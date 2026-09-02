@@ -38,3 +38,4 @@ uv.lock
 
 # Vercel
 .vercel
+.env*
