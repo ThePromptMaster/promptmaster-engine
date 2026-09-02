@@ -26,13 +26,15 @@ export function SummaryPhase() {
   const sessionSaved = useSessionStore((s) => s.sessionSaved);
   const setSessionSaved = useSessionStore((s) => s.setSessionSaved);
   const sessionFacts = useSessionStore((s) => s.sessionFacts);
+  const sessionId = useSessionStore((s) => s.sessionId);
+  const longForm = useSessionStore((s) => s.longForm);
 
   const { user } = useAuth();
 
   useEffect(() => {
     if (user && !sessionSaved && iterations.length > 0) {
       const session: Session = {
-        session_id: crypto.randomUUID().slice(0, 8),
+        session_id: sessionId ?? crypto.randomUUID().replace(/-/g, '').slice(0, 8),
         created_at: new Date().toISOString(),
         objective,
         audience,
@@ -42,6 +44,7 @@ export function SummaryPhase() {
         model,
         iterations,
         finalized: true,
+        long_form: longForm,
       };
       saveSession(session, user.id).catch(() => {});
       recordUsage('session_finalize').catch(() => {});

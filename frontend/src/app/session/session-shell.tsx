@@ -7,9 +7,12 @@ import { TutorialProvider } from '@/components/tutorial/tutorial-provider';
 import { ChatPanel } from '@/components/chat/chat-panel';
 import { ChatPanelToggle } from '@/components/chat/chat-panel-toggle';
 import { useSessionStore } from '@/stores/session-store';
+import { useSessionAutosave } from '@/lib/persistence/use-session-autosave';
 
 export function SessionShell({ children }: { children: React.ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useSessionAutosave();
 
   const phase = useSessionStore((s) => s.phase);
   const chatPanelOpen = useSessionStore((s) => s.chatPanelOpen);

@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useSessionStore } from '@/stores/session-store';
+import { flushSession } from '@/lib/persistence/session-snapshot';
 import type { User } from '@supabase/supabase-js';
 
 export function useAuth() {
@@ -58,6 +59,16 @@ export function useAuth() {
   }, [supabase]);
 
   const signOut = useCallback(async () => {
+    // Flush before signing out — once the session is gone, RLS blocks the write
+    // and any unsaved iterations are lost with the sessionStorage clear below.
+    const { data: { user: current } } = await supabase.auth.getUser();
+    if (current) {
+      try {
+        await flushSession(current.id);
+      } catch {
+        // Never block sign-out on a failed save.
+      }
+    }
     await supabase.auth.signOut();
     setUser(null);
     useSessionStore.getState().resetSession();
