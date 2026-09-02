@@ -1,6 +1,6 @@
 """Engine endpoints: prompt building, iteration, realignment, audit."""
 
-import asyncio
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from promptmaster.schemas import PMInput, AssembledPrompt, EvaluationResult
@@ -11,11 +11,8 @@ from promptmaster.engine import (
     generate_hard_reset_lessons,
     run_self_audit,
 )
-from promptmaster.evaluator import evaluate_output
 from promptmaster.schemas import Iteration
 from promptmaster.realigner import build_realignment_prompt
-from promptmaster.guidance import generate_suggestions
-from promptmaster.summaries import generate_summary
 from promptmaster.session_context import _label_trigger
 from promptmaster.flow_triggers import (
     build_flow_trigger_prompt,
@@ -27,8 +24,13 @@ from promptmaster.flow_triggers import (
     FlowInspectType,
 )
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError
-from routers._pipeline import force_incomplete_on_length
+from routers._pipeline import build_iteration_with_full_pipeline
 from deps import get_client
+
+# Triggers that produce commentary *about* the previous answer rather than a
+# replacement for it. They are returned unevaluated: scoring a critique against
+# the original objective would be meaningless.
+DIAGNOSTIC_TRIGGERS = ("challenge", "self_audit", "reframe")
 
 router = APIRouter(prefix="/api", tags=["engine"])
 
@@ -133,55 +135,21 @@ async def api_run_iteration(
             model=model,
         )
 
-        iteration_draft = Iteration(
-            iteration_number=req.iteration_number,
-            prompt_sent=req.prompt_text,
-            system_prompt_used=req.system_text,
-            output=output,
-            mode=req.inputs.mode,
-            evaluation=None,
-            trigger_source=req.source,
-        )
-
-        eval_task = evaluate_output(client, req.inputs, output, iterations=history, model=model)
-        suggestions_task = generate_suggestions(
+        iteration, suggestions = await build_iteration_with_full_pipeline(
             client=client,
+            model=model,
             inputs=req.inputs,
             output=output,
-            iterations=history,
-            model=model,
-        )
-
-        if history and len(history) > 0:
-            prev = history[-1]
-            summary_task = generate_summary(
-                client=client,
-                model=model,
-                inputs=req.inputs,
-                prev_iter=prev,
-                new_iter=iteration_draft,
-                chat_history=[],
-                user_action=_label_trigger(req.source),
-            )
-            evaluation, suggestions, summary = await asyncio.gather(
-                eval_task, suggestions_task, summary_task
-            )
-        else:
-            evaluation, suggestions = await asyncio.gather(eval_task, suggestions_task)
-            summary = None
-
-        # Pre-filter: force incomplete if model hit max_tokens
-        evaluation = force_incomplete_on_length(evaluation, finish_reason)
-
-        iteration = Iteration(
             iteration_number=req.iteration_number,
-            prompt_sent=req.prompt_text,
-            system_prompt_used=req.system_text,
-            output=output,
-            mode=req.inputs.mode,
-            evaluation=evaluation,
+            system_text=req.system_text,
+            prompt_text=req.prompt_text,
             trigger_source=req.source,
-            summary=summary,
+            # None on the first iteration — nothing to summarise a change against.
+            active_iteration=history[-1] if history else None,
+            chat_history=[],
+            iteration_history=history,
+            user_action_label=_label_trigger(req.source),
+            finish_reason=finish_reason,
         )
 
         return RunIterationResponse(iteration=iteration, suggestions=suggestions)
@@ -198,6 +166,10 @@ async def api_flow_trigger(
 
     Builds a pre-configured prompt from the book's Ch1 S13-S14 techniques,
     then runs the full pipeline: generate -> (evaluate || suggestions || summary).
+
+    Diagnostic triggers are the exception: they produce commentary about the
+    previous answer rather than a replacement for it, so they are returned
+    unevaluated and without suggestions.
     """
     try:
         model = req.model or None
@@ -217,9 +189,7 @@ async def api_flow_trigger(
             model=model,
         )
 
-        is_diagnostic = req.trigger in ("challenge", "self_audit", "reframe")
-
-        if is_diagnostic:
+        if req.trigger in DIAGNOSTIC_TRIGGERS:
             iteration = Iteration(
                 iteration_number=req.iteration_number,
                 prompt_sent=prompt_text,
@@ -228,58 +198,27 @@ async def api_flow_trigger(
                 mode=req.inputs.mode,
                 evaluation=None,
                 trigger_source=req.trigger,
+                created_at=datetime.now(timezone.utc).isoformat(),
+                model_used=model or "",
+                instruction=_label_trigger(req.trigger),
             )
             return RunIterationResponse(iteration=iteration, suggestions=[])
 
-        iteration_draft = Iteration(
-            iteration_number=req.iteration_number,
-            prompt_sent=prompt_text,
-            system_prompt_used=system_text,
-            output=output,
-            mode=req.inputs.mode,
-            evaluation=None,
-            trigger_source=req.trigger,
-        )
-
-        eval_task = evaluate_output(client, req.inputs, output, iterations=history, model=model)
-        suggestions_task = generate_suggestions(
+        iteration, suggestions = await build_iteration_with_full_pipeline(
             client=client,
+            model=model,
             inputs=req.inputs,
             output=output,
-            iterations=history,
-            model=model,
-        )
-
-        if history and len(history) > 0:
-            prev = history[-1]
-            summary_task = generate_summary(
-                client=client,
-                model=model,
-                inputs=req.inputs,
-                prev_iter=prev,
-                new_iter=iteration_draft,
-                chat_history=[],
-                user_action=_label_trigger(req.trigger),
-            )
-            evaluation, suggestions, summary = await asyncio.gather(
-                eval_task, suggestions_task, summary_task
-            )
-        else:
-            evaluation, suggestions = await asyncio.gather(eval_task, suggestions_task)
-            summary = None
-
-        # Pre-filter: force incomplete if model hit max_tokens
-        evaluation = force_incomplete_on_length(evaluation, finish_reason)
-
-        iteration = Iteration(
             iteration_number=req.iteration_number,
-            prompt_sent=prompt_text,
-            system_prompt_used=system_text,
-            output=output,
-            mode=req.inputs.mode,
-            evaluation=evaluation,
+            system_text=system_text,
+            prompt_text=prompt_text,
             trigger_source=req.trigger,
-            summary=summary,
+            active_iteration=history[-1] if history else None,
+            chat_history=[],
+            iteration_history=history,
+            user_action_label=_label_trigger(req.trigger),
+            finish_reason=finish_reason,
+            instruction=_label_trigger(req.trigger),
         )
 
         return RunIterationResponse(iteration=iteration, suggestions=suggestions)

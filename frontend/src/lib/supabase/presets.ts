@@ -44,6 +44,9 @@ export async function addPreset(
   return data as UserPreset;
 }
 
+// Unwired: no caller. Only removeLocalPreset is hooked up, so a signed-in user
+// can add a preset but cannot delete it from Supabase. Kept — the fix is to wire
+// this in, not to delete it.
 export async function deletePreset(id: string): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase

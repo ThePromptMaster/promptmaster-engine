@@ -106,6 +106,18 @@ class Iteration(BaseModel):
         default=None,
         description="Snapshot used to build this iteration's continuation prompt. Set on continuation iterations only.",
     )
+    created_at: str = Field(
+        default="",
+        description="ISO-8601 UTC timestamp of when this version was produced (FR-10).",
+    )
+    model_used: str = Field(
+        default="",
+        description="Model that produced this version. Per-version, unlike Session.model (FR-10).",
+    )
+    instruction: str = Field(
+        default="",
+        description="The instruction or recommendation that produced this version, if any (FR-10).",
+    )
 
 
 class PromptTemplate(BaseModel):

@@ -25,6 +25,10 @@ export async function loadTemplate(templateId: string): Promise<PromptTemplate |
   return data.data as PromptTemplate;
 }
 
+// Unwired: no caller. Template *creation* was never built — the UI only lists,
+// loads and deletes. Kept because it is the write-half of a live feature, not
+// dead code. NOTE: the live schema has no UPDATE policy on templates, so this
+// upsert would fail under RLS on conflict; add the policy when wiring it up.
 export async function saveTemplate(template: PromptTemplate, userId: string): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase
