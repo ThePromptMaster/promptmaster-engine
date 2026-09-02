@@ -25,17 +25,84 @@ import type {
   GenerateSectionResponse,
   OutlineSection,
 } from '@/types';
+import { createClient } from '@/lib/supabase/client';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+/** An API failure that carries the HTTP status, so callers can branch on 401. */
+export class ApiError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+/**
+ * getSession() reads the locally cached session; getUser() would make a network
+ * round-trip to Supabase on every one of the ~20 API methods. supabase-js
+ * refreshes in the background, so the cached token is normally fresh.
+ */
+async function authHeader(): Promise<Record<string, string>> {
+  try {
+    const { data } = await createClient().auth.getSession();
+    const token = data.session?.access_token;
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  } catch {
+    // Never block a request on an auth-layer failure; the backend decides.
+    return {};
+  }
+}
+
+/**
+ * Single-flight refresh. Without this, twenty parallel calls that all 401 fire
+ * twenty refreshes and race each other into a revoked-refresh-token loop.
+ */
+let refreshInFlight: Promise<boolean> | null = null;
+
+async function doRefresh(): Promise<boolean> {
+  try {
+    const { data, error } = await createClient().auth.refreshSession();
+    return Boolean(data.session) && !error;
+  } catch {
+    return false;
+  }
+}
+
+function refreshSessionOnce(): Promise<boolean> {
+  if (!refreshInFlight) {
+    const pending = doRefresh().finally(() => {
+      refreshInFlight = null;
+    });
+    refreshInFlight = pending;
+    return pending;
+  }
+  return refreshInFlight;
+}
+
+async function rawFetch(path: string, options?: RequestInit): Promise<Response> {
+  return fetch(`${API_URL}${path}`, {
     ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(await authHeader()),
+      ...options?.headers,
+    },
   });
+}
+
+async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+  let res = await rawFetch(path, options);
+
+  // An expired token is the common case and is silently recoverable; retry once.
+  if (res.status === 401 && (await refreshSessionOnce())) {
+    res = await rawFetch(path, options);
+  }
+
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(error.detail || `API error: ${res.status}`);
+    const body = await res.json().catch(() => ({ detail: res.statusText }));
+    const detail =
+      typeof body?.detail === 'string' ? body.detail : `API error: ${res.status}`;
+    throw new ApiError(detail, res.status);
   }
   return res.json();
 }

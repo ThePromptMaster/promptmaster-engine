@@ -60,3 +60,25 @@ def mock_client() -> AsyncMock:
 def llm_replies() -> dict[str, Any]:
     """Helper for tests that need to control multiple sequential LLM responses."""
     return {"queue": []}
+
+
+TEST_USER_ID = "00000000-0000-0000-0000-000000000001"
+
+
+@pytest.fixture(autouse=True)
+def auth_bypass():
+    """Treat every test request as authenticated.
+
+    Auth is wired at router-include level in main.py, so overriding the single
+    require_user dependency covers every protected endpoint at once — which is
+    why adding authentication needed no edits to any existing test body. Tests
+    that exercise the auth logic itself pop this override.
+    """
+    from main import app
+    from auth import AuthUser, require_user
+
+    app.dependency_overrides[require_user] = lambda: AuthUser(
+        id=TEST_USER_ID, email="test@example.com", role="authenticated"
+    )
+    yield
+    app.dependency_overrides.pop(require_user, None)

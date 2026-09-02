@@ -34,7 +34,9 @@ Backend deps live in a pyenv 3.12.4 environment on this machine; if `pytest` res
 - `frontend/` — Next.js 16 (App Router) on Vercel
 - `backend/` — FastAPI on Vercel (`@vercel/python`, `vercel.json` routes everything to `main.py`); `Dockerfile` exists for container hosting
 
-**The load-bearing invariant:** the backend is a *stateless LLM proxy*. Its only secrets are `OPENROUTER_API_KEY` and `ALLOWED_ORIGINS`. It has no database, no auth, no user identity — every request carries the state it needs (inputs, iteration history, chat history). All persistence and auth happen in the frontend via the Supabase JS SDK under RLS. Do not add a Supabase client, session store, or auth check to the backend.
+**The load-bearing invariant:** the backend is a *stateless but authenticated* LLM proxy. It **owns no user data** — no Supabase data client, no persistence, no session store; every request carries the state it needs (inputs, iteration history, chat history). All persistence happens in the frontend via the Supabase JS SDK under RLS. **Do not add a Supabase data client or session store to the backend.**
+
+It does verify identity. `backend/auth.py` checks the Supabase JWT and attaches a `user_id`; `main.py` applies `require_user` at router-include time so a new router cannot ship unprotected by omission. This superseded the original "no auth check" rule on 2026-09-02: every `/api/*` route had been public and billable against the OpenRouter key, and FR-17/FR-18 require an authenticated API and per-user cost controls. `/api/health` and `/api/modes` stay public; `/api/models` is protected because it calls OpenRouter.
 
 **Where state actually lives:**
 - Zustand store (`frontend/src/stores/session-store.ts`, ~450 lines) is the single source of truth for a live session, persisted to **sessionStorage** (survives refresh, clears on tab close) with `error`/`loading` stripped via `partialize`.
@@ -55,7 +57,7 @@ Backend deps live in a pyenv 3.12.4 environment on this machine; if `pytest` res
 | `setup.py` | `generate-setup` |
 | `audit.py` | `audit-findings`, `apply-audit` |
 
-`routers/_pipeline.py` — `build_iteration_with_full_pipeline()` is the shared "produce a new Iteration" path: it fans out eval + suggestions + summary in parallel via `asyncio` and assembles the `Iteration`. Any new endpoint that creates an iteration should call it rather than re-implementing the fan-out. It also enforces `finish_reason == "length"` → `completeness = incomplete`, overriding whatever the evaluator LLM said.
+`routers/_pipeline.py` — `build_iteration_with_full_pipeline()` is **the** "produce a new Iteration" path, used by every iteration-creating endpoint. It fans out eval + suggestions + summary in parallel via `asyncio`, stamps the FR-10 provenance fields (`created_at`, `model_used`, `instruction`), and enforces `finish_reason == "length"` → `completeness = incomplete`, overriding whatever the evaluator LLM said. Pass `active_iteration=None` for a first iteration: there is nothing to summarise a change against, so the summary call is skipped. Never re-implement the fan-out — until 2026-09-02 `engine.py` had its own inlined copy twice, which made every new `Iteration` field a three-site change.
 
 `promptmaster/` modules: `prompt_builder` (assembly), `modes` (persona scaffolding), `evaluator`, `guidance` (suggestions), `realigner`, `flow_triggers` (one-click techniques), `conversation`, `continuity` (snapshot compression for continuation — generated lazily, only on user action), `long_form`, `setup_suggester`, `audit_findings`, `session_context` (formats history into prompts), `summaries`, `schemas` (Pydantic; frontend `src/types/index.ts` mirrors it), `llm_client`.
 
@@ -66,7 +68,8 @@ Backend deps live in a pyenv 3.12.4 environment on this machine; if `pytest` res
 - `src/app/session/page.tsx` — phase router: renders one of five phase components off `store.phase`, wrapped in `ErrorBoundary`
 - `src/app/session/session-shell.tsx` — sidebar + top nav + content well
 - `src/components/phases/` — `input`, `review`, `output`, `realign`, `summary`
-- `src/components/` also: `chat/`, `long-form/`, `evaluation/`, `persona/`, `sidebar/`, `tutorial/`, `shared/`, `ui/`
+- `src/components/` also: `chat/`, `long-form/`, `evaluation/`, `input/`, `output/`, `persona/`, `sidebar/`, `tutorial/`, `shared/`, `ui/`
+- The live 5-phase UI is `layout/top-nav.tsx` (`PHASE_TABS`) and `layout/sidebar.tsx` (`PHASE_LABELS`) — there is no phase-indicator component
 - `src/lib/api/client.ts` — the `api` object; every backend call goes through `apiFetch`, which unwraps FastAPI's `detail` into an `Error`. Frontend never talks to an LLM directly.
 - `src/lib/supabase/` — one module per table: `sessions`, `templates`, `usage`, `custom-modes`, `conversation` (`conversation_messages`), `presets` (`user_presets`)
 - `src/lib/constants.ts` — `MODE_DISPLAY`, `PROMPT_STACKS`, `CONSTRAINT_PRESETS`, `FORMAT_PRESETS`, `AUDIENCE_OPTIONS`, `DEFAULT_MODEL`
