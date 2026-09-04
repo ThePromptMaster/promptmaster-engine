@@ -142,15 +142,26 @@ export interface WorkflowState {
   stages: Record<string, StageState>;
 }
 
+/**
+ * Must stay in step with the workflow_events type CHECK constraint. A value
+ * the database rejects fails at insert time, which is the worst place to find
+ * out — see the seed-drift guard for the same problem solved for templates.
+ */
 export type WorkflowEventType =
+  | 'project_created'
   | 'stage_entered'
   | 'stage_completed'
   | 'stage_skipped'
   | 'stage_returned'
   | 'outline_approved'
+  | 'outline_version_created'
   | 'section_written'
+  | 'section_regenerated'
   | 'job_enqueued'
-  | 'job_failed';
+  | 'job_failed'
+  | 'generation_paused'
+  | 'generation_resumed'
+  | 'imported_from_session';
 
 export interface WorkflowEvent {
   type: WorkflowEventType;
