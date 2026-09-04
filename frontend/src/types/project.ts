@@ -34,8 +34,12 @@ export interface Project {
   format_presets: string[];
 
   workflow: string;
+  /** Pins the exact template version this project started on. */
+  workflow_template_id: string | null;
   stage: string;
   status: ProjectStatus;
+  /** User-ticked exit criteria, keyed by criterion id. */
+  manual_checks: Record<string, boolean>;
 
   /** Bumped by a database trigger on every update; the FR-21 concurrency guard. */
   revision: number;
@@ -166,6 +170,7 @@ export type ProjectPatch = Partial<
     | 'workflow'
     | 'stage'
     | 'status'
+    | 'manual_checks'
   >
 >;
 

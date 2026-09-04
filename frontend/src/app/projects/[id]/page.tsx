@@ -1,11 +1,14 @@
 'use client';
 
-import { use, useEffect } from 'react';
+import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
 
 import { useProjectStore } from '@/stores/project-store';
 import { useProjectFlush } from '@/lib/persistence/use-project-flush';
 import { MarkdownOutput } from '@/components/shared/markdown-output';
+import { WorkflowWorkspace } from '@/components/workflow/workflow-workspace';
+import { getLatestTemplate, getTemplateById } from '@/lib/supabase/workflow';
+import type { WorkflowTemplate } from '@/lib/workflow/types';
 
 const SAVE_LABEL: Record<string, string> = {
   idle: '',
@@ -34,17 +37,35 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const restoreVersion = useProjectStore((s) => s.restoreVersion);
   const resolveConflict = useProjectStore((s) => s.resolveConflict);
 
+  const [template, setTemplate] = useState<WorkflowTemplate | null>(null);
+
   useProjectFlush();
 
   useEffect(() => {
     void loadProject(id);
   }, [id, loadProject]);
 
+  useEffect(() => {
+    if (!project) return;
+    // Pinned version first; fall back to the latest published one for a project
+    // created before templates existed.
+    const load = project.workflow_template_id
+      ? getTemplateById(project.workflow_template_id)
+      : getLatestTemplate(project.workflow);
+    load.then(setTemplate).catch(() => setTemplate(null));
+  }, [project]);
+
   const active = versions.find((v) => v.id === activeVersionId) ?? versions.at(-1) ?? null;
   const evaluation = active ? evaluations[active.id] : undefined;
   const isHead = active?.id === artifact?.current_version_id;
 
-  if (loading) return <main className="mx-auto max-w-[900px] px-6 py-16 text-sm text-[var(--on-surface-variant)]">Loading…</main>;
+  if (loading) {
+    return (
+      <main className="mx-auto max-w-[900px] px-6 py-16 text-sm text-[var(--on-surface-variant)]">
+        Loading…
+      </main>
+    );
+  }
 
   if (error && !project) {
     return (
@@ -59,33 +80,11 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
   if (!project) return null;
 
-  return (
-    <main className="mx-auto max-w-[900px] px-6 py-12">
-      <Link
-        href="/projects"
-        className="mb-8 inline-flex items-center gap-1 text-sm text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
-      >
-        <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-        Projects
-      </Link>
-
-      <div className="mb-2 flex items-baseline justify-between gap-4">
-        <input
-          value={project.title}
-          onChange={(e) => patchProject({ title: e.target.value })}
-          aria-label="Project title"
-          className="min-w-0 flex-1 bg-transparent text-[2.25rem] leading-tight tracking-tight text-[var(--on-surface)] outline-none"
-        />
-        <span className="shrink-0 text-xs text-[var(--on-surface-variant)]">
-          {SAVE_LABEL[saveState]}
-        </span>
-      </div>
-
+  const artifactPane = (
+    <>
       {conflict && (
-        <div className="mb-6 rounded-lg bg-[var(--surface-container-high)] px-4 py-3 text-sm">
-          <p className="text-[var(--on-surface)]">
-            This project was changed in another tab.
-          </p>
+        <div className="mb-6 rounded-xl bg-[var(--surface-container-high)] px-5 py-4 text-sm">
+          <p className="text-[var(--on-surface)]">This project was changed in another tab.</p>
           <div className="mt-3 flex gap-2">
             <button
               onClick={() => void resolveConflict('reload')}
@@ -108,13 +107,13 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         onChange={(e) => patchProject({ objective: e.target.value })}
         aria-label="Objective"
         rows={2}
-        className="mb-10 w-full resize-none bg-transparent text-[var(--on-surface-variant)] outline-none"
         placeholder="What are you trying to produce?"
+        className="mb-8 w-full resize-none bg-transparent text-[var(--on-surface-variant)] outline-none"
       />
 
       {versions.length === 0 ? (
         <div className="rounded-xl bg-[var(--surface-container-low)] px-8 py-14 text-center text-sm text-[var(--on-surface-variant)]">
-          No versions yet.
+          Nothing generated in this project yet.
         </div>
       ) : (
         <>
@@ -123,6 +122,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
               <button
                 key={v.id}
                 onClick={() => setActiveVersion(v.id)}
+                title={v.change_summary ?? v.source_operation}
                 className={`rounded-lg px-3 py-2 text-xs transition-colors ${
                   v.id === active?.id
                     ? 'bg-[var(--pm-primary)] text-[var(--on-primary)]'
@@ -147,7 +147,12 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
             <article className="rounded-xl bg-[var(--surface-container-lowest)] px-8 py-7">
               <div className="mb-4 flex flex-wrap items-center gap-3 text-xs text-[var(--on-surface-variant)]">
                 <span>{active.source_operation}</span>
-                {active.model && <><span aria-hidden>·</span><span>{active.model}</span></>}
+                {active.model && (
+                  <>
+                    <span aria-hidden>·</span>
+                    <span>{active.model}</span>
+                  </>
+                )}
                 {evaluation && (
                   <>
                     <span aria-hidden>·</span>
@@ -167,6 +172,65 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           )}
         </>
       )}
-    </main>
+    </>
+  );
+
+  const header = (
+    <div className="mb-2 flex items-baseline justify-between gap-4">
+      <input
+        value={project.title}
+        onChange={(e) => patchProject({ title: e.target.value })}
+        aria-label="Project title"
+        className="min-w-0 flex-1 bg-transparent text-[1.5rem] leading-tight tracking-tight text-[var(--on-surface)] outline-none"
+      />
+      <span className="shrink-0 text-xs text-[var(--on-surface-variant)]">
+        {SAVE_LABEL[saveState]}
+      </span>
+    </div>
+  );
+
+  // A project whose template is missing still renders its work — a workflow is
+  // a way of organising the project, not a precondition for reading it.
+  if (!template) {
+    return (
+      <main className="mx-auto max-w-[900px] px-6 py-12">
+        <Link
+          href="/projects"
+          className="mb-8 inline-flex items-center gap-1 text-sm text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
+        >
+          <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+          Projects
+        </Link>
+        {header}
+        {artifactPane}
+      </main>
+    );
+  }
+
+  return (
+    <div>
+      <div className="border-0 bg-[var(--surface-container-lowest)] px-6 py-4 md:px-10">
+        <div className="mx-auto flex max-w-[1200px] items-center gap-4">
+          <Link
+            href="/projects"
+            aria-label="Back to projects"
+            className="shrink-0 text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
+          >
+            <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+          </Link>
+          <div className="min-w-0 flex-1">{header}</div>
+        </div>
+      </div>
+
+      <WorkflowWorkspace
+        project={project}
+        artifact={artifact}
+        versions={versions}
+        template={template}
+        onPatchProject={patchProject}
+      >
+        {artifactPane}
+      </WorkflowWorkspace>
+    </div>
   );
 }

@@ -31,7 +31,8 @@ function project(overrides: Partial<Project> = {}): Project {
     constraints: '', output_format: '', mode: 'architect', custom_name: '',
     custom_preamble: '', custom_tone: '', model: '', session_facts: [],
     active_stack_id: null, constraint_presets: [], format_presets: [],
-    workflow: 'single_output', stage: 'input', status: 'active', revision: 3,
+    workflow: 'single_output', workflow_template_id: null, stage: 'input',
+    status: 'active', manual_checks: {}, revision: 3,
     archived_at: null, deleted_at: null, legacy_session_id: null,
     created_at: '', updated_at: '', ...overrides,
   };

@@ -14,7 +14,7 @@ const FULL_COLUMNS = `
   id, user_id, title, objective, audience, constraints, output_format,
   mode, custom_name, custom_preamble, custom_tone,
   model, session_facts, active_stack_id, constraint_presets, format_presets,
-  workflow, stage, status, revision,
+  workflow, workflow_template_id, stage, status, manual_checks, revision,
   archived_at, deleted_at, legacy_session_id, created_at, updated_at
 `;
 
