@@ -193,6 +193,10 @@ export function WorkflowWorkspace({
             stage={stage}
             status={state.stages[stage.id]?.status ?? 'not_started'}
             skippedReason={state.stages[stage.id]?.skipped_reason}
+            position={{
+              index: template.stages.findIndex((s) => s.id === stage.id) + 1,
+              total: template.stages.length,
+            }}
           />
 
           <div className="mb-8">{children}</div>

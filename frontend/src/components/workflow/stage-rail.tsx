@@ -70,8 +70,8 @@ export function StageRail({ template, state, nextSuggestedId, onSelect }: Props)
   return (
     <nav aria-label="Workflow stages" className="py-2">
       {groups.map((group, gi) => (
-        <div key={`${group.group}-${gi}`} className="mb-5">
-          <div className="mb-2 px-3 text-[11px] font-medium uppercase tracking-wider text-[var(--on-surface-variant)]">
+        <div key={`${group.group}-${gi}`} className="mb-3 last:mb-0">
+          <div className="mb-1 px-3 text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--on-surface-variant)] opacity-70">
             {GROUP_LABEL[group.group]}
           </div>
 
