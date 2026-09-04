@@ -33,10 +33,20 @@
 
 do $$
 declare
+  n_candidates bigint;
   n_linked bigint;
   n_versioned bigint;
   n_remaining bigint;
 begin
+  select count(*) into n_candidates
+  from public.conversation_messages cm
+  where cm.project_id is null
+    and (cm.session_id, cm.user_id) in (
+      ('755cc043', 'a7526944-26eb-4cb3-b95c-5b8455ee3e4c'::uuid),
+      ('c7f18bf6', 'a7526944-26eb-4cb3-b95c-5b8455ee3e4c'::uuid),
+      ('cafdaf50', 'a7526944-26eb-4cb3-b95c-5b8455ee3e4c'::uuid)
+    );
+
   with mapping(session_id, user_id, project_id) as (values
     ('755cc043', 'a7526944-26eb-4cb3-b95c-5b8455ee3e4c'::uuid, 'c8f13598-d350-4e7d-bb54-596932905413'::uuid),
     ('c7f18bf6', 'a7526944-26eb-4cb3-b95c-5b8455ee3e4c'::uuid, '748f99ab-40e2-4e7e-bb8a-88d307c793af'::uuid),
@@ -75,7 +85,14 @@ begin
   raise notice 'chat reattachment: % messages linked, % given a version, % still detached',
     n_linked, n_versioned, n_remaining;
 
-  if n_linked <> 18 then
-    raise exception 'Expected to link 18 messages (14 + 2 + 2), linked % — aborting', n_linked;
+  -- Assert against what was actually present to link. The first version
+  -- hardcoded 18 and aborted on any other count, so the migration could not run
+  -- against an empty database — which broke shadow validation and would have
+  -- broken provisioning any fresh environment. Guarding on the candidate count
+  -- keeps the safety (a partial link still aborts) without assuming
+  -- production's data.
+  if n_candidates > 0 and n_linked <> n_candidates then
+    raise exception
+      'Expected to link % messages, linked % — aborting', n_candidates, n_linked;
   end if;
 end $$;
