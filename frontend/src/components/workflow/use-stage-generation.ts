@@ -183,18 +183,18 @@ export function useStageGeneration({
     if (stage.renderer === 'outline' || stage.renderer === 'long_form') return;
     if (attempted.current.has(stage.id)) return;
 
+    // Safe to read as authoritative: loadProject sets the project and every
+    // stage bundle in one update, and the page renders nothing until it has,
+    // so an absent bundle here means the stage genuinely has no artifact
+    // rather than that its versions have not arrived.
     const bundle = bundles[stage.id];
-    // Wait until the project's artifacts have loaded before concluding a stage
-    // is empty; drafting over a stage whose versions had not arrived yet would
-    // fork its history.
-    if (bundle === undefined && Object.keys(bundles).length === 0 && !project.id) return;
     if ((bundle?.versions.at(-1)?.content ?? '').trim()) {
       attempted.current.add(stage.id);
       return;
     }
 
     void generate(stage);
-  }, [enabled, stage, bundles, project.id, generate]);
+  }, [enabled, stage, bundles, generate]);
 
   const regenerate = useCallback(
     (options?: { force?: boolean }) => {
