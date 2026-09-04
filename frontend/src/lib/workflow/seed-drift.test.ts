@@ -28,7 +28,8 @@ function latestSeedSql(): string {
 
 /** Pull each `'{...}'::jsonb` literal back out of the generated SQL. */
 function seededDefinitions(sql: string): Record<string, unknown>[] {
-  return [...sql.matchAll(/'(\{"outline_stage".*?\})'::jsonb/gs)].map((m) =>
+  // [\s\S] rather than the `s` flag: the app targets ES2017.
+  return [...sql.matchAll(/'(\{"outline_stage"[\s\S]*?\})'::jsonb/g)].map((m) =>
     JSON.parse(m[1].replace(/''/g, "'"))
   );
 }
