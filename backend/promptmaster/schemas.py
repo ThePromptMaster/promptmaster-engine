@@ -232,3 +232,80 @@ class SetupSuggestion(BaseModel):
     constraints: str
     output_format: str
     rationale: SetupRationale = Field(default_factory=SetupRationale)
+
+
+# --------------------------------------------------------------------------
+# Stage artifacts — the declarative workflow's generation contract
+# --------------------------------------------------------------------------
+#
+# A Book project has thirteen stages, each producing its own artifact. The
+# backend stays stateless: it is told which stage it is generating for and what
+# the upstream stages already concluded, and never reads a database.
+
+
+class StageDigestEntry(BaseModel):
+    """One completed upstream stage, projected down to a few lines.
+
+    Deliberately a summary rather than the artifact itself. A thirteen-stage
+    book would otherwise ship the whole manuscript in order to generate a claim
+    table — unbounded growth that also buries the instruction that matters.
+    """
+    stage_id: str = Field(..., description="The stage this came from.")
+    label: str = Field(default="", description="Human label, used verbatim in the prompt.")
+    summary: str = Field(default="", description="A few lines. Not the artifact.")
+
+
+class StageDigest(BaseModel):
+    """Everything a stage is allowed to know about the work before it.
+
+    Assembled by the client, because the client already holds the project. The
+    objective is carried in full — it is short, and every stage is judged
+    against it — while prior stages are carried as summaries.
+    """
+    objective: str = Field(default="", description="Full text; never summarised.")
+    audience: str = Field(default="")
+    prior_stages: list["StageDigestEntry"] = Field(default_factory=list)
+
+
+class StageItemField(BaseModel):
+    """One field of a list stage's item."""
+    key: str = Field(..., description="Object key in the emitted JSON.")
+    label: str = Field(default="", description="What this field means, told to the model.")
+    hint: str = Field(default="", description="Optional extra instruction for this field.")
+
+
+class StageItemSchema(BaseModel):
+    """The shape of one item in a list stage.
+
+    Sent by the client rather than hard-coded here, so that an Audience stage
+    emitting {who, prior_knowledge, what_they_want} and a fact-check stage
+    emitting {claim, source, status} run through this one endpoint with no
+    server-side knowledge of either workflow.
+    """
+    item_label: str = Field(default="item", description="Singular noun, e.g. 'audience segment'.")
+    fields: list[StageItemField] = Field(default_factory=list)
+    min_items: int = Field(default=3)
+    max_items: int = Field(default=8)
+
+
+class StageDescriptor(BaseModel):
+    """The stage being generated for, lifted straight from the template."""
+    id: str
+    label: str = Field(default="")
+    renderer: Literal["prose", "list", "outline", "long_form", "review"] = "prose"
+    entry_prompt_hint: str = Field(default="", description="The stage's authored instruction.")
+    artifact_kind: str = Field(default="", description="Primary expected artifact kind.")
+
+
+class StageItem(BaseModel):
+    """One generated row. Extra keys are kept — the schema is client-defined."""
+    model_config = {"extra": "allow"}
+
+    id: str
+
+
+class GenerateStageArtifactResponse(BaseModel):
+    """Prose stages fill `content`; list stages fill `items`."""
+    content: str = Field(default="")
+    items: list[StageItem] = Field(default_factory=list)
+    finish_reason: str = Field(default="")
