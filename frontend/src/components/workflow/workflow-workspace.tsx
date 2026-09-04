@@ -157,7 +157,7 @@ export function WorkflowWorkspace({
 
   return (
     <div className="flex min-h-screen">
-      <aside className="hidden w-[248px] shrink-0 bg-[var(--surface-container-lowest)] px-2 py-6 md:block">
+      <aside className="sticky top-0 hidden h-screen w-[248px] shrink-0 overflow-y-auto bg-[var(--surface-container-lowest)] px-2 py-6 md:block sidebar-scroll">
         <div className="mb-4 px-3">
           <div className="text-xs uppercase tracking-wider text-[var(--on-surface-variant)]">
             {template.name}

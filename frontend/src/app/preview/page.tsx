@@ -93,7 +93,7 @@ function WorkflowSlice({ template }: { template: WorkflowTemplate }) {
 
   return (
     <div className="flex overflow-hidden rounded-2xl bg-[var(--surface)] shadow-[0_1px_2px_rgba(25,28,30,0.04),0_12px_32px_-16px_rgba(25,28,30,0.25)]">
-      <aside className="w-[248px] shrink-0 bg-[var(--surface-container-lowest)] px-2 py-6">
+      <aside className="w-[248px] shrink-0 self-start bg-[var(--surface-container-lowest)] px-2 py-6">
         <div className="mb-4 px-3">
           <div className="text-label uppercase tracking-wider text-[var(--on-surface-variant)]">
             {template.name}
@@ -121,8 +121,19 @@ function WorkflowSlice({ template }: { template: WorkflowTemplate }) {
             total: template.stages.length,
           }}
         />
-        <div className="mb-6 rounded-xl bg-[var(--surface-container-lowest)] px-6 py-10 text-center text-body text-[var(--on-surface-variant)]">
-          The stage’s artifact renderer goes here — {stage.renderer}
+        <div className="mb-6 rounded-xl bg-[var(--surface-container-lowest)] px-6 py-6">
+          <div className="mb-3 text-label uppercase tracking-wider text-[var(--on-surface-variant)] opacity-70">
+            {stage.renderer} renderer
+          </div>
+          <div className="space-y-2.5" aria-hidden>
+            {[100, 92, 96, 74, 88, 60].map((w, i) => (
+              <div
+                key={i}
+                className="h-3 rounded bg-[var(--surface-container-high)]"
+                style={{ width: `${w}%` }}
+              />
+            ))}
+          </div>
         </div>
         <div className="space-y-4">
           <ExitCriteriaChecklist

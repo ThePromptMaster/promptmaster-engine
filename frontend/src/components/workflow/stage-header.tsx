@@ -78,7 +78,7 @@ export function StageHeader({ stage, status, skippedReason, position, onPickMode
               <button
                 key={rec.mode}
                 onClick={() => onPickMode?.(rec.mode)}
-                className="max-w-[280px] rounded-xl bg-[var(--surface-container-low)] px-3.5 py-2.5 text-left transition-colors hover:bg-[var(--surface-container-high)]"
+                className="min-w-[220px] max-w-[380px] flex-1 rounded-xl bg-[var(--surface-container-low)] px-4 py-3 text-left transition-colors hover:bg-[var(--surface-container-high)]"
               >
                 <span className="block text-title text-[var(--on-surface)]">
                   {MODE_DISPLAY[rec.mode]?.display_name ?? rec.mode}
