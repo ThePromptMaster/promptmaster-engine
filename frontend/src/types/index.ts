@@ -312,3 +312,53 @@ export interface CustomModeInput {
   preamble: string;
   tone: string;
 }
+
+// --- Stage artifacts (POST /api/generate-stage-artifact) ---
+//
+// Mirrors backend/promptmaster/schemas.py. One request shape covers every
+// stage of every workflow: the difference between an Audience stage and a
+// fact-check stage is the descriptor and the item schema, both of which are
+// template data.
+
+export interface StageDigestEntry {
+  stage_id: string;
+  label: string;
+  summary: string;
+}
+
+export interface StageDigestRequest {
+  objective: string;
+  audience: string;
+  prior_stages: StageDigestEntry[];
+}
+
+export interface StageDescriptorRequest {
+  id: string;
+  label: string;
+  renderer: 'prose' | 'list' | 'outline' | 'long_form' | 'review';
+  entry_prompt_hint: string;
+  artifact_kind: string;
+}
+
+export interface StageItemSchemaRequest {
+  item_label: string;
+  fields: { key: string; label: string; hint?: string }[];
+  min_items: number;
+  max_items: number;
+}
+
+export interface GenerateStageArtifactRequest {
+  inputs: PMInput;
+  stage: StageDescriptorRequest;
+  digest: StageDigestRequest;
+  item_schema?: StageItemSchemaRequest | null;
+  existing_content?: string;
+  model?: string;
+}
+
+export interface GenerateStageArtifactResponse {
+  content: string;
+  /** Rows for list and review stages; the extra keys are schema-defined. */
+  items: Record<string, string>[];
+  finish_reason: string;
+}

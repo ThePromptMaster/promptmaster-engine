@@ -2,8 +2,8 @@ import { createClient } from './client';
 import type { Artifact, ArtifactVersion, Evaluation } from '@/types/project';
 
 const ARTIFACT_COLUMNS = `
-  id, user_id, project_id, kind, name, current_version_id, version_count,
-  long_form, revision, created_at, updated_at
+  id, user_id, project_id, kind, name, stage_id, summary, current_version_id,
+  version_count, long_form, revision, created_at, updated_at
 `;
 
 const VERSION_COLUMNS = `
@@ -38,17 +38,34 @@ export async function createArtifact(
   projectId: string,
   userId: string,
   kind: Artifact['kind'] = 'output',
-  name = 'Output'
+  name = 'Output',
+  stageId: string | null = null
 ): Promise<Artifact> {
   const supabase = createClient();
   const { data, error } = await supabase
     .from('artifacts')
-    .insert({ project_id: projectId, user_id: userId, kind, name })
+    .insert({ project_id: projectId, user_id: userId, kind, name, stage_id: stageId })
     .select(ARTIFACT_COLUMNS)
     .single();
 
   if (error || !data) throw error ?? new Error('Failed to create artifact');
   return data as unknown as Artifact;
+}
+
+/**
+ * Store what a stage concluded, so later stages can be told without being sent
+ * the artifact itself. Written when a stage completes; see digest.ts.
+ */
+export async function saveArtifactSummary(
+  artifactId: string,
+  summary: string
+): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from('artifacts')
+    .update({ summary })
+    .eq('id', artifactId);
+  if (error) throw error;
 }
 
 /** Long-form state stays a JSONB blob on the artifact; see the M1 migration. */

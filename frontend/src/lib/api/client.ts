@@ -24,6 +24,8 @@ import type {
   GenerateOutlineResponse,
   GenerateSectionResponse,
   OutlineSection,
+  GenerateStageArtifactRequest,
+  GenerateStageArtifactResponse,
 } from '@/types';
 import { createClient } from '@/lib/supabase/client';
 
@@ -241,6 +243,26 @@ export const api = {
     return apiFetch('/api/finalize-long-form', {
       method: 'POST',
       body: JSON.stringify(req),
+    });
+  },
+
+  /**
+   * Draft one stage's artifact. 1 LLM call.
+   *
+   * One method for all five renderers and both workflows — the stage
+   * descriptor and item schema carry the difference, so adding a workflow
+   * never adds a call site here.
+   */
+  async generateStageArtifact(
+    req: GenerateStageArtifactRequest,
+    signal?: AbortSignal
+  ): Promise<GenerateStageArtifactResponse> {
+    return apiFetch('/api/generate-stage-artifact', {
+      method: 'POST',
+      body: JSON.stringify(req),
+      // Drafting has to be interruptible: a user who navigates away mid-draft
+      // must not have a stale response land on the stage they moved to.
+      signal,
     });
   },
 

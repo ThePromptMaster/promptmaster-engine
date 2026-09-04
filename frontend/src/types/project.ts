@@ -71,6 +71,18 @@ export interface Artifact {
   project_id: string;
   kind: 'output' | 'long_form_document' | 'export';
   name: string;
+  /**
+   * Which stage owns this artifact. Null for the 65 imported projects, which
+   * predate stages entirely; free text with no FK because stage ids live
+   * inside a workflow template's JSONB.
+   */
+  stage_id: string | null;
+  /**
+   * A few lines projecting what this stage concluded, written when the stage
+   * completes. Feeds the digest that later stages generate against, so prompt
+   * size grows with the number of stages rather than the length of the book.
+   */
+  summary: string | null;
   current_version_id: string | null;
   version_count: number;
   long_form: LongFormState | null;

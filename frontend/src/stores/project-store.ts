@@ -14,6 +14,7 @@ import {
   listVersions,
   rateVersion as rateVersionRow,
   restoreVersion as restoreVersionRow,
+  saveArtifactSummary,
   saveEvaluation,
   type NewEvaluation,
   type NewVersion,
@@ -45,11 +46,25 @@ const DEBOUNCE_MS = 800;
 
 export type SaveState = 'idle' | 'saving' | 'saved' | 'conflict' | 'error';
 
+/** One stage's artifact and its whole version history. */
+export interface StageBundle {
+  artifact: Artifact | null;
+  versions: ArtifactVersion[];
+}
+
 interface ProjectState {
   projectId: string | null;
   project: Project | null;
   artifact: Artifact | null;
   versions: ArtifactVersion[];
+  /**
+   * Every stage's artifact, keyed by stage id.
+   *
+   * `artifact`/`versions` above remain the single-output project's pane and
+   * the legacy /session path; this map is what a thirteen-stage Book reads.
+   * Both point at the same rows — a stage bundle is not a copy.
+   */
+  stages: Record<string, StageBundle>;
   evaluations: Record<string, Evaluation>;
 
   /** Which version the UI is *displaying*. Never implies a restore. */
@@ -72,6 +87,19 @@ interface ProjectState {
 
   appendVersion: (version: NewVersion, evaluation?: NewEvaluation) => Promise<ArtifactVersion>;
   restoreVersion: (versionId: string) => Promise<void>;
+
+  /** Create this stage's artifact if it has none yet. Idempotent. */
+  ensureStageArtifact: (stageId: string, name: string) => Promise<Artifact>;
+  /** Append a version to a specific stage's artifact, creating it if needed. */
+  appendStageVersion: (
+    stageId: string,
+    name: string,
+    version: NewVersion
+  ) => Promise<ArtifactVersion>;
+  restoreStageVersion: (stageId: string, versionId: string) => Promise<void>;
+  /** Record what a stage concluded, for the digest later stages generate against. */
+  setStageSummary: (stageId: string, summary: string) => Promise<void>;
+
   rateVersion: (versionId: string, rating: 'positive' | 'negative' | null) => Promise<void>;
   setActiveVersion: (versionId: string | null) => void;
 
@@ -95,6 +123,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
   project: null,
   artifact: null,
   versions: [],
+  stages: {},
   evaluations: {},
   activeVersionId: null,
   loading: false,
@@ -115,8 +144,20 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       }
 
       const artifacts = await listArtifacts(id);
+
+      // A Book project has thirteen artifacts, not one. Load them all and index
+      // by stage; picking `kind === 'output'` could only ever describe a
+      // single-output project, which is the shape this replaces.
+      const stages: Record<string, StageBundle> = {};
+      const allVersions = await Promise.all(
+        artifacts.map(async (a) => ({ artifact: a, versions: await listVersions(a.id) }))
+      );
+      for (const bundle of allVersions) {
+        if (bundle.artifact.stage_id) stages[bundle.artifact.stage_id] = bundle;
+      }
+
       const artifact = artifacts.find((a) => a.kind === 'output') ?? artifacts[0] ?? null;
-      const versions = artifact ? await listVersions(artifact.id) : [];
+      const versions = allVersions.find((b) => b.artifact.id === artifact?.id)?.versions ?? [];
 
       const evaluations: Record<string, Evaluation> = {};
       // Only the head version's evaluation is needed to render; the rest load
@@ -131,6 +172,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         project,
         artifact,
         versions,
+        stages,
         evaluations,
         activeVersionId: head?.id ?? null,
         loading: false,
@@ -148,6 +190,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       project: null,
       artifact: null,
       versions: [],
+      stages: {},
       evaluations: {},
       activeVersionId: null,
       saveState: 'idle',
@@ -221,6 +264,87 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     }));
 
     return created;
+  },
+
+  async ensureStageArtifact(stageId, name) {
+    const { stages, project } = get();
+    const existing = stages[stageId]?.artifact;
+    if (existing) return existing;
+    if (!project) throw new Error('No project open.');
+
+    const created = await createArtifact(project.id, project.user_id, 'output', name, stageId);
+    set((s) => ({ stages: { ...s.stages, [stageId]: { artifact: created, versions: [] } } }));
+    return created;
+  },
+
+  async appendStageVersion(stageId, name, version) {
+    const artifact = await get().ensureStageArtifact(stageId, name);
+    // Read the artifact back out of the store rather than reusing the one
+    // above: version_count and revision move with every append, and a stale
+    // copy would write version 2 twice.
+    const current = get().stages[stageId]?.artifact ?? artifact;
+    const created = await appendVersionRow(current, version);
+
+    set((s) => {
+      const bundle = s.stages[stageId] ?? { artifact: current, versions: [] };
+      return {
+        stages: {
+          ...s.stages,
+          [stageId]: {
+            artifact: {
+              ...current,
+              current_version_id: created.id,
+              version_count: created.version_number,
+              revision: current.revision + 1,
+            },
+            versions: [...bundle.versions, created],
+          },
+        },
+      };
+    });
+
+    return created;
+  },
+
+  async restoreStageVersion(stageId, versionId) {
+    const bundle = get().stages[stageId];
+    const target = bundle?.versions.find((v) => v.id === versionId);
+    if (!bundle?.artifact || !target) throw new Error('Version not found.');
+
+    // Restore appends rather than mutating, so restoring is itself undoable.
+    const created = await restoreVersionRow(bundle.artifact, target);
+    set((s) => ({
+      stages: {
+        ...s.stages,
+        [stageId]: {
+          artifact: {
+            ...bundle.artifact!,
+            current_version_id: created.id,
+            version_count: created.version_number,
+            revision: bundle.artifact!.revision + 1,
+          },
+          versions: [...bundle.versions, created],
+        },
+      },
+    }));
+  },
+
+  async setStageSummary(stageId, summary) {
+    const bundle = get().stages[stageId];
+    if (!bundle?.artifact) return;
+    if ((bundle.artifact.summary ?? '') === summary) return;
+
+    await saveArtifactSummary(bundle.artifact.id, summary);
+    set((s) => {
+      const current = s.stages[stageId];
+      if (!current?.artifact) return {};
+      return {
+        stages: {
+          ...s.stages,
+          [stageId]: { ...current, artifact: { ...current.artifact, summary } },
+        },
+      };
+    });
   },
 
   async restoreVersion(versionId) {

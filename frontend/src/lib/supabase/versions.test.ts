@@ -44,6 +44,8 @@ function artifact(overrides: Partial<Artifact> = {}): Artifact {
     project_id: 'p1',
     kind: 'output',
     name: 'Output',
+    stage_id: null,
+    summary: null,
     current_version_id: 'v3',
     version_count: 3,
     long_form: null,
