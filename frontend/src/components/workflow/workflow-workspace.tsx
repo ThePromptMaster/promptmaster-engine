@@ -17,6 +17,7 @@ import {
 } from '@/lib/workflow/engine';
 import type { StageContext, WorkflowEvent, WorkflowTemplate } from '@/lib/workflow/types';
 import { appendWorkflowEvent, listWorkflowEvents } from '@/lib/supabase/workflow';
+import { approvedOutlineVersionId } from '@/lib/supabase/outline';
 import type { Artifact, ArtifactVersion, Project } from '@/types/project';
 
 interface Props {
@@ -73,14 +74,18 @@ export function WorkflowWorkspace({
       artifactNonEmpty: stage
         ? { [stage.id]: versions.length > 0 && versions.at(-1)!.content.trim().length > 0 }
         : {},
-      outlineApproved: longForm?.state === 'writing' || longForm?.state === 'complete',
+      // Approval is an event, not a mode the long-form machine happens to be
+      // in. Reading it from long_form.state was a placeholder that could only
+      // ever be true once drafting had already started — which is backwards,
+      // since drafting is what approval gates.
+      outlineApproved: approvedOutlineVersionId(events ?? []) !== null,
       sectionsTotal: outline.length,
       sectionsComplete: outline.filter((s) => s.status === 'complete').length,
       findingsTotal: 0,
       findingsTriaged: 0,
       manualChecks: project.manual_checks ?? {},
     };
-  }, [project, artifact, versions, stage]);
+  }, [project, artifact, versions, stage, events]);
 
   const evaluation = useMemo(
     () => evaluateStage(template, stageId, context),
