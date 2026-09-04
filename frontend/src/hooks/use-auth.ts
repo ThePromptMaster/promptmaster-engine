@@ -58,6 +58,35 @@ export function useAuth() {
     if (error) throw error;
   }, [supabase]);
 
+  /**
+   * Start using the app without an account.
+   *
+   * Supabase issues a real auth.users row for an anonymous user, so RLS, row
+   * ownership and every foreign key work unchanged — the only difference is
+   * that the identity has no email attached yet. supabase-js keeps the session
+   * in browser storage, so the work survives reloads on this browser.
+   *
+   * Requires the project's anonymous provider to be enabled; the caller gets a
+   * recognisable error if it is not.
+   */
+  const continueAsGuest = useCallback(async () => {
+    const { error } = await supabase.auth.signInAnonymously();
+    if (error) throw error;
+  }, [supabase]);
+
+  /**
+   * Turn the current anonymous account into a permanent one, keeping every
+   * project already created. Supabase updates the existing user in place
+   * rather than creating a second one, so nothing has to be migrated.
+   */
+  const createAccountFromGuest = useCallback(
+    async (email: string, password: string) => {
+      const { error } = await supabase.auth.updateUser({ email, password });
+      if (error) throw error;
+    },
+    [supabase]
+  );
+
   const signOut = useCallback(async () => {
     // Flush before signing out — once the session is gone, RLS blocks the write
     // and any unsaved iterations are lost with the sessionStorage clear below.
@@ -77,5 +106,18 @@ export function useAuth() {
     }
   }, [supabase]);
 
-  return { user, loading, signIn, signUp, signInWithGoogle, signOut };
+  // Supabase marks guest identities with is_anonymous on the JWT.
+  const isGuest = Boolean(user?.is_anonymous);
+
+  return {
+    user,
+    loading,
+    isGuest,
+    signIn,
+    signUp,
+    signInWithGoogle,
+    continueAsGuest,
+    createAccountFromGuest,
+    signOut,
+  };
 }

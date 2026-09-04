@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useAuth } from '@/hooks/use-auth';
 import { listProjects, softDeleteProject } from '@/lib/supabase/projects';
 import type { ProjectSummary } from '@/types/project';
+import { GuestBanner } from '@/components/projects/guest-banner';
 
 const WORKFLOW_ICON: Record<string, string> = {
   book: 'menu_book',
@@ -79,6 +80,8 @@ export default function ProjectsPage() {
           New project
         </Link>
       </header>
+
+      <GuestBanner />
 
       {error && (
         <div className="mb-8 rounded-xl bg-[var(--error-container)] px-4 py-3 text-body text-[var(--on-error-container)]">
