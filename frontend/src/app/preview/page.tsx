@@ -12,6 +12,9 @@ import { notFound } from 'next/navigation';
 import { useState } from 'react';
 
 import { WorkflowPicker } from '@/components/projects/workflow-picker';
+import { StageRenderer } from '@/components/workflow/renderers/stage-renderer';
+import { itemSchemaFor, serializeItems } from '@/lib/workflow/stage-artifact';
+import type { ArtifactVersion } from '@/types/project';
 import { StageRail } from '@/components/workflow/stage-rail';
 import { StageHeader } from '@/components/workflow/stage-header';
 import { ExitCriteriaChecklist } from '@/components/workflow/exit-criteria-checklist';
@@ -67,6 +70,111 @@ function ctx(overrides: Partial<StageContext> = {}): StageContext {
     manualChecks: {},
     ...overrides,
   };
+}
+
+// --- renderer fixtures ------------------------------------------------------
+
+function fixtureVersion(content: string, n = 1): ArtifactVersion {
+  return {
+    id: `v${n}`,
+    user_id: 'u',
+    project_id: 'p',
+    artifact_id: 'a',
+    version_number: n,
+    parent_version_id: null,
+    source_operation: 'stage_draft',
+    instruction: '',
+    system_prompt: '',
+    content,
+    model: 'anthropic/claude-sonnet',
+    mode: 'architect',
+    change_summary: null,
+    restored_from_version_id: null,
+    finish_reason: 'stop',
+    user_rating: null,
+    continuity_snapshot: null,
+    created_at: '2026-09-04T00:00:00Z',
+  };
+}
+
+const PROSE_FIXTURE = `This book is for people who are already shipping work that an AI helped
+write, and who have been asked — by a regulator, a client, or their own board —
+to explain how.
+
+It is **not** a book about prompting. Prompt technique dates in months;
+governance does not.
+
+Out of scope: model selection, cost optimisation, and anything that reads as a
+tool review.`;
+
+const AUDIENCE_FIXTURE = serializeItems([
+  {
+    id: 'i1',
+    who: 'Engineering leads at regulated companies',
+    prior_knowledge: 'Fluent with the tools, no vocabulary for defending their use.',
+    what_they_want: 'Something they can hand to an auditor without translating it first.',
+  },
+  {
+    id: 'i2',
+    who: 'Independent consultants',
+    prior_knowledge: 'Have been asked "did an AI write this?" and did not enjoy answering.',
+    what_they_want: 'A defensible process, not a disclaimer.',
+  },
+]);
+
+const FACT_CHECK_FIXTURE = serializeItems([
+  {
+    id: 'i1',
+    claim: 'Most organisations have no written policy on AI-assisted drafting.',
+    source: 'Industry survey, 2025',
+    where: 'Chapter 2, opening',
+    status: 'verified',
+  },
+  {
+    id: 'i2',
+    claim: 'Nine in ten reviewers cannot tell AI-assisted prose from human prose.',
+    source: 'Unclear — heard secondhand',
+    where: 'Chapter 4',
+    status: 'unverifiable',
+    reason: 'No primary source; the figure traces back to a blog post citing itself.',
+  },
+  {
+    id: 'i3',
+    claim: 'Regulators have begun requiring disclosure.',
+    source: '',
+    where: 'Chapter 7',
+  },
+]);
+
+function RendererSlice({
+  stageId,
+  content,
+  generating = false,
+}: {
+  stageId: string;
+  content: string | null;
+  generating?: boolean;
+}) {
+  const stage = getStage(BOOK_V1, stageId)!;
+  return (
+    <div className="rounded-2xl bg-[var(--surface)] px-8 py-8 shadow-[0_1px_2px_rgba(25,28,30,0.04),0_12px_32px_-16px_rgba(25,28,30,0.25)]">
+      <StageRenderer
+        stage={stage}
+        schema={itemSchemaFor(stage)}
+        versions={content === null ? [] : [fixtureVersion(content)]}
+        activeVersionId={null}
+        onSelectVersion={() => {}}
+        onRestore={async () => {}}
+        onSaveContent={async () => {}}
+        onSaveItems={async () => {}}
+        generating={generating}
+        generationError={null}
+        onGenerate={() => {}}
+        onCancelGeneration={() => {}}
+        readOnly={false}
+      />
+    </div>
+  );
 }
 
 function Section({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
@@ -174,6 +282,37 @@ export default function PreviewPage() {
             note="Shown at project creation. The cards show the shape of the work, not just its name."
           >
             <WorkflowPicker templates={TEMPLATES} selectedId={pickerId} onSelect={setPickerId} />
+          </Section>
+
+          <Section
+            title="The prose renderer"
+            note="Read view with version pills. Edit swaps in a Markdown textarea with a preview toggle, and Save appends a version rather than overwriting one."
+          >
+            <RendererSlice stageId="objective" content={PROSE_FIXTURE} />
+          </Section>
+
+          <Section
+            title="The list renderer"
+            note="Fields come from the item schema, so the same component draws audience segments here and hypotheses in Research. Reorder is buttons before drag — drag alone is unusable at thirty rows."
+          >
+            <RendererSlice stageId="audience" content={AUDIENCE_FIXTURE} />
+          </Section>
+
+          <Section
+            title="The review renderer"
+            note="A real table. Statuses that dismiss a row demand a reason; the third row has no status at all, which is what keeps the stage's exit criterion unmet."
+          >
+            <RendererSlice stageId="fact_check" content={FACT_CHECK_FIXTURE} />
+          </Section>
+
+          <Section
+            title="An empty stage, and one mid-draft"
+            note="No stage opens blank — entering one starts a draft. This is what the two states look like."
+          >
+            <div className="space-y-6">
+              <RendererSlice stageId="positioning" content={null} />
+              <RendererSlice stageId="positioning" content={null} generating />
+            </div>
           </Section>
 
           <Section

@@ -6,6 +6,8 @@ import { StageHeader } from './stage-header';
 import { StageRail } from './stage-rail';
 import { ExitCriteriaChecklist } from './exit-criteria-checklist';
 import { StageTransitionBar } from './stage-transition-bar';
+import { StageRenderer } from './renderers/stage-renderer';
+import { useStageGeneration } from './use-stage-generation';
 import {
   availableTransitions,
   evaluateStage,
@@ -15,8 +17,19 @@ import {
   projectState,
   type TransitionOption,
 } from '@/lib/workflow/engine';
+import { summariseStageContent } from '@/lib/workflow/digest';
+import {
+  isTriaged,
+  itemSchemaFor,
+  parseItems,
+  rendererHoldsItems,
+  serializeItems,
+  type StageItem,
+} from '@/lib/workflow/stage-artifact';
 import type { StageContext, WorkflowEvent, WorkflowTemplate } from '@/lib/workflow/types';
 import { appendWorkflowEvent, listWorkflowEvents } from '@/lib/supabase/workflow';
+import type { NewVersion } from '@/lib/supabase/versions';
+import type { StageBundle } from '@/stores/project-store';
 import type { Artifact, ArtifactVersion, Project } from '@/types/project';
 
 interface Props {
@@ -24,7 +37,17 @@ interface Props {
   artifact: Artifact | null;
   versions: ArtifactVersion[];
   template: WorkflowTemplate;
+  /** Every stage's artifact and version history, keyed by stage id. */
+  stages?: Record<string, StageBundle>;
   onPatchProject: (patch: { manual_checks?: Record<string, boolean>; stage?: string }) => void;
+  appendStageVersion?: (
+    stageId: string,
+    name: string,
+    version: NewVersion
+  ) => Promise<unknown>;
+  restoreStageVersion?: (stageId: string, versionId: string) => Promise<void>;
+  setStageSummary?: (stageId: string, summary: string) => Promise<void>;
+  /** Rendered instead of the dispatched renderer; used by the legacy pane. */
   children?: React.ReactNode;
 }
 
@@ -33,12 +56,17 @@ export function WorkflowWorkspace({
   artifact,
   versions,
   template,
+  stages: bundles,
   onPatchProject,
+  appendStageVersion,
+  restoreStageVersion,
+  setStageSummary,
   children,
 }: Props) {
   const [events, setEvents] = useState<WorkflowEvent[] | null>(null);
   const [viewingStageId, setViewingStageId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [activeVersionId, setActiveVersionId] = useState<string | null>(null);
 
   useEffect(() => {
     listWorkflowEvents(project.id)
@@ -59,28 +87,86 @@ export function WorkflowWorkspace({
   const stage = getStage(template, stageId);
   const isCurrent = stageId === state.current_stage_id;
 
+  const stageBundles = useMemo(() => bundles ?? {}, [bundles]);
+
+  // Viewing resets per stage: a version pill selected on one stage means
+  // nothing on the next.
+  useEffect(() => setActiveVersionId(null), [stageId]);
+
+  const generation = useStageGeneration({
+    project,
+    template,
+    state,
+    stage,
+    bundles: stageBundles,
+    // Never start work on a stage the user is only looking at, and never
+    // before the event log has loaded — the current stage is not yet known.
+    enabled: Boolean(appendStageVersion) && isCurrent && events !== null,
+    appendStageVersion: appendStageVersion ?? (async () => undefined),
+  });
+
+  /**
+   * The exit-criteria context.
+   *
+   * These fields were hardcoded to {} and 0, which meant every `min_items` and
+   * `every_item_has_status` criterion in both templates evaluated false and
+   * could never be satisfied — the checklist was decorative. Deriving them from
+   * the stage artifacts is what makes the gates real.
+   */
   const context: StageContext = useMemo(() => {
     const longForm = artifact?.long_form ?? null;
     const outline = longForm?.outline ?? [];
+
+    const itemCounts: Record<string, number> = {};
+    const itemsMissingStatus: Record<string, number> = {};
+    const artifactNonEmpty: Record<string, boolean> = {};
+    let findingsTotal = 0;
+    let findingsTriaged = 0;
+
+    for (const s of template.stages) {
+      const bundle = stageBundles[s.id];
+      const content = bundle?.versions.at(-1)?.content ?? '';
+      artifactNonEmpty[s.id] = content.trim().length > 0;
+
+      if (!rendererHoldsItems(s.renderer)) continue;
+      const items = parseItems(content);
+      if (!items) continue;
+
+      const schema = itemSchemaFor(s);
+      itemCounts[s.id] = items.length;
+      itemsMissingStatus[s.id] = items.filter((i) => !isTriaged(i, schema)).length;
+
+      // Findings criteria are about the stage being looked at, not the whole
+      // project: "3 untriaged" on the Critique stage must not count Continuity's.
+      if (s.id === stageId && s.renderer === 'review') {
+        findingsTotal = items.length;
+        findingsTriaged = items.length - itemsMissingStatus[s.id];
+      }
+    }
+
+    // The single-output project keeps its one artifact, which has no stage row.
+    if (stage && !stageBundles[stage.id]) {
+      artifactNonEmpty[stage.id] =
+        versions.length > 0 && versions.at(-1)!.content.trim().length > 0;
+    }
+
     return {
       fields: {
         objective: project.objective,
         audience: project.audience,
         constraints: project.constraints,
       },
-      itemCounts: {},
-      itemsMissingStatus: {},
-      artifactNonEmpty: stage
-        ? { [stage.id]: versions.length > 0 && versions.at(-1)!.content.trim().length > 0 }
-        : {},
+      itemCounts,
+      itemsMissingStatus,
+      artifactNonEmpty,
       outlineApproved: longForm?.state === 'writing' || longForm?.state === 'complete',
       sectionsTotal: outline.length,
       sectionsComplete: outline.filter((s) => s.status === 'complete').length,
-      findingsTotal: 0,
-      findingsTriaged: 0,
+      findingsTotal,
+      findingsTriaged,
       manualChecks: project.manual_checks ?? {},
     };
-  }, [project, artifact, versions, stage]);
+  }, [project, artifact, versions, stage, stageId, template, stageBundles]);
 
   const evaluation = useMemo(
     () => evaluateStage(template, stageId, context),
@@ -116,6 +202,16 @@ export function WorkflowWorkspace({
               ? 'stage_returned'
               : 'stage_completed';
 
+        // Record what this stage concluded before leaving it. Later stages
+        // generate against this summary, so writing it at completion — rather
+        // than recomputing at every call — means a subsequent edit upstream
+        // cannot silently rewrite the context a downstream draft was given.
+        if (type === 'stage_completed' && setStageSummary) {
+          const content = stageBundles[stage.id]?.versions.at(-1)?.content ?? '';
+          const summary = summariseStageContent(stage, content);
+          if (summary) await setStageSummary(stage.id, summary).catch(() => {});
+        }
+
         const nextSeq = (events?.length ?? 0) + 1;
         await appendWorkflowEvent(
           project.id,
@@ -141,7 +237,7 @@ export function WorkflowWorkspace({
         setBusy(false);
       }
     },
-    [stage, busy, events, project, template, onPatchProject]
+    [stage, busy, events, project, template, onPatchProject, setStageSummary, stageBundles]
   );
 
   const handleToggleManual = useCallback(
@@ -153,7 +249,39 @@ export function WorkflowWorkspace({
     [project.manual_checks, onPatchProject]
   );
 
+  const saveContent = useCallback(
+    async (content: string) => {
+      if (!stage || !appendStageVersion) return;
+      await appendStageVersion(stage.id, stage.label, {
+        content,
+        source_operation: 'stage_edit',
+        model: project.model,
+        mode: project.mode,
+        change_summary: 'Edited by hand.',
+      });
+    },
+    [stage, appendStageVersion, project.model, project.mode]
+  );
+
+  const saveItems = useCallback(
+    async (items: StageItem[]) => {
+      await saveContent(serializeItems(items));
+    },
+    [saveContent]
+  );
+
+  const restore = useCallback(
+    async (versionId: string) => {
+      if (!stage || !restoreStageVersion) return;
+      await restoreStageVersion(stage.id, versionId);
+      setActiveVersionId(null);
+    },
+    [stage, restoreStageVersion]
+  );
+
   if (!stage) return null;
+
+  const stageVersions = stageBundles[stage.id]?.versions ?? [];
 
   return (
     <div className="flex min-h-screen">
@@ -199,7 +327,27 @@ export function WorkflowWorkspace({
             }}
           />
 
-          <div className="mb-8">{children}</div>
+          <div className="mb-8">
+            {/* `children` is the legacy single-output pane. Once that workflow
+                renders through `single_output`, this prop goes. */}
+            {children ?? (
+              <StageRenderer
+                stage={stage}
+                schema={itemSchemaFor(stage)}
+                versions={stageVersions}
+                activeVersionId={activeVersionId}
+                onSelectVersion={setActiveVersionId}
+                onRestore={restore}
+                onSaveContent={appendStageVersion ? saveContent : undefined}
+                onSaveItems={appendStageVersion ? saveItems : undefined}
+                generating={generation.generating}
+                generationError={generation.error}
+                onGenerate={generation.generate}
+                onCancelGeneration={generation.cancel}
+                readOnly={!isCurrent}
+              />
+            )}
+          </div>
 
           <div className="space-y-4">
             <ExitCriteriaChecklist

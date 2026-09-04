@@ -24,6 +24,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const project = useProjectStore((s) => s.project);
   const artifact = useProjectStore((s) => s.artifact);
   const versions = useProjectStore((s) => s.versions);
+  const stages = useProjectStore((s) => s.stages);
   const evaluations = useProjectStore((s) => s.evaluations);
   const activeVersionId = useProjectStore((s) => s.activeVersionId);
   const loading = useProjectStore((s) => s.loading);
@@ -36,6 +37,9 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const setActiveVersion = useProjectStore((s) => s.setActiveVersion);
   const restoreVersion = useProjectStore((s) => s.restoreVersion);
   const resolveConflict = useProjectStore((s) => s.resolveConflict);
+  const appendStageVersion = useProjectStore((s) => s.appendStageVersion);
+  const restoreStageVersion = useProjectStore((s) => s.restoreStageVersion);
+  const setStageSummary = useProjectStore((s) => s.setStageSummary);
 
   const [template, setTemplate] = useState<WorkflowTemplate | null>(null);
 
@@ -80,27 +84,31 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
   if (!project) return null;
 
+  // A concurrent edit has to be visible whichever pane is showing — it is a
+  // property of the project, not of the single-output view it used to live in.
+  const conflictBanner = conflict ? (
+    <div className="mb-6 rounded-xl bg-[var(--surface-container-high)] px-5 py-4 text-sm">
+      <p className="text-[var(--on-surface)]">This project was changed in another tab.</p>
+      <div className="mt-3 flex gap-2">
+        <button
+          onClick={() => void resolveConflict('reload')}
+          className="rounded-lg bg-[var(--surface-container-highest)] px-3 py-2 text-xs"
+        >
+          Reload theirs
+        </button>
+        <button
+          onClick={() => void resolveConflict('keep-mine')}
+          className="rounded-lg bg-[var(--pm-primary)] px-3 py-2 text-xs text-[var(--on-primary)]"
+        >
+          Keep my changes
+        </button>
+      </div>
+    </div>
+  ) : null;
+
   const artifactPane = (
     <>
-      {conflict && (
-        <div className="mb-6 rounded-xl bg-[var(--surface-container-high)] px-5 py-4 text-sm">
-          <p className="text-[var(--on-surface)]">This project was changed in another tab.</p>
-          <div className="mt-3 flex gap-2">
-            <button
-              onClick={() => void resolveConflict('reload')}
-              className="rounded-lg bg-[var(--surface-container-highest)] px-3 py-2 text-xs"
-            >
-              Reload theirs
-            </button>
-            <button
-              onClick={() => void resolveConflict('keep-mine')}
-              className="rounded-lg bg-[var(--pm-primary)] px-3 py-2 text-xs text-[var(--on-primary)]"
-            >
-              Keep my changes
-            </button>
-          </div>
-        </div>
-      )}
+      {conflictBanner}
 
       <textarea
         value={project.objective}
@@ -220,16 +228,27 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           </Link>
           <div className="min-w-0 flex-1">{header}</div>
         </div>
+        {template.key !== 'single_output' && conflictBanner && (
+          <div className="mx-auto mt-4 max-w-[1200px]">{conflictBanner}</div>
+        )}
       </div>
 
+      {/* Stage renderers own the pane for every workflow that has stages. The
+          legacy single-output pane stays only for projects imported from
+          /session, which have one artifact and no stage rows; it goes when
+          single_output renders through the workspace like everything else. */}
       <WorkflowWorkspace
         project={project}
         artifact={artifact}
         versions={versions}
+        stages={stages}
         template={template}
         onPatchProject={patchProject}
+        appendStageVersion={appendStageVersion}
+        restoreStageVersion={restoreStageVersion}
+        setStageSummary={setStageSummary}
       >
-        {artifactPane}
+        {template.key === 'single_output' ? artifactPane : undefined}
       </WorkflowWorkspace>
     </div>
   );
