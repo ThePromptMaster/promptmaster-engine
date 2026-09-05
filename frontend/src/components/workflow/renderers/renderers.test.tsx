@@ -412,13 +412,13 @@ describe('ReviewRenderer', () => {
     render(<ReviewRenderer {...props(bookStage('fact_check'), { versions: [version(rows)] })} />);
 
     // Verified is a decision that stands on its own.
-    await user.click(screen.getAllByRole('button', { name: /Not looked at/ })[0]);
-    await user.click(screen.getByRole('button', { name: 'Verified' }));
+    await user.click(screen.getAllByRole('combobox')[0]);
+    await user.click(screen.getByRole('option', { name: 'Verified' }));
     expect(screen.queryByText(/still counts as unresolved/)).not.toBeInTheDocument();
 
     // Unverifiable is legitimate, but has to say why.
-    await user.click(screen.getAllByRole('button', { name: /Not looked at/ })[0]);
-    await user.click(screen.getByRole('button', { name: 'Unverifiable' }));
+    await user.click(screen.getAllByRole('combobox')[0]);
+    await user.click(screen.getByRole('option', { name: 'Unverifiable' }));
     expect(screen.getByText(/still counts as unresolved/)).toBeInTheDocument();
 
     await user.type(screen.getByLabelText(/Why unverifiable\?/), 'No primary source.');
