@@ -55,3 +55,16 @@ def test_worker_must_name_a_user(monkeypatch):
 
     with pytest.raises(HTTPException):
         _worker_user(_request({"X-PromptMaster-User": "   "}), "s3cret")
+
+
+def test_non_ascii_token_is_rejected_not_a_crash(monkeypatch):
+    """A hostile bearer token must produce a 401, never a 500.
+
+    hmac.compare_digest raises TypeError when handed a str containing non-ASCII,
+    so comparing the raw strings turned a token with a single accented character
+    into an unhandled server error — a trivially reachable way to make the API
+    fail loudly. The comparison is done on bytes for that reason.
+    """
+    monkeypatch.setenv("WORKER_SHARED_SECRET", "s3cret")
+    assert _worker_user(_request({"X-PromptMaster-User": "u"}), "café-token") is None
+    assert _worker_user(_request({"X-PromptMaster-User": "u"}), "‮secret") is None

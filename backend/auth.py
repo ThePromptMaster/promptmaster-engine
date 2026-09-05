@@ -160,7 +160,11 @@ def _worker_user(request: Request, token: str) -> AuthUser | None:
     """Return the impersonated user when `token` is the worker secret, else None."""
     secret = _worker_secret()
     # An unset secret must never match an empty or absent header.
-    if not secret or not hmac.compare_digest(token, secret):
+    #
+    # Compared as bytes, not str: compare_digest raises TypeError on a str
+    # holding non-ASCII, so a bearer token with a single accented character
+    # would surface as a 500 rather than the 401 it is.
+    if not secret or not hmac.compare_digest(token.encode("utf-8"), secret.encode("utf-8")):
         return None
 
     user_id = request.headers.get("X-PromptMaster-User", "").strip()
