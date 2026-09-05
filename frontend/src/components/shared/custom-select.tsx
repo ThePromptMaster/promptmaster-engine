@@ -54,10 +54,13 @@ export function CustomSelect({
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
-  // Opening lands on the current value rather than the top of the list.
-  useEffect(() => {
-    if (open) setActiveIndex(selectedIndex >= 0 ? selectedIndex : 0);
-  }, [open, selectedIndex]);
+  // Opening lands on the current value rather than the top of the list. Done
+  // at the point of opening rather than in an effect on `open`, which would
+  // set state during render and cascade.
+  function openList() {
+    setActiveIndex(selectedIndex >= 0 ? selectedIndex : 0);
+    setOpen(true);
+  }
 
   function commit(index: number) {
     const option = options[index];
@@ -74,7 +77,7 @@ export function CustomSelect({
     if (!open) {
       if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(e.key)) {
         e.preventDefault();
-        setOpen(true);
+        openList();
       }
       return;
     }
@@ -124,7 +127,7 @@ export function CustomSelect({
         aria-activedescendant={open && activeIndex >= 0 ? `${listId}-${activeIndex}` : undefined}
         aria-label={ariaLabel}
         disabled={disabled}
-        onClick={() => setOpen(!open)}
+        onClick={() => (open ? setOpen(false) : openList())}
         onKeyDown={handleKeyDown}
         className={`w-full flex items-center justify-between gap-2 px-4 py-3 bg-[var(--surface-container-low)] rounded-lg text-sm text-left transition-all duration-200 outline-none ${
           open
