@@ -19,6 +19,7 @@
 
 import { ErrorBoundary } from '@/components/shared/error-boundary';
 import { ListRenderer } from './list-renderer';
+import { LongFormRenderer } from './long-form-renderer';
 import { ProseRenderer } from './prose-renderer';
 import { ReviewRenderer } from './review-renderer';
 import type { StageRendererProps } from './types';
@@ -37,11 +38,13 @@ export function StageRenderer(props: StageRendererProps) {
     case 'review':
       body = <ReviewRenderer {...props} />;
       break;
-    // Outline and long-form land in their own streams. A named placeholder is
-    // honest about that; falling through to prose would silently render an
-    // outline as a wall of text and look like a bug rather than a gap.
-    case 'outline':
     case 'long_form':
+      body = <LongFormRenderer {...props} />;
+      break;
+    // The outline editor lands in its own stream. A named placeholder is honest
+    // about that; falling through to prose would silently render an outline as a
+    // wall of text and look like a bug rather than a gap.
+    case 'outline':
     default:
       body = <NotYetRenderer renderer={stage.renderer} />;
   }
@@ -53,7 +56,6 @@ export function StageRenderer(props: StageRendererProps) {
 
 const PENDING_LABEL: Record<string, string> = {
   outline: 'The outline editor',
-  long_form: 'Section-by-section drafting',
 };
 
 function NotYetRenderer({ renderer }: { renderer: string }) {

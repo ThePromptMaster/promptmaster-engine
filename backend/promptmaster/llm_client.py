@@ -20,8 +20,32 @@ _RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 
 
 class OpenRouterError(Exception):
-    """Base error for OpenRouter API failures."""
-    pass
+    """Base error for OpenRouter API failures.
+
+    Carries structure as well as a message. Until now this class was purely
+    stringly-typed: `_is_retryable` substring-matched "429" against the message,
+    which quietly also matches a model that happened to emit "429" in its prose,
+    and gives a caller nothing to branch on when it needs to tell "you are out
+    of credits" (never retry, tell the user) from "you are rate limited" (retry
+    after N seconds). FR-16 needs that distinction to produce a recovery message
+    rather than a stack trace.
+
+    Every field is optional and the message is unchanged, so existing callers
+    and tests that only read `str(e)` keep working.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: int | None = None,
+        provider_code: str | None = None,
+        retry_after: float | None = None,
+    ):
+        super().__init__(message)
+        self.status_code = status_code
+        self.provider_code = provider_code
+        self.retry_after = retry_after
 
 
 class OpenRouterDeadlineError(OpenRouterError):
@@ -32,6 +56,42 @@ class OpenRouterDeadlineError(OpenRouterError):
     """
 
     pass
+
+
+def _provider_code(response: httpx.Response) -> str | None:
+    """Pull OpenRouter's own error code out of the body, if it says one.
+
+    OpenRouter wraps upstream failures as {"error": {"code": ..., "message": ...}}.
+    The code is what distinguishes "context_length_exceeded" from a generic 400,
+    and no amount of substring-matching the HTTP status recovers it.
+    """
+    try:
+        body = response.json()
+    except Exception:
+        return None
+    if not isinstance(body, dict):
+        return None
+    error = body.get("error")
+    if not isinstance(error, dict):
+        return None
+    code = error.get("code")
+    if code is None:
+        # Some providers put the machine-readable name in `type` instead.
+        code = error.get("type")
+    return str(code) if code is not None else None
+
+
+def _retry_after_seconds(response: httpx.Response) -> float | None:
+    """Honour the provider's own Retry-After rather than guessing a backoff."""
+    raw = response.headers.get("retry-after")
+    if not raw:
+        return None
+    try:
+        return float(raw)
+    except ValueError:
+        # The HTTP-date form is legal but rare here; a wrong guess is worse
+        # than falling back to the standard ladder.
+        return None
 
 
 class OpenRouterClient:
@@ -254,7 +314,11 @@ class OpenRouterClient:
                         break
                     raise
                 last_error = e
+                # A provider that tells us when to come back knows better than
+                # our ladder does; a 429 retried too early just burns an attempt.
                 delay = _RETRY_BASE_DELAY * (2 ** (attempt - 1))
+                if e.retry_after is not None:
+                    delay = max(delay, e.retry_after)
                 # Don't sleep into the deadline just to fail on the far side.
                 if deadline is not None and time.monotonic() + delay >= deadline:
                     raise OpenRouterDeadlineError(
@@ -287,6 +351,9 @@ class OpenRouterClient:
             if response.status_code in _RETRYABLE_STATUS_CODES:
                 raise OpenRouterError(
                     f"Server error (HTTP {response.status_code}): {response.text[:200]}",
+                    status_code=response.status_code,
+                    provider_code=_provider_code(response),
+                    retry_after=_retry_after_seconds(response),
                 )
             response.raise_for_status()
 
@@ -318,14 +385,32 @@ class OpenRouterClient:
             return content, usage_stats, finish_reason
 
         except httpx.TimeoutException as e:
-            raise OpenRouterError(f"Request timed out after {effective_timeout}s") from e
+            raise OpenRouterError(
+                f"Request timed out after {effective_timeout}s",
+                provider_code="timeout",
+            ) from e
         except httpx.HTTPStatusError as e:
-            raise OpenRouterError(f"HTTP {e.response.status_code}: {e.response.text[:200]}") from e
+            raise OpenRouterError(
+                f"HTTP {e.response.status_code}: {e.response.text[:200]}",
+                status_code=e.response.status_code,
+                provider_code=_provider_code(e.response),
+                retry_after=_retry_after_seconds(e.response),
+            ) from e
         except httpx.RequestError as e:
-            raise OpenRouterError(f"Network error: {e}") from e
+            raise OpenRouterError(f"Network error: {e}", provider_code="network") from e
 
     def _is_retryable(self, error: OpenRouterError) -> bool:
-        """Check if an error is retryable based on its message."""
+        """Whether an error is worth another attempt.
+
+        Prefers the structured status code now that we carry one. The substring
+        pass is kept as a fallback, not as the primary signal: errors raised
+        without a status (and every OpenRouterError constructed by older code,
+        including in tests) still classify exactly as they did before.
+        """
+        if error.status_code is not None:
+            return error.status_code in _RETRYABLE_STATUS_CODES
+        if error.provider_code in ("timeout", "network"):
+            return True
         msg = str(error)
         return any(code in msg for code in ["429", "500", "502", "503", "504", "timed out", "Network error"])
 

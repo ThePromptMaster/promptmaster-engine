@@ -118,8 +118,22 @@ describe('renderers are workflow-agnostic', () => {
   });
 
   it('names the renderers that are not built yet rather than falling through', () => {
-    render(<StageRenderer {...props(bookStage('drafting'))} />);
+    // The outline editor is the one that remains. Falling through to prose here
+    // would render an outline as a wall of text and look like a bug, not a gap.
+    render(<StageRenderer {...props(bookStage('outline'))} />);
     expect(screen.getByText(/not built yet/)).toBeInTheDocument();
+  });
+
+  it('renders drafting through the long-form renderer, not the placeholder', () => {
+    render(<StageRenderer {...props(bookStage('drafting'))} />);
+    expect(screen.queryByText(/not built yet/)).not.toBeInTheDocument();
+  });
+
+  it('says drafting is unwired rather than crashing when no project context is passed', () => {
+    // The renderer enqueues server jobs, so it needs a project. Missing context
+    // is a wiring mistake and must read as one.
+    render(<StageRenderer {...props(bookStage('drafting'))} />);
+    expect(screen.getByText(/not wired to a project/i)).toBeInTheDocument();
   });
 });
 

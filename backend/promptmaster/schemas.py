@@ -213,6 +213,69 @@ class GenerateSectionResponse(BaseModel):
     new_snapshot: ContinuitySnapshot
 
 
+# ---------------------------------------------------------------------------
+# FR-06 continuity records
+# ---------------------------------------------------------------------------
+#
+# ContinuitySnapshot (above) is a *rolling* four-field summary regenerated from
+# the whole document so far. That is fine for /api/continue-document, which runs
+# once, and fatal for a book: the input to the snapshot call grows linearly with
+# the prose already written, so section 40 costs an order of magnitude more than
+# section 4 and eventually will not fit at all. That is the ~100-page ceiling.
+#
+# A SectionRecord inverts it. Each record is extracted from ONE newly written
+# section and then persisted, so extraction cost is constant per section and the
+# drafting prompt is assembled from stored records rather than from prose.
+# FR-06 names the four things it has to carry, and glossary is the one that
+# exists nowhere else in the system.
+
+
+class GlossaryTerm(BaseModel):
+    """A term the document has defined and must keep using consistently.
+
+    Project-scoped rather than section-scoped: the point of a glossary is that
+    section 9 uses "continuity record" to mean what section 2 said it meant.
+    """
+    term: str
+    definition: str = ""
+    #: Where it was first defined, so a contradiction can be traced.
+    first_seen_section_id: str = ""
+
+
+class SectionRecord(BaseModel):
+    """What section N leaves behind for sections N+1..M.
+
+    Deliberately small and bounded. Everything here is written once, when the
+    section is written, and read many times afterwards.
+    """
+    section_id: str
+    section_index: int
+    title: str = ""
+    #: Two or three sentences. Not the prose — a projection of it.
+    summary: str = ""
+    glossary_terms: list[GlossaryTerm] = Field(default_factory=list)
+    #: Choices this section committed the document to (scope, stance, structure).
+    decisions: list[str] = Field(default_factory=list)
+    #: Promises made to the reader that a later section has to keep.
+    todos: list[str] = Field(default_factory=list)
+
+
+class ExtractSectionRecordResponse(BaseModel):
+    """Response from the record-extraction call (step 3 of a drafting job)."""
+    record: SectionRecord
+
+
+class GenerateSectionProseResponse(BaseModel):
+    """Response from the prose-only call (step 2 of a drafting job).
+
+    Split out from GenerateSectionResponse on purpose: the drain commits this
+    result — the expensive one — before it attempts extraction, so a function
+    timeout between the two costs nothing but the extraction call.
+    """
+    content: str
+    finish_reason: str
+
+
 # Resolve forward reference for Iteration.continuity_snapshot
 Iteration.model_rebuild()
 

@@ -13,6 +13,7 @@ but authenticated".
 
 from __future__ import annotations
 
+import hmac
 import logging
 import os
 from dataclasses import dataclass
@@ -131,6 +132,51 @@ def decode_token(token: str) -> dict:
         raise HTTPException(401, f"Invalid token: {exc}", headers=_UNAUTHENTICATED_HEADERS)
 
 
+def _worker_secret() -> str:
+    """Shared secret the job drain presents instead of a user token.
+
+    The drain is a Next.js route handler holding the service-role key. It calls
+    this API for generation only, and under Vercel Cron there is no user in the
+    request at all — so there is no Supabase access token to forward. Nor can it
+    present the service-role key: that is signed for `role: service_role` with no
+    `sub` and a different issuer, so decode_token rejects it, and on projects
+    using the newer publishable/secret keys it is not a JWT at all.
+
+    A job also outlives a token. Access tokens expire in an hour; a ten-section
+    book queued at 4pm may still be draining at 6pm, so capturing the user's
+    token at enqueue time and replaying it would fail exactly when resumption
+    matters most.
+
+    This is a machine identity, not an escalation. The drain already holds the
+    service-role key, so it can already read and write any row; letting it name
+    the user it is working on behalf of grants it nothing it did not have. What
+    it buys is that the backend still knows WHO each generation call is for,
+    which is what FR-18's per-user cost controls will meter on.
+    """
+    return os.getenv("WORKER_SHARED_SECRET", "").strip()
+
+
+def _worker_user(request: Request, token: str) -> AuthUser | None:
+    """Return the impersonated user when `token` is the worker secret, else None."""
+    secret = _worker_secret()
+    # An unset secret must never match an empty or absent header.
+    #
+    # Compared as bytes, not str: compare_digest raises TypeError on a str
+    # holding non-ASCII, so a bearer token with a single accented character
+    # would surface as a 500 rather than the 401 it is.
+    if not secret or not hmac.compare_digest(token.encode("utf-8"), secret.encode("utf-8")):
+        return None
+
+    user_id = request.headers.get("X-PromptMaster-User", "").strip()
+    if not user_id:
+        raise HTTPException(
+            401,
+            "Worker credential accepted but no X-PromptMaster-User was supplied.",
+            headers=_UNAUTHENTICATED_HEADERS,
+        )
+    return AuthUser(id=user_id, email=None, role="worker")
+
+
 def _to_user(claims: dict) -> AuthUser:
     return AuthUser(
         id=str(claims.get("sub", "")),
@@ -150,7 +196,8 @@ async def get_optional_user(
     """
     if credentials is None or not credentials.credentials:
         return None
-    user = _to_user(decode_token(credentials.credentials))
+    worker = _worker_user(request, credentials.credentials)
+    user = worker or _to_user(decode_token(credentials.credentials))
     request.state.user = user
     return user
 
@@ -175,6 +222,7 @@ async def require_user(
         )
         return None
 
-    user = _to_user(decode_token(credentials.credentials))
+    worker = _worker_user(request, credentials.credentials)
+    user = worker or _to_user(decode_token(credentials.credentials))
     request.state.user = user
     return user
