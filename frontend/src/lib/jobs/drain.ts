@@ -170,7 +170,7 @@ interface StepArgs {
 type StepOutcome = { done: true } | { done: false; checkpoint: DraftCheckpoint };
 
 async function runStep(args: StepArgs): Promise<StepOutcome> {
-  const { job, payload, checkpoint, store, generator, worker } = args;
+  const { job, payload, checkpoint, store, worker } = args;
   const context = await store.loadSectionContext(payload);
 
   if (!context.section) {

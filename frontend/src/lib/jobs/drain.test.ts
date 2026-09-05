@@ -23,6 +23,7 @@ import { describe, expect, it } from 'vitest';
 import { runDrain } from './drain';
 import {
   DRAFT_SECTION,
+  type DraftCheckpoint,
   type DraftSectionPayload,
   type Job,
   type JobStore,
@@ -69,6 +70,9 @@ interface FakeJobRow extends Job {
   run_after: number;
   created_at: number;
   checkpoint: Record<string, unknown>;
+  idempotency_key: string;
+  error_code?: string;
+  error_message?: string;
 }
 
 class FakeStore implements JobStore {
@@ -112,7 +116,7 @@ class FakeStore implements JobStore {
       run_after: this.clock.now(),
       created_at: this.clock.now() + sectionIndex,
       idempotency_key: key,
-    } as FakeJobRow & { idempotency_key: string });
+    });
   }
 
   async reapExpiredLeases(): Promise<number> {
@@ -168,10 +172,10 @@ class FakeStore implements JobStore {
     return job;
   }
 
-  async checkpointJob(jobId: string, worker: string, checkpoint: Record<string, unknown>): Promise<boolean> {
+  async checkpointJob(jobId: string, worker: string, checkpoint: DraftCheckpoint): Promise<boolean> {
     const job = this.held(jobId, worker);
     if (!job) return false;
-    job.checkpoint = { ...checkpoint };
+    job.checkpoint = { ...checkpoint } as unknown as Record<string, unknown>;
     return true;
   }
 
@@ -197,8 +201,8 @@ class FakeStore implements JobStore {
     job.status = !retryable ? 'failed' : job.attempts >= job.max_attempts ? 'dead' : 'queued';
     job.lease_owner = null;
     job.leased_until = null;
-    (job as unknown as { error_code: string }).error_code = code;
-    (job as unknown as { error_message: string }).error_message = message;
+    job.error_code = code;
+    job.error_message = message;
     return true;
   }
 
@@ -487,10 +491,10 @@ describe('FR-05: resumable ten-section drafting', () => {
 
     await drain(store, generator, clock, 'worker-2', 40_000);
 
-    const failed = store.jobFor(next.id) as unknown as { error_code: string; error_message: string };
+    const failed = store.jobFor(next.id);
     expect(failed.error_code).toBe('insufficient_credits');
     // The FR-16 rule: the message must say what is safe.
-    expect(failed.error_message).toMatch(/Nothing was lost — \d+ of 10 sections are saved\./);
+    expect(failed.error_message!).toMatch(/Nothing was lost — \d+ of 10 sections are saved\./);
   });
 });
 
