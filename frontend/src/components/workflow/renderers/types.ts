@@ -1,6 +1,29 @@
 import type { StageDefinition } from '@/lib/workflow/types';
 import type { StageItem, StageItemSchema } from '@/lib/workflow/stage-artifact';
-import type { ArtifactVersion } from '@/types/project';
+import type { ArtifactVersion, Project } from '@/types/project';
+import type { LongFormState } from '@/types';
+
+/**
+ * What the drafting renderer needs beyond the common props.
+ *
+ * It is a separate optional block rather than more top-level fields because
+ * drafting is the one renderer whose work outlives the component: it enqueues
+ * server jobs, so it needs the project row (for the model and the PMInput the
+ * drain will use hours later) and the artifact to write into. Folding those
+ * into the shared props would hand every renderer a project it has no business
+ * touching.
+ */
+export interface LongFormContext {
+  project: Project;
+  artifactId: string | null;
+  stageId: string;
+  /** The stage artifact's long-form state — the authority on what is written. */
+  state: LongFormState | null;
+  /** FR-07: the outline version drafting is bound to. */
+  approvedOutlineVersionId: string | null;
+  /** Ask the workspace to reload the artifact after the server changed it. */
+  onRefresh: () => void;
+}
 
 /**
  * The contract every stage renderer implements.
@@ -43,4 +66,7 @@ export interface StageRendererProps {
    * because editing a stage you are only looking at is how work gets lost.
    */
   readOnly: boolean;
+
+  /** Present only for `long_form` stages. */
+  longForm?: LongFormContext;
 }

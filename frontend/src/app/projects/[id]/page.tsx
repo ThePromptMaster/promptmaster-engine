@@ -247,6 +247,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         appendStageVersion={appendStageVersion}
         restoreStageVersion={restoreStageVersion}
         setStageSummary={setStageSummary}
+        onReload={() => void loadProject(id)}
       >
         {template.key === 'single_output' ? artifactPane : undefined}
       </WorkflowWorkspace>

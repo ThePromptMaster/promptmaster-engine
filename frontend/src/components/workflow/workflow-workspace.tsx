@@ -48,6 +48,8 @@ interface Props {
   ) => Promise<unknown>;
   restoreStageVersion?: (stageId: string, versionId: string) => Promise<void>;
   setStageSummary?: (stageId: string, summary: string) => Promise<void>;
+  /** Reload project state after the server changed it behind our back. */
+  onReload?: () => void;
   /** Rendered instead of the dispatched renderer; used by the legacy pane. */
   children?: React.ReactNode;
 }
@@ -62,6 +64,7 @@ export function WorkflowWorkspace({
   appendStageVersion,
   restoreStageVersion,
   setStageSummary,
+  onReload,
   children,
 }: Props) {
   const [events, setEvents] = useState<WorkflowEvent[] | null>(null);
@@ -115,7 +118,13 @@ export function WorkflowWorkspace({
    * the stage artifacts is what makes the gates real.
    */
   const context: StageContext = useMemo(() => {
-    const longForm = artifact?.long_form ?? null;
+    // The drafting stage has its own artifact in a thirteen-stage Book; only a
+    // single-output project keeps everything on the project-level one. Reading
+    // the project artifact unconditionally made sectionsComplete permanently 0
+    // for Book, so all_sections_complete could never satisfy.
+    const longFormArtifact =
+      (stage ? stageBundles[stage.id]?.artifact : null) ?? artifact;
+    const longForm = longFormArtifact?.long_form ?? null;
     const outline = longForm?.outline ?? [];
 
     const itemCounts: Record<string, number> = {};
@@ -288,6 +297,21 @@ export function WorkflowWorkspace({
 
   const stageVersions = stageBundles[stage.id]?.versions ?? [];
 
+  // Only assembled for drafting stages. Carries the project row because the
+  // drain will rebuild this project's PMInput hours from now, in a process that
+  // has never seen the user.
+  const longFormContext =
+    stage.renderer === 'long_form'
+      ? {
+          project,
+          artifactId: (stageBundles[stage.id]?.artifact ?? artifact)?.id ?? null,
+          stageId: stage.id,
+          state: (stageBundles[stage.id]?.artifact ?? artifact)?.long_form ?? null,
+          approvedOutlineVersionId: approvedOutlineVersionId(events ?? []),
+          onRefresh: () => onReload?.(),
+        }
+      : undefined;
+
   return (
     <div className="flex min-h-screen">
       <aside className="sticky top-0 hidden h-screen w-[248px] shrink-0 overflow-y-auto bg-[var(--surface-container-lowest)] px-2 py-6 md:block sidebar-scroll">
@@ -350,6 +374,7 @@ export function WorkflowWorkspace({
                 onGenerate={generation.generate}
                 onCancelGeneration={generation.cancel}
                 readOnly={!isCurrent}
+                longForm={longFormContext}
               />
             )}
           </div>
