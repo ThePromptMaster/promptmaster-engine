@@ -1,7 +1,3 @@
-
-> frontend@0.1.0 gen:templates
-> node scripts/generate-template-seed.ts
-
 -- GENERATED FILE — do not edit by hand.
 --
 -- Produced by frontend/scripts/generate-template-seed.ts from the TypeScript

@@ -14,6 +14,16 @@ import { useState } from 'react';
 import { WorkflowPicker } from '@/components/projects/workflow-picker';
 import { StageRenderer } from '@/components/workflow/renderers/stage-renderer';
 import { itemSchemaFor, serializeItems } from '@/lib/workflow/stage-artifact';
+import { OutlineEditor } from '@/components/outline/outline-editor';
+import { OutlineHistory } from '@/components/outline/outline-history';
+import { applyOutlineEdit } from '@/lib/outline/use-outline-draft';
+import {
+  newItem,
+  outlineHistory,
+  serializeOutlineDocument,
+  staleDrafts,
+} from '@/lib/outline/model';
+import type { OutlineDocument, SectionDraftBinding } from '@/types/outline';
 import type { ArtifactVersion } from '@/types/project';
 import { StageRail } from '@/components/workflow/stage-rail';
 import { StageHeader } from '@/components/workflow/stage-header';
@@ -187,6 +197,97 @@ function Section({ title, note, children }: { title: string; note?: string; chil
   );
 }
 
+// --- outline fixtures -------------------------------------------------------
+
+const OUTLINE_SECTIONS: Array<[string, string]> = [
+  ['Why governance fails quietly', 'The failure mode is not refusal; it is unexamined acceptance.'],
+  ['What a review actually checks', 'Separating the claim, the evidence, and the reviewer’s job.'],
+  ['Writing the rule down', 'Turning a norm into something a new joiner can follow on day one.'],
+  ['When to break your own rule', 'Guidance is suggestive, not restrictive — and the exceptions prove it.'],
+];
+
+function outlineFixture(): OutlineDocument {
+  return {
+    schema: 1,
+    items: OUTLINE_SECTIONS.map(([title, abstract], i) =>
+      newItem({ id: `sec-${i + 1}`, title, abstract })
+    ),
+    orphans: [
+      {
+        item_id: 'sec-orphan',
+        title: 'A chapter on tooling',
+        abstract: 'Cut from the outline; the writing was kept.',
+        reason: 'regenerated',
+        orphaned_at: '2026-09-03T00:00:00Z',
+      },
+    ],
+  };
+}
+
+/** Two sections written, one of them against the outline before this one. */
+const OUTLINE_DRAFTS: SectionDraftBinding[] = [
+  { item_id: 'sec-1', outline_version_id: 'v2', word_count: 2140 },
+  { item_id: 'sec-2', outline_version_id: 'v1', word_count: 1680 },
+  { item_id: 'sec-orphan', outline_version_id: 'v1', word_count: 940 },
+];
+
+const OUTLINE_VERSIONS = [1, 2].map(
+  (n) =>
+    ({
+      id: `v${n}`,
+      version_number: n,
+      content: serializeOutlineDocument(outlineFixture()),
+      change_summary: n === 1 ? 'First pass' : 'Split the middle chapter',
+      created_at: `2026-09-0${n + 1}T00:00:00Z`,
+    }) as ArtifactVersion
+);
+
+/**
+ * The outline stage as it behaves, not a screenshot of it: the fixture routes
+ * every edit through the real copy-on-write rule, so editing the approved
+ * outline below actually forks a draft.
+ */
+function OutlineSlice() {
+  const head = outlineFixture();
+  const [draft, setDraft] = useState<OutlineDocument | null>(null);
+  const doc = draft ?? head;
+
+  return (
+    <div className="rounded-2xl bg-[var(--surface)] p-6 shadow-[0_1px_2px_rgba(25,28,30,0.04),0_12px_32px_-16px_rgba(25,28,30,0.25)]">
+      <OutlineEditor
+        document={doc}
+        onChange={(next) =>
+          setDraft((current) =>
+            applyOutlineEdit({ head, headVersionId: 'v2', headApproved: true, draft: current }, next)
+          )
+        }
+        drafts={OUTLINE_DRAFTS}
+        staleDrafts={staleDrafts(OUTLINE_DRAFTS, 'v2', OUTLINE_VERSIONS)}
+        onRewriteSection={() => {}}
+        isDraft={draft !== null}
+        headVersionNumber={2}
+        approvedVersionNumber={2}
+        forkedFromVersionNumber={draft?.forked_from_version_id ? 2 : null}
+        onSaveDraft={() => {}}
+        onDiscardDraft={() => setDraft(null)}
+        onApprove={() => {}}
+        onRegenerateAll={() => {}}
+        onRegenerateItem={() => {}}
+      />
+      <div className="mt-4">
+        <OutlineHistory
+          history={outlineHistory(OUTLINE_VERSIONS, [
+            { outline_version_id: 'v1', created_at: '2026-09-02T00:00:00Z' },
+            { outline_version_id: 'v2', created_at: '2026-09-03T00:00:00Z' },
+          ])}
+          approvedVersionId="v2"
+          onRestore={() => {}}
+        />
+      </div>
+    </div>
+  );
+}
+
 function WorkflowSlice({ template }: { template: WorkflowTemplate }) {
   const events = template.key === 'book' ? EVENTS : [];
   const state = projectState(template, events);
@@ -327,6 +428,13 @@ export default function PreviewPage() {
             note="Different stages, different criteria — identical components. Nothing below branches on which workflow it is."
           >
             <WorkflowSlice template={RESEARCH_V1} />
+          </Section>
+
+          <Section
+            title="The outline editor"
+            note="FR-07. Reorder with the buttons or Alt+Arrow, insert between rows, and try editing a title: the outline is approved, so the first keystroke forks a draft rather than changing what drafting is bound to."
+          >
+            <OutlineSlice />
           </Section>
 
           <Section

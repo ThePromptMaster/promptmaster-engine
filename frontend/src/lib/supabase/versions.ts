@@ -3,7 +3,7 @@ import type { Artifact, ArtifactVersion, Evaluation } from '@/types/project';
 
 const ARTIFACT_COLUMNS = `
   id, user_id, project_id, kind, name, stage_id, summary, current_version_id,
-  version_count, long_form, revision, created_at, updated_at
+  version_count, long_form, outline_draft, revision, created_at, updated_at
 `;
 
 const VERSION_COLUMNS = `

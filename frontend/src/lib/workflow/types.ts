@@ -170,6 +170,13 @@ export interface WorkflowEvent {
   actor: 'user' | 'system';
   reason?: string;
   to_stage_id?: string;
+  /**
+   * Event-specific detail. An outline_approved event carries the
+   * outline_version_id it approved — without it the log would record that an
+   * approval happened but not what was approved, and drafting could not bind
+   * to a version.
+   */
+  payload?: Record<string, unknown>;
   created_at: string;
 }
 

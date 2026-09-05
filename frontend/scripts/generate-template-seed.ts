@@ -6,7 +6,11 @@
  * definitions as JSON in a migration would create a second source of truth
  * that silently drifts. Instead, revise the TypeScript and regenerate.
  *
- *   node scripts/generate-template-seed.ts > ../supabase/migrations/<ts>_seed_workflow_templates.sql
+ *   npm run --silent gen:templates > ../supabase/migrations/<ts>_seed_workflow_templates.sql
+ *
+ * --silent matters: without it npm prints its own "> pkg@version script" banner
+ * to stdout, which lands in the redirected file and makes the SQL fail with a
+ * syntax error at the leading '>'.
  */
 
 import { BOOK_V1 } from '../src/lib/workflow/templates/book.v1.ts';

@@ -8,6 +8,7 @@
  */
 
 import type { ModeType, LongFormState, ContinuitySnapshot, WhyThisWorks } from './index';
+import type { OutlineDocument } from './outline';
 
 export type ProjectStatus = 'active' | 'finalized' | 'archived';
 export type ScoreValue = 'Low' | 'Medium' | 'High';
@@ -69,7 +70,7 @@ export interface Artifact {
   id: string;
   user_id: string;
   project_id: string;
-  kind: 'output' | 'long_form_document' | 'export';
+  kind: 'output' | 'outline' | 'long_form_document' | 'export';
   name: string;
   /**
    * Which stage owns this artifact. Null for the 65 imported projects, which
@@ -86,6 +87,11 @@ export interface Artifact {
   current_version_id: string | null;
   version_count: number;
   long_form: LongFormState | null;
+  /**
+   * The outline's uncommitted working copy (FR-07). Mutable by design: a
+   * version row can never be edited in place, so the draft cannot be one.
+   */
+  outline_draft: OutlineDocument | null;
   revision: number;
   created_at: string;
   updated_at: string;
