@@ -24,7 +24,8 @@ import {
   staleDrafts,
 } from '@/lib/outline/model';
 import type { OutlineDocument, SectionDraftBinding } from '@/types/outline';
-import type { ArtifactVersion } from '@/types/project';
+import type { ArtifactVersion, Project } from '@/types/project';
+import type { LongFormState } from '@/types';
 import { StageRail } from '@/components/workflow/stage-rail';
 import { StageHeader } from '@/components/workflow/stage-header';
 import { ExitCriteriaChecklist } from '@/components/workflow/exit-criteria-checklist';
@@ -182,6 +183,109 @@ function RendererSlice({
         onGenerate={() => {}}
         onCancelGeneration={() => {}}
         readOnly={false}
+      />
+    </div>
+  );
+}
+
+/**
+ * Drafting, six sections in.
+ *
+ * The state that matters here is the one the old view could not represent:
+ * three sections written and safe, one cut short at the model's output limit,
+ * and the rest still to come — with no client-side loop anywhere. The counts
+ * come from the artifact, so this is what a user sees after closing the tab and
+ * coming back to find cron had carried on without them.
+ */
+const DRAFTING_PROJECT = {
+  id: 'preview-project',
+  user_id: 'preview-user',
+  title: 'How to Become a PromptMaster',
+  objective: 'Write a practical book on structured AI workflows.',
+  audience: 'Analysts, auditors and strategists',
+  constraints: '',
+  output_format: '',
+  mode: 'architect',
+  custom_name: '',
+  custom_preamble: '',
+  custom_tone: '',
+  model: 'openai/gpt-5.4',
+  session_facts: [],
+  active_stack_id: null,
+  constraint_presets: [],
+  format_presets: [],
+  workflow: 'book',
+  workflow_template_id: null,
+  stage: 'drafting',
+  status: 'active' as const,
+  manual_checks: {},
+  revision: 3,
+  archived_at: null,
+  deleted_at: null,
+  legacy_session_id: null,
+  created_at: '2026-09-01T10:00:00Z',
+  updated_at: '2026-09-05T10:00:00Z',
+};
+
+const DRAFTED_SECTIONS: Array<[string, 'complete' | 'truncated' | 'pending']> = [
+  ['The problem with chatting', 'complete'],
+  ['Modes as scaffolding', 'complete'],
+  ['Evaluation before iteration', 'complete'],
+  ['Drift, and how to see it', 'truncated'],
+  ['Realignment in practice', 'pending'],
+  ['Continuity across sections', 'pending'],
+];
+
+function draftingLongForm() {
+  return {
+    state: 'writing' as const,
+    current_section_index: 3,
+    started_at: '2026-09-05T09:00:00Z',
+    completed_at: null,
+    continuity_snapshot: null,
+    outline: DRAFTED_SECTIONS.map(([title, kind], i) => ({
+      id: `sec-${i}`,
+      title,
+      abstract: `What section ${i + 1} covers.`,
+      status: (kind === 'pending' ? 'pending' : 'complete') as 'pending' | 'complete',
+      content:
+        kind === 'pending'
+          ? ''
+          : `Generated prose for "${title}". In the real artifact this runs to several paragraphs; here it is one line so the row layout is what you are judging.`,
+      revision: kind === 'pending' ? 0 : 1,
+      finish_reason: kind === 'truncated' ? 'length' : kind === 'pending' ? null : 'stop',
+      error: null,
+      generated_at: kind === 'pending' ? null : '2026-09-05T09:30:00Z',
+    })),
+  };
+}
+
+function DraftingSlice() {
+  const stage = getStage(BOOK_V1, 'drafting')!;
+  return (
+    <div className="rounded-2xl bg-[var(--surface)] px-8 py-8 shadow-[0_1px_2px_rgba(25,28,30,0.04),0_12px_32px_-16px_rgba(25,28,30,0.25)]">
+      <StageRenderer
+        stage={stage}
+        schema={itemSchemaFor(stage)}
+        versions={[]}
+        activeVersionId={null}
+        onSelectVersion={() => {}}
+        onRestore={async () => {}}
+        onSaveContent={async () => {}}
+        onSaveItems={async () => {}}
+        generating={false}
+        generationError={null}
+        onGenerate={() => {}}
+        onCancelGeneration={() => {}}
+        readOnly={false}
+        longForm={{
+          project: DRAFTING_PROJECT as unknown as Project,
+          artifactId: 'preview-artifact',
+          stageId: 'drafting',
+          state: draftingLongForm() as unknown as LongFormState,
+          approvedOutlineVersionId: 'preview-outline-v2',
+          onRefresh: () => {},
+        }}
       />
     </div>
   );
@@ -414,6 +518,13 @@ export default function PreviewPage() {
               <RendererSlice stageId="positioning" content={null} />
               <RendererSlice stageId="positioning" content={null} generating />
             </div>
+          </Section>
+
+          <Section
+            title="The drafting renderer"
+            note="Sections are written by server jobs, so this component holds no generation state at all. Progress comes from the artifact and in-flight status from the job rows, which is why it stays honest after a tab close. The fourth section hit the model's output limit and says so."
+          >
+            <DraftingSlice />
           </Section>
 
           <Section
