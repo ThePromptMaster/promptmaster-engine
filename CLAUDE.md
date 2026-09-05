@@ -39,9 +39,8 @@ Backend deps live in a pyenv 3.12.4 environment on this machine; if `pytest` res
 It does verify identity. `backend/auth.py` checks the Supabase JWT and attaches a `user_id`; `main.py` applies `require_user` at router-include time so a new router cannot ship unprotected by omission. This superseded the original "no auth check" rule on 2026-09-02: every `/api/*` route had been public and billable against the OpenRouter key, and FR-17/FR-18 require an authenticated API and per-user cost controls. `/api/health` and `/api/modes` stay public; `/api/models` is protected because it calls OpenRouter.
 
 **Where state actually lives:**
-- Zustand store (`frontend/src/stores/session-store.ts`, ~450 lines) is the single source of truth for a live session, persisted to **sessionStorage** (survives refresh, clears on tab close) with `error`/`loading` stripped via `partialize`.
-- Supabase persists the session across tabs in `sessions.data` (a JSONB blob holding the whole `Session`, `long_form` included). There is no `sessions.long_form` column — the only per-row columns are the denormalized `objective`/`mode`/`audience`/`iterations` (an int count)/`finalized` used for listing.
-- The store is passed wholesale into API calls; the backend reconstructs context from `iteration_history` and `chat_history` on each request.
+- **`/projects`** — Supabase is authoritative. `project-store.ts` holds a cache plus a `revision` for optimistic concurrency; scalar edits are debounced field patches (never whole snapshots — that is a lost-update generator), appends are immediate, and a conflict is surfaced rather than resolved. `use-project-flush` forces pending edits out on tab hide and unload.
+- **`/session`** — the legacy flow. Zustand persisted to `sessionStorage` (dies on tab close), autosaved to `sessions.data` as one JSONB blob.
 
 ### Backend layout
 
@@ -76,13 +75,27 @@ It does verify identity. `backend/auth.py` checks the Supabase JWT and attaches 
 
 `frontend/AGENTS.md`: this is Next.js 16 — APIs differ from training data. Read `node_modules/next/dist/docs/` before writing framework-level code. Notably `proxy.ts` replaces `middleware.ts`, and auth/session routes are `force-dynamic`.
 
-## The 5-Phase Workflow
+## Two flows, mid-migration
 
-1. **Input** — mode card grid (8 modes incl. `custom`), objective, audience, constraint/format presets, session facts, prompt stack
-2. **Review** — inspect assembled system prompt, edit user prompt, execute. Long-form detection runs here, before `run-iteration`.
-3. **Output & Evaluation** — output, scores, suggestions, flow triggers, chat panel; refine / realign / finalize
-4. **Realignment** — corrective prompt, re-execute
-5. **Summary** — export (txt/json), iteration comparison, Cold Critic self-audit, carry lessons forward
+The app currently has **two** ways to do work. This is deliberate and temporary.
+
+### `/projects` — the Phase 2 workflow system (where new work goes)
+
+A project pins a **workflow template version** (`projects.workflow_template_id`) and moves through its stages. Templates are rows in `workflow_templates`, immutable once published — revising one publishes a new version, so a book halfway through drafting is unaffected.
+
+- `src/lib/workflow/` — the engine. `engine.ts` is pure functions (evaluate a stage's exit criteria, project state from events, list transitions); `templates/*.v1.ts` are the authoring source for `book`, `research` and `single_output`.
+- **Templates are generated into a seed migration**, never hand-written as JSON: `npm run --silent gen:templates > ../supabase/migrations/<ts>_seed_workflow_templates.sql`. `seed-drift.test.ts` fails if the TypeScript and the migration disagree. The `--silent` matters — without it npm's banner lands in the SQL.
+- `src/components/workflow/` — stage rail, header, exit-criteria checklist, transition bar, workspace. `workflow-workspace.tsx` dispatches on `stage.renderer`.
+- `src/components/workflow/renderers/` — `prose`, `list`, `review` (and `outline`, `long_form`). **Five renderers cover 26 stages across both workflows; no renderer branches on which workflow it is**, and a test asserts that.
+- Generation is `POST /api/generate-stage-artifact`, one LLM call. It does *not* use `build_iteration_with_full_pipeline` — that scores output against `inputs.objective`, which judges a list of audience segments against the wrong thing, and costs four calls where one will do.
+
+**Stage state is projected from the `workflow_events` log in exactly one place** (`projectState` in `engine.ts`). Events are the record; `projects.stage` is a denormalised cursor for the list view.
+
+**Exit criteria are declarative predicates evaluated by pure functions** — never an LLM call. A gate that fails because a model timed out is a gate users learn to resent. Unknown rule types degrade to a manual checklist item rather than throwing.
+
+### `/session` — the legacy 5-phase flow (still live, being retired)
+
+Input → Review → Output → Realign → Summary, driven by `session-store.ts` and `components/phases/`. It retires once `single_output` renders through the workspace; until then it is the only place some generation happens. **Do not add features here.**
 
 ## Evaluation System
 
@@ -97,10 +110,17 @@ A separate LLM call scores three dimensions plus two optional fields (`Evaluatio
 
 ## Supabase Schema
 
-Six tables, all RLS-scoped to `auth.uid() = user_id`:
-`sessions` (objective, mode, audience, iterations as an int count, finalized, `data` JSONB), `templates`, `usage_tracking` (action: iteration/realignment/session_finalize — `self_audit` and `hard_reset` are *not* emitted by any code path), `custom_modes`, `conversation_messages`, `user_presets`.
+**Phase 2 (current):** `projects`, `artifacts`, `artifact_versions`, `evaluations`, `workflow_templates`, `workflow_events`, `project_stage_events`, `recommendations`, `decisions`, `project_tasks`, `jobs`.
 
-Migrations live in `supabase/migrations/` (applied manually against the project — no local Supabase CLI setup in the repo). New tables follow the `custom_modes` pattern: `(user_id, created_at desc)` index, four owner policies, `touch_updated_at` trigger.
+Four rules the schema enforces, so they cannot be undone by a later code change:
+- **`project_stage_events.actor` is `user | system` — there is no `'model'`.** A model reaches stage state only via `proposal_id` pointing at an accepted recommendation. Auditable from the DDL alone, which matters because this is contract evidence.
+- **Children carry a composite FK on `(project_id, user_id)`**, so an artifact cannot be parented into another user's project even from a service-role client.
+- **`artifact_versions` is append-only**, with a trigger permitting only `user_rating` to change. Restore appends a new version rather than mutating; that is why version history and prompt assembly can trust it.
+- **`revision` is bumped by trigger, never by the client.** A client that could set it would echo its stale value back and defeat the concurrency guard.
+
+**Legacy (still live):** `sessions` (a whole `Session` in a `data` JSONB blob; the per-row columns are only for listing), `templates`, `usage_tracking` (emits `iteration`/`realignment`/`session_finalize` only), `custom_modes`, `conversation_messages`, `user_presets`.
+
+Migrations are the source of truth: always checked in, always idempotent, `drop policy if exists` before `create policy` (Postgres has no `create policy if not exists`). **A migration must apply against an empty database** — validate with `supabase db diff --linked --schema public` before pushing. Two migrations here have already broken that rule and had to be fixed.
 
 ## Environment Variables
 
