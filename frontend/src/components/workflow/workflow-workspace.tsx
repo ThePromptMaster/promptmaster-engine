@@ -18,6 +18,11 @@ import {
   type TransitionOption,
 } from '@/lib/workflow/engine';
 import { summariseStageContent } from '@/lib/workflow/digest';
+import { deriveOutlineItems } from '@/lib/workflow/derived-outline';
+import { OutlineStagePanel } from '@/components/outline/outline-stage-panel';
+import { draftBindings, longFormFromOutline } from '@/lib/outline/long-form';
+import { saveLongForm } from '@/lib/supabase/versions';
+import type { OutlineDocument } from '@/types/outline';
 import {
   isTriaged,
   itemSchemaFor,
@@ -48,6 +53,15 @@ interface Props {
   ) => Promise<unknown>;
   restoreStageVersion?: (stageId: string, versionId: string) => Promise<void>;
   setStageSummary?: (stageId: string, summary: string) => Promise<void>;
+  /**
+   * Create a stage's artifact if it has none yet.
+   *
+   * A drafting stage generates nothing on entry, so nothing had ever created
+   * its row — and approving an outline with nowhere to write it would leave
+   * drafting reporting "0 of 0 sections" with an approval in the log saying
+   * otherwise.
+   */
+  ensureStageArtifact?: (stageId: string, name: string) => Promise<Artifact>;
   /** Reload project state after the server changed it behind our back. */
   onReload?: () => void;
   /** Rendered instead of the dispatched renderer; used by the legacy pane. */
@@ -64,6 +78,7 @@ export function WorkflowWorkspace({
   appendStageVersion,
   restoreStageVersion,
   setStageSummary,
+  ensureStageArtifact,
   onReload,
   children,
 }: Props) {
@@ -293,9 +308,66 @@ export function WorkflowWorkspace({
     [stage, restoreStageVersion]
   );
 
+  /**
+   * The artifact this stage writes into.
+   *
+   * The project-level `artifact` is only a legitimate answer for a project whose
+   * one artifact has no stage at all — the single-output shape. A thirteen-stage
+   * project's `artifact` is whichever row happened to sort first, so falling
+   * back to it on a stage that has no artifact yet would materialise a drafting
+   * outline onto the research question's row.
+   */
+  const stageArtifact =
+    (stage ? stageBundles[stage.id]?.artifact : null) ??
+    (artifact && !artifact.stage_id ? artifact : null);
+
+  const deriveOutline = useCallback(
+    () => deriveOutlineItems(template, state, stageBundles),
+    [template, state, stageBundles]
+  );
+
+  const materialiseOutline = useCallback(
+    async (_version: ArtifactVersion, doc: OutlineDocument) => {
+      // The approved outline lives in artifact_versions; drafting reads
+      // artifacts.long_form. Approving has to cross that gap, and the merge
+      // keeps every section already written — approving a revised outline must
+      // not cost prose that has been generated and paid for.
+      const target =
+        stageArtifact ??
+        (stage && ensureStageArtifact ? await ensureStageArtifact(stage.id, stage.label) : null);
+      if (!target) throw new Error('This stage has no artifact to draft into.');
+
+      await saveLongForm(target.id, longFormFromOutline(doc, target.long_form ?? null));
+      onReload?.();
+    },
+    [stageArtifact, stage, ensureStageArtifact, onReload]
+  );
+
+  const reloadEvents = useCallback(async () => {
+    setEvents(await listWorkflowEvents(project.id));
+  }, [project.id]);
+
   if (!stage) return null;
 
   const stageVersions = stageBundles[stage.id]?.versions ?? [];
+
+  /**
+   * The derived outline (FR-07), routed on `outline_stage` rather than on the
+   * template key.
+   *
+   * 'explicit' is Book: a stage of its own where the user builds and approves
+   * an outline. 'derived' has no such stage — the outline falls out of the work
+   * already done, so it is offered on the drafting stage itself, above the
+   * drafting renderer. 'none' is single_output, which has no outline at all.
+   *
+   * Nothing below this point knows the difference. The derivation produces an
+   * ordinary outline document, the user edits it in the ordinary editor, and
+   * approving it writes the ordinary `outline_approved` event that drafting
+   * binds to — which is why the drafting renderer needed no change and still
+   * cannot tell one workflow from another.
+   */
+  const derivedOutlineHere =
+    template.outline_stage === 'derived' && template.derived_outline?.stage_id === stage.id;
 
   // Only assembled for drafting stages. Carries the project row because the
   // drain will rebuild this project's PMInput hours from now, in a process that
@@ -304,9 +376,9 @@ export function WorkflowWorkspace({
     stage.renderer === 'long_form'
       ? {
           project,
-          artifactId: (stageBundles[stage.id]?.artifact ?? artifact)?.id ?? null,
+          artifactId: stageArtifact?.id ?? null,
           stageId: stage.id,
-          state: (stageBundles[stage.id]?.artifact ?? artifact)?.long_form ?? null,
+          state: stageArtifact?.long_form ?? null,
           approvedOutlineVersionId: approvedOutlineVersionId(events ?? []),
           onRefresh: () => onReload?.(),
         }
@@ -357,6 +429,21 @@ export function WorkflowWorkspace({
           />
 
           <div className="mb-8">
+            {derivedOutlineHere && !children && (
+              <div className="mb-6">
+                <OutlineStagePanel
+                  project={project}
+                  stageId={stage.id}
+                  events={events ?? []}
+                  onEventsChanged={reloadEvents}
+                  derive={deriveOutline}
+                  drafts={draftBindings(stageArtifact?.long_form ?? null)}
+                  onApproved={materialiseOutline}
+                  readOnly={!isCurrent}
+                />
+              </div>
+            )}
+
             {/* `children` is the legacy single-output pane. Once that workflow
                 renders through `single_output`, this prop goes. */}
             {children ?? (

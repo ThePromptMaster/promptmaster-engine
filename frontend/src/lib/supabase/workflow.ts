@@ -7,7 +7,11 @@ interface TemplateRow {
   version: number;
   name: string;
   description: string;
-  definition: { outline_stage: WorkflowTemplate['outline_stage']; stages: StageDefinition[] };
+  definition: {
+    outline_stage: WorkflowTemplate['outline_stage'];
+    derived_outline?: WorkflowTemplate['derived_outline'];
+    stages: StageDefinition[];
+  };
 }
 
 function toTemplate(row: TemplateRow): WorkflowTemplate & { id: string } {
@@ -18,6 +22,7 @@ function toTemplate(row: TemplateRow): WorkflowTemplate & { id: string } {
     name: row.name,
     description: row.description,
     outline_stage: row.definition.outline_stage,
+    derived_outline: row.definition.derived_outline,
     stages: row.definition.stages,
   };
 }
