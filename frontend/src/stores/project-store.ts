@@ -19,6 +19,7 @@ import {
   type NewEvaluation,
   type NewVersion,
 } from '@/lib/supabase/versions';
+import { OUTLINE_ARTIFACT_KIND } from '@/lib/supabase/outline';
 import {
   ProjectConflictError,
   type Artifact,
@@ -153,7 +154,18 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         artifacts.map(async (a) => ({ artifact: a, versions: await listVersions(a.id) }))
       );
       for (const bundle of allVersions) {
-        if (bundle.artifact.stage_id) stages[bundle.artifact.stage_id] = bundle;
+        const stageId = bundle.artifact.stage_id;
+        if (!stageId) continue;
+        // A derived-outline workflow puts TWO artifacts on its drafting stage:
+        // the outline it approves, and the paper it writes. The outline is a
+        // companion to the stage rather than its output, so it never claims the
+        // bundle — letting it win would make the drafting renderer read an
+        // outline as its manuscript and every exit criterion answer about the
+        // wrong row.
+        const held = stages[stageId];
+        if (held && bundle.artifact.kind === OUTLINE_ARTIFACT_KIND) continue;
+        if (held && held.artifact?.kind !== OUTLINE_ARTIFACT_KIND) continue;
+        stages[stageId] = bundle;
       }
 
       const artifact = artifacts.find((a) => a.kind === 'output') ?? artifacts[0] ?? null;

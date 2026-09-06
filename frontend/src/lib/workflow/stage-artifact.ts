@@ -103,7 +103,27 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
     ],
   },
 
-  hypothesis: {
+  literature_map: {
+    itemLabel: 'work',
+    minItems: 3,
+    maxItems: 15,
+    fields: [
+      { key: 'work', label: 'The work', hint: 'Named specifically enough to find again', max: 240 },
+      { key: 'finding', label: 'What it established', long: true, max: 400 },
+      {
+        key: 'relation',
+        label: 'How it bears on this question',
+        hint: 'Supports, contradicts, neighbours, or supplies the method',
+        long: true,
+        max: 400,
+      },
+    ],
+  },
+
+  // Keyed 'hypotheses' because that is the artifact kind the Research template
+  // declares. The registry is keyed by kind, so a near-miss here silently
+  // demotes the stage to a single free-text field.
+  hypotheses: {
     itemLabel: 'hypothesis',
     minItems: 1,
     maxItems: 6,
@@ -135,6 +155,66 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
       { value: 'verified', label: 'Verified', tone: 'done' },
       { value: 'unverifiable', label: 'Unverifiable', tone: 'neutral', requiresReason: true },
       { value: 'removed', label: 'Remove', tone: 'warn', requiresReason: true },
+    ],
+  },
+
+  runs: {
+    itemLabel: 'run',
+    minItems: 1,
+    maxItems: 20,
+    fields: [
+      { key: 'run', label: 'What was to be done', long: true, max: 400 },
+      { key: 'observed', label: 'What actually happened', long: true, max: 400 },
+      { key: 'deviation', label: 'Deviation from the plan', long: true, max: 400 },
+    ],
+    // A run that was not done is fine; a run that vanishes between the method
+    // and the results is not — so "not run" costs a sentence.
+    statuses: [
+      { value: 'completed', label: 'Completed', tone: 'done' },
+      { value: 'deviated', label: 'Deviated', tone: 'neutral', requiresReason: true },
+      { value: 'not_run', label: 'Not run', tone: 'warn', requiresReason: true },
+    ],
+  },
+
+  alternatives: {
+    itemLabel: 'alternative explanation',
+    minItems: 2,
+    maxItems: 12,
+    fields: [
+      {
+        key: 'explanation',
+        label: 'The rival explanation',
+        hint: 'In the form its own advocate would recognise',
+        long: true,
+        max: 400,
+      },
+      { key: 'why_plausible', label: 'What makes it plausible here', long: true, max: 400 },
+      { key: 'how_addressed', label: 'What rules it out', long: true, max: 400 },
+    ],
+    // Left open is an acceptable outcome. Left unmentioned is not, which is
+    // why there is no status meaning "not considered".
+    statuses: [
+      { value: 'ruled_out', label: 'Ruled out', tone: 'done' },
+      { value: 'addressed', label: 'Addressed', tone: 'done' },
+      { value: 'left_open', label: 'Left open', tone: 'neutral', requiresReason: true },
+    ],
+  },
+
+  validation_table: {
+    itemLabel: 'result',
+    minItems: 1,
+    maxItems: 20,
+    fields: [
+      { key: 'result', label: 'The result', hint: "In the analysis's own terms", long: true, max: 400 },
+      { key: 'attempt', label: 'What was done to validate it', long: true, max: 400 },
+      { key: 'notes', label: 'What came back', long: true, max: 400 },
+    ],
+    // Not attempted is honest; unexamined is not. There is no status that lets
+    // "we did not check" read as "it held".
+    statuses: [
+      { value: 'reproduced', label: 'Reproduced', tone: 'done' },
+      { value: 'not_reproduced', label: 'Not reproduced', tone: 'warn', requiresReason: true },
+      { value: 'not_attempted', label: 'Not attempted', tone: 'neutral', requiresReason: true },
     ],
   },
 

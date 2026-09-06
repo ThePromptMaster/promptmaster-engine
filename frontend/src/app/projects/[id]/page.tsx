@@ -40,6 +40,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const appendStageVersion = useProjectStore((s) => s.appendStageVersion);
   const restoreStageVersion = useProjectStore((s) => s.restoreStageVersion);
   const setStageSummary = useProjectStore((s) => s.setStageSummary);
+  const ensureStageArtifact = useProjectStore((s) => s.ensureStageArtifact);
 
   const [template, setTemplate] = useState<WorkflowTemplate | null>(null);
 
@@ -247,6 +248,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         appendStageVersion={appendStageVersion}
         restoreStageVersion={restoreStageVersion}
         setStageSummary={setStageSummary}
+        ensureStageArtifact={ensureStageArtifact}
         onReload={() => void loadProject(id)}
       >
         {template.key === 'single_output' ? artifactPane : undefined}

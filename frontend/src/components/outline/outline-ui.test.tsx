@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+import { DerivedOutlineNotice } from './derived-outline-notice';
 import { OutlineEditor } from './outline-editor';
 import { OutlineHistory } from './outline-history';
 import { newItem, outlineHistory, serializeOutlineDocument, staleDrafts } from '@/lib/outline/model';
@@ -295,6 +296,54 @@ describe('OutlineEditor — prose written against an older outline', () => {
       screen.getByRole('button', { name: /Rewrite “One” against the approved outline/ })
     );
     expect(onRewriteSection).toHaveBeenCalledWith('i1');
+  });
+});
+
+describe('DerivedOutlineNotice — upstream moved after approval', () => {
+  const item = (id: string, title: string) => ({ id, title, abstract: '' });
+
+  it('names what moved and offers a re-derivation rather than performing one', async () => {
+    const onRederive = vi.fn();
+    render(
+      <DerivedOutlineNotice
+        drift={{
+          changed: [item('discussion', 'Discussion')],
+          added: [item('related_work', 'Related work')],
+          removed: [item('results', 'Results')],
+          stale: true,
+        }}
+        onRederive={onRederive}
+      />
+    );
+
+    expect(
+      screen.getByText('An earlier stage changed after this outline was approved')
+    ).toBeInTheDocument();
+    expect(screen.getByText('Discussion')).toBeInTheDocument();
+    expect(screen.getByText('Related work')).toBeInTheDocument();
+    expect(screen.getByText('Results')).toBeInTheDocument();
+
+    // Nothing happens until the user asks for it: an approved outline is what
+    // drafting is bound to.
+    expect(onRederive).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: /Re-derive from the stages/ }));
+    expect(onRederive).toHaveBeenCalledTimes(1);
+  });
+
+  it('omits the categories that are empty, and itself when nothing moved', () => {
+    const { unmount } = render(
+      <DerivedOutlineNotice
+        drift={{ changed: [item('method', 'Method')], added: [], removed: [], stale: true }}
+      />
+    );
+    expect(screen.getByText('Now briefed differently')).toBeInTheDocument();
+    expect(screen.queryByText('No stage feeds these any more')).not.toBeInTheDocument();
+    // No handler, no button — this is how it reads on a stage being browsed.
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    unmount();
+
+    render(<DerivedOutlineNotice drift={{ changed: [], added: [], removed: [], stale: false }} />);
+    expect(screen.queryByText(/An earlier stage changed/)).not.toBeInTheDocument();
   });
 });
 

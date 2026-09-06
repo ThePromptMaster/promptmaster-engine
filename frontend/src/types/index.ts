@@ -57,6 +57,14 @@ export interface OutlineSection {
   finish_reason: string | null;
   error: string | null;
   generated_at: string | null;
+  /**
+   * FR-07: the approved outline this section was written against.
+   *
+   * `write_long_form_section` has stamped it since the job writes landed; it
+   * was simply absent from this type, which is why the outline editor could not
+   * tell which prose was written against a superseded outline.
+   */
+  outline_version_id?: string | null;
 }
 
 export type LongFormStateName =

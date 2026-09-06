@@ -46,7 +46,13 @@ describe('generated seed matches the templates', () => {
     (key, index) => {
       const template = WORKFLOW_TEMPLATES[index];
       expect(definitions[index]).toEqual(
-        JSON.parse(JSON.stringify({ outline_stage: template.outline_stage, stages: template.stages }))
+        JSON.parse(
+          JSON.stringify({
+            outline_stage: template.outline_stage,
+            ...(template.derived_outline ? { derived_outline: template.derived_outline } : {}),
+            stages: template.stages,
+          })
+        )
       );
       expect(key).toBe(template.key);
     }

@@ -13,6 +13,7 @@ import {
   progressSummary,
   projectState,
 } from './index';
+import { itemSchemaFor, rendererHoldsItems } from './stage-artifact';
 import type { StageContext, WorkflowEvent, WorkflowTemplate } from './types';
 
 function emptyContext(overrides: Partial<StageContext> = {}): StageContext {
@@ -184,6 +185,114 @@ describe('FR-03: one engine, two workflows', () => {
       (s) => s.transitions.branch_options
     );
     expect(branching.map((s) => s.id)).toEqual(['continuity']);
+  });
+
+  it('reaches its terminal stage along the default path, in both workflows', () => {
+    // Research differs from Book only in its data, so the same walk has to
+    // arrive somewhere in both. A default_next cycle, or a spine that stops
+    // short of the terminal stage, would strand a user with no way forward
+    // that does not involve going backwards.
+    for (const template of [BOOK_V1, RESEARCH_V1]) {
+      const walked: string[] = [];
+      let cursor: string | null = template.stages[0].id;
+      while (cursor && !walked.includes(cursor)) {
+        walked.push(cursor);
+        cursor = getStage(template, cursor)!.transitions.default_next;
+      }
+      expect(cursor, `${template.key} loops`).toBeNull();
+      const terminal = template.stages.find((s) => s.transitions.default_next === null)!;
+      expect(walked.at(-1), `${template.key} spine`).toBe(terminal.id);
+    }
+  });
+
+  it('walks Research to the end through the same projection Book uses', () => {
+    // Not a re-read of the template: this drives projectState with a completed
+    // event per stage and asserts the cursor lands on final_review.
+    let events: WorkflowEvent[] = [];
+    let state = initialState(RESEARCH_V1);
+    while (getStage(RESEARCH_V1, state.current_stage_id)!.transitions.default_next) {
+      const next = getStage(RESEARCH_V1, state.current_stage_id)!.transitions.default_next!;
+      events = [...events, event('stage_completed', state.current_stage_id, { to_stage_id: next })];
+      state = projectState(RESEARCH_V1, events);
+    }
+    expect(state.current_stage_id).toBe('final_review');
+    expect(progressSummary(RESEARCH_V1, state)).toMatchObject({ complete: 12, remaining: 1 });
+  });
+
+  it('gives every long-form stage an instruction, not just guidance', () => {
+    // entry_guidance is shown to the user; entry_prompt_hint is what the stage
+    // generator appends to the mode-locked system prompt. A stage without one
+    // generates a generic essay about its own title — which is what Research
+    // v1 shipped, and what v2 exists to fix.
+    for (const template of [BOOK_V1, RESEARCH_V1]) {
+      for (const stage of template.stages) {
+        expect(stage.entry_prompt_hint?.trim(), `${template.key}/${stage.id}`).toBeTruthy();
+      }
+    }
+  });
+
+  it('names a failure mode in each Research instruction, not only the output', () => {
+    // The clause that does the work is the one saying what a lazy answer looks
+    // like. Without it the hint is a description, and the model reliably
+    // produces the thing the stage exists to prevent.
+    //
+    // Research only, for the same reason as the field-name contract below:
+    // Book v2 is published and immutable, and its final_review hint states the
+    // standard without naming what falls short of it.
+    // "X rather than Y" counts — it is the same move in a positive voice.
+    const NEGATIVE = /\bnot\b|\bno\b|\bnothing\b|\bnever\b|\bworse\b|\bfail|\brather than\b/i;
+    for (const template of [RESEARCH_V1]) {
+      for (const stage of template.stages) {
+        expect(
+          NEGATIVE.test(stage.entry_prompt_hint ?? ''),
+          `${template.key}/${stage.id}`
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('gives every list and review stage a field schema its criteria can read', () => {
+    // A stage whose artifact kind is missing from the registry falls back to
+    // one free-text field: the prompt then names columns the parser drops, and
+    // an every_item_has_status gate has no status enum to read, so the gate can
+    // never be satisfied by any sequence of user actions. Research v1 had five
+    // such stages.
+    for (const template of [BOOK_V1, RESEARCH_V1]) {
+      for (const stage of template.stages) {
+        // Book's outline_approval renders rows but declares no artifact of its
+        // own — it gates on an approval, not on something it produces.
+        if (!rendererHoldsItems(stage.renderer) || !stage.expected_artifacts.length) continue;
+        const schema = itemSchemaFor(stage);
+        expect(
+          schema.fields.map((f) => f.key),
+          `${template.key}/${stage.id}`
+        ).not.toEqual(['text']);
+        if (stage.exit_criteria.some((c) => c.rule?.type === 'every_item_has_status')) {
+          expect(schema.statuses?.length, `${template.key}/${stage.id}`).toBeGreaterThan(0);
+        }
+      }
+    }
+  });
+
+  it('names the schema fields the Research hints ask the model for', () => {
+    // The hint and the registry are two halves of one contract: a field named
+    // in the prompt but absent from the schema is stripped by the backend
+    // parser, so the column arrives empty and the stage looks broken.
+    //
+    // Research only. Book v2 is published and therefore immutable, and two of
+    // its hints describe their rows in prose rather than naming the keys; that
+    // is a v3 change, not something to relax the contract for.
+    for (const template of [RESEARCH_V1]) {
+      for (const stage of template.stages) {
+        // Book's outline_approval renders rows but declares no artifact of its
+        // own — it gates on an approval, not on something it produces.
+        if (!rendererHoldsItems(stage.renderer) || !stage.expected_artifacts.length) continue;
+        const hint = stage.entry_prompt_hint ?? '';
+        for (const field of itemSchemaFor(stage).fields) {
+          expect(hint, `${template.key}/${stage.id} hint omits ${field.key}`).toContain(field.key);
+        }
+      }
+    }
   });
 
   it('gives every FR-04 group a home so the rail can distinguish them', () => {

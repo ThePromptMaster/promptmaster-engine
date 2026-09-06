@@ -1,3 +1,6 @@
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -96,12 +99,12 @@ describe('renderers are workflow-agnostic', () => {
     expect(screen.queryByLabelText('What it predicts')).not.toBeInTheDocument();
     unmount();
 
-    const hypothesis: StageDefinition = {
-      ...audience,
-      id: 'hypothesis',
-      label: 'Hypothesis',
-      expected_artifacts: [{ kind: 'hypothesis', cardinality: 'many', primary: true }],
-    };
+    // The real Research stage, not a fabricated one: the registry is keyed by
+    // artifact kind, so a test that invents a kind proves nothing about the
+    // template that ships. (It also hid a near-miss — the template declares
+    // 'hypotheses' and the registry had 'hypothesis', which quietly demoted the
+    // stage to a single free-text field.)
+    const hypothesis = getStage(RESEARCH_V1, 'hypothesis')!;
     render(<ListRenderer {...props(hypothesis, { versions: [version(serializeItems([{ id: 'i1' }]))] })} />);
     expect(screen.getByLabelText('What it predicts')).toBeInTheDocument();
     expect(screen.queryByLabelText('What they already know')).not.toBeInTheDocument();
@@ -127,6 +130,34 @@ describe('renderers are workflow-agnostic', () => {
   it('renders drafting through the long-form renderer, not the placeholder', () => {
     render(<StageRenderer {...props(bookStage('drafting'))} />);
     expect(screen.queryByText(/not built yet/)).not.toBeInTheDocument();
+  });
+
+  it('no renderer source so much as names a workflow', () => {
+    // The behavioural tests above prove the renderers behave the same for both
+    // workflows today. This one closes the door on the shortcut that would end
+    // that: adding Research's derived outline made it tempting to special-case
+    // drafting, and the rule is that routing on `outline_stage` happens in the
+    // workspace, on a field, never in a renderer, on a name.
+    const dir = join(process.cwd(), 'src', 'components', 'workflow', 'renderers');
+    const files = readdirSync(dir).filter((f) => f.endsWith('.tsx') && !f.includes('.test.'));
+    expect(files.length).toBeGreaterThan(0);
+
+    // What a branch would actually look like, rather than any mention of the
+    // word: a workflow key as a literal, a template import, or a reach for the
+    // fields only the workspace is allowed to route on. A prose comment saying
+    // "research claims" is not a branch.
+    const banned: Array<[RegExp, string]> = [
+      [/['"`](book|research|single_output)['"`]/, 'a workflow key as a string literal'],
+      [/\b(BOOK_V1|RESEARCH_V1|SINGLE_OUTPUT_V1)\b/, 'a template import'],
+      [/\b(template|workflow)\s*[.?]\s*(key|outline_stage|derived_outline)\b/, 'the workflow identity'],
+    ];
+
+    for (const file of files) {
+      const source = readFileSync(join(dir, file), 'utf8');
+      for (const [pattern, what] of banned) {
+        expect(source, `${file} branches on ${what}`).not.toMatch(pattern);
+      }
+    }
   });
 
   it('says drafting is unwired rather than crashing when no project context is passed', () => {

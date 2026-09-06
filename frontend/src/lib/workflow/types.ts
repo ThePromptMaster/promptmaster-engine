@@ -112,6 +112,51 @@ export interface StageDefinition {
   transitions: StageTransitions;
 }
 
+/**
+ * One section of a derived outline.
+ *
+ * `from_stages` is the whole idea: a paper's structure is a mapping from work
+ * already done onto the conventional shape of a write-up. That mapping is a
+ * fact about the workflow, not something a model should be asked to invent
+ * afresh every time somebody looks at it.
+ */
+export interface DerivedSectionSpec {
+  /**
+   * Also the outline item's id, deliberately. Item ids are the lineage binding
+   * prose to an outline item, so a derivation re-run after an upstream edit
+   * must land on the SAME ids — otherwise every written section detaches
+   * itself the moment an earlier stage is touched.
+   */
+  id: string;
+  title: string;
+  /** Stage ids this section draws on, in the order their briefs are read. */
+  from_stages: string[];
+  /** What the section must cover, independent of what upstream produced. */
+  guidance: string;
+  /**
+   * Required sections survive their sources being skipped, carrying an empty
+   * brief; optional ones are dropped. A write-up still needs its method
+   * section when the method stage is thin, but it does not need a "Related
+   * work" heading over nothing at all.
+   */
+  required: boolean;
+}
+
+/**
+ * How a `derived` workflow builds its outline (FR-07).
+ *
+ * Applied by a pure function over this spec and the project's stage artifacts —
+ * no model call, for the same reason exit criteria have none. An outline that
+ * comes back different every time you look at it is not a plan, and a paper's
+ * section structure is a convention rather than a creative act. It also cannot
+ * fail because a model timed out.
+ */
+export interface DerivedOutlineSpec {
+  /** The stage that owns the derived outline: the workflow's drafting stage. */
+  stage_id: string;
+  sections: DerivedSectionSpec[];
+}
+
 export interface WorkflowTemplate {
   key: string;
   version: number;
@@ -123,6 +168,12 @@ export interface WorkflowTemplate {
    * this as a flag rather than a code branch is what keeps one engine.
    */
   outline_stage: 'explicit' | 'derived' | 'none';
+  /**
+   * Required when `outline_stage` is 'derived', meaningless otherwise. Routing
+   * reads `outline_stage`, never the template key: a second derived workflow
+   * has to work without a line of new code.
+   */
+  derived_outline?: DerivedOutlineSpec;
   stages: StageDefinition[];
 }
 
