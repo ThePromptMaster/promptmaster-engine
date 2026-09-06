@@ -212,3 +212,20 @@ export function derivedOutlineDrift(
     stale: changed.length > 0 || added.length > 0 || removed.length > 0,
   };
 }
+
+/**
+ * The stage an approved outline is written *for*: the first stage that drafts.
+ *
+ * For a derived outline this is the stage the panel already sits on, so caller
+ * and destination coincide. For Book's explicit Outline stage it is a later
+ * stage entirely — and writing `long_form` onto the outline stage's own
+ * artifact would leave drafting reporting "0 of 0 sections" with an approval
+ * sitting in the event log saying otherwise. That mismatch is exactly why
+ * Book's outline stage could not be wired up by dispatching a renderer alone.
+ *
+ * First rather than only: Book has several `long_form` stages (drafting, then
+ * the expansion passes). Sections are materialised once, by the first.
+ */
+export function draftingStageId(template: WorkflowTemplate): string | null {
+  return template.stages.find((s) => s.renderer === 'long_form')?.id ?? null;
+}
