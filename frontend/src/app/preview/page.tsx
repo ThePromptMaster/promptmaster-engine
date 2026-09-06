@@ -157,6 +157,121 @@ const FACT_CHECK_FIXTURE = serializeItems([
   },
 ]);
 
+// --- Research fixtures ------------------------------------------------------
+//
+// The Research stages are here for the same reason the Book ones are: the hints
+// that make a stage produce falsifiable propositions rather than an essay about
+// hypotheses are only judgeable against the columns they fill. Each fixture is
+// written as a plausible *good* answer to its stage's instruction, so the rows
+// below are also the standard the prompt is aiming at.
+
+const HYPOTHESIS_FIXTURE = serializeItems([
+  {
+    id: 'i1',
+    statement: 'Queue latency above 400ms at p95 drives free-tier churn within a week.',
+    prediction: 'Churn rises monotonically with p95 latency; roughly 2pp per 100ms above 400ms.',
+    disconfirming_observation:
+      'Churn flat across the 200–900ms range, or rising below 400ms as fast as above it.',
+  },
+  {
+    id: 'i2',
+    statement: 'The effect runs through failed retries, not through perceived slowness.',
+    prediction: 'Controlling for retry failures removes most of the latency–churn association.',
+    disconfirming_observation:
+      'The association survives the control at close to full strength.',
+  },
+]);
+
+const ALTERNATIVES_FIXTURE = serializeItems([
+  {
+    id: 'i1',
+    explanation: 'High-latency periods coincide with the weekly billing job, so the churn is priced, not slow.',
+    why_plausible: 'Both peaks land on Tuesdays; we never separated them.',
+    how_addressed: 'Re-ran the comparison excluding Tuesdays; the effect held at 80% strength.',
+    status: 'addressed',
+  },
+  {
+    id: 'i2',
+    explanation: 'Selection: accounts on the slowest shard were also the oldest free accounts.',
+    why_plausible: 'Shard assignment predates the current placement policy.',
+    how_addressed: 'Would need an account-age-matched sample we do not have.',
+    status: 'left_open',
+    reason: 'No matched sample this quarter; recorded for the next study.',
+  },
+]);
+
+const VALIDATION_FIXTURE = serializeItems([
+  {
+    id: 'i1',
+    result: 'Churn rises with p95 latency above 400ms.',
+    attempt: 'Rerun on the following month, independent sample.',
+    notes: 'Same direction, slope 1.6pp per 100ms against 2.0pp.',
+    status: 'reproduced',
+  },
+  {
+    id: 'i2',
+    result: 'Retry failures mediate most of the effect.',
+    attempt: 'None — the retry log rotates at 14 days.',
+    notes: '',
+    status: 'not_attempted',
+    reason: 'Log retention is shorter than the observation window.',
+  },
+]);
+
+function ResearchSlice({ stageId, content }: { stageId: string; content: string }) {
+  const stage = getStage(RESEARCH_V1, stageId)!;
+  return (
+    <div className="rounded-2xl bg-[var(--surface)] px-8 py-8 shadow-[0_1px_2px_rgba(25,28,30,0.04),0_12px_32px_-16px_rgba(25,28,30,0.25)]">
+      <StageRenderer
+        stage={stage}
+        schema={itemSchemaFor(stage)}
+        versions={[fixtureVersion(content)]}
+        activeVersionId={null}
+        onSelectVersion={() => {}}
+        onRestore={async () => {}}
+        onSaveContent={async () => {}}
+        onSaveItems={async () => {}}
+        generating={false}
+        generationError={null}
+        onGenerate={() => {}}
+        onCancelGeneration={() => {}}
+        readOnly={false}
+      />
+    </div>
+  );
+}
+
+/** What the stage generator is actually sent, so the authoring can be read. */
+function InstructionSlice({ template }: { template: WorkflowTemplate }) {
+  return (
+    <div className="overflow-hidden rounded-2xl bg-[var(--surface)] shadow-[0_1px_2px_rgba(25,28,30,0.04),0_12px_32px_-16px_rgba(25,28,30,0.25)]">
+      {template.stages.map((stage, i) => (
+        <div
+          key={stage.id}
+          className={
+            i % 2 === 0
+              ? 'px-8 py-5'
+              : 'bg-[var(--surface-container-lowest)] px-8 py-5'
+          }
+        >
+          <div className="flex items-baseline gap-3">
+            <span className="text-label uppercase tracking-wider text-[var(--on-surface-variant)]">
+              {i + 1}
+            </span>
+            <span className="text-body font-semibold text-[var(--on-surface)]">{stage.label}</span>
+            <span className="text-label text-[var(--on-surface-variant)]">
+              {stage.renderer}
+            </span>
+          </div>
+          <p className="mt-2 text-body text-[var(--on-surface-variant)]">
+            {stage.entry_prompt_hint}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function RendererSlice({
   stageId,
   content,
@@ -539,6 +654,24 @@ export default function PreviewPage() {
             note="Different stages, different criteria — identical components. Nothing below branches on which workflow it is."
           >
             <WorkflowSlice template={RESEARCH_V1} />
+          </Section>
+
+          <Section
+            title="Research stages, rendered"
+            note="Hypothesis through the list renderer, alternatives and validation through the review renderer — the same three components as Book, filled from the Research item schemas. The second alternative is left open with a reason, and the second result was never re-run; both are legitimate answers, and both are visible rather than absorbed."
+          >
+            <div className="space-y-6">
+              <ResearchSlice stageId="hypothesis" content={HYPOTHESIS_FIXTURE} />
+              <ResearchSlice stageId="alternatives" content={ALTERNATIVES_FIXTURE} />
+              <ResearchSlice stageId="validation" content={VALIDATION_FIXTURE} />
+            </div>
+          </Section>
+
+          <Section
+            title="What each Research stage asks the model for"
+            note="entry_prompt_hint, appended to the mode-locked system prompt. Not shown to the user anywhere in the app — this is the only place it can be read and judged. Each one ends with its failure mode, which is the clause that does the work."
+          >
+            <InstructionSlice template={RESEARCH_V1} />
           </Section>
 
           <Section
