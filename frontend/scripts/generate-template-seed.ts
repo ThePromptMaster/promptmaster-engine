@@ -22,8 +22,14 @@ const TEMPLATES = [BOOK_V1, RESEARCH_V1, SINGLE_OUTPUT_V1];
 const sqlString = (value: string) => `'${value.replace(/'/g, "''")}'`;
 
 const rows = TEMPLATES.map((t) => {
+  // outline_stage stays first: the drift test finds each definition by
+  // anchoring on it, and a reordered key would make the guard match nothing and
+  // pass vacuously.
   const definition = JSON.stringify({
     outline_stage: t.outline_stage,
+    // Omitted rather than written as null where a workflow has none, so
+    // Book and single_output seed exactly the JSON they seeded before.
+    ...(t.derived_outline ? { derived_outline: t.derived_outline } : {}),
     stages: t.stages,
   });
   return `  (${sqlString(t.key)}, ${t.version}, ${sqlString(t.name)}, ${sqlString(t.description)}, ${sqlString(definition)}::jsonb)`;

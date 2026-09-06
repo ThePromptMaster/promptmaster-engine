@@ -5,6 +5,7 @@ import type { WorkflowTemplate } from './types';
 
 export * from './types';
 export * from './engine';
+export * from './derived-outline';
 
 /**
  * Templates live in the repo so they can be validated offline by tests, and

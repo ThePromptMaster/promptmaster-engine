@@ -44,6 +44,102 @@ export const RESEARCH_V1: WorkflowTemplate = {
   name: 'Research',
   description: 'Question through validated write-up, with the analysis plan fixed before the data.',
   outline_stage: 'derived',
+  /**
+   * The outline Research never stops to write.
+   *
+   * Book has an Outline stage and an Outline-approval stage; Research has
+   * neither, and until this spec existed that meant a project could plan itself
+   * across twelve stages and then find nothing to draft — an empty outline, no
+   * approved version, and a disabled button.
+   *
+   * The mapping is declared rather than generated. Which stage feeds which
+   * section of a paper is a convention of the form, and a convention is exactly
+   * the kind of thing that should be written down once and read, not asked of a
+   * model at a cost of one round-trip and a different answer each time.
+   *
+   * `required` is set from the source stages' own `allow_skip`: introduction,
+   * method, discussion and conclusion rest on stages that cannot be skipped, so
+   * they always appear. Every other section is dropped when the stages behind
+   * it produced nothing — a theoretical study skips the experiment stage and
+   * gets a paper with no Results heading, rather than an empty one.
+   */
+  derived_outline: {
+    stage_id: 'drafting',
+    sections: [
+      {
+        id: 'introduction',
+        title: 'Introduction',
+        from_stages: ['question', 'hypothesis'],
+        guidance:
+          'State the question, why it is open, and what would count as an answer. Set out the propositions being tested and what each predicts, so a reader knows before the method what result would settle this against you.',
+        required: true,
+      },
+      {
+        id: 'related_work',
+        title: 'Related work',
+        from_stages: ['literature'],
+        guidance:
+          'Place the study against the work it follows: what each prior result established, and what it does to this question. Close on the gap — a gap in what is known, not in what has happened to be tried.',
+        required: false,
+      },
+      {
+        id: 'method',
+        title: 'Method',
+        from_stages: ['method'],
+        guidance:
+          'Give the procedure, the variables and how they are measured, the controls, and the analysis plan as it was fixed before the data. Written so someone else could run it without asking a follow-up question.',
+        required: true,
+      },
+      {
+        id: 'results',
+        title: 'Results',
+        from_stages: ['experiment'],
+        guidance:
+          'Report what was observed, run by run, including deviations from the plan and runs that were not done. Report; do not yet interpret. A run that disappears between the method and the results is the commonest way a study stops being reproducible.',
+        required: false,
+      },
+      {
+        id: 'reproduction',
+        title: 'Reproduction and validation',
+        from_stages: ['validation'],
+        guidance:
+          'Say which results were re-run or independently checked, by what means, and how closely they matched. Not attempted is an honest answer when the reason is given; it must not be allowed to read as held.',
+        required: false,
+      },
+      {
+        id: 'discussion',
+        title: 'Discussion',
+        from_stages: ['analysis'],
+        guidance:
+          'Take each hypothesis in turn and give its verdict against the evidence that decides it, applying the analysis plan as written. Verdicts that went against the expected answer belong here in the same voice as the ones that did not.',
+        required: true,
+      },
+      {
+        id: 'threats',
+        title: 'Threats to validity',
+        from_stages: ['alternatives'],
+        guidance:
+          'Set out the rival explanations in the form their own advocates would recognise, what in the data is consistent with each, and what rules it out or would be needed to. An alternative left open, with a reason, belongs here too.',
+        required: false,
+      },
+      {
+        id: 'interpretation',
+        title: 'Interpretation and scope',
+        from_stages: ['mechanism', 'generality'],
+        guidance:
+          'Say why the result comes out this way, or say plainly that the mechanism is unknown and what would establish it. Then give the scope: where the finding holds, where it should be expected to fail, and which of those boundaries are evidenced rather than guessed.',
+        required: false,
+      },
+      {
+        id: 'conclusion',
+        title: 'Conclusion',
+        from_stages: ['analysis', 'generality'],
+        guidance:
+          'Answer the question as it was originally posed, claiming no more than the scope conditions allow, and name what is still open. A conclusion that reads as though nothing went wrong in a study with open alternatives is not a conclusion, it is a cover.',
+        required: true,
+      },
+    ],
+  },
   stages: [
     {
       id: 'question',
