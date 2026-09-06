@@ -308,7 +308,18 @@ export function WorkflowWorkspace({
     [stage, restoreStageVersion]
   );
 
-  const draftingArtifact = (stage ? stageBundles[stage.id]?.artifact : null) ?? artifact;
+  /**
+   * The artifact this stage writes into.
+   *
+   * The project-level `artifact` is only a legitimate answer for a project whose
+   * one artifact has no stage at all — the single-output shape. A thirteen-stage
+   * project's `artifact` is whichever row happened to sort first, so falling
+   * back to it on a stage that has no artifact yet would materialise a drafting
+   * outline onto the research question's row.
+   */
+  const stageArtifact =
+    (stage ? stageBundles[stage.id]?.artifact : null) ??
+    (artifact && !artifact.stage_id ? artifact : null);
 
   const deriveOutline = useCallback(
     () => deriveOutlineItems(template, state, stageBundles),
@@ -322,14 +333,14 @@ export function WorkflowWorkspace({
       // keeps every section already written — approving a revised outline must
       // not cost prose that has been generated and paid for.
       const target =
-        draftingArtifact ??
+        stageArtifact ??
         (stage && ensureStageArtifact ? await ensureStageArtifact(stage.id, stage.label) : null);
       if (!target) throw new Error('This stage has no artifact to draft into.');
 
       await saveLongForm(target.id, longFormFromOutline(doc, target.long_form ?? null));
       onReload?.();
     },
-    [draftingArtifact, stage, ensureStageArtifact, onReload]
+    [stageArtifact, stage, ensureStageArtifact, onReload]
   );
 
   const reloadEvents = useCallback(async () => {
@@ -365,9 +376,9 @@ export function WorkflowWorkspace({
     stage.renderer === 'long_form'
       ? {
           project,
-          artifactId: (stageBundles[stage.id]?.artifact ?? artifact)?.id ?? null,
+          artifactId: stageArtifact?.id ?? null,
           stageId: stage.id,
-          state: (stageBundles[stage.id]?.artifact ?? artifact)?.long_form ?? null,
+          state: stageArtifact?.long_form ?? null,
           approvedOutlineVersionId: approvedOutlineVersionId(events ?? []),
           onRefresh: () => onReload?.(),
         }
@@ -426,7 +437,7 @@ export function WorkflowWorkspace({
                   events={events ?? []}
                   onEventsChanged={reloadEvents}
                   derive={deriveOutline}
-                  drafts={draftBindings(draftingArtifact?.long_form ?? null)}
+                  drafts={draftBindings(stageArtifact?.long_form ?? null)}
                   onApproved={materialiseOutline}
                   readOnly={!isCurrent}
                 />
