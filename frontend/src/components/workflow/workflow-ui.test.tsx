@@ -5,8 +5,42 @@ import userEvent from '@testing-library/user-event';
 import { StageRail } from './stage-rail';
 import { ExitCriteriaChecklist } from './exit-criteria-checklist';
 import { StageTransitionBar } from './stage-transition-bar';
-import { BOOK_V1, RESEARCH_V1, availableTransitions, evaluateStage, projectState } from '@/lib/workflow';
+import { StageRenderer } from './renderers/stage-renderer';
+import {
+  BOOK_V1,
+  RESEARCH_V1,
+  availableTransitions,
+  evaluateStage,
+  getStage,
+  projectState,
+} from '@/lib/workflow';
+import { itemSchemaFor, serializeItems } from '@/lib/workflow/stage-artifact';
 import type { CriterionResult, StageContext, WorkflowEvent } from '@/lib/workflow/types';
+import type { ArtifactVersion } from '@/types/project';
+
+/** A version row carrying whatever content a renderer is being handed. */
+function researchVersion(content: string): ArtifactVersion {
+  return {
+    id: 'v1',
+    user_id: 'u1',
+    project_id: 'p1',
+    artifact_id: 'a1',
+    version_number: 1,
+    parent_version_id: null,
+    source_operation: 'stage_draft',
+    instruction: '',
+    system_prompt: '',
+    content,
+    model: 'test/model',
+    mode: 'architect',
+    change_summary: null,
+    restored_from_version_id: null,
+    finish_reason: 'stop',
+    user_rating: null,
+    continuity_snapshot: null,
+    created_at: '2026-09-04T00:00:00Z',
+  };
+}
 
 function ctx(overrides: Partial<StageContext> = {}): StageContext {
   return {
@@ -54,6 +88,44 @@ describe('StageRail', () => {
       />
     );
     expect(screen.getByRole('button', { name: /Hypothesis/ })).toBeInTheDocument();
+  });
+
+  it('draws every Research stage with a renderer Book already uses', () => {
+    // The FR-03 claim, asserted rather than asserted-about: Research adds no
+    // renderer of its own, so the set it needs is a subset of Book's. If this
+    // fails, someone has answered a Research requirement with a new component
+    // instead of new data.
+    const bookRenderers = new Set(BOOK_V1.stages.map((s) => s.renderer));
+    for (const stage of RESEARCH_V1.stages) {
+      expect(bookRenderers, `${stage.id}`).toContain(stage.renderer);
+    }
+  });
+
+  it('renders a Research stage through the same StageRenderer dispatch', () => {
+    // Not a claim about the template — the component is mounted with Research
+    // data and asked to draw it. The fields come from the item schema, so a
+    // hypothesis row is an audience row with different columns.
+    const hypothesis = getStage(RESEARCH_V1, 'hypothesis')!;
+    render(
+      <StageRenderer
+        stage={hypothesis}
+        schema={itemSchemaFor(hypothesis)}
+        versions={[researchVersion(serializeItems([{ id: 'i1', statement: 'Latency drives churn' }]))]}
+        activeVersionId={null}
+        onSelectVersion={vi.fn()}
+        onRestore={vi.fn(async () => {})}
+        onSaveContent={vi.fn(async () => {})}
+        onSaveItems={vi.fn(async () => {})}
+        generating={false}
+        generationError={null}
+        onGenerate={vi.fn()}
+        onCancelGeneration={vi.fn()}
+        readOnly={false}
+      />
+    );
+    expect(screen.getByLabelText('Statement')).toHaveValue('Latency drives churn');
+    expect(screen.getByLabelText('What would show it false')).toBeInTheDocument();
+    expect(screen.queryByText(/not built yet/)).not.toBeInTheDocument();
   });
 
   it('groups stages so 13 items read as phases', () => {
