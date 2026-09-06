@@ -19,29 +19,6 @@ function rowToMessage(row: ConversationMessageRow): ChatMessage {
   };
 }
 
-/**
- * Load all messages for a single (session, iteration) pair, ordered chronologically.
- * Returns empty array if user is unauthenticated or table query fails.
- */
-export async function loadMessages(
-  sessionId: string,
-  iterationNumber: number
-): Promise<ChatMessage[]> {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return [];
-
-  const { data, error } = await supabase
-    .from('conversation_messages')
-    .select('id, iteration_number, role, content, created_at')
-    .eq('user_id', user.id)
-    .eq('session_id', sessionId)
-    .eq('iteration_number', iterationNumber)
-    .order('created_at', { ascending: true });
-
-  if (error || !data) return [];
-  return (data as ConversationMessageRow[]).map(rowToMessage);
-}
 
 /**
  * Load every message for a session, grouped by iteration_number.

@@ -35,3 +35,7 @@ uv.lock
 .playwright-mcp/
 *.docx
 *.pdf
+
+# Vercel
+.vercel
+.env*

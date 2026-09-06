@@ -10,14 +10,88 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+# Must stay under the serverless function limit. Vercel's default is 60s, so a
+# 120s client timeout (the previous default) could never fire before the
+# platform killed the request — the caller just saw an opaque 504.
+DEFAULT_TIMEOUT = 55.0
 _RETRY_MAX_ATTEMPTS = 3
 _RETRY_BASE_DELAY = 1.5
 _RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 
 
 class OpenRouterError(Exception):
-    """Base error for OpenRouter API failures."""
+    """Base error for OpenRouter API failures.
+
+    Carries structure as well as a message. Until now this class was purely
+    stringly-typed: `_is_retryable` substring-matched "429" against the message,
+    which quietly also matches a model that happened to emit "429" in its prose,
+    and gives a caller nothing to branch on when it needs to tell "you are out
+    of credits" (never retry, tell the user) from "you are rate limited" (retry
+    after N seconds). FR-16 needs that distinction to produce a recovery message
+    rather than a stack trace.
+
+    Every field is optional and the message is unchanged, so existing callers
+    and tests that only read `str(e)` keep working.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: int | None = None,
+        provider_code: str | None = None,
+        retry_after: float | None = None,
+    ):
+        super().__init__(message)
+        self.status_code = status_code
+        self.provider_code = provider_code
+        self.retry_after = retry_after
+
+
+class OpenRouterDeadlineError(OpenRouterError):
+    """Ran out of wall-clock budget before the request could be retried.
+
+    Distinct from a plain timeout so callers (the job drain in particular) can
+    re-queue the work instead of counting it as a failed attempt.
+    """
+
     pass
+
+
+def _provider_code(response: httpx.Response) -> str | None:
+    """Pull OpenRouter's own error code out of the body, if it says one.
+
+    OpenRouter wraps upstream failures as {"error": {"code": ..., "message": ...}}.
+    The code is what distinguishes "context_length_exceeded" from a generic 400,
+    and no amount of substring-matching the HTTP status recovers it.
+    """
+    try:
+        body = response.json()
+    except Exception:
+        return None
+    if not isinstance(body, dict):
+        return None
+    error = body.get("error")
+    if not isinstance(error, dict):
+        return None
+    code = error.get("code")
+    if code is None:
+        # Some providers put the machine-readable name in `type` instead.
+        code = error.get("type")
+    return str(code) if code is not None else None
+
+
+def _retry_after_seconds(response: httpx.Response) -> float | None:
+    """Honour the provider's own Retry-After rather than guessing a backoff."""
+    raw = response.headers.get("retry-after")
+    if not raw:
+        return None
+    try:
+        return float(raw)
+    except ValueError:
+        # The HTTP-date form is legal but rare here; a wrong guess is worse
+        # than falling back to the standard ladder.
+        return None
 
 
 class OpenRouterClient:
@@ -38,7 +112,7 @@ class OpenRouterClient:
         self,
         api_key: str | None = None,
         model: str = DEFAULT_MODEL,
-        timeout: float = 120.0,
+        timeout: float = DEFAULT_TIMEOUT,
     ):
         self.api_key = api_key or os.getenv("OPENROUTER_API_KEY")
         if not self.api_key:
@@ -48,7 +122,9 @@ class OpenRouterClient:
             )
         self.model = model
         self.timeout = timeout
-        self._client = httpx.AsyncClient(timeout=timeout)
+        # No client-level timeout: it would silently cap every per-call value.
+        # Each request passes its own, defaulting to self.timeout.
+        self._client = httpx.AsyncClient(timeout=None)
 
     async def generate(
         self,
@@ -58,6 +134,8 @@ class OpenRouterClient:
         max_tokens: int = 16384,
         json_mode: bool = False,
         model: str | None = None,
+        timeout: float | None = None,
+        deadline: float | None = None,
     ) -> tuple[str, dict[str, int]]:
         """Generate a response from the LLM with automatic retry.
 
@@ -86,24 +164,10 @@ class OpenRouterClient:
             "X-Title": "PromptMaster Engine",
         }
 
-        last_error: Exception | None = None
-
-        for attempt in range(1, _RETRY_MAX_ATTEMPTS + 1):
-            try:
-                content, usage_stats, _finish_reason = await self._single_request(payload, headers, attempt)
-                return content, usage_stats
-            except OpenRouterError as e:
-                if not self._is_retryable(e) or attempt == _RETRY_MAX_ATTEMPTS:
-                    if attempt == _RETRY_MAX_ATTEMPTS:
-                        last_error = e
-                        break
-                    raise
-                last_error = e
-                delay = _RETRY_BASE_DELAY * (2 ** (attempt - 1))
-                logger.warning(f"Retryable error (attempt {attempt}/{_RETRY_MAX_ATTEMPTS}), retrying in {delay:.1f}s: {e}")
-                await asyncio.sleep(delay)
-
-        raise last_error or OpenRouterError("All retry attempts failed")
+        content, usage_stats, _finish_reason = await self._request_with_retries(
+            payload, headers, timeout, deadline
+        )
+        return content, usage_stats
 
     async def generate_with_meta(
         self,
@@ -113,6 +177,8 @@ class OpenRouterClient:
         max_tokens: int = 16384,
         json_mode: bool = False,
         model: str | None = None,
+        timeout: float | None = None,
+        deadline: float | None = None,
     ) -> tuple[str, dict[str, int], str]:
         """Like generate(), but also returns the OpenRouter finish_reason.
 
@@ -142,24 +208,7 @@ class OpenRouterClient:
             "X-Title": "PromptMaster Engine",
         }
 
-        last_error: Exception | None = None
-
-        for attempt in range(1, _RETRY_MAX_ATTEMPTS + 1):
-            try:
-                content, usage_stats, finish_reason = await self._single_request(payload, headers, attempt)
-                return content, usage_stats, finish_reason
-            except OpenRouterError as e:
-                if not self._is_retryable(e) or attempt == _RETRY_MAX_ATTEMPTS:
-                    if attempt == _RETRY_MAX_ATTEMPTS:
-                        last_error = e
-                        break
-                    raise
-                last_error = e
-                delay = _RETRY_BASE_DELAY * (2 ** (attempt - 1))
-                logger.warning(f"Retryable error (attempt {attempt}/{_RETRY_MAX_ATTEMPTS}), retrying in {delay:.1f}s: {e}")
-                await asyncio.sleep(delay)
-
-        raise last_error or OpenRouterError("All retry attempts failed")
+        return await self._request_with_retries(payload, headers, timeout, deadline)
 
     async def generate_json(
         self,
@@ -168,6 +217,8 @@ class OpenRouterClient:
         temperature: float = 0.7,
         max_tokens: int = 8192,
         model: str | None = None,
+        timeout: float | None = None,
+        deadline: float | None = None,
     ) -> tuple[dict, dict[str, int]]:
         """Generate a JSON response from the LLM.
 
@@ -183,6 +234,8 @@ class OpenRouterClient:
             max_tokens=max_tokens,
             json_mode=True,
             model=model,
+            timeout=timeout,
+            deadline=deadline,
         )
 
         cleaned = self._clean_json_response(content)
@@ -207,32 +260,100 @@ class OpenRouterClient:
                 max_tokens=max_tokens,
                 json_mode=True,
                 model=model,
+                timeout=timeout,
+                # The repair shares the caller's budget: this is the second
+                # call in the worst case, and it is what pushed a single
+                # request past the function limit.
+                deadline=deadline,
             )
             total_usage = {
                 "tokens_in": usage.get("tokens_in", 0) + repair_usage.get("tokens_in", 0),
                 "tokens_out": usage.get("tokens_out", 0) + repair_usage.get("tokens_out", 0),
             }
             return json.loads(self._clean_json_response(repaired)), total_usage
+        except OpenRouterDeadlineError:
+            raise
         except (json.JSONDecodeError, OpenRouterError) as repair_error:
             raise OpenRouterError(
                 f"Failed to parse JSON after repair attempt: {repair_error}"
             )
+
+
+    async def _request_with_retries(
+        self,
+        payload: dict[str, Any],
+        headers: dict[str, str],
+        timeout: float | None,
+        deadline: float | None,
+    ) -> tuple[str, dict[str, int], str]:
+        """Run a request with backoff, respecting a wall-clock deadline.
+
+        `deadline` is a time.monotonic() value. Without it the ladder can burn
+        three request timeouts plus 4.5s of sleep, which overruns a serverless
+        function limit and turns a recoverable retry into an opaque 504.
+        """
+        last_error: Exception | None = None
+
+        for attempt in range(1, _RETRY_MAX_ATTEMPTS + 1):
+            # Never let one attempt outlive the budget.
+            call_timeout = timeout if timeout is not None else self.timeout
+            if deadline is not None:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise OpenRouterDeadlineError(
+                        f"Deadline exceeded before attempt {attempt}"
+                    ) from last_error
+                call_timeout = min(call_timeout, remaining)
+
+            try:
+                return await self._single_request(payload, headers, attempt, call_timeout)
+            except OpenRouterError as e:
+                if not self._is_retryable(e) or attempt == _RETRY_MAX_ATTEMPTS:
+                    if attempt == _RETRY_MAX_ATTEMPTS:
+                        last_error = e
+                        break
+                    raise
+                last_error = e
+                # A provider that tells us when to come back knows better than
+                # our ladder does; a 429 retried too early just burns an attempt.
+                delay = _RETRY_BASE_DELAY * (2 ** (attempt - 1))
+                if e.retry_after is not None:
+                    delay = max(delay, e.retry_after)
+                # Don't sleep into the deadline just to fail on the far side.
+                if deadline is not None and time.monotonic() + delay >= deadline:
+                    raise OpenRouterDeadlineError(
+                        f"Deadline would elapse during backoff after attempt {attempt}: {e}"
+                    ) from e
+                logger.warning(
+                    f"Retryable error (attempt {attempt}/{_RETRY_MAX_ATTEMPTS}), "
+                    f"retrying in {delay:.1f}s: {e}"
+                )
+                await asyncio.sleep(delay)
+
+        raise last_error or OpenRouterError("All retry attempts failed")
 
     async def _single_request(
         self,
         payload: dict[str, Any],
         headers: dict[str, str],
         attempt: int,
+        timeout: float | None = None,
     ) -> tuple[str, dict[str, int], str]:
         """Execute a single HTTP request."""
         t0 = time.monotonic()
+        effective_timeout = timeout if timeout is not None else self.timeout
 
         try:
-            response = await self._client.post(self.BASE_URL, json=payload, headers=headers)
+            response = await self._client.post(
+                self.BASE_URL, json=payload, headers=headers, timeout=effective_timeout
+            )
 
             if response.status_code in _RETRYABLE_STATUS_CODES:
                 raise OpenRouterError(
                     f"Server error (HTTP {response.status_code}): {response.text[:200]}",
+                    status_code=response.status_code,
+                    provider_code=_provider_code(response),
+                    retry_after=_retry_after_seconds(response),
                 )
             response.raise_for_status()
 
@@ -264,14 +385,32 @@ class OpenRouterClient:
             return content, usage_stats, finish_reason
 
         except httpx.TimeoutException as e:
-            raise OpenRouterError(f"Request timed out after {self.timeout}s") from e
+            raise OpenRouterError(
+                f"Request timed out after {effective_timeout}s",
+                provider_code="timeout",
+            ) from e
         except httpx.HTTPStatusError as e:
-            raise OpenRouterError(f"HTTP {e.response.status_code}: {e.response.text[:200]}") from e
+            raise OpenRouterError(
+                f"HTTP {e.response.status_code}: {e.response.text[:200]}",
+                status_code=e.response.status_code,
+                provider_code=_provider_code(e.response),
+                retry_after=_retry_after_seconds(e.response),
+            ) from e
         except httpx.RequestError as e:
-            raise OpenRouterError(f"Network error: {e}") from e
+            raise OpenRouterError(f"Network error: {e}", provider_code="network") from e
 
     def _is_retryable(self, error: OpenRouterError) -> bool:
-        """Check if an error is retryable based on its message."""
+        """Whether an error is worth another attempt.
+
+        Prefers the structured status code now that we carry one. The substring
+        pass is kept as a fallback, not as the primary signal: errors raised
+        without a status (and every OpenRouterError constructed by older code,
+        including in tests) still classify exactly as they did before.
+        """
+        if error.status_code is not None:
+            return error.status_code in _RETRYABLE_STATUS_CODES
+        if error.provider_code in ("timeout", "network"):
+            return True
         msg = str(error)
         return any(code in msg for code in ["429", "500", "502", "503", "504", "timed out", "Network error"])
 

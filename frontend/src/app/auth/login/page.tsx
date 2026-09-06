@@ -8,7 +8,7 @@ import { createClient } from '@/lib/supabase/client';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { signIn, signInWithGoogle } = useAuth();
+  const { signIn, signInWithGoogle, continueAsGuest } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -19,6 +19,26 @@ export default function LoginPage() {
   const [forgotMode, setForgotMode] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
+  const [guestLoading, setGuestLoading] = useState(false);
+
+  const handleGuest = async () => {
+    setError(null);
+    setGuestLoading(true);
+    try {
+      await continueAsGuest();
+      router.push('/projects');
+    } catch (err) {
+      // The project's anonymous provider can be turned off, in which case
+      // saying so is more useful than a generic failure.
+      const message = err instanceof Error ? err.message : '';
+      setError(
+        /anonymous/i.test(message)
+          ? 'Guest access is turned off for this workspace. Sign in or create an account to continue.'
+          : message || 'Could not start a guest session.'
+      );
+      setGuestLoading(false);
+    }
+  };
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,7 +46,7 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       await signIn(email, password);
-      router.push('/session');
+      router.push('/projects');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Invalid email or password.');
     } finally {
@@ -274,8 +294,35 @@ export default function LoginPage() {
           )}
         </section>
 
+        {/* Try it without committing to an account. The work is kept against a
+            real (anonymous) identity, so it can be claimed later without
+            migrating anything. */}
+        {!forgotMode && (
+          <div className="mt-6">
+            <div className="mb-4 flex items-center gap-3">
+              <span className="h-px flex-1 bg-[var(--surface-container-high)]" />
+              <span className="text-xs uppercase tracking-wider text-[var(--on-surface-variant)]">
+                or
+              </span>
+              <span className="h-px flex-1 bg-[var(--surface-container-high)]" />
+            </div>
+
+            <button
+              type="button"
+              onClick={handleGuest}
+              disabled={guestLoading}
+              className="w-full rounded-lg bg-[var(--surface-container-low)] px-4 py-3 text-sm font-medium text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-high)] disabled:opacity-60"
+            >
+              {guestLoading ? 'Starting…' : 'Continue without an account'}
+            </button>
+            <p className="mt-2 text-center text-xs text-[var(--on-surface-variant)]">
+              Your work stays in this browser until you create an account.
+            </p>
+          </div>
+        )}
+
         {/* Footer */}
-        <footer className="text-center">
+        <footer className="mt-6 text-center">
           <p className="text-sm text-[var(--on-surface-variant)]">
             Don&apos;t have an account?{' '}
             <Link

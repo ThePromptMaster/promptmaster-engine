@@ -1,10 +1,21 @@
 """Long-form document orchestration endpoints.
 
-Four endpoints (all stateless; orchestration loop runs on the frontend):
+All stateless. The backend owns no Supabase client and no job state: the drain
+(a Next.js route handler holding the service-role key) reads the outline and
+continuity records, calls these endpoints for generation only, and writes the
+results back itself.
+
 - POST /api/detect-long-form        — classifier (1 LLM call)
 - POST /api/generate-outline        — outline generator (1 LLM call)
-- POST /api/generate-section        — single section + snapshot (2 LLM calls)
+- POST /api/generate-section        — legacy: section + snapshot welded (2 LLM calls)
+- POST /api/generate-section-prose  — just the prose (1 LLM call)
+- POST /api/extract-section-record  — just the FR-06 record (1 LLM call)
 - POST /api/finalize-long-form      — eval + suggestions + summary on merged content (3 parallel calls)
+
+/api/generate-section is the pair of calls the two endpoints below split apart.
+The split is the whole point of FR-05: the drain commits the prose the instant
+it returns, so a function timeout during extraction costs one cheap call rather
+than a section the user has already paid for.
 """
 
 from __future__ import annotations
@@ -16,17 +27,22 @@ from deps import get_client
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError
 from promptmaster.long_form import (
     detect_long_form,
+    extract_section_record,
     generate_outline,
     generate_section,
+    generate_section_prose,
 )
 from promptmaster.schemas import (
     ContinuitySnapshot,
     DetectLongFormResponse,
+    ExtractSectionRecordResponse,
     GenerateOutlineResponse,
+    GenerateSectionProseResponse,
     GenerateSectionResponse,
     Iteration,
     OutlineSection,
     PMInput,
+    SectionRecord,
 )
 from promptmaster.session_context import _label_trigger
 from routers._pipeline import build_iteration_with_full_pipeline
@@ -59,13 +75,57 @@ class GenerateSectionRequest(BaseModel):
     model: str = ""
 
 
+class GenerateSectionProseRequest(BaseModel):
+    inputs: PMInput
+    outline: list[OutlineSection]
+    section_index: int
+    #: FR-06 records. Preferred over prior_snapshot; both are optional so the
+    #: first section of a document sends neither.
+    records: list[SectionRecord] = []
+    prior_snapshot: ContinuitySnapshot | None = None
+    prev_section_content: str = ""
+    model: str = ""
+
+
+class ExtractSectionRecordRequest(BaseModel):
+    section_id: str
+    section_index: int
+    section_title: str = ""
+    section_content: str
+    #: Term names only — definitions are not resent, which is what keeps this
+    #: call's input constant as the glossary grows.
+    existing_terms: list[str] = []
+    model: str = ""
+
+
 class FinalizeLongFormRequest(BaseModel):
     inputs: PMInput
     merged_content: str
     outline: list[OutlineSection]
     iteration_number: int
     iteration_history: list[Iteration] = []
+    #: Worst finish_reason across the sections. Hardcoding "stop" here defeated
+    #: truncation detection for the whole document: a section that hit the token
+    #: limit was merged in and then declared complete.
+    finish_reason: str = ""
     model: str = ""
+
+
+def _document_finish_reason(req: FinalizeLongFormRequest) -> str:
+    """The document is truncated if ANY of its sections was.
+
+    This used to be the literal string "stop", which meant the completeness
+    override in _pipeline (finish_reason == "length" -> incomplete) could never
+    fire for a long-form document: a section cut off mid-sentence was merged in
+    and the finished document was then scored as complete. An explicit request
+    value wins; otherwise it is derived from the sections that were actually
+    written, which is the information the caller already has.
+    """
+    if req.finish_reason:
+        return req.finish_reason
+    if any(s.finish_reason == "length" for s in req.outline):
+        return "length"
+    return "stop"
 
 
 # -------- endpoints --------
@@ -171,8 +231,58 @@ async def api_finalize_long_form(
             chat_history=[],
             iteration_history=req.iteration_history,
             user_action_label=_label_trigger("long_form_finalize"),
-            finish_reason="stop",
+            finish_reason=_document_finish_reason(req),
         )
         return IterationFromConversationResponse(iteration=iteration, suggestions=suggestions)
+    except OpenRouterError as e:
+        raise HTTPException(status_code=502, detail=f"LLM error: {e}")
+
+
+@router.post("/generate-section-prose", response_model=GenerateSectionProseResponse)
+async def api_generate_section_prose(
+    req: GenerateSectionProseRequest,
+    client: OpenRouterClient = Depends(get_client),
+):
+    """Write one section and return it. No continuity work, no persistence.
+
+    Kept deliberately narrow so the caller can commit the result before doing
+    anything else with it.
+    """
+    if req.section_index < 0 or req.section_index >= len(req.outline):
+        raise HTTPException(status_code=400, detail=f"section_index {req.section_index} out of range")
+    try:
+        return await generate_section_prose(
+            client=client,
+            model=req.model or None,
+            inputs=req.inputs,
+            outline=req.outline,
+            section_index=req.section_index,
+            prior_snapshot=req.prior_snapshot,
+            prev_section_content=req.prev_section_content,
+            records=req.records or None,
+        )
+    except OpenRouterError as e:
+        raise HTTPException(status_code=502, detail=f"LLM error: {e}")
+
+
+@router.post("/extract-section-record", response_model=ExtractSectionRecordResponse)
+async def api_extract_section_record(
+    req: ExtractSectionRecordRequest,
+    client: OpenRouterClient = Depends(get_client),
+):
+    """Extract the FR-06 continuity record for one already-written section."""
+    if not req.section_content.strip():
+        raise HTTPException(status_code=400, detail="section_content is empty")
+    try:
+        record = await extract_section_record(
+            client=client,
+            model=req.model or None,
+            section_id=req.section_id,
+            section_index=req.section_index,
+            section_title=req.section_title,
+            section_content=req.section_content,
+            existing_terms=req.existing_terms,
+        )
+        return ExtractSectionRecordResponse(record=record)
     except OpenRouterError as e:
         raise HTTPException(status_code=502, detail=f"LLM error: {e}")

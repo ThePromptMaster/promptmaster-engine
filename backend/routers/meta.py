@@ -1,8 +1,9 @@
 """Meta endpoints: modes and model list."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from promptmaster.modes import MODES
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError
+from auth import require_user
 
 router = APIRouter(prefix="/api", tags=["meta"])
 
@@ -20,7 +21,9 @@ async def get_modes():
     }
 
 
-@router.get("/models")
+# Protected even though the router is public: this one reaches out to
+# OpenRouter with our key on every call.
+@router.get("/models", dependencies=[Depends(require_user)])
 async def get_models():
     """Fetch available text models from OpenRouter."""
     try:

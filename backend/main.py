@@ -3,13 +3,14 @@
 import os
 import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
 load_dotenv()
 
 from deps import lifespan_client
+from auth import require_user
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -53,11 +54,20 @@ from routers.continuation import router as continuation_router
 from routers.setup import router as setup_router
 from routers.audit import router as audit_router
 from routers.long_form import router as long_form_router
+from routers.stage import router as stage_router
 
+# Auth is applied at include time, not per-endpoint, so a new route cannot be
+# added unprotected by omission. test_auth.py asserts this holds.
+_protected = [Depends(require_user)]
+
+# meta_router is public: /api/modes is static data from promptmaster/modes.py
+# and the marketing page reads it. /api/models proxies OpenRouter, so it is
+# protected separately inside that router.
 app.include_router(meta_router)
-app.include_router(engine_router)
-app.include_router(conversation_router)
-app.include_router(continuation_router)
-app.include_router(setup_router)
-app.include_router(audit_router)
-app.include_router(long_form_router)
+app.include_router(engine_router, dependencies=_protected)
+app.include_router(conversation_router, dependencies=_protected)
+app.include_router(continuation_router, dependencies=_protected)
+app.include_router(setup_router, dependencies=_protected)
+app.include_router(audit_router, dependencies=_protected)
+app.include_router(long_form_router, dependencies=_protected)
+app.include_router(stage_router, dependencies=_protected)

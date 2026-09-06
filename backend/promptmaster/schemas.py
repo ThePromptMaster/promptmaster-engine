@@ -106,6 +106,18 @@ class Iteration(BaseModel):
         default=None,
         description="Snapshot used to build this iteration's continuation prompt. Set on continuation iterations only.",
     )
+    created_at: str = Field(
+        default="",
+        description="ISO-8601 UTC timestamp of when this version was produced (FR-10).",
+    )
+    model_used: str = Field(
+        default="",
+        description="Model that produced this version. Per-version, unlike Session.model (FR-10).",
+    )
+    instruction: str = Field(
+        default="",
+        description="The instruction or recommendation that produced this version, if any (FR-10).",
+    )
 
 
 class PromptTemplate(BaseModel):
@@ -201,6 +213,69 @@ class GenerateSectionResponse(BaseModel):
     new_snapshot: ContinuitySnapshot
 
 
+# ---------------------------------------------------------------------------
+# FR-06 continuity records
+# ---------------------------------------------------------------------------
+#
+# ContinuitySnapshot (above) is a *rolling* four-field summary regenerated from
+# the whole document so far. That is fine for /api/continue-document, which runs
+# once, and fatal for a book: the input to the snapshot call grows linearly with
+# the prose already written, so section 40 costs an order of magnitude more than
+# section 4 and eventually will not fit at all. That is the ~100-page ceiling.
+#
+# A SectionRecord inverts it. Each record is extracted from ONE newly written
+# section and then persisted, so extraction cost is constant per section and the
+# drafting prompt is assembled from stored records rather than from prose.
+# FR-06 names the four things it has to carry, and glossary is the one that
+# exists nowhere else in the system.
+
+
+class GlossaryTerm(BaseModel):
+    """A term the document has defined and must keep using consistently.
+
+    Project-scoped rather than section-scoped: the point of a glossary is that
+    section 9 uses "continuity record" to mean what section 2 said it meant.
+    """
+    term: str
+    definition: str = ""
+    #: Where it was first defined, so a contradiction can be traced.
+    first_seen_section_id: str = ""
+
+
+class SectionRecord(BaseModel):
+    """What section N leaves behind for sections N+1..M.
+
+    Deliberately small and bounded. Everything here is written once, when the
+    section is written, and read many times afterwards.
+    """
+    section_id: str
+    section_index: int
+    title: str = ""
+    #: Two or three sentences. Not the prose — a projection of it.
+    summary: str = ""
+    glossary_terms: list[GlossaryTerm] = Field(default_factory=list)
+    #: Choices this section committed the document to (scope, stance, structure).
+    decisions: list[str] = Field(default_factory=list)
+    #: Promises made to the reader that a later section has to keep.
+    todos: list[str] = Field(default_factory=list)
+
+
+class ExtractSectionRecordResponse(BaseModel):
+    """Response from the record-extraction call (step 3 of a drafting job)."""
+    record: SectionRecord
+
+
+class GenerateSectionProseResponse(BaseModel):
+    """Response from the prose-only call (step 2 of a drafting job).
+
+    Split out from GenerateSectionResponse on purpose: the drain commits this
+    result — the expensive one — before it attempts extraction, so a function
+    timeout between the two costs nothing but the extraction call.
+    """
+    content: str
+    finish_reason: str
+
+
 # Resolve forward reference for Iteration.continuity_snapshot
 Iteration.model_rebuild()
 
@@ -220,3 +295,80 @@ class SetupSuggestion(BaseModel):
     constraints: str
     output_format: str
     rationale: SetupRationale = Field(default_factory=SetupRationale)
+
+
+# --------------------------------------------------------------------------
+# Stage artifacts — the declarative workflow's generation contract
+# --------------------------------------------------------------------------
+#
+# A Book project has thirteen stages, each producing its own artifact. The
+# backend stays stateless: it is told which stage it is generating for and what
+# the upstream stages already concluded, and never reads a database.
+
+
+class StageDigestEntry(BaseModel):
+    """One completed upstream stage, projected down to a few lines.
+
+    Deliberately a summary rather than the artifact itself. A thirteen-stage
+    book would otherwise ship the whole manuscript in order to generate a claim
+    table — unbounded growth that also buries the instruction that matters.
+    """
+    stage_id: str = Field(..., description="The stage this came from.")
+    label: str = Field(default="", description="Human label, used verbatim in the prompt.")
+    summary: str = Field(default="", description="A few lines. Not the artifact.")
+
+
+class StageDigest(BaseModel):
+    """Everything a stage is allowed to know about the work before it.
+
+    Assembled by the client, because the client already holds the project. The
+    objective is carried in full — it is short, and every stage is judged
+    against it — while prior stages are carried as summaries.
+    """
+    objective: str = Field(default="", description="Full text; never summarised.")
+    audience: str = Field(default="")
+    prior_stages: list["StageDigestEntry"] = Field(default_factory=list)
+
+
+class StageItemField(BaseModel):
+    """One field of a list stage's item."""
+    key: str = Field(..., description="Object key in the emitted JSON.")
+    label: str = Field(default="", description="What this field means, told to the model.")
+    hint: str = Field(default="", description="Optional extra instruction for this field.")
+
+
+class StageItemSchema(BaseModel):
+    """The shape of one item in a list stage.
+
+    Sent by the client rather than hard-coded here, so that an Audience stage
+    emitting {who, prior_knowledge, what_they_want} and a fact-check stage
+    emitting {claim, source, status} run through this one endpoint with no
+    server-side knowledge of either workflow.
+    """
+    item_label: str = Field(default="item", description="Singular noun, e.g. 'audience segment'.")
+    fields: list[StageItemField] = Field(default_factory=list)
+    min_items: int = Field(default=3)
+    max_items: int = Field(default=8)
+
+
+class StageDescriptor(BaseModel):
+    """The stage being generated for, lifted straight from the template."""
+    id: str
+    label: str = Field(default="")
+    renderer: Literal["prose", "list", "outline", "long_form", "review"] = "prose"
+    entry_prompt_hint: str = Field(default="", description="The stage's authored instruction.")
+    artifact_kind: str = Field(default="", description="Primary expected artifact kind.")
+
+
+class StageItem(BaseModel):
+    """One generated row. Extra keys are kept — the schema is client-defined."""
+    model_config = {"extra": "allow"}
+
+    id: str
+
+
+class GenerateStageArtifactResponse(BaseModel):
+    """Prose stages fill `content`; list stages fill `items`."""
+    content: str = Field(default="")
+    items: list[StageItem] = Field(default_factory=list)
+    finish_reason: str = Field(default="")
