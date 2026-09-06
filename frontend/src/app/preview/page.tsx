@@ -14,8 +14,10 @@ import { useState } from 'react';
 import { WorkflowPicker } from '@/components/projects/workflow-picker';
 import { StageRenderer } from '@/components/workflow/renderers/stage-renderer';
 import { itemSchemaFor, serializeItems } from '@/lib/workflow/stage-artifact';
+import { DerivedOutlineNotice } from '@/components/outline/derived-outline-notice';
 import { OutlineEditor } from '@/components/outline/outline-editor';
 import { OutlineHistory } from '@/components/outline/outline-history';
+import { deriveOutlineItems, derivedOutlineDrift } from '@/lib/workflow/derived-outline';
 import { applyOutlineEdit } from '@/lib/outline/use-outline-draft';
 import {
   newItem,
@@ -24,7 +26,7 @@ import {
   staleDrafts,
 } from '@/lib/outline/model';
 import type { OutlineDocument, SectionDraftBinding } from '@/types/outline';
-import type { ArtifactVersion, Project } from '@/types/project';
+import type { Artifact, ArtifactVersion, Project } from '@/types/project';
 import type { LongFormState } from '@/types';
 import { StageRail } from '@/components/workflow/stage-rail';
 import { StageHeader } from '@/components/workflow/stage-header';
@@ -507,6 +509,97 @@ function OutlineSlice() {
   );
 }
 
+/**
+ * The derived outline, derived — not a fixture of one.
+ *
+ * The items below come out of `deriveOutlineItems` against fabricated stage
+ * summaries, so what is on the page is what the real function returns. That is
+ * the point worth reviewing: the outline is a pure projection of work already
+ * done, and the drift notice above it is the only thing that happens when an
+ * earlier stage moves after approval.
+ */
+const DERIVED_CONCLUSIONS: Record<string, string> = {
+  question: 'Does checkpointing at the section boundary preserve completed work across worker death?',
+  literature: 'Prior queue designs restart the unit of work; none checkpoint mid-unit.',
+  hypothesis: 'Checkpointing preserves every completed section; any regeneration disconfirms it.',
+  method: 'Ten-section project, worker killed after section three, resumed; count regenerated sections.',
+  experiment: 'Run 1: killed at section 3, resumed [complete]; Run 2: lease expired, reaped [complete].',
+  analysis: 'Supported: three completed sections survived and none were regenerated.',
+  validation: 'Re-ran the ten-section project on a second machine [reproduced].',
+  mechanism: 'The lease, not the process, holds the claim, so a dead worker releases by expiry.',
+  generality: 'Holds where a unit of work is externally durable; fails where the model call is the unit.',
+};
+
+/** The alternatives stage is skipped, so Threats to validity is dropped. */
+const DERIVED_SKIPPED = ['alternatives'];
+
+function derivedFixture() {
+  const events: WorkflowEvent[] = [];
+  const bundles: Record<string, { artifact: Artifact | null; versions: ArtifactVersion[] }> = {};
+
+  for (const stage of RESEARCH_V1.stages) {
+    if (stage.id === 'drafting') break;
+    if (DERIVED_SKIPPED.includes(stage.id)) {
+      events.push(ev('stage_skipped', stage.id, { reason: 'Alternatives ruled out by design' }));
+      continue;
+    }
+    const summary = DERIVED_CONCLUSIONS[stage.id] ?? '';
+    bundles[stage.id] = {
+      artifact: { id: `a-${stage.id}`, summary } as unknown as Artifact,
+      versions: [{ id: `v-${stage.id}`, content: summary } as unknown as ArtifactVersion],
+    };
+    events.push(ev('stage_completed', stage.id));
+  }
+
+  const state = projectState(RESEARCH_V1, events);
+  return { items: deriveOutlineItems(RESEARCH_V1, state, bundles), state, bundles };
+}
+
+function DerivedOutlineSlice() {
+  const { items, state, bundles } = derivedFixture();
+  const head: OutlineDocument = { schema: 1, items, orphans: [] };
+  const [draft, setDraft] = useState<OutlineDocument | null>(null);
+  const doc = draft ?? head;
+
+  // The analysis stage revised after approval: the drift the notice reports.
+  const drift = derivedOutlineDrift(
+    items,
+    deriveOutlineItems(RESEARCH_V1, state, {
+      ...bundles,
+      analysis: {
+        ...bundles.analysis,
+        artifact: { ...bundles.analysis.artifact!, summary: 'Not supported after all.' },
+      },
+    })
+  );
+
+  return (
+    <div className="space-y-4 rounded-2xl bg-[var(--surface)] p-6 shadow-[0_1px_2px_rgba(25,28,30,0.04),0_12px_32px_-16px_rgba(25,28,30,0.25)]">
+      <DerivedOutlineNotice drift={drift} onRederive={() => setDraft(null)} />
+      <OutlineEditor
+        document={doc}
+        onChange={(next) =>
+          setDraft((current) =>
+            applyOutlineEdit(
+              { head, headVersionId: 'v1', headApproved: true, draft: current },
+              next
+            )
+          )
+        }
+        isDraft={draft !== null}
+        headVersionNumber={1}
+        approvedVersionNumber={1}
+        forkedFromVersionNumber={draft?.forked_from_version_id ? 1 : null}
+        onSaveDraft={() => {}}
+        onDiscardDraft={() => setDraft(null)}
+        onApprove={() => {}}
+        onRegenerateAll={() => {}}
+        onRegenerateItem={() => {}}
+      />
+    </div>
+  );
+}
+
 function WorkflowSlice({ template }: { template: WorkflowTemplate }) {
   const events = template.key === 'book' ? EVENTS : [];
   const state = projectState(template, events);
@@ -679,6 +772,13 @@ export default function PreviewPage() {
             note="FR-07. Reorder with the buttons or Alt+Arrow, insert between rows, and try editing a title: the outline is approved, so the first keystroke forks a draft rather than changing what drafting is bound to."
           >
             <OutlineSlice />
+          </Section>
+
+          <Section
+            title="The derived outline"
+            note="Research has no outline stage: the outline falls out of the twelve stages before it. Every brief below is the conclusion that stage recorded — no model call, and the same outline every time you look. Threats to validity is missing because the alternatives stage was skipped, and the notice above it is what a project sees when an earlier stage is revised after approval."
+          >
+            <DerivedOutlineSlice />
           </Section>
 
           <Section
