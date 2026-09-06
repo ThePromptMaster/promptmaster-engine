@@ -53,6 +53,15 @@ interface Props {
   ) => Promise<unknown>;
   restoreStageVersion?: (stageId: string, versionId: string) => Promise<void>;
   setStageSummary?: (stageId: string, summary: string) => Promise<void>;
+  /**
+   * Create a stage's artifact if it has none yet.
+   *
+   * A drafting stage generates nothing on entry, so nothing had ever created
+   * its row — and approving an outline with nowhere to write it would leave
+   * drafting reporting "0 of 0 sections" with an approval in the log saying
+   * otherwise.
+   */
+  ensureStageArtifact?: (stageId: string, name: string) => Promise<Artifact>;
   /** Reload project state after the server changed it behind our back. */
   onReload?: () => void;
   /** Rendered instead of the dispatched renderer; used by the legacy pane. */
@@ -69,6 +78,7 @@ export function WorkflowWorkspace({
   appendStageVersion,
   restoreStageVersion,
   setStageSummary,
+  ensureStageArtifact,
   onReload,
   children,
 }: Props) {
@@ -311,12 +321,15 @@ export function WorkflowWorkspace({
       // artifacts.long_form. Approving has to cross that gap, and the merge
       // keeps every section already written — approving a revised outline must
       // not cost prose that has been generated and paid for.
-      if (!draftingArtifact) return;
-      const next = longFormFromOutline(doc, draftingArtifact.long_form ?? null);
-      await saveLongForm(draftingArtifact.id, next);
+      const target =
+        draftingArtifact ??
+        (stage && ensureStageArtifact ? await ensureStageArtifact(stage.id, stage.label) : null);
+      if (!target) throw new Error('This stage has no artifact to draft into.');
+
+      await saveLongForm(target.id, longFormFromOutline(doc, target.long_form ?? null));
       onReload?.();
     },
-    [draftingArtifact, onReload]
+    [draftingArtifact, stage, ensureStageArtifact, onReload]
   );
 
   const reloadEvents = useCallback(async () => {
