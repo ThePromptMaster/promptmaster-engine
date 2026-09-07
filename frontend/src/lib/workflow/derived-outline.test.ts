@@ -22,7 +22,7 @@ import { RESEARCH_V1 } from './templates/research.v1';
 import { BOOK_V1 } from './templates/book.v1';
 import { SINGLE_OUTPUT_V1 } from './templates/single-output.v1';
 import { evaluateStage, projectState } from './engine';
-import { deriveOutlineItems, derivedOutlineDrift, stageBrief } from './derived-outline';
+import { deriveOutlineItems, derivedOutlineDrift, draftingStageId, stageBrief } from './derived-outline';
 import type { StageArtifactBundle } from './digest';
 import type { StageContext, WorkflowEvent } from './types';
 import { longFormFromOutline, longFormMatchesOutline, draftBindings } from '@/lib/outline/long-form';
@@ -603,5 +603,36 @@ describe('upstream changing after approval', () => {
 
     expect(longFormMatchesOutline(doc, null)).toBe(false);
     expect(longFormMatchesOutline(doc, longFormFromOutline(doc, null))).toBe(true);
+  });
+});
+
+describe('where an approved outline is materialised', () => {
+  it('sends Book\'s approval to the drafting stage, not the outline stage', () => {
+    // Book approves on its own Outline stage but drafts on a later one. Writing
+    // long_form onto the outline stage's artifact would leave drafting showing
+    // "0 of 0 sections" with an approval in the log saying otherwise — which is
+    // why dispatching the outline renderer alone was never enough to wire it.
+    const outlineStage = BOOK_V1.stages.find((s) => s.renderer === 'outline');
+    expect(outlineStage).toBeDefined();
+    expect(draftingStageId(BOOK_V1)).toBe('drafting');
+    expect(draftingStageId(BOOK_V1)).not.toBe(outlineStage!.id);
+  });
+
+  it('sends a derived approval to the stage the panel already sits on', () => {
+    // Research has no separate outline stage: caller and destination coincide,
+    // so the same code path needs no special case.
+    expect(draftingStageId(RESEARCH_V1)).toBe(RESEARCH_V1.derived_outline?.stage_id);
+  });
+
+  it('picks the first drafting stage when a workflow has several', () => {
+    // Book drafts, then expands, and both are long_form. Sections are
+    // materialised once, by the first.
+    const longFormStages = BOOK_V1.stages.filter((s) => s.renderer === 'long_form');
+    expect(longFormStages.length).toBeGreaterThan(1);
+    expect(draftingStageId(BOOK_V1)).toBe(longFormStages[0].id);
+  });
+
+  it('returns null for a workflow that never drafts', () => {
+    expect(draftingStageId(SINGLE_OUTPUT_V1)).toBeNull();
   });
 });
