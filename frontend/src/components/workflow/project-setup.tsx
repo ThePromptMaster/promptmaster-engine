@@ -117,17 +117,22 @@ export function ProjectSetup({ project, stage, onPatch, readOnly }: Props) {
 
           return (
             <div key={key}>
-              <label
-                htmlFor={`setup-${key}`}
-                className="mb-1.5 flex items-center gap-2 text-label text-[var(--on-surface-variant)]"
-              >
-                {field.label}
+              {/* The hint sits beside the label, not inside it: a label whose
+                  accessible name drifts with the field's own value is one no
+                  screen reader user — or test — can address by name. */}
+              <div className="mb-1.5 flex items-center gap-2">
+                <label
+                  htmlFor={`setup-${key}`}
+                  className="text-label text-[var(--on-surface-variant)]"
+                >
+                  {field.label}
+                </label>
                 {isRequired && (
-                  <span className="text-label text-[var(--pm-tertiary)]">
+                  <span aria-hidden className="text-label text-[var(--pm-tertiary)]">
                     {value.trim() ? 'required' : 'required — this stage is waiting on it'}
                   </span>
                 )}
-              </label>
+              </div>
               <textarea
                 id={`setup-${key}`}
                 value={value}

@@ -32,15 +32,15 @@ import {
 /**
  * The open project.
  *
- * A new store rather than an extension of session-store.ts. That file is ~450
- * lines of flat session fields, and every field added there is one the legacy
- * flow has to carry too; the two can coexist while /session is still live.
+ * Built as a new store rather than an extension of the legacy session store,
+ * which was ~450 lines of flat session fields that both flows would have had
+ * to carry. That store is gone now, along with the flow it drove; this is the
+ * only one left.
  *
- * One store instance holding one project, not a map of projects. Around forty
- * components read the old store with no project context, so a store-per-project
- * design would force a React context and a hook threaded through all of them
- * for no user-visible gain — the UI shows one project at a time, and
- * multi-project concurrency comes free from browser tabs.
+ * One store instance holding one project, not a map of projects. The UI shows
+ * one project at a time, and multi-project concurrency comes free from browser
+ * tabs — a store-per-project design would buy a React context and a hook
+ * threaded through every consumer for no user-visible gain.
  */
 
 const DEBOUNCE_MS = 800;

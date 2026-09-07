@@ -33,7 +33,7 @@ export default function NotFound() {
         {/* Actions */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
           <Link
-            href="/session"
+            href="/projects"
             className="px-6 py-3 bg-[var(--pm-primary)] text-white font-semibold rounded-xl hover:bg-[var(--pm-primary-container)] active:scale-[0.98] transition-all duration-200 text-sm flex items-center gap-2"
           >
             <span className="material-symbols-outlined text-[18px]">dashboard</span>

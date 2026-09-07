@@ -2,9 +2,28 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { useSessionStore } from '@/stores/session-store';
-import { flushSession } from '@/lib/persistence/session-snapshot';
+import { useProjectStore } from '@/stores/project-store';
 import type { User } from '@supabase/supabase-js';
+
+/**
+ * Drop whatever the signed-out user was looking at.
+ *
+ * This used to reset the session store and clear its `pm-session`
+ * sessionStorage key. Neither exists now: project state lives in Supabase
+ * under RLS, and the store holds a cache of one project. Flushing first
+ * matters for the same reason it always did — once the session is gone RLS
+ * refuses the write, so a debounced edit that has not left the browser yet is
+ * lost with it.
+ */
+async function releaseOpenProject() {
+  const store = useProjectStore.getState();
+  try {
+    await store.flush();
+  } catch {
+    // Never block sign-out on a failed save.
+  }
+  store.closeProject();
+}
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
@@ -23,10 +42,7 @@ export function useAuth() {
       setUser(session?.user ?? null);
       setLoading(false);
       if (event === 'SIGNED_OUT') {
-        useSessionStore.getState().resetSession();
-        if (typeof window !== 'undefined') {
-          sessionStorage.removeItem('pm-session');
-        }
+        useProjectStore.getState().closeProject();
       }
     });
 
@@ -88,22 +104,9 @@ export function useAuth() {
   );
 
   const signOut = useCallback(async () => {
-    // Flush before signing out — once the session is gone, RLS blocks the write
-    // and any unsaved iterations are lost with the sessionStorage clear below.
-    const { data: { user: current } } = await supabase.auth.getUser();
-    if (current) {
-      try {
-        await flushSession(current.id);
-      } catch {
-        // Never block sign-out on a failed save.
-      }
-    }
+    await releaseOpenProject();
     await supabase.auth.signOut();
     setUser(null);
-    useSessionStore.getState().resetSession();
-    if (typeof window !== 'undefined') {
-      sessionStorage.removeItem('pm-session');
-    }
   }, [supabase]);
 
   // Supabase marks guest identities with is_anonymous on the JWT.

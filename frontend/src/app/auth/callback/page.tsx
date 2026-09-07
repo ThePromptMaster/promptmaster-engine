@@ -28,7 +28,7 @@ export default function AuthCallbackPage() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string) => {
       if (event === 'SIGNED_IN') {
-        router.push('/session');
+        router.push('/projects');
       }
     });
 
