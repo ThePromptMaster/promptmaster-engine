@@ -20,6 +20,7 @@ import {
 import { summariseStageContent } from '@/lib/workflow/digest';
 import { deriveOutlineItems, draftingStageId } from '@/lib/workflow/derived-outline';
 import { OutlineStagePanel } from '@/components/outline/outline-stage-panel';
+import { ProjectSetup, stageWantsSetup } from './project-setup';
 import { draftBindings, longFormFromOutline } from '@/lib/outline/long-form';
 import { saveLongForm } from '@/lib/supabase/versions';
 import type { OutlineDocument } from '@/types/outline';
@@ -36,7 +37,7 @@ import { appendWorkflowEvent, listWorkflowEvents } from '@/lib/supabase/workflow
 import type { NewVersion } from '@/lib/supabase/versions';
 import type { StageBundle } from '@/stores/project-store';
 import { approvedOutlineVersionId } from '@/lib/supabase/outline';
-import type { Artifact, ArtifactVersion, Project } from '@/types/project';
+import type { Artifact, ArtifactVersion, Project, ProjectPatch } from '@/types/project';
 
 interface Props {
   project: Project;
@@ -45,7 +46,7 @@ interface Props {
   template: WorkflowTemplate;
   /** Every stage's artifact and version history, keyed by stage id. */
   stages?: Record<string, StageBundle>;
-  onPatchProject: (patch: { manual_checks?: Record<string, boolean>; stage?: string }) => void;
+  onPatchProject: (patch: ProjectPatch) => void;
   appendStageVersion?: (
     stageId: string,
     name: string,
@@ -64,8 +65,6 @@ interface Props {
   ensureStageArtifact?: (stageId: string, name: string) => Promise<Artifact>;
   /** Reload project state after the server changed it behind our back. */
   onReload?: () => void;
-  /** Rendered instead of the dispatched renderer; used by the legacy pane. */
-  children?: React.ReactNode;
 }
 
 export function WorkflowWorkspace({
@@ -80,7 +79,6 @@ export function WorkflowWorkspace({
   setStageSummary,
   ensureStageArtifact,
   onReload,
-  children,
 }: Props) {
   const [events, setEvents] = useState<WorkflowEvent[] | null>(null);
   const [viewingStageId, setViewingStageId] = useState<string | null>(null);
@@ -95,9 +93,13 @@ export function WorkflowWorkspace({
 
   // State is derived from the event log in exactly one place, so it cannot
   // drift from the record.
+  // `project.stage` is only consulted while the log is empty. Every project
+  // imported from /session is in exactly that position — a cursor recorded by
+  // the import, and no events — so without it they all open on stage one with
+  // their finished output filed one click away in the rail.
   const state = useMemo(
-    () => projectState(template, events ?? []),
-    [template, events]
+    () => projectState(template, events ?? [], project.stage),
+    [template, events, project.stage]
   );
 
   // What the rail highlights vs what the user is reading: selecting a stage
@@ -459,7 +461,19 @@ export function WorkflowWorkspace({
           />
 
           <div className="mb-8">
-            {outlinePanelHere && !children && (
+            {/* The stage's exit criteria say whether the project's setup fields
+                belong here — no stage in any template asks for them twice, and
+                nothing about this reads the workflow's name. */}
+            {stageWantsSetup(stage) && (
+              <ProjectSetup
+                project={project}
+                stage={stage}
+                onPatch={onPatchProject}
+                readOnly={!isCurrent}
+              />
+            )}
+
+            {outlinePanelHere && (
               <div className="mb-6">
                 <OutlineStagePanel
                   project={project}
@@ -483,11 +497,8 @@ export function WorkflowWorkspace({
                 renderer as well would draw the "not built yet" placeholder
                 underneath a working editor. A derived outline sits on the
                 drafting stage, whose renderer still has work to do, so only the
-                explicit case suppresses it.
-
-                `children` is the legacy single-output pane. Once that workflow
-                renders through `single_output`, this prop goes. */}
-            {explicitOutlineHere ? null : children ?? (
+                explicit case suppresses it. */}
+            {explicitOutlineHere ? null : (
               <StageRenderer
                 stage={stage}
                 schema={itemSchemaFor(stage)}
