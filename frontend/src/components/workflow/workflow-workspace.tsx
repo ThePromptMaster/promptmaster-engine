@@ -37,7 +37,7 @@ import { appendWorkflowEvent, listWorkflowEvents } from '@/lib/supabase/workflow
 import type { NewVersion } from '@/lib/supabase/versions';
 import type { StageBundle } from '@/stores/project-store';
 import { approvedOutlineVersionId } from '@/lib/supabase/outline';
-import type { Artifact, ArtifactVersion, Project, ProjectPatch } from '@/types/project';
+import type { Artifact, ArtifactVersion, Evaluation, Project, ProjectPatch } from '@/types/project';
 
 interface Props {
   project: Project;
@@ -46,6 +46,8 @@ interface Props {
   template: WorkflowTemplate;
   /** Every stage's artifact and version history, keyed by stage id. */
   stages?: Record<string, StageBundle>;
+  /** Stored evaluations, keyed by the version they scored. */
+  evaluations?: Record<string, Evaluation>;
   onPatchProject: (patch: ProjectPatch) => void;
   appendStageVersion?: (
     stageId: string,
@@ -73,6 +75,7 @@ export function WorkflowWorkspace({
   versions,
   template,
   stages: bundles,
+  evaluations,
   onPatchProject,
   appendStageVersion,
   restoreStageVersion,
@@ -513,6 +516,11 @@ export function WorkflowWorkspace({
                 onGenerate={generation.generate}
                 onCancelGeneration={generation.cancel}
                 readOnly={!isCurrent}
+                evaluation={
+                  evaluations?.[
+                    activeVersionId ?? stageVersions.at(-1)?.id ?? ''
+                  ]
+                }
                 longForm={longFormContext}
               />
             )}

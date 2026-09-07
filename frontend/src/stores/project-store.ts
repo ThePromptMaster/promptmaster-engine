@@ -172,13 +172,30 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       const versions = allVersions.find((b) => b.artifact.id === artifact?.id)?.versions ?? [];
 
       const evaluations: Record<string, Evaluation> = {};
-      // Only the head version's evaluation is needed to render; the rest load
+      // Only head versions' evaluations are needed to render; the rest load
       // lazily when the user opens version history.
-      const head = versions[versions.length - 1];
-      if (head) {
-        const evaluation = await getEvaluation(head.id);
-        if (evaluation) evaluations[head.id] = evaluation;
+      //
+      // Every stage's head, not just the project artifact's. The 65 imported
+      // projects carry 128 evaluation rows against stage artifacts, and loading
+      // only the project-level one left every score invisible on exactly the
+      // projects that have them.
+      const heads = new Set<string>();
+      const projectHead = versions[versions.length - 1];
+      if (projectHead) heads.add(projectHead.id);
+      for (const bundle of Object.values(stages)) {
+        const head = bundle.versions[bundle.versions.length - 1];
+        if (head) heads.add(head.id);
       }
+
+      // In parallel: this is one round trip per stage, and a thirteen-stage
+      // Book would otherwise serialise thirteen of them behind each other.
+      const loaded = await Promise.all(
+        [...heads].map(async (id) => [id, await getEvaluation(id)] as const)
+      );
+      for (const [id, evaluation] of loaded) {
+        if (evaluation) evaluations[id] = evaluation;
+      }
+      const head = projectHead;
 
       set({
         project,

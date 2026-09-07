@@ -11,7 +11,8 @@
  * claim table.
  */
 
-import type { ArtifactVersion } from '@/types/project';
+import { EvaluationScores } from '../evaluation-scores';
+import type { ArtifactVersion, Evaluation } from '@/types/project';
 
 interface VersionBarProps {
   versions: ArtifactVersion[];
@@ -20,6 +21,8 @@ interface VersionBarProps {
   onSelect: (versionId: string | null) => void;
   onRestore: (versionId: string) => Promise<void>;
   readOnly: boolean;
+  /** Scores for the version being viewed, when one was ever stored. */
+  evaluation?: Evaluation;
 }
 
 export function VersionBar({
@@ -29,6 +32,7 @@ export function VersionBar({
   onSelect,
   onRestore,
   readOnly,
+  evaluation,
 }: VersionBarProps) {
   if (versions.length === 0) return null;
 
@@ -57,6 +61,10 @@ export function VersionBar({
           </button>
         ))}
       </div>
+
+      {/* Scores belong beside the version they describe: selecting an older
+          pill and seeing the newest version's alignment would be a lie. */}
+      <EvaluationScores evaluation={evaluation} />
 
       {/* Restoring appends a new version rather than rewinding — reachable
           only while looking at an older one, so browsing stays free. */}

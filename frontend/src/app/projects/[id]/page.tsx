@@ -25,6 +25,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const artifact = useProjectStore((s) => s.artifact);
   const versions = useProjectStore((s) => s.versions);
   const stages = useProjectStore((s) => s.stages);
+  const evaluations = useProjectStore((s) => s.evaluations);
   const loading = useProjectStore((s) => s.loading);
   const error = useProjectStore((s) => s.error);
   const saveState = useProjectStore((s) => s.saveState);
@@ -179,6 +180,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         artifact={artifact}
         versions={versions}
         stages={stages}
+        evaluations={evaluations}
         template={template}
         onPatchProject={patchProject}
         appendStageVersion={appendStageVersion}
