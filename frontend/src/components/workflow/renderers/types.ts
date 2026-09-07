@@ -1,6 +1,6 @@
 import type { StageDefinition } from '@/lib/workflow/types';
 import type { StageItem, StageItemSchema } from '@/lib/workflow/stage-artifact';
-import type { ArtifactVersion, Project } from '@/types/project';
+import type { Evaluation, ArtifactVersion, Project } from '@/types/project';
 import type { LongFormState } from '@/types';
 
 /**
@@ -44,6 +44,8 @@ export interface StageRendererProps {
 
   /** Every version of this stage's artifact, oldest first. */
   versions: ArtifactVersion[];
+  /** Scores for the version being viewed, when one was ever stored. */
+  evaluation?: Evaluation;
   /** Which version is being *displayed*. Never implies a restore. */
   activeVersionId: string | null;
   onSelectVersion: (versionId: string | null) => void;

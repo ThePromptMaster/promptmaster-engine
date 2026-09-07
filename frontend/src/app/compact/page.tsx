@@ -61,7 +61,7 @@ export default function CompactPage() {
       {/* Header */}
       <header className="border-b border-[var(--outline-variant)]/20 bg-white">
         <div className="max-w-3xl mx-auto px-6 py-6 flex items-center">
-          <Link href="/session" className="flex items-center gap-2 text-sm text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] transition-colors">
+          <Link href="/projects" className="flex items-center gap-2 text-sm text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] transition-colors">
             <span className="material-symbols-outlined text-[18px]">arrow_back</span>
             Back to session
           </Link>
@@ -126,7 +126,7 @@ export default function CompactPage() {
         </p>
         <div>
           <Link
-            href="/session"
+            href="/projects"
             className="inline-flex items-center gap-2 px-6 py-3 bg-[var(--pm-primary)] text-white text-sm font-semibold rounded-xl hover:opacity-90 transition-all"
           >
             <span className="material-symbols-outlined text-[18px]">arrow_forward</span>

@@ -32,15 +32,15 @@ import {
 /**
  * The open project.
  *
- * A new store rather than an extension of session-store.ts. That file is ~450
- * lines of flat session fields, and every field added there is one the legacy
- * flow has to carry too; the two can coexist while /session is still live.
+ * Built as a new store rather than an extension of the legacy session store,
+ * which was ~450 lines of flat session fields that both flows would have had
+ * to carry. That store is gone now, along with the flow it drove; this is the
+ * only one left.
  *
- * One store instance holding one project, not a map of projects. Around forty
- * components read the old store with no project context, so a store-per-project
- * design would force a React context and a hook threaded through all of them
- * for no user-visible gain — the UI shows one project at a time, and
- * multi-project concurrency comes free from browser tabs.
+ * One store instance holding one project, not a map of projects. The UI shows
+ * one project at a time, and multi-project concurrency comes free from browser
+ * tabs — a store-per-project design would buy a React context and a hook
+ * threaded through every consumer for no user-visible gain.
  */
 
 const DEBOUNCE_MS = 800;
@@ -172,13 +172,30 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       const versions = allVersions.find((b) => b.artifact.id === artifact?.id)?.versions ?? [];
 
       const evaluations: Record<string, Evaluation> = {};
-      // Only the head version's evaluation is needed to render; the rest load
+      // Only head versions' evaluations are needed to render; the rest load
       // lazily when the user opens version history.
-      const head = versions[versions.length - 1];
-      if (head) {
-        const evaluation = await getEvaluation(head.id);
-        if (evaluation) evaluations[head.id] = evaluation;
+      //
+      // Every stage's head, not just the project artifact's. The 65 imported
+      // projects carry 128 evaluation rows against stage artifacts, and loading
+      // only the project-level one left every score invisible on exactly the
+      // projects that have them.
+      const heads = new Set<string>();
+      const projectHead = versions[versions.length - 1];
+      if (projectHead) heads.add(projectHead.id);
+      for (const bundle of Object.values(stages)) {
+        const head = bundle.versions[bundle.versions.length - 1];
+        if (head) heads.add(head.id);
       }
+
+      // In parallel: this is one round trip per stage, and a thirteen-stage
+      // Book would otherwise serialise thirteen of them behind each other.
+      const loaded = await Promise.all(
+        [...heads].map(async (id) => [id, await getEvaluation(id)] as const)
+      );
+      for (const [id, evaluation] of loaded) {
+        if (evaluation) evaluations[id] = evaluation;
+      }
+      const head = projectHead;
 
       set({
         project,

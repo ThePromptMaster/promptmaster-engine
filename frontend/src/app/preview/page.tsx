@@ -29,6 +29,7 @@ import type { OutlineDocument, SectionDraftBinding } from '@/types/outline';
 import type { Artifact, ArtifactVersion, Project } from '@/types/project';
 import type { LongFormState } from '@/types';
 import { StageRail } from '@/components/workflow/stage-rail';
+import { ProjectSetup, stageWantsSetup } from '@/components/workflow/project-setup';
 import { StageHeader } from '@/components/workflow/stage-header';
 import { ExitCriteriaChecklist } from '@/components/workflow/exit-criteria-checklist';
 import { StageTransitionBar } from '@/components/workflow/stage-transition-bar';
@@ -600,6 +601,141 @@ function DerivedOutlineSlice() {
   );
 }
 
+/**
+ * Single output, stage by stage, with the controls live.
+ *
+ * The other slices on this page show a workflow's chrome around a grey block
+ * standing in for its content. This one has to show the content, because
+ * single output is the workflow that just stopped having a bespoke pane: the
+ * question a reviewer needs answered is whether five stages of prose and review
+ * renderers actually replace the five hand-written phases, and a placeholder
+ * cannot answer it.
+ *
+ * Everything reacts. Typing an objective satisfies Input's blocking criterion
+ * in front of you, ticking a manual check flips its row, and moving between
+ * stages swaps the renderer — all through the same `evaluateStage` the app
+ * runs. Only the artifacts are fixtures, and only because there is no model
+ * behind a preview.
+ */
+const SINGLE_OUTPUT_FIXTURES: Record<string, string> = {
+  input:
+    'Produce a two-page briefing for the board on why the migration is worth its cost, ' +
+    'in language a non-technical director can act on.',
+  review:
+    'You are writing for a board that has approved the budget but not the plan. ' +
+    'Lead with the decision they have to make, then the evidence, then the risk you are asking them to accept.',
+  output:
+    '## The decision\n\nTwo systems now do the same job, and every change has to be made ' +
+    'twice or consciously not made twice. The cost of the second one is not the code — it is ' +
+    'the deliberation tax on everything else.\n\n## What we are asking\n\nApproval to retire ' +
+    'the older path this quarter rather than next.',
+  realign:
+    'The draft argued from engineering convenience. Rewrite it to argue from the cost of ' +
+    'delay, which is the only currency this audience spends.',
+};
+
+function SingleOutputSlice() {
+  const template = SINGLE_OUTPUT_V1;
+  const [stageId, setStageId] = useState(template.stages[0].id);
+  const [objective, setObjective] = useState('');
+  const [checks, setChecks] = useState<Record<string, boolean>>({});
+
+  const stage = getStage(template, stageId)!;
+  const project = {
+    ...DRAFTING_PROJECT,
+    workflow: 'single_output',
+    stage: stageId,
+    objective,
+    manual_checks: checks,
+  } as Project;
+
+  const content = SINGLE_OUTPUT_FIXTURES[stageId] ?? null;
+  const items = stage.renderer === 'review' ? FACT_CHECK_FIXTURE : null;
+  const shown = items ?? content;
+
+  const context = ctx({
+    fields: { objective },
+    artifactNonEmpty: { [stageId]: Boolean(shown?.trim()) },
+    manualChecks: checks,
+  });
+  const evaluation = evaluateStage(template, stageId, context);
+  const state = projectState(template, [], stageId);
+  const manualIds = new Set(
+    stage.exit_criteria.filter((c) => c.check === 'manual').map((c) => c.id)
+  );
+
+  return (
+    <div className="rounded-2xl bg-[var(--surface)] px-8 py-8 shadow-[0_1px_2px_rgba(25,28,30,0.04),0_12px_32px_-16px_rgba(25,28,30,0.25)]">
+      <div className="mb-6 flex flex-wrap gap-2">
+        {template.stages.map((s) => (
+          <button
+            key={s.id}
+            onClick={() => setStageId(s.id)}
+            className={`rounded-lg px-3 py-1.5 text-label transition-colors ${
+              s.id === stageId
+                ? 'bg-[var(--pm-primary)] text-[var(--on-primary)]'
+                : 'bg-[var(--surface-container-low)] text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)]'
+            }`}
+          >
+            {s.short_label}
+            <span className="ml-2 opacity-60">{s.renderer}</span>
+          </button>
+        ))}
+      </div>
+
+      <StageHeader
+        stage={stage}
+        status={state.stages[stage.id]?.status ?? 'not_started'}
+        position={{
+          index: template.stages.findIndex((s) => s.id === stage.id) + 1,
+          total: template.stages.length,
+        }}
+      />
+
+      {stageWantsSetup(stage) && (
+        <ProjectSetup
+          project={project}
+          stage={stage}
+          onPatch={(patch) => setObjective(String(patch.objective ?? objective))}
+          readOnly={false}
+        />
+      )}
+
+      <div className="mb-6">
+        <StageRenderer
+          stage={stage}
+          schema={itemSchemaFor(stage)}
+          versions={shown === null ? [] : [fixtureVersion(shown)]}
+          activeVersionId={null}
+          onSelectVersion={() => {}}
+          onRestore={async () => {}}
+          onSaveContent={async () => {}}
+          onSaveItems={async () => {}}
+          generating={false}
+          generationError={null}
+          onGenerate={() => {}}
+          onCancelGeneration={() => {}}
+          readOnly={false}
+        />
+      </div>
+
+      <div className="space-y-4">
+        <ExitCriteriaChecklist
+          criteria={evaluation.criteria}
+          manualIds={manualIds}
+          onToggleManual={(id, checked) => setChecks((c) => ({ ...c, [id]: checked }))}
+        />
+        <StageTransitionBar
+          stage={stage}
+          evaluation={evaluation}
+          options={availableTransitions(template, state, evaluation)}
+          onTransition={(option) => option.toStageId && setStageId(option.toStageId)}
+        />
+      </div>
+    </div>
+  );
+}
+
 function WorkflowSlice({ template }: { template: WorkflowTemplate }) {
   const events = template.key === 'book' ? EVENTS : [];
   const state = projectState(template, events);
@@ -786,6 +922,13 @@ export default function PreviewPage() {
             note="The old five-phase session expressed as workflow data rather than a hard-coded path."
           >
             <WorkflowSlice template={SINGLE_OUTPUT_V1} />
+          </Section>
+
+          <Section
+            title="Single output, stage by stage"
+            note="/session is retired, so this is the whole of it. Pick a stage and the renderer changes with it — no branch anywhere reads the workflow's name. Type an objective on Input and watch its blocking criterion satisfy; tick a manual check and watch its row flip. Advance and Skip move between stages here rather than writing events."
+          >
+            <SingleOutputSlice />
           </Section>
         </div>
       </div>

@@ -27,6 +27,7 @@ export function ListRenderer({
   stage,
   schema,
   versions,
+  evaluation,
   activeVersionId,
   onSelectVersion,
   onRestore,
@@ -130,6 +131,7 @@ export function ListRenderer({
       />
 
       <VersionBar
+          evaluation={evaluation}
         versions={versions}
         activeVersionId={activeVersionId}
         headVersionId={versions.at(-1)?.id ?? null}

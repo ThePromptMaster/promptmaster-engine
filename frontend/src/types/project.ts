@@ -73,9 +73,10 @@ export interface Artifact {
   kind: 'output' | 'outline' | 'long_form_document' | 'export';
   name: string;
   /**
-   * Which stage owns this artifact. Null for the 65 imported projects, which
-   * predate stages entirely; free text with no FK because stage ids live
-   * inside a workflow template's JSONB.
+   * Which stage owns this artifact. Free text with no FK, because stage ids
+   * live inside a workflow template's JSONB. Nullable because the column
+   * predates stages; in practice nothing writes null any more — the M1 import
+   * filed all 65 legacy artifacts onto single output's `output` stage.
    */
   stage_id: string | null;
   /**
