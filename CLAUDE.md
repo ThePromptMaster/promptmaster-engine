@@ -101,6 +101,17 @@ What went with it, and is **not** reachable anywhere in the UI today: the chat p
 
 The `sessions`, `templates`, `custom_modes`, `user_presets` and `conversation_messages` tables are untouched, as are their client modules under `lib/supabase/`. `sessions` in particular is the rollback path for the M1 import and must not be narrowed. Several of those modules currently have no importer.
 
+## Requirements
+
+`docs/requirements/phase2-functional-requirements.md` holds FR-01 to FR-23 verbatim
+from Exhibit A of the Phase 2 amendment. **It is the authority.** Code comments cite
+FR numbers freely; those citations are shorthand, not the requirement.
+
+Read the FR before building against it. An implementation pass had to stop dead on
+2026-09-08 because FR-11 to FR-15 appeared nowhere in the repository — the only trace
+was two paraphrase fragments in a migration comment, and the contract was a .docx in
+someone's Downloads folder.
+
 ## Evaluation System
 
 A separate LLM call scores three dimensions plus two optional fields (`EvaluationResult` in `schemas.py`):
