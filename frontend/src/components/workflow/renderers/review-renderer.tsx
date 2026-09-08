@@ -42,6 +42,7 @@ export function ReviewRenderer({
   stage,
   schema,
   versions,
+  evaluation,
   activeVersionId,
   onSelectVersion,
   onRestore,
@@ -118,6 +119,7 @@ export function ReviewRenderer({
       />
 
       <VersionBar
+          evaluation={evaluation}
         versions={versions}
         activeVersionId={activeVersionId}
         headVersionId={versions.at(-1)?.id ?? null}

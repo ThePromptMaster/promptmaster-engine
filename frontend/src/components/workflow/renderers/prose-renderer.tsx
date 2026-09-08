@@ -24,6 +24,7 @@ import type { StageRendererProps } from './types';
 export function ProseRenderer({
   stage,
   versions,
+  evaluation,
   activeVersionId,
   onSelectVersion,
   onRestore,
@@ -113,6 +114,7 @@ export function ProseRenderer({
       />
 
       <VersionBar
+          evaluation={evaluation}
         versions={versions}
         activeVersionId={activeVersionId}
         headVersionId={versions.at(-1)?.id ?? null}

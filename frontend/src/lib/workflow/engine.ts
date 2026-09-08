@@ -200,11 +200,30 @@ export function availableTransitions(
 
 // --- projection -------------------------------------------------------------
 
-export function initialState(template: WorkflowTemplate): WorkflowState {
-  const first = template.stages[0];
+/**
+ * The state a project starts from before any event is replayed.
+ *
+ * `resumeStageId` exists for a project whose event log is empty but which is
+ * demonstrably not at the beginning — every project imported from /session is
+ * exactly that: `projects.stage` records where the user got to, and no
+ * `workflow_events` row was ever written for them. Without it, sixty-five
+ * imported projects open on stage one with their finished output a click away
+ * in the rail, which reads as data loss.
+ *
+ * It moves the cursor and nothing else. Earlier stages stay `not_started`
+ * rather than being back-filled as `complete`: we know where the user was, and
+ * inventing completions they never recorded would put fiction in the one place
+ * the app treats as the record.
+ */
+export function initialState(
+  template: WorkflowTemplate,
+  resumeStageId?: string | null
+): WorkflowState {
+  const resume = resumeStageId ? getStage(template, resumeStageId) : undefined;
+  const start = resume ?? template.stages[0];
   return {
-    current_stage_id: first?.id ?? '',
-    stages: first ? { [first.id]: { status: 'in_progress' } } : {},
+    current_stage_id: start?.id ?? '',
+    stages: start ? { [start.id]: { status: 'in_progress' } } : {},
   };
 }
 
@@ -217,9 +236,16 @@ export function initialState(template: WorkflowTemplate): WorkflowState {
  */
 export function projectState(
   template: WorkflowTemplate,
-  events: WorkflowEvent[]
+  events: WorkflowEvent[],
+  /**
+   * Where to start when there is nothing to replay — `projects.stage`, the
+   * denormalised cursor. Ignored the moment a single event exists, because
+   * from then on the log is the record and a cursor that disagrees with it is
+   * stale by definition.
+   */
+  resumeStageId?: string | null
 ): WorkflowState {
-  const state = initialState(template);
+  const state = initialState(template, events.length === 0 ? resumeStageId : undefined);
   const order = template.stages.map((s) => s.id);
 
   const set = (id: string, patch: Partial<StageState>) => {

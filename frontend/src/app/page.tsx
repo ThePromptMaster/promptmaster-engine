@@ -121,7 +121,7 @@ export default function LandingPage() {
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
               <Link
-                href="/session"
+                href="/projects"
                 className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-[var(--pm-primary)] text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all"
               >
                 <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
@@ -283,7 +283,7 @@ export default function LandingPage() {
             result. Refine until it&apos;s right.
           </p>
           <Link
-            href="/session"
+            href="/projects"
             className="inline-flex items-center justify-center gap-2 px-10 py-4 bg-[var(--pm-primary)] text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all"
           >
             <span className="material-symbols-outlined text-[18px]">arrow_forward</span>

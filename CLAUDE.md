@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-PromptMaster Engine is a professional AI workflow platform that structures interactions with LLMs using modes, evaluation, and iterative refinement. It is NOT a chatbot — it's a 5-phase guided workflow for analysts, auditors, lawyers, and strategists who need aligned, evaluated AI outputs.
+PromptMaster Engine is a professional AI workflow platform that structures interactions with LLMs using modes, evaluation, and iterative refinement. It is NOT a chatbot — it's a stage-based guided workflow for analysts, auditors, lawyers, and strategists who need aligned, evaluated AI outputs.
 
 The system is based on a book ("How to Become a PromptMaster" by Sean Moran) and has a provisional patent covering the structured interaction + evaluation loop. Backend modules reference book chapters/sections in docstrings (e.g. "Ch1 S13-S14") — keep those citations when editing.
 
@@ -40,7 +40,6 @@ It does verify identity. `backend/auth.py` checks the Supabase JWT and attaches 
 
 **Where state actually lives:**
 - **`/projects`** — Supabase is authoritative. `project-store.ts` holds a cache plus a `revision` for optimistic concurrency; scalar edits are debounced field patches (never whole snapshots — that is a lost-update generator), appends are immediate, and a conflict is surfaced rather than resolved. `use-project-flush` forces pending edits out on tab hide and unload.
-- **`/session`** — the legacy flow. Zustand persisted to `sessionStorage` (dies on tab close), autosaved to `sessions.data` as one JSONB blob.
 
 ### Backend layout
 
@@ -64,22 +63,21 @@ It does verify identity. `backend/auth.py` checks the Supabase JWT and attaches 
 
 ### Frontend layout
 
-- `src/app/session/page.tsx` — phase router: renders one of five phase components off `store.phase`, wrapped in `ErrorBoundary`
-- `src/app/session/session-shell.tsx` — sidebar + top nav + content well
-- `src/components/phases/` — `input`, `review`, `output`, `realign`, `summary`
-- `src/components/` also: `chat/`, `long-form/`, `evaluation/`, `input/`, `output/`, `persona/`, `sidebar/`, `tutorial/`, `shared/`, `ui/`
-- The live 5-phase UI is `layout/top-nav.tsx` (`PHASE_TABS`) and `layout/sidebar.tsx` (`PHASE_LABELS`) — there is no phase-indicator component
+- `src/app/projects/[id]/page.tsx` — loads the project and its pinned template, then hands both to `WorkflowWorkspace`. It has no pane of its own any more.
+- `src/app/session/page.tsx` — a redirect to `/projects`. Nothing else remains of the old flow.
+- `src/components/` — `workflow/` (the workspace and its renderers), `outline/`, `projects/`, `shared/` (`markdown-output`, `error-boundary`, `custom-select`), `ui/`
 - `src/lib/api/client.ts` — the `api` object; every backend call goes through `apiFetch`, which unwraps FastAPI's `detail` into an `Error`. Frontend never talks to an LLM directly.
 - `src/lib/supabase/` — one module per table: `sessions`, `templates`, `usage`, `custom-modes`, `conversation` (`conversation_messages`), `presets` (`user_presets`)
 - `src/lib/constants.ts` — `MODE_DISPLAY`, `PROMPT_STACKS`, `CONSTRAINT_PRESETS`, `FORMAT_PRESETS`, `AUDIENCE_OPTIONS`, `DEFAULT_MODEL`
 
-`frontend/AGENTS.md`: this is Next.js 16 — APIs differ from training data. Read `node_modules/next/dist/docs/` before writing framework-level code. Notably `proxy.ts` replaces `middleware.ts`, and auth/session routes are `force-dynamic`.
+`frontend/AGENTS.md`: this is Next.js 16 — APIs differ from training data. Read `node_modules/next/dist/docs/` before writing framework-level code. Notably `proxy.ts` replaces `middleware.ts`, and auth routes are `force-dynamic`.
 
-## Two flows, mid-migration
+## One flow
 
-The app currently has **two** ways to do work. This is deliberate and temporary.
+`/projects` is the only way to do work. The legacy 5-phase `/session` flow was
+retired on 2026-09-07; the route is a redirect to `/projects`.
 
-### `/projects` — the Phase 2 workflow system (where new work goes)
+### `/projects` — the Phase 2 workflow system
 
 A project pins a **workflow template version** (`projects.workflow_template_id`) and moves through its stages. Templates are rows in `workflow_templates`, immutable once published — revising one publishes a new version, so a book halfway through drafting is unaffected.
 
@@ -93,9 +91,15 @@ A project pins a **workflow template version** (`projects.workflow_template_id`)
 
 **Exit criteria are declarative predicates evaluated by pure functions** — never an LLM call. A gate that fails because a model timed out is a gate users learn to resent. Unknown rule types degrade to a manual checklist item rather than throwing.
 
-### `/session` — the legacy 5-phase flow (still live, being retired)
+**The project's setup fields are offered by the stage whose exit criteria ask for them** (`components/workflow/project-setup.tsx`, routed on `field_non_empty`). Every template declares that criterion on its first stage, so this is what makes those blocking gates satisfiable — it is wired by data, never by workflow key.
 
-Input → Review → Output → Realign → Summary, driven by `session-store.ts` and `components/phases/`. It retires once `single_output` renders through the workspace; until then it is the only place some generation happens. **Do not add features here.**
+### `/session` — retired 2026-09-07
+
+Input → Review → Output → Realign → Summary lived in `session-store.ts` and `components/phases/`, and is gone. `single_output.v1` is those five stages as template data, rendered by the ordinary `prose` and `review` renderers; `app/session/page.tsx` is a redirect to `/projects`.
+
+What went with it, and is **not** reachable anywhere in the UI today: the chat panel, the flow triggers (Challenge/Reframe/Drift Alert/Refine as…), the flow inspections (Check Intent, Ask Questions, Analyze My Pattern), audit findings and apply-audit, continue-document, generated realignment prompts, the full self-audit, carry-lessons-forward, the tutorial overlay, prompt-stack templates, custom personas and preset pills, per-version thumb ratings, and `.txt`/`.json` session export. **Their backend endpoints all still exist and are still authenticated** — nothing was deleted server-side — so re-surfacing any of them in the workspace is a UI job, not a rebuild. The evaluation pipeline is likewise intact; stage generation simply does not call it (`generate-stage-artifact` is one call, deliberately).
+
+The `sessions`, `templates`, `custom_modes`, `user_presets` and `conversation_messages` tables are untouched, as are their client modules under `lib/supabase/`. `sessions` in particular is the rollback path for the M1 import and must not be narrowed. Several of those modules currently have no importer.
 
 ## Evaluation System
 
