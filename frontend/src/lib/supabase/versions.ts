@@ -1,4 +1,5 @@
 import { createClient } from './client';
+import { VersionConflictError } from '@/types/project';
 import type { Artifact, ArtifactVersion, Evaluation } from '@/types/project';
 import type { AuditFinding } from '@/types';
 
@@ -119,6 +120,14 @@ export interface NewVersion {
  * statements. If the second fails the version still exists and is simply not
  * yet the head, which is recoverable and visible; the reverse (a head pointing
  * at nothing) would not be.
+ *
+ * Both concurrent-write outcomes are named rather than left raw. Two tabs on
+ * one artifact used to produce either an unexplained Postgres unique-violation
+ * or, worse, a silent no-op: the head update carried a revision guard whose
+ * result nobody read, so a stale revision matched zero rows, returned no error,
+ * and left the new version written but invisible behind the old head. The
+ * conflict now says which of the two happened, because they need different
+ * words — one lost nothing, the other kept the work and needs a reload.
  */
 export async function appendVersion(
   artifact: Artifact,
@@ -149,15 +158,33 @@ export async function appendVersion(
     .select(VERSION_COLUMNS)
     .single();
 
-  if (error || !data) throw error ?? new Error('Failed to append version');
+  if (error || !data) {
+    // 23505 on av_artifact_version_uidx (artifact_id, version_number): another
+    // tab appended while we were composing, so our version_number is taken.
+    // Surfacing the raw Postgres text here is what made two open windows look
+    // like a crash rather than a conflict.
+    if ((error as { code?: string } | null)?.code === '23505') {
+      throw new VersionConflictError('taken', nextNumber);
+    }
+    throw error ?? new Error('Failed to append version');
+  }
   const created = data as unknown as ArtifactVersion;
 
-  const { error: headError } = await supabase
+  const { data: moved, error: headError } = await supabase
     .from('artifacts')
     .update({ current_version_id: created.id, version_count: nextNumber })
     .eq('id', artifact.id)
-    .eq('revision', artifact.revision);
+    .eq('revision', artifact.revision)
+    .select('id')
+    .maybeSingle();
   if (headError) throw headError;
+
+  // The revision guard was already here, but nothing read its result. A stale
+  // revision matches zero rows and returns no error, so the version was written
+  // and the head silently stayed where it was — the artifact would show the old
+  // content with the new version sitting invisible behind it. Recoverable, but
+  // only if someone is told.
+  if (!moved) throw new VersionConflictError('stale-head', nextNumber);
 
   return created;
 }
