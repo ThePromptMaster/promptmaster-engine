@@ -483,8 +483,13 @@ export function deriveWorkflowRecommendations({
       rationale: {
         triggering_issue: `"${criterion.label}" is not satisfied on ${stage.label}.`,
         relevant_stage: stage.label,
+        // Where the objective is already written, quote it: the useful thing
+        // to know while filling in an audience is what the book is *for*, and
+        // the field it has to sit beside is two panels up the page.
         expected_benefit:
-          'Every stage of this project is generated against the setup fields, so filling this in now is what stops later work having to be redone.',
+          rule.field !== 'objective' && objective.trim()
+            ? `Every stage is generated against the setup fields, and the objective already says: ${objective.trim()}`
+            : 'Every stage of this project is generated against the setup fields, so filling this in now is what stops later work having to be redone.',
         scope: 'The project setup, not the artifact.',
       },
       scope: { kind: 'document', described_as: "This project's setup fields." },

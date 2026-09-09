@@ -10,6 +10,10 @@ import { StageRenderer } from './renderers/stage-renderer';
 import { useStageGeneration } from './use-stage-generation';
 import { useStageEvaluation } from './use-stage-evaluation';
 import { StageEvaluationPanel } from './evaluation-panel';
+import { RecommendationsPanel } from './recommendations-panel';
+import { TasksPanel } from './tasks-panel';
+import { ApplyPreview } from './apply-preview';
+import { useRecommendations } from './use-recommendations';
 import {
   availableTransitions,
   evaluateStage,
@@ -266,6 +270,36 @@ export function WorkflowWorkspace({
 
   const progress = useMemo(() => progressSummary(template, state), [template, state]);
 
+  const stageVersionList = useMemo(
+    () => (stage ? stageBundles[stage.id]?.versions ?? [] : []),
+    [stage, stageBundles]
+  );
+  const headVersion = useMemo(() => stageVersionList.at(-1) ?? null, [stageVersionList]);
+  const shownEvaluation = evaluations?.[activeVersionId ?? headVersion?.id ?? ''];
+
+  /**
+   * The recommendations surface — FR-13, FR-09, FR-01.
+   *
+   * Takes the pure exit-criteria `evaluation` (which is what guarantees a
+   * workflow recommendation on every stage) and the stored model evaluation
+   * (which supplies the contextual half where one has been paid for). Browsing
+   * an earlier stage disables it for the same reason it disables generation and
+   * evaluation: acting on a stage you are only looking at is never what was
+   * meant.
+   */
+  const recommendations = useRecommendations({
+    project,
+    template,
+    stage,
+    stageEvaluation: evaluation,
+    headVersion,
+    storedEvaluation: shownEvaluation,
+    modelRecommendation: stageEvaluation.recommendation,
+    onModelRecommendationConsumed: stageEvaluation.dismissRecommendation,
+    appendStageVersion,
+    enabled: isCurrent && events !== null,
+  });
+
   const manualIds = useMemo(
     () => new Set((stage?.exit_criteria ?? []).filter((c) => c.check === 'manual').map((c) => c.id)),
     [stage]
@@ -422,7 +456,7 @@ export function WorkflowWorkspace({
 
   if (!stage) return null;
 
-  const stageVersions = stageBundles[stage.id]?.versions ?? [];
+  const stageVersions = stageVersionList;
 
   /**
    * The derived outline (FR-07), routed on `outline_stage` rather than on the
@@ -468,6 +502,22 @@ export function WorkflowWorkspace({
 
   return (
     <div className="flex min-h-screen">
+      {/* FR-09: what is about to happen, before it happens. Opening this makes
+          no model call — everything on it is computed from rows already in
+          memory, and nothing is spent until Apply is pressed. */}
+      {recommendations.previewing && (
+        <ApplyPreview
+          selected={recommendations.previewRows}
+          headVersionNumber={headVersion?.version_number ?? null}
+          stageLabel={stage.short_label}
+          applying={recommendations.busy}
+          error={recommendations.error}
+          onRemove={recommendations.removeFromPreview}
+          onApply={() => void recommendations.confirmApply()}
+          onCancel={recommendations.closePreview}
+        />
+      )}
+
       <aside className="sticky top-0 hidden h-screen w-[248px] shrink-0 overflow-y-auto bg-[var(--surface-container-lowest)] px-2 py-6 md:block sidebar-scroll">
         <div className="mb-4 px-3">
           <div className="text-xs uppercase tracking-wider text-[var(--on-surface-variant)]">
@@ -577,22 +627,39 @@ export function WorkflowWorkspace({
           </div>
 
           <div className="space-y-4">
+            {/* The order below is the argument. The checklist states the gap;
+                the recommendations propose closing it; the evaluation is the
+                evidence some of them rest on, so it sits under the thing it
+                justifies rather than above it. Tasks are what was set aside,
+                and the transition bar is the way out. */}
             <ExitCriteriaChecklist
               criteria={evaluation.criteria}
               manualIds={manualIds}
               onToggleManual={handleToggleManual}
             />
 
+            <RecommendationsPanel
+              stageLabel={stage.short_label}
+              rows={recommendations.rows}
+              selected={recommendations.selected}
+              onToggleSelect={recommendations.toggleSelect}
+              onTriage={(rec, status, reason) => void recommendations.triage(rec, status, reason)}
+              onApply={recommendations.openPreview}
+              busy={recommendations.busy}
+              readOnly={!isCurrent}
+            />
+
             {/* Beside the exit criteria rather than under the artifact: both
                 answer "is this good enough to move on", and the criteria are
                 the declarative half of the same question the evaluation
                 answers by judgment. */}
-            <StageEvaluationPanel
-              evaluation={
-                evaluations?.[activeVersionId ?? stageVersions.at(-1)?.id ?? '']
-              }
-              recommendation={stageEvaluation.recommendation}
-              onDismissRecommendation={stageEvaluation.dismissRecommendation}
+            <StageEvaluationPanel evaluation={shownEvaluation} />
+
+            <TasksPanel
+              tasks={recommendations.tasks}
+              onResolve={(id, status) => void recommendations.resolveTask(id, status)}
+              busy={recommendations.busy}
+              readOnly={!isCurrent}
             />
 
             {/* Transitions act on the current stage only — browsing history

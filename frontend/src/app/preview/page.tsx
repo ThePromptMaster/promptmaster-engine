@@ -14,6 +14,19 @@ import { useState } from 'react';
 import { WorkflowPicker } from '@/components/projects/workflow-picker';
 import { StageRenderer } from '@/components/workflow/renderers/stage-renderer';
 import { StageEvaluationPanel } from '@/components/workflow/evaluation-panel';
+import {
+  RecommendationsPanel,
+  type PanelRecommendation,
+} from '@/components/workflow/recommendations-panel';
+import { TasksPanel } from '@/components/workflow/tasks-panel';
+import { ApplyPreview } from '@/components/workflow/apply-preview';
+import {
+  bySeverity,
+  deriveWorkflowRecommendations,
+  proposalFromCorrection,
+  signalsFromEvaluation,
+} from '@/lib/workflow/recommend';
+import type { ProjectTask } from '@/lib/supabase/tasks';
 import { itemSchemaFor, serializeItems } from '@/lib/workflow/stage-artifact';
 import { DerivedOutlineNotice } from '@/components/outline/derived-outline-notice';
 import { OutlineEditor } from '@/components/outline/outline-editor';
@@ -502,7 +515,6 @@ function StageEvaluationSlice() {
   const stage = getStage(BOOK_V1, 'positioning')!;
   const [evaluated, setEvaluated] = useState(false);
   const [evaluating, setEvaluating] = useState(false);
-  const [dismissed, setDismissed] = useState(false);
 
   return (
     <div className="space-y-6">
@@ -531,19 +543,154 @@ function StageEvaluationSlice() {
             setTimeout(() => {
               setEvaluating(false);
               setEvaluated(true);
-              setDismissed(false);
             }, 700);
           }}
         />
       </div>
 
-      <div className="max-w-[420px]">
-        <StageEvaluationPanel
-          evaluation={evaluated ? EVAL_FIXTURE : undefined}
-          recommendation={evaluated && !dismissed ? EVAL_RECOMMENDATION : null}
-          onDismissRecommendation={() => setDismissed(true)}
-        />
+      <div className="max-w-[520px]">
+        <StageEvaluationPanel evaluation={evaluated ? EVAL_FIXTURE : undefined} />
       </div>
+    </div>
+  );
+}
+
+/**
+ * The recommendations surface — FR-13, FR-14, FR-09, FR-15.
+ *
+ * The three panels in the order the workspace stacks them, against the same
+ * defective positioning artifact the evaluation slice uses. Everything here is
+ * the real component: the derived rows come from the real
+ * `deriveWorkflowRecommendations` over the real BOOK_V1 template, and the
+ * conflict warning comes from the real `detectConflicts`.
+ *
+ * The only fabrication is the persistence — pressing Dismiss here does not
+ * write a row.
+ */
+function RecommendationsSlice() {
+  const stage = getStage(BOOK_V1, 'positioning')!;
+
+  // Nothing done on this stage: the exit-criteria evaluation fails, so the
+  // derived half produces its blocking-criterion row.
+  const stageEvaluation = evaluateStage(BOOK_V1, stage.id, ctx());
+
+  const derived: PanelRecommendation[] = deriveWorkflowRecommendations({
+    template: BOOK_V1,
+    stage,
+    evaluation: stageEvaluation,
+    objective: 'A practitioner book on prompting for engineering managers.',
+  }).map((r) => ({ ...r, origin: 'derived' as const }));
+
+  const signals = signalsFromEvaluation(EVAL_FIXTURE);
+
+  // Two applyable rows, so multi-select and the conflict warning are both
+  // reachable. The second carries an opposing tag on the same axis.
+  const fromEvaluation: PanelRecommendation[] = [
+    {
+      ...proposalFromCorrection(EVAL_RECOMMENDATION, signals, stage, ''),
+      origin: 'evaluation',
+      id: 'row-1',
+    },
+    {
+      ...proposalFromCorrection(
+        {
+          id: 'r2',
+          title: 'Cut the survey material',
+          triggering_issue: '',
+          expected_benefit: '',
+          scope: '',
+          instruction: 'Remove the literature survey; keep only what positions the book.',
+        },
+        signals,
+        stage,
+        ''
+      ),
+      origin: 'evaluation',
+      id: 'row-2',
+      // Opposing `length` directions is what makes the warning fire — assigned
+      // deterministically in the app, hardcoded here to reach the state.
+      tags: ['length:shorter'],
+    },
+  ];
+  fromEvaluation[0].tags = ['length:longer', 'scope:narrow'];
+
+  const rows = [...fromEvaluation, ...derived].sort(bySeverity);
+
+  const [selected, setSelected] = useState<string[]>(fromEvaluation.map((r) => r.category));
+  const [previewing, setPreviewing] = useState<string[] | null>(null);
+  const [triaged, setTriaged] = useState<string | null>(null);
+
+  const previewRows = rows.filter((r) => previewing?.includes(r.category));
+
+  const [tasks, setTasks] = useState<ProjectTask[]>([
+    {
+      id: 't1',
+      user_id: 'u',
+      project_id: 'p',
+      title: 'Name two comparable practitioner books',
+      detail: 'Deferred from Positioning — need to check what is actually in print.',
+      stage: 'positioning',
+      status: 'open',
+      origin: 'recommendation',
+      origin_recommendation_id: null,
+      created_at: '2026-09-09T00:00:00Z',
+      resolved_at: null,
+    },
+  ]);
+
+  return (
+    <div className="max-w-[720px] space-y-4">
+      {previewing && (
+        <ApplyPreview
+          selected={previewRows}
+          headVersionNumber={4}
+          stageLabel={stage.short_label}
+          applying={false}
+          error={null}
+          onRemove={(category) =>
+            setPreviewing((prev) => {
+              const next = (prev ?? []).filter((c) => c !== category);
+              return next.length > 0 ? next : null;
+            })
+          }
+          onApply={() => setPreviewing(null)}
+          onCancel={() => setPreviewing(null)}
+        />
+      )}
+
+      <ExitCriteriaChecklist
+        criteria={stageEvaluation.criteria}
+        manualIds={new Set(stage.exit_criteria.filter((c) => c.check === 'manual').map((c) => c.id))}
+        onToggleManual={() => {}}
+      />
+
+      <RecommendationsPanel
+        stageLabel={stage.short_label}
+        rows={rows}
+        selected={selected}
+        onToggleSelect={(category, checked) =>
+          setSelected((prev) =>
+            checked ? [...new Set([...prev, category])] : prev.filter((c) => c !== category)
+          )
+        }
+        onTriage={(rec, status, reason) => setTriaged(`${rec.title} — ${status}${reason ? `: ${reason}` : ''}`)}
+        onApply={setPreviewing}
+      />
+
+      {triaged && (
+        <p className="px-5 text-label text-[var(--on-surface-variant)]">
+          Recorded here rather than written: {triaged}
+        </p>
+      )}
+
+      <StageEvaluationPanel evaluation={EVAL_FIXTURE} />
+
+      <TasksPanel
+        tasks={tasks}
+        onResolve={(id, status) =>
+          setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status } : t)))
+        }
+      />
     </div>
   );
 }
@@ -1008,6 +1155,13 @@ export default function PreviewPage() {
             note="FR-11 and FR-12. Press Evaluate — it says what it costs, because nothing here fires on its own. The artifact is deliberately defective: it answers a different question than the stage asked, addresses the wrong readers, names vendors the constraints forbid, and promises chapters the approved outline does not contain. Each is a finding, categorised by the axis it offends. The correction is offered, never applied; carrying on without it is a first-class answer."
           >
             <StageEvaluationSlice />
+          </Section>
+
+          <Section
+            title="The recommendations surface"
+            note="FR-13, FR-14, FR-09 and FR-15, in the order the workspace stacks them: the checklist states the gap, the recommendations propose closing it, the evaluation is the evidence they rest on, and the tasks are what was set aside. Open 'Why this' on any row — all four rationale slots are filled, and the derived ones are filled without a model having been asked. Tick both applyable rows and press Combine: the dialog shows the exact instruction that will be sent, the affected scope, and what happens to v4, before anything is spent. The two pull opposite ways on length, so it warns — and leaves the button enabled, because guidance is suggestive, not restrictive."
+          >
+            <RecommendationsSlice />
           </Section>
 
           <Section
