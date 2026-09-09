@@ -365,6 +365,20 @@ export function scopeFromModel(prose: string | undefined, stageLabel: string): R
  * Deterministic, because conflict detection is (see `combine.ts`). A model
  * asked to tag its own suggestion would tag two contradictory ones the same
  * way and the warning would never fire.
+ *
+ * **A known limitation, stated because it is easy to miss.** These tags are a
+ * function of the *evaluation*, not of the individual recommendation. One
+ * evaluate call returns one correction today, so in practice a stage rarely
+ * holds two applyable recommendations whose tags differ — and two derived from
+ * the same evaluation would carry identical tags and so never conflict. The
+ * detection is real, tested, and correct for the data it is given; it will
+ * simply fire less often than the surface implies until recommendations carry
+ * per-recommendation axes.
+ *
+ * The alternative — asking the model for the axes — is what this function
+ * exists to avoid, and a wrong warning is worse than an absent one. The right
+ * fix is a second deterministic source (the user narrowing a scope, or a
+ * "shorten"/"expand" quick action carrying its own tag), not a model call.
  */
 export function tagsFromSignals(s: EvaluationSignals): string[] {
   const tags: string[] = [];
