@@ -140,23 +140,72 @@ export async function POST(request: NextRequest) {
   // leases, which is the one thing the lease-owner checks cannot catch.
   const worker = `${caller.kind}-${crypto.randomUUID()}`;
 
+  const generator = new HttpSectionGenerator(workerSecret);
+
   try {
     const report = await runDrain({
       store,
-      generator: new HttpSectionGenerator(workerSecret),
+      generator,
       worker,
       budgetMs: BUDGET_MS,
       leaseSeconds: LEASE_SECONDS,
       projectId: caller.kind === 'user' ? caller.projectId : null,
     });
+    // FR-18: the drain spends after the tab is closed, so its usage has to be
+    // recorded here — the browser is not around to do it. Written with the
+    // service-role client because there is no user session in a cron request.
+    await persistDrainUsage(generator);
     return NextResponse.json(report);
   } catch (error) {
+    // Record what was spent before the throw. A drain that dies halfway has
+    // still paid for the sections it generated, and losing that is how a cost
+    // page quietly understates exactly when something is going wrong.
+    await persistDrainUsage(generator);
     // A drain that throws has already left its job leased; the reaper recovers
     // it, so this is reported rather than retried here.
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Drain failed.' },
       { status: 500 }
     );
+  }
+}
+
+/**
+ * FR-18: write the drain's usage rows.
+ *
+ * Best-effort and never rethrows — this runs after the work is committed, and
+ * failing the drain response because a telemetry insert failed would turn a
+ * successful book into a reported error and, worse, into a retry.
+ *
+ * `user_id` comes from the job payload rather than from a session, because
+ * under cron there is no session; the drain already holds the service-role key
+ * and is trusted to name the user it is working for, which is the same
+ * machine-identity argument that `X-PromptMaster-User` rests on.
+ */
+async function persistDrainUsage(generator: HttpSectionGenerator): Promise<void> {
+  const spent = generator.spent.splice(0);
+  if (spent.length === 0) return;
+
+  try {
+    await createServiceClient()
+      .from('model_usage')
+      .insert(
+        spent.map((row) => ({
+          user_id: row.userId,
+          project_id: row.projectId,
+          request_id: row.requestId,
+          route: row.route,
+          model: row.model,
+          tokens_in: row.tokensIn,
+          tokens_out: row.tokensOut,
+          cost_usd: row.costUsd,
+          prompt_price_usd: row.promptPriceUsd,
+          completion_price_usd: row.completionPriceUsd,
+          source: 'drain',
+        }))
+      );
+  } catch {
+    // Deliberately silent. See the docstring.
   }
 }
 

@@ -21,6 +21,7 @@
  */
 
 import { classifyDrainError, classified, withPreserved } from './errors';
+import { drainLog } from './log';
 import {
   DRAFT_SECTION,
   type DraftCheckpoint,
@@ -98,6 +99,18 @@ export async function runDrain(options: DrainOptions): Promise<DrainReport> {
   // nothing was alive to write one.
   report.reaped = await store.reapExpiredLeases();
 
+  // FR-19. A reaped lease means a previous drain was killed mid-job, which is
+  // the one event here that indicates something is actually wrong with the
+  // platform rather than with a user's request — so it is a warning, not chatter.
+  if (report.reaped > 0) {
+    drainLog('warn', {
+      event: 'leases_reaped',
+      count: report.reaped,
+      worker,
+      projectId,
+    });
+  }
+
   let handled = 0;
   while (handled < maxJobs && remaining() > BUDGET_RESERVE_MS + MIN_STEP_MS) {
     const job = await store.claimNextJob(worker, leaseSeconds, projectId);
@@ -107,6 +120,17 @@ export async function runDrain(options: DrainOptions): Promise<DrainReport> {
     report.claimed += 1;
     await runJob({ job, store, generator, worker, remaining, report });
   }
+
+  drainLog('info', {
+    event: 'drain_completed',
+    worker,
+    projectId,
+    durationMs: now() - startedAt,
+    ...report,
+    // The report's own `errors` array carries messages that may quote a
+    // provider response; the counts are what belongs on the summary line.
+    errors: report.errors.length,
+  });
 
   return report;
 }
@@ -131,6 +155,10 @@ async function runJob(args: RunJobArgs): Promise<void> {
 
   const payload = job.payload as unknown as DraftSectionPayload;
   let checkpoint = normaliseCheckpoint(job.checkpoint);
+
+  // FR-18/FR-19: attribute everything this job spends and logs. Optional on the
+  // interface, so the in-memory test double is unaffected.
+  generator.attributeTo?.(job.id, payload.project_id ?? null);
 
   // One checkpointable step per iteration, budget re-checked between them.
   for (;;) {
@@ -309,6 +337,23 @@ async function recordFailure(args: FailureArgs): Promise<void> {
   );
   report.failed += 1;
   report.errors.push({ jobId: job.id, code: outcome.code, message });
+
+  // FR-19. `jobs.error_code` already records this for the owning user's
+  // renderer; this line is what makes it visible to an operator watching every
+  // project at once, and it carries the code so failures can be alerted on and
+  // counted by kind. The classified message is safe to log — it is the
+  // plain-language recovery sentence, not the user's own content.
+  drainLog(outcome.retryable ? 'warn' : 'error', {
+    event: 'job_failed',
+    jobId: job.id,
+    projectId: payload.project_id,
+    sectionIndex: payload.section_index,
+    code: outcome.code,
+    retryable: outcome.retryable,
+    attempts: job.attempts,
+    maxAttempts: job.max_attempts,
+    worker,
+  });
 }
 
 function normaliseCheckpoint(raw: Record<string, unknown> | null | undefined): DraftCheckpoint {

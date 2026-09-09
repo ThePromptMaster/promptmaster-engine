@@ -184,4 +184,15 @@ export interface SectionGenerator {
     model: string;
     userId: string;
   }): Promise<{ record: SectionRecord }>;
+
+  /**
+   * FR-18/FR-19: tell the generator which job its next calls belong to, so the
+   * usage rows and log lines it produces can be attributed.
+   *
+   * Optional because it is telemetry, not generation. The in-memory test double
+   * does not implement it and should not have to — this interface describes
+   * what it means to generate a section, and a required method here would make
+   * every implementation carry bookkeeping plumbing to satisfy a type.
+   */
+  attributeTo?(jobId: string, projectId: string | null): void;
 }
