@@ -52,7 +52,15 @@ interface Options {
   ) => Promise<Evaluation>;
 }
 
-function inputsFrom(project: Project): PMInput {
+/**
+ * The project's fields as a PMInput.
+ *
+ * Exported because the apply path needs exactly the same assembly: applying a
+ * recommendation and evaluating an artifact must present the model with the
+ * same objective, audience and constraints, or the correction is written
+ * against a different brief than the one it was judged against.
+ */
+export function inputsFrom(project: Project): PMInput {
   return {
     objective: project.objective,
     audience: project.audience,

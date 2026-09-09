@@ -125,11 +125,7 @@ describe('EvaluationRatings — each rating carries its own explanation', () => 
 
   it('is reachable through the panel the workspace actually renders', () => {
     render(
-      <StageEvaluationPanel
-        evaluation={evaluation()}
-        recommendation={null}
-        onDismissRecommendation={() => {}}
-      />
+      <StageEvaluationPanel evaluation={evaluation()} />
     );
     expect(screen.getByLabelText('Drift rating')).toHaveTextContent(
       'Stays inside the objective and the approved outline.'
