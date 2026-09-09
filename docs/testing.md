@@ -5,9 +5,12 @@ this branch.
 
 | Suite | Command | Result | Time |
 |---|---|---|---|
-| Backend | `cd backend && pytest -q` | **281 passed** (30 test files) | ~2.7 s |
-| Frontend | `cd frontend && npx vitest run` | **400 passed in 28 files** | — |
+| Backend | `cd backend && pytest -q` | **292 passed** | ~2.5 s |
+| Frontend | `cd frontend && npx vitest run` | **530 passed in 32 files** | — |
 | Frontend build | `cd frontend && npm run build` | passes | — |
+
+*(Counts as of `phase2/wave1` including Lane A. They were 281 / 400-in-28 immediately
+before that merge; quote them from a run, not from here.)*
 
 `npm run build` **must pass before pushing**. There is no CI to catch it — see
 [`known-limitations.md`](known-limitations.md).
@@ -88,11 +91,25 @@ Stated plainly, because these are the gaps that matter for acceptance:
 
 - **No end-to-end harness.** No Playwright, no Cypress. Every walkthrough — including
   the Book and Research workflow demonstrations — was captured manually.
-- **No SQL test harness.** The trigger and RLS invariants in
-  [`data-model.md`](data-model.md) are asserted by grepping migration text. That
-  proves the SQL *says* the right thing; it does not prove a trigger *fires*. Nothing
-  exercises the ten `SECURITY DEFINER` job functions against a real Postgres — the
-  drain tests run against an in-memory fake.
+- **No SQL test harness.** No pgTAP, no `supabase test db` wiring. Most trigger and
+  RLS invariants in [`data-model.md`](data-model.md) are asserted by grepping
+  migration text — which guards against the DDL being weakened, but does not prove a
+  trigger *fires*. Nothing exercises the ten `SECURITY DEFINER` job functions against
+  a real Postgres; the drain tests run against an in-memory fake.
+
+  **One real SQL test exists**, `supabase/tests/fr02_proposal.sql`, covering the FR-02
+  proposal boundary. Run it by hand against a database the migrations have been applied
+  to:
+
+  ```
+  psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/fr02_proposal.sql
+  ```
+
+  It creates a throwaway user and project, asserts, and rolls back. It was last run on
+  2026-09-09 against a fresh PostgreSQL with every migration replayed from empty — 10
+  assertions, all passing, plus a negative control confirming the trigger rather than
+  the foreign key is what enforces the rule. **Nothing re-runs it**, so it can rot
+  silently.
 - **No CI.** There is no `.github/` directory and no workflow of any kind. Both suites
   and the build are run by hand.
 - **No load or concurrency testing** beyond the single-process drain test.

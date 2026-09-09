@@ -75,17 +75,30 @@ This is the cheapest item on this list to fix and it protects every other item.
 
 ### L-05 · No SQL test harness · `open`
 
-The four schema-enforced invariants in [`data-model.md`](data-model.md) are asserted by
-**grepping migration text**. That proves the SQL *says* the right thing. It does not
-prove a trigger *fires*, that an RLS policy *denies*, or that a composite foreign key
-*rejects* a cross-user parent.
+There is **no pgTAP, no `supabase test db` wiring, and no CI step that runs SQL**.
+
+Most schema invariants in [`data-model.md`](data-model.md) are asserted by **grepping
+migration text**. That is a real guard against a later edit weakening the DDL, and it
+proves the SQL *says* the right thing. It does not prove a trigger *fires*, that an RLS
+policy *denies*, or that a composite foreign key *rejects* a cross-user parent.
+
+The one exception is `supabase/tests/fr02_proposal.sql`, which genuinely exercises the
+FR-02 proposal trigger. It was run on 2026-09-09 against a throwaway PostgreSQL with
+every migration replayed from empty; all 10 assertions passed, **and a negative control
+was run** — with the trigger dropped, a pending proposal could be cited and an
+`actor='system'` row could cite one, confirming the foreign key alone does not enforce
+FR-02. That is the right way to write such a test.
+
+But **running it is a manual act**, and nothing re-runs it. Until a harness exists it
+can rot without anything going red.
 
 Nothing exercises the ten `SECURITY DEFINER` job functions against a real Postgres
 either; `drain.test.ts` runs against an in-memory fake that models their behaviour.
 The fake and the functions can drift, and nothing would notice.
 
-This matters more than usual here because those invariants are being offered as
-contract evidence.
+This matters more than usual here because these invariants are being offered as
+contract evidence. **The single highest-value fix in this register is a harness that
+runs `supabase/tests/*.sql` in CI** — it would convert L-05 and much of L-04 at once.
 
 ---
 
@@ -97,18 +110,21 @@ contract evidence.
 state from it, and it is the table the product actually uses.
 
 `project_stage_events` has **zero readers and zero writers** in application code. The
-only references anywhere are the migration that creates it and one comment in
-`lib/workflow/types.ts` pointing at it. Yet it is the table carrying `proposal_id` and
-the full FR-02 comment about a model proposing rather than owning transitions.
+only references anywhere are the migrations and one comment in `lib/workflow/types.ts`
+pointing at it.
 
-So the table that carries the *contract evidence* is not the table that carries the
-*data*. `workflow_events` does repeat the `actor in ('user','system')` restriction, so
-the substantive guarantee holds on the live table — but the `proposal_id` link does not
-exist there.
+The more serious half of this — that the *contract evidence* (`proposal_id` and the
+FR-02 boundary) sat on the dormant table while the *data* lived on the live one — was
+**resolved on 2026-09-09** by `20260909000000_recommendation_governance.sql`, which
+adds `proposal_id` to `workflow_events` and installs the
+`stage_event_proposal_accepted()` trigger on **both** tables, explicitly "so the rule
+cannot hold on one and not the other". See L-10.
 
-**A consolidation is owed.** Either project stage state from `project_stage_events`, or
-move `proposal_id` onto `workflow_events` and drop the unused table. Leaving both
-invites someone to write to the wrong one.
+What remains is the duplication itself: two tables with the same purpose, the same
+actor restriction and now the same trigger, one of which nothing writes.
+**A consolidation is still owed** — drop `project_stage_events`, or adopt it — because
+leaving both invites someone to write to the wrong one, and every future invariant now
+has to be installed twice to stay honest.
 
 ### L-07 · 132 chat messages remain deliberately detached · `accepted`
 
@@ -163,12 +179,20 @@ Nothing today deletes versions, and `on delete cascade` from `projects` is a
 legitimate path the purge function relies on. But "append-only" is a weaker statement
 than it sounds: it is append-only *for users*, not for the system.
 
-### L-10 · `proposal_id` does not require an accepted recommendation · `accepted`
+### L-10 · ~~`proposal_id` does not require an accepted recommendation~~ · `resolved 2026-09-09`
 
-`project_stage_events.proposal_id` references `recommendations(id)` with no constraint
-requiring `status = 'accepted'`. The claim that "a model reaches stage state only via
-an accepted recommendation" is **half schema-enforced**: the `actor` restriction is in
-the CHECK, the acceptance is a code convention.
+**Resolved.** Previously the `proposal_id` foreign key pointed at `recommendations(id)`
+with nothing requiring `status = 'accepted'`, so FR-02's guarantee was only half
+schema-enforced.
+
+`20260909000000_recommendation_governance.sql` adds the
+`stage_event_proposal_accepted()` trigger, on both history tables, rejecting four
+distinct ways the boundary could be claimed without being kept: a proposal that does
+not exist, one belonging to another user, one that is not `accepted`, and any row where
+`actor <> 'user'` — that last being the exact shape FR-02 forbids, a model owning a
+transition with a recommendation stapled on as cover.
+
+Kept in the register rather than deleted, because a resolved item is evidence too.
 
 ### L-11 · `conversation_messages.version_id` has no foreign key · `accepted`
 
@@ -212,7 +236,7 @@ gated by whether the UI happens to call it — see L-15.
 
 ### L-15 · The API surface is much larger than the product · `accepted`
 
-Eighteen of twenty-four browser-facing FastAPI endpoints have **no caller** — the
+Eighteen of twenty-five browser-facing FastAPI endpoints have **no caller** — the
 server side of the retired `/session` flow. They remain authenticated and were
 deliberately not deleted, so that re-surfacing any of them is a UI job rather than a
 rebuild. That was the right call.
@@ -322,16 +346,16 @@ which would silently stop bumping `revision` and disable the concurrency guard.
 | L-03 | No E2E test harness | open |
 | L-04 | No CI | open |
 | L-05 | No SQL test harness | open |
-| L-06 | Two stage-history tables; the unused one holds the FR-02 evidence | open |
+| L-06 | Two stage-history tables, one dormant; consolidation owed | open |
 | L-07 | 132 chat messages deliberately detached and invisible | accepted |
 | L-08 | No `defer_recommendation` in the decision trail | open |
 | L-09 | Append-only bypassed by service role | accepted |
-| L-10 | `proposal_id` acceptance not schema-enforced | accepted |
+| L-10 | ~~`proposal_id` acceptance not schema-enforced~~ | **resolved** |
 | L-11 | `conversation_messages.version_id` has no FK | accepted |
 | L-12 | Re-seeding a published template version silently no-ops | accepted |
 | L-13 | `config.toml` references a missing `seed.sql` | open |
 | L-14 | No feature flags | open |
-| L-15 | 18 of 24 endpoints have no caller | accepted |
+| L-15 | 18 of 25 endpoints have no caller | accepted |
 | L-16 | Usage metering not wired; no spend cap | open |
 | L-17 | `AUTH_ENFORCED` can disable auth | accepted |
 | L-18 | Stale cross-tab reads never warned | open |

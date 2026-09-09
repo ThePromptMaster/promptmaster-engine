@@ -57,9 +57,27 @@ model reaches stage state only by way of `proposal_id` pointing at a recommendat
 the user accepted. This is the mechanical expression of FR-02's "model may propose but
 does not silently own transitions".
 
-**Caveat, and it should be honest:** the FK on `proposal_id` points at
-`recommendations(id)` with no constraint requiring `status = 'accepted'`. The *actor*
-restriction is schema-enforced; the *acceptance* half is a code convention.
+The *acceptance* half is enforced too, by
+`20260909000000_recommendation_governance.sql`. It adds `proposal_id` to
+`workflow_events` — the log that is actually read — and installs
+`stage_event_proposal_accepted()` as a `BEFORE INSERT OR UPDATE` trigger on **both**
+history tables, "so the rule cannot hold on one and not the other". It rejects four
+things:
+
+- a `proposal_id` that does not exist — a citation nobody can check is not evidence;
+- a proposal belonging to **another user** — otherwise one user's accepted
+  recommendation could launder a transition in another's project, even from a
+  service-role client that RLS does not constrain;
+- a proposal that is pending, dismissed or superseded — "accepted" is the whole
+  content of the requirement;
+- any row with `actor <> 'user'` — a proposal-driven transition is the *user* acting on
+  a suggestion; `actor = 'system'` with a `proposal_id` is a model owning a transition
+  with a recommendation stapled on as cover, which is exactly what FR-02 forbids.
+
+`supabase/tests/fr02_proposal.sql` exercises this against a real Postgres, **including
+a negative control**: with the trigger dropped, a pending proposal could be cited — so
+the foreign key alone does not enforce FR-02, and the trigger is what does. Running it
+is a manual act; see [`testing.md`](testing.md).
 
 ### 2. Children carry a composite ownership foreign key
 
@@ -200,6 +218,7 @@ Four migrations define functions and are therefore invisible to schema diffing:
 | `20260902000000_projects_core.sql` | `touch_and_bump_revision`, `touch_updated_at`, `artifact_versions_immutable` |
 | `20260907000000_jobs_functions.sql` | `enqueue_job`, `claim_next_job`, `reap_expired_leases` |
 | `20260907000100_section_records_and_job_writes.sql` | `checkpoint_job`, `complete_job`, `fail_job`, `release_job`, `request_project_cancel`, `write_long_form_section`, `write_section_record` |
+| `20260909000000_recommendation_governance.sql` | `stage_event_proposal_accepted`, `recommendations_resolution_forward_only` |
 | `20260909200000_purge_deleted_projects.sql` | `purge_deleted_projects` |
 
 **Grants are equally invisible to diffing.** Every one of the job/section functions is

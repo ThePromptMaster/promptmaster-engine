@@ -79,6 +79,7 @@ in `frontend/src/` on this branch, not from memory. **Live** = something calls i
 | POST | `/api/chat-message` | `chatMessage` | `conversation.py` | **Live** |
 | POST | `/api/apply-to-answer` | `applyToAnswer` | `conversation.py` | **Live** |
 | POST | `/api/export-session` | `exportSession` | `engine.py` | **Live** |
+| POST | `/api/apply-recommendations` | `applyRecommendations` | `audit.py` | **Live** — FR-09, one call for a multi-select apply |
 | POST | `/api/generate-section-prose` | *(not in `client.ts`)* | `long_form.py` | **Live — worker only**, via `lib/jobs/generator.ts` |
 | POST | `/api/extract-section-record` | *(not in `client.ts`)* | `long_form.py` | **Live — worker only**, via `lib/jobs/generator.ts` |
 | GET | `/api/models` | `getModels` | `meta.py` | Dormant — but note it carries its own `Depends(require_user)` inside the otherwise-public meta router, because it proxies OpenRouter and is billable |
@@ -100,7 +101,7 @@ in `frontend/src/` on this branch, not from memory. **Live** = something calls i
 | POST | `/api/audit-findings` | `auditFindings` | `audit.py` | Dormant |
 | POST | `/api/apply-audit` | `applyAudit` | `audit.py` | Dormant |
 
-Six of twenty-four browser-facing endpoints are live. That is a consequence of
+Seven of twenty-five browser-facing endpoints are live. That is a consequence of
 retiring `/session` without deleting its server side, which was the right call — but
 it means the API surface is much larger than the product.
 

@@ -13,8 +13,8 @@ legacy Streamlit app, and `frontend/vercel.json` disables it explicitly.
 Before pushing:
 
 ```
-cd backend  && pytest -q                  # expect 281 passed
-cd frontend && npx vitest run             # expect 400 passed in 28 files
+cd backend  && pytest -q                  # 292 passed as of phase2/wave1
+cd frontend && npx vitest run             # 530 passed in 32 files
 cd frontend && npm run build              # must pass — there is no CI
 ```
 
