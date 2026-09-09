@@ -1,13 +1,22 @@
 -- FR-02 proposal boundary: does the trigger actually fire?
 --
 -- THIS REPOSITORY HAS NO SQL TEST HARNESS. There is no pgTAP, no
--- `supabase test db` wiring, and nothing in CI runs this file. The vitest
+-- `supabase test db` wiring, and **nothing in CI runs this file**. The vitest
 -- companion (`frontend/src/lib/workflow/proposal-boundary.test.ts`) asserts on
 -- the TEXT of the migration — that the column is `on delete restrict`, that the
 -- trigger is installed on both history tables, that each of the four
 -- rejections is present. That is a real guard against the DDL being weakened
 -- by a later edit, and it is NOT a proof that the trigger fires. Only this
--- file is, and running it is currently a manual act.
+-- file is, and running it is a manual act. Until a harness exists, this can
+-- rot without anything going red.
+--
+-- It was run on 2026-09-09 against a throwaway PostgreSQL 15 with every
+-- migration in `supabase/migrations` replayed from empty. All 10 assertions
+-- passed. A negative control was also run: with `we_proposal_accepted`
+-- dropped, a PENDING proposal could be cited and an `actor='system'` row could
+-- cite one — so the foreign key alone does NOT enforce FR-02, and the trigger
+-- is what does. That is worth knowing, because a test that would pass without
+-- the mechanism it is testing proves nothing.
 --
 -- Run against a database the migrations have been applied to:
 --

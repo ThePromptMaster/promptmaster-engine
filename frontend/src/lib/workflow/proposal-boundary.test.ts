@@ -14,9 +14,15 @@ import { describe, expect, it } from 'vitest';
  * of the four rejections is present. It does NOT prove the trigger fires.
  *
  * `supabase/tests/fr02_proposal.sql` is what proves that, and running it is a
- * manual act. The two are complementary and neither substitutes for the other;
- * saying so here is cheaper than a later reader inferring coverage this file
- * does not have.
+ * manual act — **nothing in CI runs it**. It was run on 2026-09-09 against a
+ * throwaway Postgres with every migration replayed from empty: all 10
+ * assertions passed, and a negative control confirmed that with the trigger
+ * dropped the foreign key alone lets a *pending* proposal be cited. So the
+ * trigger is doing the work, and this file is not evidence of that.
+ *
+ * The two are complementary and neither substitutes for the other; saying so
+ * here is cheaper than a later reader inferring coverage this file does not
+ * have.
  *
  * Modelled on event-type-drift.test.ts, which already greps constraints out of
  * migration SQL for the same reason: a schema invariant that only one
