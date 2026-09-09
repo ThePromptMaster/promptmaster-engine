@@ -639,7 +639,7 @@ export function WorkflowWorkspace({
       {chatOpen && (
         <aside
           id="stage-side-chat"
-          className="fixed inset-0 z-40 bg-[var(--surface)] p-4 lg:sticky lg:top-0 lg:z-auto lg:h-screen lg:w-[380px] lg:shrink-0 lg:bg-transparent lg:py-6 lg:pl-0 lg:pr-6"
+          className="fixed inset-0 z-40 bg-[var(--surface)] p-4 lg:sticky lg:inset-auto lg:top-0 lg:z-auto lg:h-screen lg:w-[380px] lg:shrink-0 lg:bg-transparent lg:py-6 lg:pl-0 lg:pr-6"
         >
           <button
             onClick={() => setChatOpen(false)}
