@@ -38,6 +38,7 @@ import {
 } from '@/lib/workflow/stage-artifact';
 import type { StageContext, WorkflowEvent, WorkflowTemplate } from '@/lib/workflow/types';
 import { appendWorkflowEvent, listWorkflowEvents } from '@/lib/supabase/workflow';
+import { setUsageProject } from '@/lib/supabase/model-usage';
 import type { NewEvaluation, NewVersion } from '@/lib/supabase/versions';
 import type { StageBundle } from '@/stores/project-store';
 import { approvedOutlineVersionId } from '@/lib/supabase/outline';
@@ -113,6 +114,22 @@ export function WorkflowWorkspace({
     listWorkflowEvents(project.id)
       .then(setEvents)
       .catch(() => setEvents([]));
+  }, [project.id]);
+
+  /**
+   * FR-18: attribute this project's usage rows.
+   *
+   * `apiFetch` is a generic transport with no idea which project a call belongs
+   * to, and threading a project id through all ~25 API methods to tell it would
+   * be a lot of churn for a telemetry field. The workspace knows, so it says so
+   * once here — the same shape the project store already uses to scope itself.
+   *
+   * Cleared on unmount so a call made from outside a project (the project list,
+   * smart setup) is not mislabelled with whichever project was open last.
+   */
+  useEffect(() => {
+    setUsageProject(project.id);
+    return () => setUsageProject(null);
   }, [project.id]);
 
   // State is derived from the event log in exactly one place, so it cannot
