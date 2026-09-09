@@ -14,6 +14,7 @@ import { useState } from 'react';
 import { WorkflowPicker } from '@/components/projects/workflow-picker';
 import { StageRenderer } from '@/components/workflow/renderers/stage-renderer';
 import { StageEvaluationPanel } from '@/components/workflow/evaluation-panel';
+import { AppliedNotice, ChatPanel, ProposalCard } from '@/components/workflow/chat-panel';
 import { itemSchemaFor, serializeItems } from '@/lib/workflow/stage-artifact';
 import { DerivedOutlineNotice } from '@/components/outline/derived-outline-notice';
 import { OutlineEditor } from '@/components/outline/outline-editor';
@@ -548,6 +549,103 @@ function StageEvaluationSlice() {
   );
 }
 
+// --- the side chat ----------------------------------------------------------
+
+/** A project row with just enough on it for the chat's PMInput. */
+const CHAT_PROJECT = {
+  id: 'preview-project',
+  user_id: 'preview-user',
+  title: 'A field guide to governing AI-assisted work',
+  objective: 'Explain how to govern AI-assisted work to a sceptical reviewer.',
+  audience: 'Engineering leads at regulated companies',
+  constraints: 'No tool reviews. No prompt technique.',
+  output_format: 'Markdown',
+  mode: 'architect',
+  model: 'anthropic/claude-sonnet',
+  workflow: 'book',
+  stage: 'objective',
+} as unknown as Project;
+
+const CHAT_VERSION = fixtureVersion(PROSE_FIXTURE, 3);
+
+/**
+ * Both modes side by side.
+ *
+ * Two panels rather than one with a toggle, because the point being reviewed
+ * is the difference between them — and that is not reviewable one at a time.
+ * They carry different stage ids so they do not share a thread.
+ */
+function ChatModesSlice() {
+  return (
+    <div className="grid gap-6 lg:grid-cols-2">
+      {(['discuss', 'instruct'] as const).map((mode) => (
+        <div key={mode} className="h-[560px]">
+          <ChatPanel
+            project={CHAT_PROJECT}
+            stageId={`preview-chat-${mode}`}
+            stageLabel="Objective"
+            content={PROSE_FIXTURE}
+            headVersion={CHAT_VERSION}
+            initialMode={mode}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * The two cards an instruction produces, with fixture content.
+ *
+ * The proposal card only appears after a model call, and the preview has no
+ * backend — so these are rendered directly. They are the same components the
+ * panel mounts; only the data is fabricated, which is the rule everywhere else
+ * on this page.
+ */
+function ApplyFlowSlice() {
+  const [state, setState] = useState<'proposed' | 'applied' | 'discarded'>('proposed');
+
+  return (
+    <div className="max-w-[520px] rounded-xl bg-[var(--surface-container-lowest)] px-5 py-4">
+      {state === 'proposed' && (
+        <ProposalCard
+          scopeLabel="The section “What this is not” — 14 words"
+          before={'## What this is not\n\nIt is **not** a book about prompting. Prompt technique dates in months; governance does not.'}
+          after={'## What this is not\n\nThis is not a book about prompting. Prompt technique dates in months. Governance outlives it, which is why this book is about the second thing.'}
+          canApply
+          busy={false}
+          onAccept={() => setState('applied')}
+          onDiscard={() => setState('discarded')}
+        />
+      )}
+
+      {state === 'applied' && (
+        <AppliedNotice
+          scope="The section “What this is not”"
+          canUndo
+          busy={false}
+          onUndo={() => setState('proposed')}
+          onDismiss={() => setState('discarded')}
+        />
+      )}
+
+      {state === 'discarded' && (
+        <div className="py-6 text-center">
+          <p className="text-body text-[var(--on-surface-variant)]">
+            Nothing was written. The artifact is exactly as it was.
+          </p>
+          <button
+            onClick={() => setState('proposed')}
+            className="mt-3 rounded-lg bg-[var(--surface-container-high)] px-3 py-1.5 text-label text-[var(--on-surface)]"
+          >
+            Propose it again
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Section({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
   return (
     <section className="mb-16">
@@ -1075,6 +1173,20 @@ export default function PreviewPage() {
             note="/session is retired, so this is the whole of it. Pick a stage and the renderer changes with it — no branch anywhere reads the workflow's name. Type an objective on Input and watch its blocking criterion satisfy; tick a manual check and watch its row flip. Advance and Skip move between stages here rather than writing events."
           >
             <SingleOutputSlice />
+          </Section>
+
+          <Section
+            title="The side chat, in both modes"
+            note="Two powers in one input box, so the whole design is making it obvious which one you are about to use. Discuss states that it cannot change the document and offers no scope; Instruct shows what it would apply to before it applies it. Both panels are the real component — the model is not reachable from the preview, so sending will report a failure rather than reply."
+          >
+            <ChatModesSlice />
+          </Section>
+
+          <Section
+            title="Proposing, applying, and undoing"
+            note="FR-09 asks for the affected scope to be shown before application and the prior version to remain recoverable. Both halves of that sentence are on the proposal card, at the point of decision rather than as a property of the system you are expected to know."
+          >
+            <ApplyFlowSlice />
           </Section>
         </div>
       </div>

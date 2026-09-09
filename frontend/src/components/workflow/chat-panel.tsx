@@ -85,6 +85,8 @@ interface Props {
    * what was discussed — but nothing can be sent into a stage that has moved on.
    */
   readOnly?: boolean;
+  /** Which mode to open in. Discuss, unless a caller says otherwise. */
+  initialMode?: Mode;
 }
 
 export function ChatPanel({
@@ -96,6 +98,7 @@ export function ChatPanel({
   appendStageVersion,
   restoreStageVersion,
   readOnly = false,
+  initialMode = 'discuss',
 }: Props) {
   const chat = useStageChat({
     project,
@@ -107,7 +110,7 @@ export function ChatPanel({
     restoreStageVersion,
   });
 
-  const [mode, setMode] = useState<Mode>('discuss');
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [draft, setDraft] = useState('');
   const [scope, setScope] = useState<ScopeKind>('document');
   const [sectionId, setSectionId] = useState<string>('');
@@ -119,9 +122,16 @@ export function ChatPanel({
   const sections = useMemo(() => documentSections(content), [content]);
   const spec = MODES.find((m) => m.key === mode)!;
 
-  useEffect(() => {
-    if (!sectionId && sections.length) setSectionId(sections[0].id);
-  }, [sections, sectionId]);
+  /**
+   * The section actually targeted.
+   *
+   * Derived rather than synced into state by an effect: the section list is a
+   * function of the content, so a stored id can go stale the moment a new
+   * version lands — and an effect that repairs it afterwards leaves a render in
+   * between where the picker points at a section that no longer exists.
+   */
+  const effectiveSectionId =
+    sections.find((s) => s.id === sectionId)?.id ?? sections[0]?.id ?? '';
 
   /**
    * Track what the user has selected in the artifact.
@@ -174,9 +184,9 @@ export function ChatPanel({
     if (mode === 'discuss') {
       await chat.discuss(text);
     } else {
-      await chat.propose(text, scope, { selection, sectionId });
+      await chat.propose(text, scope, { selection, sectionId: effectiveSectionId });
     }
-  }, [draft, mode, scope, selection, sectionId, chat]);
+  }, [draft, mode, scope, selection, effectiveSectionId, chat]);
 
   return (
     <section
@@ -252,7 +262,7 @@ export function ChatPanel({
               scope={scope}
               onScope={setScope}
               sections={sections}
-              sectionId={sectionId}
+              sectionId={effectiveSectionId}
               onSection={setSectionId}
               selection={selection}
               hasContent={content.trim().length > 0}
@@ -512,7 +522,7 @@ function ScopePicker({
  * trusting, and the line about the previous version is stated at the point of
  * decision instead of being a property of the system they have to know about.
  */
-function ProposalCard({
+export function ProposalCard({
   scopeLabel,
   before,
   after,
@@ -577,7 +587,7 @@ function ProposalCard({
   );
 }
 
-function AppliedNotice({
+export function AppliedNotice({
   scope,
   canUndo,
   busy,
