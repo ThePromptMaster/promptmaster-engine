@@ -17,7 +17,10 @@ const components: Components = {
 
 export function MarkdownOutput({ content }: MarkdownOutputProps) {
   return (
-    <article className="prose prose-sm prose-slate max-w-none prose-headings:text-[var(--on-surface)] prose-headings:font-semibold prose-p:text-[var(--on-surface)] prose-p:leading-relaxed prose-li:text-[var(--on-surface)] prose-strong:text-[var(--on-surface)] prose-a:text-[var(--pm-primary)] prose-code:text-[var(--pm-primary)] prose-code:bg-[var(--surface-container-low)] prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-xs prose-pre:bg-[var(--surface-container-low)] prose-pre:rounded-xl prose-th:bg-[var(--surface-container-low)] prose-th:px-3 prose-th:py-2 prose-th:text-left prose-th:text-xs prose-th:font-semibold prose-th:whitespace-nowrap prose-td:px-3 prose-td:py-2 prose-td:text-sm prose-td:border-t prose-td:border-[var(--outline-variant)]/20">
+    // `prose-slate` was the only `slate` reference outside components/ui/ —
+    // and inert, since every colour it sets is overridden by a token utility
+    // on the next line. Dropping it leaves the rendered output identical.
+    <article className="prose prose-sm max-w-none prose-headings:text-[var(--on-surface)] prose-headings:font-semibold prose-p:text-[var(--on-surface)] prose-p:leading-relaxed prose-li:text-[var(--on-surface)] prose-strong:text-[var(--on-surface)] prose-a:text-[var(--pm-primary)] prose-code:text-[var(--pm-primary)] prose-code:bg-[var(--surface-container-low)] prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-[0.75rem] prose-pre:bg-[var(--surface-container-low)] prose-pre:rounded-xl prose-th:bg-[var(--surface-container-low)] prose-th:px-3 prose-th:py-2 prose-th:text-left prose-th:text-[0.75rem] prose-th:font-semibold prose-th:whitespace-nowrap prose-td:px-3 prose-td:py-2 prose-td:text-[0.875rem] prose-td:border-t prose-td:border-[var(--outline-variant)]/20">
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
         {content}
       </ReactMarkdown>

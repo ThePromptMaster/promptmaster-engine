@@ -112,6 +112,8 @@ export function WorkflowWorkspace({
   const [chatOpen, setChatOpen] = useState(true);
   const [busy, setBusy] = useState(false);
   const [activeVersionId, setActiveVersionId] = useState<string | null>(null);
+  // Below md the rail is not on the page; this is the drawer that replaces it.
+  const [mobileRailOpen, setMobileRailOpen] = useState(false);
 
   useEffect(() => {
     listWorkflowEvents(project.id)
@@ -275,6 +277,9 @@ export function WorkflowWorkspace({
   );
 
   const progress = useMemo(() => progressSummary(template, state), [template, state]);
+  // 0-based position of the stage on screen. Read twice — by the stage header
+  // and by the narrow-viewport bar — so it is derived once.
+  const stageIndex = template.stages.findIndex((s) => s.id === stage?.id);
 
   const stageVersionList = useMemo(
     () => (stage ? stageBundles[stage.id]?.versions ?? [] : []),
@@ -551,12 +556,15 @@ export function WorkflowWorkspace({
         />
       )}
 
+      {/* The template name and the progress line are the only persistent
+          orientation anywhere in the app — where you are and how much is left.
+          They were set in the smallest size available, below the stage names
+          they are meant to caption. The name is now a title and the progress a
+          label, so the block reads top-down instead of flat. */}
       <aside className="sticky top-0 hidden h-screen w-[248px] shrink-0 overflow-y-auto bg-[var(--surface-container-lowest)] px-2 py-6 md:block sidebar-scroll">
-        <div className="mb-4 px-3">
-          <div className="text-xs uppercase tracking-wider text-[var(--on-surface-variant)]">
-            {template.name}
-          </div>
-          <div className="mt-1 text-xs text-[var(--on-surface-variant)]">
+        <div className="mb-5 px-3">
+          <div className="text-title text-[var(--on-surface)]">{template.name}</div>
+          <div className="mt-1 text-label text-[var(--on-surface-variant)]">
             {progress.complete} done
             {progress.skipped > 0 && ` · ${progress.skipped} skipped`}
             {` · ${progress.remaining} to go`}
@@ -571,8 +579,93 @@ export function WorkflowWorkspace({
         />
       </aside>
 
+      {/* Below 768px the rail is hidden and, until now, replaced by nothing at
+          all: on a narrow window or a phone there was no way to see the other
+          stages, let alone move between them. The same rail is offered here as
+          a drawer over the work, opened from a bar that doubles as the
+          orientation the desktop rail provides — it is the only place a narrow
+          viewport can learn what stage it is on out of how many.
+
+          One `StageRail`, two placements. `md:hidden` on this and `md:block`
+          on the aside means exactly one is ever mounted. */}
+      {mobileRailOpen && (
+        <div className="fixed inset-0 z-50 flex md:hidden">
+          <div
+            className="absolute inset-0 bg-[var(--inverse-surface)]/40"
+            onClick={() => setMobileRailOpen(false)}
+            aria-hidden
+          />
+          <nav
+            aria-label="Workflow stages"
+            className="relative flex h-full w-[280px] max-w-[85vw] flex-col overflow-y-auto bg-[var(--surface-container-lowest)] px-2 py-5 sidebar-scroll"
+          >
+            <div className="mb-5 flex items-start gap-2 px-3">
+              <div className="min-w-0 flex-1">
+                <div className="text-title text-[var(--on-surface)]">{template.name}</div>
+                <div className="mt-1 text-label text-[var(--on-surface-variant)]">
+                  {progress.complete} done
+                  {progress.skipped > 0 && ` · ${progress.skipped} skipped`}
+                  {` · ${progress.remaining} to go`}
+                </div>
+              </div>
+              <button
+                onClick={() => setMobileRailOpen(false)}
+                aria-label="Close stages"
+                className="-mt-1 shrink-0 rounded-lg p-1.5 text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-low)] hover:text-[var(--on-surface)]"
+              >
+                <span aria-hidden className="material-symbols-outlined text-[20px]">
+                  close
+                </span>
+              </button>
+            </div>
+
+            <StageRail
+              template={template}
+              state={state}
+              nextSuggestedId={nextSuggested}
+              onSelect={(stageId) => {
+                setViewingStageId(stageId);
+                // Picking a stage is the point of the drawer; leaving it open
+                // over the stage you just chose hides the answer.
+                setMobileRailOpen(false);
+              }}
+            />
+          </nav>
+        </div>
+      )}
+
       <main className="min-w-0 flex-1 px-6 py-10 md:px-10">
         <div className="mx-auto max-w-[820px]">
+          {/* The narrow-viewport counterpart to the rail: where you are, how
+              much is left, and the way to the rest of the stages. Hidden from
+              md up, where the rail itself says all three. */}
+          <button
+            onClick={() => setMobileRailOpen(true)}
+            aria-expanded={mobileRailOpen}
+            className="mb-4 flex w-full items-center gap-3 rounded-xl bg-[var(--surface-container-lowest)] px-4 py-3 text-left transition-colors hover:bg-[var(--surface-container-low)] md:hidden"
+          >
+            <span
+              aria-hidden
+              className="material-symbols-outlined text-[20px] text-[var(--on-surface-variant)]"
+            >
+              list_alt
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-title text-[var(--on-surface)]">
+                {stage.short_label}
+              </span>
+              <span className="block text-label text-[var(--on-surface-variant)]">
+                Stage {stageIndex + 1} of {template.stages.length} · {progress.remaining} to go
+              </span>
+            </span>
+            <span
+              aria-hidden
+              className="material-symbols-outlined text-[20px] text-[var(--on-surface-variant)]"
+            >
+              chevron_right
+            </span>
+          </button>
+
           <div className="mb-4 flex items-center justify-end">
             <button
               onClick={() => setChatOpen((open) => !open)}
@@ -590,7 +683,7 @@ export function WorkflowWorkspace({
           {!isCurrent && (
             <button
               onClick={() => setViewingStageId(null)}
-              className="mb-4 inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-low)] px-3 py-1.5 text-xs text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
+              className="mb-4 inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-low)] px-3 py-1.5 text-label text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
             >
               <span className="material-symbols-outlined text-[16px]">arrow_back</span>
               Viewing an earlier stage — back to {getStage(template, state.current_stage_id)?.short_label}
@@ -617,10 +710,7 @@ export function WorkflowWorkspace({
             stage={stage}
             status={state.stages[stage.id]?.status ?? 'not_started'}
             skippedReason={state.stages[stage.id]?.skipped_reason}
-            position={{
-              index: template.stages.findIndex((s) => s.id === stage.id) + 1,
-              total: template.stages.length,
-            }}
+            position={{ index: stageIndex + 1, total: template.stages.length }}
           />
 
           <div className="mb-8">

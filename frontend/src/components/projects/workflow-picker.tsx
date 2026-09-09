@@ -64,13 +64,13 @@ export function WorkflowPicker({ templates, selectedId, onSelect }: Props) {
               {preview.map((label) => (
                 <span
                   key={label}
-                  className="rounded-md bg-[var(--surface-container-high)] px-1.5 py-0.5 text-[11px] text-[var(--on-surface-variant)]"
+                  className="rounded-md bg-[var(--surface-container-high)] px-1.5 py-0.5 text-label text-[var(--on-surface-variant)]"
                 >
                   {label}
                 </span>
               ))}
               {template.stages.length > preview.length && (
-                <span className="text-[11px] text-[var(--on-surface-variant)]">
+                <span className="text-label text-[var(--on-surface-variant)]">
                   +{template.stages.length - preview.length}
                 </span>
               )}

@@ -24,7 +24,7 @@ export default function NotFound() {
           <h1 className="text-xl font-semibold text-[var(--on-surface)] tracking-tight">
             Page not found
           </h1>
-          <p className="text-sm text-[var(--on-surface-variant)] leading-relaxed max-w-[320px] mx-auto">
+          <p className="text-body text-[var(--on-surface-variant)] leading-relaxed max-w-[320px] mx-auto">
             The page you&apos;re looking for doesn&apos;t exist or has been moved.
             Let&apos;s get you back on track.
           </p>
@@ -34,14 +34,14 @@ export default function NotFound() {
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
           <Link
             href="/projects"
-            className="px-6 py-3 bg-[var(--pm-primary)] text-white font-semibold rounded-xl hover:bg-[var(--pm-primary-container)] active:scale-[0.98] transition-all duration-200 text-sm flex items-center gap-2"
+            className="px-6 py-3 bg-[var(--pm-primary)] text-[var(--on-primary)] font-semibold rounded-xl hover:bg-[var(--pm-primary-container)] active:scale-[0.98] transition-all duration-200 text-title flex items-center gap-2"
           >
             <span className="material-symbols-outlined text-[18px]">dashboard</span>
             Go to Dashboard
           </Link>
           <Link
             href="/auth/login"
-            className="px-6 py-3 border border-[var(--outline-variant)]/30 text-[var(--on-surface)] font-medium rounded-xl hover:bg-[var(--surface-container-low)] transition-all duration-200 text-sm flex items-center gap-2"
+            className="px-6 py-3 bg-[var(--surface-container-low)] text-[var(--on-surface)] font-medium rounded-xl hover:bg-[var(--surface-container-high)] transition-all duration-200 text-title flex items-center gap-2"
           >
             <span className="material-symbols-outlined text-[18px]">login</span>
             Sign In

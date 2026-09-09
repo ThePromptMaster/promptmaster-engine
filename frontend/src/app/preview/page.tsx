@@ -1,14 +1,14 @@
 'use client';
 
 /**
- * Design preview. Dev-only — see the notFound() guard below.
+ * Design preview. Deployed — see the note on PreviewPage below.
  *
  * Renders the real workflow components against fixture data so the UI can be
  * reviewed without a login. Every surface here imports the same component the
  * app does, so what you see is what ships; only the data is fabricated.
  */
 
-import { notFound } from 'next/navigation';
+
 import { useState } from 'react';
 
 import { WorkflowPicker } from '@/components/projects/workflow-picker';
@@ -1239,11 +1239,15 @@ function WorkflowSlice({ template }: { template: WorkflowTemplate }) {
 
   return (
     <div className="flex overflow-hidden rounded-2xl bg-[var(--surface)] shadow-[0_1px_2px_rgba(25,28,30,0.04),0_12px_32px_-16px_rgba(25,28,30,0.25)]">
+      {/* Unconditional, unlike the workspace's own aside, which is
+          `hidden md:block` with a drawer behind a bar below that. This slice is
+          a card inside a long page rather than a viewport-sized workspace, so
+          it shows the wide-screen arrangement whatever the window is doing —
+          which is worth saying out loud, because it means this page is *not* a
+          test of the narrow-viewport rail. Resize the real app for that. */}
       <aside className="w-[248px] shrink-0 self-start bg-[var(--surface-container-lowest)] px-2 py-6">
-        <div className="mb-4 px-3">
-          <div className="text-label uppercase tracking-wider text-[var(--on-surface-variant)]">
-            {template.name}
-          </div>
+        <div className="mb-5 px-3">
+          <div className="text-title text-[var(--on-surface)]">{template.name}</div>
           <div className="mt-1 text-label text-[var(--on-surface-variant)]">
             {progress.complete} done
             {progress.skipped > 0 && ` · ${progress.skipped} skipped`}
@@ -1300,19 +1304,48 @@ function WorkflowSlice({ template }: { template: WorkflowTemplate }) {
 }
 
 export default function PreviewPage() {
-  // Never ships. The preview exists so the UI can be reviewed without a login;
-  // exposing fixture-driven screens in production would be worse than useless.
-  if (process.env.NODE_ENV === 'production') notFound();
+  /**
+   * This ships.
+   *
+   * It used to `notFound()` in production on the reasoning that fixture-driven
+   * screens have no business being live. That was right when the preview was a
+   * scratch page; it is wrong now. Every surface here imports the component the
+   * app imports — only the data is fabricated — which makes this the fastest
+   * way to see the whole product at once, with no login, no project to set up
+   * and no model call to wait for.
+   *
+   * What the guard was actually protecting against is someone mistaking a
+   * fixture for their own work. That is a labelling problem, so it is solved by
+   * labelling: the banner below states it plainly, sits at the top of the page
+   * before any component, and stays there when the page scrolls.
+   */
 
   const [pickerId, setPickerId] = useState<string | null>(TEMPLATES[0].id);
 
   return (
-    <div className="min-h-screen bg-[var(--surface)] px-8 py-12">
-      <div className="mx-auto max-w-[1200px]">
-        <p className="mb-2 text-label uppercase tracking-wider text-[var(--on-surface-variant)]">
-          Design preview · fixture data · not deployed
-        </p>
+    <div className="min-h-screen bg-[var(--surface)]">
+      {/* Sticky, tertiary, and unmissable. A quiet line of small caps at the
+          top of a long page is not an honest warning once you have scrolled
+          past it — and every screen below this looks exactly like the real
+          thing, which is the entire point of the page and also the risk. */}
+      <div className="sticky top-0 z-50 bg-[var(--tertiary-container)] px-8 py-2.5">
+        <div className="mx-auto flex max-w-[1200px] items-center gap-2.5">
+          <span aria-hidden className="material-symbols-outlined text-[18px] text-[var(--on-primary)]">
+            science
+          </span>
+          <p className="text-label uppercase tracking-wider text-[var(--on-primary)]">
+            Design preview · every figure and document on this page is fixture data · nothing here
+            is saved
+          </p>
+        </div>
+      </div>
+
+      <div className="mx-auto max-w-[1200px] px-8 py-12">
         <h1 className="text-display text-[var(--on-surface)]">Phase 2 workflow UI</h1>
+        <p className="mt-3 max-w-[70ch] text-body text-[var(--on-surface-variant)]">
+          Every surface below imports the same component the app does, so what you see is what
+          ships. Only the data is fabricated.
+        </p>
 
         <div className="mt-14">
           <Section

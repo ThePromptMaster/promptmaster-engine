@@ -54,12 +54,12 @@ export function StageTransitionBar({ stage, evaluation, options, onTransition }:
   if (pending) {
     return (
       <div className="rounded-xl bg-[var(--surface-container-high)] px-5 py-4">
-        <p className="text-sm text-[var(--on-surface)]">
+        <p className="text-body text-[var(--on-surface)]">
           {isSkip ? `Skipping ${stage.short_label}. Why?` : 'Moving on with unfinished items. Why?'}
         </p>
 
         {!isSkip && evaluation.unmet.length > 0 && (
-          <ul className="mt-2 space-y-1 text-xs text-[var(--on-surface-variant)]">
+          <ul className="mt-2 space-y-1 text-label text-[var(--on-surface-variant)]">
             {evaluation.unmet.map((c) => (
               <li key={c.id}>· {c.label}{c.detail ? ` — ${c.detail}` : ''}</li>
             ))}
@@ -72,7 +72,7 @@ export function StageTransitionBar({ stage, evaluation, options, onTransition }:
               <button
                 key={reason}
                 onClick={() => setNote(reason)}
-                className={`rounded-lg px-3 py-1.5 text-xs transition-colors ${
+                className={`rounded-lg px-3 py-1.5 text-label transition-colors ${
                   note === reason
                     ? 'bg-[var(--pm-primary)] text-[var(--on-primary)]'
                     : 'bg-[var(--surface-container-highest)] text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]'
@@ -90,20 +90,20 @@ export function StageTransitionBar({ stage, evaluation, options, onTransition }:
           rows={2}
           autoFocus
           placeholder={isSkip ? 'Or write your own reason' : 'Optional note'}
-          className="mt-3 w-full resize-none rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2 text-sm text-[var(--on-surface)] outline-none"
+          className="mt-3 w-full resize-none rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2 text-body text-[var(--on-surface)] outline-none"
         />
 
         <div className="mt-3 flex gap-2">
           <button
             onClick={confirm}
             disabled={!canConfirm}
-            className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-sm text-[var(--on-primary)] disabled:opacity-40"
+            className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-title text-[var(--on-primary)] disabled:opacity-40"
           >
             {isSkip ? 'Skip stage' : 'Move on'}
           </button>
           <button
             onClick={() => setPending(null)}
-            className="rounded-lg px-4 py-2 text-sm text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
+            className="rounded-lg px-4 py-2 text-title text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
           >
             Cancel
           </button>
@@ -114,7 +114,7 @@ export function StageTransitionBar({ stage, evaluation, options, onTransition }:
 
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-xl bg-[var(--surface-container-low)] px-5 py-4">
-      <span className="mr-auto text-xs text-[var(--on-surface-variant)]">
+      <span className="mr-auto text-label text-[var(--on-surface-variant)]">
         {evaluation.canAdvance
           ? 'Ready to move on'
           : `${evaluation.unmet.length} item${evaluation.unmet.length === 1 ? '' : 's'} outstanding`}
@@ -124,7 +124,7 @@ export function StageTransitionBar({ stage, evaluation, options, onTransition }:
         <div className="relative">
           <button
             onClick={() => setShowReturns((v) => !v)}
-            className="rounded-lg px-3 py-2 text-sm text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)] hover:text-[var(--on-surface)]"
+            className="rounded-lg px-3 py-2 text-title text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)] hover:text-[var(--on-surface)]"
           >
             Go back
           </button>
@@ -137,13 +137,13 @@ export function StageTransitionBar({ stage, evaluation, options, onTransition }:
                     setShowReturns(false);
                     start(option);
                   }}
-                  className="block w-full px-4 py-2 text-left text-sm text-[var(--on-surface)] hover:bg-[var(--surface-container-high)]"
+                  className="block w-full px-4 py-2 text-left text-body text-[var(--on-surface)] hover:bg-[var(--surface-container-high)]"
                 >
                   {option.label}
                 </button>
               ))}
               {/* Returning never deletes later work; it marks it stale. */}
-              <p className="px-4 py-2 text-[11px] leading-snug text-[var(--on-surface-variant)]">
+              <p className="px-4 py-2 text-label leading-snug text-[var(--on-surface-variant)]">
                 Later work is kept and flagged, not deleted.
               </p>
             </div>
@@ -154,7 +154,7 @@ export function StageTransitionBar({ stage, evaluation, options, onTransition }:
       {skip && (
         <button
           onClick={() => start(skip)}
-          className="rounded-lg px-3 py-2 text-sm text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)] hover:text-[var(--on-surface)]"
+          className="rounded-lg px-3 py-2 text-title text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)] hover:text-[var(--on-surface)]"
         >
           Skip
         </button>
@@ -163,7 +163,7 @@ export function StageTransitionBar({ stage, evaluation, options, onTransition }:
       {advance && (
         <button
           onClick={() => start(advance)}
-          className="rounded-lg bg-[var(--pm-primary)] px-5 py-2 text-sm font-medium text-[var(--on-primary)] transition-opacity hover:opacity-90"
+          className="rounded-lg bg-[var(--pm-primary)] px-5 py-2 text-title text-[var(--on-primary)] transition-opacity hover:opacity-90"
         >
           {advance.label}
         </button>
