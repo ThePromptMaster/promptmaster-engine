@@ -30,8 +30,31 @@ import type {
   GenerateStageArtifactResponse,
 } from '@/types';
 import { createClient } from '@/lib/supabase/client';
+import {
+  REQUEST_ID_HEADER,
+  USAGE_HEADER,
+  parseUsageHeader,
+} from '@/lib/observability/usage';
+import {
+  currentUsageProject,
+  recordErrorEvent,
+  recordModelUsage,
+} from '@/lib/supabase/model-usage';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+/** FR-18: the pre-flight answer to "is this a large job?". Mirrors `EstimateJobResponse`. */
+export interface JobEstimate {
+  section_count: number;
+  llm_calls: number;
+  estimated_tokens_in: number;
+  estimated_tokens_out: number;
+  /** null when the model's price is unknown. Render as "cost unknown", not $0. */
+  estimated_cost_usd: number | null;
+  is_large: boolean;
+  /** The sentence to show. Written server-side so copy and threshold cannot drift. */
+  warning: string | null;
+}
 
 /**
  * An API failure that carries the HTTP status, so callers can branch on 401 —
@@ -142,28 +165,109 @@ function refreshSessionOnce(): Promise<boolean> {
   return refreshInFlight;
 }
 
-async function rawFetch(path: string, options?: RequestInit): Promise<Response> {
+/**
+ * FR-19: one id, followed across the client, the API, and the drain.
+ *
+ * Generated here rather than server-side so that a request which never arrives
+ * — a network failure, a CORS rejection, a cold-start timeout — still has an id
+ * to report. The backend adopts an inbound `X-Request-Id` rather than minting
+ * its own, so this is the id that appears in its log lines and on the
+ * `model_usage` row.
+ */
+function newRequestId(): string {
+  try {
+    return crypto.randomUUID().replace(/-/g, '');
+  } catch {
+    // `crypto.randomUUID` needs a secure context. Correlation is not security,
+    // so a weaker id here is fine; having none is not.
+    return `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+  }
+}
+
+async function rawFetch(
+  path: string,
+  options: RequestInit | undefined,
+  requestId: string
+): Promise<Response> {
+  const projectId = currentUsageProject();
   return fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      [REQUEST_ID_HEADER]: requestId,
+      // Attribution only — the backend uses it to tag its log lines. It is not
+      // an authorisation input on either side, and it is absent outside a
+      // project, which is a real and expected state.
+      ...(projectId ? { 'X-PromptMaster-Project': projectId } : {}),
       ...(await authHeader()),
       ...options?.headers,
     },
   });
 }
 
+/**
+ * Read one response header without ever throwing.
+ *
+ * A `Response` from the platform always has `headers`, but this is the only
+ * thing standing between a stubbed or exotic response object and a request path
+ * that dies on telemetry. The whole design commitment is that metering can lose
+ * a row but must never lose a generation, and that commitment is worth four
+ * lines rather than an assumption.
+ */
+function header(res: Response, name: string): string | null {
+  try {
+    return res.headers?.get(name) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * FR-18: persist what the request spent, off the response header.
+ *
+ * Deliberately not awaited by the caller. Metering is bookkeeping attached to a
+ * response the user is already looking at; making them wait on an insert to see
+ * their own generation would be the wrong trade in every case. Failures inside
+ * are swallowed by `recordModelUsage` itself.
+ */
+function meter(res: Response, path: string, requestId: string): void {
+  const events = parseUsageHeader(header(res, USAGE_HEADER));
+  if (events.length === 0) return;
+  void recordModelUsage(events, { route: path, requestId });
+}
+
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  let res = await rawFetch(path, options);
+  const requestId = newRequestId();
+  let res = await rawFetch(path, options, requestId);
 
   // An expired token is the common case and is silently recoverable; retry once.
   if (res.status === 401 && (await refreshSessionOnce())) {
-    res = await rawFetch(path, options);
+    // A retry is a second billable request, so it carries a second id rather
+    // than reusing the first — otherwise two sets of usage rows would collapse
+    // onto one correlation id and the log would show one request that somehow
+    // spent twice.
+    meter(res, path, requestId);
+    res = await rawFetch(path, options, newRequestId());
   }
+
+  // Read usage before branching on `ok`: a request can fail *after* spending
+  // money. A stage generation whose evaluation call 502s has already paid for
+  // the generation, and that is exactly the spend an operator needs to see.
+  meter(res, path, header(res, REQUEST_ID_HEADER) ?? requestId);
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ detail: res.statusText }));
-    throw toApiError(body, res.status);
+    const error = toApiError(body, res.status);
+    void recordErrorEvent({
+      code: error.code ?? 'unknown',
+      title: error.title ?? '',
+      message: error.message,
+      technical: error.technical,
+      route: path,
+      requestId: header(res, REQUEST_ID_HEADER) ?? requestId,
+      httpStatus: res.status,
+    });
+    throw error;
   }
   return res.json();
 }
@@ -254,6 +358,21 @@ export const api = {
 
   async continueDocument(req: ContinueDocumentRequest): Promise<IterationFromConversationResponse> {
     return apiFetch('/api/continue-document', {
+      method: 'POST',
+      body: JSON.stringify(req),
+    });
+  },
+
+  /**
+   * FR-18: what a drafting run will cost, before it is enqueued.
+   *
+   * Makes no LLM call — it is arithmetic over the backend's own limits plus the
+   * live OpenRouter price. A warning that costs a model call to produce, or
+   * that arrives after a round-trip the user will not wait through, is a
+   * warning nobody sees.
+   */
+  async estimateJob(req: { section_count: number; model?: string }): Promise<JobEstimate> {
+    return apiFetch('/api/estimate-job', {
       method: 'POST',
       body: JSON.stringify(req),
     });
