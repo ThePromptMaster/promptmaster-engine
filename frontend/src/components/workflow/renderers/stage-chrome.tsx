@@ -89,6 +89,10 @@ interface GenerationBarProps {
   onGenerate: (options?: { force?: boolean }) => void;
   onCancel: () => void;
   readOnly: boolean;
+  /** FR-11. Absent when the stage cannot be evaluated (browsing, no store). */
+  onEvaluate?: () => void;
+  evaluating?: boolean;
+  evaluationError?: string | null;
 }
 
 /**
@@ -106,6 +110,9 @@ export function GenerationBar({
   onGenerate,
   onCancel,
   readOnly,
+  onEvaluate,
+  evaluating = false,
+  evaluationError = null,
 }: GenerationBarProps) {
   if (readOnly) return null;
 
@@ -139,6 +146,37 @@ export function GenerationBar({
           {error}
         </p>
       )}
+      {evaluationError && (
+        <p className="text-label text-[var(--pm-tertiary)]" role="alert">
+          {evaluationError}
+        </p>
+      )}
+
+      {/* Evaluation is never automatic — it is a model call the user chooses
+          to spend, so the button says what it costs. Placed before Draft and
+          without the accent fill, because drafting is the primary action on a
+          stage and scoring is the considered second one. */}
+      {onEvaluate && hasContent && (
+        <button
+          onClick={onEvaluate}
+          disabled={evaluating}
+          className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-low)] px-3 py-1.5 text-label text-[var(--on-surface-variant)] transition-colors hover:bg-[var(--surface-container-high)] hover:text-[var(--on-surface)] disabled:opacity-50"
+        >
+          {evaluating ? (
+            <span
+              aria-hidden
+              className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--pm-primary)] border-t-transparent"
+            />
+          ) : (
+            <span aria-hidden className="material-symbols-outlined text-[16px]">
+              rule
+            </span>
+          )}
+          {evaluating ? 'Evaluating…' : 'Evaluate this stage'}
+          <span className="text-[var(--on-surface-variant)] opacity-70">· 1 model call</span>
+        </button>
+      )}
+
       <button
         onClick={() => onGenerate()}
         className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-low)] px-3 py-1.5 text-label text-[var(--on-surface-variant)] transition-colors hover:bg-[var(--surface-container-high)] hover:text-[var(--on-surface)]"

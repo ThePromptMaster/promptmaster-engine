@@ -35,6 +35,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const patchProject = useProjectStore((s) => s.patchProject);
   const resolveConflict = useProjectStore((s) => s.resolveConflict);
   const appendStageVersion = useProjectStore((s) => s.appendStageVersion);
+  const recordStageEvaluation = useProjectStore((s) => s.recordStageEvaluation);
   const restoreStageVersion = useProjectStore((s) => s.restoreStageVersion);
   const setStageSummary = useProjectStore((s) => s.setStageSummary);
   const ensureStageArtifact = useProjectStore((s) => s.ensureStageArtifact);
@@ -184,6 +185,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         template={template}
         onPatchProject={patchProject}
         appendStageVersion={appendStageVersion}
+        recordStageEvaluation={recordStageEvaluation}
         restoreStageVersion={restoreStageVersion}
         setStageSummary={setStageSummary}
         ensureStageArtifact={ensureStageArtifact}
