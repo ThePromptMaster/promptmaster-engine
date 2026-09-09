@@ -8,6 +8,8 @@ import { ExitCriteriaChecklist } from './exit-criteria-checklist';
 import { StageTransitionBar } from './stage-transition-bar';
 import { StageRenderer } from './renderers/stage-renderer';
 import { useStageGeneration } from './use-stage-generation';
+import { useStageEvaluation } from './use-stage-evaluation';
+import { StageEvaluationPanel } from './evaluation-panel';
 import {
   availableTransitions,
   evaluateStage,
@@ -34,7 +36,7 @@ import {
 } from '@/lib/workflow/stage-artifact';
 import type { StageContext, WorkflowEvent, WorkflowTemplate } from '@/lib/workflow/types';
 import { appendWorkflowEvent, listWorkflowEvents } from '@/lib/supabase/workflow';
-import type { NewVersion } from '@/lib/supabase/versions';
+import type { NewEvaluation, NewVersion } from '@/lib/supabase/versions';
 import type { StageBundle } from '@/stores/project-store';
 import { approvedOutlineVersionId } from '@/lib/supabase/outline';
 import type { Artifact, ArtifactVersion, Evaluation, Project, ProjectPatch } from '@/types/project';
@@ -54,6 +56,18 @@ interface Props {
     name: string,
     version: NewVersion
   ) => Promise<unknown>;
+  /**
+   * Attach an evaluation to a stage version that already exists (FR-11).
+   *
+   * Optional for the same reason `appendStageVersion` is: the preview surface
+   * renders this workspace with no store behind it, and an absent writer is
+   * what makes the Evaluate control absent rather than broken.
+   */
+  recordStageEvaluation?: (
+    stageId: string,
+    versionId: string,
+    evaluation: NewEvaluation
+  ) => Promise<Evaluation>;
   restoreStageVersion?: (stageId: string, versionId: string) => Promise<void>;
   setStageSummary?: (stageId: string, summary: string) => Promise<void>;
   /**
@@ -78,6 +92,7 @@ export function WorkflowWorkspace({
   evaluations,
   onPatchProject,
   appendStageVersion,
+  recordStageEvaluation,
   restoreStageVersion,
   setStageSummary,
   ensureStageArtifact,
@@ -127,6 +142,38 @@ export function WorkflowWorkspace({
     // before the event log has loaded — the current stage is not yet known.
     enabled: Boolean(appendStageVersion) && isCurrent && events !== null,
     appendStageVersion: appendStageVersion ?? (async () => undefined),
+  });
+
+  /**
+   * FR-12's fourth drift axis: the outline the work is bound to.
+   *
+   * Read from the long-form artifact rather than re-derived, because that is
+   * the outline drafting was materialised against — an outline recomputed here
+   * could disagree with the one the sections were actually written to, and
+   * then the evaluation would be scoring drift against a document that never
+   * existed.
+   */
+  const approvedOutline = useMemo(() => {
+    if (approvedOutlineVersionId(events ?? []) === null) return [];
+    const draftingId = draftingStageId(template);
+    const holder =
+      (draftingId ? stageBundles[draftingId]?.artifact : null) ??
+      (stage ? stageBundles[stage.id]?.artifact : null) ??
+      artifact;
+    return holder?.long_form?.outline ?? [];
+  }, [events, template, stageBundles, stage, artifact]);
+
+  const stageEvaluation = useStageEvaluation({
+    project,
+    template,
+    state,
+    stage,
+    bundles: stageBundles,
+    approvedOutline,
+    // Same guard as drafting: never spend a call on a stage the user is only
+    // looking at, and never before the event log says which stage that is.
+    enabled: Boolean(recordStageEvaluation) && isCurrent && events !== null,
+    recordStageEvaluation,
   });
 
   /**
@@ -515,6 +562,9 @@ export function WorkflowWorkspace({
                 generationError={generation.error}
                 onGenerate={generation.generate}
                 onCancelGeneration={generation.cancel}
+                onEvaluate={stageEvaluation.evaluate}
+                evaluating={stageEvaluation.evaluating}
+                evaluationError={stageEvaluation.error}
                 readOnly={!isCurrent}
                 evaluation={
                   evaluations?.[
@@ -531,6 +581,18 @@ export function WorkflowWorkspace({
               criteria={evaluation.criteria}
               manualIds={manualIds}
               onToggleManual={handleToggleManual}
+            />
+
+            {/* Beside the exit criteria rather than under the artifact: both
+                answer "is this good enough to move on", and the criteria are
+                the declarative half of the same question the evaluation
+                answers by judgment. */}
+            <StageEvaluationPanel
+              evaluation={
+                evaluations?.[activeVersionId ?? stageVersions.at(-1)?.id ?? '']
+              }
+              recommendation={stageEvaluation.recommendation}
+              onDismissRecommendation={stageEvaluation.dismissRecommendation}
             />
 
             {/* Transitions act on the current stage only — browsing history

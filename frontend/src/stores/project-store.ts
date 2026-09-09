@@ -91,13 +91,33 @@ interface ProjectState {
 
   /** Create this stage's artifact if it has none yet. Idempotent. */
   ensureStageArtifact: (stageId: string, name: string) => Promise<Artifact>;
-  /** Append a version to a specific stage's artifact, creating it if needed. */
+  /**
+   * Append a version to a specific stage's artifact, creating it if needed.
+   *
+   * The optional evaluation mirrors `appendVersion` — a caller that produced
+   * content and its scores in one operation writes both here, rather than
+   * appending and then discovering there is no seam to attach scores through.
+   */
   appendStageVersion: (
     stageId: string,
     name: string,
-    version: NewVersion
+    version: NewVersion,
+    evaluation?: NewEvaluation
   ) => Promise<ArtifactVersion>;
   restoreStageVersion: (stageId: string, versionId: string) => Promise<void>;
+  /**
+   * Attach an evaluation to a stage version that already exists.
+   *
+   * Evaluating is not editing: the content is unchanged, so it must not append
+   * a version. `artifact_versions` is append-only content history, and a
+   * version whose only difference from its parent is that someone pressed
+   * Evaluate would be noise in every history view forever.
+   */
+  recordStageEvaluation: (
+    stageId: string,
+    versionId: string,
+    evaluation: NewEvaluation
+  ) => Promise<Evaluation>;
   /** Record what a stage concluded, for the digest later stages generate against. */
   setStageSummary: (stageId: string, summary: string) => Promise<void>;
 
@@ -306,13 +326,16 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     return created;
   },
 
-  async appendStageVersion(stageId, name, version) {
+  async appendStageVersion(stageId, name, version, evaluation) {
     const artifact = await get().ensureStageArtifact(stageId, name);
     // Read the artifact back out of the store rather than reusing the one
     // above: version_count and revision move with every append, and a stale
     // copy would write version 2 twice.
     const current = get().stages[stageId]?.artifact ?? artifact;
     const created = await appendVersionRow(current, version);
+
+    let saved: Evaluation | null = null;
+    if (evaluation) saved = await saveEvaluation(created, evaluation);
 
     set((s) => {
       const bundle = s.stages[stageId] ?? { artifact: current, versions: [] };
@@ -329,10 +352,21 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
             versions: [...bundle.versions, created],
           },
         },
+        evaluations: saved ? { ...s.evaluations, [created.id]: saved } : s.evaluations,
       };
     });
 
     return created;
+  },
+
+  async recordStageEvaluation(stageId, versionId, evaluation) {
+    const bundle = get().stages[stageId];
+    const version = bundle?.versions.find((v) => v.id === versionId);
+    if (!version) throw new Error('That version is no longer open.');
+
+    const saved = await saveEvaluation(version, evaluation);
+    set((s) => ({ evaluations: { ...s.evaluations, [versionId]: saved } }));
+    return saved;
   },
 
   async restoreStageVersion(stageId, versionId) {

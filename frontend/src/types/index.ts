@@ -36,6 +36,14 @@ export interface EvaluationResult {
   clarity: DimensionScore;
   completeness?: CompletenessResult | null;
   interpretation?: WhyThisWorks | null;
+  /**
+   * FR-11: the specific defects this evaluation found.
+   *
+   * Same shape as AuditFinding on purpose — `evaluations.findings jsonb` was
+   * pre-carved for it. Empty for the four-call iteration pipeline, which never
+   * asks for findings; populated by `/api/evaluate-stage-artifact`.
+   */
+  findings?: AuditFinding[];
 }
 
 export type UserRating = 'positive' | 'negative';
@@ -346,6 +354,14 @@ export interface StageDescriptorRequest {
   renderer: 'prose' | 'list' | 'outline' | 'long_form' | 'review';
   entry_prompt_hint: string;
   artifact_kind: string;
+  /**
+   * What would make this stage's artifact acceptable, sent for evaluation.
+   *
+   * The engine still decides transitions with pure predicates — this is the
+   * bar the artifact was written to, told to a judge, not a gate handed to a
+   * model. Optional so generation callers need not send it.
+   */
+  exit_criteria?: { id: string; label: string; blocking: boolean }[];
 }
 
 export interface StageItemSchemaRequest {
@@ -369,4 +385,37 @@ export interface GenerateStageArtifactResponse {
   /** Rows for list and review stages; the extra keys are schema-defined. */
   items: Record<string, string>[];
   finish_reason: string;
+}
+
+/**
+ * FR-11's "corrective recommendation when warranted".
+ *
+ * Carries the four things FR-14 wants a rationale to identify, so M4.2's
+ * recommendations surface can render one without re-running the evaluation.
+ */
+export interface StageRecommendation {
+  id: string;
+  title: string;
+  triggering_issue: string;
+  expected_benefit: string;
+  scope: string;
+  /** The revision instruction. Offered, never applied here — FR-12. */
+  instruction: string;
+}
+
+export interface EvaluateStageArtifactRequest {
+  inputs: PMInput;
+  stage: StageDescriptorRequest;
+  /** The artifact as stored: Markdown for prose, the item document otherwise. */
+  content: string;
+  digest: StageDigestRequest;
+  /** FR-12's fourth drift axis. Empty when no outline has been approved. */
+  approved_outline?: OutlineSection[];
+  iterations?: Iteration[];
+  model?: string;
+}
+
+export interface EvaluateStageArtifactResponse {
+  evaluation: EvaluationResult;
+  recommendation: StageRecommendation | null;
 }

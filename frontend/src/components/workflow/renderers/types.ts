@@ -64,6 +64,17 @@ export interface StageRendererProps {
   onCancelGeneration: () => void;
 
   /**
+   * FR-11: score this stage's artifact. Absent when it cannot be evaluated —
+   * an earlier stage being browsed, or a surface with no store behind it.
+   *
+   * Deliberately shaped like `onGenerate`: a renderer receives the ability to
+   * evaluate as data and knows nothing about which workflow it is in.
+   */
+  onEvaluate?: () => void;
+  evaluating?: boolean;
+  evaluationError?: string | null;
+
+  /**
    * Browsing an earlier stage. Everything stays readable; nothing is editable,
    * because editing a stage you are only looking at is how work gets lost.
    */
