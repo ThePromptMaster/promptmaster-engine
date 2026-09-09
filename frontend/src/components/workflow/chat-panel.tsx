@@ -87,6 +87,16 @@ interface Props {
   readOnly?: boolean;
   /** Which mode to open in. Discuss, unless a caller says otherwise. */
   initialMode?: Mode;
+  /**
+   * False when the version on screen is not the stage's latest.
+   *
+   * Instruct splices its revision into the content it was given and appends
+   * the result, so revising while reading version 1 of a stage that is on
+   * version 3 would append a version 4 built from version 1 — silently
+   * discarding two versions of work. Discussion is unaffected: asking about an
+   * old version is a reasonable thing to do.
+   */
+  canInstruct?: boolean;
 }
 
 export function ChatPanel({
@@ -99,6 +109,7 @@ export function ChatPanel({
   restoreStageVersion,
   readOnly = false,
   initialMode = 'discuss',
+  canInstruct = true,
 }: Props) {
   const chat = useStageChat({
     project,
@@ -110,7 +121,10 @@ export function ChatPanel({
     restoreStageVersion,
   });
 
-  const [mode, setMode] = useState<Mode>(initialMode);
+  const [requestedMode, setMode] = useState<Mode>(initialMode);
+  // Derived, not corrected after the fact: there is no render in which the
+  // composer offers a power the panel will not honour.
+  const mode: Mode = canInstruct ? requestedMode : 'discuss';
   const [draft, setDraft] = useState('');
   const [scope, setScope] = useState<ScopeKind>('document');
   const [sectionId, setSectionId] = useState<string>('');
@@ -199,7 +213,16 @@ export function ChatPanel({
         <p className="mt-0.5 text-label text-[var(--on-surface-variant)]">{stageLabel}</p>
       </header>
 
-      <ModeSwitch mode={mode} onChange={setMode} disabled={readOnly} />
+      <ModeSwitch
+        mode={mode}
+        onChange={setMode}
+        disabled={readOnly}
+        instructDisabledReason={
+          canInstruct
+            ? null
+            : 'You are reading an earlier version. Open the latest one to revise it.'
+        }
+      />
 
       <div
         ref={threadRef}
@@ -318,10 +341,13 @@ function ModeSwitch({
   mode,
   onChange,
   disabled,
+  instructDisabledReason,
 }: {
   mode: Mode;
   onChange: (mode: Mode) => void;
   disabled: boolean;
+  /** Present when Instruct is unavailable — and then it says why. */
+  instructDisabledReason: string | null;
 }) {
   return (
     <div className="px-5 pt-4">
@@ -333,7 +359,7 @@ function ModeSwitch({
               key={m.key}
               role="tab"
               aria-selected={active}
-              disabled={disabled}
+              disabled={disabled || (m.key === 'instruct' && Boolean(instructDisabledReason))}
               onClick={() => onChange(m.key)}
               className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-label disabled:opacity-40 ${
                 active
@@ -366,6 +392,10 @@ function ModeSwitch({
             : 'Revisions are shown for review first, and never replace a version.'}
         </span>
       </p>
+
+      {instructDisabledReason && (
+        <p className="mt-1.5 text-label text-[var(--pm-tertiary)]">{instructDisabledReason}</p>
+      )}
     </div>
   );
 }

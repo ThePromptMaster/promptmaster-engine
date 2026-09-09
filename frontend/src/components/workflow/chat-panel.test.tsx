@@ -260,6 +260,32 @@ describe('Instruct mode proposes before it applies', () => {
   });
 });
 
+describe('reading an older version', () => {
+  it('will not instruct against it, and says why', async () => {
+    // Revising splices into the content it was handed. Instructing while
+    // reading version 1 of a stage on version 3 would append a version 4 built
+    // from version 1 and silently drop two versions of work.
+    panel({ canInstruct: false });
+    expect(screen.getByRole('tab', { name: /instruct/i })).toBeDisabled();
+    expect(screen.getByText(/open the latest one to revise/i)).toBeInTheDocument();
+  });
+
+  it('still allows discussion of it', async () => {
+    panel({ canInstruct: false });
+    await ask('What was wrong with this draft?');
+    await waitFor(() => expect(chatMessage).toHaveBeenCalledTimes(1));
+    expect(applyToAnswer).not.toHaveBeenCalled();
+  });
+
+  it('cannot be forced into instruct mode by an initialMode', async () => {
+    // Derived, not corrected after the fact — there is no render in which the
+    // composer offers a power the panel will not honour.
+    panel({ canInstruct: false, initialMode: 'instruct' });
+    expect(screen.getByLabelText('Ask a question')).toBeInTheDocument();
+    expect(screen.queryByText('Apply to')).not.toBeInTheDocument();
+  });
+});
+
 describe('a stage being browsed rather than worked on', () => {
   it('keeps the thread readable but takes the composer away', () => {
     panel({ readOnly: true });

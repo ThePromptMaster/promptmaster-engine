@@ -667,6 +667,12 @@ export function WorkflowWorkspace({
               appendStageVersion={appendStageVersion}
               restoreStageVersion={restoreStageVersion}
               readOnly={!isCurrent}
+              // Revising splices into the content it was handed, so instructing
+              // while reading an older version would append a version built
+              // from it and lose everything since. Discussion is unaffected.
+              canInstruct={
+                activeVersionId === null || activeVersionId === stageVersions.at(-1)?.id
+              }
             />
           </div>
         </aside>
