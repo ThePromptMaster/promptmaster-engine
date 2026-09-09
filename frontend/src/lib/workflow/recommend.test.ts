@@ -105,7 +105,6 @@ describe('FR-13: every active stage yields at least one workflow recommendation'
             template,
             stage,
             evaluation,
-            objective: OBJECTIVE,
           });
 
           // The acceptance criterion, stage by stage. Rules 2 and 3 are
@@ -149,7 +148,6 @@ describe('FR-13: the three rules, in priority order', () => {
       template: BOOK_V1,
       stage,
       evaluation,
-      objective: '',
     });
 
     expect(derived[0].kind).toBe('setup');
@@ -189,7 +187,6 @@ describe('FR-13: the three rules, in priority order', () => {
       template,
       stage: counting!.stage,
       evaluation,
-      objective: OBJECTIVE,
     });
     const workflowRec = derived.find((r) => r.kind === 'workflow');
     expect(workflowRec?.summary).toContain(blocker!.detail!);
@@ -205,7 +202,6 @@ describe('FR-13: the three rules, in priority order', () => {
       template: BOOK_V1,
       stage: terminal!,
       evaluation,
-      objective: OBJECTIVE,
     });
 
     expect(derived.map((r) => r.title)).toContain('Finish');
@@ -220,7 +216,6 @@ describe('FR-13: the three rules, in priority order', () => {
         template,
         stage: first,
         evaluation,
-        objective: OBJECTIVE,
       });
       const advance = derived.find((r) => r.kind === 'stage_transition');
       const next = template.stages.find((s) => s.id === first.transitions.default_next);
@@ -239,7 +234,6 @@ describe('FR-01: a dismissal survives a refresh', () => {
       template: BOOK_V1,
       stage,
       evaluation,
-      objective: '',
     });
     expect(all.length).toBeGreaterThan(0);
 
@@ -247,7 +241,6 @@ describe('FR-01: a dismissal survives a refresh', () => {
       template: BOOK_V1,
       stage,
       evaluation,
-      objective: '',
       dismissed: new Set([all[0].category]),
     });
     expect(kept.map((r) => r.category)).not.toContain(all[0].category);

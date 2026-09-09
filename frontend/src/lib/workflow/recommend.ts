@@ -426,10 +426,21 @@ export interface DeriveOptions {
   stage: StageDefinition;
   /** The pure exit-criteria evaluation from `engine.ts`. */
   evaluation: StageEvaluation;
-  objective: string;
   /** Category keys the user has dismissed; filtered on reload so they stick. */
   dismissed?: ReadonlySet<string>;
 }
+
+/*
+ * Deliberately no `objective` parameter.
+ *
+ * `buildRationale` takes one, because an evaluation-driven correction's
+ * backfill can honestly say "points the artifact back at the stated
+ * objective: X". None of the three derived rules can: the setup rule fires
+ * precisely when a required field is *missing*, and the other two are about
+ * criteria and transitions, which the objective says nothing about. A
+ * parameter threaded through to be quoted in a branch no template can reach
+ * is worse than no parameter.
+ */
 
 /** How many derived rows the panel will ever show. FR-13 says "a limited number". */
 export const MAX_DERIVED = 2;
@@ -457,7 +468,6 @@ export function deriveWorkflowRecommendations({
   template,
   stage,
   evaluation,
-  objective,
   dismissed,
 }: DeriveOptions): ProposedRecommendation[] {
   const out: ProposedRecommendation[] = [];
@@ -483,13 +493,8 @@ export function deriveWorkflowRecommendations({
       rationale: {
         triggering_issue: `"${criterion.label}" is not satisfied on ${stage.label}.`,
         relevant_stage: stage.label,
-        // Where the objective is already written, quote it: the useful thing
-        // to know while filling in an audience is what the book is *for*, and
-        // the field it has to sit beside is two panels up the page.
         expected_benefit:
-          rule.field !== 'objective' && objective.trim()
-            ? `Every stage is generated against the setup fields, and the objective already says: ${objective.trim()}`
-            : 'Every stage of this project is generated against the setup fields, so filling this in now is what stops later work having to be redone.',
+          'Every stage of this project is generated against the setup fields, so filling this in now is what stops later work having to be redone.',
         scope: 'The project setup, not the artifact.',
       },
       scope: { kind: 'document', described_as: "This project's setup fields." },

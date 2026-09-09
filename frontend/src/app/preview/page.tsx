@@ -578,7 +578,6 @@ function RecommendationsSlice() {
     template: BOOK_V1,
     stage,
     evaluation: stageEvaluation,
-    objective: 'A practitioner book on prompting for engineering managers.',
   }).map((r) => ({ ...r, origin: 'derived' as const }));
 
   const signals = signalsFromEvaluation(EVAL_FIXTURE);

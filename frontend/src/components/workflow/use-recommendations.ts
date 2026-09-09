@@ -211,10 +211,9 @@ export function useRecommendations({
       template,
       stage,
       evaluation: stageEvaluation,
-      objective: project.objective,
       dismissed,
     });
-  }, [template, stage, stageEvaluation, project.objective, dismissed]);
+  }, [template, stage, stageEvaluation, dismissed]);
 
   const panelRows: PanelRecommendation[] = useMemo(() => {
     const persisted = rows
