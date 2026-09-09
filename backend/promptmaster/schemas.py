@@ -3,26 +3,63 @@
 from typing import Literal
 from datetime import datetime, timezone
 from uuid import uuid4
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from .limits import (
+    MAX_OBJECTIVE_CHARS,
+    MAX_PREAMBLE_CHARS,
+    MAX_SESSION_FACT_CHARS,
+    MAX_SESSION_FACTS,
+    MAX_SHORT_TEXT_CHARS,
+)
 
 ModeType = Literal["architect", "critic", "clarity", "coach", "therapist", "cold_critic", "analyst", "custom"]
 ScoreLevel = Literal["Low", "Medium", "High"]
 
 
 class PMInput(BaseModel):
-    """User inputs for a PromptMaster session."""
-    objective: str = Field(..., description="What the user wants to accomplish")
-    audience: str = Field(default="General", description="Target audience")
-    constraints: str = Field(default="", description="Optional constraints")
-    output_format: str = Field(default="", description="Desired output structure (e.g. bullet points, numbered list)")
+    """User inputs for a PromptMaster session.
+
+    FR-18: every free-text field here is concatenated into a prompt and paid for
+    by the token, and `session_facts` is paid for on *every* call in a session.
+    The `max_length` bounds are the generation-size control, enforced by
+    FastAPI before a handler runs — see `promptmaster/limits.py`.
+    """
+    objective: str = Field(..., max_length=MAX_OBJECTIVE_CHARS, description="What the user wants to accomplish")
+    audience: str = Field(default="General", max_length=MAX_SHORT_TEXT_CHARS, description="Target audience")
+    constraints: str = Field(default="", max_length=MAX_SHORT_TEXT_CHARS, description="Optional constraints")
+    output_format: str = Field(default="", max_length=MAX_SHORT_TEXT_CHARS, description="Desired output structure (e.g. bullet points, numbered list)")
     mode: ModeType = Field(..., description="Selected operational mode")
     # Custom mode fields (only used when mode == 'custom')
-    custom_name: str = Field(default="", description="Custom mode persona name")
-    custom_preamble: str = Field(default="", description="Custom mode system preamble")
-    custom_tone: str = Field(default="", description="Custom mode tone")
+    custom_name: str = Field(default="", max_length=MAX_SHORT_TEXT_CHARS, description="Custom mode persona name")
+    custom_preamble: str = Field(default="", max_length=MAX_PREAMBLE_CHARS, description="Custom mode system preamble")
+    custom_tone: str = Field(default="", max_length=MAX_SHORT_TEXT_CHARS, description="Custom mode tone")
     # Session Facts (Information Anchors, Ch5 S5) — pinned facts that anchor
     # the conversation's knowledge and get injected into every prompt.
-    session_facts: list[str] = Field(default_factory=list, description="Pinned facts that anchor the session")
+    session_facts: list[str] = Field(
+        default_factory=list,
+        max_length=MAX_SESSION_FACTS,
+        description="Pinned facts that anchor the session",
+    )
+
+    @field_validator("session_facts")
+    @classmethod
+    def _bound_each_fact(cls, facts: list[str]) -> list[str]:
+        """The list length is bounded by `max_length`; this bounds each element.
+
+        Fifty facts of unbounded size is the same unbounded prompt as one fact
+        of unbounded size, and Pydantic has no per-element constraint on a
+        plain `list[str]`.
+        """
+        oversized = next((f for f in facts if len(f) > MAX_SESSION_FACT_CHARS), None)
+        if oversized is not None:
+            raise ValueError(
+                f"A session fact is {len(oversized):,} characters; "
+                f"the limit is {MAX_SESSION_FACT_CHARS:,}. "
+                "Session facts are short anchors injected into every prompt — "
+                "put long material in the objective instead."
+            )
+        return facts
 
 
 class AssembledPrompt(BaseModel):

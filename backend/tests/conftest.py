@@ -82,3 +82,20 @@ def auth_bypass():
     )
     yield
     app.dependency_overrides.pop(require_user, None)
+
+
+@pytest.fixture(autouse=True)
+def fresh_rate_limiter():
+    """FR-18's limiter keys on user id, and the whole suite is one user.
+
+    The limiter is in-process by design (see `ratelimit.py`), so without this
+    the 281st request from TEST_USER_ID in a single pytest process would be
+    refused and the failure would land on whichever test happened to run last —
+    a genuinely baffling bug. Resetting per test also means each test starts
+    from a known window, which is what makes `test_rate_limit.py` deterministic.
+    """
+    from ratelimit import reset_limiter
+
+    reset_limiter()
+    yield
+    reset_limiter()
