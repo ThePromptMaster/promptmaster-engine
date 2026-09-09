@@ -15,6 +15,7 @@
  * of the four this milestone can honestly offer, so it is the only one shown.
  */
 
+import { EvaluationRatings } from './evaluation-ratings';
 import type { Evaluation } from '@/types/project';
 import type { StageRecommendation } from '@/types';
 
@@ -31,7 +32,6 @@ export function StageEvaluationPanel({
 }: Props) {
   const findings = evaluation?.findings ?? [];
   const interpretation = evaluation?.interpretation ?? null;
-  const incomplete = evaluation?.completeness_status === 'incomplete';
 
   if (!evaluation && !recommendation) return null;
 
@@ -44,18 +44,24 @@ export function StageEvaluationPanel({
         Evaluation
       </h3>
 
+      {/* Section 8: each rating carries its explanation, affected area and
+          corrective action. What stood here was the three scores on one line —
+          numbers alone, with the stored explanations displayed nowhere.
+          Completeness moved in as a fourth rating rather than a conditional
+          line of prose below the scores. */}
       {evaluation && (
-        <p className="mt-2 text-label text-[var(--on-surface-variant)]">
-          Alignment {evaluation.alignment_score} · Clarity {evaluation.clarity_score} · Drift{' '}
-          {evaluation.drift_score}
-          {evaluation.needs_realignment && ' · needs realignment'}
-        </p>
-      )}
-
-      {incomplete && evaluation?.completeness_reason && (
-        <p className="mt-2 text-body text-[var(--pm-tertiary)]">
-          Incomplete: {evaluation.completeness_reason}
-        </p>
+        <>
+          {evaluation.needs_realignment && (
+            <p className="mt-2 text-label text-[var(--pm-error)]">Needs realignment</p>
+          )}
+          {findings.length > 0 && (
+            <p className="mt-2 text-label text-[var(--on-surface-variant)]">
+              {findings.length} finding{findings.length === 1 ? '' : 's'}, shown against the
+              rating each one affects.
+            </p>
+          )}
+          <EvaluationRatings evaluation={evaluation} />
+        </>
       )}
 
       {interpretation && interpretation.bullets.length > 0 && (
@@ -71,26 +77,10 @@ export function StageEvaluationPanel({
         </div>
       )}
 
-      {findings.length > 0 && (
-        <div className="mt-4">
-          <p className="text-label text-[var(--on-surface-variant)]">
-            {findings.length} finding{findings.length === 1 ? '' : 's'}
-          </p>
-          <ul className="mt-2 space-y-3">
-            {findings.map((finding) => (
-              <li key={finding.id}>
-                <p className="text-label uppercase tracking-wider text-[var(--on-surface-variant)]">
-                  {finding.category}
-                </p>
-                <p className="text-body text-[var(--on-surface)]">{finding.summary}</p>
-                <p className="text-body text-[var(--on-surface-variant)]">
-                  {finding.suggested_change}
-                </p>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      {/* Findings are no longer listed separately here: each one is shown as
+          the corrective action of the rating it speaks to, and the ones that
+          match no dimension are grouped by EvaluationRatings. Listing them
+          twice made the same sentence read as two different problems. */}
 
       {evaluation && findings.length === 0 && (
         <p className="mt-4 text-body text-[var(--on-surface-variant)]">
