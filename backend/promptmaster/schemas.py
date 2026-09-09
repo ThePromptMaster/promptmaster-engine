@@ -75,6 +75,15 @@ class EvaluationResult(BaseModel):
         default=None,
         description="Plain-language 3-4 bullet summary of why the output works or what to improve.",
     )
+    findings: list[AuditFinding] = Field(
+        default_factory=list,
+        description=(
+            "FR-11: the specific defects this evaluation found. Reuses AuditFinding "
+            "rather than inventing a shape, because `evaluations.findings jsonb` was "
+            "pre-carved to exactly that shape and has been written empty since M1. "
+            "Empty for the four-call iteration pipeline, which does not ask for them."
+        ),
+    )
 
     @property
     def needs_realignment(self) -> bool:
@@ -351,6 +360,20 @@ class StageItemSchema(BaseModel):
     max_items: int = Field(default=8)
 
 
+class StageExitCriterion(BaseModel):
+    """One of a stage's declared exit criteria, carried for evaluation only.
+
+    The engine evaluates these as pure predicates in the frontend and never
+    asks a model about them — that rule is unchanged. What reaches the model
+    here is the criteria's *labels*, as a statement of what this stage's
+    artifact was supposed to achieve. Judging an artifact needs to know the bar
+    it was written to; deciding whether a gate is open does not.
+    """
+    id: str = Field(default="")
+    label: str = Field(default="")
+    blocking: bool = Field(default=False)
+
+
 class StageDescriptor(BaseModel):
     """The stage being generated for, lifted straight from the template."""
     id: str
@@ -358,6 +381,13 @@ class StageDescriptor(BaseModel):
     renderer: Literal["prose", "list", "outline", "long_form", "review"] = "prose"
     entry_prompt_hint: str = Field(default="", description="The stage's authored instruction.")
     artifact_kind: str = Field(default="", description="Primary expected artifact kind.")
+    exit_criteria: list[StageExitCriterion] = Field(
+        default_factory=list,
+        description=(
+            "What would make this stage's artifact acceptable. Optional, so "
+            "generate-stage-artifact callers that never sent it keep working."
+        ),
+    )
 
 
 class StageItem(BaseModel):
@@ -372,3 +402,39 @@ class GenerateStageArtifactResponse(BaseModel):
     content: str = Field(default="")
     items: list[StageItem] = Field(default_factory=list)
     finish_reason: str = Field(default="")
+
+
+class StageRecommendation(BaseModel):
+    """FR-11's "corrective recommendation when warranted", FR-12's offer.
+
+    Carries the four things FR-14 asks a rationale to identify — the triggering
+    issue, the stage it concerns, the expected benefit, and the affected scope
+    — so that M4.2's recommendations surface has something to render without
+    the evaluation being re-run.
+    """
+    id: str = Field(..., description="Unique within one evaluation.")
+    title: str = Field(..., description="One line — the corrective action.")
+    triggering_issue: str = Field(default="", description="What went wrong that prompts this.")
+    expected_benefit: str = Field(default="", description="What applying it would fix.")
+    scope: str = Field(default="", description="What it would touch, e.g. 'section 3 onward'.")
+    instruction: str = Field(
+        default="",
+        description="The revision instruction, ready to be applied. Not applied here.",
+    )
+
+
+class StageEvaluationResponse(BaseModel):
+    """One LLM call: scores, findings, and a corrective recommendation.
+
+    Deliberately not `build_iteration_with_full_pipeline`. That path is four
+    calls scoring against `inputs.objective`, which is the wrong question to ask
+    of an Audience stage's segments — the same reason `generate-stage-artifact`
+    opted out of it. FR-11 wants one result carrying a rating, an explanation,
+    the artifact it concerns and a corrective recommendation; asking for all of
+    them in one call is what makes the cost visible and chosen.
+    """
+    evaluation: EvaluationResult
+    recommendation: StageRecommendation | None = Field(
+        default=None,
+        description="Present when a threshold was crossed. FR-12: offered, never applied.",
+    )
