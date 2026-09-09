@@ -51,6 +51,9 @@ import { stageFailure } from '@/lib/errors/recovery';
 import { ApiError } from '@/lib/api/client';
 import type { ErrorCode } from '@/lib/jobs/errors';
 import { StageRail } from '@/components/workflow/stage-rail';
+import { AdminDashboard } from '@/components/admin/admin-dashboard';
+import { LargeJobWarning } from '@/components/workflow/large-job-warning';
+import type { AdminOverview } from '@/lib/admin/types';
 import { ProjectSetup, stageWantsSetup } from '@/components/workflow/project-setup';
 import { StageHeader } from '@/components/workflow/stage-header';
 import { ExitCriteriaChecklist } from '@/components/workflow/exit-criteria-checklist';
@@ -1303,6 +1306,243 @@ function WorkflowSlice({ template }: { template: WorkflowTemplate }) {
   );
 }
 
+
+// ---------------------------------------------------------------------------
+// FR-18 / FR-19 — operations
+// ---------------------------------------------------------------------------
+
+/**
+ * Fabricated, but shaped exactly like what `/api/admin/overview` returns —
+ * including the cases the page has to get right and a happy fixture would hide:
+ * a user whose spend is partly unpriced, a project that has since been deleted,
+ * a dead job next to a retryable one, and a warning that a query failed.
+ */
+const ADMIN_OVERVIEW: AdminOverview = {
+  windowDays: 30,
+  generatedAt: new Date(Date.now() - 4 * 60_000).toISOString(),
+  totals: {
+    calls: 1_284,
+    tokensIn: 3_940_112,
+    tokensOut: 812_455,
+    costUsd: 38.4127,
+    unpricedCalls: 12,
+    activeUsers: 4,
+    failedJobs: 3,
+    errors: 27,
+  },
+  usageByUser: [
+    {
+      userId: 'u-1',
+      email: 'author@example.test',
+      calls: 902,
+      tokensIn: 2_811_004,
+      tokensOut: 604_221,
+      costUsd: 28.9014,
+      unpricedCalls: 0,
+      lastCallAt: new Date(Date.now() - 21 * 60_000).toISOString(),
+    },
+    {
+      userId: 'u-2',
+      email: 'analyst@example.test',
+      calls: 288,
+      tokensIn: 902_441,
+      tokensOut: 171_882,
+      costUsd: 8.7719,
+      // The case the "+N?" marker exists for: a cheap local model with no
+      // published price, so this row's cost understates and says so.
+      unpricedCalls: 12,
+      lastCallAt: new Date(Date.now() - 3 * 3_600_000).toISOString(),
+    },
+    {
+      userId: 'u-3',
+      email: null,
+      calls: 94,
+      tokensIn: 226_667,
+      tokensOut: 36_352,
+      costUsd: 0.7394,
+      unpricedCalls: 0,
+      lastCallAt: new Date(Date.now() - 2 * 86_400_000).toISOString(),
+    },
+  ],
+  failedJobs: [
+    {
+      id: 'j-1',
+      kind: 'draft_section',
+      status: 'dead',
+      projectId: 'p-1',
+      projectTitle: 'Tidal Energy Handbook',
+      userEmail: 'author@example.test',
+      attempts: 3,
+      maxAttempts: 3,
+      errorCode: 'insufficient_credits',
+      errorMessage:
+        'The OpenRouter account has run out of credit. Nothing was lost — 6 of 10 sections are saved.',
+      createdAt: new Date(Date.now() - 5 * 3_600_000).toISOString(),
+    },
+    {
+      id: 'j-2',
+      kind: 'draft_section',
+      status: 'failed',
+      projectId: 'p-2',
+      projectTitle: 'Regulatory Review',
+      userEmail: 'analyst@example.test',
+      attempts: 1,
+      maxAttempts: 3,
+      errorCode: 'provider_unavailable',
+      errorMessage: 'This is on their side, not yours. Trying again shortly usually works.',
+      createdAt: new Date(Date.now() - 40 * 60_000).toISOString(),
+    },
+    {
+      id: 'j-3',
+      kind: 'draft_section',
+      status: 'dead',
+      // The project was deleted after the job died. The row must still render.
+      projectId: null,
+      projectTitle: null,
+      userEmail: null,
+      attempts: 3,
+      maxAttempts: 3,
+      errorCode: 'context_length',
+      errorMessage: "This section's context exceeded the model's limit.",
+      createdAt: new Date(Date.now() - 9 * 86_400_000).toISOString(),
+    },
+  ],
+  recentErrors: [
+    {
+      id: 'e-1',
+      code: 'rate_limited',
+      title: 'Too many requests, too quickly',
+      message:
+        'This account has hit the beta’s request limit. Waiting about 20s and trying again will clear it.',
+      route: '/api/generate-stage-artifact',
+      requestId: 'a91f4c22e0b7d3f1',
+      httpStatus: 429,
+      userEmail: 'author@example.test',
+      projectTitle: 'Tidal Energy Handbook',
+      source: 'client',
+      createdAt: new Date(Date.now() - 12 * 60_000).toISOString(),
+    },
+    {
+      id: 'e-2',
+      code: 'invalid_request',
+      title: 'That request asked for too much',
+      message:
+        'The number of sections is above the maximum of 40. Nothing was generated and nothing was charged.',
+      route: '/api/generate-outline',
+      requestId: 'bb2701aa54cc9e30',
+      httpStatus: 422,
+      userEmail: 'analyst@example.test',
+      projectTitle: 'Regulatory Review',
+      source: 'client',
+      createdAt: new Date(Date.now() - 90 * 60_000).toISOString(),
+    },
+    {
+      id: 'e-3',
+      code: 'function_timeout',
+      title: 'Paused — the run hit its time limit',
+      message: 'Generation stopped partway through and will pick up automatically.',
+      route: '/api/generate-section-prose',
+      requestId: 'job7f21c9a4pros3k',
+      httpStatus: null,
+      userEmail: 'author@example.test',
+      projectTitle: 'Tidal Energy Handbook',
+      source: 'drain',
+      createdAt: new Date(Date.now() - 6 * 3_600_000).toISOString(),
+    },
+  ],
+  errorTally: [
+    { code: 'rate_limited', count: 11 },
+    { code: 'provider_unavailable', count: 7 },
+    { code: 'function_timeout', count: 5 },
+    { code: 'invalid_request', count: 3 },
+    { code: 'insufficient_credits', count: 1 },
+  ],
+  warnings: [],
+};
+
+function AdminSlice() {
+  return <AdminDashboard overview={ADMIN_OVERVIEW} />;
+}
+
+/** The same page when something behind it is broken, and when nothing is wrong. */
+function AdminEdgeSlice() {
+  const [view, setView] = useState<'degraded' | 'quiet'>('degraded');
+
+  const degraded: AdminOverview = {
+    ...ADMIN_OVERVIEW,
+    warnings: [
+      'Errors could not be read: permission denied for table error_events',
+      'User email addresses could not be resolved, so rows are labelled by id.',
+    ],
+    recentErrors: [],
+    errorTally: [],
+  };
+
+  const quiet: AdminOverview = {
+    ...ADMIN_OVERVIEW,
+    totals: {
+      calls: 0,
+      tokensIn: 0,
+      tokensOut: 0,
+      // Nothing spent and nothing known: the page must not print $0.00 as if it
+      // were a measurement.
+      costUsd: null,
+      unpricedCalls: 0,
+      activeUsers: 0,
+      failedJobs: 0,
+      errors: 0,
+    },
+    usageByUser: [],
+    failedJobs: [],
+    recentErrors: [],
+    errorTally: [],
+    warnings: [],
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2">
+        {(['degraded', 'quiet'] as const).map((key) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setView(key)}
+            aria-pressed={view === key}
+            className={`rounded-full px-3 py-1.5 text-label transition-colors ${
+              view === key
+                ? 'bg-[var(--pm-primary)] text-[var(--on-primary)]'
+                : 'bg-[var(--surface-container-high)] text-[var(--on-surface-variant)]'
+            }`}
+          >
+            {key === 'degraded' ? 'A query failed' : 'Nothing has happened yet'}
+          </button>
+        ))}
+      </div>
+      <AdminDashboard overview={view === 'degraded' ? degraded : quiet} />
+    </div>
+  );
+}
+
+function LargeJobSlice() {
+  const [open, setOpen] = useState(true);
+  return open ? (
+    <LargeJobWarning
+      sectionCount={24}
+      model="openai/gpt-4o"
+      onConfirm={() => setOpen(false)}
+      onCancel={() => setOpen(false)}
+    />
+  ) : (
+    <button
+      type="button"
+      onClick={() => setOpen(true)}
+      className="rounded-full bg-[var(--surface-container-high)] px-4 py-2 text-label text-[var(--on-surface)]"
+    >
+      Show the warning again
+    </button>
+  );
+}
+
 export default function PreviewPage() {
   /**
    * This ships.
@@ -1493,6 +1733,27 @@ export default function PreviewPage() {
             note="Two powers in one input box, so the whole design is making it obvious which one you are about to use. Discuss states that it cannot change the document and offers no scope; Instruct shows what it would apply to before it applies it. Both panels are the real component — the model is not reachable from the preview, so sending will report a failure rather than reply."
           >
             <ChatModesSlice />
+          </Section>
+
+          <Section
+            title="Warning before a large run spends"
+            note="FR-18. Drafting a book is the one action that commits real money without asking again — 24 sections is 48 provider calls that keep running after the tab closes. The estimate makes no model call; it is arithmetic over the backend's own caps plus the live provider price, so the dialog appears instantly. Small runs are never interrupted, because a dialog in front of every draft is one people learn to dismiss."
+          >
+            <LargeJobSlice />
+          </Section>
+
+          <Section
+            title="Operations: what broke and what it cost"
+            note="FR-19, for the product owner rather than a developer. No uuids and no schema words — accounts are emails, jobs say &lsquo;Gave up after 3 tries&rsquo; rather than status: dead, and every figure names its period. The &lsquo;+12?&rsquo; beside the second row is 12 calls whose model had no published price: the total understates rather than guessing, because a cost page is believed. This component holds no privilege at all — the refusal for a non-admin happens in the route handler that owns the service-role key."
+          >
+            <AdminSlice />
+          </Section>
+
+          <Section
+            title="The same page when it has nothing, or has lost something"
+            note="Two states worth designing deliberately. When a query fails, the page says so rather than rendering an empty table — an empty list where a read failed reads as &lsquo;nothing is wrong&rsquo;, which is the opposite of the truth. When genuinely nothing has happened, cost shows an em dash and not $0.00, because &lsquo;we do not know&rsquo; and &lsquo;it was free&rsquo; are different facts."
+          >
+            <AdminEdgeSlice />
           </Section>
 
           <Section

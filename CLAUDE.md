@@ -141,7 +141,18 @@ A separate LLM call scores three dimensions plus two optional fields (`Evaluatio
 
 ## Supabase Schema
 
-**Phase 2 (current):** `projects`, `artifacts`, `artifact_versions`, `evaluations`, `workflow_templates`, `workflow_events`, `project_stage_events`, `recommendations`, `decisions`, `project_tasks`, `jobs`.
+**Phase 2 (current):** `projects`, `artifacts`, `artifact_versions`, `evaluations`, `workflow_templates`, `workflow_events`, `project_stage_events`, `recommendations`, `decisions`, `project_tasks`, `jobs`, `model_usage`, `error_events`.
+
+`model_usage` and `error_events` (FR-18/FR-19) are **insert-and-select only** —
+no update or delete policy, because a user who could edit their own usage rows
+could edit their own bill. Neither grants cross-user reads: the admin surface
+does not widen RLS, it goes through `/api/admin/overview`, a route handler that
+checks `ADMIN_USER_IDS` *before* constructing the service-role client. Do not
+add an "admins can read everything" policy — that would put a second, weaker
+copy of the decision in the place where getting it wrong is a breach rather than
+an empty page. `model_usage.cost_usd` is **nullable and null means "price
+unknown", never "free"**; every surface must render that as unavailable rather
+than `$0.00`. `usage_tracking` is superseded by `model_usage`, not extended.
 
 Four rules the schema enforces, so they cannot be undone by a later code change:
 - **`project_stage_events.actor` is `user | system` — there is no `'model'`.** A model reaches stage state only via `proposal_id` pointing at an accepted recommendation. Auditable from the DDL alone, which matters because this is contract evidence.
@@ -157,6 +168,13 @@ Migrations are the source of truth: always checked in, always idempotent, `drop 
 
 Frontend `.env.local`: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_API_URL` (defaults to `http://localhost:8000`).
 Backend `.env`: `OPENROUTER_API_KEY`, `ALLOWED_ORIGINS` (comma-separated; no hardcoded default — CORS fails closed if unset).
+
+**FR-18/FR-19 operations vars.** Frontend: `ADMIN_USER_IDS` — comma-separated
+Supabase user ids allowed to read `/api/admin/overview`. Deliberately *not*
+`NEXT_PUBLIC_`, and **unset denies everyone**; a missing var must never mean "no
+restriction". Backend: `RATE_LIMIT_PER_MINUTE` (60), `RATE_LIMIT_PER_HOUR`
+(600), `RATE_LIMIT_ENABLED` (kill switch), `LOG_FORMAT=json` (auto on Vercel),
+`LOG_LEVEL`. All read per call, so they are tunable without a redeploy.
 
 ## Branches
 
