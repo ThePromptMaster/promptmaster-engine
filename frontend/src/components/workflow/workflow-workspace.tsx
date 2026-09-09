@@ -10,6 +10,7 @@ import { StageRenderer } from './renderers/stage-renderer';
 import { useStageGeneration } from './use-stage-generation';
 import { useStageEvaluation } from './use-stage-evaluation';
 import { StageEvaluationPanel } from './evaluation-panel';
+import { ExportMenu } from './export-menu';
 import {
   availableTransitions,
   evaluateStage,
@@ -499,6 +500,22 @@ export function WorkflowWorkspace({
               Viewing an earlier stage — back to {getStage(template, state.current_stage_id)?.short_label}
             </button>
           )}
+
+          {/* FR-20. Above the stage header rather than inside it: exporting is
+              a property of the project, not of whichever stage happens to be
+              open, and burying it in a stage would make it look like one. */}
+          <div className="mb-3 flex justify-end">
+            <ExportMenu
+              bundle={{
+                project,
+                template,
+                state,
+                events: events ?? [],
+                stages: bundles ?? {},
+                evaluations: evaluations ?? {},
+              }}
+            />
+          </div>
 
           <StageHeader
             stage={stage}

@@ -72,6 +72,17 @@ export interface ProjectSummary {
   created_at: string;
 }
 
+/**
+ * A soft-deleted project, as the trash view needs it.
+ *
+ * `deleted_at` is not optional here: the whole point of the view is showing how
+ * much of the retention window is left, and a summary that could omit it would
+ * let a caller render "Deleted" with no clock beside it.
+ */
+export interface DeletedProjectSummary extends ProjectSummary {
+  deleted_at: string;
+}
+
 export interface Artifact {
   id: string;
   user_id: string;

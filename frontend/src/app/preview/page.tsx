@@ -29,6 +29,13 @@ import {
 import type { OutlineDocument, SectionDraftBinding } from '@/types/outline';
 import type { Artifact, ArtifactVersion, Evaluation, Project } from '@/types/project';
 import type { AuditFinding, LongFormState, StageRecommendation } from '@/types';
+import { RecoveryPanel } from '@/components/workflow/recovery-panel';
+import { ExportMenu } from '@/components/workflow/export-menu';
+import { FeedbackForm } from '@/components/shared/feedback-form';
+import { BETA_NOTICE_STORAGE_KEY } from '@/components/shared/beta-notice';
+import { stageFailure } from '@/lib/errors/recovery';
+import { ApiError } from '@/lib/api/client';
+import type { ErrorCode } from '@/lib/jobs/errors';
 import { StageRail } from '@/components/workflow/stage-rail';
 import { ProjectSetup, stageWantsSetup } from '@/components/workflow/project-setup';
 import { StageHeader } from '@/components/workflow/stage-header';
@@ -543,6 +550,105 @@ function StageEvaluationSlice() {
           recommendation={evaluated && !dismissed ? EVAL_RECOMMENDATION : null}
           onDismissRecommendation={() => setDismissed(true)}
         />
+      </div>
+    </div>
+  );
+}
+
+// --- FR-16, FR-20, FR-22 slices ---------------------------------------------
+
+const FAILURE_CODES: ErrorCode[] = [
+  'insufficient_credits',
+  'rate_limited',
+  'context_length',
+  'output_truncated',
+  'function_timeout',
+  'job_dead',
+  'provider_unavailable',
+  'invalid_request',
+  'unknown',
+];
+
+/**
+ * Every failure a user can hit, with the recovery each one actually offers.
+ *
+ * Rendered from the same `stageFailure` the workspace calls, so what is on
+ * screen here is what ships — including the preservation sentence, which is
+ * generated rather than written into the fixture.
+ */
+function RecoverySlice() {
+  return (
+    <div className="space-y-3">
+      {FAILURE_CODES.map((code) => (
+        <RecoveryPanel
+          key={code}
+          failure={stageFailure(
+            new ApiError('classified upstream', 502, {
+              code,
+              technical: 'LLM error: OpenRouter API error: HTTP 402 insufficient_credits',
+              retryAfter: code === 'rate_limited' ? 30 : null,
+            }),
+            { savedVersions: 6, label: 'positioning statement' }
+          )}
+          onRetry={() => {}}
+          onDismiss={() => {}}
+          onSwitchModel={() => {}}
+          currentModel="anthropic/claude-sonnet"
+        />
+      ))}
+    </div>
+  );
+}
+
+function ExportSlice() {
+  const project = {
+    ...DRAFTING_PROJECT,
+    title: 'Governing AI-assisted work',
+    workflow: 'book',
+    stage: 'research',
+  } as Project;
+  return (
+    <div className="flex justify-end rounded-2xl bg-[var(--surface-container-low)] px-6 py-5">
+      <ExportMenu
+        bundle={{
+          project,
+          template: BOOK_V1,
+          state: projectState(BOOK_V1, EVENTS, project.stage),
+          events: EVENTS,
+          stages: {
+            objective: { artifact: null, versions: [fixtureVersion(PROSE_FIXTURE, 1)] },
+            audience: { artifact: null, versions: [fixtureVersion(AUDIENCE_FIXTURE, 1)] },
+          },
+          evaluations: {},
+        }}
+      />
+    </div>
+  );
+}
+
+/**
+ * The notice itself is mounted globally by the layout, so it is already on this
+ * page. What the preview adds is a way back to it after dismissal, and the
+ * feedback form on its own, at full size, where its four fields can be read.
+ */
+function BetaSlice() {
+  return (
+    <div className="space-y-4">
+      <button
+        onClick={() => {
+          try {
+            localStorage.removeItem(BETA_NOTICE_STORAGE_KEY);
+          } catch {
+            // Private window. The notice is showing anyway.
+          }
+          location.reload();
+        }}
+        className="rounded-xl bg-[var(--surface-container-high)] px-5 py-2.5 text-title text-[var(--on-surface)]"
+      >
+        Reset the beta notice and reload
+      </button>
+      <div className="rounded-2xl bg-[var(--surface-container-low)] px-6 py-5">
+        <FeedbackForm />
       </div>
     </div>
   );
@@ -1068,6 +1174,27 @@ export default function PreviewPage() {
             note="The old five-phase session expressed as workflow data rather than a hard-coded path."
           >
             <WorkflowSlice template={SINGLE_OUTPUT_V1} />
+          </Section>
+
+          <Section
+            title="When generation fails"
+            note="FR-16. Nine classified failures, each with the actions that apply to it and none of the ones that do not — no retry where retrying is guaranteed to fail again, resume rather than retry where the work was interrupted. Every message says what survived, because the first question a failure raises is whether the work is gone. The raw provider error is behind Technical details, never the message."
+          >
+            <RecoverySlice />
+          </Section>
+
+          <Section
+            title="Getting the work out"
+            note="FR-20. Markdown is the artifact — every stage the project reached, in order, with a skipped stage recorded rather than dropped. The full record is project, stage history, every version and every evaluation: FR-01's durability claim made inspectable."
+          >
+            <ExportSlice />
+          </Section>
+
+          <Section
+            title="The beta notice and feedback"
+            note="FR-22. The notice is already on this page — it is mounted app-wide — and collapses to a chip rather than disappearing, because a warning a user can permanently delete is a warning that was never given. The form asks the four things the validation framework asks."
+          >
+            <BetaSlice />
           </Section>
 
           <Section
