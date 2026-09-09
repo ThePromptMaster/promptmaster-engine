@@ -59,9 +59,9 @@ export default function CompactPage() {
   return (
     <div className="min-h-screen bg-[var(--surface)]">
       {/* Header */}
-      <header className="border-b border-[var(--outline-variant)]/20 bg-white">
+      <header className="bg-[var(--surface-container-lowest)]">
         <div className="max-w-3xl mx-auto px-6 py-6 flex items-center">
-          <Link href="/projects" className="flex items-center gap-2 text-sm text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] transition-colors">
+          <Link href="/projects" className="flex items-center gap-2 text-body text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] transition-colors">
             <span className="material-symbols-outlined text-[18px]">arrow_back</span>
             Back to session
           </Link>
@@ -70,20 +70,20 @@ export default function CompactPage() {
 
       {/* Hero */}
       <section className="max-w-3xl mx-auto px-6 pt-16 pb-12 text-center space-y-4">
-        <p className="text-xs uppercase tracking-[0.25em] font-bold text-[var(--pm-primary)]">
+        <p className="text-label uppercase tracking-[0.25em] font-bold text-[var(--pm-primary)]">
           Principles of Structured, Ethical AI Mastery
         </p>
         <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-[var(--on-surface)] leading-tight">
           The PromptMaster&apos;s Compact
         </h1>
-        <p className="text-sm md:text-base text-[var(--on-surface-variant)] max-w-xl mx-auto italic leading-relaxed pt-4">
+        <p className="text-body md:text-[1rem] text-[var(--on-surface-variant)] max-w-xl mx-auto italic leading-relaxed pt-4">
           &ldquo;This is the return to signal. This is the end of drift. This is the beginning of the real work.&rdquo;
         </p>
       </section>
 
       {/* Intro */}
       <section className="max-w-3xl mx-auto px-6 pb-12">
-        <div className="bg-white rounded-xl shadow-ambient p-8 space-y-4 text-sm leading-relaxed text-[var(--on-surface-variant)]">
+        <div className="bg-[var(--surface-container-lowest)] rounded-xl shadow-ambient p-8 space-y-4 text-body leading-relaxed text-[var(--on-surface-variant)]">
           <p>
             These ten principles encapsulate what it means to practice prompt mastery at
             the highest level. Think of them as a code of conduct and mindset in one — a
@@ -101,16 +101,16 @@ export default function CompactPage() {
       {/* Principles */}
       <section className="max-w-3xl mx-auto px-6 pb-16 space-y-6">
         {PRINCIPLES.map((p) => (
-          <article key={p.number} className="bg-white rounded-xl shadow-ambient p-8 space-y-4">
+          <article key={p.number} className="bg-[var(--surface-container-lowest)] rounded-xl shadow-ambient p-8 space-y-4">
             <div className="flex items-start gap-4">
-              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-[var(--pm-primary)] text-white flex items-center justify-center font-bold text-sm">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-[var(--pm-primary)] text-[var(--on-primary)] flex items-center justify-center font-bold text-body">
                 {p.number}
               </div>
               <h2 className="text-lg md:text-xl font-bold text-[var(--on-surface)] leading-tight pt-1">
                 {p.title}
               </h2>
             </div>
-            <p className="text-sm leading-relaxed text-[var(--on-surface-variant)] pl-14">
+            <p className="text-body leading-relaxed text-[var(--on-surface-variant)] pl-14">
               {p.body}
             </p>
           </article>
@@ -119,7 +119,7 @@ export default function CompactPage() {
 
       {/* Footer */}
       <footer className="max-w-3xl mx-auto px-6 pb-20 text-center space-y-6">
-        <p className="text-sm italic text-[var(--on-surface-variant)] leading-relaxed">
+        <p className="text-body italic text-[var(--on-surface-variant)] leading-relaxed">
           Prompt with purpose. Design with clarity. Lead with ethics.
           <br />
           And never stop learning.
@@ -127,7 +127,7 @@ export default function CompactPage() {
         <div>
           <Link
             href="/projects"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-[var(--pm-primary)] text-white text-sm font-semibold rounded-xl hover:opacity-90 transition-all"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-[var(--pm-primary)] text-[var(--on-primary)] text-title font-semibold rounded-xl hover:opacity-90 transition-all"
           >
             <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
             Return to session

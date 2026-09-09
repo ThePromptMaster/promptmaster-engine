@@ -50,8 +50,8 @@ export function TasksPanel({ tasks, onResolve, busy = false, readOnly = false }:
       className="rounded-xl bg-[var(--surface-container-low)] px-5 py-4"
     >
       <header className="mb-3 flex items-baseline justify-between gap-3">
-        <h3 className="text-sm font-medium text-[var(--on-surface)]">Carried forward</h3>
-        <span className="text-xs text-[var(--on-surface-variant)]">
+        <h3 className="text-title text-[var(--on-surface)]">Carried forward</h3>
+        <span className="text-label text-[var(--on-surface-variant)]">
           {open.length} open {open.length === 1 ? 'task' : 'tasks'}
         </span>
       </header>

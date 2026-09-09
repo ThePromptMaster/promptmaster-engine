@@ -54,20 +54,20 @@ export default function AuthCallbackPage() {
             <h2 className="text-lg font-semibold text-[var(--on-surface)]">
               Authentication Error
             </h2>
-            <p className="text-sm text-[var(--on-surface-variant)] leading-relaxed">
+            <p className="text-body text-[var(--on-surface-variant)] leading-relaxed">
               {error}
             </p>
           </div>
           <div className="flex flex-col gap-3">
             <Link
               href="/auth/login"
-              className="w-full py-3 px-4 bg-[var(--pm-primary)] text-white font-semibold rounded-lg hover:bg-[var(--pm-primary-container)] active:scale-[0.98] transition-all duration-200 text-center text-sm"
+              className="w-full py-3 px-4 bg-[var(--pm-primary)] text-[var(--on-primary)] font-semibold rounded-lg hover:bg-[var(--pm-primary-container)] active:scale-[0.98] transition-all duration-200 text-center text-title"
             >
               Back to Sign In
             </Link>
             <button
               onClick={() => router.back()}
-              className="text-sm text-[var(--on-surface-variant)] hover:text-[var(--pm-primary)] transition-colors"
+              className="text-body text-[var(--on-surface-variant)] hover:text-[var(--pm-primary)] transition-colors"
             >
               Go Back
             </button>
@@ -83,7 +83,7 @@ export default function AuthCallbackPage() {
         <span className="material-symbols-outlined text-[var(--pm-primary)] text-[32px] animate-spin">
           progress_activity
         </span>
-        <p className="text-sm text-[var(--on-surface-variant)]">Completing sign in...</p>
+        <p className="text-body text-[var(--on-surface-variant)]">Completing sign in...</p>
       </div>
     </div>
   );

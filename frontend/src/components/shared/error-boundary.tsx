@@ -14,7 +14,7 @@ interface State {
 /**
  * The fallback shown when a stage renderer throws.
  *
- * It used to import the shadcn Button and lean on `text-muted-foreground`,
+ * It used to import the shadcn Button and lean on the shadcn muted-foreground token,
  * which meant the one surface guaranteed to appear at the worst possible
  * moment — this wraps every renderer in the workspace — was the one surface
  * rendered in a foreign design system. It is on the tokens now, and separates

@@ -134,8 +134,8 @@ export function RecommendationsPanel({
       className="rounded-xl bg-[var(--surface-container-low)] px-5 py-4"
     >
       <header className="mb-3 flex items-baseline justify-between gap-3">
-        <h3 className="text-sm font-medium text-[var(--on-surface)]">What to do next</h3>
-        <span className="text-xs text-[var(--on-surface-variant)]">
+        <h3 className="text-title text-[var(--on-surface)]">What to do next</h3>
+        <span className="text-label text-[var(--on-surface-variant)]">
           {rows.length} for {stageLabel}
         </span>
       </header>
@@ -239,7 +239,7 @@ function RecommendationRow({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-2">
             <span
-              className={`text-[10px] uppercase tracking-wide ${SEVERITY_CLASS[rec.severity]}`}
+              className={`text-label uppercase tracking-wide ${SEVERITY_CLASS[rec.severity]}`}
             >
               {SEVERITY_LABEL[rec.severity]}
             </span>

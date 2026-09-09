@@ -226,7 +226,7 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
                   type="button"
                   onClick={startDrafting}
                   disabled={busy || complete === outline.length}
-                  className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label font-semibold text-white disabled:opacity-50"
+                  className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label font-semibold text-[var(--on-primary)] disabled:opacity-50"
                 >
                   {complete === 0 ? 'Start drafting' : 'Resume drafting'}
                 </button>
