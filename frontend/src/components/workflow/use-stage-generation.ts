@@ -22,7 +22,13 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { api, ApiError } from '@/lib/api/client';
+import { api } from '@/lib/api/client';
+import {
+  localFailure,
+  stageFailure,
+  type PreservedContext,
+  type StageFailure,
+} from '@/lib/errors/recovery';
 import { buildStageDigest, type StageArtifactBundle } from '@/lib/workflow/digest';
 import {
   itemSchemaFor,
@@ -74,7 +80,7 @@ export function useStageGeneration({
   appendStageVersion,
 }: Options) {
   const [generating, setGenerating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [failure, setFailure] = useState<StageFailure | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
   const attempted = useRef<Set<string>>(new Set());
@@ -106,7 +112,14 @@ export function useStageGeneration({
       abortRef.current = controller;
       attempted.current.add(target.id);
       setGenerating(true);
-      setError(null);
+      setFailure(null);
+
+      // FR-16: what the user can be told is still there. The version count is
+      // the strongest claim available — they can go and click the pills.
+      const preserved: PreservedContext = {
+        savedVersions: bundle?.versions.length ?? 0,
+        label: target.label.toLowerCase(),
+      };
 
       const schema = itemSchemaFor(target);
       const wantsItems = rendererHoldsItems(target.renderer);
@@ -148,7 +161,15 @@ export function useStageGeneration({
           : response.content;
 
         if (!content.trim() || (wantsItems && response.items.length === 0)) {
-          setError('The draft came back empty. Try again, or write it yourself.');
+          // Not a provider failure, so it must not be dressed as one — but it
+          // owes the same reassurance, because it raises the same question.
+          setFailure(
+            localFailure(
+              'The draft came back empty',
+              'The model returned nothing usable. Trying again often works, and you can always write it yourself.',
+              preserved
+            )
+          );
           return;
         }
 
@@ -163,11 +184,10 @@ export function useStageGeneration({
         });
       } catch (err) {
         if (controller.signal.aborted || (err as Error)?.name === 'AbortError') return;
-        setError(
-          err instanceof ApiError
-            ? err.message
-            : 'Could not draft this stage. Try again in a moment.'
-        );
+        // Everything goes through stageFailure, including a fetch that never
+        // reached the server: it is the only path that guarantees the message
+        // says what survived.
+        setFailure(stageFailure(err, preserved));
       } finally {
         if (abortRef.current === controller) abortRef.current = null;
         if (!controller.signal.aborted) setGenerating(false);
@@ -203,5 +223,13 @@ export function useStageGeneration({
     [stage, generate]
   );
 
-  return { generating, error, generate: regenerate, cancel };
+  return {
+    generating,
+    failure,
+    /** The plain string, for surfaces that have not adopted the panel. */
+    error: failure?.message ?? null,
+    dismissFailure: useCallback(() => setFailure(null), []),
+    generate: regenerate,
+    cancel,
+  };
 }

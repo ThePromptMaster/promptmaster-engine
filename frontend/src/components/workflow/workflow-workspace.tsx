@@ -565,6 +565,14 @@ export function WorkflowWorkspace({
                 onEvaluate={stageEvaluation.evaluate}
                 evaluating={stageEvaluation.evaluating}
                 evaluationError={stageEvaluation.error}
+                generationFailure={generation.failure}
+                evaluationFailure={stageEvaluation.failure}
+                onDismissFailure={() => {
+                  generation.dismissFailure();
+                  stageEvaluation.dismissFailure();
+                }}
+                onSwitchModel={(model) => onPatchProject({ model })}
+                currentModel={project.model}
                 readOnly={!isCurrent}
                 evaluation={
                   evaluations?.[

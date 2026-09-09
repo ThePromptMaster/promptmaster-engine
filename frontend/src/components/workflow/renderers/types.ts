@@ -1,3 +1,4 @@
+import type { StageFailure } from '@/lib/errors/recovery';
 import type { StageDefinition } from '@/lib/workflow/types';
 import type { StageItem, StageItemSchema } from '@/lib/workflow/stage-artifact';
 import type { Evaluation, ArtifactVersion, Project } from '@/types/project';
@@ -73,6 +74,30 @@ export interface StageRendererProps {
   onEvaluate?: () => void;
   evaluating?: boolean;
   evaluationError?: string | null;
+
+  /**
+   * FR-16: the failure, classified, with the recovery actions that apply to it.
+   *
+   * Additive rather than a replacement for `generationError`. The string is the
+   * floor — a renderer with no classification still shows something — and the
+   * classified failure is what carries the code, the action set, and the
+   * sentence saying what survived.
+   */
+  generationFailure?: StageFailure | null;
+  evaluationFailure?: StageFailure | null;
+  /** Clear a failure without retrying: FR-16's "pause". */
+  onDismissFailure?: () => void;
+  /** FR-16's "switch configured model". Absent on surfaces with no store. */
+  onSwitchModel?: (model: string) => void;
+  /**
+   * The project's configured model id, so the switcher can show what is set.
+   *
+   * The id alone rather than the project row: a renderer that could reach the
+   * project could reach its workflow, and "no renderer branches on which
+   * workflow it is" is a property worth keeping unreachable rather than merely
+   * unexercised.
+   */
+  currentModel?: string;
 
   /**
    * Browsing an earlier stage. Everything stays readable; nothing is editable,
