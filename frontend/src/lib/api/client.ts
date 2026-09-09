@@ -33,12 +33,71 @@ import { createClient } from '@/lib/supabase/client';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-/** An API failure that carries the HTTP status, so callers can branch on 401. */
+/**
+ * An API failure that carries the HTTP status, so callers can branch on 401 —
+ * and, since FR-16, the backend's classification of what actually went wrong.
+ *
+ * `message` is the plain-language recovery sentence when the server classified
+ * the failure, and the raw detail string when it did not. `technical` is the
+ * unvarnished cause, which is what the "view technical details" disclosure
+ * shows; it is deliberately never the thing rendered by default.
+ */
 export class ApiError extends Error {
-  constructor(message: string, readonly status: number) {
+  readonly code?: string;
+  readonly title?: string;
+  readonly retryable?: boolean;
+  readonly retryAfter?: number | null;
+  readonly technical?: string;
+  readonly providerStatus?: number | null;
+
+  constructor(
+    message: string,
+    readonly status: number,
+    classified?: {
+      code?: string;
+      title?: string;
+      retryable?: boolean;
+      retryAfter?: number | null;
+      technical?: string;
+      providerStatus?: number | null;
+    }
+  ) {
     super(message);
     this.name = 'ApiError';
+    Object.assign(this, classified ?? {});
   }
+}
+
+/**
+ * FastAPI serialises `detail` verbatim, so it arrives as either the legacy
+ * string or the FR-16 object. Reading both keeps a client deployed ahead of
+ * the backend — or behind it — working rather than showing "API error: 502".
+ */
+function toApiError(body: unknown, status: number): ApiError {
+  const detail = (body as { detail?: unknown } | null)?.detail;
+
+  if (detail && typeof detail === 'object') {
+    const d = detail as Record<string, unknown>;
+    const message =
+      typeof d.message === 'string' && d.message
+        ? d.message
+        : typeof d.detail === 'string'
+          ? d.detail
+          : `API error: ${status}`;
+    return new ApiError(message, status, {
+      code: typeof d.code === 'string' ? d.code : undefined,
+      title: typeof d.title === 'string' ? d.title : undefined,
+      retryable: typeof d.retryable === 'boolean' ? d.retryable : undefined,
+      retryAfter: typeof d.retry_after === 'number' ? d.retry_after : null,
+      technical: typeof d.detail === 'string' ? d.detail : undefined,
+      providerStatus: typeof d.provider_status === 'number' ? d.provider_status : null,
+    });
+  }
+
+  return new ApiError(
+    typeof detail === 'string' ? detail : `API error: ${status}`,
+    status
+  );
 }
 
 /**
@@ -104,9 +163,7 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ detail: res.statusText }));
-    const detail =
-      typeof body?.detail === 'string' ? body.detail : `API error: ${res.status}`;
-    throw new ApiError(detail, res.status);
+    throw toApiError(body, res.status);
   }
   return res.json();
 }

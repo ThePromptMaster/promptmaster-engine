@@ -22,7 +22,13 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { api, ApiError } from '@/lib/api/client';
+import { api } from '@/lib/api/client';
+import {
+  localFailure,
+  stageFailure,
+  type PreservedContext,
+  type StageFailure,
+} from '@/lib/errors/recovery';
 import { buildStageDigest, type StageArtifactBundle } from '@/lib/workflow/digest';
 import type { StageDefinition, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
 import type { NewEvaluation } from '@/lib/supabase/versions';
@@ -71,7 +77,7 @@ export function useStageEvaluation({
   recordStageEvaluation,
 }: Options) {
   const [evaluating, setEvaluating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [failure, setFailure] = useState<StageFailure | null>(null);
   /**
    * The recommendation lives here rather than in the database.
    *
@@ -100,7 +106,7 @@ export function useStageEvaluation({
   const stageId = stage?.id ?? null;
   useEffect(() => {
     setRecommendation(null);
-    setError(null);
+    setFailure(null);
   }, [stageId]);
 
   const evaluate = useCallback(async () => {
@@ -115,9 +121,21 @@ export function useStageEvaluation({
 
     if (!stage || !record) return;
 
+    const preserved: PreservedContext = {
+      savedVersions: b[stage.id]?.versions.length ?? 0,
+      label: stage.label.toLowerCase(),
+    };
+
     const version = b[stage.id]?.versions.at(-1);
     if (!version?.content.trim()) {
-      setError('There is nothing here to evaluate yet.');
+      setFailure(
+        localFailure(
+          'Nothing to evaluate yet',
+          'This stage has no content, so there is nothing to score.',
+          preserved,
+          ['details']
+        )
+      );
       return;
     }
 
@@ -125,7 +143,7 @@ export function useStageEvaluation({
     const controller = new AbortController();
     abortRef.current = controller;
     setEvaluating(true);
-    setError(null);
+    setFailure(null);
 
     try {
       const response = await api.evaluateStageArtifact(
@@ -177,11 +195,7 @@ export function useStageEvaluation({
       setRecommendation(response.recommendation);
     } catch (err) {
       if (controller.signal.aborted || (err as Error)?.name === 'AbortError') return;
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : 'Could not evaluate this stage. Try again in a moment.'
-      );
+      setFailure(stageFailure(err, preserved));
     } finally {
       if (abortRef.current === controller) abortRef.current = null;
       if (!controller.signal.aborted) setEvaluating(false);
@@ -190,7 +204,10 @@ export function useStageEvaluation({
 
   return {
     evaluating,
-    error,
+    failure,
+    /** The plain string, for surfaces that have not adopted the panel. */
+    error: failure?.message ?? null,
+    dismissFailure: useCallback(() => setFailure(null), []),
     recommendation,
     dismissRecommendation: useCallback(() => setRecommendation(null), []),
     evaluate: enabled && recordStageEvaluation ? evaluate : undefined,

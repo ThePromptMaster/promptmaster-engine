@@ -15,7 +15,9 @@ from promptmaster.conversation import (
     build_save_as_new_version_prompt,
 )
 from promptmaster.engine import generate
+from promptmaster.errors import PRESERVED_NOTHING_WRITTEN
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError
+from routers._errors import llm_http_error
 from promptmaster.schemas import ChatMessage, Iteration, PMInput
 from promptmaster.session_context import _label_trigger
 from routers._pipeline import build_iteration_with_full_pipeline
@@ -99,7 +101,7 @@ async def api_chat_message(
         )
         return ChatMessageResponse(assistant_message=msg)
     except OpenRouterError as e:
-        raise HTTPException(status_code=502, detail=f"LLM error: {e}")
+        raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
 
 
 @router.post("/apply-to-answer")
@@ -139,7 +141,7 @@ async def api_apply_to_answer(
         )
         return IterationFromConversationResponse(iteration=iteration, suggestions=suggestions)
     except OpenRouterError as e:
-        raise HTTPException(status_code=502, detail=f"LLM error: {e}")
+        raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
 
 
 @router.post("/save-as-new-version")
@@ -179,4 +181,4 @@ async def api_save_as_new_version(
         )
         return IterationFromConversationResponse(iteration=iteration, suggestions=suggestions)
     except OpenRouterError as e:
-        raise HTTPException(status_code=502, detail=f"LLM error: {e}")
+        raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)

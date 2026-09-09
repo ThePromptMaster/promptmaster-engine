@@ -6,7 +6,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from deps import get_client
+from promptmaster.errors import PRESERVED_NOTHING_WRITTEN
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError
+from routers._errors import llm_http_error
 from promptmaster.schemas import SetupSuggestion
 from promptmaster.setup_suggester import suggest_setup
 
@@ -36,4 +38,4 @@ async def api_generate_setup(
         )
         return GenerateSetupResponse(suggestion=suggestion)
     except OpenRouterError as e:
-        raise HTTPException(status_code=502, detail=f"LLM error: {e}")
+        raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)

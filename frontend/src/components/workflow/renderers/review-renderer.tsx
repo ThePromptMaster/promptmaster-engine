@@ -49,6 +49,11 @@ export function ReviewRenderer({
   onSaveItems,
   generating,
   generationError,
+  generationFailure,
+  evaluationFailure,
+  onDismissFailure,
+  onSwitchModel,
+  currentModel,
   onGenerate,
   onCancelGeneration,
   onEvaluate,
@@ -121,6 +126,11 @@ export function ReviewRenderer({
         onEvaluate={onEvaluate}
         evaluating={evaluating}
         evaluationError={evaluationError}
+        failure={generationFailure}
+        evaluationFailure={evaluationFailure}
+        onDismissFailure={onDismissFailure}
+        onSwitchModel={onSwitchModel}
+        currentModel={currentModel}
         readOnly={readOnly}
       />
 
