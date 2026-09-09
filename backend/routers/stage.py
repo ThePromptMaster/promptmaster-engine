@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from deps import get_client
+from promptmaster.errors import PRESERVED_EVALUATION, PRESERVED_STAGE_VERSIONS
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError
 from promptmaster.schemas import (
     GenerateStageArtifactResponse,
@@ -25,6 +26,7 @@ from promptmaster.schemas import (
     StageItemSchema,
 )
 from promptmaster.stage import generate_stage_artifact
+from routers._errors import llm_http_error
 from promptmaster.stage_evaluation import evaluate_stage_artifact
 
 router = APIRouter(prefix="/api", tags=["stage"])
@@ -64,7 +66,7 @@ async def api_generate_stage_artifact(
             existing_content=req.existing_content,
         )
     except OpenRouterError as e:
-        raise HTTPException(status_code=502, detail=f"LLM error: {e}")
+        raise llm_http_error(e, PRESERVED_STAGE_VERSIONS)
 
 
 class EvaluateStageArtifactRequest(BaseModel):
@@ -107,4 +109,4 @@ async def api_evaluate_stage_artifact(
             model=req.model or None,
         )
     except OpenRouterError as e:
-        raise HTTPException(status_code=502, detail=f"LLM error: {e}")
+        raise llm_http_error(e, PRESERVED_EVALUATION)

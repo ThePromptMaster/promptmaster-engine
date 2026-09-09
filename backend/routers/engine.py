@@ -23,7 +23,9 @@ from promptmaster.flow_triggers import (
     FlowTriggerType,
     FlowInspectType,
 )
+from promptmaster.errors import PRESERVED_NOTHING_WRITTEN
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError
+from routers._errors import llm_http_error
 from routers._pipeline import build_iteration_with_full_pipeline
 from deps import get_client
 
@@ -154,7 +156,7 @@ async def api_run_iteration(
 
         return RunIterationResponse(iteration=iteration, suggestions=suggestions)
     except OpenRouterError as e:
-        raise HTTPException(status_code=502, detail=f"LLM error: {e}")
+        raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
 
 
 @router.post("/flow-trigger")
@@ -223,7 +225,7 @@ async def api_flow_trigger(
 
         return RunIterationResponse(iteration=iteration, suggestions=suggestions)
     except OpenRouterError as e:
-        raise HTTPException(status_code=502, detail=f"LLM error: {e}")
+        raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
 
 
 @router.post("/flow-inspect")
@@ -276,7 +278,7 @@ async def api_flow_inspect(
             return FlowInspectResponse(kind="ask_questions", questions=questions)
         raise HTTPException(status_code=400, detail=f"Unknown inspection type: {req.inspection}")
     except OpenRouterError as e:
-        raise HTTPException(status_code=502, detail=f"LLM error: {e}")
+        raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
 
 
 @router.post("/build-realignment")
@@ -295,7 +297,7 @@ async def api_build_realignment(
         )
         return RealignmentResponse(realignment_prompt=prompt)
     except OpenRouterError as e:
-        raise HTTPException(status_code=502, detail=f"LLM error: {e}")
+        raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
 
 
 @router.post("/run-self-audit")
@@ -313,7 +315,7 @@ async def api_run_self_audit(
         )
         return {"audit": audit}
     except OpenRouterError as e:
-        raise HTTPException(status_code=502, detail=f"LLM error: {e}")
+        raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
 
 
 @router.post("/hard-reset-lessons")
@@ -331,7 +333,7 @@ async def api_hard_reset_lessons(
         )
         return {"lessons": lessons}
     except OpenRouterError as e:
-        raise HTTPException(status_code=502, detail=f"LLM error: {e}")
+        raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
 
 
 @router.post("/format-summary")

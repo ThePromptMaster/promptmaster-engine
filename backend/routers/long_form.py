@@ -24,6 +24,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from deps import get_client
+from promptmaster.errors import PRESERVED_NOTHING_WRITTEN, preserved_sections
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError
 from promptmaster.long_form import (
     detect_long_form,
@@ -45,6 +46,7 @@ from promptmaster.schemas import (
     SectionRecord,
 )
 from promptmaster.session_context import _label_trigger
+from routers._errors import llm_http_error
 from routers._pipeline import build_iteration_with_full_pipeline
 
 # Reuse the existing IterationFromConversationResponse shape
@@ -141,7 +143,7 @@ async def api_detect_long_form(
     try:
         return await detect_long_form(client=client, model=req.model or None, inputs=req.inputs)
     except OpenRouterError as e:
-        raise HTTPException(status_code=502, detail=f"LLM error: {e}")
+        raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
 
 
 @router.post("/generate-outline", response_model=GenerateOutlineResponse)
@@ -158,7 +160,7 @@ async def api_generate_outline(
         )
         return GenerateOutlineResponse(outline=outline)
     except (OpenRouterError, ValueError) as e:
-        raise HTTPException(status_code=502, detail=f"LLM error: {e}")
+        raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
 
 
 @router.post("/generate-section", response_model=GenerateSectionResponse)
@@ -184,7 +186,11 @@ async def api_generate_section(
             prev_section_content=req.prev_section_content,
         )
     except OpenRouterError as e:
-        raise HTTPException(status_code=502, detail=f"LLM error: {e}")
+        # The canonical FR-16 case: a book six sections in. `section_index` is
+        # how many are already written, so the message can name them.
+        raise llm_http_error(
+            e, preserved_sections(req.section_index, len(req.outline)) or PRESERVED_NOTHING_WRITTEN
+        )
 
 
 @router.post("/finalize-long-form", response_model=IterationFromConversationResponse)
@@ -235,7 +241,7 @@ async def api_finalize_long_form(
         )
         return IterationFromConversationResponse(iteration=iteration, suggestions=suggestions)
     except OpenRouterError as e:
-        raise HTTPException(status_code=502, detail=f"LLM error: {e}")
+        raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
 
 
 @router.post("/generate-section-prose", response_model=GenerateSectionProseResponse)
@@ -262,7 +268,9 @@ async def api_generate_section_prose(
             records=req.records or None,
         )
     except OpenRouterError as e:
-        raise HTTPException(status_code=502, detail=f"LLM error: {e}")
+        raise llm_http_error(
+            e, preserved_sections(req.section_index, len(req.outline)) or PRESERVED_NOTHING_WRITTEN
+        )
 
 
 @router.post("/extract-section-record", response_model=ExtractSectionRecordResponse)
@@ -285,4 +293,4 @@ async def api_extract_section_record(
         )
         return ExtractSectionRecordResponse(record=record)
     except OpenRouterError as e:
-        raise HTTPException(status_code=502, detail=f"LLM error: {e}")
+        raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)

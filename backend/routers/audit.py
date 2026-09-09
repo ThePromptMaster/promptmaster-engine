@@ -10,7 +10,9 @@ from promptmaster.audit_findings import (
     build_apply_audit_prompt,
     generate_audit_findings,
 )
+from promptmaster.errors import PRESERVED_NOTHING_WRITTEN
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError
+from routers._errors import llm_http_error
 from promptmaster.schemas import AuditFinding, Iteration, PMInput
 from promptmaster.session_context import _label_trigger
 from routers._pipeline import build_iteration_with_full_pipeline
@@ -64,7 +66,7 @@ async def api_audit_findings(
         )
         return AuditFindingsResponse(findings=findings)
     except OpenRouterError as e:
-        raise HTTPException(status_code=502, detail=f"LLM error: {e}")
+        raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
 
 
 @router.post("/apply-audit")
@@ -107,4 +109,4 @@ async def api_apply_audit(
         )
         return IterationFromConversationResponse(iteration=iteration, suggestions=suggestions)
     except OpenRouterError as e:
-        raise HTTPException(status_code=502, detail=f"LLM error: {e}")
+        raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
