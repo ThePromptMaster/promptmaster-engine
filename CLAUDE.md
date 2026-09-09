@@ -8,6 +8,13 @@ PromptMaster Engine is a professional AI workflow platform that structures inter
 
 The system is based on a book ("How to Become a PromptMaster" by Sean Moran) and has a provisional patent covering the structured interaction + evaluation loop. Backend modules reference book chapters/sections in docstrings (e.g. "Ch1 S13-S14") — keep those citations when editing.
 
+**This file orients an agent working *in* the repo. `docs/` documents *operating the
+product* (FR-23) — architecture, schemas, API boundaries, deployment, env vars, the
+job system, tests, extension points, and the known-limitations register. Start at
+[`docs/README.md`](docs/README.md).** The two are meant not to duplicate each other:
+if you are about to write more than a paragraph of operator-facing detail here, it
+probably belongs in `docs/` with a link from here instead.
+
 ## Commands
 
 **Frontend** (`cd frontend`):
@@ -39,7 +46,7 @@ Backend deps live in a pyenv 3.12.4 environment on this machine; if `pytest` res
 It does verify identity. `backend/auth.py` checks the Supabase JWT and attaches a `user_id`; `main.py` applies `require_user` at router-include time so a new router cannot ship unprotected by omission. This superseded the original "no auth check" rule on 2026-09-02: every `/api/*` route had been public and billable against the OpenRouter key, and FR-17/FR-18 require an authenticated API and per-user cost controls. `/api/health` and `/api/modes` stay public; `/api/models` is protected because it calls OpenRouter.
 
 **Where state actually lives:**
-- **`/projects`** — Supabase is authoritative. `project-store.ts` holds a cache plus a `revision` for optimistic concurrency; scalar edits are debounced field patches (never whole snapshots — that is a lost-update generator), appends are immediate, and a conflict is surfaced rather than resolved. `use-project-flush` forces pending edits out on tab hide and unload.
+- **`/projects`** — Supabase is authoritative. `project-store.ts` holds a cache plus a `revision` for optimistic concurrency; scalar edits are debounced field patches (never whole snapshots — that is a lost-update generator), appends are immediate, and a conflict is surfaced rather than resolved. `use-project-flush` forces pending edits out on tab hide and unload. Full behaviour, including the two-tab case, is in [`docs/saving-and-concurrency.md`](docs/saving-and-concurrency.md) (FR-21).
 
 ### Backend layout
 
@@ -84,7 +91,7 @@ A project pins a **workflow template version** (`projects.workflow_template_id`)
 - `src/lib/workflow/` — the engine. `engine.ts` is pure functions (evaluate a stage's exit criteria, project state from events, list transitions); `templates/*.v1.ts` are the authoring source for `book`, `research` and `single_output`.
 - **Templates are generated into a seed migration**, never hand-written as JSON: `npm run --silent gen:templates > ../supabase/migrations/<ts>_seed_workflow_templates.sql`. `seed-drift.test.ts` fails if the TypeScript and the migration disagree. The `--silent` matters — without it npm's banner lands in the SQL.
 - `src/components/workflow/` — stage rail, header, exit-criteria checklist, transition bar, workspace. `workflow-workspace.tsx` dispatches on `stage.renderer`.
-- `src/components/workflow/renderers/` — `prose`, `list`, `review` (and `outline`, `long_form`). **Five renderers cover 26 stages across both workflows; no renderer branches on which workflow it is**, and a test asserts that.
+- `src/components/workflow/renderers/` — `prose`, `list`, `review`, `long_form` (the `outline` stage is served by `OutlineStagePanel`, mounted by the workspace rather than through the renderer switch). **Four renderers cover 33 stages across the three workflows; no renderer branches on which workflow it is**, and a test asserts that.
 - Generation is `POST /api/generate-stage-artifact`, one LLM call. It does *not* use `build_iteration_with_full_pipeline` — that scores output against `inputs.objective`, which judges a list of audience segments against the wrong thing, and costs four calls where one will do.
 
 **Stage state is projected from the `workflow_events` log in exactly one place** (`projectState` in `engine.ts`). Events are the record; `projects.stage` is a denormalised cursor for the list view.
@@ -104,13 +111,22 @@ The `sessions`, `templates`, `custom_modes`, `user_presets` and `conversation_me
 ## Requirements
 
 `docs/requirements/phase2-functional-requirements.md` holds FR-01 to FR-23 verbatim
-from Exhibit A of the Phase 2 amendment. **It is the authority.** Code comments cite
-FR numbers freely; those citations are shorthand, not the requirement.
+from Exhibit A of the Phase 2 amendment, **plus sections 8 to 12** — including
+**section 12, the Definition of Done**, which is the bar this work is accepted
+against. **It is the authority.** Code comments cite FR numbers freely; those
+citations are shorthand, not the requirement.
+`docs/requirements/phase2-roadmap-exhibit-b.md` holds Exhibit B, which is attached for
+reference only and is explicitly *not* a scope commitment.
 
 Read the FR before building against it. An implementation pass had to stop dead on
 2026-09-08 because FR-11 to FR-15 appeared nowhere in the repository — the only trace
 was two paraphrase fragments in a migration comment, and the contract was a .docx in
-someone's Downloads folder.
+someone's Downloads folder. Sections 8 to 12 were extracted on 2026-09-09 for the same
+reason.
+
+Section 12 also names a **known-limitations register** as a deliverable in its own
+right: `docs/known-limitations.md`. Keep it current — an entry added when a trade-off
+is made costs nothing; one reconstructed months later costs an argument.
 
 ## Evaluation System
 

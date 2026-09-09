@@ -155,8 +155,9 @@ template authored against a newer engine still renders on an older one.
 Four renderers — `prose`, `list`, `review`, `long_form` — cover 33 stages across the
 three workflows (book 15, research 13, single_output 5), plus the outline stage, which
 is served by `OutlineStagePanel` mounted directly by the workspace rather than through
-the renderer switch. (`CLAUDE.md` says "26 stages across both workflows"; that was
-true when it was written, before `single_output` and the later template versions.)
+the renderer switch. (`CLAUDE.md` said "five renderers cover 26 stages across both
+workflows"; that was true when written, before `single_output` and the later template
+versions. Corrected there in the same change that added these documents.)
 
 **No renderer branches on which workflow it is**, and a test in
 `renderers.test.tsx` asserts that. Book's fact-check table and Research's
