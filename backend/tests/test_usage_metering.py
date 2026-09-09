@@ -207,6 +207,99 @@ def test_the_usage_header_is_compact_json(accumulator):
     assert entries == [{"m": "a/b", "i": 10, "o": 5, "ms": 100, "c": 0.5}]
 
 
+def test_usage_recorded_inside_a_handler_reaches_the_response_header():
+    """The subtle one, and the reason `UsageAccumulator` is mutated not rebound.
+
+    Starlette runs the downstream app in a child task, which copies the context
+    at spawn time. A value *set* downstream is invisible to the middleware; an
+    object *mutated* downstream is the same object. If anyone ever "tidies"
+    `llm_client._meter` into `usage_var.set(...)`, every request would report
+    zero usage and nothing else would fail — so this asserts the whole path
+    end to end rather than the pieces.
+    """
+    from deps import get_client
+
+    class MeteringStub:
+        """Stands in for the LLM client, recording a call the way the real one does."""
+
+        async def generate_json(self, *_args, **_kwargs):
+            _meter(model="a/b", tokens_in=700, tokens_out=250, elapsed=0.4, finish_reason="stop")
+            return {"outline": [{"title": "One", "summary": "s"}]}, {}
+
+        async def generate(self, *_args, **_kwargs):
+            _meter(model="a/b", tokens_in=700, tokens_out=250, elapsed=0.4, finish_reason="stop")
+            return "text", {}
+
+    app.dependency_overrides[get_client] = lambda: MeteringStub()
+    try:
+        pricing.pricing_cache().prime(
+            {"a/b": pricing.ModelPrice(prompt=0.00001, completion=0.00002)}
+        )
+        res = TestClient(app).post(
+            "/api/generate-outline",
+            json={
+                "inputs": {"objective": "Write a short book.", "mode": "architect"},
+                "suggested_section_count": 3,
+            },
+        )
+    finally:
+        app.dependency_overrides.pop(get_client, None)
+
+    assert res.status_code == 200, res.text
+    entries = json.loads(res.headers[USAGE_HEADER])
+    assert entries[0]["i"] == 700
+    assert entries[0]["o"] == 250
+    assert entries[0]["c"] == pytest.approx(0.012)
+
+
+def test_usage_is_reported_even_when_the_request_then_fails():
+    """A request can fail *after* spending, and that spend is the important kind.
+
+    A stage generation whose evaluation call 502s has already paid for the
+    generation. Dropping its usage because the response was not a 200 would make
+    the cost page understate precisely when things are going wrong — which is
+    when someone is looking at it.
+    """
+    from deps import get_client
+    from promptmaster.llm_client import OpenRouterError
+
+    class SpendsThenFails:
+        async def generate_json(self, *_args, **_kwargs):
+            _meter(model="a/b", tokens_in=900, tokens_out=100, elapsed=0.3, finish_reason="stop")
+            raise OpenRouterError("HTTP 402", status_code=402)
+
+    app.dependency_overrides[get_client] = lambda: SpendsThenFails()
+    try:
+        res = TestClient(app).post(
+            "/api/generate-outline",
+            json={
+                "inputs": {"objective": "Write a short book.", "mode": "architect"},
+                "suggested_section_count": 3,
+            },
+        )
+    finally:
+        app.dependency_overrides.pop(get_client, None)
+
+    assert res.status_code == 502
+    # The credit exhaustion is still classified, not generic.
+    assert res.json()["detail"]["code"] == "insufficient_credits"
+    # And the tokens it burned before failing are still reported.
+    entries = json.loads(res.headers[USAGE_HEADER])
+    assert entries[0]["i"] == 900
+
+
+def test_the_request_id_is_echoed_alongside_the_usage():
+    """The client needs both to write a correlated `model_usage` row."""
+    from observability import REQUEST_ID_HEADER
+
+    res = TestClient(app).post(
+        "/api/estimate-job",
+        json={"section_count": 2, "model": "m"},
+        headers={REQUEST_ID_HEADER: "corr-123"},
+    )
+    assert res.headers[REQUEST_ID_HEADER] == "corr-123"
+
+
 def test_a_very_chatty_request_folds_its_header_by_model():
     """A response header has a practical size ceiling.
 

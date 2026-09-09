@@ -72,7 +72,18 @@ export function drainLog(level: Level, fields: DrainLogFields): void {
  * one apparent request that somehow spent twice.
  */
 export function stepRequestId(jobId: string, step: string): string {
-  const short = jobId.replace(/-/g, '').slice(0, 12);
+  // Stripped to alphanumerics because callers pass an API path as the step, and
+  // a header value carrying `/api/generate-section-prose` is both noise and an
+  // invitation to whatever parses the log later. Correlation ids should be
+  // opaque tokens.
+  const short = alnum(jobId).slice(0, 12);
+  // The tail of the path, not the head: every route here begins `apigenerate`,
+  // so the first characters distinguish nothing.
+  const label = alnum(step).slice(-6);
   const nonce = Math.random().toString(36).slice(2, 8);
-  return `job${short}${step.slice(0, 4)}${nonce}`;
+  return `job${short}${label}${nonce}`;
+}
+
+function alnum(value: string): string {
+  return value.replace(/[^A-Za-z0-9]/g, '');
 }
