@@ -100,7 +100,7 @@ export async function saveMessage(
 // (session_id, iteration_number). Both readers coexist on one table: the
 // functions above serve the imported /session history, these serve the
 // workspace. `stage_id` and `meta` were added additively for exactly this —
-// see 20260909000000_conversation_stage_key.sql.
+// see 20260909000100_conversation_stage_key.sql.
 //
 // `session_id` is `not null` on the table and has no foreign key, so a stage
 // thread writes the project id into it. That keeps the legacy grouped reader
