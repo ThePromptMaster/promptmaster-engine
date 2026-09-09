@@ -227,6 +227,43 @@ describe('statuses that dismiss demand a sentence; statuses that accept do not',
     expect(props.onTriage).not.toHaveBeenCalled();
   });
 
+  it('routes a stage-transition Accept through triage, not the preview — that is the FR-02 path', async () => {
+    // Accepting "move on to Audience" is not a revision, so it must not open
+    // the apply dialog. It goes through `onTriage`, which accepts the
+    // recommendation and only then writes the workflow event citing it — the
+    // one order the database will take, since a citation of a pending proposal
+    // is refused outright.
+    const transition: PanelRecommendation = {
+      category: 'advance:positioning:research',
+      origin: 'derived',
+      kind: 'stage_transition',
+      title: 'Move on to Research',
+      summary: 'Nothing on Positioning is outstanding.',
+      suggested_change: 'Advance to Research.',
+      instruction: '',
+      rationale: {
+        triggering_issue: 'Every blocking criterion on Positioning is satisfied.',
+        relevant_stage: 'Positioning',
+        expected_benefit: 'Starts Research.',
+        scope: 'The project, not the artifact.',
+      },
+      scope: { kind: 'document', described_as: 'Moves the project to Research.' },
+      tags: [],
+      severity: 'info',
+    };
+
+    const props = panel({ rows: [transition] });
+    await userEvent.click(screen.getByRole('combobox'));
+    await userEvent.click(screen.getByRole('option', { name: 'Accept' }));
+
+    expect(props.onApply).not.toHaveBeenCalled();
+    expect(props.onTriage).toHaveBeenCalledTimes(1);
+    expect(props.onTriage.mock.calls[0][0].kind).toBe('stage_transition');
+    expect(props.onTriage.mock.calls[0][1]).toBe('accepted');
+    // Accepting costs no sentence. Only setting something aside does.
+    expect(props.onTriage.mock.calls[0][2]).toBe('');
+  });
+
   it('offers no Accept on a workflow recommendation', async () => {
     panel({ rows: [DERIVED] });
     await userEvent.click(screen.getByRole('combobox'));

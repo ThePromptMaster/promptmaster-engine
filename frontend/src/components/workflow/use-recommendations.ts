@@ -73,6 +73,16 @@ interface Options {
   onModelRecommendationConsumed: () => void;
   /** Absent on the preview surface, and while browsing an earlier stage. */
   appendStageVersion?: (stageId: string, name: string, version: NewVersion) => Promise<unknown>;
+  /**
+   * Advance the stage, citing the accepted proposal — FR-02's whole point.
+   *
+   * Separate from the ordinary transition handler because the ordering is
+   * load-bearing and the database enforces it: the recommendation must already
+   * be `accepted` when the event is written, or `stage_event_proposal_accepted()`
+   * refuses the insert. "The model proposed and the user agreed" is therefore
+   * not a comment, it is the only sequence that can be persisted.
+   */
+  onAcceptTransition?: (proposalId: string) => Promise<void>;
   enabled: boolean;
 }
 
@@ -103,6 +113,7 @@ export function useRecommendations({
   modelRecommendation,
   onModelRecommendationConsumed,
   appendStageVersion,
+  onAcceptTransition,
   enabled,
 }: Options) {
   const [rows, setRows] = useState<Recommendation[]>([]);
@@ -305,14 +316,25 @@ export function useRecommendations({
         // 'accepted' with nothing to apply. Applyable rows never reach here —
         // the panel routes those into the preview dialog instead, because an
         // accepted fix that changed nothing is not a fix that was accepted.
-        const row = rec.id
-          ? await resolveRecommendation(rec.id, 'accepted')
-          : await materialise(rec, 'pending');
+        const created = rec.id ? null : await materialise(rec, 'pending');
+        const row = await resolveRecommendation(rec.id ?? created!.id, 'accepted');
         await recordDecision(project.id, project.user_id, {
           decision_type: 'accept_recommendation',
           recommendation_id: row.id,
           metadata: { category: rec.category, stage: stage?.id ?? null },
         });
+
+        // FR-02, performed rather than described. The proposal is `accepted`
+        // by the line above before the event is written, which is the only
+        // order the database will accept: `stage_event_proposal_accepted()`
+        // rejects a citation of a pending proposal outright. So the stage
+        // history carries proof that a model suggested this move and a user
+        // agreed to it — not a claim in a comment, a column with a trigger
+        // behind it.
+        if (rec.kind === 'stage_transition' && onAcceptTransition) {
+          await onAcceptTransition(row.id);
+        }
+
         await reload();
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Could not record that.');
@@ -320,7 +342,7 @@ export function useRecommendations({
         setBusy(false);
       }
     },
-    [busy, project.id, project.user_id, stage, materialise, reload]
+    [busy, project.id, project.user_id, stage, materialise, reload, onAcceptTransition]
   );
 
   /**

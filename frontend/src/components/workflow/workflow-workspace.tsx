@@ -277,36 +277,25 @@ export function WorkflowWorkspace({
   const headVersion = useMemo(() => stageVersionList.at(-1) ?? null, [stageVersionList]);
   const shownEvaluation = evaluations?.[activeVersionId ?? headVersion?.id ?? ''];
 
-  /**
-   * The recommendations surface — FR-13, FR-09, FR-01.
-   *
-   * Takes the pure exit-criteria `evaluation` (which is what guarantees a
-   * workflow recommendation on every stage) and the stored model evaluation
-   * (which supplies the contextual half where one has been paid for). Browsing
-   * an earlier stage disables it for the same reason it disables generation and
-   * evaluation: acting on a stage you are only looking at is never what was
-   * meant.
-   */
-  const recommendations = useRecommendations({
-    project,
-    template,
-    stage,
-    stageEvaluation: evaluation,
-    headVersion,
-    storedEvaluation: shownEvaluation,
-    modelRecommendation: stageEvaluation.recommendation,
-    onModelRecommendationConsumed: stageEvaluation.dismissRecommendation,
-    appendStageVersion,
-    enabled: isCurrent && events !== null,
-  });
-
   const manualIds = useMemo(
     () => new Set((stage?.exit_criteria ?? []).filter((c) => c.check === 'manual').map((c) => c.id)),
     [stage]
   );
 
   const handleTransition = useCallback(
-    async (option: TransitionOption, note?: string) => {
+    async (
+      option: TransitionOption,
+      note?: string,
+      /**
+       * The accepted recommendation this move acted on (FR-02).
+       *
+       * Only set when the user pressed Accept on a `stage_transition`
+       * recommendation. Pressing Advance on the transition bar leaves it null,
+       * which is correct: nothing proposed that move, and recording a proposal
+       * that did not happen would be worse than recording none.
+       */
+      proposalId?: string
+    ) => {
       if (!stage || busy) return;
       setBusy(true);
       try {
@@ -336,6 +325,7 @@ export function WorkflowWorkspace({
             stage_id: stage.id,
             to_stage_id: option.toStageId ?? undefined,
             reason: note,
+            proposal_id: proposalId ?? null,
           },
           nextSeq
         );
@@ -354,6 +344,43 @@ export function WorkflowWorkspace({
     },
     [stage, busy, events, project, template, onPatchProject, setStageSummary, stageBundles]
   );
+
+  /**
+   * The recommendations surface — FR-13, FR-09, FR-01.
+   *
+   * Takes the pure exit-criteria `evaluation` (which is what guarantees a
+   * workflow recommendation on every stage) and the stored model evaluation
+   * (which supplies the contextual half where one has been paid for). Browsing
+   * an earlier stage disables it for the same reason it disables generation and
+   * evaluation: acting on a stage you are only looking at is never what was
+   * meant.
+   */
+  const recommendations = useRecommendations({
+    project,
+    template,
+    stage,
+    stageEvaluation: evaluation,
+    headVersion,
+    storedEvaluation: shownEvaluation,
+    modelRecommendation: stageEvaluation.recommendation,
+    onModelRecommendationConsumed: stageEvaluation.dismissRecommendation,
+    appendStageVersion,
+    /**
+     * Accepting a "move on to X" recommendation performs the move, and the
+     * event records which proposal it acted on.
+     *
+     * This is the one path in the product where a model's suggestion leads to
+     * a change of application state, so it is the path FR-02 is about. It uses
+     * the ordinary transition machinery — same event type, same summary write,
+     * same cursor patch — and adds only the citation, because a proposal-driven
+     * advance is not a different kind of advance.
+     */
+    onAcceptTransition: async (proposalId: string) => {
+      const move = transitions.find((t) => t.kind === 'advance' || t.kind === 'finish');
+      if (move) await handleTransition(move, undefined, proposalId);
+    },
+    enabled: isCurrent && events !== null,
+  });
 
   const handleToggleManual = useCallback(
     (id: string, checked: boolean) => {
