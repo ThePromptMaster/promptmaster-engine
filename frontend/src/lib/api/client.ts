@@ -24,6 +24,8 @@ import type {
   GenerateOutlineResponse,
   GenerateSectionResponse,
   OutlineSection,
+  EvaluateStageArtifactRequest,
+  EvaluateStageArtifactResponse,
   GenerateStageArtifactRequest,
   GenerateStageArtifactResponse,
 } from '@/types';
@@ -262,6 +264,25 @@ export const api = {
       body: JSON.stringify(req),
       // Drafting has to be interruptible: a user who navigates away mid-draft
       // must not have a stale response land on the stage they moved to.
+      signal,
+    });
+  },
+
+  /**
+   * Evaluate one stage's artifact. 1 LLM call. FR-11, FR-12.
+   *
+   * User-triggered rather than automatic on generation: the product decision
+   * is that the cost is visible and chosen. Interruptible for the same reason
+   * drafting is — a response landing on a stage the user has left is worse
+   * than no response.
+   */
+  async evaluateStageArtifact(
+    req: EvaluateStageArtifactRequest,
+    signal?: AbortSignal
+  ): Promise<EvaluateStageArtifactResponse> {
+    return apiFetch('/api/evaluate-stage-artifact', {
+      method: 'POST',
+      body: JSON.stringify(req),
       signal,
     });
   },

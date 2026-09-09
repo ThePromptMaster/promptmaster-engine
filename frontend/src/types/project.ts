@@ -7,7 +7,13 @@
  * Iteration does not (parent pointers, restore lineage, per-row ownership).
  */
 
-import type { ModeType, LongFormState, ContinuitySnapshot, WhyThisWorks } from './index';
+import type {
+  ModeType,
+  LongFormState,
+  ContinuitySnapshot,
+  WhyThisWorks,
+  AuditFinding,
+} from './index';
 import type { OutlineDocument } from './outline';
 
 export type ProjectStatus = 'active' | 'finalized' | 'archived';
@@ -142,7 +148,15 @@ export interface Evaluation {
   completeness_status: string | null;
   completeness_reason: string | null;
   interpretation: WhyThisWorks | null;
-  findings: unknown[];
+  /**
+   * FR-11's findings, in the column M1 pre-carved for them.
+   *
+   * Typed as AuditFinding rather than `unknown[]`: the column has existed
+   * since M1, defaulted to `'[]'`, been written empty by `saveEvaluation` and
+   * read by nothing. `/api/evaluate-stage-artifact` is what finally fills it,
+   * and a row written by an older build is simply an empty array.
+   */
+  findings: AuditFinding[];
 
   /** Generated column: alignment === 'Low' || drift === 'High'. */
   needs_realignment: boolean;

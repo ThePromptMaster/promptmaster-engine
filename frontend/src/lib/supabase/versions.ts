@@ -1,5 +1,6 @@
 import { createClient } from './client';
 import type { Artifact, ArtifactVersion, Evaluation } from '@/types/project';
+import type { AuditFinding } from '@/types';
 
 const ARTIFACT_COLUMNS = `
   id, user_id, project_id, kind, name, stage_id, summary, current_version_id,
@@ -199,6 +200,10 @@ export async function restoreVersion(
       completeness_status: previous.completeness_status,
       completeness_reason: previous.completeness_reason,
       interpretation: previous.interpretation,
+      // Copied forward with the scores. The content is byte-identical, so a
+      // restore that kept the ratings but dropped the findings explaining them
+      // would read as the defects having been fixed.
+      findings: previous.findings ?? [],
       evaluator_model: previous.evaluator_model,
       source: 'restored',
     });
@@ -248,10 +253,19 @@ export async function listEvaluations(projectId: string): Promise<Evaluation[]> 
   return (data ?? []) as unknown as Evaluation[];
 }
 
+/**
+ * Findings are optional but typed.
+ *
+ * `findings` is Omit-ed and added back rather than left in place because the
+ * column has a default and most writers have nothing to put there — the
+ * four-call iteration pipeline produces no findings at all. What changed in
+ * M4.1 is the type: it was `unknown[]`, which is what a slot nothing writes
+ * looks like, and a caller could not have built a valid finding against it.
+ */
 export type NewEvaluation = Omit<
   Evaluation,
   'id' | 'user_id' | 'project_id' | 'version_id' | 'needs_realignment' | 'created_at' | 'findings'
-> & { findings?: unknown[] };
+> & { findings?: AuditFinding[] };
 
 export async function saveEvaluation(
   version: ArtifactVersion,

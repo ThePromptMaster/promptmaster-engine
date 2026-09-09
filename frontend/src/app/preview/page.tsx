@@ -13,6 +13,7 @@ import { useState } from 'react';
 
 import { WorkflowPicker } from '@/components/projects/workflow-picker';
 import { StageRenderer } from '@/components/workflow/renderers/stage-renderer';
+import { StageEvaluationPanel } from '@/components/workflow/evaluation-panel';
 import { itemSchemaFor, serializeItems } from '@/lib/workflow/stage-artifact';
 import { DerivedOutlineNotice } from '@/components/outline/derived-outline-notice';
 import { OutlineEditor } from '@/components/outline/outline-editor';
@@ -26,8 +27,8 @@ import {
   staleDrafts,
 } from '@/lib/outline/model';
 import type { OutlineDocument, SectionDraftBinding } from '@/types/outline';
-import type { Artifact, ArtifactVersion, Project } from '@/types/project';
-import type { LongFormState } from '@/types';
+import type { Artifact, ArtifactVersion, Evaluation, Project } from '@/types/project';
+import type { AuditFinding, LongFormState, StageRecommendation } from '@/types';
 import { StageRail } from '@/components/workflow/stage-rail';
 import { ProjectSetup, stageWantsSetup } from '@/components/workflow/project-setup';
 import { StageHeader } from '@/components/workflow/stage-header';
@@ -405,6 +406,144 @@ function DraftingSlice() {
           onRefresh: () => {},
         }}
       />
+    </div>
+  );
+}
+
+/**
+ * Stage evaluation — FR-11 and FR-12, reviewable without a login.
+ *
+ * The fixture is deliberately the defective case, because that is the one with
+ * anything to look at: the positioning artifact below drifts on the objective,
+ * ignores the approved outline and names vendors the constraints forbid, and
+ * each of those is a finding categorised by the axis it offends.
+ *
+ * Both live states are shown — the control before it is pressed, saying what
+ * it costs, and the panel afterwards. The recommendation carries FR-14's
+ * rationale fields; "Carry on without it" is the one FR-12 response M4.1
+ * implements, since accept/modify/reject are M4.2's surface.
+ */
+const EVAL_FINDINGS: AuditFinding[] = [
+  {
+    id: 'f1',
+    category: 'objective',
+    summary: 'Surveys the academic literature instead of positioning the book.',
+    suggested_change: 'Name two comparable practitioner books and say what this does differently.',
+  },
+  {
+    id: 'f2',
+    category: 'audience',
+    summary: 'Addresses doctoral candidates, not the engineering managers named upstream.',
+    suggested_change: 'Rewrite for a manager who has to act on it this quarter.',
+  },
+  {
+    id: 'f3',
+    category: 'constraints',
+    summary: 'Names two vendors, which the project constraints forbid.',
+    suggested_change: 'Remove the vendor names.',
+  },
+  {
+    id: 'f4',
+    category: 'approved outline',
+    summary: 'Promises chapters the approved outline does not contain.',
+    suggested_change: 'Align the chapter list with the three approved sections.',
+  },
+];
+
+const EVAL_FIXTURE: Evaluation = {
+  id: 'e1',
+  user_id: 'u',
+  project_id: 'p',
+  version_id: 'v1',
+  alignment_score: 'Low',
+  alignment_explanation: 'It never positions the book against anything.',
+  drift_score: 'High',
+  drift_explanation: 'Drifts on the objective, the audience and the approved outline.',
+  clarity_score: 'Medium',
+  clarity_explanation: 'Readable sentences, but no structure a reader can navigate.',
+  completeness_status: 'incomplete',
+  completeness_reason: 'No comparable books are named, which the stage requires.',
+  interpretation: {
+    label: 'What to improve',
+    bullets: [
+      'Answers a different question than the stage asked.',
+      'No sections; one undifferentiated block.',
+      'Contradicts the outline the draft is bound to.',
+    ],
+  },
+  findings: EVAL_FINDINGS,
+  needs_realignment: true,
+  evaluator_model: 'anthropic/claude-sonnet',
+  source: 'manual',
+  created_at: '2026-09-09T00:00:00Z',
+};
+
+const EVAL_RECOMMENDATION: StageRecommendation = {
+  id: 'r1',
+  title: 'Rewrite the positioning against the approved outline',
+  triggering_issue: 'Alignment Low and drift High across three of the five axes.',
+  expected_benefit: 'A positioning statement the drafting stages can be judged against.',
+  scope: 'The positioning stage only; the approved outline is untouched.',
+  instruction: 'Rewrite naming two comparable practitioner books, no vendors, for managers.',
+};
+
+const DEFECTIVE_POSITIONING = `# Positioning
+
+This book is a comprehensive survey of the academic literature on organisational
+theory from 1954 onward, with extended treatment of the Carnegie School. It is
+written for doctoral candidates preparing for comprehensive examinations, and
+assumes familiarity with the bounded-rationality debates. Chapter one covers
+prompt engineering syntax; chapter two covers vendor selection; chapter three
+covers procurement contracts.
+
+Recommended tooling: Acme CoPilot Enterprise and the Initech review suite.`;
+
+function StageEvaluationSlice() {
+  const stage = getStage(BOOK_V1, 'positioning')!;
+  const [evaluated, setEvaluated] = useState(false);
+  const [evaluating, setEvaluating] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-2xl bg-[var(--surface)] px-8 py-8 shadow-[0_1px_2px_rgba(25,28,30,0.04),0_12px_32px_-16px_rgba(25,28,30,0.25)]">
+        <StageRenderer
+          stage={stage}
+          schema={itemSchemaFor(stage)}
+          versions={[fixtureVersion(DEFECTIVE_POSITIONING)]}
+          activeVersionId={null}
+          onSelectVersion={() => {}}
+          onRestore={async () => {}}
+          onSaveContent={async () => {}}
+          onSaveItems={async () => {}}
+          generating={false}
+          generationError={null}
+          onGenerate={() => {}}
+          onCancelGeneration={() => {}}
+          readOnly={false}
+          evaluation={evaluated ? EVAL_FIXTURE : undefined}
+          evaluating={evaluating}
+          evaluationError={null}
+          onEvaluate={() => {
+            // Fakes the round trip so both states are reachable here; the real
+            // call is one request to /api/evaluate-stage-artifact.
+            setEvaluating(true);
+            setTimeout(() => {
+              setEvaluating(false);
+              setEvaluated(true);
+              setDismissed(false);
+            }, 700);
+          }}
+        />
+      </div>
+
+      <div className="max-w-[420px]">
+        <StageEvaluationPanel
+          evaluation={evaluated ? EVAL_FIXTURE : undefined}
+          recommendation={evaluated && !dismissed ? EVAL_RECOMMENDATION : null}
+          onDismissRecommendation={() => setDismissed(true)}
+        />
+      </div>
     </div>
   );
 }
@@ -862,6 +1001,13 @@ export default function PreviewPage() {
               <RendererSlice stageId="positioning" content={null} />
               <RendererSlice stageId="positioning" content={null} generating />
             </div>
+          </Section>
+
+          <Section
+            title="Evaluating a stage"
+            note="FR-11 and FR-12. Press Evaluate — it says what it costs, because nothing here fires on its own. The artifact is deliberately defective: it answers a different question than the stage asked, addresses the wrong readers, names vendors the constraints forbid, and promises chapters the approved outline does not contain. Each is a finding, categorised by the axis it offends. The correction is offered, never applied; carrying on without it is a first-class answer."
+          >
+            <StageEvaluationSlice />
           </Section>
 
           <Section

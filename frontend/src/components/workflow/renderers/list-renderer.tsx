@@ -36,6 +36,9 @@ export function ListRenderer({
   generationError,
   onGenerate,
   onCancelGeneration,
+  onEvaluate,
+  evaluating,
+  evaluationError,
   readOnly,
 }: StageRendererProps) {
   const active = useMemo(
@@ -127,6 +130,9 @@ export function ListRenderer({
         hasContent={items.length > 0}
         onGenerate={requestGenerate}
         onCancel={onCancelGeneration}
+        onEvaluate={onEvaluate}
+        evaluating={evaluating}
+        evaluationError={evaluationError}
         readOnly={readOnly}
       />
 
