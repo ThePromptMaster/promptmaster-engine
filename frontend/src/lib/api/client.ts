@@ -19,6 +19,8 @@ import type {
   AuditFindingsRequest,
   AuditFindingsResponse,
   ApplyAuditRequest,
+  ApplyRecommendationsRequest,
+  ApplyRecommendationsResponse,
   ContinuitySnapshot,
   DetectLongFormResponse,
   GenerateOutlineResponse,
@@ -305,6 +307,27 @@ export const api = {
     return apiFetch('/api/apply-audit', {
       method: 'POST',
       body: JSON.stringify(req),
+    });
+  },
+
+  /**
+   * Apply accepted recommendations to a stage's artifact. 1 LLM call. FR-09.
+   *
+   * Deliberately not `applyAudit`, which runs the four-call iteration pipeline
+   * and scores the result against `inputs.objective` — the wrong bar for a
+   * stage artifact, and three discarded results.
+   *
+   * Interruptible for the same reason drafting and evaluation are: a response
+   * landing on a stage the user has left is worse than no response.
+   */
+  async applyRecommendations(
+    req: ApplyRecommendationsRequest,
+    signal?: AbortSignal
+  ): Promise<ApplyRecommendationsResponse> {
+    return apiFetch('/api/apply-recommendations', {
+      method: 'POST',
+      body: JSON.stringify(req),
+      signal,
     });
   },
 

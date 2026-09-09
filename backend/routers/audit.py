@@ -1,4 +1,10 @@
-"""Audit -> Action endpoints — produce structured findings, apply selected ones."""
+"""Audit -> Action endpoints — produce structured findings, apply selected ones.
+
+`/api/apply-recommendations` (M4.2, FR-09) lives here rather than in a router of
+its own because it reuses this module's prompt builder verbatim: a
+recommendation casts to an `AuditFinding`, so applying one is applying a finding
+under a different name.
+"""
 
 from __future__ import annotations
 
@@ -7,6 +13,7 @@ from pydantic import BaseModel
 
 from deps import get_client
 from promptmaster.audit_findings import (
+    _format_findings_block,
     build_apply_audit_prompt,
     generate_audit_findings,
 )
@@ -41,6 +48,35 @@ class ApplyAuditRequest(BaseModel):
     iteration_number: int
     iteration_history: list[Iteration] = []
     model: str = ""
+
+
+class ApplyRecommendationsRequest(BaseModel):
+    """One or more accepted recommendations, applied to a stage's artifact (FR-09).
+
+    `findings` is the recommendation list already cast to the AuditFinding
+    shape by the caller: `{id, category: kind, summary: title,
+    suggested_change: instruction}`. That cast is why this endpoint needs no
+    prompt text of its own — `build_apply_audit_prompt` formats exactly these
+    fields, so the combined instruction the user read in the preview dialog is
+    the combined instruction the model receives.
+    """
+
+    inputs: PMInput
+    # The artifact as stored, rather than a whole Iteration. The workspace
+    # holds ArtifactVersion rows, which have no evaluation, no iteration
+    # number and no trigger source; making the client fabricate those to
+    # satisfy a schema would be inventing provenance to pass a type check.
+    content: str
+    findings: list[AuditFinding]
+    model: str = ""
+
+
+class ApplyRecommendationsResponse(BaseModel):
+    content: str
+    #: What was sent, so the caller can store it as the version's `instruction`
+    #: (FR-10 provenance) without rebuilding the string and risking a mismatch.
+    instruction: str
+    finish_reason: str = ""
 
 
 # --- Endpoints ---
@@ -106,5 +142,65 @@ async def api_apply_audit(
             finish_reason=finish_reason,
         )
         return IterationFromConversationResponse(iteration=iteration, suggestions=suggestions)
+    except OpenRouterError as e:
+        raise HTTPException(status_code=502, detail=f"LLM error: {e}")
+
+
+@router.post("/apply-recommendations")
+async def api_apply_recommendations(
+    req: ApplyRecommendationsRequest,
+    client: OpenRouterClient = Depends(get_client),
+) -> ApplyRecommendationsResponse:
+    """Apply accepted recommendations to a stage's artifact. **1 LLM call.** FR-09.
+
+    Deliberately not `/api/apply-audit`, which does the same revision and then
+    four calls' worth of work on top: it runs the full iteration pipeline, which
+    scores the result against `inputs.objective`. That is the wrong bar for a
+    stage artifact, by exactly the argument `stage_evaluation.py` already makes
+    — a list of audience segments judged against the book's objective is judged
+    against the wrong thing — and the pipeline's three extra results would be
+    discarded here anyway.
+
+    The prompt is `build_apply_audit_prompt`, unchanged and unwrapped. A
+    recommendation casts cleanly to `AuditFinding`, so this milestone adds no
+    prompt text at all, and the block the user approved in the preview dialog is
+    byte-for-byte the block that reaches the model.
+    """
+    try:
+        model = req.model or None
+
+        # A minimal Iteration purely to feed the existing builder, which reads
+        # `.output` from it and nothing else. Constructed here rather than
+        # demanded from the client, so no caller has to invent an iteration
+        # number or an evaluation that never happened in order to pass a schema.
+        source = Iteration(
+            iteration_number=1,
+            prompt_sent="",
+            output=req.content,
+            mode=req.inputs.mode,
+            trigger_source="applied_recommendations",
+        )
+
+        system_text, prompt_text = build_apply_audit_prompt(
+            inputs=req.inputs,
+            source_iteration=source,
+            findings=req.findings,
+            iterations=[],
+        )
+
+        revised, _usage, finish_reason = await client.generate_with_meta(
+            prompt=prompt_text,
+            system=system_text,
+            model=model,
+        )
+
+        return ApplyRecommendationsResponse(
+            content=revised,
+            # Returned rather than recomputed by the caller: the version row
+            # stores it as FR-10 provenance, and two places building the same
+            # string is two places for it to drift.
+            instruction=_format_findings_block(req.findings),
+            finish_reason=finish_reason or "",
+        )
     except OpenRouterError as e:
         raise HTTPException(status_code=502, detail=f"LLM error: {e}")
