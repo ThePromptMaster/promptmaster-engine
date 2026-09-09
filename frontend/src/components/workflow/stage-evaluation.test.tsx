@@ -245,10 +245,14 @@ describe('the evaluation panel', () => {
         onDismissRecommendation={vi.fn()}
       />
     );
-    const panel = screen.getByLabelText('Stage evaluation');
-    expect(panel.textContent).toMatch(/Alignment Low/);
-    expect(panel.textContent).toMatch(/Drift High/);
-    expect(panel.textContent).toMatch(/needs realignment/);
+    // Each score now sits in its own rating card with its explanation beside
+    // it (section 8), rather than on one comma-separated line — so the
+    // assertion is scoped to the card instead of to the panel's text.
+    expect(screen.getByLabelText('Alignment rating')).toHaveTextContent('Low');
+    expect(screen.getByLabelText('Drift rating')).toHaveTextContent('High');
+    expect(screen.getByLabelText('Stage evaluation').textContent).toMatch(
+      /needs realignment/i
+    );
   });
 
   it('says so when a clean artifact produced no findings', () => {

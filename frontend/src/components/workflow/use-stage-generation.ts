@@ -56,7 +56,8 @@ interface Options {
   ) => Promise<unknown>;
 }
 
-function inputsFrom(project: Project): PMInput {
+/** The project's setup fields as the PMInput every backend call expects. */
+export function inputsFrom(project: Project): PMInput {
   return {
     objective: project.objective,
     audience: project.audience,

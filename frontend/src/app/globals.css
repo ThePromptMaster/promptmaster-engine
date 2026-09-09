@@ -82,6 +82,15 @@
   --on-error: #ffffff;
   --on-error-container: #93000a;
 
+  /* === Success ===
+     Referenced by evaluation-scores.tsx as var(--pm-success, …) since the
+     scores came back, but never defined — so every good score fell through to
+     the fallback and rendered in plain body colour. A rating display whose
+     good end is indistinguishable from its middle is not a rating display. */
+  --pm-success: #0f6b45;
+  --success-container: #b7f0cf;
+  --on-success-container: #00301c;
+
   /* === Secondary === */
   --pm-secondary: #495c95;
   --secondary-container: #acbfff;

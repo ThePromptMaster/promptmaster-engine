@@ -11,6 +11,7 @@ import { useStageGeneration } from './use-stage-generation';
 import { useStageEvaluation } from './use-stage-evaluation';
 import { StageEvaluationPanel } from './evaluation-panel';
 import { ExportMenu } from './export-menu';
+import { ChatPanel } from './chat-panel';
 import {
   availableTransitions,
   evaluateStage,
@@ -101,6 +102,10 @@ export function WorkflowWorkspace({
 }: Props) {
   const [events, setEvents] = useState<WorkflowEvent[] | null>(null);
   const [viewingStageId, setViewingStageId] = useState<string | null>(null);
+  // Open by default: section 8 asks for the side chat to be part of the
+  // workspace, and a panel behind a button that has to be found first is a
+  // disconnected product path with an extra step.
+  const [chatOpen, setChatOpen] = useState(true);
   const [busy, setBusy] = useState(false);
   const [activeVersionId, setActiveVersionId] = useState<string | null>(null);
 
@@ -491,6 +496,20 @@ export function WorkflowWorkspace({
 
       <main className="min-w-0 flex-1 px-6 py-10 md:px-10">
         <div className="mx-auto max-w-[820px]">
+          <div className="mb-4 flex items-center justify-end">
+            <button
+              onClick={() => setChatOpen((open) => !open)}
+              aria-expanded={chatOpen}
+              aria-controls="stage-side-chat"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-low)] px-3 py-1.5 text-label text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
+            >
+              <span aria-hidden className="material-symbols-outlined text-[16px]">
+                forum
+              </span>
+              {chatOpen ? 'Hide side chat' : 'Side chat'}
+            </button>
+          </div>
+
           {!isCurrent && (
             <button
               onClick={() => setViewingStageId(null)}
@@ -633,6 +652,56 @@ export function WorkflowWorkspace({
           </div>
         </div>
       </main>
+
+      {/* The side chat, in the workspace rather than on a route of its own —
+          section 8 asks for artifact, evaluation, versions and chat to sit
+          together. It reads the version currently on screen, so a question
+          asked while browsing an old version is a question about that version.
+
+          One mount, two positions: a rail beside the work on a wide screen, a
+          sheet over it on a narrow one. Mounting it twice would give the stage
+          two threads and two histories of the same conversation. */}
+      {chatOpen && (
+        <aside
+          id="stage-side-chat"
+          className="fixed inset-0 z-40 bg-[var(--surface)] p-4 lg:sticky lg:inset-auto lg:top-0 lg:z-auto lg:h-screen lg:w-[380px] lg:shrink-0 lg:bg-transparent lg:py-6 lg:pl-0 lg:pr-6"
+        >
+          <button
+            onClick={() => setChatOpen(false)}
+            className="mb-2 ml-auto flex items-center gap-1 rounded-lg px-2 py-1 text-label text-[var(--on-surface-variant)] lg:hidden"
+          >
+            <span aria-hidden className="material-symbols-outlined text-[18px]">
+              close
+            </span>
+            Close
+          </button>
+
+          <div className="h-[calc(100%-2rem)] lg:h-full">
+            <ChatPanel
+              project={project}
+              stageId={stage.id}
+              stageLabel={stage.label}
+              content={
+                (activeVersionId
+                  ? stageVersions.find((v) => v.id === activeVersionId)?.content
+                  : undefined) ??
+                stageVersions.at(-1)?.content ??
+                ''
+              }
+              headVersion={stageVersions.at(-1) ?? null}
+              appendStageVersion={appendStageVersion}
+              restoreStageVersion={restoreStageVersion}
+              readOnly={!isCurrent}
+              // Revising splices into the content it was handed, so instructing
+              // while reading an older version would append a version built
+              // from it and lose everything since. Discussion is unaffected.
+              canInstruct={
+                activeVersionId === null || activeVersionId === stageVersions.at(-1)?.id
+              }
+            />
+          </div>
+        </aside>
+      )}
     </div>
   );
 }
