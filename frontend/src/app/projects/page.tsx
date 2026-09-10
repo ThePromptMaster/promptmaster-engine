@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 
 import { useAuth } from '@/hooks/use-auth';
 import { listProjects, softDeleteProject } from '@/lib/supabase/projects';
 import type { ProjectSummary } from '@/types/project';
 import { GuestBanner } from '@/components/projects/guest-banner';
+import { DeletedProjects } from '@/components/projects/deleted-projects';
 
 const WORKFLOW_ICON: Record<string, string> = {
   book: 'menu_book',
@@ -38,12 +39,16 @@ export default function ProjectsPage() {
   const [error, setError] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!user) return;
+  const load = useCallback(() => {
     listProjects()
       .then(setProjects)
       .catch((e) => setError(e instanceof Error ? e.message : 'Could not load projects.'));
-  }, [user]);
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    load();
+  }, [user, load]);
 
   async function handleDelete(id: string) {
     const previous = projects;
@@ -202,6 +207,10 @@ export default function ProjectsPage() {
           </section>
         )
       )}
+
+      {/* FR-20. Last on the page and closed by default: trash is somewhere you
+          go looking for, not something that competes with the work. */}
+      {projects !== null && <DeletedProjects onRestored={load} />}
     </main>
   );
 }

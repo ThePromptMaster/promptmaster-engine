@@ -4,6 +4,7 @@ import {
   type Project,
   type ProjectInput,
   type ProjectPatch,
+  type DeletedProjectSummary,
   type ProjectSummary,
 } from '@/types/project';
 
@@ -106,6 +107,12 @@ export async function updateProject(
  * FR-20: recoverable by default. A hard delete of someone's book manuscript
  * with no undo is the wrong default, so this sets deleted_at and a scheduled
  * job removes the row later.
+ *
+ * That job now exists — `purge_deleted_projects()`, thirty days, see the
+ * migration. Until it did, this docstring described it in the future tense and
+ * nothing removed anything: every project any user had ever deleted was still
+ * in the table with all of its versions, invisible because `listProjects`
+ * filters them out. The user believed it was gone and it was not.
  */
 export async function softDeleteProject(id: string): Promise<void> {
   const supabase = createClient();
@@ -114,6 +121,26 @@ export async function softDeleteProject(id: string): Promise<void> {
     .update({ deleted_at: new Date().toISOString() })
     .eq('id', id);
   if (error) throw error;
+}
+
+/**
+ * Recently deleted projects, newest deletion first.
+ *
+ * `deleted_at` comes back with them because the trash view has to say how long
+ * is left: a retention window nobody can see is indistinguishable from a
+ * promise that the row is kept forever.
+ */
+export async function listDeletedProjects(limit = 50): Promise<DeletedProjectSummary[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('projects')
+    .select(`${LIST_COLUMNS}, deleted_at`)
+    .not('deleted_at', 'is', null)
+    .order('deleted_at', { ascending: false })
+    .limit(limit);
+
+  if (error) throw error;
+  return (data ?? []) as unknown as DeletedProjectSummary[];
 }
 
 export async function restoreProject(id: string): Promise<void> {
@@ -125,7 +152,13 @@ export async function restoreProject(id: string): Promise<void> {
   if (error) throw error;
 }
 
-/** Permanent. Cascades to artifacts, versions and evaluations. */
+/**
+ * Permanent. Cascades to artifacts, versions and evaluations.
+ *
+ * Reachable from the trash view rather than only from the purge job. A beta
+ * that warns users not to enter sensitive information owes anyone who did it
+ * anyway a delete that means it now, not a flag that expires in thirty days.
+ */
 export async function hardDeleteProject(id: string): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase.from('projects').delete().eq('id', id);

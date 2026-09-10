@@ -72,6 +72,17 @@ export interface ProjectSummary {
   created_at: string;
 }
 
+/**
+ * A soft-deleted project, as the trash view needs it.
+ *
+ * `deleted_at` is not optional here: the whole point of the view is showing how
+ * much of the retention window is left, and a summary that could omit it would
+ * let a caller render "Deleted" with no clock beside it.
+ */
+export interface DeletedProjectSummary extends ProjectSummary {
+  deleted_at: string;
+}
+
 export interface Artifact {
   id: string;
   user_id: string;
@@ -228,5 +239,34 @@ export class ProjectConflictError extends Error {
         : 'This project was changed in another tab.'
     );
     this.name = 'ProjectConflictError';
+  }
+}
+
+/**
+ * Two tabs appended to the same artifact.
+ *
+ * `taken` — the version_number was claimed between our read and our insert;
+ * `av_artifact_version_uidx` refused it. Nothing was written.
+ * `stale-head` — the version WAS written, but the artifact's head did not move
+ * because our revision was stale. The work exists and is recoverable; the
+ * artifact is simply still pointing at the older version.
+ *
+ * Named rather than surfaced as a raw Postgres error, because the two outcomes
+ * need different words: one lost nothing and can be retried, the other kept the
+ * work and needs a reload to see it.
+ */
+export type VersionConflictReason = 'taken' | 'stale-head';
+
+export class VersionConflictError extends Error {
+  constructor(
+    readonly reason: VersionConflictReason,
+    readonly versionNumber: number
+  ) {
+    super(
+      reason === 'taken'
+        ? 'Another tab saved a version first. Nothing was lost — try again.'
+        : 'Your version was saved, but another tab moved this artifact on. Reload to see both.'
+    );
+    this.name = 'VersionConflictError';
   }
 }

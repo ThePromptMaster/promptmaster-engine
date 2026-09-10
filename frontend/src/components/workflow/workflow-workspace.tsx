@@ -10,6 +10,12 @@ import { StageRenderer } from './renderers/stage-renderer';
 import { useStageGeneration } from './use-stage-generation';
 import { useStageEvaluation } from './use-stage-evaluation';
 import { StageEvaluationPanel } from './evaluation-panel';
+import { ExportMenu } from './export-menu';
+import { ChatPanel } from './chat-panel';
+import { RecommendationsPanel } from './recommendations-panel';
+import { TasksPanel } from './tasks-panel';
+import { ApplyPreview } from './apply-preview';
+import { useRecommendations } from './use-recommendations';
 import {
   availableTransitions,
   evaluateStage,
@@ -36,6 +42,7 @@ import {
 } from '@/lib/workflow/stage-artifact';
 import type { StageContext, WorkflowEvent, WorkflowTemplate } from '@/lib/workflow/types';
 import { appendWorkflowEvent, listWorkflowEvents } from '@/lib/supabase/workflow';
+import { setUsageProject } from '@/lib/supabase/model-usage';
 import type { NewEvaluation, NewVersion } from '@/lib/supabase/versions';
 import type { StageBundle } from '@/stores/project-store';
 import { approvedOutlineVersionId } from '@/lib/supabase/outline';
@@ -100,13 +107,35 @@ export function WorkflowWorkspace({
 }: Props) {
   const [events, setEvents] = useState<WorkflowEvent[] | null>(null);
   const [viewingStageId, setViewingStageId] = useState<string | null>(null);
+  // Open by default: section 8 asks for the side chat to be part of the
+  // workspace, and a panel behind a button that has to be found first is a
+  // disconnected product path with an extra step.
+  const [chatOpen, setChatOpen] = useState(true);
   const [busy, setBusy] = useState(false);
   const [activeVersionId, setActiveVersionId] = useState<string | null>(null);
+  // Below md the rail is not on the page; this is the drawer that replaces it.
+  const [mobileRailOpen, setMobileRailOpen] = useState(false);
 
   useEffect(() => {
     listWorkflowEvents(project.id)
       .then(setEvents)
       .catch(() => setEvents([]));
+  }, [project.id]);
+
+  /**
+   * FR-18: attribute this project's usage rows.
+   *
+   * `apiFetch` is a generic transport with no idea which project a call belongs
+   * to, and threading a project id through all ~25 API methods to tell it would
+   * be a lot of churn for a telemetry field. The workspace knows, so it says so
+   * once here — the same shape the project store already uses to scope itself.
+   *
+   * Cleared on unmount so a call made from outside a project (the project list,
+   * smart setup) is not mislabelled with whichever project was open last.
+   */
+  useEffect(() => {
+    setUsageProject(project.id);
+    return () => setUsageProject(null);
   }, [project.id]);
 
   // State is derived from the event log in exactly one place, so it cannot
@@ -265,6 +294,16 @@ export function WorkflowWorkspace({
   );
 
   const progress = useMemo(() => progressSummary(template, state), [template, state]);
+  // 0-based position of the stage on screen. Read twice — by the stage header
+  // and by the narrow-viewport bar — so it is derived once.
+  const stageIndex = template.stages.findIndex((s) => s.id === stage?.id);
+
+  const stageVersionList = useMemo(
+    () => (stage ? stageBundles[stage.id]?.versions ?? [] : []),
+    [stage, stageBundles]
+  );
+  const headVersion = useMemo(() => stageVersionList.at(-1) ?? null, [stageVersionList]);
+  const shownEvaluation = evaluations?.[activeVersionId ?? headVersion?.id ?? ''];
 
   const manualIds = useMemo(
     () => new Set((stage?.exit_criteria ?? []).filter((c) => c.check === 'manual').map((c) => c.id)),
@@ -272,7 +311,19 @@ export function WorkflowWorkspace({
   );
 
   const handleTransition = useCallback(
-    async (option: TransitionOption, note?: string) => {
+    async (
+      option: TransitionOption,
+      note?: string,
+      /**
+       * The accepted recommendation this move acted on (FR-02).
+       *
+       * Only set when the user pressed Accept on a `stage_transition`
+       * recommendation. Pressing Advance on the transition bar leaves it null,
+       * which is correct: nothing proposed that move, and recording a proposal
+       * that did not happen would be worse than recording none.
+       */
+      proposalId?: string
+    ) => {
       if (!stage || busy) return;
       setBusy(true);
       try {
@@ -302,6 +353,7 @@ export function WorkflowWorkspace({
             stage_id: stage.id,
             to_stage_id: option.toStageId ?? undefined,
             reason: note,
+            proposal_id: proposalId ?? null,
           },
           nextSeq
         );
@@ -320,6 +372,43 @@ export function WorkflowWorkspace({
     },
     [stage, busy, events, project, template, onPatchProject, setStageSummary, stageBundles]
   );
+
+  /**
+   * The recommendations surface — FR-13, FR-09, FR-01.
+   *
+   * Takes the pure exit-criteria `evaluation` (which is what guarantees a
+   * workflow recommendation on every stage) and the stored model evaluation
+   * (which supplies the contextual half where one has been paid for). Browsing
+   * an earlier stage disables it for the same reason it disables generation and
+   * evaluation: acting on a stage you are only looking at is never what was
+   * meant.
+   */
+  const recommendations = useRecommendations({
+    project,
+    template,
+    stage,
+    stageEvaluation: evaluation,
+    headVersion,
+    storedEvaluation: shownEvaluation,
+    modelRecommendation: stageEvaluation.recommendation,
+    onModelRecommendationConsumed: stageEvaluation.dismissRecommendation,
+    appendStageVersion,
+    /**
+     * Accepting a "move on to X" recommendation performs the move, and the
+     * event records which proposal it acted on.
+     *
+     * This is the one path in the product where a model's suggestion leads to
+     * a change of application state, so it is the path FR-02 is about. It uses
+     * the ordinary transition machinery — same event type, same summary write,
+     * same cursor patch — and adds only the citation, because a proposal-driven
+     * advance is not a different kind of advance.
+     */
+    onAcceptTransition: async (proposalId: string) => {
+      const move = transitions.find((t) => t.kind === 'advance' || t.kind === 'finish');
+      if (move) await handleTransition(move, undefined, proposalId);
+    },
+    enabled: isCurrent && events !== null,
+  });
 
   const handleToggleManual = useCallback(
     (id: string, checked: boolean) => {
@@ -422,7 +511,7 @@ export function WorkflowWorkspace({
 
   if (!stage) return null;
 
-  const stageVersions = stageBundles[stage.id]?.versions ?? [];
+  const stageVersions = stageVersionList;
 
   /**
    * The derived outline (FR-07), routed on `outline_stage` rather than on the
@@ -468,12 +557,31 @@ export function WorkflowWorkspace({
 
   return (
     <div className="flex min-h-screen">
+      {/* FR-09: what is about to happen, before it happens. Opening this makes
+          no model call — everything on it is computed from rows already in
+          memory, and nothing is spent until Apply is pressed. */}
+      {recommendations.previewing && (
+        <ApplyPreview
+          selected={recommendations.previewRows}
+          headVersionNumber={headVersion?.version_number ?? null}
+          stageLabel={stage.short_label}
+          applying={recommendations.busy}
+          error={recommendations.error}
+          onRemove={recommendations.removeFromPreview}
+          onApply={() => void recommendations.confirmApply()}
+          onCancel={recommendations.closePreview}
+        />
+      )}
+
+      {/* The template name and the progress line are the only persistent
+          orientation anywhere in the app — where you are and how much is left.
+          They were set in the smallest size available, below the stage names
+          they are meant to caption. The name is now a title and the progress a
+          label, so the block reads top-down instead of flat. */}
       <aside className="sticky top-0 hidden h-screen w-[248px] shrink-0 overflow-y-auto bg-[var(--surface-container-lowest)] px-2 py-6 md:block sidebar-scroll">
-        <div className="mb-4 px-3">
-          <div className="text-xs uppercase tracking-wider text-[var(--on-surface-variant)]">
-            {template.name}
-          </div>
-          <div className="mt-1 text-xs text-[var(--on-surface-variant)]">
+        <div className="mb-5 px-3">
+          <div className="text-title text-[var(--on-surface)]">{template.name}</div>
+          <div className="mt-1 text-label text-[var(--on-surface-variant)]">
             {progress.complete} done
             {progress.skipped > 0 && ` · ${progress.skipped} skipped`}
             {` · ${progress.remaining} to go`}
@@ -488,26 +596,138 @@ export function WorkflowWorkspace({
         />
       </aside>
 
+      {/* Below 768px the rail is hidden and, until now, replaced by nothing at
+          all: on a narrow window or a phone there was no way to see the other
+          stages, let alone move between them. The same rail is offered here as
+          a drawer over the work, opened from a bar that doubles as the
+          orientation the desktop rail provides — it is the only place a narrow
+          viewport can learn what stage it is on out of how many.
+
+          One `StageRail`, two placements. `md:hidden` on this and `md:block`
+          on the aside means exactly one is ever mounted. */}
+      {mobileRailOpen && (
+        <div className="fixed inset-0 z-50 flex md:hidden">
+          <div
+            className="absolute inset-0 bg-[var(--inverse-surface)]/40"
+            onClick={() => setMobileRailOpen(false)}
+            aria-hidden
+          />
+          <nav
+            aria-label="Workflow stages"
+            className="relative flex h-full w-[280px] max-w-[85vw] flex-col overflow-y-auto bg-[var(--surface-container-lowest)] px-2 py-5 sidebar-scroll"
+          >
+            <div className="mb-5 flex items-start gap-2 px-3">
+              <div className="min-w-0 flex-1">
+                <div className="text-title text-[var(--on-surface)]">{template.name}</div>
+                <div className="mt-1 text-label text-[var(--on-surface-variant)]">
+                  {progress.complete} done
+                  {progress.skipped > 0 && ` · ${progress.skipped} skipped`}
+                  {` · ${progress.remaining} to go`}
+                </div>
+              </div>
+              <button
+                onClick={() => setMobileRailOpen(false)}
+                aria-label="Close stages"
+                className="-mt-1 shrink-0 rounded-lg p-1.5 text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-low)] hover:text-[var(--on-surface)]"
+              >
+                <span aria-hidden className="material-symbols-outlined text-[20px]">
+                  close
+                </span>
+              </button>
+            </div>
+
+            <StageRail
+              template={template}
+              state={state}
+              nextSuggestedId={nextSuggested}
+              onSelect={(stageId) => {
+                setViewingStageId(stageId);
+                // Picking a stage is the point of the drawer; leaving it open
+                // over the stage you just chose hides the answer.
+                setMobileRailOpen(false);
+              }}
+            />
+          </nav>
+        </div>
+      )}
+
       <main className="min-w-0 flex-1 px-6 py-10 md:px-10">
         <div className="mx-auto max-w-[820px]">
+          {/* The narrow-viewport counterpart to the rail: where you are, how
+              much is left, and the way to the rest of the stages. Hidden from
+              md up, where the rail itself says all three. */}
+          <button
+            onClick={() => setMobileRailOpen(true)}
+            aria-expanded={mobileRailOpen}
+            className="mb-4 flex w-full items-center gap-3 rounded-xl bg-[var(--surface-container-lowest)] px-4 py-3 text-left transition-colors hover:bg-[var(--surface-container-low)] md:hidden"
+          >
+            <span
+              aria-hidden
+              className="material-symbols-outlined text-[20px] text-[var(--on-surface-variant)]"
+            >
+              list_alt
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-title text-[var(--on-surface)]">
+                {stage.short_label}
+              </span>
+              <span className="block text-label text-[var(--on-surface-variant)]">
+                Stage {stageIndex + 1} of {template.stages.length} · {progress.remaining} to go
+              </span>
+            </span>
+            <span
+              aria-hidden
+              className="material-symbols-outlined text-[20px] text-[var(--on-surface-variant)]"
+            >
+              chevron_right
+            </span>
+          </button>
+
+          <div className="mb-4 flex items-center justify-end">
+            <button
+              onClick={() => setChatOpen((open) => !open)}
+              aria-expanded={chatOpen}
+              aria-controls="stage-side-chat"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-low)] px-3 py-1.5 text-label text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
+            >
+              <span aria-hidden className="material-symbols-outlined text-[16px]">
+                forum
+              </span>
+              {chatOpen ? 'Hide side chat' : 'Side chat'}
+            </button>
+          </div>
+
           {!isCurrent && (
             <button
               onClick={() => setViewingStageId(null)}
-              className="mb-4 inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-low)] px-3 py-1.5 text-xs text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
+              className="mb-4 inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-low)] px-3 py-1.5 text-label text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
             >
               <span className="material-symbols-outlined text-[16px]">arrow_back</span>
               Viewing an earlier stage — back to {getStage(template, state.current_stage_id)?.short_label}
             </button>
           )}
 
+          {/* FR-20. Above the stage header rather than inside it: exporting is
+              a property of the project, not of whichever stage happens to be
+              open, and burying it in a stage would make it look like one. */}
+          <div className="mb-3 flex justify-end">
+            <ExportMenu
+              bundle={{
+                project,
+                template,
+                state,
+                events: events ?? [],
+                stages: bundles ?? {},
+                evaluations: evaluations ?? {},
+              }}
+            />
+          </div>
+
           <StageHeader
             stage={stage}
             status={state.stages[stage.id]?.status ?? 'not_started'}
             skippedReason={state.stages[stage.id]?.skipped_reason}
-            position={{
-              index: template.stages.findIndex((s) => s.id === stage.id) + 1,
-              total: template.stages.length,
-            }}
+            position={{ index: stageIndex + 1, total: template.stages.length }}
           />
 
           <div className="mb-8">
@@ -565,6 +785,14 @@ export function WorkflowWorkspace({
                 onEvaluate={stageEvaluation.evaluate}
                 evaluating={stageEvaluation.evaluating}
                 evaluationError={stageEvaluation.error}
+                generationFailure={generation.failure}
+                evaluationFailure={stageEvaluation.failure}
+                onDismissFailure={() => {
+                  generation.dismissFailure();
+                  stageEvaluation.dismissFailure();
+                }}
+                onSwitchModel={(model) => onPatchProject({ model })}
+                currentModel={project.model}
                 readOnly={!isCurrent}
                 evaluation={
                   evaluations?.[
@@ -577,22 +805,39 @@ export function WorkflowWorkspace({
           </div>
 
           <div className="space-y-4">
+            {/* The order below is the argument. The checklist states the gap;
+                the recommendations propose closing it; the evaluation is the
+                evidence some of them rest on, so it sits under the thing it
+                justifies rather than above it. Tasks are what was set aside,
+                and the transition bar is the way out. */}
             <ExitCriteriaChecklist
               criteria={evaluation.criteria}
               manualIds={manualIds}
               onToggleManual={handleToggleManual}
             />
 
+            <RecommendationsPanel
+              stageLabel={stage.short_label}
+              rows={recommendations.rows}
+              selected={recommendations.selected}
+              onToggleSelect={recommendations.toggleSelect}
+              onTriage={(rec, status, reason) => void recommendations.triage(rec, status, reason)}
+              onApply={recommendations.openPreview}
+              busy={recommendations.busy}
+              readOnly={!isCurrent}
+            />
+
             {/* Beside the exit criteria rather than under the artifact: both
                 answer "is this good enough to move on", and the criteria are
                 the declarative half of the same question the evaluation
                 answers by judgment. */}
-            <StageEvaluationPanel
-              evaluation={
-                evaluations?.[activeVersionId ?? stageVersions.at(-1)?.id ?? '']
-              }
-              recommendation={stageEvaluation.recommendation}
-              onDismissRecommendation={stageEvaluation.dismissRecommendation}
+            <StageEvaluationPanel evaluation={shownEvaluation} />
+
+            <TasksPanel
+              tasks={recommendations.tasks}
+              onResolve={(id, status) => void recommendations.resolveTask(id, status)}
+              busy={recommendations.busy}
+              readOnly={!isCurrent}
             />
 
             {/* Transitions act on the current stage only — browsing history
@@ -608,6 +853,56 @@ export function WorkflowWorkspace({
           </div>
         </div>
       </main>
+
+      {/* The side chat, in the workspace rather than on a route of its own —
+          section 8 asks for artifact, evaluation, versions and chat to sit
+          together. It reads the version currently on screen, so a question
+          asked while browsing an old version is a question about that version.
+
+          One mount, two positions: a rail beside the work on a wide screen, a
+          sheet over it on a narrow one. Mounting it twice would give the stage
+          two threads and two histories of the same conversation. */}
+      {chatOpen && (
+        <aside
+          id="stage-side-chat"
+          className="fixed inset-0 z-40 bg-[var(--surface)] p-4 lg:sticky lg:inset-auto lg:top-0 lg:z-auto lg:h-screen lg:w-[380px] lg:shrink-0 lg:bg-transparent lg:py-6 lg:pl-0 lg:pr-6"
+        >
+          <button
+            onClick={() => setChatOpen(false)}
+            className="mb-2 ml-auto flex items-center gap-1 rounded-lg px-2 py-1 text-label text-[var(--on-surface-variant)] lg:hidden"
+          >
+            <span aria-hidden className="material-symbols-outlined text-[18px]">
+              close
+            </span>
+            Close
+          </button>
+
+          <div className="h-[calc(100%-2rem)] lg:h-full">
+            <ChatPanel
+              project={project}
+              stageId={stage.id}
+              stageLabel={stage.label}
+              content={
+                (activeVersionId
+                  ? stageVersions.find((v) => v.id === activeVersionId)?.content
+                  : undefined) ??
+                stageVersions.at(-1)?.content ??
+                ''
+              }
+              headVersion={stageVersions.at(-1) ?? null}
+              appendStageVersion={appendStageVersion}
+              restoreStageVersion={restoreStageVersion}
+              readOnly={!isCurrent}
+              // Revising splices into the content it was handed, so instructing
+              // while reading an older version would append a version built
+              // from it and lose everything since. Discussion is unaffected.
+              canInstruct={
+                activeVersionId === null || activeVersionId === stageVersions.at(-1)?.id
+              }
+            />
+          </div>
+        </aside>
+      )}
     </div>
   );
 }

@@ -311,6 +311,29 @@ export interface ApplyAuditRequest {
   model?: string;
 }
 
+/**
+ * FR-09: apply accepted recommendations to a stage's artifact. One LLM call.
+ *
+ * `findings` is the recommendation list cast to `AuditFinding` by
+ * `asFinding()` in `lib/workflow/combine.ts` — which is why the backend needs
+ * no new prompt text, and why the combined instruction shown in the preview
+ * dialog is the one spliced into the prompt.
+ */
+export interface ApplyRecommendationsRequest {
+  inputs: PMInput;
+  /** The artifact as stored — Markdown for prose, the item document otherwise. */
+  content: string;
+  findings: AuditFinding[];
+  model?: string;
+}
+
+export interface ApplyRecommendationsResponse {
+  content: string;
+  /** The findings block that was sent. Stored as the new version's FR-10 instruction. */
+  instruction: string;
+  finish_reason: string;
+}
+
 // --- Custom Modes ---
 
 export interface CustomMode {

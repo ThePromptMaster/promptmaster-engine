@@ -224,8 +224,6 @@ describe('the evaluation panel', () => {
     render(
       <StageEvaluationPanel
         evaluation={evaluation()}
-        recommendation={null}
-        onDismissRecommendation={vi.fn()}
       />
     );
 
@@ -241,14 +239,16 @@ describe('the evaluation panel', () => {
     render(
       <StageEvaluationPanel
         evaluation={evaluation()}
-        recommendation={null}
-        onDismissRecommendation={vi.fn()}
       />
     );
-    const panel = screen.getByLabelText('Stage evaluation');
-    expect(panel.textContent).toMatch(/Alignment Low/);
-    expect(panel.textContent).toMatch(/Drift High/);
-    expect(panel.textContent).toMatch(/needs realignment/);
+    // Each score now sits in its own rating card with its explanation beside
+    // it (section 8), rather than on one comma-separated line — so the
+    // assertion is scoped to the card instead of to the panel's text.
+    expect(screen.getByLabelText('Alignment rating')).toHaveTextContent('Low');
+    expect(screen.getByLabelText('Drift rating')).toHaveTextContent('High');
+    expect(screen.getByLabelText('Stage evaluation').textContent).toMatch(
+      /needs realignment/i
+    );
   });
 
   it('says so when a clean artifact produced no findings', () => {
@@ -260,8 +260,6 @@ describe('the evaluation panel', () => {
           completeness_status: 'complete',
           completeness_reason: '',
         })}
-        recommendation={null}
-        onDismissRecommendation={vi.fn()}
       />
     );
     expect(screen.getByText(/no specific defects found/i)).toBeTruthy();
@@ -273,39 +271,35 @@ describe('the evaluation panel', () => {
     render(
       <StageEvaluationPanel
         evaluation={evaluation({ findings: undefined as unknown as AuditFinding[] })}
-        recommendation={null}
-        onDismissRecommendation={vi.fn()}
       />
     );
     expect(screen.getByText(/no specific defects found/i)).toBeTruthy();
   });
 
-  it('offers the recommendation with its rationale, and lets the user proceed', async () => {
-    const onDismiss = vi.fn();
-    render(
-      <StageEvaluationPanel
-        evaluation={evaluation()}
-        recommendation={RECOMMENDATION}
-        onDismissRecommendation={onDismiss}
-      />
-    );
+  it('no longer carries the recommendation — M4.2 took it', () => {
+    // This panel's docstring used to promise that M4.2 would own accept /
+    // modify / reject / apply and the `recommendations` table. It does, so the
+    // correction and its "Carry on without it" button have moved to
+    // RecommendationsPanel, where the recommendation is a durable row rather
+    // than React state that vanished on reload. What is left here is the
+    // evidence the recommendation rests on.
+    render(<StageEvaluationPanel evaluation={evaluation()} />);
 
-    expect(screen.getByText(RECOMMENDATION.title)).toBeTruthy();
-    // FR-14's rationale fields, which is why they survive the parse.
-    expect(screen.getByText(/Alignment Low and drift High/)).toBeTruthy();
-    expect(screen.getByText(/positioning stage only/)).toBeTruthy();
+    const panel = screen.getByLabelText('Stage evaluation');
+    expect(panel.textContent).not.toContain(RECOMMENDATION.title);
+    expect(screen.queryByRole('button', { name: /carry on without it/i })).toBeNull();
 
-    // FR-12: proceeding without applying is a first-class option.
-    await userEvent.click(screen.getByRole('button', { name: /carry on without it/i }));
-    expect(onDismiss).toHaveBeenCalledTimes(1);
+    // The findings and scores did not move.
+    expect(screen.getByText(/2 findings/i)).toBeTruthy();
+    // Whitespace-agnostic: M4.3 split the one-line score row into per-rating
+    // cards, so the words are no longer adjacent in the markup.
+    expect(panel.textContent).toMatch(/Alignment\s*Low/);
   });
 
   it('renders nothing at all before anything has been evaluated', () => {
     const { container } = render(
       <StageEvaluationPanel
         evaluation={undefined}
-        recommendation={null}
-        onDismissRecommendation={vi.fn()}
       />
     );
     expect(container.firstChild).toBeNull();

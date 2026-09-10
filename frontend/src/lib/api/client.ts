@@ -19,6 +19,8 @@ import type {
   AuditFindingsRequest,
   AuditFindingsResponse,
   ApplyAuditRequest,
+  ApplyRecommendationsRequest,
+  ApplyRecommendationsResponse,
   ContinuitySnapshot,
   DetectLongFormResponse,
   GenerateOutlineResponse,
@@ -30,15 +32,97 @@ import type {
   GenerateStageArtifactResponse,
 } from '@/types';
 import { createClient } from '@/lib/supabase/client';
+import {
+  REQUEST_ID_HEADER,
+  USAGE_HEADER,
+  parseUsageHeader,
+} from '@/lib/observability/usage';
+import {
+  currentUsageProject,
+  recordErrorEvent,
+  recordModelUsage,
+} from '@/lib/supabase/model-usage';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-/** An API failure that carries the HTTP status, so callers can branch on 401. */
+/** FR-18: the pre-flight answer to "is this a large job?". Mirrors `EstimateJobResponse`. */
+export interface JobEstimate {
+  section_count: number;
+  llm_calls: number;
+  estimated_tokens_in: number;
+  estimated_tokens_out: number;
+  /** null when the model's price is unknown. Render as "cost unknown", not $0. */
+  estimated_cost_usd: number | null;
+  is_large: boolean;
+  /** The sentence to show. Written server-side so copy and threshold cannot drift. */
+  warning: string | null;
+}
+
+/**
+ * An API failure that carries the HTTP status, so callers can branch on 401 —
+ * and, since FR-16, the backend's classification of what actually went wrong.
+ *
+ * `message` is the plain-language recovery sentence when the server classified
+ * the failure, and the raw detail string when it did not. `technical` is the
+ * unvarnished cause, which is what the "view technical details" disclosure
+ * shows; it is deliberately never the thing rendered by default.
+ */
 export class ApiError extends Error {
-  constructor(message: string, readonly status: number) {
+  readonly code?: string;
+  readonly title?: string;
+  readonly retryable?: boolean;
+  readonly retryAfter?: number | null;
+  readonly technical?: string;
+  readonly providerStatus?: number | null;
+
+  constructor(
+    message: string,
+    readonly status: number,
+    classified?: {
+      code?: string;
+      title?: string;
+      retryable?: boolean;
+      retryAfter?: number | null;
+      technical?: string;
+      providerStatus?: number | null;
+    }
+  ) {
     super(message);
     this.name = 'ApiError';
+    Object.assign(this, classified ?? {});
   }
+}
+
+/**
+ * FastAPI serialises `detail` verbatim, so it arrives as either the legacy
+ * string or the FR-16 object. Reading both keeps a client deployed ahead of
+ * the backend — or behind it — working rather than showing "API error: 502".
+ */
+function toApiError(body: unknown, status: number): ApiError {
+  const detail = (body as { detail?: unknown } | null)?.detail;
+
+  if (detail && typeof detail === 'object') {
+    const d = detail as Record<string, unknown>;
+    const message =
+      typeof d.message === 'string' && d.message
+        ? d.message
+        : typeof d.detail === 'string'
+          ? d.detail
+          : `API error: ${status}`;
+    return new ApiError(message, status, {
+      code: typeof d.code === 'string' ? d.code : undefined,
+      title: typeof d.title === 'string' ? d.title : undefined,
+      retryable: typeof d.retryable === 'boolean' ? d.retryable : undefined,
+      retryAfter: typeof d.retry_after === 'number' ? d.retry_after : null,
+      technical: typeof d.detail === 'string' ? d.detail : undefined,
+      providerStatus: typeof d.provider_status === 'number' ? d.provider_status : null,
+    });
+  }
+
+  return new ApiError(
+    typeof detail === 'string' ? detail : `API error: ${status}`,
+    status
+  );
 }
 
 /**
@@ -83,30 +167,109 @@ function refreshSessionOnce(): Promise<boolean> {
   return refreshInFlight;
 }
 
-async function rawFetch(path: string, options?: RequestInit): Promise<Response> {
+/**
+ * FR-19: one id, followed across the client, the API, and the drain.
+ *
+ * Generated here rather than server-side so that a request which never arrives
+ * — a network failure, a CORS rejection, a cold-start timeout — still has an id
+ * to report. The backend adopts an inbound `X-Request-Id` rather than minting
+ * its own, so this is the id that appears in its log lines and on the
+ * `model_usage` row.
+ */
+function newRequestId(): string {
+  try {
+    return crypto.randomUUID().replace(/-/g, '');
+  } catch {
+    // `crypto.randomUUID` needs a secure context. Correlation is not security,
+    // so a weaker id here is fine; having none is not.
+    return `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+  }
+}
+
+async function rawFetch(
+  path: string,
+  options: RequestInit | undefined,
+  requestId: string
+): Promise<Response> {
+  const projectId = currentUsageProject();
   return fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      [REQUEST_ID_HEADER]: requestId,
+      // Attribution only — the backend uses it to tag its log lines. It is not
+      // an authorisation input on either side, and it is absent outside a
+      // project, which is a real and expected state.
+      ...(projectId ? { 'X-PromptMaster-Project': projectId } : {}),
       ...(await authHeader()),
       ...options?.headers,
     },
   });
 }
 
+/**
+ * Read one response header without ever throwing.
+ *
+ * A `Response` from the platform always has `headers`, but this is the only
+ * thing standing between a stubbed or exotic response object and a request path
+ * that dies on telemetry. The whole design commitment is that metering can lose
+ * a row but must never lose a generation, and that commitment is worth four
+ * lines rather than an assumption.
+ */
+function header(res: Response, name: string): string | null {
+  try {
+    return res.headers?.get(name) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * FR-18: persist what the request spent, off the response header.
+ *
+ * Deliberately not awaited by the caller. Metering is bookkeeping attached to a
+ * response the user is already looking at; making them wait on an insert to see
+ * their own generation would be the wrong trade in every case. Failures inside
+ * are swallowed by `recordModelUsage` itself.
+ */
+function meter(res: Response, path: string, requestId: string): void {
+  const events = parseUsageHeader(header(res, USAGE_HEADER));
+  if (events.length === 0) return;
+  void recordModelUsage(events, { route: path, requestId });
+}
+
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  let res = await rawFetch(path, options);
+  const requestId = newRequestId();
+  let res = await rawFetch(path, options, requestId);
 
   // An expired token is the common case and is silently recoverable; retry once.
   if (res.status === 401 && (await refreshSessionOnce())) {
-    res = await rawFetch(path, options);
+    // A retry is a second billable request, so it carries a second id rather
+    // than reusing the first — otherwise two sets of usage rows would collapse
+    // onto one correlation id and the log would show one request that somehow
+    // spent twice.
+    meter(res, path, requestId);
+    res = await rawFetch(path, options, newRequestId());
   }
+
+  // Read usage before branching on `ok`: a request can fail *after* spending
+  // money. A stage generation whose evaluation call 502s has already paid for
+  // the generation, and that is exactly the spend an operator needs to see.
+  meter(res, path, header(res, REQUEST_ID_HEADER) ?? requestId);
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ detail: res.statusText }));
-    const detail =
-      typeof body?.detail === 'string' ? body.detail : `API error: ${res.status}`;
-    throw new ApiError(detail, res.status);
+    const error = toApiError(body, res.status);
+    void recordErrorEvent({
+      code: error.code ?? 'unknown',
+      title: error.title ?? '',
+      message: error.message,
+      technical: error.technical,
+      route: path,
+      requestId: header(res, REQUEST_ID_HEADER) ?? requestId,
+      httpStatus: res.status,
+    });
+    throw error;
   }
   return res.json();
 }
@@ -197,6 +360,21 @@ export const api = {
 
   async continueDocument(req: ContinueDocumentRequest): Promise<IterationFromConversationResponse> {
     return apiFetch('/api/continue-document', {
+      method: 'POST',
+      body: JSON.stringify(req),
+    });
+  },
+
+  /**
+   * FR-18: what a drafting run will cost, before it is enqueued.
+   *
+   * Makes no LLM call — it is arithmetic over the backend's own limits plus the
+   * live OpenRouter price. A warning that costs a model call to produce, or
+   * that arrives after a round-trip the user will not wait through, is a
+   * warning nobody sees.
+   */
+  async estimateJob(req: { section_count: number; model?: string }): Promise<JobEstimate> {
+    return apiFetch('/api/estimate-job', {
       method: 'POST',
       body: JSON.stringify(req),
     });
@@ -305,6 +483,27 @@ export const api = {
     return apiFetch('/api/apply-audit', {
       method: 'POST',
       body: JSON.stringify(req),
+    });
+  },
+
+  /**
+   * Apply accepted recommendations to a stage's artifact. 1 LLM call. FR-09.
+   *
+   * Deliberately not `applyAudit`, which runs the four-call iteration pipeline
+   * and scores the result against `inputs.objective` — the wrong bar for a
+   * stage artifact, and three discarded results.
+   *
+   * Interruptible for the same reason drafting and evaluation are: a response
+   * landing on a stage the user has left is worse than no response.
+   */
+  async applyRecommendations(
+    req: ApplyRecommendationsRequest,
+    signal?: AbortSignal
+  ): Promise<ApplyRecommendationsResponse> {
+    return apiFetch('/api/apply-recommendations', {
+      method: 'POST',
+      body: JSON.stringify(req),
+      signal,
     });
   },
 

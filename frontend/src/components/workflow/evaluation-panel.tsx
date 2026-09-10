@@ -1,39 +1,39 @@
 'use client';
 
 /**
- * What a stage evaluation found — FR-11, minimally.
+ * What a stage evaluation found — FR-11.
  *
- * Deliberately not the recommendations surface. M4.2 owns accept / modify /
- * reject / apply and the `recommendations` table; this panel exists so the
- * findings that M4.1 now persists are *visible*, and so the corrective
- * recommendation the same call produced is not thrown away silently between
- * being returned and being renderable.
+ * **This panel got smaller in M4.2, and that was the plan.** It used to carry
+ * the corrective recommendation and a "Carry on without it" button, with a
+ * docstring promising that M4.2 would own accept / modify / reject / apply and
+ * the `recommendations` table. That promise is discharged: the recommendation
+ * block now lives in `RecommendationsPanel`, where it can be accepted,
+ * applied, deferred or dismissed with a reason, and where it is a durable row
+ * rather than React state that vanished on reload.
  *
- * The one interaction here is Dismiss, which clears the recommendation from
- * view and nothing else. FR-12 says a user "may accept, modify, reject, or
- * proceed without applying it" — proceeding without applying is the only one
- * of the four this milestone can honestly offer, so it is the only one shown.
+ * What is left here is the evidence, which is what an evaluation panel should
+ * be: the four scores, the incompleteness note, the interpretation bullets and
+ * the findings. The panel sits *below* the recommendations for that reason —
+ * the recommendations propose, and this is what they rest on.
+ *
+ * FR-12's four options are now all genuinely available, and none of them are
+ * here: accept and modify are the apply preview, reject is Dismiss with a
+ * reason, and proceeding without applying is simply not acting — which costs
+ * nothing and blocks nothing, exactly as the transition bar stays enabled.
  */
 
+import { EvaluationRatings } from './evaluation-ratings';
 import type { Evaluation } from '@/types/project';
-import type { StageRecommendation } from '@/types';
 
 interface Props {
   evaluation: Evaluation | undefined;
-  recommendation: StageRecommendation | null;
-  onDismissRecommendation: () => void;
 }
 
-export function StageEvaluationPanel({
-  evaluation,
-  recommendation,
-  onDismissRecommendation,
-}: Props) {
+export function StageEvaluationPanel({ evaluation }: Props) {
   const findings = evaluation?.findings ?? [];
   const interpretation = evaluation?.interpretation ?? null;
-  const incomplete = evaluation?.completeness_status === 'incomplete';
 
-  if (!evaluation && !recommendation) return null;
+  if (!evaluation) return null;
 
   return (
     <section
@@ -44,18 +44,24 @@ export function StageEvaluationPanel({
         Evaluation
       </h3>
 
+      {/* Section 8: each rating carries its explanation, affected area and
+          corrective action. What stood here was the three scores on one line —
+          numbers alone, with the stored explanations displayed nowhere.
+          Completeness moved in as a fourth rating rather than a conditional
+          line of prose below the scores. */}
       {evaluation && (
-        <p className="mt-2 text-label text-[var(--on-surface-variant)]">
-          Alignment {evaluation.alignment_score} · Clarity {evaluation.clarity_score} · Drift{' '}
-          {evaluation.drift_score}
-          {evaluation.needs_realignment && ' · needs realignment'}
-        </p>
-      )}
-
-      {incomplete && evaluation?.completeness_reason && (
-        <p className="mt-2 text-body text-[var(--pm-tertiary)]">
-          Incomplete: {evaluation.completeness_reason}
-        </p>
+        <>
+          {evaluation.needs_realignment && (
+            <p className="mt-2 text-label text-[var(--pm-error)]">Needs realignment</p>
+          )}
+          {findings.length > 0 && (
+            <p className="mt-2 text-label text-[var(--on-surface-variant)]">
+              {findings.length} finding{findings.length === 1 ? '' : 's'}, shown against the
+              rating each one affects.
+            </p>
+          )}
+          <EvaluationRatings evaluation={evaluation} />
+        </>
       )}
 
       {interpretation && interpretation.bullets.length > 0 && (
@@ -71,61 +77,15 @@ export function StageEvaluationPanel({
         </div>
       )}
 
-      {findings.length > 0 && (
-        <div className="mt-4">
-          <p className="text-label text-[var(--on-surface-variant)]">
-            {findings.length} finding{findings.length === 1 ? '' : 's'}
-          </p>
-          <ul className="mt-2 space-y-3">
-            {findings.map((finding) => (
-              <li key={finding.id}>
-                <p className="text-label uppercase tracking-wider text-[var(--on-surface-variant)]">
-                  {finding.category}
-                </p>
-                <p className="text-body text-[var(--on-surface)]">{finding.summary}</p>
-                <p className="text-body text-[var(--on-surface-variant)]">
-                  {finding.suggested_change}
-                </p>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      {/* Findings are no longer listed separately here: each one is shown as
+          the corrective action of the rating it speaks to, and the ones that
+          match no dimension are grouped by EvaluationRatings. Listing them
+          twice made the same sentence read as two different problems. */}
 
-      {evaluation && findings.length === 0 && (
+      {findings.length === 0 && (
         <p className="mt-4 text-body text-[var(--on-surface-variant)]">
           No specific defects found.
         </p>
-      )}
-
-      {recommendation && (
-        <div className="mt-5 rounded-lg bg-[var(--surface-container-high)] px-4 py-3">
-          <p className="text-label uppercase tracking-wider text-[var(--on-surface-variant)]">
-            Suggested correction
-          </p>
-          <p className="mt-1 text-body text-[var(--on-surface)]">{recommendation.title}</p>
-          {recommendation.triggering_issue && (
-            <p className="mt-1 text-body text-[var(--on-surface-variant)]">
-              Because: {recommendation.triggering_issue}
-            </p>
-          )}
-          {recommendation.expected_benefit && (
-            <p className="text-body text-[var(--on-surface-variant)]">
-              Would give you: {recommendation.expected_benefit}
-            </p>
-          )}
-          {recommendation.scope && (
-            <p className="text-body text-[var(--on-surface-variant)]">
-              Affects: {recommendation.scope}
-            </p>
-          )}
-          <button
-            onClick={onDismissRecommendation}
-            className="mt-3 rounded-lg px-3 py-1.5 text-label text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-highest)] hover:text-[var(--on-surface)]"
-          >
-            Carry on without it
-          </button>
-        </div>
       )}
     </section>
   );

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { appendVersion, restoreVersion } from './versions';
+import { VersionConflictError } from '@/types/project';
 import type { Artifact, ArtifactVersion, Evaluation } from '@/types/project';
 
 function makeSupabase() {
@@ -116,7 +117,7 @@ beforeEach(() => {
 describe('appendVersion', () => {
   it('numbers the new version after the current head', async () => {
     supa.current!.queue(version({ id: 'v4', version_number: 4 }));
-    supa.current!.queue(null); // head-pointer update
+    supa.current!.queue({ id: 'a1' }); // head-pointer update matched a row
 
     await appendVersion(artifact(), { content: 'next', source_operation: 'refine' });
 
@@ -125,7 +126,7 @@ describe('appendVersion', () => {
 
   it('links the new version to the one it supersedes', async () => {
     supa.current!.queue(version({ id: 'v4', version_number: 4 }));
-    supa.current!.queue(null);
+    supa.current!.queue({ id: 'a1' }); // head update matched a row
 
     await appendVersion(artifact(), { content: 'next', source_operation: 'refine' });
 
@@ -134,7 +135,7 @@ describe('appendVersion', () => {
 
   it('moves the artifact head to the new version', async () => {
     supa.current!.queue(version({ id: 'v4', version_number: 4 }));
-    supa.current!.queue(null);
+    supa.current!.queue({ id: 'a1' }); // head update matched a row
 
     await appendVersion(artifact(), { content: 'next', source_operation: 'refine' });
 
@@ -156,10 +157,46 @@ describe('appendVersion', () => {
   });
 });
 
+describe('two tabs appending to one artifact', () => {
+  it('names the lost race instead of leaking a Postgres error', async () => {
+    // av_artifact_version_uidx (artifact_id, version_number) refuses the second
+    // insert. Two open windows used to look like a crash.
+    supa.current!.queue(null, { code: '23505', message: 'duplicate key value' });
+
+    const err = await appendVersion(artifact(), {
+      content: 'next',
+      source_operation: 'refine',
+    }).catch((e) => e);
+
+    expect(err).toBeInstanceOf(VersionConflictError);
+    expect(err.reason).toBe('taken');
+    // Nothing was written, so the honest advice is simply to retry.
+    expect(err.message).toMatch(/Nothing was lost/i);
+  });
+
+  it('does not silently leave a version behind an unmoved head', async () => {
+    // The revision guard was always here; nothing read its result. A stale
+    // revision matches zero rows and returns NO error, so the version was
+    // written and the artifact went on pointing at the older one.
+    supa.current!.queue(version({ id: 'v4', version_number: 4 }));
+    supa.current!.queue(null); // zero rows matched: revision was stale
+
+    const err = await appendVersion(artifact(), {
+      content: 'next',
+      source_operation: 'refine',
+    }).catch((e) => e);
+
+    expect(err).toBeInstanceOf(VersionConflictError);
+    expect(err.reason).toBe('stale-head');
+    // The work exists — the words have to say so, or a user redoes it.
+    expect(err.message).toMatch(/saved/i);
+  });
+});
+
 describe('restoreVersion', () => {
   it('appends a new version rather than mutating history', async () => {
     supa.current!.queue(version({ id: 'v4', version_number: 4 }));
-    supa.current!.queue(null); // head update
+    supa.current!.queue({ id: 'a1' }); // head update matched a row
     supa.current!.queue(null); // no prior evaluation
 
     await restoreVersion(artifact(), version({ id: 'v2', version_number: 2 }));
@@ -172,7 +209,7 @@ describe('restoreVersion', () => {
 
   it('carries the old content forward verbatim', async () => {
     supa.current!.queue(version({ id: 'v4', version_number: 4 }));
-    supa.current!.queue(null);
+    supa.current!.queue({ id: 'a1' }); // head update matched a row
     supa.current!.queue(null);
 
     await restoreVersion(
@@ -188,7 +225,7 @@ describe('restoreVersion', () => {
     // money and could return a different score for the same text — which reads
     // to a user as a bug.
     supa.current!.queue(version({ id: 'v4', version_number: 4 }));
-    supa.current!.queue(null);
+    supa.current!.queue({ id: 'a1' }); // head update matched a row
     supa.current!.queue(evaluation({ alignment_score: 'Medium' }));
     supa.current!.queue(evaluation());
 
@@ -201,7 +238,7 @@ describe('restoreVersion', () => {
 
   it('still restores when the target was never evaluated', async () => {
     supa.current!.queue(version({ id: 'v4', version_number: 4 }));
-    supa.current!.queue(null);
+    supa.current!.queue({ id: 'a1' }); // head update matched a row
     supa.current!.queue(null); // no evaluation
 
     await expect(

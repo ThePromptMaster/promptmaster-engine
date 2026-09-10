@@ -35,6 +35,7 @@ import logging
 import uuid
 
 from .conversation import _shared_system
+from .errors import PRESERVED_EVALUATION, classify_error
 from .llm_client import OpenRouterClient
 from .schemas import (
     AuditFinding,
@@ -316,18 +317,34 @@ def parse_stage_evaluation(result: dict) -> StageEvaluationResponse:
     )
 
 
-def _failed(reason: str) -> StageEvaluationResponse:
+def _failed(reason: str, error: BaseException | None = None) -> StageEvaluationResponse:
     """A total failure still returns a shape the UI can render.
 
     Middle scores with the error in the explanation, rather than an exception:
     an evaluation the user asked for and paid for should not take the stage
     down with it, and 'Medium — evaluation error' is honest about what happened.
+
+    FR-16: the explanation used to be `f"Evaluation error: {e}"`, which is how
+    ``Evaluation error: OpenRouter API error: HTTP 402`` ended up printed three
+    times inside a scorecard. Degrading gracefully is still the right call —
+    the exception is deliberately not re-raised — but the sentence the user
+    reads is now the classified one, and it says what survived.
     """
+    plain = (
+        classify_error(error).with_preserved(PRESERVED_EVALUATION).message
+        if error is not None
+        else f"This stage could not be scored. Nothing was lost — {PRESERVED_EVALUATION}."
+    )
+    # The raw cause is kept, at the end and in parentheses. FR-16 lists "view
+    # technical details" among the actions, and a scorecard has no disclosure
+    # widget to hide it behind — so it goes last, after the sentence a person
+    # can act on, rather than first as the whole message.
+    explanation = f"{plain} (Technical detail: {reason})"
     return StageEvaluationResponse(
         evaluation=EvaluationResult(
-            alignment=DimensionScore(score="Medium", explanation=f"Evaluation error: {reason}"),
-            drift=DimensionScore(score="Medium", explanation=f"Evaluation error: {reason}"),
-            clarity=DimensionScore(score="Medium", explanation=f"Evaluation error: {reason}"),
+            alignment=DimensionScore(score="Medium", explanation=explanation),
+            drift=DimensionScore(score="Medium", explanation=explanation),
+            clarity=DimensionScore(score="Medium", explanation=explanation),
         ),
         recommendation=None,
     )
@@ -365,7 +382,7 @@ async def evaluate_stage_artifact(
         )
     except Exception as e:
         logger.error(f"Stage evaluation failed for {stage.id}: {e}")
-        return _failed(str(e))
+        return _failed(str(e), e)
 
     if not isinstance(result, dict):
         logger.warning(f"Stage evaluation for {stage.id} returned a non-object")

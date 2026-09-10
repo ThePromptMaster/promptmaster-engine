@@ -129,9 +129,9 @@ export function CustomSelect({
         disabled={disabled}
         onClick={() => (open ? setOpen(false) : openList())}
         onKeyDown={handleKeyDown}
-        className={`w-full flex items-center justify-between gap-2 px-4 py-3 bg-[var(--surface-container-low)] rounded-lg text-sm text-left transition-all duration-200 outline-none ${
+        className={`w-full flex items-center justify-between gap-2 px-4 py-3 bg-[var(--surface-container-low)] rounded-lg text-body text-left transition-all duration-200 outline-none ${
           open
-            ? 'ring-2 ring-[var(--pm-primary)]/40 bg-white'
+            ? 'ring-2 ring-[var(--pm-primary)]/40 bg-[var(--surface-container-lowest)]'
             : 'hover:bg-[var(--surface-container-high)]'
         } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
       >
@@ -153,7 +153,9 @@ export function CustomSelect({
           id={listId}
           role="listbox"
           aria-label={ariaLabel}
-          className="absolute z-50 mt-1 w-full max-h-60 overflow-auto rounded-xl bg-white shadow-lg shadow-black/10 border border-[var(--outline-variant)]/20 py-1 custom-scrollbar"
+          // Tonal separation and an ambient shadow lift the list off the page;
+          // the 1px hairline it used to carry is not how this system separates.
+          className="absolute z-50 mt-1 w-full max-h-60 overflow-auto rounded-xl bg-[var(--surface-container-lowest)] shadow-lg shadow-black/10 py-1 custom-scrollbar"
         >
           {options.map((option, index) => (
             <li
@@ -163,7 +165,7 @@ export function CustomSelect({
               aria-selected={option.value === value}
               onClick={() => commit(index)}
               onMouseEnter={() => setActiveIndex(index)}
-              className={`cursor-pointer px-4 py-2.5 text-sm transition-colors ${
+              className={`cursor-pointer px-4 py-2.5 text-body transition-colors ${
                 option.value === value
                   ? 'bg-[var(--primary-fixed)]/30 text-[var(--pm-primary)] font-medium'
                   : index === activeIndex
@@ -173,7 +175,7 @@ export function CustomSelect({
             >
               <span className="block">{option.label}</span>
               {option.description && (
-                <span className="block text-[11px] text-[var(--on-surface-variant)] leading-tight mt-0.5">
+                <span className="block text-label text-[var(--on-surface-variant)] leading-tight mt-0.5">
                   {option.description}
                 </span>
               )}

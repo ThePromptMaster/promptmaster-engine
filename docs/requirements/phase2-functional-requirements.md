@@ -1,4 +1,4 @@
-# Phase 2 Functional Requirements (FR-01 – FR-23)
+# Phase 2 Functional Requirements (FR-01 – FR-23) and Sections 8 – 12
 
 Verbatim from Exhibit A of the First Amendment to the Joint Development Agreement
 (Phase 2). **This is contract text — do not paraphrase it here, and do not treat a
@@ -8,6 +8,13 @@ Extracted into the repository on 2026-09-08, after an implementation pass had to
 FR-11 through FR-15 existed nowhere in the codebase, and the only surviving trace was
 two paraphrase fragments in a migration comment. Requirements that live only in a
 contract on someone's laptop get built from memory, which is how they get built wrong.
+
+Sections 8 through 12 were added on 2026-09-09, for the same reason: **section 12 is
+the Definition of Done** — the acceptance bar this work is measured against — and it
+existed only in the `.docx`. Section 7 (the FRs) is below; sections 8 to 12 follow it.
+Exhibit B, the product roadmap, is in
+[`phase2-roadmap-exhibit-b.md`](phase2-roadmap-exhibit-b.md); it is attached to the
+Amendment for reference only and is **not** a scope commitment.
 
 ---
 
@@ -216,3 +223,94 @@ Phase 2 includes technical documentation and the access needed for PromptMaster 
 
 Architecture, schemas, API boundaries, deployment, environment variables, job system, tests, limitations, and extension points are documented.
 Repository, deployment, database, provider, logging, and other agreed administrative access is transferred or confirmed.
+
+---
+
+# 8. User Experience Requirements
+
+New-user entry: Offer Start Building and an optional concise framework-learning path; the educational path is an experiment, not primarily a book-sales funnel.
+
+Project creation: Collect title, objective, audience, constraints, and workflow with optional clarification assistance.
+
+Project home: Immediately show objective, current stage, primary artifact, recent activity, next recommendation, progress, and unresolved work.
+
+Main workspace: Integrate project state, artifact, side chat, recommendations, evaluation, and versions without forcing users through disconnected product paths.
+
+Long-form status: Show active phase, current section, completed/remaining sections, saved progress, and whether the system is planning, drafting, expanding, evaluating, or polishing.
+
+Side chat modes: Support discussion that does not modify the artifact and modification instructions that can be applied to a selected scope.
+
+Evaluation display: Show each rating with explanation, affected area, and corrective action rather than numbers alone.
+
+Stage transition: Show exit-criteria status, unresolved items, rationale, and options to advance, remain, return, or skip.
+
+Completion: Show completed stages, unresolved issues, final evaluation, export choices, and logical next actions rather than simply stopping.
+
+# 9. Security, Trust, and Operations
+
+Supabase Auth or agreed equivalent for email/password and retained OAuth login.
+
+Authenticated route handlers and API requests.
+
+Row-level security or equivalent database-enforced user isolation.
+
+Provider keys stored only as server-side secrets.
+
+Rate limiting and usage metering appropriate for controlled beta.
+
+Server-side error, job, and security-event logging.
+
+Defined backup and recovery responsibility.
+
+Feature flags for experimental functionality where practical.
+
+Early-beta notice reviewed by counsel.
+
+# 10. Real-World Validation Framework
+
+Phase 2 success is not limited to technical completion. Controlled beta testing should identify whether users experience repeatable value.
+
+Who is the user and what recurring task are they attempting?
+
+What problem occurs when the user performs that task in a general AI interface?
+
+Where does PromptMaster reduce reconstruction, drift, repetition, or uncertainty?
+
+Can the user resume the project without rebuilding context?
+
+Does the user understand the next step?
+
+Does the user return voluntarily?
+
+Would the user recommend, pay for, or advocate for wider adoption?
+
+# 11. Phase Classification
+
+| Required Phase 2 Core | Optional / Hourly Enhancements | Deferred Roadmap |
+| --- | --- | --- |
+| Persistent project/state system | Free sample chapter onboarding | Multi-agent orchestration |
+| Book and Research workflows | Saved action sets and custom workflows | MCP server/client implementation |
+| Queued resumable long-form generation | Advanced semantic retrieval | Enterprise SAML/SCIM |
+| Editing, Apply-to-Output, versions | Additional export formats | On-prem deployment |
+| Evaluation, recommendations, rationale | Model comparison/routing enhancements | Cross-project learning |
+| Security, documentation, account control | Advanced analytics and dashboards | Marketplace and organizational memory |
+
+# 12. Definition of Done
+
+Required milestones and acceptance tests are completed.
+
+Book Workflow and Research Workflow demonstrations pass.
+
+Long-form interruption-and-resume test passes.
+
+Required editing, versioning, evaluation, recommendation, and user-isolation tests pass.
+
+Critical and unwaived high-severity defects are resolved.
+
+Controlled beta is deployed and operational.
+
+Documentation and known-limitations register are delivered.
+
+Source code and agreed administrative access are controlled by Moran or PromptMaster LLC.
+
+Ownership and IP obligations in the primary development agreement are satisfied.

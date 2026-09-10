@@ -33,6 +33,7 @@ import {
 } from '@/lib/supabase/jobs';
 import type { OutlineSection } from '@/types';
 import type { StageRendererProps } from './types';
+import { LargeJobWarning, isLargeJob } from '@/components/workflow/large-job-warning';
 
 /** Statuses that mean the server still has work to do. */
 const PENDING_STATUSES = new Set(['queued', 'leased']);
@@ -65,6 +66,8 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  // FR-18: gate a large drafting run behind an explicit confirmation.
+  const [confirmingLargeJob, setConfirmingLargeJob] = useState(false);
 
   const outline = useMemo<OutlineSection[]>(() => state?.outline ?? [], [state]);
   const complete = outline.filter((s) => s.status === 'complete').length;
@@ -124,8 +127,26 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
     [refreshJobs, onRefresh, complete, outline.length]
   );
 
+  /**
+   * FR-18: ask before committing to a large run.
+   *
+   * Counted over the sections that will *actually* be drafted — completed ones
+   * collide on their idempotency key and cost nothing, so including them would
+   * warn about spending that is not going to happen.
+   */
+  const pendingSectionCount = outline.filter((s) => s.status !== 'complete').length;
+
+  const requestDrafting = () => {
+    if (isLargeJob(pendingSectionCount)) {
+      setConfirmingLargeJob(true);
+      return;
+    }
+    void startDrafting();
+  };
+
   const startDrafting = () =>
     run(async () => {
+      setConfirmingLargeJob(false);
       if (!artifactId) throw new Error('This stage has no artifact to draft into.');
       // Enqueue every section that is not already written. Sections that are
       // done collide on their idempotency key and quietly do nothing, which is
@@ -224,9 +245,9 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
               ) : (
                 <button
                   type="button"
-                  onClick={startDrafting}
+                  onClick={requestDrafting}
                   disabled={busy || complete === outline.length}
-                  className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label font-semibold text-white disabled:opacity-50"
+                  className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label font-semibold text-[var(--on-primary)] disabled:opacity-50"
                 >
                   {complete === 0 ? 'Start drafting' : 'Resume drafting'}
                 </button>
@@ -244,6 +265,15 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
           />
         </div>
       </Panel>
+
+      {confirmingLargeJob && (
+        <LargeJobWarning
+          sectionCount={pendingSectionCount}
+          model={project.model}
+          onConfirm={() => void startDrafting()}
+          onCancel={() => setConfirmingLargeJob(false)}
+        />
+      )}
 
       {actionError && <Notice tone="error">{actionError}</Notice>}
 

@@ -23,8 +23,8 @@ export function ExitCriteriaChecklist({ criteria, manualIds, onToggleManual }: P
   return (
     <section className="rounded-xl bg-[var(--surface-container-low)] px-5 py-4">
       <header className="mb-3 flex items-baseline justify-between">
-        <h3 className="text-sm font-medium text-[var(--on-surface)]">Before moving on</h3>
-        <span className="text-xs text-[var(--on-surface-variant)]">
+        <h3 className="text-title text-[var(--on-surface)]">Before moving on</h3>
+        <span className="text-label text-[var(--on-surface-variant)]">
           {met} of {criteria.length}
         </span>
       </header>
@@ -37,7 +37,7 @@ export function ExitCriteriaChecklist({ criteria, manualIds, onToggleManual }: P
           return (
             <li key={c.id}>
               <Row
-                className={`flex items-start gap-2.5 text-sm ${
+                className={`flex items-start gap-2.5 text-body ${
                   isManual ? 'cursor-pointer' : ''
                 }`}
               >
@@ -71,12 +71,12 @@ export function ExitCriteriaChecklist({ criteria, manualIds, onToggleManual }: P
                   {c.label}
                   {/* Say what is actually missing — "3 of 5" beats a red cross. */}
                   {!c.satisfied && c.detail && (
-                    <span className="ml-2 text-xs text-[var(--on-surface-variant)]">
+                    <span className="ml-2 text-label text-[var(--on-surface-variant)]">
                       {c.detail}
                     </span>
                   )}
                   {!c.satisfied && c.blocking && (
-                    <span className="ml-2 text-[10px] uppercase tracking-wide text-[var(--pm-tertiary)]">
+                    <span className="ml-2 text-label uppercase tracking-wide text-[var(--pm-tertiary)]">
                       needed
                     </span>
                   )}

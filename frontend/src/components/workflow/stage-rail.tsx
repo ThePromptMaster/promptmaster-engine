@@ -71,7 +71,7 @@ export function StageRail({ template, state, nextSuggestedId, onSelect }: Props)
     <nav aria-label="Workflow stages" className="py-2">
       {groups.map((group, gi) => (
         <div key={`${group.group}-${gi}`} className="mb-3 last:mb-0">
-          <div className="mb-1 px-3 text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--on-surface-variant)] opacity-70">
+          <div className="mb-1 px-3 text-label uppercase tracking-[0.08em] text-[var(--on-surface-variant)] opacity-70">
             {GROUP_LABEL[group.group]}
           </div>
 
@@ -88,7 +88,7 @@ export function StageRail({ template, state, nextSuggestedId, onSelect }: Props)
                     onClick={() => onSelect(stage.id)}
                     aria-current={isCurrent ? 'step' : undefined}
                     title={skipReason ? `Skipped — ${skipReason}` : stage.label}
-                    className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+                    className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-body transition-colors ${
                       isCurrent
                         ? 'bg-[var(--surface-container-high)] text-[var(--on-surface)]'
                         : 'text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-low)]'
@@ -112,13 +112,13 @@ export function StageRail({ template, state, nextSuggestedId, onSelect }: Props)
                     {/* Optional stages are marked so a user can tell what they
                         are allowed to leave out before they open it. */}
                     {!stage.required && status === 'not_started' && !isNext && (
-                      <span className="shrink-0 text-[10px] uppercase tracking-wide opacity-60">
+                      <span className="shrink-0 text-label uppercase tracking-wide opacity-60">
                         opt
                       </span>
                     )}
 
                     {isNext && (
-                      <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-[var(--pm-primary)]">
+                      <span className="shrink-0 rounded px-1.5 py-0.5 text-label uppercase tracking-wide text-[var(--pm-primary)]">
                         next
                       </span>
                     )}
@@ -126,7 +126,7 @@ export function StageRail({ template, state, nextSuggestedId, onSelect }: Props)
                     {status === 'stale' && (
                       <span
                         title="Work here predates a change you made earlier"
-                        className="shrink-0 text-[10px] uppercase tracking-wide text-[var(--pm-tertiary)]"
+                        className="shrink-0 text-label uppercase tracking-wide text-[var(--pm-tertiary)]"
                       >
                         stale
                       </span>

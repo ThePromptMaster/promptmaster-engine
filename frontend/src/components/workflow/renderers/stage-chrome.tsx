@@ -12,6 +12,8 @@
  */
 
 import { EvaluationScores } from '../evaluation-scores';
+import { RecoveryPanel } from '../recovery-panel';
+import type { StageFailure } from '@/lib/errors/recovery';
 import type { ArtifactVersion, Evaluation } from '@/types/project';
 
 interface VersionBarProps {
@@ -93,6 +95,21 @@ interface GenerationBarProps {
   onEvaluate?: () => void;
   evaluating?: boolean;
   evaluationError?: string | null;
+
+  /**
+   * FR-16. The classified failure, when there is one.
+   *
+   * Kept alongside the plain `error` string rather than replacing it: every
+   * surface that renders a stage — the preview page, four renderer test files —
+   * passes a string today, and a classified failure is strictly more than a
+   * string, so the string stays as the floor. When both are present the
+   * classified one wins, because it is the one that says what survived.
+   */
+  failure?: StageFailure | null;
+  evaluationFailure?: StageFailure | null;
+  onDismissFailure?: () => void;
+  onSwitchModel?: (model: string) => void;
+  currentModel?: string;
 }
 
 /**
@@ -113,6 +130,11 @@ export function GenerationBar({
   onEvaluate,
   evaluating = false,
   evaluationError = null,
+  failure = null,
+  evaluationFailure = null,
+  onDismissFailure,
+  onSwitchModel,
+  currentModel,
 }: GenerationBarProps) {
   if (readOnly) return null;
 
@@ -139,17 +161,41 @@ export function GenerationBar({
 
   return (
     <div className="mb-4 flex flex-wrap items-center gap-3">
-      {error && (
-        // --pm-tertiary is the warning tone in this dialect; a failed draft is
-        // recoverable by pressing the button again, not an error state.
-        <p className="text-label text-[var(--pm-tertiary)]" role="alert">
-          {error}
-        </p>
+      {/* FR-16. The classified panel replaces the bare line entirely when one
+          is available — showing both would state the same failure twice, once
+          usefully and once not. */}
+      {failure ? (
+        <RecoveryPanel
+          failure={failure}
+          onRetry={() => onGenerate({ force: hasContent })}
+          onDismiss={onDismissFailure}
+          onSwitchModel={onSwitchModel}
+          currentModel={currentModel}
+        />
+      ) : (
+        error && (
+          // --pm-tertiary is the warning tone in this dialect; a failed draft is
+          // recoverable by pressing the button again, not an error state.
+          <p className="text-label text-[var(--pm-tertiary)]" role="alert">
+            {error}
+          </p>
+        )
       )}
-      {evaluationError && (
-        <p className="text-label text-[var(--pm-tertiary)]" role="alert">
-          {evaluationError}
-        </p>
+
+      {evaluationFailure ? (
+        <RecoveryPanel
+          failure={evaluationFailure}
+          onRetry={() => onEvaluate?.()}
+          onDismiss={onDismissFailure}
+          onSwitchModel={onSwitchModel}
+          currentModel={currentModel}
+        />
+      ) : (
+        evaluationError && (
+          <p className="text-label text-[var(--pm-tertiary)]" role="alert">
+            {evaluationError}
+          </p>
+        )
       )}
 
       {/* Evaluation is never automatic — it is a model call the user chooses

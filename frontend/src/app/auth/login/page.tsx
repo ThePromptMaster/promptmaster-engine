@@ -6,6 +6,17 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { createClient } from '@/lib/supabase/client';
 
+/**
+ * The field and label treatments are shared with the sign-up page, which was
+ * rebuilt on these same tokens — the two pages are one link apart and used to
+ * look like two different products.
+ */
+const FIELD_CLASS =
+  'w-full px-4 py-3 bg-[var(--surface-container-low)] border-none rounded-lg text-[var(--on-surface)] text-body focus:ring-2 focus:ring-[var(--pm-primary)]/40 focus:bg-[var(--surface-container-lowest)] transition-all duration-200 outline-none placeholder:text-[var(--outline)]/60';
+
+const LABEL_CLASS =
+  'block text-label uppercase tracking-wider text-[var(--on-surface-variant)]';
+
 export default function LoginPage() {
   const router = useRouter();
   const { signIn, signInWithGoogle, continueAsGuest } = useAuth();
@@ -92,21 +103,22 @@ export default function LoginPage() {
       <main className="w-full max-w-[420px] space-y-12">
         {/* Minimal Branding Anchor */}
         <header className="text-center space-y-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.svg" alt="PromptMaster" className="w-12 h-12 rounded-xl mx-auto mb-6" />
-          <h1 className="text-[var(--on-surface)] font-bold text-xl tracking-tighter">PromptMaster</h1>
-          <p className="text-[var(--on-surface-variant)] text-sm">A system for thinking with AI</p>
+          <h1 className="text-[var(--on-surface)] text-headline tracking-tight">PromptMaster</h1>
+          <p className="text-[var(--on-surface-variant)] text-body">A system for thinking with AI</p>
         </header>
 
         {/* Login Container Well */}
         <section
-          className="bg-white rounded-xl p-8 space-y-6"
+          className="bg-[var(--surface-container-lowest)] rounded-xl p-8 space-y-6"
           style={{ boxShadow: '0px 4px 20px rgba(25, 28, 30, 0.04)' }}
         >
           {forgotMode ? (
             /* Forgot Password Form */
             <form onSubmit={handleResetPassword} className="space-y-5">
               {error && (
-                <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
+                <div className="rounded-lg bg-[var(--error-container)] px-3 py-2 text-body text-[var(--on-error-container)]">
                   {error}
                 </div>
               )}
@@ -114,16 +126,16 @@ export default function LoginPage() {
               {resetSent ? (
                 <div className="space-y-4 text-center py-4">
                   <span className="material-symbols-outlined text-[var(--pm-primary)] text-[40px]">mark_email_read</span>
-                  <p className="text-sm text-[var(--on-surface)]">
+                  <p className="text-body text-[var(--on-surface)]">
                     Password reset link sent to <strong>{email}</strong>
                   </p>
-                  <p className="text-xs text-[var(--on-surface-variant)]">
+                  <p className="text-label text-[var(--on-surface-variant)]">
                     Check your inbox and follow the link to reset your password.
                   </p>
                   <button
                     type="button"
                     onClick={() => { setForgotMode(false); setResetSent(false); setError(null); }}
-                    className="text-sm text-[var(--pm-primary)] font-medium hover:underline"
+                    className="text-body text-[var(--pm-primary)] font-medium hover:underline"
                   >
                     Back to Sign In
                   </button>
@@ -131,15 +143,15 @@ export default function LoginPage() {
               ) : (
                 <>
                   <div className="space-y-1">
-                    <h3 className="text-sm font-semibold text-[var(--on-surface)]">Reset your password</h3>
-                    <p className="text-xs text-[var(--on-surface-variant)]">
+                    <h3 className="text-title text-[var(--on-surface)]">Reset your password</h3>
+                    <p className="text-label text-[var(--on-surface-variant)]">
                       Enter your email and we&apos;ll send you a link to reset your password.
                     </p>
                   </div>
 
                   <div className="space-y-2">
                     <label
-                      className="block text-xs font-medium text-[var(--on-surface-variant)] uppercase tracking-wider"
+                      className={LABEL_CLASS}
                       htmlFor="reset-email"
                     >
                       Email Address
@@ -152,14 +164,14 @@ export default function LoginPage() {
                       onChange={(e) => setEmail(e.target.value)}
                       required
                       autoComplete="email"
-                      className="w-full px-4 py-3 bg-[var(--surface-container-low)] border-none rounded-lg text-[var(--on-surface)] text-sm focus:ring-2 focus:ring-[var(--pm-primary)]/40 focus:bg-white transition-all duration-200 outline-none placeholder:text-[var(--outline)]/60"
+                      className={FIELD_CLASS}
                     />
                   </div>
 
                   <button
                     type="submit"
                     disabled={resetLoading}
-                    className="w-full py-3 px-4 bg-[var(--pm-primary)] text-white font-semibold rounded-lg hover:bg-[var(--pm-primary-container)] active:scale-[0.98] transition-all duration-200 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="w-full py-3 px-4 bg-[var(--pm-primary)] text-[var(--on-primary)] font-semibold rounded-lg hover:bg-[var(--pm-primary-container)] active:scale-[0.98] transition-all duration-200 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     {resetLoading ? 'Sending...' : 'Send Reset Link'}
                   </button>
@@ -167,7 +179,7 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={() => { setForgotMode(false); setError(null); }}
-                    className="w-full text-center text-sm text-[var(--on-surface-variant)] hover:text-[var(--pm-primary)] transition-colors"
+                    className="w-full text-center text-body text-[var(--on-surface-variant)] hover:text-[var(--pm-primary)] transition-colors"
                   >
                     Back to Sign In
                   </button>
@@ -178,14 +190,14 @@ export default function LoginPage() {
             /* Login Form */
             <form onSubmit={handleSignIn} className="space-y-5">
               {error && (
-                <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
+                <div className="rounded-lg bg-[var(--error-container)] px-3 py-2 text-body text-[var(--on-error-container)]">
                   {error}
                 </div>
               )}
 
               <div className="space-y-2">
                 <label
-                  className="block text-xs font-medium text-[var(--on-surface-variant)] uppercase tracking-wider"
+                  className={LABEL_CLASS}
                   htmlFor="email"
                 >
                   Email Address
@@ -199,14 +211,14 @@ export default function LoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   autoComplete="email"
-                  className="w-full px-4 py-3 bg-[var(--surface-container-low)] border-none rounded-lg text-[var(--on-surface)] text-sm focus:ring-2 focus:ring-[var(--pm-primary)]/40 focus:bg-white transition-all duration-200 outline-none placeholder:text-[var(--outline)]/60"
+                  className={FIELD_CLASS}
                 />
               </div>
 
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <label
-                    className="block text-xs font-medium text-[var(--on-surface-variant)] uppercase tracking-wider"
+                    className={LABEL_CLASS}
                     htmlFor="password"
                   >
                     Password
@@ -214,7 +226,7 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={() => { setForgotMode(true); setError(null); }}
-                    className="text-xs text-[var(--pm-primary)] hover:underline transition-all"
+                    className="text-label text-[var(--pm-primary)] hover:underline transition-all"
                   >
                     Forgot password?
                   </button>
@@ -229,7 +241,7 @@ export default function LoginPage() {
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     autoComplete="current-password"
-                    className="w-full px-4 py-3 bg-[var(--surface-container-low)] border-none rounded-lg text-[var(--on-surface)] text-sm focus:ring-2 focus:ring-[var(--pm-primary)]/40 focus:bg-white transition-all duration-200 outline-none placeholder:text-[var(--outline)]/60"
+                    className={FIELD_CLASS}
                   />
                   <button
                     type="button"
@@ -247,7 +259,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full py-3 px-4 bg-[var(--pm-primary)] text-white font-semibold rounded-lg hover:bg-[var(--pm-primary-container)] active:scale-[0.98] transition-all duration-200 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                className="w-full py-3 px-4 bg-[var(--pm-primary)] text-[var(--on-primary)] font-semibold rounded-lg hover:bg-[var(--pm-primary-container)] active:scale-[0.98] transition-all duration-200 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {isLoading ? 'Signing in...' : 'Sign In'}
               </button>
@@ -259,7 +271,7 @@ export default function LoginPage() {
               {/* Divider */}
               <div className="relative py-2 flex items-center gap-4">
                 <div className="flex-grow h-[1px] bg-[var(--surface-container-high)]" />
-                <span className="text-[10px] font-bold text-[var(--outline)] uppercase tracking-widest">OR</span>
+                <span className="text-label font-bold text-[var(--outline)] uppercase tracking-widest">OR</span>
                 <div className="flex-grow h-[1px] bg-[var(--surface-container-high)]" />
               </div>
 
@@ -268,7 +280,7 @@ export default function LoginPage() {
                 type="button"
                 disabled={isGoogleLoading}
                 onClick={handleGoogleSignIn}
-                className="w-full flex items-center justify-center gap-3 py-3 px-4 bg-white border border-[var(--outline-variant)]/30 text-[var(--on-surface)] font-medium rounded-lg hover:bg-[var(--surface-container-low)] transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
+                className="w-full flex items-center justify-center gap-3 py-3 px-4 bg-[var(--surface-container-low)] text-[var(--on-surface)] font-medium rounded-lg hover:bg-[var(--surface-container-high)] transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
               >
             <svg fill="none" height="18" viewBox="0 0 24 24" width="18" aria-hidden="true">
               <path
@@ -301,7 +313,7 @@ export default function LoginPage() {
           <div className="mt-6">
             <div className="mb-4 flex items-center gap-3">
               <span className="h-px flex-1 bg-[var(--surface-container-high)]" />
-              <span className="text-xs uppercase tracking-wider text-[var(--on-surface-variant)]">
+              <span className="text-label uppercase tracking-wider text-[var(--on-surface-variant)]">
                 or
               </span>
               <span className="h-px flex-1 bg-[var(--surface-container-high)]" />
@@ -311,11 +323,11 @@ export default function LoginPage() {
               type="button"
               onClick={handleGuest}
               disabled={guestLoading}
-              className="w-full rounded-lg bg-[var(--surface-container-low)] px-4 py-3 text-sm font-medium text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-high)] disabled:opacity-60"
+              className="w-full rounded-lg bg-[var(--surface-container-low)] px-4 py-3 text-body font-medium text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-high)] disabled:opacity-60"
             >
               {guestLoading ? 'Starting…' : 'Continue without an account'}
             </button>
-            <p className="mt-2 text-center text-xs text-[var(--on-surface-variant)]">
+            <p className="mt-2 text-center text-label text-[var(--on-surface-variant)]">
               Your work stays in this browser until you create an account.
             </p>
           </div>
@@ -323,7 +335,7 @@ export default function LoginPage() {
 
         {/* Footer */}
         <footer className="mt-6 text-center">
-          <p className="text-sm text-[var(--on-surface-variant)]">
+          <p className="text-body text-[var(--on-surface-variant)]">
             Don&apos;t have an account?{' '}
             <Link
               href="/auth/signup"

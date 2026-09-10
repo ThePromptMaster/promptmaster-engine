@@ -23,6 +23,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { CustomSelect } from '@/components/shared/custom-select';
+import { ReasonField } from '@/components/shared/reason-field';
 import {
   isTriaged,
   parseItems,
@@ -49,6 +50,11 @@ export function ReviewRenderer({
   onSaveItems,
   generating,
   generationError,
+  generationFailure,
+  evaluationFailure,
+  onDismissFailure,
+  onSwitchModel,
+  currentModel,
   onGenerate,
   onCancelGeneration,
   onEvaluate,
@@ -121,6 +127,11 @@ export function ReviewRenderer({
         onEvaluate={onEvaluate}
         evaluating={evaluating}
         evaluationError={evaluationError}
+        failure={generationFailure}
+        evaluationFailure={evaluationFailure}
+        onDismissFailure={onDismissFailure}
+        onSwitchModel={onSwitchModel}
+        currentModel={currentModel}
         readOnly={readOnly}
       />
 
@@ -254,33 +265,23 @@ function ReviewRow({ row, columns, statuses, schema, readOnly, onPatch }: Review
       </tr>
 
       {/* The reason lives in its own row rather than a cramped cell: it is a
-          sentence, and squeezing it beside a select made both unreadable. */}
+          sentence, and squeezing it beside a select made both unreadable.
+
+          `ReasonField` is shared with the recommendations panel, which needs
+          the identical control for the identical reason — dismissing a
+          recommendation is dismissing a finding. It was extracted from here. */}
       {needsReason && (
         <tr>
           <td colSpan={columns.length + 1} className="px-4 pb-4">
-            <label
-              htmlFor={`${row.id}-reason`}
-              className="mb-1 block text-label uppercase tracking-wider text-[var(--on-surface-variant)]"
-            >
-              Why {option?.label.toLowerCase()}?
-            </label>
-            <textarea
+            <ReasonField
               id={`${row.id}-reason`}
+              label={`Why ${option?.label.toLowerCase()}?`}
               value={row.reason ?? ''}
               disabled={readOnly}
-              rows={2}
-              placeholder="One sentence is enough."
-              aria-invalid={reasonMissing}
-              onChange={(e) => onPatch(row.id, 'reason', e.target.value)}
-              className={`w-full resize-y rounded-lg bg-[var(--surface-container-low)] px-3 py-2 text-body text-[var(--on-surface)] outline-none focus:ring-2 focus:ring-[var(--pm-primary)]/40 ${
-                reasonMissing ? 'ring-1 ring-[var(--pm-tertiary)]' : ''
-              }`}
+              missing={reasonMissing}
+              missingMessage="This one still counts as unresolved until you say why."
+              onChange={(value) => onPatch(row.id, 'reason', value)}
             />
-            {reasonMissing && (
-              <p className="mt-1 text-label text-[var(--pm-tertiary)]">
-                This one still counts as unresolved until you say why.
-              </p>
-            )}
           </td>
         </tr>
       )}

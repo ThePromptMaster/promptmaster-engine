@@ -1,6 +1,15 @@
+import { AppHeader } from '@/components/shared/app-header';
+
 // Force dynamic rendering — project pages depend on Supabase runtime env vars.
 export const dynamic = 'force-dynamic';
 
 export default function ProjectsLayout({ children }: { children: React.ReactNode }) {
-  return <div className="min-h-screen bg-[var(--surface)]">{children}</div>;
+  return (
+    <div className="min-h-screen bg-[var(--surface)]">
+      {/* Every signed-in route carries the same chrome, so the header never
+          changes shape as you move between the list and a project. */}
+      <AppHeader />
+      {children}
+    </div>
+  );
 }

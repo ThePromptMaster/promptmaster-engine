@@ -248,3 +248,42 @@ def job_dead(attempts: int) -> ClassifiedError:
         message=f"This section failed {attempts} times, so automatic retrying has stopped. Retry it by hand once the underlying problem is fixed.",
         retryable=False,
     )
+
+
+# ---------------------------------------------------------------------------
+# Preservation clauses
+# ---------------------------------------------------------------------------
+#
+# The phrases `with_preserved` appends live here rather than in the routers,
+# for the same reason prompt text does: a router is an HTTP shell, and
+# user-facing copy that drifts between seven of them is copy nobody can review.
+#
+# Each one is a statement of fact about a specific endpoint, not reassurance in
+# general. "Nothing was lost" is only worth printing if the sentence after it
+# can be checked against what the endpoint actually writes — and none of the
+# synchronous endpoints write anything at all, which is precisely why they can
+# say so.
+
+#: For endpoints that read state and return a result without persisting.
+PRESERVED_NOTHING_WRITTEN = "everything already saved in this project is untouched"
+
+#: Stage drafting. The stage's version history is append-only and this call
+#: failed before appending, so the head version is exactly where it was.
+PRESERVED_STAGE_VERSIONS = "every version already saved on this stage is untouched"
+
+#: Stage evaluation. Scoring never edits the thing it scores.
+PRESERVED_EVALUATION = (
+    "the artifact and its version history are untouched — evaluating never rewrites your work"
+)
+
+
+def preserved_sections(complete: int, total: int) -> str | None:
+    """`"6 of 10 sections are saved"` — the clause the whole module exists for.
+
+    Returns None when there is nothing truthful to say. Claiming "0 of 0
+    sections are saved" is noise, and claiming preservation that cannot be
+    demonstrated is worse than saying nothing.
+    """
+    if total <= 0 or complete <= 0:
+        return None
+    return f"{complete} of {total} sections are saved"

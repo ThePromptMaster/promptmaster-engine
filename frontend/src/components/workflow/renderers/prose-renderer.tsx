@@ -31,6 +31,11 @@ export function ProseRenderer({
   onSaveContent,
   generating,
   generationError,
+  generationFailure,
+  evaluationFailure,
+  onDismissFailure,
+  onSwitchModel,
+  currentModel,
   onGenerate,
   onCancelGeneration,
   onEvaluate,
@@ -116,6 +121,11 @@ export function ProseRenderer({
         onEvaluate={onEvaluate}
         evaluating={evaluating}
         evaluationError={evaluationError}
+        failure={generationFailure}
+        evaluationFailure={evaluationFailure}
+        onDismissFailure={onDismissFailure}
+        onSwitchModel={onSwitchModel}
+        currentModel={currentModel}
         readOnly={readOnly}
       />
 

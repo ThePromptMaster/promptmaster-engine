@@ -19,6 +19,69 @@ _RETRY_BASE_DELAY = 1.5
 _RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 
 
+def _meter(
+    *,
+    model: str,
+    tokens_in: int,
+    tokens_out: int,
+    elapsed: float,
+    finish_reason: str,
+) -> None:
+    """FR-18/FR-19: record one provider call, both to the log and to the meter.
+
+    This is the only place in the codebase that observes a completed LLM call
+    with its token counts, which is why metering hangs off it rather than off
+    each of the seven routers. Every path — `generate`, `generate_with_meta`,
+    `generate_json` and its repair pass, every retry attempt — funnels through
+    `_single_request`, so nothing can spend money without being counted. A
+    router-level hook would have missed the repair call, which is precisely the
+    call that costs money when things are going badly.
+
+    Wholly best-effort. Metering that can raise is metering that can lose a
+    generation the user has already paid for, so every failure here is
+    swallowed after being logged. The token counts still reached the caller.
+    """
+    line_extra = {
+        "event": "llm_call",
+        "model": model,
+        "tokens_in": tokens_in,
+        "tokens_out": tokens_out,
+        "duration_ms": int(elapsed * 1000),
+        "finish_reason": finish_reason,
+    }
+
+    try:
+        from observability import UsageEvent, current_usage
+        from pricing import pricing_cache
+
+        cache = pricing_cache()
+        price = cache.get(model)
+        # Warm the cache for the *next* call, never for this one.
+        cache.ensure_fresh()
+
+        cost = price.cost(tokens_in, tokens_out) if price else None
+        if cost is not None:
+            line_extra["cost_usd"] = round(cost, 8)
+
+        accumulator = current_usage()
+        if accumulator is not None:
+            accumulator.add(
+                UsageEvent(
+                    model=model,
+                    tokens_in=tokens_in,
+                    tokens_out=tokens_out,
+                    elapsed_ms=int(elapsed * 1000),
+                    cost_usd=cost,
+                    prompt_price_usd=price.prompt if price else None,
+                    completion_price_usd=price.completion if price else None,
+                )
+            )
+    except Exception:  # pragma: no cover - defensive, see docstring
+        logger.warning("metering_failed", exc_info=True)
+
+    logger.info("llm_call", extra=line_extra)
+
+
 class OpenRouterError(Exception):
     """Base error for OpenRouter API failures.
 
@@ -380,7 +443,13 @@ class OpenRouterClient:
             }
 
             elapsed = time.monotonic() - t0
-            logger.info(f"LLM response: {usage_stats['tokens_in']:,} in / {usage_stats['tokens_out']:,} out ({elapsed:.1f}s)")
+            _meter(
+                model=str(payload.get("model") or ""),
+                tokens_in=usage_stats["tokens_in"],
+                tokens_out=usage_stats["tokens_out"],
+                elapsed=elapsed,
+                finish_reason=finish_reason,
+            )
 
             return content, usage_stats, finish_reason
 

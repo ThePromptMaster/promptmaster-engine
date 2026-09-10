@@ -120,6 +120,18 @@ export interface NewWorkflowEvent {
   reason?: string;
   actor?: 'user' | 'system';
   payload?: Record<string, unknown>;
+  /**
+   * The accepted recommendation this transition acted on — FR-02's proposal
+   * boundary, now on the log that is actually read.
+   *
+   * Set only when the user advanced by pressing Accept on a `stage_transition`
+   * recommendation, which is the one path where a model's suggestion leads to
+   * a state change. The database validates it: the proposal must exist, belong
+   * to this user and already be `accepted`, and `actor` must be 'user'. So an
+   * unaccepted proposal cannot be cited, and a citation cannot be used to dress
+   * up a system-actor transition as a user decision.
+   */
+  proposal_id?: string | null;
 }
 
 /**
@@ -147,6 +159,7 @@ export async function appendWorkflowEvent(
     actor: event.actor ?? 'user',
     reason: event.reason ?? null,
     payload: event.payload ?? {},
+    proposal_id: event.proposal_id ?? null,
   });
   if (error) throw error;
 }

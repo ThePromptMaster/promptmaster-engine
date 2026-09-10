@@ -1,19 +1,33 @@
 'use client';
 
 /**
- * Design preview. Dev-only — see the notFound() guard below.
+ * Design preview. Deployed — see the note on PreviewPage below.
  *
  * Renders the real workflow components against fixture data so the UI can be
  * reviewed without a login. Every surface here imports the same component the
  * app does, so what you see is what ships; only the data is fabricated.
  */
 
-import { notFound } from 'next/navigation';
+
 import { useState } from 'react';
 
 import { WorkflowPicker } from '@/components/projects/workflow-picker';
 import { StageRenderer } from '@/components/workflow/renderers/stage-renderer';
 import { StageEvaluationPanel } from '@/components/workflow/evaluation-panel';
+import { AppliedNotice, ChatPanel, ProposalCard } from '@/components/workflow/chat-panel';
+import {
+  RecommendationsPanel,
+  type PanelRecommendation,
+} from '@/components/workflow/recommendations-panel';
+import { TasksPanel } from '@/components/workflow/tasks-panel';
+import { ApplyPreview } from '@/components/workflow/apply-preview';
+import {
+  bySeverity,
+  deriveWorkflowRecommendations,
+  proposalFromCorrection,
+  signalsFromEvaluation,
+} from '@/lib/workflow/recommend';
+import type { ProjectTask } from '@/lib/supabase/tasks';
 import { itemSchemaFor, serializeItems } from '@/lib/workflow/stage-artifact';
 import { DerivedOutlineNotice } from '@/components/outline/derived-outline-notice';
 import { OutlineEditor } from '@/components/outline/outline-editor';
@@ -29,7 +43,17 @@ import {
 import type { OutlineDocument, SectionDraftBinding } from '@/types/outline';
 import type { Artifact, ArtifactVersion, Evaluation, Project } from '@/types/project';
 import type { AuditFinding, LongFormState, StageRecommendation } from '@/types';
+import { RecoveryPanel } from '@/components/workflow/recovery-panel';
+import { ExportMenu } from '@/components/workflow/export-menu';
+import { FeedbackForm } from '@/components/shared/feedback-form';
+import { BETA_NOTICE_STORAGE_KEY } from '@/components/shared/beta-notice';
+import { stageFailure } from '@/lib/errors/recovery';
+import { ApiError } from '@/lib/api/client';
+import type { ErrorCode } from '@/lib/jobs/errors';
 import { StageRail } from '@/components/workflow/stage-rail';
+import { AdminDashboard } from '@/components/admin/admin-dashboard';
+import { LargeJobWarning } from '@/components/workflow/large-job-warning';
+import type { AdminOverview } from '@/lib/admin/types';
 import { ProjectSetup, stageWantsSetup } from '@/components/workflow/project-setup';
 import { StageHeader } from '@/components/workflow/stage-header';
 import { ExitCriteriaChecklist } from '@/components/workflow/exit-criteria-checklist';
@@ -502,7 +526,6 @@ function StageEvaluationSlice() {
   const stage = getStage(BOOK_V1, 'positioning')!;
   const [evaluated, setEvaluated] = useState(false);
   const [evaluating, setEvaluating] = useState(false);
-  const [dismissed, setDismissed] = useState(false);
 
   return (
     <div className="space-y-6">
@@ -531,19 +554,349 @@ function StageEvaluationSlice() {
             setTimeout(() => {
               setEvaluating(false);
               setEvaluated(true);
-              setDismissed(false);
             }, 700);
           }}
         />
       </div>
 
-      <div className="max-w-[420px]">
-        <StageEvaluationPanel
-          evaluation={evaluated ? EVAL_FIXTURE : undefined}
-          recommendation={evaluated && !dismissed ? EVAL_RECOMMENDATION : null}
-          onDismissRecommendation={() => setDismissed(true)}
-        />
+      <div className="max-w-[520px]">
+        <StageEvaluationPanel evaluation={evaluated ? EVAL_FIXTURE : undefined} />
       </div>
+    </div>
+  );
+}
+
+// --- FR-16, FR-20, FR-22 slices ---------------------------------------------
+
+const FAILURE_CODES: ErrorCode[] = [
+  'insufficient_credits',
+  'rate_limited',
+  'context_length',
+  'output_truncated',
+  'function_timeout',
+  'job_dead',
+  'provider_unavailable',
+  'invalid_request',
+  'unknown',
+];
+
+/**
+ * Every failure a user can hit, with the recovery each one actually offers.
+ *
+ * Rendered from the same `stageFailure` the workspace calls, so what is on
+ * screen here is what ships — including the preservation sentence, which is
+ * generated rather than written into the fixture.
+ */
+function RecoverySlice() {
+  return (
+    <div className="space-y-3">
+      {FAILURE_CODES.map((code) => (
+        <RecoveryPanel
+          key={code}
+          failure={stageFailure(
+            new ApiError('classified upstream', 502, {
+              code,
+              technical: 'LLM error: OpenRouter API error: HTTP 402 insufficient_credits',
+              retryAfter: code === 'rate_limited' ? 30 : null,
+            }),
+            { savedVersions: 6, label: 'positioning statement' }
+          )}
+          onRetry={() => {}}
+          onDismiss={() => {}}
+          onSwitchModel={() => {}}
+          currentModel="anthropic/claude-sonnet"
+        />
+      ))}
+    </div>
+  );
+}
+
+// --- the side chat ----------------------------------------------------------
+
+/** A project row with just enough on it for the chat's PMInput. */
+const CHAT_PROJECT = {
+  id: 'preview-project',
+  user_id: 'preview-user',
+  title: 'A field guide to governing AI-assisted work',
+  objective: 'Explain how to govern AI-assisted work to a sceptical reviewer.',
+  audience: 'Engineering leads at regulated companies',
+  constraints: 'No tool reviews. No prompt technique.',
+  output_format: 'Markdown',
+  mode: 'architect',
+  model: 'anthropic/claude-sonnet',
+  workflow: 'book',
+  stage: 'objective',
+} as unknown as Project;
+
+const CHAT_VERSION = fixtureVersion(PROSE_FIXTURE, 3);
+
+/**
+ * Both modes side by side.
+ *
+ * Two panels rather than one with a toggle, because the point being reviewed
+ * is the difference between them — and that is not reviewable one at a time.
+ * They carry different stage ids so they do not share a thread.
+ */
+function ChatModesSlice() {
+  return (
+    <div className="grid gap-6 lg:grid-cols-2">
+      {(['discuss', 'instruct'] as const).map((mode) => (
+        <div key={mode} className="h-[560px]">
+          <ChatPanel
+            project={CHAT_PROJECT}
+            stageId={`preview-chat-${mode}`}
+            stageLabel="Objective"
+            content={PROSE_FIXTURE}
+            headVersion={CHAT_VERSION}
+            initialMode={mode}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ExportSlice() {
+  const project = {
+    ...DRAFTING_PROJECT,
+    title: 'Governing AI-assisted work',
+    workflow: 'book',
+    stage: 'research',
+  } as Project;
+  return (
+    <div className="flex justify-end rounded-2xl bg-[var(--surface-container-low)] px-6 py-5">
+      <ExportMenu
+        bundle={{
+          project,
+          template: BOOK_V1,
+          state: projectState(BOOK_V1, EVENTS, project.stage),
+          events: EVENTS,
+          stages: {
+            objective: { artifact: null, versions: [fixtureVersion(PROSE_FIXTURE, 1)] },
+            audience: { artifact: null, versions: [fixtureVersion(AUDIENCE_FIXTURE, 1)] },
+          },
+          evaluations: {},
+        }}
+      />
+    </div>
+  );
+}
+
+/**
+ * The notice itself is mounted globally by the layout, so it is already on this
+ * page. What the preview adds is a way back to it after dismissal, and the
+ * feedback form on its own, at full size, where its four fields can be read.
+ */
+function BetaSlice() {
+  return (
+    <div className="space-y-4">
+      <button
+        onClick={() => {
+          try {
+            localStorage.removeItem(BETA_NOTICE_STORAGE_KEY);
+          } catch {
+            // Private window. The notice is showing anyway.
+          }
+          location.reload();
+        }}
+        className="rounded-xl bg-[var(--surface-container-high)] px-5 py-2.5 text-title text-[var(--on-surface)]"
+      >
+        Reset the beta notice and reload
+      </button>
+      <div className="rounded-2xl bg-[var(--surface-container-low)] px-6 py-5">
+        <FeedbackForm />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The two cards an instruction produces, with fixture content.
+ *
+ * The proposal card only appears after a model call, and the preview has no
+ * backend — so these are rendered directly. They are the same components the
+ * panel mounts; only the data is fabricated, which is the rule everywhere else
+ * on this page.
+ */
+function ApplyFlowSlice() {
+  const [state, setState] = useState<'proposed' | 'applied' | 'discarded'>('proposed');
+
+  return (
+    <div className="max-w-[520px] rounded-xl bg-[var(--surface-container-lowest)] px-5 py-4">
+      {state === 'proposed' && (
+        <ProposalCard
+          scopeLabel="The section “What this is not” — 14 words"
+          before={'## What this is not\n\nIt is **not** a book about prompting. Prompt technique dates in months; governance does not.'}
+          after={'## What this is not\n\nThis is not a book about prompting. Prompt technique dates in months. Governance outlives it, which is why this book is about the second thing.'}
+          canApply
+          busy={false}
+          onAccept={() => setState('applied')}
+          onDiscard={() => setState('discarded')}
+        />
+      )}
+
+      {state === 'applied' && (
+        <AppliedNotice
+          scope="The section “What this is not”"
+          canUndo
+          busy={false}
+          onUndo={() => setState('proposed')}
+          onDismiss={() => setState('discarded')}
+        />
+      )}
+
+      {state === 'discarded' && (
+        <div className="py-6 text-center">
+          <p className="text-body text-[var(--on-surface-variant)]">
+            Nothing was written. The artifact is exactly as it was.
+          </p>
+          <button
+            onClick={() => setState('proposed')}
+            className="mt-3 rounded-lg bg-[var(--surface-container-high)] px-3 py-1.5 text-label text-[var(--on-surface)]"
+          >
+            Propose it again
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The recommendations surface — FR-13, FR-14, FR-09, FR-15.
+ *
+ * The three panels in the order the workspace stacks them, against the same
+ * defective positioning artifact the evaluation slice uses. Everything here is
+ * the real component: the derived rows come from the real
+ * `deriveWorkflowRecommendations` over the real BOOK_V1 template, and the
+ * conflict warning comes from the real `detectConflicts`.
+ *
+ * The only fabrication is the persistence — pressing Dismiss here does not
+ * write a row.
+ */
+function RecommendationsSlice() {
+  const stage = getStage(BOOK_V1, 'positioning')!;
+
+  // Nothing done on this stage: the exit-criteria evaluation fails, so the
+  // derived half produces its blocking-criterion row.
+  const stageEvaluation = evaluateStage(BOOK_V1, stage.id, ctx());
+
+  const derived: PanelRecommendation[] = deriveWorkflowRecommendations({
+    template: BOOK_V1,
+    stage,
+    evaluation: stageEvaluation,
+  }).map((r) => ({ ...r, origin: 'derived' as const }));
+
+  const signals = signalsFromEvaluation(EVAL_FIXTURE);
+
+  // Two applyable rows, so multi-select and the conflict warning are both
+  // reachable. The second carries an opposing tag on the same axis.
+  const fromEvaluation: PanelRecommendation[] = [
+    {
+      ...proposalFromCorrection(EVAL_RECOMMENDATION, signals, stage, ''),
+      origin: 'evaluation',
+      id: 'row-1',
+    },
+    {
+      ...proposalFromCorrection(
+        {
+          id: 'r2',
+          title: 'Cut the survey material',
+          triggering_issue: '',
+          expected_benefit: '',
+          scope: '',
+          instruction: 'Remove the literature survey; keep only what positions the book.',
+        },
+        signals,
+        stage,
+        ''
+      ),
+      origin: 'evaluation',
+      id: 'row-2',
+      // Opposing `length` directions is what makes the warning fire — assigned
+      // deterministically in the app, hardcoded here to reach the state.
+      tags: ['length:shorter'],
+    },
+  ];
+  fromEvaluation[0].tags = ['length:longer', 'scope:narrow'];
+
+  const rows = [...fromEvaluation, ...derived].sort(bySeverity);
+
+  const [selected, setSelected] = useState<string[]>(fromEvaluation.map((r) => r.category));
+  const [previewing, setPreviewing] = useState<string[] | null>(null);
+  const [triaged, setTriaged] = useState<string | null>(null);
+
+  const previewRows = rows.filter((r) => previewing?.includes(r.category));
+
+  const [tasks, setTasks] = useState<ProjectTask[]>([
+    {
+      id: 't1',
+      user_id: 'u',
+      project_id: 'p',
+      title: 'Name two comparable practitioner books',
+      detail: 'Deferred from Positioning — need to check what is actually in print.',
+      stage: 'positioning',
+      status: 'open',
+      origin: 'recommendation',
+      origin_recommendation_id: null,
+      created_at: '2026-09-09T00:00:00Z',
+      resolved_at: null,
+    },
+  ]);
+
+  return (
+    <div className="max-w-[720px] space-y-4">
+      {previewing && (
+        <ApplyPreview
+          selected={previewRows}
+          headVersionNumber={4}
+          stageLabel={stage.short_label}
+          applying={false}
+          error={null}
+          onRemove={(category) =>
+            setPreviewing((prev) => {
+              const next = (prev ?? []).filter((c) => c !== category);
+              return next.length > 0 ? next : null;
+            })
+          }
+          onApply={() => setPreviewing(null)}
+          onCancel={() => setPreviewing(null)}
+        />
+      )}
+
+      <ExitCriteriaChecklist
+        criteria={stageEvaluation.criteria}
+        manualIds={new Set(stage.exit_criteria.filter((c) => c.check === 'manual').map((c) => c.id))}
+        onToggleManual={() => {}}
+      />
+
+      <RecommendationsPanel
+        stageLabel={stage.short_label}
+        rows={rows}
+        selected={selected}
+        onToggleSelect={(category, checked) =>
+          setSelected((prev) =>
+            checked ? [...new Set([...prev, category])] : prev.filter((c) => c !== category)
+          )
+        }
+        onTriage={(rec, status, reason) => setTriaged(`${rec.title} — ${status}${reason ? `: ${reason}` : ''}`)}
+        onApply={setPreviewing}
+      />
+
+      {triaged && (
+        <p className="px-5 text-label text-[var(--on-surface-variant)]">
+          Recorded here rather than written: {triaged}
+        </p>
+      )}
+
+      <StageEvaluationPanel evaluation={EVAL_FIXTURE} />
+
+      <TasksPanel
+        tasks={tasks}
+        onResolve={(id, status) =>
+          setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status } : t)))
+        }
+      />
     </div>
   );
 }
@@ -889,11 +1242,15 @@ function WorkflowSlice({ template }: { template: WorkflowTemplate }) {
 
   return (
     <div className="flex overflow-hidden rounded-2xl bg-[var(--surface)] shadow-[0_1px_2px_rgba(25,28,30,0.04),0_12px_32px_-16px_rgba(25,28,30,0.25)]">
+      {/* Unconditional, unlike the workspace's own aside, which is
+          `hidden md:block` with a drawer behind a bar below that. This slice is
+          a card inside a long page rather than a viewport-sized workspace, so
+          it shows the wide-screen arrangement whatever the window is doing —
+          which is worth saying out loud, because it means this page is *not* a
+          test of the narrow-viewport rail. Resize the real app for that. */}
       <aside className="w-[248px] shrink-0 self-start bg-[var(--surface-container-lowest)] px-2 py-6">
-        <div className="mb-4 px-3">
-          <div className="text-label uppercase tracking-wider text-[var(--on-surface-variant)]">
-            {template.name}
-          </div>
+        <div className="mb-5 px-3">
+          <div className="text-title text-[var(--on-surface)]">{template.name}</div>
           <div className="mt-1 text-label text-[var(--on-surface-variant)]">
             {progress.complete} done
             {progress.skipped > 0 && ` · ${progress.skipped} skipped`}
@@ -949,20 +1306,286 @@ function WorkflowSlice({ template }: { template: WorkflowTemplate }) {
   );
 }
 
+
+// ---------------------------------------------------------------------------
+// FR-18 / FR-19 — operations
+// ---------------------------------------------------------------------------
+
+/**
+ * Fabricated, but shaped exactly like what `/api/admin/overview` returns —
+ * including the cases the page has to get right and a happy fixture would hide:
+ * a user whose spend is partly unpriced, a project that has since been deleted,
+ * a dead job next to a retryable one, and a warning that a query failed.
+ */
+const ADMIN_OVERVIEW: AdminOverview = {
+  windowDays: 30,
+  generatedAt: new Date(Date.now() - 4 * 60_000).toISOString(),
+  totals: {
+    calls: 1_284,
+    tokensIn: 3_940_112,
+    tokensOut: 812_455,
+    costUsd: 38.4127,
+    unpricedCalls: 12,
+    activeUsers: 4,
+    failedJobs: 3,
+    errors: 27,
+  },
+  usageByUser: [
+    {
+      userId: 'u-1',
+      email: 'author@example.test',
+      calls: 902,
+      tokensIn: 2_811_004,
+      tokensOut: 604_221,
+      costUsd: 28.9014,
+      unpricedCalls: 0,
+      lastCallAt: new Date(Date.now() - 21 * 60_000).toISOString(),
+    },
+    {
+      userId: 'u-2',
+      email: 'analyst@example.test',
+      calls: 288,
+      tokensIn: 902_441,
+      tokensOut: 171_882,
+      costUsd: 8.7719,
+      // The case the "+N?" marker exists for: a cheap local model with no
+      // published price, so this row's cost understates and says so.
+      unpricedCalls: 12,
+      lastCallAt: new Date(Date.now() - 3 * 3_600_000).toISOString(),
+    },
+    {
+      userId: 'u-3',
+      email: null,
+      calls: 94,
+      tokensIn: 226_667,
+      tokensOut: 36_352,
+      costUsd: 0.7394,
+      unpricedCalls: 0,
+      lastCallAt: new Date(Date.now() - 2 * 86_400_000).toISOString(),
+    },
+  ],
+  failedJobs: [
+    {
+      id: 'j-1',
+      kind: 'draft_section',
+      status: 'dead',
+      projectId: 'p-1',
+      projectTitle: 'Tidal Energy Handbook',
+      userEmail: 'author@example.test',
+      attempts: 3,
+      maxAttempts: 3,
+      errorCode: 'insufficient_credits',
+      errorMessage:
+        'The OpenRouter account has run out of credit. Nothing was lost — 6 of 10 sections are saved.',
+      createdAt: new Date(Date.now() - 5 * 3_600_000).toISOString(),
+    },
+    {
+      id: 'j-2',
+      kind: 'draft_section',
+      status: 'failed',
+      projectId: 'p-2',
+      projectTitle: 'Regulatory Review',
+      userEmail: 'analyst@example.test',
+      attempts: 1,
+      maxAttempts: 3,
+      errorCode: 'provider_unavailable',
+      errorMessage: 'This is on their side, not yours. Trying again shortly usually works.',
+      createdAt: new Date(Date.now() - 40 * 60_000).toISOString(),
+    },
+    {
+      id: 'j-3',
+      kind: 'draft_section',
+      status: 'dead',
+      // The project was deleted after the job died. The row must still render.
+      projectId: null,
+      projectTitle: null,
+      userEmail: null,
+      attempts: 3,
+      maxAttempts: 3,
+      errorCode: 'context_length',
+      errorMessage: "This section's context exceeded the model's limit.",
+      createdAt: new Date(Date.now() - 9 * 86_400_000).toISOString(),
+    },
+  ],
+  recentErrors: [
+    {
+      id: 'e-1',
+      code: 'rate_limited',
+      title: 'Too many requests, too quickly',
+      message:
+        'This account has hit the beta’s request limit. Waiting about 20s and trying again will clear it.',
+      route: '/api/generate-stage-artifact',
+      requestId: 'a91f4c22e0b7d3f1',
+      httpStatus: 429,
+      userEmail: 'author@example.test',
+      projectTitle: 'Tidal Energy Handbook',
+      source: 'client',
+      createdAt: new Date(Date.now() - 12 * 60_000).toISOString(),
+    },
+    {
+      id: 'e-2',
+      code: 'invalid_request',
+      title: 'That request asked for too much',
+      message:
+        'The number of sections is above the maximum of 40. Nothing was generated and nothing was charged.',
+      route: '/api/generate-outline',
+      requestId: 'bb2701aa54cc9e30',
+      httpStatus: 422,
+      userEmail: 'analyst@example.test',
+      projectTitle: 'Regulatory Review',
+      source: 'client',
+      createdAt: new Date(Date.now() - 90 * 60_000).toISOString(),
+    },
+    {
+      id: 'e-3',
+      code: 'function_timeout',
+      title: 'Paused — the run hit its time limit',
+      message: 'Generation stopped partway through and will pick up automatically.',
+      route: '/api/generate-section-prose',
+      requestId: 'job7f21c9a4pros3k',
+      httpStatus: null,
+      userEmail: 'author@example.test',
+      projectTitle: 'Tidal Energy Handbook',
+      source: 'drain',
+      createdAt: new Date(Date.now() - 6 * 3_600_000).toISOString(),
+    },
+  ],
+  errorTally: [
+    { code: 'rate_limited', count: 11 },
+    { code: 'provider_unavailable', count: 7 },
+    { code: 'function_timeout', count: 5 },
+    { code: 'invalid_request', count: 3 },
+    { code: 'insufficient_credits', count: 1 },
+  ],
+  warnings: [],
+};
+
+function AdminSlice() {
+  return <AdminDashboard overview={ADMIN_OVERVIEW} />;
+}
+
+/** The same page when something behind it is broken, and when nothing is wrong. */
+function AdminEdgeSlice() {
+  const [view, setView] = useState<'degraded' | 'quiet'>('degraded');
+
+  const degraded: AdminOverview = {
+    ...ADMIN_OVERVIEW,
+    warnings: [
+      'Errors could not be read: permission denied for table error_events',
+      'User email addresses could not be resolved, so rows are labelled by id.',
+    ],
+    recentErrors: [],
+    errorTally: [],
+  };
+
+  const quiet: AdminOverview = {
+    ...ADMIN_OVERVIEW,
+    totals: {
+      calls: 0,
+      tokensIn: 0,
+      tokensOut: 0,
+      // Nothing spent and nothing known: the page must not print $0.00 as if it
+      // were a measurement.
+      costUsd: null,
+      unpricedCalls: 0,
+      activeUsers: 0,
+      failedJobs: 0,
+      errors: 0,
+    },
+    usageByUser: [],
+    failedJobs: [],
+    recentErrors: [],
+    errorTally: [],
+    warnings: [],
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2">
+        {(['degraded', 'quiet'] as const).map((key) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setView(key)}
+            aria-pressed={view === key}
+            className={`rounded-full px-3 py-1.5 text-label transition-colors ${
+              view === key
+                ? 'bg-[var(--pm-primary)] text-[var(--on-primary)]'
+                : 'bg-[var(--surface-container-high)] text-[var(--on-surface-variant)]'
+            }`}
+          >
+            {key === 'degraded' ? 'A query failed' : 'Nothing has happened yet'}
+          </button>
+        ))}
+      </div>
+      <AdminDashboard overview={view === 'degraded' ? degraded : quiet} />
+    </div>
+  );
+}
+
+function LargeJobSlice() {
+  const [open, setOpen] = useState(true);
+  return open ? (
+    <LargeJobWarning
+      sectionCount={24}
+      model="openai/gpt-4o"
+      onConfirm={() => setOpen(false)}
+      onCancel={() => setOpen(false)}
+    />
+  ) : (
+    <button
+      type="button"
+      onClick={() => setOpen(true)}
+      className="rounded-full bg-[var(--surface-container-high)] px-4 py-2 text-label text-[var(--on-surface)]"
+    >
+      Show the warning again
+    </button>
+  );
+}
+
 export default function PreviewPage() {
-  // Never ships. The preview exists so the UI can be reviewed without a login;
-  // exposing fixture-driven screens in production would be worse than useless.
-  if (process.env.NODE_ENV === 'production') notFound();
+  /**
+   * This ships.
+   *
+   * It used to `notFound()` in production on the reasoning that fixture-driven
+   * screens have no business being live. That was right when the preview was a
+   * scratch page; it is wrong now. Every surface here imports the component the
+   * app imports — only the data is fabricated — which makes this the fastest
+   * way to see the whole product at once, with no login, no project to set up
+   * and no model call to wait for.
+   *
+   * What the guard was actually protecting against is someone mistaking a
+   * fixture for their own work. That is a labelling problem, so it is solved by
+   * labelling: the banner below states it plainly, sits at the top of the page
+   * before any component, and stays there when the page scrolls.
+   */
 
   const [pickerId, setPickerId] = useState<string | null>(TEMPLATES[0].id);
 
   return (
-    <div className="min-h-screen bg-[var(--surface)] px-8 py-12">
-      <div className="mx-auto max-w-[1200px]">
-        <p className="mb-2 text-label uppercase tracking-wider text-[var(--on-surface-variant)]">
-          Design preview · fixture data · not deployed
-        </p>
+    <div className="min-h-screen bg-[var(--surface)]">
+      {/* Sticky, tertiary, and unmissable. A quiet line of small caps at the
+          top of a long page is not an honest warning once you have scrolled
+          past it — and every screen below this looks exactly like the real
+          thing, which is the entire point of the page and also the risk. */}
+      <div className="sticky top-0 z-50 bg-[var(--tertiary-container)] px-8 py-2.5">
+        <div className="mx-auto flex max-w-[1200px] items-center gap-2.5">
+          <span aria-hidden className="material-symbols-outlined text-[18px] text-[var(--on-primary)]">
+            science
+          </span>
+          <p className="text-label uppercase tracking-wider text-[var(--on-primary)]">
+            Design preview · every figure and document on this page is fixture data · nothing here
+            is saved
+          </p>
+        </div>
+      </div>
+
+      <div className="mx-auto max-w-[1200px] px-8 py-12">
         <h1 className="text-display text-[var(--on-surface)]">Phase 2 workflow UI</h1>
+        <p className="mt-3 max-w-[70ch] text-body text-[var(--on-surface-variant)]">
+          Every surface below imports the same component the app does, so what you see is what
+          ships. Only the data is fabricated.
+        </p>
 
         <div className="mt-14">
           <Section
@@ -1008,6 +1631,13 @@ export default function PreviewPage() {
             note="FR-11 and FR-12. Press Evaluate — it says what it costs, because nothing here fires on its own. The artifact is deliberately defective: it answers a different question than the stage asked, addresses the wrong readers, names vendors the constraints forbid, and promises chapters the approved outline does not contain. Each is a finding, categorised by the axis it offends. The correction is offered, never applied; carrying on without it is a first-class answer."
           >
             <StageEvaluationSlice />
+          </Section>
+
+          <Section
+            title="The recommendations surface"
+            note="FR-13, FR-14, FR-09 and FR-15, in the order the workspace stacks them: the checklist states the gap, the recommendations propose closing it, the evaluation is the evidence they rest on, and the tasks are what was set aside. Open 'Why this' on any row — all four rationale slots are filled, and the derived ones are filled without a model having been asked. Tick both applyable rows and press Combine: the dialog shows the exact instruction that will be sent, the affected scope, and what happens to v4, before anything is spent. The two pull opposite ways on length, so it warns — and leaves the button enabled, because guidance is suggestive, not restrictive."
+          >
+            <RecommendationsSlice />
           </Section>
 
           <Section
@@ -1071,10 +1701,66 @@ export default function PreviewPage() {
           </Section>
 
           <Section
+            title="When generation fails"
+            note="FR-16. Nine classified failures, each with the actions that apply to it and none of the ones that do not — no retry where retrying is guaranteed to fail again, resume rather than retry where the work was interrupted. Every message says what survived, because the first question a failure raises is whether the work is gone. The raw provider error is behind Technical details, never the message."
+          >
+            <RecoverySlice />
+          </Section>
+
+          <Section
+            title="Getting the work out"
+            note="FR-20. Markdown is the artifact — every stage the project reached, in order, with a skipped stage recorded rather than dropped. The full record is project, stage history, every version and every evaluation: FR-01's durability claim made inspectable."
+          >
+            <ExportSlice />
+          </Section>
+
+          <Section
+            title="The beta notice and feedback"
+            note="FR-22. The notice is already on this page — it is mounted app-wide — and collapses to a chip rather than disappearing, because a warning a user can permanently delete is a warning that was never given. The form asks the four things the validation framework asks."
+          >
+            <BetaSlice />
+          </Section>
+
+          <Section
             title="Single output, stage by stage"
             note="/session is retired, so this is the whole of it. Pick a stage and the renderer changes with it — no branch anywhere reads the workflow's name. Type an objective on Input and watch its blocking criterion satisfy; tick a manual check and watch its row flip. Advance and Skip move between stages here rather than writing events."
           >
             <SingleOutputSlice />
+          </Section>
+
+          <Section
+            title="The side chat, in both modes"
+            note="Two powers in one input box, so the whole design is making it obvious which one you are about to use. Discuss states that it cannot change the document and offers no scope; Instruct shows what it would apply to before it applies it. Both panels are the real component — the model is not reachable from the preview, so sending will report a failure rather than reply."
+          >
+            <ChatModesSlice />
+          </Section>
+
+          <Section
+            title="Warning before a large run spends"
+            note="FR-18. Drafting a book is the one action that commits real money without asking again — 24 sections is 48 provider calls that keep running after the tab closes. The estimate makes no model call; it is arithmetic over the backend's own caps plus the live provider price, so the dialog appears instantly. Small runs are never interrupted, because a dialog in front of every draft is one people learn to dismiss."
+          >
+            <LargeJobSlice />
+          </Section>
+
+          <Section
+            title="Operations: what broke and what it cost"
+            note="FR-19, for the product owner rather than a developer. No uuids and no schema words — accounts are emails, jobs say &lsquo;Gave up after 3 tries&rsquo; rather than status: dead, and every figure names its period. The &lsquo;+12?&rsquo; beside the second row is 12 calls whose model had no published price: the total understates rather than guessing, because a cost page is believed. This component holds no privilege at all — the refusal for a non-admin happens in the route handler that owns the service-role key."
+          >
+            <AdminSlice />
+          </Section>
+
+          <Section
+            title="The same page when it has nothing, or has lost something"
+            note="Two states worth designing deliberately. When a query fails, the page says so rather than rendering an empty table — an empty list where a read failed reads as &lsquo;nothing is wrong&rsquo;, which is the opposite of the truth. When genuinely nothing has happened, cost shows an em dash and not $0.00, because &lsquo;we do not know&rsquo; and &lsquo;it was free&rsquo; are different facts."
+          >
+            <AdminEdgeSlice />
+          </Section>
+
+          <Section
+            title="Proposing, applying, and undoing"
+            note="FR-09 asks for the affected scope to be shown before application and the prior version to remain recoverable. Both halves of that sentence are on the proposal card, at the point of decision rather than as a property of the system you are expected to know."
+          >
+            <ApplyFlowSlice />
           </Section>
         </div>
       </div>

@@ -21,9 +21,21 @@ than a section the user has already paid for.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from deps import get_client
+from promptmaster.errors import PRESERVED_NOTHING_WRITTEN, preserved_sections
+from promptmaster.limits import (
+    MAX_CONTENT_CHARS,
+    MAX_DOCUMENT_CHARS,
+    MAX_GLOSSARY_TERMS,
+    MAX_ITERATION_HISTORY,
+    MAX_MODEL_SLUG_CHARS,
+    MAX_OUTLINE_SECTIONS,
+    MAX_SECTION_COUNT,
+    MAX_SECTION_RECORDS,
+    MIN_SECTION_COUNT,
+)
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError
 from promptmaster.long_form import (
     detect_long_form,
@@ -45,6 +57,7 @@ from promptmaster.schemas import (
     SectionRecord,
 )
 from promptmaster.session_context import _label_trigger
+from routers._errors import llm_http_error
 from routers._pipeline import build_iteration_with_full_pipeline
 
 # Reuse the existing IterationFromConversationResponse shape
@@ -55,60 +68,75 @@ router = APIRouter(prefix="/api", tags=["long_form"])
 
 # -------- request bodies --------
 
+#: FR-18. Applied to every `model` field below rather than left unbounded: the
+#: slug is echoed into an outbound provider payload and into our own logs, and
+#: neither should accept an arbitrary-length string from a client.
+ModelField = Field(default="", max_length=MAX_MODEL_SLUG_CHARS)
+
+
 class DetectRequest(BaseModel):
     inputs: PMInput
-    model: str = ""
+    model: str = ModelField
 
 
 class GenerateOutlineRequest(BaseModel):
     inputs: PMInput
-    suggested_section_count: int = 8
-    model: str = ""
+    #: FR-18, and the field `promptmaster/limits.py` was written for. This was
+    #: `int = 8` with no upper bound, so `{"suggested_section_count": 500}` was
+    #: a well-formed request: 500 sections, ~1000 paid LLM calls, drained one
+    #: at a time until the OpenRouter account was empty. `le=` turns that into
+    #: a 422 that costs nothing — rejected before a single token is generated.
+    suggested_section_count: int = Field(
+        default=8, ge=MIN_SECTION_COUNT, le=MAX_SECTION_COUNT
+    )
+    model: str = ModelField
 
 
 class GenerateSectionRequest(BaseModel):
     inputs: PMInput
-    outline: list[OutlineSection]
-    section_index: int
+    outline: list[OutlineSection] = Field(..., max_length=MAX_OUTLINE_SECTIONS)
+    section_index: int = Field(..., ge=0, le=MAX_OUTLINE_SECTIONS)
     prior_snapshot: ContinuitySnapshot | None = None
-    prev_section_content: str = ""
-    model: str = ""
+    prev_section_content: str = Field(default="", max_length=MAX_CONTENT_CHARS)
+    model: str = ModelField
 
 
 class GenerateSectionProseRequest(BaseModel):
     inputs: PMInput
-    outline: list[OutlineSection]
-    section_index: int
+    outline: list[OutlineSection] = Field(..., max_length=MAX_OUTLINE_SECTIONS)
+    section_index: int = Field(..., ge=0, le=MAX_OUTLINE_SECTIONS)
     #: FR-06 records. Preferred over prior_snapshot; both are optional so the
     #: first section of a document sends neither.
-    records: list[SectionRecord] = []
+    records: list[SectionRecord] = Field(default=[], max_length=MAX_SECTION_RECORDS)
     prior_snapshot: ContinuitySnapshot | None = None
-    prev_section_content: str = ""
-    model: str = ""
+    prev_section_content: str = Field(default="", max_length=MAX_CONTENT_CHARS)
+    model: str = ModelField
 
 
 class ExtractSectionRecordRequest(BaseModel):
-    section_id: str
-    section_index: int
-    section_title: str = ""
-    section_content: str
+    section_id: str = Field(..., max_length=200)
+    section_index: int = Field(..., ge=0, le=MAX_OUTLINE_SECTIONS)
+    section_title: str = Field(default="", max_length=1_000)
+    section_content: str = Field(..., max_length=MAX_CONTENT_CHARS)
     #: Term names only — definitions are not resent, which is what keeps this
     #: call's input constant as the glossary grows.
-    existing_terms: list[str] = []
-    model: str = ""
+    existing_terms: list[str] = Field(default=[], max_length=MAX_GLOSSARY_TERMS)
+    model: str = ModelField
 
 
 class FinalizeLongFormRequest(BaseModel):
     inputs: PMInput
-    merged_content: str
-    outline: list[OutlineSection]
-    iteration_number: int
-    iteration_history: list[Iteration] = []
+    #: The whole merged document, so this gets the document-scale bound rather
+    #: than the per-section one.
+    merged_content: str = Field(..., max_length=MAX_DOCUMENT_CHARS)
+    outline: list[OutlineSection] = Field(..., max_length=MAX_OUTLINE_SECTIONS)
+    iteration_number: int = Field(..., ge=1, le=10_000)
+    iteration_history: list[Iteration] = Field(default=[], max_length=MAX_ITERATION_HISTORY)
     #: Worst finish_reason across the sections. Hardcoding "stop" here defeated
     #: truncation detection for the whole document: a section that hit the token
     #: limit was merged in and then declared complete.
-    finish_reason: str = ""
-    model: str = ""
+    finish_reason: str = Field(default="", max_length=100)
+    model: str = ModelField
 
 
 def _document_finish_reason(req: FinalizeLongFormRequest) -> str:
@@ -141,7 +169,7 @@ async def api_detect_long_form(
     try:
         return await detect_long_form(client=client, model=req.model or None, inputs=req.inputs)
     except OpenRouterError as e:
-        raise HTTPException(status_code=502, detail=f"LLM error: {e}")
+        raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
 
 
 @router.post("/generate-outline", response_model=GenerateOutlineResponse)
@@ -158,7 +186,7 @@ async def api_generate_outline(
         )
         return GenerateOutlineResponse(outline=outline)
     except (OpenRouterError, ValueError) as e:
-        raise HTTPException(status_code=502, detail=f"LLM error: {e}")
+        raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
 
 
 @router.post("/generate-section", response_model=GenerateSectionResponse)
@@ -184,7 +212,11 @@ async def api_generate_section(
             prev_section_content=req.prev_section_content,
         )
     except OpenRouterError as e:
-        raise HTTPException(status_code=502, detail=f"LLM error: {e}")
+        # The canonical FR-16 case: a book six sections in. `section_index` is
+        # how many are already written, so the message can name them.
+        raise llm_http_error(
+            e, preserved_sections(req.section_index, len(req.outline)) or PRESERVED_NOTHING_WRITTEN
+        )
 
 
 @router.post("/finalize-long-form", response_model=IterationFromConversationResponse)
@@ -235,7 +267,7 @@ async def api_finalize_long_form(
         )
         return IterationFromConversationResponse(iteration=iteration, suggestions=suggestions)
     except OpenRouterError as e:
-        raise HTTPException(status_code=502, detail=f"LLM error: {e}")
+        raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
 
 
 @router.post("/generate-section-prose", response_model=GenerateSectionProseResponse)
@@ -262,7 +294,9 @@ async def api_generate_section_prose(
             records=req.records or None,
         )
     except OpenRouterError as e:
-        raise HTTPException(status_code=502, detail=f"LLM error: {e}")
+        raise llm_http_error(
+            e, preserved_sections(req.section_index, len(req.outline)) or PRESERVED_NOTHING_WRITTEN
+        )
 
 
 @router.post("/extract-section-record", response_model=ExtractSectionRecordResponse)
@@ -285,4 +319,4 @@ async def api_extract_section_record(
         )
         return ExtractSectionRecordResponse(record=record)
     except OpenRouterError as e:
-        raise HTTPException(status_code=502, detail=f"LLM error: {e}")
+        raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)

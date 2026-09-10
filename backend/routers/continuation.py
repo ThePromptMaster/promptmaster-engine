@@ -10,7 +10,9 @@ from promptmaster.continuity import (
     build_continuation_prompt,
     generate_continuity_snapshot,
 )
+from promptmaster.errors import PRESERVED_NOTHING_WRITTEN
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError
+from routers._errors import llm_http_error
 from promptmaster.schemas import Iteration, PMInput
 from promptmaster.session_context import _label_trigger
 from routers._pipeline import build_iteration_with_full_pipeline
@@ -95,4 +97,4 @@ async def api_continue_document(
 
         return IterationFromConversationResponse(iteration=iteration, suggestions=suggestions)
     except OpenRouterError as e:
-        raise HTTPException(status_code=502, detail=f"LLM error: {e}")
+        raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
