@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { createProject, pressTransition, skipStage } from './helpers';
+import { createProject, pressTransition, skipStage, stageArtifact } from './helpers';
 
 /**
  * A1d — Sean: "see very top and bottom after I press save", and the Research
@@ -29,7 +29,7 @@ test('approving an outline does not swap the page for a skeleton', async ({ page
   await expect(page.getByText('Mock output').first()).toBeVisible();
   await pressTransition(page);
   await expect(page.getByRole('heading', { name: /Audience/ })).toBeVisible();
-  await expect(page.getByText(/Mock /).first()).toBeVisible();
+  await expect(stageArtifact(page).getByText(/Mock /).first()).toBeVisible();
 
   // Walk to the outline, then approve it. Approval reloads the project; that
   // reload used to replace the whole page — header, rail, transition bar —

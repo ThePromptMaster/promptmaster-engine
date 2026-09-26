@@ -112,3 +112,12 @@ export function criterion(page: Page, label: string) {
   const checklist = page.locator('section').filter({ has: page.getByRole('heading', { name: 'To finish this stage' }) });
   return checklist.getByRole('listitem').filter({ hasText: label });
 }
+
+/**
+ * The current stage's artifact, for asserting on what was drafted. Scoped
+ * because other surfaces (the collapsed project brief, recommendations) can
+ * hold the same text hidden, and an unscoped getByText would match them first.
+ */
+export function stageArtifact(page: Page) {
+  return page.getByRole('region', { name: / artifact$/ });
+}
