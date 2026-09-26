@@ -49,10 +49,11 @@ interface Props {
   error: string | null;
   onRemove: (category: string) => void;
   /**
-   * PM-24: for each pair that pulls opposite ways, which one the user said
-   * controls — sent to the model with the fixes, as sentences.
+   * PM-22: with `showFirst`, the revision is shown as a diff before anything is
+   * saved. PM-24: `precedence` — for each pair that pulls opposite ways, which
+   * one the user said controls, sent to the model with the fixes as sentences.
    */
-  onApply: (precedence: string[]) => void;
+  onApply: (options: { showFirst: boolean; precedence: string[] }) => void;
   onCancel: () => void;
 }
 
@@ -66,6 +67,7 @@ export function ApplyPreview({
   onApply,
   onCancel,
 }: Props) {
+  const [showFirst, setShowFirst] = useState(true);
   const conflicts = detectConflicts(selected);
   // Per conflict: the category that controls, or '' to let the model balance them.
   const [controls, setControls] = useState<Record<number, string>>({});
@@ -201,7 +203,17 @@ export function ApplyPreview({
 
         {error && <p className="mt-4 text-body text-[var(--pm-error)]">{error}</p>}
 
-        <div className="mt-6 flex items-center justify-end gap-2">
+        <label className="mt-5 flex items-center gap-2 text-label text-[var(--on-surface-variant)]">
+          <input
+            type="checkbox"
+            checked={showFirst}
+            onChange={(e) => setShowFirst(e.target.checked)}
+            className="h-4 w-4 accent-[var(--pm-primary)]"
+          />
+          Show the revised version before saving it
+        </label>
+
+        <div className="mt-4 flex items-center justify-end gap-2">
           <button
             onClick={onCancel}
             disabled={applying}
@@ -210,7 +222,7 @@ export function ApplyPreview({
             Cancel
           </button>
           <button
-            onClick={() => onApply(precedence)}
+            onClick={() => onApply({ showFirst, precedence })}
             // Never disabled by a conflict. Only by there being nothing to do,
             // or by a call already in flight.
             disabled={applying || selected.length === 0}

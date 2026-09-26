@@ -121,6 +121,13 @@ export function useRecommendations({
   const [tasks, setTasks] = useState<ProjectTask[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [previewing, setPreviewing] = useState<string[] | null>(null);
+  /** PM-22: a revision made but not yet saved, shown first as a diff. */
+  const [revision, setRevision] = useState<{
+    chosen: PanelRecommendation[];
+    before: string;
+    response: { content: string; instruction: string; finish_reason: string };
+    precedence: string[];
+  } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -354,13 +361,66 @@ export function useRecommendations({
   );
 
   /**
+   * Save an applied revision: version FIRST, then accept, then record. A
+   * failure after the version leaves a good version and a still-pending
+   * recommendation — visible, and re-doable.
+   */
+  const commitRevision = useCallback(
+    async (
+      chosen: PanelRecommendation[],
+      response: { content: string; instruction: string; finish_reason: string },
+      precedence: string[] = []
+    ) => {
+      if (!stage || !appendStageVersion) return;
+        await appendStageVersion(stage.id, stage.label, {
+          content: response.content,
+          source_operation: 'applied_recommendations',
+          // The literal block that was sent, returned by the endpoint rather
+          // than rebuilt here — two places building the same string is two
+          // places for it to drift (FR-10).
+          instruction: response.instruction,
+          model: project.model,
+          mode: project.mode,
+          change_summary:
+            chosen.length === 1
+              ? `Applied: ${chosen[0].title}`
+              : `Applied ${chosen.length} recommendations together.`,
+          finish_reason: response.finish_reason || null,
+        });
+
+        // --- then accept, then record ----------------------------------------
+        // A failure from here leaves a good version and a still-pending
+        // recommendation: visible, and re-doable.
+        for (const rec of chosen) {
+          const row = rec.id
+            ? await resolveRecommendation(rec.id, 'accepted')
+            : await materialise(rec, 'pending');
+          const accepted = rec.id ? row : await resolveRecommendation(row.id, 'accepted');
+          await recordDecision(project.id, project.user_id, {
+            decision_type: 'accept_recommendation',
+            recommendation_id: accepted.id,
+            rationale: null,
+            metadata: {
+              category: rec.category,
+              stage: stage.id,
+              applied_with: chosen.length,
+              ...(precedence.length ? { precedence } : {}),
+            },
+          });
+        }
+    },
+    [stage, appendStageVersion, project, materialise]
+  );
+
+  /**
    * Apply the selected recommendations. FR-09.
    *
    * The only place in this milestone that spends a model call, and it happens
    * after the preview dialog has shown the user the exact instruction, the
    * affected scope, and what happens to the current version.
    */
-  const confirmApply = useCallback(async (precedence: string[] = []) => {
+  const confirmApply = useCallback(async (opts: { showFirst?: boolean; precedence?: string[] } = {}) => {
+    const precedence = opts.precedence ?? [];
     if (!stage || !previewing || busy || !appendStageVersion) return;
     const chosen = panelRows.filter((r) => previewing.includes(r.category) && isApplyable(r));
     const content = headVersion?.content ?? '';
@@ -396,44 +456,13 @@ export function useRecommendations({
       );
       if (controller.signal.aborted) return;
 
-      // --- version FIRST ---------------------------------------------------
-      await appendStageVersion(stage.id, stage.label, {
-        content: response.content,
-        source_operation: 'applied_recommendations',
-        // The literal block that was sent, returned by the endpoint rather
-        // than rebuilt here — two places building the same string is two
-        // places for it to drift (FR-10).
-        instruction: response.instruction,
-        model: project.model,
-        mode: project.mode,
-        change_summary:
-          chosen.length === 1
-            ? `Applied: ${chosen[0].title}`
-            : `Applied ${chosen.length} recommendations together.`,
-        finish_reason: response.finish_reason || null,
-      });
-
-      // --- then accept, then record ----------------------------------------
-      // A failure from here leaves a good version and a still-pending
-      // recommendation: visible, and re-doable.
-      for (const rec of chosen) {
-        const row = rec.id
-          ? await resolveRecommendation(rec.id, 'accepted')
-          : await materialise(rec, 'pending');
-        const accepted = rec.id ? row : await resolveRecommendation(row.id, 'accepted');
-        await recordDecision(project.id, project.user_id, {
-          decision_type: 'accept_recommendation',
-          recommendation_id: accepted.id,
-          rationale: null,
-          metadata: {
-            category: rec.category,
-            stage: stage.id,
-            applied_with: chosen.length,
-            ...(precedence.length ? { precedence } : {}),
-          },
-        });
+      // PM-22: "Show revised version first" — hold it until Keep.
+      if (opts.showFirst) {
+        setRevision({ chosen, before: content, response, precedence });
+        setPreviewing(null);
+        return;
       }
-
+      await commitRevision(chosen, response, precedence);
       setPreviewing(null);
       setSelected([]);
       await reload();
@@ -456,9 +485,25 @@ export function useRecommendations({
     panelRows,
     headVersion,
     project,
-    materialise,
     reload,
+    commitRevision,
   ]);
+
+  const keepRevision = useCallback(async () => {
+    if (!revision) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await commitRevision(revision.chosen, revision.response, revision.precedence);
+      setRevision(null);
+      setSelected([]);
+      await reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save it. Your current version is untouched.');
+    } finally {
+      setBusy(false);
+    }
+  }, [revision, commitRevision, reload]);
 
   const resolveTask = useCallback(
     async (id: string, status: 'done' | 'dismissed') => {
@@ -499,6 +544,19 @@ export function useRecommendations({
     }, []),
     triage,
     confirmApply,
+    /** PM-22: the revision held for "show revised version first", in the preview's shape. */
+    revision: revision
+      ? {
+          findings: revision.chosen.map(asFinding),
+          before: revision.before,
+          after: revision.response.content,
+          instruction: revision.response.instruction,
+          finishReason: revision.response.finish_reason || null,
+          source: 'the recommendations',
+        }
+      : null,
+    keepRevision,
+    discardRevision: useCallback(() => setRevision(null), []),
     resolveTask,
     busy,
     error,

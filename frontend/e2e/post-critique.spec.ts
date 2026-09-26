@@ -130,3 +130,54 @@ test('"Buttonize it": each point of a Challenge can be applied as you go', async
   expect(v2.content).toContain('Weak reasoning');
   expect(v2.content).not.toContain('Unstated assumptions');
 });
+
+test('A recommendation can be shown revised first, too — then accepted and recorded', async ({ page }) => {
+  const { id } = await checked(page, 'E2E recommendation show first');
+  // The check's correction is the suggested next step.
+  await transitionBar(page).getByRole('button', { name: 'Apply the suggested fix' }).click();
+  const dialog = page.getByRole('dialog', { name: /Apply this recommendation/ });
+  await expect(dialog.getByRole('checkbox', { name: 'Show the revised version before saving it' })).toBeChecked();
+  await dialog.getByRole('button', { name: 'Apply', exact: true }).click();
+
+  const preview = page.getByRole('dialog', { name: 'Revised version' });
+  await expect(preview.getByTestId('revision-diff').locator('ins')).toContainText('Applied by the mock');
+  expect(await versionsOf(id)).toHaveLength(1); // nothing saved yet
+  await page.screenshot({ path: test.info().outputPath('01-recommendation-revised-first.png') });
+  await preview.getByRole('button', { name: 'Keep this version' }).click();
+
+  await expect(page.getByRole('button', { name: 'v2' })).toBeVisible();
+  expect((await versionsOf(id)).map((v) => v.source_operation)).toEqual(['stage_draft', 'applied_recommendations']);
+  const [rec] = await serviceSelect('recommendations', `project_id=eq.${id}&kind=neq.workflow&select=id,status`);
+  expect(rec.status).toBe('accepted');
+  expect(await serviceSelect('decisions', `recommendation_id=eq.${rec.id}&select=decision_type`)).toEqual([{ decision_type: 'accept_recommendation' }]);
+});
+
+test('Discarding a recommendation revision keeps the recommendation pending', async ({ page }) => {
+  const { id } = await checked(page, 'E2E recommendation discard');
+  await transitionBar(page).getByRole('button', { name: 'Apply the suggested fix' }).click();
+  await page.getByRole('dialog', { name: /Apply this recommendation/ }).getByRole('button', { name: 'Apply', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Revised version' }).getByRole('button', { name: 'Discard' }).click();
+  expect(await versionsOf(id)).toHaveLength(1);
+  const [rec] = await serviceSelect('recommendations', `project_id=eq.${id}&kind=neq.workflow&select=status`);
+  expect(rec.status).toBe('pending');
+  await expect(transitionBar(page).getByRole('button', { name: 'Apply the suggested fix' })).toBeVisible();
+});
+
+test('"Buttonize it" in the side chat: a reply\'s suggestions can each be applied', async ({ page }) => {
+  const id = await createProject(page, { workflow: 'Book', name: 'E2E buttonize chat', objective: 'A book about giraffes' });
+  await expect(page.getByText('Mock output').first()).toBeVisible();
+  const chat = page.getByRole('region', { name: 'Side chat' });
+  await chat.getByRole('textbox', { name: 'Ask a question' }).fill('How could this be better?');
+  await chat.getByRole('button', { name: 'Ask' }).click();
+
+  const act = chat.getByRole('region', { name: 'Act on this reply' });
+  await expect(act.getByRole('listitem')).toHaveCount(3);
+  await page.screenshot({ path: test.info().outputPath('01-chat-buttonized.png') });
+  await act.getByRole('checkbox', { name: 'Show the revised version first' }).uncheck();
+  await act.getByRole('button', { name: /^Apply: Mock: replace the abstract/ }).click();
+
+  await expect(page.getByRole('button', { name: 'v2' })).toBeVisible();
+  const [, v2] = await versionsOf(id);
+  expect(v2.content).toContain('Applied by the mock: Mock: replace the abstract second paragraph with one example.');
+  expect(v2.content).not.toContain('open with the question');
+});
