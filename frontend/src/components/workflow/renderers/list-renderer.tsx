@@ -22,6 +22,7 @@ import { emptyItem, isBlankItem, type StageItem } from '@/lib/workflow/stage-art
 import { parseItems } from '@/lib/workflow/stage-artifact';
 import { ConfirmOverwrite, EmptyStage, GenerationBar, VersionBar } from './stage-chrome';
 import type { StageRendererProps } from './types';
+import { AutoGrowTextarea } from '@/components/shared/auto-grow-textarea';
 
 export function ListRenderer({
   stage,
@@ -338,14 +339,14 @@ export function ItemField({ id, field, value, readOnly, onChange }: ItemFieldPro
         {field.label}
       </label>
       {field.long ? (
-        <textarea
+        <AutoGrowTextarea
           id={id}
           value={value}
           disabled={readOnly}
           rows={3}
           placeholder={field.hint}
           onChange={(e) => onChange(e.target.value)}
-          className={`${shared} resize-y`}
+          className={shared}
         />
       ) : (
         <input

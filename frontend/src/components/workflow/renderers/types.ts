@@ -24,6 +24,13 @@ export interface LongFormContext {
   approvedOutlineVersionId: string | null;
   /** Ask the workspace to reload the artifact after the server changed it. */
   onRefresh: () => void;
+  /**
+   * What to tell the user when there is nothing to draft from yet. Worded by
+   * the workspace from the template's outline style — the renderer used to say
+   * "approve an outline in the outline stage" to Research projects, which have
+   * no outline stage.
+   */
+  emptyHint?: string;
 }
 
 /**

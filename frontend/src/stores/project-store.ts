@@ -78,7 +78,16 @@ interface ProjectState {
   saveState: SaveState;
   conflict: { serverProject: Project | null; localPatch: ProjectPatch } | null;
 
-  loadProject: (id: string) => Promise<void>;
+  /**
+   * `background: true` re-reads the project in place: no skeleton, and edits
+   * still waiting on the debounce are kept and re-applied over what loads.
+   * The workspace reloads after approvals and after each drafted section; a
+   * foreground reload there swapped the whole page for the loading skeleton —
+   * header and footer vanished, scroll, chat and the stage being viewed all
+   * reset — and silently dropped any edit typed in the last 800ms (Sean's
+   * "see very top and bottom after I press save").
+   */
+  loadProject: (id: string, options?: { background?: boolean }) => Promise<void>;
   closeProject: () => void;
 
   /** Optimistic local edit, flushed after a debounce. */
@@ -131,6 +140,11 @@ interface ProjectState {
 // machinery, not something a component should re-render on.
 let timer: ReturnType<typeof setTimeout> | null = null;
 let pendingPatch: ProjectPatch = {};
+// The flush currently talking to the server. A second flush waits for it
+// rather than racing it: two requests carrying the same starting revision make
+// the second one a conflict with the first, and the user saw "This project was
+// changed in another tab" with only one tab open.
+let inFlight: Promise<void> | null = null;
 
 function clearTimer() {
   if (timer) {
@@ -152,10 +166,16 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
   saveState: 'idle',
   conflict: null,
 
-  async loadProject(id) {
-    clearTimer();
-    pendingPatch = {};
-    set({ loading: true, error: null, projectId: id, saveState: 'idle', conflict: null });
+  async loadProject(id, options) {
+    const background = Boolean(options?.background) && get().projectId === id && get().project !== null;
+    if (background) {
+      // Let an in-progress save land first, so what loads includes it.
+      if (inFlight) await inFlight.catch(() => undefined);
+    } else {
+      clearTimer();
+      pendingPatch = {};
+      set({ loading: true, error: null, projectId: id, saveState: 'idle', conflict: null });
+    }
 
     try {
       const project = await getProject(id);
@@ -218,7 +238,9 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       const head = projectHead;
 
       set({
-        project,
+        // Unsaved local edits stay on screen over the freshly loaded row; the
+        // pending flush will send them with the new revision.
+        project: background ? { ...project, ...pendingPatch } : project,
         artifact,
         versions,
         stages,
@@ -265,14 +287,26 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
 
   async flush() {
     clearTimer();
+    // Serialise: wait for the save already on the wire, then send what has
+    // accumulated since, against the revision that save produced.
+    while (inFlight) await inFlight.catch(() => undefined);
+
     const { project } = get();
     const patch = pendingPatch;
     if (!project || Object.keys(patch).length === 0) return;
 
     pendingPatch = {};
+    const request = updateProject(project.id, patch, project.revision);
+    inFlight = request.then(
+      () => undefined,
+      () => undefined
+    );
     try {
-      const updated = await updateProject(project.id, patch, project.revision);
-      set({ project: updated, saveState: 'saved' });
+      const updated = await request;
+      // Characters typed while the request was out are still in pendingPatch;
+      // replacing the project with the server row alone made the text jump back.
+      set({ project: { ...updated, ...pendingPatch }, saveState: 'saved' });
+      if (Object.keys(pendingPatch).length > 0) set({ saveState: 'saving' });
     } catch (err) {
       if (err instanceof ProjectConflictError) {
         // Never resolve automatically: the local edit is what the user just
@@ -286,6 +320,8 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       // Keep the patch so the next flush retries it rather than dropping the edit.
       pendingPatch = { ...patch, ...pendingPatch };
       set({ saveState: 'error', error: err instanceof Error ? err.message : 'Save failed.' });
+    } finally {
+      inFlight = null;
     }
   },
 

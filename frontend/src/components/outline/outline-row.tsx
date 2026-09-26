@@ -3,6 +3,7 @@
 import { useState } from 'react';
 
 import type { OutlineItem } from '@/types/outline';
+import { AutoGrowTextarea } from '@/components/shared/auto-grow-textarea';
 
 /**
  * One outline section: its text, its position, and everything you can do to it.
@@ -119,14 +120,14 @@ export function OutlineRow({
             placeholder="Section title"
             className="w-full rounded-lg bg-[var(--surface-container-low)] px-3 py-2 text-title text-[var(--on-surface)] outline-none placeholder:font-normal placeholder:text-[var(--on-surface-variant)] disabled:opacity-70"
           />
-          <textarea
+          <AutoGrowTextarea
             value={item.abstract}
             onChange={(e) => onChange({ abstract: e.target.value })}
             disabled={readOnly}
             rows={2}
             aria-label={`What section ${index + 1} covers`}
             placeholder="What this section covers, in a sentence"
-            className="w-full resize-none rounded-lg bg-[var(--surface-container-low)] px-3 py-2 text-body text-[var(--on-surface)] outline-none placeholder:text-[var(--on-surface-variant)] disabled:opacity-70"
+            className="w-full rounded-lg bg-[var(--surface-container-low)] px-3 py-2 text-body text-[var(--on-surface)] outline-none placeholder:text-[var(--on-surface-variant)] disabled:opacity-70"
           />
 
           {words > 0 && (

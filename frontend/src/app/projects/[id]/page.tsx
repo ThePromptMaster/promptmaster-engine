@@ -56,7 +56,11 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
       ? getTemplateById(project.workflow_template_id)
       : getLatestTemplate(project.workflow);
     load.then(setTemplate).catch(() => setTemplate(null));
-  }, [project]);
+    // Keyed on the pin, not the project: every keystroke produces a new
+    // project object, and re-fetching the template for each one rebuilt every
+    // memo in the workspace on every character typed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project?.workflow_template_id, project?.workflow]);
 
   if (loading) {
     // A skeleton in the shape of the thing being loaded, rather than the bare
@@ -227,7 +231,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         restoreStageVersion={restoreStageVersion}
         setStageSummary={setStageSummary}
         ensureStageArtifact={ensureStageArtifact}
-        onReload={() => void loadProject(id)}
+        onReload={() => void loadProject(id, { background: true })}
       />
     </div>
   );

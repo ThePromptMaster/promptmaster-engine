@@ -29,6 +29,7 @@ import { useMemo } from 'react';
 
 import type { StageDefinition } from '@/lib/workflow/types';
 import type { Project, ProjectPatch } from '@/types/project';
+import { AutoGrowTextarea } from '@/components/shared/auto-grow-textarea';
 
 /** The project columns a criterion is allowed to require, and how to label one. */
 const FIELDS = {
@@ -133,14 +134,14 @@ export function ProjectSetup({ project, stage, onPatch, readOnly }: Props) {
                   </span>
                 )}
               </div>
-              <textarea
+              <AutoGrowTextarea
                 id={`setup-${key}`}
                 value={value}
                 readOnly={readOnly}
                 rows={field.rows}
                 placeholder={field.placeholder}
                 onChange={(e) => onPatch({ [key]: e.target.value })}
-                className="w-full resize-y rounded-lg bg-[var(--surface-container-low)] px-4 py-3 text-body leading-relaxed text-[var(--on-surface)] outline-none placeholder:text-[var(--on-surface-variant)] focus:ring-2 focus:ring-[var(--pm-primary)]/40 read-only:opacity-70"
+                className="w-full rounded-lg bg-[var(--surface-container-low)] px-4 py-3 text-body leading-relaxed text-[var(--on-surface)] outline-none placeholder:text-[var(--on-surface-variant)] focus:ring-2 focus:ring-[var(--pm-primary)]/40 read-only:opacity-70"
               />
             </div>
           );

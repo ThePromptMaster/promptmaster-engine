@@ -154,6 +154,81 @@ describe('patchProject', () => {
   });
 });
 
+describe('saves in flight (A1d)', () => {
+  it('does not race two saves into a false "changed in another tab"', async () => {
+    await loadFixture();
+    // The first save is slow to answer; the server moves 3 -> 4.
+    let answerFirst!: (p: Project) => void;
+    updateProject.mockImplementationOnce(
+      () => new Promise<Project>((resolve) => (answerFirst = resolve))
+    );
+    updateProject.mockImplementation(async (_id, patch, revision) => {
+      // A stale revision is exactly what used to produce the false conflict.
+      if (revision !== 4) throw new ProjectConflictError('stale', project({ revision: 99 }));
+      return project({ ...patch, revision: 5 });
+    });
+
+    useProjectStore.getState().patchProject({ title: 'A' });
+    const first = useProjectStore.getState().flush();
+    useProjectStore.getState().patchProject({ objective: 'B' });
+    const second = useProjectStore.getState().flush();
+
+    answerFirst(project({ title: 'A', revision: 4 }));
+    await first;
+    await second;
+
+    expect(useProjectStore.getState().conflict).toBeNull();
+    expect(updateProject).toHaveBeenLastCalledWith('p1', { objective: 'B' }, 4);
+  });
+
+  it('keeps characters typed while a save was on the wire', async () => {
+    await loadFixture();
+    let answer!: (p: Project) => void;
+    updateProject.mockImplementationOnce(() => new Promise<Project>((resolve) => (answer = resolve)));
+
+    useProjectStore.getState().patchProject({ title: 'Gira' });
+    const saving = useProjectStore.getState().flush();
+    useProjectStore.getState().patchProject({ title: 'Giraffes' });
+    answer(project({ title: 'Gira', revision: 4 }));
+    await saving;
+
+    // Replacing the project with the server row made the text jump back.
+    expect(useProjectStore.getState().project?.title).toBe('Giraffes');
+  });
+});
+
+describe('background reload (A1d)', () => {
+  it('re-reads in place: no skeleton, and unsaved edits survive', async () => {
+    await loadFixture();
+    useProjectStore.getState().patchProject({ objective: 'typed but not saved yet' });
+
+    const seen: boolean[] = [];
+    const unsubscribe = useProjectStore.subscribe((st) => seen.push(st.loading));
+    getProject.mockResolvedValue(project({ stage: 'review', revision: 4 }));
+    await useProjectStore.getState().loadProject('p1', { background: true });
+    unsubscribe();
+
+    expect(seen).not.toContain(true);
+    const s = useProjectStore.getState().project!;
+    expect(s.stage).toBe('review');
+    expect(s.objective).toBe('typed but not saved yet');
+
+    // And the edit is still on its way to the server, against the new revision.
+    updateProject.mockResolvedValue(project({ revision: 5 }));
+    await useProjectStore.getState().flush();
+    expect(updateProject).toHaveBeenCalledWith('p1', { objective: 'typed but not saved yet' }, 4);
+  });
+
+  it('a normal load still shows the skeleton and starts clean', async () => {
+    await loadFixture();
+    const seen: boolean[] = [];
+    const unsubscribe = useProjectStore.subscribe((st) => seen.push(st.loading));
+    await useProjectStore.getState().loadProject('p1');
+    unsubscribe();
+    expect(seen).toContain(true);
+  });
+});
+
 describe('conflicts', () => {
   it('surfaces a conflict rather than resolving it silently', async () => {
     await loadFixture();
