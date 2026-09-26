@@ -12,7 +12,9 @@ import type { StageDefinition, StageEvaluation, WorkflowState, WorkflowTemplate 
 import type { AgentStep } from '@/types/agent';
 import type { Evaluation } from '@/types/project';
 
+/** The backend's cap on `artifact_excerpt` (AgentState in promptmaster/agent.py) — marker included. */
 export const ARTIFACT_EXCERPT_CHARS = 12_000;
+const TRIMMED = '\n[… trimmed …]';
 export const RECENT_STEPS = 8;
 
 export interface AgentStateDigest {
@@ -47,7 +49,12 @@ export function buildAgentState(input: {
     stage_label: stage.label,
     stage_instruction: stage.entry_prompt_hint || stage.entry_guidance,
     artifact_excerpt:
-      content.length > ARTIFACT_EXCERPT_CHARS ? content.slice(0, ARTIFACT_EXCERPT_CHARS) + '\n[… trimmed …]' : content,
+      // The marker counts against the cap: slicing to the full cap and then
+      // appending it made every stage over 12,000 characters a 422, and Go mode
+      // could not take a single step on it.
+      content.length > ARTIFACT_EXCERPT_CHARS
+        ? content.slice(0, ARTIFACT_EXCERPT_CHARS - TRIMMED.length) + TRIMMED
+        : content,
     criteria_met: stageEvaluation.criteria.filter((c) => c.satisfied).map((c) => c.label),
     // A box only the user ticks cannot be satisfied by rewriting the draft —
     // without saying so, a real planner revised three times to tick one (B4).

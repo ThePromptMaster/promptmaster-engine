@@ -1173,7 +1173,8 @@ export function WorkflowWorkspace({
               className="mb-4 inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-low)] px-3 py-1.5 text-label text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
             >
               <span className="material-symbols-outlined text-[16px]">arrow_back</span>
-              Viewing an earlier stage — back to {getStage(template, state.current_stage_id)?.short_label}
+              Viewing {stageIndex > template.stages.findIndex((s) => s.id === state.current_stage_id) ? 'a later' : 'an earlier'}{' '}
+              stage — back to {getStage(template, state.current_stage_id)?.short_label}
             </button>
           )}
 

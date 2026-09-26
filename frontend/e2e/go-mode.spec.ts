@@ -252,3 +252,27 @@ test('A question the run asks can be answered in place, and the answer is on the
   const recorded = await stepsOf((await runOf(id)).id);
   expect(recorded.slice(0, 3).map((s) => s.action_key)).toEqual(['request_user_decision', 'user_answer', 'prove']);
 });
+
+test('a draft longer than the planner excerpt still gets a next move', async ({ page }) => {
+  await researchProject(page, 'E2E go long draft', 'Pendulum period [[mock:plan=derive]]');
+
+  // Longer than ARTIFACT_EXCERPT_CHARS: the digest has to trim it to the
+  // backend's cap, marker included, or the planner refuses the request (422).
+  const artifact = stageArtifact(page);
+  await artifact.getByRole('button', { name: 'Edit' }).click();
+  await page.getByLabel('Edit Research question').fill('A long research question draft. '.repeat(700));
+  await page.getByRole('button', { name: 'Save as new version' }).click();
+  await expect(artifact.getByRole('button', { name: 'Edit' })).toBeVisible();
+
+  await choose(page, 'Guided');
+  const prompt = page.getByRole('region', { name: 'Go mode needs your approval' });
+  await expect(prompt).toContainText('Derive');
+  await expect(page.getByText(/longer than the 12,000-character limit/)).toHaveCount(0);
+  await prompt.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: test.info().outputPath('01-long-draft-gets-a-proposal.png') });
+
+  // Previewing a stage ahead of the cursor says so, rather than "earlier".
+  await page.getByRole('button', { name: /^Hypothesis/ }).first().click();
+  await expect(page.getByRole('button', { name: /Viewing a later stage — back to/ })).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath('02-later-stage-banner.png') });
+});
