@@ -279,8 +279,7 @@ export function OutlineStagePanel({
         project.id,
         project.user_id,
         stageId,
-        version,
-        events.length + 1
+        version
       );
       // After the event, so a failure to materialise leaves an approval that
       // can be retried rather than a drafting state bound to nothing.
@@ -291,7 +290,7 @@ export function OutlineStagePanel({
     } finally {
       setBusy(false);
     }
-  }, [commit, project.id, project.user_id, stageId, events.length, onEventsChanged, onApproved]);
+  }, [commit, project.id, project.user_id, stageId, onEventsChanged, onApproved]);
 
   const handleRegenerateAll = useCallback(async () => {
     setRegeneratingAll(true);

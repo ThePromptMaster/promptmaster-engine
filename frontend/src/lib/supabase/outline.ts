@@ -109,8 +109,7 @@ export async function approveOutlineVersion(
   projectId: string,
   userId: string,
   stageId: string,
-  version: ArtifactVersion,
-  nextSeq: number
+  version: ArtifactVersion
 ): Promise<void> {
   await appendWorkflowEvent(
     projectId,
@@ -123,8 +122,7 @@ export async function approveOutlineVersion(
         outline_version_number: version.version_number,
         artifact_id: version.artifact_id,
       },
-    },
-    nextSeq
+    }
   );
 }
 

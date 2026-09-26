@@ -17,7 +17,7 @@ future change does not undo a guarantee without noticing.
 | `artifact_versions` | Append-only version history. Content, prompt, model, mode, `finish_reason`, `user_rating`, `continuity_snapshot`. |
 | `evaluations` | Alignment / drift / clarity / completeness per version, with `needs_realignment` as a generated column. |
 | `workflow_templates` | Immutable published template versions (`key` + `version`), definition as JSONB. |
-| `workflow_events` | **The live stage-history log.** Stage state is projected from this. |
+| `workflow_events` | **The live stage-history log.** Stage state is projected from this. `seq` is assigned by a `BEFORE INSERT` trigger (`workflow_events_assign_seq`, max+1 under a per-project advisory lock); any value a writer supplies is ignored. |
 | `project_stage_events` | A second, unused stage-history table. See limitations. |
 | `recommendations` | Proposed actions, with `status` and `resulting_version_id`. |
 | `decisions` | Append-only decision trail. |

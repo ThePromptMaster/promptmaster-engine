@@ -60,8 +60,7 @@ describe('approving an outline', () => {
       'p1',
       'u1',
       'outline_approval',
-      { id: 'v7', version_number: 3, artifact_id: 'a1' } as ArtifactVersion,
-      5
+      { id: 'v7', version_number: 3, artifact_id: 'a1' } as ArtifactVersion
     );
 
     const [insert] = supa.current.inserts;
@@ -69,11 +68,13 @@ describe('approving an outline', () => {
     expect(insert.row).toMatchObject({
       project_id: 'p1',
       user_id: 'u1',
-      seq: 5,
       type: 'outline_approved',
       stage_id: 'outline_approval',
       actor: 'user',
     });
+    // seq is the database's to assign (PM-03); a client value would be ignored,
+    // and sending one invites someone to start trusting it again.
+    expect(insert.row).not.toHaveProperty('seq');
     // Without the version id the log would record that an approval happened
     // but not what was approved, and drafting could not bind to anything.
     expect(insert.row.payload).toEqual({
