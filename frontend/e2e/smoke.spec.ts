@@ -27,7 +27,8 @@ test('new project offers each workflow once, then drafts and evaluates a stage',
   // the request went browser -> FastAPI (JWT checked) -> mock -> back.
   await expect(page.getByText('Mock output').first()).toBeVisible();
 
-  await page.getByRole('button', { name: /Evaluate this stage/ }).click();
+  // PM-06: checking the stage is the suggested next step once it has a draft.
+  await page.getByRole('group', { name: 'Stage actions' }).getByRole('button', { name: 'Check this stage' }).click();
   await expect(page.getByText(/Alignment\s*High/).first()).toBeVisible();
   await expect(page.getByText('Needs realignment')).toHaveCount(0);
 });

@@ -31,19 +31,35 @@ export async function createProject(
   return page.url().split('/').at(-1)!;
 }
 
-/** The bar at the foot of the current stage (status line plus transitions). */
+/** The bar at the foot of the current stage: status, "More", and one primary action (PM-06). */
 export function transitionBar(page: Page) {
-  return page.getByText(/Ready to move on|items? outstanding/).locator('..');
+  return page.getByRole('group', { name: 'Stage actions' });
 }
 
 /**
- * Press the stage's primary transition. "Advance anyway" asks for an optional
- * note first; confirm it without one.
+ * Move to the next stage (or finish). Since PM-06 this is the primary button
+ * only when moving on is the suggested next step; otherwise it is under More.
+ * "… anyway" asks for an optional note first; confirm it without one.
  */
-export async function pressTransition(page: Page, label: RegExp) {
-  await transitionBar(page).getByRole('button', { name: label }).click();
+export async function pressTransition(page: Page) {
+  const bar = transitionBar(page);
+  const direct = bar.getByRole('button', { name: /^(Continue to|Finish)/ });
+  if (await direct.count()) {
+    await direct.click();
+  } else {
+    await bar.getByRole('button', { name: /^More/ }).click();
+    await page.getByRole('menuitem', { name: /^(Continue to|Finish)/ }).click();
+  }
   const moveOn = page.getByRole('button', { name: 'Move on' });
   if (await moveOn.isVisible().catch(() => false)) await moveOn.click();
+}
+
+/** Skip the current stage with a reason. */
+export async function skipStage(page: Page, reason: string) {
+  await transitionBar(page).getByRole('button', { name: /^More/ }).click();
+  await page.getByRole('menuitem', { name: 'Skip this stage' }).click();
+  await page.getByPlaceholder('Or write your own reason').fill(reason);
+  await page.getByRole('button', { name: 'Skip stage' }).click();
 }
 
 /**
@@ -93,6 +109,6 @@ export async function servicePatch(table: string, query: string, patch: Record<s
 
 /** The exit-criteria row for one criterion, by its label (the row also carries detail text). */
 export function criterion(page: Page, label: string) {
-  const checklist = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Before moving on' }) });
+  const checklist = page.locator('section').filter({ has: page.getByRole('heading', { name: 'To finish this stage' }) });
   return checklist.getByRole('listitem').filter({ hasText: label });
 }

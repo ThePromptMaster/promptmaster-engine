@@ -47,6 +47,18 @@ export interface LongFormContext {
  */
 export interface StageRendererProps {
   stage: StageDefinition;
+  /**
+   * The workspace draws the stage's actions in one bar with a single primary
+   * button (PM-06). When set, renderers keep drafting status and errors but
+   * not their own Draft / Regenerate / Evaluate buttons.
+   */
+  hideStageActions?: boolean;
+  /**
+   * Unsaved edits, reported upward so "Save changes" can be the primary action
+   * and the checklist can say edits do not count yet. `save` performs the same
+   * save as the renderer's own button.
+   */
+  onDirtyChange?: (state: { dirty: boolean; save: () => Promise<void> }) => void;
   /** The shape of one item, for list and review stages. */
   schema: StageItemSchema;
 

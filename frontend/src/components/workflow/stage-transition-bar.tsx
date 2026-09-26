@@ -4,6 +4,16 @@ import { useState } from 'react';
 
 import type { StageDefinition, StageEvaluation } from '@/lib/workflow/types';
 import type { TransitionOption } from '@/lib/workflow/engine';
+import type { StageAction } from '@/lib/workflow/next-action';
+
+/** An action offered under "More" (PM-06). */
+export interface MoreAction {
+  id: string;
+  label: string;
+  icon: string;
+  onSelect: () => void;
+  disabled?: boolean;
+}
 
 interface Props {
   stage: StageDefinition;
@@ -14,6 +24,18 @@ interface Props {
   busy?: boolean;
   /** Why the last transition failed, in words the user can act on. */
   error?: string | null;
+  /**
+   * PM-06: the one thing to do next. When given, the bar shows a single
+   * primary button and puts every other action — including the transitions
+   * that are not the primary — behind "More".
+   */
+  primary?: StageAction;
+  /** Runs a non-transition primary (save, draft, evaluate, apply fixes). */
+  onPrimary?: () => void;
+  /** Stage actions other than transitions (Regenerate, Evaluate, …). */
+  more?: MoreAction[];
+  /** Short label of the next stage, for "Continue to …" under More. */
+  nextStageLabel?: string | null;
 }
 
 /**
@@ -24,7 +46,19 @@ interface Props {
  * of the way rather than blocking. Advancing with something unmet relabels and
  * asks for a note; it is never disabled.
  */
-export function StageTransitionBar({ stage, evaluation, options, onTransition, busy = false, error = null }: Props) {
+export function StageTransitionBar({
+  stage,
+  evaluation,
+  options,
+  onTransition,
+  busy = false,
+  error = null,
+  primary,
+  onPrimary,
+  more = [],
+  nextStageLabel = null,
+}: Props) {
+  const [menuOpen, setMenuOpen] = useState(false);
   const [pending, setPending] = useState<TransitionOption | null>(null);
   const [note, setNote] = useState('');
   const [showReturns, setShowReturns] = useState(false);
@@ -116,6 +150,112 @@ export function StageTransitionBar({ stage, evaluation, options, onTransition, b
     );
   }
 
+  const statusLine = evaluation.canAdvance
+    ? 'Ready to move on'
+    : `${evaluation.unmet.length} item${evaluation.unmet.length === 1 ? '' : 's'} outstanding`;
+
+  if (primary) {
+    const primaryIsTransition = primary.kind === 'continue' || primary.kind === 'finish';
+    const menu: MoreAction[] = [
+      ...more,
+      // The transition, when something else leads: moving on is always one
+      // click away, never hidden, just not the suggestion.
+      ...(!primaryIsTransition && advance
+        ? [{ id: 'advance', label: advance.kind === 'finish' ? 'Finish project' : `Continue to ${nextStageLabel ?? 'the next stage'}`, icon: 'arrow_forward', onSelect: () => start(advance) }]
+        : []),
+      ...(skip ? [{ id: 'skip', label: 'Skip this stage', icon: 'redo', onSelect: () => start(skip) }] : []),
+      ...returns.map((option) => ({
+        id: `return-${option.toStageId}`,
+        label: option.label.replace(/^Return to/, 'Go back to'),
+        icon: 'undo',
+        onSelect: () => start(option),
+      })),
+    ];
+
+    return (
+      <div>
+        {error && (
+          <p role="alert" className="mb-2 rounded-lg bg-[var(--error-container)] px-4 py-3 text-body text-[var(--on-error-container)]">
+            {error}
+          </p>
+        )}
+        <div
+          role="group"
+          aria-label="Stage actions"
+          className="flex flex-wrap items-center gap-3 rounded-xl bg-[var(--surface-container-low)] px-5 py-4"
+        >
+          <div className="mr-auto min-w-0">
+            <span className="block text-label text-[var(--on-surface-variant)]">{statusLine}</span>
+            {primary.reason && (
+              <span className="mt-0.5 block text-label text-[var(--on-surface-variant)] opacity-80">
+                {primary.reason}
+              </span>
+            )}
+          </div>
+
+          {menu.length > 0 && (
+            <div className="relative">
+              <button
+                onClick={() => setMenuOpen((v) => !v)}
+                aria-haspopup="menu"
+                aria-expanded={menuOpen}
+                className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-title text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)] hover:text-[var(--on-surface)]"
+              >
+                More
+                <span aria-hidden className="material-symbols-outlined text-[18px]">expand_more</span>
+              </button>
+              {menuOpen && (
+                <div
+                  role="menu"
+                  className="absolute bottom-full right-0 z-10 mb-1 min-w-[240px] rounded-lg bg-[var(--surface-container-highest)] py-1 shadow-lg"
+                >
+                  {menu.map((item) => (
+                    <button
+                      key={item.id}
+                      role="menuitem"
+                      disabled={item.disabled || busy}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        item.onSelect();
+                      }}
+                      className="flex w-full items-center gap-2 px-4 py-2 text-left text-body text-[var(--on-surface)] hover:bg-[var(--surface-container-high)] disabled:opacity-40"
+                    >
+                      <span aria-hidden className="material-symbols-outlined text-[18px] text-[var(--on-surface-variant)]">
+                        {item.icon}
+                      </span>
+                      {item.label}
+                    </button>
+                  ))}
+                  {returns.length > 0 && (
+                    <p className="px-4 py-2 text-label leading-snug text-[var(--on-surface-variant)]">
+                      Going back keeps later work and flags it, never deletes it.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {primary.kind !== 'none' && (
+            <button
+              onClick={() => {
+                if (primaryIsTransition) {
+                  if (advance) start(advance);
+                } else {
+                  onPrimary?.();
+                }
+              }}
+              disabled={busy}
+              className="rounded-lg bg-[var(--pm-primary)] px-5 py-2 text-title text-[var(--on-primary)] transition-opacity hover:opacity-90 disabled:opacity-50"
+            >
+              {busy ? 'Saving…' : primary.label}
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
     {error && (
@@ -123,7 +263,11 @@ export function StageTransitionBar({ stage, evaluation, options, onTransition, b
         {error}
       </p>
     )}
-    <div className="flex flex-wrap items-center gap-2 rounded-xl bg-[var(--surface-container-low)] px-5 py-4">
+    <div
+      role="group"
+      aria-label="Stage actions"
+      className="flex flex-wrap items-center gap-2 rounded-xl bg-[var(--surface-container-low)] px-5 py-4"
+    >
       <span className="mr-auto text-label text-[var(--on-surface-variant)]">
         {evaluation.canAdvance
           ? 'Ready to move on'

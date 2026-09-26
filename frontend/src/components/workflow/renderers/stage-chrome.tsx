@@ -15,6 +15,7 @@ import { EvaluationScores } from '../evaluation-scores';
 import { RecoveryPanel } from '../recovery-panel';
 import type { StageFailure } from '@/lib/errors/recovery';
 import type { ArtifactVersion, Evaluation } from '@/types/project';
+import { operationLabel, versionTitle } from '@/lib/workflow/labels';
 
 interface VersionBarProps {
   versions: ArtifactVersion[];
@@ -49,7 +50,7 @@ export function VersionBar({
             key={v.id}
             onClick={() => onSelect(v.id)}
             aria-pressed={v.id === active.id}
-            title={v.change_summary ?? v.source_operation}
+            title={v.change_summary ?? versionTitle(v.version_number, v.source_operation)}
             className={`rounded-lg px-3 py-1.5 text-label transition-colors ${
               v.id === active.id
                 ? 'bg-[var(--pm-primary)] text-[var(--on-primary)]'
@@ -63,6 +64,11 @@ export function VersionBar({
           </button>
         ))}
       </div>
+
+      {/* PM-07: say what the pill is, rather than leaving "v1" to be decoded. */}
+      <span className="text-label text-[var(--on-surface-variant)]">
+        {operationLabel(active.source_operation)}
+      </span>
 
       {/* Scores belong beside the version they describe: selecting an older
           pill and seeing the newest version's alignment would be a lie. */}
@@ -110,6 +116,8 @@ interface GenerationBarProps {
   onDismissFailure?: () => void;
   onSwitchModel?: (model: string) => void;
   currentModel?: string;
+  /** The workspace's action bar owns Draft / Regenerate / Evaluate (PM-06). */
+  compact?: boolean;
 }
 
 /**
@@ -135,6 +143,7 @@ export function GenerationBar({
   onDismissFailure,
   onSwitchModel,
   currentModel,
+  compact = false,
 }: GenerationBarProps) {
   if (readOnly) return null;
 
@@ -202,7 +211,7 @@ export function GenerationBar({
           to spend, so the button says what it costs. Placed before Draft and
           without the accent fill, because drafting is the primary action on a
           stage and scoring is the considered second one. */}
-      {onEvaluate && hasContent && (
+      {!compact && onEvaluate && hasContent && (
         <button
           onClick={onEvaluate}
           disabled={evaluating}
@@ -223,15 +232,17 @@ export function GenerationBar({
         </button>
       )}
 
-      <button
-        onClick={() => onGenerate()}
-        className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-low)] px-3 py-1.5 text-label text-[var(--on-surface-variant)] transition-colors hover:bg-[var(--surface-container-high)] hover:text-[var(--on-surface)]"
-      >
-        <span aria-hidden className="material-symbols-outlined text-[16px]">
-          {hasContent ? 'refresh' : 'auto_awesome'}
-        </span>
-        {hasContent ? 'Regenerate' : `Draft the ${label}`}
-      </button>
+      {!compact && (
+        <button
+          onClick={() => onGenerate()}
+          className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-low)] px-3 py-1.5 text-label text-[var(--on-surface-variant)] transition-colors hover:bg-[var(--surface-container-high)] hover:text-[var(--on-surface)]"
+        >
+          <span aria-hidden className="material-symbols-outlined text-[16px]">
+            {hasContent ? 'refresh' : 'auto_awesome'}
+          </span>
+          {hasContent ? 'Regenerate' : `Draft the ${label}`}
+        </button>
+      )}
     </div>
   );
 }

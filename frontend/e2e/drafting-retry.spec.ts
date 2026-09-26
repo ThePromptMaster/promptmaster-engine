@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { createProject, pressTransition, transitionBar } from './helpers';
+import { createProject, pressTransition, skipStage } from './helpers';
 
 /**
  * PM-04 — "some chapters it wrote and some said it attempted three times then
@@ -23,15 +23,13 @@ test('a chapter that fails says why, names itself, and can be retried', async ({
   // Planning stages. (Gates are passed with "Advance anyway" where needed; this
   // test is about drafting.)
   await expect(page.getByText('Mock output').first()).toBeVisible();
-  await pressTransition(page, /^Advance/);
+  await pressTransition(page);
   await expect(page.getByRole('heading', { name: /Audience/ })).toBeVisible();
   await expect(page.getByText(/Mock /).first()).toBeVisible();
-  await pressTransition(page, /^Advance/);
+  await pressTransition(page);
   await expect(page.getByRole('heading', { name: /Positioning/ })).toBeVisible();
-  await pressTransition(page, /^Advance/);
-  await transitionBar(page).getByRole('button', { name: 'Skip' }).click();
-  await page.getByPlaceholder('Or write your own reason').fill('Not needed');
-  await page.getByRole('button', { name: 'Skip stage' }).click();
+  await pressTransition(page);
+  await skipStage(page, 'Not needed');
 
   // Outline: three sections, the second of which fails once.
   await expect(page.getByRole('button', { name: 'Add a section' })).toBeVisible();
@@ -43,10 +41,10 @@ test('a chapter that fails says why, names itself, and can be retried', async ({
   }
   await page.getByRole('button', { name: 'Save and approve' }).click();
   await expect(page.getByText(/approved/i).first()).toBeVisible();
-  await pressTransition(page, /^Advance/);
+  await pressTransition(page);
 
   await expect(page.getByRole('heading', { name: /Outline approval/ })).toBeVisible();
-  await pressTransition(page, /^Advance/);
+  await pressTransition(page);
 
   // Drafting through the real queue.
   await expect(page.getByRole('heading', { name: /Draft/ })).toBeVisible();

@@ -5,7 +5,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { StageHeader } from './stage-header';
 import { StageRail } from './stage-rail';
 import { ExitCriteriaChecklist } from './exit-criteria-checklist';
-import { StageTransitionBar } from './stage-transition-bar';
+import { StageTransitionBar, type MoreAction } from './stage-transition-bar';
+import { ConfirmOverwrite } from './renderers/stage-chrome';
+import { CheckpointPanel } from './checkpoint-panel';
+import { nextStageAction } from '@/lib/workflow/next-action';
+import { isApplyable } from '@/lib/workflow/recommend';
 import { ProjectFinishedBanner } from './project-finished-banner';
 import { StageRenderer } from './renderers/stage-renderer';
 import { useStageGeneration } from './use-stage-generation';
@@ -36,6 +40,7 @@ import type { OutlineDocument } from '@/types/outline';
 import {
   effectiveRenderer,
   isTriaged,
+  stageDrafts,
   itemSchemaFor,
   parseItems,
   rendererHoldsItems,
@@ -116,6 +121,9 @@ export function WorkflowWorkspace({
   const [chatOpen, setChatOpen] = useState(true);
   const [busy, setBusy] = useState(false);
   const [transitionError, setTransitionError] = useState<string | null>(null);
+  // PM-06: unsaved edits in the renderer, so "Save changes" can lead.
+  const [dirtyState, setDirtyState] = useState<{ dirty: boolean; save: () => Promise<void> } | null>(null);
+  const [confirmingRegenerate, setConfirmingRegenerate] = useState(false);
   // Live section counts reported by the outline panel, which owns its own
   // unsaved draft (PM-01). Keyed by stage id.
   const [outlineCounts, setOutlineCounts] = useState<Record<string, number>>({});
@@ -325,6 +333,12 @@ export function WorkflowWorkspace({
   );
   const headVersion = useMemo(() => stageVersionList.at(-1) ?? null, [stageVersionList]);
   const shownEvaluation = evaluations?.[activeVersionId ?? headVersion?.id ?? ''];
+
+  // A stage's unsaved edits belong to that stage.
+  useEffect(() => {
+    setDirtyState(null);
+    setConfirmingRegenerate(false);
+  }, [stage?.id]);
 
   const manualIds = useMemo(
     () => new Set((stage?.exit_criteria ?? []).filter((c) => c.check === 'manual').map((c) => c.id)),
@@ -571,6 +585,67 @@ export function WorkflowWorkspace({
   // Only assembled for drafting stages. Carries the project row because the
   // drain will rebuild this project's PMInput hours from now, in a process that
   // has never seen the user.
+  // --- PM-06: one primary action per stage -----------------------------------
+  const draftable = stageDrafts(stage) && Boolean(appendStageVersion);
+  const headEvaluation = headVersion ? evaluations?.[headVersion.id] : undefined;
+  const hasContent = (headVersion?.content ?? '').trim().length > 0;
+  const applyable = recommendations.rows.filter((r) => r.kind !== 'stage_transition' && isApplyable(r));
+  const nextStage = stage.transitions.default_next ? getStage(template, stage.transitions.default_next) : null;
+  const primaryAction = nextStageAction({
+    finished: project.status === 'finalized',
+    busy: generation.generating || stageEvaluation.evaluating || busy,
+    dirty: Boolean(dirtyState?.dirty),
+    draftable,
+    hasContent,
+    evaluable: draftable && Boolean(stageEvaluation.evaluate),
+    evaluated: Boolean(headEvaluation),
+    evaluationClean: Boolean(
+      headEvaluation &&
+        headEvaluation.alignment_score === 'High' &&
+        headEvaluation.clarity_score === 'High' &&
+        headEvaluation.drift_score === 'Low' &&
+        (headEvaluation.findings ?? []).length === 0
+    ),
+    applyableFixes: applyable.length,
+    canAdvance: evaluation.canAdvance,
+    isLast: !stage.transitions.default_next,
+    nextLabel: nextStage?.short_label ?? null,
+  });
+
+  const runPrimary = () => {
+    switch (primaryAction.kind) {
+      case 'save':
+        void dirtyState?.save();
+        return;
+      case 'draft':
+        generation.generate();
+        return;
+      case 'evaluate':
+        stageEvaluation.evaluate?.();
+        return;
+      case 'apply_fixes':
+        recommendations.openPreview(applyable.map((r) => r.category));
+        return;
+    }
+  };
+
+  const moreActions: MoreAction[] = [
+    ...(draftable && hasContent
+      ? [{ id: 'regenerate', label: 'Regenerate this stage', icon: 'refresh', onSelect: () => setConfirmingRegenerate(true) }]
+      : []),
+    ...(draftable && !hasContent && primaryAction.kind !== 'draft'
+      ? [{ id: 'draft', label: 'Draft this stage', icon: 'auto_awesome', onSelect: () => generation.generate() }]
+      : []),
+    ...(draftable && hasContent && Boolean(stageEvaluation.evaluate) && primaryAction.kind !== 'evaluate'
+      ? [{
+          id: 'evaluate',
+          label: headEvaluation ? 'Check this stage again · 1 model call' : 'Check this stage · 1 model call',
+          icon: 'rule',
+          onSelect: () => stageEvaluation.evaluate?.(),
+        }]
+      : []),
+  ];
+
   // Revision and editing are long-form stages with no manuscript of their own:
   // they work on the one Drafting wrote. Without this they showed "no approved
   // outline" to someone who had just finished drafting a whole book.
@@ -623,7 +698,7 @@ export function WorkflowWorkspace({
           They were set in the smallest size available, below the stage names
           they are meant to caption. The name is now a title and the progress a
           label, so the block reads top-down instead of flat. */}
-      <aside className="sticky top-0 hidden h-screen w-[248px] shrink-0 overflow-y-auto bg-[var(--surface-container-lowest)] px-2 py-6 md:block sidebar-scroll">
+      <aside className="sticky top-0 hidden h-screen w-[248px] shrink-0 overflow-y-auto bg-[var(--surface-container-lowest)] px-2 pb-24 pt-6 md:block sidebar-scroll">
         <div className="mb-5 px-3">
           <div className="text-title text-[var(--on-surface)]">{template.name}</div>
           <div className="mt-1 text-label text-[var(--on-surface-variant)]">
@@ -773,6 +848,8 @@ export function WorkflowWorkspace({
             status={state.stages[stage.id]?.status ?? 'not_started'}
             skippedReason={state.stages[stage.id]?.skipped_reason}
             position={{ index: stageIndex + 1, total: template.stages.length }}
+            onPickMode={isCurrent ? (mode) => onPatchProject({ mode: mode as Project['mode'] }) : undefined}
+            currentMode={project.mode}
           />
 
           <div className="mb-8">
@@ -814,8 +891,13 @@ export function WorkflowWorkspace({
                 underneath a working editor. A derived outline sits on the
                 drafting stage, whose renderer still has work to do, so only the
                 explicit case suppresses it. */}
-            {explicitOutlineHere ? null : (
+            {explicitOutlineHere ? null : !stageDrafts(stage) &&
+              stage.renderer !== 'long_form' ? (
+              <CheckpointPanel />
+            ) : (
               <StageRenderer
+                hideStageActions={isCurrent}
+                onDirtyChange={setDirtyState}
                 stage={stage}
                 schema={itemSchemaFor(stage)}
                 versions={stageVersions}
@@ -891,6 +973,16 @@ export function WorkflowWorkspace({
             {isCurrent && project.status === 'finalized' && (
               <ProjectFinishedBanner onReopen={() => onPatchProject({ status: 'active' })} />
             )}
+            {isCurrent && confirmingRegenerate && (
+              <ConfirmOverwrite
+                label={stage.short_label.toLowerCase()}
+                onConfirm={() => {
+                  setConfirmingRegenerate(false);
+                  generation.generate({ force: true });
+                }}
+                onCancel={() => setConfirmingRegenerate(false)}
+              />
+            )}
             {isCurrent && project.status !== 'finalized' && (
               <StageTransitionBar
                 stage={stage}
@@ -899,6 +991,10 @@ export function WorkflowWorkspace({
                 onTransition={handleTransition}
                 busy={busy}
                 error={transitionError}
+                primary={primaryAction}
+                onPrimary={runPrimary}
+                more={moreActions}
+                nextStageLabel={nextStage?.short_label ?? null}
               />
             )}
           </div>

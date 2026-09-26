@@ -20,7 +20,7 @@
  * item schema declares and the statuses are whatever it offers.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 
 import { CustomSelect } from '@/components/shared/custom-select';
 import { ReasonField } from '@/components/shared/reason-field';
@@ -41,6 +41,8 @@ const TONE_CLASS: Record<string, string> = {
 
 export function ReviewRenderer({
   stage,
+  hideStageActions = false,
+  onDirtyChange,
   schema,
   versions,
   evaluation,
@@ -83,6 +85,15 @@ export function ReviewRenderer({
   const triaged = rows.filter((r) => isTriaged(r, schema)).length;
   const outstanding = rows.length - triaged;
 
+  // PM-06: tell the workspace about unsaved edits, so "Save changes" can lead.
+  const saveRef = useRef<() => Promise<void>>(async () => {});
+  useEffect(() => {
+    saveRef.current = save;
+  });
+  useEffect(() => {
+    onDirtyChange?.({ dirty, save: () => saveRef.current() });
+  }, [dirty, onDirtyChange]);
+
   function patch(id: string, key: string, value: string) {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, [key]: value } : r)));
   }
@@ -118,6 +129,7 @@ export function ReviewRenderer({
       )}
 
       <GenerationBar
+        compact={hideStageActions}
         label={`${schema.itemLabel}s`}
         generating={generating}
         error={generationError}

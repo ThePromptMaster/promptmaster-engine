@@ -168,7 +168,7 @@ describe('StageRail', () => {
       ev('stage_returned', 'positioning', { to_stage_id: 'objective' }),
     ]);
     render(<StageRail template={BOOK_V1} state={state} nextSuggestedId={null} onSelect={vi.fn()} />);
-    expect(screen.getByText('stale')).toBeInTheDocument();
+    expect(screen.getByText('recheck')).toBeInTheDocument();
   });
 
   it('selects a stage without moving the workflow cursor', async () => {
@@ -191,7 +191,7 @@ describe('ExitCriteriaChecklist', () => {
   it('says what is missing rather than only that something is', () => {
     render(<ExitCriteriaChecklist criteria={criteria} manualIds={new Set(['c'])} onToggleManual={vi.fn()} />);
     expect(screen.getByText('1 of 2')).toBeInTheDocument();
-    expect(screen.getByText('1 of 3')).toBeInTheDocument();
+    expect(screen.getByText('1 of 3 done')).toBeInTheDocument();
   });
 
   it('lets the user tick a manual criterion but not a computed one', async () => {
@@ -314,5 +314,54 @@ describe('StageTransitionBar', () => {
       <StageTransitionBar stage={final} evaluation={evaluation} options={options} onTransition={vi.fn()} />
     );
     expect(screen.getByRole('button', { name: 'Finish' })).toBeInTheDocument();
+  });
+});
+
+describe('StageTransitionBar with one primary action (PM-06)', () => {
+  const stage = BOOK_V1.stages[1]; // Audience: can skip, can go back
+  const evaluation = evaluateStage(BOOK_V1, stage.id, ctx({ itemCounts: { audience: 2 } }));
+  const options = availableTransitions(BOOK_V1, { current_stage_id: stage.id, stages: {} }, evaluation);
+
+  it('shows a single primary and puts moving on, skipping and going back under More', async () => {
+    const onPrimary = vi.fn();
+    const onTransition = vi.fn();
+    render(
+      <StageTransitionBar
+        stage={stage}
+        evaluation={evaluation}
+        options={options}
+        onTransition={onTransition}
+        primary={{ kind: 'evaluate', label: 'Check this stage', reason: 'One model call.' }}
+        onPrimary={onPrimary}
+        more={[{ id: 'regenerate', label: 'Regenerate this stage', icon: 'refresh', onSelect: vi.fn() }]}
+        nextStageLabel="Positioning"
+      />
+    );
+    const bar = screen.getByRole('group', { name: 'Stage actions' });
+    expect(within(bar).getAllByRole('button').map((b) => b.textContent)).toEqual(['Moreexpand_more', 'Check this stage']);
+
+    await userEvent.click(within(bar).getByRole('button', { name: 'Check this stage' }));
+    expect(onPrimary).toHaveBeenCalled();
+
+    await userEvent.click(within(bar).getByRole('button', { name: /More/ }));
+    const items = screen.getAllByRole('menuitem').map((m) => m.textContent);
+    expect(items.some((t) => t?.includes('Regenerate this stage'))).toBe(true);
+    expect(items.some((t) => t?.includes('Continue to Positioning'))).toBe(true);
+    expect(items.some((t) => t?.includes('Skip this stage'))).toBe(true);
+  });
+
+  it('runs the transition itself when moving on is the primary', async () => {
+    const onTransition = vi.fn();
+    render(
+      <StageTransitionBar
+        stage={stage}
+        evaluation={evaluation}
+        options={options}
+        onTransition={onTransition}
+        primary={{ kind: 'continue', label: 'Continue to Positioning', reason: '' }}
+      />
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Continue to Positioning' }));
+    expect(onTransition).toHaveBeenCalledWith(expect.objectContaining({ kind: 'advance' }));
   });
 });

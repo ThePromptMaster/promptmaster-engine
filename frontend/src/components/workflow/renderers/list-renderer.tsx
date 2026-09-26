@@ -16,7 +16,7 @@
  * use raw red/amber Tailwind, which is a second visual language.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 
 import { emptyItem, isBlankItem, type StageItem } from '@/lib/workflow/stage-artifact';
 import { parseItems } from '@/lib/workflow/stage-artifact';
@@ -26,6 +26,8 @@ import { AutoGrowTextarea } from '@/components/shared/auto-grow-textarea';
 
 export function ListRenderer({
   stage,
+  hideStageActions = false,
+  onDirtyChange,
   schema,
   versions,
   evaluation,
@@ -70,6 +72,15 @@ export function ListRenderer({
     [items, saved]
   );
   const label = schema.itemLabel;
+
+  // PM-06: tell the workspace about unsaved edits, so "Save changes" can lead.
+  const saveRef = useRef<() => Promise<void>>(async () => {});
+  useEffect(() => {
+    saveRef.current = save;
+  });
+  useEffect(() => {
+    onDirtyChange?.({ dirty, save: () => saveRef.current() });
+  }, [dirty, onDirtyChange]);
 
   function patch(id: string, key: string, value: string) {
     setItems((prev) => prev.map((i) => (i.id === id ? { ...i, [key]: value } : i)));
@@ -130,6 +141,7 @@ export function ListRenderer({
       )}
 
       <GenerationBar
+        compact={hideStageActions}
         label={`${label}s`}
         generating={generating}
         error={generationError}

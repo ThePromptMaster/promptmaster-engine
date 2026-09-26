@@ -113,7 +113,7 @@ export function StageRail({ template, state, nextSuggestedId, onSelect }: Props)
                         are allowed to leave out before they open it. */}
                     {!stage.required && status === 'not_started' && !isNext && (
                       <span className="shrink-0 text-label uppercase tracking-wide opacity-60">
-                        opt
+                        optional
                       </span>
                     )}
 
@@ -128,7 +128,7 @@ export function StageRail({ template, state, nextSuggestedId, onSelect }: Props)
                         title="Work here predates a change you made earlier"
                         className="shrink-0 text-label uppercase tracking-wide text-[var(--pm-tertiary)]"
                       >
-                        stale
+                        recheck
                       </span>
                     )}
                   </button>
@@ -138,6 +138,31 @@ export function StageRail({ template, state, nextSuggestedId, onSelect }: Props)
           </ul>
         </div>
       ))}
+
+      {/* PM-07: the glyphs, in words. */}
+      <details className="mt-4 px-3 text-label text-[var(--on-surface-variant)]">
+        <summary className="cursor-pointer select-none opacity-80 hover:opacity-100">
+          What the icons mean
+        </summary>
+        <ul className="mt-2 space-y-1.5">
+          {LEGEND.map(([status, words]) => (
+            <li key={status} className="flex items-center gap-2">
+              <span aria-hidden className="material-symbols-outlined text-[16px]">
+                {STATUS_ICON[status]}
+              </span>
+              {words}
+            </li>
+          ))}
+        </ul>
+      </details>
     </nav>
   );
 }
+
+const LEGEND: [StageStatus, string][] = [
+  ['complete', 'Done'],
+  ['in_progress', 'You are here'],
+  ['not_started', 'Not started yet'],
+  ['skipped', 'Skipped, with a reason'],
+  ['stale', 'Recheck — something before it changed'],
+];

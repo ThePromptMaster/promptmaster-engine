@@ -382,6 +382,20 @@ export function effectiveRenderer(stage: StageDefinition): StageRenderer {
   return stage.renderer;
 }
 
+/**
+ * Whether the model drafts this stage's artifact through the stage renderer.
+ *
+ * False for a checkpoint stage that produces nothing (Book's Outline approval,
+ * whose only job is to confirm the outline) and for stages that draft through
+ * their own panel (the outline editor, long-form drafting). A checkpoint used
+ * to auto-draft "items", fail with "The draft came back empty", and offer
+ * "Draft the items" on a stage with nothing to draft.
+ */
+export function stageDrafts(stage: StageDefinition): boolean {
+  if (stage.renderer === 'outline' || stage.renderer === 'long_form') return false;
+  return stage.expected_artifacts.length > 0;
+}
+
 /** Which renderers store their artifact as items rather than as prose. */
 export function rendererHoldsItems(renderer: StageRenderer): boolean {
   return renderer === 'list' || renderer === 'review';

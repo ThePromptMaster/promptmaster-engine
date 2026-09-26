@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { createProject, e2eUser, pressTransition, serviceInsert, serviceSelect, transitionBar } from './helpers';
+import { createProject, e2eUser, pressTransition, serviceInsert, serviceSelect, skipStage, transitionBar } from './helpers';
 
 /**
  * PM-03, "Finish does nothing" — reproduced against the real database.
@@ -20,19 +20,17 @@ test('Finish closes the project even when the server wrote events the page has n
 
   // Input -> Review -> Output -> Realign (skip) -> Summary
   await expect(transitionBar(page).getByText('Ready to move on')).toBeVisible();
-  await pressTransition(page, /^Advance/);
+  await pressTransition(page);
 
   await expect(page.getByRole('heading', { name: 'Review the prompt' })).toBeVisible();
-  await pressTransition(page, /^Advance/);
+  await pressTransition(page);
 
   await expect(page.getByRole('heading', { name: 'Output and evaluation' })).toBeVisible();
   await expect(page.getByText('Mock output').first()).toBeVisible(); // auto-drafted
-  await pressTransition(page, /^Advance/);
+  await pressTransition(page);
 
   await expect(page.getByRole('heading', { name: 'Realignment' })).toBeVisible();
-  await transitionBar(page).getByRole('button', { name: 'Skip' }).click();
-  await page.getByPlaceholder('Or write your own reason').fill('Scores are already good');
-  await page.getByRole('button', { name: 'Skip stage' }).click();
+  await skipStage(page, 'Scores are already good');
 
   await expect(page.getByRole('heading', { name: 'Final review' })).toBeVisible();
 
@@ -48,7 +46,7 @@ test('Finish closes the project even when the server wrote events the page has n
     actor: 'system',
   });
 
-  await pressTransition(page, /^Finish/);
+  await pressTransition(page);
 
   await expect(page.getByText('This project is finished')).toBeVisible();
   // Not getByRole('alert'): Next's route announcer is an empty alert region.

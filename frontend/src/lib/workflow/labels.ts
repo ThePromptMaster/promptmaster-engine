@@ -1,0 +1,37 @@
+/**
+ * Words a user can read, for codes the database stores (PM-07).
+ *
+ * Sean saw "v1 stage_draft" above his giraffe book's objective and could not
+ * tell what it meant. The stored values stay as they are — they are
+ * provenance (FR-10) and other code keys on them — and are translated only at
+ * the point of display.
+ */
+
+const OPERATION_LABEL: Record<string, string> = {
+  stage_draft: 'AI draft',
+  stage_regenerate: 'AI redraft',
+  stage_edit: 'Your edit',
+  chat_instruct: 'Revised from chat',
+  applied_recommendations: 'Suggested fixes applied',
+  restore: 'Restored earlier version',
+  refine: 'Refined',
+  outline_edit: 'Outline edit',
+  initial: 'Imported',
+};
+
+/** "AI draft", "Your edit", … — never the raw code. */
+export function operationLabel(operation: string | null | undefined): string {
+  if (!operation) return 'Draft';
+  return OPERATION_LABEL[operation] ?? operation.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
+}
+
+/**
+ * What a version pill means, for its tooltip and screen readers. The "v1"
+ * on its own was the other half of Sean's question.
+ */
+export function versionTitle(versionNumber: number, operation: string | null | undefined): string {
+  const what = operationLabel(operation);
+  return versionNumber === 1
+    ? `Version 1 — ${what}. Every change saves a new version you can go back to.`
+    : `Version ${versionNumber} — ${what}. Earlier versions are kept; select one to view or restore it.`;
+}

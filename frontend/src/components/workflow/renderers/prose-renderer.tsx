@@ -20,9 +20,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { MarkdownOutput } from '@/components/shared/markdown-output';
 import { ConfirmOverwrite, EmptyStage, GenerationBar, VersionBar } from './stage-chrome';
 import type { StageRendererProps } from './types';
+import { operationLabel } from '@/lib/workflow/labels';
 
 export function ProseRenderer({
   stage,
+  hideStageActions = false,
+  onDirtyChange,
   versions,
   evaluation,
   activeVersionId,
@@ -73,6 +76,15 @@ export function ProseRenderer({
   const dirty = editing && draft !== content;
   const label = stage.short_label.toLowerCase();
 
+  // PM-06: tell the workspace about unsaved edits, so "Save changes" can lead.
+  const saveRef = useRef<() => Promise<void>>(async () => {});
+  useEffect(() => {
+    saveRef.current = save;
+  });
+  useEffect(() => {
+    onDirtyChange?.({ dirty, save: () => saveRef.current() });
+  }, [dirty, onDirtyChange]);
+
   function startEditing() {
     setDraft(content);
     setEditing(true);
@@ -120,6 +132,7 @@ export function ProseRenderer({
       )}
 
       <GenerationBar
+        compact={hideStageActions}
         label={label}
         generating={generating}
         error={generationError}
@@ -160,7 +173,7 @@ export function ProseRenderer({
         <article className="rounded-xl bg-[var(--surface-container-lowest)] px-7 py-6">
           <div className="mb-4 flex flex-wrap items-center gap-3">
             <span className="text-label text-[var(--on-surface-variant)]">
-              {active?.source_operation ?? 'Your draft'}
+              {active ? operationLabel(active.source_operation) : 'Your draft'}
             </span>
             {active?.model && (
               <>
