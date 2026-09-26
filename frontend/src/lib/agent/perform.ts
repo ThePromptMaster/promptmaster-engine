@@ -69,6 +69,8 @@ export interface StepOutcome {
 }
 
 const MAX_OUTPUT = 6_000;
+/** WriteCodeRequest.goal's cap in routers/agent.py. The goal can come from the model, so it is clipped rather than trusted. */
+const MAX_GOAL = 2_000;
 
 function clip(text: string): string {
   return text.length > MAX_OUTPUT ? text.slice(0, MAX_OUTPUT) + '\n[… trimmed …]' : text;
@@ -112,7 +114,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
 
     case 'compute': {
       const kind = params.kind === 'simulation' ? 'simulation' : 'computation';
-      const goal = typeof params.goal === 'string' ? params.goal : ctx.step.expected_outcome;
+      const goal = (typeof params.goal === 'string' ? params.goal : ctx.step.expected_outcome).slice(0, MAX_GOAL);
       const written = await api.agentWriteCode({ inputs, state: ctx.digest, goal, kind, model }, ctx.signal);
       let result;
       try {

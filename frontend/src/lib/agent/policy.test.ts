@@ -140,6 +140,30 @@ describe('the planner is told which requirements only the user can tick', () => 
   });
 });
 
+describe('the artifact excerpt fits the backend cap', () => {
+  it('a draft over the cap is trimmed to the cap, marker included', async () => {
+    const { buildAgentState, ARTIFACT_EXCERPT_CHARS } = await import('./digest');
+    const stage = RESEARCH_V1.stages[0];
+    const long = 'x'.repeat(20_000);
+    const digest = buildAgentState({
+      template: RESEARCH_V1, state: research, stage, steps: [],
+      bundles: { [stage.id]: { versions: [{ content: long }] } } as never,
+      stageEvaluation: { stageId: stage.id, canAdvance: false, criteria: [], unmet: [] },
+    });
+    expect(digest.artifact_excerpt.length).toBeLessThanOrEqual(ARTIFACT_EXCERPT_CHARS);
+    expect(digest.artifact_excerpt.endsWith('[… trimmed …]')).toBe(true);
+  });
+
+  it('uses the same cap as AgentState in promptmaster/agent.py', async () => {
+    const { ARTIFACT_EXCERPT_CHARS } = await import('./digest');
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const py = readFileSync(join(process.cwd(), '..', 'backend', 'promptmaster', 'agent.py'), 'utf8');
+    const cap = py.match(/artifact_excerpt: str = Field\(default="", max_length=([\d_]+)\)/)?.[1];
+    expect(Number(cap?.replace(/_/g, ''))).toBe(ARTIFACT_EXCERPT_CHARS);
+  });
+});
+
 describe('the budget is a cap', () => {
   it('a computation needs room for its interpretation too', () => {
     expect(fitsBudget('derive', 24, 25)).toBe(true);
