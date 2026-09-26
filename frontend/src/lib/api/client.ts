@@ -16,6 +16,7 @@ import type {
   ContinueDocumentRequest,
   GenerateSetupRequest,
   GenerateSetupResponse,
+  GuideQuestionsResponse,
   AuditFindingsRequest,
   AuditFindingsResponse,
   ApplyAuditRequest,
@@ -467,6 +468,14 @@ export const api = {
 
   async generateSetup(req: GenerateSetupRequest): Promise<GenerateSetupResponse> {
     return apiFetch('/api/generate-setup', {
+      method: 'POST',
+      body: JSON.stringify(req),
+    });
+  },
+
+  /** PM-09 "Guide me": a few questions before recommending a setup. 1 LLM call. */
+  async guideQuestions(req: { objective: string; model?: string }): Promise<GuideQuestionsResponse> {
+    return apiFetch('/api/guide-questions', {
       method: 'POST',
       body: JSON.stringify(req),
     });

@@ -280,6 +280,19 @@ export function ChatPanel({
 
       {!readOnly && (
         <div className="px-5 pb-5">
+          {/* PM-10: the original core's "Save as New Version" — the discussion
+              becomes a revised draft, shown for review before it is saved. */}
+          {mode === 'discuss' && chat.canApply && !chat.proposal &&
+            chat.messages.some((m) => m.role === 'assistant') && (
+            <button
+              onClick={() => void chat.saveDiscussion()}
+              disabled={chat.busy || content.trim().length === 0}
+              className="mb-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-[var(--surface-container-high)] px-3 py-2 text-label text-[var(--on-surface)] hover:bg-[var(--surface-container-highest)] disabled:opacity-50"
+            >
+              <span aria-hidden className="material-symbols-outlined text-[16px]">note_add</span>
+              Save this discussion as a new version
+            </button>
+          )}
           {mode === 'instruct' && (
             <ScopePicker
               scope={scope}

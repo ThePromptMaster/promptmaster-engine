@@ -10,6 +10,7 @@ import {
   serviceSelect,
   skipStage,
   transitionBar,
+  stageArtifact,
 } from './helpers';
 
 /**
@@ -27,7 +28,7 @@ test('Book: comparables can be ticked (PM-02) and the outline counter updates li
   await expect(page.getByText('Mock output').first()).toBeVisible();
   await pressTransition(page);
   await expect(page.getByRole('heading', { name: /Audience/ })).toBeVisible();
-  await expect(page.getByText(/Mock who 1|Mock /).first()).toBeVisible();
+  await expect(stageArtifact(page).getByText(/Mock /).first()).toBeVisible();
   await pressTransition(page);
   await expect(page.getByRole('heading', { name: /Positioning/ })).toBeVisible();
 

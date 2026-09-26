@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 
 from .llm_client import OpenRouterClient
-from .schemas import ModeType, SetupRationale, SetupSuggestion
+from .schemas import GuideAnswer, GuideQuestion, ModeType, SetupRationale, SetupSuggestion
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +20,8 @@ _VALID_MODES = {
     "architect", "critic", "clarity", "coach",
     "therapist", "cold_critic", "analyst",
 }
+
+_VALID_WORKFLOWS = {"book", "research", "single_output"}
 
 
 SETUP_SUGGESTER_SYSTEM = (
@@ -45,16 +47,35 @@ SETUP_SUGGESTER_SYSTEM = (
     "\"Markdown table\"). If none clearly apply, return \"Free-form prose\".\n\n"
     "Rationale: one line per field (≤80 chars) explaining why you picked it. "
     "Be brief and useful, not generic.\n\n"
+    "Workflow: which PromptMaster workflow fits the objective.\n"
+    "- book: long-form writing that has to hold together across chapters or "
+    "sections — a book, a long report, a guide.\n"
+    "- research: an investigation where the method matters as much as the "
+    "result — a question to answer, a hypothesis to test, evidence to weigh.\n"
+    "- single_output: one thing, done well, in one sitting — a memo, an email, "
+    "an analysis, a plan, an answer.\n"
+    "Pick the smallest workflow that fits; most everyday objectives are "
+    "single_output. Give workflow_reason as one line (≤100 chars).\n\n"
     "Return JSON only."
 )
 
 
-def build_setup_prompt(objective: str) -> str:
+def _format_answers(answers: list[GuideAnswer] | None) -> str:
+    if not answers:
+        return ""
+    lines = [f"- {a.question.strip()} {a.answer.strip() or '(no answer)'}" for a in answers]
+    return "What the user told us when asked:\n" + "\n".join(lines) + "\n\n"
+
+
+def build_setup_prompt(objective: str, answers: list[GuideAnswer] | None = None) -> str:
     """Build the user prompt for the setup-suggestion LLM call."""
     return (
         f"Objective: {objective}\n\n"
+        f"{_format_answers(answers)}"
         "Recommend a setup. Return JSON in this exact shape:\n"
         "{\n"
+        '  "workflow": "book|research|single_output",\n'
+        '  "workflow_reason": "...",\n'
         '  "mode": "architect|critic|clarity|coach|therapist|cold_critic|analyst",\n'
         '  "audience": "...",\n'
         '  "constraints": "...",\n'
@@ -73,16 +94,17 @@ async def suggest_setup(
     client: OpenRouterClient,
     model: str | None,
     objective: str,
+    answers: list[GuideAnswer] | None = None,
 ) -> SetupSuggestion:
     """Run the Smart Setup LLM call. Defensive on missing/invalid fields."""
-    prompt = build_setup_prompt(objective)
+    prompt = build_setup_prompt(objective, answers)
 
     try:
         result, _usage = await client.generate_json(
             prompt=prompt,
             system=SETUP_SUGGESTER_SYSTEM,
             temperature=0.3,
-            max_tokens=512,
+            max_tokens=640,
             model=model,
         )
     except Exception as e:
@@ -115,4 +137,78 @@ async def suggest_setup(
             constraints=rationale_raw.get("constraints") or "",
             output_format=rationale_raw.get("output_format") or "",
         ),
+        workflow=result.get("workflow") if result.get("workflow") in _VALID_WORKFLOWS else "single_output",
+        workflow_reason=str(result.get("workflow_reason") or ""),
     )
+
+
+# ---------------------------------------------------------------------------
+# "Guide me" — PM-09's second way in
+# ---------------------------------------------------------------------------
+
+GUIDE_QUESTIONS_SYSTEM = (
+    "You are the intake layer of PromptMaster. A user has said what they want "
+    "to do or figure out, but not enough to set the work up well. Ask the few "
+    "questions whose answers would most change how the work is set up: who it "
+    "is for, what a good result looks like, what must be included or avoided, "
+    "how long or deep it should be, and whether it is one piece of writing, a "
+    "long document, or an investigation. Never ask something the objective "
+    "already answers. Ask 3 to 5 questions, each short and plain, each with a "
+    "one-line reason and up to four short example answers the user can click. "
+    "Return JSON only."
+)
+
+
+def build_guide_questions_prompt(objective: str) -> str:
+    return (
+        f"Objective: {objective}\n\n"
+        "Return JSON in this exact shape:\n"
+        "{\n"
+        '  "questions": [\n'
+        '    {"id": "q1", "question": "...", "why": "...", "options": ["...", "..."]}\n'
+        "  ]\n"
+        "}"
+    )
+
+
+_FALLBACK_QUESTIONS = [
+    GuideQuestion(id="q1", question="Who is this for?", why="Audience decides tone and depth.",
+                  options=["Just me", "My team", "Executives", "The public"]),
+    GuideQuestion(id="q2", question="What would a great result look like?",
+                  why="It sets the bar the work is judged against."),
+    GuideQuestion(id="q3", question="Is this one piece, a long document, or a question to investigate?",
+                  why="It decides the workflow.",
+                  options=["One piece", "A long document", "A question to investigate"]),
+]
+
+
+async def suggest_guide_questions(
+    client: OpenRouterClient,
+    model: str | None,
+    objective: str,
+) -> list[GuideQuestion]:
+    """3-5 questions for the 'Guide me' path. Falls back to a generic three."""
+    try:
+        result, _usage = await client.generate_json(
+            prompt=build_guide_questions_prompt(objective),
+            system=GUIDE_QUESTIONS_SYSTEM,
+            temperature=0.4,
+            max_tokens=700,
+            model=model,
+        )
+    except Exception as e:
+        logger.warning(f"Guide questions LLM call failed: {e}")
+        return list(_FALLBACK_QUESTIONS)
+
+    questions: list[GuideQuestion] = []
+    for index, raw in enumerate(result.get("questions") or []):
+        if not isinstance(raw, dict) or not str(raw.get("question") or "").strip():
+            continue
+        options = [str(o).strip() for o in (raw.get("options") or []) if str(o).strip()][:4]
+        questions.append(GuideQuestion(
+            id=str(raw.get("id") or f"q{index + 1}"),
+            question=str(raw["question"]).strip(),
+            why=str(raw.get("why") or "").strip(),
+            options=options,
+        ))
+    return questions[:5] or list(_FALLBACK_QUESTIONS)

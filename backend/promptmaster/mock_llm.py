@@ -124,7 +124,16 @@ def _legacy_evaluation() -> dict:
 
 
 def _setup(prompt: str) -> dict:
+    objective = _objective(prompt).lower()
+    if "book" in objective:
+        workflow, reason = "book", "Mock: a book needs chapters that hold together."
+    elif "research" in objective or "?" in objective:
+        workflow, reason = "research", "Mock: a question to answer calls for a method."
+    else:
+        workflow, reason = "single_output", "Mock: one piece, done in one sitting."
     return {
+        "workflow": workflow,
+        "workflow_reason": reason,
         "mode": "architect",
         "audience": "General",
         "constraints": "Mock constraints for: " + _objective(prompt)[:80],
@@ -171,6 +180,14 @@ def _json_reply(system: str, prompt: str) -> dict:
         return _stage_items(prompt)
     if system.startswith(setup_suggester.SETUP_SUGGESTER_SYSTEM[:60]):
         return _setup(prompt)
+    if system.startswith(setup_suggester.GUIDE_QUESTIONS_SYSTEM[:60]):
+        return {"questions": [
+            {"id": "q1", "question": "Who is this for?", "why": "Mock: audience sets tone.",
+             "options": ["Children", "Adults", "Experts"]},
+            {"id": "q2", "question": "How long should it be?", "why": "Mock: length sets depth.",
+             "options": ["A page", "A chapter", "A whole book"]},
+            {"id": "q3", "question": "What must it include?", "why": "Mock: scope.", "options": []},
+        ]}
     if system.startswith(long_form._DETECT_SYSTEM[:60]):
         return {"is_long_form": True, "suggested_section_count": 3, "reason": "Mock: multi-section."}
     if system.startswith(long_form._OUTLINE_SYSTEM[:60]):

@@ -21,6 +21,7 @@ from .schemas import PMInput, EvaluationResult, Iteration
 from .llm_client import OpenRouterClient
 from .modes import MODES
 from .prompt_builder import build_prompt
+from .self_model import PROMPTMASTER_SELF_MODEL
 from .session_context import format_session_history
 
 logger = logging.getLogger(__name__)
@@ -52,10 +53,12 @@ FlowInspectType = Literal[
 
 _PROMPTMASTER_CONTEXT = (
     "You are operating inside PromptMaster — a structured AI workflow system based on the book "
-    "'How to Become a PromptMaster' by Sean Moran. The user interacts via a 5-phase loop: "
-    "Input → Review → Output & Evaluation → Realignment → Summary. "
+    "'How to Become a PromptMaster' by Sean Moran. The user works through the stages of a "
+    "workflow toward a stated objective. "
     "The system uses Mode Locking, Anchoring, and Invisible Scaffolding to keep the AI aligned, "
     "and a separate evaluator LLM to detect drift.\n\n"
+    + PROMPTMASTER_SELF_MODEL
+    + "\n\n"
     "USER RATINGS: The session history may show iterations rated STRONG or POOR by the user. "
     "These are direct signals about their taste. When producing new output or critique, actively "
     "preserve what made STRONG iterations work and avoid repeating the patterns of POOR ones."
