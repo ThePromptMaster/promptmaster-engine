@@ -200,11 +200,21 @@ function Harness({ template = SINGLE_OUTPUT_V1 }: { template?: typeof SINGLE_OUT
 
 /** The transition bar, which is the only place a stage can be left from. */
 function transitionBar() {
-  return screen.getByText(/Ready to move on|items? outstanding/).parentElement!;
+  return screen.getByRole('group', { name: 'Stage actions' });
 }
 
-async function advance(user: ReturnType<typeof userEvent.setup>, label: RegExp) {
-  await user.click(within(transitionBar()).getByRole('button', { name: label }));
+/**
+ * Move on. Since PM-06 the move is the primary button only when it is the
+ * suggested next step; otherwise it is under "More".
+ */
+async function advance(user: ReturnType<typeof userEvent.setup>) {
+  const direct = within(transitionBar()).queryByRole('button', { name: /^(Continue to|Finish)/ });
+  if (direct) {
+    await user.click(direct);
+    return;
+  }
+  await user.click(within(transitionBar()).getByRole('button', { name: /^More/ }));
+  await user.click(screen.getByRole('menuitem', { name: /^(Continue to|Finish)/ }));
 }
 
 beforeEach(() => {
@@ -238,7 +248,7 @@ describe('the single-output workflow walks its five stages in the workspace', ()
       expect(screen.getByText(/Generated for the input stage/)).toBeInTheDocument()
     );
 
-    await advance(user, /^Advance$/);
+    await advance(user);
 
     // --- 2. Review ----------------------------------------------------------
     expect(await screen.findByRole('heading', { name: /Review the prompt/ })).toBeInTheDocument();
@@ -246,7 +256,7 @@ describe('the single-output workflow walks its five stages in the workspace', ()
     expect(screen.queryByLabelText('Objective')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('checkbox', { name: /Prompt looks right/ }));
-    await advance(user, /^Advance$/);
+    await advance(user);
 
     // --- 3. Output ----------------------------------------------------------
     expect(await screen.findByRole('heading', { name: /Output and evaluation/ })).toBeInTheDocument();
@@ -260,18 +270,19 @@ describe('the single-output workflow walks its five stages in the workspace', ()
       expect(within(transitionBar()).getByText(/Ready to move on/)).toBeInTheDocument()
     );
 
-    await advance(user, /^Advance$/);
+    await advance(user);
 
     // --- 4. Realign — offered every time, taken only when it is needed -------
     expect(await screen.findByRole('heading', { name: /Realignment/ })).toBeInTheDocument();
-    await user.click(within(transitionBar()).getByRole('button', { name: /^Skip$/ }));
+    await user.click(within(transitionBar()).getByRole('button', { name: /^More/ }));
+    await user.click(screen.getByRole('menuitem', { name: 'Skip this stage' }));
     await user.click(screen.getByRole('button', { name: 'Alignment and drift are already good' }));
     await user.click(screen.getByRole('button', { name: /^Skip stage$/ }));
 
     // --- 5. Summary ---------------------------------------------------------
     expect(await screen.findByRole('heading', { name: /Final review/ })).toBeInTheDocument();
     await user.click(screen.getByRole('checkbox', { name: /Output accepted/ }));
-    await advance(user, /^Finish$/);
+    await advance(user);
 
     // PM-03: Finish used to record the stage and change nothing else, so the
     // button looked dead. Now the project says it is done, and can be reopened.
@@ -306,13 +317,13 @@ describe('the single-output workflow walks its five stages in the workspace', ()
     );
 
     appendWorkflowEvent.mockRejectedValueOnce(new Error('duplicate key value violates unique constraint'));
-    await advance(user, /^Advance$/);
+    await advance(user);
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/didn't go through.*Nothing was changed/);
     expect(events).toHaveLength(0);
 
     // And trying again works: the failure left nothing half-written.
-    await advance(user, /^Advance$/);
+    await advance(user);
     await waitFor(() => expect(events.map((e) => e.type)).toEqual(['stage_completed']));
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   }, 30000);

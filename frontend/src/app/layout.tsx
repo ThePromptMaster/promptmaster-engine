@@ -55,8 +55,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={inter.variable}>
       <head>
+        {/* display=block, not swap: an icon font's fallback is its ligature
+            names, so "swap" flashed "arrow_back" and "science" as text on
+            every first load. Next's lint rule targets text fonts, where swap
+            is right; for an icon font it is the cause of the flash. */}
+        {/* eslint-disable-next-line @next/next/google-font-display */}
         <link
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=block"
           rel="stylesheet"
         />
       </head>

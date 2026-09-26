@@ -35,6 +35,7 @@ import {
   rendererHoldsItems,
   serializeItems,
   type StageItem,
+  stageDrafts,
 } from '@/lib/workflow/stage-artifact';
 import type { StageDefinition, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
 import type { NewVersion } from '@/lib/supabase/versions';
@@ -201,7 +202,7 @@ export function useStageGeneration({
   // renderer that generates, nothing already written, and not already tried.
   useEffect(() => {
     if (!enabled || !stage) return;
-    if (stage.renderer === 'outline' || stage.renderer === 'long_form') return;
+    if (!stageDrafts(stage)) return;
     if (attempted.current.has(stage.id)) return;
 
     // Safe to read as authoritative: loadProject sets the project and every

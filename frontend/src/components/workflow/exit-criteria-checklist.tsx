@@ -26,11 +26,22 @@ export function ExitCriteriaChecklist({ criteria, manualIds = new Set(), onToggl
   return (
     <section className="rounded-xl bg-[var(--surface-container-low)] px-5 py-4">
       <header className="mb-3 flex items-baseline justify-between">
-        <h3 className="text-title text-[var(--on-surface)]">Before moving on</h3>
+        <h3 className="text-title text-[var(--on-surface)]">To finish this stage</h3>
         <span className="text-label text-[var(--on-surface-variant)]">
-          {met} of {criteria.length}
+          {met} of {criteria.length} done
         </span>
       </header>
+      {/* PM-07: Sean could not tell the circles from the squares. */}
+      <p className="-mt-1 mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-label text-[var(--on-surface-variant)]">
+        <span className="inline-flex items-center gap-1">
+          <span aria-hidden className="material-symbols-outlined text-[16px]">radio_button_unchecked</span>
+          checked for you as you work
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <span aria-hidden className="inline-block h-3.5 w-3.5 rounded-[3px] border border-current" />
+          tick yourself when you are satisfied
+        </span>
+      </p>
 
       <ul className="space-y-2">
         {criteria.map((c) => {
@@ -80,7 +91,7 @@ export function ExitCriteriaChecklist({ criteria, manualIds = new Set(), onToggl
                   )}
                   {!c.satisfied && c.blocking && (
                     <span className="ml-2 text-label uppercase tracking-wide text-[var(--pm-tertiary)]">
-                      needed
+                      required
                     </span>
                   )}
                 </span>

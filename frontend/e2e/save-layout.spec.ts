@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { createProject, pressTransition, transitionBar } from './helpers';
+import { createProject, pressTransition, skipStage } from './helpers';
 
 /**
  * A1d — Sean: "see very top and bottom after I press save", and the Research
@@ -12,7 +12,7 @@ test('long entries are shown in full, never clipped', async ({ page }) => {
 
   // A long entry in a list field is shown in full, not clipped.
   await expect(page.getByText('Mock output').first()).toBeVisible();
-  await pressTransition(page, /^Advance/);
+  await pressTransition(page);
   await expect(page.getByRole('heading', { name: /Audience/ })).toBeVisible();
   const field = page.getByLabel('What they already know').first();
   await expect(field).toBeVisible();
@@ -27,19 +27,17 @@ test('long entries are shown in full, never clipped', async ({ page }) => {
 test('approving an outline does not swap the page for a skeleton', async ({ page }) => {
   await createProject(page, { workflow: 'Book', name: 'E2E save', objective: 'A book about giraffes' });
   await expect(page.getByText('Mock output').first()).toBeVisible();
-  await pressTransition(page, /^Advance/);
+  await pressTransition(page);
   await expect(page.getByRole('heading', { name: /Audience/ })).toBeVisible();
   await expect(page.getByText(/Mock /).first()).toBeVisible();
 
   // Walk to the outline, then approve it. Approval reloads the project; that
   // reload used to replace the whole page — header, rail, transition bar —
   // with the loading skeleton and remount everything.
-  await pressTransition(page, /^Advance/);
+  await pressTransition(page);
   await expect(page.getByRole('heading', { name: /Positioning/ })).toBeVisible();
-  await pressTransition(page, /^Advance/);
-  await transitionBar(page).getByRole('button', { name: 'Skip' }).click();
-  await page.getByPlaceholder('Or write your own reason').fill('Not needed');
-  await page.getByRole('button', { name: 'Skip stage' }).click();
+  await pressTransition(page);
+  await skipStage(page, 'Not needed');
   await page.getByRole('button', { name: 'Add a section' }).click();
   await page.getByLabel('Title of section 1').fill('Habitat');
   await page.getByRole('button', { name: /Insert a section after/ }).click();

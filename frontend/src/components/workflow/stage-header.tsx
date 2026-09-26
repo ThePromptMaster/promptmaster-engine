@@ -18,9 +18,11 @@ interface Props {
   /** 1-based position, for orientation within a 13-stage workflow. */
   position?: { index: number; total: number };
   onPickMode?: (mode: string) => void;
+  /** The project's current mode, so the card in use is marked. */
+  currentMode?: string;
 }
 
-export function StageHeader({ stage, status, skippedReason, position, onPickMode }: Props) {
+export function StageHeader({ stage, status, skippedReason, position, onPickMode, currentMode }: Props) {
   const [showGuidance, setShowGuidance] = useState(true);
 
   return (
@@ -71,17 +73,31 @@ export function StageHeader({ stage, status, skippedReason, position, onPickMode
           {/* Label above rather than beside: alongside a two-line chip it sat
               at the chip's vertical centre and read as misaligned. */}
           <div className="mb-2 text-label uppercase tracking-wider text-[var(--on-surface-variant)]">
-            Suited to this stage
+            {onPickMode ? 'How to think about this stage — pick a mode' : 'Suited to this stage'}
           </div>
           <div className="flex flex-wrap gap-2">
-            {stage.recommended_modes.map((rec) => (
+            {stage.recommended_modes.map((rec) => {
+              const inUse = currentMode === rec.mode;
+              return (
               <button
                 key={rec.mode}
+                // These looked like buttons and did nothing: onPickMode was
+                // never passed. Picking one now sets the mode every generation
+                // on this project is shaped by.
                 onClick={() => onPickMode?.(rec.mode)}
-                className="min-w-[220px] max-w-[380px] flex-1 rounded-xl bg-[var(--surface-container-low)] px-4 py-3 text-left transition-colors hover:bg-[var(--surface-container-high)]"
+                disabled={!onPickMode}
+                aria-pressed={onPickMode ? inUse : undefined}
+                className={`min-w-[220px] max-w-[380px] flex-1 rounded-xl px-4 py-3 text-left transition-colors disabled:cursor-default ${
+                  inUse
+                    ? 'bg-[var(--surface-container-high)] ring-2 ring-[var(--pm-primary)]/50'
+                    : 'bg-[var(--surface-container-low)] hover:bg-[var(--surface-container-high)]'
+                }`}
               >
-                <span className="block text-title text-[var(--on-surface)]">
+                <span className="flex items-center justify-between gap-2 text-title text-[var(--on-surface)]">
                   {MODE_DISPLAY[rec.mode]?.display_name ?? rec.mode}
+                  {inUse && (
+                    <span className="text-label font-normal text-[var(--pm-primary)]">In use</span>
+                  )}
                 </span>
                 {/* The reason matters more than the label — a recommendation
                     without one is just another thing telling you what to do. */}
@@ -89,7 +105,8 @@ export function StageHeader({ stage, status, skippedReason, position, onPickMode
                   {rec.reason}
                 </span>
               </button>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

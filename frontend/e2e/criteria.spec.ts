@@ -8,6 +8,7 @@ import {
   serviceInsert,
   servicePatch,
   serviceSelect,
+  skipStage,
   transitionBar,
 } from './helpers';
 
@@ -24,10 +25,10 @@ test('Book: comparables can be ticked (PM-02) and the outline counter updates li
 
   // Objective -> Audience -> Positioning
   await expect(page.getByText('Mock output').first()).toBeVisible();
-  await pressTransition(page, /^Advance/);
+  await pressTransition(page);
   await expect(page.getByRole('heading', { name: /Audience/ })).toBeVisible();
   await expect(page.getByText(/Mock who 1|Mock /).first()).toBeVisible();
-  await pressTransition(page, /^Advance/);
+  await pressTransition(page);
   await expect(page.getByRole('heading', { name: /Positioning/ })).toBeVisible();
 
   // PM-02: "At least two comparables named" was a count rule on a prose stage,
@@ -37,12 +38,10 @@ test('Book: comparables can be ticked (PM-02) and the outline counter updates li
   await expect(comparables.getByRole('checkbox')).toBeChecked();
   await criterion(page, 'One-sentence differentiator').getByRole('checkbox').check();
   await page.screenshot({ path: test.info().outputPath('01-comparables-ticked.png') });
-  await pressTransition(page, /^Advance/);
+  await pressTransition(page);
 
   // Research is optional.
-  await transitionBar(page).getByRole('button', { name: 'Skip' }).click();
-  await page.getByPlaceholder('Or write your own reason').fill('Not needed for this test');
-  await page.getByRole('button', { name: 'Skip stage' }).click();
+  await skipStage(page, 'Not needed for this test');
 
   // PM-01: "Outline has sections — 0 of 2 NEEDED" never moved as sections were added.
   const sections = criterion(page, 'Outline has sections');
@@ -58,7 +57,7 @@ test('Book: comparables can be ticked (PM-02) and the outline counter updates li
   await page.getByLabel('Title of section 2').fill('Why the long neck');
 
   await expect(sections).not.toContainText('of 2');
-  await expect(sections).not.toContainText('needed');
+  await expect(sections).not.toContainText('required');
   await page.screenshot({ path: test.info().outputPath('02-outline-counter-met.png') });
 });
 
