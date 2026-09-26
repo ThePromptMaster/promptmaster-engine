@@ -319,6 +319,20 @@ describe('exit criteria', () => {
     expect(r.criteria.find((c) => c.id === 'out.sections')!.detail).toBe('1 of 2');
   });
 
+  it('does not call Revision\'s findings "applied" before anything was applied', () => {
+    // all_findings_triaged counts findings on the stage itself; a long-form
+    // stage has none, so it read as satisfied the moment Revision opened.
+    const opened = evaluateStage(BOOK_V1, 'revision', emptyContext());
+    const rule = opened.criteria.find((c) => c.id === 'rev.applied')!;
+    expect(rule.satisfied).toBe(false);
+    expect(rule.manual).toBe(true);
+    const ticked = evaluateStage(BOOK_V1, 'revision', emptyContext({ manualChecks: { 'rev.applied': true } }));
+    expect(ticked.criteria.find((c) => c.id === 'rev.applied')!.satisfied).toBe(true);
+    // On a review stage it stays automatic.
+    const critique = evaluateStage(BOOK_V1, 'critique', emptyContext());
+    expect(critique.criteria.find((c) => c.id === 'crit.triaged')!.manual).toBeFalsy();
+  });
+
   it('turns a count rule on a stage with nothing to count into a box the user ticks (PM-02)', () => {
     // "At least two comparables named" sits on the prose Positioning stage. A
     // prose draft has no items, so as authored this could never be satisfied —

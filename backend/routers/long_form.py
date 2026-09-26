@@ -52,6 +52,7 @@ from promptmaster.schemas import (
     ExtractSectionRecordResponse,
     GenerateOutlineResponse,
     GenerateSectionProseResponse,
+    SectionRevisionBrief,
     GenerateSectionResponse,
     Iteration,
     OutlineSection,
@@ -119,6 +120,8 @@ class GenerateSectionProseRequest(BaseModel):
     #: back" — instead of being killed mid-call, losing prose that was already
     #: paid for, and burning one of the job's three attempts.
     budget_seconds: float | None = Field(default=None, gt=0, le=780)
+    #: Set by the Revision and Editing stages: rewrite the existing section.
+    revision: SectionRevisionBrief | None = None
 
 
 class ExtractSectionRecordRequest(BaseModel):
@@ -307,6 +310,7 @@ async def api_generate_section_prose(
             prev_section_content=req.prev_section_content,
             records=req.records or None,
             deadline=_deadline(req.budget_seconds),
+            revision=req.revision,
         )
     except OpenRouterError as e:
         raise llm_http_error(

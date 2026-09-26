@@ -12,6 +12,9 @@
  *
  * The order is the workflow a careful user would follow anyway:
  *   unsaved edits  -> save them (nothing else counts until they are saved)
+ *   panel step     -> a stage that works through its own panel (the outline
+ *                     editor, drafting, revision) names its step, and that is
+ *                     the primary — not "Continue anyway" beside it
  *   nothing yet    -> draft it
  *   not checked    -> check it (one model call, and it is the loop's point)
  *   fixes offered  -> apply them
@@ -27,7 +30,26 @@ export type StageActionKind =
   | 'evaluate'
   | 'apply_fixes'
   | 'continue'
-  | 'finish';
+  | 'finish'
+  | 'panel';
+
+/**
+ * The next step a stage's own panel holds: approve the outline, start drafting,
+ * apply the findings. Reported by the panel, because only it knows.
+ */
+export interface PanelStep {
+  label: string;
+  reason: string;
+  /** The panel is working (a draft is running); the stage is busy, not stuck. */
+  busy?: boolean;
+}
+
+/** What a panel reports upward: its step, and how to take it. */
+export interface ReportedPanelStep extends PanelStep {
+  run?: () => void;
+}
+
+export type PanelStepReporter = (stageId: string, step: ReportedPanelStep | null) => void;
 
 export interface NextActionInput {
   /** The project is finished; nothing is suggested. */
@@ -63,6 +85,8 @@ export interface NextActionInput {
   isLast: boolean;
   /** Short label of the stage after this one, for the button. */
   nextLabel: string | null;
+  /** The step the stage's own panel is waiting on, if it has one. */
+  panelStep?: PanelStep | null;
 }
 
 export interface StageAction {
@@ -82,6 +106,11 @@ export function nextStageAction(input: NextActionInput): StageAction {
       label: 'Save changes',
       reason: 'Your edits count once they are saved as a new version.',
     };
+  }
+
+  if (input.panelStep?.busy) return { kind: 'none', label: '', reason: 'Working…' };
+  if (input.panelStep) {
+    return { kind: 'panel', label: input.panelStep.label, reason: input.panelStep.reason };
   }
 
   if (input.draftable && !input.hasContent) {
