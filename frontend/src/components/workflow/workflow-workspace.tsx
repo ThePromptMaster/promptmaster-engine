@@ -8,6 +8,9 @@ import { ExitCriteriaChecklist } from './exit-criteria-checklist';
 import { StageTransitionBar, type MoreAction } from './stage-transition-bar';
 import { ConfirmOverwrite } from './renderers/stage-chrome';
 import { CheckpointPanel } from './checkpoint-panel';
+import { UpgradeBanner } from './upgrade-banner';
+import { templateDiff } from '@/lib/workflow/upgrade';
+import { BlockForm, BlockedNotice, CompletionDialog } from './stage-status-panels';
 import { StageToolResult } from './stage-tool-result';
 import { CRITIQUE_TOOLS, REWRITE_TOOLS, useStageTools } from './use-stage-tools';
 import { nextStageAction } from '@/lib/workflow/next-action';
@@ -31,6 +34,8 @@ import {
   progressSummary,
   projectState,
   type TransitionOption,
+  completionSummary,
+  deliverableStage,
 } from '@/lib/workflow/engine';
 import { summariseStageContent } from '@/lib/workflow/digest';
 import { deriveOutlineItems, draftingStageId } from '@/lib/workflow/derived-outline';
@@ -49,8 +54,8 @@ import {
   serializeItems,
   type StageItem,
 } from '@/lib/workflow/stage-artifact';
-import type { StageContext, WorkflowEvent, WorkflowTemplate } from '@/lib/workflow/types';
-import { appendWorkflowEvent, listWorkflowEvents } from '@/lib/supabase/workflow';
+import type { StageContext, WorkflowEvent, WorkflowTemplate, BlockKind } from '@/lib/workflow/types';
+import { appendWorkflowEvent, getLatestTemplate, listWorkflowEvents } from '@/lib/supabase/workflow';
 import { countNamedSections, parseOutlineDocument } from '@/lib/outline/model';
 import { setUsageProject } from '@/lib/supabase/model-usage';
 import type { NewEvaluation, NewVersion } from '@/lib/supabase/versions';
@@ -126,6 +131,13 @@ export function WorkflowWorkspace({
   // PM-06: unsaved edits in the renderer, so "Save changes" can lead.
   const [dirtyState, setDirtyState] = useState<{ dirty: boolean; save: () => Promise<void> } | null>(null);
   const [confirmingRegenerate, setConfirmingRegenerate] = useState(false);
+  // PM-13/14: the block form and the finish summary.
+  const [blocking, setBlocking] = useState(false);
+  // A5: a newer published version of this project's workflow, if any.
+  const [latestTemplate, setLatestTemplate] = useState<(WorkflowTemplate & { id: string }) | null>(null);
+  const [upgradeDismissed, setUpgradeDismissed] = useState(false);
+  const [upgrading, setUpgrading] = useState(false);
+  const [finishing, setFinishing] = useState<{ option: TransitionOption; note?: string } | null>(null);
   // Live section counts reported by the outline panel, which owns its own
   // unsaved draft (PM-01). Keyed by stage id.
   const [outlineCounts, setOutlineCounts] = useState<Record<string, number>>({});
@@ -365,18 +377,31 @@ export function WorkflowWorkspace({
       setBusy(true);
       setTransitionError(null);
       try {
+        // PM-13: moving on with the stage's requirements met completes it;
+        // moving on without them ("Continue anyway") leaves it open. The
+        // legacy stage_completed is no longer written.
         const type =
           option.kind === 'skip'
             ? 'stage_skipped'
             : option.kind === 'return'
               ? 'stage_returned'
-              : 'stage_completed';
+              : evaluation.canAdvance
+                ? 'stage_marked_complete'
+                : 'stage_advanced';
+
+        // The stage's own head version is the evidence of completion; the
+        // database checks it belongs to this stage (20260927000000).
+        const bundle = stageBundles[stage.id];
+        const evidenceId =
+          type === 'stage_marked_complete' && bundle?.artifact?.stage_id === stage.id
+            ? bundle.versions.at(-1)?.id
+            : undefined;
 
         // Record what this stage concluded before leaving it. Later stages
         // generate against this summary, so writing it at completion — rather
         // than recomputing at every call — means a subsequent edit upstream
         // cannot silently rewrite the context a downstream draft was given.
-        if (type === 'stage_completed' && setStageSummary) {
+        if ((type === 'stage_marked_complete' || type === 'stage_advanced') && setStageSummary) {
           const content = stageBundles[stage.id]?.versions.at(-1)?.content ?? '';
           const summary = summariseStageContent(stage, content);
           if (summary) await setStageSummary(stage.id, summary).catch(() => {});
@@ -388,7 +413,18 @@ export function WorkflowWorkspace({
           to_stage_id: option.toStageId ?? undefined,
           reason: note,
           proposal_id: proposalId ?? null,
+          ...(evidenceId ? { payload: { evidence_version_id: evidenceId } } : {}),
         });
+
+        // PM-14: finishing the project is its own event, separate from the
+        // last stage — the project can be finished with stages left open.
+        if (option.kind === 'finish') {
+          await appendWorkflowEvent(project.id, project.user_id, {
+            type: 'project_finalized',
+            stage_id: stage.id,
+            reason: note,
+          });
+        }
 
         const fresh = await listWorkflowEvents(project.id);
         setEvents(fresh);
@@ -414,8 +450,73 @@ export function WorkflowWorkspace({
         setBusy(false);
       }
     },
-    [stage, busy, project, template, onPatchProject, setStageSummary, stageBundles]
+    [stage, busy, project, template, onPatchProject, setStageSummary, stageBundles, evaluation]
   );
+
+  /** PM-13: mark the current stage blocked, or lift the block. */
+  const setBlocked = useCallback(
+    async (block: { kind: BlockKind; reason: string } | null) => {
+      if (!stage) return;
+      setTransitionError(null);
+      try {
+        await appendWorkflowEvent(project.id, project.user_id, block
+          ? { type: 'stage_blocked', stage_id: stage.id, reason: block.reason, payload: { block_kind: block.kind } }
+          : { type: 'stage_unblocked', stage_id: stage.id });
+        setEvents(await listWorkflowEvents(project.id));
+        setBlocking(false);
+      } catch (e) {
+        setTransitionError(`That didn't go through${e instanceof Error && e.message ? `: ${e.message}` : ''}. Nothing was changed.`);
+      }
+    },
+    [stage, project.id, project.user_id]
+  );
+
+  useEffect(() => {
+    let live = true;
+    getLatestTemplate(template.key)
+      .then((latest) => {
+        if (live) setLatestTemplate(latest && latest.version > template.version ? latest : null);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [template.key, template.version]);
+
+  const upgradeTemplate = useCallback(async () => {
+    if (!latestTemplate || !stage) return;
+    setUpgrading(true);
+    setTransitionError(null);
+    try {
+      // The event first: the log records the re-pin, and a failed patch after
+      // it leaves an honest trail rather than a silent change.
+      await appendWorkflowEvent(project.id, project.user_id, {
+        type: 'template_upgraded',
+        stage_id: stage.id,
+        payload: {
+          from_template_id: project.workflow_template_id,
+          from_version: template.version,
+          to_template_id: latestTemplate.id,
+          to_version: latestTemplate.version,
+        },
+      });
+      onPatchProject({ workflow_template_id: latestTemplate.id });
+    } catch (e) {
+      setTransitionError(`The upgrade didn't go through${e instanceof Error && e.message ? `: ${e.message}` : ''}. Nothing was changed.`);
+    } finally {
+      setUpgrading(false);
+    }
+  }, [latestTemplate, stage, project.id, project.user_id, project.workflow_template_id, template.version, onPatchProject]);
+
+  const reopenProject = useCallback(async () => {
+    if (!stage) return;
+    try {
+      await appendWorkflowEvent(project.id, project.user_id, { type: 'project_reopened', stage_id: stage.id });
+      setEvents(await listWorkflowEvents(project.id));
+    } finally {
+      onPatchProject({ status: 'active' });
+    }
+  }, [stage, project.id, project.user_id, onPatchProject]);
 
   /**
    * The recommendations surface — FR-13, FR-09, FR-01.
@@ -642,7 +743,23 @@ export function WorkflowWorkspace({
     }
   };
 
+  const stageState = state.stages[stage.id];
+  const isBlocked = stageState?.status === 'blocked';
+
+  // PM-14: what finishing would be finishing.
+  const deliverable = deliverableStage(template);
+  const deliverableBundle = deliverable ? stageBundles[deliverable.id] : undefined;
+  const deliverableSections = deliverableBundle?.artifact?.long_form?.outline ?? [];
+  const completion = completionSummary(template, state, {
+    artifactNonEmpty: Boolean(deliverable && context.artifactNonEmpty[deliverable.id]),
+    sectionsTotal: deliverableSections.length,
+    sectionsComplete: deliverableSections.filter((s) => s.status === 'complete').length,
+  });
+
   const moreActions: MoreAction[] = [
+    isBlocked
+      ? { id: 'unblock', label: 'Unblock this stage', icon: 'lock_open', onSelect: () => void setBlocked(null) }
+      : { id: 'block', label: 'Mark as blocked…', icon: 'block', onSelect: () => setBlocking(true) },
     ...(draftable && hasContent
       ? [{ id: 'regenerate', label: 'Regenerate this stage', icon: 'refresh', onSelect: () => setConfirmingRegenerate(true) }]
       : []),
@@ -865,6 +982,18 @@ export function WorkflowWorkspace({
             />
           </div>
 
+          {latestTemplate && !upgradeDismissed && isCurrent && (
+            <UpgradeBanner
+              name={template.name}
+              fromVersion={template.version}
+              toVersion={latestTemplate.version}
+              diff={templateDiff(template, latestTemplate)}
+              busy={upgrading}
+              onUpgrade={() => void upgradeTemplate()}
+              onDismiss={() => setUpgradeDismissed(true)}
+            />
+          )}
+
           <StageHeader
             stage={stage}
             status={state.stages[stage.id]?.status ?? 'not_started'}
@@ -1007,7 +1136,25 @@ export function WorkflowWorkspace({
             {/* Transitions act on the current stage only — browsing history
                 must not let you advance a stage you are merely looking at. */}
             {isCurrent && project.status === 'finalized' && (
-              <ProjectFinishedBanner onReopen={() => onPatchProject({ status: 'active' })} />
+              <ProjectFinishedBanner onReopen={() => void reopenProject()} />
+            )}
+            {isCurrent && isBlocked && stageState?.blocked && (
+              <BlockedNotice kind={stageState.blocked.kind} reason={stageState.blocked.reason} onUnblock={() => void setBlocked(null)} />
+            )}
+            {isCurrent && blocking && (
+              <BlockForm onSubmit={(block) => void setBlocked(block)} onCancel={() => setBlocking(false)} />
+            )}
+            {isCurrent && finishing && (
+              <CompletionDialog
+                summary={completion}
+                busy={busy}
+                onConfirm={() => {
+                  const { option, note } = finishing;
+                  setFinishing(null);
+                  void handleTransition(option, note);
+                }}
+                onCancel={() => setFinishing(null)}
+              />
             )}
             {isCurrent && confirmingRegenerate && (
               <ConfirmOverwrite
@@ -1024,7 +1171,11 @@ export function WorkflowWorkspace({
                 stage={stage}
                 evaluation={evaluation}
                 options={transitions}
-                onTransition={handleTransition}
+                onTransition={(option, note) => {
+                  // PM-14: finishing shows what is being finished, first.
+                  if (option.kind === 'finish') setFinishing({ option, note });
+                  else void handleTransition(option, note);
+                }}
                 busy={busy}
                 error={transitionError}
                 primary={primaryAction}

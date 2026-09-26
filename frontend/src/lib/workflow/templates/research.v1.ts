@@ -27,6 +27,8 @@ import type { WorkflowTemplate } from '../types';
  * alternative explanation is stated in the form its own advocate would
  * recognise. Published templates are immutable, so this is a new version rather
  * than an edit: a study already running on v1 keeps the workflow it began.
+ * `version: 3` adds plain-language hints to the criteria new users stumbled on
+ * (PM-02, PM-07) — Sean was stuck at "Every planned run has a result or a reason".
  *
  * v2 also moves `experiment` and `alternatives` from the 'list' renderer to
  * 'review'. Both carry a blocking `every_item_has_status` criterion, and the
@@ -40,7 +42,7 @@ import type { WorkflowTemplate } from '../types';
  */
 export const RESEARCH_V1: WorkflowTemplate = {
   key: 'research',
-  version: 2,
+  version: 3,
   name: 'Research',
   description: 'Question through validated write-up, with the analysis plan fixed before the data.',
   outline_stage: 'derived',
@@ -247,7 +249,7 @@ export const RESEARCH_V1: WorkflowTemplate = {
       entry_prompt_hint:
         'Produce one row per planned run, taken from the method\'s procedure rather than invented here. \'run\' names what was to be done and under what conditions; \'observed\' records what actually happened, with the numbers where there are numbers; \'deviation\' records anything that differed from the plan, however small. Every row needs a status, and a run that was not done needs a reason. Do not write a result you do not have — mark the row not run and say why. A run that quietly disappears between the method and the results is the commonest way a study stops being reproducible, and it is invisible to every later stage.',
       exit_criteria: [
-        { id: 'exp.results', label: 'Every planned run has a result or a reason', check: 'auto', rule: { type: 'every_item_has_status' }, blocking: true },
+        { id: 'exp.results', label: 'Every planned run has a result or a reason', check: 'auto', rule: { type: 'every_item_has_status' }, blocking: true, hint: 'Give each run a status in the table above — Completed, Deviated or Not run (the last two need a reason) — then save.' },
       ],
       expected_artifacts: [{ kind: 'runs', cardinality: 'many', primary: true }],
       recommended_modes: [{ mode: 'analyst', reason: 'Deviations are data, not embarrassments' }],

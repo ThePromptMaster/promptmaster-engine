@@ -17,6 +17,7 @@ import type {
   WorkflowState,
   WorkflowTemplate,
 } from './types';
+import { isDone } from './types';
 
 export function getStage(
   template: WorkflowTemplate,
@@ -40,6 +41,7 @@ function evaluateCriterion(
     id: criterion.id,
     label: criterion.label,
     blocking: criterion.blocking ?? false,
+    ...(criterion.hint ? { hint: criterion.hint } : {}),
   };
 
   const manual = { ...base, manual: true, satisfied: Boolean(ctx.manualChecks[criterion.id]) };
@@ -155,7 +157,7 @@ export function nextSuggestedStage(
   // jumped around still gets a sensible suggestion.
   const pending = template.stages.find((s) => {
     const status = state.stages[s.id]?.status ?? 'not_started';
-    return s.required && status !== 'complete' && status !== 'skipped';
+    return s.required && !isDone(status) && status !== 'skipped';
   });
   return pending?.id ?? null;
 }
@@ -277,12 +279,63 @@ export function projectState(
         state.current_stage_id = event.stage_id;
         break;
 
+      // Legacy: every log written before PM-13 projects exactly as it did.
       case 'stage_completed':
-        set(event.stage_id, { status: 'complete', completed_at: event.created_at });
+        set(event.stage_id, { status: 'complete', completed_at: event.created_at, left_open: false });
         if (event.to_stage_id) {
           set(event.to_stage_id, { status: 'in_progress', entered_at: event.created_at });
           state.current_stage_id = event.to_stage_id;
         }
+        break;
+
+      case 'stage_marked_complete': {
+        const evidence = event.payload?.evidence_version_id;
+        set(event.stage_id, {
+          status: typeof evidence === 'string' ? 'completed_with_artifact' : 'complete',
+          evidence_version_id: typeof evidence === 'string' ? evidence : undefined,
+          completed_at: event.created_at,
+          left_open: false,
+          blocked: undefined,
+        });
+        if (event.to_stage_id) {
+          set(event.to_stage_id, { status: 'in_progress', entered_at: event.created_at });
+          state.current_stage_id = event.to_stage_id;
+        }
+        break;
+      }
+
+      // Moving on is not finishing (PM-13): the stage stays in progress,
+      // flagged as left open, and says so on the rail.
+      case 'stage_advanced':
+        set(event.stage_id, { status: 'in_progress', left_open: true });
+        if (event.to_stage_id) {
+          set(event.to_stage_id, { status: 'in_progress', entered_at: event.created_at });
+          state.current_stage_id = event.to_stage_id;
+        }
+        break;
+
+      case 'stage_blocked': {
+        const kind = event.payload?.block_kind;
+        set(event.stage_id, {
+          status: 'blocked',
+          blocked: {
+            kind: kind === 'tool_missing' || kind === 'data_missing' ? kind : 'needs_decision',
+            reason: event.reason ?? '',
+          },
+        });
+        break;
+      }
+
+      case 'stage_unblocked':
+        set(event.stage_id, { status: 'in_progress', blocked: undefined });
+        break;
+
+      case 'project_finalized':
+        state.project_status = 'finalized';
+        break;
+
+      case 'project_reopened':
+        state.project_status = 'active';
         break;
 
       case 'stage_skipped':
@@ -299,7 +352,7 @@ export function projectState(
         // the user may well keep it.
         const cutoff = order.indexOf(target);
         order.forEach((id, i) => {
-          if (i > cutoff && state.stages[id]?.status === 'complete') {
+          if (i > cutoff && isDone(state.stages[id]?.status)) {
             set(id, { status: 'stale' });
           }
         });
@@ -323,7 +376,7 @@ export function progressSummary(template: WorkflowTemplate, state: WorkflowState
   let skipped = 0;
   for (const stage of template.stages) {
     const status = state.stages[stage.id]?.status;
-    if (status === 'complete') complete += 1;
+    if (isDone(status)) complete += 1;
     else if (status === 'skipped') skipped += 1;
   }
   return {
@@ -332,4 +385,71 @@ export function progressSummary(template: WorkflowTemplate, state: WorkflowState
     remaining: template.stages.length - complete - skipped,
     total: template.stages.length,
   };
+}
+
+// --- project completion (PM-14) ------------------------------------------------
+
+/**
+ * The stage that holds what the project exists to produce.
+ *
+ * Sean: "Project completion should depend on the actual objective/artifact
+ * being completed, not just every workflow stage being checked off." In a
+ * workflow with long-form drafting the deliverable is the manuscript, which
+ * lives on the first long-form stage (revision and editing work on it too);
+ * otherwise it is the last required prose stage — Single output's Output, not
+ * its optional Realign.
+ */
+export function deliverableStage(template: WorkflowTemplate): StageDefinition | undefined {
+  const longForm = template.stages.find((s) => s.renderer === 'long_form');
+  if (longForm) return longForm;
+  return [...template.stages].reverse().find((s) => s.required && s.renderer === 'prose');
+}
+
+export interface CompletionSummary {
+  deliverable: StageDefinition | undefined;
+  deliverableDone: boolean;
+  completed: number;
+  withArtifact: number;
+  skipped: number;
+  leftOpen: number;
+  blocked: number;
+  notStarted: number;
+}
+
+/**
+ * What finishing the project would be finishing. `deliverableDone` is the
+ * question that matters; the counts are context, not a gate.
+ */
+export function completionSummary(
+  template: WorkflowTemplate,
+  state: WorkflowState,
+  deliverable: { artifactNonEmpty: boolean; sectionsTotal: number; sectionsComplete: number }
+): CompletionSummary {
+  const stage = deliverableStage(template);
+  const done =
+    stage?.renderer === 'long_form'
+      ? deliverable.sectionsTotal > 0 && deliverable.sectionsComplete >= deliverable.sectionsTotal
+      : deliverable.artifactNonEmpty;
+
+  const summary: CompletionSummary = {
+    deliverable: stage,
+    deliverableDone: done,
+    completed: 0,
+    withArtifact: 0,
+    skipped: 0,
+    leftOpen: 0,
+    blocked: 0,
+    notStarted: 0,
+  };
+  for (const s of template.stages) {
+    const st = state.stages[s.id];
+    const status = st?.status ?? 'not_started';
+    if (isDone(status)) summary.completed += 1;
+    if (status === 'completed_with_artifact') summary.withArtifact += 1;
+    if (status === 'skipped') summary.skipped += 1;
+    if (status === 'blocked') summary.blocked += 1;
+    if (status === 'not_started') summary.notStarted += 1;
+    if (st?.left_open && status === 'in_progress') summary.leftOpen += 1;
+  }
+  return summary;
 }

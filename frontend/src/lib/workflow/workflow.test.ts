@@ -505,3 +505,95 @@ describe('nextSuggestedStage', () => {
     expect(nextSuggestedStage(BOOK_V1, state)).toBe('audience');
   });
 });
+
+describe('PM-13 statuses and PM-14 completion, projected from the log', () => {
+  it('replays a legacy log exactly as before', () => {
+    const state = projectState(BOOK_V1, [
+      event('stage_completed', 'objective', { to_stage_id: 'audience' }),
+      event('stage_skipped', 'audience', { to_stage_id: 'positioning', reason: 'Not needed' }),
+    ]);
+    expect(state.stages.objective.status).toBe('complete');
+    expect(state.stages.audience.status).toBe('skipped');
+    expect(state.current_stage_id).toBe('positioning');
+    expect(state.project_status).toBeUndefined();
+  });
+
+  it('completion with evidence is "completed with artifact"', () => {
+    const state = projectState(BOOK_V1, [
+      event('stage_marked_complete', 'objective', { to_stage_id: 'audience', payload: { evidence_version_id: 'v9' } }),
+    ]);
+    expect(state.stages.objective).toMatchObject({ status: 'completed_with_artifact', evidence_version_id: 'v9' });
+    expect(state.current_stage_id).toBe('audience');
+  });
+
+  it('moving on with requirements unmet does NOT complete the stage', () => {
+    const state = projectState(BOOK_V1, [
+      event('stage_advanced', 'objective', { to_stage_id: 'audience', reason: 'Will come back' }),
+    ]);
+    expect(state.stages.objective).toMatchObject({ status: 'in_progress', left_open: true });
+    expect(state.current_stage_id).toBe('audience');
+    expect(progressSummary(BOOK_V1, state).complete).toBe(0);
+  });
+
+  it('a left-open stage completed later is simply complete', () => {
+    const state = projectState(BOOK_V1, [
+      event('stage_advanced', 'objective', { to_stage_id: 'audience' }),
+      event('stage_marked_complete', 'objective'),
+    ]);
+    expect(state.stages.objective).toMatchObject({ status: 'complete', left_open: false });
+    expect(state.current_stage_id).toBe('audience');
+  });
+
+  it('blocked carries its kind and reason, and can be lifted', () => {
+    const blocked = projectState(BOOK_V1, [
+      event('stage_blocked', 'objective', { reason: 'Waiting on sales data', payload: { block_kind: 'data_missing' } }),
+    ]);
+    expect(blocked.stages.objective).toMatchObject({
+      status: 'blocked',
+      blocked: { kind: 'data_missing', reason: 'Waiting on sales data' },
+    });
+    const lifted = projectState(BOOK_V1, [
+      event('stage_blocked', 'objective', { reason: 'x', payload: { block_kind: 'tool_missing' } }),
+      event('stage_unblocked', 'objective'),
+    ]);
+    expect(lifted.stages.objective.status).toBe('in_progress');
+    expect(lifted.stages.objective.blocked).toBeUndefined();
+  });
+
+  it('the project is finished by an event, and can be reopened', () => {
+    expect(projectState(BOOK_V1, [event('project_finalized', 'final_review')]).project_status).toBe('finalized');
+    expect(
+      projectState(BOOK_V1, [event('project_finalized', 'final_review'), event('project_reopened', 'final_review')])
+        .project_status
+    ).toBe('active');
+  });
+
+  it('returning marks both kinds of completed work stale', () => {
+    const state = projectState(BOOK_V1, [
+      event('stage_marked_complete', 'objective', { to_stage_id: 'audience', payload: { evidence_version_id: 'v1' } }),
+      event('stage_completed', 'audience', { to_stage_id: 'positioning' }),
+      event('stage_returned', 'positioning', { to_stage_id: 'objective' }),
+    ]);
+    expect(state.stages.audience.status).toBe('stale');
+    expect(state.current_stage_id).toBe('objective');
+  });
+});
+
+describe('project completion is about the deliverable (PM-14)', () => {
+  it('finds the deliverable: the manuscript, or the last required prose stage', async () => {
+    const { deliverableStage } = await import('./engine');
+    const { SINGLE_OUTPUT_V1 } = await import('./templates/single-output.v1');
+    expect(deliverableStage(BOOK_V1)?.id).toBe('drafting');
+    expect(deliverableStage(SINGLE_OUTPUT_V1)?.id).toBe('output');
+  });
+
+  it('a book is done when every section is written, whatever the checklists say', async () => {
+    const { completionSummary } = await import('./engine');
+    const state = projectState(BOOK_V1, [event('stage_advanced', 'objective', { to_stage_id: 'audience' })]);
+    const done = completionSummary(BOOK_V1, state, { artifactNonEmpty: true, sectionsTotal: 3, sectionsComplete: 3 });
+    expect(done).toMatchObject({ deliverableDone: true, leftOpen: 1 });
+    const notDone = completionSummary(BOOK_V1, state, { artifactNonEmpty: true, sectionsTotal: 3, sectionsComplete: 2 });
+    expect(notDone.deliverableDone).toBe(false);
+    expect(completionSummary(BOOK_V1, state, { artifactNonEmpty: false, sectionsTotal: 0, sectionsComplete: 0 }).deliverableDone).toBe(false);
+  });
+});

@@ -29,6 +29,7 @@ import type {
 } from './types';
 import { emptyDocument } from '@/lib/outline/model';
 import type { OutlineDocument, OutlineItem } from '@/types/outline';
+import { isDone } from './types';
 
 /** One source stage's contribution, before it is folded into an abstract. */
 export interface SectionSource {
@@ -64,7 +65,7 @@ export function stageBrief(
   state: WorkflowState,
   bundles: Record<string, StageArtifactBundle>
 ): string {
-  if (state.stages[stage.id]?.status !== 'complete') return '';
+  if (!isDone(state.stages[stage.id]?.status)) return '';
   const bundle = bundles[stage.id];
   const stored = bundle?.artifact?.summary?.trim();
   if (stored) return stored;

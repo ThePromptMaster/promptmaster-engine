@@ -44,6 +44,8 @@ const appendWorkflowEvent = vi.fn(
 );
 
 vi.mock('@/lib/supabase/workflow', () => ({
+  // No newer workflow version in these tests.
+  getLatestTemplate: async () => null,
   listWorkflowEvents: (...args: unknown[]) =>
     (listWorkflowEvents as unknown as (...a: unknown[]) => unknown)(...args),
   appendWorkflowEvent: (...args: unknown[]) =>
@@ -286,19 +288,30 @@ describe('the single-output workflow walks its five stages in the workspace', ()
     await user.click(screen.getByRole('checkbox', { name: /Output accepted/ }));
     await advance(user);
 
+    // PM-14: Finish first says what is being finished — the deliverable is the
+    // question, not whether every box is ticked.
+    const summary = await screen.findByRole('region', { name: 'Finish the project' });
+    expect(summary).toHaveTextContent(/The deliverable \(Output\) is done/);
+    await user.click(within(summary).getByRole('button', { name: 'Finish project' }));
+
     // PM-03: Finish used to record the stage and change nothing else, so the
     // button looked dead. Now the project says it is done, and can be reopened.
     expect(await screen.findByText('This project is finished')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Finish$/ })).not.toBeInTheDocument();
 
     // The event log is the record, and it is the log the walk actually wrote.
+    // PM-13: stages whose requirements were met are marked complete (with
+    // their version as evidence where they have one); finishing the project is
+    // its own event.
     expect(events.map((e) => [e.type, e.stage_id])).toEqual([
-      ['stage_completed', 'input'],
-      ['stage_completed', 'review'],
-      ['stage_completed', 'output'],
+      ['stage_marked_complete', 'input'],
+      ['stage_marked_complete', 'review'],
+      ['stage_marked_complete', 'output'],
       ['stage_skipped', 'realign'],
-      ['stage_completed', 'summary'],
+      ['stage_marked_complete', 'summary'],
+      ['project_finalized', 'summary'],
     ]);
+    expect(events.find((e) => e.stage_id === 'output')!.payload).toHaveProperty('evidence_version_id');
     expect(events.find((e) => e.type === 'stage_skipped')!.reason).toBe(
       'Alignment and drift are already good'
     );
@@ -326,7 +339,7 @@ describe('the single-output workflow walks its five stages in the workspace', ()
 
     // And trying again works: the failure left nothing half-written.
     await advance(user);
-    await waitFor(() => expect(events.map((e) => e.type)).toEqual(['stage_completed']));
+    await waitFor(() => expect(events.map((e) => e.type)).toEqual(['stage_marked_complete']));
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   }, 30000);
 

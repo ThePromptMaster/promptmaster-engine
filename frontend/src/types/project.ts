@@ -212,6 +212,7 @@ export type ProjectPatch = Partial<
     | 'constraint_presets'
     | 'format_presets'
     | 'workflow'
+    | 'workflow_template_id'
     | 'stage'
     | 'status'
     | 'manual_checks'

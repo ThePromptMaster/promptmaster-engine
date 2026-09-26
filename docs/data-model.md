@@ -26,6 +26,26 @@ future change does not undo a guarantee without noticing.
 | `section_records` | Per-section continuity records (summary, glossary, decisions, TODOs). |
 | `beta_feedback` | FR-22 feedback capture. |
 
+### Stage statuses (PM-13) and project completion (PM-14)
+
+Stage state is projected from `workflow_events` by `projectState` (`lib/workflow/engine.ts`).
+Migration `20260927000000_stage_statuses` widened `we_type_chk`:
+
+| Event | Projects to |
+|---|---|
+| `stage_marked_complete` | `completed_with_artifact` when `payload.evidence_version_id` is set (a trigger checks the version belongs to that stage's artifact in the same project), else `complete` |
+| `stage_advanced` | cursor moves; the stage stays `in_progress` with `left_open` — **moving on is not completing** |
+| `stage_blocked` / `stage_unblocked` | `blocked` with `{kind, reason}` (`we_block_reason_chk`: reason required, kind ∈ tool_missing / data_missing / needs_decision) / back to `in_progress` |
+| `project_finalized` / `project_reopened` | `WorkflowState.project_status`; `projects.status` is the denormalised copy |
+| `template_upgraded` | re-pin to a newer workflow version; payload records from/to |
+| `stage_completed` (legacy) | `complete` — kept so every existing log replays unchanged; new code does not write it |
+
+Finish is gated on the **deliverable** (`deliverableStage`: the manuscript on the first
+long-form stage, else the last required prose stage), shown in a completion summary;
+finishing without it is allowed and said out loud. `decisions_type_chk` was deliberately
+**not** widened (FR-02 contract evidence).
+
+
 ### Legacy (still live, deliberately)
 
 `sessions`, `templates`, `usage_tracking`, `custom_modes`, `conversation_messages`,
