@@ -93,3 +93,68 @@ async def test_suggest_setup_handles_missing_optional_fields():
     assert result.constraints == ""
     assert result.output_format == ""
     assert result.rationale.mode == ""
+
+
+# --- PM-09: unified entry ------------------------------------------------------
+
+from promptmaster.schemas import GuideAnswer  # noqa: E402
+from promptmaster.setup_suggester import (  # noqa: E402
+    GUIDE_QUESTIONS_SYSTEM,
+    build_guide_questions_prompt,
+    suggest_guide_questions,
+)
+
+
+def test_setup_asks_for_a_workflow_with_a_reason():
+    """The user should not have to know Book / Research / Single output first."""
+    assert "book|research|single_output" in build_setup_prompt("x")
+    assert "workflow_reason" in build_setup_prompt("x")
+    assert "smallest workflow that fits" in SETUP_SUGGESTER_SYSTEM
+
+
+def test_guided_answers_reach_the_setup_prompt():
+    prompt = build_setup_prompt(
+        "A book about giraffes",
+        [GuideAnswer(question="Who is this for?", answer="Ten-year-olds")],
+    )
+    assert "Who is this for? Ten-year-olds" in prompt
+
+
+@pytest.mark.asyncio
+async def test_invalid_workflow_falls_back_to_single_output():
+    client = AsyncMock()
+    client.generate_json = AsyncMock(return_value=({"mode": "architect", "workflow": "novel"}, {}))
+    s = await suggest_setup(client=client, model=None, objective="x")
+    assert s.workflow == "single_output"
+
+
+@pytest.mark.asyncio
+async def test_workflow_and_reason_are_returned():
+    client = AsyncMock()
+    client.generate_json = AsyncMock(
+        return_value=({"mode": "clarity", "workflow": "book", "workflow_reason": "Chapters."}, {})
+    )
+    s = await suggest_setup(client=client, model=None, objective="x")
+    assert (s.workflow, s.workflow_reason) == ("book", "Chapters.")
+
+
+def test_guide_questions_prompt_is_about_setting_the_work_up():
+    assert "Never ask something the objective already answers" in GUIDE_QUESTIONS_SYSTEM
+    assert "Objective: learn Rust" in build_guide_questions_prompt("learn Rust")
+
+
+@pytest.mark.asyncio
+async def test_guide_questions_are_capped_cleaned_and_have_a_fallback():
+    client = AsyncMock()
+    client.generate_json = AsyncMock(return_value=({"questions": [
+        {"question": "Who for?", "options": ["a", "b", "c", "d", "e"]},
+        {"question": ""},
+        "junk",
+    ]}, {}))
+    qs = await suggest_guide_questions(client=client, model=None, objective="x")
+    assert [q.question for q in qs] == ["Who for?"]
+    assert len(qs[0].options) == 4
+
+    client.generate_json = AsyncMock(side_effect=RuntimeError("down"))
+    fallback = await suggest_guide_questions(client=client, model=None, objective="x")
+    assert len(fallback) == 3

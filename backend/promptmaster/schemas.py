@@ -334,6 +334,9 @@ class SetupRationale(BaseModel):
     output_format: str = Field(default="")
 
 
+WorkflowKey = Literal["book", "research", "single_output"]
+
+
 class SetupSuggestion(BaseModel):
     """Suggested PMInput fields produced by the Smart Setup LLM call."""
     mode: ModeType
@@ -341,6 +344,26 @@ class SetupSuggestion(BaseModel):
     constraints: str
     output_format: str
     rationale: SetupRationale = Field(default_factory=SetupRationale)
+    #: PM-09: which workflow fits the objective, so the user is not made to
+    #: know Book / Research / Single output before they have started.
+    workflow: WorkflowKey = "single_output"
+    workflow_reason: str = Field(default="", description="One line on why this workflow fits.")
+
+
+class GuideAnswer(BaseModel):
+    """One answer from the 'Guide me' path, fed back into setup."""
+    question: str = Field(..., max_length=500)
+    answer: str = Field(default="", max_length=2_000)
+
+
+class GuideQuestion(BaseModel):
+    """A question the 'Guide me' path asks before recommending a setup."""
+    id: str
+    question: str
+    #: Why it matters, in one line — a question without a reason reads as a form.
+    why: str = ""
+    #: Up to four short suggested answers the user can click. May be empty.
+    options: list[str] = Field(default_factory=list)
 
 
 # --------------------------------------------------------------------------

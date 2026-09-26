@@ -16,16 +16,22 @@ export function e2eUser(): { id: string; email: string; password: string } {
   return JSON.parse(readFileSync(path.join(__dirname, '.auth', 'user.json'), 'utf8'));
 }
 
-/** Create a project through the real New-project page; returns its id. */
+/**
+ * Create a project through the real entry page (PM-09): say what you want,
+ * take the recommended setup, pick the workflow the test needs, start.
+ * Returns the project id.
+ */
 export async function createProject(
   page: Page,
   { workflow, name, objective }: { workflow: 'Book' | 'Research' | 'Single output'; name: string; objective: string }
 ): Promise<string> {
   await page.goto('/projects/new');
   await dismissBetaNotice(page);
+  await page.getByLabel('What do you want to do or figure out?').fill(objective);
+  await page.getByRole('button', { name: /I know what I want to do/ }).click();
+  await expect(page.getByRole('heading', { name: 'Your setup' })).toBeVisible();
   await page.getByRole('radio', { name: new RegExp(`^${workflow}`) }).click();
   await page.getByLabel('Project name').fill(name);
-  await page.getByLabel('Objective').fill(objective);
   await page.getByRole('button', { name: /^Start / }).click();
   await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}$/);
   return page.url().split('/').at(-1)!;

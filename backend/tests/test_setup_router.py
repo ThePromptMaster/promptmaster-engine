@@ -106,3 +106,44 @@ def test_generate_setup_falls_back_to_architect_for_invalid_mode_end_to_end():
         assert body["suggestion"]["mode"] == "architect"  # fallback worked
     finally:
         app.dependency_overrides.clear()
+
+
+def test_generate_setup_passes_guided_answers_through():
+    from unittest.mock import AsyncMock as _AsyncMock
+    from fastapi.testclient import TestClient as _TestClient
+    from deps import get_client as _get_client
+    from main import app as _app
+
+    client = _AsyncMock()
+    client.generate_json = _AsyncMock(return_value=({"mode": "coach", "workflow": "book"}, {}))
+    _app.dependency_overrides[_get_client] = lambda: client
+    try:
+        r = _TestClient(_app).post("/api/generate-setup", json={
+            "objective": "A book about giraffes",
+            "answers": [{"question": "Who is this for?", "answer": "Ten-year-olds"}],
+        })
+    finally:
+        _app.dependency_overrides.pop(_get_client, None)
+    assert r.status_code == 200
+    assert r.json()["suggestion"]["workflow"] == "book"
+    assert "Ten-year-olds" in client.generate_json.await_args.kwargs["prompt"]
+
+
+def test_guide_questions_endpoint():
+    from unittest.mock import AsyncMock as _AsyncMock
+    from fastapi.testclient import TestClient as _TestClient
+    from deps import get_client as _get_client
+    from main import app as _app
+
+    client = _AsyncMock()
+    client.generate_json = _AsyncMock(return_value=({"questions": [
+        {"id": "q1", "question": "Who is this for?", "why": "Tone.", "options": ["Kids"]}
+    ]}, {}))
+    _app.dependency_overrides[_get_client] = lambda: client
+    try:
+        r = _TestClient(_app).post("/api/guide-questions", json={"objective": "A book about giraffes"})
+    finally:
+        _app.dependency_overrides.pop(_get_client, None)
+    assert r.status_code == 200
+    assert r.json()["questions"][0]["question"] == "Who is this for?"
+    assert "A book about giraffes" in client.generate_json.await_args.kwargs["prompt"]

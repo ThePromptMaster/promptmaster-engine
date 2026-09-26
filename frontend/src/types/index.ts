@@ -260,17 +260,40 @@ export interface SetupRationale {
   output_format: string;
 }
 
+export type WorkflowKey = 'book' | 'research' | 'single_output';
+
 export interface SetupSuggestion {
   mode: ModeType;
   audience: string;
   constraints: string;
   output_format: string;
   rationale: SetupRationale;
+  /** PM-09: the workflow that fits the objective, and why. */
+  workflow: WorkflowKey;
+  workflow_reason: string;
+}
+
+export interface GuideAnswer {
+  question: string;
+  answer: string;
+}
+
+export interface GuideQuestion {
+  id: string;
+  question: string;
+  why: string;
+  options: string[];
 }
 
 export interface GenerateSetupRequest {
   objective: string;
   model?: string;
+  /** Answers from the "Guide me" path. */
+  answers?: GuideAnswer[];
+}
+
+export interface GuideQuestionsResponse {
+  questions: GuideQuestion[];
 }
 
 export interface GenerateSetupResponse {
