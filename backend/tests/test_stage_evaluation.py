@@ -551,3 +551,11 @@ def test_endpoint_is_authenticated():
     http = TestClient(app, raise_server_exceptions=False)
     response = http.post("/api/evaluate-stage-artifact", json={})
     assert response.status_code in (401, 403)
+
+
+def test_evaluating_a_review_stage_sees_the_manuscript(book_inputs, positioning_stage, book_digest):
+    with_book = book_digest.model_copy(update={"manuscript": "MANUSCRIPT-PROSE-MARKER"})
+    _system, user = build_stage_evaluation_prompt(book_inputs, positioning_stage, "findings", with_book)
+    assert "MANUSCRIPT-PROSE-MARKER" in user
+    _system, user = build_stage_evaluation_prompt(book_inputs, positioning_stage, "findings", book_digest)
+    assert "THE MANUSCRIPT THIS STAGE WAS PRODUCED FROM" not in user

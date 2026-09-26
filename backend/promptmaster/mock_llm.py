@@ -92,11 +92,14 @@ def _stage_items(prompt: str) -> dict:
             keys = [k for k in json.loads(match.group(1)) if k != "id"] or ["text"]
         except json.JSONDecodeError:
             pass
+    # Say whether the drafted chapters arrived, so a browser test can see that
+    # the stages after drafting are reviewing the book and not a summary of it.
+    read = " (read the manuscript)" if "--- BEGIN MANUSCRIPT ---" in prompt else ""
     items = []
     for n in range(1, 4):
         item: dict[str, str] = {"id": f"i{n}"}
-        for key in keys:
-            item[key] = "clean" if key == "status" else f"Mock {key.replace('_', ' ')} {n}"
+        for i, key in enumerate(keys):
+            item[key] = "clean" if key == "status" else f"Mock {key.replace('_', ' ')} {n}{read if i == 0 else ''}"
         items.append(item)
     return {"items": items}
 
@@ -282,6 +285,12 @@ def _prose_reply(system: str, prompt: str) -> str:
     if "GO MODE — PERFORM:" in system:
         move = system.split("GO MODE — PERFORM:", 1)[1].split(".", 1)[0].strip().title()
         return f"## Mock {move}\n\nScripted reasoning for this move. Nothing was run or looked up."
+    if "--- BEGIN SECTION ---" in prompt:
+        # A Revision/Editing rewrite: name the first finding it was given, so a
+        # browser test can see the findings reached the chapter.
+        notes = re.search(r"leave the rest alone\):\n(.*?)\n\n", prompt, re.S)
+        first = notes.group(1).splitlines()[0].strip() if notes else "(no findings)"
+        return f"## Mock revision\n\nRevised by the mock model, applying: {first[:160]}"
     objective = _objective(prompt) if "Objective:" in prompt else "the task"
     return (
         "## Mock output\n\n"

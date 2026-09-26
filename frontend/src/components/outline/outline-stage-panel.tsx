@@ -29,6 +29,8 @@ import {
 import { listVersions } from '@/lib/supabase/versions';
 import type { OutlineDocument, OutlineItem, SectionDraftBinding } from '@/types/outline';
 import type { Artifact, ArtifactVersion, Project } from '@/types/project';
+import type { PanelStepReporter } from '@/lib/workflow/next-action';
+import { useReportPanelStep } from '@/components/workflow/use-report-panel-step';
 import type { PMInput } from '@/types';
 import type { WorkflowEvent } from '@/lib/workflow/types';
 
@@ -83,6 +85,8 @@ interface Props {
    * and stayed at 0 however many sections were visible.
    */
   onItemCountChange?: (count: number) => void;
+  /** Report the panel's next step to the stage bar (PM-06). */
+  onPanelStep?: PanelStepReporter;
   readOnly?: boolean;
 }
 
@@ -110,6 +114,7 @@ export function OutlineStagePanel({
   derive,
   onApproved,
   onItemCountChange,
+  onPanelStep,
   readOnly = false,
 }: Props) {
   const [artifact, setArtifact] = useState<Artifact | null>(null);
@@ -258,7 +263,6 @@ export function OutlineStagePanel({
               current_version_id: created.id,
               version_count: created.version_number,
               outline_draft: null,
-              revision: a.revision + 2,
             }
           : a
       );
@@ -390,6 +394,30 @@ export function OutlineStagePanel({
     setDraft(null);
     scheduleDraftSave(null);
   }, [scheduleDraftSave]);
+
+  // PM-06: approving is this stage's step. The stage bar used to offer
+  // "Continue to Approval" beside an unsaved outline's "Save and approve".
+  useReportPanelStep(
+    onPanelStep,
+    stageId,
+    readOnly
+      ? null
+      : loading || busy || regeneratingAll
+        ? { label: '', reason: '', busy: true }
+        : namedSections === 0
+          ? {
+              label: 'Generate the outline',
+              reason: 'Drafts the sections from the stages before this one. Every line stays editable.',
+              run: () => void handleRegenerateAll(),
+            }
+          : draft !== null || !headApproved
+            ? {
+                label: draft !== null ? 'Save and approve' : 'Approve this outline',
+                reason: 'Drafting writes against the approved outline.',
+                run: () => void handleApprove(),
+              }
+            : null
+  );
 
   if (loading) {
     return (

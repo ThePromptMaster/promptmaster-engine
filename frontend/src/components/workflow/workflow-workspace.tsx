@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { StageHeader } from './stage-header';
 import { StageRail } from './stage-rail';
@@ -13,7 +13,7 @@ import { templateDiff } from '@/lib/workflow/upgrade';
 import { BlockForm, BlockedNotice, CompletionDialog } from './stage-status-panels';
 import { StageToolResult } from './stage-tool-result';
 import { CRITIQUE_TOOLS, REWRITE_TOOLS, useStageTools } from './use-stage-tools';
-import { nextStageAction } from '@/lib/workflow/next-action';
+import { nextStageAction, type ReportedPanelStep } from '@/lib/workflow/next-action';
 import { isApplyable } from '@/lib/workflow/recommend';
 import { ProjectFinishedBanner } from './project-finished-banner';
 import { StageRenderer } from './renderers/stage-renderer';
@@ -39,7 +39,11 @@ import {
   completionSummary,
   deliverableStage,
 } from '@/lib/workflow/engine';
-import { summariseStageContent } from '@/lib/workflow/digest';
+import { buildStageDigest, formatManuscript, summariseStageContent } from '@/lib/workflow/digest';
+import { api } from '@/lib/api/client';
+import { inputsFrom } from './use-stage-generation';
+import type { EvaluationResult } from '@/types';
+import { revisionBrief } from '@/lib/workflow/revision';
 import { deriveOutlineItems, draftingStageId } from '@/lib/workflow/derived-outline';
 import { OutlineStagePanel } from '@/components/outline/outline-stage-panel';
 import { ProjectBrief, ProjectSetup, stageWantsSetup } from './project-setup';
@@ -57,6 +61,7 @@ import {
   type StageItem,
 } from '@/lib/workflow/stage-artifact';
 import type { StageContext, WorkflowEvent, WorkflowTemplate, BlockKind } from '@/lib/workflow/types';
+import { isDone } from '@/lib/workflow/types';
 import { appendWorkflowEvent, getLatestTemplate, listWorkflowEvents } from '@/lib/supabase/workflow';
 import { countNamedSections, parseOutlineDocument } from '@/lib/outline/model';
 import { setUsageProject } from '@/lib/supabase/model-usage';
@@ -107,6 +112,9 @@ interface Props {
   onReload?: () => void;
 }
 
+/** Per-viewer convenience only: whether this person last left the side chat open. */
+const CHAT_OPEN_KEY = 'pm.sideChatOpen';
+
 export function WorkflowWorkspace({
   project,
   artifact,
@@ -127,7 +135,34 @@ export function WorkflowWorkspace({
   // Open by default: section 8 asks for the side chat to be part of the
   // workspace, and a panel behind a button that has to be found first is a
   // disconnected product path with an extra step.
-  const [chatOpen, setChatOpen] = useState(true);
+  //
+  // Except on a narrow screen, where "open" is a full-screen sheet over the
+  // stage: a first visit on a phone landed on the chat, not the work (PM-08).
+  // There it starts closed, and either way the user's last choice sticks.
+  const [chatOpen, setChatOpenState] = useState(true);
+  useEffect(() => {
+    let remembered: string | null = null;
+    try {
+      remembered = window.localStorage.getItem(CHAT_OPEN_KEY);
+    } catch {
+      // Storage unavailable (private window, blocked site data): use the default.
+    }
+    if (remembered === '0' || remembered === '1') setChatOpenState(remembered === '1');
+    else if (typeof window.matchMedia === 'function' && !window.matchMedia('(min-width: 1024px)').matches) {
+      setChatOpenState(false);
+    }
+  }, []);
+  const setChatOpen = useCallback((next: boolean | ((open: boolean) => boolean)) => {
+    setChatOpenState((open) => {
+      const value = typeof next === 'function' ? next(open) : next;
+      try {
+        window.localStorage.setItem(CHAT_OPEN_KEY, value ? '1' : '0');
+      } catch {
+        // Not remembering is fine; the toggle still works.
+      }
+      return value;
+    });
+  }, []);
   const [busy, setBusy] = useState(false);
   const [transitionError, setTransitionError] = useState<string | null>(null);
   // PM-06: unsaved edits in the renderer, so "Save changes" can lead.
@@ -140,6 +175,16 @@ export function WorkflowWorkspace({
   const [upgradeDismissed, setUpgradeDismissed] = useState(false);
   const [upgrading, setUpgrading] = useState(false);
   const [finishing, setFinishing] = useState<{ option: TransitionOption; note?: string } | null>(null);
+  // PM-14: the deliverable scored against the objective before finishing.
+  const [objectiveCheck, setObjectiveCheck] = useState<{
+    running: boolean;
+    result: EvaluationResult | null;
+    error: string | null;
+  }>({ running: false, result: null, error: null });
+  const objectiveCheckRef = useRef<EvaluationResult | null>(null);
+  useEffect(() => {
+    objectiveCheckRef.current = objectiveCheck.result;
+  }, [objectiveCheck.result]);
   // Live section counts reported by the outline panel, which owns its own
   // unsaved draft (PM-01). Keyed by stage id.
   const [outlineCounts, setOutlineCounts] = useState<Record<string, number>>({});
@@ -317,6 +362,22 @@ export function WorkflowWorkspace({
     };
   }, [project, artifact, versions, stage, stageId, template, stageBundles, events, outlineCounts]);
 
+  // PM-06: the step a panel-driven stage (outline, drafting, revision) is
+  // waiting on. Keyed by stage, and a withdrawal only clears its own stage's
+  // report, so an unmounting panel cannot wipe the next stage's step.
+  const [panelSteps, setPanelSteps] = useState<Record<string, ReportedPanelStep>>({});
+  const reportPanelStep = useCallback((stageId: string, step: ReportedPanelStep | null) => {
+    setPanelSteps((prev) => {
+      if (!step) {
+        if (!(stageId in prev)) return prev;
+        const next = { ...prev };
+        delete next[stageId];
+        return next;
+      }
+      return { ...prev, [stageId]: step };
+    });
+  }, []);
+
   const reportOutlineCount = useCallback(
     (count: number) => {
       if (!stage) return;
@@ -423,10 +484,25 @@ export function WorkflowWorkspace({
         // PM-14: finishing the project is its own event, separate from the
         // last stage — the project can be finished with stages left open.
         if (option.kind === 'finish') {
+          const checked = objectiveCheckRef.current;
           await appendWorkflowEvent(project.id, project.user_id, {
             type: 'project_finalized',
             stage_id: stage.id,
             reason: note,
+            // What the deliverable scored against the objective when the user
+            // finished, if they asked. The record of "finished" says how well.
+            ...(checked
+              ? {
+                  payload: {
+                    objective_check: {
+                      alignment: checked.alignment.score,
+                      clarity: checked.clarity.score,
+                      drift: checked.drift.score,
+                      completeness: checked.completeness?.status ?? null,
+                    },
+                  },
+                }
+              : {}),
           });
         }
 
@@ -474,6 +550,29 @@ export function WorkflowWorkspace({
     },
     [stage, project.id, project.user_id]
   );
+
+  /**
+   * PM-13: finish a stage without leaving it — or finish one that was left
+   * open earlier. Continue already completes a stage whose requirements are
+   * met; this is the same event with no move, for the user who wants to record
+   * "done" and stay, or come back and close a stage they moved past.
+   */
+  const markComplete = useCallback(async () => {
+    if (!stage) return;
+    setTransitionError(null);
+    try {
+      const bundle = stageBundles[stage.id];
+      const evidenceId = bundle?.artifact?.stage_id === stage.id ? bundle.versions.at(-1)?.id : undefined;
+      await appendWorkflowEvent(project.id, project.user_id, {
+        type: 'stage_marked_complete',
+        stage_id: stage.id,
+        ...(evidenceId ? { payload: { evidence_version_id: evidenceId } } : {}),
+      });
+      setEvents(await listWorkflowEvents(project.id));
+    } catch (e) {
+      setTransitionError(`That didn't go through${e instanceof Error && e.message ? `: ${e.message}` : ''}. Nothing was changed.`);
+    }
+  }, [stage, stageBundles, project.id, project.user_id]);
 
   useEffect(() => {
     let live = true;
@@ -763,6 +862,7 @@ export function WorkflowWorkspace({
     canAdvance: evaluation.canAdvance,
     isLast: !stage.transitions.default_next,
     nextLabel: nextStage?.short_label ?? null,
+    panelStep: isCurrent ? (panelSteps[stage.id] ?? null) : null,
   });
 
   // PM-10: the original core's actions — refine, realign, challenge, reframe,
@@ -785,6 +885,9 @@ export function WorkflowWorkspace({
       case 'continue_writing':
         void tools.run('continue');
         return;
+      case 'panel':
+        panelSteps[stage.id]?.run?.();
+        return;
     }
   };
 
@@ -801,7 +904,53 @@ export function WorkflowWorkspace({
     sectionsComplete: deliverableSections.filter((s) => s.status === 'complete').length,
   });
 
+  /** Score the deliverable against the objective. 1 model call, on request. */
+  const checkAgainstObjective = async () => {
+    if (!deliverable) return;
+    const content =
+      deliverable.renderer === 'long_form'
+        ? formatManuscript(deliverableSections)
+        : (deliverableBundle?.versions.at(-1)?.content ?? '');
+    if (!content.trim()) {
+      setObjectiveCheck({ running: false, result: null, error: 'There is nothing written to check yet.' });
+      return;
+    }
+    setObjectiveCheck({ running: true, result: null, error: null });
+    try {
+      const response = await api.evaluateStageArtifact({
+        inputs: inputsFrom(project),
+        stage: {
+          id: deliverable.id,
+          label: `${deliverable.label} — the finished deliverable`,
+          renderer: 'prose',
+          entry_prompt_hint: `Judge the finished deliverable against the project objective: does it deliver what was asked, for the audience named? ${deliverable.entry_prompt_hint ?? ''}`,
+          artifact_kind: deliverable.expected_artifacts[0]?.kind ?? '',
+          exit_criteria: [],
+        },
+        content,
+        digest: buildStageDigest(template, state, project, stageBundles, deliverable.id),
+        model: project.model,
+      });
+      setObjectiveCheck({ running: false, result: response.evaluation, error: null });
+    } catch (e) {
+      setObjectiveCheck({
+        running: false,
+        result: null,
+        error: `The check did not run${e instanceof Error && e.message ? `: ${e.message}` : ''}. You can still finish.`,
+      });
+    }
+  };
+
+  const canMarkComplete =
+    project.status !== 'finalized' &&
+    evaluation.canAdvance &&
+    !isDone(stageState?.status) &&
+    (isCurrent || Boolean(stageState?.left_open));
+
   const moreActions: MoreAction[] = [
+    ...(canMarkComplete
+      ? [{ id: 'mark-complete', label: 'Mark this stage complete', icon: 'task_alt', onSelect: () => void markComplete() }]
+      : []),
     isBlocked
       ? { id: 'unblock', label: 'Unblock this stage', icon: 'lock_open', onSelect: () => void setBlocked(null) }
       : { id: 'block', label: 'Mark as blocked…', icon: 'block', onSelect: () => setBlocking(true) },
@@ -850,6 +999,8 @@ export function WorkflowWorkspace({
           state: manuscript?.long_form ?? null,
           approvedOutlineVersionId: approvedOutlineVersionId(events ?? []),
           onRefresh: () => onReload?.(),
+          revise: revisionBrief(template, stage.id, stageBundles),
+          onPanelStep: reportPanelStep,
           emptyHint:
             template.outline_stage === 'explicit'
               ? 'Approve an outline on the Outline stage, and drafting will follow it.'
@@ -1083,6 +1234,7 @@ export function WorkflowWorkspace({
                   )}
                   onApproved={materialiseOutline}
                   onItemCountChange={reportOutlineCount}
+                  onPanelStep={reportPanelStep}
                   readOnly={!isCurrent}
                 />
               </div>
@@ -1197,12 +1349,17 @@ export function WorkflowWorkspace({
               <CompletionDialog
                 summary={completion}
                 busy={busy}
+                check={objectiveCheck}
+                onCheck={() => void checkAgainstObjective()}
                 onConfirm={() => {
                   const { option, note } = finishing;
                   setFinishing(null);
                   void handleTransition(option, note);
                 }}
-                onCancel={() => setFinishing(null)}
+                onCancel={() => {
+                  setFinishing(null);
+                  setObjectiveCheck({ running: false, result: null, error: null });
+                }}
               />
             )}
             {isCurrent && confirmingRegenerate && (

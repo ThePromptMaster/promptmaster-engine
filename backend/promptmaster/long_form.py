@@ -16,6 +16,7 @@ from .schemas import (
     ContinuitySnapshot,
     DetectLongFormResponse,
     GenerateSectionProseResponse,
+    SectionRevisionBrief,
     GenerateSectionResponse,
     GlossaryTerm,
     OutlineSection,
@@ -292,6 +293,39 @@ def build_section_prompt(
     return system, user
 
 
+def build_section_revision_prompt(
+    inputs: PMInput,
+    outline: list[OutlineSection],
+    section_index: int,
+    revision: SectionRevisionBrief,
+) -> tuple[str, str]:
+    """Build (system, user) prompts to rewrite one existing section.
+
+    The section's own current text is the input, not the outline: a revision
+    that re-drafts from the abstract throws away everything the user kept. The
+    notes are shared across every section of the manuscript, so the model is
+    told to act only on the ones that concern this section.
+    """
+    target = outline[section_index]
+    system = _shared_system(inputs, [], _SECTION_INSTRUCTION)
+    notes = revision.notes.strip() or "(none — work from the stage brief alone)"
+    user = (
+        f"Original objective: {inputs.objective}\n"
+        f"Audience: {inputs.audience}\n"
+        f"Constraints: {inputs.constraints or '(none)'}\n\n"
+        f"FULL OUTLINE:\n{_format_outline_for_prompt(outline, section_index)}\n\n"
+        f"STAGE: {revision.stage_label or 'Revision'}\n"
+        f"STAGE BRIEF: {revision.instruction or 'Revise this section.'}\n\n"
+        "FINDINGS THE USER ACCEPTED (they cover the whole manuscript — apply only the ones "
+        f"that concern this section, and leave the rest alone):\n{notes}\n\n"
+        f"THE CURRENT TEXT OF SECTION {section_index + 1}: {target.title}\n"
+        f"--- BEGIN SECTION ---\n{revision.current_content}\n--- END SECTION ---\n\n"
+        "Return the whole section as it should now read — prose only, no title, no notes "
+        "on what you changed. If nothing here applies to this section, return it unchanged."
+    )
+    return system, user
+
+
 async def generate_section_prose(
     client: OpenRouterClient,
     model: str | None,
@@ -302,21 +336,30 @@ async def generate_section_prose(
     prev_section_content: str = "",
     records: list[SectionRecord] | None = None,
     deadline: float | None = None,
+    revision: SectionRevisionBrief | None = None,
 ) -> GenerateSectionProseResponse:
     """Write one section. One LLM call, and nothing else.
 
     This is the expensive half, and it is separate from record extraction so
     that the drain can commit the prose the moment it exists. Anything that
     happens after this call returns is, by construction, cheap to redo.
+
+    With `revision`, the section is rewritten from its current text rather than
+    drafted from the outline.
     """
-    system, user = build_section_prompt(
-        inputs=inputs,
-        outline=outline,
-        section_index=section_index,
-        prior_snapshot=prior_snapshot,
-        prev_section_content=prev_section_content,
-        records=records,
-    )
+    if revision is not None:
+        system, user = build_section_revision_prompt(
+            inputs=inputs, outline=outline, section_index=section_index, revision=revision
+        )
+    else:
+        system, user = build_section_prompt(
+            inputs=inputs,
+            outline=outline,
+            section_index=section_index,
+            prior_snapshot=prior_snapshot,
+            prev_section_content=prev_section_content,
+            records=records,
+        )
 
     content, _usage, finish_reason = await client.generate_with_meta(
         prompt=user,

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { createProject, pressTransition, skipStage, stageArtifact } from './helpers';
+import { createProject, pressTransition, skipStage, stageArtifact, transitionBar } from './helpers';
 
 /**
  * A1d — Sean: "see very top and bottom after I press save", and the Research
@@ -42,6 +42,11 @@ test('approving an outline does not swap the page for a skeleton', async ({ page
   await page.getByLabel('Title of section 1').fill('Habitat');
   await page.getByRole('button', { name: /Insert a section after/ }).click();
   await page.getByLabel('Title of section 2').fill('Diet');
+  // Let the 800 ms draft autosave land first, as it does for anyone who pauses
+  // before approving. Clicking inside that window is what hid the bug where the
+  // autosave's revision bump stranded the approved version and every retry
+  // collided on its number (20260927000200).
+  await page.waitForTimeout(1_500);
 
   const title = await page.getByLabel('Project title').elementHandle();
   let skeleton = false;
@@ -52,14 +57,16 @@ test('approving an outline does not swap the page for a skeleton', async ({ page
       await page.waitForTimeout(50);
     }
   })();
-  await page.getByRole('button', { name: 'Save and approve' }).click();
+  await transitionBar(page).getByRole('button', { name: 'Save and approve' }).click();
   await watch;
 
   expect(skeleton).toBe(false);
   // Same element: the header was never unmounted.
   expect(await title!.evaluate((el) => el.isConnected)).toBe(true);
-  await expect(page.getByText(/approved/i).first()).toBeVisible();
+  // Strict: /approved/i also matched "Nothing approved yet".
+  await expect(page.getByText(/Approved · v\d/).first()).toBeVisible();
   await expect(page.getByText('This project was changed in another tab')).toHaveCount(0);
+  await expect(page.getByText(/another tab/i)).toHaveCount(0);
   await page.screenshot({ path: test.info().outputPath('02-after-approve-no-skeleton.png') });
 });
 

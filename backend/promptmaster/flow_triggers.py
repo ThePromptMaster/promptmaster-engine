@@ -238,7 +238,9 @@ def build_refine_prompt(
         f"{format_session_history(iterations or [])}\n\n"
         f"--- PREVIOUS ANSWER (the one you are refining) ---\n{current_output}\n--- END PREVIOUS ANSWER ---\n\n"
         f"REFINEMENT INSTRUCTION: {refine_instruction}\n\n"
-        f"Produce the refined version now, staying within {mode_config['display_name']} Mode."
+        f"Produce the refined version now, staying within {mode_config['display_name']} Mode. "
+        "Return only the refined text itself — no preamble, no notes on what changed, "
+        "and no appended 'Next Steps' section."
     )
     return system, user
 

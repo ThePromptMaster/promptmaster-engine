@@ -66,6 +66,8 @@ export function useStageGeneration({
   const [failure, setFailure] = useState<StageFailure | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
+  /** The stage the in-flight draft is for. */
+  const inFlightFor = useRef<string | null>(null);
   const attempted = useRef<Set<string>>(new Set());
 
   // Read through a ref inside the callback so a changing bundle map does not
@@ -81,6 +83,16 @@ export function useStageGeneration({
 
   useEffect(() => cancel, [cancel]);
 
+  // The workflow moved off the stage being drafted — skipped, continued past,
+  // gone back from. Its draft is no longer wanted: without this a skipped
+  // Research stage finished drafting in the background, billed a model call,
+  // and wrote an artifact onto a stage the user had just said they did not need.
+  // Browsing another stage does not move the cursor, so it does not cancel.
+  const currentStageId = state.current_stage_id;
+  useEffect(() => {
+    if (abortRef.current && inFlightFor.current && inFlightFor.current !== currentStageId) cancel();
+  }, [currentStageId, cancel]);
+
   const generate = useCallback(
     async (target: StageDefinition, options?: { force?: boolean }) => {
       const { project: p, template: t, state: s, bundles: b, appendStageVersion: append } =
@@ -93,6 +105,7 @@ export function useStageGeneration({
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
+      inFlightFor.current = target.id;
       attempted.current.add(target.id);
       setGenerating(true);
       setFailure(null);

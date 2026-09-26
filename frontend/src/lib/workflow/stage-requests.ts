@@ -71,7 +71,7 @@ export function generationRequest(
     item_schema: rendererHoldsItems(target.renderer)
       ? {
           item_label: schema.itemLabel,
-          fields: schema.fields.map((f) => ({ key: f.key, label: f.label, hint: f.hint })),
+          fields: schema.fields.map((f) => ({ key: f.key, label: f.label, hint: f.hint, max_chars: f.max ?? null })),
           min_items: schema.minItems,
           max_items: schema.maxItems,
         }

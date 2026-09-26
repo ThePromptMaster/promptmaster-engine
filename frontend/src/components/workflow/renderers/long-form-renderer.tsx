@@ -33,9 +33,14 @@ import {
   revisionToEnqueue,
   type ProjectJob,
 } from '@/lib/supabase/jobs';
+import { appendVersion } from '@/lib/supabase/versions';
+import { formatManuscript } from '@/lib/workflow/digest';
+import { formatRevisionNotes } from '@/lib/workflow/revision';
 import type { OutlineSection } from '@/types';
+import type { Artifact } from '@/types/project';
 import type { StageRendererProps } from './types';
 import { LargeJobWarning, isLargeJob } from '@/components/workflow/large-job-warning';
+import { useReportPanelStep } from '@/components/workflow/use-report-panel-step';
 
 /** Statuses that mean the server still has work to do. */
 const PENDING_STATUSES = new Set(['queued', 'leased']);
@@ -63,6 +68,7 @@ interface DraftingProps {
 
 function Drafting({ ctx, readOnly }: DraftingProps) {
   const { project, artifactId, state, approvedOutlineVersionId, stageId, onRefresh } = ctx;
+  const revise = ctx.revise ?? null;
 
   const [jobs, setJobs] = useState<ProjectJob[]>([]);
   const [busy, setBusy] = useState(false);
@@ -213,6 +219,95 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
       });
     });
 
+  /**
+   * Revision and Editing: rewrite the written sections with the stage's brief
+   * and the findings accepted before it. The manuscript as it stood is saved
+   * as a version first, because a rewrite replaces each section's text in
+   * place and "each accepted finding becomes a version you can compare
+   * against" is what the stage promises.
+   */
+  const reviseSections = (targets: { section: OutlineSection; index: number }[]) =>
+    run(async () => {
+      if (!artifactId || !revise) throw new Error('This stage has no manuscript to revise.');
+      await appendVersion(
+        { id: artifactId, user_id: project.user_id, project_id: project.id } as Artifact,
+        {
+          content: formatManuscript(outline, Number.POSITIVE_INFINITY),
+          source_operation: 'manuscript_snapshot',
+          instruction: `Before ${revise.stageLabel}`,
+          model: '',
+          mode: project.mode,
+          change_summary: `The manuscript as it stood before ${revise.stageLabel}.`,
+        }
+      );
+      const brief = {
+        stage_label: revise.stageLabel,
+        instruction: revise.instruction,
+        notes: formatRevisionNotes(revise.findings),
+      };
+      for (const { section, index } of targets) {
+        await enqueueSectionJob({
+          project,
+          artifactId,
+          stageId,
+          outlineVersionId: approvedOutlineVersionId,
+          sectionId: section.id,
+          sectionIndex: index,
+          revision: (section.revision ?? 0) + 1,
+          revise: brief,
+        });
+      }
+    });
+
+  // A section counts as revised here once any job this stage queued for it
+  // succeeded — not only its latest job, which after Editing runs is Editing's,
+  // and would make Revision read as never applied.
+  const revisedCount = revise
+    ? outline.filter((s) =>
+        jobs.some(
+          (j) =>
+            j.status === 'succeeded' &&
+            j.payload?.stage_id === stageId &&
+            j.payload?.section_id === s.id
+        )
+      ).length
+    : 0;
+
+  const reviseAll = () =>
+    void reviseSections(
+      outline.flatMap((section, index) => (section.status === 'complete' ? [{ section, index }] : []))
+    );
+  const findingCount = revise?.findings.length ?? 0;
+  const reviseLabel =
+    findingCount > 0
+      ? `Apply ${findingCount} finding${findingCount === 1 ? '' : 's'} to every section`
+      : `Run ${(revise?.stageLabel ?? '').toLowerCase()} on every section`;
+
+  // PM-06: the stage bar's one primary button takes this panel's step.
+  useReportPanelStep(
+    ctx.onPanelStep,
+    stageId,
+    readOnly || !outline.length
+      ? null
+      : pendingJobs.length > 0 || busy
+        ? { label: '', reason: '', busy: true }
+        : revise
+          ? complete > 0 && revisedCount === 0
+            ? {
+                label: reviseLabel,
+                reason: 'Rewrites each chapter as it stands. The current manuscript is saved as a version first.',
+                run: reviseAll,
+              }
+            : null
+          : complete < outline.length
+            ? {
+                label: complete === 0 ? 'Start drafting' : 'Resume drafting',
+                reason: 'Writes each section against the approved outline. You can pause at any time.',
+                run: requestDrafting,
+              }
+            : null
+  );
+
   const toggle = (id: string) =>
     setExpanded((prev) => {
       const next = new Set(prev);
@@ -247,6 +342,19 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
 
   return (
     <div className="space-y-6">
+      {revise ? (
+        <RevisionPanel
+          revise={revise}
+          written={complete}
+          total={outline.length}
+          revised={revisedCount}
+          running={running}
+          busy={busy}
+          readOnly={readOnly}
+          onReviseAll={reviseAll}
+          onPause={pause}
+        />
+      ) : (
       <Panel>
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
@@ -274,11 +382,17 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
                 >
                   Pause
                 </button>
+              ) : complete === outline.length ? (
+                // Nothing left to draft. A disabled "Resume drafting" read as a
+                // next step that could not be taken.
+                <span className="text-label text-[var(--on-surface-variant)]">
+                  Every section is written
+                </span>
               ) : (
                 <button
                   type="button"
                   onClick={requestDrafting}
-                  disabled={busy || complete === outline.length}
+                  disabled={busy}
                   className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label font-semibold text-[var(--on-primary)] disabled:opacity-50"
                 >
                   {complete === 0 ? 'Start drafting' : 'Resume drafting'}
@@ -297,6 +411,7 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
           />
         </div>
       </Panel>
+      )}
 
       {confirmingLargeJob && (
         <LargeJobWarning
@@ -334,7 +449,14 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
               job={jobBySection.get(section.id) ?? null}
               expanded={expanded.has(section.id)}
               onToggle={() => toggle(section.id)}
-              onRegenerate={readOnly ? undefined : () => regenerate(section, index)}
+              onRegenerate={
+                readOnly
+                  ? undefined
+                  : revise
+                    ? () => void reviseSections([{ section, index }])
+                    : () => regenerate(section, index)
+              }
+              regenerateLabel={revise ? 'Revise' : 'Regenerate'}
               onRetry={readOnly ? undefined : () => retry(section, index)}
               busy={busy}
             />
@@ -352,6 +474,7 @@ interface SectionRowProps {
   expanded: boolean;
   onToggle: () => void;
   onRegenerate?: () => void;
+  regenerateLabel?: string;
   onRetry?: () => void;
   busy: boolean;
 }
@@ -363,6 +486,7 @@ function SectionRow({
   expanded,
   onToggle,
   onRegenerate,
+  regenerateLabel = 'Regenerate',
   onRetry,
   busy,
 }: SectionRowProps) {
@@ -406,12 +530,17 @@ function SectionRow({
                 disabled={busy || inFlight}
                 className="shrink-0 text-label font-semibold text-[var(--pm-primary)] disabled:opacity-50"
               >
-                Regenerate
+                {regenerateLabel}
               </button>
             )}
           </div>
 
           <p className="mt-1 text-label text-[var(--on-surface-variant)]">{section.abstract}</p>
+          {done && section.content && (
+            <p className="mt-1 text-label text-[var(--on-surface-variant)]">
+              {wordCount(section.content).toLocaleString()} words
+            </p>
+          )}
 
           {inFlight && (
             <p className="mt-2 text-label text-[var(--on-surface-variant)]">
@@ -487,5 +616,104 @@ function Notice({ tone, children }: { tone: 'error'; children: React.ReactNode }
     >
       {children}
     </div>
+  );
+}
+
+function wordCount(text: string): number {
+  const trimmed = text.trim();
+  return trimmed ? trimmed.split(/\s+/).length : 0;
+}
+
+interface RevisionPanelProps {
+  revise: NonNullable<DraftingProps['ctx']['revise']>;
+  written: number;
+  total: number;
+  revised: number;
+  running: boolean;
+  busy: boolean;
+  readOnly: boolean;
+  onReviseAll: () => void;
+  onPause: () => void;
+}
+
+/** Revision and Editing: what will be applied, and one button to apply it. */
+function RevisionPanel({
+  revise,
+  written,
+  total,
+  revised,
+  running,
+  busy,
+  readOnly,
+  onReviseAll,
+  onPause,
+}: RevisionPanelProps) {
+  const n = revise.findings.length;
+  const from = revise.sources.length ? revise.sources.join(' and ') : 'the stages before this one';
+  const unwritten = written < total;
+
+  return (
+    <Panel>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <p className="text-label text-[var(--on-surface-variant)]">{revise.stageLabel}</p>
+          <p className="mt-1 text-body text-[var(--on-surface)]">
+            {revised > 0
+              ? `${revised} of ${written} sections revised`
+              : n > 0
+                ? `${n} accepted finding${n === 1 ? '' : 's'} from ${from} will be applied to each chapter as it stands.`
+                : `No accepted findings from ${from}. Each chapter still gets this stage's own pass.`}
+          </p>
+          {unwritten && (
+            <p className="mt-1 text-label text-[var(--on-surface-variant)]">
+              {total - written} section{total - written === 1 ? ' is' : 's are'} not written yet — finish
+              drafting first, or they will be left out.
+            </p>
+          )}
+          <p className="mt-1 text-label text-[var(--on-surface-variant)]">
+            The manuscript as it stands is saved as a version first. Findings you rejected are not applied.
+          </p>
+        </div>
+        {!readOnly && (
+          running ? (
+            <button
+              type="button"
+              onClick={onPause}
+              disabled={busy}
+              className="rounded-lg bg-[var(--surface-container-high)] px-4 py-2 text-label font-semibold text-[var(--on-surface)] disabled:opacity-50"
+            >
+              Pause
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onReviseAll}
+              disabled={busy || written === 0}
+              className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label font-semibold text-[var(--on-primary)] disabled:opacity-50"
+            >
+              {revised > 0
+                ? 'Revise every section again'
+                : n > 0
+                  ? `Apply ${n} finding${n === 1 ? '' : 's'} to every section`
+                  : `Run ${revise.stageLabel.toLowerCase()} on every section`}
+            </button>
+          )
+        )}
+      </div>
+      {n > 0 && (
+        <details className="mt-4">
+          <summary className="cursor-pointer text-label font-semibold text-[var(--pm-primary)]">
+            Show the findings
+          </summary>
+          <ul className="mt-2 space-y-1">
+            {revise.findings.map((f, i) => (
+              <li key={i} className="text-label text-[var(--on-surface)]">
+                <span className="text-[var(--on-surface-variant)]">{f.source}:</span> {f.text}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </Panel>
   );
 }
