@@ -167,13 +167,68 @@ def _section_record() -> dict:
     }
 
 
+_PLAN = re.compile(r"\[\[mock:plan=([a-z_,]+)\]\]")
+_ALLOWED_LINE = re.compile(r"^- ([a-z_]+): ", re.M)
+_DONE_LINE = re.compile(r"^- ([a-z_]+) → ", re.M)
+
+
+def _next_action(system: str, prompt: str) -> dict:
+    """Go mode's planner, scripted.
+
+    An objective carrying [[mock:plan=derive,run_computation,…]] makes the
+    mock choose those moves in that order, one per call, skipping any already
+    in the run's history; with no plan it takes the first allowed non-workflow
+    action not yet tried. Either way it ends on declare_objective_complete, so
+    a scripted run always terminates.
+    """
+    allowed_block = prompt.split("ALLOWED ACTIONS:", 1)[-1]
+    allowed = _ALLOWED_LINE.findall(allowed_block)
+    history_block = prompt.split("Moves made so far in this run", 1)[-1].split("ALLOWED ACTIONS:", 1)[0]
+    done = _DONE_LINE.findall(history_block)
+    plan_match = _PLAN.search(system + "\n" + prompt)
+    if plan_match:
+        candidates = [k for k in plan_match.group(1).split(",") if k]
+        # A plan may repeat an action; count how many times each was used.
+        remaining = list(done)
+        choice = None
+        for key in candidates:
+            if key in remaining:
+                remaining.remove(key)
+                continue
+            choice = key
+            break
+    else:
+        workflow = {"advance_stage", "mark_blocked", "request_user_decision", "declare_objective_complete"}
+        choice = next((k for k in allowed if k not in done and k not in workflow), None)
+    if choice is None:
+        choice = "declare_objective_complete"
+    params: dict = {}
+    if choice == "run_computation":
+        params = {"goal": "Mock: compute 2 + 2", "kind": "computation"}
+    elif choice == "mark_blocked":
+        params = {"reason": "Mock: missing data", "block_kind": "data_missing"}
+    elif choice == "revise_stage":
+        params = {"instruction": "Mock: tighten the argument"}
+    return {
+        "action_key": choice,
+        "params": params,
+        "rationale": f"Mock: {choice} is the next scripted move.",
+        "expected_outcome": f"Mock: the result of {choice}.",
+        "needs_user_decision": choice == "request_user_decision",
+        "decision_question": "Mock: which way should this go?" if choice == "request_user_decision" else None,
+        "objective_complete": choice == "declare_objective_complete",
+    }
+
+
 def _json_reply(system: str, prompt: str) -> dict:
     # Imported here, not at module top, to avoid import cycles with modules that
     # import the client.
-    from promptmaster import audit_findings, continuity, evaluator, guidance, long_form, setup_suggester
+    from promptmaster import agent, audit_findings, continuity, evaluator, guidance, long_form, setup_suggester
     from promptmaster.stage import _LIST_INSTRUCTION
     from promptmaster.stage_evaluation import _STAGE_EVAL_INSTRUCTION
 
+    if agent._NEXT_ACTION_INSTRUCTION[:60] in system:
+        return _next_action(system, prompt)
     if _STAGE_EVAL_INSTRUCTION[:60] in system:
         return _stage_evaluation()
     if _LIST_INSTRUCTION[:60] in system:
@@ -210,6 +265,17 @@ def _json_reply(system: str, prompt: str) -> dict:
 
 
 def _prose_reply(system: str, prompt: str) -> str:
+    from promptmaster import agent
+
+    if agent._WRITE_CODE_INSTRUCTION[:60] in system:
+        # Fenced on purpose: clean_code must strip it.
+        return "```python\nresult = 2 + 2\nprint(f\"2 + 2 = {result}\")\n```"
+    if agent._INTERPRET_INSTRUCTION[:60] in system:
+        stdout = prompt.split("--- STDOUT ---", 1)[-1].split("--- STDERR ---", 1)[0].strip()
+        return f"## Mock interpretation\n\nThe run printed `{stdout[:200]}`, which is what the computation asked for."
+    if "GO MODE — PERFORM:" in system:
+        move = system.split("GO MODE — PERFORM:", 1)[1].split(".", 1)[0].strip().title()
+        return f"## Mock {move}\n\nScripted reasoning for this move. Nothing was run or looked up."
     objective = _objective(prompt) if "Objective:" in prompt else "the task"
     return (
         "## Mock output\n\n"
