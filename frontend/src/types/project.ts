@@ -13,6 +13,8 @@ import type {
   ContinuitySnapshot,
   WhyThisWorks,
   AuditFinding,
+  CritiqueIntensity,
+  CritiqueTone,
 } from './index';
 import type { OutlineDocument } from './outline';
 
@@ -47,6 +49,9 @@ export interface Project {
   status: ProjectStatus;
   /** User-ticked exit criteria, keyed by criterion id. */
   manual_checks: Record<string, boolean>;
+  /** PM-21: the project's critique dials. */
+  critique_intensity?: CritiqueIntensity;
+  critique_tone?: CritiqueTone;
 
   /** Bumped by a database trigger on every update; the FR-21 concurrency guard. */
   revision: number;
@@ -169,6 +174,10 @@ export interface Evaluation {
    */
   findings: AuditFinding[];
 
+  /** PM-25: null when the evaluator was not asked (older evaluations). */
+  further_pass_needed?: boolean | null;
+  further_pass_reason?: string | null;
+
   /** Generated column: alignment === 'Low' || drift === 'High'. */
   needs_realignment: boolean;
 
@@ -216,6 +225,8 @@ export type ProjectPatch = Partial<
     | 'stage'
     | 'status'
     | 'manual_checks'
+    | 'critique_intensity'
+    | 'critique_tone'
   >
 >;
 

@@ -284,3 +284,17 @@ current unresolved state is recorded in [`known-limitations.md`](known-limitatio
 | `sandbox_runs` | Executed code and its real output. | **Service role only** — owners can read, never write, so an execution cannot be forged from a browser |
 
 `workflow_events.agent_run_id` + trigger `workflow_events_agent_authorized`: a system-actor stage move must cite a running, authorized run of the same project, and only what its policy allows — Autonomous may block, advance, or complete *with evidence*; Checkpoint may only block; Guided may change nothing. Skip, return, finish, reopen and upgrade are user decisions under every policy. The FR-02 proposal trigger is unchanged. Asserted by `supabase/tests/agent_runs.sql` (14 cases).
+
+### Critique dials and "no further pass" (C1: PM-21, PM-25)
+
+- `projects.critique_intensity` (`light | standard | rigorous`, default `standard`) and
+  `projects.critique_tone` (`gentle | neutral | direct`, default `neutral`) are two
+  separate settings. They travel in every `PMInput` (`lib/workflow/stage-requests.ts`),
+  and only the evaluation and critique prompts read them (`promptmaster/critique_style.py`).
+  Intensity sets what is found and the findings cap (3, 7 or 10). Tone sets only the
+  wording.
+- `evaluations.further_pass_needed` / `further_pass_reason` hold the evaluator's answer to
+  "would another AI pass materially improve this?". `null` means the evaluator was not asked
+  (evaluations before C1, and the iteration pipeline), which is never read as "needed".
+  `stage_evaluation._further_pass` overrides a "not needed" that contradicts the evaluation's
+  own scores: Low alignment, High drift, incomplete, or any findings.

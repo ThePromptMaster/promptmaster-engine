@@ -104,9 +104,41 @@ def _stage_items(prompt: str) -> dict:
     return {"items": items}
 
 
-def _stage_evaluation() -> dict:
+_FINDINGS = re.compile(r"\[\[mock:findings=(\d+)\]\]")
+_STYLE = re.compile(r"CRITIQUE INTENSITY — ([A-Z]+)\..*?COMMUNICATION TONE — ([A-Z]+)\.", re.S)
+
+
+def _stage_evaluation(system: str = "", prompt: str = "") -> dict:
+    """Clean by default. `[[mock:findings=N]]` in the objective gives N findings,
+    Medium scores and a correction, so the after-critique actions have
+    something to act on. The critique style the prompt carried is echoed back,
+    so a test can see PM-21's settings reached the evaluator."""
+    style = _STYLE.search(system)
+    echo = f" (intensity {style.group(1).lower()}, tone {style.group(2).lower()})" if style else ""
+    wanted = _FINDINGS.search(system + "\n" + prompt)
+    count = int(wanted.group(1)) if wanted else 0
+    if count:
+        findings = [
+            {"id": f"f{i}", "category": "clarity", "summary": f"Mock finding {i}: point {i} is vague.",
+             "suggested_change": f"Make point {i} concrete."}
+            for i in range(1, count + 1)
+        ]
+        return {
+            "alignment": {"score": "Medium", "explanation": f"Mock: mostly on target{echo}."},
+            "drift": {"score": "Low", "explanation": "Mock: no drift on any of the five axes."},
+            "clarity": {"score": "Medium", "explanation": f"Mock: some points are vague{echo}."},
+            "completeness": {"status": "complete", "reason": ""},
+            "interpretation": {"label": "What to improve", "bullets": [f["summary"] for f in findings][:3]},
+            "findings": findings,
+            "further_pass": {"needed": True, "reason": "Mock: the findings are worth one more pass."},
+            "recommendation": {
+                "id": "r1", "title": "Mock: make the vague points concrete",
+                "triggering_issue": "Mock: vague points", "expected_benefit": "Mock: clearer",
+                "scope": "Mock: the whole stage", "instruction": "Make every vague point concrete.",
+            },
+        }
     return {
-        "alignment": {"score": "High", "explanation": "Mock: the artifact does what this stage asked for."},
+        "alignment": {"score": "High", "explanation": f"Mock: the artifact does what this stage asked for{echo}."},
         "drift": {"score": "Low", "explanation": "Mock: no drift on any of the five axes."},
         "clarity": {"score": "High", "explanation": "Mock: plainly structured and easy to follow."},
         "completeness": {"status": "complete", "reason": ""},
@@ -115,6 +147,7 @@ def _stage_evaluation() -> dict:
             "bullets": ["Mock: matches the stage.", "Mock: clear structure.", "Mock: stays focused."],
         },
         "findings": [],
+        "further_pass": {"needed": False, "reason": "Mock: it meets this stage's bar; another pass would only churn it."},
         "recommendation": None,
     }
 
@@ -233,7 +266,7 @@ def _json_reply(system: str, prompt: str) -> dict:
     if agent._NEXT_ACTION_INSTRUCTION[:60] in system:
         return _next_action(system, prompt)
     if _STAGE_EVAL_INSTRUCTION[:60] in system:
-        return _stage_evaluation()
+        return _stage_evaluation(system, prompt)
     if _LIST_INSTRUCTION[:60] in system:
         return _stage_items(prompt)
     if system.startswith(setup_suggester.SETUP_SUGGESTER_SYSTEM[:60]):
