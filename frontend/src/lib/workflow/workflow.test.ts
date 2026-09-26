@@ -394,6 +394,18 @@ describe('transitions', () => {
     expect(options[0].kind).toBe('finish');
   });
 
+  it('asks for a note to finish past an unmet blocking criterion, as advancing does', () => {
+    const state = { current_stage_id: 'final_review', stages: {} };
+    const blocked = { stageId: 'final_review', criteria: [], canAdvance: false, unmet: [] };
+    const clear = { ...blocked, canAdvance: true };
+
+    const finishWhenBlocked = availableTransitions(BOOK_V1, state, blocked).find((t) => t.kind === 'finish');
+    expect(finishWhenBlocked).toMatchObject({ label: 'Finish anyway', requiresNote: true });
+
+    const finish = availableTransitions(BOOK_V1, state, clear).find((t) => t.kind === 'finish');
+    expect(finish).toMatchObject({ label: 'Finish', requiresNote: false });
+  });
+
   it('requires a note to skip', () => {
     const state = { current_stage_id: 'audience', stages: {} };
     const skip = availableTransitions(BOOK_V1, state, evaluateStage(BOOK_V1, 'audience', emptyContext())).find((t) => t.kind === 'skip')!;

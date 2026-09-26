@@ -26,9 +26,10 @@ const appendWorkflowEvent = vi.fn(
   async (
     projectId: string,
     userId: string,
-    event: Partial<WorkflowEvent> & { type: string; stage_id: string },
-    seq: number
+    event: Partial<WorkflowEvent> & { type: string; stage_id: string }
   ) => {
+    // The database assigns seq (a trigger); the fake does what it does.
+    const seq = events.length + 1;
     events.push({
       id: `e${seq}`,
       project_id: projectId,
@@ -272,6 +273,11 @@ describe('the single-output workflow walks its five stages in the workspace', ()
     await user.click(screen.getByRole('checkbox', { name: /Output accepted/ }));
     await advance(user, /^Finish$/);
 
+    // PM-03: Finish used to record the stage and change nothing else, so the
+    // button looked dead. Now the project says it is done, and can be reopened.
+    expect(await screen.findByText('This project is finished')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Finish$/ })).not.toBeInTheDocument();
+
     // The event log is the record, and it is the log the walk actually wrote.
     expect(events.map((e) => [e.type, e.stage_id])).toEqual([
       ['stage_completed', 'input'],
@@ -287,6 +293,28 @@ describe('the single-output workflow walks its five stages in the workspace', ()
     // And the output survived the walk: browsing back to it shows the artifact.
     await user.click(screen.getByRole('button', { name: /Output/ }));
     expect(await screen.findByText(/Generated for the output stage/)).toBeInTheDocument();
+  }, 30000);
+
+  it('says so when a transition fails, instead of looking like a dead button', async () => {
+    // PM-03's other half: the insert that failed was never reported, because the
+    // bar did not await it and the workspace had no catch.
+    const user = userEvent.setup();
+    render(<Harness />);
+    await user.type(await screen.findByLabelText('Objective'), 'Explain the migration.');
+    await waitFor(() =>
+      expect(within(transitionBar()).getByText(/Ready to move on/)).toBeInTheDocument()
+    );
+
+    appendWorkflowEvent.mockRejectedValueOnce(new Error('duplicate key value violates unique constraint'));
+    await advance(user, /^Advance$/);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/didn't go through.*Nothing was changed/);
+    expect(events).toHaveLength(0);
+
+    // And trying again works: the failure left nothing half-written.
+    await advance(user, /^Advance$/);
+    await waitFor(() => expect(events.map((e) => e.type)).toEqual(['stage_completed']));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   }, 30000);
 
   it('opens an imported project where its cursor says it got to', async () => {

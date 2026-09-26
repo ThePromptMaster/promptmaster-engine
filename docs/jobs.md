@@ -70,7 +70,7 @@ All are `language plpgsql`, `security definer`, `set search_path = public, pg_te
 | `release_job(job, worker, run_after_seconds)` | `service_role` | Voluntary hand-back. Returns the attempt: `attempts = greatest(attempts - 1, 0)`. |
 | `reap_expired_leases()` | `service_role` | Reclaims expired leases. See below. |
 | `request_project_cancel(project)` | `authenticated`, `service_role` | Sets `cancel_requested` on queued and leased jobs; cancels the queued ones immediately. |
-| `write_long_form_section(...)` | `service_role` | Writes a section into `artifacts.long_form` and appends a `workflow_events` row, allocating `seq` in the same statement. |
+| `write_long_form_section(...)` | `service_role` | Writes a section into `artifacts.long_form` and appends a `workflow_events` row. Its own `max(seq)+1` is overridden by the `workflow_events_assign_seq` trigger, which serialises it with browser writers (PM-03). |
 | `write_section_record(...)` | `service_role` | Upserts the continuity record on `(project_id, section_id)`. |
 
 Every lease-holding function is guarded on `lease_owner = p_worker`, so a worker whose

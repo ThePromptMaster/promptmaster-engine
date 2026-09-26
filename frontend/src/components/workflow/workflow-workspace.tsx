@@ -6,6 +6,7 @@ import { StageHeader } from './stage-header';
 import { StageRail } from './stage-rail';
 import { ExitCriteriaChecklist } from './exit-criteria-checklist';
 import { StageTransitionBar } from './stage-transition-bar';
+import { ProjectFinishedBanner } from './project-finished-banner';
 import { StageRenderer } from './renderers/stage-renderer';
 import { useStageGeneration } from './use-stage-generation';
 import { useStageEvaluation } from './use-stage-evaluation';
@@ -112,6 +113,7 @@ export function WorkflowWorkspace({
   // disconnected product path with an extra step.
   const [chatOpen, setChatOpen] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [transitionError, setTransitionError] = useState<string | null>(null);
   const [activeVersionId, setActiveVersionId] = useState<string | null>(null);
   // Below md the rail is not on the page; this is the drawer that replaces it.
   const [mobileRailOpen, setMobileRailOpen] = useState(false);
@@ -326,6 +328,7 @@ export function WorkflowWorkspace({
     ) => {
       if (!stage || busy) return;
       setBusy(true);
+      setTransitionError(null);
       try {
         const type =
           option.kind === 'skip'
@@ -344,19 +347,13 @@ export function WorkflowWorkspace({
           if (summary) await setStageSummary(stage.id, summary).catch(() => {});
         }
 
-        const nextSeq = (events?.length ?? 0) + 1;
-        await appendWorkflowEvent(
-          project.id,
-          project.user_id,
-          {
-            type,
-            stage_id: stage.id,
-            to_stage_id: option.toStageId ?? undefined,
-            reason: note,
-            proposal_id: proposalId ?? null,
-          },
-          nextSeq
-        );
+        await appendWorkflowEvent(project.id, project.user_id, {
+          type,
+          stage_id: stage.id,
+          to_stage_id: option.toStageId ?? undefined,
+          reason: note,
+          proposal_id: proposalId ?? null,
+        });
 
         const fresh = await listWorkflowEvents(project.id);
         setEvents(fresh);
@@ -365,12 +362,24 @@ export function WorkflowWorkspace({
         // projects.stage is a denormalised cursor for the list view; the event
         // log stays the record.
         const moved = projectState(template, fresh).current_stage_id;
-        if (moved !== project.stage) onPatchProject({ stage: moved });
+        // Finishing the last stage finishes the project (PM-03). It used to
+        // record the stage and change nothing else, so the page looked exactly
+        // as it did before the click and the button seemed dead.
+        if (option.kind === 'finish') onPatchProject({ status: 'finalized', stage: moved });
+        else if (moved !== project.stage) onPatchProject({ stage: moved });
+      } catch (e) {
+        // Was swallowed: the bar did not await this, so a failed insert became
+        // an unhandled rejection and the click looked like it did nothing.
+        setTransitionError(
+          e instanceof Error && e.message
+            ? `That didn't go through: ${e.message}. Nothing was changed, so you can try again.`
+            : "That didn't go through. Nothing was changed, so you can try again."
+        );
       } finally {
         setBusy(false);
       }
     },
-    [stage, busy, events, project, template, onPatchProject, setStageSummary, stageBundles]
+    [stage, busy, project, template, onPatchProject, setStageSummary, stageBundles]
   );
 
   /**
@@ -842,12 +851,17 @@ export function WorkflowWorkspace({
 
             {/* Transitions act on the current stage only — browsing history
                 must not let you advance a stage you are merely looking at. */}
-            {isCurrent && (
+            {isCurrent && project.status === 'finalized' && (
+              <ProjectFinishedBanner onReopen={() => onPatchProject({ status: 'active' })} />
+            )}
+            {isCurrent && project.status !== 'finalized' && (
               <StageTransitionBar
                 stage={stage}
                 evaluation={evaluation}
                 options={transitions}
                 onTransition={handleTransition}
+                busy={busy}
+                error={transitionError}
               />
             )}
           </div>

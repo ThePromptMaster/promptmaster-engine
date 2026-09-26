@@ -176,7 +176,14 @@ export function availableTransitions(
       requiresNote: !evaluation.canAdvance,
     });
   } else {
-    options.push({ kind: 'finish', toStageId: null, label: 'Finish', requiresNote: false });
+    // Same rule as advancing: finishing past an unmet blocking criterion is
+    // allowed, but it is a deviation, so it is named and asks why.
+    options.push({
+      kind: 'finish',
+      toStageId: null,
+      label: evaluation.canAdvance ? 'Finish' : 'Finish anyway',
+      requiresNote: !evaluation.canAdvance,
+    });
   }
 
   if (stage.transitions.allow_skip && next) {

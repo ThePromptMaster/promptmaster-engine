@@ -155,22 +155,20 @@ export interface NewWorkflowEvent {
 /**
  * Append an event.
  *
- * `seq` is assigned client-side from the current count. Two tabs acting at the
- * same instant would collide on the (project_id, seq) unique index — which is
- * the correct outcome: one write fails loudly rather than two events silently
- * sharing an ordering slot. A retry picks up the new count.
+ * `seq` is not sent: a BEFORE INSERT trigger assigns max+1 under a per-project
+ * lock (migration 20260926000000). The browser used to allocate it from its
+ * last read of the log, which collided with sections the drain had written in
+ * the meantime — and that is how Finish came to do nothing (PM-03).
  */
 export async function appendWorkflowEvent(
   projectId: string,
   userId: string,
-  event: NewWorkflowEvent,
-  nextSeq: number
+  event: NewWorkflowEvent
 ): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase.from('workflow_events').insert({
     project_id: projectId,
     user_id: userId,
-    seq: nextSeq,
     type: event.type,
     stage_id: event.stage_id,
     to_stage_id: event.to_stage_id ?? null,

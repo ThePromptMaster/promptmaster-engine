@@ -10,6 +10,10 @@ interface Props {
   evaluation: StageEvaluation;
   options: TransitionOption[];
   onTransition: (option: TransitionOption, note?: string) => void;
+  /** A transition is being written; the buttons wait rather than double-submit. */
+  busy?: boolean;
+  /** Why the last transition failed, in words the user can act on. */
+  error?: string | null;
 }
 
 /**
@@ -20,7 +24,7 @@ interface Props {
  * of the way rather than blocking. Advancing with something unmet relabels and
  * asks for a note; it is never disabled.
  */
-export function StageTransitionBar({ stage, evaluation, options, onTransition }: Props) {
+export function StageTransitionBar({ stage, evaluation, options, onTransition, busy = false, error = null }: Props) {
   const [pending, setPending] = useState<TransitionOption | null>(null);
   const [note, setNote] = useState('');
   const [showReturns, setShowReturns] = useState(false);
@@ -113,6 +117,12 @@ export function StageTransitionBar({ stage, evaluation, options, onTransition }:
   }
 
   return (
+    <div>
+    {error && (
+      <p role="alert" className="mb-2 rounded-lg bg-[var(--error-container)] px-4 py-3 text-body text-[var(--on-error-container)]">
+        {error}
+      </p>
+    )}
     <div className="flex flex-wrap items-center gap-2 rounded-xl bg-[var(--surface-container-low)] px-5 py-4">
       <span className="mr-auto text-label text-[var(--on-surface-variant)]">
         {evaluation.canAdvance
@@ -163,11 +173,13 @@ export function StageTransitionBar({ stage, evaluation, options, onTransition }:
       {advance && (
         <button
           onClick={() => start(advance)}
-          className="rounded-lg bg-[var(--pm-primary)] px-5 py-2 text-title text-[var(--on-primary)] transition-opacity hover:opacity-90"
+          disabled={busy}
+          className="rounded-lg bg-[var(--pm-primary)] px-5 py-2 text-title text-[var(--on-primary)] transition-opacity hover:opacity-90 disabled:opacity-50"
         >
-          {advance.label}
+          {busy ? 'Saving…' : advance.label}
         </button>
       )}
+    </div>
     </div>
   );
 }

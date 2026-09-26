@@ -66,8 +66,7 @@ export default function NewProjectPage() {
       await appendWorkflowEvent(
         project.id,
         user.id,
-        { type: 'project_created', stage_id: selected.stages[0]?.id ?? '' },
-        1
+        { type: 'project_created', stage_id: selected.stages[0]?.id ?? '' }
       );
 
       router.push(`/projects/${project.id}`);
