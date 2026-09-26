@@ -373,3 +373,17 @@ which would silently stop bumping `revision` and disable the concurrency guard.
 | L-21 | Five Supabase modules unused (`sessions` must be kept) | accepted |
 | L-22 | `templates` missing RLS UPDATE policy | accepted |
 | L-23 | `touch_updated_at()` dead and adjacent to a load-bearing function | open |
+
+### L-B3 — Go mode code execution: Python only, fixed package set, no network
+
+`/api/sandbox/run` runs model-written Python 3.13 in a Vercel Sandbox microVM with
+numpy, scipy, sympy and matplotlib and **no network** while the code runs. Anything
+else — another language, another library, a dataset fetched from the internet —
+is recorded as `blocked` / `tool_missing` (or `data_missing` for a missing input
+file) rather than attempted another way. Limits: 30 s per command, 10 runs per Go
+run (`SANDBOX_MAX_PER_RUN`), 600 s of execution per user per UTC day
+(`SANDBOX_DAILY_SECONDS`), 5 output files of ≤1 MB each. Without
+`SANDBOX_SNAPSHOT_ID` each run installs the packages first (~20–25 s wall time).
+Cost is recorded only when `SANDBOX_USD_PER_VCPU_SECOND` is set, and is otherwise
+null ("unknown"), never $0. `SANDBOX_ENABLED` must be `true` in production; when
+it is not, every computation is honestly blocked on a missing tool.
