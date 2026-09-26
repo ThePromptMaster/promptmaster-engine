@@ -210,6 +210,17 @@ export function ChatPanel({
   // PM-24: an instruction is checked for conflicts before it is sent.
   const [checking, setChecking] = useState(false);
   const [conflicting, setConflicting] = useState<{ text: string; conflicts: InstructionConflict[] } | null>(null);
+  const conflictRef = useRef<HTMLDivElement>(null);
+
+  // The question is only useful if it can be answered: bring its top into the
+  // thread's view when it appears. Its buttons stay pinned (see ConflictPrompt),
+  // so on a short window the answers are reachable without hunting for them.
+  useEffect(() => {
+    const thread = threadRef.current;
+    const prompt = conflictRef.current;
+    if (!conflicting || !thread || !prompt) return;
+    thread.scrollTop += prompt.getBoundingClientRect().top - thread.getBoundingClientRect().top - 8;
+  }, [conflicting]);
   // The latest assistant reply in Discuss, split into points that can each be applied.
   const latestReply = [...chat.messages].reverse().find((m) => m.role === 'assistant' && m.mode === 'discuss');
   const latestReplyId = latestReply?.id ?? null;
@@ -337,7 +348,7 @@ export function ChatPanel({
           <p role="status" className="mt-3 text-label text-[var(--on-surface-variant)]">Checking it against your objective and earlier decisions…</p>
         )}
         {conflicting && (
-          <div className="mt-3">
+          <div ref={conflictRef} className="mt-3">
             <ConflictPrompt
               instruction={conflicting.text}
               conflicts={conflicting.conflicts}

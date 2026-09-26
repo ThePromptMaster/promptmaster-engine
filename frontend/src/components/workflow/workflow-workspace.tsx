@@ -1459,7 +1459,13 @@ export function WorkflowWorkspace({
             )}
             {/* PM-23: the planner's suggestion, beside the stage's own next step. */}
             {isCurrent && go.pendingStep && go.run?.policy === 'guided' && (
-              <NextMoveCard step={go.pendingStep} onDo={() => void go.approve()} onDismiss={() => void go.decline()} />
+              <NextMoveCard
+                step={go.pendingStep}
+                stale={go.pendingStale}
+                onDo={() => void go.approve()}
+                onReplan={() => void go.replan()}
+                onDismiss={() => void go.decline()}
+              />
             )}
             {isCurrent && project.status !== 'finalized' && (
               <StageTransitionBar

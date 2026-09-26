@@ -44,7 +44,7 @@ const PHRASES: Record<ConflictAxis, Record<string, RegExp>> = {
     longer: /\b(longer|lengthen|expand|elaborate|more detail(ed)?|flesh (it )?out|go deeper into every|add (a )?(long|lengthy|detailed) section)\b/i,
   },
   depth: {
-    deeper: /\b(more technical|in depth|in-depth|more rigorous|advanced)\b/i,
+    deeper: /\b(more technical|technical terminology|in depth|in-depth|more rigorous|advanced|(university|graduate|postgraduate|undergraduate)( [a-z]+)? (students|readers|level)|for (experts|specialists|researchers|academics))\b/i,
     shallower: /\b(simpler|simplify|less technical|high[- ]level only|for (a )?beginners?|for children|for kids|(?:[5-9]|1[0-2])[- ]year[- ]olds?)\b/i,
   },
   tone: {
@@ -75,14 +75,20 @@ export function directionsOf(text: string): Map<ConflictAxis, string> {
   return found;
 }
 
-function opposed(instruction: string, other: string): ConflictAxis | null {
+/** Every axis the two texts pull opposite ways on — all of them, so the user is told the whole reason. */
+function opposed(instruction: string, other: string): ConflictAxis[] {
   const mine = directionsOf(instruction);
   const theirs = directionsOf(other);
+  const out: ConflictAxis[] = [];
   for (const [axis, dir] of mine) {
     const t = theirs.get(axis);
-    if (t && t !== dir) return axis;
+    if (t && t !== dir) out.push(axis);
   }
-  return null;
+  return out;
+}
+
+function listOf(words: string[]): string {
+  return words.length <= 1 ? words.join('') : `${words.slice(0, -1).join(', ')} and ${words[words.length - 1]}`;
 }
 
 const WHAT: Record<ConflictKind, string> = {
@@ -102,11 +108,11 @@ export function ruleConflicts(input: {
   const out: InstructionConflict[] = [];
   const check = (kind: ConflictKind, id: string, text: string) => {
     if (!text.trim()) return;
-    const axis = opposed(input.instruction, text);
-    if (axis) {
+    const axes = opposed(input.instruction, text);
+    if (axes.length) {
       out.push({
         kind, with_id: id, with_text: text, source: 'rule',
-        explanation: `This instruction pulls the opposite way on ${axis} from ${WHAT[kind]}.`,
+        explanation: `This instruction pulls the opposite way on ${listOf(axes)} from ${WHAT[kind]}.`,
       });
     }
   };
@@ -122,15 +128,34 @@ export function ruleConflicts(input: {
  * objective and the constraints are asked about once each, however many
  * sentences of them an instruction trips over — the user decides about "the
  * constraints", not about each clause of them.
+ *
+ * One question, but every reason: when the rule and the model both flag the
+ * same thing, the model's explanation of meaning ("the audience is
+ * 10-year-olds") leads and the rule's axis follows. Keeping only the first
+ * finding once told a user their university-level rewrite clashed on
+ * "length" and said nothing of the audience.
  */
 export function mergeConflicts(rule: InstructionConflict[], model: InstructionConflict[]): InstructionConflict[] {
   const out: InstructionConflict[] = [];
-  const seen = new Set<string>();
+  const reasons = new Map<InstructionConflict, { model: string[]; rule: string[] }>();
+  const byKey = new Map<string, InstructionConflict>();
   for (const c of [...rule, ...model]) {
     const key = c.with_id ? `${c.kind}:${c.with_id}` : c.kind;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(c);
+    let kept = byKey.get(key);
+    if (!kept) {
+      kept = { ...c };
+      byKey.set(key, kept);
+      reasons.set(kept, { model: [], rule: [] });
+      out.push(kept);
+    }
+    const r = reasons.get(kept)!;
+    const list = c.source === 'model' ? r.model : r.rule;
+    const text = c.explanation.trim();
+    if (text && !r.model.includes(text) && !r.rule.includes(text)) list.push(text);
+  }
+  for (const c of out) {
+    const r = reasons.get(c)!;
+    c.explanation = [...r.model, ...r.rule].join(' ');
   }
   return out.slice(0, 5);
 }

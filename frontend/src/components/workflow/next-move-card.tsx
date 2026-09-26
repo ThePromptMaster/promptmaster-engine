@@ -9,11 +9,16 @@ import type { AgentStep } from '@/types/agent';
  */
 export function NextMoveCard({
   step,
+  stale = false,
   onDo,
+  onReplan,
   onDismiss,
 }: {
   step: AgentStep;
+  /** Suggested before the stage last changed: its reasons may no longer hold. */
+  stale?: boolean;
   onDo: () => void;
+  onReplan?: () => void;
   onDismiss: () => void;
 }) {
   return (
@@ -26,10 +31,21 @@ export function NextMoveCard({
       {step.decision_question && <p className="mt-1 text-body text-[var(--on-surface)]">{step.decision_question}</p>}
       {step.rationale && <p className="mt-1 text-body text-[var(--on-surface)]">Why: {step.rationale}</p>}
       {step.expected_outcome && <p className="mt-0.5 text-label text-[var(--on-surface-variant)]">You get: {step.expected_outcome}</p>}
+      {stale && (
+        <p role="status" className="mt-2 text-label text-[var(--pm-tertiary)]">
+          Suggested before your latest change to this stage, so this reasoning may no longer hold.
+        </p>
+      )}
       <div className="mt-3 flex gap-2">
-        <button onClick={onDo} className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-title text-[var(--on-primary)]">
-          Do it
-        </button>
+        {stale && onReplan ? (
+          <button onClick={onReplan} className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-title text-[var(--on-primary)]">
+            Suggest again
+          </button>
+        ) : (
+          <button onClick={onDo} className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-title text-[var(--on-primary)]">
+            Do it
+          </button>
+        )}
         <button onClick={onDismiss} className="rounded-lg px-4 py-2 text-title text-[var(--on-surface-variant)]">
           Not now
         </button>

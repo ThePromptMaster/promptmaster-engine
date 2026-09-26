@@ -21,6 +21,15 @@ describe('ruleConflicts — instruction vs objective, constraints, decisions, ot
     expect(c.explanation).toContain('length');
   });
 
+  it('names every axis it pulls against, not just the first (a university rewrite of a 10-year-olds\' explainer)', () => {
+    const found = ruleConflicts({
+      ...base,
+      objective: 'A one-page explainer for 10-year-olds, under 300 words',
+      instruction: 'Rewrite it for university zoology students, expanded with much more detail',
+    });
+    expect(found[0].explanation).toBe('This instruction pulls the opposite way on length and depth from the objective.');
+  });
+
   it('against the objective', () => {
     expect(ruleConflicts({ ...base, instruction: 'Make it more technical' })[0]).toMatchObject({ kind: 'objective' });
   });
@@ -47,13 +56,22 @@ describe('merge and precedence', () => {
   const model: InstructionConflict = { kind: 'constraint', with_id: '', with_text: 'the word limit', explanation: 'm', source: 'model' };
   const other: InstructionConflict = { kind: 'decision', with_id: 'd1', with_text: 'Natural selection only', explanation: 'm2', source: 'model' };
 
-  it('keeps one entry per thing conflicted with', () => {
-    expect(mergeConflicts([rule], [model, other]).map((c) => c.explanation)).toEqual(['r', 'm2']);
+  it('keeps one entry per thing conflicted with, with every reason — the model\'s first', () => {
+    const merged = mergeConflicts([rule], [model, other]);
+    expect(merged.map((c) => c.explanation)).toEqual(['m r', 'm2']);
+    expect(merged[0]).toMatchObject({ with_text: 'Under 300 words', source: 'rule' });
   });
 
   it('asks about the constraints once even when the model finds two clauses of them', () => {
     const second: InstructionConflict = { ...model, with_text: 'Use simple language', explanation: 'm3' };
-    expect(mergeConflicts([], [model, second]).map((c) => c.explanation)).toEqual(['m']);
+    expect(mergeConflicts([], [model, second]).map((c) => c.explanation)).toEqual(['m m3']);
+  });
+
+  it('does not repeat a reason given twice, nor mutate its inputs', () => {
+    const again: InstructionConflict = { ...model };
+    expect(mergeConflicts([], [model, again]).map((c) => c.explanation)).toEqual(['m']);
+    mergeConflicts([rule], [model]);
+    expect(rule.explanation).toBe('r');
   });
 
   it('tells the model what the user decided, either way', () => {

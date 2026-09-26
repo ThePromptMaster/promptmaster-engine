@@ -89,7 +89,13 @@ export function GoPanel({
             </div>
           )}
           {go.pendingStep && (
-            <DecisionPrompt step={go.pendingStep} onApprove={() => void go.approve()} onDecline={() => void go.decline()} />
+            <DecisionPrompt
+              step={go.pendingStep}
+              stale={go.pendingStale}
+              onApprove={() => void go.approve()}
+              onReplan={() => void go.replan()}
+              onDecline={() => void go.decline()}
+            />
           )}
           {askingUser && go.run?.stop_reason && (
             <QuestionPrompt key={go.run.stop_reason} question={go.run.stop_reason} onAnswer={(t) => void go.answer(t)} />

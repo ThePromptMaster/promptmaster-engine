@@ -313,6 +313,8 @@ describe('PM-24: an instruction that conflicts asks which should control', () =>
 
     const prompt = await screen.findByRole('region', { name: 'Which should control?' });
     expect(prompt).toHaveTextContent('Keep it to one page');
+    // Answerable on a short window: Continue sits in a row pinned to the bottom of the thread.
+    expect(screen.getByRole('button', { name: 'Continue' }).parentElement).toHaveClass('sticky', 'bottom-0');
     expect(prompt).toHaveTextContent('A new chapter breaks the one-page decision.');
     expect(applyToAnswer).not.toHaveBeenCalled();
 

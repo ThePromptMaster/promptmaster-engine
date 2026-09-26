@@ -4,7 +4,7 @@ import { RESEARCH_V1, SINGLE_OUTPUT_V1 } from '@/lib/workflow';
 import { initialState } from '@/lib/workflow/engine';
 import type { AgentStep } from '@/types/agent';
 import { deriveExecutionLabel } from './labels';
-import { allowedActions, fitsBudget, noProgress, preempt, shouldPause, stageMoveActor } from './policy';
+import { allowedActions, fitsBudget, noProgress, plannedBeforeLatestChange, preempt, shouldPause, stageMoveActor } from './policy';
 
 function step(over: Partial<AgentStep>): AgentStep {
   return {
@@ -169,5 +169,18 @@ describe('the budget is a cap', () => {
     expect(fitsBudget('derive', 24, 25)).toBe(true);
     expect(fitsBudget('run_computation', 24, 25)).toBe(false);
     expect(fitsBudget('run_computation', 23, 25)).toBe(true);
+  });
+});
+
+describe('plannedBeforeLatestChange — PM-23, a suggestion about a stage that has since moved on', () => {
+  const planned = { started_at: '2026-09-27T10:00:00Z' };
+  it('is outdated once a newer version or a newer check exists', () => {
+    expect(plannedBeforeLatestChange(planned, ['2026-09-27T10:05:00Z', null])).toBe(true);
+    expect(plannedBeforeLatestChange(planned, [null, '2026-09-27T10:05:00Z'])).toBe(true);
+  });
+  it('is current when everything it read predates it — including the check that led to it', () => {
+    expect(plannedBeforeLatestChange(planned, ['2026-09-27T09:00:00Z', '2026-09-27T09:59:59Z'])).toBe(false);
+    expect(plannedBeforeLatestChange(planned, [undefined, null])).toBe(false);
+    expect(plannedBeforeLatestChange({ started_at: '' }, ['2026-09-27T10:05:00Z'])).toBe(false);
   });
 });

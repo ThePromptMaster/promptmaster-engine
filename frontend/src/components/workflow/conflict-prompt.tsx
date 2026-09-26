@@ -64,7 +64,9 @@ export function ConflictPrompt({
           </li>
         ))}
       </ol>
-      <div className="mt-3 flex gap-2">
+      {/* Pinned to the bottom of the chat thread's scroll area, so Continue is in
+          reach however many conflicts are listed and however short the window. */}
+      <div className="sticky bottom-0 -mx-4 mt-3 flex gap-2 bg-[var(--surface-container-high)] px-4 py-2">
         <button
           onClick={() => onContinue(choices as Controls[])}
           disabled={!ready || busy}
