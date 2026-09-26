@@ -130,3 +130,21 @@ export function shouldPause(policy: ExecutionPolicy, actionKey: string, needsUse
 export function stageMoveActor(policy: ExecutionPolicy, approvedByUser: boolean): 'user' | 'system' {
   return approvedByUser || policy !== 'autonomous' ? 'user' : 'system';
 }
+
+/**
+ * A move proposed before the stage last changed — a newer version, or a newer
+ * check — was reasoned about a state that no longer exists. Its "why" may now
+ * be false ("the current issue is stage drift", after the drift was fixed), so
+ * it is shown as outdated rather than offered as the next move (PM-23).
+ */
+export function plannedBeforeLatestChange(
+  step: Pick<AgentStep, 'started_at'>,
+  changedAt: readonly (string | null | undefined)[],
+): boolean {
+  const planned = Date.parse(step.started_at);
+  if (Number.isNaN(planned)) return false;
+  return changedAt.some((t) => {
+    const at = t ? Date.parse(t) : NaN;
+    return !Number.isNaN(at) && at > planned;
+  });
+}

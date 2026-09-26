@@ -35,7 +35,7 @@ import { actionFor, actionLabel, INTERPRET_STEP, USER_ANSWER_STEP } from '@/lib/
 import { authorizeRun } from '@/lib/agent/authorize';
 import { buildAgentState } from '@/lib/agent/digest';
 import { performStep, type PerformContext, type StepOutcome } from '@/lib/agent/perform';
-import { allowedActions, DEFAULT_BUDGET_STEPS, fitsBudget, preempt, shouldPause, stepCost } from '@/lib/agent/policy';
+import { allowedActions, DEFAULT_BUDGET_STEPS, fitsBudget, plannedBeforeLatestChange, preempt, shouldPause, stepCost } from '@/lib/agent/policy';
 import {
   createAgentRun,
   endAgentRun,
@@ -552,10 +552,37 @@ export function useGoLoop(opts: Options) {
 
   const active = phase === 'thinking' || phase === 'performing';
   const pendingStep = useMemo(() => steps.find((s) => s.id === pendingStepId) ?? null, [steps, pendingStepId]);
+  const pendingStale = useMemo(() => {
+    if (!pendingStep) return false;
+    const latestVersion = opts.bundles[pendingStep.stage_id]?.versions.at(-1);
+    return plannedBeforeLatestChange(pendingStep, [latestVersion?.created_at, opts.latestEvaluation?.created_at]);
+  }, [pendingStep, opts.bundles, opts.latestEvaluation]);
+
+  /**
+   * Close an outdated proposal and ask the planner again about the stage as it
+   * is now. The old step is cancelled, not declined: the user did not reject
+   * the move, the project moved on under it.
+   */
+  const replan = useCallback(async () => {
+    const id = pendingStepId;
+    if (!id || abortRef.current) return;
+    setPendingStepId(null);
+    setError(null);
+    try {
+      const closed = await finishAgentStep(id, { status: 'cancelled', label: null, output: 'Superseded: the stage changed after this was suggested.' });
+      upsertStep(closed);
+      await setRunStatus('stopped', 'Suggested again after the stage changed.');
+      setPhase('ended');
+      setPolicy('guided');
+      await startRun('guided', null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not suggest a move.');
+    }
+  }, [pendingStepId, setRunStatus, upsertStep, startRun]);
 
   return {
-    policy, setPolicy, budget, setBudget, run, steps, phase, active, pendingStep, authorizing, error,
-    go, suggest, stop, approve, decline, answer, confirmAuthorization,
+    policy, setPolicy, budget, setBudget, run, steps, phase, active, pendingStep, pendingStale, authorizing, error,
+    go, suggest, replan, stop, approve, decline, answer, confirmAuthorization,
     cancelAuthorization: useCallback(() => setAuthorizing(null), []),
     dismissError: useCallback(() => setError(null), []),
   };

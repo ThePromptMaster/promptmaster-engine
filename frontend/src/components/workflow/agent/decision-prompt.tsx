@@ -8,11 +8,16 @@ import type { AgentStep } from '@/types/agent';
 /** The run is waiting on the user: approve this move, or decline it. */
 export function DecisionPrompt({
   step,
+  stale = false,
   onApprove,
+  onReplan,
   onDecline,
 }: {
   step: AgentStep;
+  /** Proposed before the stage last changed: its reasons may no longer hold. */
+  stale?: boolean;
   onApprove: () => void;
+  onReplan?: () => void;
   onDecline: () => void;
 }) {
   return (
@@ -24,10 +29,21 @@ export function DecisionPrompt({
       {step.expected_outcome && (
         <p className="mt-1 text-label text-[var(--on-surface-variant)]">Expected: {step.expected_outcome}</p>
       )}
+      {stale && (
+        <p role="status" className="mt-2 text-label text-[var(--pm-tertiary)]">
+          Proposed before your latest change to this stage, so this reasoning may no longer hold.
+        </p>
+      )}
       <div className="mt-3 flex gap-2">
-        <button onClick={onApprove} className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-title text-[var(--on-primary)]">
-          Approve
-        </button>
+        {stale && onReplan ? (
+          <button onClick={onReplan} className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-title text-[var(--on-primary)]">
+            Propose again
+          </button>
+        ) : (
+          <button onClick={onApprove} className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-title text-[var(--on-primary)]">
+            Approve
+          </button>
+        )}
         <button onClick={onDecline} className="rounded-lg px-4 py-2 text-title text-[var(--on-surface-variant)]">
           Decline
         </button>
