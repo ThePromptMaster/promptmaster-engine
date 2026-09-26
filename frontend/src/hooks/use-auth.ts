@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useProjectStore } from '@/stores/project-store';
-import type { User } from '@supabase/supabase-js';
+import type { Session, User } from '@supabase/supabase-js';
 
 /**
  * Drop whatever the signed-out user was looking at.
@@ -38,7 +38,7 @@ export function useAuth() {
     };
     getUser();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string, session: any) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string, session: Session | null) => {
       setUser(session?.user ?? null);
       setLoading(false);
       if (event === 'SIGNED_OUT') {

@@ -1,6 +1,7 @@
 # Tests
 
-Two suites, both fast, both offline. Counts below were produced by running them on
+Two unit suites, both fast and offline, plus a browser E2E suite that runs the
+real stack with a scripted model. Counts below were produced by running them on
 this branch.
 
 | Suite | Command | Result | Time |
@@ -8,12 +9,50 @@ this branch.
 | Backend | `cd backend && pytest -q` | **292 passed** | ~2.5 s |
 | Frontend | `cd frontend && npx vitest run` | **530 passed in 32 files** | — |
 | Frontend build | `cd frontend && npm run build` | passes | — |
+| Browser E2E | `cd frontend && npm run test:e2e` | see [E2E](#browser-e2e--playwright) | ~1 min incl. build |
 
 *(Counts as of `phase2/wave1` including Lane A. They were 281 / 400-in-28 immediately
 before that merge; quote them from a run, not from here.)*
 
-`npm run build` **must pass before pushing**. There is no CI to catch it — see
-[`known-limitations.md`](known-limitations.md).
+`npm run build` **must pass before pushing**. CI (`.github/workflows/ci.yml`) runs
+all of the above on every pull request; Vercel auto-deploy is not connected, so CI is
+the only gate before a CLI deploy.
+
+---
+
+## Browser E2E — Playwright
+
+`frontend/e2e/`, config in `frontend/playwright.config.ts`. It runs:
+
+- a **real local Supabase** (`npx supabase start` — every migration applied to an
+  empty database),
+- the **real FastAPI app** with `PM_LLM_MODE=mock`, on port 8100,
+- a **production build** of the frontend (`NEXT_DIST_DIR=.next-e2e`), on port 3100.
+
+Only the model is replaced. `backend/promptmaster/mock_llm.py::ScriptedClient`
+overrides the one network method of `OpenRouterClient`, so JSON cleaning and the
+repair pass still run, and picks each reply by matching the real prompt constants.
+`deps.llm_mode()` refuses mock mode when `VERCEL_ENV=production`.
+
+**Fault injection.** Put a marker anywhere that reaches a prompt (an objective, a
+section title): `[[mock:402]]` out of credits, `[[mock:429]]` rate limited,
+`[[mock:500]]` provider error, `[[mock:length]]` truncated output,
+`[[mock:slow=N]]` sleep N seconds. This is how recovery paths are driven from the UI.
+
+Each run creates a fresh confirmed user in the local database (`e2e/global-setup.ts`,
+which refuses any non-local Supabase URL) and signs in through the real login form.
+
+**Every test records video and screenshots** into `frontend/test-results/`; CI uploads
+them as the `playwright-evidence` artifact. They are the evidence attached to pull
+requests.
+
+```
+npx supabase start                  # from the repo root, once
+cd frontend && npm run test:e2e     # builds, starts both servers, runs
+npm run test:e2e:report             # open the HTML report
+```
+
+`E2E_UVICORN` overrides the uvicorn binary (default `../backend/.venv/bin/uvicorn`).
 
 ---
 
@@ -89,8 +128,9 @@ values against the CHECK constraint in the migration.
 
 Stated plainly, because these are the gaps that matter for acceptance:
 
-- **No end-to-end harness.** No Playwright, no Cypress. Every walkthrough — including
-  the Book and Research workflow demonstrations — was captured manually.
+- **E2E coverage is new and still thin.** The harness exists (above) and CI runs it;
+  scenarios are being added feature by feature. Anything not listed in
+  `frontend/e2e/` is still verified by hand.
 - **No SQL test harness.** No pgTAP, no `supabase test db` wiring. Most trigger and
   RLS invariants in [`data-model.md`](data-model.md) are asserted by grepping
   migration text — which guards against the DDL being weakened, but does not prove a
@@ -108,10 +148,8 @@ Stated plainly, because these are the gaps that matter for acceptance:
   It creates a throwaway user and project, asserts, and rolls back. It was last run on
   2026-09-09 against a fresh PostgreSQL with every migration replayed from empty — 10
   assertions, all passing, plus a negative control confirming the trigger rather than
-  the foreign key is what enforces the rule. **Nothing re-runs it**, so it can rot
-  silently.
-- **No CI.** There is no `.github/` directory and no workflow of any kind. Both suites
-  and the build are run by hand.
+  the foreign key is what enforces the rule. **CI now runs every file in
+  `supabase/tests/`** against the migrated local database.
 - **No load or concurrency testing** beyond the single-process drain test.
 
 See [`known-limitations.md`](known-limitations.md).
