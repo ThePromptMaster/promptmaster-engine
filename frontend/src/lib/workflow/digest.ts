@@ -19,6 +19,7 @@
 import type { Artifact, ArtifactVersion, Project } from '@/types/project';
 import type { StageDefinition, WorkflowState, WorkflowTemplate } from './types';
 import { parseItems, rendererHoldsItems } from './stage-artifact';
+import { isDone } from './types';
 
 /** Per-stage budget. Twelve stages of this is a paragraph, not a book. */
 export const SUMMARY_MAX = 320;
@@ -104,7 +105,7 @@ export function buildStageDigest(
 
   template.stages.forEach((stage, index) => {
     if (cutoff >= 0 && index >= cutoff) return;
-    if (state.stages[stage.id]?.status !== 'complete') return;
+    if (!isDone(state.stages[stage.id]?.status)) return;
 
     const bundle = bundles[stage.id];
     const stored = bundle?.artifact?.summary?.trim();

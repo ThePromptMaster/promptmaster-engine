@@ -52,6 +52,11 @@ export async function pressTransition(page: Page) {
   }
   const moveOn = page.getByRole('button', { name: 'Move on' });
   if (await moveOn.isVisible().catch(() => false)) await moveOn.click();
+  // PM-14: Finish shows what is being finished before it finishes.
+  const summary = page.getByRole('region', { name: 'Finish the project' });
+  if (await summary.isVisible().catch(() => false)) {
+    await summary.getByRole('button', { name: /^Finish (project|anyway)$/ }).click();
+  }
 }
 
 /** Skip the current stage with a reason. */

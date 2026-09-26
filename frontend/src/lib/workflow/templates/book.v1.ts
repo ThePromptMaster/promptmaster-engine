@@ -11,7 +11,9 @@ import type { WorkflowTemplate } from '../types';
  * produces a claim table lives here rather than in a code path.
  *
  * `version: 2` because those hints changed the definition and v1 is already
- * published. Published templates are immutable: projects pin the version they
+ * published. `version: 3` (PM-02) makes "comparables named" a box the author
+ * ticks — it sat on a prose stage as an item count nothing could satisfy —
+ * and adds plain-language hints to the criteria new users stumbled on. Published templates are immutable: projects pin the version they
  * started on, so a project mid-way through v1 keeps the workflow it began.
  *
  * The exported symbol stays BOOK_V1 — it names *the Book template*, which is
@@ -20,7 +22,7 @@ import type { WorkflowTemplate } from '../types';
  */
 export const BOOK_V1: WorkflowTemplate = {
   key: 'book',
-  version: 2,
+  version: 3,
   name: 'Book',
   description: 'Objective through final review, with an approved outline driving the draft.',
   outline_stage: 'explicit',
@@ -84,7 +86,7 @@ export const BOOK_V1: WorkflowTemplate = {
       entry_prompt_hint:
         'Produce a positioning statement: the books this one sits beside, named as actual titles rather than categories, and the single thing it does that they do not. Put the differentiator in one sentence a reader could later judge false. If the claim cannot fail, it is not positioning.',
       exit_criteria: [
-        { id: 'pos.comparables', label: 'At least two comparables named', check: 'auto', rule: { type: 'min_items', n: 2 } },
+        { id: 'pos.comparables', label: 'At least two comparables named', check: 'manual', hint: 'Comparables are 2–3 existing books your reader would shelve beside yours. Name them in the draft above, say how yours differs, then tick this.' },
         { id: 'pos.differentiator', label: 'One-sentence differentiator', check: 'manual', blocking: true },
         { id: 'pos.falsifiable', label: 'The promise could be judged false', check: 'manual' },
       ],
@@ -130,7 +132,7 @@ export const BOOK_V1: WorkflowTemplate = {
       entry_prompt_hint:
         'Produce the ordered sections of the book. Each has a title and a short abstract saying what that section does and why it belongs here rather than three chapters later. The order is the argument: someone reading only the abstracts, in sequence, should see the case being built. Cover every need the audience stage identified, and nothing outside the stated scope.',
       exit_criteria: [
-        { id: 'out.sections', label: 'Outline has sections', check: 'auto', rule: { type: 'min_items', n: 2 }, blocking: true },
+        { id: 'out.sections', label: 'Outline has sections', check: 'auto', rule: { type: 'min_items', n: 2 }, blocking: true, hint: 'Add at least two named sections below — each becomes a chapter or section when drafting.' },
         { id: 'out.covers', label: 'Every audience need maps to a section', check: 'manual' },
       ],
       expected_artifacts: [{ kind: 'outline', cardinality: 'one', primary: true }],

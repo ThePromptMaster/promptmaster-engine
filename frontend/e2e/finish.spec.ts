@@ -58,7 +58,9 @@ test('Finish closes the project even when the server wrote events the page has n
     'workflow_events',
     `project_id=eq.${projectId}&select=seq,type,stage_id&order=seq`
   );
-  expect(log.at(-1)).toMatchObject({ type: 'stage_completed', stage_id: 'summary' });
+  // PM-13/14: the last stage is marked complete, then the project is finalized.
+  expect(log.at(-2)).toMatchObject({ type: 'stage_marked_complete', stage_id: 'summary' });
+  expect(log.at(-1)).toMatchObject({ type: 'project_finalized', stage_id: 'summary' });
   expect(new Set(log.map((e: { seq: number }) => e.seq)).size).toBe(log.length);
 
   // It is filed under Finished.

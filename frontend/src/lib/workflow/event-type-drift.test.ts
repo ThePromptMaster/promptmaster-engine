@@ -30,17 +30,28 @@ const UNION: WorkflowEventType[] = [
   'generation_paused',
   'generation_resumed',
   'imported_from_session',
+  'stage_marked_complete',
+  'stage_advanced',
+  'stage_blocked',
+  'stage_unblocked',
+  'project_finalized',
+  'project_reopened',
+  'template_upgraded',
 ];
 
 function checkConstraintValues(): string[] {
+  // Every migration, in order, and the LAST definition wins: a later migration
+  // that widens the constraint (20260927000000_stage_statuses) replaces it.
   const sql = readdirSync(MIGRATIONS)
-    .filter((f) => f.endsWith('_workflow_templates.sql'))
+    .filter((f) => f.endsWith('.sql'))
+    .sort()
     .map((f) => readFileSync(join(MIGRATIONS, f), 'utf8'))
     .join('\n');
 
-  const match = sql.match(/constraint we_type_chk check \(type in \(([\s\S]*?)\)\)/);
-  if (!match) throw new Error('we_type_chk not found in migrations');
-  return [...match[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+  const matches = [...sql.matchAll(/constraint we_type_chk check \(type in \(([\s\S]*?)\)\)/g)];
+  const latest = matches.at(-1);
+  if (!latest) throw new Error('we_type_chk not found in migrations');
+  return [...latest[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
 }
 
 describe('workflow event types', () => {

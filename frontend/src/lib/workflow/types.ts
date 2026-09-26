@@ -62,6 +62,12 @@ export interface ExitCriterion {
    * note instead.
    */
   blocking?: boolean;
+  /**
+   * One plain line saying what the requirement means, shown under it (PM-02).
+   * Sean did not know what "add to comparables" asked of him; a checklist
+   * item a new user cannot decode is one they cannot satisfy.
+   */
+  hint?: string;
 }
 
 export interface ArtifactSpec {
@@ -179,18 +185,46 @@ export interface WorkflowTemplate {
 
 // --- runtime state ----------------------------------------------------------
 
-export type StageStatus = 'not_started' | 'in_progress' | 'complete' | 'skipped' | 'stale';
+/**
+ * PM-13. 'complete' is "completed"; 'completed_with_artifact' is completed
+ * with the version that is its evidence; 'skipped' is always intentional (a
+ * skip cannot be recorded without a reason); 'blocked' carries why. A stage
+ * the user moved past with requirements unmet stays 'in_progress' with
+ * `left_open` — advancing does not complete a stage.
+ */
+export type StageStatus =
+  | 'not_started'
+  | 'in_progress'
+  | 'complete'
+  | 'completed_with_artifact'
+  | 'skipped'
+  | 'blocked'
+  | 'stale';
+
+export type BlockKind = 'tool_missing' | 'data_missing' | 'needs_decision';
 
 export interface StageState {
   status: StageStatus;
   entered_at?: string;
   completed_at?: string;
   skipped_reason?: string;
+  /** Moved past with requirements unmet ("Continue anyway"). Not complete. */
+  left_open?: boolean;
+  /** The version that is this stage's evidence of completion. */
+  evidence_version_id?: string;
+  blocked?: { kind: BlockKind; reason: string };
 }
 
 export interface WorkflowState {
   current_stage_id: string;
   stages: Record<string, StageState>;
+  /** PM-14: finished by the user, not by ticking every stage. */
+  project_status?: 'active' | 'finalized';
+}
+
+/** Both kinds of completed. */
+export function isDone(status: StageStatus | undefined): boolean {
+  return status === 'complete' || status === 'completed_with_artifact';
 }
 
 /**
@@ -212,7 +246,14 @@ export type WorkflowEventType =
   | 'job_failed'
   | 'generation_paused'
   | 'generation_resumed'
-  | 'imported_from_session';
+  | 'imported_from_session'
+  | 'stage_marked_complete'
+  | 'stage_advanced'
+  | 'stage_blocked'
+  | 'stage_unblocked'
+  | 'project_finalized'
+  | 'project_reopened'
+  | 'template_upgraded';
 
 export interface WorkflowEvent {
   type: WorkflowEventType;
@@ -266,6 +307,8 @@ export interface CriterionResult {
    * `check` — otherwise a degraded criterion is a circle nobody can fill.
    */
   manual?: boolean;
+  /** The criterion's plain-language hint, carried through for display. */
+  hint?: string;
 }
 
 export interface StageEvaluation {

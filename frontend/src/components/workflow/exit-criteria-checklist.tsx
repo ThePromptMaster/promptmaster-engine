@@ -94,6 +94,11 @@ export function ExitCriteriaChecklist({ criteria, manualIds = new Set(), onToggl
                       required
                     </span>
                   )}
+                  {!c.satisfied && c.hint && (
+                    <span className="mt-0.5 block text-label leading-snug text-[var(--on-surface-variant)]">
+                      {c.hint}
+                    </span>
+                  )}
                 </span>
               </Row>
             </li>

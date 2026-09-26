@@ -29,6 +29,8 @@ const GROUP_LABEL: Record<StageGroup, string> = {
 /** Material Symbols glyph per status. */
 const STATUS_ICON: Record<StageStatus, string> = {
   complete: 'check_circle',
+  completed_with_artifact: 'task_alt',
+  blocked: 'block',
   skipped: 'do_not_disturb_on',
   in_progress: 'radio_button_checked',
   stale: 'history',
@@ -39,7 +41,10 @@ function statusColor(status: StageStatus, isCurrent: boolean): string {
   if (isCurrent) return 'text-[var(--pm-primary)]';
   switch (status) {
     case 'complete':
+    case 'completed_with_artifact':
       return 'text-[var(--pm-secondary)]';
+    case 'blocked':
+      return 'text-[var(--pm-tertiary)]';
     case 'skipped':
       return 'text-[var(--on-surface-variant)]';
     case 'stale':
@@ -123,6 +128,16 @@ export function StageRail({ template, state, nextSuggestedId, onSelect }: Props)
                       </span>
                     )}
 
+                    {/* PM-13: moved past, not finished. */}
+                    {state.stages[stage.id]?.left_open && status === 'in_progress' && !isCurrent && (
+                      <span
+                        title="You moved on with requirements still open — this stage is not complete"
+                        className="shrink-0 text-label uppercase tracking-wide text-[var(--pm-tertiary)]"
+                      >
+                        open
+                      </span>
+                    )}
+
                     {status === 'stale' && (
                       <span
                         title="Work here predates a change you made earlier"
@@ -160,9 +175,11 @@ export function StageRail({ template, state, nextSuggestedId, onSelect }: Props)
 }
 
 const LEGEND: [StageStatus, string][] = [
+  ['completed_with_artifact', 'Done, with its work saved'],
   ['complete', 'Done'],
   ['in_progress', 'You are here'],
   ['not_started', 'Not started yet'],
-  ['skipped', 'Skipped, with a reason'],
+  ['skipped', 'Skipped on purpose, with a reason'],
+  ['blocked', 'Blocked — waiting on something'],
   ['stale', 'Recheck — something before it changed'],
 ];
