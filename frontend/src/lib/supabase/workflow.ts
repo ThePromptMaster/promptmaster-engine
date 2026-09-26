@@ -150,6 +150,11 @@ export interface NewWorkflowEvent {
    * up a system-actor transition as a user decision.
    */
   proposal_id?: string | null;
+  /**
+   * Go mode (B1): the agent run acting. Only with actor 'system', and only for
+   * the stage moves the run's accepted policy allows — the database checks.
+   */
+  agent_run_id?: string | null;
 }
 
 /**
@@ -176,6 +181,7 @@ export async function appendWorkflowEvent(
     reason: event.reason ?? null,
     payload: event.payload ?? {},
     proposal_id: event.proposal_id ?? null,
+    agent_run_id: event.agent_run_id ?? null,
   });
   if (error) throw error;
 }
