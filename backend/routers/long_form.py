@@ -20,6 +20,8 @@ than a section the user has already paid for.
 
 from __future__ import annotations
 
+import time
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
@@ -111,6 +113,12 @@ class GenerateSectionProseRequest(BaseModel):
     prior_snapshot: ContinuitySnapshot | None = None
     prev_section_content: str = Field(default="", max_length=MAX_CONTENT_CHARS)
     model: str = ModelField
+    #: Wall-clock seconds the caller can wait (PM-04). The drain sends what is
+    #: left of its function budget so the provider retry ladder stops in time
+    #: and reports `function_timeout` — which the drain treats as "hand the job
+    #: back" — instead of being killed mid-call, losing prose that was already
+    #: paid for, and burning one of the job's three attempts.
+    budget_seconds: float | None = Field(default=None, gt=0, le=780)
 
 
 class ExtractSectionRecordRequest(BaseModel):
@@ -122,6 +130,12 @@ class ExtractSectionRecordRequest(BaseModel):
     #: call's input constant as the glossary grows.
     existing_terms: list[str] = Field(default=[], max_length=MAX_GLOSSARY_TERMS)
     model: str = ModelField
+    #: See GenerateSectionProseRequest.budget_seconds.
+    budget_seconds: float | None = Field(default=None, gt=0, le=780)
+
+
+def _deadline(budget_seconds: float | None) -> float | None:
+    return time.monotonic() + budget_seconds if budget_seconds else None
 
 
 class FinalizeLongFormRequest(BaseModel):
@@ -292,6 +306,7 @@ async def api_generate_section_prose(
             prior_snapshot=req.prior_snapshot,
             prev_section_content=req.prev_section_content,
             records=req.records or None,
+            deadline=_deadline(req.budget_seconds),
         )
     except OpenRouterError as e:
         raise llm_http_error(
@@ -316,6 +331,7 @@ async def api_extract_section_record(
             section_title=req.section_title,
             section_content=req.section_content,
             existing_terms=req.existing_terms,
+            deadline=_deadline(req.budget_seconds),
         )
         return ExtractSectionRecordResponse(record=record)
     except OpenRouterError as e:

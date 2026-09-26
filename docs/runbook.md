@@ -60,7 +60,7 @@ Read the numbers as:
 
 | Field | Meaning |
 |---|---|
-| `reaped` | Leases that expired and went back on the queue. **A small non-zero number is normal** — that is how a job survives a function timeout. A large or growing number means jobs are consistently outrunning the 120-second lease. |
+| `reaped` | Leases that expired and went back on the queue. **A small non-zero number is normal** — that is how a job survives a function timeout. A large or growing number means jobs are consistently outrunning the 330-second lease (or the 300-second function). |
 | `claimed` / `completed` | Throughput. `claimed` much greater than `completed` over time means steps are failing or timing out. |
 | `released` | Voluntary hand-backs. These return the attempt, so they do not burn retries. |
 | `failed` | Steps that reported an error. |

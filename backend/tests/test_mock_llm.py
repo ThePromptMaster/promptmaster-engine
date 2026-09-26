@@ -120,3 +120,30 @@ def test_402_reaches_the_user_as_a_structured_error(http):
     r = http.post("/api/generate-stage-artifact", json={"inputs": inputs, "stage": STAGE})
     assert r.status_code >= 400
     assert isinstance(r.json()["detail"], dict)
+
+
+# --- scoping and counted markers (used by the PM-04 retry E2E) ------------------
+
+
+@pytest.mark.asyncio
+async def test_a_counted_marker_fails_only_the_first_section_write():
+    client = ScriptedClient()
+    writing = "1. Diet [[mock:402x1]] ← WRITING NOW\n   b"
+    # Another stage listing the outline does not use the failure up.
+    content, _usage = await client.generate("Outline so far:\n1. Diet [[mock:402x1]]")
+    assert "Mock output" in content
+    with pytest.raises(OpenRouterError):
+        await client.generate(writing)
+    content, _usage = await client.generate(writing)
+    assert "Mock output" in content
+
+
+@pytest.mark.asyncio
+async def test_outline_markers_fire_only_for_the_section_being_written():
+    outline = "1. Habitat ← WRITING NOW\n   a\n2. Diet [[mock:402]]\n   b"
+    content, _usage = await ScriptedClient().generate(outline)
+    assert "Mock output" in content
+
+    writing_diet = "1. Habitat\n   a\n2. Diet [[mock:402]] ← WRITING NOW\n   b"
+    with pytest.raises(OpenRouterError):
+        await ScriptedClient().generate(writing_diet)

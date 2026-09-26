@@ -38,16 +38,20 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 /**
- * Under the platform's default 60s ceiling. The drain stops early on its own
- * budget, so this is the backstop rather than the mechanism — a job killed here
- * is recovered by `reap_expired_leases` on the next tick regardless.
+ * 300s (Vercel Pro). At 60s a single slow chapter — 4k tokens on a slow model
+ * routinely takes longer — could not finish inside one function, so it was
+ * killed, reaped and retried until buried as "gave up" (PM-04). The drain still
+ * stops early on its own budget; this is the backstop, not the mechanism.
  */
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 /** Wall clock the loop may spend, leaving headroom under maxDuration. */
-const BUDGET_MS = 45_000;
-/** Long enough to outlive a slow provider, short enough to recover promptly. */
-const LEASE_SECONDS = 120;
+const BUDGET_MS = 270_000;
+/**
+ * Longer than the whole function, so a live worker's lease is never reaped
+ * under it; short enough that a killed one is recovered within a few minutes.
+ */
+const LEASE_SECONDS = 330;
 
 type Caller =
   | { kind: 'cron' }

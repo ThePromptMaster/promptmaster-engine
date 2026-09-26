@@ -16,7 +16,7 @@ export interface ProjectJob {
   id: string;
   kind: string;
   status: 'queued' | 'leased' | 'succeeded' | 'failed' | 'cancelled' | 'dead';
-  payload: { section_id?: string; section_index?: number } | null;
+  payload: { section_id?: string; section_index?: number; revision?: number } | null;
   attempts: number;
   max_attempts: number;
   error_code: string | null;
@@ -78,6 +78,29 @@ export interface EnqueueSectionArgs {
   sectionIndex: number;
   /** Bumped by a user-requested regenerate; otherwise the section's own. */
   revision: number;
+}
+
+/** A job that stopped for good: nothing will run it again unless asked. */
+export function isStoppedJob(job: Pick<ProjectJob, 'status'> | null): boolean {
+  return job?.status === 'failed' || job?.status === 'dead' || job?.status === 'cancelled';
+}
+
+/**
+ * The revision to enqueue a section at (PM-04).
+ *
+ * Re-enqueueing a section whose last job failed at the same revision collides
+ * on the idempotency key and silently does nothing — which is why "Resume
+ * drafting" could not bring back a section that had "given up", and why a
+ * second press of Retry would do nothing either. Past a stopped job, the next
+ * revision is one above whichever is higher: the section's own or the job's.
+ */
+export function revisionToEnqueue(
+  section: { revision?: number },
+  latestJob: Pick<ProjectJob, 'status' | 'payload'> | null
+): number {
+  const own = section.revision ?? 0;
+  if (!isStoppedJob(latestJob)) return own;
+  return Math.max(own, latestJob?.payload?.revision ?? own) + 1;
 }
 
 /** Returns the job id, or null when this exact unit of work already exists. */
