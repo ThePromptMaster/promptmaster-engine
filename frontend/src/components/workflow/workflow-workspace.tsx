@@ -23,6 +23,10 @@ import { useGoLoop } from './use-go-loop';
 import { GoPanel } from './agent/go-panel';
 import { StageEvaluationPanel } from './evaluation-panel';
 import { CritiqueStyleControl } from './critique-style-control';
+import { CritiqueActions } from './critique-actions';
+import { RevisedPreview } from './revised-preview';
+import { useApplyFindings } from './use-apply-findings';
+import { findingFromPoint, pointsFromCommentary } from '@/lib/workflow/critique-points';
 import { ExportMenu } from './export-menu';
 import { ChatPanel } from './chat-panel';
 import { RecommendationsPanel } from './recommendations-panel';
@@ -633,6 +637,12 @@ export function WorkflowWorkspace({
    * meant.
    */
   const tools = useStageTools({ project, stage: stage ?? null, headVersion, appendStageVersion });
+  // PM-22: every "apply" after a critique goes through one path.
+  const applyFindings = useApplyFindings({ project, stage, headVersion, appendStageVersion });
+  const critiquePoints = useMemo(
+    () => (tools.commentary ? pointsFromCommentary(tools.commentary.text) : []),
+    [tools.commentary]
+  );
 
   const recommendations = useRecommendations({
     project,
@@ -1028,7 +1038,7 @@ export function WorkflowWorkspace({
           applying={recommendations.busy}
           error={recommendations.error}
           onRemove={recommendations.removeFromPreview}
-          onApply={() => void recommendations.confirmApply()}
+          onApply={(options) => void recommendations.confirmApply(options)}
           onCancel={recommendations.closePreview}
         />
       )}
@@ -1292,6 +1302,23 @@ export function WorkflowWorkspace({
             )}
           </div>
 
+          {recommendations.revision && (
+            <RevisedPreview
+              revision={recommendations.revision}
+              busy={recommendations.busy}
+              onKeep={() => void recommendations.keepRevision()}
+              onDiscard={recommendations.discardRevision}
+            />
+          )}
+          {applyFindings.pending && (
+            <RevisedPreview
+              revision={applyFindings.pending}
+              busy={applyFindings.running}
+              onKeep={() => void applyFindings.keep()}
+              onDiscard={applyFindings.discard}
+            />
+          )}
+
           {isCurrent && (tools.running || tools.error || tools.commentary) && (
             <StageToolResult
               running={tools.running}
@@ -1302,6 +1329,23 @@ export function WorkflowWorkspace({
                 tools.dismissError();
               }}
             />
+          )}
+
+          {/* PM-22 "buttonize it": each point the critique made is its own Apply. */}
+          {isCurrent && draftable && tools.commentary && critiquePoints.length > 0 && (
+            <div className="mb-6">
+              <CritiqueActions
+                title="Act on this critique"
+                points={critiquePoints}
+                busy={applyFindings.running}
+                onApply={(ids, showFirst) =>
+                  void applyFindings.apply(
+                    critiquePoints.filter((p) => ids.includes(p.id)).map((p) => findingFromPoint(p, tools.commentary!.title)),
+                    { showFirst, source: tools.commentary!.title }
+                  )
+                }
+              />
+            </div>
           )}
 
           <div className="space-y-4">
@@ -1341,6 +1385,30 @@ export function WorkflowWorkspace({
             )}
 
             <StageEvaluationPanel evaluation={shownEvaluation} />
+
+            {/* PM-22: the easy actions after a check, on the version it checked. */}
+            {isCurrent && draftable && headVersion && (evaluations?.[headVersion.id]?.findings ?? []).length > 0 && (
+              <CritiqueActions
+                title="Act on this check"
+                points={(evaluations?.[headVersion.id]?.findings ?? []).map((f) => ({ id: f.id, text: f.summary, change: f.suggested_change }))}
+                busy={applyFindings.running}
+                onApply={(ids, showFirst) =>
+                  void applyFindings.apply(
+                    (evaluations?.[headVersion.id]?.findings ?? []).filter((f) => ids.includes(f.id)),
+                    { showFirst, source: 'the stage check' }
+                  )
+                }
+              />
+            )}
+            {applyFindings.running && !applyFindings.pending && (
+              <p role="status" className="text-label text-[var(--on-surface-variant)]">Applying the fixes…</p>
+            )}
+            {applyFindings.error && (
+              <div role="alert" className="flex items-start gap-3 rounded-xl bg-[var(--error-container)] px-5 py-3">
+                <p className="flex-1 text-body text-[var(--on-error-container)]">{applyFindings.error}</p>
+                <button onClick={applyFindings.dismissError} className="text-label text-[var(--on-error-container)] underline">Dismiss</button>
+              </div>
+            )}
 
             <TasksPanel
               tasks={recommendations.tasks}
@@ -1454,6 +1522,13 @@ export function WorkflowWorkspace({
               canInstruct={
                 activeVersionId === null || activeVersionId === stageVersions.at(-1)?.id
               }
+              onApplyPoints={
+                draftable
+                  ? (points, showFirst) =>
+                      void applyFindings.apply(points.map((p) => findingFromPoint(p, 'the side chat')), { showFirst, source: 'the side chat' })
+                  : undefined
+              }
+              applying={applyFindings.running}
             />
           </div>
         </aside>

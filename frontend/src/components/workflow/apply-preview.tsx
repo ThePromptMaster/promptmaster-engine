@@ -26,6 +26,8 @@
  * the whole behaviour.
  */
 
+import { useState } from 'react';
+
 import { buildCombinedInstruction, detectConflicts } from '@/lib/workflow/combine';
 import { describeScope, type ProposedRecommendation } from '@/lib/workflow/recommend';
 
@@ -46,7 +48,8 @@ interface Props {
   applying: boolean;
   error: string | null;
   onRemove: (category: string) => void;
-  onApply: () => void;
+  /** PM-22: with `showFirst`, the revision is shown as a diff before anything is saved. */
+  onApply: (options: { showFirst: boolean }) => void;
   onCancel: () => void;
 }
 
@@ -61,6 +64,7 @@ export function ApplyPreview({
   onCancel,
 }: Props) {
   const combined = buildCombinedInstruction(selected);
+  const [showFirst, setShowFirst] = useState(true);
   const conflicts = detectConflicts(selected);
 
   // Stated as arithmetic rather than as a promise. "The prior version remains
@@ -168,7 +172,17 @@ export function ApplyPreview({
 
         {error && <p className="mt-4 text-body text-[var(--pm-error)]">{error}</p>}
 
-        <div className="mt-6 flex items-center justify-end gap-2">
+        <label className="mt-5 flex items-center gap-2 text-label text-[var(--on-surface-variant)]">
+          <input
+            type="checkbox"
+            checked={showFirst}
+            onChange={(e) => setShowFirst(e.target.checked)}
+            className="h-4 w-4 accent-[var(--pm-primary)]"
+          />
+          Show the revised version before saving it
+        </label>
+
+        <div className="mt-4 flex items-center justify-end gap-2">
           <button
             onClick={onCancel}
             disabled={applying}
@@ -177,7 +191,7 @@ export function ApplyPreview({
             Cancel
           </button>
           <button
-            onClick={onApply}
+            onClick={() => onApply({ showFirst })}
             // Never disabled by a conflict. Only by there being nothing to do,
             // or by a call already in flight.
             disabled={applying || selected.length === 0}
