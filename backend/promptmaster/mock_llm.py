@@ -320,6 +320,17 @@ def _prose_reply(system: str, prompt: str) -> str:
         return f"## Mock {move}\n\nScripted reasoning for this move. Nothing was run or looked up."
     from promptmaster import audit_findings
 
+    from promptmaster import conversation
+
+    if conversation._CHAT_REPLY_INSTRUCTION[:60] in system:
+        # A discussion reply that suggests changes as a list — so the side
+        # chat's "buttonize it" has points to apply.
+        return (
+            "Mock reply: it reads well, but three things would help.\n\n"
+            "- Mock: open with the question the reader actually has.\n"
+            "- Mock: replace the abstract second paragraph with one example.\n"
+            "- Mock: end on what the reader should do next.\n"
+        )
     if "PromptMaster Challenge Mode" in system:
         # A critique with list items, so "buttonize it" has points to click.
         return (

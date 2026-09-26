@@ -33,6 +33,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { MarkdownOutput } from '@/components/shared/markdown-output';
 import { useStageChat } from './use-stage-chat';
+import { CritiqueActions } from './critique-actions';
+import { pointsFromCommentary, type CritiquePoint } from '@/lib/workflow/critique-points';
 import { documentSections, type ScopeKind } from './chat-scope';
 import type { StageChatMessage } from '@/lib/supabase/conversation';
 import type { NewVersion } from '@/lib/supabase/versions';
@@ -97,6 +99,12 @@ interface Props {
    * old version is a reasonable thing to do.
    */
   canInstruct?: boolean;
+  /**
+   * PM-22 "buttonize it": apply points from the latest reply as you go. The
+   * workspace owns applying, so the chat and the critiques behave the same.
+   */
+  onApplyPoints?: (points: CritiquePoint[], showFirst: boolean) => void;
+  applying?: boolean;
 }
 
 export function ChatPanel({
@@ -110,6 +118,8 @@ export function ChatPanel({
   readOnly = false,
   initialMode = 'discuss',
   canInstruct = true,
+  onApplyPoints,
+  applying = false,
 }: Props) {
   const chat = useStageChat({
     project,
@@ -186,6 +196,11 @@ export function ChatPanel({
         ? sections.length > 0
         : selection.length > 0;
 
+  // The latest assistant reply in Discuss, split into points that can each be applied.
+  const latestReply = [...chat.messages].reverse().find((m) => m.role === 'assistant' && m.mode === 'discuss');
+  const latestReplyId = latestReply?.id ?? null;
+  const replyPoints = useMemo(() => (latestReply ? pointsFromCommentary(latestReply.content) : []), [latestReply]);
+
   const canSend =
     !readOnly && !chat.busy && draft.trim().length > 0 && (mode === 'discuss' || scopeReady);
 
@@ -238,6 +253,16 @@ export function ChatPanel({
             {chat.messages.map((message) => (
               <li key={message.id}>
                 <Bubble message={message} />
+                {onApplyPoints && !readOnly && message.id === latestReplyId && replyPoints.length > 0 && (
+                  <div className="mt-2">
+                    <CritiqueActions
+                      title="Act on this reply"
+                      points={replyPoints}
+                      busy={applying}
+                      onApply={(ids, showFirst) => onApplyPoints(replyPoints.filter((p) => ids.includes(p.id)), showFirst)}
+                    />
+                  </div>
+                )}
               </li>
             ))}
           </ol>
@@ -401,7 +426,7 @@ function ModeSwitch({
         </span>
         <span>
           {mode === 'discuss'
-            ? 'Discussion only — this mode cannot change your document.'
+            ? 'Discussion only — talking here cannot change your document. Only a point you choose to Apply does, as a new version.'
             : 'Revisions are shown for review first, and never replace a version.'}
         </span>
       </p>

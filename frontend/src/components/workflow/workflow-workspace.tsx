@@ -1038,7 +1038,7 @@ export function WorkflowWorkspace({
           applying={recommendations.busy}
           error={recommendations.error}
           onRemove={recommendations.removeFromPreview}
-          onApply={() => void recommendations.confirmApply()}
+          onApply={(options) => void recommendations.confirmApply(options)}
           onCancel={recommendations.closePreview}
         />
       )}
@@ -1302,6 +1302,14 @@ export function WorkflowWorkspace({
             )}
           </div>
 
+          {recommendations.revision && (
+            <RevisedPreview
+              revision={recommendations.revision}
+              busy={recommendations.busy}
+              onKeep={() => void recommendations.keepRevision()}
+              onDiscard={recommendations.discardRevision}
+            />
+          )}
           {applyFindings.pending && (
             <RevisedPreview
               revision={applyFindings.pending}
@@ -1514,6 +1522,13 @@ export function WorkflowWorkspace({
               canInstruct={
                 activeVersionId === null || activeVersionId === stageVersions.at(-1)?.id
               }
+              onApplyPoints={
+                draftable
+                  ? (points, showFirst) =>
+                      void applyFindings.apply(points.map((p) => findingFromPoint(p, 'the side chat')), { showFirst, source: 'the side chat' })
+                  : undefined
+              }
+              applying={applyFindings.running}
             />
           </div>
         </aside>
