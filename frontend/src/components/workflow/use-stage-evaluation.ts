@@ -194,7 +194,7 @@ export function useStageEvaluation({
         completeness_reason: evaluation.completeness?.reason ?? null,
         interpretation: evaluation.interpretation ?? null,
         findings: evaluation.findings ?? [],
-        evaluator_model: p.model,
+        evaluator_model: response.model_used || p.model,
         // 'manual' is the source this is: a user pressed a button, rather than
         // the four-call pipeline producing one as a side effect.
         source: 'manual',

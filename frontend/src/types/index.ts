@@ -408,6 +408,8 @@ export interface GenerateStageArtifactResponse {
   /** Rows for list and review stages; the extra keys are schema-defined. */
   items: Record<string, string>[];
   finish_reason: string;
+  /** The model the call actually ran on, resolved server-side (FR-10). */
+  model_used: string;
 }
 
 /**
@@ -441,4 +443,6 @@ export interface EvaluateStageArtifactRequest {
 export interface EvaluateStageArtifactResponse {
   evaluation: EvaluationResult;
   recommendation: StageRecommendation | null;
+  /** The model that scored the artifact, resolved server-side (FR-10). */
+  model_used: string;
 }

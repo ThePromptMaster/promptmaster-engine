@@ -59,6 +59,7 @@ def test_prose_stage_round_trip(client_with):
     assert body["content"] == "Drafted positioning."
     assert body["items"] == []
 
+
     # The authored instruction and the digest reached the model, not just the app.
     system = stub.generate_with_meta.await_args.kwargs["system"]
     user = stub.generate_with_meta.await_args.kwargs["prompt"]
@@ -117,3 +118,24 @@ def test_digest_is_optional(client_with):
         json={"inputs": INPUTS, "stage": {"id": "objective", "renderer": "prose"}},
     )
     assert r.status_code == 200
+
+
+def test_model_used_is_the_one_the_call_ran_on(client_with):
+    """FR-10: a project that never picked a model must still get a version
+    attributed to the model that wrote it, not an empty string."""
+    stub = AsyncMock()
+    stub.model = "provider/default-model"
+    stub.generate_with_meta = AsyncMock(return_value=("Drafted.", {}, "stop"))
+    client = client_with(stub)
+    stage = {"id": "positioning", "label": "Positioning", "renderer": "prose"}
+
+    defaulted = client.post(
+        "/api/generate-stage-artifact",
+        json={"inputs": INPUTS, "stage": stage, "digest": DIGEST},
+    )
+    chosen = client.post(
+        "/api/generate-stage-artifact",
+        json={"inputs": INPUTS, "stage": stage, "digest": DIGEST, "model": "provider/picked"},
+    )
+    assert defaulted.json()["model_used"] == "provider/default-model"
+    assert chosen.json()["model_used"] == "provider/picked"

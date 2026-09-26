@@ -68,16 +68,34 @@ export async function getLatestTemplate(
   return data ? toTemplate(data as unknown as TemplateRow) : null;
 }
 
+/**
+ * Keep only the highest version of each template key, in first-seen key order.
+ *
+ * Every revision is a new published row, so without this the picker listed
+ * Book v1 beside Book v2 — and defaulted a new project onto whichever came
+ * first, which was the stale one.
+ */
+export function latestPerKey<T extends { key: string; version: number }>(rows: T[]): T[] {
+  const latest = new Map<string, T>();
+  for (const row of rows) {
+    const held = latest.get(row.key);
+    if (!held || row.version > held.version) latest.set(row.key, row);
+  }
+  return [...latest.values()];
+}
+
+/** The latest published version of every template. Used by the new-project picker. */
 export async function listTemplates(): Promise<(WorkflowTemplate & { id: string })[]> {
   const supabase = createClient();
   const { data, error } = await supabase
     .from('workflow_templates')
     .select(TEMPLATE_COLUMNS)
     .eq('status', 'published')
-    .order('key');
+    .order('key')
+    .order('version', { ascending: false });
 
   if (error) throw error;
-  return ((data ?? []) as unknown as TemplateRow[]).map(toTemplate);
+  return latestPerKey(((data ?? []) as unknown as TemplateRow[]).map(toTemplate));
 }
 
 // --- events -----------------------------------------------------------------

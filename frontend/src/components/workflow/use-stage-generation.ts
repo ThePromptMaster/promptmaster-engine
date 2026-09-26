@@ -178,7 +178,7 @@ export function useStageGeneration({
           content,
           source_operation: options?.force ? 'stage_regenerate' : 'stage_draft',
           instruction: target.entry_prompt_hint ?? '',
-          model: p.model,
+          model: response.model_used || p.model,
           mode: p.mode,
           change_summary: options?.force ? 'Regenerated draft.' : null,
           finish_reason: response.finish_reason || null,

@@ -202,6 +202,21 @@ def test_drift_polarity_is_stated(book_inputs, positioning_stage, book_digest):
     assert "'Low' means focused" in system
 
 
+def test_alignment_and_clarity_polarity_is_stated(book_inputs, positioning_stage, book_digest):
+    """Told only that drift is inverted, a model scored a well-aligned, clear
+    artifact Low/Low — and "Needs realignment" fired on a good draft. The
+    normal polarity has to be stated too, in the rules and in the shape."""
+    system, user = build_stage_evaluation_prompt(
+        inputs=book_inputs, stage=positioning_stage, content="x", digest=book_digest
+    )
+    prompt = system + user
+    assert "DRIFT ONLY" in system
+    assert "'High' is GOOD" in system
+    assert '"alignment": {"score": "High|Medium|Low (High is good)"' in prompt
+    assert '"clarity": {"score": "High|Medium|Low (High is good)"' in prompt
+    assert '"drift": {"score": "Low|Medium|High (Low is good)"' in prompt
+
+
 # --- FR-11: the bar is the stage, not the objective -------------------------
 
 
@@ -416,6 +431,19 @@ def test_missing_scores_default_rather_than_raise():
     assert result.recommendation is None
 
 
+def test_echoed_polarity_annotation_keeps_the_score():
+    """The shape says "High|Medium|Low (High is good)"; a model that echoes
+    the annotation must not have its score silently reset to Medium."""
+    result = parse_stage_evaluation({
+        "alignment": {"score": "High (High is good)", "explanation": "a"},
+        "drift": {"score": "low", "explanation": "b"},
+        "clarity": {"score": "Invented", "explanation": "c"},
+    })
+    assert result.evaluation.alignment.score == "High"
+    assert result.evaluation.drift.score == "Low"
+    assert result.evaluation.clarity.score == "Medium"
+
+
 # --- the runner and the endpoint --------------------------------------------
 
 
@@ -468,6 +496,7 @@ def test_endpoint_returns_findings_and_a_recommendation(monkeypatch):
     from deps import get_client
 
     client = AsyncMock()
+    client.model = "provider/default-model"
     client.generate_json = AsyncMock(return_value=(_defect_response(), {}))
     app.dependency_overrides[get_client] = lambda: client
     try:
@@ -509,6 +538,9 @@ def test_endpoint_returns_findings_and_a_recommendation(monkeypatch):
     assert body["evaluation"]["alignment"]["score"] == "Low"
     assert body["evaluation"]["drift"]["score"] == "High"
     assert body["recommendation"]["title"].startswith("Rewrite the positioning")
+    # FR-10: no model was requested, so the one the client defaulted to is
+    # what gets recorded — never an empty string.
+    assert body["model_used"] == "provider/default-model"
 
 
 def test_endpoint_is_authenticated():

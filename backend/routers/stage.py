@@ -32,6 +32,18 @@ from promptmaster.stage_evaluation import evaluate_stage_artifact
 router = APIRouter(prefix="/api", tags=["stage"])
 
 
+def _model_used(requested: str, client: OpenRouterClient) -> str:
+    """The model a call actually ran on, for FR-10 provenance.
+
+    A project that never picked a model sends "" and the client falls back to
+    its default; recording the "" would leave the version unattributable.
+    """
+    if requested:
+        return requested
+    default = getattr(client, "model", "")
+    return default if isinstance(default, str) else ""
+
+
 class GenerateStageArtifactRequest(BaseModel):
     inputs: PMInput
     stage: StageDescriptor
@@ -56,7 +68,7 @@ async def api_generate_stage_artifact(
     produce audience segments, and costs four calls where one will do.
     """
     try:
-        return await generate_stage_artifact(
+        result = await generate_stage_artifact(
             client=client,
             model=req.model or None,
             inputs=req.inputs,
@@ -67,6 +79,8 @@ async def api_generate_stage_artifact(
         )
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_STAGE_VERSIONS)
+    result.model_used = _model_used(req.model, client)
+    return result
 
 
 class EvaluateStageArtifactRequest(BaseModel):
@@ -98,7 +112,7 @@ async def api_evaluate_stage_artifact(
     artifact against the stage's declared intent instead.
     """
     try:
-        return await evaluate_stage_artifact(
+        result = await evaluate_stage_artifact(
             client=client,
             inputs=req.inputs,
             stage=req.stage,
@@ -110,3 +124,5 @@ async def api_evaluate_stage_artifact(
         )
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_EVALUATION)
+    result.model_used = _model_used(req.model, client)
+    return result

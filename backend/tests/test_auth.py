@@ -162,37 +162,50 @@ def test_unenforced_mode_still_rejects_an_invalid_token(auth_live, monkeypatch):
 # --- coverage: the guard that stops a future router shipping unprotected ----
 
 
-def _has_require_user(route) -> bool:
-    stack = list(getattr(getattr(route, "dependant", None), "dependencies", []) or [])
-    while stack:
-        dep = stack.pop()
-        if getattr(dep, "call", None) is require_user:
-            return True
-        stack.extend(dep.dependencies or [])
-    return False
-
-
 PUBLIC_PATHS = {"/api/health", "/api/modes"}
 
 
-def test_every_money_spending_route_requires_auth():
+def _api_operations() -> list[tuple[str, str]]:
+    """Every (method, path) the app serves under /api, from its OpenAPI schema.
+
+    Deliberately not a walk of `app.routes`: from FastAPI 0.141 an included
+    router appears there as one opaque `_IncludedRouter`, and a walk that
+    stepped over it found no routes to check — so the coverage test below
+    passed while checking nothing. The schema is public API; `app.routes`'
+    shape is not.
+    """
+    ops = []
+    for path, methods in app.openapi()["paths"].items():
+        if not path.startswith("/api/"):
+            continue
+        concrete = path.replace("{", "").replace("}", "")
+        for method in methods:
+            ops.append((method.upper(), concrete))
+    return ops
+
+
+def test_route_discovery_is_not_vacuous():
+    """If discovery silently finds nothing, every check below passes."""
+    paths = {path for _method, path in _api_operations()}
+    assert {"/api/build-prompt", "/api/generate-stage-artifact", "/api/models"} <= paths
+    assert PUBLIC_PATHS <= paths
+
+
+def test_every_money_spending_route_requires_auth(auth_live):
     unprotected = [
-        r.path
-        for r in app.routes
-        if getattr(r, "path", "").startswith("/api/")
-        and r.path not in PUBLIC_PATHS
-        and not _has_require_user(r)
+        f"{method} {path} -> {status}"
+        for method, path in _api_operations()
+        if path not in PUBLIC_PATHS
+        and (status := auth_live.request(method, path, json={}).status_code) != 401
     ]
-    assert not unprotected, f"these /api routes are unauthenticated: {unprotected}"
+    assert not unprotected, f"these /api routes answer without a token: {unprotected}"
 
 
-def test_health_and_modes_stay_public():
-    for r in app.routes:
-        if getattr(r, "path", "") in PUBLIC_PATHS:
-            assert not _has_require_user(r), f"{r.path} should stay public"
+def test_health_and_modes_stay_public(auth_live):
+    for path in PUBLIC_PATHS:
+        assert auth_live.get(path).status_code == 200, f"{path} should stay public"
 
 
-def test_models_is_protected_even_though_its_router_is_public():
+def test_models_is_protected_even_though_its_router_is_public(auth_live):
     """/api/models proxies OpenRouter with our key on every call."""
-    route = next(r for r in app.routes if getattr(r, "path", "") == "/api/models")
-    assert _has_require_user(route)
+    assert auth_live.get("/api/models").status_code == 401
