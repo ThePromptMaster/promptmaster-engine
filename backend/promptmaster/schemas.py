@@ -439,6 +439,10 @@ class GenerateStageArtifactResponse(BaseModel):
     content: str = Field(default="")
     items: list[StageItem] = Field(default_factory=list)
     finish_reason: str = Field(default="")
+    model_used: str = Field(
+        default="",
+        description="Model that produced this draft, resolved server-side (FR-10).",
+    )
 
 
 class StageRecommendation(BaseModel):
@@ -474,4 +478,8 @@ class StageEvaluationResponse(BaseModel):
     recommendation: StageRecommendation | None = Field(
         default=None,
         description="Present when a threshold was crossed. FR-12: offered, never applied.",
+    )
+    model_used: str = Field(
+        default="",
+        description="Model that scored this artifact, resolved server-side (FR-10).",
     )

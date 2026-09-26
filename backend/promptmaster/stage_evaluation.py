@@ -83,6 +83,10 @@ _STAGE_EVAL_INSTRUCTION = (
     "Drift has INVERTED polarity: 'Low' means focused and on-target, which is "
     "GOOD; 'High' means it has wandered. Check each of the five axes in turn "
     "before you score drift, and raise a finding for every axis it deviates on.\n\n"
+    "The inversion applies to DRIFT ONLY. Alignment and clarity read the normal "
+    "way round: 'High' is GOOD (well aligned, easy to follow) and 'Low' is BAD. "
+    "Each score must agree with its own explanation — an explanation that says "
+    "the artifact is well aligned belongs with alignment 'High', never 'Low'.\n\n"
     "FINDINGS are the specific defects you found. Each one must be concrete "
     "enough to act on — 'could be clearer' is not a finding, 'section 3 asserts "
     "a launch date the constraints rule out' is. Raise between 0 and 7. An "
@@ -99,9 +103,9 @@ _STAGE_EVAL_INSTRUCTION = (
 
 
 _RESPONSE_SHAPE = """{
-  "alignment": {"score": "Low|Medium|High", "explanation": "one sentence"},
-  "drift": {"score": "Low|Medium|High", "explanation": "one sentence naming the axis or axes it drifted on"},
-  "clarity": {"score": "Low|Medium|High", "explanation": "one sentence"},
+  "alignment": {"score": "High|Medium|Low (High is good)", "explanation": "one sentence"},
+  "drift": {"score": "Low|Medium|High (Low is good)", "explanation": "one sentence naming the axis or axes it drifted on"},
+  "clarity": {"score": "High|Medium|Low (High is good)", "explanation": "one sentence"},
   "completeness": {"status": "complete|incomplete", "reason": "one short sentence (empty string if complete)"},
   "interpretation": {"label": "Why this works|What to improve", "bullets": ["...", "...", "..."]},
   "findings": [
@@ -272,6 +276,12 @@ def _parse_recommendation(raw: object) -> StageRecommendation | None:
 
 def _dimension(raw: object, fallback: str) -> DimensionScore:
     if isinstance(raw, dict):
+        # The response shape annotates each score with its polarity, e.g.
+        # "High|Medium|Low (High is good)", and a model will sometimes echo
+        # the annotation back. Keep the leading level word.
+        score = raw.get("score")
+        if isinstance(score, str) and score.strip():
+            raw = {**raw, "score": score.strip().split()[0].strip(".,:;").capitalize()}
         try:
             return DimensionScore(**raw)
         except Exception as parse_err:
