@@ -55,6 +55,24 @@ export interface DraftSectionPayload {
   revision: number;
   model: string;
   inputs: PMInput;
+  /**
+   * Set by the Revision and Editing stages: rewrite the section as it stands,
+   * applying these notes, instead of drafting it from the outline. The current
+   * text is read when the job runs, not when it is queued, so a hand edit made
+   * in between is what gets revised.
+   */
+  revise?: SectionRevisePayload;
+}
+
+export interface SectionRevisePayload {
+  stage_label: string;
+  instruction: string;
+  notes: string;
+}
+
+/** What the backend is sent for a rewrite: the brief plus the section's current text. */
+export interface SectionRevisionBrief extends SectionRevisePayload {
+  current_content: string;
 }
 
 /**
@@ -173,6 +191,7 @@ export interface SectionGenerator {
     prev_section_content: string;
     model: string;
     userId: string;
+    revision?: SectionRevisionBrief;
   }): Promise<{ content: string; finish_reason: string }>;
 
   extractSectionRecord(req: {

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { createProject, pressTransition, skipStage, stageArtifact } from './helpers';
+import { createProject, pressTransition, skipStage, stageArtifact, transitionBar } from './helpers';
 
 /**
  * PM-04 — "some chapters it wrote and some said it attempted three times then
@@ -39,8 +39,9 @@ test('a chapter that fails says why, names itself, and can be retried', async ({
     else await page.getByRole('button', { name: /Insert a section after/ }).nth(i - 1).click();
     await page.getByLabel(`Title of section ${i + 1}`).fill(title);
   }
-  await page.getByRole('button', { name: 'Save and approve' }).click();
-  await expect(page.getByText(/approved/i).first()).toBeVisible();
+  // PM-06: approving is the stage's one primary action.
+  await transitionBar(page).getByRole('button', { name: 'Save and approve' }).click();
+  await expect(page.getByText(/Approved · v\d/).first()).toBeVisible();
   await pressTransition(page);
 
   await expect(page.getByRole('heading', { name: /Outline approval/ })).toBeVisible();
@@ -48,7 +49,8 @@ test('a chapter that fails says why, names itself, and can be retried', async ({
 
   // Drafting through the real queue.
   await expect(page.getByRole('heading', { name: /Draft/ })).toBeVisible();
-  await page.getByRole('button', { name: 'Start drafting' }).click();
+  // PM-06: the stage bar's primary is "Start drafting", not "Continue … anyway".
+  await transitionBar(page).getByRole('button', { name: 'Start drafting' }).click();
 
   // The healthy sections are written; section 2 stops, and says which section
   // it is and why — "out of credits" is not retried three times any more.

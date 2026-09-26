@@ -142,6 +142,23 @@ def test_list_stage_states_the_shape_in_the_system_prompt(
     assert '{ "items": [ ... ] }' in system
 
 
+def test_list_stage_tells_the_model_each_fields_length_limit(basic_inputs, list_stage, digest):
+    """The screen caps "who" at 160 characters. Without the limit in the prompt
+    the model wrote 212-249, which arrived clipped and flagged red."""
+    schema = StageItemSchema(
+        item_label="audience segment",
+        fields=[
+            StageItemField(key="who", label="Who they are", max_chars=160),
+            StageItemField(key="prior_knowledge", label="What they already know"),
+        ],
+    )
+    system, _user = build_stage_prompt(basic_inputs, list_stage, digest, schema)
+    who_line = next(line for line in system.splitlines() if line.startswith("- who:"))
+    assert "At most 160 characters." in who_line
+    prior_line = next(line for line in system.splitlines() if line.startswith("- prior_knowledge:"))
+    assert "At most" not in prior_line
+
+
 def test_list_stage_restates_the_shape_as_a_literal_example(
     basic_inputs, list_stage, digest, audience_schema
 ):
@@ -265,3 +282,19 @@ async def test_a_failed_list_call_degrades_to_an_empty_stage(
     )
     assert result.items == []
     assert result.finish_reason == "error"
+
+
+def test_stages_after_drafting_read_the_manuscript_itself(basic_inputs, digest, audience_schema):
+    """Continuity, critique and fact-check exist to read the book. Given only the
+    320-character stage summaries they reviewed the summaries — "the draft
+    material provided is incomplete" — and fact-checked the objective."""
+    stage = StageDescriptor(id="continuity", label="Continuity", renderer="review")
+    with_book = digest.model_copy(update={"manuscript": "## Chapter 1\n\nCHAPTER-ONE-PROSE-MARKER"})
+    _system, user = build_stage_prompt(basic_inputs, stage, with_book, audience_schema)
+    assert "THE MANUSCRIPT AS DRAFTED" in user
+    assert "CHAPTER-ONE-PROSE-MARKER" in user
+
+
+def test_stages_before_drafting_carry_no_manuscript_block(basic_inputs, prose_stage, digest):
+    _system, user = build_stage_prompt(basic_inputs, prose_stage, digest)
+    assert "THE MANUSCRIPT AS DRAFTED" not in user

@@ -1,3 +1,5 @@
+import type { PanelStepReporter } from '@/lib/workflow/next-action';
+import type { RevisionBrief } from '@/lib/workflow/revision';
 import type { StageFailure } from '@/lib/errors/recovery';
 import type { StageDefinition } from '@/lib/workflow/types';
 import type { StageItem, StageItemSchema } from '@/lib/workflow/stage-artifact';
@@ -31,6 +33,14 @@ export interface LongFormContext {
    * no outline stage.
    */
   emptyHint?: string;
+  /**
+   * Set on Revision and Editing: the stage rewrites the manuscript drafting
+   * wrote, applying the findings accepted in the review stages before it.
+   * Null on the drafting stage itself.
+   */
+  revise?: RevisionBrief | null;
+  /** Report the panel's next step, so the stage bar's one primary button takes it (PM-06). */
+  onPanelStep?: PanelStepReporter;
 }
 
 /**

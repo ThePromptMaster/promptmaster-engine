@@ -1,0 +1,165 @@
+"""Go mode's model calls (PM-17, PM-19). Thin HTTP shells over promptmaster/agent.py.
+
+The loop runs in the browser and persists every step itself (B4); these
+endpoints hold no state, like every other router here. What they add is the
+contract the client can rely on:
+
+  - next-action returns an action from the allowed list, or a question — never
+    an invented action;
+  - write-code returns code and nothing claiming to be its output;
+  - interpret-result only ever sees output that really came back from a run.
+
+None of them can move a stage. That happens through workflow_events, under the
+agent_run authorization the database checks (B1).
+"""
+
+from __future__ import annotations
+
+from typing import Literal
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
+
+from deps import get_client
+from promptmaster.agent import (
+    AgentState,
+    NextAction,
+    choose_next_action,
+    interpret_result,
+    perform_reason,
+    write_code,
+)
+from promptmaster.agent_actions import ACTION_KEYS, AGENT_ACTIONS, REASONING_ACTIONS, AgentAction
+from promptmaster.errors import PRESERVED_NOTHING_WRITTEN
+from promptmaster.llm_client import OpenRouterClient, OpenRouterError
+from promptmaster.schemas import PMInput
+from routers._errors import llm_http_error
+from routers.stage import _model_used
+
+router = APIRouter(prefix="/api/agent", tags=["agent"])
+
+Policy = Literal["guided", "checkpoint", "autonomous"]
+
+
+class Usage(BaseModel):
+    tokens_in: int = 0
+    tokens_out: int = 0
+
+
+def _usage(raw: dict[str, int]) -> Usage:
+    return Usage(tokens_in=raw.get("tokens_in", 0), tokens_out=raw.get("tokens_out", 0))
+
+
+@router.get("/actions")
+async def api_agent_actions() -> list[AgentAction]:
+    """The registry, so the client can check its mirror at runtime too."""
+    return AGENT_ACTIONS
+
+
+class NextActionRequest(BaseModel):
+    inputs: PMInput
+    state: AgentState
+    allowed_actions: list[str] = Field(min_length=1)
+    policy: Policy = "guided"
+    model: str = ""
+
+
+class NextActionResponse(NextAction):
+    model_used: str = ""
+
+
+@router.post("/next-action")
+async def api_next_action(
+    req: NextActionRequest, client: OpenRouterClient = Depends(get_client)
+) -> NextActionResponse:
+    """Choose ONE next move. 1 LLM call (plus the JSON repair pass if needed)."""
+    unknown = [k for k in req.allowed_actions if k not in ACTION_KEYS]
+    if unknown:
+        raise HTTPException(status_code=422, detail=f"Unknown actions: {', '.join(unknown)}")
+    try:
+        choice = await choose_next_action(
+            client, req.model or None, req.inputs, req.state, req.allowed_actions, req.policy
+        )
+    except OpenRouterError as e:
+        raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
+    return NextActionResponse(**choice.model_dump(), model_used=_model_used(req.model, client))
+
+
+class ReasonRequest(BaseModel):
+    inputs: PMInput
+    state: AgentState
+    action_key: str
+    params: dict = Field(default_factory=dict)
+    model: str = ""
+
+
+class TextResponse(BaseModel):
+    text: str
+    model_used: str = ""
+    usage: Usage = Usage()
+
+
+@router.post("/reason")
+async def api_reason(req: ReasonRequest, client: OpenRouterClient = Depends(get_client)) -> TextResponse:
+    """Perform a reasoning move. Its honest label is 'discussed' — nothing ran."""
+    if req.action_key not in REASONING_ACTIONS:
+        raise HTTPException(status_code=422, detail=f"'{req.action_key}' is not a reasoning action")
+    try:
+        text, usage = await perform_reason(
+            client, req.model or None, req.inputs, req.state, req.action_key, req.params
+        )
+    except OpenRouterError as e:
+        raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
+    return TextResponse(text=text, model_used=_model_used(req.model, client), usage=_usage(usage))
+
+
+class WriteCodeRequest(BaseModel):
+    inputs: PMInput
+    state: AgentState
+    goal: str = Field(default="", max_length=2_000)
+    kind: Literal["computation", "simulation"] = "computation"
+    model: str = ""
+
+
+class WriteCodeResponse(BaseModel):
+    code: str
+    language: Literal["python"] = "python"
+    model_used: str = ""
+    usage: Usage = Usage()
+
+
+@router.post("/write-code")
+async def api_write_code(req: WriteCodeRequest, client: OpenRouterClient = Depends(get_client)) -> WriteCodeResponse:
+    """Write code for a computation. It is not run here; label 'code_written'."""
+    try:
+        code, usage = await write_code(client, req.model or None, req.inputs, req.state, req.goal, req.kind)
+    except OpenRouterError as e:
+        raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
+    if not code.strip():
+        raise HTTPException(status_code=502, detail="The model returned no code.")
+    return WriteCodeResponse(code=code, model_used=_model_used(req.model, client), usage=_usage(usage))
+
+
+class InterpretRequest(BaseModel):
+    inputs: PMInput
+    state: AgentState
+    #: The sandbox_runs row this interprets. The client passes it through to the
+    #: step it records, where the database requires it (agent_steps_label_honest).
+    sandbox_run_id: str
+    code: str = Field(max_length=40_000)
+    stdout: str = Field(default="", max_length=40_000)
+    stderr: str = Field(default="", max_length=20_000)
+    exit_code: int | None = None
+    model: str = ""
+
+
+@router.post("/interpret-result")
+async def api_interpret_result(req: InterpretRequest, client: OpenRouterClient = Depends(get_client)) -> TextResponse:
+    """Explain what a real execution printed. Label 'result_interpreted'."""
+    try:
+        text, usage = await interpret_result(
+            client, req.model or None, req.inputs, req.state, req.code, req.stdout, req.stderr, req.exit_code
+        )
+    except OpenRouterError as e:
+        raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
+    return TextResponse(text=text, model_used=_model_used(req.model, client), usage=_usage(usage))
