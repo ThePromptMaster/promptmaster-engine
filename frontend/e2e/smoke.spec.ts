@@ -10,6 +10,9 @@ import { dismissBetaNotice } from './helpers';
 test('new project offers each workflow once, then drafts and evaluates a stage', async ({ page }) => {
   await page.goto('/projects/new');
   await dismissBetaNotice(page);
+  await page.getByLabel('What do you want to do or figure out?').fill('A short guide to structured prompting for analysts');
+  await page.getByRole('button', { name: /I know what I want to do/ }).click();
+  await expect(page.getByRole('heading', { name: 'Your setup' })).toBeVisible();
 
   const workflows = page.getByRole('radiogroup', { name: 'Workflow' }).getByRole('radio');
   await expect(workflows).toHaveCount(3);
@@ -19,7 +22,6 @@ test('new project offers each workflow once, then drafts and evaluates a stage',
 
   await page.getByRole('radio', { name: /^Book/ }).click();
   await page.getByLabel('Project name').fill('E2E smoke');
-  await page.getByLabel('Objective').fill('A short guide to structured prompting for analysts');
   await page.getByRole('button', { name: 'Start Book' }).click();
   await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}$/);
 
