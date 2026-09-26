@@ -113,8 +113,9 @@ def validation_error_payload(exc: RequestValidationError) -> dict:
         "title": "That request asked for too much",
         "message": (
             f"{summary} Nothing was generated and nothing was charged — the request "
-            "was refused before it reached the model. Adjusting the value above and "
-            "trying again will work."
+            "was refused before it reached the model. If that is a value you entered, "
+            "shortening or correcting it and trying again will work; if it is not, "
+            "this is a fault in PromptMaster rather than anything you did."
         ),
         "retryable": False,
         "retry_after": None,
