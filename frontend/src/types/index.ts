@@ -394,6 +394,8 @@ export interface StageDigestRequest {
   objective: string;
   audience: string;
   prior_stages: StageDigestEntry[];
+  /** Drafted chapters, for stages after drafting only. */
+  manuscript?: string;
 }
 
 export interface StageDescriptorRequest {
@@ -414,7 +416,7 @@ export interface StageDescriptorRequest {
 
 export interface StageItemSchemaRequest {
   item_label: string;
-  fields: { key: string; label: string; hint?: string }[];
+  fields: { key: string; label: string; hint?: string; max_chars?: number | null }[];
   min_items: number;
   max_items: number;
 }

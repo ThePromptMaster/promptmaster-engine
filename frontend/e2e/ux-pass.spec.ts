@@ -77,8 +77,8 @@ test('unsaved edits make saving the next step, and a checkpoint stage never draf
   await page.getByLabel('Title of section 1').fill('Habitat');
   await page.getByRole('button', { name: /Insert a section after/ }).click();
   await page.getByLabel('Title of section 2').fill('Diet');
-  await page.getByRole('button', { name: 'Save and approve' }).click();
-  await expect(page.getByText(/approved/i).first()).toBeVisible();
+  await transitionBar(page).getByRole('button', { name: 'Save and approve' }).click();
+  await expect(page.getByText(/Approved · v\d/).first()).toBeVisible();
   await pressTransition(page);
 
   await expect(page.getByRole('heading', { name: 'Outline approval' })).toBeVisible();

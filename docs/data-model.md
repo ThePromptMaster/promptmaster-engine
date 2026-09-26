@@ -271,3 +271,16 @@ production project.
 
 Backup and recovery responsibility is covered in [`runbook.md`](runbook.md) and its
 current unresolved state is recorded in [`known-limitations.md`](known-limitations.md).
+
+
+### Go mode: agent runs (B1)
+
+`20260928000000_agent_runs` adds three tables and one trigger on `workflow_events`.
+
+| Table | What it holds | Who writes |
+|---|---|---|
+| `agent_runs` | One Go session: `policy` (guided / checkpoint / autonomous), status, budget, lease. Checkpoint and Autonomous require `authorization_id` — an **accepted** recommendation with `scope.kind = 'agent_authorization'` for that policy. One running run per project (partial unique index). Policy and authorization are immutable; ended runs are final. | Owner (RLS) |
+| `agent_steps` | One action each: action key, rationale, status and **execution label** (PM-12). `code_executed` / `simulation_run` require a `sandbox_runs` row for the step; `result_interpreted` must cite one of the run's executions. Finished steps are immutable. | Owner (RLS) |
+| `sandbox_runs` | Executed code and its real output. | **Service role only** — owners can read, never write, so an execution cannot be forged from a browser |
+
+`workflow_events.agent_run_id` + trigger `workflow_events_agent_authorized`: a system-actor stage move must cite a running, authorized run of the same project, and only what its policy allows — Autonomous may block, advance, or complete *with evidence*; Checkpoint may only block; Guided may change nothing. Skip, return, finish, reopen and upgrade are user decisions under every policy. The FR-02 proposal trigger is unchanged. Asserted by `supabase/tests/agent_runs.sql` (14 cases).

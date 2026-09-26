@@ -17,6 +17,7 @@ import type {
   OutlineSectionState,
   SectionGenerator,
   SectionRecord,
+  SectionRevisionBrief,
 } from './types';
 import type { PMInput } from '@/types';
 import { USAGE_HEADER, parseUsageHeader } from '@/lib/observability/usage';
@@ -208,6 +209,7 @@ export class HttpSectionGenerator implements SectionGenerator {
     prev_section_content: string;
     model: string;
     userId: string;
+    revision?: SectionRevisionBrief;
   }): Promise<{ content: string; finish_reason: string }> {
     return this.post(
       '/api/generate-section-prose',
@@ -218,6 +220,7 @@ export class HttpSectionGenerator implements SectionGenerator {
         records: req.records,
         prev_section_content: req.prev_section_content,
         model: req.model,
+        ...(req.revision ? { revision: req.revision } : {}),
       },
       req.userId
     );

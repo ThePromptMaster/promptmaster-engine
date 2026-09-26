@@ -7,8 +7,11 @@
  * limit across thirteen stages and bury the instruction that matters, so each
  * completed upstream stage contributes at most a few hundred characters.
  *
- * The objective is the one exception, carried in full — it is short, and every
- * stage is judged against it.
+ * The objective is carried in full — it is short, and every stage is judged
+ * against it. The manuscript is the other exception: stages after drafting
+ * (continuity, critique, fact-check, final review) exist to read the chapters,
+ * and given only summaries they reviewed the summaries. It is bounded by
+ * MANUSCRIPT_MAX, and only those stages get it.
  *
  * Summaries are read off the artifact when one has been stored (written when
  * the stage completes) and projected from the artifact's head version
@@ -17,6 +20,7 @@
  */
 
 import type { Artifact, ArtifactVersion, Project } from '@/types/project';
+import type { OutlineSection } from '@/types';
 import type { StageDefinition, WorkflowState, WorkflowTemplate } from './types';
 import { parseItems, rendererHoldsItems } from './stage-artifact';
 import { isDone } from './types';
@@ -34,6 +38,40 @@ export interface StageDigest {
   objective: string;
   audience: string;
   prior_stages: StageDigestEntry[];
+  /** The drafted chapters; empty for every stage up to and including drafting. */
+  manuscript: string;
+}
+
+/**
+ * Roughly 30k tokens. A short book fits whole; past this each chapter is cut to
+ * an equal share, and the cut is marked so the model does not review a
+ * truncation as if the chapter ended there.
+ */
+export const MANUSCRIPT_MAX = 120_000;
+
+/** The written chapters as one text, bounded. Pure; no model call. */
+export function formatManuscript(
+  sections: Pick<OutlineSection, 'title' | 'content' | 'status'>[],
+  max = MANUSCRIPT_MAX
+): string {
+  const written = sections
+    .map((s, i) => ({ heading: `## ${i + 1}. ${s.title || 'Untitled section'}`, body: (s.content ?? '').trim() }))
+    .filter((s) => s.body);
+  if (!written.length) return '';
+
+  const whole = written.map((s) => `${s.heading}\n\n${s.body}`).join('\n\n');
+  if (whole.length <= max) return whole;
+
+  const marker = '\n\n[… the rest of this section is omitted to fit the review budget …]';
+  const share = Math.max(200, Math.floor(max / written.length) - marker.length - 80);
+  return written
+    .map((s) => {
+      if (s.body.length <= share) return `${s.heading}\n\n${s.body}`;
+      const cut = s.body.slice(0, share);
+      const space = cut.lastIndexOf(' ');
+      return `${s.heading}\n\n${(space > share * 0.8 ? cut.slice(0, space) : cut).trimEnd()}${marker}`;
+    })
+    .join('\n\n');
 }
 
 function truncate(text: string, max = SUMMARY_MAX): string {
@@ -116,9 +154,21 @@ export function buildStageDigest(
     prior_stages.push({ stage_id: stage.id, label: stage.label, summary });
   });
 
+  // The manuscript lives on the first long-form stage's artifact (Revision and
+  // Editing rewrite it in place). Stages after it that are not themselves
+  // long-form are the ones that read it.
+  const draftingIndex = template.stages.findIndex((s) => s.renderer === 'long_form');
+  const target = template.stages[cutoff];
+  const readsManuscript =
+    draftingIndex >= 0 && cutoff > draftingIndex && target?.renderer !== 'long_form';
+  const sections = readsManuscript
+    ? (bundles[template.stages[draftingIndex].id]?.artifact?.long_form?.outline ?? [])
+    : [];
+
   return {
     objective: project.objective ?? '',
     audience: project.audience ?? '',
     prior_stages,
+    manuscript: formatManuscript(sections),
   };
 }

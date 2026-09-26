@@ -1,5 +1,4 @@
 import { createClient } from './client';
-import { VersionConflictError } from '@/types/project';
 import type { Artifact, ArtifactVersion, Evaluation } from '@/types/project';
 import type { AuditFinding } from '@/types';
 
@@ -49,6 +48,22 @@ export async function createArtifact(
     .insert({ project_id: projectId, user_id: userId, kind, name, stage_id: stageId })
     .select(ARTIFACT_COLUMNS)
     .single();
+
+  // 23505 on artifacts_project_stage_kind_uidx: someone else created this
+  // stage's artifact between our read and our insert — a second tab, or React
+  // running the opening effect twice. The row we wanted exists, so return it.
+  // Surfacing this as an error is what showed "Could not open the outline."
+  if ((error as { code?: string } | null)?.code === '23505' && stageId) {
+    const { data: existing, error: readError } = await supabase
+      .from('artifacts')
+      .select(ARTIFACT_COLUMNS)
+      .eq('project_id', projectId)
+      .eq('stage_id', stageId)
+      .eq('kind', kind)
+      .maybeSingle();
+    if (readError) throw readError;
+    if (existing) return existing as unknown as Artifact;
+  }
 
   if (error || !data) throw error ?? new Error('Failed to create artifact');
   return data as unknown as Artifact;
@@ -111,30 +126,25 @@ export interface NewVersion {
 }
 
 /**
- * Append a version and move the artifact's head pointer to it.
+ * Append a version; the database numbers it and moves the head.
  *
  * Writes the version BEFORE updating local state (callers rely on this): a
  * failed write must not leave the UI showing a version that does not exist.
  *
- * Not transactional — the version insert and the head-pointer update are two
- * statements. If the second fails the version still exists and is simply not
- * yet the head, which is recoverable and visible; the reverse (a head pointing
- * at nothing) would not be.
- *
- * Both concurrent-write outcomes are named rather than left raw. Two tabs on
- * one artifact used to produce either an unexplained Postgres unique-violation
- * or, worse, a silent no-op: the head update carried a revision guard whose
- * result nobody read, so a stale revision matched zero rows, returned no error,
- * and left the new version written but invisible behind the old head. The
- * conflict now says which of the two happened, because they need different
- * words — one lost nothing, the other kept the work and needs a reload.
+ * One statement. version_number, parent_version_id and the artifact's head are
+ * set by triggers under a per-artifact lock (20260927000200), so the version
+ * and the head cannot disagree. This used to be numbered from the cached
+ * version_count and the head moved in a second UPDATE guarded on `revision` —
+ * which every artifact write bumps, the outline's draft autosave included — so
+ * an outline edited and then approved was written but never became the head,
+ * and every retry collided on the same number. Two tabs appending now
+ * serialise into two versions; history is append-only, so nothing is lost.
  */
 export async function appendVersion(
   artifact: Artifact,
   version: NewVersion
 ): Promise<ArtifactVersion> {
   const supabase = createClient();
-  const nextNumber = artifact.version_count + 1;
 
   const { data, error } = await supabase
     .from('artifact_versions')
@@ -142,8 +152,6 @@ export async function appendVersion(
       user_id: artifact.user_id,
       project_id: artifact.project_id,
       artifact_id: artifact.id,
-      version_number: nextNumber,
-      parent_version_id: artifact.current_version_id,
       source_operation: version.source_operation,
       instruction: version.instruction ?? '',
       system_prompt: version.system_prompt ?? '',
@@ -158,35 +166,8 @@ export async function appendVersion(
     .select(VERSION_COLUMNS)
     .single();
 
-  if (error || !data) {
-    // 23505 on av_artifact_version_uidx (artifact_id, version_number): another
-    // tab appended while we were composing, so our version_number is taken.
-    // Surfacing the raw Postgres text here is what made two open windows look
-    // like a crash rather than a conflict.
-    if ((error as { code?: string } | null)?.code === '23505') {
-      throw new VersionConflictError('taken', nextNumber);
-    }
-    throw error ?? new Error('Failed to append version');
-  }
-  const created = data as unknown as ArtifactVersion;
-
-  const { data: moved, error: headError } = await supabase
-    .from('artifacts')
-    .update({ current_version_id: created.id, version_count: nextNumber })
-    .eq('id', artifact.id)
-    .eq('revision', artifact.revision)
-    .select('id')
-    .maybeSingle();
-  if (headError) throw headError;
-
-  // The revision guard was already here, but nothing read its result. A stale
-  // revision matches zero rows and returns no error, so the version was written
-  // and the head silently stayed where it was — the artifact would show the old
-  // content with the new version sitting invisible behind it. Recoverable, but
-  // only if someone is told.
-  if (!moved) throw new VersionConflictError('stale-head', nextNumber);
-
-  return created;
+  if (error || !data) throw error ?? new Error('Failed to append version');
+  return data as unknown as ArtifactVersion;
 }
 
 /**

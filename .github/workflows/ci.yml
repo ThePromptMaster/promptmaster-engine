@@ -64,7 +64,9 @@ jobs:
 
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # Pinned: resolving "latest" calls the GitHub API, and a rate limit
+          # there failed a run before any test started (PR #17).
+          version: 2.118.0
       - name: Start Supabase (applies every migration to an empty database)
         run: supabase start -x studio,imgproxy,realtime,edge-runtime,logflare,vector,supavisor,mailpit
       - name: SQL tests (supabase/tests/*.sql against the migrated database)

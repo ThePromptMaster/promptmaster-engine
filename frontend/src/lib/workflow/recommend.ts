@@ -579,6 +579,18 @@ export function deriveWorkflowRecommendations({
 
   // --- 3. ready to advance, or to finish -----------------------------------
   if (out.length < MAX_DERIVED && evaluation.canAdvance) {
+    // canAdvance means nothing BLOCKING is open. Unticked optional items are
+    // still open, and "nothing is outstanding" beside "0 of 2 done" read as a
+    // contradiction.
+    const open = evaluation.unmet.filter((c) => !c.blocking);
+    const openNote = open.length
+      ? ` ${open.length === 1 ? 'One item is' : `${open.length} items are`} still unticked (${open
+          .map((c) => `"${c.label}"`)
+          .join(', ')}) — optional, but worth a look.`
+      : '';
+    const nothingBlocks = open.length
+      ? `Nothing on ${stage.label} blocks moving on.${openNote}`
+      : `Nothing on ${stage.label} is outstanding.`;
     const next = stage.transitions.default_next;
     if (next) {
       const target = getStage(template, next);
@@ -587,7 +599,7 @@ export function deriveWorkflowRecommendations({
         category: `advance:${stage.id}:${next}`,
         kind: 'stage_transition',
         title: `Move on to ${targetLabel}`,
-        summary: `Nothing on ${stage.label} is outstanding.`,
+        summary: nothingBlocks,
         suggested_change: `Advance to ${targetLabel}.`,
         // Empty: the transition bar below is the affordance, and it is the
         // only place that writes the workflow event.
@@ -609,7 +621,9 @@ export function deriveWorkflowRecommendations({
         category: `finish:${stage.id}`,
         kind: 'stage_transition',
         title: 'Finish',
-        summary: `${stage.label} is the last stage, and nothing on it is outstanding.`,
+        summary: open.length
+          ? `${stage.label} is the last stage, and nothing on it blocks finishing.${openNote}`
+          : `${stage.label} is the last stage, and nothing on it is outstanding.`,
         suggested_change: 'Mark the project finished.',
         instruction: '',
         rationale: {

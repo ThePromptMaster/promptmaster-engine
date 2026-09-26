@@ -226,7 +226,17 @@ async function runStep(args: StepArgs): Promise<StepOutcome> {
     // checkpoint_job lands, and in that window the checkpoint still says
     // 'prose'. Regenerating then would rewrite a finished, already-billed
     // section — precisely the FR-05 failure — so the committed section wins.
-    if (context.section.status === 'complete' && context.section.content) {
+    //
+    // "Prose exists" means prose for THIS job's revision. write_long_form_section
+    // bumps the section's revision on every write, so a regenerate (queued at
+    // revision n+1 against a section at n) still has work to do, and after its
+    // own write the section reaches n+1 and a crash-restart skips it. Checking
+    // status alone made every Regenerate of a written section a silent no-op.
+    if (
+      context.section.status === 'complete' &&
+      context.section.content &&
+      (context.section.revision ?? 0) >= Math.max(payload.revision, 1)
+    ) {
       return {
         done: false,
         checkpoint: {
@@ -253,6 +263,9 @@ async function runProseStep(args: StepArgs, context: SectionContext): Promise<St
     prev_section_content: context.prevSectionContent,
     model: payload.model,
     userId: job.user_id,
+    ...(payload.revise && context.section?.content
+      ? { revision: { ...payload.revise, current_content: context.section.content } }
+      : {}),
   });
 
   // COMMIT. Everything above this line is redoable; everything below is not

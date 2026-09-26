@@ -20,6 +20,22 @@ const base: NextActionInput = {
 const kind = (overrides: Partial<NextActionInput>) => nextStageAction({ ...base, ...overrides }).kind;
 
 describe('nextStageAction — one primary action per stage (PM-06)', () => {
+  it('lets a panel-driven stage name its own step instead of "Continue anyway"', () => {
+    // Drafting showed "Continue to Continuity anyway" beside a "Start drafting"
+    // button; the outline showed "Continue to Approval" beside "Save and approve".
+    const drafting = { draftable: false, hasContent: false, canAdvance: false };
+    const step = { label: 'Start drafting', reason: 'Writes each section.' };
+    expect(nextStageAction({ ...base, ...drafting, panelStep: step })).toMatchObject({
+      kind: 'panel',
+      label: 'Start drafting',
+    });
+    expect(kind({ ...drafting, panelStep: { ...step, busy: true } })).toBe('none');
+    // Once the panel has nothing left to do, moving on is the step again.
+    expect(kind({ ...drafting, canAdvance: true, panelStep: null })).toBe('continue');
+    // Unsaved edits still come first.
+    expect(kind({ ...drafting, dirty: true, panelStep: step })).toBe('save');
+  });
+
   it('walks draft -> check -> fix -> continue, as a careful user would', () => {
     expect(kind({ hasContent: false, evaluated: false })).toBe('draft');
     expect(kind({ evaluated: false })).toBe('evaluate');

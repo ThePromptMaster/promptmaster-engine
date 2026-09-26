@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { appendVersion, restoreVersion } from './versions';
-import { VersionConflictError } from '@/types/project';
+import { appendVersion, createArtifact, restoreVersion } from './versions';
 import type { Artifact, ArtifactVersion, Evaluation } from '@/types/project';
 
 function makeSupabase() {
@@ -115,101 +114,74 @@ beforeEach(() => {
 });
 
 describe('appendVersion', () => {
-  it('numbers the new version after the current head', async () => {
+  it('lets the database number the version and pick its parent', async () => {
+    // version_number and parent_version_id come from a trigger under a
+    // per-artifact lock (20260927000200). A number computed from the cached
+    // version_count is what stranded outlines behind an unmoved head.
     supa.current!.queue(version({ id: 'v4', version_number: 4 }));
-    supa.current!.queue({ id: 'a1' }); // head-pointer update matched a row
 
-    await appendVersion(artifact(), { content: 'next', source_operation: 'refine' });
+    const created = await appendVersion(artifact(), { content: 'next', source_operation: 'refine' });
 
-    expect(insertPayload('artifact_versions').version_number).toBe(4);
+    const payload = insertPayload('artifact_versions');
+    expect(payload).not.toHaveProperty('version_number');
+    expect(payload).not.toHaveProperty('parent_version_id');
+    expect(created.version_number).toBe(4);
   });
 
-  it('links the new version to the one it supersedes', async () => {
+  it('does not move the head itself, so no revision can make it fail', async () => {
+    // The old revision-guarded head UPDATE failed whenever anything else had
+    // touched the artifact — the outline draft autosave, a stage summary.
     supa.current!.queue(version({ id: 'v4', version_number: 4 }));
-    supa.current!.queue({ id: 'a1' }); // head update matched a row
 
-    await appendVersion(artifact(), { content: 'next', source_operation: 'refine' });
+    await appendVersion(artifact({ revision: 1 }), { content: 'next', source_operation: 'refine' });
 
-    expect(insertPayload('artifact_versions').parent_version_id).toBe('v3');
+    expect(
+      supa.current!.calls.some((c) => c.table === 'artifacts' && c.method === 'update')
+    ).toBe(false);
   });
 
-  it('moves the artifact head to the new version', async () => {
-    supa.current!.queue(version({ id: 'v4', version_number: 4 }));
-    supa.current!.queue({ id: 'a1' }); // head update matched a row
-
-    await appendVersion(artifact(), { content: 'next', source_operation: 'refine' });
-
-    const update = supa.current!.calls.find(
-      (c) => c.table === 'artifacts' && c.method === 'update'
-    );
-    expect(update!.args[0]).toMatchObject({ current_version_id: 'v4', version_count: 4 });
-  });
-
-  it('surfaces a failed insert instead of moving the head', async () => {
+  it('surfaces a failed insert', async () => {
     // A failed write must not leave the UI pointing at a version that does not exist.
     supa.current!.queue(null, { message: 'rls denied' });
     await expect(
       appendVersion(artifact(), { content: 'next', source_operation: 'refine' })
     ).rejects.toBeTruthy();
-    expect(
-      supa.current!.calls.some((c) => c.table === 'artifacts' && c.method === 'update')
-    ).toBe(false);
   });
 });
 
-describe('two tabs appending to one artifact', () => {
-  it('names the lost race instead of leaking a Postgres error', async () => {
-    // av_artifact_version_uidx (artifact_id, version_number) refuses the second
-    // insert. Two open windows used to look like a crash.
+describe('createArtifact', () => {
+  it('returns the existing stage artifact when a concurrent create won', async () => {
+    // Two openers of the outline stage raced into artifacts_project_stage_kind_uidx
+    // and the loser showed "Could not open the outline."
     supa.current!.queue(null, { code: '23505', message: 'duplicate key value' });
+    supa.current!.queue(artifact({ id: 'a-existing', kind: 'outline', stage_id: 'outline' }));
 
-    const err = await appendVersion(artifact(), {
-      content: 'next',
-      source_operation: 'refine',
-    }).catch((e) => e);
+    const got = await createArtifact('p1', 'u1', 'outline', 'Outline', 'outline');
 
-    expect(err).toBeInstanceOf(VersionConflictError);
-    expect(err.reason).toBe('taken');
-    // Nothing was written, so the honest advice is simply to retry.
-    expect(err.message).toMatch(/Nothing was lost/i);
+    expect(got.id).toBe('a-existing');
   });
 
-  it('does not silently leave a version behind an unmoved head', async () => {
-    // The revision guard was always here; nothing read its result. A stale
-    // revision matches zero rows and returns NO error, so the version was
-    // written and the artifact went on pointing at the older one.
-    supa.current!.queue(version({ id: 'v4', version_number: 4 }));
-    supa.current!.queue(null); // zero rows matched: revision was stale
-
-    const err = await appendVersion(artifact(), {
-      content: 'next',
-      source_operation: 'refine',
-    }).catch((e) => e);
-
-    expect(err).toBeInstanceOf(VersionConflictError);
-    expect(err.reason).toBe('stale-head');
-    // The work exists — the words have to say so, or a user redoes it.
-    expect(err.message).toMatch(/saved/i);
+  it('still surfaces other failures', async () => {
+    supa.current!.queue(null, { message: 'rls denied' });
+    await expect(createArtifact('p1', 'u1', 'outline', 'Outline', 'outline')).rejects.toBeTruthy();
   });
 });
 
 describe('restoreVersion', () => {
   it('appends a new version rather than mutating history', async () => {
     supa.current!.queue(version({ id: 'v4', version_number: 4 }));
-    supa.current!.queue({ id: 'a1' }); // head update matched a row
     supa.current!.queue(null); // no prior evaluation
 
-    await restoreVersion(artifact(), version({ id: 'v2', version_number: 2 }));
+    const created = await restoreVersion(artifact(), version({ id: 'v2', version_number: 2 }));
 
     const payload = insertPayload('artifact_versions');
-    expect(payload.version_number).toBe(4);
+    expect(created.version_number).toBe(4);
     expect(payload.source_operation).toBe('restore');
     expect(payload.restored_from_version_id).toBe('v2');
   });
 
   it('carries the old content forward verbatim', async () => {
     supa.current!.queue(version({ id: 'v4', version_number: 4 }));
-    supa.current!.queue({ id: 'a1' }); // head update matched a row
     supa.current!.queue(null);
 
     await restoreVersion(
@@ -225,7 +197,6 @@ describe('restoreVersion', () => {
     // money and could return a different score for the same text — which reads
     // to a user as a bug.
     supa.current!.queue(version({ id: 'v4', version_number: 4 }));
-    supa.current!.queue({ id: 'a1' }); // head update matched a row
     supa.current!.queue(evaluation({ alignment_score: 'Medium' }));
     supa.current!.queue(evaluation());
 
@@ -238,7 +209,6 @@ describe('restoreVersion', () => {
 
   it('still restores when the target was never evaluated', async () => {
     supa.current!.queue(version({ id: 'v4', version_number: 4 }));
-    supa.current!.queue({ id: 'a1' }); // head update matched a row
     supa.current!.queue(null); // no evaluation
 
     await expect(

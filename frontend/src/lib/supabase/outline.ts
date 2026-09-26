@@ -48,9 +48,8 @@ export async function ensureOutlineArtifact(
 /**
  * Write the working draft.
  *
- * Revision-guarded like every other artifact write (FR-21): a stale write is
- * rejected rather than silently overwriting an edit made in another tab.
- * Returns the artifact's new revision so the caller can keep its guard current.
+ * Unguarded, last write wins: the draft is one tab's scratch copy, and nothing
+ * committed can be lost by overwriting it — committed outlines are versions.
  */
 export async function saveOutlineDraft(
   artifact: Artifact,
@@ -93,7 +92,7 @@ export async function commitOutlineVersion(
     change_summary: options.changeSummary ?? null,
   });
 
-  await saveOutlineDraft({ ...artifact, revision: artifact.revision + 1 }, null);
+  await saveOutlineDraft(artifact, null);
   return created;
 }
 

@@ -8,7 +8,7 @@
  */
 
 import { createClient } from '@/lib/supabase/client';
-import { DRAFT_SECTION, type DraftSectionPayload } from '@/lib/jobs/types';
+import { DRAFT_SECTION, type DraftSectionPayload, type SectionRevisePayload } from '@/lib/jobs/types';
 import type { PMInput } from '@/types';
 import type { Project } from '@/types/project';
 
@@ -16,7 +16,7 @@ export interface ProjectJob {
   id: string;
   kind: string;
   status: 'queued' | 'leased' | 'succeeded' | 'failed' | 'cancelled' | 'dead';
-  payload: { section_id?: string; section_index?: number; revision?: number } | null;
+  payload: { section_id?: string; section_index?: number; revision?: number; stage_id?: string } | null;
   attempts: number;
   max_attempts: number;
   error_code: string | null;
@@ -78,6 +78,8 @@ export interface EnqueueSectionArgs {
   sectionIndex: number;
   /** Bumped by a user-requested regenerate; otherwise the section's own. */
   revision: number;
+  /** Revision and Editing stages: rewrite the section with these notes. */
+  revise?: SectionRevisePayload;
 }
 
 /** A job that stopped for good: nothing will run it again unless asked. */
@@ -118,6 +120,7 @@ export async function enqueueSectionJob(args: EnqueueSectionArgs): Promise<strin
     // Carried in the payload rather than reassembled later: the drain may run
     // hours afterwards, in a process that has never seen this user.
     inputs: inputsFromProject(args.project),
+    ...(args.revise ? { revise: args.revise } : {}),
   };
 
   const { data, error } = await supabase.rpc('enqueue_job', {

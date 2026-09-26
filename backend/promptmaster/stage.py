@@ -86,7 +86,10 @@ def _format_item_schema(schema: StageItemSchema) -> str:
     for field in schema.fields:
         label = field.label or field.key
         hint = f" {field.hint}" if field.hint else ""
-        lines.append(f"- {field.key}: {label}.{hint}".rstrip())
+        # The screen enforces this limit; a draft that overruns it arrives
+        # clipped and flagged red before the user has touched it.
+        limit = f" At most {field.max_chars} characters." if field.max_chars else ""
+        lines.append(f"- {field.key}: {label}.{hint}{limit}".rstrip())
     return "\n".join(lines)
 
 
@@ -150,6 +153,16 @@ def build_stage_prompt(
         "",
         f"STAGE TO PRODUCE: {stage.label or stage.id}",
     ]
+
+    if digest.manuscript.strip():
+        parts += [
+            "",
+            "THE MANUSCRIPT AS DRAFTED — the actual chapters. Work from this text, not "
+            "from the summaries above, and point to the chapter and passage you mean:",
+            "--- BEGIN MANUSCRIPT ---",
+            digest.manuscript.strip(),
+            "--- END MANUSCRIPT ---",
+        ]
 
     if existing_content.strip():
         # Regeneration with something already on the page. Saying so keeps the
