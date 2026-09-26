@@ -23,6 +23,7 @@ export type StageActionKind =
   | 'none'
   | 'save'
   | 'draft'
+  | 'continue_writing'
   | 'evaluate'
   | 'apply_fixes'
   | 'continue'
@@ -42,6 +43,12 @@ export interface NextActionInput {
    */
   draftable: boolean;
   hasContent: boolean;
+  /**
+   * The draft stopped before it was finished — the model hit its length limit,
+   * or the evaluation judged it incomplete. Finishing it is the real work of
+   * the stage (PM-11), so it comes before judging it.
+   */
+  truncated?: boolean;
   /** The artifact can be scored by the stage evaluator. */
   evaluable: boolean;
   /** The head version has been evaluated. */
@@ -82,6 +89,14 @@ export function nextStageAction(input: NextActionInput): StageAction {
       kind: 'draft',
       label: 'Draft this stage',
       reason: 'Start from a draft you can edit, or write it yourself from More.',
+    };
+  }
+
+  if (input.draftable && input.hasContent && input.truncated) {
+    return {
+      kind: 'continue_writing',
+      label: 'Continue writing',
+      reason: 'The draft stopped before it was finished. This picks up where it left off.',
     };
   }
 

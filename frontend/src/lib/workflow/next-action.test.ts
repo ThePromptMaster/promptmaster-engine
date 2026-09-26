@@ -59,3 +59,14 @@ describe('nextStageAction — one primary action per stage (PM-06)', () => {
     expect(kind({ applyableFixes: 1, evaluationClean: true })).toBe('continue');
   });
 });
+
+describe('a draft that was cut off (PM-11)', () => {
+  it('suggests finishing it before judging it', () => {
+    expect(nextStageAction({ ...base, evaluated: false, truncated: true }).kind).toBe('continue_writing');
+    expect(nextStageAction({ ...base, truncated: true }).label).toBe('Continue writing');
+  });
+
+  it('still lets unsaved edits go first', () => {
+    expect(nextStageAction({ ...base, truncated: true, dirty: true }).kind).toBe('save');
+  });
+});

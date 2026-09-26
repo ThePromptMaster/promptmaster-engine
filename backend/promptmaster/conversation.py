@@ -9,13 +9,15 @@ from __future__ import annotations
 
 from .prompt_builder import build_prompt
 from .schemas import ChatMessage, Iteration, PMInput
+from .self_model import PROMPTMASTER_SELF_MODEL
 from .session_context import format_session_history
 
 
 _PROMPTMASTER_CONTEXT = (
     "You are operating inside the PromptMaster Engine, a structured AI workflow "
     "system. The user is working through a defined objective in a specific mode. "
-    "Stay aligned with the original objective at all times."
+    "Stay aligned with the original objective at all times.\n\n"
+    + PROMPTMASTER_SELF_MODEL
 )
 
 

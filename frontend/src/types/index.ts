@@ -117,6 +117,8 @@ export interface Iteration {
   trigger_source?: string | null;
   user_rating?: UserRating | null;
   summary?: string | null;
+  /** FR-10: the model that produced this iteration (mirrors schemas.Iteration). */
+  model_used?: string;
   continuity_snapshot?: ContinuitySnapshot | null;
 }
 
