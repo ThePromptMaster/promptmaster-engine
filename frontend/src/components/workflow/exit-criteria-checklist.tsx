@@ -4,8 +4,11 @@ import type { CriterionResult } from '@/lib/workflow/types';
 
 interface Props {
   criteria: CriterionResult[];
-  /** Manual criteria are user-ticked; auto ones are computed and read-only. */
-  manualIds: Set<string>;
+  /**
+   * Authored-manual ids. Kept for callers that predate `CriterionResult.manual`;
+   * the result's own flag wins, since it also covers degraded criteria.
+   */
+  manualIds?: Set<string>;
   onToggleManual: (id: string, checked: boolean) => void;
 }
 
@@ -15,7 +18,7 @@ interface Props {
  * Shown continuously beside the work rather than revealed when the user tries
  * to leave — a checklist you only see at the exit is a gate, not guidance.
  */
-export function ExitCriteriaChecklist({ criteria, manualIds, onToggleManual }: Props) {
+export function ExitCriteriaChecklist({ criteria, manualIds = new Set(), onToggleManual }: Props) {
   if (criteria.length === 0) return null;
 
   const met = criteria.filter((c) => c.satisfied).length;
@@ -31,7 +34,7 @@ export function ExitCriteriaChecklist({ criteria, manualIds, onToggleManual }: P
 
       <ul className="space-y-2">
         {criteria.map((c) => {
-          const isManual = manualIds.has(c.id);
+          const isManual = c.manual ?? manualIds.has(c.id);
           const Row = isManual ? 'label' : 'div';
 
           return (

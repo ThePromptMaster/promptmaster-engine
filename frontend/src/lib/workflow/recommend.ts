@@ -119,6 +119,31 @@ export interface RecommendationScope {
   section_id?: string;
   /** Character range in the version's content. Set only by a user selection. */
   selection?: { start: number; end: number };
+  /**
+   * The stage the recommendation was raised on. Stored because `version_id`
+   * alone cannot place a row: one raised on a stage with no saved version has
+   * a null version, and null matched every other stage with no saved version —
+   * which is how Experiment came to offer "Move on to Literature".
+   */
+  stage_id?: string;
+}
+
+/**
+ * Whether a stored recommendation belongs on the stage being shown.
+ *
+ * Rows that carry a stage are matched on it and on the version they were
+ * raised against. Older rows without one are shown only when their version
+ * pins them; a legacy row with a null version cannot be attributed to any
+ * stage, so it is not shown on all of them.
+ */
+export function belongsToStage(
+  row: { scope?: Partial<RecommendationScope> | null; version_id: string | null },
+  stageId: string | null,
+  headVersionId: string | null
+): boolean {
+  const recordedStage = row.scope?.stage_id;
+  if (recordedStage) return recordedStage === stageId && (row.version_id ?? null) === headVersionId;
+  return row.version_id !== null && row.version_id === headVersionId;
 }
 
 /**

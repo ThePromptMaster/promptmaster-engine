@@ -315,8 +315,33 @@ describe('exit criteria', () => {
   });
 
   it('reports shortfall detail rather than just failing', () => {
-    const r = evaluateStage(BOOK_V1, 'positioning', emptyContext({ itemCounts: { positioning: 1 } }));
-    expect(r.criteria.find((c) => c.id === 'pos.comparables')!.detail).toBe('1 of 2');
+    const r = evaluateStage(BOOK_V1, 'outline', emptyContext({ itemCounts: { outline: 1 } }));
+    expect(r.criteria.find((c) => c.id === 'out.sections')!.detail).toBe('1 of 2');
+  });
+
+  it('turns a count rule on a stage with nothing to count into a box the user ticks (PM-02)', () => {
+    // "At least two comparables named" sits on the prose Positioning stage. A
+    // prose draft has no items, so as authored this could never be satisfied —
+    // this test used to hand the engine an item count the app never produces.
+    const unticked = evaluateStage(BOOK_V1, 'positioning', emptyContext());
+    const comparables = unticked.criteria.find((c) => c.id === 'pos.comparables')!;
+    expect(comparables).toMatchObject({ manual: true, satisfied: false });
+
+    const ticked = evaluateStage(
+      BOOK_V1,
+      'positioning',
+      emptyContext({ manualChecks: { 'pos.comparables': true } })
+    );
+    expect(ticked.criteria.find((c) => c.id === 'pos.comparables')!.satisfied).toBe(true);
+  });
+
+  it('marks every criterion evaluated as manual, so the checklist can draw a box for it', () => {
+    const r = evaluateStage(BOOK_V1, 'objective', emptyContext());
+    const authoredManual = BOOK_V1.stages[0].exit_criteria.filter((c) => c.check === 'manual');
+    for (const c of authoredManual) {
+      expect(r.criteria.find((x) => x.id === c.id)!.manual).toBe(true);
+    }
+    expect(r.criteria.find((x) => x.id === 'obj.stated')!.manual).toBeUndefined();
   });
 
   it('does not treat "no sections at all" as all sections complete', () => {

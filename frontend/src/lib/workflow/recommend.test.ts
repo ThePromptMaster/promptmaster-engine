@@ -6,6 +6,7 @@ import { SINGLE_OUTPUT_V1 } from './templates/single-output.v1';
 import { evaluateStage } from './engine';
 import type { StageContext, WorkflowTemplate } from './types';
 import {
+  belongsToStage,
   MAX_DERIVED,
   buildRationale,
   bySeverity,
@@ -509,5 +510,28 @@ describe('an evaluator correction becomes a row-shaped proposal', () => {
         needs_realignment: false,
       })
     ).toContain('structure:more');
+  });
+});
+
+describe('a stored recommendation shows only on the stage it was raised on', () => {
+  // Sean's screenshot: on Experiment, "Move on to Literature context —
+  // Nothing on Research question is outstanding". That row was raised on the
+  // Question stage before it had a saved version, so version_id was null, and
+  // null matched every other stage without a saved version.
+  it('does not leak a null-version row onto another stage', () => {
+    const raisedOnQuestion = { scope: { stage_id: 'question' }, version_id: null };
+    expect(belongsToStage(raisedOnQuestion, 'experiment', null)).toBe(false);
+    expect(belongsToStage(raisedOnQuestion, 'question', null)).toBe(true);
+  });
+
+  it('still pins a row to the version it was raised against', () => {
+    const row = { scope: { stage_id: 'method' }, version_id: 'v2' };
+    expect(belongsToStage(row, 'method', 'v2')).toBe(true);
+    expect(belongsToStage(row, 'method', 'v3')).toBe(false);
+  });
+
+  it('hides legacy rows that cannot be attributed to any stage', () => {
+    expect(belongsToStage({ scope: { kind: 'document' }, version_id: null }, 'experiment', null)).toBe(false);
+    expect(belongsToStage({ scope: null, version_id: 'v9' }, 'anything', 'v9')).toBe(true);
   });
 });

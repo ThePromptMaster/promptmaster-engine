@@ -75,3 +75,24 @@ export async function serviceSelect(table: string, query: string) {
   if (!res.ok) throw new Error(`service select on ${table} failed: ${res.status}`);
   return res.json();
 }
+
+/** Update rows as the service role (local only). Used to seed states a test starts from. */
+export async function servicePatch(table: string, query: string, patch: Record<string, unknown>) {
+  const sb = supabaseEnv();
+  const res = await fetch(`${sb.API_URL}/rest/v1/${table}?${query}`, {
+    method: 'PATCH',
+    headers: {
+      apikey: sb.SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${sb.SERVICE_ROLE_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) throw new Error(`service patch on ${table} failed: ${res.status} ${await res.text()}`);
+}
+
+/** The exit-criteria row for one criterion, by its label (the row also carries detail text). */
+export function criterion(page: Page, label: string) {
+  const checklist = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Before moving on' }) });
+  return checklist.getByRole('listitem').filter({ hasText: label });
+}

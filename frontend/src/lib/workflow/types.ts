@@ -259,6 +259,13 @@ export interface CriterionResult {
   blocking: boolean;
   /** Present when unmet: one line on what is missing. */
   detail?: string;
+  /**
+   * Evaluated as a box the user ticks, whether authored that way or degraded
+   * to it (no rule, an unknown rule, or a count rule on a stage that holds no
+   * items). The checklist draws a checkbox from this, not from the authored
+   * `check` — otherwise a degraded criterion is a circle nobody can fill.
+   */
+  manual?: boolean;
 }
 
 export interface StageEvaluation {
