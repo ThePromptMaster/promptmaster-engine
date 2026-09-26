@@ -34,6 +34,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, ApiError } from '@/lib/api/client';
 import { asFinding } from '@/lib/workflow/combine';
 import {
+  belongsToStage,
   bySeverity,
   deriveWorkflowRecommendations,
   isApplyable,
@@ -191,6 +192,7 @@ export function useRecommendations({
     let cancelled = false;
     insertRecommendation(project.id, project.user_id, {
       ...proposal,
+      scope: { ...proposal.scope, stage_id: stage.id },
       version_id: headVersion?.id ?? null,
       source_model: storedEvaluation?.evaluator_model || project.model || 'unknown',
     })
@@ -228,17 +230,22 @@ export function useRecommendations({
 
   const panelRows: PanelRecommendation[] = useMemo(() => {
     const persisted = rows
-      .filter((r) => r.status === 'pending' && r.version_id === (headVersion?.id ?? null))
+      .filter((r) => r.status === 'pending' && belongsToStage(r, stageId, headVersion?.id ?? null))
       .map(toPanelRow);
+
+    // A finished project has nowhere to move on to; "Finish" or "Move on"
+    // offered under the finished banner reads as the button not having worked.
+    const finished = project.status === 'finalized';
+    const live = (r: { kind: string }) => !(finished && r.kind === 'stage_transition');
 
     // Evaluation-driven first once sorted by severity, because they are the
     // ones with a defect behind them; derived rows are almost all `info`.
     const merged: PanelRecommendation[] = [
-      ...persisted,
-      ...derived.map((d): PanelRecommendation => ({ ...d, origin: 'derived' })),
+      ...persisted.filter(live),
+      ...derived.filter(live).map((d): PanelRecommendation => ({ ...d, origin: 'derived' })),
     ];
     return merged.sort(bySeverity);
-  }, [rows, derived, headVersion]);
+  }, [rows, derived, headVersion, stageId, project.status]);
 
   const selectedRows = useMemo(
     () => (previewing ? panelRows.filter((r) => previewing.includes(r.category)) : []),
@@ -262,13 +269,14 @@ export function useRecommendations({
       }
       const created = await insertRecommendation(project.id, project.user_id, {
         ...(rec as ProposedRecommendation),
+        scope: { ...rec.scope, ...(stage ? { stage_id: stage.id } : {}) },
         version_id: headVersion?.id ?? null,
         status,
       });
       setRows((prev) => [...prev, created]);
       return created;
     },
-    [rows, project.id, project.user_id, headVersion]
+    [rows, project.id, project.user_id, headVersion, stage]
   );
 
   const triage = useCallback(

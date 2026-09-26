@@ -23,12 +23,13 @@ import { LongFormRenderer } from './long-form-renderer';
 import { ProseRenderer } from './prose-renderer';
 import { ReviewRenderer } from './review-renderer';
 import type { StageRendererProps } from './types';
+import { effectiveRenderer } from '@/lib/workflow/stage-artifact';
 
 export function StageRenderer(props: StageRendererProps) {
   const { stage } = props;
 
   let body: React.ReactNode;
-  switch (stage.renderer) {
+  switch (effectiveRenderer(stage)) {
     case 'prose':
       body = <ProseRenderer {...props} />;
       break;

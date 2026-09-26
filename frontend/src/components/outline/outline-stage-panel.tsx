@@ -10,6 +10,7 @@ import { api } from '@/lib/api/client';
 import {
   applyItemRegeneration,
   coerceOutlineDocument,
+  countNamedSections,
   emptyDocument,
   mergeRegeneratedOutline,
   outlineHistory,
@@ -74,6 +75,14 @@ interface Props {
    * the caller owns that write because it owns the drafting artifact.
    */
   onApproved?: (version: ArtifactVersion, doc: OutlineDocument) => void | Promise<void>;
+  /**
+   * The number of named sections on screen, reported as the user edits
+   * (PM-01). The panel keeps its own state — the unsaved draft in
+   * `outline_draft` plus its own version list — so without this the stage's
+   * "outline has sections" criterion read a count the workspace never had,
+   * and stayed at 0 however many sections were visible.
+   */
+  onItemCountChange?: (count: number) => void;
   readOnly?: boolean;
 }
 
@@ -100,6 +109,7 @@ export function OutlineStagePanel({
   onRewriteSection,
   derive,
   onApproved,
+  onItemCountChange,
   readOnly = false,
 }: Props) {
   const [artifact, setArtifact] = useState<Artifact | null>(null);
@@ -169,6 +179,11 @@ export function OutlineStagePanel({
   );
   const headApproved = head ? approvedIds.has(head.id) : false;
   const doc = draft ?? headDocument;
+
+  const namedSections = countNamedSections(doc);
+  useEffect(() => {
+    if (!loading) onItemCountChange?.(namedSections);
+  }, [namedSections, loading, onItemCountChange]);
 
   const approvedVersion = versions.find((v) => v.id === approvedVersionId) ?? null;
   const forkedFrom = draft?.forked_from_version_id

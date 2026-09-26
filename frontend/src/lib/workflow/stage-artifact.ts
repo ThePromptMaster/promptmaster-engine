@@ -275,7 +275,7 @@ export function itemSchemaFor(stage: StageDefinition): StageItemSchema {
   const kind = primaryArtifactKind(stage);
   const found = kind ? ITEM_SCHEMAS[kind] : undefined;
   if (found) return found;
-  if (stage.renderer === 'review') return { ...GENERIC_ITEM, statuses: TRIAGE };
+  if (effectiveRenderer(stage) === 'review') return { ...GENERIC_ITEM, statuses: TRIAGE };
   return GENERIC_ITEM;
 }
 
@@ -359,6 +359,27 @@ export function isTriaged(item: StageItem, schema: StageItemSchema): boolean {
   if (!option) return false;
   if (option.requiresReason) return (item.reason ?? '').trim().length > 0;
   return true;
+}
+
+/**
+ * The renderer a stage is actually drawn with.
+ *
+ * A `list` stage that carries an `every_item_has_status` criterion is drawn as
+ * `review`, because only the review renderer has a status control and the
+ * criterion is otherwise unsatisfiable. Research v1's Experiment and
+ * Alternatives stages were authored that way; v2 fixed the template, but
+ * published versions are immutable and projects pinned to v1 were stranded at
+ * "10 still unresolved" with no way to resolve anything. Decided by the
+ * stage's own criteria, never by which workflow it belongs to.
+ */
+export function effectiveRenderer(stage: StageDefinition): StageRenderer {
+  if (
+    stage.renderer === 'list' &&
+    stage.exit_criteria.some((c) => c.rule?.type === 'every_item_has_status')
+  ) {
+    return 'review';
+  }
+  return stage.renderer;
 }
 
 /** Which renderers store their artifact as items rather than as prose. */

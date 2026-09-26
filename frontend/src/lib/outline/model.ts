@@ -107,6 +107,16 @@ export function coerceOutlineDocument(raw: unknown): OutlineDocument {
  * not read as an edit; otherwise loading an outline and touching nothing would
  * report unsaved changes.
  */
+/**
+ * Sections that count toward "the outline has N sections" (PM-01).
+ *
+ * A row the user has added but not yet named is a placeholder, not a section:
+ * counting it would let an outline of empty rows satisfy the gate.
+ */
+export function countNamedSections(doc: Pick<OutlineDocument, 'items'>): number {
+  return doc.items.filter((item) => item.title.trim().length > 0).length;
+}
+
 export function serializeOutlineDocument(doc: OutlineDocument): string {
   return JSON.stringify({
     schema: 1,
