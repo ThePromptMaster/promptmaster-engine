@@ -29,11 +29,12 @@ import {
   type PreservedContext,
   type StageFailure,
 } from '@/lib/errors/recovery';
-import { buildStageDigest, type StageArtifactBundle } from '@/lib/workflow/digest';
+import type { StageArtifactBundle } from '@/lib/workflow/digest';
+import { evaluationRecord, evaluationRequest } from '@/lib/workflow/stage-requests';
 import type { StageDefinition, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
 import type { NewEvaluation } from '@/lib/supabase/versions';
 import type { Evaluation, Project } from '@/types/project';
-import type { OutlineSection, PMInput, StageRecommendation } from '@/types';
+import type { OutlineSection, StageRecommendation } from '@/types';
 
 interface Options {
   project: Project;
@@ -52,27 +53,7 @@ interface Options {
   ) => Promise<Evaluation>;
 }
 
-/**
- * The project's fields as a PMInput.
- *
- * Exported because the apply path needs exactly the same assembly: applying a
- * recommendation and evaluating an artifact must present the model with the
- * same objective, audience and constraints, or the correction is written
- * against a different brief than the one it was judged against.
- */
-export function inputsFrom(project: Project): PMInput {
-  return {
-    objective: project.objective,
-    audience: project.audience,
-    constraints: project.constraints,
-    output_format: project.output_format,
-    mode: project.mode,
-    custom_name: project.custom_name,
-    custom_preamble: project.custom_preamble,
-    custom_tone: project.custom_tone,
-    session_facts: project.session_facts,
-  };
-}
+export { inputsFrom } from '@/lib/workflow/stage-requests';
 
 export function useStageEvaluation({
   project,
@@ -155,50 +136,15 @@ export function useStageEvaluation({
 
     try {
       const response = await api.evaluateStageArtifact(
-        {
-          inputs: inputsFrom(p),
-          stage: {
-            id: stage.id,
-            label: stage.label,
-            renderer: stage.renderer,
-            entry_prompt_hint: stage.entry_prompt_hint ?? '',
-            artifact_kind: stage.expected_artifacts[0]?.kind ?? '',
-            // The bar the artifact was written to. The engine still opens
-            // gates with pure predicates; this only tells the judge what
-            // acceptable was supposed to mean.
-            exit_criteria: stage.exit_criteria.map((c) => ({
-              id: c.id,
-              label: c.label,
-              blocking: Boolean(c.blocking),
-            })),
-          },
-          content: version.content,
-          digest: buildStageDigest(t, s, p, b, stage.id),
-          approved_outline: outline,
-          model: p.model,
-        },
+        evaluationRequest(p, t, s, b, stage, version.content, outline),
         controller.signal
       );
 
       if (controller.signal.aborted) return;
 
-      const { evaluation } = response;
-      await record(stage.id, version.id, {
-        alignment_score: evaluation.alignment.score,
-        alignment_explanation: evaluation.alignment.explanation,
-        drift_score: evaluation.drift.score,
-        drift_explanation: evaluation.drift.explanation,
-        clarity_score: evaluation.clarity.score,
-        clarity_explanation: evaluation.clarity.explanation,
-        completeness_status: evaluation.completeness?.status ?? null,
-        completeness_reason: evaluation.completeness?.reason ?? null,
-        interpretation: evaluation.interpretation ?? null,
-        findings: evaluation.findings ?? [],
-        evaluator_model: response.model_used || p.model,
-        // 'manual' is the source this is: a user pressed a button, rather than
-        // the four-call pipeline producing one as a side effect.
-        source: 'manual',
-      });
+      // 'manual' is the source this is: a user pressed a button, rather than
+      // the four-call pipeline producing one as a side effect.
+      await record(stage.id, version.id, evaluationRecord(response, p.model, 'manual'));
 
       setRecommendation(response.recommendation);
     } catch (err) {

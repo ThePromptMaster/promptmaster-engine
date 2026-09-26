@@ -26,6 +26,9 @@ const OPERATION_LABEL: Record<string, string> = {
   flow_drift_alert: 'Realigned to the objective',
   continuation: 'Continued',
   chat_save: 'Saved from the discussion',
+  // PM-17: Go mode's own work, kept distinguishable from a button press.
+  agent_draft: 'Go mode draft',
+  agent_revise: 'Go mode revision',
 };
 
 /** "AI draft", "Your edit", … — never the raw code. */

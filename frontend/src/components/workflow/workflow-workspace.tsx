@@ -19,6 +19,8 @@ import { ProjectFinishedBanner } from './project-finished-banner';
 import { StageRenderer } from './renderers/stage-renderer';
 import { useStageGeneration } from './use-stage-generation';
 import { useStageEvaluation } from './use-stage-evaluation';
+import { useGoLoop } from './use-go-loop';
+import { GoPanel } from './agent/go-panel';
 import { StageEvaluationPanel } from './evaluation-panel';
 import { ExportMenu } from './export-menu';
 import { ChatPanel } from './chat-panel';
@@ -144,6 +146,8 @@ export function WorkflowWorkspace({
   const [activeVersionId, setActiveVersionId] = useState<string | null>(null);
   // Below md the rail is not on the page; this is the drawer that replaces it.
   const [mobileRailOpen, setMobileRailOpen] = useState(false);
+  // Go mode drafts stages itself; the entry auto-draft must not race it.
+  const [goDriving, setGoDriving] = useState(false);
 
   useEffect(() => {
     listWorkflowEvents(project.id)
@@ -198,7 +202,7 @@ export function WorkflowWorkspace({
     bundles: stageBundles,
     // Never start work on a stage the user is only looking at, and never
     // before the event log has loaded — the current stage is not yet known.
-    enabled: Boolean(appendStageVersion) && isCurrent && events !== null,
+    enabled: Boolean(appendStageVersion) && isCurrent && events !== null && !goDriving,
     appendStageVersion: appendStageVersion ?? (async () => undefined),
   });
 
@@ -656,6 +660,47 @@ export function WorkflowWorkspace({
     setEvents(await listWorkflowEvents(project.id));
   }, [project.id]);
 
+  // --- Go mode (B4, PM-17 … PM-20) ------------------------------------------------
+  // After a stage event the run caused, the log is re-read and the list-view
+  // cursor follows it, exactly as a transition-bar click does.
+  const reloadAfterAgent = useCallback(async () => {
+    const fresh = await listWorkflowEvents(project.id);
+    setEvents(fresh);
+    setViewingStageId(null);
+    const moved = projectState(template, fresh).current_stage_id;
+    if (moved !== project.stage) onPatchProject({ stage: moved });
+  }, [project.id, project.stage, template, onPatchProject]);
+
+  const deliverableDone = useMemo(() => {
+    const target = deliverableStage(template);
+    const sections = (target ? stageBundles[target.id]?.artifact?.long_form?.outline : undefined) ?? [];
+    return completionSummary(template, state, {
+      artifactNonEmpty: Boolean(target && context.artifactNonEmpty[target.id]),
+      sectionsTotal: sections.length,
+      sectionsComplete: sections.filter((s) => s.status === 'complete').length,
+    }).deliverableDone;
+  }, [template, state, stageBundles, context]);
+
+  const go = useGoLoop({
+    project,
+    template,
+    state,
+    // Go works the stage the project is on, never one the user is browsing.
+    stage: getStage(template, state.current_stage_id),
+    bundles: stageBundles,
+    context,
+    stageEvaluation: evaluateStage(template, state.current_stage_id, context),
+    latestEvaluation: evaluations?.[stageBundles[state.current_stage_id]?.versions.at(-1)?.id ?? ''] ?? null,
+    approvedOutline,
+    deliverableDone,
+    enabled: Boolean(appendStageVersion) && events !== null,
+    appendStageVersion,
+    recordStageEvaluation,
+    setStageSummary,
+    reloadEvents: reloadAfterAgent,
+  });
+  useEffect(() => setGoDriving(go.active || go.phase === 'awaiting'), [go.active, go.phase]);
+
   if (!stage) return null;
 
   const stageVersions = stageVersionList;
@@ -1002,6 +1047,10 @@ export function WorkflowWorkspace({
             onPickMode={isCurrent ? (mode) => onPatchProject({ mode: mode as Project['mode'] }) : undefined}
             currentMode={project.mode}
           />
+
+          {isCurrent && appendStageVersion && project.status !== 'finalized' && (
+            <GoPanel go={go} stageLabel={stage.label} mode={project.mode} />
+          )}
 
           <div className="mb-8">
             {/* The stage's exit criteria say whether the project's setup fields

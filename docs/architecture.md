@@ -164,6 +164,33 @@ versions. Corrected there in the same change that added these documents.)
 reproduction table are the same `review` renderer with different columns. This is the
 property that makes a fourth workflow cheap.
 
+## Go mode (Phase B: PM-12, PM-15, PM-17 … PM-20)
+
+The next-best-action loop runs **in the browser** (`components/workflow/use-go-loop.ts`)
+and persists every step as it goes. The backend stays stateless: it chooses a move and
+performs model work (`/api/agent/*`, B2); the Next route `/api/sandbox/run` executes code in
+a Vercel Sandbox and writes the only trusted record of it (B3); the database decides what a
+run may do on its own (B1).
+
+| Layer (PM-15) | Question | Where |
+|---|---|---|
+| Workflow | where are we | the stage (`projectState`) |
+| Mode | how to think | `projects.mode`, the stage header picker |
+| Action | what now | `lib/agent/actions.ts` ↔ `backend/promptmaster/agent_actions.py` (drift-tested) |
+| Execution policy | how autonomously | Guided / Checkpoint / Autonomous (`lib/agent/policy.ts`) |
+
+One pass of the loop: `preempt` (budget, blocked, finished, no progress, repeated failure —
+no model call) → `next-action` (a move from `allowedActions` only) → **insert the step** →
+pause for approval if the policy says so → `performStep` → close the step with a label
+derived from what happened (`lib/agent/labels.ts`). `run_computation` is followed by an
+automatic `interpret_result` step that cites the sandbox run.
+
+Honesty is enforced twice: `deriveExecutionLabel` never takes a label from the model, and
+`agent_steps_label_honest` refuses `code_executed`/`simulation_run` without a sandbox run
+for the step and `result_interpreted` without one to cite. Stage moves are the user's when
+they approved them; only an Autonomous run records them as `actor='system'`, citing the run,
+which `workflow_events_agent_authorized` checks against its accepted authorization.
+
 ## Extension points
 
 These are the seams the system was built to be extended at. Working with them is

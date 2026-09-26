@@ -387,3 +387,14 @@ run (`SANDBOX_MAX_PER_RUN`), 600 s of execution per user per UTC day
 Cost is recorded only when `SANDBOX_USD_PER_VCPU_SECOND` is set, and is otherwise
 null ("unknown"), never $0. `SANDBOX_ENABLED` must be `true` in production; when
 it is not, every computation is honestly blocked on a missing tool.
+
+### L-B4 — Go mode runs while the tab is open
+
+The Go loop is browser-driven. Closing the tab pauses a run; reopening the project resumes
+it, and whatever step was in flight is recorded as `interrupted` and never repeated. Two
+tabs cannot drive one run (a lease with a 10 s heartbeat; the second tab watches and takes
+over if the first goes quiet for 25 s). Other limits: the step budget is counted in steps,
+not dollars (`agent_runs.budget_usd` exists but is not enforced yet; model spend is in
+`model_usage` as usual); `check_literature` is always blocked (`tool_missing`) because no
+retrieval tool is connected; `draft_stage` / `revise_stage` do not cover the outline and
+long-form drafting stages, which keep their own controls.

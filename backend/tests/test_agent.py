@@ -248,3 +248,9 @@ def test_mock_code_round_trip(mock_http):
 def test_mock_reason(mock_http):
     r = mock_http.post("/api/agent/reason", json={**J, "action_key": "prove"})
     assert "Mock Prove" in r.json()["text"]
+
+
+def test_mock_code_markers_drive_the_sandbox_branches(mock_http):
+    inputs = {**INPUTS.model_dump(), "objective": "Pendulum [[mock:sandbox=unavailable]]"}
+    code = mock_http.post("/api/agent/write-code", json={"inputs": inputs, "state": STATE.model_dump()}).json()["code"]
+    assert "# mock:unavailable" in code

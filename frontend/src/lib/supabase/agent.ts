@@ -148,3 +148,22 @@ export async function getSandboxRun(id: string): Promise<SandboxRun | null> {
   if (error) throw error;
   return (data as SandboxRun | null) ?? null;
 }
+
+/** Park a step for the user's approval, or pick it back up after it. */
+export async function setAgentStepStatus(stepId: string, status: 'awaiting_decision' | 'running'): Promise<void> {
+  const { error } = await createClient().from('agent_steps').update({ status }).eq('id', stepId);
+  if (error) throw error;
+}
+
+/** The project's most recent run, finished or not — what reopening the page shows. */
+export async function getLatestAgentRun(projectId: string): Promise<AgentRun | null> {
+  const { data, error } = await createClient()
+    .from('agent_runs')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as AgentRun | null) ?? null;
+}

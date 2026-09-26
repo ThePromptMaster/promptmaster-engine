@@ -33,6 +33,14 @@ import type {
   GenerateStageArtifactResponse,
 } from '@/types';
 import { createClient } from '@/lib/supabase/client';
+import type { AgentStateDigest } from '@/lib/agent/digest';
+import type {
+  AgentTextResponse,
+  NextActionRequest,
+  NextActionResponse,
+  SandboxRunResponse,
+  WriteCodeResponse,
+} from '@/types/agent';
 import {
   REQUEST_ID_HEADER,
   USAGE_HEADER,
@@ -557,6 +565,64 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(req),
     });
+  },
+
+  // --- Go mode (B2). Stateless model calls; the loop persists every step itself.
+
+  async agentNextAction(req: NextActionRequest, signal?: AbortSignal): Promise<NextActionResponse> {
+    return apiFetch('/api/agent/next-action', { method: 'POST', body: JSON.stringify(req), signal });
+  },
+
+  async agentReason(
+    req: { inputs: PMInput; state: AgentStateDigest; action_key: string; params: Record<string, unknown>; model?: string },
+    signal?: AbortSignal
+  ): Promise<AgentTextResponse> {
+    return apiFetch('/api/agent/reason', { method: 'POST', body: JSON.stringify(req), signal });
+  },
+
+  async agentWriteCode(
+    req: { inputs: PMInput; state: AgentStateDigest; goal: string; kind: 'computation' | 'simulation'; model?: string },
+    signal?: AbortSignal
+  ): Promise<WriteCodeResponse> {
+    return apiFetch('/api/agent/write-code', { method: 'POST', body: JSON.stringify(req), signal });
+  },
+
+  async agentInterpretResult(
+    req: {
+      inputs: PMInput;
+      state: AgentStateDigest;
+      sandbox_run_id: string;
+      code: string;
+      stdout: string;
+      stderr: string;
+      exit_code: number | null;
+      model?: string;
+    },
+    signal?: AbortSignal
+  ): Promise<AgentTextResponse> {
+    return apiFetch('/api/agent/interpret-result', { method: 'POST', body: JSON.stringify(req), signal });
+  },
+
+  /**
+   * Run code in the sandbox (B3). Same-origin Next route, not FastAPI: it
+   * writes the trusted sandbox_runs row with the service role.
+   */
+  async runSandbox(
+    req: { project_id: string; run_id: string; step_id: string; code: string; kind: 'computation' | 'simulation' },
+    signal?: AbortSignal
+  ): Promise<SandboxRunResponse> {
+    const { data } = await createClient().auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) throw new Error('You are signed out. Sign in again to run code.');
+    const res = await fetch('/api/sandbox/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(req),
+      signal,
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw Object.assign(new Error(body.error || `Code execution failed (${res.status}).`), { status: res.status });
+    return body as SandboxRunResponse;
   },
 
   async getModels(): Promise<{ models: Array<{ id: string; name: string; context_length: number }> }> {
