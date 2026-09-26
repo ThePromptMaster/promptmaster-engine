@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends
 from promptmaster.modes import MODES
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError
 from auth import require_user
+from deps import llm_mode
 
 router = APIRouter(prefix="/api", tags=["meta"])
 
@@ -27,7 +28,12 @@ async def get_modes():
 async def get_models():
     """Fetch available text models from OpenRouter."""
     try:
-        models = await OpenRouterClient.fetch_text_models()
+        if llm_mode() == "mock":
+            from promptmaster.mock_llm import ScriptedClient
+
+            models = await ScriptedClient.fetch_text_models()
+        else:
+            models = await OpenRouterClient.fetch_text_models()
         return {"models": models}
     except OpenRouterError as e:
         return {"models": [], "error": str(e)}
