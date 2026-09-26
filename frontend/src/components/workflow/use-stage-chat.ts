@@ -39,6 +39,7 @@ import {
   type StageChatMessage,
 } from '@/lib/supabase/conversation';
 import { inputsFrom } from './use-stage-generation';
+import { asIteration } from '@/lib/workflow/legacy';
 import {
   describeScope,
   resolveScope,
@@ -49,7 +50,7 @@ import {
 } from './chat-scope';
 import type { NewVersion } from '@/lib/supabase/versions';
 import type { ArtifactVersion, Project } from '@/types/project';
-import type { ChatMessage, Iteration } from '@/types';
+import type { ChatMessage } from '@/types';
 
 /** A revision the user has been shown but has not yet accepted. */
 export interface ChatProposal {
@@ -66,6 +67,8 @@ export interface ChatProposal {
   /** The message row the instruction was persisted as, to stamp on accept. */
   messageId: string | null;
   changeSummary: string;
+  /** How the version is recorded when accepted; defaults to 'chat_instruct'. */
+  source?: string;
 }
 
 /** What was applied last, so it can be undone without hunting for it. */
@@ -101,16 +104,6 @@ interface Options {
  * lets the side chat reuse three endpoints, three prompt builders and their
  * tests without a backend change.
  */
-function asIteration(output: string, number: number, mode: Project['mode']): Iteration {
-  return {
-    iteration_number: number,
-    prompt_sent: '',
-    system_prompt_used: '',
-    output,
-    mode,
-    evaluation: null,
-  };
-}
 
 /** The thread as the backend wants it: role and content, nothing else. */
 function asHistory(messages: StageChatMessage[]): ChatMessage[] {
@@ -328,6 +321,51 @@ export function useStageChat({
   );
 
   /**
+   * "Save as New Version" from the original core (PM-10): turn the discussion
+   * so far into a revised draft of the whole document. Like an instruction it
+   * is only a proposal — it is shown before anything is written.
+   */
+  const saveDiscussion = useCallback(async () => {
+    if (busy || messages.length === 0) return;
+    const target = resolveScope(content, 'document', {});
+    if (!target) {
+      setError('There is no draft here to revise yet.');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await api.saveAsNewVersion({
+        inputs: inputsFrom(project),
+        active_iteration: asIteration(content, versionNumber, project.mode),
+        chat_history: asHistory(messages),
+        iteration_number: versionNumber + 1,
+        model: project.model,
+      });
+      const after = response.iteration.output.trim();
+      if (!after) {
+        if (live.current) setError('The new version came back empty. Try again in a moment.');
+        return;
+      }
+      if (!live.current) return;
+      setProposal({
+        instruction: 'Save the discussion as a new version',
+        target,
+        before: describeScope(target),
+        after,
+        nextContent: after,
+        messageId: null,
+        changeSummary: response.iteration.summary?.trim() || 'Revised from the side-chat discussion.',
+        source: 'chat_save',
+      });
+    } catch (err) {
+      if (live.current) setError(errorText(err, 'Could not turn the discussion into a new version.'));
+    } finally {
+      if (live.current) setBusy(false);
+    }
+  }, [busy, messages, content, project, versionNumber]);
+
+  /**
    * Accept the proposal: append it as a new version.
    *
    * Appending, not mutating — `artifact_versions` is append-only and the
@@ -343,7 +381,7 @@ export function useStageChat({
     try {
       await appendStageVersion(stageId, stageLabel, {
         content: proposal.nextContent,
-        source_operation: 'chat_instruct',
+        source_operation: proposal.source ?? 'chat_instruct',
         instruction: proposal.instruction,
         model: project.model,
         mode: project.mode,
@@ -413,6 +451,7 @@ export function useStageChat({
     applied,
     discuss,
     propose,
+    saveDiscussion,
     accept,
     discard,
     undo,

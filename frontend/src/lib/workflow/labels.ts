@@ -17,6 +17,15 @@ const OPERATION_LABEL: Record<string, string> = {
   refine: 'Refined',
   outline_edit: 'Outline edit',
   initial: 'Imported',
+  // PM-10: the original core's actions, inside a stage.
+  flow_refine_shorter: 'Refined: shorter',
+  flow_refine_technical: 'Refined: more technical',
+  flow_refine_concrete: 'Refined: more concrete',
+  flow_refine_angle: 'Refined: different angle',
+  flow_refine_cautious: 'Refined: more cautious',
+  flow_drift_alert: 'Realigned to the objective',
+  continuation: 'Continued',
+  chat_save: 'Saved from the discussion',
 };
 
 /** "AI draft", "Your edit", … — never the raw code. */

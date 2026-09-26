@@ -150,3 +150,55 @@ export function ProjectSetup({ project, stage, onPatch, readOnly }: Props) {
     </section>
   );
 }
+
+/**
+ * The project brief on every other stage (PM-10).
+ *
+ * Objective, audience, constraints and output format used to be editable only
+ * on the first stage, which made them feel like a form filled in once rather
+ * than the thing every stage is generated against. Collapsed by default so it
+ * costs one line; open, it is the same four fields.
+ */
+export function ProjectBrief({ project, onPatch, readOnly }: Omit<Props, 'stage'>) {
+  const objective = project.objective.trim();
+  return (
+    <details className="group mb-6 rounded-xl bg-[var(--surface-container-lowest)] px-7 py-4">
+      <summary className="flex cursor-pointer list-none items-center gap-2 text-body text-[var(--on-surface-variant)]">
+        <span aria-hidden className="material-symbols-outlined text-[18px] transition-transform group-open:rotate-90">
+          chevron_right
+        </span>
+        <span className="shrink-0 text-label uppercase tracking-wider">Project brief</span>
+        <span className="min-w-0 truncate text-[var(--on-surface)]">
+          {objective || 'No objective yet'}
+        </span>
+        {project.audience && (
+          <span className="hidden shrink-0 text-label sm:inline">· for {project.audience}</span>
+        )}
+      </summary>
+      <p className="mt-3 mb-4 text-label text-[var(--on-surface-variant)]">
+        Every stage is written against this. Change it here and the next draft follows.
+      </p>
+      <div className="space-y-4">
+        {ORDER.map((key) => {
+          const field = FIELDS[key];
+          return (
+            <div key={key}>
+              <label htmlFor={`brief-${key}`} className="mb-1.5 block text-label text-[var(--on-surface-variant)]">
+                {field.label}
+              </label>
+              <AutoGrowTextarea
+                id={`brief-${key}`}
+                value={project[key] ?? ''}
+                readOnly={readOnly}
+                rows={1}
+                placeholder={field.placeholder}
+                onChange={(e) => onPatch({ [key]: e.target.value })}
+                className="w-full rounded-lg bg-[var(--surface-container-low)] px-4 py-2.5 text-body leading-relaxed text-[var(--on-surface)] outline-none placeholder:text-[var(--on-surface-variant)] focus:ring-2 focus:ring-[var(--pm-primary)]/40 read-only:opacity-70"
+              />
+            </div>
+          );
+        })}
+      </div>
+    </details>
+  );
+}

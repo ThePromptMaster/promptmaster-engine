@@ -49,8 +49,10 @@ _PROSE_INSTRUCTION = (
     "STAGE MODE: You are producing the artifact for ONE stage of a longer piece "
     "of structured work. Write only this stage's artifact. Do not preview what "
     "later stages will cover, do not restate the earlier stages back to the "
-    "user, and do not add meta commentary about the process. Return Markdown "
-    "prose, no code fences around the whole answer."
+    "user, and do not add meta commentary about the process. Produce the "
+    "artifact itself — the actual text this stage calls for, written in full — "
+    "never a plan, an outline or notes about how it could be written. Return "
+    "Markdown prose, no code fences around the whole answer."
 )
 
 _LIST_INSTRUCTION = (

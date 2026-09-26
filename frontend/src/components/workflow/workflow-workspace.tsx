@@ -8,6 +8,8 @@ import { ExitCriteriaChecklist } from './exit-criteria-checklist';
 import { StageTransitionBar, type MoreAction } from './stage-transition-bar';
 import { ConfirmOverwrite } from './renderers/stage-chrome';
 import { CheckpointPanel } from './checkpoint-panel';
+import { StageToolResult } from './stage-tool-result';
+import { CRITIQUE_TOOLS, REWRITE_TOOLS, useStageTools } from './use-stage-tools';
 import { nextStageAction } from '@/lib/workflow/next-action';
 import { isApplyable } from '@/lib/workflow/recommend';
 import { ProjectFinishedBanner } from './project-finished-banner';
@@ -33,7 +35,7 @@ import {
 import { summariseStageContent } from '@/lib/workflow/digest';
 import { deriveOutlineItems, draftingStageId } from '@/lib/workflow/derived-outline';
 import { OutlineStagePanel } from '@/components/outline/outline-stage-panel';
-import { ProjectSetup, stageWantsSetup } from './project-setup';
+import { ProjectBrief, ProjectSetup, stageWantsSetup } from './project-setup';
 import { draftBindings, longFormFromOutline } from '@/lib/outline/long-form';
 import { saveLongForm } from '@/lib/supabase/versions';
 import type { OutlineDocument } from '@/types/outline';
@@ -425,6 +427,8 @@ export function WorkflowWorkspace({
    * evaluation: acting on a stage you are only looking at is never what was
    * meant.
    */
+  const tools = useStageTools({ project, stage: stage ?? null, headVersion, appendStageVersion });
+
   const recommendations = useRecommendations({
     project,
     template,
@@ -591,12 +595,15 @@ export function WorkflowWorkspace({
   const hasContent = (headVersion?.content ?? '').trim().length > 0;
   const applyable = recommendations.rows.filter((r) => r.kind !== 'stage_transition' && isApplyable(r));
   const nextStage = stage.transitions.default_next ? getStage(template, stage.transitions.default_next) : null;
+  const truncated =
+    headVersion?.finish_reason === 'length' || headEvaluation?.completeness_status === 'incomplete';
   const primaryAction = nextStageAction({
     finished: project.status === 'finalized',
-    busy: generation.generating || stageEvaluation.evaluating || busy,
+    busy: generation.generating || stageEvaluation.evaluating || busy || tools.running !== null,
     dirty: Boolean(dirtyState?.dirty),
     draftable,
     hasContent,
+    truncated,
     evaluable: draftable && Boolean(stageEvaluation.evaluate),
     evaluated: Boolean(headEvaluation),
     evaluationClean: Boolean(
@@ -612,6 +619,9 @@ export function WorkflowWorkspace({
     nextLabel: nextStage?.short_label ?? null,
   });
 
+  // PM-10: the original core's actions — refine, realign, challenge, reframe,
+  // self-audit, continue — on a prose stage that has a draft.
+  const toolsAvailable = isCurrent && draftable && stage.renderer === 'prose' && hasContent;
   const runPrimary = () => {
     switch (primaryAction.kind) {
       case 'save':
@@ -626,6 +636,9 @@ export function WorkflowWorkspace({
       case 'apply_fixes':
         recommendations.openPreview(applyable.map((r) => r.category));
         return;
+      case 'continue_writing':
+        void tools.run('continue');
+        return;
     }
   };
 
@@ -635,6 +648,15 @@ export function WorkflowWorkspace({
       : []),
     ...(draftable && !hasContent && primaryAction.kind !== 'draft'
       ? [{ id: 'draft', label: 'Draft this stage', icon: 'auto_awesome', onSelect: () => generation.generate() }]
+      : []),
+    ...(toolsAvailable
+      ? [
+          ...(truncated && primaryAction.kind !== 'continue_writing'
+            ? [{ id: 'continue', label: 'Continue writing', icon: 'play_arrow', onSelect: () => void tools.run('continue') }]
+            : []),
+          ...REWRITE_TOOLS.map((t) => ({ id: t.kind, label: t.label, icon: t.icon, onSelect: () => void tools.run(t.kind) })),
+          ...CRITIQUE_TOOLS.map((t) => ({ id: t.kind, label: t.label, icon: t.icon, onSelect: () => void tools.run(t.kind) })),
+        ]
       : []),
     ...(draftable && hasContent && Boolean(stageEvaluation.evaluate) && primaryAction.kind !== 'evaluate'
       ? [{
@@ -856,13 +878,15 @@ export function WorkflowWorkspace({
             {/* The stage's exit criteria say whether the project's setup fields
                 belong here — no stage in any template asks for them twice, and
                 nothing about this reads the workflow's name. */}
-            {stageWantsSetup(stage) && (
+            {stageWantsSetup(stage) ? (
               <ProjectSetup
                 project={project}
                 stage={stage}
                 onPatch={onPatchProject}
                 readOnly={!isCurrent}
               />
+            ) : (
+              <ProjectBrief project={project} onPatch={onPatchProject} readOnly={!isCurrent} />
             )}
 
             {outlinePanelHere && (
@@ -931,6 +955,18 @@ export function WorkflowWorkspace({
               />
             )}
           </div>
+
+          {isCurrent && (tools.running || tools.error || tools.commentary) && (
+            <StageToolResult
+              running={tools.running}
+              error={tools.error}
+              commentary={tools.commentary}
+              onDismiss={() => {
+                tools.dismissCommentary();
+                tools.dismissError();
+              }}
+            />
+          )}
 
           <div className="space-y-4">
             {/* The order below is the argument. The checklist states the gap;
