@@ -171,15 +171,15 @@ Two further points:
 - After Tab A resolves with "Keep my changes", **Tab B is still not notified.** It goes
   on displaying its own value until it next writes, at which point it gets its own
   conflict banner.
-- **The append path has no cross-tab protection at all.** Two tabs appending versions
-  concurrently each compute a version number from their own cached `version_count`.
-  Within a single tab this is handled — `appendStageVersion` re-reads the artifact
-  from the store first, because "a stale copy would write version 2 twice" — but
-  across tabs the only thing standing in the way is the
-  `unique (artifact_id, version_number)` index, which turns the second write into a
-  raw error rather than a conflict banner.
+- **Appends are numbered by the database.** `version_number`, the parent and the
+  artifact's head are set by triggers under a per-artifact lock
+  (`20260927000200_artifact_version_append.sql`), so two tabs appending serialise into
+  two versions rather than one failing. The browser no longer sends a number, and no
+  `revision` guard sits on the head move: `revision` is bumped by every artifact write
+  (the outline draft autosave included), and guarding the head on it is what stranded
+  approved outlines.
 
-Both are in [`known-limitations.md`](known-limitations.md).
+The first is in [`known-limitations.md`](known-limitations.md) (L-18).
 
 ## No rate limiting on the save path
 

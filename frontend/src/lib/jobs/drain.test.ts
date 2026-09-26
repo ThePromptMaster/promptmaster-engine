@@ -84,7 +84,12 @@ class FakeStore implements JobStore {
 
   constructor(private clock: Clock) {}
 
-  enqueue(sectionIndex: number, section: OutlineSectionState, revision = 0): void {
+  enqueue(
+    sectionIndex: number,
+    section: OutlineSectionState,
+    revision = 0,
+    revise?: DraftSectionPayload['revise']
+  ): void {
     const key = `draft:${OUTLINE_VERSION}:${section.id}:${revision}`;
     // on conflict do nothing — the idempotency guarantee.
     if (this.jobs.some((j) => j.project_id === PROJECT && j.idempotency_key === key)) return;
@@ -99,6 +104,7 @@ class FakeStore implements JobStore {
       revision,
       model: 'test-model',
       inputs: INPUTS,
+      ...(revise ? { revise } : {}),
     };
     this.jobs.push({
       id: `job-${section.id}-${revision}`,
@@ -294,11 +300,16 @@ class CountingGenerator implements SectionGenerator {
 
   constructor(private clock: Clock, private msPerCall = 5_000) {}
 
+  /** The revision brief each prose call carried, by section id. */
+  revisions = new Map<string, unknown>();
+
   async generateSectionProse(req: {
     outline: OutlineSectionState[];
     section_index: number;
+    revision?: unknown;
   }): Promise<{ content: string; finish_reason: string }> {
     const section = req.outline[req.section_index];
+    if (req.revision) this.revisions.set(section.id, req.revision);
     this.clock.advance(this.msPerCall);
     const failure = this.proseFailures.get(section.id);
     if (failure) throw failure;
@@ -459,6 +470,8 @@ describe('FR-05: resumable ten-section drafting', () => {
 
     store.outline[0].status = 'complete';
     store.outline[0].content = 'committed, but never checkpointed';
+    // write_long_form_section bumps the section's revision on every commit.
+    store.outline[0].revision = 1;
     expect(store.jobFor('s0').checkpoint).toEqual({});
 
     await drain(store, generator, clock, 'worker-1', 30_000);
@@ -478,6 +491,38 @@ describe('FR-05: resumable ten-section drafting', () => {
     // A user-requested regenerate carries a new revision, so it is a new row.
     store.enqueue(0, store.outline[0], 1);
     expect(store.jobs).toHaveLength(before + 1);
+  });
+
+  it('a regenerate of a written section really writes it again', async () => {
+    // It used to enqueue a job that the "prose already committed" check then
+    // skipped, because it looked at status alone: Regenerate did nothing.
+    const { clock, store, generator } = setup();
+    await drain(store, generator, clock, 'worker-1', 10_000_000);
+    const first = store.outline[0].content;
+    expect(generator.proseCalls.filter((c) => c === 's0')).toHaveLength(1);
+
+    store.enqueue(0, store.outline[0], (store.outline[0].revision ?? 0) + 1);
+    await drain(store, generator, clock, 'worker-1', 10_000_000);
+
+    expect(generator.proseCalls.filter((c) => c === 's0')).toHaveLength(2);
+    expect(store.outline[0].revision).toBe(2);
+    expect(first).toBeTruthy();
+  });
+
+  it('a revision job rewrites the section from its current text and notes', async () => {
+    const { clock, store, generator } = setup();
+    await drain(store, generator, clock, 'worker-1', 10_000_000);
+    store.outline[0].content = 'The chapter after a hand edit.';
+
+    const revise = { stage_label: 'Revision', instruction: 'Apply the accepted findings.', notes: '- a finding' };
+    store.enqueue(0, store.outline[0], (store.outline[0].revision ?? 0) + 1, revise);
+    await drain(store, generator, clock, 'worker-1', 10_000_000);
+
+    // The text sent is what the section says when the job runs, hand edit included.
+    expect(generator.revisions.get('s0')).toEqual({
+      ...revise,
+      current_content: 'The chapter after a hand edit.',
+    });
   });
 
   it('hands a section back, attempt returned, when the run runs out of time mid-call (PM-04)', async () => {

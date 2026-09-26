@@ -361,13 +361,20 @@ export function ItemField({ id, field, value, readOnly, onChange }: ItemFieldPro
           className={shared}
         />
       ) : (
-        <input
+        // A one-line field that wraps instead of scrolling sideways. An <input>
+        // clipped an AI-drafted 250-character "Who they are" mid-word, with
+        // nothing on screen to say the rest existed. Enter and pasted newlines
+        // are dropped, so the value stays a single line.
+        <AutoGrowTextarea
           id={id}
-          type="text"
           value={value}
           disabled={readOnly}
+          rows={1}
           placeholder={field.hint}
-          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.preventDefault();
+          }}
+          onChange={(e) => onChange(e.target.value.replace(/\s*\n\s*/g, ' '))}
           className={shared}
         />
       )}

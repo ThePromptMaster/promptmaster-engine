@@ -297,17 +297,36 @@ Stale *saves* are reliably prevented, which is what FR-21 requires. Stale *reads
 not surfaced. Full description in
 [`saving-and-concurrency.md`](saving-and-concurrency.md).
 
-### L-19 · The version-append path has no concurrency guard · `open`
+### L-19 · ~~The version-append path has no concurrency guard~~ · `resolved`
 
-`patchProject` is revision-guarded. The append path — `appendVersion`,
-`appendStageVersion`, `restoreVersion` and friends — sends no revision at all and
-computes the next version number from a cached `version_count`. Within one tab this is
-handled by re-reading the artifact from the store first. **Across two tabs nothing
-protects it** except the `unique (artifact_id, version_number)` index, which surfaces as
-a raw database error rather than the conflict banner.
+Resolved by `20260927000200_artifact_version_append.sql`. `version_number`,
+`parent_version_id` and the artifact's head (`current_version_id`, `version_count`) are
+now set by triggers under a per-artifact advisory lock, the same pattern as
+`workflow_events.seq`. Two tabs appending serialise into two versions; history is
+append-only, so neither write is lost.
 
-Losing a version append is worse than losing a debounced keystroke, so the guarded path
-is currently protecting the cheaper of the two operations.
+The old path was worse than "unguarded". It numbered from a cached `version_count` and
+moved the head with an UPDATE guarded on `revision`, which *every* artifact write bumps,
+including the outline's 800 ms draft autosave. An outline edited, left for a second,
+then approved wrote v1 but never moved the head, and every retry collided on v1 again:
+the project could not get past Outline. The migration also repairs artifacts left in
+that state. Test: `supabase/tests/artifact_version_append.sql`.
+
+### L-24 · Stages after drafting are sent the manuscript, bounded · `accepted`
+
+Continuity, Critique, Fact-check and Final review receive the drafted chapters in their
+prompt (`digest.manuscript`), capped at `MANUSCRIPT_MAX` (120,000 characters, about 30k
+tokens). Past that each chapter is cut to an equal share and the cut is marked. For a
+long book those stages therefore review the opening of each chapter, not all of it.
+Reviewing chapter by chapter would remove the cap and multiply the calls. The earlier
+design sent a 320-character summary, and the review stages reviewed the summary.
+
+### L-25 · A Revision/Editing rewrite keeps the old text as a flat snapshot · `open`
+
+Before a Revision or Editing stage rewrites the chapters, the whole manuscript is saved
+as one `manuscript_snapshot` version on the drafting artifact. Nothing is lost, but
+there is no one-click restore of a snapshot back into the per-section structure, and no
+per-section diff. Restoring means copying text back by hand.
 
 ### L-20 · `components/ui/` is largely dead, and carries a second design system · `open`
 
@@ -368,8 +387,10 @@ which would silently stop bumping `revision` and disable the concurrency guard.
 | L-16 | Usage metering not wired; no spend cap | open |
 | L-17 | `AUTH_ENFORCED` can disable auth | accepted |
 | L-18 | Stale cross-tab reads never warned | open |
-| L-19 | Version appends have no concurrency guard | open |
+| L-19 | ~~Version appends have no concurrency guard~~ | **resolved** |
 | L-20 | `components/ui/` 10 of 18 dead; second token system | open |
 | L-21 | Five Supabase modules unused (`sessions` must be kept) | accepted |
 | L-22 | `templates` missing RLS UPDATE policy | accepted |
 | L-23 | `touch_updated_at()` dead and adjacent to a load-bearing function | open |
+| L-24 | Review stages see the manuscript up to 120k characters | accepted |
+| L-25 | Revision snapshots have no one-click restore into sections | open |

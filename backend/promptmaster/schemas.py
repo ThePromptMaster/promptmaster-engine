@@ -311,6 +311,20 @@ class ExtractSectionRecordResponse(BaseModel):
     record: SectionRecord
 
 
+class SectionRevisionBrief(BaseModel):
+    """A rewrite of a section that already exists (Revision and Editing stages).
+
+    Carried by the job so a revision stage does real work on the chapters rather
+    than re-showing the drafting panel. `notes` are the findings the user
+    accepted in the review stages before it; `instruction` is the stage's own
+    brief ("apply the accepted findings and only those", "work at the line").
+    """
+    stage_label: str = Field(default="", max_length=200)
+    instruction: str = Field(default="", max_length=4_000)
+    notes: str = Field(default="", max_length=40_000)
+    current_content: str = Field(..., max_length=400_000)
+
+
 class GenerateSectionProseResponse(BaseModel):
     """Response from the prose-only call (step 2 of a drafting job).
 
@@ -393,10 +407,17 @@ class StageDigest(BaseModel):
     Assembled by the client, because the client already holds the project. The
     objective is carried in full — it is short, and every stage is judged
     against it — while prior stages are carried as summaries.
+
+    `manuscript` is the one exception to "summaries only": the drafted chapters,
+    sent to the stages that come after drafting (continuity, critique,
+    fact-check, final review). Those stages exist to read the book; given only a
+    320-character summary they reviewed the summary and said so. The client
+    bounds it (see digest.ts, MANUSCRIPT_MAX).
     """
     objective: str = Field(default="", description="Full text; never summarised.")
     audience: str = Field(default="")
     prior_stages: list["StageDigestEntry"] = Field(default_factory=list)
+    manuscript: str = Field(default="", max_length=200_000, description="Drafted chapters, bounded by the client.")
 
 
 class StageItemField(BaseModel):
@@ -404,6 +425,10 @@ class StageItemField(BaseModel):
     key: str = Field(..., description="Object key in the emitted JSON.")
     label: str = Field(default="", description="What this field means, told to the model.")
     hint: str = Field(default="", description="Optional extra instruction for this field.")
+    max_chars: int | None = Field(
+        default=None,
+        description="The field's length limit on screen. Told to the model so a draft fits it.",
+    )
 
 
 class StageItemSchema(BaseModel):

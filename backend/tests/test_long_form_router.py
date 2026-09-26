@@ -326,3 +326,56 @@ def test_record_extraction_also_honours_the_budget(client_for_app):
         "budget_seconds": 30,
     })
     assert mock_llm.generate_json.await_args.kwargs["deadline"] is not None
+
+
+def test_section_prose_with_a_revision_brief_rewrites_the_existing_text(client_for_app):
+    """Revision and Editing work on the chapter as written, with the findings the
+    user accepted — not a fresh draft from the outline abstract."""
+    api_client, mock_llm = client_for_app
+    captured = {}
+
+    async def _capture(**kwargs):
+        captured.update(kwargs)
+        return ("revised prose", {}, "stop")
+
+    mock_llm.generate_with_meta = _capture
+    r = api_client.post("/api/generate-section-prose", json={
+        "inputs": _basic_inputs_dict(),
+        "outline": [
+            {"id": "s1", "title": "Intro", "abstract": "ABSTRACT-MARKER"},
+            {"id": "s2", "title": "Body", "abstract": "b"},
+        ],
+        "section_index": 0,
+        "revision": {
+            "stage_label": "Revision",
+            "instruction": "BRIEF-MARKER apply the accepted findings",
+            "notes": "- FINDING-MARKER: the term 'control' is used two ways",
+            "current_content": "CURRENT-TEXT-MARKER The chapter as drafted.",
+        },
+    })
+    assert r.status_code == 200
+    assert r.json()["content"] == "revised prose"
+    prompt = captured["prompt"]
+    for marker in ("BRIEF-MARKER", "FINDING-MARKER", "CURRENT-TEXT-MARKER"):
+        assert marker in prompt
+    assert "apply only the ones that concern this section" in prompt
+    assert "Return the whole section as it should now read" in prompt
+    # A rewrite is not a first draft: the drafting instruction is not sent.
+    assert "WRITE SECTION 1" not in prompt
+
+
+def test_section_prose_without_a_revision_is_still_a_first_draft(client_for_app):
+    api_client, mock_llm = client_for_app
+    captured = {}
+
+    async def _capture(**kwargs):
+        captured.update(kwargs)
+        return ("prose", {}, "stop")
+
+    mock_llm.generate_with_meta = _capture
+    api_client.post("/api/generate-section-prose", json={
+        "inputs": _basic_inputs_dict(),
+        "outline": [{"id": "s1", "title": "Intro", "abstract": "a"}],
+        "section_index": 0,
+    })
+    assert "WRITE SECTION 1: Intro" in captured["prompt"]

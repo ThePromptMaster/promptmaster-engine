@@ -67,6 +67,13 @@ function evaluateCriterion(
     return { ...manual, detail: manual.satisfied ? undefined : 'tick when the draft covers it' };
   }
 
+  // Revision's "Accepted findings applied": the findings live on the review
+  // stage before it, so on the long-form stage itself there are none, and the
+  // rule read as satisfied before anything had been applied. Tick it instead.
+  if (rule.type === 'all_findings_triaged' && renderer === 'long_form') {
+    return { ...manual, detail: manual.satisfied ? undefined : 'tick once the findings are applied' };
+  }
+
   switch (rule.type) {
     case 'artifact_non_empty':
       return { ...base, satisfied: Boolean(ctx.artifactNonEmpty[stageId]) };

@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 
+import type { EvaluationResult } from '@/types';
+
 import type { CompletionSummary } from '@/lib/workflow/engine';
 import type { BlockKind } from '@/lib/workflow/types';
 
@@ -90,11 +92,16 @@ export function BlockedNotice({ kind, reason, onUnblock }: { kind: BlockKind; re
 export function CompletionDialog({
   summary,
   busy,
+  check,
+  onCheck,
   onConfirm,
   onCancel,
 }: {
   summary: CompletionSummary;
   busy: boolean;
+  /** The deliverable scored against the objective, when the user asks (PM-14). */
+  check?: { running: boolean; result: EvaluationResult | null; error: string | null };
+  onCheck?: () => void;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -126,6 +133,44 @@ export function CompletionDialog({
         <p className="mt-2 text-label text-[var(--on-surface-variant)]">
           Finishing now records the project as finished without it. You can reopen it at any time.
         </p>
+      )}
+      {check && onCheck && summary.deliverableDone && (
+        <div className="mt-4 rounded-lg bg-[var(--surface-container-low)] px-4 py-3">
+          {check.result ? (
+            <>
+              <p className="text-label font-semibold text-[var(--on-surface)]">Against your objective</p>
+              <p className="mt-1 text-body text-[var(--on-surface)]">
+                Alignment {check.result.alignment.score} · Clarity {check.result.clarity.score} · Drift{' '}
+                {check.result.drift.score} (low is good)
+                {check.result.completeness?.status ? ` · ${check.result.completeness.status}` : ''}
+              </p>
+              <p className="mt-1 text-label text-[var(--on-surface-variant)]">
+                {check.result.alignment.explanation}
+              </p>
+              {(check.result.interpretation?.bullets ?? []).slice(0, 3).map((b, i) => (
+                <p key={i} className="mt-1 text-label text-[var(--on-surface-variant)]">
+                  · {b}
+                </p>
+              ))}
+              <p className="mt-2 text-label text-[var(--on-surface-variant)]">
+                Recorded with the project when you finish.
+              </p>
+            </>
+          ) : (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-label text-[var(--on-surface-variant)]">
+                {check.error ?? 'Score the finished deliverable against your objective before you close it.'}
+              </p>
+              <button
+                onClick={onCheck}
+                disabled={check.running || busy}
+                className="rounded-lg bg-[var(--surface-container-high)] px-4 py-2 text-label font-semibold text-[var(--on-surface)] disabled:opacity-50"
+              >
+                {check.running ? 'Checking…' : 'Check it against the objective · 1 model call'}
+              </button>
+            </div>
+          )}
+        </div>
       )}
       <div className="mt-4 flex gap-2">
         <button

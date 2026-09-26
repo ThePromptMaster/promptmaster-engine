@@ -208,6 +208,17 @@ def build_stage_evaluation_prompt(
         "",
         f"WHAT THE EARLIER STAGES ESTABLISHED:\n{_format_prior_stages(digest)}",
         "",
+        *(
+            [
+                "THE MANUSCRIPT THIS STAGE WAS PRODUCED FROM (judge the artifact against it):",
+                "--- BEGIN MANUSCRIPT ---",
+                digest.manuscript.strip(),
+                "--- END MANUSCRIPT ---",
+                "",
+            ]
+            if digest.manuscript.strip()
+            else []
+        ),
         "--- BEGIN STAGE ARTIFACT UNDER EVALUATION ---",
         content.strip() or "(this stage's artifact is empty)",
         "--- END STAGE ARTIFACT ---",

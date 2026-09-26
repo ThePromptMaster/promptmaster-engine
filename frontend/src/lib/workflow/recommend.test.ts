@@ -209,6 +209,26 @@ describe('FR-13: the three rules, in priority order', () => {
     expect(derived.find((r) => r.title === 'Finish')?.category).toBe(`finish:${terminal!.id}`);
   });
 
+  it('does not call a stage with unticked optional items "nothing outstanding"', () => {
+    // The Objective stage said "Nothing on Objective and purpose is
+    // outstanding" beside a checklist reading "1 of 3 done".
+    const stage = BOOK_V1.stages[0];
+    const ctx = satisfiedContext(BOOK_V1);
+    const all = evaluateStage(BOOK_V1, stage.id, ctx);
+    const optional = stage.exit_criteria.find((c) => !c.blocking);
+    expect(optional).toBeDefined();
+    const evaluation = {
+      ...all,
+      unmet: [...all.unmet, { id: optional!.id, label: optional!.label, blocking: false }],
+    } as typeof all;
+
+    const advance = deriveWorkflowRecommendations({ template: BOOK_V1, stage, evaluation }).find(
+      (r) => r.kind === 'stage_transition'
+    );
+    expect(advance?.summary).not.toMatch(/is outstanding/);
+    expect(advance?.summary).toContain(`"${optional!.label}"`);
+  });
+
   it('names the stage it advances to, on every template', () => {
     for (const template of [BOOK_V1, RESEARCH_V1, SINGLE_OUTPUT_V1]) {
       const first = template.stages[0];

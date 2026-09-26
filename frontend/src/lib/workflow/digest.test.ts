@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import { BOOK_V1, RESEARCH_V1, projectState } from './index';
-import { SUMMARY_MAX, buildStageDigest, summariseStageContent, type StageArtifactBundle } from './digest';
+import {
+  MANUSCRIPT_MAX,
+  SUMMARY_MAX,
+  buildStageDigest,
+  formatManuscript,
+  summariseStageContent,
+  type StageArtifactBundle,
+} from './digest';
 import { serializeItems } from './stage-artifact';
 import type { WorkflowEvent } from './types';
 import type { Artifact, ArtifactVersion, Project } from '@/types/project';
@@ -153,5 +160,50 @@ describe('buildStageDigest', () => {
       second.id
     );
     expect(digest.prior_stages).toHaveLength(1);
+  });
+});
+
+describe('the manuscript in the digest', () => {
+  const chapters = [
+    { title: 'Define the finding', content: 'CHAPTER-ONE prose.', status: 'complete' as const },
+    { title: 'Support it', content: 'CHAPTER-TWO prose.', status: 'complete' as const },
+    { title: 'Not yet written', content: '', status: 'pending' as const },
+  ];
+  const drafted: Record<string, StageArtifactBundle> = {
+    drafting: {
+      artifact: { id: 'm', summary: null, long_form: { outline: chapters } } as unknown as Artifact,
+      versions: [],
+    },
+  };
+  const state = projectState(BOOK_V1, []);
+
+  it('is what the stages after drafting review, not a summary of it', () => {
+    // Continuity said "the draft material provided is incomplete" and
+    // fact-checked the objective, because all it had was 320 characters.
+    for (const stageId of ['continuity', 'critique', 'fact_check', 'final_review']) {
+      const digest = buildStageDigest(BOOK_V1, state, PROJECT, drafted, stageId);
+      expect(digest.manuscript).toContain('CHAPTER-ONE prose.');
+      expect(digest.manuscript).toContain('## 2. Support it');
+      expect(digest.manuscript).not.toContain('Not yet written');
+    }
+  });
+
+  it('is not sent before drafting, or to the long-form stages that rewrite it', () => {
+    for (const stageId of ['positioning', 'outline', 'drafting', 'revision', 'editing']) {
+      expect(buildStageDigest(BOOK_V1, state, PROJECT, drafted, stageId).manuscript).toBe('');
+    }
+  });
+
+  it('is bounded, and says where it cut', () => {
+    const long = Array.from({ length: 10 }, (_, i) => ({
+      title: `Chapter ${i + 1}`,
+      content: 'word '.repeat(10_000),
+      status: 'complete' as const,
+    }));
+    const text = formatManuscript(long);
+    expect(text.length).toBeLessThanOrEqual(MANUSCRIPT_MAX);
+    // Every chapter is represented, each marked as cut rather than silently ending.
+    expect(text.match(/^## \d+\./gm)).toHaveLength(10);
+    expect(text.match(/omitted to fit the review budget/g)).toHaveLength(10);
   });
 });
