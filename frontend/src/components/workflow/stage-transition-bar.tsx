@@ -36,6 +36,9 @@ interface Props {
   more?: MoreAction[];
   /** Short label of the next stage, for "Continue to …" under More. */
   nextStageLabel?: string | null;
+  /** PM-23: ask PromptMaster for the best next move (one Guided planner call). */
+  onSuggest?: () => void;
+  suggesting?: boolean;
 }
 
 /**
@@ -54,11 +57,14 @@ export function StageTransitionBar({
   busy = false,
   error = null,
   primary,
+  onSuggest,
+  suggesting = false,
   onPrimary,
   more = [],
   nextStageLabel = null,
 }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [whyOpen, setWhyOpen] = useState(false);
   const [pending, setPending] = useState<TransitionOption | null>(null);
   const [note, setNote] = useState('');
   const [showReturns, setShowReturns] = useState(false);
@@ -157,6 +163,11 @@ export function StageTransitionBar({
   if (primary) {
     const primaryIsTransition = primary.kind === 'continue' || primary.kind === 'finish';
     const menu: MoreAction[] = [
+      // PM-23: the planner's best move, with its reasons — behind More, so the
+      // bar keeps one primary action (PM-06).
+      ...(onSuggest
+        ? [{ id: 'suggest', label: suggesting ? 'Thinking…' : 'Suggest a move', icon: 'lightbulb', onSelect: onSuggest, disabled: suggesting }]
+        : []),
       ...more,
       // The transition, when something else leads: moving on is always one
       // click away, never hidden, just not the suggestion.
@@ -191,7 +202,26 @@ export function StageTransitionBar({
                 {primary.reason}
               </span>
             )}
+            {/* PM-23: why this is the next step, from the facts that chose it. */}
+            {primary.because && primary.because.length > 0 && (
+              <button
+                onClick={() => setWhyOpen((v) => !v)}
+                aria-expanded={whyOpen}
+                className="mt-1 inline-flex items-center gap-1 text-label text-[var(--pm-primary)]"
+              >
+                {whyOpen ? 'Hide why' : 'Why this?'}
+                <span aria-hidden className="material-symbols-outlined text-[14px]">{whyOpen ? 'expand_less' : 'expand_more'}</span>
+              </button>
+            )}
+            {whyOpen && primary.because && (
+              <ul aria-label="Why this is the next step" className="mt-1 list-disc space-y-0.5 pl-5 text-label text-[var(--on-surface)]">
+                {primary.because.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            )}
           </div>
+
 
           {menu.length > 0 && (
             <div className="relative">

@@ -244,7 +244,7 @@ export function useStageChat({
     async (
       instruction: string,
       kind: ScopeKind,
-      options: { selection?: string; sectionId?: string } = {}
+      options: { selection?: string; sectionId?: string; precedence?: string[] } = {}
     ) => {
       const text = instruction.trim();
       if (!text || busy) return;
@@ -279,7 +279,9 @@ export function useStageChat({
             `Revise ONLY the passage given as the current version. It is ` +
             `${scopeNoun(kind)} of a longer document, not the whole of it. Return the ` +
             `revised passage alone — no preamble, no surrounding text, no commentary.\n\n` +
-            `Instruction: ${text}`,
+            `Instruction: ${text}` +
+            // PM-24: what the user decided when this instruction conflicted with something.
+            (options.precedence?.length ? `\n\n${options.precedence.join('\n')}` : ''),
           created_at: new Date().toISOString(),
         };
 

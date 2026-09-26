@@ -360,7 +360,7 @@ export function useRecommendations({
    * after the preview dialog has shown the user the exact instruction, the
    * affected scope, and what happens to the current version.
    */
-  const confirmApply = useCallback(async () => {
+  const confirmApply = useCallback(async (precedence: string[] = []) => {
     if (!stage || !previewing || busy || !appendStageVersion) return;
     const chosen = panelRows.filter((r) => previewing.includes(r.category) && isApplyable(r));
     const content = headVersion?.content ?? '';
@@ -380,7 +380,16 @@ export function useRecommendations({
         {
           inputs: inputsFrom(project),
           content,
-          findings: chosen.map(asFinding),
+          // PM-24: which fix controls where two pull against each other.
+          findings: [
+            ...chosen.map(asFinding),
+            ...precedence.map((summary, i) => ({
+              id: `precedence-${i + 1}`,
+              category: 'precedence',
+              summary,
+              suggested_change: 'Follow this wherever the fixes above disagree.',
+            })),
+          ],
           model: project.model,
         },
         controller.signal
@@ -420,6 +429,7 @@ export function useRecommendations({
             category: rec.category,
             stage: stage.id,
             applied_with: chosen.length,
+            ...(precedence.length ? { precedence } : {}),
           },
         });
       }

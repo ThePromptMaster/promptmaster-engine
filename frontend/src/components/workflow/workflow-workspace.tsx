@@ -21,6 +21,7 @@ import { useStageGeneration } from './use-stage-generation';
 import { useStageEvaluation } from './use-stage-evaluation';
 import { useGoLoop } from './use-go-loop';
 import { GoPanel } from './agent/go-panel';
+import { NextMoveCard } from './next-move-card';
 import { StageEvaluationPanel } from './evaluation-panel';
 import { CritiqueStyleControl } from './critique-style-control';
 import { CritiqueActions } from './critique-actions';
@@ -878,6 +879,7 @@ export function WorkflowWorkspace({
     isLast: !stage.transitions.default_next,
     nextLabel: nextStage?.short_label ?? null,
     panelStep: isCurrent ? (panelSteps[stage.id] ?? null) : null,
+    unmetRequired: evaluation.unmet.filter((c) => c.blocking).map((c) => c.label),
   });
 
   // PM-10: the original core's actions — refine, realign, challenge, reframe,
@@ -1038,7 +1040,7 @@ export function WorkflowWorkspace({
           applying={recommendations.busy}
           error={recommendations.error}
           onRemove={recommendations.removeFromPreview}
-          onApply={() => void recommendations.confirmApply()}
+          onApply={(precedence) => void recommendations.confirmApply(precedence)}
           onCancel={recommendations.closePreview}
         />
       )}
@@ -1446,6 +1448,10 @@ export function WorkflowWorkspace({
                 onCancel={() => setConfirmingRegenerate(false)}
               />
             )}
+            {/* PM-23: the planner's suggestion, beside the stage's own next step. */}
+            {isCurrent && go.pendingStep && go.run?.policy === 'guided' && (
+              <NextMoveCard step={go.pendingStep} onDo={() => void go.approve()} onDismiss={() => void go.decline()} />
+            )}
             {isCurrent && project.status !== 'finalized' && (
               <StageTransitionBar
                 stage={stage}
@@ -1462,6 +1468,8 @@ export function WorkflowWorkspace({
                 onPrimary={runPrimary}
                 more={moreActions}
                 nextStageLabel={nextStage?.short_label ?? null}
+                onSuggest={appendStageVersion && !go.active && !go.pendingStep ? () => void go.suggest() : undefined}
+                suggesting={go.active && go.run?.policy === 'guided'}
               />
             )}
           </div>

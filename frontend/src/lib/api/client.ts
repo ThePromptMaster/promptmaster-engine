@@ -625,6 +625,17 @@ export const api = {
     return body as SandboxRunResponse;
   },
 
+  /** PM-24: does this instruction contradict the objective, a decision, or another instruction? */
+  async checkConflicts(req: {
+    inputs: PMInput;
+    instruction: string;
+    decisions: { id: string; text: string }[];
+    other_instructions: { id: string; text: string }[];
+    model?: string;
+  }): Promise<{ conflicts: { kind: 'objective' | 'constraint' | 'decision' | 'instruction'; with_id: string; with_text: string; explanation: string }[] }> {
+    return apiFetch('/api/check-conflicts', { method: 'POST', body: JSON.stringify(req) });
+  },
+
   async getModels(): Promise<{ models: Array<{ id: string; name: string; context_length: number }> }> {
     return apiFetch('/api/models');
   },

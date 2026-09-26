@@ -92,6 +92,8 @@ export interface NextActionInput {
   nextLabel: string | null;
   /** The step the stage's own panel is waiting on, if it has one. */
   panelStep?: PanelStep | null;
+  /** PM-23: the required items still open, by label, for "why this". */
+  unmetRequired?: string[];
 }
 
 export interface StageAction {
@@ -99,9 +101,62 @@ export interface StageAction {
   label: string;
   /** One line under the button saying why this is the next step. */
   reason: string;
+  /**
+   * PM-23, "why it is recommended": the facts that made this the next step,
+   * from the same inputs that chose it — so the explanation cannot disagree
+   * with the choice.
+   */
+  because?: string[];
 }
 
 export function nextStageAction(input: NextActionInput): StageAction {
+  const action = chooseAction(input);
+  return action.kind === 'none' ? action : { ...action, because: because(action.kind, input) };
+}
+
+function because(kind: StageActionKind, input: NextActionInput): string[] {
+  const open = input.unmetRequired ?? [];
+  const openLine = open.length ? `Still open: ${open.join('; ')}.` : 'Every required item on this stage is met.';
+  switch (kind) {
+    case 'save':
+      return ['You have edits that are not saved as a version yet.', 'Checks, fixes and moving on all work from the saved version.'];
+    case 'panel':
+      return [input.panelStep?.reason ?? 'This stage works through its own panel.'];
+    case 'draft':
+      return ['This stage has nothing written yet.', 'A draft gives you something to react to — edit it, or write your own instead.'];
+    case 'continue_writing':
+      return ['The current draft stopped before it was finished (length limit, or the check found it incomplete).', 'Finishing it comes before judging it.'];
+    case 'evaluate':
+      return [
+        'The current version has not been checked.',
+        'A check scores it against your objective and this stage’s requirements, and suggests specific fixes.',
+        openLine,
+      ];
+    case 'apply_fixes':
+      return [
+        `${input.applyableFixes} suggested fix${input.applyableFixes === 1 ? ' is' : 'es are'} waiting from the last check.`,
+        'The check found problems worth fixing before moving on.',
+        'You see the change before anything is replaced.',
+      ];
+    case 'continue':
+    case 'finish':
+      return [
+        openLine,
+        input.noFurtherPassReason
+          ? `The check says no further AI pass is needed: ${input.noFurtherPassReason}`
+          : input.evaluated && input.evaluationClean
+            ? 'The last check found nothing that needs another pass.'
+            : input.evaluated
+              ? 'The last check has been dealt with.'
+              : 'This stage has not been checked; you can still check it from More.',
+        ...(input.canAdvance ? [] : ['Moving on anyway is allowed: you will be asked why, and the stage stays open.']),
+      ];
+    default:
+      return [];
+  }
+}
+
+function chooseAction(input: NextActionInput): StageAction {
   if (input.finished) return { kind: 'none', label: '', reason: '' };
   if (input.busy) return { kind: 'none', label: '', reason: 'Working…' };
 

@@ -24,12 +24,21 @@ import type { ArtifactVersion, Project } from '@/types/project';
 const chatMessage = vi.fn();
 const applyToAnswer = vi.fn();
 const saveAsNewVersion = vi.fn();
+const checkConflicts = vi.fn<(...args: unknown[]) => Promise<{ conflicts: unknown[] }>>(async () => ({ conflicts: [] }));
+const recordConflictChoice = vi.fn<(...args: unknown[]) => Promise<void>>(async () => {});
+
+// PM-24's decision trail is Supabase; here it is the empty trail plus a spy.
+vi.mock('@/lib/workflow/conflict-trail', () => ({
+  conflictContext: vi.fn(async () => ({ decisions: [], others: [] })),
+  recordConflictChoice: (...args: unknown[]) => recordConflictChoice(...args),
+}));
 
 vi.mock('@/lib/api/client', () => ({
   api: {
     chatMessage: (...args: unknown[]) => chatMessage(...args),
     applyToAnswer: (...args: unknown[]) => applyToAnswer(...args),
     saveAsNewVersion: (...args: unknown[]) => saveAsNewVersion(...args),
+    checkConflicts: (...args: unknown[]) => checkConflicts(...args),
   },
   ApiError: class ApiError extends Error {},
 }));
@@ -291,5 +300,48 @@ describe('a stage being browsed rather than worked on', () => {
     panel({ readOnly: true });
     expect(screen.getByLabelText('Side chat')).toBeInTheDocument();
     expect(screen.queryByLabelText('Ask a question')).not.toBeInTheDocument();
+  });
+});
+
+describe('PM-24: an instruction that conflicts asks which should control', () => {
+  it('stops before any revision, asks, records the answer, and tells the model', async () => {
+    checkConflicts.mockResolvedValueOnce({
+      conflicts: [{ kind: 'decision', with_id: 'd1', with_text: 'Keep it to one page', explanation: 'A new chapter breaks the one-page decision.' }],
+    });
+    panel();
+    await instruct('Add a whole new chapter.', /whole document/i);
+
+    const prompt = await screen.findByRole('region', { name: 'Which should control?' });
+    expect(prompt).toHaveTextContent('Keep it to one page');
+    expect(prompt).toHaveTextContent('A new chapter breaks the one-page decision.');
+    expect(applyToAnswer).not.toHaveBeenCalled();
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('radio', { name: 'My new instruction controls' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+
+    await waitFor(() => expect(applyToAnswer).toHaveBeenCalledTimes(1));
+    expect(recordConflictChoice).toHaveBeenCalledWith(expect.objectContaining({ controls: 'new', instruction: 'Add a whole new chapter.' }));
+    const history = (applyToAnswer.mock.calls[0][0] as { chat_history: { content: string }[] }).chat_history;
+    expect(history.at(-1)!.content).toContain('The user has decided this instruction takes precedence over "Keep it to one page"');
+  });
+
+  it('Cancel sends nothing and gives the instruction back', async () => {
+    checkConflicts.mockResolvedValueOnce({
+      conflicts: [{ kind: 'objective', with_id: '', with_text: 'the objective', explanation: 'x' }],
+    });
+    panel();
+    await instruct('Rewrite it for adults.', /whole document/i);
+    await screen.findByRole('region', { name: 'Which should control?' });
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(applyToAnswer).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Give a revision instruction')).toHaveValue('Rewrite it for adults.');
+  });
+
+  it('a failed check never blocks the instruction', async () => {
+    checkConflicts.mockRejectedValueOnce(new Error('provider down'));
+    panel();
+    await instruct('Tighten this.', /whole document/i);
+    await waitFor(() => expect(applyToAnswer).toHaveBeenCalledTimes(1));
   });
 });

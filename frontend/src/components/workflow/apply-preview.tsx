@@ -26,6 +26,8 @@
  * the whole behaviour.
  */
 
+import { useState } from 'react';
+
 import { buildCombinedInstruction, detectConflicts } from '@/lib/workflow/combine';
 import { describeScope, type ProposedRecommendation } from '@/lib/workflow/recommend';
 
@@ -46,7 +48,11 @@ interface Props {
   applying: boolean;
   error: string | null;
   onRemove: (category: string) => void;
-  onApply: () => void;
+  /**
+   * PM-24: for each pair that pulls opposite ways, which one the user said
+   * controls — sent to the model with the fixes, as sentences.
+   */
+  onApply: (precedence: string[]) => void;
   onCancel: () => void;
 }
 
@@ -60,8 +66,17 @@ export function ApplyPreview({
   onApply,
   onCancel,
 }: Props) {
-  const combined = buildCombinedInstruction(selected);
   const conflicts = detectConflicts(selected);
+  // Per conflict: the category that controls, or '' to let the model balance them.
+  const [controls, setControls] = useState<Record<number, string>>({});
+  const titleOf = (category: string) => selected.find((r) => r.category === category)?.title ?? category;
+  const precedence = conflicts.flatMap((c, i) => {
+    const winner = controls[i];
+    if (!winner) return [];
+    const loser = c.between.find((x) => x !== winner) ?? '';
+    return [`Where "${titleOf(winner)}" and "${titleOf(loser)}" pull against each other, "${titleOf(winner)}" takes precedence.`];
+  });
+  const combined = [buildCombinedInstruction(selected), ...precedence].join('\n');
 
   // Stated as arithmetic rather than as a promise. "The prior version remains
   // recoverable" is true because artifact_versions is append-only with a
@@ -120,17 +135,35 @@ export function ApplyPreview({
             <p className="text-label uppercase tracking-wider text-[var(--pm-tertiary)]">
               {conflicts.length === 1 ? 'One of these pulls against another' : 'These pull against each other'}
             </p>
-            <ul className="mt-1.5 space-y-1">
+            <ul className="mt-1.5 space-y-3">
               {conflicts.map((conflict, i) => (
-                <li key={i} className="text-body text-[var(--pm-tertiary)]">
-                  {conflict.message}
+                <li key={i}>
+                  <p className="text-body text-[var(--pm-tertiary)]">{conflict.message}</p>
+                  {/* PM-24: ask which should control, rather than leave it to the model. */}
+                  <div role="radiogroup" aria-label={`Which should control (${i + 1})`} className="mt-1.5 flex flex-wrap gap-2">
+                    {[...conflict.between, ''].map((category) => (
+                      <button
+                        key={category || 'balance'}
+                        role="radio"
+                        aria-checked={(controls[i] ?? '') === category}
+                        onClick={() => setControls((prev) => ({ ...prev, [i]: category }))}
+                        className={`rounded-lg px-3 py-1.5 text-label ${
+                          (controls[i] ?? '') === category
+                            ? 'bg-[var(--pm-primary)] text-[var(--on-primary)]'
+                            : 'bg-[var(--surface-container-highest)] text-[var(--on-surface)]'
+                        }`}
+                      >
+                        {category ? `"${titleOf(category)}" controls` : 'Let the model balance them'}
+                      </button>
+                    ))}
+                  </div>
                 </li>
               ))}
             </ul>
             {/* Said out loud, because a warning beside an enabled button
                 otherwise reads as a bug. */}
             <p className="mt-2 text-label text-[var(--on-surface-variant)]">
-              You can still apply them. Combining them means the model decides which wins.
+              You can still apply them. Pick which one controls, or let the model balance them.
             </p>
           </div>
         )}
@@ -177,7 +210,7 @@ export function ApplyPreview({
             Cancel
           </button>
           <button
-            onClick={onApply}
+            onClick={() => onApply(precedence)}
             // Never disabled by a conflict. Only by there being nothing to do,
             // or by a call already in flight.
             disabled={applying || selected.length === 0}

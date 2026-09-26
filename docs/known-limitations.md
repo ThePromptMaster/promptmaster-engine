@@ -419,3 +419,15 @@ not dollars (`agent_runs.budget_usd` exists but is not enforced yet; model spend
 `model_usage` as usual); `check_literature` is always blocked (`tool_missing`) because no
 retrieval tool is connected; `draft_stage` / `revise_stage` do not cover the outline and
 long-form drafting stages, which keep their own controls.
+
+### L-C3 — Conflict detection: what it sees, and what it costs
+
+PM-24's check runs on **side-chat instructions** and on **combined recommendations** (the
+apply preview). It does not run on Go mode's own revise instructions or on the stage-level
+refine tools, which carry no free text. The rule-based half (`instruction-conflicts.ts`)
+reads a short phrase list on FR-15's six axes, so it catches opposite directions ("expand"
+against "under 300 words") but not paraphrase. That is the job of the model half, which costs
+one small JSON call per instruction and fails open: if the call fails, the instruction is sent
+with whatever conflicts the rules found. Answers are stored as accepted or dismissed
+`recommendations` rows with a `decisions` row (category `conflict:*`), so `decisions_type_chk`
+is not widened.

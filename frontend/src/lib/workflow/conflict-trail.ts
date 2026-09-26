@@ -1,0 +1,79 @@
+/**
+ * Where PM-24's inputs come from, and where its answers go.
+ *
+ * Prior decisions are the project's own decision trail: recommendations the
+ * user accepted or dismissed, and earlier "which should control?" answers.
+ * Each answer is recorded the same way as any other accepted or dismissed
+ * proposal — a `recommendations` row plus a `decisions` row — so no CHECK
+ * constraint is widened, and the next conflict check reads it back as a
+ * decision the user already made.
+ */
+
+import { insertRecommendation, listRecommendations, recordDecision } from '@/lib/supabase/recommendations';
+import type { RecommendationScope } from './recommend';
+import { describeWith, type ConflictSource, type Controls, type InstructionConflict } from './instruction-conflicts';
+
+export const CONFLICT_CATEGORY = 'conflict:';
+
+export async function conflictContext(
+  projectId: string,
+  stageId: string,
+  recentInstructions: string[]
+): Promise<{ decisions: ConflictSource[]; others: ConflictSource[] }> {
+  const rows = await listRecommendations(projectId).catch(() => []);
+  const decisions: ConflictSource[] = rows
+    .filter((r) => (r.status === 'accepted' || r.status === 'dismissed') && (r.scope as { kind?: string })?.kind !== 'agent_authorization')
+    .slice(-15)
+    .map((r) => ({
+      id: r.id,
+      text: r.category?.startsWith(CONFLICT_CATEGORY)
+        ? r.title
+        : `${r.status === 'accepted' ? 'Accepted' : 'Dismissed'}: ${r.title}${r.instruction ? ` — ${r.instruction}` : ''}`,
+    }));
+  const others: ConflictSource[] = [
+    ...rows
+      .filter((r) => r.status === 'pending' && r.instruction && (r.scope as RecommendationScope)?.stage_id === stageId)
+      .map((r) => ({ id: r.id, text: r.instruction })),
+    ...recentInstructions.slice(-5).map((text, i) => ({ id: `chat-${i}`, text })),
+  ];
+  return { decisions, others };
+}
+
+export async function recordConflictChoice(args: {
+  projectId: string;
+  userId: string;
+  stageId: string;
+  instruction: string;
+  conflict: InstructionConflict;
+  controls: Controls;
+}): Promise<void> {
+  const { conflict, controls, instruction } = args;
+  const title =
+    controls === 'new'
+      ? `"${instruction.slice(0, 160)}" takes precedence over ${describeWith(conflict)}`
+      : `${describeWith(conflict)} takes precedence over "${instruction.slice(0, 160)}"`;
+  const rec = await insertRecommendation(args.projectId, args.userId, {
+    category: `${CONFLICT_CATEGORY}${Date.now()}`,
+    kind: 'workflow',
+    title,
+    summary: conflict.explanation,
+    suggested_change: '',
+    instruction: '',
+    rationale: {
+      triggering_issue: conflict.explanation,
+      relevant_stage: args.stageId,
+      expected_benefit: 'The model is told which one controls instead of guessing.',
+      scope: `Conflicts with ${conflict.kind}: ${conflict.with_text.slice(0, 300)}`,
+    },
+    scope: { kind: 'document', described_as: 'A conflict between instructions', stage_id: args.stageId },
+    tags: ['conflict'],
+    severity: 'minor',
+    status: controls === 'new' ? 'accepted' : 'dismissed',
+  });
+  await recordDecision(args.projectId, args.userId, {
+    decision_type: controls === 'new' ? 'accept_recommendation' : 'dismiss_recommendation',
+    recommendation_id: rec.id,
+    rationale: title,
+    metadata: { conflict_kind: conflict.kind, with_id: conflict.with_id, source: conflict.source },
+  });
+}
