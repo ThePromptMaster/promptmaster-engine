@@ -93,9 +93,10 @@ Two things follow:
   `unique_violation` under a race. The function catches it and retries the whole
   selection up to three times.
 
-Lease duration is **120 seconds**, floored at 15 (`greatest(p_lease_seconds, 15)`),
-passed as `LEASE_SECONDS = 120` by the route and extended by another 120 at the
-checkpoint between the two steps.
+Lease duration is **330 seconds** — longer than the whole 300-second function, so a
+live worker's lease is never reaped under it — floored at 15
+(`greatest(p_lease_seconds, 15)`), passed as `LEASE_SECONDS = 330` by the route and
+extended at the checkpoint between the two steps.
 
 ### Reaping
 
@@ -132,7 +133,7 @@ where to look.
 ## The drain
 
 `frontend/src/app/api/jobs/drain/route.ts` — `POST`, with `GET` delegating to it.
-`runtime = 'nodejs'`, `dynamic = 'force-dynamic'`, `maxDuration = 60`.
+`runtime = 'nodejs'`, `dynamic = 'force-dynamic'`, `maxDuration = 300` (Vercel Pro; it was 60 until PM-04 — a slow 4k-token chapter could not finish inside one function and was killed, reaped and retried until buried).
 
 **This route holds `SUPABASE_SERVICE_ROLE_KEY`.** It is the only place in the system
 that does. Keep it that way.
@@ -144,9 +145,34 @@ One invocation:
 3. Return a `DrainReport`: `{ reaped, claimed, completed, released, failed, errors[] }`.
 
 The loop stops at `maxJobs` (25) or when the remaining time budget falls below
-`BUDGET_RESERVE_MS (8s) + MIN_STEP_MS (12s)` against a `BUDGET_MS` of 45 seconds. In
+`BUDGET_RESERVE_MS (8s) + MIN_STEP_MS (12s)` against a `BUDGET_MS` of 270 seconds. In
 practice the clock stops it long before the count does. **A drain that returns with
 jobs still queued is working correctly** — the next minute's cron picks them up.
+
+**Every call fits inside the function (PM-04).** Before each step the drain calls
+`generator.setTimeBudget(remaining - reserve)`. The HTTP generator caps its own timeout
+(150 s ceiling) at that budget and sends `budget_seconds` to FastAPI, which turns it
+into a `deadline` for the provider retry ladder. Running out of that budget raises
+`function_timeout`, and the drain **releases** the job with its attempt returned —
+exactly as it does between steps — rather than failing it. Only genuine failures
+spend one of a job's three attempts.
+
+**Errors keep their classification.** FastAPI's error body is structured
+(`{code, title, message, ...}`); `HttpSectionGenerator` reads `detail.code`, so an
+out-of-credits or context-length error fails at once as non-retryable instead of
+being retried three times as "provider unavailable".
+
+**Retrying by hand.** A section whose latest job failed or died shows **Retry
+section**. It, and **Resume drafting**, enqueue at `revisionToEnqueue()` — one past the
+stopped job's revision — because re-enqueueing at the same revision collides on the
+idempotency key and silently does nothing. Failure notices show only a section's
+latest job, and only while the section is unwritten.
+
+**The browser drain hook releases its Web Lock on unmount.** Its cleanup used to clear
+the sleep timer without resolving the sleep, so a loop unmounted mid-sleep never woke
+and never released the lock; every later mount for that project waited forever and
+drafting advanced only on cron ticks. Starting a draft remounts the renderer, so this
+hit nearly every book.
 
 The worker id is `${caller.kind}-${randomUUID()}`, so `cron-…` or `user-…`. That is
 what appears in `lease_owner`, and it tells you whether a stuck job was claimed by the

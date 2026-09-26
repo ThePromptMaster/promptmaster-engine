@@ -263,3 +263,66 @@ def test_finalize_stays_complete_when_no_section_was_truncated(client_for_app):
     })
     assert r.status_code == 200
     assert r.json()["iteration"]["evaluation"]["completeness"]["status"] == "complete"
+
+
+# ---------------------------------------------------------------------------
+# PM-04: a section must not outlive the function that asked for it
+# ---------------------------------------------------------------------------
+
+def test_section_prose_turns_the_callers_budget_into_a_deadline(client_for_app):
+    """Without a deadline the provider retry ladder (3 x 55s) outlived the
+    drain's function, which was killed mid-call and lost paid-for prose."""
+    import time
+
+    api_client, mock_llm = client_for_app
+    mock_llm.generate_with_meta = AsyncMock(return_value=("Section prose.", {}, "stop"))
+
+    before = time.monotonic()
+    r = api_client.post("/api/generate-section-prose", json={
+        "inputs": _basic_inputs_dict(),
+        "outline": [{"id": "s1", "title": "Body", "abstract": "b"}],
+        "section_index": 0,
+        "budget_seconds": 120,
+    })
+    assert r.status_code == 200
+    deadline = mock_llm.generate_with_meta.await_args.kwargs["deadline"]
+    assert before + 119 < deadline <= time.monotonic() + 120
+
+
+def test_section_prose_without_a_budget_keeps_the_old_behaviour(client_for_app):
+    api_client, mock_llm = client_for_app
+    mock_llm.generate_with_meta = AsyncMock(return_value=("Section prose.", {}, "stop"))
+    api_client.post("/api/generate-section-prose", json={
+        "inputs": _basic_inputs_dict(),
+        "outline": [{"id": "s1", "title": "Body", "abstract": "b"}],
+        "section_index": 0,
+    })
+    assert mock_llm.generate_with_meta.await_args.kwargs["deadline"] is None
+
+
+def test_running_out_of_budget_is_reported_as_function_timeout(client_for_app):
+    """The drain reads this code and hands the job back without spending an attempt."""
+    from promptmaster.llm_client import OpenRouterDeadlineError
+
+    api_client, mock_llm = client_for_app
+    mock_llm.generate_with_meta = AsyncMock(side_effect=OpenRouterDeadlineError("out of time"))
+    r = api_client.post("/api/generate-section-prose", json={
+        "inputs": _basic_inputs_dict(),
+        "outline": [{"id": "s1", "title": "Body", "abstract": "b"}],
+        "section_index": 0,
+        "budget_seconds": 5,
+    })
+    assert r.status_code == 502
+    assert r.json()["detail"]["code"] == "function_timeout"
+
+
+def test_record_extraction_also_honours_the_budget(client_for_app):
+    api_client, mock_llm = client_for_app
+    mock_llm.generate_json = AsyncMock(return_value=({"summary": "s"}, {}))
+    api_client.post("/api/extract-section-record", json={
+        "section_id": "s1",
+        "section_index": 0,
+        "section_content": "Some prose.",
+        "budget_seconds": 30,
+    })
+    assert mock_llm.generate_json.await_args.kwargs["deadline"] is not None

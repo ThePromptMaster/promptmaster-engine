@@ -22,6 +22,16 @@ anything that reaches a prompt, e.g. the project objective or a section title.
   [[mock:500]]      -> provider error
   [[mock:length]]   -> finish_reason "length" (truncated output)
   [[mock:slow=N]]   -> sleep N seconds before answering
+  [[mock:402x1]]    -> the same, but only the first N section-writing calls
+                       carrying it (402x1, 500x2, ...) fail; later ones
+                       succeed — a transient failure a retry can recover
+                       from. Counted markers fire only in long-form section
+                       calls ("← WRITING NOW"): other stages also list the
+                       outline and would otherwise use the failure up first.
+
+In a long-form section prompt the whole outline is listed, so a marker in one
+section title would otherwise fire for every section. There, markers on
+outline lines count only on the line being written ("← WRITING NOW").
 """
 
 from __future__ import annotations
@@ -35,7 +45,9 @@ from promptmaster.llm_client import OpenRouterClient, OpenRouterError
 
 MOCK_MODEL = "mock/scripted"
 
-_MARKER = re.compile(r"\[\[mock:([a-z0-9]+)(?:=(\d+))?\]\]")
+_MARKER = re.compile(r"\[\[mock:([a-z0-9]+?)(?:x(\d+))?(?:=(\d+))?\]\]")
+_OUTLINE_LINE = re.compile(r"^\d+\. .*$", re.M)
+_WRITING_NOW = "← WRITING NOW"
 
 
 def _system_and_prompt(payload: dict[str, Any]) -> tuple[str, str]:
@@ -48,8 +60,19 @@ def _system_and_prompt(payload: dict[str, Any]) -> tuple[str, str]:
     return system, prompt
 
 
-def _markers(text: str) -> dict[str, int | None]:
-    return {m.group(1): (int(m.group(2)) if m.group(2) else None) for m in _MARKER.finditer(text)}
+def _scoped(text: str) -> str:
+    """Drop outline lines other than the one being written, when there is one."""
+    if _WRITING_NOW not in text:
+        return text
+    return _OUTLINE_LINE.sub(lambda m: m.group(0) if _WRITING_NOW in m.group(0) else "", text)
+
+
+def _markers(text: str) -> list[tuple[str, int | None, int | None, str]]:
+    """(name, times, value, the marker text itself) for each marker present."""
+    return [
+        (m.group(1), int(m.group(2)) if m.group(2) else None, int(m.group(3)) if m.group(3) else None, m.group(0))
+        for m in _MARKER.finditer(_scoped(text))
+    ]
 
 
 def _objective(prompt: str) -> str:
@@ -184,6 +207,23 @@ class ScriptedClient(OpenRouterClient):
 
     def __init__(self) -> None:
         super().__init__(api_key="mock-key-not-used", model=MOCK_MODEL)
+        # How many times each counted marker (e.g. [[mock:402x1]]) has fired.
+        self._fired: dict[str, int] = {}
+
+    def _active(self, text: str) -> dict[str, int | None]:
+        """Markers that should fire on this call, consuming counted ones."""
+        active: dict[str, int | None] = {}
+        writing_section = _WRITING_NOW in text
+        for name, times, value, raw in _markers(text):
+            if times is not None and not writing_section:
+                continue
+            if times is not None:
+                fired = self._fired.get(raw, 0)
+                if fired >= times:
+                    continue
+                self._fired[raw] = fired + 1
+            active[name] = value
+        return active
 
     async def _request_with_retries(
         self,
@@ -193,7 +233,7 @@ class ScriptedClient(OpenRouterClient):
         deadline: float | None,
     ) -> tuple[str, dict[str, int], str]:
         system, prompt = _system_and_prompt(payload)
-        markers = _markers(system + "\n" + prompt)
+        markers = self._active(system + "\n" + prompt)
 
         if "slow" in markers:
             await asyncio.sleep(markers["slow"] or 5)

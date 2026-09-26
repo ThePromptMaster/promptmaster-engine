@@ -480,6 +480,25 @@ describe('FR-05: resumable ten-section drafting', () => {
     expect(store.jobs).toHaveLength(before + 1);
   });
 
+  it('hands a section back, attempt returned, when the run runs out of time mid-call (PM-04)', async () => {
+    // A chapter that cannot finish in what is left of this function is not a
+    // broken chapter. Treating it as a failure is how long books had sections
+    // "attempted three times then gave up".
+    const { clock, store, generator } = setup();
+    const target = store.outline[0];
+    generator.proseFailures.set(
+      target.id,
+      Object.assign(new Error('Generation timed out'), { status: 504, code: 'function_timeout' })
+    );
+
+    await drain(store, generator, clock, 'worker-1', 40_000);
+
+    const job = store.jobFor(target.id);
+    expect(job.status).toBe('queued');
+    expect(job.attempts).toBe(0);
+    expect(job.error_code ?? null).toBeNull();
+  });
+
   it('records what survived when a section fails', async () => {
     const { clock, store, generator } = setup();
 

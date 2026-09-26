@@ -50,11 +50,33 @@ export interface DrainUsage {
   completionPriceUsd: number | null;
 }
 
+/** Headroom kept back from the backend's budget for the response to travel. */
+const RESPONSE_HEADROOM_MS = 5_000;
+
 export class HttpSectionGenerator implements SectionGenerator {
   constructor(
     private workerSecret: string,
-    private timeoutMs = 90_000
+    private timeoutMs = 150_000
   ) {}
+
+  /**
+   * How long the next call may take, set by the drain before each step (PM-04).
+   *
+   * The timeout used to be a fixed 90s inside a 60s function, so it could never
+   * fire first: a slow chapter was killed by the platform mid-call, the prose
+   * already paid for was lost, the lease expired, and after three rounds the
+   * job was buried as "gave up". Now a call never outlives the function, and
+   * the backend is told the same budget so its retry ladder stops in time.
+   */
+  private budgetMs: number | null = null;
+
+  setTimeBudget(ms: number): void {
+    this.budgetMs = Math.max(0, ms);
+  }
+
+  private callTimeoutMs(): number {
+    return this.budgetMs === null ? this.timeoutMs : Math.min(this.timeoutMs, this.budgetMs);
+  }
 
   /**
    * Which job and project the next calls belong to.
@@ -112,7 +134,10 @@ export class HttpSectionGenerator implements SectionGenerator {
     // it: that would burn the whole budget and leave the lease to expire, which
     // costs the user a lease interval of apparent stall.
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+    const timeoutMs = this.callTimeoutMs();
+    const cappedByBudget = timeoutMs < this.timeoutMs;
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const budgetSeconds = Math.max(1, Math.floor((timeoutMs - RESPONSE_HEADROOM_MS) / 1000));
 
     // FR-19. The backend adopts this rather than minting its own, so this one
     // string ties the drain's log line, the API's log lines, and the usage rows
@@ -129,7 +154,7 @@ export class HttpSectionGenerator implements SectionGenerator {
           'X-Request-Id': requestId,
           ...(this.projectId ? { 'X-PromptMaster-Project': this.projectId } : {}),
         },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ ...(body as object), budget_seconds: budgetSeconds }),
         signal: controller.signal,
       });
 
@@ -139,17 +164,35 @@ export class HttpSectionGenerator implements SectionGenerator {
 
       if (!res.ok) {
         const payload = await res.json().catch(() => null);
-        const detail =
-          payload && typeof payload.detail === 'string'
-            ? payload.detail
-            : `API error: ${res.status}`;
-        throw new GeneratorError(detail, res.status);
+        const detail = payload?.detail;
+        // The backend's error body is structured — {code, title, message, ...}
+        // (routers/_errors.py). Only the string form used to be read, so every
+        // failure arrived here code-less and was classified by HTTP status: a
+        // 502 wrapping "out of credits" became "provider unavailable, retry",
+        // and a non-retryable error was retried until the job was buried.
+        if (detail && typeof detail === 'object' && typeof detail.code === 'string') {
+          throw new GeneratorError(
+            String(detail.message || detail.title || `API error: ${res.status}`),
+            res.status,
+            detail.code
+          );
+        }
+        throw new GeneratorError(
+          typeof detail === 'string' ? detail : `API error: ${res.status}`,
+          res.status
+        );
       }
       return (await res.json()) as T;
     } catch (error) {
       if (error instanceof GeneratorError) throw error;
       if (error instanceof Error && error.name === 'AbortError') {
-        throw new GeneratorError(`Generation timed out after ${this.timeoutMs}ms`, 504);
+        // Stopping because this run is out of time is a pause, not a failure:
+        // the drain hands the job back without spending an attempt.
+        throw new GeneratorError(
+          `Generation timed out after ${timeoutMs}ms`,
+          504,
+          cappedByBudget ? 'function_timeout' : undefined
+        );
       }
       throw error;
     } finally {

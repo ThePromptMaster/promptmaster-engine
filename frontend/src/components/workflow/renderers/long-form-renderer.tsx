@@ -27,8 +27,10 @@ import { useJobDrain } from '@/hooks/use-job-drain';
 import { classifyDrainError, classified, withPreserved, type ErrorCode } from '@/lib/jobs/errors';
 import {
   enqueueSectionJob,
+  isStoppedJob,
   listProjectJobs,
   requestProjectCancel,
+  revisionToEnqueue,
   type ProjectJob,
 } from '@/lib/supabase/jobs';
 import type { OutlineSection } from '@/types';
@@ -74,6 +76,17 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
 
   const pendingJobs = useMemo(
     () => jobs.filter((j) => PENDING_STATUSES.has(j.status)),
+    [jobs]
+  );
+
+  // Jobs arrive oldest first, so the map ends up holding each section's latest.
+  const jobBySection = useMemo(
+    () =>
+      new Map(
+        jobs
+          .filter((j) => typeof j.payload?.section_id === 'string')
+          .map((j) => [j.payload!.section_id as string, j] as const)
+      ),
     [jobs]
   );
 
@@ -160,7 +173,9 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
           outlineVersionId: approvedOutlineVersionId,
           sectionId: section.id,
           sectionIndex: index,
-          revision: section.revision ?? 0,
+          // A section whose last job gave up needs a fresh key, or resuming
+          // collides with the dead row and does nothing (PM-04).
+          revision: revisionToEnqueue(section, jobBySection.get(section.id) ?? null),
         });
       }
     });
@@ -180,6 +195,21 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
         sectionId: section.id,
         sectionIndex: index,
         revision: (section.revision ?? 0) + 1,
+      });
+    });
+
+  /** Try a section again after it gave up (PM-04). The failure notice used to say to, with no way to. */
+  const retry = (section: OutlineSection, index: number) =>
+    run(async () => {
+      if (!artifactId) throw new Error('This stage has no artifact to draft into.');
+      await enqueueSectionJob({
+        project,
+        artifactId,
+        stageId,
+        outlineVersionId: approvedOutlineVersionId,
+        sectionId: section.id,
+        sectionIndex: index,
+        revision: revisionToEnqueue(section, jobBySection.get(section.id) ?? null),
       });
     });
 
@@ -204,14 +234,16 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
     );
   }
 
-  const jobBySection = new Map(
-    jobs
-      .filter((j) => typeof j.payload?.section_id === 'string')
-      .map((j) => [j.payload!.section_id as string, j] as const)
-  );
-
   const running = pendingJobs.length > 0;
-  const failures = jobs.filter((j) => j.status === 'failed' || j.status === 'dead');
+  // Only a section's latest job speaks for it, and only while it is unwritten:
+  // listing every failure ever recorded kept "gave up" on screen after the
+  // section had been retried and written.
+  const failures = outline.flatMap((section, index) => {
+    const job = jobBySection.get(section.id) ?? null;
+    return job && isStoppedJob(job) && job.status !== 'cancelled' && section.status !== 'complete'
+      ? [{ job, section, index }]
+      : [];
+  });
 
   return (
     <div className="space-y-6">
@@ -277,13 +309,17 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
 
       {actionError && <Notice tone="error">{actionError}</Notice>}
 
-      {failures.map((job) => (
+      {failures.map(({ job, section, index }) => (
         <Notice key={job.id} tone="error">
           <span className="font-semibold">
+            Section {index + 1}, “{section.title}”:{' '}
             {classified((job.error_code as ErrorCode) ?? 'unknown').title}.
           </span>{' '}
-          {job.error_message ??
-            withPreserved(classified('unknown'), complete, outline.length).message}
+          {/* Counted now, not when the job failed: the stored message said "1
+              of 3 saved" after later sections had been written. */}
+          {job.error_code && job.error_code !== 'unknown'
+            ? withPreserved(classified(job.error_code as ErrorCode), complete, outline.length).message
+            : (job.error_message ?? withPreserved(classified('unknown'), complete, outline.length).message)}
         </Notice>
       ))}
 
@@ -299,6 +335,7 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
               expanded={expanded.has(section.id)}
               onToggle={() => toggle(section.id)}
               onRegenerate={readOnly ? undefined : () => regenerate(section, index)}
+              onRetry={readOnly ? undefined : () => retry(section, index)}
               busy={busy}
             />
           ))}
@@ -315,6 +352,7 @@ interface SectionRowProps {
   expanded: boolean;
   onToggle: () => void;
   onRegenerate?: () => void;
+  onRetry?: () => void;
   busy: boolean;
 }
 
@@ -325,17 +363,19 @@ function SectionRow({
   expanded,
   onToggle,
   onRegenerate,
+  onRetry,
   busy,
 }: SectionRowProps) {
   // The job row is the authority on "in flight"; the artifact is the authority
   // on "written". Neither is inferred from the other.
   const inFlight = job !== null && PENDING_STATUSES.has(job.status);
   const done = section.status === 'complete';
+  const gaveUp = !done && (job?.status === 'dead' || job?.status === 'failed');
 
   return (
     <li className="rounded-lg bg-[var(--surface-container-low)] px-4 py-3">
       <div className="flex items-start gap-3">
-        <StatusIcon done={done} inFlight={inFlight} failed={job?.status === 'dead' || job?.status === 'failed'} />
+        <StatusIcon done={done} inFlight={inFlight} failed={gaveUp} />
 
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-4">
@@ -347,6 +387,17 @@ function SectionRow({
             >
               {index + 1}. {section.title}
             </button>
+
+            {gaveUp && onRetry && (
+              <button
+                type="button"
+                onClick={onRetry}
+                disabled={busy}
+                className="shrink-0 rounded-lg bg-[var(--pm-primary)] px-3 py-1.5 text-label font-semibold text-[var(--on-primary)] disabled:opacity-50"
+              >
+                Retry section
+              </button>
+            )}
 
             {done && onRegenerate && (
               <button
