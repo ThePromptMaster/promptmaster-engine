@@ -487,6 +487,42 @@ describe('ReviewRenderer', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Research v1 stranded projects at Experiment (Sean's screenshot, Sep 10)
+// ---------------------------------------------------------------------------
+
+describe('a list stage that needs a status on every row', () => {
+  // v1 authored Experiment as `list` with `every_item_has_status`. The list
+  // renderer draws no status control, so "Every planned run has a result or a
+  // reason — 10 still unresolved" could never be cleared. v2 fixed the
+  // template; projects pinned to v1 stayed stuck. This is that v1 stage.
+  const experimentV1: StageDefinition = { ...getStage(RESEARCH_V1, 'experiment')!, renderer: 'list' };
+  const runs = serializeItems([
+    { id: 'r1', run: 'Baseline', observed: 'Held', deviation: 'None' },
+    { id: 'r2', run: 'Stress test', observed: 'Failed at 3x', deviation: 'Ran at 2.5x' },
+  ]);
+
+  it('is drawn with a status control, so the gate can be satisfied', () => {
+    render(<StageRenderer {...props(experimentV1, { versions: [version(runs)] })} />);
+    expect(screen.getAllByRole('combobox')).toHaveLength(2);
+    expect(screen.getByText('2 still to resolve')).toBeInTheDocument();
+  });
+
+  it('satisfies the criterion once every row has a status', () => {
+    const schema = itemSchemaFor(experimentV1);
+    expect(schema.statuses?.length).toBeGreaterThan(0);
+    const done = schema.statuses!.find((o) => !o.requiresReason)!.value;
+    const resolved = parseItems(runs)!.map((r) => ({ ...r, status: done }));
+
+    const evaluation = evaluateStage(
+      { ...RESEARCH_V1, stages: RESEARCH_V1.stages.map((st) => (st.id === 'experiment' ? experimentV1 : st)) },
+      'experiment',
+      contextFrom(RESEARCH_V1 as typeof BOOK_V1, { experiment: serializeItems(resolved) })
+    );
+    expect(evaluation.criteria.find((c) => c.id === 'exp.results')!.satisfied).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Version history is shared furniture
 // ---------------------------------------------------------------------------
 

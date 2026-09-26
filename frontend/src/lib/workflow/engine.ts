@@ -27,10 +27,14 @@ export function getStage(
 
 // --- exit criteria ----------------------------------------------------------
 
+/** Renderers whose artifact is a list of items that count rules can count. */
+const COUNTABLE_RENDERERS = new Set(['list', 'review', 'outline']);
+
 function evaluateCriterion(
   criterion: ExitCriterion,
   stageId: string,
-  ctx: StageContext
+  ctx: StageContext,
+  renderer?: string
 ): CriterionResult {
   const base = {
     id: criterion.id,
@@ -38,16 +42,27 @@ function evaluateCriterion(
     blocking: criterion.blocking ?? false,
   };
 
-  if (criterion.check === 'manual') {
-    return { ...base, satisfied: Boolean(ctx.manualChecks[criterion.id]) };
-  }
+  const manual = { ...base, manual: true, satisfied: Boolean(ctx.manualChecks[criterion.id]) };
+
+  if (criterion.check === 'manual') return manual;
 
   const rule = criterion.rule;
   if (!rule) {
     // An auto criterion with no rule is a template authoring mistake. Degrade
     // to a manual checklist item rather than throwing: an admin editing a
     // template should get a checkbox, not a broken workflow.
-    return { ...base, satisfied: Boolean(ctx.manualChecks[criterion.id]) };
+    return manual;
+  }
+
+  // A count rule on a stage with nothing to count — Book's "at least two
+  // comparables" on the prose Positioning stage (PM-02) — can never be met by
+  // anything the user does. Same degradation: let them tick it.
+  if (
+    (rule.type === 'min_items' || rule.type === 'every_item_has_status') &&
+    renderer !== undefined &&
+    !COUNTABLE_RENDERERS.has(renderer)
+  ) {
+    return { ...manual, detail: manual.satisfied ? undefined : 'tick when the draft covers it' };
   }
 
   switch (rule.type) {
@@ -101,11 +116,7 @@ function evaluateCriterion(
       // An unrecognised rule type — an admin added one this build predates.
       // Degrade to a manual check rather than a 500.
       const unknown = rule as { type: string };
-      return {
-        ...base,
-        label: `Manual check: ${unknown.type}`,
-        satisfied: Boolean(ctx.manualChecks[criterion.id]),
-      };
+      return { ...manual, label: `Manual check: ${unknown.type}` };
     }
   }
 }
@@ -120,7 +131,7 @@ export function evaluateStage(
     return { stageId, criteria: [], canAdvance: true, unmet: [] };
   }
 
-  const criteria = stage.exit_criteria.map((c) => evaluateCriterion(c, stageId, ctx));
+  const criteria = stage.exit_criteria.map((c) => evaluateCriterion(c, stageId, ctx, stage.renderer));
   const unmet = criteria.filter((c) => !c.satisfied);
   return {
     stageId,

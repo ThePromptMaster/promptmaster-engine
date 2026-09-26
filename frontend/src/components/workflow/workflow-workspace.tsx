@@ -34,6 +34,7 @@ import { draftBindings, longFormFromOutline } from '@/lib/outline/long-form';
 import { saveLongForm } from '@/lib/supabase/versions';
 import type { OutlineDocument } from '@/types/outline';
 import {
+  effectiveRenderer,
   isTriaged,
   itemSchemaFor,
   parseItems,
@@ -43,6 +44,7 @@ import {
 } from '@/lib/workflow/stage-artifact';
 import type { StageContext, WorkflowEvent, WorkflowTemplate } from '@/lib/workflow/types';
 import { appendWorkflowEvent, listWorkflowEvents } from '@/lib/supabase/workflow';
+import { countNamedSections, parseOutlineDocument } from '@/lib/outline/model';
 import { setUsageProject } from '@/lib/supabase/model-usage';
 import type { NewEvaluation, NewVersion } from '@/lib/supabase/versions';
 import type { StageBundle } from '@/stores/project-store';
@@ -114,6 +116,9 @@ export function WorkflowWorkspace({
   const [chatOpen, setChatOpen] = useState(true);
   const [busy, setBusy] = useState(false);
   const [transitionError, setTransitionError] = useState<string | null>(null);
+  // Live section counts reported by the outline panel, which owns its own
+  // unsaved draft (PM-01). Keyed by stage id.
+  const [outlineCounts, setOutlineCounts] = useState<Record<string, number>>({});
   const [activeVersionId, setActiveVersionId] = useState<string | null>(null);
   // Below md the rail is not on the page; this is the drawer that replaces it.
   const [mobileRailOpen, setMobileRailOpen] = useState(false);
@@ -236,6 +241,12 @@ export function WorkflowWorkspace({
       const content = bundle?.versions.at(-1)?.content ?? '';
       artifactNonEmpty[s.id] = content.trim().length > 0;
 
+      if (s.renderer === 'outline') {
+        // The saved outline, for a stage the panel is not currently showing.
+        // The live count below overrides it while the panel is mounted.
+        itemCounts[s.id] = outlineCounts[s.id] ?? countNamedSections(parseOutlineDocument(content));
+        continue;
+      }
       if (!rendererHoldsItems(s.renderer)) continue;
       const items = parseItems(content);
       if (!items) continue;
@@ -246,7 +257,7 @@ export function WorkflowWorkspace({
 
       // Findings criteria are about the stage being looked at, not the whole
       // project: "3 untriaged" on the Critique stage must not count Continuity's.
-      if (s.id === stageId && s.renderer === 'review') {
+      if (s.id === stageId && effectiveRenderer(s) === 'review') {
         findingsTotal = items.length;
         findingsTriaged = items.length - itemsMissingStatus[s.id];
       }
@@ -278,7 +289,15 @@ export function WorkflowWorkspace({
       findingsTriaged,
       manualChecks: project.manual_checks ?? {},
     };
-  }, [project, artifact, versions, stage, stageId, template, stageBundles, events]);
+  }, [project, artifact, versions, stage, stageId, template, stageBundles, events, outlineCounts]);
+
+  const reportOutlineCount = useCallback(
+    (count: number) => {
+      if (!stage) return;
+      setOutlineCounts((prev) => (prev[stage.id] === count ? prev : { ...prev, [stage.id]: count }));
+    },
+    [stage]
+  );
 
   const evaluation = useMemo(
     () => evaluateStage(template, stageId, context),
@@ -784,6 +803,7 @@ export function WorkflowWorkspace({
                     )?.long_form ?? null
                   )}
                   onApproved={materialiseOutline}
+                  onItemCountChange={reportOutlineCount}
                   readOnly={!isCurrent}
                 />
               </div>
