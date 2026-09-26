@@ -237,12 +237,21 @@ export function GenerationBar({
 }
 
 /** Shown while a stage has nothing and nothing is running. */
-export function EmptyStage({ label }: { label: string }) {
+export function EmptyStage({ label, onWrite }: { label: string; onWrite?: () => void }) {
   return (
     <div className="rounded-xl bg-[var(--surface-container-low)] px-8 py-12 text-center">
       <p className="text-body text-[var(--on-surface-variant)]">
         No {label} yet. Draft one, or write it yourself.
       </p>
+      {onWrite && (
+        <button
+          onClick={onWrite}
+          className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-high)] px-4 py-2 text-label text-[var(--on-surface)] hover:opacity-90"
+        >
+          <span aria-hidden className="material-symbols-outlined text-[16px]">edit</span>
+          Write it yourself
+        </button>
+      )}
     </div>
   );
 }

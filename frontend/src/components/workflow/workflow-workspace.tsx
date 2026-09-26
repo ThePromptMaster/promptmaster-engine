@@ -552,15 +552,32 @@ export function WorkflowWorkspace({
   // Only assembled for drafting stages. Carries the project row because the
   // drain will rebuild this project's PMInput hours from now, in a process that
   // has never seen the user.
+  // Revision and editing are long-form stages with no manuscript of their own:
+  // they work on the one Drafting wrote. Without this they showed "no approved
+  // outline" to someone who had just finished drafting a whole book.
+  const manuscript =
+    stage.renderer === 'long_form' &&
+    !stageArtifact?.long_form &&
+    draftingStage &&
+    draftingStage.id !== stage.id
+      ? (stageBundles[draftingStage.id]?.artifact ?? stageArtifact)
+      : stageArtifact;
+
   const longFormContext =
     stage.renderer === 'long_form'
       ? {
           project,
-          artifactId: stageArtifact?.id ?? null,
+          artifactId: manuscript?.id ?? null,
           stageId: stage.id,
-          state: stageArtifact?.long_form ?? null,
+          state: manuscript?.long_form ?? null,
           approvedOutlineVersionId: approvedOutlineVersionId(events ?? []),
           onRefresh: () => onReload?.(),
+          emptyHint:
+            template.outline_stage === 'explicit'
+              ? 'Approve an outline on the Outline stage, and drafting will follow it.'
+              : `This workflow builds its outline from the stages before it. Approve it on the ${
+                  draftingStage?.short_label ?? 'Drafting'
+                } stage, and drafting will follow it.`,
         }
       : undefined;
 

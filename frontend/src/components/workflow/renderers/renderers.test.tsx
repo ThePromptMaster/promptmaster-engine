@@ -533,3 +533,41 @@ describe('stage items serialise into the version content column', () => {
     expect(parsed![0].id).toBeTruthy();
   });
 });
+
+// ---------------------------------------------------------------------------
+// A1d: dead ends on an empty prose stage
+// ---------------------------------------------------------------------------
+
+describe('an empty prose stage', () => {
+  it('can be written by hand, as the empty state says', async () => {
+    const user = userEvent.setup();
+    const onSaveContent = vi.fn(async () => {});
+    render(<ProseRenderer {...props(bookStage('objective'), { onSaveContent })} />);
+
+    await user.click(screen.getByRole('button', { name: /Write it yourself/ }));
+    await user.type(screen.getByRole('textbox', { name: /Edit/ }), 'My own objective.');
+    await user.click(screen.getByRole('button', { name: 'Save as new version' }));
+
+    expect(onSaveContent).toHaveBeenCalledWith('My own objective.');
+  });
+
+  it('says so when a save fails, and keeps the text', async () => {
+    const user = userEvent.setup();
+    const onSaveContent = vi.fn(async () => {
+      throw new Error('network down');
+    });
+    render(<ProseRenderer {...props(bookStage('objective'), { onSaveContent })} />);
+
+    await user.click(screen.getByRole('button', { name: /Write it yourself/ }));
+    await user.type(screen.getByRole('textbox', { name: /Edit/ }), 'Keep me.');
+    await user.click(screen.getByRole('button', { name: 'Save as new version' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/Not saved: network down/);
+    expect(screen.getByRole('textbox', { name: /Edit/ })).toHaveValue('Keep me.');
+  });
+
+  it('offers no writing on a stage being browsed read-only', () => {
+    render(<ProseRenderer {...props(bookStage('objective'), { readOnly: true })} />);
+    expect(screen.queryByRole('button', { name: /Write it yourself/ })).not.toBeInTheDocument();
+  });
+});

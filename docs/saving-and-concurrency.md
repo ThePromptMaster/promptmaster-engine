@@ -62,6 +62,23 @@ header indicator reads.
 no timer-based retry and no backoff; a user who stops typing after a failed save has
 their edit sitting in memory until they type again or the page flushes.
 
+## One save at a time, and reloads that keep your place (A1d)
+
+**Saves are serialised.** `flush()` waits for a save already on the wire before
+sending the next, so the second request carries the revision the first one produced.
+Two overlapping flushes used to send the same starting revision, and the second came
+back as a conflict — the user saw "This project was changed in another tab" with one
+tab open. Characters typed while a save is in flight are layered back over the server
+row, so text no longer jumps back when the save lands.
+
+**Background reloads.** The workspace re-reads the project after an outline approval
+and after each drafted section. `loadProject(id, { background: true })` does that in
+place: no loading skeleton, and edits still waiting on the debounce are kept and
+re-applied. A foreground reload there replaced the whole page with the skeleton —
+header and footer vanished, scroll, chat and the viewed stage reset — and silently
+dropped anything typed in the last 800 ms. Only the first load of a project, and
+"Reload theirs" on a conflict, show the skeleton.
+
 ## The `revision` guard
 
 `projects.revision` is a `bigint` bumped by a database trigger on every update

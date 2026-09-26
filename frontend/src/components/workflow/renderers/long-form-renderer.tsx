@@ -198,7 +198,7 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
           There is no approved outline to draft from yet.
         </p>
         <p className="mt-1 text-label text-[var(--on-surface-variant)]">
-          Approve an outline in the outline stage and drafting will follow it.
+          {ctx.emptyHint ?? 'Approve an outline and drafting will follow it.'}
         </p>
       </Panel>
     );

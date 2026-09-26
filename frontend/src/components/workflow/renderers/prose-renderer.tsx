@@ -52,6 +52,7 @@ export function ProseRenderer({
   const [draft, setDraft] = useState('');
   const [preview, setPreview] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -80,11 +81,18 @@ export function ProseRenderer({
   async function save() {
     if (!onSaveContent || !dirty || saving) return;
     setSaving(true);
+    setSaveError(null);
     try {
       // Saving appends a version rather than overwriting one. Every edit is
       // recoverable, and the provenance chain stays unbroken.
       await onSaveContent(draft);
       setEditing(false);
+    } catch (e) {
+      // Used to fail silently, leaving the editor open with no word of why.
+      // The draft stays in the editor, so nothing typed is lost.
+      setSaveError(
+        `Not saved${e instanceof Error && e.message ? `: ${e.message}` : ''}. Your text is still here — try again.`
+      );
     } finally {
       setSaving(false);
     }
@@ -139,20 +147,27 @@ export function ProseRenderer({
         readOnly={readOnly}
       />
 
-      {!active && !generating && <EmptyStage label={label} />}
+      {!active && !generating && !editing && (
+        <EmptyStage
+          label={label}
+          // "Draft one, or write it yourself" — with no way to write it, when the
+          // stage had never been drafted (or the draft failed).
+          onWrite={!readOnly && onSaveContent ? startEditing : undefined}
+        />
+      )}
 
-      {active && (
+      {(active || editing) && (
         <article className="rounded-xl bg-[var(--surface-container-lowest)] px-7 py-6">
           <div className="mb-4 flex flex-wrap items-center gap-3">
             <span className="text-label text-[var(--on-surface-variant)]">
-              {active.source_operation}
+              {active?.source_operation ?? 'Your draft'}
             </span>
-            {active.model && (
+            {active?.model && (
               <>
                 <span aria-hidden className="text-label text-[var(--on-surface-variant)]">
                   ·
                 </span>
-                <span className="text-label text-[var(--on-surface-variant)]">{active.model}</span>
+                <span className="text-label text-[var(--on-surface-variant)]">{active?.model}</span>
               </>
             )}
 
@@ -196,9 +211,15 @@ export function ProseRenderer({
             )}
           </div>
 
-          {active.change_summary && !editing && (
+          {active?.change_summary && !editing && (
             <p className="mb-5 text-body italic text-[var(--on-surface-variant)]">
               {active.change_summary}
+            </p>
+          )}
+
+          {saveError && (
+            <p role="alert" className="mb-4 rounded-lg bg-[var(--error-container)] px-4 py-3 text-body text-[var(--on-error-container)]">
+              {saveError}
             </p>
           )}
 
