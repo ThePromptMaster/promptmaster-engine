@@ -34,6 +34,10 @@ class PMInput(BaseModel):
     custom_name: str = Field(default="", max_length=MAX_SHORT_TEXT_CHARS, description="Custom mode persona name")
     custom_preamble: str = Field(default="", max_length=MAX_PREAMBLE_CHARS, description="Custom mode system preamble")
     custom_tone: str = Field(default="", max_length=MAX_SHORT_TEXT_CHARS, description="Custom mode tone")
+    # PM-21: two separate dials for critique — how hard to look, and how to say
+    # it. Read only by evaluation and critique prompts (critique_style.py).
+    critique_intensity: Literal["light", "standard", "rigorous"] = Field(default="standard")
+    critique_tone: Literal["gentle", "neutral", "direct"] = Field(default="neutral")
     # Session Facts (Information Anchors, Ch5 S5) — pinned facts that anchor
     # the conversation's knowledge and get injected into every prompt.
     session_facts: list[str] = Field(
@@ -121,6 +125,11 @@ class EvaluationResult(BaseModel):
             "Empty for the four-call iteration pipeline, which does not ask for them."
         ),
     )
+    # PM-25: the evaluator's own statement of whether another AI pass would
+    # materially improve this. None when it was not asked (older evaluations,
+    # the iteration pipeline), which is "not stated", never "needed".
+    further_pass_needed: bool | None = Field(default=None)
+    further_pass_reason: str = Field(default="", max_length=1000)
 
     @property
     def needs_realignment(self) -> bool:

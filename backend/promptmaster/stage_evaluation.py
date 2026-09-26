@@ -35,6 +35,7 @@ import logging
 import uuid
 
 from .conversation import _shared_system
+from .critique_style import MAX_FINDINGS, critique_style_block, intensity_of
 from .errors import PRESERVED_EVALUATION, classify_error
 from .llm_client import OpenRouterClient
 from .schemas import (
@@ -89,16 +90,21 @@ _STAGE_EVAL_INSTRUCTION = (
     "the artifact is well aligned belongs with alignment 'High', never 'Low'.\n\n"
     "FINDINGS are the specific defects you found. Each one must be concrete "
     "enough to act on — 'could be clearer' is not a finding, 'section 3 asserts "
-    "a launch date the constraints rule out' is. Raise between 0 and 7. An "
-    "artifact with nothing wrong with it gets an empty list; do not manufacture "
-    "findings to look rigorous.\n\n"
+    "a launch date the constraints rule out' is. How many to raise, and how "
+    "high the bar is, is set by the CRITIQUE INTENSITY below. An artifact with "
+    "nothing wrong with it gets an empty list; do not manufacture findings to "
+    "look rigorous.\n\n"
     "RECOMMENDATION: when a threshold is crossed — alignment Low, drift High, "
     "or a finding serious enough to be worth a revision — return ONE corrective "
     "recommendation. It is offered to the user, never applied: they may accept, "
     "modify, reject, or carry on without it. When nothing warrants one, return "
     "null.\n\n"
-    "You are fair but rigorous. You do not inflate scores and you do not "
-    "manufacture problems. Return ONLY valid JSON, no other text."
+    "FURTHER PASS (PM-25): say whether another AI pass would materially improve "
+    "this artifact against this stage's bar. If it already meets the bar and "
+    "more passes would only churn it, set needed to false and say so plainly — "
+    "do not recommend another pass out of habit.\n\n"
+    "You are fair. You do not inflate scores and you do not manufacture "
+    "problems. Return ONLY valid JSON, no other text."
 )
 
 
@@ -111,6 +117,7 @@ _RESPONSE_SHAPE = """{
   "findings": [
     {"id": "f1", "category": "...", "summary": "one line — what is wrong", "suggested_change": "one line — what to do"}
   ],
+  "further_pass": {"needed": true, "reason": "one sentence: why another AI pass would or would not materially improve it"},
   "recommendation": {
     "id": "r1",
     "title": "one line — the corrective action",
@@ -183,7 +190,14 @@ def build_stage_evaluation_prompt(
     prompt under headings that name them, and the stage's intent — its
     instruction and its acceptance criteria — is stated as the bar.
     """
-    system = _shared_system(inputs, iterations or [], _STAGE_EVAL_INSTRUCTION)
+    system = _shared_system(
+        inputs,
+        iterations or [],
+        f"{_STAGE_EVAL_INSTRUCTION}\n\n"
+        + critique_style_block(inputs.critique_intensity, inputs.critique_tone)
+        + "\nThe tone applies to the explanations, interpretation and findings you "
+        "write; the scores and the further-pass answer follow the intensity alone.",
+    )
 
     stage_label = stage.label or stage.id
     hint = stage.entry_prompt_hint.strip() or "(this stage declares no instruction)"
@@ -332,10 +346,34 @@ def parse_stage_evaluation(result: dict) -> StageEvaluationResponse:
         findings=_parse_findings(result.get("findings")),
     )
 
+    evaluation.further_pass_needed, evaluation.further_pass_reason = _further_pass(
+        result.get("further_pass"), evaluation
+    )
     return StageEvaluationResponse(
         evaluation=evaluation,
         recommendation=_parse_recommendation(result.get("recommendation")),
     )
+
+
+def _further_pass(raw: object, evaluation: EvaluationResult) -> tuple[bool | None, str]:
+    """PM-25: the model's answer, held to its own scores. Pure.
+
+    "No further pass needed" beside a Low alignment, a High drift, an
+    incomplete draft or open findings would be a contradiction the user has to
+    resolve — so the scores win, and the reason says why.
+    """
+    if not isinstance(raw, dict) or not isinstance(raw.get("needed"), bool):
+        return None, ""
+    needed: bool = raw["needed"]
+    reason = str(raw.get("reason") or "").strip()[:1000]
+    if not needed:
+        if evaluation.alignment.score == "Low" or evaluation.drift.score == "High":
+            return True, "The scores show it is off target, so another pass is warranted."
+        if evaluation.completeness and evaluation.completeness.status == "incomplete":
+            return True, "It is not complete yet, so another pass is warranted."
+        if evaluation.findings:
+            return True, "There are open findings to address first."
+    return needed, reason
 
 
 def _failed(reason: str, error: BaseException | None = None) -> StageEvaluationResponse:
@@ -409,4 +447,8 @@ async def evaluate_stage_artifact(
         logger.warning(f"Stage evaluation for {stage.id} returned a non-object")
         return _failed("malformed response")
 
-    return parse_stage_evaluation(result)
+    parsed = parse_stage_evaluation(result)
+    # The intensity's cap is a promise to the user; a model that raises more
+    # has its extras dropped rather than shown.
+    parsed.evaluation.findings = parsed.evaluation.findings[: MAX_FINDINGS[intensity_of(inputs.critique_intensity)]]
+    return parsed

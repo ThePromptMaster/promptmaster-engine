@@ -12,7 +12,13 @@ export interface PMInput {
   custom_preamble?: string;
   custom_tone?: string;
   session_facts?: string[];
+  /** PM-21: how hard critique looks, and how it is worded — independent. */
+  critique_intensity?: CritiqueIntensity;
+  critique_tone?: CritiqueTone;
 }
+
+export type CritiqueIntensity = 'light' | 'standard' | 'rigorous';
+export type CritiqueTone = 'gentle' | 'neutral' | 'direct';
 
 export interface AssembledPrompt {
   system_prompt: string;
@@ -44,6 +50,9 @@ export interface EvaluationResult {
    * asks for findings; populated by `/api/evaluate-stage-artifact`.
    */
   findings?: AuditFinding[];
+  /** PM-25: the evaluator's answer to "would another AI pass materially help?". Null = not asked. */
+  further_pass_needed?: boolean | null;
+  further_pass_reason?: string;
 }
 
 export type UserRating = 'positive' | 'negative';

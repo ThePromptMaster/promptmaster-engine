@@ -18,7 +18,8 @@ const EVAL_COLUMNS = `
   id, user_id, project_id, version_id,
   alignment_score, alignment_explanation, drift_score, drift_explanation,
   clarity_score, clarity_explanation, completeness_status, completeness_reason,
-  interpretation, findings, needs_realignment, evaluator_model, source, created_at
+  interpretation, findings, further_pass_needed, further_pass_reason,
+  needs_realignment, evaluator_model, source, created_at
 `;
 
 // --- artifacts --------------------------------------------------------------

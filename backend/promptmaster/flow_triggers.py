@@ -17,6 +17,8 @@ Each trigger either:
 import json
 import logging
 from typing import Literal
+
+from .critique_style import critique_style_block
 from .schemas import PMInput, EvaluationResult, Iteration
 from .llm_client import OpenRouterClient
 from .modes import MODES
@@ -79,7 +81,8 @@ def build_challenge_prompt(
         "not contrarianism for its own sake. The goal is to surface what is fragile in the previous "
         "answer so the user can see it clearly.\n\n"
         "Do not produce a new polished answer. Produce a structured critique of the previous answer. "
-        "Reference specific parts of it. Be blunt and specific."
+        "Reference specific parts of it. Be specific.\n\n"
+        + critique_style_block(inputs.critique_intensity, inputs.critique_tone)
     )
     user = (
         f"Original objective: {inputs.objective}\n\n"
@@ -112,7 +115,8 @@ def build_reframe_prompt(
         "refine the answer; Tier 4 reframes the PROBLEM. Your task now is to step back one level "
         "and ask: is the user solving the right problem? Is there a higher-level framing that "
         "would make the current question obsolete?\n\n"
-        "Do not produce a refined answer. Produce a structured reframing analysis."
+        "Do not produce a refined answer. Produce a structured reframing analysis.\n\n"
+        + critique_style_block(inputs.critique_intensity, inputs.critique_tone)
     )
     user = (
         f"Original objective: {inputs.objective}\n\n"
@@ -143,8 +147,9 @@ def build_self_audit_response_prompt(
         "You just produced an answer. Your new task is to audit your own response (Ch1 S13 Structured "
         "Self-Check): identify specific ways it may be incomplete, unclear, or fail to fully address "
         "the user's objective. Then produce a revised answer that fixes those specific gaps.\n\n"
-        "Be rigorous. Don't say vague things like 'could be more detailed.' Name the specific gap and "
-        "show how your revision closes it."
+        "Don't say vague things like 'could be more detailed.' Name the specific gap and "
+        "show how your revision closes it.\n\n"
+        + critique_style_block(inputs.critique_intensity, inputs.critique_tone)
     )
     user = (
         f"Original objective: {inputs.objective}\n\n"

@@ -77,6 +77,11 @@ export interface NextActionInput {
   evaluated: boolean;
   /** That evaluation needs nothing: aligned, clear, on topic, no findings. */
   evaluationClean: boolean;
+  /**
+   * PM-25: the evaluator said no further AI pass is needed, and why. The
+   * primary action says so in those words rather than inviting another pass.
+   */
+  noFurtherPassReason?: string | null;
   /** Pending recommendations that can be applied to the text. */
   applyableFixes: number;
   /** No blocking exit criterion is unmet. */
@@ -146,13 +151,16 @@ export function nextStageAction(input: NextActionInput): StageAction {
   }
 
   const clean = input.evaluated && input.evaluationClean;
+  const done = input.noFurtherPassReason
+    ? `No further AI pass needed — ${input.noFurtherPassReason.replace(/\.$/, '')}.`
+    : 'Looks good — nothing here needs another pass.';
   if (input.isLast) {
     return {
       kind: 'finish',
       label: input.canAdvance ? 'Finish project' : 'Finish anyway',
       reason: input.canAdvance
         ? clean
-          ? 'Nothing here needs another pass.'
+          ? done
           : 'This is the last stage.'
         : 'Some required items are still open — you will be asked why.',
     };
@@ -164,7 +172,7 @@ export function nextStageAction(input: NextActionInput): StageAction {
     label: input.canAdvance ? `Continue to ${to}` : `Continue to ${to} anyway`,
     reason: input.canAdvance
       ? clean
-        ? 'Looks good — nothing here needs another pass.'
+        ? done
         : 'Everything this stage needs is done.'
       : 'Some required items are still open — you will be asked why.',
   };

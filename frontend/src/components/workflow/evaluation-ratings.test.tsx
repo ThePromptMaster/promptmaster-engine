@@ -166,3 +166,20 @@ describe('ratingDisplay', () => {
     expect(findingDimension(finding({ category: 'Whimsy' }))).toBeNull();
   });
 });
+
+describe('PM-25: the evaluation says when no further pass is needed', () => {
+  it('shows it plainly, with the reason', () => {
+    render(<StageEvaluationPanel evaluation={evaluation({ further_pass_needed: false, further_pass_reason: 'It meets the bar.' })} />);
+    const note = screen.getByRole('status');
+    expect(note).toHaveTextContent('No further AI pass needed');
+    expect(note).toHaveTextContent('It meets the bar.');
+  });
+
+  it('says nothing of the kind when a pass is needed or the question was not asked', () => {
+    const { rerender } = render(<StageEvaluationPanel evaluation={evaluation({ further_pass_needed: true, further_pass_reason: 'Two claims lack support.' })} />);
+    expect(screen.queryByText('No further AI pass needed')).toBeNull();
+    expect(screen.getByText('Another pass would help: Two claims lack support.')).toBeInTheDocument();
+    rerender(<StageEvaluationPanel evaluation={evaluation()} />);
+    expect(screen.queryByText('No further AI pass needed')).toBeNull();
+  });
+});

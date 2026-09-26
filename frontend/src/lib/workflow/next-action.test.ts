@@ -86,3 +86,16 @@ describe('a draft that was cut off (PM-11)', () => {
     expect(nextStageAction({ ...base, truncated: true, dirty: true }).kind).toBe('save');
   });
 });
+
+describe('PM-25: no further AI pass needed', () => {
+  it('says so, with the reason, instead of inviting another pass', () => {
+    const action = nextStageAction({ ...base, evaluated: true, evaluationClean: true, noFurtherPassReason: 'It meets the bar.' });
+    expect(action.kind).toBe('continue');
+    expect(action.reason).toBe('No further AI pass needed — It meets the bar.');
+  });
+
+  it('keeps the old wording when the evaluator was not asked', () => {
+    const action = nextStageAction({ ...base, evaluated: true, evaluationClean: true });
+    expect(action.reason).toBe('Looks good — nothing here needs another pass.');
+  });
+});

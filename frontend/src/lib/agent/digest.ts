@@ -63,7 +63,11 @@ export function buildAgentState(input: {
     ),
     evaluation: ev
       ? `alignment ${ev.alignment_score}, clarity ${ev.clarity_score}, drift ${ev.drift_score}` +
-        (ev.findings?.length ? `; ${ev.findings.length} finding(s)` : '')
+        (ev.findings?.length ? `; ${ev.findings.length} finding(s)` : '') +
+        // PM-25: the evaluator's own "no further pass needed" reaches the planner.
+        (ev.further_pass_needed === false
+          ? `; evaluator: no further AI pass needed${ev.further_pass_reason ? ` (${ev.further_pass_reason})` : ''}`
+          : '')
       : '',
     next_stage_label: next ? (template.stages.find((s) => s.id === next)?.label ?? next) : '',
     prior_stages: template.stages

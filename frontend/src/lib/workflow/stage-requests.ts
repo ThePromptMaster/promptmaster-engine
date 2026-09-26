@@ -46,6 +46,8 @@ export function inputsFrom(project: Project): PMInput {
     custom_preamble: project.custom_preamble,
     custom_tone: project.custom_tone,
     session_facts: project.session_facts,
+    critique_intensity: project.critique_intensity ?? 'standard',
+    critique_tone: project.critique_tone ?? 'neutral',
   };
 }
 
@@ -135,6 +137,8 @@ export function evaluationRecord(
     completeness_reason: evaluation.completeness?.reason ?? null,
     interpretation: evaluation.interpretation ?? null,
     findings: evaluation.findings ?? [],
+    further_pass_needed: evaluation.further_pass_needed ?? null,
+    further_pass_reason: evaluation.further_pass_reason || null,
     evaluator_model: response.model_used || fallbackModel,
     source,
   };

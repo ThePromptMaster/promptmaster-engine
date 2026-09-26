@@ -39,7 +39,7 @@ test('each stage offers one next step, in words a new user can read', async ({ p
   // Check -> the next step is to move on, and it says nothing needs another pass (PM-25).
   await bar.getByRole('button', { name: 'Check this stage' }).click();
   await expect(bar.getByRole('button', { name: 'Continue to Audience' })).toBeVisible();
-  await expect(bar).toContainText('nothing here needs another pass');
+  await expect(bar).toContainText('No further AI pass needed');
   await bar.scrollIntoViewIfNeeded();
   await page.screenshot({ path: test.info().outputPath('03-checked-then-continue.png') });
 

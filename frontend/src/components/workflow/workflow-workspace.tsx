@@ -22,6 +22,7 @@ import { useStageEvaluation } from './use-stage-evaluation';
 import { useGoLoop } from './use-go-loop';
 import { GoPanel } from './agent/go-panel';
 import { StageEvaluationPanel } from './evaluation-panel';
+import { CritiqueStyleControl } from './critique-style-control';
 import { ExportMenu } from './export-menu';
 import { ChatPanel } from './chat-panel';
 import { RecommendationsPanel } from './recommendations-panel';
@@ -853,11 +854,15 @@ export function WorkflowWorkspace({
     evaluated: Boolean(headEvaluation),
     evaluationClean: Boolean(
       headEvaluation &&
-        headEvaluation.alignment_score === 'High' &&
-        headEvaluation.clarity_score === 'High' &&
-        headEvaluation.drift_score === 'Low' &&
-        (headEvaluation.findings ?? []).length === 0
+        headEvaluation.further_pass_needed !== true &&
+        (headEvaluation.further_pass_needed === false ||
+          (headEvaluation.alignment_score === 'High' &&
+            headEvaluation.clarity_score === 'High' &&
+            headEvaluation.drift_score === 'Low' &&
+            (headEvaluation.findings ?? []).length === 0))
     ),
+    noFurtherPassReason:
+      headEvaluation?.further_pass_needed === false ? headEvaluation.further_pass_reason || null : null,
     applyableFixes: applyable.length,
     canAdvance: evaluation.canAdvance,
     isLast: !stage.transitions.default_next,
@@ -1326,6 +1331,15 @@ export function WorkflowWorkspace({
                 answer "is this good enough to move on", and the criteria are
                 the declarative half of the same question the evaluation
                 answers by judgment. */}
+            {/* PM-21: the dials sit with the critique they shape. */}
+            {isCurrent && draftable && hasContent && (
+              <CritiqueStyleControl
+                intensity={project.critique_intensity ?? 'standard'}
+                tone={project.critique_tone ?? 'neutral'}
+                onChange={onPatchProject}
+              />
+            )}
+
             <StageEvaluationPanel evaluation={shownEvaluation} />
 
             <TasksPanel

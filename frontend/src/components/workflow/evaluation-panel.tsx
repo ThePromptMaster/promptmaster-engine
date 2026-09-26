@@ -49,6 +49,27 @@ export function StageEvaluationPanel({ evaluation }: Props) {
           numbers alone, with the stored explanations displayed nowhere.
           Completeness moved in as a fourth rating rather than a conditional
           line of prose below the scores. */}
+      {/* PM-25: said plainly, rather than always nudging towards another pass. */}
+      {evaluation.further_pass_needed === false && (
+        <div role="status" className="mt-2 flex items-start gap-2 rounded-lg bg-[var(--pm-secondary)]/10 px-3 py-2">
+          <span aria-hidden className="material-symbols-outlined text-[var(--pm-secondary)]">task_alt</span>
+          <div>
+            <p className="text-body font-semibold text-[var(--on-surface)]">No further AI pass needed</p>
+            {evaluation.further_pass_reason && (
+              <p className="text-label text-[var(--on-surface-variant)]">{evaluation.further_pass_reason}</p>
+            )}
+            <p className="text-label text-[var(--on-surface-variant)]">
+              You can move on. Refining again is still there under More, but it is not needed.
+            </p>
+          </div>
+        </div>
+      )}
+      {evaluation.further_pass_needed === true && evaluation.further_pass_reason && (
+        <p className="mt-2 text-label text-[var(--on-surface-variant)]">
+          Another pass would help: {evaluation.further_pass_reason}
+        </p>
+      )}
+
       {evaluation && (
         <>
           {evaluation.needs_realignment && (
