@@ -186,6 +186,12 @@ export interface SectionGenerator {
   }): Promise<{ record: SectionRecord }>;
 
   /**
+   * PM-04: how long the next call may take. Optional, like attributeTo — the
+   * in-memory test double has no clock to respect.
+   */
+  setTimeBudget?(ms: number): void;
+
+  /**
    * FR-18/FR-19: tell the generator which job its next calls belong to, so the
    * usage rows and log lines it produces can be attributed.
    *

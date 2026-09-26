@@ -172,6 +172,9 @@ async function runJob(args: RunJobArgs): Promise<void> {
       return;
     }
 
+    // Every call in this step must finish before the function does.
+    generator.setTimeBudget?.(remaining() - BUDGET_RESERVE_MS);
+
     try {
       const outcome = await runStep({ job, payload, checkpoint, store, generator, worker });
       if (outcome.done) {
@@ -180,6 +183,15 @@ async function runJob(args: RunJobArgs): Promise<void> {
       }
       checkpoint = outcome.checkpoint;
     } catch (error) {
+      // Out of time is not a failure: the step stopped because this run ends,
+      // not because the section is broken. Hand it back with its attempt
+      // returned, exactly as between steps above. Counting it as a failure is
+      // how long chapters used to exhaust three attempts and be buried.
+      if (classifyDrainError(error).code === 'function_timeout') {
+        await store.releaseJob(job.id, worker, 0);
+        report.released += 1;
+        return;
+      }
       await recordFailure({ job, payload, store, worker, error, report });
       return;
     }

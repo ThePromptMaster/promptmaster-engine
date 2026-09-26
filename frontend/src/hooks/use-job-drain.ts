@@ -71,9 +71,19 @@ export function useJobDrain({ projectId, hasPendingJobs, onProgress }: UseJobDra
 
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
+    // Resolves the current sleep early. Cleanup MUST call it: clearing the
+    // timer alone leaves the sleep pending forever, and because the loop runs
+    // inside the Web Lock, a loop that never wakes never releases the lock. The
+    // next mount for this project then waits on that lock indefinitely and the
+    // tab stops draining — sections only appeared when cron ticked, once a
+    // minute (found while reproducing PM-04). Starting a draft remounts this
+    // component, so it happened on essentially every book.
+    let wake: (() => void) | null = null;
+    const lockAbort = new AbortController();
 
     const sleep = (ms: number) =>
       new Promise<void>((resolve) => {
+        wake = resolve;
         timer = setTimeout(resolve, ms);
       });
 
@@ -125,7 +135,7 @@ export function useJobDrain({ projectId, hasPendingJobs, onProgress }: UseJobDra
     const lockName = `pm-drain-${projectId}`;
     if (typeof navigator !== 'undefined' && navigator.locks) {
       navigator.locks
-        .request(lockName, { mode: 'exclusive' }, async () => {
+        .request(lockName, { mode: 'exclusive', signal: lockAbort.signal }, async () => {
           await loop();
         })
         .catch(() => {
@@ -140,6 +150,10 @@ export function useJobDrain({ projectId, hasPendingJobs, onProgress }: UseJobDra
     return () => {
       cancelled = true;
       if (timer) clearTimeout(timer);
+      // Let a sleeping loop finish so it releases the lock...
+      wake?.();
+      // ...and withdraw a lock request that has not been granted yet.
+      lockAbort.abort();
     };
   }, [projectId]);
 }
