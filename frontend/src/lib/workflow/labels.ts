@@ -27,6 +27,8 @@ const OPERATION_LABEL: Record<string, string> = {
   continuation: 'Continued',
   chat_save: 'Saved from the discussion',
   // PM-17: Go mode's own work, kept distinguishable from a button press.
+  // PM-22: fixes applied from a stage check or a critique.
+  applied_findings: 'Critique applied',
   agent_draft: 'Go mode draft',
   agent_revise: 'Go mode revision',
 };

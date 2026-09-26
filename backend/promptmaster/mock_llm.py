@@ -318,6 +318,24 @@ def _prose_reply(system: str, prompt: str) -> str:
     if "GO MODE — PERFORM:" in system:
         move = system.split("GO MODE — PERFORM:", 1)[1].split(".", 1)[0].strip().title()
         return f"## Mock {move}\n\nScripted reasoning for this move. Nothing was run or looked up."
+    from promptmaster import audit_findings
+
+    if "PromptMaster Challenge Mode" in system:
+        # A critique with list items, so "buttonize it" has points to click.
+        return (
+            "## The case against this draft\n\n"
+            "1. **Unstated assumptions** — Mock: it assumes the reader already knows the topic.\n"
+            "2. **Weak reasoning** — Mock: the main claim is asserted, never shown.\n"
+            "3. **Missing perspectives** — Mock: the strongest counter-argument is ignored.\n"
+        )
+    if audit_findings._APPLY_AUDIT_INSTRUCTION[:60] in system:
+        # Apply fixes: keep the previous text and add one line per finding, so
+        # a diff shows exactly what was applied (C2's review and preview).
+        previous = prompt.split("PREVIOUS OUTPUT (revise this — do not repeat verbatim):\n", 1)[-1]
+        previous = previous.split("\n\nFINDINGS TO ADDRESS:", 1)[0].strip()
+        block = prompt.split("FINDINGS TO ADDRESS:\n", 1)[-1].split("\n\n", 1)[0]
+        applied = [line.split("] ", 1)[-1].split(" → ", 1)[0] for line in block.splitlines() if line.startswith("- ")]
+        return previous + "\n\n" + "\n".join(f"Applied by the mock: {a}" for a in applied)
     if "--- BEGIN SECTION ---" in prompt:
         # A Revision/Editing rewrite: name the first finding it was given, so a
         # browser test can see the findings reached the chapter.
