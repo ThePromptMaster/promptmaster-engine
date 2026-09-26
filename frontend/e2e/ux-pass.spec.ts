@@ -15,7 +15,9 @@ test('each stage offers one next step, in words a new user can read', async ({ p
   const bar = transitionBar(page);
   // PM-06: one primary button; everything else behind More.
   await expect(bar.getByRole('button', { name: 'Check this stage' })).toBeVisible();
-  await expect(bar.getByRole('button')).toHaveCount(2); // More + the primary
+  // More + the primary; "Why this?" is a disclosure beside the reason, not an action (PM-23).
+  await expect(bar.getByRole('button')).toHaveCount(3);
+  await expect(bar.getByRole('button', { name: 'Why this?' })).toHaveAttribute('aria-expanded', 'false');
   await expect(bar).toContainText('One model call scores it against your objective');
 
   // PM-07: plain labels.

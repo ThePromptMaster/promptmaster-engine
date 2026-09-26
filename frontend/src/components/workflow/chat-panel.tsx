@@ -33,6 +33,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { MarkdownOutput } from '@/components/shared/markdown-output';
 import { useStageChat } from './use-stage-chat';
+import { ConflictPrompt } from './conflict-prompt';
+import { api } from '@/lib/api/client';
+import { conflictContext, recordConflictChoice } from '@/lib/workflow/conflict-trail';
+import {
+  mergeConflicts,
+  precedenceNote,
+  ruleConflicts,
+  type Controls,
+  type InstructionConflict,
+} from '@/lib/workflow/instruction-conflicts';
+import { inputsFrom } from '@/lib/workflow/stage-requests';
 import { CritiqueActions } from './critique-actions';
 import { pointsFromCommentary, type CritiquePoint } from '@/lib/workflow/critique-points';
 import { documentSections, type ScopeKind } from './chat-scope';
@@ -196,13 +207,16 @@ export function ChatPanel({
         ? sections.length > 0
         : selection.length > 0;
 
+  // PM-24: an instruction is checked for conflicts before it is sent.
+  const [checking, setChecking] = useState(false);
+  const [conflicting, setConflicting] = useState<{ text: string; conflicts: InstructionConflict[] } | null>(null);
   // The latest assistant reply in Discuss, split into points that can each be applied.
   const latestReply = [...chat.messages].reverse().find((m) => m.role === 'assistant' && m.mode === 'discuss');
   const latestReplyId = latestReply?.id ?? null;
   const replyPoints = useMemo(() => (latestReply ? pointsFromCommentary(latestReply.content) : []), [latestReply]);
 
   const canSend =
-    !readOnly && !chat.busy && draft.trim().length > 0 && (mode === 'discuss' || scopeReady);
+    !readOnly && !chat.busy && !checking && !conflicting && draft.trim().length > 0 && (mode === 'discuss' || scopeReady);
 
   const send = useCallback(async () => {
     const text = draft.trim();
@@ -212,10 +226,55 @@ export function ChatPanel({
     setDraft('');
     if (mode === 'discuss') {
       await chat.discuss(text);
-    } else {
-      await chat.propose(text, scope, { selection, sectionId: effectiveSectionId });
+      return;
     }
-  }, [draft, mode, scope, selection, effectiveSectionId, chat]);
+    setChecking(true);
+    let conflicts: InstructionConflict[] = [];
+    try {
+      const recent = chat.messages.filter((m) => m.role === 'user' && m.mode === 'instruct').map((m) => m.content);
+      const { decisions, others } = await conflictContext(project.id, stageId, recent);
+      const rule = ruleConflicts({ instruction: text, objective: project.objective, constraints: project.constraints, decisions, others });
+      let model: InstructionConflict[] = [];
+      try {
+        const res = await api.checkConflicts({
+          inputs: inputsFrom(project), instruction: text, decisions, other_instructions: others, model: project.model,
+        });
+        model = res.conflicts.map((c) => ({ ...c, source: 'model' as const }));
+      } catch {
+        // The model half failing never blocks an instruction; the rule's half still counts.
+      }
+      conflicts = mergeConflicts(rule, model);
+    } catch {
+      // Nor does anything else about the check.
+    } finally {
+      setChecking(false);
+    }
+    if (conflicts.length) {
+      setConflicting({ text, conflicts });
+      return;
+    }
+    await chat.propose(text, scope, { selection, sectionId: effectiveSectionId });
+  }, [draft, mode, scope, selection, effectiveSectionId, chat, project, stageId]);
+
+  const resolveConflicts = useCallback(
+    async (choices: Controls[]) => {
+      if (!conflicting) return;
+      const { text, conflicts } = conflicting;
+      setConflicting(null);
+      await Promise.all(
+        conflicts.map((conflict, i) =>
+          recordConflictChoice({ projectId: project.id, userId: project.user_id, stageId, instruction: text, conflict, controls: choices[i] })
+            .catch(() => undefined)
+        )
+      );
+      await chat.propose(text, scope, {
+        selection,
+        sectionId: effectiveSectionId,
+        precedence: conflicts.map((c, i) => precedenceNote(c, text, choices[i])),
+      });
+    },
+    [conflicting, project, stageId, chat, scope, selection, effectiveSectionId]
+  );
 
   return (
     <section
@@ -274,6 +333,23 @@ export function ChatPanel({
           </p>
         )}
 
+        {checking && (
+          <p role="status" className="mt-3 text-label text-[var(--on-surface-variant)]">Checking it against your objective and earlier decisions…</p>
+        )}
+        {conflicting && (
+          <div className="mt-3">
+            <ConflictPrompt
+              instruction={conflicting.text}
+              conflicts={conflicting.conflicts}
+              busy={chat.busy}
+              onContinue={(choices) => void resolveConflicts(choices)}
+              onCancel={() => {
+                setDraft(conflicting.text);
+                setConflicting(null);
+              }}
+            />
+          </div>
+        )}
         {chat.proposal && (
           <ProposalCard
             scopeLabel={chat.proposal.target.label}

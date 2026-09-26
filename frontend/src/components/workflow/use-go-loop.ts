@@ -357,6 +357,22 @@ export function useGoLoop(opts: Options) {
     }
   }, [policy, pendingStepId, commitRun, loop, startRun]);
 
+  /**
+   * PM-23: "next logical action; why it is recommended; ability to apply".
+   * One Guided proposal — the planner's best move with its rationale, waiting
+   * for one click. Nothing runs until the user says Do it.
+   */
+  const suggest = useCallback(async () => {
+    if (abortRef.current || pendingStepId) return;
+    setError(null);
+    setPolicy('guided');
+    try {
+      await startRun('guided', null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not suggest a move.');
+    }
+  }, [pendingStepId, startRun]);
+
   const confirmAuthorization = useCallback(async () => {
     const chosen = authorizing;
     const o = latest.current;
@@ -539,7 +555,7 @@ export function useGoLoop(opts: Options) {
 
   return {
     policy, setPolicy, budget, setBudget, run, steps, phase, active, pendingStep, authorizing, error,
-    go, stop, approve, decline, answer, confirmAuthorization,
+    go, suggest, stop, approve, decline, answer, confirmAuthorization,
     cancelAuthorization: useCallback(() => setAuthorizing(null), []),
     dismissError: useCallback(() => setError(null), []),
   };

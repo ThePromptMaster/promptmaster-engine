@@ -263,6 +263,16 @@ def _json_reply(system: str, prompt: str) -> dict:
     from promptmaster.stage import _LIST_INSTRUCTION
     from promptmaster.stage_evaluation import _STAGE_EVAL_INSTRUCTION
 
+    from promptmaster import conflicts
+
+    if conflicts._CONFLICT_INSTRUCTION[:60] in system:
+        # "[[mock:conflict]]" in the instruction conflicts with the objective;
+        # anything else is the usual answer: no conflict.
+        instruction = prompt.split("--- THE NEW INSTRUCTION ---", 1)[-1]
+        if "[[mock:conflict]]" in instruction:
+            return {"conflicts": [{"kind": "objective", "with_id": "", "with_text": "the project objective",
+                                   "explanation": "Mock: this instruction pulls the work away from the objective."}]}
+        return {"conflicts": []}
     if agent._NEXT_ACTION_INSTRUCTION[:60] in system:
         return _next_action(system, prompt)
     if _STAGE_EVAL_INSTRUCTION[:60] in system:

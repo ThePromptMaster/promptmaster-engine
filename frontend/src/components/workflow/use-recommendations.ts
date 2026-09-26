@@ -126,6 +126,7 @@ export function useRecommendations({
     chosen: PanelRecommendation[];
     before: string;
     response: { content: string; instruction: string; finish_reason: string };
+    precedence: string[];
   } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -367,7 +368,8 @@ export function useRecommendations({
   const commitRevision = useCallback(
     async (
       chosen: PanelRecommendation[],
-      response: { content: string; instruction: string; finish_reason: string }
+      response: { content: string; instruction: string; finish_reason: string },
+      precedence: string[] = []
     ) => {
       if (!stage || !appendStageVersion) return;
         await appendStageVersion(stage.id, stage.label, {
@@ -402,6 +404,7 @@ export function useRecommendations({
               category: rec.category,
               stage: stage.id,
               applied_with: chosen.length,
+              ...(precedence.length ? { precedence } : {}),
             },
           });
         }
@@ -416,7 +419,8 @@ export function useRecommendations({
    * after the preview dialog has shown the user the exact instruction, the
    * affected scope, and what happens to the current version.
    */
-  const confirmApply = useCallback(async (opts: { showFirst?: boolean } = {}) => {
+  const confirmApply = useCallback(async (opts: { showFirst?: boolean; precedence?: string[] } = {}) => {
+    const precedence = opts.precedence ?? [];
     if (!stage || !previewing || busy || !appendStageVersion) return;
     const chosen = panelRows.filter((r) => previewing.includes(r.category) && isApplyable(r));
     const content = headVersion?.content ?? '';
@@ -436,7 +440,16 @@ export function useRecommendations({
         {
           inputs: inputsFrom(project),
           content,
-          findings: chosen.map(asFinding),
+          // PM-24: which fix controls where two pull against each other.
+          findings: [
+            ...chosen.map(asFinding),
+            ...precedence.map((summary, i) => ({
+              id: `precedence-${i + 1}`,
+              category: 'precedence',
+              summary,
+              suggested_change: 'Follow this wherever the fixes above disagree.',
+            })),
+          ],
           model: project.model,
         },
         controller.signal
@@ -445,11 +458,11 @@ export function useRecommendations({
 
       // PM-22: "Show revised version first" — hold it until Keep.
       if (opts.showFirst) {
-        setRevision({ chosen, before: content, response });
+        setRevision({ chosen, before: content, response, precedence });
         setPreviewing(null);
         return;
       }
-      await commitRevision(chosen, response);
+      await commitRevision(chosen, response, precedence);
       setPreviewing(null);
       setSelected([]);
       await reload();
@@ -481,7 +494,7 @@ export function useRecommendations({
     setBusy(true);
     setError(null);
     try {
-      await commitRevision(revision.chosen, revision.response);
+      await commitRevision(revision.chosen, revision.response, revision.precedence);
       setRevision(null);
       setSelected([]);
       await reload();

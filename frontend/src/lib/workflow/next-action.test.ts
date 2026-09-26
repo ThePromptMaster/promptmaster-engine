@@ -99,3 +99,26 @@ describe('PM-25: no further AI pass needed', () => {
     expect(action.reason).toBe('Looks good — nothing here needs another pass.');
   });
 });
+
+describe('PM-23: why the next step is the next step', () => {
+  it('explains a check from the facts that chose it', () => {
+    const a = nextStageAction({ ...base, evaluated: false, unmetRequired: ['Says who it is for'] });
+    expect(a.kind).toBe('evaluate');
+    expect(a.because).toEqual([
+      'The current version has not been checked.',
+      'A check scores it against your objective and this stage’s requirements, and suggests specific fixes.',
+      'Still open: Says who it is for.',
+    ]);
+  });
+
+  it('explains fixes and moving on', () => {
+    expect(nextStageAction({ ...base, evaluationClean: false, applyableFixes: 2 }).because?.[0]).toBe('2 suggested fixes are waiting from the last check.');
+    const move = nextStageAction({ ...base, canAdvance: false, unmetRequired: ['A', 'B'] });
+    expect(move.because).toContain('Still open: A; B.');
+    expect(move.because).toContain('Moving on anyway is allowed: you will be asked why, and the stage stays open.');
+  });
+
+  it('gives no reasons when there is nothing to do', () => {
+    expect(nextStageAction({ ...base, finished: true }).because).toBeUndefined();
+  });
+});

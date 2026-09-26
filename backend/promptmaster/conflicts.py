@@ -1,0 +1,123 @@
+"""Conflict detection for a typed instruction (PM-24).
+
+Sean, Sep 10: "Conflict detection still matters: current instruction vs
+project objective; current instruction vs prior decision; one instruction vs
+another; user should be asked which should control when there is a real
+conflict."
+
+This is the model half. The deterministic half — opposite directions on the
+closed vocabulary of combine.ts ("shorter" vs "longer") — runs in the browser
+first and costs nothing (lib/workflow/conflicts.ts). What a keyword list cannot
+see is meaning: "add a section on sexual selection" does not share a word with
+a constraint of "under 300 words", and it is still a conflict. One cheap JSON
+call looks for those, against the three things Sean named and nothing else.
+
+The bar is set high on purpose. A user who is asked "which should control?"
+about a refinement that contradicts nothing learns to click through the
+question, and then misses the real one.
+"""
+
+from __future__ import annotations
+
+from typing import Literal
+
+from pydantic import BaseModel, Field
+
+from .conversation import _shared_system
+from .llm_client import OpenRouterClient
+from .schemas import PMInput
+
+ConflictKind = Literal["objective", "constraint", "decision", "instruction"]
+
+
+class ConflictSource(BaseModel):
+    id: str
+    text: str = Field(max_length=2_000)
+
+
+class Conflict(BaseModel):
+    kind: ConflictKind
+    #: The id of the decision or instruction it conflicts with; "" for the objective or constraints.
+    with_id: str = ""
+    with_text: str
+    explanation: str
+
+
+_CONFLICT_INSTRUCTION = (
+    "CONFLICT CHECK MODE. The user is about to give an instruction. Decide whether "
+    "following it would CONTRADICT any of: the project objective, the project "
+    "constraints, a decision the user already made, or another pending "
+    "instruction — all listed below.\n\n"
+    "Only a REAL conflict counts: following the new instruction would mean "
+    "violating or undoing the other thing, so the user must choose which one "
+    "controls. A refinement, an addition that fits, a change of wording, or "
+    "something merely different is NOT a conflict. When in doubt, it is not a "
+    "conflict. Most instructions have none; an empty list is the usual answer.\n\n"
+    "For each real conflict, quote what it conflicts with and say in one plain "
+    "sentence how the two pull against each other.\n\n"
+    "Return JSON only:\n"
+    '{"conflicts": [{"kind": "objective|constraint|decision|instruction", '
+    '"with_id": "the id shown, or empty for the objective/constraints", '
+    '"with_text": "what it conflicts with", "explanation": "one sentence"}]}'
+)
+
+
+def build_conflict_prompt(
+    inputs: PMInput, instruction: str, decisions: list[ConflictSource], others: list[ConflictSource]
+) -> tuple[str, str]:
+    system = _shared_system(inputs, [], _CONFLICT_INSTRUCTION)
+    listed = lambda items: "\n".join(f"- [{i.id}] {i.text}" for i in items) or "(none)"  # noqa: E731
+    user = "\n".join([
+        f"OBJECTIVE: {inputs.objective or '(none)'}",
+        f"CONSTRAINTS: {inputs.constraints or '(none)'}",
+        "",
+        "DECISIONS THE USER ALREADY MADE:",
+        listed(decisions),
+        "",
+        "OTHER PENDING INSTRUCTIONS:",
+        listed(others),
+        "",
+        "--- THE NEW INSTRUCTION ---",
+        instruction.strip(),
+        "--- END ---",
+        "",
+        "List only real conflicts.",
+    ])
+    return system, user
+
+
+def parse_conflicts(raw: object, decisions: list[ConflictSource], others: list[ConflictSource]) -> list[Conflict]:
+    """Keep only well-formed conflicts that point at something that was actually listed."""
+    if not isinstance(raw, dict) or not isinstance(raw.get("conflicts"), list):
+        return []
+    known = {s.id: s.text for s in [*decisions, *others]}
+    out: list[Conflict] = []
+    for item in raw["conflicts"][:5]:
+        if not isinstance(item, dict):
+            continue
+        kind = item.get("kind")
+        explanation = str(item.get("explanation") or "").strip()
+        if kind not in ("objective", "constraint", "decision", "instruction") or not explanation:
+            continue
+        with_id = str(item.get("with_id") or "")
+        if kind in ("decision", "instruction"):
+            # A conflict with something that was never listed is invented.
+            if with_id not in known:
+                continue
+            with_text = known[with_id]
+        else:
+            with_id = ""
+            with_text = str(item.get("with_text") or "").strip()
+            if not with_text:
+                continue
+        out.append(Conflict(kind=kind, with_id=with_id, with_text=with_text[:2_000], explanation=explanation[:500]))
+    return out
+
+
+async def find_conflicts(
+    client: OpenRouterClient, model: str | None, inputs: PMInput, instruction: str,
+    decisions: list[ConflictSource], others: list[ConflictSource],
+) -> list[Conflict]:
+    system, user = build_conflict_prompt(inputs, instruction, decisions, others)
+    raw, _usage = await client.generate_json(prompt=user, system=system, temperature=0.0, max_tokens=700, model=model)
+    return parse_conflicts(raw, decisions, others)

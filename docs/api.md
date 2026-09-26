@@ -100,6 +100,7 @@ in `frontend/src/` on this branch, not from memory. **Live** = something calls i
 | POST | `/api/continue-document` | `continueDocument` | `continuation.py` | Dormant |
 | POST | `/api/audit-findings` | `auditFindings` | `audit.py` | Dormant |
 | POST | `/api/apply-audit` | `applyAudit` | `audit.py` | Dormant |
+| POST | `/api/check-conflicts` | `checkConflicts` | `conflicts.py` | **Live** — PM-24: one JSON call per side-chat instruction; returns only conflicts with things actually listed (objective, constraints, prior decisions, pending instructions) |
 | GET | `/api/agent/actions` | *(B4)* | `agent.py` | Dormant until B4 — the Go mode action registry |
 | POST | `/api/agent/next-action` | *(B4)* | `agent.py` | Dormant until B4 — chooses ONE move from `allowed_actions`; anything else becomes `request_user_decision` |
 | POST | `/api/agent/reason` | *(B4)* | `agent.py` | Dormant until B4 — performs a reasoning move (label `discussed`); 422 for non-reasoning actions |
