@@ -97,3 +97,57 @@ export interface SandboxRun {
   status: 'ok' | 'error' | 'timeout' | 'unavailable';
   created_at: string;
 }
+
+// --- B2's endpoints (backend/routers/agent.py) ---------------------------------
+
+import type { PMInput } from './index';
+import type { AgentStateDigest } from '@/lib/agent/digest';
+
+export interface AgentUsage {
+  tokens_in: number;
+  tokens_out: number;
+}
+
+export interface NextActionRequest {
+  inputs: PMInput;
+  state: AgentStateDigest;
+  allowed_actions: string[];
+  policy: ExecutionPolicy;
+  model?: string;
+}
+
+export interface NextActionResponse {
+  action_key: string;
+  params: Record<string, unknown>;
+  rationale: string;
+  expected_outcome: string;
+  needs_user_decision: boolean;
+  decision_question: string | null;
+  objective_complete: boolean;
+  model_used: string;
+}
+
+export interface AgentTextResponse {
+  text: string;
+  model_used: string;
+  usage: AgentUsage;
+}
+
+export interface WriteCodeResponse {
+  code: string;
+  language: 'python';
+  model_used: string;
+  usage: AgentUsage;
+}
+
+/** /api/sandbox/run (B3). */
+export interface SandboxRunResponse {
+  sandbox_run: SandboxRun & { cost_usd: number | null };
+  classification: {
+    stepStatus: 'succeeded' | 'failed' | 'blocked';
+    executionLabel: ExecutionLabel;
+    blockKind: BlockKind | null;
+    summary: string;
+  };
+  detail: string | null;
+}

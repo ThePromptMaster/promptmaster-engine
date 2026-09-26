@@ -68,6 +68,8 @@ export default defineConfig({
         SUPABASE_SERVICE_ROLE_KEY: sb.SERVICE_ROLE_KEY,
         WORKER_SHARED_SECRET: workerSecret,
         CRON_SECRET: 'e2e-cron-secret',
+        // B3: scripted code execution; refused when VERCEL_ENV=production.
+        SANDBOX_MODE: 'mock',
       },
     },
   ],

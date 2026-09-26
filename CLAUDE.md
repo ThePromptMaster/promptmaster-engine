@@ -111,6 +111,14 @@ What went with it, and is **still not** reachable anywhere in the UI today: the 
 
 The `sessions`, `templates`, `custom_modes`, `user_presets` and `conversation_messages` tables are untouched, as are their client modules under `lib/supabase/`. `sessions` in particular is the rollback path for the M1 import and must not be narrowed. Several of those modules currently have no importer.
 
+### Go mode (Phase B)
+
+`use-go-loop.ts` drives a next-best-action loop from the browser over `lib/agent/`
+(pure except `perform.ts`). **Execution labels are derived from what happened, never taken
+from a model**, and the database re-checks them; see `docs/architecture.md` § Go mode. The
+action registry exists twice (TS and Python) and `actions-drift.test.ts` keeps them equal.
+Code runs only through `/api/sandbox/run` (Vercel Sandbox; `SANDBOX_MODE=mock` in E2E).
+
 ## Requirements
 
 `docs/requirements/phase2-functional-requirements.md` holds FR-01 to FR-23 verbatim

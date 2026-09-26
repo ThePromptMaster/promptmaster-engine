@@ -29,18 +29,12 @@ import {
   type PreservedContext,
   type StageFailure,
 } from '@/lib/errors/recovery';
-import { buildStageDigest, type StageArtifactBundle } from '@/lib/workflow/digest';
-import {
-  itemSchemaFor,
-  rendererHoldsItems,
-  serializeItems,
-  type StageItem,
-  stageDrafts,
-} from '@/lib/workflow/stage-artifact';
+import type { StageArtifactBundle } from '@/lib/workflow/digest';
+import { stageDrafts } from '@/lib/workflow/stage-artifact';
+import { generationContent, generationRequest } from '@/lib/workflow/stage-requests';
 import type { StageDefinition, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
 import type { NewVersion } from '@/lib/supabase/versions';
 import type { Project } from '@/types/project';
-import type { PMInput } from '@/types';
 
 interface Options {
   project: Project;
@@ -57,20 +51,7 @@ interface Options {
   ) => Promise<unknown>;
 }
 
-/** The project's setup fields as the PMInput every backend call expects. */
-export function inputsFrom(project: Project): PMInput {
-  return {
-    objective: project.objective,
-    audience: project.audience,
-    constraints: project.constraints,
-    output_format: project.output_format,
-    mode: project.mode,
-    custom_name: project.custom_name,
-    custom_preamble: project.custom_preamble,
-    custom_tone: project.custom_tone,
-    session_facts: project.session_facts,
-  };
-}
+export { inputsFrom } from '@/lib/workflow/stage-requests';
 
 export function useStageGeneration({
   project,
@@ -136,47 +117,17 @@ export function useStageGeneration({
         label: target.label.toLowerCase(),
       };
 
-      const schema = itemSchemaFor(target);
-      const wantsItems = rendererHoldsItems(target.renderer);
-
       try {
         const response = await api.generateStageArtifact(
-          {
-            inputs: inputsFrom(p),
-            stage: {
-              id: target.id,
-              label: target.label,
-              renderer: target.renderer,
-              entry_prompt_hint: target.entry_prompt_hint ?? '',
-              artifact_kind: target.expected_artifacts[0]?.kind ?? '',
-            },
-            digest: buildStageDigest(t, s, p, b, target.id),
-            item_schema: wantsItems
-              ? {
-                  item_label: schema.itemLabel,
-                  fields: schema.fields.map((f) => ({
-                    key: f.key,
-                    label: f.label,
-                    hint: f.hint,
-                    max_chars: f.max ?? null,
-                  })),
-                  min_items: schema.minItems,
-                  max_items: schema.maxItems,
-                }
-              : null,
-            existing_content: options?.force ? head : '',
-            model: p.model,
-          },
+          generationRequest(p, t, s, b, target, options?.force ? head : ''),
           controller.signal
         );
 
         if (controller.signal.aborted) return;
 
-        const content = wantsItems
-          ? serializeItems(response.items as unknown as StageItem[])
-          : response.content;
+        const content = generationContent(target, response);
 
-        if (!content.trim() || (wantsItems && response.items.length === 0)) {
+        if (!content) {
           // Not a provider failure, so it must not be dressed as one — but it
           // owes the same reassurance, because it raises the same question.
           setFailure(

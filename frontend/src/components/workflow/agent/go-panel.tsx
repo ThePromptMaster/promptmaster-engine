@@ -1,0 +1,112 @@
+'use client';
+
+import { useState } from 'react';
+
+import { actionLabel } from '@/lib/agent/actions';
+import type { useGoLoop } from '../use-go-loop';
+import { AuthorizationDialog } from './authorization-dialog';
+import { DecisionPrompt, QuestionPrompt } from './decision-prompt';
+import { GoControl } from './go-control';
+import { PolicySelector } from './policy-selector';
+import { StepTimeline } from './step-timeline';
+import { TransparencyPanel } from './transparency-panel';
+
+/**
+ * Go mode (PM-17 … PM-20): the four layers side by side — the stage (where),
+ * the mode (how to think), the action (what now) and the execution policy (how
+ * autonomously) — with what is actually happening underneath.
+ */
+export function GoPanel({
+  go,
+  stageLabel,
+  mode,
+}: {
+  go: ReturnType<typeof useGoLoop>;
+  stageLabel: string;
+  mode: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const live = go.run && !go.run.ended_at;
+  const expanded = open || Boolean(live) || go.steps.length > 0 || Boolean(go.authorizing);
+  const current = go.steps.at(-1) ?? null;
+  const next = go.pendingStep
+    ? `${actionLabel(go.pendingStep.action_key)} — waiting for your approval`
+    : go.phase === 'thinking' || go.phase === 'performing'
+      ? 'Chosen after this step finishes'
+      : go.run?.status === 'completed'
+        ? 'Nothing — the objective is met'
+        : 'Press Go to choose the next move';
+  const askingUser = Boolean(live && go.run!.status === 'awaiting_decision' && !go.pendingStep && !go.active);
+  const canResume = Boolean(live && (go.run!.status === 'blocked' || go.run!.status === 'awaiting_decision') && !go.pendingStep);
+
+  return (
+    <section aria-label="Go mode" className="mb-6 rounded-2xl bg-[var(--surface-container)] px-5 py-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <span aria-hidden className="material-symbols-outlined text-[var(--pm-primary)]">rocket_launch</span>
+        <div className="mr-auto">
+          <h2 className="text-title text-[var(--on-surface)]">Go mode</h2>
+          <p className="text-label text-[var(--on-surface-variant)]">
+            Chooses the best next move for this stage and does it — and says whether it reasoned or actually ran something.
+          </p>
+        </div>
+        {!expanded && (
+          <button onClick={() => setOpen(true)} className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-title text-[var(--on-primary)]">
+            Set up Go
+          </button>
+        )}
+      </div>
+
+      {expanded && (
+        <div className="mt-4 space-y-4">
+          <PolicySelector value={go.policy} onChange={go.setPolicy} disabled={go.active || go.phase === 'watching'} />
+          <GoControl
+            run={go.run}
+            running={go.active}
+            budget={go.budget}
+            onBudget={go.setBudget}
+            onGo={() => void go.go()}
+            onStop={() => void go.stop()}
+            canResume={canResume}
+            disabled={go.phase === 'watching' || Boolean(go.pendingStep) || Boolean(go.authorizing)}
+          />
+          {go.phase === 'watching' && (
+            <p role="status" className="text-body text-[var(--on-surface-variant)]">
+              This run is being driven from another tab. It will continue here if that tab closes.
+            </p>
+          )}
+          {go.authorizing && (
+            <AuthorizationDialog
+              policy={go.authorizing}
+              budget={go.budget}
+              onAuthorize={() => void go.confirmAuthorization()}
+              onCancel={go.cancelAuthorization}
+            />
+          )}
+          {go.error && (
+            <div role="alert" className="flex items-start gap-3 rounded-xl bg-[var(--pm-tertiary)]/10 px-4 py-3 text-body text-[var(--on-surface)]">
+              <span className="mr-auto">{go.error}</span>
+              <button onClick={go.dismissError} className="text-label text-[var(--on-surface-variant)]">Dismiss</button>
+            </div>
+          )}
+          {go.pendingStep && (
+            <DecisionPrompt step={go.pendingStep} onApprove={() => void go.approve()} onDecline={() => void go.decline()} />
+          )}
+          {askingUser && go.run?.stop_reason && (
+            <QuestionPrompt key={go.run.stop_reason} question={go.run.stop_reason} onAnswer={(t) => void go.answer(t)} />
+          )}
+          {(go.run || go.steps.length > 0) && (
+            <TransparencyPanel
+              run={go.run}
+              step={current}
+              next={next}
+              stageLabel={stageLabel}
+              mode={mode}
+              thinking={go.phase === 'thinking'}
+            />
+          )}
+          <StepTimeline steps={go.steps} />
+        </div>
+      )}
+    </section>
+  );
+}

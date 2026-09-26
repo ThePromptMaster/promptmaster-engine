@@ -271,6 +271,12 @@ def _prose_reply(system: str, prompt: str) -> str:
     from promptmaster import agent
 
     if agent._WRITE_CODE_INSTRUCTION[:60] in system:
+        # The objective steers the sandbox branch the E2E needs (MockRunner
+        # reads these back out of the code).
+        if "[[mock:sandbox=unavailable]]" in prompt:
+            return "# mock:unavailable\nprint(1)"
+        if "[[mock:sandbox=missing]]" in prompt:
+            return "import nonexistent_lib\nprint(nonexistent_lib.x)"
         # Fenced on purpose: clean_code must strip it.
         return "```python\nresult = 2 + 2\nprint(f\"2 + 2 = {result}\")\n```"
     if agent._INTERPRET_INSTRUCTION[:60] in system:
