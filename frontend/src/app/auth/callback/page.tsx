@@ -8,20 +8,21 @@ import { createClient } from '@/lib/supabase/client';
 export default function AuthCallbackPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [error, setError] = useState<string | null>(null);
+  const [timeoutError, setTimeoutError] = useState<string | null>(null);
+
+  // Supabase redirects with ?error=...; that error is derived from the URL during
+  // render rather than copied into state from an effect.
+  const errorParam = searchParams.get('error');
+  const errorDescription = searchParams.get('error_description');
+  const urlError = errorParam
+    ? errorDescription
+      ? errorDescription.replace(/\+/g, ' ')
+      : 'Authentication failed. Please try again.'
+    : null;
+  const error = urlError ?? timeoutError;
 
   useEffect(() => {
-    // Check for error in query params (Supabase redirects with ?error=...)
-    const errorParam = searchParams.get('error');
-    const errorDescription = searchParams.get('error_description');
-
-    if (errorParam) {
-      const message = errorDescription
-        ? errorDescription.replace(/\+/g, ' ')
-        : 'Authentication failed. Please try again.';
-      setError(message);
-      return;
-    }
+    if (urlError) return;
 
     // No error — proceed with auth exchange
     const supabase = createClient();
@@ -34,14 +35,14 @@ export default function AuthCallbackPage() {
 
     // Timeout — if no auth event after 10s, show error
     const timeout = setTimeout(() => {
-      setError('Sign in timed out. Please try again.');
+      setTimeoutError('Sign in timed out. Please try again.');
     }, 10000);
 
     return () => {
       subscription.unsubscribe();
       clearTimeout(timeout);
     };
-  }, [router, searchParams]);
+  }, [router, urlError]);
 
   if (error) {
     return (

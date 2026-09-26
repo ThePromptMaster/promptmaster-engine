@@ -10,7 +10,9 @@ export async function listSessions(limit = 20): Promise<SessionSummary[]> {
     .limit(limit);
 
   if (error) throw error;
-  return (data ?? []).map((s: any) => ({
+  // `objective` is nullable in the table; the summary is not.
+  type Row = Omit<SessionSummary, 'objective'> & { objective: string | null };
+  return ((data ?? []) as Row[]).map((s) => ({
     session_id: s.session_id,
     objective: s.objective?.slice(0, 80) ?? '',
     mode: s.mode,
