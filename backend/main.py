@@ -95,6 +95,7 @@ from routers.audit import router as audit_router
 from routers.long_form import router as long_form_router
 from routers.stage import router as stage_router
 from routers.usage import router as usage_router
+from routers.agent import router as agent_router
 
 # Auth is applied at include time, not per-endpoint, so a new route cannot be
 # added unprotected by omission. test_auth.py asserts this holds.
@@ -118,3 +119,4 @@ app.include_router(audit_router, dependencies=_protected)
 app.include_router(long_form_router, dependencies=_protected)
 app.include_router(stage_router, dependencies=_protected)
 app.include_router(usage_router, dependencies=_protected)
+app.include_router(agent_router, dependencies=_protected)
