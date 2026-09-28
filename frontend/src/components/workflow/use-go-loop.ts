@@ -33,7 +33,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '@/lib/api/client';
 import { actionFor, actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, USER_ANSWER_STEP } from '@/lib/agent/actions';
 import { readStageFacts, type StageFacts } from '@/lib/agent/facts';
+import { describeNeed, needsUser, type NeedsUser } from '@/lib/agent/needs';
 import { assertHonestOutcome } from '@/lib/agent/outcome';
+import { outlineStageFor } from '@/lib/outline/actions';
+import { recordDecision } from '@/lib/supabase/recommendations';
 import { requestProjectCancel } from '@/lib/supabase/jobs';
 import { authorizeRun } from '@/lib/agent/authorize';
 import { buildAgentState } from '@/lib/agent/digest';
@@ -128,6 +131,10 @@ export function useGoLoop(opts: Options) {
   const abortRef = useRef<AbortController | null>(null);
   const followRef = useRef<StepOutcome['followUp'] | null>(null);
   const [progress, setProgress] = useState<string | null>(null);
+  /** Steps of the windows this run continues (B4): the planner reads them as history. */
+  const priorStepsRef = useRef<AgentStep[]>([]);
+  /** The user said "draft them anyway" for this many sections (FR-18). */
+  const largeJobOkRef = useRef<number | null>(null);
   /**
    * Steps before this index predate the last Go/Resume. The no-progress and
    * repeated-failure guards only count what happened since: pressing Resume
@@ -155,16 +162,17 @@ export function useGoLoop(opts: Options) {
   );
 
   const setRunStatus = useCallback(
-    async (status: AgentRunStatus, reason: string | null) => {
+    async (status: AgentRunStatus, reason: string | null, needs: NeedsUser | null = null) => {
       const current = runRef.current;
       if (!current) return;
       const terminal = ['completed', 'budget_exhausted', 'stopped', 'failed'].includes(status);
-      if (terminal) await endAgentRun(current.id, status, reason ?? '');
-      else await updateAgentRun(current.id, { status, stop_reason: reason });
-      commitRun({ ...current, status, stop_reason: reason, ended_at: terminal ? new Date().toISOString() : null });
+      if (terminal) await endAgentRun(current.id, status, reason ?? '', needs);
+      else await updateAgentRun(current.id, { status, stop_reason: reason, needs });
+      commitRun({ ...current, status, stop_reason: reason, needs, ended_at: terminal ? new Date().toISOString() : null });
     },
     [commitRun]
   );
+  const stageLabelFor = useCallback((id: string) => getStage(latest.current.template, id)?.short_label ?? id, []);
 
   // --- performing one step ------------------------------------------------------
 
@@ -189,7 +197,7 @@ export function useGoLoop(opts: Options) {
         context: o.context, approvedOutline: o.approvedOutline, run: current, step,
         digest: buildAgentState({
           template: o.template, state: o.state, stage: o.stage, bundles: o.bundles,
-          stageEvaluation: o.stageEvaluation, latestEvaluation: o.latestEvaluation, steps: stepsRef.current,
+          stageEvaluation: o.stageEvaluation, latestEvaluation: o.latestEvaluation, steps: [...priorStepsRef.current, ...stepsRef.current],
           context: o.context, approvedOutline: o.approvedOutline,
         }),
         approvedByUser, deliverableDone: o.deliverableDone,
@@ -230,12 +238,12 @@ export function useGoLoop(opts: Options) {
       if (outcome.followUp) followRef.current = outcome.followUp;
       if (outcome.status === 'interrupted') {
         // The work goes on in the background; the run waits for the user to
-        // say "keep waiting" (Resume) rather than spinning here.
-        await setRunStatus('awaiting_decision', outcome.output.split('\n')[0]);
+        // say "keep waiting" rather than spinning here.
+        await setRunStatus('awaiting_decision', outcome.output.split('\n')[0], outcome.needs ?? null);
         return 'stop';
       }
       if (outcome.stop) {
-        await setRunStatus(outcome.stop.status, outcome.stop.reason);
+        await setRunStatus(outcome.stop.status, outcome.stop.reason, outcome.needs ?? null);
         return 'stop';
       }
       if (outcome.status === 'blocked') {
@@ -282,7 +290,14 @@ export function useGoLoop(opts: Options) {
           steps: stepsRef.current.slice(sinceRef.current).filter((s) => s.action_key !== AWAIT_SECTIONS_STEP),
         });
         if (stop) {
-          await setRunStatus(stop.status, stop.reason);
+          // Said as what the user can do about it (B4), not only why it stopped.
+          const blocked = o.state.stages[o.stage.id]?.blocked;
+          const need: NeedsUser | null =
+            stop.status === 'budget_exhausted' ? { kind: 'continue_budget', budgetSteps: current.budget_steps }
+            : stop.status === 'blocked' && blocked ? { kind: 'unblock_stage', stageId: o.stage.id, reason: blocked.reason, blockKind: blocked.kind }
+            : stop.status === 'awaiting_decision' && !o.project.objective.trim() ? { kind: 'set_objective' }
+            : null;
+          await setRunStatus(stop.status, stop.reason, need);
           break;
         }
 
@@ -308,9 +323,20 @@ export function useGoLoop(opts: Options) {
 
         const hasDraft = (o.bundles[o.stage.id]?.versions.at(-1)?.content ?? '').trim().length > 0;
         const allowed = allowedActions(o.template, o.state, o.stage, hasDraft, undefined, facts);
+
+        // Before the planner is asked: is the next move the user's? (B4)
+        const need = needsUser({
+          state: o.state, stage: o.stage, facts, stageEvaluation: o.stageEvaluation, allowed, policy: current.policy,
+          outlineStageId: outlineStageFor(o.template)?.id ?? null, largeJobAcknowledged: largeJobOkRef.current,
+        });
+        if (need) {
+          await setRunStatus('awaiting_decision', describeNeed(need, stageLabelFor).message, need);
+          break;
+        }
+
         const digest = buildAgentState({
           template: o.template, state: o.state, stage: o.stage, bundles: o.bundles,
-          stageEvaluation: o.stageEvaluation, latestEvaluation: o.latestEvaluation, steps: stepsRef.current,
+          stageEvaluation: o.stageEvaluation, latestEvaluation: o.latestEvaluation, steps: [...priorStepsRef.current, ...stepsRef.current],
           context: o.context, approvedOutline: o.approvedOutline, pendingJobs: facts.manuscript?.pendingJobs.length ?? 0,
         });
         const choice = await api.agentNextAction(
@@ -321,7 +347,8 @@ export function useGoLoop(opts: Options) {
         if (!fitsBudget(choice.action_key, current.steps_used, current.budget_steps)) {
           await setRunStatus(
             'budget_exhausted',
-            `Stopped before "${actionLabel(choice.action_key)}": it needs ${stepCost(choice.action_key)} steps and ${current.budget_steps - current.steps_used} remain.`
+            `Stopped before "${actionLabel(choice.action_key)}": it needs ${stepCost(choice.action_key)} steps and ${current.budget_steps - current.steps_used} remain.`,
+            { kind: 'continue_budget', budgetSteps: current.budget_steps }
           );
           break;
         }
@@ -362,7 +389,7 @@ export function useGoLoop(opts: Options) {
     } finally {
       if (abortRef.current === controller) abortRef.current = null;
     }
-  }, [perform, setRunStatus, upsertStep]);
+  }, [perform, setRunStatus, upsertStep, stageLabelFor]);
 
   // --- controls -----------------------------------------------------------------
 
@@ -379,12 +406,53 @@ export function useGoLoop(opts: Options) {
       });
       commitRun(created);
       commitSteps([]);
+      priorStepsRef.current = [];
+      largeJobOkRef.current = null;
       followRef.current = null;
       sinceRef.current = 0;
       void loop();
     },
     [budget, commitRun, commitSteps, loop]
   );
+
+  /**
+   * Another window (B4, Sean item 3): the same policy under the same
+   * authorization, chained to the run whose window was used up, with that
+   * run's steps kept as history for the planner. Each window is the user's
+   * click; when the policy needed an authorization, the click is recorded
+   * against it.
+   */
+  const continueRun = useCallback(async () => {
+    const o = latest.current;
+    const prev = runRef.current;
+    if (!prev || prev.status !== 'budget_exhausted') return;
+    setError(null);
+    try {
+      const created = await createAgentRun({
+        projectId: o.project.id, userId: o.project.user_id, policy: prev.policy,
+        authorizationId: prev.authorization_id, budgetSteps: prev.budget_steps, leaseHolder: tabId.current,
+        continuesRunId: prev.id,
+      });
+      if (prev.authorization_id) {
+        const windows = priorStepsRef.current.length ? 2 + Math.floor(priorStepsRef.current.length / Math.max(1, prev.budget_steps)) : 2;
+        await recordDecision(o.project.id, o.project.user_id, {
+          decision_type: 'accept_recommendation',
+          recommendation_id: prev.authorization_id,
+          rationale: `Continue Go mode for ${prev.budget_steps} more steps.`,
+          metadata: { continues_run_id: prev.id, window: windows },
+        }).catch(() => undefined);
+      }
+      priorStepsRef.current = [...priorStepsRef.current, ...stepsRef.current];
+      setPolicy(prev.policy);
+      commitRun(created);
+      commitSteps([]);
+      followRef.current = null;
+      sinceRef.current = 0;
+      void loop();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not continue Go mode.');
+    }
+  }, [commitRun, commitSteps, loop]);
 
   const go = useCallback(async () => {
     setError(null);
@@ -394,8 +462,8 @@ export function useGoLoop(opts: Options) {
       // it keeps its budget and its history.
       if (live && !live.ended_at && live.policy === policy && (live.status === 'blocked' || live.status === 'awaiting_decision') && !pendingStepId) {
         sinceRef.current = stepsRef.current.length;
-        await updateAgentRun(live.id, { status: 'running', stop_reason: null, lease_holder: tabId.current, heartbeat_at: new Date().toISOString() });
-        commitRun({ ...live, status: 'running', stop_reason: null });
+        await updateAgentRun(live.id, { status: 'running', stop_reason: null, needs: null, lease_holder: tabId.current, heartbeat_at: new Date().toISOString() });
+        commitRun({ ...live, status: 'running', stop_reason: null, needs: null });
         void loop();
         return;
       }
@@ -657,8 +725,18 @@ export function useGoLoop(opts: Options) {
     }
   }, [pendingStepId, setRunStatus, upsertStep, startRun]);
 
+  /** FR-18: the user confirmed a large drafting run; resume and let it through once. */
+  const acknowledgeLargeJob = useCallback(async (sections: number) => {
+    largeJobOkRef.current = sections;
+    await go();
+  }, [go]);
+
   return {
     progress,
+    needs: run?.needs ?? null,
+    continueRun,
+    acknowledgeLargeJob,
+    stageLabelFor,
     policy, setPolicy, budget, setBudget, run, steps, phase, active, pendingStep, pendingStale, authorizing, error,
     go, suggest, replan, stop, approve, decline, answer, confirmAuthorization,
     cancelAuthorization: useCallback(() => setAuthorizing(null), []),

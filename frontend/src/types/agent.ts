@@ -54,6 +54,10 @@ export interface AgentRun {
   heartbeat_at: string | null;
   created_at: string;
   ended_at: string | null;
+  /** What the run needs from the user before it can continue (B4): rendered as the "I need you to…" card. */
+  needs: NeedsUser | null;
+  /** The budget_exhausted run this one continues (B4): windows chain. */
+  continues_run_id: string | null;
 }
 
 export interface AgentStep {
@@ -100,6 +104,7 @@ export interface SandboxRun {
 
 // --- B2's endpoints (backend/routers/agent.py) ---------------------------------
 
+import type { NeedsUser } from '@/lib/agent/needs';
 import type { PMInput } from './index';
 import type { AgentStateDigest } from '@/lib/agent/digest';
 

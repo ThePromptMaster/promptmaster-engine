@@ -14,6 +14,7 @@ export function GoControl({
   onStop,
   canResume,
   disabled,
+  hideResume = false,
 }: {
   run: AgentRun | null;
   running: boolean;
@@ -23,6 +24,8 @@ export function GoControl({
   onStop: () => void;
   canResume: boolean;
   disabled: boolean;
+  /** The "I need you to…" card carries the one button that resumes; a bare Resume beside it re-trips the same stop. */
+  hideResume?: boolean;
 }) {
   const used = run?.steps_used ?? 0;
   const cap = run && !run.ended_at ? run.budget_steps : budget;
@@ -37,7 +40,7 @@ export function GoControl({
           <span aria-hidden className="material-symbols-outlined">stop_circle</span>
           Stop
         </button>
-      ) : (
+      ) : hideResume && canResume ? null : (
         <button
           onClick={onGo}
           disabled={disabled}
@@ -48,7 +51,7 @@ export function GoControl({
         </button>
       )}
       <label className="flex items-center gap-2 text-label text-[var(--on-surface-variant)]">
-        Budget
+        Window
         <select
           value={budget}
           onChange={(e) => onBudget(Number(e.target.value))}
@@ -69,7 +72,7 @@ export function GoControl({
             <div className="h-full rounded-full bg-[var(--pm-primary)]" style={{ width: `${pct}%` }} />
           </div>
           <span className="text-label text-[var(--on-surface-variant)]">
-            {used} / {cap} steps
+            {used} / {cap} steps this window
           </span>
         </div>
       )}

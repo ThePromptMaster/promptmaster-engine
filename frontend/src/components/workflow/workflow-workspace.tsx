@@ -56,7 +56,7 @@ import { deriveOutlineItems, draftingStageId } from '@/lib/workflow/derived-outl
 import { OutlineStagePanel } from '@/components/outline/outline-stage-panel';
 import { ProjectBrief, ProjectSetup, stageWantsSetup } from './project-setup';
 import { draftBindings } from '@/lib/outline/long-form';
-import { materialiseOutlineInto } from '@/lib/outline/actions';
+import { approveOutline, loadOutline, materialiseOutlineInto } from '@/lib/outline/actions';
 import type { OutlineDocument } from '@/types/outline';
 import { stageDrafts, itemSchemaFor, serializeItems, type StageItem } from '@/lib/workflow/stage-artifact';
 import { buildStageContext } from '@/lib/workflow/context';
@@ -772,6 +772,28 @@ export function WorkflowWorkspace({
   });
   useEffect(() => setGoDriving(go.active || go.phase === 'awaiting'), [go.active, go.phase]);
 
+  // What Go can ask the user for, done from its card with one click (B4):
+  // the same writes the stage's own controls make.
+  const goNeedsActions = useMemo(
+    () => ({
+      approveOutline: async (outlineStageId: string) => {
+        const { versions } = await loadOutline({ id: project.id, user_id: project.user_id }, outlineStageId);
+        const head = versions.at(-1);
+        if (!head) throw new Error('There is no saved outline to approve yet.');
+        await approveOutline({
+          project: { id: project.id, user_id: project.user_id },
+          stageId: outlineStageId,
+          version: head,
+          materialise: (doc) => materialiseOutline(head, doc),
+        });
+        await refreshEvents();
+      },
+      unblock: () => setBlocked(null),
+      tick: (criterionId: string) => handleToggleManual(criterionId, true),
+    }),
+    [project.id, project.user_id, materialiseOutline, refreshEvents, setBlocked, handleToggleManual]
+  );
+
   if (!stage) return null;
 
   const stageVersions = stageVersionList;
@@ -1193,7 +1215,7 @@ export function WorkflowWorkspace({
           />
 
           {isCurrent && appendStageVersion && project.status !== 'finalized' && (
-            <GoPanel go={go} stageLabel={stage.label} mode={project.mode} />
+            <GoPanel go={go} stageLabel={stage.label} mode={project.mode} needsActions={goNeedsActions} />
           )}
 
           <div className="mb-8">

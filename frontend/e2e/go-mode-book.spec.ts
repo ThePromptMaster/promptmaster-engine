@@ -77,14 +77,15 @@ test('Go on a fully drafted stage moves on and marks it complete with the manusc
 });
 
 /**
- * B2b — Go does the stage's own work with the functions the buttons call.
- * The scripted plan spans stages: generate_outline on Outline, draft_sections
- * on Drafting, then move on. The outline's approval stays the user's.
+ * B2b + B4 — Go does the stage's own work with the functions the buttons
+ * call, and when the next move is the user's it says so with the button
+ * right there. One Guided run, one scripted plan that spans stages.
  */
-test('Go generates the outline, and once it is approved, drafts every section and moves on', async ({ page }) => {
+test('Go generates the outline, asks for its approval with the button, drafts every section and moves on', async ({ page }) => {
   test.setTimeout(240_000);
   const id = await createProject(page, {
-    workflow: 'Book', name: 'E2E go writes', objective: 'A short book about giraffes [[mock:plan=generate_outline,draft_sections,advance_stage]]',
+    workflow: 'Book', name: 'E2E go writes',
+    objective: 'A short book about giraffes [[mock:plan=generate_outline,advance_stage,advance_stage,draft_sections,advance_stage]]',
   });
   await expect(page.getByText('Mock output').first()).toBeVisible();
   await pressTransition(page);
@@ -103,43 +104,48 @@ test('Go generates the outline, and once it is approved, drafts every section an
   const prompt = page.getByRole('region', { name: 'Go mode needs your approval' });
   await expect(prompt).toContainText('Generate the outline', { timeout: 30_000 });
   await prompt.getByRole('button', { name: 'Approve' }).click();
-  await expect(page.getByRole('list', { name: 'Go mode steps' }).getByRole('listitem').filter({ hasText: 'Generated an outline' })).toHaveCount(1, { timeout: 30_000 });
-  // Guided then proposes the next move (moving on); approving the outline is
-  // the user's, so decline it and approve by hand. (B4 makes Go ask for exactly this.)
-  await expect(prompt).toContainText('Move to the next stage', { timeout: 30_000 });
-  await prompt.getByRole('button', { name: 'Decline' }).click();
-  // The panel shows the version Go saved, unapproved: approving stays the user's.
-  await expect(page.getByLabel('Title of section 1')).toHaveValue(/Mock section 1/, { timeout: 15_000 });
-  await page.screenshot({ path: test.info().outputPath('03-go-generated-the-outline.png'), fullPage: true });
-  await transitionBar(page).getByRole('button', { name: 'Approve this outline' }).click();
-  await expect(page.getByText(/Approved · v\d/).first()).toBeVisible();
-  await pressTransition(page);
-  await expect(page.getByRole('heading', { name: /Outline approval/ })).toBeVisible();
-  await pressTransition(page);
-  await expect(page.getByRole('heading', { name: /Draft/ })).toBeVisible();
 
-  // Drafting: Go writes every section through the queue and waits for them.
-  await panel.getByRole('button', { name: /^Go$/ }).click();
-  await expect(prompt).toContainText('Draft the sections', { timeout: 30_000 });
-  await prompt.getByRole('button', { name: 'Approve' }).click();
+  // B4: approving the outline is the user's — and the button is right there.
+  const card = page.getByRole('region', { name: 'Go mode needs you' });
+  await expect(card).toContainText('I need your approval of outline version 1 before I can continue.', { timeout: 30_000 });
+  await expect(panel.getByRole('button', { name: /^Resume$/ })).toHaveCount(0);
+  await expect(page.getByLabel('Title of section 1')).toHaveValue(/Mock section 1/, { timeout: 15_000 });
+  await page.screenshot({ path: test.info().outputPath('03-go-needs-the-outline-approved.png'), fullPage: true });
+  await card.getByRole('button', { name: 'Approve the outline' }).click();
+  await expect(page.getByText(/Approved · v1/).first()).toBeVisible({ timeout: 15_000 });
+
+  // The run resumes on its own: through Approval to Drafting, drafting every
+  // section through the real queue, then moving on with the manuscript (A2).
+  for (const move of ['Move to the next stage', 'Move to the next stage', 'Draft the sections']) {
+    await expect(prompt).toContainText(move, { timeout: 30_000 });
+    await prompt.getByRole('button', { name: 'Approve' }).click();
+  }
   await expect(page.getByText(/3 of 3 sections written/)).toBeVisible({ timeout: 90_000 });
-  // …then proposes moving on, with the manuscript as evidence (A2).
   await expect(prompt).toContainText('Move to the next stage', { timeout: 30_000 });
   await page.screenshot({ path: test.info().outputPath('04-go-drafted-every-section.png'), fullPage: true });
   await prompt.getByRole('button', { name: 'Approve' }).click();
   await expect(page.getByRole('heading', { name: /Continuity/ })).toBeVisible({ timeout: 30_000 });
 
-  const runs = await serviceSelect('agent_runs', `project_id=eq.${id}&select=id&order=created_at`);
-  const steps = await serviceSelect('agent_steps', `run_id=in.(${runs.map((r: { id: string }) => r.id).join(',')})&select=action_key,status,execution_label,changes&order=started_at`);
-  expect(steps.map((s: { action_key: string; status: string }) => [s.action_key, s.status])).toEqual([
+  const [run] = await serviceSelect('agent_runs', `project_id=eq.${id}&select=id&order=created_at.desc&limit=1`);
+  const stepRows = () => serviceSelect('agent_steps', `run_id=eq.${run.id}&select=action_key,status,execution_label,changes&order=idx`);
+  // The page moves on before the last step row is closed; wait for the record.
+  // Guided may already have proposed one more move on Continuity (the plan is
+  // exhausted, so it declares the objective complete and waits); the five
+  // moves are what matter.
+  await expect.poll(async () => (await stepRows()).slice(0, 5).map((s: { action_key: string; status: string }) => [s.action_key, s.status]), { timeout: 15_000 }).toEqual([
     ['generate_outline', 'succeeded'],
-    ['advance_stage', 'cancelled'], // declined: the outline was the user's to approve
+    ['advance_stage', 'succeeded'],
+    ['advance_stage', 'succeeded'],
     ['draft_sections', 'succeeded'],
     ['advance_stage', 'succeeded'],
   ]);
+  const steps = await stepRows();
   expect(steps[0].changes.version_ids).toHaveLength(1);
-  expect(steps[2].changes.sections_written).toHaveLength(3);
-  expect(steps[2].execution_label).toBe('designed');
+  expect(steps[3].changes.sections_written).toHaveLength(3);
+  expect(steps[3].execution_label).toBe('designed');
   const [outlineVersion] = await serviceSelect('artifact_versions', `id=eq.${steps[0].changes.version_ids[0]}&select=source_operation`);
   expect(outlineVersion.source_operation).toBe('agent_outline');
+  // The approval was the user's click, on the record.
+  const approvals = await serviceSelect('workflow_events', `project_id=eq.${id}&type=eq.outline_approved&select=actor`);
+  expect(approvals).toEqual([{ actor: 'user' }]);
 });
