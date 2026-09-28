@@ -53,8 +53,37 @@ class AgentStepSummary(BaseModel):
     output: str = Field(default="", max_length=4_000)
 
 
+class AgentOutline(BaseModel):
+    """The outline as it stands — its own artifact, invisible to the excerpt before B0."""
+    sections: list[str] = Field(default_factory=list, max_length=60)
+    named_count: int = 0
+    approved: bool = False
+
+
+class AgentManuscript(BaseModel):
+    """The chapters, which live in artifacts.long_form rather than in a version."""
+    total: int = 0
+    complete: int = 0
+    pending_jobs: int = 0
+    written: list[str] = Field(default_factory=list, max_length=60)
+    unwritten: list[str] = Field(default_factory=list, max_length=60)
+
+
+class AgentFindings(BaseModel):
+    """A review stage's table and how much of it the user has decided on."""
+    total: int = 0
+    triaged: int = 0
+    sample: list[str] = Field(default_factory=list, max_length=8)
+
+
 class AgentState(BaseModel):
-    """What the planner may know. Assembled by the client from the project."""
+    """What the planner may know. Assembled by the client from the project.
+
+    Until B0 the planner saw only the stage's head version. On the Outline and
+    long-form stages that is empty (the outline and the chapters are kept
+    elsewhere), so it read "(empty — nothing drafted yet)" on a finished book
+    and chose mark_blocked (Sean, 28 Sep, items 1 and 2, screenshot 3).
+    """
     stage_id: str = ""
     stage_label: str = ""
     stage_instruction: str = ""
@@ -66,6 +95,11 @@ class AgentState(BaseModel):
     next_stage_label: str = ""
     prior_stages: list[str] = Field(default_factory=list)
     recent_steps: list[AgentStepSummary] = Field(default_factory=list, max_length=12)
+    outline: AgentOutline | None = None
+    manuscript: AgentManuscript | None = None
+    findings: AgentFindings | None = None
+    #: Tools the run can call; a move without its tool is not offered.
+    tools: dict[str, bool] = Field(default_factory=dict)
 
 
 class NextAction(BaseModel):
@@ -90,6 +124,11 @@ _NEXT_ACTION_INSTRUCTION = (
     "specific question. If a missing tool or missing data stops you, choose "
     "mark_blocked and say what is missing. Do not repeat a move that just "
     "failed or produced nothing new.\n\n"
+    "Work that the stage's own controls do — generating or approving an outline, "
+    "drafting or revising sections, deciding on findings — is not missing data: "
+    "if it is needed and no allowed action does it, choose request_user_decision "
+    "and name that control exactly (\"press Generate the outline\"). Never "
+    "mark_blocked for it: a blocked stage stops every later move too.\n\n"
     "Return JSON only, in exactly this shape:\n"
     "{\n"
     '  "action_key": "one of the allowed keys",\n'
@@ -110,6 +149,31 @@ def _format_state(inputs: PMInput, state: AgentState) -> str:
         + (f": {s.output.strip()[:300]}" if s.output.strip() else "")
         for s in state.recent_steps
     ) or "(none yet — this is the first move)"
+    facts: list[str] = []
+    if state.outline is not None:
+        o = state.outline
+        facts.append(
+            f"OUTLINE: {o.named_count} named section(s), "
+            + ("approved for drafting" if o.approved else "not yet approved")
+            + (": " + "; ".join(o.sections[:20]) if o.sections else "")
+        )
+    if state.manuscript is not None:
+        m = state.manuscript
+        facts.append(
+            f"MANUSCRIPT: {m.complete} of {m.total} section(s) written"
+            + (f", {m.pending_jobs} being written now" if m.pending_jobs else "")
+            + (f"; written: {'; '.join(m.written[:20])}" if m.written else "")
+            + (f"; still unwritten: {'; '.join(m.unwritten[:20])}" if m.unwritten else "")
+        )
+    if state.findings is not None:
+        f = state.findings
+        facts.append(
+            f"FINDINGS: {f.total} in the table, {f.triaged} decided by the user, "
+            f"{max(f.total - f.triaged, 0)} still undecided"
+            + (": " + "; ".join(f.sample) if f.sample else "")
+        )
+    if state.tools:
+        facts.append("TOOLS: " + ", ".join(f"{k}={'yes' if v else 'no'}" for k, v in sorted(state.tools.items())))
     return "\n".join([
         f"OBJECTIVE (authoritative): {inputs.objective}",
         f"Audience: {inputs.audience or '(not set)'}",
@@ -121,6 +185,7 @@ def _format_state(inputs: PMInput, state: AgentState) -> str:
         "Requirements still open: " + ("; ".join(state.criteria_unmet) or "(none)"),
         f"Latest evaluation: {state.evaluation or '(not checked yet)'}",
         "Earlier stages: " + ("; ".join(state.prior_stages) or "(none)"),
+        *facts,
         "",
         "--- CURRENT STAGE ARTIFACT (may be trimmed) ---",
         state.artifact_excerpt.strip() or "(empty — nothing drafted yet)",

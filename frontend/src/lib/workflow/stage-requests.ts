@@ -57,7 +57,8 @@ export function generationRequest(
   state: WorkflowState,
   bundles: Record<string, StageArtifactBundle>,
   target: StageDefinition,
-  existingContent: string
+  existingContent: string,
+  instruction = ''
 ): GenerateStageArtifactRequest {
   const schema = itemSchemaFor(target);
   return {
@@ -79,6 +80,7 @@ export function generationRequest(
         }
       : null,
     existing_content: existingContent,
+    ...(instruction.trim() ? { instruction: instruction.trim() } : {}),
     model: project.model,
   };
 }

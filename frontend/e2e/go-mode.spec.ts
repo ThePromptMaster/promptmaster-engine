@@ -124,12 +124,14 @@ test('Checkpoint: reasoning runs on its own, code waits for approval, then runs 
   expect(decisions).toEqual([{ decision_type: 'accept_recommendation' }]);
 });
 
-test('Autonomous moves stages on its own authority and stops, blocked, at a tool it does not have', async ({ page }) => {
-  const id = await researchProject(page, 'E2E go autonomous', 'Pendulum period [[mock:plan=derive,advance_stage,check_literature]]');
+test('Autonomous moves stages on its own authority and stops, blocked, at data it does not have', async ({ page }) => {
+  // B0: check_literature is no longer offered without a search tool, so the
+  // honest stop is the planner's own mark_blocked.
+  const id = await researchProject(page, 'E2E go autonomous', 'Pendulum period [[mock:plan=derive,advance_stage,mark_blocked]]');
   await choose(page, 'Autonomous');
 
   const transparency = page.getByRole('region', { name: 'What Go mode is doing' });
-  await expect(transparency).toContainText('Checking the literature needs a search tool', { timeout: 30_000 });
+  await expect(transparency).toContainText('Mock: missing data', { timeout: 30_000 });
   await expect(transparency.locator('[data-field="Status"]')).toContainText('Blocked');
   await expect(steps(page).last()).toContainText('Blocked');
   await page.screenshot({ path: test.info().outputPath('01-autonomous-blocked-on-literature.png'), fullPage: true });
@@ -139,16 +141,17 @@ test('Autonomous moves stages on its own authority and stops, blocked, at a tool
   expect(await stepsOf(run.id)).toMatchObject([
     { action_key: 'derive', status: 'succeeded' },
     { action_key: 'advance_stage', status: 'succeeded', execution_label: null },
-    { action_key: 'check_literature', status: 'blocked', execution_label: 'blocked', block_kind: 'tool_missing' },
+    { action_key: 'mark_blocked', status: 'blocked', execution_label: 'blocked', block_kind: 'data_missing' },
   ]);
-  // The stage move is the run's, cited and checked by the database.
+  // The stage moves are the run's, cited and checked by the database.
   const moves = await serviceSelect(
     'workflow_events',
-    `project_id=eq.${id}&agent_run_id=eq.${run.id}&select=type,actor,stage_id,payload`
+    `project_id=eq.${id}&agent_run_id=eq.${run.id}&select=type,actor,stage_id,payload&order=seq`
   );
-  expect(moves).toHaveLength(1);
+  expect(moves).toHaveLength(2);
   expect(moves[0]).toMatchObject({ actor: 'system', stage_id: 'question' });
   expect(['stage_marked_complete', 'stage_advanced']).toContain(moves[0].type);
+  expect(moves[1]).toMatchObject({ type: 'stage_blocked', actor: 'system', stage_id: 'literature' });
 });
 
 test('Stop mid-step cancels it and keeps nothing it would have produced', async ({ page }) => {

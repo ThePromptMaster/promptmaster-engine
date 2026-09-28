@@ -436,6 +436,8 @@ export interface GenerateStageArtifactRequest {
   digest: StageDigestRequest;
   item_schema?: StageItemSchemaRequest | null;
   existing_content?: string;
+  /** What to change about the current draft (a revision), when there is one. */
+  instruction?: string;
   model?: string;
 }
 

@@ -167,16 +167,18 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       if (!ctx.appendStageVersion) throw new Error('This view cannot save versions.');
       const head = ctx.bundles[ctx.stage.id]?.versions.at(-1)?.content ?? '';
       const revising = actionFor(key)!.performer === 'revise';
+      const instruction = typeof params.instruction === 'string' ? params.instruction : '';
+      // The instruction used to reach only the version's metadata, never the
+      // model: "revise" was "regenerate with the old draft as context" (B0).
       const res = await api.generateStageArtifact(
-        generationRequest(ctx.project, ctx.template, ctx.state, ctx.bundles, ctx.stage, revising ? head : ''),
+        generationRequest(ctx.project, ctx.template, ctx.state, ctx.bundles, ctx.stage, revising ? head : '', revising ? instruction : ''),
         ctx.signal
       );
       const content = generationContent(ctx.stage, res);
       if (!content) {
         return done(key, { status: 'failed', output: 'The model returned nothing usable.', toolsUsed: ['model'], changes: {} });
       }
-      const instruction = typeof params.instruction === 'string' ? params.instruction : '';
-      await ctx.appendStageVersion(ctx.stage.id, ctx.stage.label, {
+      const created = await ctx.appendStageVersion(ctx.stage.id, ctx.stage.label, {
         content,
         source_operation: revising ? 'agent_revise' : 'agent_draft',
         instruction: instruction || ctx.step.rationale || ctx.stage.entry_prompt_hint || '',
@@ -185,8 +187,11 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         change_summary: revising ? `Go mode: ${instruction || 'revised'}` : 'Go mode draft.',
         finish_reason: res.finish_reason || null,
       });
+      const versionId = (created as { id?: unknown } | null)?.id;
       return done(key, {
-        status: 'succeeded', toolsUsed: ['model'], changes: {},
+        status: 'succeeded', toolsUsed: ['model'],
+        // What changed, so the record can be checked against the project (SN-25).
+        changes: typeof versionId === 'string' ? { version_ids: [versionId] } : {},
         output: `${revising ? 'Revised' : 'Drafted'} ${ctx.stage.label} — saved as a new version (${content.length.toLocaleString()} characters).`,
       });
     }

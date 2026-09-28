@@ -254,3 +254,35 @@ def test_mock_code_markers_drive_the_sandbox_branches(mock_http):
     inputs = {**INPUTS.model_dump(), "objective": "Pendulum [[mock:sandbox=unavailable]]"}
     code = mock_http.post("/api/agent/write-code", json={"inputs": inputs, "state": STATE.model_dump()}).json()["code"]
     assert "# mock:unavailable" in code
+
+
+# --- B0: the planner is told what exists on outline, long-form and review stages
+
+
+def test_state_facts_reach_the_prompt():
+    from promptmaster.agent import AgentFindings, AgentManuscript, AgentOutline
+
+    state = STATE.model_copy(update={
+        "stage_label": "Drafting",
+        "artifact_excerpt": "",
+        "outline": AgentOutline(sections=["1. Habitat", "2. Diet"], named_count=2, approved=True),
+        "manuscript": AgentManuscript(total=2, complete=1, pending_jobs=1, written=["1. Habitat"], unwritten=["2. Diet"]),
+        "findings": AgentFindings(total=3, triaged=1, sample=["Chapter 2 repeats chapter 1"]),
+        "tools": {"literature": False},
+    })
+    _, user = build_next_action_prompt(INPUTS, state, RESEARCH, "guided")
+    assert "OUTLINE: 2 named section(s), approved for drafting: 1. Habitat; 2. Diet" in user
+    assert "MANUSCRIPT: 1 of 2 section(s) written, 1 being written now; written: 1. Habitat; still unwritten: 2. Diet" in user
+    assert "FINDINGS: 3 in the table, 1 decided by the user, 2 still undecided: Chapter 2 repeats chapter 1" in user
+    assert "TOOLS: literature=no" in user
+
+
+def test_without_facts_the_prompt_is_as_before():
+    _, user = build_next_action_prompt(INPUTS, STATE, RESEARCH, "guided")
+    assert "OUTLINE:" not in user and "MANUSCRIPT:" not in user and "FINDINGS:" not in user
+
+
+def test_the_planner_is_told_not_to_block_for_work_the_stage_controls_do():
+    system, _ = build_next_action_prompt(INPUTS, STATE, RESEARCH, "guided")
+    assert "Never mark_blocked for it" in system
+    assert "press Generate the outline" in system
