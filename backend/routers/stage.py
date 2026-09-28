@@ -10,7 +10,7 @@ engine.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from deps import get_client
 from promptmaster.errors import PRESERVED_EVALUATION, PRESERVED_STAGE_VERSIONS
@@ -53,6 +53,8 @@ class GenerateStageArtifactRequest(BaseModel):
     item_schema: StageItemSchema | None = None
     # What the stage already holds, when the user asked to regenerate.
     existing_content: str = ""
+    # What to change about it: a revision instruction from the user or Go mode.
+    instruction: str = Field(default="", max_length=4_000)
     model: str = ""
 
 
@@ -76,6 +78,7 @@ async def api_generate_stage_artifact(
             digest=req.digest,
             item_schema=req.item_schema,
             existing_content=req.existing_content,
+            instruction=req.instruction,
         )
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_STAGE_VERSIONS)

@@ -26,18 +26,30 @@ export const DEFAULT_BUDGET_STEPS = 12;
 export const NO_PROGRESS_REPEATS = 3;
 export const MAX_CONSECUTIVE_FAILURES = 2;
 
+/** Which tools a run can actually call. Nothing retrieves literature yet (B0). */
+export interface AgentTools {
+  literature: boolean;
+}
+
+export const NO_TOOLS: AgentTools = { literature: false };
+
 export function allowedActions(
   template: WorkflowTemplate,
   state: WorkflowState,
   stage: StageDefinition,
-  stageHasDraft: boolean
+  stageHasDraft: boolean,
+  tools: AgentTools = NO_TOOLS
 ): string[] {
   const keys: string[] = [];
   if (template.key === 'research') {
     keys.push(
       'derive', 'prove', 'simplify', 'limiting_case', 'try_contradiction', 'run_computation',
-      'falsify_hypothesis', 'compare_alternatives', 'check_literature', 'update_assumptions'
+      'falsify_hypothesis', 'compare_alternatives', 'update_assumptions'
     );
+    // A move the run cannot perform is not offered: every Research run used to
+    // be able to walk into "no search tool is connected" and stop there
+    // (Sean, 28 Sep, Research note).
+    if (tools.literature) keys.push('check_literature');
   }
   if (stageDrafts(stage)) {
     keys.push(stageHasDraft ? 'evaluate_stage' : 'draft_stage');

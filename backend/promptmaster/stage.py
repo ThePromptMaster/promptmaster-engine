@@ -122,6 +122,7 @@ def build_stage_prompt(
     digest: StageDigest,
     item_schema: StageItemSchema | None = None,
     existing_content: str = "",
+    instruction: str = "",
 ) -> tuple[str, str]:
     """Build (system, user) prompts for one stage's artifact.
 
@@ -171,6 +172,16 @@ def build_stage_prompt(
             "",
             "THE CURRENT DRAFT OF THIS STAGE (produce a better one; do not repeat it verbatim):",
             existing_content.strip(),
+        ]
+
+    if instruction.strip():
+        # Go mode's revise_stage carried an instruction that never reached the
+        # model, so "revise" was "regenerate with the old draft as context" (B0).
+        parts += [
+            "",
+            "REVISION INSTRUCTION — apply this to the current draft, keeping everything "
+            "it does not ask you to change:",
+            instruction.strip(),
         ]
 
     if wants_items and item_schema:
@@ -256,6 +267,7 @@ async def generate_stage_artifact(
     digest: StageDigest,
     item_schema: StageItemSchema | None = None,
     existing_content: str = "",
+    instruction: str = "",
 ) -> GenerateStageArtifactResponse:
     """Generate one stage's artifact. One LLM call.
 
@@ -270,6 +282,7 @@ async def generate_stage_artifact(
         digest=digest,
         item_schema=item_schema,
         existing_content=existing_content,
+        instruction=instruction,
     )
 
     if stage.renderer in ("list", "review"):

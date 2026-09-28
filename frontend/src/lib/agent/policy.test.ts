@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { RESEARCH_V1, SINGLE_OUTPUT_V1 } from '@/lib/workflow';
+import { BOOK_V1 } from '@/lib/workflow/templates/book.v1';
 import { initialState } from '@/lib/workflow/engine';
 import type { AgentStep } from '@/types/agent';
 import { deriveExecutionLabel } from './labels';
@@ -182,5 +183,77 @@ describe('plannedBeforeLatestChange — PM-23, a suggestion about a stage that h
     expect(plannedBeforeLatestChange(planned, ['2026-09-27T09:00:00Z', '2026-09-27T09:59:59Z'])).toBe(false);
     expect(plannedBeforeLatestChange(planned, [undefined, null])).toBe(false);
     expect(plannedBeforeLatestChange({ started_at: '' }, ['2026-09-27T10:05:00Z'])).toBe(false);
+  });
+});
+
+describe('B0: the planner sees what exists on outline, long-form and review stages', () => {
+  const book = initialState(BOOK_V1);
+  const stage = (id: string) => BOOK_V1.stages.find((s) => s.id === id)!;
+  const evaluation = (id: string) => ({ stageId: id, canAdvance: false, criteria: [], unmet: [] });
+
+  it('an outline stage reports its sections and approval, and excerpts titles rather than JSON', async () => {
+    const { buildAgentState } = await import('./digest');
+    const content = JSON.stringify({ schema: 1, items: [{ id: 'a', title: 'Habitat', abstract: 'Where they live' }, { id: 'b', title: 'Diet', abstract: '' }], orphans: [] });
+    const digest = buildAgentState({
+      template: BOOK_V1, state: book, stage: stage('outline'), steps: [], stageEvaluation: evaluation('outline'),
+      bundles: { outline: { artifact: { id: 'a', stage_id: 'outline', long_form: null }, versions: [{ id: 'v', content }] } } as never,
+    });
+    expect(digest.outline).toEqual({ sections: ['1. Habitat — Where they live', '2. Diet'], named_count: 2, approved: false });
+    expect(digest.artifact_excerpt).toBe('1. Habitat — Where they live\n2. Diet');
+    expect(digest.tools).toEqual({ literature: false });
+  });
+
+  it('a long-form stage reports the sections written and unwritten — not "(empty)"', async () => {
+    const { buildAgentState } = await import('./digest');
+    const outline = [
+      { id: 's1', title: 'Habitat', status: 'complete', content: 'Giraffes live on the savannah.' },
+      { id: 's2', title: 'Diet', status: 'pending', content: '' },
+    ];
+    const bundles = { drafting: { artifact: { id: 'm', stage_id: 'drafting', long_form: { outline } }, versions: [] } } as never;
+    const digest = buildAgentState({
+      template: BOOK_V1, state: book, stage: stage('drafting'), steps: [], stageEvaluation: evaluation('drafting'), bundles, pendingJobs: 1,
+    });
+    expect(digest.manuscript).toEqual({ total: 2, complete: 1, pending_jobs: 1, written: ['1. Habitat'], unwritten: ['2. Diet'] });
+    expect(digest.artifact_excerpt).toContain('## 1. Habitat');
+    // Revision reads the same manuscript.
+    const revision = buildAgentState({
+      template: BOOK_V1, state: book, stage: stage('revision'), steps: [], stageEvaluation: evaluation('revision'), bundles,
+    });
+    expect(revision.manuscript?.complete).toBe(1);
+  });
+
+  it('a review stage reports the findings and how many are undecided', async () => {
+    const { buildAgentState } = await import('./digest');
+    const { serializeItems } = await import('@/lib/workflow/stage-artifact');
+    const content = serializeItems([
+      { id: 'i1', finding: 'Ch 3 repeats Ch 1', where: 'Ch 3', severity: 'high', status: 'accepted' },
+      { id: 'i2', finding: 'Terminology drifts', where: 'Ch 2', severity: 'low' },
+    ]);
+    const digest = buildAgentState({
+      template: BOOK_V1, state: book, stage: stage('continuity'), steps: [], stageEvaluation: evaluation('continuity'),
+      bundles: { continuity: { artifact: { id: 'c', stage_id: 'continuity', long_form: null }, versions: [{ id: 'v', content }] } } as never,
+    });
+    expect(digest.findings).toEqual({ total: 2, triaged: 1, sample: ['Terminology drifts'] });
+    expect(digest.artifact_excerpt).toBe('[accepted] Ch 3 repeats Ch 1\n[undecided] Terminology drifts');
+  });
+
+  it('a prose stage is unchanged: the head version, no facts', async () => {
+    const { buildAgentState } = await import('./digest');
+    const digest = buildAgentState({
+      template: BOOK_V1, state: book, stage: stage('objective'), steps: [], stageEvaluation: evaluation('objective'),
+      bundles: { objective: { artifact: { id: 'o', stage_id: 'objective', long_form: null }, versions: [{ id: 'v', content: 'Why dogs bark.' }] } } as never,
+    });
+    expect(digest.artifact_excerpt).toBe('Why dogs bark.');
+    expect(digest.outline).toBeUndefined();
+    expect(digest.manuscript).toBeUndefined();
+    expect(digest.findings).toBeUndefined();
+  });
+});
+
+describe('B0: a move the run cannot perform is not offered', () => {
+  it('check_literature is offered only with a literature tool', () => {
+    const stage = RESEARCH_V1.stages[0];
+    expect(allowedActions(RESEARCH_V1, research, stage, false)).not.toContain('check_literature');
+    expect(allowedActions(RESEARCH_V1, research, stage, false, { literature: true })).toContain('check_literature');
   });
 });

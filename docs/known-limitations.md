@@ -416,9 +416,14 @@ it, and whatever step was in flight is recorded as `interrupted` and never repea
 tabs cannot drive one run (a lease with a 10 s heartbeat; the second tab watches and takes
 over if the first goes quiet for 25 s). Other limits: the step budget is counted in steps,
 not dollars (`agent_runs.budget_usd` exists but is not enforced yet; model spend is in
-`model_usage` as usual); `check_literature` is always blocked (`tool_missing`) because no
-retrieval tool is connected; `draft_stage` / `revise_stage` do not cover the outline and
-long-form drafting stages, which keep their own controls.
+`model_usage` as usual); `check_literature` is **not offered** until a retrieval tool is
+connected (B0, 2026-09-28 — before that it was always offered and always blocked, so
+every Research run could walk into "no search tool is connected" and stop there);
+`draft_stage` / `revise_stage` do not cover the outline and long-form drafting stages,
+which keep their own controls. Since B0 the planner is told what those stages hold (the
+outline's sections, the sections written and unwritten, the findings decided) and is
+instructed to ask the user to press the stage's own control rather than mark the stage
+blocked; giving Go those controls as actions is Phase B2.
 
 ### L-C3 — Conflict detection: what it sees, and what it costs
 

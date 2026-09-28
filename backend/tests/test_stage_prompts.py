@@ -342,3 +342,21 @@ def test_a_model_cannot_mark_a_claim_verified(claim_schema):
 def test_other_tables_keep_whatever_status_the_model_sent(audience_schema):
     items = _parse_items({"items": [{"who": "a", "status": "verified"}]}, audience_schema)
     assert items[0].model_dump()["status"] == "verified"
+
+
+# --- B0: a revision instruction reaches the model -----------------------------
+
+
+def test_a_revision_instruction_reaches_the_user_prompt(basic_inputs, prose_stage, digest):
+    _, user = build_stage_prompt(
+        basic_inputs, prose_stage, digest, existing_content="The old draft.", instruction="Cut the second paragraph."
+    )
+    assert "REVISION INSTRUCTION" in user
+    assert "Cut the second paragraph." in user
+    # After the draft it applies to, so the model reads the text before the ask.
+    assert user.index("The old draft.") < user.index("Cut the second paragraph.")
+
+
+def test_no_instruction_means_no_instruction_block(basic_inputs, prose_stage, digest):
+    _, user = build_stage_prompt(basic_inputs, prose_stage, digest, existing_content="The old draft.")
+    assert "REVISION INSTRUCTION" not in user
