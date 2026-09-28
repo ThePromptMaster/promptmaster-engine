@@ -17,7 +17,8 @@ import { getArtifact } from '@/lib/supabase/versions';
 import { manuscriptArtifactFor } from '@/lib/workflow/context';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import { revisionBrief, type RevisionBrief } from '@/lib/workflow/revision';
-import { stageDrafts } from '@/lib/workflow/stage-artifact';
+import { effectiveRenderer, itemSchemaFor, parseItems, stageDrafts, type StageItem, type StageItemSchema } from '@/lib/workflow/stage-artifact';
+import { isTriageTable, splitUntriaged } from '@/lib/workflow/triage';
 import type { StageDefinition, WorkflowEvent, WorkflowTemplate } from '@/lib/workflow/types';
 import type { OutlineSection } from '@/types';
 import type { OutlineDocument } from '@/types/outline';
@@ -57,10 +58,20 @@ export interface EvaluationFacts {
   aboutHead: boolean;
 }
 
+export interface ReviewFacts {
+  items: StageItem[];
+  schema: StageItemSchema;
+  /** Undecided rows Go may decide (minor / moderate). */
+  routine: StageItem[];
+  /** Undecided rows only the user decides (major, or of unknown severity). */
+  material: StageItem[];
+}
+
 export interface StageFacts {
   outline?: OutlineFacts;
   manuscript?: ManuscriptFacts;
   evaluationFindings?: EvaluationFacts;
+  review?: ReviewFacts;
 }
 
 export async function readStageFacts(input: {
@@ -112,6 +123,14 @@ export async function readStageFacts(input: {
         revisedInStage: revisedCount(outline, own, stage.id),
       };
       void jobBySection; // re-exported helper used by callers; keeps the import honest
+    }
+  }
+
+  if (effectiveRenderer(stage) === 'review') {
+    const schema = itemSchemaFor(stage);
+    const items = parseItems(bundles[stage.id]?.versions.at(-1)?.content) ?? [];
+    if (isTriageTable(schema) && items.length) {
+      facts.review = { items, schema, ...splitUntriaged(items, schema) };
     }
   }
 

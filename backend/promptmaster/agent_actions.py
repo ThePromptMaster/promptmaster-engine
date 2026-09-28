@@ -80,6 +80,10 @@ AGENT_ACTIONS: list[AgentAction] = [
                 when="The latest check of this draft produced findings that have not been applied. "
                      "Revises the draft against them as a new version.",
                 important=True),
+    AgentAction(key="triage_findings", family="writing", label="Decide the routine findings",
+                when="A review table has undecided minor or moderate findings. Decides each of "
+                     "those (accept, defer or reject, with a reason); major ones are left for the user.",
+                important=True),
     # --- workflow ---------------------------------------------------------------
     AgentAction(key="advance_stage", family="workflow", label="Move to the next stage",
                 when="This stage's work is done and checked.", important=True),

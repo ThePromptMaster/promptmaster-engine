@@ -33,6 +33,8 @@ const OPERATION_LABEL: Record<string, string> = {
   agent_revise: 'Go mode revision',
   // A2: a long-form stage's versions are snapshots of the manuscript.
   long_form_complete: 'Manuscript saved',
+  agent_outline: 'Go mode outline',
+  agent_triage: 'Go mode: routine findings decided',
   manuscript_snapshot: 'Manuscript before revision',
 };
 

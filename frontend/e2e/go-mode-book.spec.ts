@@ -149,3 +149,44 @@ test('Go generates the outline, asks for its approval with the button, drafts ev
   const approvals = await serviceSelect('workflow_events', `project_id=eq.${id}&type=eq.outline_approved&select=actor`);
   expect(approvals).toEqual([{ actor: 'user' }]);
 });
+
+/**
+ * B3 — under Autonomous, Go decides the routine findings itself and stops
+ * for the ones that would change the work (Sean, 28 Sep, items 10 and 11).
+ * The mock's continuity review has one major finding and two minor ones.
+ */
+test('Autonomous decides the routine continuity findings and leaves the major one to the user', async ({ page }) => {
+  test.setTimeout(240_000);
+  const id = await bookDraftedToTheEnd(page, 'E2E go triage', 'A short book about giraffes [[mock:plan=triage_findings]]');
+  await pressTransition(page);
+  await expect(page.getByRole('heading', { name: /Continuity/ })).toBeVisible();
+  await expect(stageArtifact(page).getByText(/\(read the manuscript\)/).first()).toBeVisible();
+  await expect(page.getByRole('table').getByRole('combobox')).toHaveCount(3);
+
+  const panel = goPanel(page);
+  await panel.getByRole('button', { name: 'Set up Go' }).click();
+  await panel.getByRole('radio', { name: /^Autonomous/ }).click();
+  await panel.getByRole('button', { name: /^Go$/ }).click();
+  await page.getByRole('button', { name: 'Authorize and go' }).click();
+
+  // Two minor findings decided by Go, as a version; the major one is the user's.
+  const card = page.getByRole('region', { name: 'Go mode needs you' });
+  await expect(card).toContainText('1 finding would change the work, so it needs your decision', { timeout: 30_000 });
+  const statuses = page.getByRole('table').getByRole('combobox');
+  await expect(statuses.nth(0)).toContainText('Not looked at');
+  await expect(statuses.nth(1)).toContainText('Accept');
+  await expect(statuses.nth(2)).toContainText('Accept');
+  await page.screenshot({ path: test.info().outputPath('05-autonomous-decided-the-routine-findings.png'), fullPage: true });
+
+  const [run] = await serviceSelect('agent_runs', `project_id=eq.${id}&select=id,status,needs&order=created_at.desc&limit=1`);
+  expect(run.status).toBe('awaiting_decision');
+  expect(run.needs).toMatchObject({ kind: 'triage_findings', count: 1 });
+  const steps = await serviceSelect('agent_steps', `run_id=eq.${run.id}&select=action_key,status,execution_label,changes&order=idx`);
+  expect(steps).toHaveLength(1);
+  expect(steps[0]).toMatchObject({ action_key: 'triage_findings', status: 'succeeded', execution_label: 'discussed' });
+  expect(steps[0].changes.items_triaged).toEqual(['i2', 'i3']);
+  const [version] = await serviceSelect('artifact_versions', `id=eq.${steps[0].changes.version_ids[0]}&select=source_operation,content`);
+  expect(version.source_operation).toBe('agent_triage');
+  const rows = JSON.parse(version.content).items as { id: string; status?: string; reason?: string }[];
+  expect(rows.map((r) => r.status ?? null)).toEqual([null, 'accepted', 'accepted']);
+});

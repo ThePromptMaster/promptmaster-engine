@@ -16,6 +16,8 @@ import { countNamedSections, parseOutlineDocument } from '@/lib/outline/model';
 import { commitOutlineVersion } from '@/lib/supabase/outline';
 import { appendWorkflowEvent } from '@/lib/supabase/workflow';
 import { appliedFindingsVersion, reviseWithFindings } from '@/lib/workflow/apply-findings';
+import { serializeItems } from '@/lib/workflow/stage-artifact';
+import { applyTriage } from '@/lib/workflow/triage';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import { summariseStageContent } from '@/lib/workflow/digest';
 import { stageContentForSummary, stageEvidence } from '@/lib/workflow/evidence';
@@ -325,6 +327,41 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         status: 'succeeded', toolsUsed: ['model'],
         changes: typeof versionId === 'string' ? { version_ids: [versionId] } : {},
         output: `Applied ${findings.length} finding${findings.length === 1 ? '' : 's'} to ${ctx.stage.label} — saved as a new version.`,
+      });
+    }
+
+    case 'triage': {
+      const r = ctx.facts?.review;
+      if (!r || !r.routine.length) return done(key, { status: 'failed', output: 'No routine finding is left to decide.', toolsUsed: [], changes: {} });
+      if (!ctx.appendStageVersion) throw new Error('This view cannot save versions.');
+      const res = await api.agentTriage(
+        {
+          inputs, state: ctx.digest,
+          items: r.routine.map((i) => Object.fromEntries(Object.entries(i).filter(([k, v]) => k !== 'status' && k !== 'reason' && typeof v === 'string')) as Record<string, string>),
+          statuses: (r.schema.statuses ?? []).map((s) => ({ value: s.value, label: s.label, requires_reason: Boolean(s.requiresReason) })),
+          model,
+        },
+        ctx.signal
+      );
+      // Only the routine rows, only the table's own statuses, a reason where
+      // one is demanded — anything else leaves the row for the user.
+      const { items, applied } = applyTriage(r.items, res.decisions.filter((d) => r.routine.some((i) => i.id === d.id)), r.schema);
+      if (!applied.length) return done(key, { status: 'failed', output: 'The model returned no usable decision.', toolsUsed: ['model'], changes: {} });
+      const created = await ctx.appendStageVersion(ctx.stage.id, ctx.stage.label, {
+        content: serializeItems(items),
+        source_operation: 'agent_triage',
+        instruction: ctx.step.rationale || 'Go mode decided the routine findings.',
+        model: res.model_used || ctx.project.model,
+        mode: ctx.project.mode,
+        change_summary: `Go mode decided ${applied.length} routine finding${applied.length === 1 ? '' : 's'}; ${r.material.length} left for you.`,
+      });
+      const versionId = (created as { id?: unknown } | null)?.id;
+      const decided = items.filter((i) => applied.includes(i.id)).map((i) => `${(r.schema.statuses ?? []).find((s) => s.value === i.status)?.label ?? i.status}: ${(i.finding ?? i.text ?? i.id).slice(0, 120)}`);
+      return done(key, {
+        status: 'succeeded', toolsUsed: ['model'],
+        changes: { ...(typeof versionId === 'string' ? { version_ids: [versionId] } : {}), items_triaged: applied },
+        output: `Decided ${applied.length} routine finding${applied.length === 1 ? '' : 's'}:\n${decided.map((d) => `- ${d}`).join('\n')}` +
+          (r.material.length ? `\n\n${r.material.length} finding${r.material.length === 1 ? '' : 's'} would change the work and ${r.material.length === 1 ? 'is' : 'are'} left for you.` : ''),
       });
     }
 

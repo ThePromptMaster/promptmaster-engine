@@ -422,7 +422,12 @@ authorization with a further `decisions` row; the chain is the project-level loo
 each window is still the user's click (auto-chaining is not offered). A stop the user can
 clear is stored as `agent_runs.needs` and shown as "I need you to…" with the one button
 that clears it (approve the outline, unblock, confirm a requirement, keep waiting,
-continue, confirm a large drafting run); a question keeps its own prompt; `check_literature` is **not offered** until a retrieval tool is
+continue, confirm a large drafting run); a question keeps its own prompt. Under
+Autonomous, Go decides a review table's **routine** findings itself (severity minor or
+moderate, an enum since B3) and stops for the **material** ones (major, or of unknown
+severity — every finding written before B3 counts as material); Checkpoint pauses before
+deciding; Guided always asks. Fact-check, runs, alternatives and validation tables are
+outcome tables and are never decided by Go; `check_literature` is **not offered** until a retrieval tool is
 connected (B0, 2026-09-28 — before that it was always offered and always blocked, so
 every Research run could walk into "no search tool is connected" and stop there);
 since B2b (2026-09-28) Go has the stage's own moves — `generate_outline`,
