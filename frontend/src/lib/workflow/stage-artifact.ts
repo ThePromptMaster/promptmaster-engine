@@ -428,6 +428,28 @@ export function effectiveRenderer(stage: StageDefinition): StageRenderer {
  * to auto-draft "items", fail with "The draft came back empty", and offer
  * "Draft the items" on a stage with nothing to draft.
  */
+/**
+ * A list or review stage's rows as text a reader (or the side chat's model)
+ * can follow, instead of the JSON the version column holds (C7). Prose
+ * content is returned as it is.
+ */
+export function stageContentForChat(schema: StageItemSchema, content: string | null | undefined): string {
+  const items = parseItems(content);
+  if (!items) return content ?? '';
+  if (items.length === 0) return '';
+  return items
+    .map((item, i) => {
+      const fields = schema.fields
+        .map((f) => ({ label: f.label, value: (item[f.key] ?? '').trim() }))
+        .filter((f) => f.value)
+        .map((f) => `${f.label}: ${f.value}`);
+      const status = statusOption(schema, item.status)?.label;
+      const reason = (item.reason ?? '').trim();
+      return `${i + 1}. ${fields.join(' — ')}${status ? ` [${status}${reason ? `: ${reason}` : ''}]` : ''}`;
+    })
+    .join('\n');
+}
+
 export function stageDrafts(stage: StageDefinition): boolean {
   if (stage.renderer === 'outline' || stage.renderer === 'long_form') return false;
   return stage.expected_artifacts.length > 0;

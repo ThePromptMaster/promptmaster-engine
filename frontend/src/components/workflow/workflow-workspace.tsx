@@ -59,7 +59,7 @@ import { ProjectBrief, ProjectSetup, stageWantsSetup } from './project-setup';
 import { draftBindings } from '@/lib/outline/long-form';
 import { approveOutline, loadOutline, materialiseOutlineInto } from '@/lib/outline/actions';
 import type { OutlineDocument } from '@/types/outline';
-import { stageDrafts, itemSchemaFor, serializeItems, type StageItem } from '@/lib/workflow/stage-artifact';
+import { stageDrafts, itemSchemaFor, rendererHoldsItems, serializeItems, stageContentForChat, type StageItem } from '@/lib/workflow/stage-artifact';
 import { buildStageContext } from '@/lib/workflow/context';
 import type { StageContext, WorkflowTemplate, BlockKind } from '@/lib/workflow/types';
 import { isDone } from '@/lib/workflow/types';
@@ -1568,13 +1568,14 @@ export function WorkflowWorkspace({
               project={project}
               stageId={stage.id}
               stageLabel={stage.label}
-              content={
+              content={stageContentForChat(
+                itemSchemaFor(stage),
                 (activeVersionId
                   ? stageVersions.find((v) => v.id === activeVersionId)?.content
                   : undefined) ??
-                stageVersions.at(-1)?.content ??
-                ''
-              }
+                  stageVersions.at(-1)?.content ??
+                  ''
+              )}
               headVersion={stageVersions.at(-1) ?? null}
               appendStageVersion={appendStageVersion}
               restoreStageVersion={restoreStageVersion}
@@ -1583,7 +1584,12 @@ export function WorkflowWorkspace({
               // while reading an older version would append a version built
               // from it and lose everything since. Discussion is unaffected.
               canInstruct={
-                activeVersionId === null || activeVersionId === stageVersions.at(-1)?.id
+                (activeVersionId === null || activeVersionId === stageVersions.at(-1)?.id) && !rendererHoldsItems(stage.renderer)
+              }
+              cannotChangeBecause={
+                rendererHoldsItems(stage.renderer)
+                  ? 'This stage is a table. Ask about it here; change the rows in the table itself.'
+                  : undefined
               }
               onApplyPoints={
                 draftable

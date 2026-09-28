@@ -62,19 +62,21 @@ const MODES: Array<{
   send: string;
   placeholder: string;
 }> = [
+  // C7 (Sean, 28 Sep, item 17): the two tabs are two different requests, and
+  // their names say which — talk it through, or change the text.
   {
     key: 'discuss',
-    label: 'Discuss',
+    label: 'Ask',
     icon: 'forum',
-    promise: 'Asks a question and gets an answer. Your document is not changed.',
+    promise: 'Talk it through — nothing changes.',
     send: 'Ask',
     placeholder: 'Ask about this draft — nothing you write here changes it.',
   },
   {
     key: 'instruct',
-    label: 'Instruct',
+    label: 'Change it',
     icon: 'edit_note',
-    promise: 'Drafts a revision. You see exactly what would change before it is applied.',
+    promise: 'Rewrites the selection, section or draft — you approve before it is saved.',
     send: 'Draft revision',
     placeholder: 'Say what to change — for example, “cut the second paragraph in half”.',
   },
@@ -110,12 +112,35 @@ interface Props {
    * old version is a reasonable thing to do.
    */
   canInstruct?: boolean;
+  /** Why "Change it" is unavailable, when it is for a reason other than reading an old version. */
+  cannotChangeBecause?: string;
   /**
    * PM-22 "buttonize it": apply points from the latest reply as you go. The
    * workspace owns applying, so the chat and the critiques behave the same.
    */
   onApplyPoints?: (points: CritiquePoint[], showFirst: boolean) => void;
   applying?: boolean;
+}
+
+/**
+ * C7: whether replies offer "Act on this reply" chips — a per-user
+ * preference, kept in this browser only. Storage can be absent or throw
+ * (private windows, blocked site data), so both directions are guarded.
+ */
+const OFFER_ACTIONS_KEY = 'pm.chat.offer-actions';
+function readOfferActions(): boolean {
+  try {
+    return window.localStorage.getItem(OFFER_ACTIONS_KEY) !== 'off';
+  } catch {
+    return true;
+  }
+}
+function writeOfferActions(on: boolean) {
+  try {
+    window.localStorage.setItem(OFFER_ACTIONS_KEY, on ? 'on' : 'off');
+  } catch {
+    // A preference that cannot be kept is still honoured for this page.
+  }
 }
 
 export function ChatPanel({
@@ -129,9 +154,12 @@ export function ChatPanel({
   readOnly = false,
   initialMode = 'discuss',
   canInstruct = true,
+  cannotChangeBecause,
   onApplyPoints,
   applying = false,
 }: Props) {
+  const [offerActions, setOfferActions] = useState(true);
+  useEffect(() => setOfferActions(readOfferActions()), []);
   const chat = useStageChat({
     project,
     stageId,
@@ -296,6 +324,20 @@ export function ChatPanel({
       <header className="px-5 pt-5">
         <h2 className="text-title text-[var(--on-surface)]">Side chat</h2>
         <p className="mt-0.5 text-label text-[var(--on-surface-variant)]">{stageLabel}</p>
+        {onApplyPoints && (
+          <label className="mt-1.5 flex cursor-pointer items-center gap-2 text-label text-[var(--on-surface-variant)]">
+            <input
+              type="checkbox"
+              checked={offerActions}
+              onChange={(e) => {
+                setOfferActions(e.target.checked);
+                writeOfferActions(e.target.checked);
+              }}
+              className="h-3.5 w-3.5 accent-[var(--pm-primary)]"
+            />
+            Offer actions from replies
+          </label>
+        )}
       </header>
 
       <ModeSwitch
@@ -305,7 +347,7 @@ export function ChatPanel({
         instructDisabledReason={
           canInstruct
             ? null
-            : 'You are reading an earlier version. Open the latest one to revise it.'
+            : (cannotChangeBecause ?? 'You are reading an earlier version. Open the latest one to revise it.')
         }
       />
 
@@ -323,7 +365,7 @@ export function ChatPanel({
             {chat.messages.map((message) => (
               <li key={message.id}>
                 <Bubble message={message} />
-                {onApplyPoints && !readOnly && message.id === latestReplyId && replyPoints.length > 0 && (
+                {onApplyPoints && offerActions && !readOnly && message.id === latestReplyId && replyPoints.length > 0 && (
                   <div className="mt-2">
                     <CritiqueActions
                       title="Act on this reply"
@@ -513,7 +555,7 @@ function ModeSwitch({
         </span>
         <span>
           {mode === 'discuss'
-            ? 'Discussion only — talking here cannot change your document. Only a point you choose to Apply does, as a new version.'
+            ? 'Ask only — talking here cannot change your document. Only a point you choose to Apply does, as a new version.'
             : 'Revisions are shown for review first, and never replace a version.'}
         </span>
       </p>
@@ -555,7 +597,7 @@ function Bubble({ message }: { message: StageChatMessage }) {
               : 'bg-[var(--surface-container)] text-[var(--on-surface-variant)]'
           }`}
         >
-          {instruct ? 'Instruct' : 'Discuss'}
+          {instruct ? 'Change it' : 'Ask'}
         </span>
         {message.scope && (
           <span className="truncate text-label text-[var(--on-surface-variant)]">
