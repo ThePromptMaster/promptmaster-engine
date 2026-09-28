@@ -271,7 +271,7 @@ def test_state_facts_reach_the_prompt():
         "tools": {"literature": False},
     })
     _, user = build_next_action_prompt(INPUTS, state, RESEARCH, "guided")
-    assert "OUTLINE: 2 named section(s), approved for drafting: 1. Habitat; 2. Diet" in user
+    assert "OUTLINE: 2 named section(s), approved for drafting — approval is done; never ask the user to approve it again: 1. Habitat; 2. Diet" in user
     assert "MANUSCRIPT: 1 of 2 section(s) written, 1 being written now; written: 1. Habitat; still unwritten: 2. Diet" in user
     assert "FINDINGS: 3 in the table, 1 decided by the user, 2 still undecided: Chapter 2 repeats chapter 1" in user
     assert "TOOLS: literature=no" in user

@@ -30,6 +30,7 @@ import { RevisedPreview } from './revised-preview';
 import { useApplyFindings } from './use-apply-findings';
 import { findingFromPoint, pointsFromCommentary } from '@/lib/workflow/critique-points';
 import { ExportMenu } from './export-menu';
+import { listWorkflowEvents } from '@/lib/supabase/workflow';
 import { ChatPanel } from './chat-panel';
 import { RecommendationsPanel } from './recommendations-panel';
 import { TasksPanel } from './tasks-panel';
@@ -783,6 +784,7 @@ export function WorkflowWorkspace({
     setStageSummary,
     reloadEvents: reloadAfterAgent,
     events: events ?? [],
+    loadEvents: () => listWorkflowEvents(project.id),
     onRefresh: onReload,
   });
   useEffect(() => setGoDriving(go.active || go.phase === 'awaiting'), [go.active, go.phase]);
