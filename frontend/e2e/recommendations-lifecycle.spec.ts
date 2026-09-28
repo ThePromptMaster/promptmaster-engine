@@ -24,6 +24,8 @@ test('a proposal deferred on one stage is retired when that stage is left', asyn
   await page.getByRole('button', { name: 'Add to tasks' }).click();
   // The task is what carries a deferral forward; its appearance means the rows landed.
   await expect(page.getByText('Decide the audience later.')).toBeVisible();
+  // Deferred, not duplicated: the persisted row stands in for the derived one.
+  await expect(panel.getByText('Move on to Audience')).toHaveCount(1);
 
   const pending = await serviceSelect('recommendations', `project_id=eq.${projectId}&select=id,title,status,scope`);
   expect(pending).toHaveLength(1);
@@ -31,9 +33,13 @@ test('a proposal deferred on one stage is retired when that stage is left', asyn
   expect(pending[0].scope.stage_id).toBe('objective');
   await page.screenshot({ path: test.info().outputPath('01-deferred-proposal-pending.png') });
 
-  // Leave the stage: the proposal has nothing left to say.
+  // Leave the stage: the proposal has nothing left to say — on screen at once,
+  // not only after a reload (seen on production 2026-09-28).
   await pressTransition(page);
   await expect(page.getByRole('heading', { name: /Audience/ })).toBeVisible();
+  await expect(panel.getByText('Move on to Positioning')).toBeVisible();
+  await expect(panel.getByText('Move on to Audience')).toHaveCount(0);
+  await expect(panel.getByText(/^1 for Audience/)).toBeVisible();
 
   const after = await serviceSelect('recommendations', `project_id=eq.${projectId}&select=title,status,resolved_at`);
   expect(after).toHaveLength(1);
