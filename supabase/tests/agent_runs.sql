@@ -70,6 +70,18 @@ begin
     values (u, proj, 'stage_marked_complete', 'objective', 'audience', 'system', run_a,
             jsonb_build_object('evidence_version_id', ver));
 
+  -- 4b. …and a stage with no artifact at all, with nothing to cite (2026-10-04)…
+  insert into public.workflow_events (user_id, project_id, type, stage_id, to_stage_id, actor, agent_run_id)
+    values (u, proj, 'stage_marked_complete', 'outline_approval', 'drafting', 'system', run_a);
+  -- 4c. …but never a stage that has an artifact and cites no version.
+  failed := false;
+  begin
+    insert into public.workflow_events (user_id, project_id, type, stage_id, actor, agent_run_id)
+      values (u, proj, 'stage_marked_complete', 'objective', 'system', run_a);
+  exception when check_violation then failed := true;
+  end;
+  if not failed then raise exception 'an autonomous run completed a stage with an artifact and no evidence'; end if;
+
   -- 5. …but not skip a stage (a user decision)…
   failed := false;
   begin

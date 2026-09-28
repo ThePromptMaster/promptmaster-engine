@@ -441,8 +441,9 @@ until 2026-09-29 every card hid it, and a run stopped for material findings coul
 be continued at all). A stage with nothing to cite — Outline approval has no artifact —
 is completed by a move the user approved (Guided, Checkpoint, or an approved Autonomous
 step) exactly as the transition bar completes it; a move an Autonomous run makes on its
-own must cite a version (`workflow_events_agent_authorized`), so there it moves on and
-leaves the stage open, and the planner is told a left-open stage is the user's to close. A drafting step waits for its section jobs for up to ten
+own must cite a version (`workflow_events_agent_authorized`) — unless the stage holds no
+artifact at all, which the trigger checks itself (20261004000000); so Outline approval
+completes under Autonomous too, and the planner is told a left-open stage is the user's to close. A drafting step waits for its section jobs for up to ten
 minutes and is then recorded `interrupted` — the sections go on being written by cron,
 and Resume waits again without spending a step. Derived (Research) outlines are still
 generated only from the panel.

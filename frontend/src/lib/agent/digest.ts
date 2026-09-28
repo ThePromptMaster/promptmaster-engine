@@ -77,6 +77,13 @@ export function buildAgentState(input: {
   context?: StageContext;
   /** The approved outline drafting is bound to, if any. */
   approvedOutline?: readonly OutlineSection[];
+  /**
+   * Whether any outline version is approved, read fresh (B1 facts). The
+   * workspace's `approvedOutline` lags by a render right after the approve
+   * card's own button, and the planner then asked for an approval that had
+   * just been given (production pass, 2026-09-29).
+   */
+  outlineApproved?: boolean;
   /** How many section jobs are still queued or running on this stage's manuscript. */
   pendingJobs?: number;
   tools?: AgentTools;
@@ -97,7 +104,7 @@ export function buildAgentState(input: {
   if (stage.renderer === 'outline') {
     const doc = parseOutlineDocument(head);
     const sections = doc.items.map((s, i) => `${i + 1}. ${s.title.trim() || 'Untitled'}${s.abstract?.trim() ? ` — ${s.abstract.trim().slice(0, 120)}` : ''}`);
-    outline = { sections: sections.slice(0, LIST_MAX), named_count: countNamedSections(doc), approved: approvedOutline.length > 0 };
+    outline = { sections: sections.slice(0, LIST_MAX), named_count: countNamedSections(doc), approved: input.outlineApproved ?? approvedOutline.length > 0 };
     excerpt = sections.join('\n');
   } else if (stage.renderer === 'long_form') {
     const sections = manuscriptArtifactFor(template, stage, bundles)?.long_form?.outline ?? [];
