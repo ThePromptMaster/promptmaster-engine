@@ -154,7 +154,7 @@ def _format_state(inputs: PMInput, state: AgentState) -> str:
         o = state.outline
         facts.append(
             f"OUTLINE: {o.named_count} named section(s), "
-            + ("approved for drafting" if o.approved else "not yet approved")
+            + ("approved for drafting — approval is done; never ask the user to approve it again" if o.approved else "not yet approved")
             + (": " + "; ".join(o.sections[:20]) if o.sections else "")
         )
     if state.manuscript is not None:

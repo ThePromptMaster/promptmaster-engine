@@ -87,6 +87,12 @@ interface Options {
   reloadEvents: () => Promise<void>;
   /** The event log, for the facts a stage's own controls need (approvals). */
   events: readonly WorkflowEvent[];
+  /**
+   * Read the events fresh from the database for each move. The prop above
+   * lags a render right after a card's own button (approve the outline,
+   * confirm a box), and the first move then reasoned from the old log.
+   */
+  loadEvents?: () => Promise<readonly WorkflowEvent[]>;
   /** Re-read the project after a write the store did not make itself. */
   onRefresh?: () => unknown;
 }
@@ -188,7 +194,8 @@ export function useGoLoop(opts: Options) {
       // Fresh, not from props: a step approved after a pause must act on the
       // stage as it is now (B1).
       const facts = await readStageFacts({
-        project: o.project, template: o.template, stage: o.stage, bundles: o.bundles, events: o.events, latestEvaluation: o.latestEvaluation,
+        project: o.project, template: o.template, stage: o.stage, bundles: o.bundles,
+        events: o.loadEvents ? await o.loadEvents() : o.events, latestEvaluation: o.latestEvaluation,
       });
       setProgress(null);
 
@@ -303,7 +310,8 @@ export function useGoLoop(opts: Options) {
 
         setPhase('thinking');
         const facts: StageFacts = await readStageFacts({
-          project: o.project, template: o.template, stage: o.stage, bundles: o.bundles, events: o.events, latestEvaluation: o.latestEvaluation,
+          project: o.project, template: o.template, stage: o.stage, bundles: o.bundles,
+          events: o.loadEvents ? await o.loadEvents() : o.events, latestEvaluation: o.latestEvaluation,
         });
         if (signal.aborted) throw new Stopped();
 
