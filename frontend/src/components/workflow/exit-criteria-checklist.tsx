@@ -10,6 +10,8 @@ interface Props {
    */
   manualIds?: Set<string>;
   onToggleManual: (id: string, checked: boolean) => void;
+  /** Viewing a stage that cannot be worked on from here: boxes shown, not clickable. */
+  readOnly?: boolean;
 }
 
 /**
@@ -18,7 +20,7 @@ interface Props {
  * Shown continuously beside the work rather than revealed when the user tries
  * to leave — a checklist you only see at the exit is a gate, not guidance.
  */
-export function ExitCriteriaChecklist({ criteria, manualIds = new Set(), onToggleManual }: Props) {
+export function ExitCriteriaChecklist({ criteria, manualIds = new Set(), onToggleManual, readOnly = false }: Props) {
   if (criteria.length === 0) return null;
 
   const met = criteria.filter((c) => c.satisfied).length;
@@ -29,6 +31,7 @@ export function ExitCriteriaChecklist({ criteria, manualIds = new Set(), onToggl
         <h3 className="text-title text-[var(--on-surface)]">To finish this stage</h3>
         <span className="text-label text-[var(--on-surface-variant)]">
           {met} of {criteria.length} done
+          {readOnly && ' · viewing only'}
         </span>
       </header>
       {/* PM-07: Sean could not tell the circles from the squares. */}
@@ -52,13 +55,14 @@ export function ExitCriteriaChecklist({ criteria, manualIds = new Set(), onToggl
             <li key={c.id}>
               <Row
                 className={`flex items-start gap-2.5 text-body ${
-                  isManual ? 'cursor-pointer' : ''
+                  isManual && !readOnly ? 'cursor-pointer' : ''
                 }`}
               >
                 {isManual ? (
                   <input
                     type="checkbox"
                     checked={c.satisfied}
+                    disabled={readOnly}
                     onChange={(e) => onToggleManual(c.id, e.target.checked)}
                     className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--pm-primary)]"
                   />

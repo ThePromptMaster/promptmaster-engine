@@ -96,6 +96,7 @@ export function CompletionDialog({
   onCheck,
   onConfirm,
   onCancel,
+  onViewStage,
 }: {
   summary: CompletionSummary;
   busy: boolean;
@@ -104,6 +105,8 @@ export function CompletionDialog({
   onCheck?: () => void;
   onConfirm: () => void;
   onCancel: () => void;
+  /** Go and look at a stage that was left open, to close it before finishing. */
+  onViewStage?: (stageId: string) => void;
 }) {
   const rows: [string, number][] = [
     ['completed', summary.completed],
@@ -129,6 +132,26 @@ export function CompletionDialog({
       <p className="mt-2 text-label text-[var(--on-surface-variant)]">
         Stages: {rows.filter(([, n]) => n > 0).map(([label, n]) => `${n} ${label}`).join(' · ') || 'none'}
       </p>
+      {summary.leftOpenStages.length > 0 && (
+        <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-label text-[var(--on-surface-variant)]">
+          <span>
+            Left open, requirements still unticked:{' '}
+            {summary.leftOpenStages.map((s) => s.short_label).join(', ')}.
+            Finishing keeps {summary.leftOpenStages.length === 1 ? 'it' : 'them'} open.
+          </span>
+          {onViewStage &&
+            summary.leftOpenStages.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => onViewStage(s.id)}
+                className="rounded px-1.5 py-0.5 text-label font-semibold text-[var(--pm-primary)] hover:bg-[var(--surface-container-low)]"
+              >
+                Close {s.short_label}
+              </button>
+            ))}
+        </p>
+      )}
       {!summary.deliverableDone && (
         <p className="mt-2 text-label text-[var(--on-surface-variant)]">
           Finishing now records the project as finished without it. You can reopen it at any time.
