@@ -5,6 +5,8 @@ import userEvent from '@testing-library/user-event';
 import { StageRail } from './stage-rail';
 import { ExitCriteriaChecklist } from './exit-criteria-checklist';
 import { StageTransitionBar } from './stage-transition-bar';
+import { CompletionDialog } from './stage-status-panels';
+import { ProjectFinishedBanner } from './project-finished-banner';
 import { StageRenderer } from './renderers/stage-renderer';
 import {
   BOOK_V1,
@@ -203,6 +205,58 @@ describe('ExitCriteriaChecklist', () => {
 
     await userEvent.click(boxes[0]);
     expect(onToggle).toHaveBeenCalledWith('c', true);
+  });
+
+  it('shows the boxes but does not let them be ticked while only viewing (A3)', async () => {
+    const onToggle = vi.fn();
+    render(<ExitCriteriaChecklist criteria={criteria} manualIds={new Set(['c'])} onToggleManual={onToggle} readOnly />);
+    const box = screen.getByRole('checkbox');
+    expect(box).toBeDisabled();
+    expect(screen.getByText(/viewing only/)).toBeInTheDocument();
+    await userEvent.click(box);
+    expect(onToggle).not.toHaveBeenCalled();
+  });
+});
+
+describe('left-open stages are named where finishing happens (A3, Sean 28 Sep item 20)', () => {
+  const positioning = BOOK_V1.stages.find((s) => s.id === 'positioning')!;
+  const summary = {
+    deliverable: BOOK_V1.stages.find((s) => s.id === 'drafting'),
+    deliverableDone: true,
+    completed: 12,
+    withArtifact: 12,
+    skipped: 0,
+    leftOpen: 1,
+    leftOpenStages: [positioning],
+    blocked: 0,
+    notStarted: 0,
+  };
+
+  it('the Finish dialog names the stage and offers to go and close it', async () => {
+    const onViewStage = vi.fn();
+    render(
+      <CompletionDialog summary={summary} busy={false} onConfirm={vi.fn()} onCancel={vi.fn()} onViewStage={onViewStage} />
+    );
+    expect(screen.getByText(/Left open, requirements still unticked: Positioning/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Close Positioning' }));
+    expect(onViewStage).toHaveBeenCalledWith('positioning');
+    // The confirm buttons keep their names: nothing else changes for the user.
+    expect(screen.getByRole('button', { name: /^Finish/ })).toBeInTheDocument();
+  });
+
+  it('the finished banner still lists what was left open, and links to it', async () => {
+    const onViewStage = vi.fn();
+    render(
+      <ProjectFinishedBanner
+        onReopen={vi.fn()}
+        leftOpen={[{ id: 'positioning', label: 'Positioning' }]}
+        onViewStage={onViewStage}
+      />
+    );
+    expect(screen.getByText('This project is finished')).toBeInTheDocument();
+    expect(screen.getByText(/Left open: Positioning/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Close Positioning' }));
+    expect(onViewStage).toHaveBeenCalledWith('positioning');
   });
 });
 

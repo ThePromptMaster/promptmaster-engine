@@ -44,8 +44,10 @@ import {
   type TransitionOption,
   completionSummary,
   deliverableStage,
+  tickClosesStage,
 } from '@/lib/workflow/engine';
 import { buildStageDigest, formatManuscript, summariseStageContent } from '@/lib/workflow/digest';
+import { stageContentForSummary, stageEvidence } from '@/lib/workflow/evidence';
 import { api } from '@/lib/api/client';
 import { inputsFrom } from './use-stage-generation';
 import type { EvaluationResult } from '@/types';
@@ -58,12 +60,12 @@ import { saveLongForm } from '@/lib/supabase/versions';
 import type { OutlineDocument } from '@/types/outline';
 import { stageDrafts, itemSchemaFor, serializeItems, type StageItem } from '@/lib/workflow/stage-artifact';
 import { buildStageContext } from '@/lib/workflow/context';
-import type { StageContext, WorkflowEvent, WorkflowTemplate, BlockKind } from '@/lib/workflow/types';
+import type { StageContext, WorkflowTemplate, BlockKind } from '@/lib/workflow/types';
 import { isDone } from '@/lib/workflow/types';
-import { appendWorkflowEvent, getLatestTemplate, listWorkflowEvents } from '@/lib/supabase/workflow';
+import { getLatestTemplate } from '@/lib/supabase/workflow';
 import { setUsageProject } from '@/lib/supabase/model-usage';
 import type { NewEvaluation, NewVersion } from '@/lib/supabase/versions';
-import type { StageBundle } from '@/stores/project-store';
+import { useProjectStore, type StageBundle } from '@/stores/project-store';
 import { approvedOutlineVersionId } from '@/lib/supabase/outline';
 import type { Artifact, ArtifactVersion, Evaluation, Project, ProjectPatch } from '@/types/project';
 
@@ -127,7 +129,13 @@ export function WorkflowWorkspace({
   ensureStageArtifact,
   onReload,
 }: Props) {
-  const [events, setEvents] = useState<WorkflowEvent[] | null>(null);
+  // The event log lives in the project store, with the artifacts it is read
+  // alongside; writing goes through `appendEvent`, which re-reads the log, so
+  // no surface can hold a copy the others have moved past.
+  const events = useProjectStore((s) => s.events);
+  const appendEvent = useProjectStore((s) => s.appendEvent);
+  const refreshEvents = useProjectStore((s) => s.refreshEvents);
+  const flushProject = useProjectStore((s) => s.flush);
   const [viewingStageId, setViewingStageId] = useState<string | null>(null);
   // Open by default: section 8 asks for the side chat to be part of the
   // workspace, and a panel behind a button that has to be found first is a
@@ -191,12 +199,6 @@ export function WorkflowWorkspace({
   // Go mode drafts stages itself; the entry auto-draft must not race it.
   const [goDriving, setGoDriving] = useState(false);
 
-  useEffect(() => {
-    listWorkflowEvents(project.id)
-      .then(setEvents)
-      .catch(() => setEvents([]));
-  }, [project.id]);
-
   /**
    * FR-18: attribute this project's usage rows.
    *
@@ -229,6 +231,12 @@ export function WorkflowWorkspace({
   const stageId = viewingStageId ?? state.current_stage_id;
   const stage = getStage(template, stageId);
   const isCurrent = stageId === state.current_stage_id;
+  // A stage moved past with requirements still open can be worked on when
+  // viewed: that is how its box gets ticked and the stage closed (PM-13,
+  // Sean 28 Sep item 20 — Positioning stayed OPEN to the end because nothing
+  // reachable could close it).
+  const viewedState = state.stages[stageId];
+  const isEditable = isCurrent || (viewedState?.status === 'in_progress' && Boolean(viewedState.left_open));
 
   const stageBundles = useMemo(() => bundles ?? {}, [bundles]);
 
@@ -340,6 +348,20 @@ export function WorkflowWorkspace({
   );
 
   const progress = useMemo(() => progressSummary(template, state), [template, state]);
+  // "12 done · 1 left open · 0 to go" rather than "12 done · 1 to go" on a
+  // finished project: a stage moved past is named for what it is.
+  const progressCaption = useMemo(() => {
+    const finished = state.project_status === 'finalized';
+    return [
+      finished ? 'Finished' : null,
+      `${progress.complete} done`,
+      progress.skipped > 0 ? `${progress.skipped} skipped` : null,
+      progress.leftOpen > 0 ? `${progress.leftOpen} left open` : null,
+      progress.remaining > 0 || !finished ? `${progress.remaining} to go` : null,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+  }, [progress, state.project_status]);
   // 0-based position of the stage on screen. Read twice — by the stage header
   // and by the narrow-viewport bar — so it is derived once.
   const stageIndex = template.stages.findIndex((s) => s.id === stage?.id);
@@ -394,10 +416,12 @@ export function WorkflowWorkspace({
 
         // The stage's own head version is the evidence of completion; the
         // database checks it belongs to this stage (20260927000000).
-        const bundle = stageBundles[stage.id];
+        // The head version — or, for a long-form stage, a snapshot of the
+        // finished manuscript saved now (A2). One function for every path
+        // that completes a stage.
         const evidenceId =
-          type === 'stage_marked_complete' && bundle?.artifact?.stage_id === stage.id
-            ? bundle.versions.at(-1)?.id
+          type === 'stage_marked_complete'
+            ? await stageEvidence({ template, stage, bundles: stageBundles, project, appendStageVersion })
             : undefined;
 
         // Record what this stage concluded before leaving it. Later stages
@@ -405,12 +429,11 @@ export function WorkflowWorkspace({
         // than recomputing at every call — means a subsequent edit upstream
         // cannot silently rewrite the context a downstream draft was given.
         if ((type === 'stage_marked_complete' || type === 'stage_advanced') && setStageSummary) {
-          const content = stageBundles[stage.id]?.versions.at(-1)?.content ?? '';
-          const summary = summariseStageContent(stage, content);
+          const summary = summariseStageContent(stage, stageContentForSummary(template, stage, stageBundles));
           if (summary) await setStageSummary(stage.id, summary).catch(() => {});
         }
 
-        await appendWorkflowEvent(project.id, project.user_id, {
+        let fresh = await appendEvent({
           type,
           stage_id: stage.id,
           to_stage_id: option.toStageId ?? undefined,
@@ -423,7 +446,7 @@ export function WorkflowWorkspace({
         // last stage — the project can be finished with stages left open.
         if (option.kind === 'finish') {
           const checked = objectiveCheckRef.current;
-          await appendWorkflowEvent(project.id, project.user_id, {
+          fresh = await appendEvent({
             type: 'project_finalized',
             stage_id: stage.id,
             reason: note,
@@ -444,8 +467,6 @@ export function WorkflowWorkspace({
           });
         }
 
-        const fresh = await listWorkflowEvents(project.id);
-        setEvents(fresh);
         setViewingStageId(null);
 
         // projects.stage is a denormalised cursor for the list view; the event
@@ -468,7 +489,7 @@ export function WorkflowWorkspace({
         setBusy(false);
       }
     },
-    [stage, busy, project, template, onPatchProject, setStageSummary, stageBundles, evaluation]
+    [stage, busy, project, template, onPatchProject, setStageSummary, stageBundles, evaluation, appendEvent, appendStageVersion]
   );
 
   /** PM-13: mark the current stage blocked, or lift the block. */
@@ -477,16 +498,15 @@ export function WorkflowWorkspace({
       if (!stage) return;
       setTransitionError(null);
       try {
-        await appendWorkflowEvent(project.id, project.user_id, block
+        await appendEvent(block
           ? { type: 'stage_blocked', stage_id: stage.id, reason: block.reason, payload: { block_kind: block.kind } }
           : { type: 'stage_unblocked', stage_id: stage.id });
-        setEvents(await listWorkflowEvents(project.id));
         setBlocking(false);
       } catch (e) {
         setTransitionError(`That didn't go through${e instanceof Error && e.message ? `: ${e.message}` : ''}. Nothing was changed.`);
       }
     },
-    [stage, project.id, project.user_id]
+    [stage, appendEvent]
   );
 
   /**
@@ -499,18 +519,16 @@ export function WorkflowWorkspace({
     if (!stage) return;
     setTransitionError(null);
     try {
-      const bundle = stageBundles[stage.id];
-      const evidenceId = bundle?.artifact?.stage_id === stage.id ? bundle.versions.at(-1)?.id : undefined;
-      await appendWorkflowEvent(project.id, project.user_id, {
+      const evidenceId = await stageEvidence({ template, stage, bundles: stageBundles, project, appendStageVersion });
+      await appendEvent({
         type: 'stage_marked_complete',
         stage_id: stage.id,
         ...(evidenceId ? { payload: { evidence_version_id: evidenceId } } : {}),
       });
-      setEvents(await listWorkflowEvents(project.id));
     } catch (e) {
       setTransitionError(`That didn't go through${e instanceof Error && e.message ? `: ${e.message}` : ''}. Nothing was changed.`);
     }
-  }, [stage, stageBundles, project.id, project.user_id]);
+  }, [stage, template, stageBundles, project, appendStageVersion, appendEvent]);
 
   useEffect(() => {
     let live = true;
@@ -531,7 +549,7 @@ export function WorkflowWorkspace({
     try {
       // The event first: the log records the re-pin, and a failed patch after
       // it leaves an honest trail rather than a silent change.
-      await appendWorkflowEvent(project.id, project.user_id, {
+      await appendEvent({
         type: 'template_upgraded',
         stage_id: stage.id,
         payload: {
@@ -547,17 +565,16 @@ export function WorkflowWorkspace({
     } finally {
       setUpgrading(false);
     }
-  }, [latestTemplate, stage, project.id, project.user_id, project.workflow_template_id, template.version, onPatchProject]);
+  }, [latestTemplate, stage, project.workflow_template_id, template.version, onPatchProject, appendEvent]);
 
   const reopenProject = useCallback(async () => {
     if (!stage) return;
     try {
-      await appendWorkflowEvent(project.id, project.user_id, { type: 'project_reopened', stage_id: stage.id });
-      setEvents(await listWorkflowEvents(project.id));
+      await appendEvent({ type: 'project_reopened', stage_id: stage.id });
     } finally {
       onPatchProject({ status: 'active' });
     }
-  }, [stage, project.id, project.user_id, onPatchProject]);
+  }, [stage, onPatchProject, appendEvent]);
 
   /**
    * The recommendations surface — FR-13, FR-09, FR-01.
@@ -605,12 +622,31 @@ export function WorkflowWorkspace({
   });
 
   const handleToggleManual = useCallback(
-    (id: string, checked: boolean) => {
-      onPatchProject({
-        manual_checks: { ...(project.manual_checks ?? {}), [id]: checked },
-      });
+    async (id: string, checked: boolean) => {
+      const manual_checks = { ...(project.manual_checks ?? {}), [id]: checked };
+      onPatchProject({ manual_checks });
+
+      // Ticking the last required box on a stage that was left open closes
+      // it. The tick is the user's declaration, so the event is theirs
+      // (actor 'user'); the cursor stays where it is. The patch is flushed
+      // first so a reload never shows a completed stage with an unticked box.
+      if (!checked || !tickClosesStage(template, state, stageId, { ...context, manualChecks: manual_checks })) return;
+      setTransitionError(null);
+      try {
+        await flushProject();
+        const evidenceId = stage
+          ? await stageEvidence({ template, stage, bundles: stageBundles, project, appendStageVersion })
+          : undefined;
+        await appendEvent({
+          type: 'stage_marked_complete',
+          stage_id: stageId,
+          ...(evidenceId ? { payload: { evidence_version_id: evidenceId } } : {}),
+        });
+      } catch (e) {
+        setTransitionError(`The box is ticked, but the stage could not be closed${e instanceof Error && e.message ? `: ${e.message}` : ''}.`);
+      }
     },
-    [project.manual_checks, onPatchProject]
+    [project, onPatchProject, template, state, stageId, stage, context, flushProject, stageBundles, appendEvent, appendStageVersion]
   );
 
   const saveContent = useCallback(
@@ -699,20 +735,15 @@ export function WorkflowWorkspace({
     [draftingStage, stage, stageArtifact, stageBundles, ensureStageArtifact, onReload]
   );
 
-  const reloadEvents = useCallback(async () => {
-    setEvents(await listWorkflowEvents(project.id));
-  }, [project.id]);
-
   // --- Go mode (B4, PM-17 … PM-20) ------------------------------------------------
   // After a stage event the run caused, the log is re-read and the list-view
   // cursor follows it, exactly as a transition-bar click does.
   const reloadAfterAgent = useCallback(async () => {
-    const fresh = await listWorkflowEvents(project.id);
-    setEvents(fresh);
+    const fresh = await refreshEvents();
     setViewingStageId(null);
     const moved = projectState(template, fresh).current_stage_id;
     if (moved !== project.stage) onPatchProject({ stage: moved });
-  }, [project.id, project.stage, template, onPatchProject]);
+  }, [refreshEvents, project.stage, template, onPatchProject]);
 
   const deliverableDone = useMemo(
     () => completionSummary(template, state, context).deliverableDone,
@@ -881,11 +912,12 @@ export function WorkflowWorkspace({
     }
   };
 
+  // A left-open stage can be closed even after the project is finished:
+  // "12 done · 1 to go" on a finished Book was exactly that stage.
   const canMarkComplete =
-    project.status !== 'finalized' &&
     evaluation.canAdvance &&
     !isDone(stageState?.status) &&
-    (isCurrent || Boolean(stageState?.left_open));
+    ((isCurrent && project.status !== 'finalized') || Boolean(stageState?.left_open));
 
   const moreActions: MoreAction[] = [
     ...(canMarkComplete
@@ -941,6 +973,13 @@ export function WorkflowWorkspace({
           onRefresh: () => onReload?.(),
           revise: revisionBrief(template, stage.id, stageBundles),
           onPanelStep: reportPanelStep,
+          // Snapshots go on the artifact that holds the manuscript — Drafting's,
+          // for Revision and Editing — through the store.
+          appendManuscriptVersion:
+            appendStageVersion && manuscript?.stage_id
+              ? (version: NewVersion) =>
+                  appendStageVersion(manuscript.stage_id!, getStage(template, manuscript.stage_id!)?.label ?? stage.label, version)
+              : undefined,
           emptyHint:
             template.outline_stage === 'explicit'
               ? 'Approve an outline on the Outline stage, and drafting will follow it.'
@@ -976,11 +1015,7 @@ export function WorkflowWorkspace({
       <aside className="sticky top-0 hidden h-screen w-[248px] shrink-0 overflow-y-auto bg-[var(--surface-container-lowest)] px-2 pb-24 pt-6 md:block sidebar-scroll">
         <div className="mb-5 px-3">
           <div className="text-title text-[var(--on-surface)]">{template.name}</div>
-          <div className="mt-1 text-label text-[var(--on-surface-variant)]">
-            {progress.complete} done
-            {progress.skipped > 0 && ` · ${progress.skipped} skipped`}
-            {` · ${progress.remaining} to go`}
-          </div>
+          <div className="mt-1 text-label text-[var(--on-surface-variant)]">{progressCaption}</div>
         </div>
 
         <StageRail
@@ -1014,11 +1049,7 @@ export function WorkflowWorkspace({
             <div className="mb-5 flex items-start gap-2 px-3">
               <div className="min-w-0 flex-1">
                 <div className="text-title text-[var(--on-surface)]">{template.name}</div>
-                <div className="mt-1 text-label text-[var(--on-surface-variant)]">
-                  {progress.complete} done
-                  {progress.skipped > 0 && ` · ${progress.skipped} skipped`}
-                  {` · ${progress.remaining} to go`}
-                </div>
+                <div className="mt-1 text-label text-[var(--on-surface-variant)]">{progressCaption}</div>
               </div>
               <button
                 onClick={() => setMobileRailOpen(false)}
@@ -1067,7 +1098,8 @@ export function WorkflowWorkspace({
                 {stage.short_label}
               </span>
               <span className="block text-label text-[var(--on-surface-variant)]">
-                Stage {stageIndex + 1} of {template.stages.length} · {progress.remaining} to go
+                Stage {stageIndex + 1} of {template.stages.length}
+                {progress.leftOpen > 0 && ` · ${progress.leftOpen} left open`} · {progress.remaining} to go
               </span>
             </span>
             <span
@@ -1093,14 +1125,32 @@ export function WorkflowWorkspace({
           </div>
 
           {!isCurrent && (
-            <button
-              onClick={() => setViewingStageId(null)}
-              className="mb-4 inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-low)] px-3 py-1.5 text-label text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
-            >
-              <span className="material-symbols-outlined text-[16px]">arrow_back</span>
-              Viewing {stageIndex > template.stages.findIndex((s) => s.id === state.current_stage_id) ? 'a later' : 'an earlier'}{' '}
-              stage — back to {getStage(template, state.current_stage_id)?.short_label}
-            </button>
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => setViewingStageId(null)}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-low)] px-3 py-1.5 text-label text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
+              >
+                <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+                Viewing {stageIndex > template.stages.findIndex((s) => s.id === state.current_stage_id) ? 'a later' : 'an earlier'}{' '}
+                stage — back to {getStage(template, state.current_stage_id)?.short_label}
+              </button>
+              {/* PM-13: moved past, not finished — and closable from here, which
+                  is the only place it could be once the cursor has moved on. */}
+              {isEditable && (
+                <span className="text-label text-[var(--on-surface-variant)]">
+                  Left open — you moved on with requirements still unticked. Tick them here, or mark it complete.
+                </span>
+              )}
+              {canMarkComplete && !isCurrent && (
+                <button
+                  onClick={() => void markComplete()}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-highest)] px-3 py-1.5 text-label font-semibold text-[var(--on-surface)] hover:opacity-90"
+                >
+                  <span className="material-symbols-outlined text-[16px]">task_alt</span>
+                  Mark this stage complete
+                </button>
+              )}
+            </div>
           )}
 
           {/* FR-20. Above the stage header rather than inside it: exporting is
@@ -1153,10 +1203,10 @@ export function WorkflowWorkspace({
                 project={project}
                 stage={stage}
                 onPatch={onPatchProject}
-                readOnly={!isCurrent}
+                readOnly={!isEditable}
               />
             ) : (
-              <ProjectBrief project={project} onPatch={onPatchProject} readOnly={!isCurrent} />
+              <ProjectBrief project={project} onPatch={onPatchProject} readOnly={!isEditable} />
             )}
 
             {outlinePanelHere && (
@@ -1165,7 +1215,7 @@ export function WorkflowWorkspace({
                   project={project}
                   stageId={stage.id}
                   events={events ?? []}
-                  onEventsChanged={reloadEvents}
+                  onEventsChanged={refreshEvents}
                   derive={derivedOutlineHere ? deriveOutline : undefined}
                   drafts={draftBindings(
                     (draftingStage && draftingStage.id !== stage.id
@@ -1216,7 +1266,7 @@ export function WorkflowWorkspace({
                 }}
                 onSwitchModel={(model) => onPatchProject({ model })}
                 currentModel={project.model}
-                readOnly={!isCurrent}
+                readOnly={!isEditable}
                 evaluation={
                   evaluations?.[
                     activeVersionId ?? stageVersions.at(-1)?.id ?? ''
@@ -1282,7 +1332,8 @@ export function WorkflowWorkspace({
             <ExitCriteriaChecklist
               criteria={evaluation.criteria}
               manualIds={manualIds}
-              onToggleManual={handleToggleManual}
+              onToggleManual={(id, checked) => void handleToggleManual(id, checked)}
+              readOnly={!isEditable}
             />
 
             <RecommendationsPanel
@@ -1345,7 +1396,11 @@ export function WorkflowWorkspace({
             {/* Transitions act on the current stage only — browsing history
                 must not let you advance a stage you are merely looking at. */}
             {isCurrent && project.status === 'finalized' && (
-              <ProjectFinishedBanner onReopen={() => void reopenProject()} />
+              <ProjectFinishedBanner
+                onReopen={() => void reopenProject()}
+                leftOpen={completion.leftOpenStages.map((s) => ({ id: s.id, label: s.short_label }))}
+                onViewStage={setViewingStageId}
+              />
             )}
             {isCurrent && isBlocked && stageState?.blocked && (
               <BlockedNotice kind={stageState.blocked.kind} reason={stageState.blocked.reason} onUnblock={() => void setBlocked(null)} />
@@ -1367,6 +1422,10 @@ export function WorkflowWorkspace({
                 onCancel={() => {
                   setFinishing(null);
                   setObjectiveCheck({ running: false, result: null, error: null });
+                }}
+                onViewStage={(id) => {
+                  setFinishing(null);
+                  setViewingStageId(id);
                 }}
               />
             )}
@@ -1452,7 +1511,7 @@ export function WorkflowWorkspace({
               headVersion={stageVersions.at(-1) ?? null}
               appendStageVersion={appendStageVersion}
               restoreStageVersion={restoreStageVersion}
-              readOnly={!isCurrent}
+              readOnly={!isEditable}
               // Revising splices into the content it was handed, so instructing
               // while reading an older version would append a version built
               // from it and lose everything since. Discussion is unaffected.

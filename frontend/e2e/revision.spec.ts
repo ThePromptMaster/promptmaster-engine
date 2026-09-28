@@ -1,6 +1,8 @@
+import { readFileSync } from 'node:fs';
+
 import { expect, test } from '@playwright/test';
 
-import { createProject, pressTransition, skipStage, stageArtifact, transitionBar } from './helpers';
+import { createProject, pressTransition, serviceSelect, skipStage, stageArtifact, transitionBar } from './helpers';
 
 /**
  * PM-11 — the stages after drafting do real work on the chapters.
@@ -16,7 +18,7 @@ import { createProject, pressTransition, skipStage, stageArtifact, transitionBar
  */
 test('review stages read the manuscript, and Revision applies the accepted findings', async ({ page }) => {
   test.setTimeout(180_000);
-  await createProject(page, { workflow: 'Book', name: 'E2E revision', objective: 'A short book about giraffes' });
+  const projectId = await createProject(page, { workflow: 'Book', name: 'E2E revision', objective: 'A short book about giraffes' });
 
   await expect(page.getByText('Mock output').first()).toBeVisible();
   await pressTransition(page);
@@ -45,9 +47,35 @@ test('review stages read the manuscript, and Revision applies the accepted findi
   await expect(page.getByRole('button', { name: 'Resume drafting' })).toHaveCount(0);
   await page.screenshot({ path: test.info().outputPath('01-drafted-with-word-counts.png'), fullPage: true });
 
+  // A2: the Markdown export is the book, not a note that nothing was written.
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: /Export/ }).click();
+  await page.getByRole('menuitem', { name: /Markdown document/ }).click();
+  const exported = readFileSync((await (await download).path())!, 'utf8');
+  expect(exported).toContain('## 1. Habitat');
+  expect(exported).toContain('## 2. Diet');
+  expect(exported).not.toContain('Started, but nothing was written');
+
   // Continuity reviews the chapters themselves.
   await pressTransition(page);
   await expect(page.getByRole('heading', { name: /Continuity/ })).toBeVisible();
+
+  // A2: Drafting completed *with evidence* — a saved snapshot of the manuscript,
+  // cited by the event. It used to complete with none, and Go left it open.
+  const drafted = (await serviceSelect(
+    'workflow_events',
+    `project_id=eq.${projectId}&stage_id=eq.drafting&type=eq.stage_marked_complete&select=payload`
+  )) as { payload: { evidence_version_id?: string } }[];
+  expect(drafted).toHaveLength(1);
+  const evidenceId = drafted[0].payload.evidence_version_id;
+  expect(evidenceId).toBeTruthy();
+  const [snapshot] = (await serviceSelect(
+    'artifact_versions',
+    `id=eq.${evidenceId}&select=source_operation,content`
+  )) as { source_operation: string; content: string }[];
+  expect(snapshot.source_operation).toBe('long_form_complete');
+  expect(snapshot.content).toContain('## 1. Habitat');
+  expect(snapshot.content).toContain('## 2. Diet');
   await expect(stageArtifact(page).getByText(/\(read the manuscript\)/).first()).toBeVisible();
   const statuses = page.getByRole('table').getByRole('combobox');
   await statuses.first().click();

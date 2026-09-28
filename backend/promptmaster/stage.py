@@ -226,6 +226,21 @@ def _parse_items(raw_result: dict, schema: StageItemSchema | None) -> list[Stage
             # Keep declared fields plus id; a hallucinated extra column renders
             # as a stray input the user cannot explain.
             row = {k: v for k, v in row.items() if k in allowed or k in ("id", "status", "reason")}
+        # A status the model proposes is a suggestion, and two of them are not
+        # even the model's to make. The stored value for "remove" is "removed"
+        # (a row marked "remove" matched no option and showed as "Not looked
+        # at"), and "verified" means the *author* checked the source — nothing
+        # here retrieved anything, so a model that says verified is guessing
+        # (Sean, 28 Sep, item 12: "If I personally click Verified, what am I
+        # representing?"). Verification is left to the user.
+        status = row.get("status")
+        if "claim" in allowed and isinstance(status, str):
+            normalised = status.strip().lower()
+            if normalised == "remove":
+                row["status"] = "removed"
+            elif normalised in ("verified", "verify"):
+                row.pop("status", None)
+                row.pop("reason", None)
         try:
             items.append(StageItem(**row))
         except Exception as parse_err:

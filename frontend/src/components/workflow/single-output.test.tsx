@@ -77,7 +77,7 @@ import { SINGLE_OUTPUT_V1 } from '@/lib/workflow';
 import type { WorkflowEvent } from '@/lib/workflow/types';
 import type { Artifact, ArtifactVersion, Project } from '@/types/project';
 import type { NewVersion } from '@/lib/supabase/versions';
-import type { StageBundle } from '@/stores/project-store';
+import { useProjectStore, type StageBundle } from '@/stores/project-store';
 
 // --- a project, and a store for the artifacts it grows ----------------------
 
@@ -222,6 +222,10 @@ async function advance(user: ReturnType<typeof userEvent.setup>) {
 beforeEach(() => {
   events.length = 0;
   vi.clearAllMocks();
+  // The workspace reads the event log from the project store and writes
+  // through it (A4); the store's writer needs an open project, and reads the
+  // same fake table the mocked module serves.
+  useProjectStore.setState({ projectId: 'p1', project: newProject(), events: [] });
 });
 
 describe('the single-output workflow walks its five stages in the workspace', () => {

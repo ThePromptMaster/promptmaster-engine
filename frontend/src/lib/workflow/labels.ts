@@ -31,6 +31,9 @@ const OPERATION_LABEL: Record<string, string> = {
   applied_findings: 'Critique applied',
   agent_draft: 'Go mode draft',
   agent_revise: 'Go mode revision',
+  // A2: a long-form stage's versions are snapshots of the manuscript.
+  long_form_complete: 'Manuscript saved',
+  manuscript_snapshot: 'Manuscript before revision',
 };
 
 /** "AI draft", "Your edit", … — never the raw code. */

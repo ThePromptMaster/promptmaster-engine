@@ -609,3 +609,62 @@ describe('project completion is about the deliverable (PM-14)', () => {
     expect(completionSummary(BOOK_V1, state, { artifactNonEmpty: {}, sections: {} }).deliverableDone).toBe(false);
   });
 });
+
+describe('a stage left open can be closed by its own tick (A3, Sean 28 Sep item 20)', () => {
+  const movedPast = [
+    event('stage_marked_complete', 'objective', { to_stage_id: 'audience' }),
+    event('stage_marked_complete', 'audience', { to_stage_id: 'positioning' }),
+    // Positioning's required "differentiator" box is unticked: moving on is
+    // "anyway", and leaves it open.
+    event('stage_advanced', 'positioning', { to_stage_id: 'research' }),
+  ];
+
+  it('progressSummary reports left-open stages on their own, not as "to go"', async () => {
+    const { progressSummary, leftOpenStages } = await import('./engine');
+    const state = projectState(BOOK_V1, movedPast);
+    expect(progressSummary(BOOK_V1, state)).toMatchObject({ complete: 2, skipped: 0, leftOpen: 1, remaining: 10 });
+    expect(leftOpenStages(BOOK_V1, state).map((s) => s.id)).toEqual(['positioning']);
+  });
+
+  it('ticking the last required box closes a left-open stage', async () => {
+    const { tickClosesStage } = await import('./engine');
+    const state = projectState(BOOK_V1, movedPast);
+    // Not yet: the required box is still unticked.
+    expect(tickClosesStage(BOOK_V1, state, 'positioning', emptyContext())).toBe(false);
+    // Ticking an optional box does not close it either.
+    expect(tickClosesStage(BOOK_V1, state, 'positioning', emptyContext({ manualChecks: { 'pos.comparables': true } }))).toBe(false);
+    // The required one does.
+    expect(tickClosesStage(BOOK_V1, state, 'positioning', emptyContext({ manualChecks: { 'pos.differentiator': true } }))).toBe(true);
+  });
+
+  it('never closes a stage that is current, done, or not started', async () => {
+    const { tickClosesStage } = await import('./engine');
+    const state = projectState(BOOK_V1, movedPast);
+    const ticked = emptyContext({ manualChecks: { 'pos.differentiator': true, 'res.openquestions': true } });
+    expect(state.current_stage_id).toBe('research');
+    expect(tickClosesStage(BOOK_V1, state, 'research', ticked)).toBe(false);   // current, not left open
+    expect(tickClosesStage(BOOK_V1, state, 'audience', ticked)).toBe(false);   // done
+    expect(tickClosesStage(BOOK_V1, state, 'outline', ticked)).toBe(false);    // not started
+  });
+
+  it('the closing event completes the stage without moving the cursor, and the count agrees', async () => {
+    const { progressSummary, completionSummary } = await import('./engine');
+    const state = projectState(BOOK_V1, [
+      ...movedPast,
+      event('stage_marked_complete', 'positioning'),
+    ]);
+    expect(state.current_stage_id).toBe('research');
+    expect(state.stages.positioning.status).toBe('complete');
+    expect(state.stages.positioning.left_open).toBe(false);
+    expect(progressSummary(BOOK_V1, state)).toMatchObject({ complete: 3, leftOpen: 0, remaining: 10 });
+    expect(completionSummary(BOOK_V1, state, { artifactNonEmpty: {}, sections: {} }).leftOpenStages).toEqual([]);
+  });
+
+  it('completionSummary names what is left open, so Finish can say which', async () => {
+    const { completionSummary } = await import('./engine');
+    const state = projectState(BOOK_V1, movedPast);
+    const summary = completionSummary(BOOK_V1, state, { artifactNonEmpty: {}, sections: {} });
+    expect(summary.leftOpen).toBe(1);
+    expect(summary.leftOpenStages.map((s) => s.short_label)).toEqual(['Positioning']);
+  });
+});

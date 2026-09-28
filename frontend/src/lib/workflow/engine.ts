@@ -379,20 +379,59 @@ export function projectState(
   return state;
 }
 
+/**
+ * A left-open stage — moved past with requirements still open (PM-13) — is
+ * neither done nor ahead. Counting it as "to go" made a finished Book read
+ * "12 done · 1 to go" (Sean, 28 Sep, item 20: Positioning). It is reported on
+ * its own so the caption can say what it is.
+ */
 export function progressSummary(template: WorkflowTemplate, state: WorkflowState) {
   let complete = 0;
   let skipped = 0;
+  let leftOpen = 0;
   for (const stage of template.stages) {
-    const status = state.stages[stage.id]?.status;
+    const st = state.stages[stage.id];
+    const status = st?.status;
     if (isDone(status)) complete += 1;
     else if (status === 'skipped') skipped += 1;
+    else if (status === 'in_progress' && st?.left_open) leftOpen += 1;
   }
   return {
     complete,
     skipped,
-    remaining: template.stages.length - complete - skipped,
+    leftOpen,
+    remaining: template.stages.length - complete - skipped - leftOpen,
     total: template.stages.length,
   };
+}
+
+/** Stages moved past with requirements still open, in workflow order. */
+export function leftOpenStages(template: WorkflowTemplate, state: WorkflowState): StageDefinition[] {
+  return template.stages.filter((s) => {
+    const st = state.stages[s.id];
+    return st?.status === 'in_progress' && Boolean(st.left_open);
+  });
+}
+
+/**
+ * Does ticking a box close a stage that was left open?
+ *
+ * A stage moved past with a required box unticked stayed open for good: the
+ * only "Mark complete" lived on the current stage's menu, and ticking the box
+ * later recorded the tick and nothing else. Once the last blocking requirement
+ * of a left-open stage is met, the tick is the user declaring it done, and the
+ * caller writes `stage_marked_complete` (actor 'user') without moving the
+ * cursor. Pure: the caller passes the context as it will be after the tick.
+ */
+export function tickClosesStage(
+  template: WorkflowTemplate,
+  state: WorkflowState,
+  stageId: string,
+  ctxAfterTick: StageContext
+): boolean {
+  const st = state.stages[stageId];
+  if (!st || st.status !== 'in_progress' || !st.left_open) return false;
+  return evaluateStage(template, stageId, ctxAfterTick).canAdvance;
 }
 
 // --- project completion (PM-14) ------------------------------------------------
@@ -432,6 +471,8 @@ export interface CompletionSummary {
   withArtifact: number;
   skipped: number;
   leftOpen: number;
+  /** The left-open stages by name, so Finish can say which, not just how many. */
+  leftOpenStages: StageDefinition[];
   blocked: number;
   notStarted: number;
 }
@@ -455,6 +496,7 @@ export function completionSummary(
     withArtifact: 0,
     skipped: 0,
     leftOpen: 0,
+    leftOpenStages: leftOpenStages(template, state),
     blocked: 0,
     notStarted: 0,
   };

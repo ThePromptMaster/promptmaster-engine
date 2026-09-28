@@ -4,6 +4,7 @@ import type { StageFailure } from '@/lib/errors/recovery';
 import type { StageDefinition } from '@/lib/workflow/types';
 import type { StageItem, StageItemSchema } from '@/lib/workflow/stage-artifact';
 import type { Evaluation, ArtifactVersion, Project } from '@/types/project';
+import type { NewVersion } from '@/lib/supabase/versions';
 import type { LongFormState } from '@/types';
 
 /**
@@ -41,6 +42,12 @@ export interface LongFormContext {
   revise?: RevisionBrief | null;
   /** Report the panel's next step, so the stage bar's one primary button takes it (PM-06). */
   onPanelStep?: PanelStepReporter;
+  /**
+   * Save a snapshot of the manuscript as a version of the artifact that holds
+   * it, through the project store — so the version bar and every other reader
+   * see it at once rather than after the next reload.
+   */
+  appendManuscriptVersion?: (version: NewVersion) => Promise<unknown>;
 }
 
 /**

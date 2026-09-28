@@ -20,6 +20,14 @@ import {
   type NewVersion,
 } from '@/lib/supabase/versions';
 import { OUTLINE_ARTIFACT_KIND } from '@/lib/supabase/outline';
+import { listRecommendations, supersedePending, type Recommendation } from '@/lib/supabase/recommendations';
+import { listTasks, type ProjectTask } from '@/lib/supabase/tasks';
+import {
+  appendWorkflowEvent,
+  listWorkflowEvents,
+  type NewWorkflowEvent,
+} from '@/lib/supabase/workflow';
+import type { WorkflowEvent } from '@/lib/workflow/types';
 import {
   ProjectConflictError,
   type Artifact,
@@ -45,6 +53,15 @@ import {
 
 const DEBOUNCE_MS = 800;
 
+/** Events after which the stage they name has been left, one way or another. */
+const STAGE_LEAVING = new Set<string>([
+  'stage_completed',
+  'stage_marked_complete',
+  'stage_advanced',
+  'stage_skipped',
+  'stage_returned',
+]);
+
 export type SaveState = 'idle' | 'saving' | 'saved' | 'conflict' | 'error';
 
 /** One stage's artifact and its whole version history. */
@@ -67,6 +84,23 @@ interface ProjectState {
    */
   stages: Record<string, StageBundle>;
   evaluations: Record<string, Evaluation>;
+
+  /**
+   * The workflow event log — the record stage state is projected from — and
+   * the recommendations and tasks, loaded with the project and re-read here.
+   *
+   * These used to be fetched by the workspace and its hooks, each on its own
+   * schedule: events in a `useState` with seven ad-hoc reloads, recommendations
+   * once per project. Surfaces then disagreed about what had happened (Sean,
+   * 28 Sep: "the individual components … do not always seem to know what the
+   * other components have already done"). One row set, one place to refresh.
+   *
+   * `events` is null until the first load, so a consumer can tell "no events"
+   * from "not read yet" and not generate against an empty log.
+   */
+  events: WorkflowEvent[] | null;
+  recommendations: Recommendation[];
+  tasks: ProjectTask[];
 
   /** Which version the UI is *displaying*. Never implies a restore. */
   activeVersionId: string | null;
@@ -111,9 +145,36 @@ interface ProjectState {
     stageId: string,
     name: string,
     version: NewVersion,
-    evaluation?: NewEvaluation
+    evaluation?: NewEvaluation,
+    /**
+     * A new head retires the pending recommendations raised on the old one
+     * (A5). A caller applying some of them passes their ids here, because
+     * they are accepted *after* the version lands and a superseded row can
+     * no longer be accepted.
+     */
+    options?: { keepRecommendations?: readonly string[] }
   ) => Promise<ArtifactVersion>;
   restoreStageVersion: (stageId: string, versionId: string) => Promise<void>;
+
+  /**
+   * Append a workflow event and re-read the log, so every consumer sees the
+   * same record the database holds (including anything the server wrote in
+   * the meantime — drafted sections, Go mode's moves). Returns the fresh log.
+   */
+  appendEvent: (event: NewWorkflowEvent) => Promise<WorkflowEvent[]>;
+  /** Re-read the event log without writing. Returns the fresh log. */
+  refreshEvents: () => Promise<WorkflowEvent[]>;
+  /** Re-read everything in place — the background reload, by its real name. */
+  refresh: () => Promise<void>;
+  reloadRecommendations: () => Promise<void>;
+  /** Reflect a row just written or resolved without a round trip. */
+  upsertRecommendation: (row: Recommendation) => void;
+  /** Reflect rows the database just retired. */
+  markSuperseded: (ids: readonly string[]) => void;
+  /** Retire a stage's pending proposals after its head moved; `keep` are being accepted. */
+  retireStageProposals: (stageId: string, keep?: readonly string[]) => Promise<void>;
+  upsertTask: (task: ProjectTask) => void;
+
   /**
    * Attach an evaluation to a stage version that already exists.
    *
@@ -160,6 +221,9 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
   versions: [],
   stages: {},
   evaluations: {},
+  events: null,
+  recommendations: [],
+  tasks: [],
   activeVersionId: null,
   loading: false,
   error: null,
@@ -184,7 +248,15 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         return;
       }
 
-      const artifacts = await listArtifacts(id);
+      // A missing recommendations or tasks row set must not take the project
+      // down: the derived half of the panel still works. Events fail closed to
+      // an empty log, as the workspace's own loader did.
+      const [artifacts, events, recommendations, tasks] = await Promise.all([
+        listArtifacts(id),
+        listWorkflowEvents(id).catch(() => [] as WorkflowEvent[]),
+        listRecommendations(id).catch(() => [] as Recommendation[]),
+        listTasks(id).catch(() => [] as ProjectTask[]),
+      ]);
 
       // A Book project has thirteen artifacts, not one. Load them all and index
       // by stage; picking `kind === 'output'` could only ever describe a
@@ -245,6 +317,9 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         versions,
         stages,
         evaluations,
+        events,
+        recommendations,
+        tasks,
         activeVersionId: head?.id ?? null,
         loading: false,
       });
@@ -263,11 +338,81 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       versions: [],
       stages: {},
       evaluations: {},
+      events: null,
+      recommendations: [],
+      tasks: [],
       activeVersionId: null,
       saveState: 'idle',
       conflict: null,
       error: null,
     });
+  },
+
+  async appendEvent(event) {
+    const { project } = get();
+    if (!project) throw new Error('No project open.');
+    await appendWorkflowEvent(project.id, project.user_id, event);
+    // Leaving a stage retires the proposals raised on it — "Move on to
+    // Drafting" has nothing to say once the project is in Revision (A5). A
+    // failure here is not a failure of the event: the panel hides such rows
+    // anyway, and the next stage move tries again.
+    const retire =
+      STAGE_LEAVING.has(event.type)
+        ? supersedePending(project.id, { stageId: event.stage_id })
+        : event.type === 'project_finalized'
+          ? supersedePending(project.id, { kind: 'stage_transition' })
+          : Promise.resolve([]);
+    const [events, retired] = await Promise.all([get().refreshEvents(), retire.catch(() => [] as string[])]);
+    if (retired.length) get().markSuperseded(retired);
+    return events;
+  },
+
+  markSuperseded(ids) {
+    if (!ids.length) return;
+    const gone = new Set(ids);
+    set((s) => ({
+      recommendations: s.recommendations.map((r) =>
+        gone.has(r.id) && r.status === 'pending' ? { ...r, status: 'superseded' as const } : r
+      ),
+    }));
+  },
+
+  async refreshEvents() {
+    const { projectId } = get();
+    if (!projectId) return [];
+    const events = await listWorkflowEvents(projectId);
+    // Only if the same project is still open: a reload that lands after the
+    // user has moved on must not file one project's log under another.
+    if (get().projectId === projectId) set({ events });
+    return events;
+  },
+
+  async refresh() {
+    const { projectId } = get();
+    if (projectId) await get().loadProject(projectId, { background: true });
+  },
+
+  async reloadRecommendations() {
+    const { projectId } = get();
+    if (!projectId) return;
+    const [recommendations, tasks] = await Promise.all([listRecommendations(projectId), listTasks(projectId)]);
+    if (get().projectId === projectId) set({ recommendations, tasks });
+  },
+
+  upsertRecommendation(row) {
+    set((s) => ({
+      recommendations: s.recommendations.some((r) => r.id === row.id)
+        ? s.recommendations.map((r) => (r.id === row.id ? row : r))
+        : [...s.recommendations, row],
+    }));
+  },
+
+  upsertTask(task) {
+    set((s) => ({
+      tasks: s.tasks.some((t) => t.id === task.id)
+        ? s.tasks.map((t) => (t.id === task.id ? task : t))
+        : [...s.tasks, task],
+    }));
   },
 
   patchProject(patch) {
@@ -362,7 +507,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     return created;
   },
 
-  async appendStageVersion(stageId, name, version, evaluation) {
+  async appendStageVersion(stageId, name, version, evaluation, options) {
     const artifact = await get().ensureStageArtifact(stageId, name);
     // Read the artifact back out of the store rather than reusing the one
     // above: version_count and revision move with every append, and a stale
@@ -372,6 +517,10 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
 
     let saved: Evaluation | null = null;
     if (evaluation) saved = await saveEvaluation(created, evaluation);
+
+    // A new head: the fixes proposed for the old text are about text that
+    // no longer exists (A5). The rows the caller is about to accept stay.
+    void get().retireStageProposals(stageId, options?.keepRecommendations);
 
     set((s) => {
       const bundle = s.stages[stageId] ?? { artifact: current, versions: [] };
@@ -405,6 +554,13 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     return saved;
   },
 
+  async retireStageProposals(stageId, keep) {
+    const { project } = get();
+    if (!project) return;
+    const retired = await supersedePending(project.id, { stageId, except: keep }).catch(() => [] as string[]);
+    if (retired.length) get().markSuperseded(retired);
+  },
+
   async restoreStageVersion(stageId, versionId) {
     const bundle = get().stages[stageId];
     const target = bundle?.versions.find((v) => v.id === versionId);
@@ -412,6 +568,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
 
     // Restore appends rather than mutating, so restoring is itself undoable.
     const created = await restoreVersionRow(bundle.artifact, target);
+    void get().retireStageProposals(stageId);
     set((s) => ({
       stages: {
         ...s.stages,
