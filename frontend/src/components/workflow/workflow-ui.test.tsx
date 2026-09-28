@@ -207,6 +207,28 @@ describe('ExitCriteriaChecklist', () => {
     expect(onToggle).toHaveBeenCalledWith('c', true);
   });
 
+  it('splits what PromptMaster checks from what the user decides, and says which is required (C1)', () => {
+    const withDegraded: CriterionResult[] = [
+      ...criteria,
+      { id: 'd', label: 'At least two comparables named', satisfied: false, blocking: true, manual: true, degraded: true, detail: 'tick when the draft covers it' },
+    ];
+    render(<ExitCriteriaChecklist criteria={withDegraded} manualIds={new Set(['c'])} onToggleManual={vi.fn()} />);
+    const checked = screen.getByRole('region', { name: 'Checked by PromptMaster' });
+    const yours = screen.getByRole('region', { name: 'For you to decide' });
+    expect(within(checked).getByText('Objective is stated')).toBeInTheDocument();
+    expect(within(checked).getByText('At least two comparables')).toBeInTheDocument();
+    expect(within(yours).getByText('Says what success looks like')).toBeInTheDocument();
+    expect(within(yours).getByText('At least two comparables named')).toBeInTheDocument();
+    // The degraded criterion is a box, with the reason on the row.
+    expect(within(yours).getAllByRole('checkbox')).toHaveLength(2);
+    expect(within(yours).getByText(/can't check this one here/)).toBeInTheDocument();
+    expect(within(checked).queryAllByRole('checkbox')).toHaveLength(0);
+    // Required / optional on every open row; the header counts them.
+    expect(screen.getByText('required')).toBeInTheDocument();
+    expect(screen.getAllByText('optional')).toHaveLength(2);
+    expect(screen.getByText(/2 required, 2 optional\. You can still move on, but the stage stays open until the required items are done\./)).toBeInTheDocument();
+  });
+
   it('shows the boxes but does not let them be ticked while only viewing (A3)', async () => {
     const onToggle = vi.fn();
     render(<ExitCriteriaChecklist criteria={criteria} manualIds={new Set(['c'])} onToggleManual={onToggle} readOnly />);

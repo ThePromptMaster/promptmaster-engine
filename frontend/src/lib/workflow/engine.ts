@@ -53,7 +53,7 @@ function evaluateCriterion(
     // An auto criterion with no rule is a template authoring mistake. Degrade
     // to a manual checklist item rather than throwing: an admin editing a
     // template should get a checkbox, not a broken workflow.
-    return manual;
+    return { ...manual, degraded: true };
   }
 
   // A count rule on a stage with nothing to count — Book's "at least two
@@ -64,14 +64,14 @@ function evaluateCriterion(
     renderer !== undefined &&
     !COUNTABLE_RENDERERS.has(renderer)
   ) {
-    return { ...manual, detail: manual.satisfied ? undefined : 'tick when the draft covers it' };
+    return { ...manual, degraded: true, detail: manual.satisfied ? undefined : 'tick when the draft covers it' };
   }
 
   // Revision's "Accepted findings applied": the findings live on the review
   // stage before it, so on the long-form stage itself there are none, and the
   // rule read as satisfied before anything had been applied. Tick it instead.
   if (rule.type === 'all_findings_triaged' && renderer === 'long_form') {
-    return { ...manual, detail: manual.satisfied ? undefined : 'tick once the findings are applied' };
+    return { ...manual, degraded: true, detail: manual.satisfied ? undefined : 'tick once the findings are applied' };
   }
 
   switch (rule.type) {
@@ -126,7 +126,7 @@ function evaluateCriterion(
       // An unrecognised rule type — an admin added one this build predates.
       // Degrade to a manual check rather than a 500.
       const unknown = rule as { type: string };
-      return { ...manual, label: `Manual check: ${unknown.type}` };
+      return { ...manual, degraded: true, label: `Manual check: ${unknown.type}` };
     }
   }
 }
