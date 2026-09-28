@@ -47,6 +47,7 @@ import {
   tickClosesStage,
 } from '@/lib/workflow/engine';
 import { buildStageDigest, formatManuscript, summariseStageContent } from '@/lib/workflow/digest';
+import { stageContentForSummary, stageEvidence } from '@/lib/workflow/evidence';
 import { api } from '@/lib/api/client';
 import { inputsFrom } from './use-stage-generation';
 import type { EvaluationResult } from '@/types';
@@ -415,10 +416,12 @@ export function WorkflowWorkspace({
 
         // The stage's own head version is the evidence of completion; the
         // database checks it belongs to this stage (20260927000000).
-        const bundle = stageBundles[stage.id];
+        // The head version — or, for a long-form stage, a snapshot of the
+        // finished manuscript saved now (A2). One function for every path
+        // that completes a stage.
         const evidenceId =
-          type === 'stage_marked_complete' && bundle?.artifact?.stage_id === stage.id
-            ? bundle.versions.at(-1)?.id
+          type === 'stage_marked_complete'
+            ? await stageEvidence({ template, stage, bundles: stageBundles, project, appendStageVersion })
             : undefined;
 
         // Record what this stage concluded before leaving it. Later stages
@@ -426,8 +429,7 @@ export function WorkflowWorkspace({
         // than recomputing at every call — means a subsequent edit upstream
         // cannot silently rewrite the context a downstream draft was given.
         if ((type === 'stage_marked_complete' || type === 'stage_advanced') && setStageSummary) {
-          const content = stageBundles[stage.id]?.versions.at(-1)?.content ?? '';
-          const summary = summariseStageContent(stage, content);
+          const summary = summariseStageContent(stage, stageContentForSummary(template, stage, stageBundles));
           if (summary) await setStageSummary(stage.id, summary).catch(() => {});
         }
 
@@ -487,7 +489,7 @@ export function WorkflowWorkspace({
         setBusy(false);
       }
     },
-    [stage, busy, project, template, onPatchProject, setStageSummary, stageBundles, evaluation, appendEvent]
+    [stage, busy, project, template, onPatchProject, setStageSummary, stageBundles, evaluation, appendEvent, appendStageVersion]
   );
 
   /** PM-13: mark the current stage blocked, or lift the block. */
@@ -517,8 +519,7 @@ export function WorkflowWorkspace({
     if (!stage) return;
     setTransitionError(null);
     try {
-      const bundle = stageBundles[stage.id];
-      const evidenceId = bundle?.artifact?.stage_id === stage.id ? bundle.versions.at(-1)?.id : undefined;
+      const evidenceId = await stageEvidence({ template, stage, bundles: stageBundles, project, appendStageVersion });
       await appendEvent({
         type: 'stage_marked_complete',
         stage_id: stage.id,
@@ -527,7 +528,7 @@ export function WorkflowWorkspace({
     } catch (e) {
       setTransitionError(`That didn't go through${e instanceof Error && e.message ? `: ${e.message}` : ''}. Nothing was changed.`);
     }
-  }, [stage, stageBundles, appendEvent]);
+  }, [stage, template, stageBundles, project, appendStageVersion, appendEvent]);
 
   useEffect(() => {
     let live = true;
@@ -633,8 +634,9 @@ export function WorkflowWorkspace({
       setTransitionError(null);
       try {
         await flushProject();
-        const bundle = stageBundles[stageId];
-        const evidenceId = bundle?.artifact?.stage_id === stageId ? bundle.versions.at(-1)?.id : undefined;
+        const evidenceId = stage
+          ? await stageEvidence({ template, stage, bundles: stageBundles, project, appendStageVersion })
+          : undefined;
         await appendEvent({
           type: 'stage_marked_complete',
           stage_id: stageId,
@@ -644,7 +646,7 @@ export function WorkflowWorkspace({
         setTransitionError(`The box is ticked, but the stage could not be closed${e instanceof Error && e.message ? `: ${e.message}` : ''}.`);
       }
     },
-    [project.manual_checks, onPatchProject, template, state, stageId, context, flushProject, stageBundles, appendEvent]
+    [project, onPatchProject, template, state, stageId, stage, context, flushProject, stageBundles, appendEvent, appendStageVersion]
   );
 
   const saveContent = useCallback(
@@ -971,6 +973,13 @@ export function WorkflowWorkspace({
           onRefresh: () => onReload?.(),
           revise: revisionBrief(template, stage.id, stageBundles),
           onPanelStep: reportPanelStep,
+          // Snapshots go on the artifact that holds the manuscript — Drafting's,
+          // for Revision and Editing — through the store.
+          appendManuscriptVersion:
+            appendStageVersion && manuscript?.stage_id
+              ? (version: NewVersion) =>
+                  appendStageVersion(manuscript.stage_id!, getStage(template, manuscript.stage_id!)?.label ?? stage.label, version)
+              : undefined,
           emptyHint:
             template.outline_stage === 'explicit'
               ? 'Approve an outline on the Outline stage, and drafting will follow it.'

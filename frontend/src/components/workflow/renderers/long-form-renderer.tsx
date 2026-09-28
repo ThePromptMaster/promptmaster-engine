@@ -67,7 +67,7 @@ interface DraftingProps {
 }
 
 function Drafting({ ctx, readOnly }: DraftingProps) {
-  const { project, artifactId, state, approvedOutlineVersionId, stageId, onRefresh } = ctx;
+  const { project, artifactId, state, approvedOutlineVersionId, stageId, onRefresh, appendManuscriptVersion } = ctx;
   const revise = ctx.revise ?? null;
 
   const [jobs, setJobs] = useState<ProjectJob[]>([]);
@@ -229,17 +229,18 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
   const reviseSections = (targets: { section: OutlineSection; index: number }[]) =>
     run(async () => {
       if (!artifactId || !revise) throw new Error('This stage has no manuscript to revise.');
-      await appendVersion(
-        { id: artifactId, user_id: project.user_id, project_id: project.id } as Artifact,
-        {
-          content: formatManuscript(outline, Number.POSITIVE_INFINITY),
-          source_operation: 'manuscript_snapshot',
-          instruction: `Before ${revise.stageLabel}`,
-          model: '',
-          mode: project.mode,
-          change_summary: `The manuscript as it stood before ${revise.stageLabel}.`,
-        }
-      );
+      const snapshot = {
+        content: formatManuscript(outline, Number.POSITIVE_INFINITY),
+        source_operation: 'manuscript_snapshot',
+        instruction: `Before ${revise.stageLabel}`,
+        model: '',
+        mode: project.mode,
+        change_summary: `The manuscript as it stood before ${revise.stageLabel}.`,
+      };
+      // Through the store when the workspace provides it, so the snapshot is
+      // in the bundle at once; the raw write is only for a caller without one.
+      if (appendManuscriptVersion) await appendManuscriptVersion(snapshot);
+      else await appendVersion({ id: artifactId, user_id: project.user_id, project_id: project.id } as Artifact, snapshot);
       const brief = {
         stage_label: revise.stageLabel,
         instruction: revise.instruction,

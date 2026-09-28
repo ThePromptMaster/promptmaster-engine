@@ -10,10 +10,10 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { exportFilename, toJson, toMarkdown, type ExportBundle } from './project-export';
+import { exportFilename, toJson, toManuscriptMarkdown, toMarkdown, type ExportBundle } from './project-export';
 import { BOOK_V1, projectState } from '@/lib/workflow';
 import type { WorkflowEvent } from '@/lib/workflow/types';
-import type { ArtifactVersion, Evaluation, Project } from '@/types/project';
+import type { Artifact, ArtifactVersion, Evaluation, Project } from '@/types/project';
 
 function version(
   id: string,
@@ -257,5 +257,81 @@ describe('filenames', () => {
     expect(exportFilename({ ...PROJECT, title: '///' }, 'json')).toMatch(
       /^project-\d{4}-\d{2}-\d{2}\.json$/
     );
+  });
+});
+
+/**
+ * A2 — the export used to print the head *version* of every stage, and a
+ * long-form stage has none: a finished Book exported with "_Started, but
+ * nothing was written._" under Drafting (Sean, 28 Sep, item 15).
+ */
+function bookWithChapters(): ExportBundle {
+  const base = bundle();
+  const drafted: WorkflowEvent[] = [
+    ...base.events,
+    { type: 'stage_skipped', stage_id: 'research', to_stage_id: 'outline', actor: 'user', created_at: '2026-09-05T00:00:00Z' },
+    { type: 'stage_marked_complete', stage_id: 'outline', to_stage_id: 'outline_approval', actor: 'user', created_at: '2026-09-05T00:00:01Z' },
+    { type: 'stage_marked_complete', stage_id: 'outline_approval', to_stage_id: 'drafting', actor: 'user', created_at: '2026-09-05T00:00:02Z' },
+    { type: 'stage_marked_complete', stage_id: 'drafting', to_stage_id: 'continuity', actor: 'user', created_at: '2026-09-06T00:00:00Z', payload: { evidence_version_id: 'v-drafting-1' } },
+    { type: 'stage_skipped', stage_id: 'continuity', to_stage_id: 'revision', actor: 'user', created_at: '2026-09-06T00:00:01Z' },
+  ];
+  const outline = [
+    { id: 's1', title: 'Habitat', status: 'complete', content: 'Giraffes live on the savannah.', revision: 1, outline_version_id: 'ov1' },
+    { id: 's2', title: 'Diet', status: 'complete', content: 'Acacia leaves, mostly.', revision: 2, outline_version_id: 'ov1' },
+  ];
+  return {
+    ...base,
+    events: drafted,
+    state: projectState(BOOK_V1, drafted, 'revision'),
+    stages: {
+      ...base.stages,
+      outline: { artifact: null, versions: [version('v-outline-1', '{"schema":1,"items":[{"title":"Habitat"},{"title":"Diet"}]}', 1, { source_operation: 'outline_edit' })] },
+      drafting: {
+        artifact: { id: 'a-drafting', stage_id: 'drafting', kind: 'output', name: 'Drafting', summary: null, version_count: 1, long_form: { state: 'complete', outline } } as unknown as Artifact,
+        versions: [version('v-drafting-1', '## 1. Habitat\n\nGiraffes live on the savannah.\n\n## 2. Diet\n\nAcacia leaves, mostly.', 1, { source_operation: 'long_form_complete' })],
+      },
+      revision: { artifact: { id: 'a-revision', stage_id: 'revision', kind: 'output', name: 'Revision', summary: null, version_count: 0, long_form: null } as Artifact, versions: [] },
+    },
+  };
+}
+
+describe('Markdown export carries the manuscript (A2)', () => {
+  const md = toMarkdown(bookWithChapters());
+
+  it('prints the chapters under Drafting, from the live text', () => {
+    expect(md).toContain('## 1. Habitat');
+    expect(md).toContain('Giraffes live on the savannah.');
+    expect(md).toContain('## 2. Diet');
+    expect(md).not.toContain('Started, but nothing was written');
+    expect(md).toContain('2 of 2 sections written');
+    expect(md).toContain('last saved as version 1 (long_form_complete)');
+  });
+
+  it('says what Revision did instead of printing the book twice', () => {
+    expect(md).toContain('## Revision');
+    expect(md).toContain('Worked on the manuscript above');
+    expect(md).toContain('A checkpoint: nothing is written at this stage');
+    expect(md.match(/## 1\. Habitat/g)).toHaveLength(1);
+  });
+
+  it('the manuscript alone is title plus chapters', () => {
+    const doc = toManuscriptMarkdown(bookWithChapters());
+    expect(doc).toMatch(/^# Governing AI-assisted work\n\n## 1\. Habitat/);
+    expect(doc).toContain('Acacia leaves, mostly.');
+    expect(doc).not.toContain('**Objective:**');
+    expect(toManuscriptMarkdown(bundle())).toBe('');
+  });
+});
+
+describe('JSON export carries the manuscript (A2)', () => {
+  const parsed = JSON.parse(toJson(bookWithChapters()));
+
+  it('includes each section with its status, revision and outline version', () => {
+    const drafting = parsed.stages.find((s: { stage_id: string }) => s.stage_id === 'drafting');
+    expect(drafting.artifact.long_form.state).toBe('complete');
+    expect(drafting.artifact.long_form.sections.map((s: { title: string }) => s.title)).toEqual(['Habitat', 'Diet']);
+    expect(drafting.artifact.long_form.sections[1]).toMatchObject({ status: 'complete', revision: 2, outline_version_id: 'ov1', content: 'Acacia leaves, mostly.' });
+    // The snapshot is there too, as the version it is.
+    expect(drafting.versions[0].source_operation).toBe('long_form_complete');
   });
 });

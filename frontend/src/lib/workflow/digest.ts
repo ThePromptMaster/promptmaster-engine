@@ -97,6 +97,13 @@ export function summariseStageContent(
 ): string {
   if (!content) return '';
 
+  // A manuscript: name its sections rather than quoting the opening of
+  // chapter one as if that were the book.
+  if (stage.renderer === 'long_form') {
+    const titles = [...content.matchAll(/^## \d+\. (.+)$/gm)].map((m) => m[1].trim());
+    if (titles.length) return truncate(`${titles.length} sections: ${titles.join('; ')}`);
+  }
+
   if (rendererHoldsItems(stage.renderer)) {
     const items = parseItems(content);
     if (!items) return truncate(content);

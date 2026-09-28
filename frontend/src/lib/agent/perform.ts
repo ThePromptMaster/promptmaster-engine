@@ -12,6 +12,7 @@ import { api } from '@/lib/api/client';
 import { appendWorkflowEvent } from '@/lib/supabase/workflow';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import { summariseStageContent } from '@/lib/workflow/digest';
+import { stageContentForSummary, stageEvidence } from '@/lib/workflow/evidence';
 import { evaluateStage } from '@/lib/workflow/engine';
 import {
   evaluationRecord,
@@ -213,14 +214,21 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
     case 'advance': {
       const target = ctx.stage.transitions.default_next;
       const evaluation = evaluateStage(ctx.template, ctx.stage.id, ctx.context);
-      const head = ctx.bundles[ctx.stage.id]?.versions.at(-1);
-      const evidence = head && ctx.bundles[ctx.stage.id]?.artifact?.stage_id === ctx.stage.id ? head.id : undefined;
+      // The same evidence the transition bar records (A2): the head version,
+      // or a snapshot of a finished manuscript saved now. Drafting used to
+      // have neither, so Go always left it open.
+      const evidence = evaluation.canAdvance
+        ? await stageEvidence({
+            template: ctx.template, stage: ctx.stage, bundles: ctx.bundles, project: ctx.project,
+            appendStageVersion: ctx.appendStageVersion,
+          })
+        : undefined;
       const actor = stageMoveActor(ctx.run.policy, ctx.approvedByUser);
       // Complete only with the requirements met and evidence to show for it;
       // otherwise move on and leave the stage open, as "Continue anyway" does.
       const type = evaluation.canAdvance && evidence ? 'stage_marked_complete' : 'stage_advanced';
-      if (ctx.setStageSummary && head) {
-        const summary = summariseStageContent(ctx.stage, head.content);
+      if (ctx.setStageSummary) {
+        const summary = summariseStageContent(ctx.stage, stageContentForSummary(ctx.template, ctx.stage, ctx.bundles));
         if (summary) await ctx.setStageSummary(ctx.stage.id, summary).catch(() => undefined);
       }
       await appendWorkflowEvent(ctx.project.id, ctx.project.user_id, {

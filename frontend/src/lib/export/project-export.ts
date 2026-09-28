@@ -24,6 +24,9 @@
  * source of truth, and nothing that can fail halfway and leave a partial file.
  */
 
+import { manuscriptArtifactFor } from '@/lib/workflow/context';
+import { formatManuscript } from '@/lib/workflow/digest';
+import { deliverableStage } from '@/lib/workflow/engine';
 import type { StageDefinition, WorkflowEvent, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
 import type { Artifact, ArtifactVersion, Evaluation, Project } from '@/types/project';
 
@@ -56,6 +59,45 @@ function head(version: ArtifactVersion[] | undefined): ArtifactVersion | undefin
 
 function stageStatus(state: WorkflowState, stage: StageDefinition): string {
   return state.stages[stage.id]?.status ?? 'not_started';
+}
+
+/**
+ * The chapters a long-form stage holds, as one document — the live text in
+ * `artifacts.long_form`, not a version. Until 2026-09-28 the export printed
+ * the head *version* for every stage, and a long-form stage had none, so a
+ * finished Book exported as "_Started, but nothing was written._" under
+ * Drafting (Sean, 28 Sep, item 15: "I do not yet understand exactly what it
+ * exports or whether it gives me the assembled manuscript").
+ */
+function manuscriptOf(bundle: ExportBundle, stage: StageDefinition): string {
+  if (stage.renderer !== 'long_form') return '';
+  const own = bundle.stages[stage.id]?.artifact;
+  // Revision and Editing work on Drafting's manuscript; only the stage that
+  // holds the text prints it, so the document has the book once.
+  if (!own?.long_form?.outline?.length) return '';
+  return formatManuscript(own.long_form.outline, Number.POSITIVE_INFINITY);
+}
+
+/**
+ * The manuscript alone: title and chapters, for reading, copying and the
+ * Word/PDF exports. Empty when nothing has been written.
+ */
+export function toManuscriptMarkdown(bundle: ExportBundle): string {
+  const { project, template, stages } = bundle;
+  const stage = deliverableStage(template);
+  if (!stage) return '';
+  const body =
+    stage.renderer === 'long_form'
+      ? formatManuscript(
+          manuscriptArtifactFor(template, stage, stages)?.long_form?.outline ?? [],
+          Number.POSITIVE_INFINITY
+        )
+      : (stages[stage.id]?.versions.at(-1)?.content ?? '');
+  if (!body.trim()) return '';
+  return `# ${project.title || 'Untitled project'}
+
+${body.trim()}
+`;
 }
 
 /**
@@ -95,8 +137,9 @@ export function toMarkdown(bundle: ExportBundle): string {
     const status = stageStatus(state, stage);
     const versions = stages[stage.id]?.versions ?? [];
     const current = head(versions);
+    const manuscript = manuscriptOf(bundle, stage);
 
-    if (status === 'not_started' && !current?.content.trim()) continue;
+    if (status === 'not_started' && !current?.content.trim() && !manuscript) continue;
 
     lines.push(`## ${stage.label}`, '');
 
@@ -111,8 +154,38 @@ export function toMarkdown(bundle: ExportBundle): string {
       if (!current?.content.trim()) continue;
     }
 
+    if (manuscript) {
+      lines.push(manuscript, '');
+      const sections = stages[stage.id]?.artifact?.long_form?.outline ?? [];
+      const written = sections.filter((s) => s.status === 'complete').length;
+      lines.push(
+        `_${written} of ${sections.length} sections written` +
+          (current ? ` · last saved as version ${current.version_number} (${current.source_operation})` : '') +
+          '_',
+        ''
+      );
+      continue;
+    }
+
+    if (stage.renderer === 'long_form') {
+      // Revision and Editing: their work is in the manuscript printed above.
+      lines.push(
+        status === 'not_started'
+          ? '_Not started._'
+          : '_Worked on the manuscript above; its current text is what is printed there._',
+        ''
+      );
+      if (current) lines.push(`_last saved as version ${current.version_number} (${current.source_operation})_`, '');
+      continue;
+    }
+
     if (!current?.content.trim()) {
-      lines.push('_Started, but nothing was written._', '');
+      lines.push(
+        stage.expected_artifacts.length === 0
+          ? '_A checkpoint: nothing is written at this stage._'
+          : '_Started, but nothing was written._',
+        ''
+      );
       continue;
     }
 
@@ -199,7 +272,8 @@ export function toJson(bundle: ExportBundle): string {
     stages: template.stages
       .map((stage) => {
         const bundleForStage = stages[stage.id];
-        if (!bundleForStage?.versions.length) return null;
+        const longForm = bundleForStage?.artifact?.long_form ?? null;
+        if (!bundleForStage?.versions.length && !longForm?.outline?.length) return null;
         return {
           stage_id: stage.id,
           label: stage.label,
@@ -210,6 +284,22 @@ export function toJson(bundle: ExportBundle): string {
                 name: bundleForStage.artifact.name,
                 summary: bundleForStage.artifact.summary,
                 version_count: bundleForStage.artifact.version_count,
+                // The live manuscript, section by section, with its status and
+                // the outline each was written against. Versions below are its
+                // saved snapshots.
+                long_form: longForm
+                  ? {
+                      state: longForm.state ?? null,
+                      sections: (longForm.outline ?? []).map((s) => ({
+                        id: s.id,
+                        title: s.title,
+                        status: s.status,
+                        revision: s.revision ?? null,
+                        outline_version_id: s.outline_version_id ?? null,
+                        content: s.content ?? '',
+                      })),
+                    }
+                  : null,
               }
             : null,
           versions: bundleForStage.versions.map((v) => ({
