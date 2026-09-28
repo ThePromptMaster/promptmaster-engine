@@ -51,6 +51,13 @@ test('Finish closes the project even when the server wrote events the page has n
   await expect(page.getByText('This project is finished')).toBeVisible();
   // Not getByRole('alert'): Next's route announcer is an empty alert region.
   await expect(page.getByText(/didn't go through/)).toHaveCount(0);
+  // C4: the work is at the centre — read it here, take it out as Word or PDF.
+  const finishedScreen = page.getByRole('region', { name: 'Your finished work' });
+  await expect(finishedScreen.getByRole('heading', { name: 'Your work is complete' })).toBeVisible();
+  await expect(finishedScreen.getByRole('button', { name: 'Export Word' })).toBeVisible();
+  await expect(finishedScreen.getByRole('link', { name: 'Export PDF' })).toHaveAttribute('href', `/projects/${projectId}/print`);
+  await finishedScreen.getByRole('button', { name: 'Read the full work' }).click();
+  await expect(finishedScreen.getByText(/Mock/).first()).toBeVisible();
   await page.getByText('This project is finished').scrollIntoViewIfNeeded();
   await page.screenshot({ path: test.info().outputPath('01-finished-banner.png') });
 

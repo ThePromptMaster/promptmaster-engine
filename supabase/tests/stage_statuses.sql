@@ -68,6 +68,15 @@ begin
   -- 7. The new project events are accepted.
   insert into public.workflow_events (user_id, project_id, type, stage_id) values (u, proj, 'project_finalized', 'audience');
   insert into public.workflow_events (user_id, project_id, type, stage_id) values (u, proj, 'project_reopened', 'audience');
+  -- 8. C5: a stage can be reopened by the user…
+  insert into public.workflow_events (user_id, project_id, type, stage_id) values (u, proj, 'stage_reopened', 'objective');
+  -- 9. …and never by a system actor.
+  failed := false;
+  begin
+    insert into public.workflow_events (user_id, project_id, type, stage_id, actor) values (u, proj, 'stage_reopened', 'objective', 'system');
+  exception when check_violation then failed := true;
+  end;
+  if not failed then raise exception 'a system actor reopened a stage'; end if;
 
   raise notice 'stage_statuses: all assertions passed';
 end;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { BOOK_V1 } from './templates/book.v1';
-import { isTriaged, itemSchemaFor, type StageItem } from './stage-artifact';
+import { isTriaged, itemSchemaFor, stageContentForChat, type StageItem } from './stage-artifact';
 import { applyTriage, findingRisk, isTriageTable, splitUntriaged } from './triage';
 
 const continuity = itemSchemaFor(BOOK_V1.stages.find((s) => s.id === 'continuity')!);
@@ -63,5 +63,19 @@ describe('claim table provenance (C3)', () => {
   it('only a tool sets "Verified by PromptMaster", and Go never triages claims', () => {
     expect(schema.statuses!.find((s) => s.value === 'verified_by_promptmaster')!.settable).toBe(false);
     expect(isTriageTable(schema)).toBe(false);
+  });
+});
+
+describe('stageContentForChat (C7)', () => {
+  it('reads a table as numbered lines with the decision, and prose as it is', () => {
+    const rows = JSON.stringify({ items: [
+      { id: 'a', finding: 'Two chapters repeat the placement rule', where: 'Ch 2', severity: 'minor', status: 'accepted' },
+      { id: 'b', finding: 'No fallback path', where: 'Ch 2', severity: 'major', status: 'rejected', reason: 'Out of scope' },
+    ] });
+    expect(stageContentForChat(continuity, rows)).toBe(
+      '1. What is wrong: Two chapters repeat the placement rule — Where: Ch 2 — Severity: minor [Accept]\n' +
+      '2. What is wrong: No fallback path — Where: Ch 2 — Severity: major [Reject: Out of scope]'
+    );
+    expect(stageContentForChat(continuity, 'Plain prose stays.')).toBe('Plain prose stays.');
   });
 });

@@ -253,7 +253,9 @@ export type WorkflowEventType =
   | 'stage_unblocked'
   | 'project_finalized'
   | 'project_reopened'
-  | 'template_upgraded';
+  | 'template_upgraded'
+  /** C5: a done stage opened for editing without moving the cursor. Closing it again is stage_marked_complete. */
+  | 'stage_reopened';
 
 export interface WorkflowEvent {
   type: WorkflowEventType;

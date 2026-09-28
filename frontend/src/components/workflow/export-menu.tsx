@@ -16,10 +16,11 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-import { downloadFile } from '@/lib/utils';
+import { downloadBlob, downloadFile } from '@/lib/utils';
 import {
   exportFilename,
   toJson,
+  toManuscriptMarkdown,
   toMarkdown,
   type ExportBundle,
 } from '@/lib/export/project-export';
@@ -42,6 +43,14 @@ export function ExportMenu({ bundle }: { bundle: ExportBundle }) {
       exportFilename(bundle.project, 'md'),
       'text/markdown;charset=utf-8'
     );
+    setOpen(false);
+  }
+
+  const manuscript = toManuscriptMarkdown(bundle);
+  async function exportWord() {
+    const { manuscriptToDocx } = await import('@/lib/export/docx-export');
+    const blob = await manuscriptToDocx(manuscript, bundle.project.title || 'Untitled project');
+    downloadBlob(blob, exportFilename(bundle.project, 'md').replace(/\.md$/, '.docx'));
     setOpen(false);
   }
 
@@ -83,6 +92,33 @@ export function ExportMenu({ bundle }: { bundle: ExportBundle }) {
               Every stage you reached, in order, ready to paste.
             </span>
           </button>
+          {manuscript && (
+            <>
+              <button
+                role="menuitem"
+                onClick={() => void exportWord()}
+                className="block w-full px-4 py-3 text-left transition-colors hover:bg-[var(--surface-container-low)]"
+              >
+                <span className="block text-body text-[var(--on-surface)]">Word document (.docx)</span>
+                <span className="mt-0.5 block text-label text-[var(--on-surface-variant)]">
+                  The manuscript alone — title and chapters.
+                </span>
+              </button>
+              <a
+                role="menuitem"
+                href={`/projects/${bundle.project.id}/print`}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => setOpen(false)}
+                className="block w-full px-4 py-3 text-left transition-colors hover:bg-[var(--surface-container-low)]"
+              >
+                <span className="block text-body text-[var(--on-surface)]">PDF (print view)</span>
+                <span className="mt-0.5 block text-label text-[var(--on-surface-variant)]">
+                  Opens the manuscript to print; choose “Save as PDF”.
+                </span>
+              </a>
+            </>
+          )}
           <button
             role="menuitem"
             onClick={exportJson}

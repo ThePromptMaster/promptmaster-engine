@@ -119,14 +119,14 @@ beforeEach(() => {
 
 async function ask(text: string) {
   const user = userEvent.setup();
-  await user.click(screen.getByRole('tab', { name: /discuss/i }));
+  await user.click(screen.getByRole('tab', { name: /^ask/i }));
   await user.type(screen.getByLabelText('Ask a question'), text);
   await user.click(screen.getByRole('button', { name: 'Ask' }));
 }
 
 async function instruct(text: string, scope: RegExp) {
   const user = userEvent.setup();
-  await user.click(screen.getByRole('tab', { name: /instruct/i }));
+  await user.click(screen.getByRole('tab', { name: /change it/i }));
   await user.click(screen.getByRole('button', { name: scope }));
   await user.type(screen.getByLabelText('Give a revision instruction'), text);
   await user.click(screen.getByRole('button', { name: /draft revision/i }));
@@ -158,14 +158,14 @@ describe('Discuss mode cannot touch the artifact', () => {
   it('offers no scope picker, because there is nothing to scope', async () => {
     panel();
     const user = userEvent.setup();
-    await user.click(screen.getByRole('tab', { name: /discuss/i }));
+    await user.click(screen.getByRole('tab', { name: /^ask/i }));
     expect(screen.queryByText('Apply to')).not.toBeInTheDocument();
   });
 
   it('says in words that it cannot change the document', async () => {
     panel();
     const user = userEvent.setup();
-    await user.click(screen.getByRole('tab', { name: /discuss/i }));
+    await user.click(screen.getByRole('tab', { name: /^ask/i }));
     // A user who has to infer this from the button label will not infer it.
     expect(screen.getByText(/cannot change your document/i)).toBeInTheDocument();
   });
@@ -257,7 +257,7 @@ describe('Instruct mode proposes before it applies', () => {
   it('refuses a selection scope until something is selected', async () => {
     panel();
     const user = userEvent.setup();
-    await user.click(screen.getByRole('tab', { name: /instruct/i }));
+    await user.click(screen.getByRole('tab', { name: /change it/i }));
     await user.click(screen.getByRole('button', { name: /^selection$/i }));
 
     expect(screen.getByText(/select text in the draft first/i)).toBeInTheDocument();
@@ -275,7 +275,7 @@ describe('reading an older version', () => {
     // reading version 1 of a stage on version 3 would append a version 4 built
     // from version 1 and silently drop two versions of work.
     panel({ canInstruct: false });
-    expect(screen.getByRole('tab', { name: /instruct/i })).toBeDisabled();
+    expect(screen.getByRole('tab', { name: /change it/i })).toBeDisabled();
     expect(screen.getByText(/open the latest one to revise/i)).toBeInTheDocument();
   });
 

@@ -15,6 +15,7 @@ import { StageToolResult } from './stage-tool-result';
 import { CRITIQUE_TOOLS, REWRITE_TOOLS, useStageTools } from './use-stage-tools';
 import { nextStageAction, type ReportedPanelStep } from '@/lib/workflow/next-action';
 import { isApplyable } from '@/lib/workflow/recommend';
+import { ProjectFinished } from './project-finished';
 import { ProjectFinishedBanner } from './project-finished-banner';
 import { StageRenderer } from './renderers/stage-renderer';
 import { useStageGeneration } from './use-stage-generation';
@@ -58,7 +59,7 @@ import { ProjectBrief, ProjectSetup, stageWantsSetup } from './project-setup';
 import { draftBindings } from '@/lib/outline/long-form';
 import { approveOutline, loadOutline, materialiseOutlineInto } from '@/lib/outline/actions';
 import type { OutlineDocument } from '@/types/outline';
-import { stageDrafts, itemSchemaFor, serializeItems, type StageItem } from '@/lib/workflow/stage-artifact';
+import { stageDrafts, itemSchemaFor, rendererHoldsItems, serializeItems, stageContentForChat, type StageItem } from '@/lib/workflow/stage-artifact';
 import { buildStageContext } from '@/lib/workflow/context';
 import type { StageContext, WorkflowTemplate, BlockKind } from '@/lib/workflow/types';
 import { isDone } from '@/lib/workflow/types';
@@ -236,7 +237,10 @@ export function WorkflowWorkspace({
   // Sean 28 Sep item 20 — Positioning stayed OPEN to the end because nothing
   // reachable could close it).
   const viewedState = state.stages[stageId];
-  const isEditable = isCurrent || (viewedState?.status === 'in_progress' && Boolean(viewedState.left_open));
+  // …and a done stage reopened for editing (C5) is in progress again.
+  const isEditable = isCurrent || viewedState?.status === 'in_progress';
+  const reopenedHere = !isCurrent && viewedState?.status === 'in_progress' && !viewedState.left_open;
+  const canReopen = !isCurrent && isDone(viewedState?.status) && project.status !== 'finalized';
 
   const stageBundles = useMemo(() => bundles ?? {}, [bundles]);
 
@@ -515,6 +519,17 @@ export function WorkflowWorkspace({
    * met; this is the same event with no move, for the user who wants to record
    * "done" and stay, or come back and close a stage they moved past.
    */
+  /** C5: a done stage, back to in progress without moving the cursor. */
+  const reopenStage = useCallback(async () => {
+    if (!stage) return;
+    setTransitionError(null);
+    try {
+      await appendEvent({ type: 'stage_reopened', stage_id: stage.id });
+    } catch (e) {
+      setTransitionError(`That didn't go through${e instanceof Error && e.message ? `: ${e.message}` : ''}. Nothing was changed.`);
+    }
+  }, [stage, appendEvent]);
+
   const markComplete = useCallback(async () => {
     if (!stage) return;
     setTransitionError(null);
@@ -898,6 +913,9 @@ export function WorkflowWorkspace({
   const deliverableBundle = deliverable ? stageBundles[deliverable.id] : undefined;
   const deliverableSections = deliverableBundle?.artifact?.long_form?.outline ?? [];
   const completion = completionSummary(template, state, context);
+  // The deliverable's latest objective check, for the finished screen (C4).
+  const deliverableHead = completion.deliverable ? bundles?.[completion.deliverable.id]?.versions.at(-1) : undefined;
+  const deliverableEvaluation = deliverableHead ? evaluations?.[deliverableHead.id] : undefined;
 
   /** Score the deliverable against the objective. 1 model call, on request. */
   const checkAgainstObjective = async () => {
@@ -941,7 +959,7 @@ export function WorkflowWorkspace({
   const canMarkComplete =
     evaluation.canAdvance &&
     !isDone(stageState?.status) &&
-    ((isCurrent && project.status !== 'finalized') || Boolean(stageState?.left_open));
+    ((isCurrent && project.status !== 'finalized') || Boolean(stageState?.left_open) || reopenedHere);
 
   const moreActions: MoreAction[] = [
     ...(canMarkComplete
@@ -1160,10 +1178,26 @@ export function WorkflowWorkspace({
               </button>
               {/* PM-13: moved past, not finished — and closable from here, which
                   is the only place it could be once the cursor has moved on. */}
-              {isEditable && (
+              {isEditable && !reopenedHere && (
                 <span className="text-label text-[var(--on-surface-variant)]">
                   Left open — you moved on with requirements still unticked. Tick them here, or mark it complete.
                 </span>
+              )}
+              {/* C5: view, reopen, close again — and the work after it is
+                  marked for a recheck if what it was built on changed. */}
+              {reopenedHere && (
+                <span className="text-label text-[var(--on-surface-variant)]">
+                  Reopened — edit it here, then mark it complete. Later stages are flagged for a recheck if this changes.
+                </span>
+              )}
+              {canReopen && (
+                <button
+                  onClick={() => void reopenStage()}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-highest)] px-3 py-1.5 text-label font-semibold text-[var(--on-surface)] hover:opacity-90"
+                >
+                  <span className="material-symbols-outlined text-[16px]">edit</span>
+                  Reopen to edit
+                </button>
               )}
               {canMarkComplete && !isCurrent && (
                 <button
@@ -1216,6 +1250,14 @@ export function WorkflowWorkspace({
 
           {isCurrent && appendStageVersion && project.status !== 'finalized' && (
             <GoPanel go={go} stageLabel={stage.label} mode={project.mode} needsActions={goNeedsActions} />
+          )}
+          {isCurrent && project.status === 'finalized' && (
+            <ProjectFinished
+              bundle={{ project, template, state, events: events ?? [], stages: bundles ?? {}, evaluations: evaluations ?? {} }}
+              completion={completion}
+              evaluation={deliverableEvaluation}
+              onReopen={() => void reopenProject()}
+            />
           )}
 
           <div className="mb-8">
@@ -1526,13 +1568,14 @@ export function WorkflowWorkspace({
               project={project}
               stageId={stage.id}
               stageLabel={stage.label}
-              content={
+              content={stageContentForChat(
+                itemSchemaFor(stage),
                 (activeVersionId
                   ? stageVersions.find((v) => v.id === activeVersionId)?.content
                   : undefined) ??
-                stageVersions.at(-1)?.content ??
-                ''
-              }
+                  stageVersions.at(-1)?.content ??
+                  ''
+              )}
               headVersion={stageVersions.at(-1) ?? null}
               appendStageVersion={appendStageVersion}
               restoreStageVersion={restoreStageVersion}
@@ -1541,7 +1584,12 @@ export function WorkflowWorkspace({
               // while reading an older version would append a version built
               // from it and lose everything since. Discussion is unaffected.
               canInstruct={
-                activeVersionId === null || activeVersionId === stageVersions.at(-1)?.id
+                (activeVersionId === null || activeVersionId === stageVersions.at(-1)?.id) && !rendererHoldsItems(stage.renderer)
+              }
+              cannotChangeBecause={
+                rendererHoldsItems(stage.renderer)
+                  ? 'This stage is a table. Ask about it here; change the rows in the table itself.'
+                  : undefined
               }
               onApplyPoints={
                 draftable

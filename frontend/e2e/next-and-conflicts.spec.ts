@@ -10,7 +10,7 @@ import { createProject, servicePatch, serviceSelect, transitionBar } from './hel
 
 async function instruct(page: Page, text: string) {
   const chat = page.getByRole('region', { name: 'Side chat' });
-  await chat.getByRole('tab', { name: /Instruct/ }).click();
+  await chat.getByRole('tab', { name: /Change it/ }).click();
   await chat.getByRole('button', { name: /whole document/i }).click();
   await chat.getByRole('textbox', { name: 'Give a revision instruction' }).fill(text);
   await chat.getByRole('button', { name: 'Draft revision' }).click();

@@ -176,6 +176,20 @@ versions. Corrected there in the same change that added these documents.)
 reproduction table are the same `review` renderer with different columns. This is the
 property that makes a fourth workflow cheap.
 
+## Phase C surface (2026-09-29)
+
+Four things a reader of the workspace should know. The exit-criteria checklist has two
+groups, *PromptMaster checked* and *You decide*; a criterion authored as a check that the
+engine cannot compute on that stage carries `degraded: true` and lands in the second group
+with a note. A done stage can be **reopened** (`stage_reopened`, user only, cursor unmoved)
+and closed again with the ordinary `stage_marked_complete`; when the second completion cites
+different evidence than the first, `projectState` marks the done stages after it `stale`,
+from the events alone. A finished project leads with `components/workflow/project-finished.tsx`
+(read, copy, Markdown, Word via `lib/export/docx-export.ts`, PDF via the print route).
+Version pills show the current version, the ones `isSaved` (`lib/workflow/labels.ts`) says
+the user chose to keep, and the rest behind "Full history". The claim table's statuses are
+provenance first (`candidate_source`, `no_source`, both undecided) and decisions second.
+
 ## Go mode (Phase B: PM-12, PM-15, PM-17 … PM-20)
 
 The next-best-action loop runs **in the browser** (`components/workflow/use-go-loop.ts`)

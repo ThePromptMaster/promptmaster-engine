@@ -298,6 +298,17 @@ export function projectState(
 
       case 'stage_marked_complete': {
         const evidence = event.payload?.evidence_version_id;
+        // C5: closing a reopened stage on different evidence than before
+        // means the work after it was built on something else. Mark that
+        // work stale (the rail's "recheck"), never delete it — derived from
+        // the events alone, no timestamps.
+        const before = state.stages[event.stage_id]?.evidence_version_id;
+        if (!event.to_stage_id && typeof evidence === 'string' && before && before !== evidence) {
+          const cutoff = order.indexOf(event.stage_id);
+          order.forEach((id, i) => {
+            if (i > cutoff && isDone(state.stages[id]?.status)) set(id, { status: 'stale' });
+          });
+        }
         set(event.stage_id, {
           status: typeof evidence === 'string' ? 'completed_with_artifact' : 'complete',
           evidence_version_id: typeof evidence === 'string' ? evidence : undefined,
@@ -336,6 +347,12 @@ export function projectState(
 
       case 'stage_unblocked':
         set(event.stage_id, { status: 'in_progress', blocked: undefined });
+        break;
+
+      // C5: back to in progress, cursor unmoved, earlier evidence remembered
+      // so that closing it again on new evidence can flag the work after it.
+      case 'stage_reopened':
+        set(event.stage_id, { status: 'in_progress', left_open: false, blocked: undefined });
         break;
 
       case 'project_finalized':
