@@ -172,7 +172,15 @@ export function StageTransitionBar({
       // The transition, when something else leads: moving on is always one
       // click away, never hidden, just not the suggestion.
       ...(!primaryIsTransition && advance
-        ? [{ id: 'advance', label: advance.kind === 'finish' ? 'Finish project' : `Continue to ${nextStageLabel ?? 'the next stage'}`, icon: 'arrow_forward', onSelect: () => start(advance) }]
+        ? [{
+            id: 'advance',
+            // "anyway" here as on the primary: moving on with requirements open leaves the stage open.
+            label: advance.kind === 'finish'
+              ? (advance.requiresNote ? 'Finish anyway' : 'Finish project')
+              : `Continue to ${nextStageLabel ?? 'the next stage'}${advance.requiresNote ? ' anyway' : ''}`,
+            icon: 'arrow_forward',
+            onSelect: () => start(advance),
+          }]
         : []),
       ...(skip ? [{ id: 'skip', label: 'Skip this stage', icon: 'redo', onSelect: () => start(skip) }] : []),
       ...returns.map((option) => ({
