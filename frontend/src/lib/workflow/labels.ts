@@ -38,6 +38,22 @@ const OPERATION_LABEL: Record<string, string> = {
   manuscript_snapshot: 'Manuscript before revision',
 };
 
+/**
+ * Versions the user chose to keep, as against the ones the app produced on
+ * the way (C6, Sean 28 Sep item 19: "current, saved, full history"). Saved:
+ * an edit, a fix or instruction the user applied, a discussion saved, a
+ * restore, a manuscript snapshot, an outline edit, an import. History:
+ * drafts, redrafts, refinements, continuations and Go mode's own work.
+ */
+const SAVED_OPERATIONS = new Set([
+  'stage_edit', 'chat_instruct', 'applied_recommendations', 'applied_findings', 'restore', 'outline_edit', 'initial',
+  'chat_save', 'long_form_complete', 'manuscript_snapshot',
+]);
+
+export function isSaved(operation: string | null | undefined): boolean {
+  return Boolean(operation && SAVED_OPERATIONS.has(operation));
+}
+
 /** "AI draft", "Your edit", … — never the raw code. */
 export function operationLabel(operation: string | null | undefined): string {
   if (!operation) return 'Draft';

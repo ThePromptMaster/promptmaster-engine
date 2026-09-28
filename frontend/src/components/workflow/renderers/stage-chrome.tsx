@@ -11,11 +11,13 @@
  * claim table.
  */
 
+import { useState } from 'react';
+
 import { EvaluationScores } from '../evaluation-scores';
 import { RecoveryPanel } from '../recovery-panel';
 import type { StageFailure } from '@/lib/errors/recovery';
 import type { ArtifactVersion, Evaluation } from '@/types/project';
-import { operationLabel, versionTitle } from '@/lib/workflow/labels';
+import { isSaved, operationLabel, versionTitle } from '@/lib/workflow/labels';
 
 interface VersionBarProps {
   versions: ArtifactVersion[];
@@ -37,15 +39,22 @@ export function VersionBar({
   readOnly,
   evaluation,
 }: VersionBarProps) {
+  // C6 (Sean, 28 Sep, item 19): the current version, the ones the user
+  // chose to keep, and the full history behind a toggle — not eleven pills.
+  const [showAll, setShowAll] = useState(false);
   if (versions.length === 0) return null;
 
+  const headId = headVersionId ?? versions.at(-1)!.id;
   const active = versions.find((v) => v.id === activeVersionId) ?? versions.at(-1)!;
-  const isHead = active.id === (headVersionId ?? versions.at(-1)!.id);
+  const isHead = active.id === headId;
+  const shown = (v: ArtifactVersion) => v.id === headId || isSaved(v.source_operation) || v.id === active.id;
+  const hidden = versions.filter((v) => !shown(v)).length;
+  const visible = showAll || hidden === 0 ? versions : versions.filter(shown);
 
   return (
     <div className="mb-4 flex flex-wrap items-center gap-2">
       <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Version history">
-        {versions.map((v) => (
+        {visible.map((v) => (
           <button
             key={v.id}
             onClick={() => onSelect(v.id)}
@@ -57,12 +66,21 @@ export function VersionBar({
                 : 'bg-[var(--surface-container-low)] text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)]'
             }`}
           >
-            v{v.version_number}
+            {v.id === headId ? `v${v.version_number} · current` : isSaved(v.source_operation) ? `v${v.version_number} · saved` : `v${v.version_number}`}
             {v.restored_from_version_id && (
               <span aria-label=" (restored)" title="Restored"> ↩</span>
             )}
           </button>
         ))}
+        {hidden > 0 && (
+          <button
+            onClick={() => setShowAll((s) => !s)}
+            aria-expanded={showAll}
+            className="rounded-lg px-2 py-1.5 text-label text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-low)]"
+          >
+            {showAll ? 'Hide history' : `Full history (${versions.length})`}
+          </button>
+        )}
       </div>
 
       {/* PM-07: say what the pill is, rather than leaving "v1" to be decoded. */}

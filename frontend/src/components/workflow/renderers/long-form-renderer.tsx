@@ -38,6 +38,9 @@ import { PENDING_JOB_STATUSES, enqueueDraftJobs, enqueueRevisionJobs, jobBySecti
 import type { OutlineSection } from '@/types';
 import type { Artifact } from '@/types/project';
 import type { StageRendererProps } from './types';
+import { VersionBar } from './stage-chrome';
+import { operationLabel } from '@/lib/workflow/labels';
+import { MarkdownOutput } from '@/components/shared/markdown-output';
 import { LargeJobWarning, isLargeJob } from '@/components/workflow/large-job-warning';
 import { useReportPanelStep } from '@/components/workflow/use-report-panel-step';
 
@@ -54,7 +57,54 @@ export function LongFormRenderer(props: StageRendererProps) {
     );
   }
 
-  return <Drafting ctx={ctx} readOnly={readOnly} />;
+  return (
+    <>
+      <ManuscriptSnapshots {...props} />
+      <Drafting ctx={ctx} readOnly={readOnly} />
+    </>
+  );
+}
+
+/**
+ * The manuscript's saved snapshots — the version rows a long-form stage
+ * holds (A2: `long_form_complete`, `manuscript_snapshot`) — with the same
+ * pills every other stage has (C6). The live text is the sections below;
+ * a snapshot is read here, not restored into them (known limitation L-25).
+ */
+function ManuscriptSnapshots({ versions, activeVersionId, onSelectVersion, evaluation }: StageRendererProps) {
+  if (versions.length === 0) return null;
+  const head = versions.at(-1)!;
+  const viewing = activeVersionId && activeVersionId !== head.id ? versions.find((v) => v.id === activeVersionId) : undefined;
+  return (
+    <section aria-label="Manuscript snapshots" className="mb-4">
+      <VersionBar
+        evaluation={evaluation}
+        versions={versions}
+        activeVersionId={activeVersionId}
+        headVersionId={head.id}
+        onSelect={onSelectVersion}
+        onRestore={async () => undefined}
+        readOnly
+      />
+      {viewing && (
+        <div className="mb-6 rounded-xl bg-[var(--surface-container-lowest)] px-5 py-4">
+          <div className="mb-2 flex flex-wrap items-center gap-3">
+            <p className="text-label text-[var(--on-surface-variant)]">
+              Reading v{viewing.version_number} — {operationLabel(viewing.source_operation)}. The sections below are the live text; a
+              snapshot is for reading and copying, not restoring.
+            </p>
+            <button
+              onClick={() => onSelectVersion(null)}
+              className="ml-auto rounded-lg bg-[var(--surface-container-high)] px-3 py-1.5 text-label text-[var(--on-surface)]"
+            >
+              Back to the sections
+            </button>
+          </div>
+          <MarkdownOutput content={viewing.content} />
+        </div>
+      )}
+    </section>
+  );
 }
 
 interface DraftingProps {

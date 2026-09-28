@@ -547,6 +547,27 @@ describe('version history', () => {
     await user.click(screen.getByRole('button', { name: 'Restore v1' }));
     expect(onRestore).toHaveBeenCalledWith('v1');
   });
+
+  it('shows the current and saved versions, and the rest behind Full history (C6)', async () => {
+    const user = userEvent.setup();
+    const versions = [
+      version('a', 1),
+      { ...version('b', 2), id: 'v2', source_operation: 'stage_edit' },
+      version('c', 3),
+      version('d', 4),
+    ];
+    render(<ProseRenderer {...props(bookStage('objective'), { versions, activeVersionId: 'v4' })} />);
+    const history = screen.getByRole('group', { name: 'Version history' });
+    expect(within(history).getByRole('button', { name: /^v4 · current/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(history).getByRole('button', { name: /^v2 · saved/ })).toBeInTheDocument();
+    expect(within(history).queryByRole('button', { name: /^v1/ })).not.toBeInTheDocument();
+    expect(within(history).queryByRole('button', { name: /^v3/ })).not.toBeInTheDocument();
+    await user.click(within(history).getByRole('button', { name: 'Full history (4)' }));
+    expect(within(history).getByRole('button', { name: /^v1/ })).toBeInTheDocument();
+    expect(within(history).getByRole('button', { name: /^v3/ })).toBeInTheDocument();
+    await user.click(within(history).getByRole('button', { name: 'Hide history' }));
+    expect(within(history).queryByRole('button', { name: /^v3/ })).not.toBeInTheDocument();
+  });
 });
 
 // ---------------------------------------------------------------------------
