@@ -18,7 +18,13 @@ export const CONFLICT_CATEGORY = 'conflict:';
 export async function conflictContext(
   projectId: string,
   stageId: string,
-  recentInstructions: string[]
+  recentInstructions: string[],
+  /**
+   * The version the instruction would change. Only pending fixes raised on it
+   * are live instructions; ones raised on an earlier version were about text
+   * that no longer exists, and a "Move on" proposal is not an instruction.
+   */
+  headVersionId: string | null = null
 ): Promise<{ decisions: ConflictSource[]; others: ConflictSource[] }> {
   const rows = await listRecommendations(projectId).catch(() => []);
   const decisions: ConflictSource[] = rows
@@ -32,7 +38,14 @@ export async function conflictContext(
     }));
   const others: ConflictSource[] = [
     ...rows
-      .filter((r) => r.status === 'pending' && r.instruction && (r.scope as RecommendationScope)?.stage_id === stageId)
+      .filter(
+        (r) =>
+          r.status === 'pending' &&
+          r.instruction &&
+          r.kind !== 'stage_transition' &&
+          (r.scope as RecommendationScope)?.stage_id === stageId &&
+          (headVersionId === null || (r.version_id ?? null) === headVersionId)
+      )
       .map((r) => ({ id: r.id, text: r.instruction })),
     ...recentInstructions.slice(-5).map((text, i) => ({ id: `chat-${i}`, text })),
   ];

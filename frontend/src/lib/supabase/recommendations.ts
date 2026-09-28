@@ -210,6 +210,36 @@ export async function resolveRecommendation(
 }
 
 /**
+ * Retire proposals the project has moved past (A5, Sean 28 Sep item 1: "while
+ * in Revision, old recommendations could still say Move on to Drafting").
+ *
+ * A pending row is superseded when the stage it was raised on is left, or when
+ * that stage's head version changes under it. The panel already hid such rows;
+ * the table did not agree, and the conflict check still read them as live
+ * instructions. `superseded` is the status the forward-only trigger reserves
+ * for exactly this. Go mode's authorizations and conflict answers are never
+ * pending, so they are untouched; `except` keeps rows about to be accepted.
+ * Returns the ids of the rows that moved.
+ */
+export async function supersedePending(
+  projectId: string,
+  opts: { stageId?: string; kind?: RecommendationKind; except?: readonly string[] } = {}
+): Promise<string[]> {
+  const supabase = createClient();
+  let query = supabase
+    .from('recommendations')
+    .update({ status: 'superseded' })
+    .eq('project_id', projectId)
+    .eq('status', 'pending');
+  if (opts.stageId) query = query.eq('scope->>stage_id', opts.stageId);
+  if (opts.kind) query = query.eq('kind', opts.kind);
+  if (opts.except?.length) query = query.not('id', 'in', `(${opts.except.join(',')})`);
+  const { data, error } = await query.select('id');
+  if (error) throw error;
+  return ((data ?? []) as { id: string }[]).map((r) => r.id);
+}
+
+/**
  * The category keys the user has already dismissed on this project.
  *
  * Derived recommendations have no stable row id — they may have no row at all

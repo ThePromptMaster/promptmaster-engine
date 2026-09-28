@@ -48,6 +48,7 @@ import {
   updateAgentRun,
 } from '@/lib/supabase/agent';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
+import { getStage } from '@/lib/workflow/engine';
 import { inputsFrom } from '@/lib/workflow/stage-requests';
 import type { StageContext, StageDefinition, StageEvaluation, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
 import type { NewEvaluation, NewVersion } from '@/lib/supabase/versions';
@@ -394,6 +395,22 @@ export function useGoLoop(opts: Options) {
     const current = runRef.current;
     if (!step || !current) return;
     setPendingStepId(null);
+    // Never perform a move on a stage other than the one it was planned for:
+    // approving a stale "move to the next stage" after a manual advance used
+    // to advance whatever stage was current (A5).
+    const nowOn = latest.current.state.current_stage_id;
+    if (step.stage_id !== nowOn) {
+      const was = getStage(latest.current.template, step.stage_id)?.short_label ?? step.stage_id;
+      const now = getStage(latest.current.template, nowOn)?.short_label ?? nowOn;
+      const closed = await finishAgentStep(step.id, {
+        status: 'cancelled', label: null,
+        output: `Planned for ${was}; the project is now on ${now}. Not performed.`,
+      });
+      upsertStep(closed);
+      await setRunStatus('stopped', `That move was planned for ${was}; the project is now on ${now}. Press Go to plan again.`);
+      setPhase('ended');
+      return;
+    }
     const controller = new AbortController();
     abortRef.current = controller;
     try {
@@ -554,9 +571,13 @@ export function useGoLoop(opts: Options) {
   const pendingStep = useMemo(() => steps.find((s) => s.id === pendingStepId) ?? null, [steps, pendingStepId]);
   const pendingStale = useMemo(() => {
     if (!pendingStep) return false;
+    // Planned for a stage the project has since left: stale whatever else
+    // happened (A5). A proposal to "move to the next stage" from Drafting
+    // must not be offered, let alone applied, once the project is in Revision.
+    if (pendingStep.stage_id !== opts.state.current_stage_id) return true;
     const latestVersion = opts.bundles[pendingStep.stage_id]?.versions.at(-1);
     return plannedBeforeLatestChange(pendingStep, [latestVersion?.created_at, opts.latestEvaluation?.created_at]);
-  }, [pendingStep, opts.bundles, opts.latestEvaluation]);
+  }, [pendingStep, opts.state.current_stage_id, opts.bundles, opts.latestEvaluation]);
 
   /**
    * Close an outdated proposal and ask the planner again about the stage as it

@@ -22,7 +22,11 @@ import type { WorkflowTemplate } from '../types';
  */
 export const BOOK_V1: WorkflowTemplate = {
   key: 'book',
-  version: 3,
+  // v4 (2026-09-28): fact-check statuses. The prompt said "remove" while the
+  // option is "removed", so those rows showed as "Not looked at"; and a model
+  // that has retrieved nothing was marking claims "verified". Verification is
+  // the author's (Sean, 28 Sep, item 12).
+  version: 4,
   name: 'Book',
   description: 'Objective through final review, with an approved outline driving the draft.',
   outline_stage: 'explicit',
@@ -256,7 +260,7 @@ export const BOOK_V1: WorkflowTemplate = {
       entry_guidance:
         'Every claim gets a status: verified, unverifiable, or removed. Unverifiable is an acceptable answer; unexamined is not.',
       entry_prompt_hint:
-        'Extract the factual claims the draft actually makes and give each one a row: \'claim\' in the draft\'s own terms, \'source\' naming where it can be checked, and \'status\' — verified, unverifiable, or remove. Every row needs a status, and unverifiable is a legitimate one; a source you are not certain exists is not. Arguments, judgements and opinions are not factual claims — leave them out.',
+        'Extract the factual claims the draft actually makes and give each one a row: \'claim\' in the draft\'s own terms, and \'source\' naming where it could be checked — a candidate for the author to verify, or an honest \'none found\'. You have retrieved nothing, so never mark a claim verified: leave \'status\' empty for the author to decide, and set it only to \'unverifiable\' (with a reason) when no source could settle it, or \'removed\' (with a reason) when the claim should not stand. A source you are not certain exists is not a source. Arguments, judgements and opinions are not factual claims — leave them out.',
       exit_criteria: [
         { id: 'fc.status', label: 'Every claim has a status', check: 'auto', rule: { type: 'every_item_has_status' }, blocking: true },
       ],
