@@ -193,7 +193,7 @@ function chooseAction(input: NextActionInput): StageAction {
     return {
       kind: 'evaluate',
       label: 'Check this stage',
-      reason: 'One model call scores it against your objective and suggests fixes.',
+      reason: 'One AI check scores it against your objective and suggests fixes.',
     };
   }
 

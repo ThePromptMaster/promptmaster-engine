@@ -47,7 +47,7 @@ describe('needsUser: the moves that are the user\'s (B4)', () => {
     const state = projectState(BOOK_V1, events);
     const need = needsUser({ ...base, state, stage: stage('objective'), facts: {}, stageEvaluation: evaluation('objective') });
     expect(need).toEqual({ kind: 'unblock_stage', stageId: 'objective', reason: 'Waiting on the survey.', blockKind: 'data_missing' });
-    expect(describeNeed(need!, label)).toEqual({ message: 'Objective is marked blocked: Waiting on the survey. I need it unblocked before I can continue.', action: 'Unblock and resume' });
+    expect(describeNeed(need!, label)).toEqual({ message: 'Objective is marked stuck: Waiting on the survey. I need that cleared before I can continue.', action: 'Continue the stage and resume' });
   });
 
   it('a stage whose only open requirements are manual boxes, with no work left, needs a tick', () => {

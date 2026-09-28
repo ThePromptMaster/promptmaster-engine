@@ -312,6 +312,12 @@ export interface CriterionResult {
    * `check` — otherwise a degraded criterion is a circle nobody can fill.
    */
   manual?: boolean;
+  /**
+   * Authored as an automatic check but evaluated as a box the user ticks,
+   * because it cannot be computed here (no rule, an unknown rule, a count on
+   * a stage with nothing to count). The checklist says so on the row (C1).
+   */
+  degraded?: boolean;
   /** The criterion's plain-language hint, carried through for display. */
   hint?: string;
 }

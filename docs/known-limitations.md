@@ -447,6 +447,22 @@ minutes and is then recorded `interrupted` — the sections go on being written 
 and Resume waits again without spending a step. Derived (Research) outlines are still
 generated only from the panel.
 
+### L-C4 — Fact-check: nothing is verified by PromptMaster
+
+The claim table's states are provenance first, decision second (C3, 2026-09-29). PromptMaster
+sets **Candidate source — verify it yourself** when the model named where a claim could be
+checked and **No source found** when it could not; both count as *undecided*, so "Every claim
+has a status" still means every claim was looked at by the author. The author's decisions are
+**Verified by me**, **Unverifiable** (with a reason) and **Remove** (with a reason). **Verified
+by PromptMaster** exists in the schema for a source-checking tool to set and is never offered
+in the dropdown; no retrieval tool is connected (D2), so no claim carries it today, and the
+model's "source" is what it inferred from the manuscript, not something it fetched. The
+backend maps whatever the model says onto these states — a model "verified" becomes a
+candidate at most (`_claim_provenance` in `promptmaster/stage.py`). Book v5 carries the prompt
+text; projects on v4 and earlier keep their old statuses and see the "Upgrade workflow" button.
+Rows written before C3 with the old `verified` value read as "Verified by me", which is what
+that click meant then too.
+
 ### L-C3 — Conflict detection: what it sees, and what it costs
 
 PM-24's check runs on **side-chat instructions** and on **combined recommendations** (the

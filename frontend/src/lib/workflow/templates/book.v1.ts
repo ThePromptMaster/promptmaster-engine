@@ -26,7 +26,9 @@ export const BOOK_V1: WorkflowTemplate = {
   // option is "removed", so those rows showed as "Not looked at"; and a model
   // that has retrieved nothing was marking claims "verified". Verification is
   // the author's (Sean, 28 Sep, item 12).
-  version: 4,
+  // v5 (2026-09-29, C3): each claim starts in a provenance state PromptMaster
+  // sets — candidate_source or no_source — and the author decides from there.
+  version: 5,
   name: 'Book',
   description: 'Objective through final review, with an approved outline driving the draft.',
   outline_stage: 'explicit',
@@ -258,9 +260,9 @@ export const BOOK_V1: WorkflowTemplate = {
       required: true,
       renderer: 'review',
       entry_guidance:
-        'Every claim gets a status: verified, unverifiable, or removed. Unverifiable is an acceptable answer; unexamined is not.',
+        'Each claim starts as what PromptMaster found — a candidate source for you to verify, or none. You decide: verified by you, unverifiable, or removed. Unverifiable is an acceptable answer; unexamined is not. Nothing is verified by PromptMaster until a source-checking tool is connected.',
       entry_prompt_hint:
-        'Extract the factual claims the draft actually makes and give each one a row: \'claim\' in the draft\'s own terms, and \'source\' naming where it could be checked — a candidate for the author to verify, or an honest \'none found\'. You have retrieved nothing, so never mark a claim verified: leave \'status\' empty for the author to decide, and set it only to \'unverifiable\' (with a reason) when no source could settle it, or \'removed\' (with a reason) when the claim should not stand. A source you are not certain exists is not a source. Arguments, judgements and opinions are not factual claims — leave them out.',
+        'Extract the factual claims the draft actually makes and give each one a row: \'claim\' in the draft\'s own terms, and \'source\' naming where it could be checked. You have retrieved nothing, so you can never mark a claim verified. Set \'status\' to \'candidate_source\' when you name a specific place the author could check, \'no_source\' when you cannot (and write \'none found\' as the source), \'unverifiable\' (with a reason) when no source could ever settle it, or \'removed\' (with a reason) when the claim should not stand. A source you are not certain exists is not a source — say \'none found\' instead. Arguments, judgements and opinions are not factual claims — leave them out.',
       exit_criteria: [
         { id: 'fc.status', label: 'Every claim has a status', check: 'auto', rule: { type: 'every_item_has_status' }, blocking: true },
       ],

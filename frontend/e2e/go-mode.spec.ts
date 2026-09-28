@@ -62,7 +62,7 @@ test('Guided proposes one move and waits; Approve performs it, labelled as reaso
   expect((await stepsOf((await runOf(id)).id)).map((s) => s.status)).toEqual(['awaiting_decision']);
 
   await prompt.getByRole('button', { name: 'Approve' }).click();
-  await expect(steps(page).first()).toContainText('Reasoned');
+  await expect(steps(page).first()).toContainText('Analyzed');
   await expect(steps(page).first()).toContainText('Mock Derive');
   // …and the next move is proposed, not performed.
   await expect(prompt).toContainText('Prove');
@@ -91,7 +91,7 @@ test('Checkpoint: reasoning runs on its own, code waits for approval, then runs 
   const prompt = page.getByRole('region', { name: 'Go mode needs your approval' });
   // derive is not important: performed without asking. run_computation is.
   await expect(prompt).toContainText('Run a computation');
-  await expect(steps(page).first()).toContainText('Reasoned');
+  await expect(steps(page).first()).toContainText('Analyzed');
   await page.screenshot({ path: test.info().outputPath('01-checkpoint-stops-before-code.png'), fullPage: true });
 
   await prompt.getByRole('button', { name: 'Approve' }).click();
@@ -132,8 +132,8 @@ test('Autonomous moves stages on its own authority and stops, blocked, at data i
 
   const transparency = page.getByRole('region', { name: 'What Go mode is doing' });
   await expect(transparency).toContainText('Mock: missing data', { timeout: 30_000 });
-  await expect(transparency.locator('[data-field="Status"]')).toContainText('Blocked');
-  await expect(steps(page).last()).toContainText('Blocked');
+  await expect(transparency.locator('[data-field="Status"]')).toContainText('Could not continue');
+  await expect(steps(page).last()).toContainText('Could not continue');
   await page.screenshot({ path: test.info().outputPath('01-autonomous-blocked-on-literature.png'), fullPage: true });
 
   const run = await runOf(id);
@@ -232,7 +232,7 @@ test('A sandbox that is not available blocks the step honestly — never "execut
   await choose(page, 'Autonomous');
   const transparency = page.getByRole('region', { name: 'What Go mode is doing' });
   await expect(transparency).toContainText('Code could not be run', { timeout: 30_000 });
-  await expect(steps(page).first()).toContainText('Blocked');
+  await expect(steps(page).first()).toContainText('Could not continue');
   await expect(steps(page).first()).not.toContainText('Code executed');
   await page.screenshot({ path: test.info().outputPath('01-sandbox-unavailable-blocked.png'), fullPage: true });
 

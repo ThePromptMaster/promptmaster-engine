@@ -68,10 +68,10 @@ export interface RatingDisplay {
  * useless; saying something specific we did not measure would be false.
  */
 const DEFAULT_AREA: Record<RatingKey, string> = {
-  alignment: "The artifact as a whole, against this stage's declared intent.",
-  clarity: 'How the artifact is structured and worded.',
+  alignment: "The draft as a whole, against this stage's declared intent.",
+  clarity: 'How the draft is structured and worded.',
   drift: 'The objective, audience, constraints, approved outline and current stage.',
-  completeness: 'Whether the artifact is structurally finished.',
+  completeness: 'Whether the draft is structurally finished.',
 };
 
 const LABEL: Record<RatingKey, string> = {

@@ -24,9 +24,9 @@ export function BlockForm({
   const [kind, setKind] = useState<BlockKind>('data_missing');
   const [reason, setReason] = useState('');
   return (
-    <section aria-label="Mark as blocked" className="rounded-xl bg-[var(--surface-container-high)] px-5 py-4">
+    <section aria-label="Mark as stuck" className="rounded-xl bg-[var(--surface-container-high)] px-5 py-4">
       <p className="text-body text-[var(--on-surface)]">What is this stage waiting on?</p>
-      <div role="radiogroup" aria-label="Why it is blocked" className="mt-3 grid gap-2 sm:grid-cols-3">
+      <div role="radiogroup" aria-label="Why it is stuck" className="mt-3 grid gap-2 sm:grid-cols-3">
         {BLOCK_KINDS.map((option) => (
           <button
             key={option.kind}
@@ -58,7 +58,7 @@ export function BlockForm({
           disabled={!reason.trim()}
           className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-title text-[var(--on-primary)] disabled:opacity-40"
         >
-          Mark as blocked
+          Mark as stuck
         </button>
         <button onClick={onCancel} className="rounded-lg px-4 py-2 text-title text-[var(--on-surface-variant)]">
           Cancel
@@ -69,16 +69,16 @@ export function BlockForm({
 }
 
 export function BlockedNotice({ kind, reason, onUnblock }: { kind: BlockKind; reason: string; onUnblock: () => void }) {
-  const label = BLOCK_KINDS.find((k) => k.kind === kind)?.label ?? 'Blocked';
+  const label = BLOCK_KINDS.find((k) => k.kind === kind)?.label ?? 'Stuck';
   return (
     <div role="status" className="flex flex-wrap items-center gap-3 rounded-xl bg-[var(--surface-container-high)] px-5 py-4">
       <span aria-hidden className="material-symbols-outlined text-[var(--pm-tertiary)]">block</span>
       <div className="mr-auto">
-        <p className="text-title text-[var(--on-surface)]">Blocked — {label.toLowerCase()}</p>
+        <p className="text-title text-[var(--on-surface)]">Stuck — {label.toLowerCase()}</p>
         <p className="text-label text-[var(--on-surface-variant)]">{reason}</p>
       </div>
       <button onClick={onUnblock} className="rounded-lg bg-[var(--surface-container-highest)] px-4 py-2 text-title text-[var(--on-surface)]">
-        Unblock
+        Continue this stage
       </button>
     </div>
   );
@@ -126,8 +126,8 @@ export function CompletionDialog({
           {summary.deliverableDone ? 'task_alt' : 'error'}
         </span>
         {summary.deliverableDone
-          ? `The deliverable (${summary.deliverable?.short_label ?? 'the main artifact'}) is done.`
-          : `The deliverable (${summary.deliverable?.short_label ?? 'the main artifact'}) is not done yet.`}
+          ? `The deliverable (${summary.deliverable?.short_label ?? 'the main work'}) is done.`
+          : `The deliverable (${summary.deliverable?.short_label ?? 'the main work'}) is not done yet.`}
       </p>
       <p className="mt-2 text-label text-[var(--on-surface-variant)]">
         Stages: {rows.filter(([, n]) => n > 0).map(([label, n]) => `${n} ${label}`).join(' · ') || 'none'}
@@ -189,7 +189,7 @@ export function CompletionDialog({
                 disabled={check.running || busy}
                 className="rounded-lg bg-[var(--surface-container-high)] px-4 py-2 text-label font-semibold text-[var(--on-surface)] disabled:opacity-50"
               >
-                {check.running ? 'Checking…' : 'Check it against the objective · 1 model call'}
+                {check.running ? 'Checking…' : 'Check it against the objective · one AI check'}
               </button>
             </div>
           )}

@@ -260,7 +260,7 @@ describe('Instruct mode proposes before it applies', () => {
     await user.click(screen.getByRole('tab', { name: /instruct/i }));
     await user.click(screen.getByRole('button', { name: /^selection$/i }));
 
-    expect(screen.getByText(/select text in the artifact first/i)).toBeInTheDocument();
+    expect(screen.getByText(/select text in the draft first/i)).toBeInTheDocument();
 
     await user.type(screen.getByLabelText('Give a revision instruction'), 'Tighten this.');
     // Never silently widened to the whole document.

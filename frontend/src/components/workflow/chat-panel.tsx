@@ -598,7 +598,7 @@ function ScopePicker({
       key: 'selection',
       label: 'Selection',
       ready: selection.length > 0,
-      why: 'Select text in the artifact first.',
+      why: 'Select text in the draft first.',
     },
     {
       key: 'section',

@@ -207,6 +207,32 @@ def build_stage_prompt(
     return system, "\n".join(parts)
 
 
+_NO_SOURCE = {"", "none", "none found", "no source", "no source found", "n/a", "na", "unknown", "-", "—"}
+_CLAIM_DECISIONS = {"unverifiable", "removed"}
+
+
+def _claim_provenance(row: dict) -> dict:
+    """The status a claim row is stored with (C3, Sean 28 Sep item 12).
+
+    Decisions the prompt allows the model to propose (unverifiable, removed)
+    are kept, "remove" included. Everything else — verified, empty, made-up —
+    becomes provenance: candidate_source when a source is named, no_source
+    when it is not; the reason goes with it, since it argued for a status the
+    row no longer has.
+    """
+    status = row.get("status")
+    normalised = status.strip().lower() if isinstance(status, str) else ""
+    if normalised == "remove":
+        normalised = "removed"
+    if normalised in _CLAIM_DECISIONS:
+        return {"status": normalised}
+    source = row.get("source")
+    named = isinstance(source, str) and source.strip().lower() not in _NO_SOURCE
+    out = {"status": "candidate_source" if named else "no_source"}
+    row.pop("reason", None)
+    return out
+
+
 def _parse_items(raw_result: dict, schema: StageItemSchema | None) -> list[StageItem]:
     """Defensive parse, matching generate_audit_findings.
 
@@ -244,14 +270,12 @@ def _parse_items(raw_result: dict, schema: StageItemSchema | None) -> list[Stage
         # here retrieved anything, so a model that says verified is guessing
         # (Sean, 28 Sep, item 12: "If I personally click Verified, what am I
         # representing?"). Verification is left to the user.
-        status = row.get("status")
-        if "claim" in allowed and isinstance(status, str):
-            normalised = status.strip().lower()
-            if normalised == "remove":
-                row["status"] = "removed"
-            elif normalised in ("verified", "verify"):
-                row.pop("status", None)
-                row.pop("reason", None)
+        # C3: a claim starts in a provenance state PromptMaster sets —
+        # candidate_source (it named where to check) or no_source — and the
+        # author decides from there. A model that says "verified" has named a
+        # candidate at most; "verified_by_promptmaster" is a tool's to set.
+        if "claim" in allowed:
+            row.update(_claim_provenance(row))
         try:
             items.append(StageItem(**row))
         except Exception as parse_err:

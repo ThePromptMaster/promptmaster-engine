@@ -228,7 +228,7 @@ export function GenerationBar({
             </span>
           )}
           {evaluating ? 'Evaluating…' : 'Evaluate this stage'}
-          <span className="text-[var(--on-surface-variant)] opacity-70">· 1 model call</span>
+          <span className="text-[var(--on-surface-variant)] opacity-70">· one AI check</span>
         </button>
       )}
 

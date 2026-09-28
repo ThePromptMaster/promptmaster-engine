@@ -49,6 +49,15 @@ export interface ReviewStatusOption {
   tone: 'done' | 'warn' | 'neutral';
   /** Dismissing something must cost a sentence; accepting it need not. */
   requiresReason?: boolean;
+  /**
+   * A provenance state PromptMaster sets, not a decision the user made: the
+   * row still counts as undecided (C3). The user replaces it with a decision.
+   */
+  decided?: false;
+  /** Only a tool can set it — never offered in the dropdown. */
+  settable?: false;
+  /** One line for the legend under the table. */
+  explain?: string;
 }
 
 export interface StageItemSchema {
@@ -158,12 +167,29 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
       { key: 'source', label: 'Source', max: 240 },
       { key: 'where', label: 'Where it appears', max: 160 },
     ],
-    // Unverifiable is an acceptable answer; unexamined is not — so there is no
-    // "skip" here, only outcomes.
+    // C3 (Sean, 28 Sep, item 12: "If I personally click Verified, what am I
+    // representing?"): who established what is on the row. PromptMaster's
+    // states are provenance, not decisions — a candidate source, or none —
+    // and the row stays undecided until the author verifies it themselves,
+    // marks it unverifiable (an acceptable answer; unexamined is not) or
+    // removes it. "Verified by PromptMaster" exists for a source-checking
+    // tool to set; none is connected, so nothing carries it today.
     statuses: [
-      { value: 'verified', label: 'Verified', tone: 'done' },
-      { value: 'unverifiable', label: 'Unverifiable', tone: 'neutral', requiresReason: true },
-      { value: 'removed', label: 'Remove', tone: 'warn', requiresReason: true },
+      {
+        value: 'verified_by_promptmaster', label: 'Verified by PromptMaster', tone: 'done', settable: false,
+        explain: 'A source-checking tool confirmed it. No tool is connected yet, so no claim carries this today.',
+      },
+      {
+        value: 'candidate_source', label: 'Candidate source — verify it yourself', tone: 'neutral', decided: false,
+        explain: 'PromptMaster named where this could be checked. It has not checked it; you decide.',
+      },
+      {
+        value: 'no_source', label: 'No source found', tone: 'neutral', decided: false,
+        explain: 'PromptMaster could not name where to check this. Verify it yourself, mark it unverifiable, or remove it.',
+      },
+      { value: 'verified', label: 'Verified by me', tone: 'done', explain: 'You checked the source yourself.' },
+      { value: 'unverifiable', label: 'Unverifiable', tone: 'neutral', requiresReason: true, explain: 'No source could settle it, and you say why. An acceptable answer.' },
+      { value: 'removed', label: 'Remove', tone: 'warn', requiresReason: true, explain: 'The claim should not stand, and you say why.' },
     ],
   },
 
@@ -367,6 +393,7 @@ export function statusOption(
 export function isTriaged(item: StageItem, schema: StageItemSchema): boolean {
   const option = statusOption(schema, item.status);
   if (!option) return false;
+  if (option.decided === false) return false;
   if (option.requiresReason) return (item.reason ?? '').trim().length > 0;
   return true;
 }

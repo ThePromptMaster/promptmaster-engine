@@ -18,7 +18,7 @@ test('each stage offers one next step, in words a new user can read', async ({ p
   // More + the primary; "Why this?" is a disclosure beside the reason, not an action (PM-23).
   await expect(bar.getByRole('button')).toHaveCount(3);
   await expect(bar.getByRole('button', { name: 'Why this?' })).toHaveAttribute('aria-expanded', 'false');
-  await expect(bar).toContainText('One model call scores it against your objective');
+  await expect(bar).toContainText('One AI check scores it against your objective');
 
   // PM-07: plain labels.
   await expect(page.getByText('AI draft').first()).toBeVisible();
