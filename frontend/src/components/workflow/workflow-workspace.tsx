@@ -237,7 +237,10 @@ export function WorkflowWorkspace({
   // Sean 28 Sep item 20 — Positioning stayed OPEN to the end because nothing
   // reachable could close it).
   const viewedState = state.stages[stageId];
-  const isEditable = isCurrent || (viewedState?.status === 'in_progress' && Boolean(viewedState.left_open));
+  // …and a done stage reopened for editing (C5) is in progress again.
+  const isEditable = isCurrent || viewedState?.status === 'in_progress';
+  const reopenedHere = !isCurrent && viewedState?.status === 'in_progress' && !viewedState.left_open;
+  const canReopen = !isCurrent && isDone(viewedState?.status) && project.status !== 'finalized';
 
   const stageBundles = useMemo(() => bundles ?? {}, [bundles]);
 
@@ -516,6 +519,17 @@ export function WorkflowWorkspace({
    * met; this is the same event with no move, for the user who wants to record
    * "done" and stay, or come back and close a stage they moved past.
    */
+  /** C5: a done stage, back to in progress without moving the cursor. */
+  const reopenStage = useCallback(async () => {
+    if (!stage) return;
+    setTransitionError(null);
+    try {
+      await appendEvent({ type: 'stage_reopened', stage_id: stage.id });
+    } catch (e) {
+      setTransitionError(`That didn't go through${e instanceof Error && e.message ? `: ${e.message}` : ''}. Nothing was changed.`);
+    }
+  }, [stage, appendEvent]);
+
   const markComplete = useCallback(async () => {
     if (!stage) return;
     setTransitionError(null);
@@ -945,7 +959,7 @@ export function WorkflowWorkspace({
   const canMarkComplete =
     evaluation.canAdvance &&
     !isDone(stageState?.status) &&
-    ((isCurrent && project.status !== 'finalized') || Boolean(stageState?.left_open));
+    ((isCurrent && project.status !== 'finalized') || Boolean(stageState?.left_open) || reopenedHere);
 
   const moreActions: MoreAction[] = [
     ...(canMarkComplete
@@ -1164,10 +1178,26 @@ export function WorkflowWorkspace({
               </button>
               {/* PM-13: moved past, not finished — and closable from here, which
                   is the only place it could be once the cursor has moved on. */}
-              {isEditable && (
+              {isEditable && !reopenedHere && (
                 <span className="text-label text-[var(--on-surface-variant)]">
                   Left open — you moved on with requirements still unticked. Tick them here, or mark it complete.
                 </span>
+              )}
+              {/* C5: view, reopen, close again — and the work after it is
+                  marked for a recheck if what it was built on changed. */}
+              {reopenedHere && (
+                <span className="text-label text-[var(--on-surface-variant)]">
+                  Reopened — edit it here, then mark it complete. Later stages are flagged for a recheck if this changes.
+                </span>
+              )}
+              {canReopen && (
+                <button
+                  onClick={() => void reopenStage()}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-highest)] px-3 py-1.5 text-label font-semibold text-[var(--on-surface)] hover:opacity-90"
+                >
+                  <span className="material-symbols-outlined text-[16px]">edit</span>
+                  Reopen to edit
+                </button>
               )}
               {canMarkComplete && !isCurrent && (
                 <button

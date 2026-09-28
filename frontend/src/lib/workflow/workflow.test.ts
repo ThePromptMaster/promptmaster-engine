@@ -668,3 +668,39 @@ describe('a stage left open can be closed by its own tick (A3, Sean 28 Sep item 
     expect(summary.leftOpenStages.map((s) => s.short_label)).toEqual(['Positioning']);
   });
 });
+
+describe('a done stage can be reopened and closed again (C5, Sean 28 Sep item 16)', () => {
+  const twoDone = [
+    event('stage_marked_complete', 'objective', { to_stage_id: 'audience', payload: { evidence_version_id: 'obj-v1' } }),
+    event('stage_marked_complete', 'audience', { to_stage_id: 'positioning', payload: { evidence_version_id: 'aud-v1' } }),
+  ];
+
+  it('reopening puts the stage back in progress without moving the cursor', () => {
+    const state = projectState(BOOK_V1, [...twoDone, event('stage_reopened', 'objective')]);
+    expect(state.current_stage_id).toBe('positioning');
+    expect(state.stages.objective).toMatchObject({ status: 'in_progress', left_open: false, evidence_version_id: 'obj-v1' });
+    expect(state.stages.audience.status).toBe('completed_with_artifact');
+  });
+
+  it('closing it on the same evidence changes nothing after it', () => {
+    const state = projectState(BOOK_V1, [
+      ...twoDone,
+      event('stage_reopened', 'objective'),
+      event('stage_marked_complete', 'objective', { payload: { evidence_version_id: 'obj-v1' } }),
+    ]);
+    expect(state.stages.objective.status).toBe('completed_with_artifact');
+    expect(state.stages.audience.status).toBe('completed_with_artifact');
+  });
+
+  it('closing it on new evidence marks the done stages after it for a recheck', () => {
+    const state = projectState(BOOK_V1, [
+      ...twoDone,
+      event('stage_reopened', 'objective'),
+      event('stage_marked_complete', 'objective', { payload: { evidence_version_id: 'obj-v2' } }),
+    ]);
+    expect(state.stages.objective).toMatchObject({ status: 'completed_with_artifact', evidence_version_id: 'obj-v2' });
+    expect(state.stages.audience.status).toBe('stale');
+    expect(state.stages.positioning.status).toBe('in_progress');
+    expect(state.current_stage_id).toBe('positioning');
+  });
+});
