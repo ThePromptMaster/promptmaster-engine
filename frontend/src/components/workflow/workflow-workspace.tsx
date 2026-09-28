@@ -56,20 +56,11 @@ import { ProjectBrief, ProjectSetup, stageWantsSetup } from './project-setup';
 import { draftBindings, longFormFromOutline } from '@/lib/outline/long-form';
 import { saveLongForm } from '@/lib/supabase/versions';
 import type { OutlineDocument } from '@/types/outline';
-import {
-  effectiveRenderer,
-  isTriaged,
-  stageDrafts,
-  itemSchemaFor,
-  parseItems,
-  rendererHoldsItems,
-  serializeItems,
-  type StageItem,
-} from '@/lib/workflow/stage-artifact';
+import { stageDrafts, itemSchemaFor, serializeItems, type StageItem } from '@/lib/workflow/stage-artifact';
+import { buildStageContext } from '@/lib/workflow/context';
 import type { StageContext, WorkflowEvent, WorkflowTemplate, BlockKind } from '@/lib/workflow/types';
 import { isDone } from '@/lib/workflow/types';
 import { appendWorkflowEvent, getLatestTemplate, listWorkflowEvents } from '@/lib/supabase/workflow';
-import { countNamedSections, parseOutlineDocument } from '@/lib/outline/model';
 import { setUsageProject } from '@/lib/supabase/model-usage';
 import type { NewEvaluation, NewVersion } from '@/lib/supabase/versions';
 import type { StageBundle } from '@/stores/project-store';
@@ -290,83 +281,24 @@ export function WorkflowWorkspace({
   });
 
   /**
-   * The exit-criteria context.
+   * The exit-criteria context, built once for every stage (lib/workflow/context.ts).
    *
-   * These fields were hardcoded to {} and 0, which meant every `min_items` and
-   * `every_item_has_status` criterion in both templates evaluated false and
-   * could never be satisfied — the checklist was decorative. Deriving them from
-   * the stage artifacts is what makes the gates real.
+   * Per-stage rather than per-viewed-stage: Go evaluates the stage the project
+   * is on while the user may be browsing another, and both must see the same
+   * facts.
    */
-  const context: StageContext = useMemo(() => {
-    // The drafting stage has its own artifact in a thirteen-stage Book; only a
-    // single-output project keeps everything on the project-level one. Reading
-    // the project artifact unconditionally made sectionsComplete permanently 0
-    // for Book, so all_sections_complete could never satisfy.
-    const longFormArtifact =
-      (stage ? stageBundles[stage.id]?.artifact : null) ?? artifact;
-    const longForm = longFormArtifact?.long_form ?? null;
-    const outline = longForm?.outline ?? [];
-
-    const itemCounts: Record<string, number> = {};
-    const itemsMissingStatus: Record<string, number> = {};
-    const artifactNonEmpty: Record<string, boolean> = {};
-    let findingsTotal = 0;
-    let findingsTriaged = 0;
-
-    for (const s of template.stages) {
-      const bundle = stageBundles[s.id];
-      const content = bundle?.versions.at(-1)?.content ?? '';
-      artifactNonEmpty[s.id] = content.trim().length > 0;
-
-      if (s.renderer === 'outline') {
-        // The saved outline, for a stage the panel is not currently showing.
-        // The live count below overrides it while the panel is mounted.
-        itemCounts[s.id] = outlineCounts[s.id] ?? countNamedSections(parseOutlineDocument(content));
-        continue;
-      }
-      if (!rendererHoldsItems(s.renderer)) continue;
-      const items = parseItems(content);
-      if (!items) continue;
-
-      const schema = itemSchemaFor(s);
-      itemCounts[s.id] = items.length;
-      itemsMissingStatus[s.id] = items.filter((i) => !isTriaged(i, schema)).length;
-
-      // Findings criteria are about the stage being looked at, not the whole
-      // project: "3 untriaged" on the Critique stage must not count Continuity's.
-      if (s.id === stageId && effectiveRenderer(s) === 'review') {
-        findingsTotal = items.length;
-        findingsTriaged = items.length - itemsMissingStatus[s.id];
-      }
-    }
-
-    // The single-output project keeps its one artifact, which has no stage row.
-    if (stage && !stageBundles[stage.id]) {
-      artifactNonEmpty[stage.id] =
-        versions.length > 0 && versions.at(-1)!.content.trim().length > 0;
-    }
-
-    return {
-      fields: {
-        objective: project.objective,
-        audience: project.audience,
-        constraints: project.constraints,
-      },
-      itemCounts,
-      itemsMissingStatus,
-      artifactNonEmpty,
-      // Approval is an event, not a mode the long-form machine happens to be
-      // in. Reading it from long_form.state was a placeholder that could only
-      // ever be true once drafting had already started — which is backwards,
-      // since drafting is what approval gates.
-      outlineApproved: approvedOutlineVersionId(events ?? []) !== null,
-      sectionsTotal: outline.length,
-      sectionsComplete: outline.filter((s) => s.status === 'complete').length,
-      findingsTotal,
-      findingsTriaged,
-      manualChecks: project.manual_checks ?? {},
-    };
-  }, [project, artifact, versions, stage, stageId, template, stageBundles, events, outlineCounts]);
+  const context: StageContext = useMemo(
+    () =>
+      buildStageContext({
+        template,
+        project,
+        bundles: stageBundles,
+        projectVersions: versions,
+        events: events ?? [],
+        outlineCounts,
+      }),
+    [project, versions, template, stageBundles, events, outlineCounts]
+  );
 
   // PM-06: the step a panel-driven stage (outline, drafting, revision) is
   // waiting on. Keyed by stage, and a withdrawal only clears its own stage's
@@ -782,15 +714,10 @@ export function WorkflowWorkspace({
     if (moved !== project.stage) onPatchProject({ stage: moved });
   }, [project.id, project.stage, template, onPatchProject]);
 
-  const deliverableDone = useMemo(() => {
-    const target = deliverableStage(template);
-    const sections = (target ? stageBundles[target.id]?.artifact?.long_form?.outline : undefined) ?? [];
-    return completionSummary(template, state, {
-      artifactNonEmpty: Boolean(target && context.artifactNonEmpty[target.id]),
-      sectionsTotal: sections.length,
-      sectionsComplete: sections.filter((s) => s.status === 'complete').length,
-    }).deliverableDone;
-  }, [template, state, stageBundles, context]);
+  const deliverableDone = useMemo(
+    () => completionSummary(template, state, context).deliverableDone,
+    [template, state, context]
+  );
 
   const go = useGoLoop({
     project,
@@ -915,11 +842,7 @@ export function WorkflowWorkspace({
   const deliverable = deliverableStage(template);
   const deliverableBundle = deliverable ? stageBundles[deliverable.id] : undefined;
   const deliverableSections = deliverableBundle?.artifact?.long_form?.outline ?? [];
-  const completion = completionSummary(template, state, {
-    artifactNonEmpty: Boolean(deliverable && context.artifactNonEmpty[deliverable.id]),
-    sectionsTotal: deliverableSections.length,
-    sectionsComplete: deliverableSections.filter((s) => s.status === 'complete').length,
-  });
+  const completion = completionSummary(template, state, context);
 
   /** Score the deliverable against the objective. 1 model call, on request. */
   const checkAgainstObjective = async () => {

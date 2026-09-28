@@ -31,17 +31,17 @@ import {
 // engine produced something else.
 
 /** Nothing done: every criterion the engine can fail, fails. */
-function emptyContext(): StageContext {
+function emptyContext(template: WorkflowTemplate = BOOK_V1): StageContext {
+  const findings: StageContext['findings'] = {};
+  for (const stage of template.stages) findings[stage.id] = { total: 3, triaged: 0 };
   return {
     fields: { objective: '', audience: '', constraints: '' },
     itemCounts: {},
     itemsMissingStatus: {},
     artifactNonEmpty: {},
     outlineApproved: false,
-    sectionsTotal: 0,
-    sectionsComplete: 0,
-    findingsTotal: 3,
-    findingsTriaged: 0,
+    sections: {},
+    findings,
     manualChecks: {},
   };
 }
@@ -52,11 +52,15 @@ function satisfiedContext(template: WorkflowTemplate): StageContext {
   const itemsMissingStatus: Record<string, number> = {};
   const artifactNonEmpty: Record<string, boolean> = {};
   const manualChecks: Record<string, boolean> = {};
+  const sections: StageContext['sections'] = {};
+  const findings: StageContext['findings'] = {};
 
   for (const stage of template.stages) {
     itemCounts[stage.id] = 99;
     itemsMissingStatus[stage.id] = 0;
     artifactNonEmpty[stage.id] = true;
+    sections[stage.id] = { total: 8, complete: 8 };
+    findings[stage.id] = { total: 3, triaged: 3 };
     for (const criterion of stage.exit_criteria) manualChecks[criterion.id] = true;
   }
 
@@ -70,10 +74,8 @@ function satisfiedContext(template: WorkflowTemplate): StageContext {
     itemsMissingStatus,
     artifactNonEmpty,
     outlineApproved: true,
-    sectionsTotal: 8,
-    sectionsComplete: 8,
-    findingsTotal: 3,
-    findingsTriaged: 3,
+    sections,
+    findings,
     manualChecks,
   };
 }
@@ -97,7 +99,7 @@ describe('FR-13: every active stage yields at least one workflow recommendation'
   for (const [key, template] of templates) {
     for (const stage of template.stages) {
       for (const [label, context] of [
-        ['nothing done', emptyContext()],
+        ['nothing done', emptyContext(template)],
         ['everything done', satisfiedContext(template)],
       ] as const) {
         it(`${key}/${stage.id} (${label}) yields a recommendation`, () => {
