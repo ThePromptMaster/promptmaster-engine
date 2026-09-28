@@ -57,7 +57,7 @@ interface Props {
   stageId: string;
   events: WorkflowEvent[];
   /** Called after an approval, so the workspace can re-read the event log. */
-  onEventsChanged?: () => void | Promise<void>;
+  onEventsChanged?: () => void | Promise<unknown>;
   /** Prose already written, per outline item. Owned by the drafting surface. */
   drafts?: SectionDraftBinding[];
   onRewriteSection?: (itemId: string) => void;

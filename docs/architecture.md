@@ -149,6 +149,18 @@ call.** A gate that fails because a model timed out is a gate users learn to res
 An unknown rule type degrades to a manual checklist item rather than throwing, so a
 template authored against a newer engine still renders on an older one.
 
+**One project snapshot, one place to refresh.** The project store
+(`src/stores/project-store.ts`) loads the project, every stage's artifact and versions,
+the `workflow_events` log, and the recommendations and tasks together, and every write
+goes back through it: `appendEvent` inserts and then *re-reads* the log, so the record
+the workspace, the rail, Go mode and the recommendations panel project from is always
+what the database holds — including rows the server wrote in the meantime. Until
+2026-09-28 the workspace kept its own copy of the events with seven ad-hoc reloads and
+the recommendations hook loaded once per project, and the surfaces could disagree
+about what had happened. The exit-criteria context is likewise built once for every
+stage (`src/lib/workflow/context.ts`), keyed by stage id, so the stage Go evaluates and
+the stage the user is viewing read the same facts.
+
 ### Renderers
 
 `stage.renderer` is dispatched by `components/workflow/renderers/stage-renderer.tsx`.

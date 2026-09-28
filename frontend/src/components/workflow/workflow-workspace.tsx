@@ -58,12 +58,12 @@ import { saveLongForm } from '@/lib/supabase/versions';
 import type { OutlineDocument } from '@/types/outline';
 import { stageDrafts, itemSchemaFor, serializeItems, type StageItem } from '@/lib/workflow/stage-artifact';
 import { buildStageContext } from '@/lib/workflow/context';
-import type { StageContext, WorkflowEvent, WorkflowTemplate, BlockKind } from '@/lib/workflow/types';
+import type { StageContext, WorkflowTemplate, BlockKind } from '@/lib/workflow/types';
 import { isDone } from '@/lib/workflow/types';
-import { appendWorkflowEvent, getLatestTemplate, listWorkflowEvents } from '@/lib/supabase/workflow';
+import { getLatestTemplate } from '@/lib/supabase/workflow';
 import { setUsageProject } from '@/lib/supabase/model-usage';
 import type { NewEvaluation, NewVersion } from '@/lib/supabase/versions';
-import type { StageBundle } from '@/stores/project-store';
+import { useProjectStore, type StageBundle } from '@/stores/project-store';
 import { approvedOutlineVersionId } from '@/lib/supabase/outline';
 import type { Artifact, ArtifactVersion, Evaluation, Project, ProjectPatch } from '@/types/project';
 
@@ -127,7 +127,12 @@ export function WorkflowWorkspace({
   ensureStageArtifact,
   onReload,
 }: Props) {
-  const [events, setEvents] = useState<WorkflowEvent[] | null>(null);
+  // The event log lives in the project store, with the artifacts it is read
+  // alongside; writing goes through `appendEvent`, which re-reads the log, so
+  // no surface can hold a copy the others have moved past.
+  const events = useProjectStore((s) => s.events);
+  const appendEvent = useProjectStore((s) => s.appendEvent);
+  const refreshEvents = useProjectStore((s) => s.refreshEvents);
   const [viewingStageId, setViewingStageId] = useState<string | null>(null);
   // Open by default: section 8 asks for the side chat to be part of the
   // workspace, and a panel behind a button that has to be found first is a
@@ -190,12 +195,6 @@ export function WorkflowWorkspace({
   const [mobileRailOpen, setMobileRailOpen] = useState(false);
   // Go mode drafts stages itself; the entry auto-draft must not race it.
   const [goDriving, setGoDriving] = useState(false);
-
-  useEffect(() => {
-    listWorkflowEvents(project.id)
-      .then(setEvents)
-      .catch(() => setEvents([]));
-  }, [project.id]);
 
   /**
    * FR-18: attribute this project's usage rows.
@@ -410,7 +409,7 @@ export function WorkflowWorkspace({
           if (summary) await setStageSummary(stage.id, summary).catch(() => {});
         }
 
-        await appendWorkflowEvent(project.id, project.user_id, {
+        let fresh = await appendEvent({
           type,
           stage_id: stage.id,
           to_stage_id: option.toStageId ?? undefined,
@@ -423,7 +422,7 @@ export function WorkflowWorkspace({
         // last stage — the project can be finished with stages left open.
         if (option.kind === 'finish') {
           const checked = objectiveCheckRef.current;
-          await appendWorkflowEvent(project.id, project.user_id, {
+          fresh = await appendEvent({
             type: 'project_finalized',
             stage_id: stage.id,
             reason: note,
@@ -444,8 +443,6 @@ export function WorkflowWorkspace({
           });
         }
 
-        const fresh = await listWorkflowEvents(project.id);
-        setEvents(fresh);
         setViewingStageId(null);
 
         // projects.stage is a denormalised cursor for the list view; the event
@@ -468,7 +465,7 @@ export function WorkflowWorkspace({
         setBusy(false);
       }
     },
-    [stage, busy, project, template, onPatchProject, setStageSummary, stageBundles, evaluation]
+    [stage, busy, project, template, onPatchProject, setStageSummary, stageBundles, evaluation, appendEvent]
   );
 
   /** PM-13: mark the current stage blocked, or lift the block. */
@@ -477,16 +474,15 @@ export function WorkflowWorkspace({
       if (!stage) return;
       setTransitionError(null);
       try {
-        await appendWorkflowEvent(project.id, project.user_id, block
+        await appendEvent(block
           ? { type: 'stage_blocked', stage_id: stage.id, reason: block.reason, payload: { block_kind: block.kind } }
           : { type: 'stage_unblocked', stage_id: stage.id });
-        setEvents(await listWorkflowEvents(project.id));
         setBlocking(false);
       } catch (e) {
         setTransitionError(`That didn't go through${e instanceof Error && e.message ? `: ${e.message}` : ''}. Nothing was changed.`);
       }
     },
-    [stage, project.id, project.user_id]
+    [stage, appendEvent]
   );
 
   /**
@@ -501,16 +497,15 @@ export function WorkflowWorkspace({
     try {
       const bundle = stageBundles[stage.id];
       const evidenceId = bundle?.artifact?.stage_id === stage.id ? bundle.versions.at(-1)?.id : undefined;
-      await appendWorkflowEvent(project.id, project.user_id, {
+      await appendEvent({
         type: 'stage_marked_complete',
         stage_id: stage.id,
         ...(evidenceId ? { payload: { evidence_version_id: evidenceId } } : {}),
       });
-      setEvents(await listWorkflowEvents(project.id));
     } catch (e) {
       setTransitionError(`That didn't go through${e instanceof Error && e.message ? `: ${e.message}` : ''}. Nothing was changed.`);
     }
-  }, [stage, stageBundles, project.id, project.user_id]);
+  }, [stage, stageBundles, appendEvent]);
 
   useEffect(() => {
     let live = true;
@@ -531,7 +526,7 @@ export function WorkflowWorkspace({
     try {
       // The event first: the log records the re-pin, and a failed patch after
       // it leaves an honest trail rather than a silent change.
-      await appendWorkflowEvent(project.id, project.user_id, {
+      await appendEvent({
         type: 'template_upgraded',
         stage_id: stage.id,
         payload: {
@@ -547,17 +542,16 @@ export function WorkflowWorkspace({
     } finally {
       setUpgrading(false);
     }
-  }, [latestTemplate, stage, project.id, project.user_id, project.workflow_template_id, template.version, onPatchProject]);
+  }, [latestTemplate, stage, project.workflow_template_id, template.version, onPatchProject, appendEvent]);
 
   const reopenProject = useCallback(async () => {
     if (!stage) return;
     try {
-      await appendWorkflowEvent(project.id, project.user_id, { type: 'project_reopened', stage_id: stage.id });
-      setEvents(await listWorkflowEvents(project.id));
+      await appendEvent({ type: 'project_reopened', stage_id: stage.id });
     } finally {
       onPatchProject({ status: 'active' });
     }
-  }, [stage, project.id, project.user_id, onPatchProject]);
+  }, [stage, onPatchProject, appendEvent]);
 
   /**
    * The recommendations surface — FR-13, FR-09, FR-01.
@@ -699,20 +693,15 @@ export function WorkflowWorkspace({
     [draftingStage, stage, stageArtifact, stageBundles, ensureStageArtifact, onReload]
   );
 
-  const reloadEvents = useCallback(async () => {
-    setEvents(await listWorkflowEvents(project.id));
-  }, [project.id]);
-
   // --- Go mode (B4, PM-17 … PM-20) ------------------------------------------------
   // After a stage event the run caused, the log is re-read and the list-view
   // cursor follows it, exactly as a transition-bar click does.
   const reloadAfterAgent = useCallback(async () => {
-    const fresh = await listWorkflowEvents(project.id);
-    setEvents(fresh);
+    const fresh = await refreshEvents();
     setViewingStageId(null);
     const moved = projectState(template, fresh).current_stage_id;
     if (moved !== project.stage) onPatchProject({ stage: moved });
-  }, [project.id, project.stage, template, onPatchProject]);
+  }, [refreshEvents, project.stage, template, onPatchProject]);
 
   const deliverableDone = useMemo(
     () => completionSummary(template, state, context).deliverableDone,
@@ -1165,7 +1154,7 @@ export function WorkflowWorkspace({
                   project={project}
                   stageId={stage.id}
                   events={events ?? []}
-                  onEventsChanged={reloadEvents}
+                  onEventsChanged={refreshEvents}
                   derive={derivedOutlineHere ? deriveOutline : undefined}
                   drafts={draftBindings(
                     (draftingStage && draftingStage.id !== stage.id

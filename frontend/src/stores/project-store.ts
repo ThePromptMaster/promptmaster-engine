@@ -20,6 +20,14 @@ import {
   type NewVersion,
 } from '@/lib/supabase/versions';
 import { OUTLINE_ARTIFACT_KIND } from '@/lib/supabase/outline';
+import { listRecommendations, type Recommendation } from '@/lib/supabase/recommendations';
+import { listTasks, type ProjectTask } from '@/lib/supabase/tasks';
+import {
+  appendWorkflowEvent,
+  listWorkflowEvents,
+  type NewWorkflowEvent,
+} from '@/lib/supabase/workflow';
+import type { WorkflowEvent } from '@/lib/workflow/types';
 import {
   ProjectConflictError,
   type Artifact,
@@ -68,6 +76,23 @@ interface ProjectState {
   stages: Record<string, StageBundle>;
   evaluations: Record<string, Evaluation>;
 
+  /**
+   * The workflow event log — the record stage state is projected from — and
+   * the recommendations and tasks, loaded with the project and re-read here.
+   *
+   * These used to be fetched by the workspace and its hooks, each on its own
+   * schedule: events in a `useState` with seven ad-hoc reloads, recommendations
+   * once per project. Surfaces then disagreed about what had happened (Sean,
+   * 28 Sep: "the individual components … do not always seem to know what the
+   * other components have already done"). One row set, one place to refresh.
+   *
+   * `events` is null until the first load, so a consumer can tell "no events"
+   * from "not read yet" and not generate against an empty log.
+   */
+  events: WorkflowEvent[] | null;
+  recommendations: Recommendation[];
+  tasks: ProjectTask[];
+
   /** Which version the UI is *displaying*. Never implies a restore. */
   activeVersionId: string | null;
 
@@ -114,6 +139,22 @@ interface ProjectState {
     evaluation?: NewEvaluation
   ) => Promise<ArtifactVersion>;
   restoreStageVersion: (stageId: string, versionId: string) => Promise<void>;
+
+  /**
+   * Append a workflow event and re-read the log, so every consumer sees the
+   * same record the database holds (including anything the server wrote in
+   * the meantime — drafted sections, Go mode's moves). Returns the fresh log.
+   */
+  appendEvent: (event: NewWorkflowEvent) => Promise<WorkflowEvent[]>;
+  /** Re-read the event log without writing. Returns the fresh log. */
+  refreshEvents: () => Promise<WorkflowEvent[]>;
+  /** Re-read everything in place — the background reload, by its real name. */
+  refresh: () => Promise<void>;
+  reloadRecommendations: () => Promise<void>;
+  /** Reflect a row just written or resolved without a round trip. */
+  upsertRecommendation: (row: Recommendation) => void;
+  upsertTask: (task: ProjectTask) => void;
+
   /**
    * Attach an evaluation to a stage version that already exists.
    *
@@ -160,6 +201,9 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
   versions: [],
   stages: {},
   evaluations: {},
+  events: null,
+  recommendations: [],
+  tasks: [],
   activeVersionId: null,
   loading: false,
   error: null,
@@ -184,7 +228,15 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         return;
       }
 
-      const artifacts = await listArtifacts(id);
+      // A missing recommendations or tasks row set must not take the project
+      // down: the derived half of the panel still works. Events fail closed to
+      // an empty log, as the workspace's own loader did.
+      const [artifacts, events, recommendations, tasks] = await Promise.all([
+        listArtifacts(id),
+        listWorkflowEvents(id).catch(() => [] as WorkflowEvent[]),
+        listRecommendations(id).catch(() => [] as Recommendation[]),
+        listTasks(id).catch(() => [] as ProjectTask[]),
+      ]);
 
       // A Book project has thirteen artifacts, not one. Load them all and index
       // by stage; picking `kind === 'output'` could only ever describe a
@@ -245,6 +297,9 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         versions,
         stages,
         evaluations,
+        events,
+        recommendations,
+        tasks,
         activeVersionId: head?.id ?? null,
         loading: false,
       });
@@ -263,11 +318,59 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       versions: [],
       stages: {},
       evaluations: {},
+      events: null,
+      recommendations: [],
+      tasks: [],
       activeVersionId: null,
       saveState: 'idle',
       conflict: null,
       error: null,
     });
+  },
+
+  async appendEvent(event) {
+    const { project } = get();
+    if (!project) throw new Error('No project open.');
+    await appendWorkflowEvent(project.id, project.user_id, event);
+    return get().refreshEvents();
+  },
+
+  async refreshEvents() {
+    const { projectId } = get();
+    if (!projectId) return [];
+    const events = await listWorkflowEvents(projectId);
+    // Only if the same project is still open: a reload that lands after the
+    // user has moved on must not file one project's log under another.
+    if (get().projectId === projectId) set({ events });
+    return events;
+  },
+
+  async refresh() {
+    const { projectId } = get();
+    if (projectId) await get().loadProject(projectId, { background: true });
+  },
+
+  async reloadRecommendations() {
+    const { projectId } = get();
+    if (!projectId) return;
+    const [recommendations, tasks] = await Promise.all([listRecommendations(projectId), listTasks(projectId)]);
+    if (get().projectId === projectId) set({ recommendations, tasks });
+  },
+
+  upsertRecommendation(row) {
+    set((s) => ({
+      recommendations: s.recommendations.some((r) => r.id === row.id)
+        ? s.recommendations.map((r) => (r.id === row.id ? row : r))
+        : [...s.recommendations, row],
+    }));
+  },
+
+  upsertTask(task) {
+    set((s) => ({
+      tasks: s.tasks.some((t) => t.id === task.id)
+        ? s.tasks.map((t) => (t.id === task.id ? task : t))
+        : [...s.tasks, task],
+    }));
   },
 
   patchProject(patch) {

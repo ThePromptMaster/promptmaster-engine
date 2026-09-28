@@ -45,12 +45,12 @@ import {
 import {
   dismissedCategories,
   insertRecommendation,
-  listRecommendations,
   recordDecision,
   resolveRecommendation,
   type Recommendation,
 } from '@/lib/supabase/recommendations';
-import { createTask, listTasks, setTaskStatus, type ProjectTask } from '@/lib/supabase/tasks';
+import { createTask, setTaskStatus } from '@/lib/supabase/tasks';
+import { useProjectStore } from '@/stores/project-store';
 import type { NewVersion } from '@/lib/supabase/versions';
 import type { StageDefinition, StageEvaluation, WorkflowTemplate } from '@/lib/workflow/types';
 import type { ArtifactVersion, Evaluation, Project } from '@/types/project';
@@ -117,8 +117,13 @@ export function useRecommendations({
   onAcceptTransition,
   enabled,
 }: Options) {
-  const [rows, setRows] = useState<Recommendation[]>([]);
-  const [tasks, setTasks] = useState<ProjectTask[]>([]);
+  // Rows live in the project store, loaded with the project and re-read
+  // there, so this panel, the conflict check and Go mode read one list.
+  const rows = useProjectStore((s) => s.recommendations);
+  const tasks = useProjectStore((s) => s.tasks);
+  const upsertRecommendation = useProjectStore((s) => s.upsertRecommendation);
+  const upsertTask = useProjectStore((s) => s.upsertTask);
+  const reload = useProjectStore((s) => s.reloadRecommendations);
   const [selected, setSelected] = useState<string[]>([]);
   const [previewing, setPreviewing] = useState<string[] | null>(null);
   /** PM-22: a revision made but not yet saved, shown first as a diff. */
@@ -133,38 +138,6 @@ export function useRecommendations({
 
   const abortRef = useRef<AbortController | null>(null);
   useEffect(() => () => abortRef.current?.abort(), []);
-
-  // --- load ----------------------------------------------------------------
-
-  const reload = useCallback(async () => {
-    const [recs, ts] = await Promise.all([
-      listRecommendations(project.id),
-      listTasks(project.id),
-    ]);
-    setRows(recs);
-    setTasks(ts);
-  }, [project.id]);
-
-  useEffect(() => {
-    let cancelled = false;
-    // A project with no rows yet is the common case, and a failure here must
-    // not take the workspace down with it — the derived half still works.
-    Promise.all([listRecommendations(project.id), listTasks(project.id)])
-      .then(([recs, ts]) => {
-        if (cancelled) return;
-        setRows(recs);
-        setTasks(ts);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setRows([]);
-          setTasks([]);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [project.id]);
 
   // Selection is per stage: a row ticked on one stage means nothing on the next.
   const stageId = stage?.id ?? null;
@@ -205,7 +178,7 @@ export function useRecommendations({
     })
       .then((created) => {
         if (cancelled) return;
-        setRows((prev) => [...prev, created]);
+        upsertRecommendation(created);
         onModelRecommendationConsumed();
       })
       .catch(() => {
@@ -280,10 +253,10 @@ export function useRecommendations({
         version_id: headVersion?.id ?? null,
         status,
       });
-      setRows((prev) => [...prev, created]);
+      upsertRecommendation(created);
       return created;
     },
-    [rows, project.id, project.user_id, headVersion, stage]
+    [rows, project.id, project.user_id, headVersion, stage, upsertRecommendation]
   );
 
   const triage = useCallback(
@@ -296,7 +269,7 @@ export function useRecommendations({
           const row = rec.id
             ? await resolveRecommendation(rec.id, 'dismissed')
             : await materialise(rec, 'dismissed');
-          if (rec.id) setRows((prev) => prev.map((r) => (r.id === row.id ? row : r)));
+          if (rec.id) upsertRecommendation(row);
           await recordDecision(project.id, project.user_id, {
             decision_type: 'dismiss_recommendation',
             recommendation_id: row.id,
@@ -322,7 +295,7 @@ export function useRecommendations({
             origin: rec.origin === 'evaluation' ? 'evaluation' : 'recommendation',
             origin_recommendation_id: rec.id ?? row?.id ?? null,
           });
-          setTasks((prev) => [...prev, created]);
+          upsertTask(created);
           // No `decisions` row: decision_type has no 'defer_recommendation'.
           // See tasks.ts — the gap is documented, not papered over.
           return;
@@ -357,7 +330,7 @@ export function useRecommendations({
         setBusy(false);
       }
     },
-    [busy, project.id, project.user_id, stage, materialise, reload, onAcceptTransition]
+    [busy, project.id, project.user_id, stage, materialise, reload, onAcceptTransition, upsertRecommendation, upsertTask]
   );
 
   /**
@@ -509,12 +482,12 @@ export function useRecommendations({
     async (id: string, status: 'done' | 'dismissed') => {
       try {
         const updated = await setTaskStatus(id, status);
-        setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+        upsertTask(updated);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Could not update that task.');
       }
     },
-    []
+    [upsertTask]
   );
 
   return {

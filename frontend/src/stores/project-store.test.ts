@@ -12,8 +12,15 @@ const appendVersionRow = vi.hoisted(() => vi.fn());
 const restoreVersionRow = vi.hoisted(() => vi.fn());
 const rateVersionRow = vi.hoisted(() => vi.fn());
 const saveEvaluation = vi.hoisted(() => vi.fn());
+const listWorkflowEvents = vi.hoisted(() => vi.fn());
+const appendWorkflowEvent = vi.hoisted(() => vi.fn());
+const listRecommendations = vi.hoisted(() => vi.fn());
+const listTasks = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/supabase/projects', () => ({ getProject, updateProject }));
+vi.mock('@/lib/supabase/workflow', () => ({ listWorkflowEvents, appendWorkflowEvent }));
+vi.mock('@/lib/supabase/recommendations', () => ({ listRecommendations }));
+vi.mock('@/lib/supabase/tasks', () => ({ listTasks }));
 vi.mock('@/lib/supabase/versions', () => ({
   listArtifacts,
   listVersions,
@@ -57,13 +64,24 @@ async function loadFixture() {
   listArtifacts.mockResolvedValue([ARTIFACT]);
   listVersions.mockResolvedValue([V1]);
   getEvaluation.mockResolvedValue(null);
+  listWorkflowEvents.mockResolvedValue([]);
+  listRecommendations.mockResolvedValue([]);
+  listTasks.mockResolvedValue([]);
   await useProjectStore.getState().loadProject('p1');
 }
+
+const EVENT = (type: string, seq: number) => ({
+  type, stage_id: 'input', actor: 'user' as const, created_at: `2026-09-28T00:00:0${seq}Z`,
+});
 
 beforeEach(() => {
   vi.useFakeTimers();
   useProjectStore.getState().closeProject();
   vi.clearAllMocks();
+  listWorkflowEvents.mockResolvedValue([]);
+  appendWorkflowEvent.mockResolvedValue(undefined);
+  listRecommendations.mockResolvedValue([]);
+  listTasks.mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -321,5 +339,84 @@ describe('versions', () => {
     expect(s.versions).toHaveLength(2);
     expect(s.artifact?.current_version_id).toBe('v3');
     expect(s.versions.at(-1)?.restored_from_version_id).toBe('v1');
+  });
+});
+
+describe('the store owns the event log and the recommendations (A4, SN-01)', () => {
+  it('loads events, recommendations and tasks with the project', async () => {
+    getProject.mockResolvedValue(project());
+    listArtifacts.mockResolvedValue([ARTIFACT]);
+    listVersions.mockResolvedValue([V1]);
+    getEvaluation.mockResolvedValue(null);
+    listWorkflowEvents.mockResolvedValue([EVENT('stage_marked_complete', 1)]);
+    listRecommendations.mockResolvedValue([{ id: 'r1', status: 'pending' }]);
+    listTasks.mockResolvedValue([{ id: 't1', status: 'open' }]);
+
+    expect(useProjectStore.getState().events).toBeNull();
+    await useProjectStore.getState().loadProject('p1');
+
+    const s = useProjectStore.getState();
+    expect(s.events?.map((e) => e.type)).toEqual(['stage_marked_complete']);
+    expect(s.recommendations.map((r) => r.id)).toEqual(['r1']);
+    expect(s.tasks.map((t) => t.id)).toEqual(['t1']);
+  });
+
+  it('a missing recommendations table does not take the project down', async () => {
+    getProject.mockResolvedValue(project());
+    listArtifacts.mockResolvedValue([ARTIFACT]);
+    listVersions.mockResolvedValue([V1]);
+    getEvaluation.mockResolvedValue(null);
+    listWorkflowEvents.mockResolvedValue([]);
+    listRecommendations.mockRejectedValue(new Error('relation does not exist'));
+    listTasks.mockRejectedValue(new Error('relation does not exist'));
+
+    await useProjectStore.getState().loadProject('p1');
+    expect(useProjectStore.getState().project?.id).toBe('p1');
+    expect(useProjectStore.getState().recommendations).toEqual([]);
+    expect(useProjectStore.getState().events).toEqual([]);
+  });
+
+  it('appendEvent writes, then re-reads the log rather than trusting its own copy', async () => {
+    await loadFixture();
+    // What the database holds after the insert — including a row the server
+    // wrote in the meantime, which a local push would have missed.
+    listWorkflowEvents.mockResolvedValue([EVENT('section_written', 1), EVENT('stage_advanced', 2)]);
+
+    const fresh = await useProjectStore.getState().appendEvent({ type: 'stage_advanced', stage_id: 'input' });
+
+    expect(appendWorkflowEvent).toHaveBeenCalledWith('p1', 'u1', { type: 'stage_advanced', stage_id: 'input' });
+    expect(fresh.map((e) => e.type)).toEqual(['section_written', 'stage_advanced']);
+    expect(useProjectStore.getState().events).toEqual(fresh);
+  });
+
+  it('a failed write leaves the log as it was', async () => {
+    await loadFixture();
+    appendWorkflowEvent.mockRejectedValueOnce(new Error('duplicate key'));
+    await expect(
+      useProjectStore.getState().appendEvent({ type: 'stage_advanced', stage_id: 'input' })
+    ).rejects.toThrow('duplicate key');
+    expect(useProjectStore.getState().events).toEqual([]);
+  });
+
+  it('a refresh that lands after the project was closed is dropped', async () => {
+    await loadFixture();
+    let release: (v: unknown) => void = () => {};
+    listWorkflowEvents.mockReturnValueOnce(new Promise((r) => { release = r; }));
+    const pending = useProjectStore.getState().refreshEvents();
+    useProjectStore.getState().closeProject();
+    release([EVENT('stage_advanced', 1)]);
+    await pending;
+    expect(useProjectStore.getState().events).toBeNull();
+  });
+
+  it('upsert replaces a row by id and appends an unknown one', () => {
+    const s = useProjectStore.getState();
+    s.upsertRecommendation({ id: 'r1', status: 'pending' } as never);
+    s.upsertRecommendation({ id: 'r1', status: 'accepted' } as never);
+    s.upsertRecommendation({ id: 'r2', status: 'pending' } as never);
+    expect(useProjectStore.getState().recommendations.map((r) => `${r.id}:${r.status}`)).toEqual(['r1:accepted', 'r2:pending']);
+    s.upsertTask({ id: 't1', status: 'open' } as never);
+    s.upsertTask({ id: 't1', status: 'done' } as never);
+    expect(useProjectStore.getState().tasks).toEqual([{ id: 't1', status: 'done' }]);
   });
 });
