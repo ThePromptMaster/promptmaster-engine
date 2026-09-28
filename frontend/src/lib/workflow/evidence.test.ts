@@ -96,7 +96,7 @@ describe('stageEvidence: what a stage can show for being complete (A2)', () => {
     await expect(
       stageEvidence({ template: BOOK_V1, stage: stage('revision'), bundles, project, appendStageVersion: append })
     ).resolves.toBe('v-revision');
-    expect(append.mock.calls[0][0]).toBe('revision');
+    expect((append.mock.calls[0] as unknown as [string])[0]).toBe('revision');
   });
 
   it('without a way to save, a long-form stage completes plainly rather than lying', async () => {
