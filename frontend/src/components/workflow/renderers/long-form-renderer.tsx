@@ -34,16 +34,12 @@ import {
   type ProjectJob,
 } from '@/lib/supabase/jobs';
 import { appendVersion } from '@/lib/supabase/versions';
-import { formatManuscript } from '@/lib/workflow/digest';
-import { formatRevisionNotes } from '@/lib/workflow/revision';
+import { PENDING_JOB_STATUSES, enqueueDraftJobs, enqueueRevisionJobs, jobBySection as latestJobBySection, pendingJobs as pendingOf, revisedCount as revisedCountOf, writtenSections } from '@/lib/jobs/sections';
 import type { OutlineSection } from '@/types';
 import type { Artifact } from '@/types/project';
 import type { StageRendererProps } from './types';
 import { LargeJobWarning, isLargeJob } from '@/components/workflow/large-job-warning';
 import { useReportPanelStep } from '@/components/workflow/use-report-panel-step';
-
-/** Statuses that mean the server still has work to do. */
-const PENDING_STATUSES = new Set(['queued', 'leased']);
 
 export function LongFormRenderer(props: StageRendererProps) {
   const { longForm: ctx, readOnly } = props;
@@ -80,21 +76,8 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
   const outline = useMemo<OutlineSection[]>(() => state?.outline ?? [], [state]);
   const complete = outline.filter((s) => s.status === 'complete').length;
 
-  const pendingJobs = useMemo(
-    () => jobs.filter((j) => PENDING_STATUSES.has(j.status)),
-    [jobs]
-  );
-
-  // Jobs arrive oldest first, so the map ends up holding each section's latest.
-  const jobBySection = useMemo(
-    () =>
-      new Map(
-        jobs
-          .filter((j) => typeof j.payload?.section_id === 'string')
-          .map((j) => [j.payload!.section_id as string, j] as const)
-      ),
-    [jobs]
-  );
+  const pendingJobs = useMemo(() => pendingOf(jobs), [jobs]);
+  const jobBySection = useMemo(() => latestJobBySection(jobs), [jobs]);
 
   const refreshJobs = useCallback(async () => {
     try {
@@ -167,23 +150,8 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
     run(async () => {
       setConfirmingLargeJob(false);
       if (!artifactId) throw new Error('This stage has no artifact to draft into.');
-      // Enqueue every section that is not already written. Sections that are
-      // done collide on their idempotency key and quietly do nothing, which is
-      // the "not regenerated unless requested" guarantee doing its job.
-      for (const [index, section] of outline.entries()) {
-        if (section.status === 'complete') continue;
-        await enqueueSectionJob({
-          project,
-          artifactId,
-          stageId,
-          outlineVersionId: approvedOutlineVersionId,
-          sectionId: section.id,
-          sectionIndex: index,
-          // A section whose last job gave up needs a fresh key, or resuming
-          // collides with the dead row and does nothing (PM-04).
-          revision: revisionToEnqueue(section, jobBySection.get(section.id) ?? null),
-        });
-      }
+      // The same call Go mode's draft_sections makes (B2a).
+      await enqueueDraftJobs({ project, artifactId, stageId, outline, approvedOutlineVersionId, jobs });
     });
 
   const pause = () => run(async () => void (await requestProjectCancel(project.id)));
@@ -229,55 +197,21 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
   const reviseSections = (targets: { section: OutlineSection; index: number }[]) =>
     run(async () => {
       if (!artifactId || !revise) throw new Error('This stage has no manuscript to revise.');
-      const snapshot = {
-        content: formatManuscript(outline, Number.POSITIVE_INFINITY),
-        source_operation: 'manuscript_snapshot',
-        instruction: `Before ${revise.stageLabel}`,
-        model: '',
-        mode: project.mode,
-        change_summary: `The manuscript as it stood before ${revise.stageLabel}.`,
-      };
-      // Through the store when the workspace provides it, so the snapshot is
-      // in the bundle at once; the raw write is only for a caller without one.
-      if (appendManuscriptVersion) await appendManuscriptVersion(snapshot);
-      else await appendVersion({ id: artifactId, user_id: project.user_id, project_id: project.id } as Artifact, snapshot);
-      const brief = {
-        stage_label: revise.stageLabel,
-        instruction: revise.instruction,
-        notes: formatRevisionNotes(revise.findings),
-      };
-      for (const { section, index } of targets) {
-        await enqueueSectionJob({
-          project,
-          artifactId,
-          stageId,
-          outlineVersionId: approvedOutlineVersionId,
-          sectionId: section.id,
-          sectionIndex: index,
-          revision: (section.revision ?? 0) + 1,
-          revise: brief,
-        });
-      }
+      // The same call Go mode's revise_sections makes (B2a). The snapshot goes
+      // through the store when the workspace provides it, so it is in the
+      // bundle at once; the raw write is only for a caller without one.
+      await enqueueRevisionJobs({
+        project, artifactId, stageId, outline, approvedOutlineVersionId, brief: revise, targets,
+        saveSnapshot: (snapshot) =>
+          appendManuscriptVersion
+            ? appendManuscriptVersion(snapshot)
+            : appendVersion({ id: artifactId, user_id: project.user_id, project_id: project.id } as Artifact, snapshot),
+      });
     });
 
-  // A section counts as revised here once any job this stage queued for it
-  // succeeded — not only its latest job, which after Editing runs is Editing's,
-  // and would make Revision read as never applied.
-  const revisedCount = revise
-    ? outline.filter((s) =>
-        jobs.some(
-          (j) =>
-            j.status === 'succeeded' &&
-            j.payload?.stage_id === stageId &&
-            j.payload?.section_id === s.id
-        )
-      ).length
-    : 0;
+  const revisedCount = revise ? revisedCountOf(outline, jobs, stageId) : 0;
 
-  const reviseAll = () =>
-    void reviseSections(
-      outline.flatMap((section, index) => (section.status === 'complete' ? [{ section, index }] : []))
-    );
+  const reviseAll = () => void reviseSections(writtenSections(outline));
   const findingCount = revise?.findings.length ?? 0;
   const reviseLabel =
     findingCount > 0
@@ -493,7 +427,7 @@ function SectionRow({
 }: SectionRowProps) {
   // The job row is the authority on "in flight"; the artifact is the authority
   // on "written". Neither is inferred from the other.
-  const inFlight = job !== null && PENDING_STATUSES.has(job.status);
+  const inFlight = job !== null && PENDING_JOB_STATUSES.has(job.status);
   const done = section.status === 'complete';
   const gaveUp = !done && (job?.status === 'dead' || job?.status === 'failed');
 

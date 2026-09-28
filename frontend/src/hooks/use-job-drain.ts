@@ -30,7 +30,7 @@
 
 import { useEffect, useRef } from 'react';
 
-import { createClient } from '@/lib/supabase/client';
+import { drainLockName, drainOnce } from '@/lib/jobs/client-drain';
 
 /** Jittered so several tabs waking together do not synchronise into a spike. */
 const MIN_INTERVAL_MS = 1_000;
@@ -87,25 +87,7 @@ export function useJobDrain({ projectId, hasPendingJobs, onProgress }: UseJobDra
         timer = setTimeout(resolve, ms);
       });
 
-    async function drainOnce(): Promise<boolean> {
-      const supabase = createClient();
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
-      if (!token) return false;
-
-      const res = await fetch('/api/jobs/drain', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ project_id: projectId }),
-      });
-      if (!res.ok) return false;
-
-      const report = (await res.json()) as { claimed?: number };
-      return (report.claimed ?? 0) > 0;
-    }
+    const id = projectId;
 
     async function loop(): Promise<void> {
       while (!cancelled) {
@@ -115,7 +97,7 @@ export function useJobDrain({ projectId, hasPendingJobs, onProgress }: UseJobDra
         }
 
         try {
-          const didWork = await drainOnce();
+          const didWork = await drainOnce(id);
           if (cancelled) return;
           if (didWork) progressRef.current?.();
         } catch {
@@ -132,7 +114,7 @@ export function useJobDrain({ projectId, hasPendingJobs, onProgress }: UseJobDra
     // One drainer per project per browser, across all its tabs. Without the
     // lock, five open tabs make five times the requests to do exactly the same
     // work — the lease makes that harmless, but not free.
-    const lockName = `pm-drain-${projectId}`;
+    const lockName = drainLockName(id);
     if (typeof navigator !== 'undefined' && navigator.locks) {
       navigator.locks
         .request(lockName, { mode: 'exclusive', signal: lockAbort.signal }, async () => {
