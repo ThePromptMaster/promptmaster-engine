@@ -132,9 +132,17 @@ export function buildAgentState(input: {
     criteria_met: stageEvaluation.criteria.filter((c) => c.satisfied).map((c) => c.label),
     // A box only the user ticks cannot be satisfied by rewriting the draft —
     // without saying so, a real planner revised three times to tick one (B4).
-    criteria_unmet: stageEvaluation.unmet.map((c) =>
-      c.manual ? `${c.label} (ticked by the user when satisfied — revising cannot satisfy it)` : c.label
-    ),
+    // A box the user has not ticked on an optional criterion is not a reason
+    // to stop either: the stage can be left with it open. Left unsaid, the
+    // planner asked about "Every audience need maps to a section" before
+    // moving on from an approved outline.
+    criteria_unmet: stageEvaluation.unmet.map((c) => {
+      const notes = [
+        ...(c.manual ? ['ticked by the user when satisfied — revising cannot satisfy it'] : []),
+        ...(c.blocking ? [] : ['optional — moving on does not need it; do not ask about it']),
+      ];
+      return notes.length ? `${c.label} (${notes.join('; ')})` : c.label;
+    }),
     evaluation: ev
       ? `alignment ${ev.alignment_score}, clarity ${ev.clarity_score}, drift ${ev.drift_score}` +
         (ev.findings?.length ? `; ${ev.findings.length} finding(s)` : '') +
@@ -144,9 +152,16 @@ export function buildAgentState(input: {
           : '')
       : '',
     next_stage_label: next ? (template.stages.find((s) => s.id === next)?.label ?? next) : '',
+    // A stage moved past with a requirement unticked stays "in progress, left
+    // open"; only the user can close it, so the planner is told not to ask.
     prior_stages: template.stages
       .slice(0, Math.max(0, index))
-      .map((s) => `${s.label}: ${state.stages[s.id]?.status ?? 'not_started'}`),
+      .map((s) => {
+        const st = state.stages[s.id];
+        return st?.status === 'in_progress' && st.left_open
+          ? `${s.label}: left open (moved past; only the user can close it — nothing for you to do there)`
+          : `${s.label}: ${st?.status ?? 'not_started'}`;
+      }),
     recent_steps: steps
       .filter((s) => s.status !== 'running')
       .slice(-RECENT_STEPS)

@@ -148,6 +148,12 @@ test('Go generates the outline, asks for its approval with the button, drafts ev
   // The approval was the user's click, on the record.
   const approvals = await serviceSelect('workflow_events', `project_id=eq.${id}&type=eq.outline_approved&select=actor`);
   expect(approvals).toEqual([{ actor: 'user' }]);
+  // Outline approval has no artifact to cite, and the user approved the move:
+  // it is complete, not left open (a left-open stage is one the planner then
+  // keeps asking the user about).
+  const approvalMoves = await serviceSelect('workflow_events', `project_id=eq.${id}&stage_id=eq.outline_approval&type=in.(stage_marked_complete,stage_advanced)&select=type,actor,payload`);
+  expect(approvalMoves).toMatchObject([{ type: 'stage_marked_complete', actor: 'user' }]);
+  expect(approvalMoves[0].payload?.evidence_version_id).toBeUndefined();
 });
 
 /**
@@ -189,4 +195,16 @@ test('Autonomous decides the routine continuity findings and leaves the major on
   expect(version.source_operation).toBe('agent_triage');
   const rows = JSON.parse(version.content).items as { id: string; status?: string; reason?: string }[];
   expect(rows.map((r) => r.status ?? null)).toEqual([null, 'accepted', 'accepted']);
+
+  // The card has no button of its own ("Decide in the table below. Then press
+  // Resume."), so Resume must be there — it was hidden behind every card
+  // once, and a run stopped here could never continue.
+  await expect(panel.getByRole('button', { name: /^Resume$/ })).toBeVisible();
+  await statuses.nth(0).click();
+  await page.getByRole('option', { name: 'Accept' }).click();
+  await page.getByRole('button', { name: 'Save changes' }).click();
+  await expect(page.getByText('1 of 1 done')).toBeVisible({ timeout: 15_000 });
+  await panel.getByRole('button', { name: /^Resume$/ }).click();
+  await expect(card).toHaveCount(0, { timeout: 30_000 });
+  await expect.poll(async () => (await serviceSelect('agent_steps', `run_id=eq.${run.id}&select=idx`)).length, { timeout: 30_000 }).toBeGreaterThan(1);
 });

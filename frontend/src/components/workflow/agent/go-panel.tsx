@@ -3,6 +3,7 @@
 import { useState } from 'react';
 
 import { actionLabel } from '@/lib/agent/actions';
+import { describeNeed } from '@/lib/agent/needs';
 import type { useGoLoop } from '../use-go-loop';
 import { AuthorizationDialog } from './authorization-dialog';
 import { DecisionPrompt, QuestionPrompt } from './decision-prompt';
@@ -111,7 +112,7 @@ export function GoPanel({
             onStop={() => void go.stop()}
             canResume={canResume}
             disabled={go.phase === 'watching' || Boolean(go.pendingStep) || Boolean(go.authorizing)}
-            hideResume={Boolean(need && needsActions)}
+            hideResume={Boolean(need && needsActions && describeNeed(need, go.stageLabelFor).action)}
           />
           {need && <NeedsYouCard key={`${need.kind}:${go.run?.id}`} need={need} stageLabel={go.stageLabelFor} onAction={act} />}
           {go.phase === 'watching' && (

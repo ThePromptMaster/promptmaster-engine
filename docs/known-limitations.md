@@ -436,7 +436,13 @@ the buttons call (`lib/outline/actions.ts`, `lib/jobs/sections.ts`,
 `lib/workflow/apply-findings.ts`), each verified against the project before it is
 recorded as succeeded. What stays the user's: approving an outline, unblocking a stage,
 ticking a manual requirement, deciding on findings; Go stops and says so (the inline
-"I need you to…" card is B4). A drafting step waits for its section jobs for up to ten
+"I need you to…" card is B4; a card with no button of its own leaves Resume in place —
+until 2026-09-29 every card hid it, and a run stopped for material findings could not
+be continued at all). A stage with nothing to cite — Outline approval has no artifact —
+is completed by a move the user approved (Guided, Checkpoint, or an approved Autonomous
+step) exactly as the transition bar completes it; a move an Autonomous run makes on its
+own must cite a version (`workflow_events_agent_authorized`), so there it moves on and
+leaves the stage open, and the planner is told a left-open stage is the user's to close. A drafting step waits for its section jobs for up to ten
 minutes and is then recorded `interrupted` — the sections go on being written by cron,
 and Resume waits again without spending a step. Derived (Research) outlines are still
 generated only from the panel.
