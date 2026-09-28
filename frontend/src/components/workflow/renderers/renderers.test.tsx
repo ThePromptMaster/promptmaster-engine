@@ -458,9 +458,9 @@ describe('ReviewRenderer', () => {
     const user = userEvent.setup();
     render(<ReviewRenderer {...props(bookStage('fact_check'), { versions: [version(rows)] })} />);
 
-    // Verified is a decision that stands on its own.
+    // Verified by me is a decision that stands on its own.
     await user.click(screen.getAllByRole('combobox')[0]);
-    await user.click(screen.getByRole('option', { name: 'Verified' }));
+    await user.click(screen.getByRole('option', { name: 'Verified by me' }));
     expect(screen.queryByText(/still counts as unresolved/)).not.toBeInTheDocument();
 
     // Unverifiable is legitimate, but has to say why.

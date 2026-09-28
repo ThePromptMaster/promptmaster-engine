@@ -217,6 +217,16 @@ export function ReviewRenderer({
               </tbody>
             </table>
           </div>
+          {statuses.some((s) => s.explain) && (
+            <dl aria-label="What the statuses mean" className="mt-3 grid gap-x-4 gap-y-1 text-label sm:grid-cols-[max-content_1fr]">
+              {statuses.filter((s) => s.explain).map((s) => (
+                <div key={s.value} className="contents">
+                  <dt className={TONE_CLASS[s.tone]}>{s.label}</dt>
+                  <dd className="text-[var(--on-surface-variant)]">{s.explain}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
         </>
       )}
 
@@ -268,7 +278,7 @@ function ReviewRow({ row, columns, statuses, schema, readOnly, onPatch }: Review
           ) : (
             <CustomSelect
               value={row.status ?? ''}
-              options={statuses.map((s) => ({ value: s.value, label: s.label }))}
+              options={statuses.filter((s) => s.settable !== false || s.value === row.status).map((s) => ({ value: s.value, label: s.label }))}
               placeholder="Not looked at"
               onChange={(value) => onPatch(row.id, 'status', value)}
             />

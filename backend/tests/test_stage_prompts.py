@@ -329,14 +329,29 @@ def test_a_remove_status_is_stored_as_removed(claim_schema):
 
 def test_a_model_cannot_mark_a_claim_verified(claim_schema):
     # Nothing here retrieved a source, so "verified" would be a guess wearing
-    # the author's badge. The status is left for the author to set.
+    # the author's badge. It becomes provenance: a candidate source, at most.
     items = _parse_items(
-        {"items": [{"claim": "a", "status": "Verified", "reason": "Merck says so"}, {"claim": "b", "status": "unverifiable"}]},
+        {"items": [
+            {"claim": "a", "source": "Merck Manual, ch. 3", "status": "Verified", "reason": "Merck says so"},
+            {"claim": "b", "status": "unverifiable", "reason": "No primary source"},
+            {"claim": "c", "source": "none found", "status": "verified_by_promptmaster"},
+        ]},
         claim_schema,
     )
-    assert "status" not in items[0].model_dump()
+    assert items[0].model_dump()["status"] == "candidate_source"
     assert "reason" not in items[0].model_dump()
     assert items[1].model_dump()["status"] == "unverifiable"
+    assert items[2].model_dump()["status"] == "no_source"
+
+
+def test_a_claim_with_no_status_starts_as_provenance(claim_schema):
+    # C3: what PromptMaster found, never a decision — candidate_source when it
+    # named where to check, no_source when it could not.
+    items = _parse_items(
+        {"items": [{"claim": "a", "source": "WHO fact sheet on rabies"}, {"claim": "b", "source": ""}, {"claim": "c"}]},
+        claim_schema,
+    )
+    assert [i.model_dump()["status"] for i in items] == ["candidate_source", "no_source", "no_source"]
 
 
 def test_other_tables_keep_whatever_status_the_model_sent(audience_schema):

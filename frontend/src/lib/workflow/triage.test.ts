@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { BOOK_V1 } from './templates/book.v1';
-import { itemSchemaFor, type StageItem } from './stage-artifact';
+import { isTriaged, itemSchemaFor, type StageItem } from './stage-artifact';
 import { applyTriage, findingRisk, isTriageTable, splitUntriaged } from './triage';
 
 const continuity = itemSchemaFor(BOOK_V1.stages.find((s) => s.id === 'continuity')!);
@@ -48,5 +48,20 @@ describe('which findings Go may decide (B3)', () => {
     const withReason = applyTriage(items, [{ id: 'b', status: 'rejected', reason: 'The text does not say that.' }], continuity);
     expect(withReason.applied).toEqual(['b']);
     expect(withReason.items[1]).toMatchObject({ status: 'rejected', reason: 'The text does not say that.' });
+  });
+});
+
+describe('claim table provenance (C3)', () => {
+  const schema = itemSchemaFor(BOOK_V1.stages.find((s) => s.id === 'fact_check')!);
+  it('a state PromptMaster set is not a decision; the user\'s is', () => {
+    expect(isTriaged({ id: 'a', claim: 'x', status: 'candidate_source' }, schema)).toBe(false);
+    expect(isTriaged({ id: 'a', claim: 'x', status: 'no_source' }, schema)).toBe(false);
+    expect(isTriaged({ id: 'a', claim: 'x', status: 'verified' }, schema)).toBe(true);
+    expect(isTriaged({ id: 'a', claim: 'x', status: 'unverifiable' }, schema)).toBe(false);
+    expect(isTriaged({ id: 'a', claim: 'x', status: 'unverifiable', reason: 'No primary source.' }, schema)).toBe(true);
+  });
+  it('only a tool sets "Verified by PromptMaster", and Go never triages claims', () => {
+    expect(schema.statuses!.find((s) => s.value === 'verified_by_promptmaster')!.settable).toBe(false);
+    expect(isTriageTable(schema)).toBe(false);
   });
 });
