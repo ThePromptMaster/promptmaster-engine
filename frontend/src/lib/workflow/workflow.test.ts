@@ -23,10 +23,8 @@ function emptyContext(overrides: Partial<StageContext> = {}): StageContext {
     itemsMissingStatus: {},
     artifactNonEmpty: {},
     outlineApproved: false,
-    sectionsTotal: 0,
-    sectionsComplete: 0,
-    findingsTotal: 0,
-    findingsTriaged: 0,
+    sections: {},
+    findings: {},
     manualChecks: {},
     ...overrides,
   };
@@ -359,14 +357,14 @@ describe('exit criteria', () => {
   });
 
   it('does not treat "no sections at all" as all sections complete', () => {
-    const r = evaluateStage(BOOK_V1, 'drafting', emptyContext({ sectionsTotal: 0, sectionsComplete: 0 }));
+    const r = evaluateStage(BOOK_V1, 'drafting', emptyContext({ sections: { drafting: { total: 0, complete: 0 } } }));
     const c = r.criteria.find((x) => x.id === 'draft.allsections')!;
     expect(c.satisfied).toBe(false);
     expect(c.detail).toBe('no sections yet');
   });
 
   it('passes when every section is written', () => {
-    const r = evaluateStage(BOOK_V1, 'drafting', emptyContext({ sectionsTotal: 12, sectionsComplete: 12 }));
+    const r = evaluateStage(BOOK_V1, 'drafting', emptyContext({ sections: { drafting: { total: 12, complete: 12 } } }));
     expect(r.criteria.find((c) => c.id === 'draft.allsections')!.satisfied).toBe(true);
     expect(r.canAdvance).toBe(true);
   });
@@ -604,10 +602,10 @@ describe('project completion is about the deliverable (PM-14)', () => {
   it('a book is done when every section is written, whatever the checklists say', async () => {
     const { completionSummary } = await import('./engine');
     const state = projectState(BOOK_V1, [event('stage_advanced', 'objective', { to_stage_id: 'audience' })]);
-    const done = completionSummary(BOOK_V1, state, { artifactNonEmpty: true, sectionsTotal: 3, sectionsComplete: 3 });
+    const done = completionSummary(BOOK_V1, state, { artifactNonEmpty: { drafting: true }, sections: { drafting: { total: 3, complete: 3 } } });
     expect(done).toMatchObject({ deliverableDone: true, leftOpen: 1 });
-    const notDone = completionSummary(BOOK_V1, state, { artifactNonEmpty: true, sectionsTotal: 3, sectionsComplete: 2 });
+    const notDone = completionSummary(BOOK_V1, state, { artifactNonEmpty: { drafting: true }, sections: { drafting: { total: 3, complete: 2 } } });
     expect(notDone.deliverableDone).toBe(false);
-    expect(completionSummary(BOOK_V1, state, { artifactNonEmpty: false, sectionsTotal: 0, sectionsComplete: 0 }).deliverableDone).toBe(false);
+    expect(completionSummary(BOOK_V1, state, { artifactNonEmpty: {}, sections: {} }).deliverableDone).toBe(false);
   });
 });

@@ -102,10 +102,8 @@ function ctx(overrides: Partial<StageContext> = {}): StageContext {
     itemsMissingStatus: {},
     artifactNonEmpty: {},
     outlineApproved: false,
-    sectionsTotal: 0,
-    sectionsComplete: 0,
-    findingsTotal: 0,
-    findingsTriaged: 0,
+    sections: {},
+    findings: {},
     manualChecks: {},
     ...overrides,
   };

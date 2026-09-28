@@ -497,10 +497,13 @@ describe('derive, approve, draft', () => {
       itemsMissingStatus: {},
       artifactNonEmpty: {},
       outlineApproved: true,
-      sectionsTotal: store.outline.length,
-      sectionsComplete: store.outline.filter((s) => s.status === 'complete').length,
-      findingsTotal: 0,
-      findingsTriaged: 0,
+      sections: {
+        drafting: {
+          total: store.outline.length,
+          complete: store.outline.filter((s) => s.status === 'complete').length,
+        },
+      },
+      findings: {},
       manualChecks: {},
     };
 
@@ -511,8 +514,7 @@ describe('derive, approve, draft', () => {
     // Sanity: with no sections it is the failure this task started from.
     const empty = evaluateStage(RESEARCH_V1, 'drafting', {
       ...context,
-      sectionsTotal: 0,
-      sectionsComplete: 0,
+      sections: { drafting: { total: 0, complete: 0 } },
     });
     expect(empty.canAdvance).toBe(false);
     expect(empty.unmet[0].detail).toBe('no sections yet');

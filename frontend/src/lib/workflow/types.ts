@@ -285,10 +285,15 @@ export interface StageContext {
   itemsMissingStatus: Record<string, number>;
   artifactNonEmpty: Record<string, boolean>;
   outlineApproved: boolean;
-  sectionsTotal: number;
-  sectionsComplete: number;
-  findingsTotal: number;
-  findingsTriaged: number;
+  /**
+   * Per long-form stage id: sections in the manuscript it works on and how
+   * many are written. Keyed by stage, not a single pair, so the same context
+   * is right for whichever stage asks — Go evaluates the current stage while
+   * the user may be viewing another.
+   */
+  sections: Record<string, { total: number; complete: number }>;
+  /** Per review stage id: findings held and how many carry a status. */
+  findings: Record<string, { total: number; triaged: number }>;
   /** Manual criteria the user has ticked, by criterion id. */
   manualChecks: Record<string, boolean>;
 }

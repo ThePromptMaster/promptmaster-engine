@@ -180,6 +180,7 @@ function contextFrom(
   const itemCounts: Record<string, number> = {};
   const itemsMissingStatus: Record<string, number> = {};
   const artifactNonEmpty: Record<string, boolean> = {};
+  const findings: StageContext['findings'] = {};
 
   for (const stage of template.stages) {
     const content = contents[stage.id] ?? '';
@@ -189,6 +190,9 @@ function contextFrom(
     const schema = itemSchemaFor(stage);
     itemCounts[stage.id] = items.length;
     itemsMissingStatus[stage.id] = items.filter((i) => !isTriaged(i, schema)).length;
+    if (stage.renderer === 'review') {
+      findings[stage.id] = { total: items.length, triaged: items.length - itemsMissingStatus[stage.id] };
+    }
   }
 
   return {
@@ -197,10 +201,8 @@ function contextFrom(
     itemsMissingStatus,
     artifactNonEmpty,
     outlineApproved: false,
-    sectionsTotal: 0,
-    sectionsComplete: 0,
-    findingsTotal: 0,
-    findingsTriaged: 0,
+    sections: {},
+    findings,
     manualChecks: {},
   };
 }

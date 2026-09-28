@@ -91,7 +91,7 @@ function evaluateCriterion(
     }
 
     case 'all_sections_complete': {
-      const { sectionsComplete: done, sectionsTotal: total } = ctx;
+      const { complete: done, total } = ctx.sections[stageId] ?? { total: 0, complete: 0 };
       return {
         ...base,
         // Zero sections is not "all complete" — it means drafting hasn't started.
@@ -113,7 +113,8 @@ function evaluateCriterion(
       return { ...base, satisfied: ctx.outlineApproved };
 
     case 'all_findings_triaged': {
-      const outstanding = ctx.findingsTotal - ctx.findingsTriaged;
+      const held = ctx.findings[stageId] ?? { total: 0, triaged: 0 };
+      const outstanding = held.total - held.triaged;
       return {
         ...base,
         satisfied: outstanding <= 0,
@@ -412,6 +413,18 @@ export function deliverableStage(template: WorkflowTemplate): StageDefinition | 
   return [...template.stages].reverse().find((s) => s.required && s.renderer === 'prose');
 }
 
+/** Is the deliverable itself done? For a manuscript, every section; otherwise a non-empty draft. */
+export function deliverableDone(
+  stage: StageDefinition,
+  ctx: Pick<StageContext, 'artifactNonEmpty' | 'sections'>
+): boolean {
+  if (stage.renderer === 'long_form') {
+    const { total, complete } = ctx.sections[stage.id] ?? { total: 0, complete: 0 };
+    return total > 0 && complete >= total;
+  }
+  return Boolean(ctx.artifactNonEmpty[stage.id]);
+}
+
 export interface CompletionSummary {
   deliverable: StageDefinition | undefined;
   deliverableDone: boolean;
@@ -430,13 +443,10 @@ export interface CompletionSummary {
 export function completionSummary(
   template: WorkflowTemplate,
   state: WorkflowState,
-  deliverable: { artifactNonEmpty: boolean; sectionsTotal: number; sectionsComplete: number }
+  ctx: Pick<StageContext, 'artifactNonEmpty' | 'sections'>
 ): CompletionSummary {
   const stage = deliverableStage(template);
-  const done =
-    stage?.renderer === 'long_form'
-      ? deliverable.sectionsTotal > 0 && deliverable.sectionsComplete >= deliverable.sectionsTotal
-      : deliverable.artifactNonEmpty;
+  const done = stage ? deliverableDone(stage, ctx) : false;
 
   const summary: CompletionSummary = {
     deliverable: stage,
