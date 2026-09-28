@@ -104,8 +104,8 @@ export function describeNeed(need: NeedsUser, stageLabel: (id: string) => string
       return { message: 'I need an objective before I can choose a move. Set one above.', action: null };
     case 'unblock_stage':
       return {
-        message: `${stageLabel(need.stageId)} is marked blocked${need.reason ? `: ${need.reason.replace(/[.\s]+$/, '')}` : ''}. I need it unblocked before I can continue.`,
-        action: 'Unblock and resume',
+        message: `${stageLabel(need.stageId)} is marked stuck${need.reason ? `: ${need.reason.replace(/[.\s]+$/, '')}` : ''}. I need that cleared before I can continue.`,
+        action: 'Continue the stage and resume',
       };
     case 'approve_outline':
       return need.unsavedDraft

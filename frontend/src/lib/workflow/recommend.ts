@@ -318,8 +318,8 @@ export function buildRationale(
     }
     if (signals.completeness === 'incomplete') {
       return firstNonBlank(signals.completeness_reason)
-        ? `The artifact is incomplete: ${signals.completeness_reason!.trim()}`
-        : 'The artifact stopped before it was complete.';
+        ? `The draft is incomplete: ${signals.completeness_reason!.trim()}`
+        : 'The draft stopped before it was complete.';
     }
     if (signals.clarity === 'Low' || signals.clarity === 'Medium') {
       return firstNonBlank(signals.clarity_explanation)
@@ -335,10 +335,10 @@ export function buildRationale(
     if (signals.drift === 'High') return `Brings the work back to what ${stageLabel} asked for.`;
     if (signals.alignment === 'Low') {
       return firstNonBlank(objective)
-        ? `Points the artifact back at the stated objective: ${objective.trim()}`
-        : 'Points the artifact back at the stated objective.';
+        ? `Points the draft back at the stated objective: ${objective.trim()}`
+        : 'Points the draft back at the stated objective.';
     }
-    if (signals.completeness === 'incomplete') return 'Finishes what the artifact left unsaid.';
+    if (signals.completeness === 'incomplete') return 'Finishes what the draft left unsaid.';
     if (signals.clarity !== 'High') return `Makes ${stageLabel} easier to read and act on.`;
     return `Raises the quality of ${stageLabel} without changing what it is about.`;
   };
@@ -351,7 +351,7 @@ export function buildRationale(
     expected_benefit: firstNonBlank(model?.expected_benefit) ?? derivedBenefit(),
     scope:
       firstNonBlank(model?.scope) ??
-      `The whole of ${stageLabel}'s artifact — no narrower scope was identified.`,
+      `The whole of ${stageLabel}'s draft — no narrower scope was identified.`,
   };
 }
 
@@ -380,7 +380,7 @@ export function scopeFromModel(prose: string | undefined, stageLabel: string): R
   return {
     kind: 'document',
     described_as:
-      firstNonBlank(prose) ?? `The whole of ${stageLabel}'s artifact, as it currently stands.`,
+      firstNonBlank(prose) ?? `The whole of ${stageLabel}'s draft, as it currently stands.`,
   };
 }
 

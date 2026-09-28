@@ -8,7 +8,7 @@ import type { StageDefinition, StageStatus } from '@/lib/workflow/types';
 const STATUS_LABEL: Partial<Record<StageStatus, string>> = {
   complete: 'Complete',
   completed_with_artifact: 'Complete',
-  blocked: 'Blocked',
+  blocked: 'Stuck',
   skipped: 'Skipped',
   stale: 'Needs another look',
 };

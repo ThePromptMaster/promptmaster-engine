@@ -95,7 +95,7 @@ export function preempt(input: {
   const current = state.stages[state.current_stage_id];
   if (current?.status === 'blocked') {
     const why = (current.blocked?.reason ?? 'no reason given').replace(/[.\s]+$/, '');
-    return { status: 'blocked', reason: `This stage is blocked: ${why}. Unblock it, or skip it, to let Go continue.` };
+    return { status: 'blocked', reason: `This stage is marked stuck: ${why}. Clear that, or skip it, to let Go continue.` };
   }
   if (stepsUsed >= budgetSteps) {
     return { status: 'budget_exhausted', reason: `Used all ${budgetSteps} steps of this run's budget.` };

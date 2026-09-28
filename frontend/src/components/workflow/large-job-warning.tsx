@@ -89,7 +89,7 @@ export function LargeJobWarning({ sectionCount, model, onConfirm, onCancel }: Pr
           {estimate && (
             <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1">
               <Figure label="Sections" value={formatTokens(estimate.section_count)} />
-              <Figure label="Model calls" value={formatTokens(estimate.llm_calls)} />
+              <Figure label="AI requests" value={formatTokens(estimate.llm_calls)} />
               <Figure
                 label="Estimated cost"
                 value={formatUsd(estimate.estimated_cost_usd)}

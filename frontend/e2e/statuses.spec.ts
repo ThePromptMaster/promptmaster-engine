@@ -29,14 +29,14 @@ test('moving on does not complete a stage; finished stages carry their evidence;
 
   // Audience: block it, then lift the block.
   await transitionBar(page).getByRole('button', { name: /^More/ }).click();
-  await page.getByRole('menuitem', { name: 'Mark as blocked…' }).click();
+  await page.getByRole('menuitem', { name: 'Mark as stuck…' }).click();
   await page.getByRole('radio', { name: /Waiting on information/ }).click();
   await page.getByLabel('What exactly is missing').fill('Reader survey results');
-  await page.getByRole('button', { name: 'Mark as blocked' }).click();
-  await expect(page.getByText('Blocked — waiting on information')).toBeVisible();
+  await page.getByRole('button', { name: 'Mark as stuck' }).click();
+  await expect(page.getByText('Stuck — waiting on information')).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('01-blocked-with-reason.png') });
-  await page.getByRole('button', { name: 'Unblock' }).click();
-  await expect(page.getByText('Blocked — waiting on information')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Continue this stage' }).click();
+  await expect(page.getByText('Stuck — waiting on information')).toHaveCount(0);
   await pressTransition(page);
 
   // Positioning (v3): the comparables hint explains the requirement (PM-02).

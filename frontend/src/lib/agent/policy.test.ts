@@ -56,7 +56,7 @@ describe('preempt — checked before any model call', () => {
   it('respects a blocked stage', () => {
     const cur = research.current_stage_id;
     const blocked = { ...research, stages: { ...research.stages, [cur]: { status: 'blocked' as const, blocked: { kind: 'data_missing' as const, reason: 'no data' } } } };
-    expect(preempt({ ...base, state: blocked })).toEqual({ status: 'blocked', reason: 'This stage is blocked: no data. Unblock it, or skip it, to let Go continue.' });
+    expect(preempt({ ...base, state: blocked })).toEqual({ status: 'blocked', reason: 'This stage is marked stuck: no data. Clear that, or skip it, to let Go continue.' });
   });
 
   it('ends a finished project as completed', () => {

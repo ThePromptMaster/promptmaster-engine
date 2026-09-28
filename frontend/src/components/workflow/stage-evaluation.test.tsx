@@ -129,7 +129,7 @@ describe('the Evaluate control', () => {
     );
 
     const button = screen.getByRole('button', { name: /evaluate this stage/i });
-    expect(button.textContent).toMatch(/1 model call/);
+    expect(button.textContent).toMatch(/one AI check/);
   });
 
   it('fires only when pressed — nothing evaluates on render', async () => {

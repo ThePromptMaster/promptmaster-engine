@@ -180,6 +180,6 @@ const LEGEND: [StageStatus, string][] = [
   ['in_progress', 'You are here'],
   ['not_started', 'Not started yet'],
   ['skipped', 'Skipped on purpose, with a reason'],
-  ['blocked', 'Blocked — waiting on something'],
+  ['blocked', 'Stuck — waiting on something'],
   ['stale', 'Recheck — something before it changed'],
 ];

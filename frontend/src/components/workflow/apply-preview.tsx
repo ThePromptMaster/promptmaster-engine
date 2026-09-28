@@ -233,7 +233,7 @@ export function ApplyPreview({
         </div>
 
         <p className="mt-3 text-right text-label text-[var(--on-surface-variant)]">
-          One model call. Nothing has been sent yet.
+          One AI pass. Nothing has been sent yet.
         </p>
       </div>
     </div>

@@ -18,7 +18,7 @@
  * one), so a bug here fails loudly instead of recording a false claim.
  */
 
-import type { ExecutionLabel } from '@/types/agent';
+import type { AgentRun, AgentStep, ExecutionLabel } from '@/types/agent';
 import { actionFor, INTERPRET_STEP } from './actions';
 
 export function deriveExecutionLabel(
@@ -50,11 +50,33 @@ export function deriveExecutionLabel(
 }
 
 export const LABEL_TEXT: Record<ExecutionLabel, { text: string; executed: boolean }> = {
-  discussed: { text: 'Reasoned', executed: false },
-  designed: { text: 'Written', executed: false },
+  discussed: { text: 'Analyzed', executed: false },
+  designed: { text: 'Draft written', executed: false },
   code_written: { text: 'Code written — not run', executed: false },
   code_executed: { text: 'Code executed', executed: true },
   simulation_run: { text: 'Simulation run', executed: true },
   result_interpreted: { text: 'Result interpreted', executed: true },
-  blocked: { text: 'Blocked', executed: false },
+  blocked: { text: 'Could not continue', executed: false },
+};
+
+/** A step's status in the user's words (C2): the raw status stays in the execution record. */
+export const STEP_STATUS_TEXT: Record<AgentStep['status'], string> = {
+  running: 'In progress',
+  succeeded: 'Done',
+  failed: 'Failed',
+  blocked: 'Could not continue',
+  awaiting_decision: 'Waiting for your approval',
+  cancelled: 'Cancelled',
+  interrupted: 'Interrupted',
+};
+
+/** A run's status in the user's words (C2). */
+export const RUN_STATUS_TEXT: Record<AgentRun['status'], string> = {
+  running: 'Running',
+  awaiting_decision: 'Waiting for you',
+  blocked: 'Could not continue',
+  completed: 'Completed',
+  budget_exhausted: 'Window used up',
+  stopped: 'Stopped',
+  failed: 'Failed',
 };

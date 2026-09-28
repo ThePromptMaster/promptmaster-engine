@@ -255,7 +255,7 @@ export function useStageChat({
         // in the source, or a section that has moved, is a refusal.
         setError(
           kind === 'selection'
-            ? 'That selection is not in this version of the text. Select inside the artifact and try again.'
+            ? 'That selection is not in this version of the text. Select inside the draft and try again.'
             : `There is no ${kind} to revise here yet.`
         );
         return;

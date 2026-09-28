@@ -948,8 +948,8 @@ export function WorkflowWorkspace({
       ? [{ id: 'mark-complete', label: 'Mark this stage complete', icon: 'task_alt', onSelect: () => void markComplete() }]
       : []),
     isBlocked
-      ? { id: 'unblock', label: 'Unblock this stage', icon: 'lock_open', onSelect: () => void setBlocked(null) }
-      : { id: 'block', label: 'Mark as blocked…', icon: 'block', onSelect: () => setBlocking(true) },
+      ? { id: 'unblock', label: 'Continue this stage', icon: 'lock_open', onSelect: () => void setBlocked(null) }
+      : { id: 'block', label: 'Mark as stuck…', icon: 'block', onSelect: () => setBlocking(true) },
     ...(draftable && hasContent
       ? [{ id: 'regenerate', label: 'Regenerate this stage', icon: 'refresh', onSelect: () => setConfirmingRegenerate(true) }]
       : []),
@@ -968,7 +968,7 @@ export function WorkflowWorkspace({
     ...(draftable && hasContent && Boolean(stageEvaluation.evaluate) && primaryAction.kind !== 'evaluate'
       ? [{
           id: 'evaluate',
-          label: headEvaluation ? 'Check this stage again · 1 model call' : 'Check this stage · 1 model call',
+          label: headEvaluation ? 'Check this stage again · one AI check' : 'Check this stage · one AI check',
           icon: 'rule',
           onSelect: () => stageEvaluation.evaluate?.(),
         }]
