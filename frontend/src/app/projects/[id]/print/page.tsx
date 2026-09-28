@@ -44,7 +44,8 @@ export default function PrintPage({ params }: { params: Promise<{ id: string }> 
 
   return (
     <main className="mx-auto max-w-[720px] px-6 py-10 print:max-w-none print:px-0 print:py-0">
-      <style>{`@media print { .print-hide { display: none } article h2 { break-before: page } @page { margin: 2cm } }`}</style>
+      {/* The app's own header would print above the title; only the manuscript prints. */}
+      <style>{`@media print { header, button, .print-hide { display: none } article h2 { break-before: page } @page { margin: 2cm } }`}</style>
       <div className="print-hide mb-6 flex flex-wrap items-center gap-3">
         <button
           onClick={() => window.print()}
