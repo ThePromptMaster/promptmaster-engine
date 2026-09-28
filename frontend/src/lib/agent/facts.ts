@@ -17,7 +17,7 @@ import { getArtifact } from '@/lib/supabase/versions';
 import { manuscriptArtifactFor } from '@/lib/workflow/context';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import { revisionBrief, type RevisionBrief } from '@/lib/workflow/revision';
-import { effectiveRenderer, itemSchemaFor, parseItems, stageDrafts, type StageItem, type StageItemSchema } from '@/lib/workflow/stage-artifact';
+import { effectiveRenderer, itemSchemaFor, parseItems, stageDrafts, type StageItem, type StageItemSchema, isTriaged } from '@/lib/workflow/stage-artifact';
 import { isTriageTable, splitUntriaged } from '@/lib/workflow/triage';
 import type { StageDefinition, WorkflowEvent, WorkflowTemplate } from '@/lib/workflow/types';
 import type { OutlineSection } from '@/types';
@@ -65,6 +65,13 @@ export interface ReviewFacts {
   routine: StageItem[];
   /** Undecided rows only the user decides (major, or of unknown severity). */
   material: StageItem[];
+  /**
+   * An outcome table (claims, runs, alternatives, validation): every row is
+   * the user's to decide, and revising the table cannot decide one. Found on
+   * the production pass of 2026-09-29, where Go revised and re-checked a
+   * claims table it could never satisfy.
+   */
+  outcome: boolean;
 }
 
 export interface StageFacts {
@@ -130,7 +137,10 @@ export async function readStageFacts(input: {
     const schema = itemSchemaFor(stage);
     const items = parseItems(bundles[stage.id]?.versions.at(-1)?.content) ?? [];
     if (isTriageTable(schema) && items.length) {
-      facts.review = { items, schema, ...splitUntriaged(items, schema) };
+      facts.review = { items, schema, ...splitUntriaged(items, schema), outcome: false };
+    } else if (items.length) {
+      const undecided = items.filter((i) => !isTriaged(i, schema));
+      facts.review = { items, schema, routine: [], material: undecided, outcome: true };
     }
   }
 

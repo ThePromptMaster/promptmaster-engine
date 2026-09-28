@@ -99,3 +99,19 @@ describe('B3: the findings that change the work are the user\'s', () => {
     expect(needsUser({ ...base, stage: stage('continuity'), facts: review(0, 0), stageEvaluation: evaluation('continuity'), allowed: ['advance_stage'] })).toBeNull();
   });
 });
+
+describe('needsUser: an outcome table is the user\'s to decide (production pass, 2026-09-29)', () => {
+  it('stops for undecided claims instead of letting the planner revise the table', () => {
+    const schema = { itemLabel: 'claim', fields: [], minItems: 1, maxItems: 20, statuses: [] };
+    const rows = [{ id: 'a', claim: 'x', status: 'candidate_source' }, { id: 'b', claim: 'y', status: 'no_source' }];
+    const need = needsUser({
+      ...base, stage: stage('fact_check'), stageEvaluation: evaluation('fact_check'), allowed: ['revise_stage', 'evaluate_stage'],
+      facts: { review: { items: rows, schema, routine: [], material: rows, outcome: true } } as never,
+    });
+    expect(need).toEqual({ kind: 'decide_rows', stageId: 'fact_check', count: 2, itemLabel: 'claim' });
+    expect(describeNeed(need!, label)).toEqual({
+      message: '2 claims are waiting for your decision — only you can settle them. Decide in the table below.',
+      action: null,
+    });
+  });
+});

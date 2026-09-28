@@ -23,7 +23,9 @@ export type NeedsUser =
   | { kind: 'wait_for_jobs'; stageId: string; pending: number; complete: number; total: number }
   | { kind: 'continue_budget'; budgetSteps: number }
   | { kind: 'large_job'; stageId: string; sections: number }
-  | { kind: 'triage_findings'; stageId: string; count: number };
+  | { kind: 'triage_findings'; stageId: string; count: number }
+  /** An outcome table's rows (claims, runs…) are all the user's to decide. */
+  | { kind: 'decide_rows'; stageId: string; count: number; itemLabel: string };
 
 /** Moves that change the stage's work; a stage with none left needs the user, not the planner. */
 const WORK_MOVES = new Set([
@@ -83,7 +85,9 @@ export function needsUser(input: {
 
   // The findings left are the ones that change the work: the user's call (B3).
   if (facts.review && facts.review.material.length > 0 && facts.review.routine.length === 0) {
-    return { kind: 'triage_findings', stageId: stage.id, count: facts.review.material.length };
+    return facts.review.outcome
+      ? { kind: 'decide_rows', stageId: stage.id, count: facts.review.material.length, itemLabel: facts.review.schema.itemLabel }
+      : { kind: 'triage_findings', stageId: stage.id, count: facts.review.material.length };
   }
 
   // Everything left to do here is a box only the user ticks.
@@ -135,6 +139,11 @@ export function describeNeed(need: NeedsUser, stageLabel: (id: string) => string
       return {
         message: `Drafting ${need.sections} sections is a large run. I need your say-so before spending that.`,
         action: `Draft ${need.sections} sections anyway`,
+      };
+    case 'decide_rows':
+      return {
+        message: `${need.count} ${need.count === 1 ? need.itemLabel : `${need.itemLabel}s`} ${need.count === 1 ? 'is' : 'are'} waiting for your decision — only you can settle ${need.count === 1 ? 'it' : 'them'}. Decide in the table below.`,
+        action: null,
       };
     case 'triage_findings':
       return {
