@@ -243,7 +243,7 @@ export function ChatPanel({
     let conflicts: InstructionConflict[] = [];
     try {
       const recent = chat.messages.filter((m) => m.role === 'user' && m.mode === 'instruct').map((m) => m.content);
-      const { decisions, others } = await conflictContext(project.id, stageId, recent);
+      const { decisions, others } = await conflictContext(project.id, stageId, recent, headVersion?.id ?? null);
       const rule = ruleConflicts({ instruction: text, objective: project.objective, constraints: project.constraints, decisions, others });
       let model: InstructionConflict[] = [];
       try {
@@ -265,7 +265,7 @@ export function ChatPanel({
       return;
     }
     await chat.propose(text, scope, { selection, sectionId: effectiveSectionId });
-  }, [draft, mode, scope, selection, effectiveSectionId, chat, project, stageId]);
+  }, [draft, mode, scope, selection, effectiveSectionId, chat, project, stageId, headVersion?.id]);
 
   const resolveConflicts = useCallback(
     async (choices: Controls[]) => {

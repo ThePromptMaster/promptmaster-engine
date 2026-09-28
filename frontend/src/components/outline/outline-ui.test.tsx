@@ -375,3 +375,22 @@ describe('OutlineHistory', () => {
     expect(within(list).getByText('Approved earlier')).toBeInTheDocument();
   });
 });
+
+describe('OutlineEditor — generate vs regenerate (A6, Sean 28 Sep item 8)', () => {
+  it('says "Generate" before an outline exists, and "Regenerate" once one does', async () => {
+    const onRegenerateAll = vi.fn();
+    const { unmount } = render(
+      <Harness head={doc([])} headApproved={false} onRegenerateAll={onRegenerateAll} />
+    );
+    // "Regenerate" before anything existed read as a step already missed.
+    expect(screen.queryByRole('button', { name: /Regenerate the outline/ })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Generate the outline' }));
+    // Nothing to replace, so nothing to confirm.
+    expect(onRegenerateAll).toHaveBeenCalledTimes(1);
+    unmount();
+
+    render(<Harness head={doc(['One'])} headApproved={false} onRegenerateAll={vi.fn()} />);
+    expect(screen.getByRole('button', { name: 'Regenerate the outline' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Generate the outline' })).not.toBeInTheDocument();
+  });
+});

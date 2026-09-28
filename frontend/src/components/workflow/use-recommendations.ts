@@ -73,7 +73,13 @@ interface Options {
   /** Clears it once persisted, so it is not written twice. */
   onModelRecommendationConsumed: () => void;
   /** Absent on the preview surface, and while browsing an earlier stage. */
-  appendStageVersion?: (stageId: string, name: string, version: NewVersion) => Promise<unknown>;
+  appendStageVersion?: (
+    stageId: string,
+    name: string,
+    version: NewVersion,
+    evaluation?: undefined,
+    options?: { keepRecommendations?: readonly string[] }
+  ) => Promise<unknown>;
   /**
    * Advance the stage, citing the accepted proposal — FR-02's whole point.
    *
@@ -345,21 +351,29 @@ export function useRecommendations({
       precedence: string[] = []
     ) => {
       if (!stage || !appendStageVersion) return;
-        await appendStageVersion(stage.id, stage.label, {
-          content: response.content,
-          source_operation: 'applied_recommendations',
-          // The literal block that was sent, returned by the endpoint rather
-          // than rebuilt here — two places building the same string is two
-          // places for it to drift (FR-10).
-          instruction: response.instruction,
-          model: project.model,
-          mode: project.mode,
-          change_summary:
-            chosen.length === 1
-              ? `Applied: ${chosen[0].title}`
-              : `Applied ${chosen.length} recommendations together.`,
-          finish_reason: response.finish_reason || null,
-        });
+        await appendStageVersion(
+          stage.id,
+          stage.label,
+          {
+            content: response.content,
+            source_operation: 'applied_recommendations',
+            // The literal block that was sent, returned by the endpoint rather
+            // than rebuilt here — two places building the same string is two
+            // places for it to drift (FR-10).
+            instruction: response.instruction,
+            model: project.model,
+            mode: project.mode,
+            change_summary:
+              chosen.length === 1
+                ? `Applied: ${chosen[0].title}`
+                : `Applied ${chosen.length} recommendations together.`,
+            finish_reason: response.finish_reason || null,
+          },
+          undefined,
+          // The new head retires the old head's pending fixes — except these,
+          // which are accepted just below and must still be pending then.
+          { keepRecommendations: chosen.map((r) => r.id).filter((id): id is string => Boolean(id)) }
+        );
 
         // --- then accept, then record ----------------------------------------
         // A failure from here leaves a good version and a still-pending

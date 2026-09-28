@@ -39,3 +39,4 @@ uv.lock
 # Vercel
 .vercel
 .env*
+test-results/

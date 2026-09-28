@@ -15,11 +15,12 @@ const saveEvaluation = vi.hoisted(() => vi.fn());
 const listWorkflowEvents = vi.hoisted(() => vi.fn());
 const appendWorkflowEvent = vi.hoisted(() => vi.fn());
 const listRecommendations = vi.hoisted(() => vi.fn());
+const supersedePending = vi.hoisted(() => vi.fn());
 const listTasks = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/supabase/projects', () => ({ getProject, updateProject }));
 vi.mock('@/lib/supabase/workflow', () => ({ listWorkflowEvents, appendWorkflowEvent }));
-vi.mock('@/lib/supabase/recommendations', () => ({ listRecommendations }));
+vi.mock('@/lib/supabase/recommendations', () => ({ listRecommendations, supersedePending }));
 vi.mock('@/lib/supabase/tasks', () => ({ listTasks }));
 vi.mock('@/lib/supabase/versions', () => ({
   listArtifacts,
@@ -81,6 +82,7 @@ beforeEach(() => {
   listWorkflowEvents.mockResolvedValue([]);
   appendWorkflowEvent.mockResolvedValue(undefined);
   listRecommendations.mockResolvedValue([]);
+  supersedePending.mockResolvedValue([]);
   listTasks.mockResolvedValue([]);
 });
 
@@ -418,5 +420,64 @@ describe('the store owns the event log and the recommendations (A4, SN-01)', () 
     s.upsertTask({ id: 't1', status: 'open' } as never);
     s.upsertTask({ id: 't1', status: 'done' } as never);
     expect(useProjectStore.getState().tasks).toEqual([{ id: 't1', status: 'done' }]);
+  });
+});
+
+describe('leaving a stage retires the proposals raised on it (A5, SN-01)', () => {
+  it('a stage-leaving event supersedes that stage\'s pending rows, and the store reflects it', async () => {
+    await loadFixture();
+    useProjectStore.setState({
+      recommendations: [
+        { id: 'r-move', status: 'pending', scope: { stage_id: 'input' } },
+        { id: 'r-next', status: 'pending', scope: { stage_id: 'review' } },
+        { id: 'r-done', status: 'accepted', scope: { stage_id: 'input' } },
+      ] as never,
+    });
+    supersedePending.mockResolvedValue(['r-move']);
+
+    await useProjectStore.getState().appendEvent({ type: 'stage_advanced', stage_id: 'input', to_stage_id: 'review' });
+
+    expect(supersedePending).toHaveBeenCalledWith('p1', { stageId: 'input' });
+    const byId = Object.fromEntries(useProjectStore.getState().recommendations.map((r) => [r.id, r.status]));
+    expect(byId).toEqual({ 'r-move': 'superseded', 'r-next': 'pending', 'r-done': 'accepted' });
+  });
+
+  it('finishing retires every pending "move on" proposal; blocking retires nothing', async () => {
+    await loadFixture();
+    await useProjectStore.getState().appendEvent({ type: 'project_finalized', stage_id: 'summary' });
+    expect(supersedePending).toHaveBeenCalledWith('p1', { kind: 'stage_transition' });
+    supersedePending.mockClear();
+    await useProjectStore.getState().appendEvent({ type: 'stage_blocked', stage_id: 'input' });
+    expect(supersedePending).not.toHaveBeenCalled();
+  });
+
+  it('a retire failure never fails the event', async () => {
+    await loadFixture();
+    supersedePending.mockRejectedValueOnce(new Error('offline'));
+    listWorkflowEvents.mockResolvedValue([EVENT('stage_advanced', 1)]);
+    const fresh = await useProjectStore.getState().appendEvent({ type: 'stage_advanced', stage_id: 'input' });
+    expect(fresh.map((e) => e.type)).toEqual(['stage_advanced']);
+  });
+
+  it('a new head retires the old head\'s pending fixes, keeping the ones being applied', async () => {
+    await loadFixture();
+    appendVersionRow.mockResolvedValue({ ...V1, id: 'v2', version_number: 2 });
+    useProjectStore.setState({ stages: { output: { artifact: { ...ARTIFACT, stage_id: 'output' } as never, versions: [V1 as never] } } });
+    useProjectStore.setState({
+      recommendations: [
+        { id: 'r-old', status: 'pending', scope: { stage_id: 'output' }, version_id: 'v1' },
+        { id: 'r-apply', status: 'pending', scope: { stage_id: 'output' }, version_id: 'v1' },
+      ] as never,
+    });
+    supersedePending.mockResolvedValue(['r-old']);
+
+    await useProjectStore.getState().appendStageVersion('output', 'Output', { content: 'second', source_operation: 'stage_edit' }, undefined, {
+      keepRecommendations: ['r-apply'],
+    });
+    await Promise.resolve();
+
+    expect(supersedePending).toHaveBeenCalledWith('p1', { stageId: 'output', except: ['r-apply'] });
+    const byId = Object.fromEntries(useProjectStore.getState().recommendations.map((r) => [r.id, r.status]));
+    expect(byId).toEqual({ 'r-old': 'superseded', 'r-apply': 'pending' });
   });
 });

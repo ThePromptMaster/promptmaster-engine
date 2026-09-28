@@ -298,3 +298,47 @@ def test_stages_after_drafting_read_the_manuscript_itself(basic_inputs, digest, 
 def test_stages_before_drafting_carry_no_manuscript_block(basic_inputs, prose_stage, digest):
     _system, user = build_stage_prompt(basic_inputs, prose_stage, digest)
     assert "THE MANUSCRIPT AS DRAFTED" not in user
+
+
+# --- A6 (Sean, 28 Sep, item 12): a model's status is a suggestion, never a verdict --
+
+
+@pytest.fixture
+def claim_schema() -> StageItemSchema:
+    return StageItemSchema(
+        item_label="claim",
+        min_items=3,
+        max_items=20,
+        fields=[
+            StageItemField(key="claim", label="Claim"),
+            StageItemField(key="source", label="Source"),
+            StageItemField(key="where", label="Where it appears"),
+        ],
+    )
+
+
+def test_a_remove_status_is_stored_as_removed(claim_schema):
+    items = _parse_items(
+        {"items": [{"claim": "a", "status": "remove", "reason": "Not a real claim"}]},
+        claim_schema,
+    )
+    dumped = items[0].model_dump()
+    assert dumped["status"] == "removed"
+    assert dumped["reason"] == "Not a real claim"
+
+
+def test_a_model_cannot_mark_a_claim_verified(claim_schema):
+    # Nothing here retrieved a source, so "verified" would be a guess wearing
+    # the author's badge. The status is left for the author to set.
+    items = _parse_items(
+        {"items": [{"claim": "a", "status": "Verified", "reason": "Merck says so"}, {"claim": "b", "status": "unverifiable"}]},
+        claim_schema,
+    )
+    assert "status" not in items[0].model_dump()
+    assert "reason" not in items[0].model_dump()
+    assert items[1].model_dump()["status"] == "unverifiable"
+
+
+def test_other_tables_keep_whatever_status_the_model_sent(audience_schema):
+    items = _parse_items({"items": [{"who": "a", "status": "verified"}]}, audience_schema)
+    assert items[0].model_dump()["status"] == "verified"
