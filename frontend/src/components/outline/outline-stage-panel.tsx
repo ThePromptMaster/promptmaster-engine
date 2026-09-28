@@ -9,24 +9,20 @@ import { derivedOutlineDrift } from '@/lib/workflow/derived-outline';
 import { api } from '@/lib/api/client';
 import {
   applyItemRegeneration,
-  coerceOutlineDocument,
   countNamedSections,
   emptyDocument,
-  mergeRegeneratedOutline,
   outlineHistory,
   parseOutlineDocument,
   staleDrafts,
 } from '@/lib/outline/model';
+import { approveOutline, generateOutlineDraft, loadOutline } from '@/lib/outline/actions';
 import { applyOutlineEdit } from '@/lib/outline/use-outline-draft';
 import {
-  approveOutlineVersion,
   approvedOutlineVersionId,
   commitOutlineVersion,
-  ensureOutlineArtifact,
   outlineApprovals,
   saveOutlineDraft,
 } from '@/lib/supabase/outline';
-import { listVersions } from '@/lib/supabase/versions';
 import type { OutlineDocument, OutlineItem, SectionDraftBinding } from '@/types/outline';
 import type { Artifact, ArtifactVersion, Project } from '@/types/project';
 import type { PanelStepReporter } from '@/lib/workflow/next-action';
@@ -138,14 +134,12 @@ export function OutlineStagePanel({
   useEffect(() => {
     let live = true;
     setLoading(true);
-    ensureOutlineArtifact(project.id, project.user_id, stageId)
-      .then(async (found) => {
-        const rows = await listVersions(found.id);
+    loadOutline({ id: project.id, user_id: project.user_id }, stageId)
+      .then(async ({ artifact: found, versions: rows, draft: saved }) => {
         if (!live) return;
         setArtifact(found);
         setVersions(rows);
 
-        const saved = found.outline_draft ? coerceOutlineDocument(found.outline_draft) : null;
         // The derivation is the starting point on a stage that has never been
         // opened. It is NOT written to the database here: it is a pure function
         // of work already recorded, so re-deriving it on the next visit gives
@@ -294,15 +288,16 @@ export function OutlineStagePanel({
       const version = await commit('Approved outline');
       if (!version) throw new Error('Save the outline before approving it.');
 
-      await approveOutlineVersion(
-        project.id,
-        project.user_id,
+      // The same call Go mode makes (B2a): the event, then the materialisation,
+      // so a failure to materialise leaves an approval that can be retried.
+      await approveOutline({
+        project: { id: project.id, user_id: project.user_id },
         stageId,
-        version
-      );
-      // After the event, so a failure to materialise leaves an approval that
-      // can be retried rather than a drafting state bound to nothing.
-      await onApproved?.(version, parseOutlineDocument(version.content));
+        version,
+        materialise: async (doc) => {
+          await onApproved?.(version, doc);
+        },
+      });
       await onEventsChanged?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not approve the outline.');
@@ -315,31 +310,10 @@ export function OutlineStagePanel({
     setRegeneratingAll(true);
     setError(null);
     try {
-      // Derived outlines re-derive; they never call a model. The merge is the
-      // same one the generated path uses, so a section that has left the
-      // outline still lands in the orphan tray with its prose intact.
-      if (derive) {
-        edit(
-          mergeRegeneratedOutline(
-            doc,
-            derive(),
-            drafts.filter((d) => d.word_count > 0).map((d) => d.item_id)
-          )
-        );
-        return;
-      }
-      const { outline } = await api.generateOutline({
-        inputs: inputsFor(project),
-        suggested_section_count: Math.max(doc.items.length, 3),
-        model: project.model,
-      });
-      edit(
-        mergeRegeneratedOutline(
-          doc,
-          outline.map((s) => ({ title: s.title, abstract: s.abstract })),
-          drafts.filter((d) => d.word_count > 0).map((d) => d.item_id)
-        )
-      );
+      // The same call Go mode's generate_outline makes (B2a). Derived outlines
+      // re-derive and never call a model; either way the merge keeps a section
+      // that has left the outline in the orphan tray with its prose intact.
+      edit(await generateOutlineDraft({ project, doc, drafts, derive }));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not regenerate the outline.');
     } finally {

@@ -55,8 +55,8 @@ import { revisionBrief } from '@/lib/workflow/revision';
 import { deriveOutlineItems, draftingStageId } from '@/lib/workflow/derived-outline';
 import { OutlineStagePanel } from '@/components/outline/outline-stage-panel';
 import { ProjectBrief, ProjectSetup, stageWantsSetup } from './project-setup';
-import { draftBindings, longFormFromOutline } from '@/lib/outline/long-form';
-import { saveLongForm } from '@/lib/supabase/versions';
+import { draftBindings } from '@/lib/outline/long-form';
+import { materialiseOutlineInto } from '@/lib/outline/actions';
 import type { OutlineDocument } from '@/types/outline';
 import { stageDrafts, itemSchemaFor, serializeItems, type StageItem } from '@/lib/workflow/stage-artifact';
 import { buildStageContext } from '@/lib/workflow/context';
@@ -729,7 +729,7 @@ export function WorkflowWorkspace({
           : null);
       if (!target) throw new Error('This stage has no artifact to draft into.');
 
-      await saveLongForm(target.id, longFormFromOutline(doc, target.long_form ?? null));
+      await materialiseOutlineInto(doc, target);
       onReload?.();
     },
     [draftingStage, stage, stageArtifact, stageBundles, ensureStageArtifact, onReload]

@@ -16,22 +16,13 @@
 
 import { useCallback, useRef, useState } from 'react';
 
-import { api } from '@/lib/api/client';
-import { inputsFrom } from '@/lib/workflow/stage-requests';
+import { appliedFindingsVersion, reviseWithFindings, type PendingRevision } from '@/lib/workflow/apply-findings';
 import type { StageDefinition } from '@/lib/workflow/types';
 import type { NewVersion } from '@/lib/supabase/versions';
 import type { AuditFinding } from '@/types';
 import type { ArtifactVersion, Project } from '@/types/project';
 
-export interface PendingRevision {
-  findings: AuditFinding[];
-  before: string;
-  after: string;
-  instruction: string;
-  finishReason: string | null;
-  /** Where the findings came from, for the version's change summary. */
-  source: string;
-}
+export type { PendingRevision };
 
 export function useApplyFindings({
   project,
@@ -52,20 +43,9 @@ export function useApplyFindings({
   const save = useCallback(
     async (rev: PendingRevision) => {
       if (!stage || !appendStageVersion) return;
-      await appendStageVersion(stage.id, stage.label, {
-        content: rev.after,
-        source_operation: 'applied_findings',
-        instruction: rev.instruction,
-        model: project.model,
-        mode: project.mode,
-        change_summary:
-          rev.findings.length === 1
-            ? `Applied from ${rev.source}: ${rev.findings[0].summary.slice(0, 120)}`
-            : `Applied ${rev.findings.length} points from ${rev.source}.`,
-        finish_reason: rev.finishReason,
-      });
+      await appendStageVersion(stage.id, stage.label, appliedFindingsVersion(rev, project));
     },
-    [stage, appendStageVersion, project.model, project.mode]
+    [stage, appendStageVersion, project]
   );
 
   const apply = useCallback(
@@ -78,16 +58,8 @@ export function useApplyFindings({
       setRunning(true);
       setError(null);
       try {
-        const res = await api.applyRecommendations(
-          { inputs: inputsFrom(project), content, findings, model: project.model },
-          controller.signal
-        );
+        const rev = await reviseWithFindings({ project, content, findings, source: opts.source, signal: controller.signal });
         if (controller.signal.aborted) return;
-        if (!res.content.trim()) throw new Error('The model returned nothing usable.');
-        const rev: PendingRevision = {
-          findings, before: content, after: res.content, instruction: res.instruction,
-          finishReason: res.finish_reason || null, source: opts.source,
-        };
         if (opts.showFirst) setPending(rev);
         else await save(rev);
       } catch (e) {
