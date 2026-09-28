@@ -231,6 +231,10 @@ def _next_action(system: str, prompt: str) -> dict:
             if key in remaining:
                 remaining.remove(key)
                 continue
+            # A plan spans stages: a move the current stage does not offer
+            # is left for the stage that does (B2b), not chosen and refused.
+            if key not in allowed:
+                continue
             choice = key
             break
     else:

@@ -20,6 +20,7 @@ import { nextSuggestedStage } from '@/lib/workflow/engine';
 import type { StageDefinition, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
 import type { AgentRunStatus, AgentStep, ExecutionPolicy } from '@/types/agent';
 import { actionFor } from './actions';
+import type { StageFacts } from './facts';
 
 export const DEFAULT_BUDGET_STEPS = 12;
 /** The same move on the same stage this many times running is not progress. */
@@ -38,7 +39,8 @@ export function allowedActions(
   state: WorkflowState,
   stage: StageDefinition,
   stageHasDraft: boolean,
-  tools: AgentTools = NO_TOOLS
+  tools: AgentTools = NO_TOOLS,
+  facts: StageFacts = {}
 ): string[] {
   const keys: string[] = [];
   if (template.key === 'research') {
@@ -54,6 +56,15 @@ export function allowedActions(
   if (stageDrafts(stage)) {
     keys.push(stageHasDraft ? 'evaluate_stage' : 'draft_stage');
     if (stageHasDraft) keys.push('revise_stage');
+    if (stageHasDraft && facts.evaluationFindings?.aboutHead && facts.evaluationFindings.count > 0) keys.push('apply_findings');
+  }
+  // B2b: the stage's own work, offered only while its preconditions hold —
+  // and never over an existing outline, which is the user's editor.
+  if (stage.renderer === 'outline' && facts.outline && facts.outline.namedSections === 0) keys.push('generate_outline');
+  if (stage.renderer === 'long_form' && facts.manuscript && facts.manuscript.pendingJobs.length === 0) {
+    const m = facts.manuscript;
+    if (!m.brief && m.approvedOutlineVersionId && m.total > 0 && m.complete < m.total) keys.push('draft_sections');
+    if (m.brief && m.complete > 0 && m.revisedInStage < m.complete) keys.push('revise_sections');
   }
   if (nextSuggestedStage(template, state)) keys.push('advance_stage');
   keys.push('mark_blocked', 'request_user_decision', 'declare_objective_complete');

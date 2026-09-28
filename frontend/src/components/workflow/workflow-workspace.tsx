@@ -767,6 +767,8 @@ export function WorkflowWorkspace({
     recordStageEvaluation,
     setStageSummary,
     reloadEvents: reloadAfterAgent,
+    events: events ?? [],
+    onRefresh: onReload,
   });
   useEffect(() => setGoDriving(go.active || go.phase === 'awaiting'), [go.active, go.phase]);
 
@@ -1216,6 +1218,7 @@ export function WorkflowWorkspace({
                   stageId={stage.id}
                   events={events ?? []}
                   onEventsChanged={refreshEvents}
+                  refreshToken={stageBundles[stage.id]?.versions.length ?? 0}
                   derive={derivedOutlineHere ? deriveOutline : undefined}
                   drafts={draftBindings(
                     (draftingStage && draftingStage.id !== stage.id

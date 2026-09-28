@@ -16,7 +16,7 @@ export interface ProjectJob {
   id: string;
   kind: string;
   status: 'queued' | 'leased' | 'succeeded' | 'failed' | 'cancelled' | 'dead';
-  payload: { section_id?: string; section_index?: number; revision?: number; stage_id?: string } | null;
+  payload: { artifact_id?: string; section_id?: string; section_index?: number; revision?: number; stage_id?: string } | null;
   attempts: number;
   max_attempts: number;
   error_code: string | null;

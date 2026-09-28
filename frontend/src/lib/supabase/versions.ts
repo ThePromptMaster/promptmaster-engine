@@ -36,6 +36,14 @@ export async function listArtifacts(projectId: string): Promise<Artifact[]> {
   return (data ?? []) as unknown as Artifact[];
 }
 
+/** One artifact by id, fresh — or null if it is gone. */
+export async function getArtifact(id: string): Promise<Artifact | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase.from('artifacts').select(ARTIFACT_COLUMNS).eq('id', id).maybeSingle();
+  if (error) throw error;
+  return (data as unknown as Artifact | null) ?? null;
+}
+
 export async function createArtifact(
   projectId: string,
   userId: string,

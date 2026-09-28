@@ -84,6 +84,8 @@ interface Props {
   /** Report the panel's next step to the stage bar (PM-06). */
   onPanelStep?: PanelStepReporter;
   readOnly?: boolean;
+  /** Changes when something other than this panel wrote a version (Go mode); the panel re-reads. */
+  refreshToken?: number;
 }
 
 function inputsFor(project: Project): PMInput {
@@ -112,6 +114,7 @@ export function OutlineStagePanel({
   onItemCountChange,
   onPanelStep,
   readOnly = false,
+  refreshToken = 0,
 }: Props) {
   const [artifact, setArtifact] = useState<Artifact | null>(null);
   const [versions, setVersions] = useState<ArtifactVersion[]>([]);
@@ -131,14 +134,24 @@ export function OutlineStagePanel({
     deriveRef.current = derive;
   }, [derive]);
 
+  // The first load shows the skeleton; a later one (the store caught up with
+  // a version something else wrote — Go mode's outline) is silent, and never
+  // replaces a draft the user is typing into.
+  const loadedOnce = useRef(false);
   useEffect(() => {
     let live = true;
-    setLoading(true);
+    const silent = loadedOnce.current;
+    if (!silent) setLoading(true);
     loadOutline({ id: project.id, user_id: project.user_id }, stageId)
       .then(async ({ artifact: found, versions: rows, draft: saved }) => {
         if (!live) return;
+        loadedOnce.current = true;
         setArtifact(found);
         setVersions(rows);
+        if (silent) {
+          setDraft((current) => current ?? saved);
+          return;
+        }
 
         // The derivation is the starting point on a stage that has never been
         // opened. It is NOT written to the database here: it is a pure function
@@ -154,11 +167,11 @@ export function OutlineStagePanel({
         }
       })
       .catch((e: unknown) => live && setError(e instanceof Error ? e.message : 'Could not open the outline.'))
-      .finally(() => live && setLoading(false));
+      .finally(() => live && !silent && setLoading(false));
     return () => {
       live = false;
     };
-  }, [project.id, project.user_id, stageId]);
+  }, [project.id, project.user_id, stageId, refreshToken]);
 
   useEffect(
     () => () => {
