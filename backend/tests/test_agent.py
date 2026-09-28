@@ -286,3 +286,67 @@ def test_the_planner_is_told_not_to_block_for_work_the_stage_controls_do():
     system, _ = build_next_action_prompt(INPUTS, STATE, RESEARCH, "guided")
     assert "Never mark_blocked for it" in system
     assert "press Generate the outline" in system
+
+
+# --- B3: deciding the routine findings ----------------------------------------
+
+
+def test_triage_prompt_lists_the_rows_and_the_statuses_offered():
+    from promptmaster.agent import TriageStatus, build_triage_prompt
+
+    statuses = [TriageStatus(value="accepted", label="Accept"), TriageStatus(value="rejected", label="Reject", requires_reason=True)]
+    system, user = build_triage_prompt(INPUTS, STATE, [{"id": "i2", "finding": "Ch 3 repeats Ch 1", "severity": "minor"}], statuses)
+    assert "DECIDE THE ROUTINE FINDINGS" in system
+    assert "- id=i2: finding: Ch 3 repeats Ch 1; severity: minor" in user
+    assert "- accepted: Accept" in user
+    assert "- rejected: Reject (reason required)" in user
+    _assert_self_model(system)
+
+
+def test_parse_triage_keeps_only_decisions_the_table_allows():
+    from promptmaster.agent import TriageStatus, parse_triage
+
+    statuses = [TriageStatus(value="accepted"), TriageStatus(value="rejected", requires_reason=True)]
+    decisions = parse_triage({"decisions": [
+        {"id": "a", "status": "accepted"},
+        {"id": "b", "status": "rejected"},                      # reason required, none given
+        {"id": "c", "status": "verified"},                      # not offered
+        {"id": "zz", "status": "accepted"},                     # not asked about
+        {"id": "a", "status": "rejected", "reason": "twice"},   # already decided above
+        {"id": "d", "status": "rejected", "reason": "The text does not say that."},
+    ]}, {"a", "b", "c", "d"}, statuses)
+    assert [(d.id, d.status, d.reason) for d in decisions] == [("a", "accepted", ""), ("d", "rejected", "The text does not say that.")]
+    assert parse_triage("nonsense", {"a"}, statuses) == []
+    assert parse_triage({"decisions": "nonsense"}, {"a"}, statuses) == []
+
+
+def test_triage_endpoint_returns_the_decisions(client_with):
+    stub = AsyncMock()
+    stub.model = "test/model"
+    stub.generate_json = AsyncMock(return_value=({"decisions": [{"id": "i1", "status": "accepted", "reason": ""}]}, {}))
+    r = client_with(stub).post("/api/agent/triage", json={
+        **J, "items": [{"id": "i1", "finding": "Minor thing", "severity": "minor"}],
+        "statuses": [{"value": "accepted", "label": "Accept", "requires_reason": False}],
+    })
+    assert r.status_code == 200, r.text
+    assert r.json() == {"decisions": [{"id": "i1", "status": "accepted", "reason": ""}], "model_used": "test/model"}
+
+
+def test_triage_route_requires_auth():
+    from auth import require_user
+
+    saved = app.dependency_overrides.pop(require_user)
+    try:
+        http = TestClient(app, raise_server_exceptions=False)
+        assert http.post("/api/agent/triage", json={}).status_code == 401
+    finally:
+        app.dependency_overrides[require_user] = saved
+
+
+def test_mock_triage_accepts_every_routine_row(mock_http):
+    r = mock_http.post("/api/agent/triage", json={
+        **J, "items": [{"id": "i2", "finding": "x", "severity": "minor"}, {"id": "i3", "finding": "y", "severity": "minor"}],
+        "statuses": [{"value": "accepted", "label": "Accept", "requires_reason": False}],
+    })
+    assert r.status_code == 200, r.text
+    assert [d["id"] for d in r.json()["decisions"]] == ["i2", "i3"]

@@ -31,6 +31,7 @@ export function deriveExecutionLabel(
   switch (action?.performer) {
     case 'reason':
     case 'evaluate':
+    case 'triage':
       return 'discussed';
     case 'draft':
     case 'revise':

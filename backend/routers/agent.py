@@ -24,9 +24,12 @@ from deps import get_client
 from promptmaster.agent import (
     AgentState,
     NextAction,
+    TriageDecision,
+    TriageStatus,
     choose_next_action,
     interpret_result,
     perform_reason,
+    triage_findings,
     write_code,
 )
 from promptmaster.agent_actions import ACTION_KEYS, AGENT_ACTIONS, REASONING_ACTIONS, AgentAction
@@ -163,3 +166,28 @@ async def api_interpret_result(req: InterpretRequest, client: OpenRouterClient =
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
     return TextResponse(text=text, model_used=_model_used(req.model, client), usage=_usage(usage))
+
+
+class TriageRequest(BaseModel):
+    inputs: PMInput
+    state: AgentState
+    #: The routine rows, each with its id and fields; never the ones kept for the user.
+    items: list[dict] = Field(min_length=1, max_length=40)
+    statuses: list[TriageStatus] = Field(min_length=1, max_length=8)
+    model: str = ""
+
+
+class TriageResponse(BaseModel):
+    decisions: list[TriageDecision]
+    model_used: str = ""
+
+
+@router.post("/triage")
+async def api_triage(req: TriageRequest, client: OpenRouterClient = Depends(get_client)) -> TriageResponse:
+    """Decide the routine findings of a review table (B3). 1 LLM call. The client
+    applies the decisions to its rows; nothing is stored here."""
+    try:
+        decisions = await triage_findings(client, req.model or None, req.inputs, req.state, req.items, req.statuses)
+    except OpenRouterError as e:
+        raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
+    return TriageResponse(decisions=decisions, model_used=_model_used(req.model, client))

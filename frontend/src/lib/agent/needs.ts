@@ -22,11 +22,12 @@ export type NeedsUser =
   | { kind: 'answer_question'; question: string }
   | { kind: 'wait_for_jobs'; stageId: string; pending: number; complete: number; total: number }
   | { kind: 'continue_budget'; budgetSteps: number }
-  | { kind: 'large_job'; stageId: string; sections: number };
+  | { kind: 'large_job'; stageId: string; sections: number }
+  | { kind: 'triage_findings'; stageId: string; count: number };
 
 /** Moves that change the stage's work; a stage with none left needs the user, not the planner. */
 const WORK_MOVES = new Set([
-  'draft_stage', 'revise_stage', 'apply_findings', 'generate_outline', 'draft_sections', 'revise_sections',
+  'draft_stage', 'revise_stage', 'apply_findings', 'generate_outline', 'draft_sections', 'revise_sections', 'triage_findings',
   'derive', 'prove', 'simplify', 'limiting_case', 'try_contradiction', 'run_computation',
   'falsify_hypothesis', 'compare_alternatives', 'check_literature', 'update_assumptions',
 ]);
@@ -80,6 +81,11 @@ export function needsUser(input: {
     }
   }
 
+  // The findings left are the ones that change the work: the user's call (B3).
+  if (facts.review && facts.review.material.length > 0 && facts.review.routine.length === 0) {
+    return { kind: 'triage_findings', stageId: stage.id, count: facts.review.material.length };
+  }
+
   // Everything left to do here is a box only the user ticks.
   const blockingUnmet = stageEvaluation.unmet.filter((c) => c.blocking);
   const workLeft = allowed.some((k) => WORK_MOVES.has(k));
@@ -129,6 +135,11 @@ export function describeNeed(need: NeedsUser, stageLabel: (id: string) => string
       return {
         message: `Drafting ${need.sections} sections is a large run. I need your say-so before spending that.`,
         action: `Draft ${need.sections} sections anyway`,
+      };
+    case 'triage_findings':
+      return {
+        message: `${need.count} finding${need.count === 1 ? '' : 's'} would change the work, so ${need.count === 1 ? 'it needs' : 'they need'} your decision. Decide in the table below.`,
+        action: null,
       };
   }
 }

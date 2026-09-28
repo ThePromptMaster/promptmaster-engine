@@ -99,7 +99,13 @@ def _stage_items(prompt: str) -> dict:
     for n in range(1, 4):
         item: dict[str, str] = {"id": f"i{n}"}
         for i, key in enumerate(keys):
-            item[key] = "clean" if key == "status" else f"Mock {key.replace('_', ' ')} {n}{read if i == 0 else ''}"
+            if key == "status":
+                item[key] = "clean"
+            elif key == "severity":
+                # One finding that changes the work, the rest routine (B3).
+                item[key] = "major" if n == 1 else "minor"
+            else:
+                item[key] = f"Mock {key.replace('_', ' ')} {n}{read if i == 0 else ''}"
         items.append(item)
     return {"items": items}
 
@@ -277,6 +283,9 @@ def _json_reply(system: str, prompt: str) -> dict:
             return {"conflicts": [{"kind": "objective", "with_id": "", "with_text": "the project objective",
                                    "explanation": "Mock: this instruction pulls the work away from the objective."}]}
         return {"conflicts": []}
+    if agent._TRIAGE_INSTRUCTION[:60] in system:
+        ids = re.findall(r"^- id=([^:]+):", prompt.split("FINDINGS TO DECIDE:", 1)[-1], re.M)
+        return {"decisions": [{"id": i, "status": "accepted", "reason": "Mock: routine, accepted."} for i in ids]}
     if agent._NEXT_ACTION_INSTRUCTION[:60] in system:
         return _next_action(system, prompt)
     if _STAGE_EVAL_INSTRUCTION[:60] in system:

@@ -75,3 +75,27 @@ describe('needsUser: the moves that are the user\'s (B4)', () => {
     expect(describeNeed({ kind: 'wait_for_jobs', stageId: 'drafting', pending: 2, complete: 1, total: 3 }, label).action).toBe('Keep waiting');
   });
 });
+
+describe('B3: the findings that change the work are the user\'s', () => {
+  const review = (routine: number, material: number) => ({
+    review: {
+      items: [], schema: { itemLabel: 'finding', fields: [], minItems: 1, maxItems: 9 },
+      routine: Array.from({ length: routine }, (_, i) => ({ id: `r${i}` })),
+      material: Array.from({ length: material }, (_, i) => ({ id: `m${i}` })),
+    },
+  }) as never;
+
+  it('with routine rows left, the planner decides them first', () => {
+    expect(needsUser({ ...base, stage: stage('continuity'), facts: review(2, 1), stageEvaluation: evaluation('continuity'), allowed: ['triage_findings'] })).toBeNull();
+  });
+
+  it('with only material rows left, the user is asked, with no button — the table is the control', () => {
+    const need = needsUser({ ...base, stage: stage('continuity'), facts: review(0, 2), stageEvaluation: evaluation('continuity'), allowed: ['advance_stage'] });
+    expect(need).toEqual({ kind: 'triage_findings', stageId: 'continuity', count: 2 });
+    expect(describeNeed(need!, label)).toEqual({ message: '2 findings would change the work, so they need your decision. Decide in the table below.', action: null });
+  });
+
+  it('a fully decided table needs nothing', () => {
+    expect(needsUser({ ...base, stage: stage('continuity'), facts: review(0, 0), stageEvaluation: evaluation('continuity'), allowed: ['advance_stage'] })).toBeNull();
+  });
+});

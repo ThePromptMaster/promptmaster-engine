@@ -12,12 +12,12 @@ import type { StepOutcome } from './perform';
 import { actionFor } from './actions';
 
 /** Performers whose success is a change to the project, not a piece of text. */
-const MUTATING = new Set(['draft', 'revise', 'outline', 'sections', 'apply']);
+const MUTATING = new Set(['draft', 'revise', 'outline', 'sections', 'apply', 'triage']);
 
 export function changedSomething(changes: StepOutcome['changes'] | undefined): boolean {
   if (!changes) return false;
   return Boolean(
-    changes.version_ids?.length || changes.sections_written?.length || changes.event_types?.length || changes.sandbox_run_id
+    changes.version_ids?.length || changes.sections_written?.length || changes.items_triaged?.length || changes.event_types?.length || changes.sandbox_run_id
   );
 }
 

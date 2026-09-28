@@ -303,3 +303,16 @@ describe("B2b: the stage's own work is offered only while its preconditions hold
     expect(allowedActions(BOOK_V1, book, objective, false, undefined, { evaluationFindings: { count: 2, aboutHead: true } })).not.toContain('apply_findings');
   });
 });
+
+describe('B3: triage_findings is offered only while routine rows are undecided', () => {
+  const book = initialState(BOOK_V1);
+  const continuity = BOOK_V1.stages.find((s) => s.id === 'continuity')!;
+  const review = (routine: number, material: number) => ({
+    review: { items: [], schema: {}, routine: Array.from({ length: routine }, (_, i) => ({ id: `r${i}` })), material: Array.from({ length: material }, (_, i) => ({ id: `m${i}` })) },
+  }) as never;
+  it('yes with routine rows; no with only material; no with none', () => {
+    expect(allowedActions(BOOK_V1, book, continuity, true, undefined, review(2, 1))).toContain('triage_findings');
+    expect(allowedActions(BOOK_V1, book, continuity, true, undefined, review(0, 1))).not.toContain('triage_findings');
+    expect(allowedActions(BOOK_V1, book, continuity, true, undefined, {})).not.toContain('triage_findings');
+  });
+});

@@ -38,6 +38,8 @@ export interface ItemFieldSpec {
   /** A long field renders as a textarea; a short one as an input. */
   long?: boolean;
   max?: number;
+  /** The values the field may take; told to the model, and what Go's triage reads risk from (B3). */
+  options?: readonly string[];
 }
 
 export interface ReviewStatusOption {
@@ -66,6 +68,13 @@ export interface StageItemSchema {
 // adds data here, never a branch in a component. A kind with no entry falls
 // back to a single free-text field, so a template can name an artifact this
 // build has never heard of and still render.
+
+/**
+ * B3: a machine-readable severity, so Go can tell a routine finding from one
+ * that changes the work. "major" is the line: structure, argument or promise.
+ */
+const SEVERITY_VALUES = ['minor', 'moderate', 'major'] as const;
+const SEVERITY_HINT = "One of: minor, moderate, major. 'major' means fixing it changes the structure, the argument or a promise made to the reader";
 
 const TRIAGE: ReviewStatusOption[] = [
   { value: 'accepted', label: 'Accept', tone: 'done' },
@@ -225,7 +234,7 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
     fields: [
       { key: 'finding', label: 'What is wrong', long: true, max: 400 },
       { key: 'where', label: 'Where', max: 200 },
-      { key: 'severity', label: 'Severity', max: 80 },
+      { key: 'severity', label: 'Severity', hint: SEVERITY_HINT, options: SEVERITY_VALUES, max: 80 },
     ],
     statuses: TRIAGE,
   },
@@ -238,6 +247,7 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
       { key: 'finding', label: 'Finding', long: true, max: 400 },
       { key: 'why_it_matters', label: 'Why it matters', long: true, max: 400 },
       { key: 'suggested_change', label: 'Suggested change', long: true, max: 400 },
+      { key: 'severity', label: 'Severity', hint: SEVERITY_HINT, options: SEVERITY_VALUES, max: 80 },
     ],
     statuses: TRIAGE,
   },

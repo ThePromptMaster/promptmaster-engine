@@ -365,3 +365,84 @@ async def interpret_result(
 ) -> tuple[str, dict[str, int]]:
     system, user = build_interpret_prompt(inputs, state, code, stdout, stderr, exit_code)
     return await client.generate(prompt=user, system=system, temperature=0.2, max_tokens=2500, model=model)
+
+
+# --- deciding the routine findings of a review table (B3) ---------------------------
+
+class TriageStatus(BaseModel):
+    value: str
+    label: str = ""
+    requires_reason: bool = False
+
+
+class TriageDecision(BaseModel):
+    id: str
+    status: str
+    reason: str = ""
+
+
+_TRIAGE_INSTRUCTION = (
+    "GO MODE — DECIDE THE ROUTINE FINDINGS. Below are findings from a review of "
+    "the work, each with an id. They are the routine ones (minor or moderate); "
+    "the ones that would change the structure or the argument have been kept "
+    "back for the user. For EACH id, choose exactly one of the statuses offered "
+    "and give a one-sentence reason where the status demands one — a reason is "
+    "what makes a deferral or rejection a decision rather than a shrug. Accept "
+    "a finding that is right; reject one that is wrong about the text; defer one "
+    "that is right but belongs to a later pass. Decide only the ids given; never "
+    "invent one.\n\n"
+    "Return JSON only, in exactly this shape:\n"
+    "{\n"
+    '  "decisions": [ {"id": "...", "status": "one of the statuses", "reason": "one sentence or empty"} ]\n'
+    "}"
+)
+
+
+def build_triage_prompt(
+    inputs: PMInput, state: AgentState, items: list[dict], statuses: list[TriageStatus]
+) -> tuple[str, str]:
+    """Build (system, user) for deciding routine findings. Pure."""
+    system = _shared_system(inputs, [], _TRIAGE_INSTRUCTION)
+    menu = "\n".join(
+        f"- {s.value}: {s.label or s.value}" + (" (reason required)" if s.requires_reason else "")
+        for s in statuses
+    )
+    rows = "\n".join(
+        f"- id={item.get('id', '?')}: " + "; ".join(f"{k}: {v}" for k, v in item.items() if k != "id" and str(v).strip())
+        for item in items
+    ) or "(none)"
+    user = f"{_format_state(inputs, state)}\n\nSTATUSES OFFERED:\n{menu}\n\nFINDINGS TO DECIDE:\n{rows}\n\nDecide each one."
+    return system, user
+
+
+def parse_triage(result: object, item_ids: set[str], statuses: list[TriageStatus]) -> list[TriageDecision]:
+    """Keep only decisions for the ids given, with a status offered, and a reason where demanded."""
+    if not isinstance(result, dict) or not isinstance(result.get("decisions"), list):
+        return []
+    by_value = {s.value: s for s in statuses}
+    out: list[TriageDecision] = []
+    seen: set[str] = set()
+    for raw in result["decisions"]:
+        if not isinstance(raw, dict):
+            continue
+        item_id = str(raw.get("id") or "")
+        status = str(raw.get("status") or "").strip()
+        reason = str(raw.get("reason") or "").strip()
+        if item_id not in item_ids or item_id in seen or status not in by_value:
+            continue
+        if by_value[status].requires_reason and not reason:
+            continue
+        seen.add(item_id)
+        out.append(TriageDecision(id=item_id, status=status, reason=reason))
+    return out
+
+
+async def triage_findings(
+    client: OpenRouterClient, model: str | None, inputs: PMInput, state: AgentState,
+    items: list[dict], statuses: list[TriageStatus],
+) -> list[TriageDecision]:
+    system, user = build_triage_prompt(inputs, state, items, statuses)
+    result, _usage = await client.generate_json(
+        prompt=user, system=system, temperature=0.2, max_tokens=1_500, model=model,
+    )
+    return parse_triage(result, {str(i.get("id")) for i in items if i.get("id")}, statuses)

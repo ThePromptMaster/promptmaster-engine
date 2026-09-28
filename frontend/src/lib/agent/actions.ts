@@ -19,6 +19,7 @@ export type Performer =
   | 'outline' // generate an outline and commit it as a version (B2b)
   | 'sections' // enqueue section jobs and wait for them (B2b)
   | 'apply' // apply the latest check's findings as a new version (B2b)
+  | 'triage' // decide the routine findings of a review table (B3)
   | 'advance' // a stage event
   | 'block' // stage_blocked
   | 'ask' // stop for the user
@@ -52,6 +53,7 @@ export const AGENT_ACTIONS: readonly AgentAction[] = [
   { key: 'draft_sections', family: 'writing', label: 'Draft the sections', performer: 'sections', important: true },
   { key: 'revise_sections', family: 'writing', label: 'Revise the sections', performer: 'sections', important: true },
   { key: 'apply_findings', family: 'writing', label: 'Apply the findings', performer: 'apply', important: true },
+  { key: 'triage_findings', family: 'writing', label: 'Decide the routine findings', performer: 'triage', important: true },
   { key: 'advance_stage', family: 'workflow', label: 'Move to the next stage', performer: 'advance', important: true },
   { key: 'mark_blocked', family: 'workflow', label: 'Mark this stage blocked', performer: 'block', important: false },
   { key: 'request_user_decision', family: 'workflow', label: 'Ask the user', performer: 'ask', important: false },

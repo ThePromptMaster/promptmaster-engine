@@ -573,6 +573,19 @@ export const api = {
     return apiFetch('/api/agent/next-action', { method: 'POST', body: JSON.stringify(req), signal });
   },
 
+  async agentTriage(
+    req: {
+      inputs: PMInput;
+      state: AgentStateDigest;
+      items: Record<string, string>[];
+      statuses: { value: string; label: string; requires_reason: boolean }[];
+      model?: string;
+    },
+    signal?: AbortSignal
+  ): Promise<{ decisions: { id: string; status: string; reason: string }[]; model_used: string }> {
+    return apiFetch('/api/agent/triage', { method: 'POST', body: JSON.stringify(req), signal });
+  },
+
   async agentReason(
     req: { inputs: PMInput; state: AgentStateDigest; action_key: string; params: Record<string, unknown>; model?: string },
     signal?: AbortSignal
