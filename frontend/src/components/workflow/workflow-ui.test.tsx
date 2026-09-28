@@ -7,11 +7,15 @@ import { ExitCriteriaChecklist } from './exit-criteria-checklist';
 import { StageTransitionBar } from './stage-transition-bar';
 import { CompletionDialog } from './stage-status-panels';
 import { ProjectFinishedBanner } from './project-finished-banner';
+import { ProjectFinished } from './project-finished';
 import { StageRenderer } from './renderers/stage-renderer';
 import {
   BOOK_V1,
   RESEARCH_V1,
+  SINGLE_OUTPUT_V1,
   availableTransitions,
+  deliverableStage,
+  initialState,
   evaluateStage,
   getStage,
   projectState,
@@ -437,5 +441,37 @@ describe('StageTransitionBar with one primary action (PM-06)', () => {
     );
     await userEvent.click(screen.getByRole('button', { name: 'Continue to Positioning' }));
     expect(onTransition).toHaveBeenCalledWith(expect.objectContaining({ kind: 'advance' }));
+  });
+});
+
+describe('the finished screen puts the work at the centre (C4, Sean 28 Sep item 15)', () => {
+  const template = SINGLE_OUTPUT_V1;
+  const stage = deliverableStage(template)!;
+  const project = { id: 'p1', title: 'Field guide', workflow: 'single_output', status: 'finalized' } as never;
+  const summary = {
+    deliverable: stage, deliverableDone: true, completed: 5, withArtifact: 5, skipped: 0, leftOpen: 0, leftOpenStages: [], blocked: 0, notStarted: 0,
+  };
+  const bundle = (content: string) => ({
+    project, template, state: initialState(template), events: [], evaluations: {},
+    stages: { [stage.id]: { artifact: null, versions: [researchVersion(content)] } },
+  });
+
+  it('says it is complete, counts the words, and reads the work on request', async () => {
+    render(<ProjectFinished bundle={bundle('One two three four five.')} completion={summary} onReopen={vi.fn()} />);
+    expect(screen.getByRole('heading', { name: 'Your work is complete' })).toBeInTheDocument();
+    expect(screen.getByText(/5 words · 5 stages done/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Export Word' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Export PDF' })).toHaveAttribute('href', '/projects/p1/print');
+    await userEvent.click(screen.getByRole('button', { name: 'Read the full work' }));
+    expect(screen.getByText('One two three four five.')).toBeInTheDocument();
+  });
+
+  it('with nothing written, offers only to continue', () => {
+    const onReopen = vi.fn();
+    render(<ProjectFinished bundle={bundle('')} completion={summary} onReopen={onReopen} />);
+    expect(screen.getByRole('heading', { name: 'This project is finished' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Export Word' })).not.toBeInTheDocument();
+    screen.getByRole('button', { name: 'Continue improving' }).click();
+    expect(onReopen).toHaveBeenCalled();
   });
 });

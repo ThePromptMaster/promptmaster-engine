@@ -15,6 +15,7 @@ import { StageToolResult } from './stage-tool-result';
 import { CRITIQUE_TOOLS, REWRITE_TOOLS, useStageTools } from './use-stage-tools';
 import { nextStageAction, type ReportedPanelStep } from '@/lib/workflow/next-action';
 import { isApplyable } from '@/lib/workflow/recommend';
+import { ProjectFinished } from './project-finished';
 import { ProjectFinishedBanner } from './project-finished-banner';
 import { StageRenderer } from './renderers/stage-renderer';
 import { useStageGeneration } from './use-stage-generation';
@@ -898,6 +899,9 @@ export function WorkflowWorkspace({
   const deliverableBundle = deliverable ? stageBundles[deliverable.id] : undefined;
   const deliverableSections = deliverableBundle?.artifact?.long_form?.outline ?? [];
   const completion = completionSummary(template, state, context);
+  // The deliverable's latest objective check, for the finished screen (C4).
+  const deliverableHead = completion.deliverable ? bundles?.[completion.deliverable.id]?.versions.at(-1) : undefined;
+  const deliverableEvaluation = deliverableHead ? evaluations?.[deliverableHead.id] : undefined;
 
   /** Score the deliverable against the objective. 1 model call, on request. */
   const checkAgainstObjective = async () => {
@@ -1216,6 +1220,14 @@ export function WorkflowWorkspace({
 
           {isCurrent && appendStageVersion && project.status !== 'finalized' && (
             <GoPanel go={go} stageLabel={stage.label} mode={project.mode} needsActions={goNeedsActions} />
+          )}
+          {isCurrent && project.status === 'finalized' && (
+            <ProjectFinished
+              bundle={{ project, template, state, events: events ?? [], stages: bundles ?? {}, evaluations: evaluations ?? {} }}
+              completion={completion}
+              evaluation={deliverableEvaluation}
+              onReopen={() => void reopenProject()}
+            />
           )}
 
           <div className="mb-8">
