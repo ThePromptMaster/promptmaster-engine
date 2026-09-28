@@ -463,6 +463,18 @@ text; projects on v4 and earlier keep their old statuses and see the "Upgrade wo
 Rows written before C3 with the old `verified` value read as "Verified by me", which is what
 that click meant then too.
 
+### L-C5 — Word and PDF export: plain fidelity, and the browser's own PDF
+
+The Word export (C4, 2026-09-29) is built in the browser from the assembled manuscript
+Markdown with the `docx` package, loaded on demand: title, chapter headings (one per page),
+sub-headings, paragraphs and bullets. Tables, code blocks, images and footnotes arrive as
+plain text. The PDF export is a print view of the manuscript alone
+(`/projects/[id]/print`) with a chapter per page; the file itself comes from the browser's
+"Save as PDF", so its fonts and margins are the browser's. Neither export includes the
+stage-by-stage record — that is the Markdown document and the JSON record, as before.
+Long-form stages now show the manuscript's saved snapshots as version pills (C6); a
+snapshot is read there, not restored into the sections (L-25 stands).
+
 ### L-C3 — Conflict detection: what it sees, and what it costs
 
 PM-24's check runs on **side-chat instructions** and on **combined recommendations** (the
