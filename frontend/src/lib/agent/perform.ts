@@ -404,7 +404,11 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // (20260928000000), so on a stage with no artifact, such as Outline
       // approval, it moves on and leaves the stage open. Otherwise move on
       // and leave the stage open, as "Continue anyway" does.
-      const type = evaluation.canAdvance && (evidence || actor === 'user') ? 'stage_marked_complete' : 'stage_advanced';
+      // A stage with no artifact at all (Outline approval) has nothing to cite;
+      // the database lets an autonomous run complete it on that ground
+      // (20261004000000), so it no longer stays "open" after every Go run.
+      const noArtifact = !ctx.bundles[ctx.stage.id]?.artifact;
+      const type = evaluation.canAdvance && (evidence || actor === 'user' || noArtifact) ? 'stage_marked_complete' : 'stage_advanced';
       if (ctx.setStageSummary) {
         const summary = summariseStageContent(ctx.stage, stageContentForSummary(ctx.template, ctx.stage, ctx.bundles));
         if (summary) await ctx.setStageSummary(ctx.stage.id, summary).catch(() => undefined);

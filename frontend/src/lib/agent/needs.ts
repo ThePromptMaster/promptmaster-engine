@@ -28,6 +28,7 @@ export type NeedsUser =
   | { kind: 'decide_rows'; stageId: string; count: number; itemLabel: string };
 
 /** Moves that change the stage's work; a stage with none left needs the user, not the planner. */
+const REVISE_MOVES = new Set(['revise_stage', 'apply_findings']);
 const WORK_MOVES = new Set([
   'draft_stage', 'revise_stage', 'apply_findings', 'generate_outline', 'draft_sections', 'revise_sections', 'triage_findings',
   'derive', 'prove', 'simplify', 'limiting_case', 'try_contradiction', 'run_computation',
@@ -90,9 +91,12 @@ export function needsUser(input: {
       : { kind: 'triage_findings', stageId: stage.id, count: facts.review.material.length };
   }
 
-  // Everything left to do here is a box only the user ticks.
+  // Everything left to do here is a box only the user ticks. A revise move
+  // does not count as work left: revising cannot tick a box, and counting
+  // it let an autonomous run move past Positioning with its one required
+  // box unticked instead of stopping here (production pass, 2026-09-29).
   const blockingUnmet = stageEvaluation.unmet.filter((c) => c.blocking);
-  const workLeft = allowed.some((k) => WORK_MOVES.has(k));
+  const workLeft = allowed.some((k) => WORK_MOVES.has(k) && !REVISE_MOVES.has(k));
   if (blockingUnmet.length > 0 && blockingUnmet.every((c) => c.manual) && !workLeft) {
     const c = blockingUnmet[0];
     return { kind: 'tick_criterion', stageId: stage.id, criterionId: c.id, label: c.label, ...(c.hint ? { hint: c.hint } : {}) };

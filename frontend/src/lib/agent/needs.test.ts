@@ -115,3 +115,20 @@ describe('needsUser: an outcome table is the user\'s to decide (production pass,
     });
   });
 });
+
+describe('needsUser: a required box with only revise moves left is the user\'s (production pass, 2026-09-29)', () => {
+  it('stops for the tick instead of counting revise_stage as work left', () => {
+    const need = needsUser({
+      ...base, stage: stage('positioning'), facts: {}, allowed: ['evaluate_stage', 'revise_stage', 'advance_stage'],
+      stageEvaluation: evaluation('positioning', [{ id: 'pos.differentiator', label: 'One-sentence differentiator', satisfied: false, blocking: true, manual: true }]),
+    });
+    expect(need).toMatchObject({ kind: 'tick_criterion', stageId: 'positioning', criterionId: 'pos.differentiator' });
+  });
+  it('still lets Go draft first when the stage is empty', () => {
+    const need = needsUser({
+      ...base, stage: stage('positioning'), facts: {}, allowed: ['draft_stage', 'advance_stage'],
+      stageEvaluation: evaluation('positioning', [{ id: 'pos.differentiator', label: 'One-sentence differentiator', satisfied: false, blocking: true, manual: true }]),
+    });
+    expect(need).toBeNull();
+  });
+});

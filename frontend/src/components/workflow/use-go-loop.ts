@@ -337,7 +337,7 @@ export function useGoLoop(opts: Options) {
         const digest = buildAgentState({
           template: o.template, state: o.state, stage: o.stage, bundles: o.bundles,
           stageEvaluation: o.stageEvaluation, latestEvaluation: o.latestEvaluation, steps: [...priorStepsRef.current, ...stepsRef.current],
-          context: o.context, approvedOutline: o.approvedOutline, pendingJobs: facts.manuscript?.pendingJobs.length ?? 0,
+          context: o.context, approvedOutline: o.approvedOutline, outlineApproved: facts.outline?.approved, pendingJobs: facts.manuscript?.pendingJobs.length ?? 0,
         });
         const choice = await api.agentNextAction(
           { inputs: inputsFrom(o.project), state: digest, allowed_actions: allowed, policy: current.policy, model: o.project.model },
