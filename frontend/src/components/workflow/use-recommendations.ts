@@ -224,11 +224,18 @@ export function useRecommendations({
     const finished = project.status === 'finalized';
     const live = (r: { kind: string }) => !(finished && r.kind === 'stage_transition');
 
+    // A derived proposal the user has already acted on (deferred, so it has
+    // a pending row) is the same proposal: the row stands in for it, or the
+    // panel shows "Move on to Audience" twice (seen on production 2026-09-28).
+    const held = new Set(persisted.map((r) => r.category));
+
     // Evaluation-driven first once sorted by severity, because they are the
     // ones with a defect behind them; derived rows are almost all `info`.
     const merged: PanelRecommendation[] = [
       ...persisted.filter(live),
-      ...derived.filter(live).map((d): PanelRecommendation => ({ ...d, origin: 'derived' })),
+      ...derived
+        .filter((d) => live(d) && !held.has(d.category))
+        .map((d): PanelRecommendation => ({ ...d, origin: 'derived' })),
     ];
     return merged.sort(bySeverity);
   }, [rows, derived, headVersion, stageId, project.status]);
