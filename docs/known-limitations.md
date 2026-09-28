@@ -419,11 +419,16 @@ not dollars (`agent_runs.budget_usd` exists but is not enforced yet; model spend
 `model_usage` as usual); `check_literature` is **not offered** until a retrieval tool is
 connected (B0, 2026-09-28 — before that it was always offered and always blocked, so
 every Research run could walk into "no search tool is connected" and stop there);
-`draft_stage` / `revise_stage` do not cover the outline and long-form drafting stages,
-which keep their own controls. Since B0 the planner is told what those stages hold (the
-outline's sections, the sections written and unwritten, the findings decided) and is
-instructed to ask the user to press the stage's own control rather than mark the stage
-blocked; giving Go those controls as actions is Phase B2.
+since B2b (2026-09-28) Go has the stage's own moves — `generate_outline`,
+`draft_sections`, `revise_sections`, `apply_findings` — performed by the same functions
+the buttons call (`lib/outline/actions.ts`, `lib/jobs/sections.ts`,
+`lib/workflow/apply-findings.ts`), each verified against the project before it is
+recorded as succeeded. What stays the user's: approving an outline, unblocking a stage,
+ticking a manual requirement, deciding on findings; Go stops and says so (the inline
+"I need you to…" card is B4). A drafting step waits for its section jobs for up to ten
+minutes and is then recorded `interrupted` — the sections go on being written by cron,
+and Resume waits again without spending a step. Derived (Research) outlines are still
+generated only from the panel.
 
 ### L-C3 — Conflict detection: what it sees, and what it costs
 

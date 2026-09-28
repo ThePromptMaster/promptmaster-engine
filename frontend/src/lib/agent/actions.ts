@@ -16,6 +16,9 @@ export type Performer =
   | 'draft' // generate-stage-artifact
   | 'evaluate' // evaluate-stage-artifact
   | 'revise' // generate-stage-artifact with the current draft
+  | 'outline' // generate an outline and commit it as a version (B2b)
+  | 'sections' // enqueue section jobs and wait for them (B2b)
+  | 'apply' // apply the latest check's findings as a new version (B2b)
   | 'advance' // a stage event
   | 'block' // stage_blocked
   | 'ask' // stop for the user
@@ -44,6 +47,11 @@ export const AGENT_ACTIONS: readonly AgentAction[] = [
   { key: 'draft_stage', family: 'writing', label: 'Draft this stage', performer: 'draft', important: false },
   { key: 'evaluate_stage', family: 'writing', label: 'Check this stage', performer: 'evaluate', important: false },
   { key: 'revise_stage', family: 'writing', label: 'Revise this stage', performer: 'revise', important: true },
+  // B2b: the stage-specific work the buttons do, as moves (Sean, 28 Sep, item 2).
+  { key: 'generate_outline', family: 'writing', label: 'Generate the outline', performer: 'outline', important: false },
+  { key: 'draft_sections', family: 'writing', label: 'Draft the sections', performer: 'sections', important: true },
+  { key: 'revise_sections', family: 'writing', label: 'Revise the sections', performer: 'sections', important: true },
+  { key: 'apply_findings', family: 'writing', label: 'Apply the findings', performer: 'apply', important: true },
   { key: 'advance_stage', family: 'workflow', label: 'Move to the next stage', performer: 'advance', important: true },
   { key: 'mark_blocked', family: 'workflow', label: 'Mark this stage blocked', performer: 'block', important: false },
   { key: 'request_user_decision', family: 'workflow', label: 'Ask the user', performer: 'ask', important: false },
@@ -54,6 +62,8 @@ export const AGENT_ACTIONS: readonly AgentAction[] = [
 export const INTERPRET_STEP = 'interpret_result';
 /** Not planner-selectable: the user's reply to a question the run asked. */
 export const USER_ANSWER_STEP = 'user_answer';
+/** Not planner-selectable: waiting for section jobs already queued (after a reload, or ones the user started). */
+export const AWAIT_SECTIONS_STEP = 'await_sections';
 
 const BY_KEY = new Map(AGENT_ACTIONS.map((a) => [a.key, a]));
 
@@ -64,5 +74,6 @@ export function actionFor(key: string): AgentAction | undefined {
 export function actionLabel(key: string): string {
   if (key === INTERPRET_STEP) return 'Interpret the result';
   if (key === USER_ANSWER_STEP) return 'Your answer';
+  if (key === AWAIT_SECTIONS_STEP) return 'Wait for the sections being written';
   return BY_KEY.get(key)?.label ?? key.replace(/_/g, ' ');
 }

@@ -257,3 +257,49 @@ describe('B0: a move the run cannot perform is not offered', () => {
     expect(allowedActions(RESEARCH_V1, research, stage, false, { literature: true })).toContain('check_literature');
   });
 });
+
+describe("B2b: the stage's own work is offered only while its preconditions hold", () => {
+  const book = initialState(BOOK_V1);
+  const stage = (id: string) => BOOK_V1.stages.find((s) => s.id === id)!;
+  const outlineFacts = (namedSections: number) => ({
+    outline: { artifact: { id: 'o' }, doc: { schema: 1, items: [], orphans: [] }, head: null, headApproved: false, approved: false, namedSections, unsavedDraft: false },
+  }) as never;
+  const manuscript = (over: Record<string, unknown>) => ({
+    manuscript: {
+      artifact: { id: 'm' }, holderStageId: 'drafting', outline: [], total: 2, complete: 0, jobs: [], pendingJobs: [], stopped: [],
+      approvedOutlineVersionId: 'ov', brief: null, revisedInStage: 0, ...over,
+    },
+  }) as never;
+
+  it('generate_outline only on an empty outline stage', () => {
+    expect(allowedActions(BOOK_V1, book, stage('outline'), false, undefined, outlineFacts(0))).toContain('generate_outline');
+    expect(allowedActions(BOOK_V1, book, stage('outline'), false, undefined, outlineFacts(3))).not.toContain('generate_outline');
+    expect(allowedActions(BOOK_V1, book, stage('outline'), false)).not.toContain('generate_outline');
+  });
+
+  it('draft_sections needs an approved outline, unwritten sections and no job in flight', () => {
+    const drafting = stage('drafting');
+    expect(allowedActions(BOOK_V1, book, drafting, false, undefined, manuscript({}))).toContain('draft_sections');
+    expect(allowedActions(BOOK_V1, book, drafting, false, undefined, manuscript({ approvedOutlineVersionId: null }))).not.toContain('draft_sections');
+    expect(allowedActions(BOOK_V1, book, drafting, false, undefined, manuscript({ complete: 2 }))).not.toContain('draft_sections');
+    expect(allowedActions(BOOK_V1, book, drafting, false, undefined, manuscript({ pendingJobs: [{ id: 'j' }] }))).not.toContain('draft_sections');
+  });
+
+  it('revise_sections needs a brief, written sections, and a pass not yet done', () => {
+    const revision = stage('revision');
+    const brief = { stageLabel: 'Revision', instruction: '', findings: [], sources: [] };
+    expect(allowedActions(BOOK_V1, book, revision, false, undefined, manuscript({ brief, complete: 2 }))).toContain('revise_sections');
+    expect(allowedActions(BOOK_V1, book, revision, false, undefined, manuscript({ brief, complete: 2, revisedInStage: 2 }))).not.toContain('revise_sections');
+    expect(allowedActions(BOOK_V1, book, revision, false, undefined, manuscript({ brief, complete: 0 }))).not.toContain('revise_sections');
+    // Never draft_sections on a revision stage: the brief says what it is.
+    expect(allowedActions(BOOK_V1, book, revision, false, undefined, manuscript({ brief, complete: 1 }))).not.toContain('draft_sections');
+  });
+
+  it('apply_findings only when the latest check is about the head and found something', () => {
+    const objective = stage('objective');
+    expect(allowedActions(BOOK_V1, book, objective, true, undefined, { evaluationFindings: { count: 2, aboutHead: true } })).toContain('apply_findings');
+    expect(allowedActions(BOOK_V1, book, objective, true, undefined, { evaluationFindings: { count: 0, aboutHead: true } })).not.toContain('apply_findings');
+    expect(allowedActions(BOOK_V1, book, objective, true, undefined, { evaluationFindings: { count: 2, aboutHead: false } })).not.toContain('apply_findings');
+    expect(allowedActions(BOOK_V1, book, objective, false, undefined, { evaluationFindings: { count: 2, aboutHead: true } })).not.toContain('apply_findings');
+  });
+});

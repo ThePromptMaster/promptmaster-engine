@@ -64,6 +64,22 @@ AGENT_ACTIONS: list[AgentAction] = [
     AgentAction(key="revise_stage", family="writing", label="Revise this stage",
                 when="The draft has specific problems worth fixing. Params: instruction.",
                 important=True),
+    # B2b: the stage-specific work the buttons do, as moves (Sean, 28 Sep, item 2).
+    AgentAction(key="generate_outline", family="writing", label="Generate the outline",
+                when="The outline stage has no named sections yet. Produces titles and abstracts "
+                     "as a saved outline version for the user to approve or edit."),
+    AgentAction(key="draft_sections", family="writing", label="Draft the sections",
+                when="Drafting: the approved outline has sections not yet written. Writes every "
+                     "unwritten section through the job queue and waits for them.",
+                important=True),
+    AgentAction(key="revise_sections", family="writing", label="Revise the sections",
+                when="Revision or Editing: rewrite the written sections applying this stage's brief "
+                     "and the findings accepted before it. The manuscript is saved as a version first.",
+                important=True),
+    AgentAction(key="apply_findings", family="writing", label="Apply the findings",
+                when="The latest check of this draft produced findings that have not been applied. "
+                     "Revises the draft against them as a new version.",
+                important=True),
     # --- workflow ---------------------------------------------------------------
     AgentAction(key="advance_stage", family="workflow", label="Move to the next stage",
                 when="This stage's work is done and checked.", important=True),

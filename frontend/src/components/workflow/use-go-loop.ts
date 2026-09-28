@@ -31,7 +31,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { api } from '@/lib/api/client';
-import { actionFor, actionLabel, INTERPRET_STEP, USER_ANSWER_STEP } from '@/lib/agent/actions';
+import { actionFor, actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, USER_ANSWER_STEP } from '@/lib/agent/actions';
+import { readStageFacts, type StageFacts } from '@/lib/agent/facts';
+import { assertHonestOutcome } from '@/lib/agent/outcome';
+import { requestProjectCancel } from '@/lib/supabase/jobs';
 import { authorizeRun } from '@/lib/agent/authorize';
 import { buildAgentState } from '@/lib/agent/digest';
 import { performStep, type PerformContext, type StepOutcome } from '@/lib/agent/perform';
@@ -50,7 +53,7 @@ import {
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import { getStage } from '@/lib/workflow/engine';
 import { inputsFrom } from '@/lib/workflow/stage-requests';
-import type { StageContext, StageDefinition, StageEvaluation, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
+import type { StageContext, StageDefinition, StageEvaluation, WorkflowEvent, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
 import type { NewEvaluation, NewVersion } from '@/lib/supabase/versions';
 import type { AgentRun, AgentRunStatus, AgentStep, ExecutionPolicy } from '@/types/agent';
 import type { OutlineSection } from '@/types';
@@ -79,6 +82,10 @@ interface Options {
   setStageSummary?: (stageId: string, summary: string) => Promise<void>;
   /** Re-read the event log after a stage event; resolves once the page has it. */
   reloadEvents: () => Promise<void>;
+  /** The event log, for the facts a stage's own controls need (approvals). */
+  events: readonly WorkflowEvent[];
+  /** Re-read the project after a write the store did not make itself. */
+  onRefresh?: () => unknown;
 }
 
 class Stopped extends Error {}
@@ -120,6 +127,7 @@ export function useGoLoop(opts: Options) {
   const stepsRef = useRef<AgentStep[]>([]);
   const abortRef = useRef<AbortController | null>(null);
   const followRef = useRef<StepOutcome['followUp'] | null>(null);
+  const [progress, setProgress] = useState<string | null>(null);
   /**
    * Steps before this index predate the last Go/Resume. The no-progress and
    * repeated-failure guards only count what happened since: pressing Resume
@@ -169,6 +177,12 @@ export function useGoLoop(opts: Options) {
 
       const interpret = step.action_key === INTERPRET_STEP ? followRef.current ?? undefined : undefined;
       followRef.current = null;
+      // Fresh, not from props: a step approved after a pause must act on the
+      // stage as it is now (B1).
+      const facts = await readStageFacts({
+        project: o.project, template: o.template, stage: o.stage, bundles: o.bundles, events: o.events, latestEvaluation: o.latestEvaluation,
+      });
+      setProgress(null);
 
       const ctx: PerformContext = {
         project: o.project, template: o.template, state: o.state, stage: o.stage, bundles: o.bundles,
@@ -184,11 +198,13 @@ export function useGoLoop(opts: Options) {
           : undefined,
         appendStageVersion: o.appendStageVersion, recordStageEvaluation: o.recordStageEvaluation,
         setStageSummary: o.setStageSummary, afterStageEvent: o.reloadEvents, signal,
+        facts, latestEvaluation: o.latestEvaluation, refresh: o.onRefresh, onProgress: setProgress,
       };
 
       let outcome: StepOutcome;
       try {
-        outcome = await performStep(ctx);
+        // "Succeeded" means the project changed (SN-25).
+        outcome = assertHonestOutcome(step.action_key, await performStep(ctx));
       } catch (e) {
         if (signal.aborted || (e as Error)?.name === 'AbortError') throw new Stopped();
         outcome = {
@@ -203,11 +219,21 @@ export function useGoLoop(opts: Options) {
         toolsUsed: outcome.toolsUsed, changes: outcome.changes, params: outcome.params,
       });
       upsertStep(finished);
-      const used = (runRef.current?.steps_used ?? 0) + 1;
-      await updateAgentRun(current.id, { steps_used: used, heartbeat_at: new Date().toISOString() });
-      commitRun({ ...runRef.current!, steps_used: used });
+      setProgress(null);
+      // Waiting for sections already queued is not a move; it costs no step.
+      if (step.action_key !== AWAIT_SECTIONS_STEP) {
+        const used = (runRef.current?.steps_used ?? 0) + 1;
+        await updateAgentRun(current.id, { steps_used: used, heartbeat_at: new Date().toISOString() });
+        commitRun({ ...runRef.current!, steps_used: used });
+      }
 
       if (outcome.followUp) followRef.current = outcome.followUp;
+      if (outcome.status === 'interrupted') {
+        // The work goes on in the background; the run waits for the user to
+        // say "keep waiting" (Resume) rather than spinning here.
+        await setRunStatus('awaiting_decision', outcome.output.split('\n')[0]);
+        return 'stop';
+      }
       if (outcome.stop) {
         await setRunStatus(outcome.stop.status, outcome.stop.reason);
         return 'stop';
@@ -252,7 +278,8 @@ export function useGoLoop(opts: Options) {
 
         const stop = preempt({
           state: o.state, objective: o.project.objective, stepsUsed: current.steps_used,
-          budgetSteps: current.budget_steps, steps: stepsRef.current.slice(sinceRef.current),
+          budgetSteps: current.budget_steps,
+          steps: stepsRef.current.slice(sinceRef.current).filter((s) => s.action_key !== AWAIT_SECTIONS_STEP),
         });
         if (stop) {
           await setRunStatus(stop.status, stop.reason);
@@ -260,12 +287,31 @@ export function useGoLoop(opts: Options) {
         }
 
         setPhase('thinking');
+        const facts: StageFacts = await readStageFacts({
+          project: o.project, template: o.template, stage: o.stage, bundles: o.bundles, events: o.events, latestEvaluation: o.latestEvaluation,
+        });
+        if (signal.aborted) throw new Stopped();
+
+        // Sections already being written — after a reload, or started by the
+        // user — are waited for first, without a planner call or a step.
+        if (facts.manuscript?.pendingJobs.length) {
+          const step = await startAgentStep({
+            runId: current.id, userId: o.project.user_id, projectId: o.project.id, idx: stepsRef.current.length,
+            stageId: o.stage.id, mode: o.project.mode, actionKey: AWAIT_SECTIONS_STEP, params: {},
+            rationale: `${facts.manuscript.pendingJobs.length} section(s) are being written; waiting for them.`,
+            expectedOutcome: 'The sections land in the manuscript.', needsDecision: false, decisionQuestion: null,
+          });
+          upsertStep(step);
+          if ((await perform(step, false, signal)) === 'stop') break;
+          continue;
+        }
+
         const hasDraft = (o.bundles[o.stage.id]?.versions.at(-1)?.content ?? '').trim().length > 0;
-        const allowed = allowedActions(o.template, o.state, o.stage, hasDraft);
+        const allowed = allowedActions(o.template, o.state, o.stage, hasDraft, undefined, facts);
         const digest = buildAgentState({
           template: o.template, state: o.state, stage: o.stage, bundles: o.bundles,
           stageEvaluation: o.stageEvaluation, latestEvaluation: o.latestEvaluation, steps: stepsRef.current,
-          context: o.context, approvedOutline: o.approvedOutline,
+          context: o.context, approvedOutline: o.approvedOutline, pendingJobs: facts.manuscript?.pendingJobs.length ?? 0,
         });
         const choice = await api.agentNextAction(
           { inputs: inputsFrom(o.project), state: digest, allowed_actions: allowed, policy: current.policy, model: o.project.model },
@@ -469,9 +515,17 @@ export function useGoLoop(opts: Options) {
     abortRef.current = null;
     followRef.current = null;
     setPendingStepId(null);
+    setProgress(null);
     const open = stepsRef.current.filter((s) => s.status === 'running' || s.status === 'awaiting_decision');
+    // Sections being written are cancelled at the queue; the ones already
+    // written are kept — the old message would have been false for them.
+    const writing = open.some((s) => actionFor(s.action_key)?.performer === 'sections' || s.action_key === AWAIT_SECTIONS_STEP);
+    if (writing) await requestProjectCancel(latest.current.project.id).catch(() => undefined);
     for (const s of open) {
-      const closed = await finishAgentStep(s.id, { status: 'cancelled', label: null, output: 'Stopped by you before it finished. Nothing it would have produced was kept.' }).catch(() => null);
+      const output = writing && (actionFor(s.action_key)?.performer === 'sections' || s.action_key === AWAIT_SECTIONS_STEP)
+        ? 'Stopped by you. Sections already written were kept; queued sections were cancelled.'
+        : 'Stopped by you before it finished. Nothing it would have produced was kept.';
+      const closed = await finishAgentStep(s.id, { status: 'cancelled', label: null, output }).catch(() => null);
       if (closed) upsertStep(closed);
     }
     if (runRef.current && !runRef.current.ended_at) await setRunStatus('stopped', 'Stopped by you.').catch(() => undefined);
@@ -604,6 +658,7 @@ export function useGoLoop(opts: Options) {
   }, [pendingStepId, setRunStatus, upsertStep, startRun]);
 
   return {
+    progress,
     policy, setPolicy, budget, setBudget, run, steps, phase, active, pendingStep, pendingStale, authorizing, error,
     go, suggest, replan, stop, approve, decline, answer, confirmAuthorization,
     cancelAuthorization: useCallback(() => setAuthorizing(null), []),

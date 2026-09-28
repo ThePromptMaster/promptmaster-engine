@@ -9,7 +9,13 @@
  */
 
 import { api } from '@/lib/api/client';
+import { awaitSectionJobs, type WaitResult } from '@/lib/jobs/await';
+import { enqueueDraftJobs, enqueueRevisionJobs } from '@/lib/jobs/sections';
+import { generateOutlineDraft } from '@/lib/outline/actions';
+import { countNamedSections, parseOutlineDocument } from '@/lib/outline/model';
+import { commitOutlineVersion } from '@/lib/supabase/outline';
 import { appendWorkflowEvent } from '@/lib/supabase/workflow';
+import { appliedFindingsVersion, reviseWithFindings } from '@/lib/workflow/apply-findings';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import { summariseStageContent } from '@/lib/workflow/digest';
 import { stageContentForSummary, stageEvidence } from '@/lib/workflow/evidence';
@@ -26,8 +32,9 @@ import type { NewEvaluation, NewVersion } from '@/lib/supabase/versions';
 import type { AgentRun, AgentStep, BlockKind, ExecutionLabel } from '@/types/agent';
 import type { OutlineSection } from '@/types';
 import type { Evaluation, Project } from '@/types/project';
-import { actionFor, INTERPRET_STEP } from './actions';
+import { actionFor, AWAIT_SECTIONS_STEP, INTERPRET_STEP } from './actions';
 import type { AgentStateDigest } from './digest';
+import type { StageFacts } from './facts';
 import { deriveExecutionLabel } from './labels';
 import { stageMoveActor } from './policy';
 
@@ -47,6 +54,13 @@ export interface PerformContext {
   /** For a follow-up interpretation: the run it reads. */
   interpret?: { sandboxRunId: string; code: string; stdout: string; stderr: string; exitCode: number | null };
   deliverableDone: boolean;
+  /** What the stage holds, read fresh (B1). */
+  facts?: StageFacts;
+  latestEvaluation?: Evaluation | null;
+  /** Re-read the project after a write that the store did not make itself. */
+  refresh?: () => unknown;
+  /** Live progress for a long step ("2 of 5 sections written"). */
+  onProgress?: (text: string) => void;
   appendStageVersion?: (stageId: string, name: string, version: NewVersion) => Promise<unknown>;
   recordStageEvaluation?: (stageId: string, versionId: string, evaluation: NewEvaluation) => Promise<Evaluation>;
   setStageSummary?: (stageId: string, summary: string) => Promise<void>;
@@ -56,7 +70,8 @@ export interface PerformContext {
 }
 
 export interface StepOutcome {
-  status: 'succeeded' | 'failed' | 'blocked';
+  /** `interrupted`: the step could not finish here (a wait ran out); the work goes on in the background. */
+  status: 'succeeded' | 'failed' | 'blocked' | 'interrupted';
   label: ExecutionLabel | null;
   output: string;
   blockKind?: BlockKind | null;
@@ -85,11 +100,52 @@ function done(actionKey: string, partial: Omit<StepOutcome, 'label'> & { sandbox
   };
 }
 
+/** Wait for the sections a step queued, and say what happened to each. */
+async function waitForSections(ctx: PerformContext, key: string, ids: string[], verb: string): Promise<StepOutcome> {
+  const m = ctx.facts?.manuscript;
+  if (!m) return done(key, { status: 'failed', output: 'This stage has no manuscript.', toolsUsed: [], changes: {} });
+  const title = (id: string) => m.outline.find((s) => s.id === id)?.title || id;
+  const r: WaitResult = await awaitSectionJobs({
+    projectId: ctx.project.id, artifactId: m.artifact.id, sectionIds: ids, signal: ctx.signal,
+    onProgress: (s) => ctx.onProgress?.(`${s.complete} of ${s.total} sections written`),
+  });
+  ctx.refresh?.();
+  const changes = { jobs: ids, sections_written: r.written };
+  const wrote = r.written.length ? `${verb} ${r.written.length} section${r.written.length === 1 ? '' : 's'}: ${r.written.map(title).join('; ')}.` : `${verb} nothing yet.`;
+  const standing = ` ${r.complete} of ${r.total} written.`;
+  switch (r.outcome) {
+    case 'done':
+      return done(key, { status: 'succeeded', toolsUsed: ['model', 'jobs'], changes, output: wrote + standing });
+    case 'failed':
+      return done(key, {
+        status: 'failed', toolsUsed: ['model', 'jobs'], changes,
+        output: `${wrote} ${r.failed.length} could not be written: ${r.failed.map((f) => `${f.title} — ${f.message}`).join('; ')}.${standing}`,
+      });
+    case 'paused':
+      return done(key, {
+        status: 'interrupted', toolsUsed: ['model', 'jobs'], changes,
+        output: `${wrote} Stopped while ${r.pending.length} section${r.pending.length === 1 ? ' was' : 's were'} still being written; they continue in the background.${standing}`,
+      });
+    default:
+      return done(key, {
+        status: 'interrupted', toolsUsed: ['model', 'jobs'], changes,
+        output: `${wrote} ${r.pending.length} still being written when the wait ran out; they continue in the background. Press Resume to keep waiting.${standing}`,
+      });
+  }
+}
+
 export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
   const key = ctx.step.action_key;
   const params = ctx.step.params ?? {};
   const inputs = inputsFrom(ctx.project);
   const model = ctx.project.model || undefined;
+
+  // Sections already queued — after a reload, or by the user — are waited for
+  // without a planner call and without spending a step.
+  if (key === AWAIT_SECTIONS_STEP) {
+    const ids = (ctx.facts?.manuscript?.pendingJobs ?? []).map((j) => j.payload?.section_id as string).filter(Boolean);
+    return waitForSections(ctx, key, ids, 'Finished writing');
+  }
 
   if (key === INTERPRET_STEP) {
     const run = ctx.interpret!;
@@ -193,6 +249,77 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         // What changed, so the record can be checked against the project (SN-25).
         changes: typeof versionId === 'string' ? { version_ids: [versionId] } : {},
         output: `${revising ? 'Revised' : 'Drafted'} ${ctx.stage.label} — saved as a new version (${content.length.toLocaleString()} characters).`,
+      });
+    }
+
+    case 'outline': {
+      const f = ctx.facts?.outline;
+      if (!f) return done(key, { status: 'failed', output: 'This stage has no outline artifact.', toolsUsed: [], changes: {} });
+      if (f.namedSections > 0) {
+        return done(key, { status: 'failed', output: 'There is already an outline; edit or regenerate it yourself.', toolsUsed: [], changes: {} });
+      }
+      // The same function "Generate the outline" calls (B2a), then committed
+      // as a version straight away: something the user can approve or edit,
+      // not a draft that exists only in this tab.
+      const doc = await generateOutlineDraft({ project: ctx.project, doc: f.doc, drafts: [] });
+      const created = await commitOutlineVersion(f.artifact, doc, {
+        sourceOperation: 'agent_outline',
+        instruction: ctx.step.rationale || 'Go mode generated the outline.',
+        changeSummary: 'Go mode: generated the outline.',
+        model: ctx.project.model,
+        mode: ctx.project.mode,
+      });
+      ctx.refresh?.();
+      const named = countNamedSections(parseOutlineDocument(created.content));
+      if (named < 2) {
+        return done(key, { status: 'failed', output: `The outline came back with ${named} named section(s); nothing usable to approve.`, toolsUsed: ['model'], changes: { version_ids: [created.id] } });
+      }
+      return done(key, {
+        status: 'succeeded', toolsUsed: ['model'], changes: { version_ids: [created.id] },
+        output: `Generated an outline of ${named} sections, saved as version ${created.version_number}: ${parseOutlineDocument(created.content).items.map((i, n) => `${n + 1}. ${i.title}`).join('; ')}. Approve it to draft against it.`,
+      });
+    }
+
+    case 'sections': {
+      const m = ctx.facts?.manuscript;
+      if (!m) return done(key, { status: 'failed', output: 'This stage has no manuscript.', toolsUsed: [], changes: {} });
+      if (m.pendingJobs.length) return done(key, { status: 'failed', output: 'Sections are already being written; wait for them first.', toolsUsed: [], changes: {} });
+      if (key === 'draft_sections') {
+        if (!m.approvedOutlineVersionId) return done(key, { status: 'failed', output: 'No approved outline to draft against.', toolsUsed: [], changes: {} });
+        const ids = await enqueueDraftJobs({
+          project: ctx.project, artifactId: m.artifact.id, stageId: ctx.stage.id, outline: m.outline,
+          approvedOutlineVersionId: m.approvedOutlineVersionId, jobs: m.jobs,
+        });
+        if (!ids.length) return done(key, { status: 'failed', output: 'Every section is already written.', toolsUsed: [], changes: {} });
+        return waitForSections(ctx, key, ids, 'Wrote');
+      }
+      if (!m.brief) return done(key, { status: 'failed', output: 'This stage has no revision brief.', toolsUsed: [], changes: {} });
+      if (!ctx.appendStageVersion) throw new Error('This view cannot save versions.');
+      const holderLabel = ctx.template.stages.find((s) => s.id === m.holderStageId)?.label ?? ctx.stage.label;
+      const append = ctx.appendStageVersion;
+      const ids = await enqueueRevisionJobs({
+        project: ctx.project, artifactId: m.artifact.id, stageId: ctx.stage.id, outline: m.outline,
+        approvedOutlineVersionId: m.approvedOutlineVersionId, brief: m.brief,
+        saveSnapshot: (v) => append(m.holderStageId, holderLabel, v),
+      });
+      if (!ids.length) return done(key, { status: 'failed', output: 'No written section to revise.', toolsUsed: [], changes: {} });
+      return waitForSections(ctx, key, ids, 'Revised');
+    }
+
+    case 'apply': {
+      if (!ctx.appendStageVersion) throw new Error('This view cannot save versions.');
+      const head = ctx.bundles[ctx.stage.id]?.versions.at(-1);
+      const findings = ctx.latestEvaluation?.findings ?? [];
+      if (!head?.content.trim() || !findings.length) {
+        return done(key, { status: 'failed', output: 'There are no findings on the current draft to apply.', toolsUsed: [], changes: {} });
+      }
+      const rev = await reviseWithFindings({ project: ctx.project, content: head.content, findings, source: 'the stage check', signal: ctx.signal });
+      const created = await ctx.appendStageVersion(ctx.stage.id, ctx.stage.label, appliedFindingsVersion(rev, ctx.project));
+      const versionId = (created as { id?: unknown } | null)?.id;
+      return done(key, {
+        status: 'succeeded', toolsUsed: ['model'],
+        changes: typeof versionId === 'string' ? { version_ids: [versionId] } : {},
+        output: `Applied ${findings.length} finding${findings.length === 1 ? '' : 's'} to ${ctx.stage.label} — saved as a new version.`,
       });
     }
 

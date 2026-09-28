@@ -34,6 +34,9 @@ export function deriveExecutionLabel(
       return 'discussed';
     case 'draft':
     case 'revise':
+    case 'outline':
+    case 'sections':
+    case 'apply':
       return 'designed';
     case 'compute':
       // Never more than the sandbox recorded; without a record, only code was written.
