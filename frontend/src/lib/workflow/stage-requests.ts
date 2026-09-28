@@ -85,10 +85,15 @@ export function generationRequest(
   };
 }
 
-/** What a draft response stores as version content; '' when it came back unusable. */
+/**
+ * What a draft response stores as version content; '' when it came back
+ * unusable. A table that may be empty (Final review's open items: nothing
+ * open is the good outcome) stores an empty table rather than reading as
+ * "the draft came back empty" (end-to-end pass, 2026-09-29).
+ */
 export function generationContent(target: StageDefinition, response: GenerateStageArtifactResponse): string {
   if (!rendererHoldsItems(target.renderer)) return response.content.trim() ? response.content : '';
-  if (response.items.length === 0) return '';
+  if (response.items.length === 0) return itemSchemaFor(target).minItems === 0 ? serializeItems([]) : '';
   const content = serializeItems(response.items as unknown as StageItem[]);
   return content.trim() ? content : '';
 }

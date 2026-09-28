@@ -280,7 +280,8 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
 
   final_evaluation: {
     itemLabel: 'open item',
-    minItems: 1,
+    // Nothing open is the good outcome: an empty table is a valid draft here.
+    minItems: 0,
     maxItems: 12,
     fields: [
       { key: 'item', label: 'Item', long: true, max: 400 },
