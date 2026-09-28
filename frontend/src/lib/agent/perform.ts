@@ -398,9 +398,13 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
           })
         : undefined;
       const actor = stageMoveActor(ctx.run.policy, ctx.approvedByUser);
-      // Complete only with the requirements met and evidence to show for it;
-      // otherwise move on and leave the stage open, as "Continue anyway" does.
-      const type = evaluation.canAdvance && evidence ? 'stage_marked_complete' : 'stage_advanced';
+      // Complete when the requirements are met — with evidence when the stage
+      // has any, and without it when the user approved the move, exactly as
+      // the transition bar does. Only an autonomous run must cite a version
+      // (20260928000000), so on a stage with no artifact, such as Outline
+      // approval, it moves on and leaves the stage open. Otherwise move on
+      // and leave the stage open, as "Continue anyway" does.
+      const type = evaluation.canAdvance && (evidence || actor === 'user') ? 'stage_marked_complete' : 'stage_advanced';
       if (ctx.setStageSummary) {
         const summary = summariseStageContent(ctx.stage, stageContentForSummary(ctx.template, ctx.stage, ctx.bundles));
         if (summary) await ctx.setStageSummary(ctx.stage.id, summary).catch(() => undefined);
@@ -412,7 +416,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         actor,
         agent_run_id: actor === 'system' ? ctx.run.id : null,
         reason: ctx.step.rationale || undefined,
-        ...(type === 'stage_marked_complete' ? { payload: { evidence_version_id: evidence } } : {}),
+        ...(type === 'stage_marked_complete' && evidence ? { payload: { evidence_version_id: evidence } } : {}),
       });
       await ctx.afterStageEvent();
       return done(key, {
