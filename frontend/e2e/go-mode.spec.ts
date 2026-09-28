@@ -206,6 +206,25 @@ test('The step budget ends the run', async ({ page }) => {
   const run = await runOf(id);
   expect(run).toMatchObject({ status: 'budget_exhausted', steps_used: 5 });
   expect(await stepsOf(run.id)).toHaveLength(5);
+
+  // B4: the window is the unit, not the project. Another window continues the
+  // same run under the same authorization, and the click is on the record.
+  const card = page.getByRole('region', { name: 'Go mode needs you' });
+  await expect(card).toContainText('This window of 5 steps is used up');
+  await card.getByRole('button', { name: 'Continue for 5 more steps' }).click();
+  await expect(page.getByRole('region', { name: 'What Go mode is doing' })).toContainText(/Objective complete|Nothing — the objective is met/, { timeout: 30_000 });
+  const next = await runOf(id);
+  expect(next.id).not.toBe(run.id);
+  expect(next).toMatchObject({ policy: 'autonomous', authorization_id: run.authorization_id });
+  const [row] = await serviceSelect('agent_runs', `id=eq.${next.id}&select=continues_run_id`);
+  expect(row.continues_run_id).toBe(run.id);
+  // Two remaining scripted moves, then the plan declares the objective complete.
+  const continued = await stepsOf(next.id);
+  expect(continued.map((s) => s.action_key)).toEqual(['falsify_hypothesis', 'compare_alternatives', 'declare_objective_complete']);
+  const decisions = await serviceSelect('decisions', `recommendation_id=eq.${run.authorization_id}&select=decision_type,metadata&order=created_at`);
+  expect(decisions).toHaveLength(2);
+  expect(decisions[1].metadata).toMatchObject({ continues_run_id: run.id });
+  await page.screenshot({ path: test.info().outputPath('02-continued-window.png'), fullPage: true });
 });
 
 test('A sandbox that is not available blocks the step honestly — never "executed"', async ({ page }) => {

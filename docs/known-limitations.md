@@ -414,9 +414,15 @@ it is not, every computation is honestly blocked on a missing tool.
 The Go loop is browser-driven. Closing the tab pauses a run; reopening the project resumes
 it, and whatever step was in flight is recorded as `interrupted` and never repeated. Two
 tabs cannot drive one run (a lease with a 10 s heartbeat; the second tab watches and takes
-over if the first goes quiet for 25 s). Other limits: the step budget is counted in steps,
+over if the first goes quiet for 25 s). Other limits: the budget is a **window** of steps,
 not dollars (`agent_runs.budget_usd` exists but is not enforced yet; model spend is in
-`model_usage` as usual); `check_literature` is **not offered** until a retrieval tool is
+`model_usage` as usual) — since B4 (2026-09-29) a used-up window offers "Continue for N
+more steps", which starts a new run chained by `continues_run_id` under the same
+authorization with a further `decisions` row; the chain is the project-level loop, and
+each window is still the user's click (auto-chaining is not offered). A stop the user can
+clear is stored as `agent_runs.needs` and shown as "I need you to…" with the one button
+that clears it (approve the outline, unblock, confirm a requirement, keep waiting,
+continue, confirm a large drafting run); a question keeps its own prompt; `check_literature` is **not offered** until a retrieval tool is
 connected (B0, 2026-09-28 — before that it was always offered and always blocked, so
 every Research run could walk into "no search tool is connected" and stop there);
 since B2b (2026-09-28) Go has the stage's own moves — `generate_outline`,

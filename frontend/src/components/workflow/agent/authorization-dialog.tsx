@@ -32,7 +32,10 @@ export function AuthorizationDialog({
         {POLICY_TERMS[policy].map((t) => (
           <li key={t}>{t}</li>
         ))}
-        <li>At most {budget} steps. You can press Stop at any time.</li>
+        <li>
+          In windows of {budget} steps. When a window is used up, Go stops and offers another; each further window is your
+          click, and is recorded. You can press Stop at any time.
+        </li>
       </ul>
       <p className="mt-2 text-label text-[var(--on-surface-variant)]">
         This authorization is recorded on the project&apos;s decision trail.

@@ -35,6 +35,7 @@ import type { Evaluation, Project } from '@/types/project';
 import { actionFor, AWAIT_SECTIONS_STEP, INTERPRET_STEP } from './actions';
 import type { AgentStateDigest } from './digest';
 import type { StageFacts } from './facts';
+import type { NeedsUser } from './needs';
 import { deriveExecutionLabel } from './labels';
 import { stageMoveActor } from './policy';
 
@@ -82,6 +83,8 @@ export interface StepOutcome {
   followUp?: { sandboxRunId: string; code: string; stdout: string; stderr: string; exitCode: number | null };
   /** End the run after this step. */
   stop?: { status: 'completed' | 'awaiting_decision' | 'blocked'; reason: string };
+  /** What the run needs from the user now (B4): the card with its one button. */
+  needs?: NeedsUser;
 }
 
 const MAX_OUTPUT = 6_000;
@@ -125,11 +128,13 @@ async function waitForSections(ctx: PerformContext, key: string, ids: string[], 
       return done(key, {
         status: 'interrupted', toolsUsed: ['model', 'jobs'], changes,
         output: `${wrote} Stopped while ${r.pending.length} section${r.pending.length === 1 ? ' was' : 's were'} still being written; they continue in the background.${standing}`,
+        needs: { kind: 'wait_for_jobs', stageId: ctx.stage.id, pending: r.pending.length, complete: r.complete, total: r.total },
       });
     default:
       return done(key, {
         status: 'interrupted', toolsUsed: ['model', 'jobs'], changes,
-        output: `${wrote} ${r.pending.length} still being written when the wait ran out; they continue in the background. Press Resume to keep waiting.${standing}`,
+        output: `${wrote} ${r.pending.length} still being written when the wait ran out; they continue in the background.${standing}`,
+        needs: { kind: 'wait_for_jobs', stageId: ctx.stage.id, pending: r.pending.length, complete: r.complete, total: r.total },
       });
   }
 }
@@ -405,6 +410,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         status: 'succeeded', toolsUsed: [], changes: {},
         output: ctx.step.decision_question || 'Which way should this go?',
         stop: { status: 'awaiting_decision', reason: ctx.step.decision_question || 'Go mode needs your decision.' },
+        needs: { kind: 'answer_question', question: ctx.step.decision_question || 'Which way should this go?' },
       });
 
     case 'complete':

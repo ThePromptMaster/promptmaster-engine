@@ -149,7 +149,9 @@ test('A recommendation can be shown revised first, too — then accepted and rec
   expect((await versionsOf(id)).map((v) => v.source_operation)).toEqual(['stage_draft', 'applied_recommendations']);
   const [rec] = await serviceSelect('recommendations', `project_id=eq.${id}&kind=neq.workflow&select=id,status`);
   expect(rec.status).toBe('accepted');
-  expect(await serviceSelect('decisions', `recommendation_id=eq.${rec.id}&select=decision_type`)).toEqual([{ decision_type: 'accept_recommendation' }]);
+  // The version pill appears before the accept and its decision are written; wait for the record.
+  await expect.poll(() => serviceSelect('decisions', `recommendation_id=eq.${rec.id}&select=decision_type`), { timeout: 10_000 })
+    .toEqual([{ decision_type: 'accept_recommendation' }]);
 });
 
 test('Discarding a recommendation revision keeps the recommendation pending', async ({ page }) => {

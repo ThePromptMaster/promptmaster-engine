@@ -24,6 +24,8 @@ export async function createAgentRun(args: {
   authorizationId: string | null;
   budgetSteps: number;
   leaseHolder: string;
+  /** The used-up run this one continues (B4). */
+  continuesRunId?: string | null;
 }): Promise<AgentRun> {
   const { data, error } = await createClient()
     .from('agent_runs')
@@ -35,6 +37,7 @@ export async function createAgentRun(args: {
       budget_steps: args.budgetSteps,
       lease_holder: args.leaseHolder,
       heartbeat_at: new Date().toISOString(),
+      continues_run_id: args.continuesRunId ?? null,
     })
     .select('*')
     .single();
@@ -58,14 +61,14 @@ export async function getLiveAgentRun(projectId: string): Promise<AgentRun | nul
 
 export async function updateAgentRun(
   runId: string,
-  patch: Partial<Pick<AgentRun, 'status' | 'stop_reason' | 'steps_used' | 'cost_usd' | 'lease_holder' | 'heartbeat_at' | 'ended_at'>>
+  patch: Partial<Pick<AgentRun, 'status' | 'stop_reason' | 'steps_used' | 'cost_usd' | 'lease_holder' | 'heartbeat_at' | 'ended_at' | 'needs'>>
 ): Promise<void> {
   const { error } = await createClient().from('agent_runs').update(patch).eq('id', runId);
   if (error) throw error;
 }
 
-export async function endAgentRun(runId: string, status: AgentRunStatus, reason: string): Promise<void> {
-  await updateAgentRun(runId, { status, stop_reason: reason, ended_at: new Date().toISOString() });
+export async function endAgentRun(runId: string, status: AgentRunStatus, reason: string, needs: AgentRun['needs'] = null): Promise<void> {
+  await updateAgentRun(runId, { status, stop_reason: reason, ended_at: new Date().toISOString(), needs });
 }
 
 export async function listAgentSteps(runId: string): Promise<AgentStep[]> {
