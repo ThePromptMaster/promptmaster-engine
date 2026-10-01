@@ -375,3 +375,83 @@ def test_a_revision_instruction_reaches_the_user_prompt(basic_inputs, prose_stag
 def test_no_instruction_means_no_instruction_block(basic_inputs, prose_stage, digest):
     _, user = build_stage_prompt(basic_inputs, prose_stage, digest, existing_content="The old draft.")
     assert "REVISION INSTRUCTION" not in user
+
+
+# --- 1 Oct, items 3, 12 and 18: what the draft knows reaches the structured field ---
+
+from promptmaster.schemas import StageItemField as _Field, StageItemStatus as _Status  # noqa: E402
+
+
+def _runs_schema() -> StageItemSchema:
+    return StageItemSchema(
+        item_label="run",
+        fields=[_Field(key="run", label="What was to be done"), _Field(key="observed", label="What actually happened")],
+        statuses=[
+            _Status(value="completed", label="Completed"),
+            _Status(value="deviated", label="Deviated", requires_reason=True),
+            _Status(value="not_run", label="Not run", requires_reason=True, model_may_set=True),
+        ],
+    )
+
+
+def test_the_prompt_says_which_status_the_model_may_set_and_which_it_may_not(basic_inputs, digest):
+    stage = StageDescriptor(id="experiment", label="Experiment", renderer="review", entry_prompt_hint="", artifact_kind="runs")
+    system, user = build_stage_prompt(basic_inputs, stage, digest, _runs_schema())
+    text = system + user
+    assert "status: set it ONLY when the project already tells you the outcome" in text
+    assert "'not_run' (Not run) — give the reason in 'reason'" in text
+    assert "Never set 'completed', 'deviated'" in text
+    assert '"status": "(only if already known: not_run)"' in text
+
+
+def test_a_run_the_model_knows_was_not_run_arrives_with_its_reason_marked_as_the_models():
+    items = _parse_items(
+        {"items": [{"id": "r1", "run": "Cohort extract", "status": "not_run", "reason": "No source data was provided."}]},
+        _runs_schema(),
+    )
+    row = items[0].model_dump()
+    assert row["status"] == "not_run"
+    assert row["reason"] == "No source data was provided."
+    assert row["status_source"] == "model"
+
+
+def test_the_model_cannot_claim_a_run_was_completed_nor_skip_the_reason():
+    items = _parse_items(
+        {"items": [
+            {"id": "r1", "run": "Cohort extract", "status": "completed"},
+            {"id": "r2", "run": "Survival model", "status": "not_run", "reason": "  "},
+            {"id": "r3", "run": "Ticket join", "status": "made_up", "status_source": "user"},
+        ]},
+        _runs_schema(),
+    )
+    for item in items:
+        row = item.model_dump()
+        assert "status" not in row
+        assert "reason" not in row
+        assert "status_source" not in row
+
+
+def test_generated_rows_start_in_the_schemas_default_state(basic_inputs):
+    schema = StageItemSchema(
+        item_label="work",
+        fields=[_Field(key="work", label="The work")],
+        statuses=[
+            _Status(value="candidate", label="Suggested by PromptMaster", model_default=True),
+            _Status(value="retrieved", label="Retrieved"),
+            _Status(value="verified", label="Verified by me"),
+        ],
+    )
+    items = _parse_items({"items": [{"work": "Smith 2019", "status": "verified"}, {"work": "Lee 2021"}]}, schema)
+    assert [i.model_dump()["status"] for i in items] == ["candidate", "candidate"]
+    system, user = build_stage_prompt(
+        basic_inputs,
+        StageDescriptor(id="literature", label="Literature", renderer="list", entry_prompt_hint="", artifact_kind="literature_map"),
+        StageDigest(), schema,
+    )
+    # Nothing the model may set: it is not asked about status at all.
+    assert "status:" not in system + user
+
+
+def test_a_client_that_sends_no_statuses_is_parsed_as_before(audience_schema):
+    items = _parse_items({"items": [{"who": "a", "status": "accepted"}]}, audience_schema)
+    assert items[0].model_dump()["status"] == "accepted"

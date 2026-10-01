@@ -428,6 +428,8 @@ export interface StageItemSchemaRequest {
   fields: { key: string; label: string; hint?: string; max_chars?: number | null }[];
   min_items: number;
   max_items: number;
+  /** Who may set which status; the server keeps a model's status only where this allows. */
+  statuses?: { value: string; label: string; requires_reason: boolean; model_may_set: boolean; model_default: boolean }[];
 }
 
 export interface GenerateStageArtifactRequest {

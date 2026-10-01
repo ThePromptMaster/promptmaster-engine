@@ -90,6 +90,21 @@ def _format_item_schema(schema: StageItemSchema) -> str:
         # clipped and flagged red before the user has touched it.
         limit = f" At most {field.max_chars} characters." if field.max_chars else ""
         lines.append(f"- {field.key}: {label}.{hint}{limit}".rstrip())
+    settable = [s for s in schema.statuses if s.model_may_set]
+    if settable:
+        # What the draft already knows should not have to be typed in again by
+        # the user (1 Oct, items 3 and 18) — but only the outcomes that are the
+        # model's to state. The rest record what a person or a tool did.
+        names = "; ".join(
+            f"'{s.value}' ({s.label or s.value})" + (" — give the reason in 'reason', one plain sentence" if s.requires_reason else "")
+            for s in settable
+        )
+        others = ", ".join(f"'{s.value}'" for s in schema.statuses if not s.model_may_set and not s.model_default)
+        lines.append(
+            f"- status: set it ONLY when the project already tells you the outcome. You may set: {names}. "
+            "Otherwise leave 'status' out."
+            + (f" Never set {others}: those record what a person or a tool actually did." if others else "")
+        )
     return "\n".join(lines)
 
 
@@ -106,6 +121,10 @@ def _example_json(schema: StageItemSchema) -> str:
         example[field.key] = "..."
     if not fields:
         example["text"] = "..."
+    settable = [s.value for s in schema.statuses if s.model_may_set]
+    if settable:
+        example["status"] = f"(only if already known: {' or '.join(settable)})"
+        example["reason"] = "(when the status needs one)"
     return (
         "{\n"
         '  "items": [\n'
@@ -233,6 +252,33 @@ def _claim_provenance(row: dict) -> dict:
     return out
 
 
+def _model_status(row: dict, schema: StageItemSchema) -> dict:
+    """The status a generated row is stored with, when the client said who may set what.
+
+    Kept only if it is one the model may set and it carries its reason where
+    one is required; then marked as the model's, so the screen can say
+    "set by PromptMaster — review or change". Anything else is dropped: a
+    model that writes "completed" on a run nobody ran is guessing, and the
+    row goes back to undecided. A row with no kept status starts in the
+    schema's default for generated rows, if it has one.
+    """
+    by_value = {s.value: s for s in schema.statuses}
+    status = row.get("status")
+    chosen = by_value.get(status.strip().lower()) if isinstance(status, str) else None
+    reason = row.get("reason")
+    reason = reason.strip() if isinstance(reason, str) else ""
+    row.pop("status", None)
+    row.pop("reason", None)
+    row.pop("status_source", None)
+    if chosen and chosen.model_may_set and (reason or not chosen.requires_reason):
+        out = {"status": chosen.value, "status_source": "model"}
+        if reason:
+            out["reason"] = reason
+        return out
+    default = next((s for s in schema.statuses if s.model_default), None)
+    return {"status": default.value, "status_source": "model"} if default else {}
+
+
 def _parse_items(raw_result: dict, schema: StageItemSchema | None) -> list[StageItem]:
     """Defensive parse, matching generate_audit_findings.
 
@@ -276,6 +322,8 @@ def _parse_items(raw_result: dict, schema: StageItemSchema | None) -> list[Stage
         # candidate at most; "verified_by_promptmaster" is a tool's to set.
         if "claim" in allowed:
             row.update(_claim_provenance(row))
+        elif schema and schema.statuses:
+            row.update(_model_status(row, schema))
         try:
             items.append(StageItem(**row))
         except Exception as parse_err:

@@ -440,6 +440,24 @@ class StageItemField(BaseModel):
     )
 
 
+class StageItemStatus(BaseModel):
+    """One value a row's status may take, and who may set it.
+
+    A status records what happened to a row, and most of them are not the
+    model's to claim: "completed" means a person or a tool ran it. The client
+    says which ones the model may set when it already knows the answer
+    (`model_may_set`: a run that could not be executed because the data was
+    never provided), and which one every generated row starts in
+    (`model_default`: a work the model recalled is a candidate, not a
+    retrieved source).
+    """
+    value: str
+    label: str = ""
+    requires_reason: bool = False
+    model_may_set: bool = False
+    model_default: bool = False
+
+
 class StageItemSchema(BaseModel):
     """The shape of one item in a list stage.
 
@@ -452,6 +470,8 @@ class StageItemSchema(BaseModel):
     fields: list[StageItemField] = Field(default_factory=list)
     min_items: int = Field(default=3)
     max_items: int = Field(default=8)
+    #: Empty for a client that predates it; the parser then keeps its old behaviour.
+    statuses: list[StageItemStatus] = Field(default_factory=list)
 
 
 class StageExitCriterion(BaseModel):

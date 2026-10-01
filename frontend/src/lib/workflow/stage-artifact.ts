@@ -40,6 +40,11 @@ export interface ItemFieldSpec {
   max?: number;
   /** The values the field may take; told to the model, and what Go's triage reads risk from (B3). */
   options?: readonly string[];
+  /**
+   * Only the user fills it; the model is never asked for it and a value it
+   * offers is dropped. A DOI is the case: a model asked for one will write one.
+   */
+  userOnly?: boolean;
 }
 
 export interface ReviewStatusOption {
@@ -56,6 +61,14 @@ export interface ReviewStatusOption {
   decided?: false;
   /** Only a tool can set it — never offered in the dropdown. */
   settable?: false;
+  /**
+   * The model may set it when the project already tells it the outcome — a
+   * run that could not be executed because the data was never provided.
+   * Statuses without this are not the model's to claim.
+   */
+  modelMaySet?: true;
+  /** The state every generated row starts in. */
+  modelDefault?: true;
   /** One line for the legend under the table. */
   explain?: string;
 }
@@ -68,6 +81,12 @@ export interface StageItemSchema {
   maxItems: number;
   /** Present for review stages: the per-row triage enum. */
   statuses?: ReviewStatusOption[];
+  /**
+   * Said above the rows while any of them is still in the model's default
+   * state: what that state means for how far the rows can be trusted.
+   * `{n}` and `{total}` are filled in.
+   */
+  defaultStateNote?: string;
 }
 
 // --- the registry -----------------------------------------------------------
@@ -135,7 +154,25 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
         long: true,
         max: 400,
       },
+      { key: 'link', label: 'DOI or link', hint: 'Where you found it — add this when you verify the work yourself', max: 300, userOnly: true },
     ],
+    // 1 Oct, item 12: eleven works recalled from the model's knowledge met
+    // "at least three works" and looked exactly like eleven sources. Who
+    // established that the work exists is now on the row. "Retrieved" is a
+    // search tool's to set; none is connected, so nothing carries it yet.
+    statuses: [
+      {
+        value: 'candidate', label: 'Suggested by PromptMaster — not retrieved', tone: 'neutral', decided: false, modelDefault: true,
+        explain: 'Recalled from the model\'s knowledge. Nothing was searched or fetched; it may be misremembered or not exist.',
+      },
+      {
+        value: 'retrieved', label: 'Retrieved by PromptMaster', tone: 'done', settable: false,
+        explain: 'A search tool found the record. No tool is connected yet, so no work carries this today.',
+      },
+      { value: 'verified', label: 'Verified by me', tone: 'done', explain: 'You found the work and checked it says this. Add its DOI or link.' },
+    ],
+    defaultStateNote:
+      '{n} of {total} works were suggested from the model\'s knowledge. They have not been searched for, retrieved or verified — treat them as candidates.',
   },
 
   // Keyed 'hypotheses' because that is the artifact kind the Research template
@@ -207,7 +244,9 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
     statuses: [
       { value: 'completed', label: 'Completed', tone: 'done' },
       { value: 'deviated', label: 'Deviated', tone: 'neutral', requiresReason: true },
-      { value: 'not_run', label: 'Not run', tone: 'warn', requiresReason: true },
+      // The one outcome the draft can know: nothing ran because what it
+      // needed was never provided. "Completed" is never the model's to say.
+      { value: 'not_run', label: 'Not run', tone: 'warn', requiresReason: true, modelMaySet: true },
     ],
   },
 

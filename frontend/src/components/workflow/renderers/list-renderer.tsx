@@ -18,7 +18,8 @@
 
 import { useEffect, useMemo, useState, useRef } from 'react';
 
-import { emptyItem, isBlankItem, type StageItem } from '@/lib/workflow/stage-artifact';
+import { emptyItem, isBlankItem, statusOption, type StageItem } from '@/lib/workflow/stage-artifact';
+import { CustomSelect } from '@/components/shared/custom-select';
 import { parseItems } from '@/lib/workflow/stage-artifact';
 import { ConfirmOverwrite, EmptyStage, GenerationBar, VersionBar } from './stage-chrome';
 import type { StageRendererProps } from './types';
@@ -83,8 +84,18 @@ export function ListRenderer({
   }, [dirty, onDirtyChange]);
 
   function patch(id: string, key: string, value: string) {
-    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, [key]: value } : i)));
+    const mine = key === 'status' ? { status_source: 'user' } : {};
+    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, [key]: value, ...mine } : i)));
   }
+
+  // How far the rows can be trusted, said above them while any is still in
+  // the state the model left it in (1 Oct, item 12).
+  const defaultStatus = schema.statuses?.find((s) => s.modelDefault)?.value;
+  const inDefault = defaultStatus ? items.filter((i) => i.status === defaultStatus).length : 0;
+  const stateNote =
+    schema.defaultStateNote && inDefault > 0
+      ? schema.defaultStateNote.replace('{n}', String(inDefault)).replace('{total}', String(items.length))
+      : null;
 
   function add() {
     setItems((prev) => [...prev, emptyItem(schema)]);
@@ -172,6 +183,12 @@ export function ListRenderer({
       {items.length === 0 && !generating ? (
         <EmptyStage label={`${label}s`} />
       ) : (
+        <>
+        {stateNote && (
+          <p role="note" className="mb-3 rounded-xl bg-[var(--surface-container-high)] px-5 py-3 text-body text-[var(--on-surface)]">
+            {stateNote}
+          </p>
+        )}
         <ul className="space-y-3">
           {items.map((item, index) => (
             <ItemCard
@@ -187,6 +204,17 @@ export function ListRenderer({
             />
           ))}
         </ul>
+        {schema.statuses?.some((s) => s.explain) && (
+          <dl aria-label="What the statuses mean" className="mt-3 grid gap-x-4 gap-y-1 text-label sm:grid-cols-[max-content_1fr]">
+            {schema.statuses.filter((s) => s.explain).map((s) => (
+              <div key={s.value} className="contents">
+                <dt className="text-[var(--on-surface)]">{s.label}</dt>
+                <dd className="text-[var(--on-surface-variant)]">{s.explain}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
+        </>
       )}
 
       {!readOnly && (
@@ -272,10 +300,28 @@ function ItemCard({
 
   return (
     <li className="rounded-xl bg-[var(--surface-container-lowest)] px-5 py-4">
-      <div className="mb-3 flex items-center gap-2">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
         <span className="text-label uppercase tracking-wider text-[var(--on-surface-variant)]">
           {schema.itemLabel} {index + 1}
         </span>
+        {schema.statuses && (
+          readOnly ? (
+            <span className="text-label text-[var(--on-surface-variant)]">
+              {statusOption(schema, item.status)?.label ?? 'Added by me — not verified'}
+            </span>
+          ) : (
+            <div className="w-[300px] max-w-full" aria-label={`Status of ${schema.itemLabel} ${index + 1}`}>
+              <CustomSelect
+                value={item.status ?? ''}
+                options={schema.statuses
+                  .filter((s) => s.settable !== false || s.value === item.status)
+                  .map((s) => ({ value: s.value, label: s.label }))}
+                placeholder="Added by me — not verified"
+                onChange={(value) => onPatch(item.id, 'status', value)}
+              />
+            </div>
+          )
+        )}
         {!readOnly && (
           <div className="ml-auto flex items-center gap-0.5">
             <button

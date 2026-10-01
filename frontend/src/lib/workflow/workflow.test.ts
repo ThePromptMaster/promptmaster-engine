@@ -286,7 +286,8 @@ describe('FR-03: one engine, two workflows', () => {
         // own — it gates on an approval, not on something it produces.
         if (!rendererHoldsItems(stage.renderer) || !stage.expected_artifacts.length) continue;
         const hint = stage.entry_prompt_hint ?? '';
-        for (const field of itemSchemaFor(stage).fields) {
+        // A field only the user fills (a DOI) is never asked of the model.
+        for (const field of itemSchemaFor(stage).fields.filter((f) => !f.userOnly)) {
           expect(hint, `${template.key}/${stage.id} hint omits ${field.key}`).toContain(field.key);
         }
       }
@@ -778,5 +779,27 @@ describe('every_item_has_fields: what PromptMaster can see, it verifies (1 Oct, 
     expect(hyp.exit_criteria.find((c) => c.id === 'hyp.accept')).toMatchObject({ label: 'I accept these hypotheses as the working set', check: 'manual', blocking: true });
     expect(evaluateStage(RESEARCH_V1, 'hypothesis', ctx(1, full)).canAdvance).toBe(false);
     expect(evaluateStage(RESEARCH_V1, 'hypothesis', ctx(1, full, { 'hyp.accept': true })).canAdvance).toBe(true);
+  });
+});
+
+describe('Literature counts candidates and established works separately (1 Oct, item 12)', () => {
+  const ctx = (counts: Record<string, number>) => {
+    const total = Object.values(counts).reduce((a, b) => a + b, 0);
+    return {
+      fields: {}, itemCounts: { literature: total }, itemsMissingStatus: {}, itemStatusCounts: { literature: counts },
+      artifactNonEmpty: { literature: total > 0 }, outlineApproved: false, sections: {}, findings: {}, manualChecks: {},
+    };
+  };
+  const result = (counts: Record<string, number>) =>
+    Object.fromEntries(evaluateStage(RESEARCH_V1, 'literature', ctx(counts)).criteria.map((r) => [r.id, r]));
+
+  it('eleven works recalled by the model are eleven candidates, and none established', () => {
+    const r = result({ candidate: 11 });
+    expect(r['lit.three']).toMatchObject({ label: 'At least three candidate works identified', satisfied: true });
+    expect(r['lit.verified']).toMatchObject({ label: 'At least three works retrieved or verified', satisfied: false, detail: '0 of 3' });
+  });
+  it('retrieved and verified both count', () => {
+    expect(result({ candidate: 8, verified: 2, retrieved: 1 })['lit.verified'].satisfied).toBe(true);
+    expect(result({ candidate: 9, verified: 2 })['lit.verified']).toMatchObject({ satisfied: false, detail: '2 of 3' });
   });
 });

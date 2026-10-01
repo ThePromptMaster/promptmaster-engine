@@ -46,6 +46,8 @@ export type AutoRule =
   | { type: 'min_items'; n: number }
   | { type: 'all_sections_complete' }
   | { type: 'every_item_has_status' }
+  /** At least n rows carry one of these statuses — "three works retrieved or verified". */
+  | { type: 'min_items_with_status'; n: number; statuses: string[] }
   /** Every row fills these fields — "each hypothesis has a prediction and a disconfirmer". */
   | { type: 'every_item_has_fields'; fields: string[] }
   | { type: 'outline_approved' }
@@ -298,6 +300,8 @@ export interface StageContext {
   itemCounts: Record<string, number>;
   /** Per stage id: items still lacking a status value. */
   itemsMissingStatus: Record<string, number>;
+  /** Per stage id, per status value: how many rows carry it. */
+  itemStatusCounts?: Record<string, Record<string, number>>;
   /** Per stage id, per field key: rows that leave that field empty. */
   itemFieldGaps?: Record<string, Record<string, number>>;
   artifactNonEmpty: Record<string, boolean>;

@@ -60,7 +60,7 @@ function evaluateCriterion(
   // comparables" on the prose Positioning stage (PM-02) — can never be met by
   // anything the user does. Same degradation: let them tick it.
   if (
-    (rule.type === 'min_items' || rule.type === 'every_item_has_status' || rule.type === 'every_item_has_fields') &&
+    (rule.type === 'min_items' || rule.type === 'every_item_has_status' || rule.type === 'every_item_has_fields' || rule.type === 'min_items_with_status') &&
     renderer !== undefined &&
     !COUNTABLE_RENDERERS.has(renderer)
   ) {
@@ -126,6 +126,13 @@ function evaluateCriterion(
         satisfied: have > 0 && short === 0,
         detail: have === 0 ? 'nothing to check yet' : short === 0 ? undefined : `${short} of ${have} incomplete`,
       };
+    }
+
+    // Three works named is not three works established (1 Oct, item 12).
+    case 'min_items_with_status': {
+      const counts = ctx.itemStatusCounts?.[stageId] ?? {};
+      const have = rule.statuses.reduce((n, s) => n + (counts[s] ?? 0), 0);
+      return { ...base, satisfied: have >= rule.n, detail: have >= rule.n ? undefined : `${have} of ${rule.n}` };
     }
 
     case 'outline_approved':
