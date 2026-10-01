@@ -20,7 +20,7 @@
 
 import { countNamedSections, parseOutlineDocument } from '@/lib/outline/model';
 import { manuscriptArtifactFor } from '@/lib/workflow/context';
-import { formatManuscript, type StageArtifactBundle } from '@/lib/workflow/digest';
+import { formatManuscript, type DataFileBrief, type StageArtifactBundle } from '@/lib/workflow/digest';
 import { nextSuggestedStage } from '@/lib/workflow/engine';
 import { effectiveRenderer, isTriaged, itemSchemaFor, parseItems } from '@/lib/workflow/stage-artifact';
 import type { StageContext, StageDefinition, StageEvaluation, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
@@ -55,6 +55,8 @@ export interface AgentStateDigest {
   /** `complete` counts the sections that hold text. */
   manuscript?: { total: number; complete: number; pending_jobs: number; written: string[]; unwritten: string[] };
   findings?: { total: number; triaged: number; sample: string[] };
+  /** The project's data files, so the planner knows a computation has something to read. */
+  data_files?: DataFileBrief[];
   tools: AgentTools;
 }
 
@@ -96,11 +98,13 @@ export function buildAgentState(input: {
   tools?: AgentTools;
   /** What the stage holds, read fresh. Preferred over `bundles` wherever both know. */
   facts?: StageFacts;
+  dataFiles?: DataFileBrief[];
 }): AgentStateDigest {
   const { template, state, stage, bundles, stageEvaluation, latestEvaluation, steps, context, approvedOutline = [], facts } = input;
   const pendingJobs = facts?.manuscript?.pendingJobs.length ?? input.pendingJobs ?? 0;
   const outlineApproved = facts?.outline?.approved ?? facts?.outlineApproved ?? input.outlineApproved ?? approvedOutline.length > 0;
-  const tools = input.tools ?? NO_TOOLS;
+  const dataFiles = input.dataFiles ?? [];
+  const tools = dataFiles.length ? { ...(input.tools ?? NO_TOOLS), datasets: true } : (input.tools ?? NO_TOOLS);
   const head = bundles[stage.id]?.versions.at(-1)?.content ?? '';
   const next = nextSuggestedStage(template, state);
   const index = template.stages.findIndex((s) => s.id === stage.id);
@@ -219,6 +223,7 @@ export function buildAgentState(input: {
     ...(outline ? { outline } : {}),
     ...(manuscript ? { manuscript } : {}),
     ...(findings ? { findings } : {}),
+    ...(dataFiles.length ? { data_files: dataFiles } : {}),
     tools,
   };
 }

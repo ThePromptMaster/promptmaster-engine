@@ -1,6 +1,7 @@
 'use client';
 
 import { create } from 'zustand';
+import { listProjectFiles } from '@/lib/supabase/project-files';
 
 import {
   getProject,
@@ -34,6 +35,7 @@ import {
   type ArtifactVersion,
   type Evaluation,
   type Project,
+  type ProjectFile,
   type ProjectPatch,
 } from '@/types/project';
 
@@ -101,6 +103,8 @@ interface ProjectState {
   events: WorkflowEvent[] | null;
   recommendations: Recommendation[];
   tasks: ProjectTask[];
+  /** Data files attached to the project; read by code the project runs. */
+  files: ProjectFile[];
 
   /** Which version the UI is *displaying*. Never implies a restore. */
   activeVersionId: string | null;
@@ -224,6 +228,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
   events: null,
   recommendations: [],
   tasks: [],
+  files: [],
   activeVersionId: null,
   loading: false,
   error: null,
@@ -251,11 +256,12 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       // A missing recommendations or tasks row set must not take the project
       // down: the derived half of the panel still works. Events fail closed to
       // an empty log, as the workspace's own loader did.
-      const [artifacts, events, recommendations, tasks] = await Promise.all([
+      const [artifacts, events, recommendations, tasks, files] = await Promise.all([
         listArtifacts(id),
         listWorkflowEvents(id).catch(() => [] as WorkflowEvent[]),
         listRecommendations(id).catch(() => [] as Recommendation[]),
         listTasks(id).catch(() => [] as ProjectTask[]),
+        listProjectFiles(id).catch(() => [] as ProjectFile[]),
       ]);
 
       // A Book project has thirteen artifacts, not one. Load them all and index
@@ -320,6 +326,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         events,
         recommendations,
         tasks,
+        files,
         activeVersionId: head?.id ?? null,
         loading: false,
       });
@@ -341,6 +348,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       events: null,
       recommendations: [],
       tasks: [],
+      files: [],
       activeVersionId: null,
       saveState: 'idle',
       conflict: null,

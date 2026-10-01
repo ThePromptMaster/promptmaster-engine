@@ -401,7 +401,18 @@ which would silently stop bumping `revision` and disable the concurrency guard.
 numpy, scipy, sympy and matplotlib and **no network** while the code runs. Anything
 else — another language, another library, a dataset fetched from the internet —
 is recorded as `blocked` / `tool_missing` (or `data_missing` for a missing input
-file) rather than attempted another way. Limits: 30 s per command, 10 runs per Go
+file) rather than attempted another way.
+
+**Data files (2026-10-01).** A user can attach CSV, TSV, JSON or text files to a
+project (`project_files` + the private `project-files` bucket; ≤5 MB each, 10 per
+project). The sandbox route copies them into `/data` for every run of that project
+(≤20 MB in total; files past that are left out, in upload order). Prompts are shown
+each file's name, columns, first rows and row count — computed in the browser at
+upload — never the file. What this does **not** do: read spreadsheets (.xlsx; save as
+CSV), query a database, or use pandas (not in the sandbox image; the code is told to
+use `csv`, `json` or numpy). A run that succeeds does **not** set an Experiment row to
+"Completed" — the user still records that, with the run's output in front of them.
+Removing a file does not touch runs already recorded. Limits: 30 s per command, 10 runs per Go
 run (`SANDBOX_MAX_PER_RUN`), 600 s of execution per user per UTC day
 (`SANDBOX_DAILY_SECONDS`), 5 output files of ≤1 MB each. Without
 `SANDBOX_SNAPSHOT_ID` each run installs the packages first (~20–25 s wall time).

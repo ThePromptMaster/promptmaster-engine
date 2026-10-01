@@ -21,9 +21,28 @@ import type { OutlineDocument } from './outline';
 export type ProjectStatus = 'active' | 'finalized' | 'archived';
 export type ScoreValue = 'Low' | 'Medium' | 'High';
 
+/** A data file attached to a project (`project_files`); read by code the project runs. */
+export interface ProjectFile {
+  id: string;
+  project_id: string;
+  user_id: string;
+  name: string;
+  path: string;
+  content_type: string;
+  bytes: number;
+  preview: import('@/lib/data/preview').DataPreview;
+  created_at: string;
+}
+
 export interface Project {
   id: string;
   user_id: string;
+  /**
+   * The project's data files. Not a column: joined on in the browser when
+   * the project is opened, so everything that is handed the project — stage
+   * generation, the Go planner, the code writer — knows what data exists.
+   */
+  data_files?: ProjectFile[];
 
   title: string;
   objective: string;

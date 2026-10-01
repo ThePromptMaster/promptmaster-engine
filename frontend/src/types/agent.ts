@@ -148,6 +148,8 @@ export interface WriteCodeResponse {
 /** /api/sandbox/run (B3). */
 export interface SandboxRunResponse {
   sandbox_run: SandboxRun & { cost_usd: number | null };
+  /** The project data files that were placed in /data for this run. */
+  data_files?: { name: string; bytes: number }[];
   classification: {
     stepStatus: 'succeeded' | 'failed' | 'blocked';
     executionLabel: ExecutionLabel;

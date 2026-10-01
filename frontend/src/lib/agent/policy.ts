@@ -40,6 +40,8 @@ export function withoutOverride(allowed: readonly string[], canAdvance: boolean,
 /** Which tools a run can actually call. Nothing retrieves literature yet (B0). */
 export interface AgentTools {
   literature: boolean;
+  /** The project has data files the sandbox can read. */
+  datasets?: boolean;
 }
 
 export const NO_TOOLS: AgentTools = { literature: false };

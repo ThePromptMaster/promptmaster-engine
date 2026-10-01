@@ -53,7 +53,7 @@ import {
   startAgentStep,
   updateAgentRun,
 } from '@/lib/supabase/agent';
-import type { StageArtifactBundle } from '@/lib/workflow/digest';
+import { dataFileBriefs, type StageArtifactBundle } from '@/lib/workflow/digest';
 import { evaluateStage, getStage } from '@/lib/workflow/engine';
 import { inputsFrom } from '@/lib/workflow/stage-requests';
 import type { StageContext, StageDefinition, StageEvaluation, WorkflowEvent, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
@@ -228,7 +228,7 @@ export function useGoLoop(opts: Options) {
           template: o.template, state: o.state, stage: o.stage, bundles: o.bundles,
           stageEvaluation: evaluateStage(o.template, o.stage.id, context), latestEvaluation: o.latestEvaluation,
           steps: [...priorStepsRef.current, ...stepsRef.current],
-          context, approvedOutline: o.approvedOutline, facts,
+          context, approvedOutline: o.approvedOutline, facts, dataFiles: dataFileBriefs(o.project),
         }),
         approvedByUser, deliverableDone: o.deliverableDone,
         interpret: interpret
@@ -391,7 +391,7 @@ export function useGoLoop(opts: Options) {
         const digest = buildAgentState({
           template: o.template, state: o.state, stage: o.stage, bundles: o.bundles,
           stageEvaluation, latestEvaluation: o.latestEvaluation, steps: [...priorStepsRef.current, ...stepsRef.current],
-          context, approvedOutline: o.approvedOutline, facts,
+          context, approvedOutline: o.approvedOutline, facts, dataFiles: dataFileBriefs(o.project),
         });
         const choice = await api.agentNextAction(
           { inputs: inputsFrom(o.project), state: digest, allowed_actions: allowed, policy: current.policy, model: o.project.model },
