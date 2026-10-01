@@ -28,6 +28,7 @@ import { CritiqueStyleControl } from './critique-style-control';
 import { CritiqueActions } from './critique-actions';
 import { RevisedPreview } from './revised-preview';
 import { useApplyFindings } from './use-apply-findings';
+import { generationRequest } from '@/lib/workflow/stage-requests';
 import { findingFromPoint, pointsFromCommentary } from '@/lib/workflow/critique-points';
 import { ExportMenu } from './export-menu';
 import { listWorkflowEvents } from '@/lib/supabase/workflow';
@@ -609,7 +610,20 @@ export function WorkflowWorkspace({
    */
   const tools = useStageTools({ project, stage: stage ?? null, headVersion, appendStageVersion });
   // PM-22: every "apply" after a critique goes through one path.
-  const applyFindings = useApplyFindings({ project, stage, headVersion, appendStageVersion });
+  // A table stage is revised as rows by the generator that drafted it; sent
+  // through the text revision it came back as prose and the table was lost.
+  const tableRevision = useMemo(
+    () =>
+      stage && rendererHoldsItems(stage.renderer)
+        ? {
+            stage,
+            request: (instruction: string) =>
+              generationRequest(project, template, state, stageBundles, stage, headVersion?.content ?? '', instruction),
+          }
+        : undefined,
+    [stage, project, template, state, stageBundles, headVersion]
+  );
+  const applyFindings = useApplyFindings({ project, stage, headVersion, appendStageVersion, table: tableRevision });
   const critiquePoints = useMemo(
     () => (tools.commentary ? pointsFromCommentary(tools.commentary.text) : []),
     [tools.commentary]

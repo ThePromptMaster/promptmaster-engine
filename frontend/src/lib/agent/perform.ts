@@ -17,7 +17,7 @@ import { commitOutlineVersion } from '@/lib/supabase/outline';
 import { appendWorkflowEvent } from '@/lib/supabase/workflow';
 import { appliedFindingsVersion, reviseWithFindings } from '@/lib/workflow/apply-findings';
 import { deriveOutlineItems } from '@/lib/workflow/derived-outline';
-import { serializeItems } from '@/lib/workflow/stage-artifact';
+import { rendererHoldsItems, serializeItems } from '@/lib/workflow/stage-artifact';
 import { applyTriage } from '@/lib/workflow/triage';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import { summariseStageContent } from '@/lib/workflow/digest';
@@ -335,7 +335,13 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       if (!head?.content.trim() || !findings.length) {
         return done(key, { status: 'failed', output: 'There are no findings on the current draft to apply.', toolsUsed: [], changes: {} });
       }
-      const rev = await reviseWithFindings({ project: ctx.project, content: head.content, findings, source: 'the stage check', signal: ctx.signal });
+      const rev = await reviseWithFindings({
+        project: ctx.project, content: head.content, findings, source: 'the stage check', signal: ctx.signal,
+        // A table is revised as rows, by the generator that drafted it.
+        ...(rendererHoldsItems(ctx.stage.renderer)
+          ? { table: { stage: ctx.stage, request: (instruction: string) => generationRequest(ctx.project, ctx.template, ctx.state, ctx.bundles, ctx.stage, head.content, instruction) } }
+          : {}),
+      });
       const created = await ctx.appendStageVersion(ctx.stage.id, ctx.stage.label, appliedFindingsVersion(rev, ctx.project));
       const versionId = (created as { id?: unknown } | null)?.id;
       return done(key, {
