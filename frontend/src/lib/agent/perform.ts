@@ -20,7 +20,7 @@ import { findInstructionConflicts } from '@/lib/workflow/conflict-trail';
 import { describeWith, type InstructionConflict } from '@/lib/workflow/instruction-conflicts';
 import { defaultOutlineForm, deriveOutlineItems } from '@/lib/workflow/derived-outline';
 import { itemSchemaFor, parseItems, rendererHoldsItems, serializeItems } from '@/lib/workflow/stage-artifact';
-import { applyLookup, lookupSummary, recordLine } from '@/lib/workflow/lookup';
+import { applyLookup, lookupQueries, lookupSummary, recordLine } from '@/lib/workflow/lookup';
 import { figuresFromOutput, readStageFigures, withRunFigures, type StageFigures } from '@/lib/workflow/figures';
 import { applyRunResult } from '@/lib/workflow/run-result';
 import { applyTriage } from '@/lib/workflow/triage';
@@ -327,12 +327,12 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       }
       const schema = itemSchemaFor(holder);
       const rows = parseItems(ctx.bundles[holder.id]!.versions.at(-1)!.content)!;
-      const works = rows.map((i) => ({ id: i.id, work: (i[schema.lookup!.field] ?? '').trim() })).filter((w) => w.work).slice(0, 20);
+      const works = lookupQueries(rows, schema);
       const { matches } = await api.agentLiterature(works, ctx.signal);
       const result = applyLookup(rows, matches, schema);
       const found = matches.filter((m) => m.found);
       const lines = [
-        lookupSummary(result, schema.lookup!.noun).replace(' Review, then save.', ''),
+        lookupSummary(result, schema.lookup!.noun, schema.lookup!.notFoundNote).replace(' Review, then save.', ''),
         ...found.map((m) => `- ${recordLine(m)}${m.doi ? ` — ${m.doi}` : ''}`),
         ...matches.filter((m) => !m.found).map((m) => `- Not found: ${works.find((w) => w.id === m.id)?.work.slice(0, 160) ?? m.id}`),
       ];

@@ -583,7 +583,9 @@ title search as Literature — L-C6): a source that is found moves the row to **
 PromptMaster — check it says this**, with the record's real title and DOI on the row. That is
 a provenance state like the other two and still counts as *undecided*: the lookup establishes
 that a work with that title exists, not that it supports the claim. A source that is not a
-published work (the author's own data, a website, an interview) is simply not found. On Book
+published work (the author's own data, a website, an interview) is simply not found, and the
+result says so in those words rather than calling it misremembered; a row with no source
+named ("none found", or the **No source found** state) is not searched at all. On Book
 the lookup is the user's button only — Go's `check_literature` is offered on Research. The
 backend maps whatever the model says onto these states — a model "verified" becomes a
 candidate at most (`_claim_provenance` in `promptmaster/stage.py`). Book v5 carries the prompt

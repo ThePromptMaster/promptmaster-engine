@@ -57,7 +57,11 @@ export function applyRunResult(
     sandbox_run_id: run.id,
     [execution.field]: runObservation(run, max),
   };
-  // The reason belonged to the status the run replaced ("not run: no data").
+  // The reason belonged to the status the run replaced ("not run: no data"),
+  // and so did what the draft wrote about a run it could not make: on
+  // production a completed row still read "the calculation outcome is not
+  // available" beside its own output.
   delete row.reason;
+  if (was.status_source === 'model') for (const key of execution.clears ?? []) delete row[key];
   return { items: items.map((item, i) => (i === n - 1 ? row : item)), row };
 }

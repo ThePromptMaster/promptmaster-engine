@@ -65,7 +65,7 @@ import { approveOutline, loadOutline, materialiseOutlineInto } from '@/lib/outli
 import type { OutlineDocument } from '@/types/outline';
 import { stageDrafts, itemSchemaFor, parseItems, rendererHoldsItems, serializeItems, stageContentForChat, type StageItem } from '@/lib/workflow/stage-artifact';
 import { previewRowAction } from '@/lib/workflow/row-actions';
-import { applyLookup, lookupSummary } from '@/lib/workflow/lookup';
+import { applyLookup, lookupQueries, lookupSummary } from '@/lib/workflow/lookup';
 import { readStageFigures, type StageFigures } from '@/lib/workflow/figures';
 import { FiguresOnRecord } from './figures-on-record';
 import type { ReplyAction } from '@/types';
@@ -789,14 +789,11 @@ export function WorkflowWorkspace({
   const lookupItems = useCallback(
     async (items: StageItem[]) => {
       const schema = itemSchemaFor(stage!);
-      const works = items
-        .map((i) => ({ id: i.id, work: (i[schema.lookup!.field] ?? '').trim() }))
-        .filter((w) => w.work)
-        .slice(0, 20);
+      const works = lookupQueries(items, schema);
       if (!works.length) return { items, message: 'There is nothing named to look up yet.' };
       const { matches } = await api.agentLiterature(works);
       const result = applyLookup(items, matches, schema);
-      return { items: result.items, message: lookupSummary(result, schema.lookup!.noun) };
+      return { items: result.items, message: lookupSummary(result, schema.lookup!.noun, schema.lookup!.notFoundNote) };
     },
     [stage]
   );
@@ -943,9 +940,11 @@ export function WorkflowWorkspace({
       showTable: () => {
         const table = document.querySelector<HTMLElement>('[data-stage-table]');
         if (!table) return;
-        table.scrollIntoView({ behavior: 'smooth', block: 'start' });
         // The first row still to decide, so the next keystroke is the decision.
         (table.querySelector<HTMLElement>('[data-undecided] button, [data-undecided] select') ?? table).focus({ preventScroll: true });
+        // Not a smooth scroll: over a long page it is slow, and in a tab that
+        // is not in front it does not move at all (production pass, 2026-10-01).
+        table.scrollIntoView({ block: 'start' });
       },
     }),
     [project.id, project.user_id, project.model, project.mode, materialiseOutline, refreshEvents, setBlocked, handleToggleManual, onReload, transitions, handleTransition]

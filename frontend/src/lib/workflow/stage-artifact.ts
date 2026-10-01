@@ -92,13 +92,25 @@ export interface StageItemSchema {
    * is searched by; a found record sets `status`, fills `linkField` if it is
    * empty, and writes what was found into `recordField`.
    */
-  lookup?: { field: string; linkField: string; recordField: string; status: string; /** What is looked up, plural: "works", "sources". */ noun: string };
+  lookup?: {
+    field: string; linkField: string; recordField: string; status: string;
+    /** What is looked up, plural: "works", "sources". */
+    noun: string;
+    /** A row in this status names nothing to search for (a claim with no source found). */
+    skipStatus?: string;
+    /** Said of what was not found, when "misremembered" is not the likely reason. */
+    notFoundNote?: string;
+  };
   /**
    * The rows are things to be carried out, and a sandbox run that executed
    * can settle one: it sets `status` and writes what the run printed into
    * `field`. Never the model's to set (see `modelMaySet`).
    */
-  execution?: { status: string; field: string };
+  execution?: {
+    status: string; field: string;
+    /** Fields the draft filled in about a run it could not make; emptied when a run settles the row, because they are no longer true. */
+    clears?: string[];
+  };
 }
 
 // --- the registry -----------------------------------------------------------
@@ -251,7 +263,10 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
     // The source a claim names can be searched for like any work. Finding it
     // is not verifying the claim: the row moves to "source found", which
     // still counts as undecided.
-    lookup: { field: 'source', linkField: 'link', recordField: 'record', status: 'source_found', noun: 'sources' },
+    lookup: {
+      field: 'source', linkField: 'link', recordField: 'record', status: 'source_found', noun: 'sources', skipStatus: 'no_source',
+      notFoundNote: 'The index holds published research; a guide, a website or the author\'s own data will not be in it, and a source can also be misremembered.',
+    },
   },
 
   runs: {
@@ -273,7 +288,7 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
       { value: 'not_run', label: 'Not run', tone: 'warn', requiresReason: true, modelMaySet: true },
     ],
     // …but a run that really executed in the sandbox is.
-    execution: { status: 'completed', field: 'observed' },
+    execution: { status: 'completed', field: 'observed', clears: ['deviation'] },
   },
 
   alternatives: {

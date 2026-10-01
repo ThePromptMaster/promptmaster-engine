@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { applyLookup, lookupSummary, type WorkMatch } from './lookup';
+import { applyLookup, lookupQueries, lookupSummary, type WorkMatch } from './lookup';
 import { ITEM_SCHEMAS } from './stage-artifact';
 
 const lit = ITEM_SCHEMAS.literature_map;
@@ -67,5 +67,33 @@ describe('a claim\'s named source can be looked up; finding it is not verifying 
     expect(byValue.source_found).toMatchObject({ settable: false, decided: false });
     expect(byValue.verified_by_promptmaster.settable).toBe(false);
     expect(byValue.source_found.modelMaySet).toBeUndefined();
+  });
+});
+
+describe('what is worth searching for (production pass, 2026-10-01)', () => {
+  const claims = ITEM_SCHEMAS.claim_table;
+
+  it('a claim with no source found, or a source cell that names nothing, is not searched', () => {
+    const rows = [
+      { id: 'a', claim: 'x', source: 'Cornell Cooperative Extension, basil growing guides', status: 'candidate_source' },
+      { id: 'b', claim: 'x', source: 'none found', status: 'no_source' },
+      { id: 'c', claim: 'x', source: 'None', status: 'candidate_source' },
+      { id: 'd', claim: 'x', source: 'n/a', status: 'candidate_source' },
+      { id: 'e', claim: 'x', source: '', status: 'candidate_source' },
+      { id: 'f', claim: 'x', source: 'A real title that happens to be filed under no source found', status: 'no_source' },
+      { id: 'g', claim: 'x', source: 'None of the Above: a study of ballots', status: 'candidate_source' },
+    ];
+    expect(lookupQueries(rows, claims).map((q) => q.id)).toEqual(['a', 'g']);
+    // Works have no such status: every named one is searched, up to the cap.
+    expect(lookupQueries(rows, lit)).toEqual([]);
+    const works = Array.from({ length: 30 }, (_, i) => ({ id: `w${i}`, work: `Work ${i}` }));
+    expect(lookupQueries(works, lit)).toHaveLength(20);
+  });
+
+  it('a source that is not found is not called misremembered: most are simply not research papers', () => {
+    const text = lookupSummary({ items: [], found: 0, notFound: 16, unreachable: 0 }, claims.lookup!.noun, claims.lookup!.notFoundNote);
+    expect(text).toContain('0 of 16 sources found in OpenAlex.');
+    expect(text).toContain('16 not found. The index holds published research; a guide, a website or the author\'s own data will not be in it');
+    expect(text).not.toContain('may be misremembered, or not exist');
   });
 });
