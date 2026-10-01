@@ -70,3 +70,56 @@ test('after a reload the window selector and the progress count show the same ru
   await expect(goPanel(page)).toContainText('A step is one action PromptMaster performs');
   await page.screenshot({ path: test.info().outputPath('01-window-matches-after-reload.png'), fullPage: true });
 });
+
+/**
+ * 1 Oct, item 20 — "The project-level loop should be persistent even if
+ * individual Go runs have 5/12/25-step windows … keep going across sessions
+ * without losing objective, decisions, accepted findings, rejected routes."
+ */
+test('the planner is told what the user already decided, and an autonomous run can be authorized for further windows', async ({ page }) => {
+  test.setTimeout(120_000);
+  const id = await createProject(page, {
+    workflow: 'Research', name: 'E2E go memory',
+    objective: 'Pendulum [[mock:plan=derive,prove,simplify,limiting_case,try_contradiction,falsify_hypothesis,compare_alternatives]]',
+  });
+  await expect(stageArtifact(page)).toContainText('Mock', { timeout: 30_000 });
+  await pressTransition(page);
+  await expect(page.getByRole('heading', { name: 'Literature context' })).toBeVisible();
+
+  // A route not taken, with its reason: skip Literature.
+  await page.getByRole('group', { name: 'Stage actions' }).getByRole('button', { name: /^More/ }).click();
+  await page.getByRole('menuitem', { name: 'Skip this stage' }).click();
+  await page.getByPlaceholder('Or write your own reason').fill('Internal diagnosis; outside reading can wait.');
+  await page.getByRole('button', { name: 'Skip stage' }).click();
+  await expect(page.getByRole('heading', { name: 'Hypothesis or proposition' })).toBeVisible();
+
+  const panel = goPanel(page);
+  await panel.getByRole('button', { name: 'Set up Go' }).click();
+  await panel.getByRole('radio', { name: /^Autonomous/ }).click();
+  await panel.getByLabel('Step budget').selectOption('5');
+  const planned = page.waitForRequest((r) => r.url().includes('/api/agent/next-action') && r.method() === 'POST');
+  await panel.getByRole('button', { name: /^Go$/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'Authorize Go mode' });
+  await dialog.getByLabel('Further windows without asking').selectOption('1');
+  await expect(dialog).toContainText('At most 10 steps before it stops and asks.');
+  await page.screenshot({ path: test.info().outputPath('01-authorize-further-windows.png') });
+  await dialog.getByRole('button', { name: 'Authorize and go' }).click();
+
+  // The first planning call already knows the skip and why.
+  const { state } = (await planned).postDataJSON();
+  expect(state.memory).toContain('Skipped Literature context: Internal diagnosis; outside reading can wait.');
+
+  // Window one is used up; the second starts on its own, and is on the record as such.
+  await expect
+    .poll(async () => (await serviceSelect('agent_runs', `project_id=eq.${id}&select=id,continues_run_id,status&order=created_at`)).length, { timeout: 60_000 })
+    .toBe(2);
+  const runs = await serviceSelect('agent_runs', `project_id=eq.${id}&select=id,continues_run_id,status,authorization_id&order=created_at`);
+  expect(runs[0].status).toBe('budget_exhausted');
+  expect(runs[1].continues_run_id).toBe(runs[0].id);
+  const decisions = await serviceSelect('decisions', `recommendation_id=eq.${runs[0].authorization_id}&select=metadata,rationale&order=created_at`);
+  expect(decisions[0].metadata).toMatchObject({ auto_continue_windows: 1 });
+  expect(decisions[1].metadata).toMatchObject({ continues_run_id: runs[0].id, auto: true });
+  expect(decisions[1].rationale).toContain('on its own, as authorized in advance');
+  await expect(page.getByRole('region', { name: 'What Go mode is doing' })).toContainText(/Objective complete|Nothing — the objective is met/, { timeout: 30_000 });
+  await page.screenshot({ path: test.info().outputPath('02-second-window-ran-on-its-own.png'), fullPage: true });
+});

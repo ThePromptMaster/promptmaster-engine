@@ -98,6 +98,8 @@ class AgentState(BaseModel):
     outline: AgentOutline | None = None
     manuscript: AgentManuscript | None = None
     findings: AgentFindings | None = None
+    #: What the user has already decided on this project, from its own records.
+    memory: list[str] = Field(default_factory=list, max_length=24)
     #: The project's data files, which code run in the sandbox can read at /data.
     data_files: list[DataFileBrief] = Field(default_factory=list, max_length=10)
     #: Tools the run can call; a move without its tool is not offered.
@@ -204,6 +206,17 @@ def _format_state(inputs: PMInput, state: AgentState) -> str:
         "Requirements still open: " + ("; ".join(state.criteria_unmet) or "(none)"),
         f"Latest evaluation: {state.evaluation or '(not checked yet)'}",
         "Earlier stages: " + ("; ".join(state.prior_stages) or "(none)"),
+        *(
+            [
+                "",
+                "ALREADY DECIDED ON THIS PROJECT, by the user, earlier (possibly in an earlier "
+                "session). Build on these. Do not ask again about something settled here, and do "
+                "not go back on one without saying why:",
+                *[f"- {line}" for line in state.memory],
+                "",
+            ]
+            if state.memory else []
+        ),
         *facts,
         "",
         "--- WHAT THIS STAGE HOLDS NOW (may be trimmed) ---",

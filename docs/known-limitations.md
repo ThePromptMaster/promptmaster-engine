@@ -429,8 +429,21 @@ over if the first goes quiet for 25 s). Other limits: the budget is a **window**
 not dollars (`agent_runs.budget_usd` exists but is not enforced yet; model spend is in
 `model_usage` as usual) — since B4 (2026-09-29) a used-up window offers "Continue for N
 more steps", which starts a new run chained by `continues_run_id` under the same
-authorization with a further `decisions` row; the chain is the project-level loop, and
-each window is still the user's click (auto-chaining is not offered). A stop the user can
+authorization with a further `decisions` row; the chain is the project-level loop. Since
+2026-10-01 an **Autonomous** authorization may name up to three further windows the run
+starts on its own; each is still a new run with its own `decisions` row
+(`metadata.auto = true`). That allowance is enforced **in the browser**, not by the
+database: the run guard checks only that a continuation follows a used-up window under
+the same authorization, so the number of windows is a promise the client keeps, recorded
+but not policed. It is also forgotten on reload (a reloaded run asks before its next
+window), and it still needs the tab open — a run that survives a closed tab is not
+built. Also since 2026-10-01 the planner is given **what the project has already
+decided** (`lib/agent/memory.ts`: skips and overrides with their reasons, reopenings,
+priority decisions, suggestions taken and turned down, the user's answers to Go's
+questions), rebuilt from the event log, the decision trail and earlier windows' steps on
+every move, and the steps of up to four earlier windows are reloaded with a run. It is
+the twenty most recent such lines, not everything; it holds decisions, not the content of
+the work, which reaches the planner as stage summaries and established figures. A stop the user can
 clear is stored as `agent_runs.needs` and shown as "I need you to…" with the one button
 that clears it (approve the outline, unblock, confirm a requirement, keep waiting,
 continue, confirm a large drafting run); a question keeps its own prompt. Under

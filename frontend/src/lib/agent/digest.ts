@@ -55,6 +55,8 @@ export interface AgentStateDigest {
   /** `complete` counts the sections that hold text. */
   manuscript?: { total: number; complete: number; pending_jobs: number; written: string[]; unwritten: string[] };
   findings?: { total: number; triaged: number; sample: string[] };
+  /** What the user has already decided on this project (lib/agent/memory.ts). */
+  memory?: string[];
   /** The project's data files, so the planner knows a computation has something to read. */
   data_files?: DataFileBrief[];
   tools: AgentTools;
@@ -99,6 +101,7 @@ export function buildAgentState(input: {
   /** What the stage holds, read fresh. Preferred over `bundles` wherever both know. */
   facts?: StageFacts;
   dataFiles?: DataFileBrief[];
+  memory?: string[];
 }): AgentStateDigest {
   const { template, state, stage, bundles, stageEvaluation, latestEvaluation, steps, context, approvedOutline = [], facts } = input;
   const pendingJobs = facts?.manuscript?.pendingJobs.length ?? input.pendingJobs ?? 0;
@@ -223,6 +226,7 @@ export function buildAgentState(input: {
     ...(outline ? { outline } : {}),
     ...(manuscript ? { manuscript } : {}),
     ...(findings ? { findings } : {}),
+    ...(input.memory?.length ? { memory: input.memory } : {}),
     ...(dataFiles.length ? { data_files: dataFiles } : {}),
     tools,
   };

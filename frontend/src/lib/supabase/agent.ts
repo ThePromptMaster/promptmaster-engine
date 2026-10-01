@@ -77,6 +77,24 @@ export async function listAgentSteps(runId: string): Promise<AgentStep[]> {
   return (data ?? []) as AgentStep[];
 }
 
+/**
+ * The steps of the windows this run continues, oldest first — so a reload, or
+ * a new day, does not lose what the earlier windows did. At most `maxRuns`
+ * windows back: the planner is shown the recent ones, and the project's
+ * decisions reach it another way (lib/agent/memory.ts).
+ */
+export async function listChainSteps(run: Pick<AgentRun, 'continues_run_id'>, maxRuns = 4): Promise<AgentStep[]> {
+  const windows: AgentStep[][] = [];
+  let parentId = run.continues_run_id;
+  for (let i = 0; i < maxRuns && parentId; i += 1) {
+    const { data, error } = await createClient().from('agent_runs').select('id, continues_run_id').eq('id', parentId).maybeSingle();
+    if (error || !data) break;
+    windows.unshift(await listAgentSteps(data.id as string));
+    parentId = (data.continues_run_id as string | null) ?? null;
+  }
+  return windows.flat();
+}
+
 export async function startAgentStep(step: {
   runId: string;
   userId: string;

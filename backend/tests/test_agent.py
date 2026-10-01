@@ -409,3 +409,18 @@ def test_the_planner_is_told_the_order_is_a_default_and_can_suggest_a_skip():
     assert "do not work through a stage only because it comes next" in system
     assert "- propose_skip: Suggest skipping this stage." in user
     assert "The user decides; nothing is skipped unless they agree." in user
+
+
+def test_the_planner_is_given_what_the_user_already_decided():
+    """1 Oct, item 20: keep going across sessions without losing decisions and rejected routes."""
+    state = STATE.model_copy(update={"memory": [
+        "Skipped Literature context: Internal diagnosis; external reading later",
+        'Asked "Which segment first?", the user answered: Mid-Market.',
+    ]})
+    _, user = build_next_action_prompt(INPUTS, state, RESEARCH, "autonomous")
+    assert "ALREADY DECIDED ON THIS PROJECT, by the user, earlier (possibly in an earlier session)" in user
+    assert "Do not ask again about something settled here" in user
+    assert "- Skipped Literature context: Internal diagnosis; external reading later" in user
+    assert '- Asked "Which segment first?", the user answered: Mid-Market.' in user
+    _, without = build_next_action_prompt(INPUTS, STATE, RESEARCH, "autonomous")
+    assert "ALREADY DECIDED ON THIS PROJECT" not in without

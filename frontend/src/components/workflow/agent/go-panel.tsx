@@ -137,6 +137,8 @@ export function GoPanel({
             <AuthorizationDialog
               policy={go.authorizing}
               budget={go.budget}
+              autoWindows={go.autoWindows}
+              onAutoWindows={go.setAutoWindows}
               onAuthorize={() => void go.confirmAuthorization()}
               onCancel={go.cancelAuthorization}
             />

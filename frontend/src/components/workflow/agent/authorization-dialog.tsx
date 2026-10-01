@@ -11,11 +11,16 @@ import type { ExecutionPolicy } from '@/types/agent';
 export function AuthorizationDialog({
   policy,
   budget,
+  autoWindows = 0,
+  onAutoWindows,
   onAuthorize,
   onCancel,
 }: {
   policy: Exclude<ExecutionPolicy, 'guided'>;
   budget: number;
+  /** Further windows the run may start on its own. Offered for Autonomous only. */
+  autoWindows?: number;
+  onAutoWindows?: (n: number) => void;
   onAuthorize: () => void;
   onCancel: () => void;
 }) {
@@ -37,6 +42,27 @@ export function AuthorizationDialog({
           click, and is recorded. You can press Stop at any time.
         </li>
       </ul>
+      {policy === 'autonomous' && onAutoWindows && (
+        <label className="mt-3 flex flex-wrap items-center gap-2 text-body text-[var(--on-surface)]">
+          When a window is used up, carry on without asking for
+          <select
+            value={autoWindows}
+            onChange={(e) => onAutoWindows(Number(e.target.value))}
+            aria-label="Further windows without asking"
+            className="rounded-md bg-[var(--surface-container-low)] px-2 py-1 text-body text-[var(--on-surface)]"
+          >
+            <option value={0}>no further windows</option>
+            <option value={1}>1 more window</option>
+            <option value={2}>2 more windows</option>
+            <option value={3}>3 more windows</option>
+          </select>
+          <span className="text-label text-[var(--on-surface-variant)]">
+            {autoWindows > 0
+              ? `At most ${budget * (autoWindows + 1)} steps before it stops and asks. Each window is recorded.`
+              : 'It stops and asks after each window.'}
+          </span>
+        </label>
+      )}
       <p className="mt-2 text-label text-[var(--on-surface-variant)]">
         This authorization is recorded on the project&apos;s decision trail.
       </p>

@@ -36,6 +36,8 @@ export async function authorizeRun(args: {
   policy: Exclude<ExecutionPolicy, 'guided'>;
   budgetSteps: number;
   stageId: string;
+  /** Further windows the run may start on its own when one is used up (Autonomous only). */
+  autoContinueWindows?: number;
 }): Promise<string> {
   const terms = POLICY_TERMS[args.policy];
   const title = args.policy === 'autonomous' ? 'Run Go mode autonomously' : 'Run Go mode with checkpoints';
@@ -45,6 +47,7 @@ export async function authorizeRun(args: {
     kind: 'agent_authorization',
     policy: args.policy,
     budget_steps: args.budgetSteps,
+    auto_continue_windows: args.autoContinueWindows ?? 0,
     described_as: terms.join(' '),
     stage_id: args.stageId,
   } as unknown as RecommendationScope;
@@ -60,7 +63,7 @@ export async function authorizeRun(args: {
       triggering_issue: 'The user pressed Go with a policy that continues without asking each time.',
       relevant_stage: args.stageId,
       expected_benefit: 'Work continues between decisions instead of waiting on every step.',
-      scope: `At most ${args.budgetSteps} steps.`,
+      scope: `Windows of ${args.budgetSteps} steps${args.autoContinueWindows ? `, and up to ${args.autoContinueWindows} further window${args.autoContinueWindows === 1 ? '' : 's'} without asking` : ''}.`,
     },
     scope,
     tags: ['go_mode'],
@@ -72,7 +75,7 @@ export async function authorizeRun(args: {
     decision_type: 'accept_recommendation',
     recommendation_id: rec.id,
     rationale: title,
-    metadata: { policy: args.policy, budget_steps: args.budgetSteps },
+    metadata: { policy: args.policy, budget_steps: args.budgetSteps, auto_continue_windows: args.autoContinueWindows ?? 0 },
   });
   return rec.id;
 }
