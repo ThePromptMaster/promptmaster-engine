@@ -32,9 +32,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { api } from '@/lib/api/client';
 import { actionFor, actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, USER_ANSWER_STEP } from '@/lib/agent/actions';
-import { readStageFacts, type StageFacts } from '@/lib/agent/facts';
+import { contextWithFacts, readOutcomeProof, readStageFacts, type StageFacts } from '@/lib/agent/facts';
 import { describeNeed, needsUser, type NeedsUser } from '@/lib/agent/needs';
-import { assertHonestOutcome } from '@/lib/agent/outcome';
+import { assertHonestOutcome, verifyOutcome } from '@/lib/agent/outcome';
 import { outlineStageFor } from '@/lib/outline/actions';
 import { recordDecision } from '@/lib/supabase/recommendations';
 import { requestProjectCancel } from '@/lib/supabase/jobs';
@@ -54,7 +54,7 @@ import {
   updateAgentRun,
 } from '@/lib/supabase/agent';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
-import { getStage } from '@/lib/workflow/engine';
+import { evaluateStage, getStage } from '@/lib/workflow/engine';
 import { inputsFrom } from '@/lib/workflow/stage-requests';
 import type { StageContext, StageDefinition, StageEvaluation, WorkflowEvent, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
 import type { NewEvaluation, NewVersion } from '@/lib/supabase/versions';
@@ -198,14 +198,17 @@ export function useGoLoop(opts: Options) {
         events: o.loadEvents ? await o.loadEvents() : o.events, latestEvaluation: o.latestEvaluation,
       });
       setProgress(null);
+      // The requirements, judged against the same read (1 Oct, item 1).
+      const context = contextWithFacts(o.context, o.stage, facts);
 
       const ctx: PerformContext = {
         project: o.project, template: o.template, state: o.state, stage: o.stage, bundles: o.bundles,
-        context: o.context, approvedOutline: o.approvedOutline, run: current, step,
+        context, approvedOutline: o.approvedOutline, run: current, step,
         digest: buildAgentState({
           template: o.template, state: o.state, stage: o.stage, bundles: o.bundles,
-          stageEvaluation: o.stageEvaluation, latestEvaluation: o.latestEvaluation, steps: [...priorStepsRef.current, ...stepsRef.current],
-          context: o.context, approvedOutline: o.approvedOutline,
+          stageEvaluation: evaluateStage(o.template, o.stage.id, context), latestEvaluation: o.latestEvaluation,
+          steps: [...priorStepsRef.current, ...stepsRef.current],
+          context, approvedOutline: o.approvedOutline, facts,
         }),
         approvedByUser, deliverableDone: o.deliverableDone,
         interpret: interpret
@@ -228,6 +231,22 @@ export function useGoLoop(opts: Options) {
         };
       }
       if (signal.aborted) throw new Stopped();
+
+      // ...and that the change is in the project, read back rather than
+      // reported (1 Oct, item 4).
+      if (outcome.status === 'succeeded') {
+        const stage = o.stage;
+        const claimed = outcome;
+        outcome = await readOutcomeProof({
+          actionKey: step.action_key, outcome: claimed, template: o.template, stage, facts,
+          loadEvents: async () => (o.loadEvents ? o.loadEvents() : latest.current.events),
+        }).then(
+          (proof) => verifyOutcome(step.action_key, claimed, proof),
+          // Unable to read is not the same as not there: say so, do not guess.
+          () => ({ ...claimed, output: `${claimed.output}\n\nNot confirmed: the project could not be read back after this step.` })
+        );
+        if (signal.aborted) throw new Stopped();
+      }
 
       const finished = await finishAgentStep(step.id, {
         status: outcome.status, label: outcome.label, output: outcome.output, blockKind: outcome.blockKind ?? null,
@@ -331,10 +350,14 @@ export function useGoLoop(opts: Options) {
 
         const hasDraft = (o.bundles[o.stage.id]?.versions.at(-1)?.content ?? '').trim().length > 0;
         const allowed = allowedActions(o.template, o.state, o.stage, hasDraft, undefined, facts);
+        // One read decides the moves, the requirements and what the planner
+        // is told (1 Oct, item 1).
+        const context = contextWithFacts(o.context, o.stage, facts);
+        const stageEvaluation = evaluateStage(o.template, o.stage.id, context);
 
         // Before the planner is asked: is the next move the user's? (B4)
         const need = needsUser({
-          state: o.state, stage: o.stage, facts, stageEvaluation: o.stageEvaluation, allowed, policy: current.policy,
+          state: o.state, stage: o.stage, facts, stageEvaluation, allowed, policy: current.policy,
           outlineStageId: outlineStageFor(o.template)?.id ?? null, largeJobAcknowledged: largeJobOkRef.current,
         });
         if (need) {
@@ -344,8 +367,8 @@ export function useGoLoop(opts: Options) {
 
         const digest = buildAgentState({
           template: o.template, state: o.state, stage: o.stage, bundles: o.bundles,
-          stageEvaluation: o.stageEvaluation, latestEvaluation: o.latestEvaluation, steps: [...priorStepsRef.current, ...stepsRef.current],
-          context: o.context, approvedOutline: o.approvedOutline, outlineApproved: facts.outline?.approved, pendingJobs: facts.manuscript?.pendingJobs.length ?? 0,
+          stageEvaluation, latestEvaluation: o.latestEvaluation, steps: [...priorStepsRef.current, ...stepsRef.current],
+          context, approvedOutline: o.approvedOutline, facts,
         });
         const choice = await api.agentNextAction(
           { inputs: inputsFrom(o.project), state: digest, allowed_actions: allowed, policy: current.policy, model: o.project.model },
