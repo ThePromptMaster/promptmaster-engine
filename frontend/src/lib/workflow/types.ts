@@ -46,6 +46,8 @@ export type AutoRule =
   | { type: 'min_items'; n: number }
   | { type: 'all_sections_complete' }
   | { type: 'every_item_has_status' }
+  /** Every row fills these fields — "each hypothesis has a prediction and a disconfirmer". */
+  | { type: 'every_item_has_fields'; fields: string[] }
   | { type: 'outline_approved' }
   | { type: 'all_findings_triaged' }
   | { type: 'field_non_empty'; field: string };
@@ -219,6 +221,8 @@ export interface StageState {
   left_open?: boolean;
   /** The version that is this stage's evidence of completion. */
   evidence_version_id?: string;
+  /** The reason given for moving past it with something required open. */
+  left_reason?: string;
   /** The head version when the stage was moved past and left open. */
   left_version_id?: string;
   blocked?: { kind: BlockKind; reason: string };
@@ -294,6 +298,8 @@ export interface StageContext {
   itemCounts: Record<string, number>;
   /** Per stage id: items still lacking a status value. */
   itemsMissingStatus: Record<string, number>;
+  /** Per stage id, per field key: rows that leave that field empty. */
+  itemFieldGaps?: Record<string, Record<string, number>>;
   artifactNonEmpty: Record<string, boolean>;
   outlineApproved: boolean;
   /**

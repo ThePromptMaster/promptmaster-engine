@@ -61,9 +61,9 @@ describe('nextStageAction — one primary action per stage (PM-06)', () => {
     expect(nextStageAction({ ...base, isLast: true })).toMatchObject({ kind: 'finish', label: 'Finish project' });
   });
 
-  it('names the next stage, and says "anyway" when required items are open', () => {
+  it('names the next stage, and calls it an override when required items are open', () => {
     expect(nextStageAction(base).label).toBe('Continue to Audience');
-    expect(nextStageAction({ ...base, canAdvance: false }).label).toBe('Continue to Audience anyway');
+    expect(nextStageAction({ ...base, canAdvance: false }).label).toBe('Override and continue to Audience');
   });
 
   it('says plainly when nothing needs another pass (PM-25)', () => {
@@ -115,7 +115,7 @@ describe('PM-23: why the next step is the next step', () => {
     expect(nextStageAction({ ...base, evaluationClean: false, applyableFixes: 2 }).because?.[0]).toBe('2 suggested fixes are waiting from the last check.');
     const move = nextStageAction({ ...base, canAdvance: false, unmetRequired: ['A', 'B'] });
     expect(move.because).toContain('Still open: A; B.');
-    expect(move.because).toContain('Moving on anyway is allowed: you will be asked why, and the stage stays open.');
+    expect(move.because).toContain('You can override and move on: it needs your reason, and the stage stays open.');
   });
 
   it('gives no reasons when there is nothing to do', () => {

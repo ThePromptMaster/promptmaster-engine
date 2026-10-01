@@ -66,6 +66,7 @@ export function buildStageContext(input: BuildContextInput): StageContext {
 
   const itemCounts: Record<string, number> = {};
   const itemsMissingStatus: Record<string, number> = {};
+  const itemFieldGaps: Record<string, Record<string, number>> = {};
   const artifactNonEmpty: Record<string, boolean> = {};
   const sections: StageContext['sections'] = {};
   const findings: StageContext['findings'] = {};
@@ -104,6 +105,9 @@ export function buildStageContext(input: BuildContextInput): StageContext {
     const schema = itemSchemaFor(s);
     itemCounts[s.id] = items.length;
     itemsMissingStatus[s.id] = items.filter((i) => !isTriaged(i, schema)).length;
+    itemFieldGaps[s.id] = Object.fromEntries(
+      schema.fields.map((f) => [f.key, items.filter((i) => !(i[f.key] ?? '').trim()).length])
+    );
 
     // Findings criteria are about one stage, not the whole project: "3
     // untriaged" on Critique must not count Continuity's. Keyed by stage so
@@ -121,6 +125,7 @@ export function buildStageContext(input: BuildContextInput): StageContext {
     },
     itemCounts,
     itemsMissingStatus,
+    itemFieldGaps,
     artifactNonEmpty,
     // Approval is an event, not a mode the long-form machine happens to be in.
     outlineApproved: approvedOutlineVersionId(events) !== null,

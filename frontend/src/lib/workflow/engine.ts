@@ -60,7 +60,7 @@ function evaluateCriterion(
   // comparables" on the prose Positioning stage (PM-02) — can never be met by
   // anything the user does. Same degradation: let them tick it.
   if (
-    (rule.type === 'min_items' || rule.type === 'every_item_has_status') &&
+    (rule.type === 'min_items' || rule.type === 'every_item_has_status' || rule.type === 'every_item_has_fields') &&
     renderer !== undefined &&
     !COUNTABLE_RENDERERS.has(renderer)
   ) {
@@ -111,6 +111,20 @@ function evaluateCriterion(
         ...base,
         satisfied: drafted && missing === 0,
         detail: !drafted ? 'nothing drafted yet' : missing === 0 ? undefined : `${missing} still unresolved`,
+      };
+    }
+
+    // What PromptMaster can see for itself it should not ask the user to
+    // vouch for: "each has a prediction and a disconfirmer" was a box to tick
+    // on a table whose rows already had both columns (1 Oct, item 6).
+    case 'every_item_has_fields': {
+      const have = ctx.itemCounts[stageId] ?? 0;
+      const gaps = ctx.itemFieldGaps?.[stageId] ?? {};
+      const short = rule.fields.map((f) => gaps[f] ?? 0).reduce((a, b) => Math.max(a, b), 0);
+      return {
+        ...base,
+        satisfied: have > 0 && short === 0,
+        detail: have === 0 ? 'nothing to check yet' : short === 0 ? undefined : `${short} of ${have} incomplete`,
       };
     }
 
@@ -342,6 +356,7 @@ export function projectState(
         set(event.stage_id, {
           status: 'in_progress', left_open: true,
           ...(typeof left === 'string' ? { left_version_id: left } : {}),
+          ...(event.reason ? { left_reason: event.reason } : {}),
         });
         if (event.to_stage_id) {
           set(event.to_stage_id, { status: 'in_progress', entered_at: event.created_at });

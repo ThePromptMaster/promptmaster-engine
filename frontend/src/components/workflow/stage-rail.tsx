@@ -139,7 +139,9 @@ export function StageRail({ template, state, nextSuggestedId, onSelect }: Props)
                     {/* PM-13: moved past, not finished. */}
                     {leftOpen && (
                       <span
-                        title="You moved on with something required still open — this stage is not complete"
+                        title={`You moved on with something required still open — this stage is not complete.${
+                          state.stages[stage.id]?.left_reason ? ` Your reason: ${state.stages[stage.id]!.left_reason}` : ''
+                        }`}
                         className="shrink-0 text-label uppercase tracking-wide text-[var(--pm-tertiary)]"
                       >
                         left open

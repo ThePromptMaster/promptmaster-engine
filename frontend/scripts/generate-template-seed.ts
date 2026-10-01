@@ -30,6 +30,7 @@ const rows = TEMPLATES.map((t) => {
     // Omitted rather than written as null where a workflow has none, so
     // Book and single_output seed exactly the JSON they seeded before.
     ...(t.derived_outline ? { derived_outline: t.derived_outline } : {}),
+    ...(t.nouns ? { nouns: t.nouns } : {}),
     stages: t.stages,
   });
   return `  (${sqlString(t.key)}, ${t.version}, ${sqlString(t.name)}, ${sqlString(t.description)}, ${sqlString(definition)}::jsonb)`;

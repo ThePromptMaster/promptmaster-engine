@@ -149,7 +149,7 @@ function because(kind: StageActionKind, input: NextActionInput): string[] {
             : input.evaluated
               ? 'The last check has been dealt with.'
               : 'This stage has not been checked; you can still check it from More.',
-        ...(input.canAdvance ? [] : ['Moving on anyway is allowed: you will be asked why, and the stage stays open.']),
+        ...(input.canAdvance ? [] : ['You can override and move on: it needs your reason, and the stage stays open.']),
       ];
     default:
       return [];
@@ -212,23 +212,23 @@ function chooseAction(input: NextActionInput): StageAction {
   if (input.isLast) {
     return {
       kind: 'finish',
-      label: input.canAdvance ? 'Finish project' : 'Finish anyway',
+      label: input.canAdvance ? 'Finish project' : 'Override and finish',
       reason: input.canAdvance
         ? clean
           ? done
           : 'This is the last stage.'
-        : 'Some required items are still open — you will be asked why.',
+        : 'Some required items are still open — overriding them needs a reason.',
     };
   }
 
   const to = input.nextLabel ?? 'the next stage';
   return {
     kind: 'continue',
-    label: input.canAdvance ? `Continue to ${to}` : `Continue to ${to} anyway`,
+    label: input.canAdvance ? `Continue to ${to}` : `Override and continue to ${to}`,
     reason: input.canAdvance
       ? clean
         ? done
         : 'Everything this stage needs is done.'
-      : 'Some required items are still open — you will be asked why.',
+      : 'Some required items are still open — overriding them needs a reason.',
   };
 }

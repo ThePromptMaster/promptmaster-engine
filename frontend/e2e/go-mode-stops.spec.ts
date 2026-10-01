@@ -33,7 +33,7 @@ test('a request the user satisfies on the stage itself clears, and Resume carrie
 
   // Positioning's one required item is the user's to confirm: the run stops and asks.
   const card = page.getByRole('region', { name: 'Go mode needs you' });
-  await expect(card).toContainText('Only you can confirm', { timeout: 30_000 });
+  await expect(card).toContainText('I need your approval before I can continue', { timeout: 30_000 });
   await page.screenshot({ path: test.info().outputPath('01-go-asks-for-the-confirmation.png'), fullPage: true });
   const [asked] = await serviceSelect('agent_runs', `project_id=eq.${id}&select=id,needs&order=created_at.desc&limit=1`);
   expect(asked.needs).toMatchObject({ kind: 'tick_criterion', onStage: 'positioning' });

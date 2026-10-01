@@ -28,10 +28,13 @@ export const BOOK_V1: WorkflowTemplate = {
   // the author's (Sean, 28 Sep, item 12).
   // v5 (2026-09-29, C3): each claim starts in a provenance state PromptMaster
   // sets — candidate_source or no_source — and the author decides from there.
-  version: 5,
+  // v6 (2026-10-01): the one required box on Positioning is worded as the
+  // author's confirmation, and the template names its own deliverable.
+  version: 6,
   name: 'Book',
   description: 'Objective through final review, with an approved outline driving the draft.',
   outline_stage: 'explicit',
+  nouns: { deliverable: 'book', unit: 'chapter' },
   stages: [
     {
       id: 'objective',
@@ -93,7 +96,7 @@ export const BOOK_V1: WorkflowTemplate = {
         'Produce a positioning statement: the books this one sits beside, named as actual titles rather than categories, and the single thing it does that they do not. Put the differentiator in one sentence a reader could later judge false. If the claim cannot fail, it is not positioning.',
       exit_criteria: [
         { id: 'pos.comparables', label: 'At least two comparables named', check: 'manual', hint: 'Comparables are 2–3 existing books your reader would shelve beside yours. Name them in the draft above, say how yours differs, then tick this.' },
-        { id: 'pos.differentiator', label: 'One-sentence differentiator', check: 'manual', blocking: true },
+        { id: 'pos.differentiator', label: 'I confirm the one-sentence differentiator is stated', check: 'manual', blocking: true },
         { id: 'pos.falsifiable', label: 'The promise could be judged false', check: 'manual' },
       ],
       expected_artifacts: [{ kind: 'positioning_statement', cardinality: 'one', primary: true }],

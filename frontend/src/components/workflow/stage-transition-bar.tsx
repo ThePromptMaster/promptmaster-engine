@@ -93,13 +93,20 @@ export function StageTransitionBar({
   // unrepresentable, so the UI mirrors that rather than surfacing a constraint
   // violation after the fact.
   const isSkip = pending?.kind === 'skip';
-  const canConfirm = !isSkip || note.trim().length > 0;
+  // Moving past something required is an override, and an override without
+  // a reason is just "required" meaning "optional" (1 Oct, item 8).
+  const overriding = Boolean(pending && !isSkip && evaluation.unmet.some((c) => c.blocking));
+  const canConfirm = !(isSkip || overriding) || note.trim().length > 0;
 
   if (pending) {
     return (
       <div className="rounded-xl bg-[var(--surface-container-high)] px-5 py-4">
         <p className="text-body text-[var(--on-surface)]">
-          {isSkip ? `Skipping ${stage.short_label}. Why?` : 'Moving on with unfinished items. Why?'}
+          {isSkip
+            ? `Skipping ${stage.short_label}. Why?`
+            : overriding
+              ? 'You are overriding something this stage requires. Say why — the reason is kept on the record, and the stage stays open.'
+              : 'Moving on with unfinished items. Why?'}
         </p>
 
         {!isSkip && evaluation.unmet.length > 0 && (
@@ -133,7 +140,8 @@ export function StageTransitionBar({
           onChange={(e) => setNote(e.target.value)}
           rows={2}
           autoFocus
-          placeholder={isSkip ? 'Or write your own reason' : 'Optional note'}
+          placeholder={isSkip ? 'Or write your own reason' : overriding ? 'Reason for the override (required)' : 'Optional note'}
+          aria-label={overriding ? 'Reason for the override' : undefined}
           className="mt-3 w-full resize-none rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2 text-body text-[var(--on-surface)] outline-none"
         />
 
@@ -143,7 +151,7 @@ export function StageTransitionBar({
             disabled={!canConfirm}
             className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-title text-[var(--on-primary)] disabled:opacity-40"
           >
-            {isSkip ? 'Skip stage' : 'Move on'}
+            {isSkip ? 'Skip stage' : overriding ? 'Override and continue' : 'Move on'}
           </button>
           <button
             onClick={() => setPending(null)}
@@ -176,8 +184,10 @@ export function StageTransitionBar({
             id: 'advance',
             // "anyway" here as on the primary: moving on with requirements open leaves the stage open.
             label: advance.kind === 'finish'
-              ? (advance.requiresNote ? 'Finish anyway' : 'Finish project')
-              : `Continue to ${nextStageLabel ?? 'the next stage'}${advance.requiresNote ? ' anyway' : ''}`,
+              ? (advance.requiresNote ? 'Override and finish' : 'Finish project')
+              : advance.requiresNote
+                ? `Override and continue to ${nextStageLabel ?? 'the next stage'}`
+                : `Continue to ${nextStageLabel ?? 'the next stage'}`,
             icon: 'arrow_forward',
             onSelect: () => start(advance),
           }]

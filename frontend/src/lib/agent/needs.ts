@@ -179,8 +179,8 @@ export function describeNeed(need: NeedsUser, stageLabel: (id: string) => string
           };
     case 'tick_criterion':
       return {
-        message: `Only you can confirm "${need.label}"${need.hint ? ` — ${need.hint}` : ''}. I need that before I can continue.`,
-        action: 'Confirm and resume',
+        message: `I need your approval before I can continue: "${need.label}".${need.hint ? ` ${need.hint}` : ''}`,
+        action: 'Approve and resume',
       };
     case 'answer_question':
       return { message: need.question, action: null };

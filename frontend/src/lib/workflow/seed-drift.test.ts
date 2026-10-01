@@ -50,6 +50,7 @@ describe('generated seed matches the templates', () => {
           JSON.stringify({
             outline_stage: template.outline_stage,
             ...(template.derived_outline ? { derived_outline: template.derived_outline } : {}),
+            ...(template.nouns ? { nouns: template.nouns } : {}),
             stages: template.stages,
           })
         )

@@ -245,7 +245,8 @@ describe('ExitCriteriaChecklist', () => {
     // Required / optional on every open row; the header counts them.
     expect(screen.getByText('required')).toBeInTheDocument();
     expect(screen.getAllByText('optional')).toHaveLength(2);
-    expect(screen.getByText(/2 required, 2 optional\. You can still move on, but the stage stays open until the required items are done\./)).toBeInTheDocument();
+    // Everything PromptMaster checks is met; what is open is the user's own.
+    expect(screen.getByText(/2 required, 2 optional\. PromptMaster has verified what it can; this stage is waiting for your approval\./)).toBeInTheDocument();
   });
 
   it('shows the boxes but does not let them be ticked while only viewing (A3)', async () => {
@@ -338,11 +339,13 @@ describe('StageTransitionBar', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Advance anyway' }));
 
     expect(onTransition).not.toHaveBeenCalled();
-    expect(screen.getByText(/Moving on with unfinished items/)).toBeInTheDocument();
+    // A required item is open: this is an override, and it needs its reason.
+    expect(screen.getByText(/You are overriding something this stage requires/)).toBeInTheDocument();
     expect(screen.getByText(/Objective is stated/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Override and continue' })).toBeDisabled();
 
-    await userEvent.type(screen.getByRole('textbox'), 'Drafting the objective later');
-    await userEvent.click(screen.getByRole('button', { name: 'Move on' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Reason for the override' }), 'Drafting the objective later');
+    await userEvent.click(screen.getByRole('button', { name: 'Override and continue' }));
     expect(onTransition).toHaveBeenCalledWith(
       expect.objectContaining({ kind: 'advance' }),
       'Drafting the objective later'

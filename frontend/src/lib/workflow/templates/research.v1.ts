@@ -42,10 +42,15 @@ import type { WorkflowTemplate } from '../types';
  */
 export const RESEARCH_V1: WorkflowTemplate = {
   key: 'research',
-  version: 3,
+  // v4 (2026-10-01): what PromptMaster can verify it verifies ("each
+  // hypothesis has a prediction and a disconfirmer" is now a rule, not a box),
+  // and what is left for the user is worded as what it is — their approval
+  // (1 Oct, items 6 and 11). Names its own deliverable (item 26).
+  version: 4,
   name: 'Research',
   description: 'Question through validated write-up, with the analysis plan fixed before the data.',
   outline_stage: 'derived',
+  nouns: { deliverable: 'research report', unit: 'section' },
   /**
    * The outline Research never stops to write.
    *
@@ -180,7 +185,7 @@ export const RESEARCH_V1: WorkflowTemplate = {
         'Produce the works this study sits against, one per item, not a summary essay. \'work\' names it specifically enough to be found again — authors, title and year, or the named result if that is how the field refers to it; \'finding\' states what it actually established, not what it was about; \'relation\' says what it does to your question: supports it, contradicts it, answers a neighbouring question, or supplies the method you intend to borrow. Across the set the gap should be visible, and it has to be a gap in knowledge — "nobody has run exactly this combination" is a description of novelty, not a gap. Say what is not known and why it matters that it is not. Do not invent citations: a work you are unsure exists costs more than one fewer row.',
       exit_criteria: [
         { id: 'lit.three', label: 'At least three works', check: 'auto', rule: { type: 'min_items', n: 3 } },
-        { id: 'lit.gap', label: 'A gap is identified', check: 'manual', blocking: true },
+        { id: 'lit.gap', label: 'I confirm the gap this work addresses is identified', check: 'manual', blocking: true },
       ],
       expected_artifacts: [{ kind: 'literature_map', cardinality: 'many', primary: true }],
       recommended_modes: [{ mode: 'analyst', reason: 'Relation to your question matters more than summary' }],
@@ -200,7 +205,8 @@ export const RESEARCH_V1: WorkflowTemplate = {
         'Produce falsifiable propositions, not a discussion of what might be going on. \'statement\' is the proposition in one flat sentence; \'prediction\' is what you should observe if it holds, specific enough that someone else could go and look — direction, and a magnitude or threshold wherever you can give one; \'disconfirming_observation\' is the result that would make you abandon it. The third field is the test of the other two: if it cannot be filled in without hedging, the hypothesis cannot be wrong, and a hypothesis that cannot be wrong is not a hypothesis, it is the question restated in a confident voice.',
       exit_criteria: [
         { id: 'hyp.one', label: 'At least one hypothesis', check: 'auto', rule: { type: 'min_items', n: 1 }, blocking: true },
-        { id: 'hyp.disconfirm', label: 'Each has a prediction and a disconfirmer', check: 'manual', blocking: true },
+        { id: 'hyp.disconfirm', label: 'Each hypothesis has a prediction and a disconfirmer', check: 'auto', rule: { type: 'every_item_has_fields', fields: ['prediction', 'disconfirming_observation'] }, blocking: true },
+        { id: 'hyp.accept', label: 'I accept these hypotheses as the working set', check: 'manual', blocking: true },
       ],
       expected_artifacts: [{ kind: 'hypotheses', cardinality: 'many', primary: true }],
       recommended_modes: [
@@ -225,7 +231,7 @@ export const RESEARCH_V1: WorkflowTemplate = {
         { id: 'meth.stated', label: 'Method is described', check: 'auto', rule: { type: 'artifact_non_empty' }, blocking: true },
         // Ordering-sensitive on purpose: this is pre-registration, and it only
         // means anything if it happens before the experiment stage opens.
-        { id: 'meth.analysisplan', label: 'Analysis plan fixed before running anything', check: 'manual', blocking: true },
+        { id: 'meth.analysisplan', label: 'I approve this analysis plan for execution', check: 'manual', blocking: true, hint: 'Fixed now, before anything runs, so the data cannot choose the analysis.' },
       ],
       expected_artifacts: [{ kind: 'method', cardinality: 'one', primary: true }],
       recommended_modes: [
@@ -267,7 +273,7 @@ export const RESEARCH_V1: WorkflowTemplate = {
       entry_prompt_hint:
         'Take each hypothesis in turn and give it a verdict — supported, not supported, or inconclusive — naming the particular runs or measurements that decide it and what they showed. Apply the analysis plan as it was written; where you depart from it, say where and why in the same sentence rather than in a footnote. Inconclusive is a legitimate verdict and often the honest one. A verdict resting on the overall impression of the results is not a verdict, it is a preference wearing the vocabulary of one, and this is precisely the stage the analysis plan was written to bind.',
       exit_criteria: [
-        { id: 'ana.verdicts', label: 'Each hypothesis has an evidence-backed verdict', check: 'manual', blocking: true },
+        { id: 'ana.verdicts', label: 'I confirm each hypothesis has an evidence-backed verdict', check: 'manual', blocking: true },
       ],
       expected_artifacts: [{ kind: 'analysis', cardinality: 'one', primary: true }],
       recommended_modes: [{ mode: 'analyst', reason: 'Holds the verdict to the evidence actually collected' }],

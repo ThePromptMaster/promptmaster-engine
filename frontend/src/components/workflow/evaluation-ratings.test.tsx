@@ -89,7 +89,7 @@ describe('EvaluationRatings — each rating carries its own explanation', () => 
         })}
       />
     );
-    const card = screen.getByLabelText('Completeness rating');
+    const card = screen.getByLabelText('Draft completeness rating');
     expect(card).toHaveTextContent('incomplete');
     expect(card).toHaveTextContent('Output stopped mid-sentence at the token limit.');
   });
