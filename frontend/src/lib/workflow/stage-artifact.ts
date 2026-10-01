@@ -87,6 +87,12 @@ export interface StageItemSchema {
    * `{n}` and `{total}` are filled in.
    */
   defaultStateNote?: string;
+  /**
+   * The rows name things a public index can be searched for. `field` is what
+   * is searched by; a found record sets `status`, fills `linkField` if it is
+   * empty, and writes what was found into `recordField`.
+   */
+  lookup?: { field: string; linkField: string; recordField: string; status: string };
 }
 
 // --- the registry -----------------------------------------------------------
@@ -155,6 +161,7 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
         max: 400,
       },
       { key: 'link', label: 'DOI or link', hint: 'Where you found it — add this when you verify the work yourself', max: 300, userOnly: true },
+      { key: 'record', label: 'Record found', hint: 'Filled in when the work is looked up — the title, authors and year the index holds', max: 500, userOnly: true },
     ],
     // 1 Oct, item 12: eleven works recalled from the model's knowledge met
     // "at least three works" and looked exactly like eleven sources. Who
@@ -167,12 +174,13 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
       },
       {
         value: 'retrieved', label: 'Retrieved by PromptMaster', tone: 'done', settable: false,
-        explain: 'A search tool found the record. No tool is connected yet, so no work carries this today.',
+        explain: 'A record with this title was found in OpenAlex, and its DOI and real title are on the row. Nobody has checked that it says what this row claims.',
       },
       { value: 'verified', label: 'Verified by me', tone: 'done', explain: 'You found the work and checked it says this. Add its DOI or link.' },
     ],
     defaultStateNote:
       '{n} of {total} works were suggested from the model\'s knowledge. They have not been searched for, retrieved or verified — treat them as candidates.',
+    lookup: { field: 'work', linkField: 'link', recordField: 'record', status: 'retrieved' },
   },
 
   // Keyed 'hypotheses' because that is the artifact kind the Research template

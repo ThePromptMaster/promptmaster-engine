@@ -115,7 +115,9 @@ describe('deriveExecutionLabel — PM-12', () => {
   });
   it('blocked wins, and workflow moves claim nothing', () => {
     expect(deriveExecutionLabel('run_computation', { blocked: true, sandboxLabel: 'code_executed' })).toBe('blocked');
-    expect(deriveExecutionLabel('check_literature', { blocked: false })).toBe('blocked');
+    // A lookup reads an index: it is analysis, not execution — and blocked when it could not run.
+    expect(deriveExecutionLabel('check_literature', { blocked: false })).toBe('discussed');
+    expect(deriveExecutionLabel('check_literature', { blocked: true })).toBe('blocked');
     expect(deriveExecutionLabel('advance_stage', { blocked: false })).toBeNull();
   });
 });

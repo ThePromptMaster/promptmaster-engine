@@ -28,6 +28,7 @@ const OPERATION_LABEL: Record<string, string> = {
   continuation: 'Continued',
   chat_save: 'Saved from the discussion',
   chat_rows: 'Rows changed from the chat',
+  literature_lookup: 'Works looked up',
   // PM-17: Go mode's own work, kept distinguishable from a button press.
   // PM-22: fixes applied from a stage check or a critique.
   applied_findings: 'Critique applied',
@@ -49,7 +50,7 @@ const OPERATION_LABEL: Record<string, string> = {
  */
 const SAVED_OPERATIONS = new Set([
   'stage_edit', 'chat_instruct', 'applied_recommendations', 'applied_findings', 'restore', 'outline_edit', 'initial',
-  'chat_save', 'chat_rows', 'long_form_complete', 'manuscript_snapshot',
+  'chat_save', 'chat_rows', 'literature_lookup', 'long_form_complete', 'manuscript_snapshot',
 ]);
 
 export function isSaved(operation: string | null | undefined): boolean {
