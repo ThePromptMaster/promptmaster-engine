@@ -294,6 +294,8 @@ export interface GuideQuestion {
   question: string;
   why: string;
   options: string[];
+  /** The options are not mutually exclusive: several may apply at once. */
+  multi?: boolean;
 }
 
 export interface GenerateSetupRequest {

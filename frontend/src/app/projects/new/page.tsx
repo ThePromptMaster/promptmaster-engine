@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 import { useAuth } from '@/hooks/use-auth';
-import { GuideQuestions } from '@/components/projects/guide-questions';
+import { GuideInterview } from '@/components/projects/guide-interview';
 import { SetupCard, type SetupDraft } from '@/components/projects/setup-card';
 import { AutoGrowTextarea } from '@/components/shared/auto-grow-textarea';
 import { api } from '@/lib/api/client';
@@ -13,7 +13,7 @@ import { createProject } from '@/lib/supabase/projects';
 import { appendWorkflowEvent, listTemplates } from '@/lib/supabase/workflow';
 import { createArtifact } from '@/lib/supabase/versions';
 import type { WorkflowTemplate } from '@/lib/workflow/types';
-import type { GuideQuestion, SetupRationale } from '@/types';
+import type { SetupRationale } from '@/types';
 
 /**
  * PM-09 — the unified entry.
@@ -45,8 +45,6 @@ export default function NewProjectPage() {
   const [templates, setTemplates] = useState<(WorkflowTemplate & { id: string })[]>([]);
   const [step, setStep] = useState<Step>('ask');
   const [objective, setObjective] = useState('');
-  const [questions, setQuestions] = useState<GuideQuestion[]>([]);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
   const [templateId, setTemplateId] = useState<string | null>(null);
   const [recommendedKey, setRecommendedKey] = useState<string | null>(null);
   const [workflowReason, setWorkflowReason] = useState('');
@@ -72,17 +70,13 @@ export default function NewProjectPage() {
   const selected = templates.find((t) => t.id === templateId) ?? null;
   const hasObjective = objective.trim().length > 0;
 
-  async function recommend(withAnswers: boolean) {
+  async function recommend(given?: { question: string; answer: string }[]) {
     setWorking('setup');
     setError(null);
     try {
       const { suggestion } = await api.generateSetup({
         objective: objective.trim(),
-        answers: withAnswers
-          ? questions
-              .map((q) => ({ question: q.question, answer: (answers[q.id] ?? '').trim() }))
-              .filter((a) => a.answer)
-          : undefined,
+        answers: given?.length ? given.slice(0, 8) : undefined,
       });
       const recommended = templateFor(suggestion.workflow) ?? templateFor('single_output');
       setTemplateId(recommended?.id ?? null);
@@ -107,19 +101,10 @@ export default function NewProjectPage() {
     }
   }
 
-  async function guideMe() {
-    setWorking('questions');
+  // The questions are asked one at a time, on their own screen (1 Oct, item 9).
+  function guideMe() {
     setError(null);
-    try {
-      const { questions: asked } = await api.guideQuestions({ objective: objective.trim() });
-      setQuestions(asked);
-      setAnswers({});
-      setStep('questions');
-    } catch (e) {
-      setError(`Could not load questions${e instanceof Error && e.message ? `: ${e.message}` : ''}.`);
-    } finally {
-      setWorking(null);
-    }
+    setStep('questions');
   }
 
   function chooseYourself() {
@@ -216,7 +201,7 @@ export default function NewProjectPage() {
 
           <div className="mt-6 grid gap-3 sm:grid-cols-2">
             <button
-              onClick={() => void recommend(false)}
+              onClick={() => void recommend()}
               disabled={!hasObjective || working !== null}
               className="rounded-2xl bg-[var(--pm-primary)] px-6 py-5 text-left text-[var(--on-primary)] transition-opacity hover:opacity-90 disabled:opacity-40"
             >
@@ -256,28 +241,14 @@ export default function NewProjectPage() {
           <h1 className="text-display text-[var(--on-surface)]">A few questions</h1>
           <p className="mt-3 mb-8 text-body text-[var(--on-surface-variant)]">
             About: <span className="text-[var(--on-surface)]">{objective.trim()}</span>. Answer what
-            you can; blanks are fine.
+            you can — one at a time, and you can stop whenever you like.
           </p>
-          <GuideQuestions
-            questions={questions}
-            answers={answers}
-            onAnswer={(id, answer) => setAnswers((prev) => ({ ...prev, [id]: answer }))}
+          <GuideInterview
+            objective={objective.trim()}
+            busy={working === 'setup'}
+            onDone={(given) => void recommend(given)}
+            onBack={() => setStep('ask')}
           />
-          <div className="mt-8 flex items-center gap-3">
-            <button
-              onClick={() => void recommend(true)}
-              disabled={working !== null}
-              className="rounded-xl bg-[var(--pm-primary)] px-6 py-3 text-title text-[var(--on-primary)] transition-opacity hover:opacity-90 disabled:opacity-40"
-            >
-              {working === 'setup' ? 'Working out a setup…' : 'Recommend a setup'}
-            </button>
-            <button
-              onClick={() => setStep('ask')}
-              className="px-3 py-3 text-body text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
-            >
-              Back
-            </button>
-          </div>
         </>
       )}
 
@@ -308,7 +279,7 @@ export default function NewProjectPage() {
               {working === 'creating' ? 'Creating…' : `Start ${selected?.name ?? 'project'}`}
             </button>
             <button
-              onClick={() => setStep(questions.length ? 'questions' : 'ask')}
+              onClick={() => setStep('ask')}
               className="px-3 py-3 text-body text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
             >
               Back

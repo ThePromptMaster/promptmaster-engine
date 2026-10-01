@@ -10,7 +10,7 @@ from promptmaster.errors import PRESERVED_NOTHING_WRITTEN
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError
 from routers._errors import llm_http_error
 from promptmaster.schemas import GuideAnswer, GuideQuestion, SetupSuggestion
-from promptmaster.setup_suggester import suggest_guide_questions, suggest_setup
+from promptmaster.setup_suggester import suggest_guide_questions, suggest_next_guide_question, suggest_setup
 
 router = APIRouter(prefix="/api", tags=["setup"])
 
@@ -61,3 +61,35 @@ async def api_guide_questions(
     """PM-09 "Guide me": a few questions before recommending a setup. 1 LLM call."""
     questions = await suggest_guide_questions(client=client, model=req.model or None, objective=req.objective)
     return GuideQuestionsResponse(questions=questions)
+
+
+class GuideAnswered(BaseModel):
+    question: str = Field(max_length=600)
+    answer: str = Field(default="", max_length=2_000)
+
+
+class GuideNextRequest(BaseModel):
+    objective: str = Field(..., min_length=1, max_length=4_000)
+    answered: list[GuideAnswered] = Field(default_factory=list, max_length=12)
+    model: str = ""
+
+
+class GuideNextResponse(BaseModel):
+    #: True when no further question is worth asking; `question` is then null.
+    enough: bool
+    question: GuideQuestion | None = None
+    reason: str = ""
+
+
+@router.post("/guide-next-question")
+async def api_guide_next_question(
+    req: GuideNextRequest,
+    client: OpenRouterClient = Depends(get_client),
+) -> GuideNextResponse:
+    """"Guide me", one question at a time: the next question given the answers
+    so far, or that there is enough. 1 small LLM call; none past six answers."""
+    enough, question, reason = await suggest_next_guide_question(
+        client=client, model=req.model or None, objective=req.objective,
+        answered=[a.model_dump() for a in req.answered],
+    )
+    return GuideNextResponse(enough=enough, question=question, reason=reason)

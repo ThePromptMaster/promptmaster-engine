@@ -59,7 +59,7 @@ It does verify identity. `backend/auth.py` checks the Supabase JWT and attaches 
 | `conversation.py` | `chat-message`, `apply-to-answer`, `save-as-new-version`, `suggest-actions` (a chat answer as at most four actions; prompt and parser in `promptmaster/reply_actions.py`) |
 | `continuation.py` | `continue-document` |
 | `long_form.py` | `detect-long-form`, `generate-outline`, `generate-section`, `finalize-long-form` |
-| `setup.py` | `generate-setup` |
+| `setup.py` | `generate-setup`, `guide-questions` (the batch; no longer used by the UI), `guide-next-question` ("Guide me" one question at a time: the next question given the answers so far, or that there is enough) |
 | `audit.py` | `audit-findings`, `apply-audit` |
 | `conflicts.py` | `check-conflicts` — PM-24; the deterministic half lives in `lib/workflow/instruction-conflicts.ts` |
 | `agent.py` | `agent/actions`, `agent/next-action`, `agent/reason`, `agent/write-code`, `agent/interpret-result`, `agent/literature` (looks named works up in OpenAlex; no model call) — Go mode (PM-17/19); the loop itself runs in the browser |
