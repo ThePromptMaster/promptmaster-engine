@@ -33,7 +33,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '@/lib/api/client';
 import { actionFor, actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, USER_ANSWER_STEP } from '@/lib/agent/actions';
 import { contextWithFacts, readOutcomeProof, readStageFacts, type StageFacts } from '@/lib/agent/facts';
-import { describeNeed, needsUser, type NeedsUser } from '@/lib/agent/needs';
+import { describeNeed, NEED_CLEARED, needStillHolds, needsUser, type NeedsUser } from '@/lib/agent/needs';
 import { assertHonestOutcome, verifyOutcome } from '@/lib/agent/outcome';
 import { outlineStageFor } from '@/lib/outline/actions';
 import { recordDecision } from '@/lib/supabase/recommendations';
@@ -171,6 +171,9 @@ export function useGoLoop(opts: Options) {
     async (status: AgentRunStatus, reason: string | null, needs: NeedsUser | null = null) => {
       const current = runRef.current;
       if (!current) return;
+      // Where the project was when the run asked: a request is only shown,
+      // and only re-checked, against that stage.
+      if (needs) needs = { ...needs, onStage: latest.current.state.current_stage_id };
       const terminal = ['completed', 'budget_exhausted', 'stopped', 'failed'].includes(status);
       if (terminal) await endAgentRun(current.id, status, reason ?? '', needs);
       else await updateAgentRun(current.id, { status, stop_reason: reason, needs });
@@ -431,13 +434,18 @@ export function useGoLoop(opts: Options) {
       if (live && !live.ended_at && live.status !== 'running') {
         await endAgentRun(live.id, 'stopped', 'Superseded by a new Go.');
       }
+      // What the last run did, and anything the user told it, stays in front
+      // of the planner. Answering a question and then pressing Go under a
+      // different policy used to start from nothing: the answer was recorded
+      // on a run the planner never read again.
+      const carried = live && live.status !== 'completed' ? [...priorStepsRef.current, ...stepsRef.current] : [];
       const created = await createAgentRun({
         projectId: o.project.id, userId: o.project.user_id, policy: chosen,
         authorizationId, budgetSteps: budget, leaseHolder: tabId.current,
       });
       commitRun(created);
       commitSteps([]);
-      priorStepsRef.current = [];
+      priorStepsRef.current = carried;
       largeJobOkRef.current = null;
       followRef.current = null;
       sinceRef.current = 0;
@@ -456,7 +464,10 @@ export function useGoLoop(opts: Options) {
   const continueRun = useCallback(async () => {
     const o = latest.current;
     const prev = runRef.current;
-    if (!prev || prev.status !== 'budget_exhausted') return;
+    if (!prev || prev.status !== 'budget_exhausted') {
+      setError('There is no used-up window to continue. Press Go to start one.');
+      return;
+    }
     setError(null);
     try {
       const created = await createAgentRun({
@@ -498,12 +509,18 @@ export function useGoLoop(opts: Options) {
         void loop();
         return;
       }
+      // A used-up window, same policy, same size: the next window of the same
+      // work, with its history — not a new run that starts from nothing.
+      if (live && live.status === 'budget_exhausted' && live.policy === policy && live.budget_steps === budget) {
+        await continueRun();
+        return;
+      }
       if (policy === 'guided') await startRun('guided', null);
       else setAuthorizing(policy);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not start Go mode.');
     }
-  }, [policy, pendingStepId, commitRun, loop, startRun]);
+  }, [policy, budget, pendingStepId, commitRun, loop, startRun, continueRun]);
 
   /**
    * PM-23: "next logical action; why it is recommended; ability to apply".
@@ -511,7 +528,11 @@ export function useGoLoop(opts: Options) {
    * for one click. Nothing runs until the user says Do it.
    */
   const suggest = useCallback(async () => {
-    if (abortRef.current || pendingStepId) return;
+    if (abortRef.current) return;
+    if (pendingStepId) {
+      setError('A move is already waiting for your decision above.');
+      return;
+    }
     setError(null);
     setPolicy('guided');
     try {
@@ -638,6 +659,9 @@ export function useGoLoop(opts: Options) {
     async (found: AgentRun) => {
       const list = await listAgentSteps(found.id).catch(() => []);
       setPolicy(found.policy);
+      // The selector shows the window this run was given, not the default:
+      // after a reload it read "12 steps" beside "3 / 25" (1 Oct, item 21).
+      setBudget(found.budget_steps);
       const fresh = found.heartbeat_at && Date.now() - new Date(found.heartbeat_at).getTime() < LEASE_STALE_MS;
       if (found.status === 'running' && fresh && found.lease_holder && found.lease_holder !== tabId.current) {
         // Another tab is driving it. Watch, do not drive.
@@ -660,6 +684,8 @@ export function useGoLoop(opts: Options) {
       }
       commitRun(found);
       commitSteps(repaired);
+      // The no-progress guard counts from here, as it does after Resume.
+      sinceRef.current = repaired.length;
       const waiting = repaired.find((s) => s.status === 'awaiting_decision');
       if (waiting) {
         setPendingStepId(waiting.id);
@@ -686,6 +712,7 @@ export function useGoLoop(opts: Options) {
       const last = await getLatestAgentRun(opts.project.id);
       if (!last) return;
       setPolicy(last.policy);
+      setBudget(last.budget_steps);
       commitRun(last);
       commitSteps(await listAgentSteps(last.id));
       setPhase('ended');
@@ -733,6 +760,46 @@ export function useGoLoop(opts: Options) {
     const latestVersion = opts.bundles[pendingStep.stage_id]?.versions.at(-1);
     return plannedBeforeLatestChange(pendingStep, [latestVersion?.created_at, opts.latestEvaluation?.created_at]);
   }, [pendingStep, opts.state.current_stage_id, opts.bundles, opts.latestEvaluation]);
+
+  // A recorded stop is checked against the project whenever the project
+  // changes under it (1 Oct, items 1 and 22). If the user has done what was
+  // asked — on the stage itself, not through the card — the request is
+  // cleared and the run says so, with Resume beside it.
+  const need = run?.needs ?? null;
+  const liveRunId = run && !run.ended_at ? run.id : null;
+  useEffect(() => {
+    if (!need || !liveRunId || pendingStepId || phase === 'thinking' || phase === 'performing' || phase === 'watching') return;
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      const o = latest.current;
+      if (!o.stage) return;
+      try {
+        const facts = await readStageFacts({
+          project: o.project, template: o.template, stage: o.stage, bundles: o.bundles,
+          events: o.loadEvents ? await o.loadEvents() : o.events, latestEvaluation: o.latestEvaluation,
+        });
+        const current = runRef.current;
+        if (cancelled || abortRef.current || !current || current.id !== liveRunId || current.needs !== need) return;
+        const hasDraft = (o.bundles[o.stage.id]?.versions.at(-1)?.content ?? '').trim().length > 0;
+        const context = contextWithFacts(o.context, o.stage, facts);
+        const holds = needStillHolds(need, {
+          state: o.state, stage: o.stage, facts, stageEvaluation: evaluateStage(o.template, o.stage.id, context),
+          allowed: allowedActions(o.template, o.state, o.stage, hasDraft, undefined, facts), policy: current.policy,
+          outlineStageId: outlineStageFor(o.template)?.id ?? null, largeJobAcknowledged: largeJobOkRef.current,
+          objective: o.project.objective, currentStageId: o.state.current_stage_id,
+        });
+        if (holds) return;
+        await updateAgentRun(current.id, { needs: null, stop_reason: NEED_CLEARED });
+        if (runRef.current?.id === current.id) commitRun({ ...runRef.current, needs: null, stop_reason: NEED_CLEARED });
+      } catch {
+        // Could not read: leave the request as it stands; the next change retries.
+      }
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [need, liveRunId, pendingStepId, phase, opts.state, opts.bundles, opts.context, opts.project.objective, commitRun]);
 
   /**
    * Close an outdated proposal and ask the planner again about the stage as it

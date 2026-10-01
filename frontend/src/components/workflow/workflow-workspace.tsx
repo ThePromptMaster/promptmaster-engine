@@ -68,7 +68,7 @@ import { getLatestTemplate } from '@/lib/supabase/workflow';
 import { setUsageProject } from '@/lib/supabase/model-usage';
 import type { NewEvaluation, NewVersion } from '@/lib/supabase/versions';
 import { useProjectStore, type StageBundle } from '@/stores/project-store';
-import { approvedOutlineVersionId } from '@/lib/supabase/outline';
+import { commitOutlineVersion, approvedOutlineVersionId } from '@/lib/supabase/outline';
 import type { Artifact, ArtifactVersion, Evaluation, Project, ProjectPatch } from '@/types/project';
 
 interface Props {
@@ -794,8 +794,15 @@ export function WorkflowWorkspace({
   const goNeedsActions = useMemo(
     () => ({
       approveOutline: async (outlineStageId: string) => {
-        const { versions } = await loadOutline({ id: project.id, user_id: project.user_id }, outlineStageId);
-        const head = versions.at(-1);
+        const { artifact, versions, draft } = await loadOutline({ id: project.id, user_id: project.user_id }, outlineStageId);
+        // Unsaved edits are saved first, as the panel's own "Save and approve"
+        // does: the card used to send the user off to find that button.
+        const head = draft
+          ? await commitOutlineVersion(artifact, draft, {
+              sourceOperation: 'outline_edit', changeSummary: 'Saved from Go mode before approval.',
+              model: project.model, mode: project.mode,
+            })
+          : versions.at(-1);
         if (!head) throw new Error('There is no saved outline to approve yet.');
         await approveOutline({
           project: { id: project.id, user_id: project.user_id },
@@ -804,11 +811,12 @@ export function WorkflowWorkspace({
           materialise: (doc) => materialiseOutline(head, doc),
         });
         await refreshEvents();
+        if (draft) onReload?.();
       },
       unblock: () => setBlocked(null),
       tick: (criterionId: string) => handleToggleManual(criterionId, true),
     }),
-    [project.id, project.user_id, materialiseOutline, refreshEvents, setBlocked, handleToggleManual]
+    [project.id, project.user_id, project.model, project.mode, materialiseOutline, refreshEvents, setBlocked, handleToggleManual, onReload]
   );
 
   if (!stage) return null;

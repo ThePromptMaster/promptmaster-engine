@@ -3,7 +3,7 @@
 import { useState } from 'react';
 
 import { actionLabel } from '@/lib/agent/actions';
-import { describeNeed } from '@/lib/agent/needs';
+import { describeNeed, NEED_CLEARED } from '@/lib/agent/needs';
 import type { useGoLoop } from '../use-go-loop';
 import { AuthorizationDialog } from './authorization-dialog';
 import { DecisionPrompt, QuestionPrompt } from './decision-prompt';
@@ -54,6 +54,11 @@ export function GoPanel({
   const need = !go.active && !go.pendingStep && go.run?.needs && go.run.needs.kind !== 'answer_question' && (live || go.run.status === 'budget_exhausted')
     ? go.run.needs
     : null;
+  // The status panel below already says so; this only keeps it from being asked as a question.
+  const cleared = canResume && !need && go.run?.stop_reason === NEED_CLEARED;
+  const canContinue = Boolean(
+    go.run && go.run.status === 'budget_exhausted' && go.run.policy === go.policy && go.run.budget_steps === go.budget
+  );
   const act = async () => {
     if (!need) return;
     switch (need.kind) {
@@ -111,6 +116,7 @@ export function GoPanel({
             onGo={() => void go.go()}
             onStop={() => void go.stop()}
             canResume={canResume}
+            canContinue={canContinue}
             disabled={go.phase === 'watching' || Boolean(go.pendingStep) || Boolean(go.authorizing)}
             hideResume={Boolean(need && needsActions && describeNeed(need, go.stageLabelFor).action)}
           />
@@ -143,7 +149,7 @@ export function GoPanel({
               onDecline={() => void go.decline()}
             />
           )}
-          {askingUser && !need && go.run?.stop_reason && (
+          {askingUser && !need && !cleared && go.run?.stop_reason && (
             <QuestionPrompt key={go.run.stop_reason} question={go.run.stop_reason} onAnswer={(t) => void go.answer(t)} />
           )}
           {(go.run || go.steps.length > 0) && (

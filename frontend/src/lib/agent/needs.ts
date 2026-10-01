@@ -14,7 +14,7 @@ import type { ExecutionPolicy } from '@/types/agent';
 import type { StageDefinition, StageEvaluation, WorkflowState } from '@/lib/workflow/types';
 import type { StageFacts } from './facts';
 
-export type NeedsUser =
+type Need =
   | { kind: 'set_objective' }
   | { kind: 'unblock_stage'; stageId: string; reason: string; blockKind: string }
   | { kind: 'approve_outline'; stageId: string; versionNumber: number | null; unsavedDraft: boolean }
@@ -26,6 +26,17 @@ export type NeedsUser =
   | { kind: 'triage_findings'; stageId: string; count: number }
   /** An outcome table's rows (claims, runs…) are all the user's to decide. */
   | { kind: 'decide_rows'; stageId: string; count: number; itemLabel: string };
+
+/**
+ * `onStage` is the stage the project was on when the run stopped. A request
+ * raised on a stage the project has since left is not shown (1 Oct, item 1:
+ * "Go sometimes continued to display an old human request after the project
+ * appeared to have advanced").
+ */
+export type NeedsUser = Need & { onStage?: string };
+
+/** What the run says once the user has done what it asked for, themselves. */
+export const NEED_CLEARED = 'That is done. Press Resume and I will carry on.';
 
 /** Moves that change the stage's work; a stage with none left needs the user, not the planner. */
 const REVISE_MOVES = new Set(['revise_stage', 'apply_findings']);
@@ -105,6 +116,39 @@ export function needsUser(input: {
   return null;
 }
 
+/**
+ * Whether a stop the run recorded still describes the project. Pure.
+ *
+ * The request was written when the run stopped and never looked at again: the
+ * user approved the outline, ticked the box or decided the rows on the stage
+ * itself, and the card went on asking for it. Resume then re-read the project
+ * and either carried on or stopped for something else — which is the
+ * "sometimes it continues, sometimes nothing happens" of item 22.
+ */
+export function needStillHolds(
+  need: NeedsUser,
+  input: Parameters<typeof needsUser>[0] & { objective: string; currentStageId: string }
+): boolean {
+  // Another window is the user's click whatever stage the project is on.
+  if (need.kind === 'continue_budget') return true;
+  if (need.onStage && need.onStage !== input.currentStageId) return false;
+  switch (need.kind) {
+    case 'set_objective':
+      return !input.objective.trim();
+    case 'answer_question':
+      return true;
+    case 'unblock_stage':
+      return input.state.stages[need.stageId]?.status === 'blocked';
+    case 'wait_for_jobs':
+      return (input.facts.manuscript?.pendingJobs.length ?? 0) > 0;
+    default: {
+      const now = needsUser(input);
+      if (!now || now.kind !== need.kind) return false;
+      return need.kind !== 'tick_criterion' || (now.kind === 'tick_criterion' && now.criterionId === need.criterionId);
+    }
+  }
+}
+
 /** The sentence the card shows, and the label of the one button that clears it (null: no button, just Resume). */
 export function describeNeed(need: NeedsUser, stageLabel: (id: string) => string): { message: string; action: string | null } {
   switch (need.kind) {
@@ -117,7 +161,7 @@ export function describeNeed(need: NeedsUser, stageLabel: (id: string) => string
       };
     case 'approve_outline':
       return need.unsavedDraft
-        ? { message: `I need your approval of the outline before I can continue — it has unsaved edits, so save and approve it on ${stageLabel(need.stageId)}.`, action: null }
+        ? { message: `I need your approval of the outline on ${stageLabel(need.stageId)} before I can continue. It has edits that are not saved yet.`, action: 'Save and approve the outline' }
         : {
             message: `I need your approval of ${need.versionNumber ? `outline version ${need.versionNumber}` : 'the outline'} before I can continue.`,
             action: 'Approve the outline',

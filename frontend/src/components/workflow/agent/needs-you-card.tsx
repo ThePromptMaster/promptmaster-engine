@@ -41,7 +41,7 @@ export function NeedsYouCard({
           >
             {busy ? 'Working…' : action}
           </button>
-          <span className="text-label text-[var(--on-surface-variant)]">Or do it yourself on the stage and press Resume.</span>
+          <span className="text-label text-[var(--on-surface-variant)]">Or do it yourself on the stage. I will notice, and Resume will appear here.</span>
         </div>
       ) : (
         <p className="mt-2 text-label text-[var(--on-surface-variant)]">Then press Resume.</p>
