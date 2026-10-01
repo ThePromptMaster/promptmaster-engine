@@ -218,6 +218,19 @@ next move is the user's, and what the planner is shown (`buildAgentState` takes 
 Before this the planner's excerpt and the requirements came from the store's bundles,
 which lag the section jobs, so Go could call a written Drafting stage empty.
 
+**A stop is re-checked (2026-10-01).** When a run stops for the user it records what it
+needs (`agent_runs.needs`, with `onStage`). `useGoLoop` re-reads the stage whenever the
+project changes and asks `needStillHolds` (`lib/agent/needs.ts`, pure); a request the user
+has satisfied on the stage itself, or one raised on a stage the project has left, is
+cleared and Resume is offered. A used-up window is continued by the main button when the
+policy and window size are unchanged; any new run started over a stopped one keeps that
+run's steps as planner history.
+
+**The window.** `budget_steps` counts performed actions (a computation counts two;
+planning, waiting and the user's answers count none). It is not a cost limit. The
+selector is restored from the run on load, and the progress count always shows the run's
+own numbers.
+
 **"Succeeded" is read back.** After a step that claims a change, `readOutcomeProof`
 re-reads the project and `verifyOutcome` (`lib/agent/outcome.ts`, pure) fails the step if
 the saved version, the written sections, the evaluation or the stage move is not there.
