@@ -280,7 +280,7 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
           ? complete > 0 && revisedCount === 0
             ? {
                 label: reviseLabel,
-                reason: 'Rewrites each chapter as it stands. The current manuscript is saved as a version first.',
+                reason: 'Rewrites each section as it stands. The full draft is saved as a version first.',
                 run: reviseAll,
               }
             : null
@@ -646,8 +646,8 @@ function RevisionPanel({
             {revised > 0
               ? `${revised} of ${written} sections revised`
               : n > 0
-                ? `${n} accepted finding${n === 1 ? '' : 's'} from ${from} will be applied to each chapter as it stands.`
-                : `No accepted findings from ${from}. Each chapter still gets this stage's own pass.`}
+                ? `${n} accepted finding${n === 1 ? '' : 's'} from ${from} will be applied to each section as it stands.`
+                : `No accepted findings from ${from}. Each section still gets this stage's own pass.`}
           </p>
           {unwritten && (
             <p className="mt-1 text-label text-[var(--on-surface-variant)]">
@@ -656,7 +656,7 @@ function RevisionPanel({
             </p>
           )}
           <p className="mt-1 text-label text-[var(--on-surface-variant)]">
-            The manuscript as it stands is saved as a version first. Findings you rejected are not applied.
+            The full draft as it stands is saved as a version first. Findings you rejected are not applied.
           </p>
         </div>
         {!readOnly && (

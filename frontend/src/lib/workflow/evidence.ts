@@ -92,7 +92,7 @@ export async function stageEvidence(input: EvidenceInput): Promise<string | unde
     instruction: `${stage.label}: every section written`,
     model: '',
     mode: project.mode,
-    change_summary: `Manuscript saved — ${manuscript.sections} sections, ${manuscript.words.toLocaleString()} words.`,
+    change_summary: `Full draft saved — ${manuscript.sections} sections, ${manuscript.words.toLocaleString()} words.`,
   });
   const id = (created as { id?: unknown } | null)?.id;
   return typeof id === 'string' ? id : undefined;

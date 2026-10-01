@@ -180,6 +180,13 @@ export interface WorkflowTemplate {
    * has to work without a line of new code.
    */
   derived_outline?: DerivedOutlineSpec;
+  /**
+   * What the finished thing and its parts are called: "book" and "chapter",
+   * "research report" and "section". Data, so no screen names a workflow.
+   * Optional: versions published before 2026-10-01 fall back
+   * (`deliverableNouns` in labels.ts).
+   */
+  nouns?: { deliverable: string; unit: string };
   stages: StageDefinition[];
 }
 
@@ -212,6 +219,8 @@ export interface StageState {
   left_open?: boolean;
   /** The version that is this stage's evidence of completion. */
   evidence_version_id?: string;
+  /** The head version when the stage was moved past and left open. */
+  left_version_id?: string;
   blocked?: { kind: BlockKind; reason: string };
 }
 

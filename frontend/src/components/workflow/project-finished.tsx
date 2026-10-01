@@ -6,6 +6,7 @@ import { MarkdownOutput } from '@/components/shared/markdown-output';
 import { downloadBlob, downloadFile } from '@/lib/utils';
 import { exportFilename, toManuscriptMarkdown, type ExportBundle } from '@/lib/export/project-export';
 import { deliverableStage, type CompletionSummary } from '@/lib/workflow/engine';
+import { deliverableNouns } from '@/lib/workflow/labels';
 import type { Evaluation } from '@/types/project';
 import { EvaluationScores } from './evaluation-scores';
 
@@ -26,11 +27,11 @@ interface Props {
 export function ProjectFinished({ bundle, completion, evaluation, onReopen }: Props) {
   const { project, template } = bundle;
   const stage = deliverableStage(template);
-  const isBook = stage?.renderer === 'long_form';
-  const noun = isBook ? 'book' : 'work';
+  const inSections = stage?.renderer === 'long_form';
+  const { deliverable: noun, unit } = deliverableNouns(template);
   const markdown = useMemo(() => toManuscriptMarkdown(bundle), [bundle]);
   const body = markdown.replace(/^# .*\n+/, '');
-  const chapters = isBook ? (body.match(/^## /gm) ?? []).length : 0;
+  const chapters = inSections ? (body.match(/^## /gm) ?? []).length : 0;
   const words = body.split(/\s+/).filter(Boolean).length;
   const [reading, setReading] = useState(false);
   const [note, setNote] = useState<string | null>(null);
@@ -71,7 +72,7 @@ export function ProjectFinished({ bundle, completion, evaluation, onReopen }: Pr
       <p className="mt-2 text-body text-[var(--on-surface-variant)]">
         {markdown
           ? [
-              isBook ? `${chapters} chapter${chapters === 1 ? '' : 's'}` : null,
+              inSections ? `${chapters} ${unit}${chapters === 1 ? '' : 's'}` : null,
               `${words.toLocaleString()} words`,
               `${completion.completed} stage${completion.completed === 1 ? '' : 's'} done`,
               completion.skipped ? `${completion.skipped} skipped` : null,

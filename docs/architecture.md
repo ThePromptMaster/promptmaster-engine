@@ -184,7 +184,14 @@ engine cannot compute on that stage carries `degraded: true` and lands in the se
 with a note. A done stage can be **reopened** (`stage_reopened`, user only, cursor unmoved)
 and closed again with the ordinary `stage_marked_complete`; when the second completion cites
 different evidence than the first, `projectState` marks the done stages after it `stale`,
-from the events alone. A finished project leads with `components/workflow/project-finished.tsx`
+from the events alone. The same holds for a stage that was **left open**: `stage_advanced`
+records the version it was left with (`payload.left_version_id`, since 2026-10-01), and
+closing it later on a different version marks the done stages after it `stale`; closing it
+by ticking a box on the same version flags nothing. The rail draws an open stage that is
+not the current one with its own glyph and a "left open" or "reopened" tag, and the stage
+header names it. What the finished thing and its parts are called comes from the template
+(`nouns`, or `deliverableNouns` in `lib/workflow/labels.ts` for versions published before
+it existed). A finished project leads with `components/workflow/project-finished.tsx`
 (read, copy, Markdown, Word via `lib/export/docx-export.ts`, PDF via the print route).
 Version pills show the current version, the ones `isSaved` (`lib/workflow/labels.ts`) says
 the user chose to keep, and the rest behind "Full history". The claim table's statuses are
