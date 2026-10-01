@@ -45,7 +45,9 @@ AGENT_ACTIONS: list[AgentAction] = [
                 when="Assume the opposite and see whether it breaks."),
     AgentAction(key="run_computation", family="research", label="Run a computation",
                 when="A number, plot or simulation would settle the question better than argument. "
-                     "Params: goal (what to compute), kind ('computation' or 'simulation').",
+                     "Params: goal (what to compute), kind ('computation' or 'simulation'), and "
+                     "row (the number of the row in this stage's table that the computation carries out, "
+                     "when it carries out exactly one of them; otherwise leave it out).",
                 important=True),
     AgentAction(key="falsify_hypothesis", family="research", label="Falsify a hypothesis",
                 when="State what would prove the current hypothesis wrong, and test it."),

@@ -31,7 +31,7 @@ describe('previewOf: what a model is shown of an attached file', () => {
 
 describe('rejectReason', () => {
   it('says why a file cannot be attached', () => {
-    expect(rejectReason('book.xlsx', 10, [])).toMatch(/not a CSV, TSV, JSON or text file/);
+    expect(rejectReason('book.pdf', 10, [])).toMatch(/not a spreadsheet \(\.xlsx\), CSV, TSV, JSON or text file/);
     expect(rejectReason('big.csv', 6_000_000, [])).toMatch(/larger than 5 MB/);
     expect(rejectReason('a.csv', 10, ['a.csv'])).toMatch(/already attached/);
     expect(rejectReason('a.csv', 0, [])).toMatch(/empty/);

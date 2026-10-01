@@ -452,7 +452,7 @@ export function WorkflowWorkspace({
         // instead of working them out again (1 Oct, item 32). Read from the
         // stage's own text; never a reason the move fails.
         if (type === 'stage_marked_complete' && setStageFigures) {
-          const figures = await readStageFigures(project, stage, stageBundles[stage.id]?.versions.at(-1));
+          const figures = await readStageFigures(project, stage, stageBundles[stage.id]?.versions.at(-1), stageBundles[stage.id]?.artifact?.key_figures);
           if (figures) await setStageFigures(stage.id, figures).catch(() => {});
         }
 

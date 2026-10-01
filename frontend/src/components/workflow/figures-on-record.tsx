@@ -30,8 +30,8 @@ export function FiguresOnRecord({
         <span className="text-label uppercase tracking-wider">Figures on record · {figures.length}</span>
       </summary>
       <p className="mt-3 text-label text-[var(--on-surface-variant)]">
-        Taken from completed stages, exactly as written there. Later stages are told to use these values and to say so
-        if they disagree with one. A stage edited after it was completed drops out until it is completed again.
+        Taken from completed stages, exactly as written there, or printed by code that ran in the sandbox. Later stages
+        are told to use these values and to say so if they disagree with one. A stage edited after it was completed drops out until it is completed again.
       </p>
       <ul className="mt-3 space-y-1.5">
         {figures.map((f, i) => (

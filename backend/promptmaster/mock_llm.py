@@ -261,6 +261,11 @@ def _next_action(system: str, prompt: str) -> dict:
     params: dict = {}
     if choice == "run_computation":
         params = {"goal": "Mock: compute 2 + 2", "kind": "computation"}
+        # "[[mock:row=2]]" in the objective says which row of the stage's
+        # table the computation carries out.
+        row = re.search(r"\[\[mock:row=(\d+)\]\]", prompt)
+        if row:
+            params["row"] = int(row.group(1))
     elif choice == "mark_blocked":
         params = {"reason": "Mock: missing data", "block_kind": "data_missing"}
     elif choice == "propose_skip":

@@ -191,3 +191,27 @@ describe('a suggestion to skip is the user\'s call (1 Oct, item 11)', () => {
     expect(needStillHolds(need, at('positioning'))).toBe(false);
   });
 });
+
+describe('needsUser: runs the data can carry out are tried before the table is the user\'s (1 Oct, item 17)', () => {
+  const schema = { itemLabel: 'run', fields: [], minItems: 1, maxItems: 20, statuses: [], execution: { status: 'completed', field: 'observed' } };
+  const rows = [{ id: 'a', run: 'Count the accounts' }, { id: 'b', run: 'Compare cohorts' }];
+  const input = {
+    ...base, stage: stage('fact_check'), stageEvaluation: evaluation('fact_check'), allowed: ['run_computation'],
+    facts: { review: { items: rows, schema, routine: [], material: rows, outcome: true } } as never,
+  };
+
+  it('with data and attempts left, the planner is asked', () => {
+    expect(needsUser({ ...input, runAttemptsLeft: 2 })).toBeNull();
+  });
+
+  it('with none left — no data, or every row tried — the rows are the user\'s, as before', () => {
+    expect(needsUser({ ...input, runAttemptsLeft: 0 })).toMatchObject({ kind: 'decide_rows', count: 2, itemLabel: 'run' });
+    expect(needsUser(input)).toMatchObject({ kind: 'decide_rows' });
+  });
+
+  it('a table no run can settle is never held back for one', () => {
+    const claims = { ...schema, itemLabel: 'claim', execution: undefined };
+    expect(needsUser({ ...input, runAttemptsLeft: 5, facts: { review: { items: rows, schema: claims, routine: [], material: rows, outcome: true } } as never }))
+      .toMatchObject({ kind: 'decide_rows', itemLabel: 'claim' });
+  });
+});

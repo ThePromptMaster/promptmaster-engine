@@ -21,7 +21,8 @@ import { describeWith, type InstructionConflict } from '@/lib/workflow/instructi
 import { defaultOutlineForm, deriveOutlineItems } from '@/lib/workflow/derived-outline';
 import { itemSchemaFor, parseItems, rendererHoldsItems, serializeItems } from '@/lib/workflow/stage-artifact';
 import { applyLookup, lookupSummary, recordLine } from '@/lib/workflow/lookup';
-import { readStageFigures, type StageFigures } from '@/lib/workflow/figures';
+import { figuresFromOutput, readStageFigures, withRunFigures, type StageFigures } from '@/lib/workflow/figures';
+import { applyRunResult } from '@/lib/workflow/run-result';
 import { applyTriage } from '@/lib/workflow/triage';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import { summariseStageContent } from '@/lib/workflow/digest';
@@ -172,6 +173,57 @@ function askWhichTakesPriority(key: string, params: Record<string, unknown>, ins
   });
 }
 
+/**
+ * What a clean run leaves on the project, beyond its own `sandbox_runs` row:
+ * the row of the stage's table it carried out, when the planner named one and
+ * the table is one a run can settle; and the labelled results it printed, on
+ * the stage's figures. Neither is essential — a failure here leaves the run
+ * recorded and says nothing more.
+ */
+async function recordRun(
+  ctx: PerformContext,
+  rowNumber: unknown,
+  run: { id: string; stdout: string }
+): Promise<{ changes: AgentStep['changes']; notes: string[] }> {
+  const changes: AgentStep['changes'] = {};
+  const notes: string[] = [];
+  const bundle = ctx.bundles[ctx.stage.id];
+  let head = bundle?.versions.at(-1);
+  try {
+    const schema = itemSchemaFor(ctx.stage);
+    const rows = rendererHoldsItems(ctx.stage.renderer) ? parseItems(head?.content) : null;
+    const result = rows && ctx.appendStageVersion ? applyRunResult(rows, rowNumber, schema, run) : null;
+    if (result && ctx.appendStageVersion) {
+      const statusLabel = schema.statuses?.find((s) => s.value === result.row.status)?.label ?? result.row.status;
+      const created = await ctx.appendStageVersion(ctx.stage.id, ctx.stage.label, {
+        content: serializeItems(result.items),
+        source_operation: 'sandbox_result',
+        instruction: ctx.step.rationale || 'Go mode ran the computation.',
+        model: '',
+        mode: ctx.project.mode,
+        change_summary: `Row ${rowNumber} marked ${statusLabel}: the code ran in the sandbox (run ${run.id.slice(0, 8)}).`,
+      });
+      const id = (created as { id?: unknown } | null)?.id;
+      if (typeof id === 'string') {
+        changes.version_ids = [id];
+        changes.items_run = [result.row.id];
+        head = { ...(head ?? {}), id, content: serializeItems(result.items) } as typeof head;
+        notes.push(`Recorded on the table: row ${rowNumber} is now "${statusLabel}", with what the run printed. Change it if the run was not that row.`);
+      }
+    }
+    const printed = figuresFromOutput(run.stdout, run.id);
+    const figures = head && bundle?.artifact && ctx.setStageFigures ? withRunFigures(bundle.artifact.key_figures, head.id, printed) : null;
+    if (figures && ctx.setStageFigures) {
+      await ctx.setStageFigures(ctx.stage.id, figures);
+      changes.figures_recorded = printed.length;
+      notes.push(`Recorded ${printed.length} figure${printed.length === 1 ? '' : 's'} the code printed; later stages are given ${printed.length === 1 ? 'it' : 'them'} once this stage is complete.`);
+    }
+  } catch {
+    // The run itself is on record; what could not be added is simply not claimed.
+  }
+  return { changes, notes };
+}
+
 const withAnswer = (instruction: string, answer?: string) =>
   answer ? `${instruction}\nThe user was asked which takes priority and answered: "${answer}". Follow that.` : instruction;
 
@@ -247,12 +299,17 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         run.stdout ? 'Output:\n```\n' + run.stdout + '\n```' : '',
         run.stderr ? 'Errors:\n```\n' + run.stderr.slice(-1500) + '\n```' : '',
       ].filter(Boolean).join('\n\n');
+      // A run that executed cleanly is execution truth, recorded without a
+      // model: on the row it carried out, and as the figures it printed.
+      const recorded = ran && classification.stepStatus === 'succeeded' && run.exit_code === 0
+        ? await recordRun(ctx, params.row, { id: run.id, stdout: run.stdout })
+        : { changes: {}, notes: [] };
       return done(key, {
         status: classification.stepStatus,
         blockKind: classification.blockKind,
-        output: clip(output),
+        output: clip([output, ...recorded.notes].join('\n\n')),
         toolsUsed: ['model', 'sandbox'],
-        changes: { sandbox_run_id: run.id },
+        changes: { sandbox_run_id: run.id, ...recorded.changes },
         sandboxLabel: classification.executionLabel,
         followUp: ran && classification.stepStatus === 'succeeded'
           ? { sandboxRunId: run.id, code: written.code, stdout: run.stdout, stderr: run.stderr, exitCode: run.exit_code }
@@ -526,7 +583,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       }
       // The figures the stage established, for later stages to quote.
       if (type === 'stage_marked_complete' && ctx.setStageFigures) {
-        const figures = await readStageFigures(ctx.project, ctx.stage, ctx.bundles[ctx.stage.id]?.versions.at(-1));
+        const figures = await readStageFigures(ctx.project, ctx.stage, ctx.bundles[ctx.stage.id]?.versions.at(-1), ctx.bundles[ctx.stage.id]?.artifact?.key_figures);
         if (figures) await ctx.setStageFigures(ctx.stage.id, figures).catch(() => undefined);
       }
       await appendWorkflowEvent(ctx.project.id, ctx.project.user_id, {

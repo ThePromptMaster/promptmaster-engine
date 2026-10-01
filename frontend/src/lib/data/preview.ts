@@ -9,6 +9,14 @@
 export const MAX_FILE_BYTES = 5_000_000;
 export const MAX_FILES = 10;
 export const ACCEPTED_EXTENSIONS = ['.csv', '.tsv', '.json', '.txt'] as const;
+/** Converted to CSV in the browser when attached (lib/data/spreadsheet.ts); never stored as it is. */
+export const SPREADSHEET_EXTENSION = '.xlsx';
+/** What the file picker offers. */
+export const PICKABLE_EXTENSIONS = [...ACCEPTED_EXTENSIONS, SPREADSHEET_EXTENSION] as const;
+
+export function isSpreadsheet(name: string): boolean {
+  return extensionOf(name) === SPREADSHEET_EXTENSION;
+}
 const SAMPLE_ROWS = 5;
 const MAX_COLUMNS = 60;
 const CELL_MAX = 80;
@@ -31,7 +39,9 @@ export function extensionOf(name: string): string {
 /** Why a file cannot be attached, or null when it can. */
 export function rejectReason(name: string, bytes: number, existing: readonly string[]): string | null {
   if (!(ACCEPTED_EXTENSIONS as readonly string[]).includes(extensionOf(name))) {
-    return `${name} is not a CSV, TSV, JSON or text file. Spreadsheets can be saved as CSV first.`;
+    return extensionOf(name) === '.xls'
+      ? `${name} is in the old Excel format. Save it as .xlsx or CSV first.`
+      : `${name} is not a spreadsheet (.xlsx), CSV, TSV, JSON or text file.`;
   }
   if (bytes > MAX_FILE_BYTES) return `${name} is larger than ${MAX_FILE_BYTES / 1_000_000} MB.`;
   if (bytes === 0) return `${name} is empty.`;

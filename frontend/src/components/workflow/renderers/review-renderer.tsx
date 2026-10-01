@@ -103,6 +103,8 @@ export function ReviewRenderer({
   // outcome (1 Oct, items 3 and 18). They count as resolved; the user can
   // still change any of them.
   const setByModel = rows.filter((r) => r.status_source === 'model' && isTriaged(r, schema)).length;
+  // …and rows a sandbox run settled: the code ran, and what it printed is on the row.
+  const setByRun = rows.filter((r) => r.status_source === 'sandbox' && isTriaged(r, schema)).length;
 
   async function save() {
     if (!onSaveItems || saving) return;
@@ -181,6 +183,11 @@ export function ReviewRenderer({
             {setByModel > 0 && (
               <span className="text-label text-[var(--on-surface-variant)]">
                 · {setByModel} set by PromptMaster from what it already knew — review or change
+              </span>
+            )}
+            {setByRun > 0 && (
+              <span className="text-label text-[var(--on-surface-variant)]">
+                · {setByRun} recorded from code that ran in the sandbox
               </span>
             )}
           </div>
@@ -296,6 +303,9 @@ function ReviewRow({ row, columns, statuses, schema, readOnly, onPatch }: Review
           )}
           {row.status_source === 'model' && option && option.decided !== false && (
             <span className="mt-1 block text-label text-[var(--on-surface-variant)]">Set by PromptMaster</span>
+          )}
+          {row.status_source === 'sandbox' && option && (
+            <span className="mt-1 block text-label text-[var(--on-surface-variant)]">Recorded from a sandbox run</span>
           )}
         </td>
       </tr>

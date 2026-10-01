@@ -172,8 +172,14 @@ export function buildAgentState(input: {
       sample: items.filter((i) => !isTriaged(i, schema)).slice(0, SAMPLE_MAX).map(firstField).filter(Boolean),
     };
     // Rows as "[status] finding" lines: what a reviewer needs, at a fraction
-    // of the JSON document's size.
-    excerpt = items.map((i) => `[${i.status || 'undecided'}] ${firstField(i)}`).join('\n');
+    // of the JSON document's size. Numbered where a computation can carry a
+    // row out, so the planner can say which one it is running.
+    excerpt = items.map((i, n) => `${schema.execution ? `${n + 1}. ` : ''}[${i.status || 'undecided'}] ${firstField(i)}`).join('\n');
+    if (schema.execution && items.length && dataFiles.length) {
+      excerpt +=
+        `\n\nA row that is not "${schema.execution.status}" can be carried out with run_computation when the project's data allows it: ` +
+        'give the row\'s number as `row`, and a run that executes is recorded on that row. A row no code can carry out is the user\'s to decide.';
+    }
   }
 
   return {
