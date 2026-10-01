@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 from main import app
-from promptmaster.literature import WorkQuery, best_match, title_of, title_overlap, to_match
+from promptmaster.literature import WorkQuery, best_match, search_text, title_of, title_overlap, to_match
 
 ASCARZA = {
     "id": "https://openalex.org/W1", "doi": "https://doi.org/10.1509/jmr.16.0163",
@@ -67,3 +67,18 @@ def test_the_title_is_what_gets_searched_not_the_whole_citation():
         "Customer switching behavior in service industries: An exploratory study"
     )
     assert title_of("The Mythical Man-Month") == "The Mythical Man-Month"
+
+
+def test_a_single_quoted_title_keeps_its_apostrophes():
+    """Production, 2026-10-01: "'Software Developers' Perceptions of Productivity.'" was searched as "Software Developers"."""
+    assert title_of("Meyer, A. N. (2019). 'Software Developers' Perceptions of Productivity.' FSE.") == "Software Developers' Perceptions of Productivity"
+    assert title_of("Haraldsson, G. (2021). 'Going Public: Iceland's journey to a shorter working week.' Autonomy.") == (
+        "Going Public: Iceland's journey to a shorter working week"
+    )
+    assert title_of("Pencavel, J. (2015). 'The Productivity of Working Hours.' Economic Journal.") == "The Productivity of Working Hours"
+
+
+def test_what_is_sent_to_the_index_has_no_characters_it_rejects():
+    """Production, 2026-10-01: a question mark in a title was a 400, reported as "could not be reached"."""
+    assert search_text("Does Working from Home Work? Evidence from a Chinese Experiment") == "Does Working from Home Work Evidence from a Chinese Experiment"
+    assert search_text("Software Developers' Perceptions (of Productivity)") == "Software Developers Perceptions of Productivity"

@@ -52,8 +52,14 @@ class WorkMatch(BaseModel):
     note: str = ""
 
 
-_QUOTED = re.compile(r"[“\"‘']([^”\"’']{12,})[”\"’']")
+_DOUBLE_QUOTED = re.compile(r"[“\"]([^”\"]{12,})[”\"]")
+# A single-quoted title may hold apostrophes ("Developers' Perceptions",
+# "Iceland's journey"), so it runs from the first opening quote to the LAST
+# closing one, not to the first apostrophe.
+_SINGLE_QUOTED = re.compile(r"(?:^|[\s(])[‘'](.{12,})[’'](?=[\s.,;:)]|$)")
 _AFTER_YEAR = re.compile(r"\(?\b(?:19|20)\d{2}[a-z]?\)?[.,:]?\s+(.{12,})")
+#: Characters OpenAlex's search rejects (a "?" in the query is a 400) or reads as operators.
+_UNSEARCHABLE = re.compile(r"[?!*\"“”‘’'()\[\]{}|\\^~]")
 
 
 def title_of(named: str) -> str:
@@ -67,13 +73,21 @@ def title_of(named: str) -> str:
     whole string.
     """
     named = " ".join(named.split())
-    quoted = max(_QUOTED.findall(named), key=len, default="")
+    quoted = max(_DOUBLE_QUOTED.findall(named), key=len, default="")
+    if not quoted:
+        single = _SINGLE_QUOTED.search(named)
+        quoted = single.group(1) if single else ""
     if quoted:
         return quoted.strip(" ,.")
     after = _AFTER_YEAR.search(named)
     if after:
         return after.group(1).split(". ")[0].strip(" ,.")
     return named
+
+
+def search_text(title: str) -> str:
+    """The title as it can be sent to the index: no characters it rejects or reads as operators."""
+    return " ".join(_UNSEARCHABLE.sub(" ", title).split())
 
 
 def _words(text: str) -> set[str]:
@@ -146,12 +160,17 @@ async def _lookup_one(http: httpx.AsyncClient, query: WorkQuery) -> WorkMatch:
     name = " ".join(query.work.split())
     if not name:
         return WorkMatch(id=query.id, note="There is no work named on this row.")
-    params = {"search": title_of(name)[:300], "per-page": "5", "select": "id,doi,display_name,publication_year,authorships"}
+    params = {"search": search_text(title_of(name))[:300], "per-page": "10", "select": "id,doi,display_name,publication_year,authorships"}
     mailto = os.getenv("OPENALEX_MAILTO", "").strip()
     if mailto:
         params["mailto"] = mailto
     try:
         response = await http.get(OPENALEX_URL, params=params, timeout=12.0)
+        if response.status_code == 429:
+            # Seven lookups at once from a shared address can trip the public
+            # limit; one pause and one more try is cheaper than "try again".
+            await asyncio.sleep(1.5)
+            response = await http.get(OPENALEX_URL, params=params, timeout=12.0)
         response.raise_for_status()
         results = response.json().get("results") or []
     except (httpx.HTTPError, ValueError):
