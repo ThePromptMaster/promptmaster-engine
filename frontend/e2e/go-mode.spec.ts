@@ -211,6 +211,8 @@ test('The step budget ends the run', async ({ page }) => {
   // same run under the same authorization, and the click is on the record.
   const card = page.getByRole('region', { name: 'Go mode needs you' });
   await expect(card).toContainText('This window of 5 steps is used up');
+  // The main button offers the same continuation, not a run that starts over.
+  await expect(goPanel(page).getByRole('button', { name: /^Continue$/ })).toBeVisible();
   await card.getByRole('button', { name: 'Continue for 5 more steps' }).click();
   await expect(page.getByRole('region', { name: 'What Go mode is doing' })).toContainText(/Objective complete|Nothing — the objective is met/, { timeout: 30_000 });
   const next = await runOf(id);

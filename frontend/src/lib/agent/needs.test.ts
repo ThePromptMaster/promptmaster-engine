@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { BOOK_V1 } from '@/lib/workflow/templates/book.v1';
 import { initialState, projectState } from '@/lib/workflow/engine';
 import type { StageEvaluation, WorkflowEvent } from '@/lib/workflow/types';
-import { describeNeed, needsUser } from './needs';
+import { describeNeed, needStillHolds, needsUser, type NeedsUser } from './needs';
 
 const stage = (id: string) => BOOK_V1.stages.find((s) => s.id === id)!;
 const evaluation = (id: string, unmet: StageEvaluation['unmet'] = []): StageEvaluation => ({ stageId: id, canAdvance: unmet.every((c) => !c.blocking), criteria: [], unmet });
@@ -27,9 +27,9 @@ describe('needsUser: the moves that are the user\'s (B4)', () => {
     expect(needsUser({ ...base, stage: stage('outline'), facts: outline(0, false), stageEvaluation: evaluation('outline'), allowed: ['generate_outline'] })).toBeNull();
   });
 
-  it('unsaved outline edits cannot be approved from here', () => {
+  it('unsaved outline edits are saved and approved by the card\'s own button', () => {
     const need = needsUser({ ...base, stage: stage('outline'), facts: outline(3, false, true), stageEvaluation: evaluation('outline') });
-    expect(describeNeed(need!, label).action).toBeNull();
+    expect(describeNeed(need!, label).action).toBe('Save and approve the outline');
   });
 
   it('the approval stage and an unbound drafting stage both point at the outline stage', () => {
@@ -130,5 +130,46 @@ describe('needsUser: a required box with only revise moves left is the user\'s (
       stageEvaluation: evaluation('positioning', [{ id: 'pos.differentiator', label: 'One-sentence differentiator', satisfied: false, blocking: true, manual: true }]),
     });
     expect(need).toBeNull();
+  });
+});
+
+describe('needStillHolds: a recorded stop is checked against the project (1 Oct, items 1 and 22)', () => {
+  const at = (stageId: string, over: Record<string, unknown> = {}) => ({
+    ...base, stage: stage(stageId), facts: {}, stageEvaluation: evaluation(stageId), objective: 'A book', currentStageId: stageId, ...over,
+  });
+
+  it('an approval the user has since given no longer holds', () => {
+    const need: NeedsUser = { kind: 'approve_outline', stageId: 'outline', versionNumber: 1, unsavedDraft: false, onStage: 'outline' };
+    expect(needStillHolds(need, at('outline', { facts: outline(3, false) }))).toBe(true);
+    expect(needStillHolds(need, at('outline', { facts: outline(3, true) }))).toBe(false);
+  });
+
+  it('a box the user has since ticked no longer holds; a different open box is a different request', () => {
+    const unmet = [{ id: 'pos.differentiator', label: 'One-sentence differentiator', satisfied: false, blocking: true, manual: true }];
+    const need: NeedsUser = { kind: 'tick_criterion', stageId: 'positioning', criterionId: 'pos.differentiator', label: 'One-sentence differentiator', onStage: 'positioning' };
+    expect(needStillHolds(need, at('positioning', { stageEvaluation: evaluation('positioning', unmet) }))).toBe(true);
+    expect(needStillHolds(need, at('positioning'))).toBe(false);
+    const other = [{ ...unmet[0], id: 'pos.other' }];
+    expect(needStillHolds(need, at('positioning', { stageEvaluation: evaluation('positioning', other) }))).toBe(false);
+  });
+
+  it('a request raised on a stage the project has left no longer holds', () => {
+    const need: NeedsUser = { kind: 'answer_question', question: 'Which audience?', onStage: 'audience' };
+    expect(needStillHolds(need, at('audience'))).toBe(true);
+    expect(needStillHolds(need, at('positioning'))).toBe(false);
+  });
+
+  it('a stage the user has continued is no longer stuck; finished jobs are no longer waited for', () => {
+    const stuck: NeedsUser = { kind: 'unblock_stage', stageId: 'objective', reason: 'x', blockKind: 'data_missing', onStage: 'objective' };
+    expect(needStillHolds(stuck, at('objective'))).toBe(false);
+    const waiting: NeedsUser = { kind: 'wait_for_jobs', stageId: 'drafting', pending: 2, complete: 1, total: 3, onStage: 'drafting' };
+    expect(needStillHolds(waiting, at('drafting', { facts: manuscript({ pendingJobs: [{}] }) }))).toBe(true);
+    expect(needStillHolds(waiting, at('drafting', { facts: manuscript({}) }))).toBe(false);
+  });
+
+  it('another window stays the user\'s click wherever the project is; a missing objective holds until it is set', () => {
+    expect(needStillHolds({ kind: 'continue_budget', budgetSteps: 12, onStage: 'audience' }, at('positioning'))).toBe(true);
+    expect(needStillHolds({ kind: 'set_objective' }, at('objective', { objective: ' ' }))).toBe(true);
+    expect(needStillHolds({ kind: 'set_objective' }, at('objective'))).toBe(false);
   });
 });
