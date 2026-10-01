@@ -21,6 +21,7 @@ export type Performer =
   | 'apply' // apply the latest check's findings as a new version (B2b)
   | 'triage' // decide the routine findings of a review table (B3)
   | 'advance' // a stage event
+  | 'skip' // proposes skipping the stage; the user decides
   | 'block' // stage_blocked
   | 'ask' // stop for the user
   | 'complete'; // end the run, if the objective really is met
@@ -54,6 +55,8 @@ export const AGENT_ACTIONS: readonly AgentAction[] = [
   { key: 'revise_sections', family: 'writing', label: 'Revise the sections', performer: 'sections', important: true },
   { key: 'apply_findings', family: 'writing', label: 'Apply the findings', performer: 'apply', important: true },
   { key: 'triage_findings', family: 'writing', label: 'Decide the routine findings', performer: 'triage', important: true },
+  // 1 Oct, item 11: the template guides the order; it does not imprison it.
+  { key: 'propose_skip', family: 'workflow', label: 'Suggest skipping this stage', performer: 'skip', important: false },
   { key: 'advance_stage', family: 'workflow', label: 'Move to the next stage', performer: 'advance', important: true },
   { key: 'mark_blocked', family: 'workflow', label: 'Mark this stage stuck', performer: 'block', important: false },
   { key: 'request_user_decision', family: 'workflow', label: 'Ask the user', performer: 'ask', important: false },

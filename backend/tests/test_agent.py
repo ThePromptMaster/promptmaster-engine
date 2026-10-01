@@ -400,3 +400,12 @@ def test_the_code_writer_is_told_to_read_only_listed_files_and_never_invent_data
     assert "never invent a file, a column or a value" in system
     assert "pandas is not installed" in system
     assert "/data/accounts.csv" in user
+
+
+def test_the_planner_is_told_the_order_is_a_default_and_can_suggest_a_skip():
+    """1 Oct, item 11: "the workflow template should guide the reasoning engine, but not mechanically imprison it"."""
+    system, user = build_next_action_prompt(INPUTS, STATE, [*RESEARCH, "propose_skip"], "autonomous")
+    assert "The workflow's order is a sensible default, not a rule" in system
+    assert "do not work through a stage only because it comes next" in system
+    assert "- propose_skip: Suggest skipping this stage." in user
+    assert "The user decides; nothing is skipped unless they agree." in user

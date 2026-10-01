@@ -255,6 +255,13 @@ and shown on the rail). An Autonomous run is not offered `advance_stage` in that
 (`withoutOverride`, `lib/agent/policy.ts`); under Guided and Checkpoint the user's Approve
 on the proposed move is the override.
 
+**The order is a default.** On a stage the template allows to be skipped, the planner may
+choose `propose_skip`: a suggestion with a reason, never a skip. The run stops with a
+`skip_stage` need; the card's button performs the ordinary skip transition as the user
+(`stage_skipped`, `actor='user'`, Go's reason as the recorded one) and Resume does the
+stage instead. It is offered once per stage per run. A skipped stage can be reopened like
+a done one.
+
 **What the planner may say.** Its `rationale`, `expected_outcome` and `decision_question`
 are shown to the user, so the prompt (`promptmaster/agent.py`) names its own sections in
 plain words ("MOVES AVAILABLE NOW", "WHAT THIS STAGE HOLDS NOW") and forbids "artifact",

@@ -88,6 +88,10 @@ export function allowedActions(
     if (!m.brief && m.approvedOutlineVersionId && m.total > 0 && m.complete < m.total) keys.push('draft_sections');
     if (m.brief && m.complete > 0 && m.revisedInStage < m.complete) keys.push('revise_sections');
   }
+  // The order is the template's default; a stage that may be skipped can be
+  // proposed for skipping (the user decides). Offered once per stage per run
+  // — the loop removes it after a proposal.
+  if (stage.transitions.allow_skip && stage.transitions.default_next) keys.push('propose_skip');
   if (nextSuggestedStage(template, state)) keys.push('advance_stage');
   keys.push('mark_blocked', 'request_user_decision', 'declare_objective_complete');
   return keys;
