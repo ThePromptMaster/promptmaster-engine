@@ -11,6 +11,8 @@ import type {
   ChatMessageRequest,
   ChatMessageResponse,
   ApplyToAnswerRequest,
+  ReplyAction,
+  SuggestActionsRequest,
   SaveAsNewVersionRequest,
   IterationFromConversationResponse,
   ContinueDocumentRequest,
@@ -351,6 +353,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(req),
     });
+  },
+
+  /** A chat answer as at most four things to do about it. Changes nothing. */
+  async suggestActions(req: SuggestActionsRequest, signal?: AbortSignal): Promise<{ actions: ReplyAction[] }> {
+    return apiFetch('/api/suggest-actions', { method: 'POST', body: JSON.stringify(req), signal });
   },
 
   async applyToAnswer(req: ApplyToAnswerRequest): Promise<IterationFromConversationResponse> {

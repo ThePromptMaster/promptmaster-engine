@@ -44,8 +44,9 @@ import {
   type InstructionConflict,
 } from '@/lib/workflow/instruction-conflicts';
 import { inputsFrom } from '@/lib/workflow/stage-requests';
-import { CritiqueActions } from './critique-actions';
-import { pointsFromCommentary, type CritiquePoint } from '@/lib/workflow/critique-points';
+import { ReplyActions } from './reply-actions';
+import type { RowChange } from '@/lib/workflow/row-actions';
+import type { ReplyAction } from '@/types';
 import { documentSections, type ScopeKind } from './chat-scope';
 import type { StageChatMessage } from '@/lib/supabase/conversation';
 import type { NewVersion } from '@/lib/supabase/versions';
@@ -115,11 +116,17 @@ interface Props {
   /** Why "Change it" is unavailable, when it is for a reason other than reading an old version. */
   cannotChangeBecause?: string;
   /**
-   * PM-22 "buttonize it": apply points from the latest reply as you go. The
-   * workspace owns applying, so the chat and the critiques behave the same.
+   * "Buttonize it" (PM-22), compressed (1 Oct, items 13 and 34): a reply is
+   * offered as at most four actions, asked for from the model, instead of
+   * one Apply per bullet. The workspace owns what an action does.
    */
-  onApplyPoints?: (points: CritiquePoint[], showFirst: boolean) => void;
+  suggestActions?: (question: string, reply: string, signal: AbortSignal) => Promise<ReplyAction[]>;
+  /** What a table action would change, for the row-by-row review. */
+  previewRows?: (action: ReplyAction) => RowChange[];
+  onRunAction?: (action: ReplyAction) => Promise<void> | void;
   applying?: boolean;
+  /** The stage's work is a table: a discussion cannot be saved over it as prose. */
+  isTable?: boolean;
 }
 
 /**
@@ -155,8 +162,11 @@ export function ChatPanel({
   initialMode = 'discuss',
   canInstruct = true,
   cannotChangeBecause,
-  onApplyPoints,
+  suggestActions,
+  previewRows,
+  onRunAction,
   applying = false,
+  isTable = false,
 }: Props) {
   const [offerActions, setOfferActions] = useState(true);
   useEffect(() => setOfferActions(readOfferActions()), []);
@@ -252,7 +262,45 @@ export function ChatPanel({
   // The latest assistant reply in Discuss, split into points that can each be applied.
   const latestReply = [...chat.messages].reverse().find((m) => m.role === 'assistant' && m.mode === 'discuss');
   const latestReplyId = latestReply?.id ?? null;
-  const replyPoints = useMemo(() => (latestReply ? pointsFromCommentary(latestReply.content) : []), [latestReply]);
+
+  // Actions are asked for once per reply, and only for replies given while
+  // the panel is open: a thread reopened tomorrow must not spend a call on
+  // an answer the user has already read. That one gets a button instead.
+  const [actions, setActions] = useState<{ forId: string; list: ReplyAction[] | null; loading: boolean; error: string | null } | null>(null);
+  const seenOnLoad = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (!chat.loading && seenOnLoad.current === undefined) seenOnLoad.current = latestReplyId;
+  }, [chat.loading, latestReplyId]);
+  const actionsAbort = useRef<AbortController | null>(null);
+  const requestActions = useCallback(
+    (replyId: string) => {
+      const reply = chat.messages.find((m) => m.id === replyId);
+      if (!reply || !suggestActions) return;
+      const index = chat.messages.indexOf(reply);
+      const question = [...chat.messages.slice(0, index)].reverse().find((m) => m.role === 'user')?.content ?? '';
+      actionsAbort.current?.abort();
+      const controller = new AbortController();
+      actionsAbort.current = controller;
+      setActions({ forId: replyId, list: null, loading: true, error: null });
+      suggestActions(question, reply.content, controller.signal).then(
+        (list) => !controller.signal.aborted && setActions({ forId: replyId, list, loading: false, error: null }),
+        () =>
+          !controller.signal.aborted &&
+          // Not being able to suggest actions is not a failed answer.
+          setActions({ forId: replyId, list: [], loading: false, error: 'Could not work out actions for this reply.' })
+      );
+    },
+    [chat.messages, suggestActions]
+  );
+  useEffect(() => {
+    if (!suggestActions || !offerActions || readOnly || chat.loading) return;
+    if (!latestReplyId || seenOnLoad.current === undefined || latestReplyId === seenOnLoad.current) return;
+    if (actions?.forId === latestReplyId) return;
+    requestActions(latestReplyId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [latestReplyId, offerActions, readOnly, chat.loading]);
+  useEffect(() => () => actionsAbort.current?.abort(), []);
+  const [dismissedFor, setDismissedFor] = useState<string | null>(null);
 
   const canSend =
     !readOnly && !chat.busy && !checking && !conflicting && draft.trim().length > 0 && (mode === 'discuss' || scopeReady);
@@ -324,7 +372,7 @@ export function ChatPanel({
       <header className="px-5 pt-5">
         <h2 className="text-title text-[var(--on-surface)]">Side chat</h2>
         <p className="mt-0.5 text-label text-[var(--on-surface-variant)]">{stageLabel}</p>
-        {onApplyPoints && (
+        {suggestActions && (
           <label className="mt-1.5 flex cursor-pointer items-center gap-2 text-label text-[var(--on-surface-variant)]">
             <input
               type="checkbox"
@@ -365,13 +413,17 @@ export function ChatPanel({
             {chat.messages.map((message) => (
               <li key={message.id}>
                 <Bubble message={message} />
-                {onApplyPoints && offerActions && !readOnly && message.id === latestReplyId && replyPoints.length > 0 && (
+                {suggestActions && onRunAction && offerActions && !readOnly && message.id === latestReplyId && dismissedFor !== message.id && (
                   <div className="mt-2">
-                    <CritiqueActions
-                      title="Act on this reply"
-                      points={replyPoints}
+                    <ReplyActions
+                      actions={actions?.forId === message.id ? actions.list : null}
+                      loading={actions?.forId === message.id && actions.loading}
+                      error={actions?.forId === message.id ? actions.error : null}
                       busy={applying}
-                      onApply={(ids, showFirst) => onApplyPoints(replyPoints.filter((p) => ids.includes(p.id)), showFirst)}
+                      previewRows={previewRows}
+                      onRun={onRunAction}
+                      onDismiss={() => setDismissedFor(message.id)}
+                      onRequest={() => requestActions(message.id)}
                     />
                   </div>
                 )}
@@ -436,7 +488,7 @@ export function ChatPanel({
         <div className="px-5 pb-5">
           {/* PM-10: the original core's "Save as New Version" — the discussion
               becomes a revised draft, shown for review before it is saved. */}
-          {mode === 'discuss' && chat.canApply && !chat.proposal &&
+          {mode === 'discuss' && chat.canApply && !chat.proposal && !isTable &&
             chat.messages.some((m) => m.role === 'assistant') && (
             <button
               onClick={() => void chat.saveDiscussion()}

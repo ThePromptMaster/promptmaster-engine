@@ -293,6 +293,31 @@ def _json_reply(system: str, prompt: str) -> dict:
             return {"conflicts": [{"kind": "objective", "with_id": "", "with_text": "the project objective",
                                    "explanation": "Mock: this instruction pulls the work away from the objective."}]}
         return {"conflicts": []}
+    from promptmaster import reply_actions
+
+    if reply_actions._REPLY_ACTIONS_INSTRUCTION[:60] in system:
+        # A table gets one action that changes its first row and one that adds
+        # a row; a draft gets two revisions. "[[mock:no-actions]]" in the
+        # question gives none (an answer that only explained).
+        if "[[mock:no-actions]]" in prompt:
+            return {"actions": []}
+        ids = re.findall(r"^- id=([^:]+):", prompt, re.M)
+        if ids:
+            status = re.search(r"^Statuses: ([a-z_]+) ", prompt, re.M)
+            first_key = re.search(r"^Columns: ([a-z_]+) ", prompt, re.M)
+            update = {"id": ids[0], "fields": {first_key.group(1): "Mock: updated from the chat."}} if first_key else {"id": ids[0]}
+            if status:
+                update |= {"status": status.group(1), "reason": "Mock: decided in the chat."}
+            return {"actions": [
+                {"label": "Update the first row", "kind": "row_updates", "updates": [update, {"id": "not-a-row", "status": "x"}]},
+                {"label": "Add the missing row", "kind": "add_rows",
+                 "rows": [{first_key.group(1): "Mock: a row added from the chat."}] if first_key else []},
+                {"label": "Rewrite it as prose", "kind": "revise", "instruction": "Mock: must be dropped on a table."},
+            ]}
+        return {"actions": [
+            {"label": "Tighten the opening", "kind": "revise", "instruction": "Mock: shorten the first paragraph."},
+            {"label": "Add the missing example.", "kind": "revise", "instruction": "Mock: add one concrete example."},
+        ]}
     if agent._TRIAGE_INSTRUCTION[:60] in system:
         ids = re.findall(r"^- id=([^:]+):", prompt.split("FINDINGS TO DECIDE:", 1)[-1], re.M)
         return {"decisions": [{"id": i, "status": "accepted", "reason": "Mock: routine, accepted."} for i in ids]}

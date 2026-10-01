@@ -197,6 +197,17 @@ Version pills show the current version, the ones `isSaved` (`lib/workflow/labels
 the user chose to keep, and the rest behind "Full history". The claim table's statuses are
 provenance first (`candidate_source`, `no_source`, both undecided) and decisions second.
 
+**Side-chat actions (2026-10-01).** An Ask reply is offered as at most four actions from
+`POST /api/suggest-actions`, not one Apply per bullet (the list parser in
+`critique-points.ts` still serves Challenge / Reframe / Self-audit, where each point is a
+finding). On a prose stage an action is a revision instruction and goes through the
+ordinary apply-findings preview. On a table stage it is row changes: `previewRowAction`
+(`lib/workflow/row-actions.ts`, pure) works out the rows as they would be and a plain list
+of what changes, the user reviews it in the chat panel, and saving appends a version with
+`source_operation: 'chat_rows'`. Both the server and the client drop rows, statuses and
+fields the table does not have. Actions are requested only for replies given while the
+panel is open; an older reply gets a "Suggest actions" button.
+
 ## Go mode (Phase B: PM-12, PM-15, PM-17 … PM-20)
 
 The next-best-action loop runs **in the browser** (`components/workflow/use-go-loop.ts`)

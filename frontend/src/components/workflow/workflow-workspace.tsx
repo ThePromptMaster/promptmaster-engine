@@ -61,7 +61,9 @@ import { ProjectBrief, ProjectSetup, stageWantsSetup } from './project-setup';
 import { draftBindings } from '@/lib/outline/long-form';
 import { approveOutline, loadOutline, materialiseOutlineInto } from '@/lib/outline/actions';
 import type { OutlineDocument } from '@/types/outline';
-import { stageDrafts, itemSchemaFor, rendererHoldsItems, serializeItems, stageContentForChat, type StageItem } from '@/lib/workflow/stage-artifact';
+import { stageDrafts, itemSchemaFor, parseItems, rendererHoldsItems, serializeItems, stageContentForChat, type StageItem } from '@/lib/workflow/stage-artifact';
+import { previewRowAction } from '@/lib/workflow/row-actions';
+import type { ReplyAction } from '@/types';
 import { buildStageContext } from '@/lib/workflow/context';
 import type { StageContext, WorkflowTemplate, BlockKind } from '@/lib/workflow/types';
 import { isDone } from '@/lib/workflow/types';
@@ -624,6 +626,68 @@ export function WorkflowWorkspace({
     [stage, project, template, state, stageBundles, headVersion]
   );
   const applyFindings = useApplyFindings({ project, stage, headVersion, appendStageVersion, table: tableRevision });
+  // --- side-chat answers as a few actions (1 Oct, items 13, 15, 34) -------------
+  const headItems = useMemo(() => parseItems(headVersion?.content) ?? [], [headVersion]);
+  const suggestReplyActions = useCallback(
+    async (question: string, reply: string, signal: AbortSignal) => {
+      if (!stage) return [];
+      const schema = itemSchemaFor(stage);
+      const res = await api.suggestActions(
+        {
+          inputs: inputsFrom(project),
+          stage_label: stage.label,
+          question,
+          reply,
+          table: rendererHoldsItems(stage.renderer)
+            ? {
+                item_label: schema.itemLabel,
+                fields: schema.fields.map((f) => ({ key: f.key, label: f.label })),
+                // Only what the user could choose themselves.
+                statuses: (schema.statuses ?? [])
+                  .filter((s) => s.settable !== false && s.decided !== false)
+                  .map((s) => ({ value: s.value, label: s.label, requires_reason: Boolean(s.requiresReason) })),
+                rows: headItems.map((item) =>
+                  Object.fromEntries(Object.entries(item).filter(([k, v]) => typeof v === 'string' && k !== 'status_source')) as Record<string, string>
+                ),
+              }
+            : null,
+          model: project.model,
+        },
+        signal
+      );
+      return res.actions;
+    },
+    [stage, project, headItems]
+  );
+  const previewReplyRows = useCallback(
+    (action: ReplyAction) => (stage ? previewRowAction(headItems, action, itemSchemaFor(stage)).changes : []),
+    [stage, headItems]
+  );
+  const runReplyAction = useCallback(
+    async (action: ReplyAction) => {
+      if (!stage || !appendStageVersion) return;
+      if (action.kind === 'revise') {
+        // One finding, the ordinary apply path: previewed before it is saved.
+        await applyFindings.apply(
+          [{ id: `chat-${Date.now()}`, category: 'Side chat', summary: action.label, suggested_change: action.instruction ?? '' }],
+          { showFirst: true, source: 'the side chat' }
+        );
+        return;
+      }
+      const { items, changes } = previewRowAction(headItems, action, itemSchemaFor(stage));
+      if (!changes.length) throw new Error('Nothing in the table would change.');
+      await appendStageVersion(stage.id, stage.label, {
+        content: serializeItems(items),
+        source_operation: 'chat_rows',
+        instruction: action.label,
+        model: project.model,
+        mode: project.mode,
+        change_summary: `From the side chat: ${action.label} (${changes.length} row${changes.length === 1 ? '' : 's'}).`,
+      });
+    },
+    [stage, appendStageVersion, applyFindings, headItems, project.model, project.mode]
+  );
+
   const critiquePoints = useMemo(
     () => (tools.commentary ? pointsFromCommentary(tools.commentary.text) : []),
     [tools.commentary]
@@ -1619,15 +1683,13 @@ export function WorkflowWorkspace({
               }
               cannotChangeBecause={
                 rendererHoldsItems(stage.renderer)
-                  ? 'This stage is a table. Ask about it here; change the rows in the table itself.'
+                  ? 'This stage is a table. Ask about it here and the answer will offer row changes you can review, or change the rows in the table itself.'
                   : undefined
               }
-              onApplyPoints={
-                draftable
-                  ? (points, showFirst) =>
-                      void applyFindings.apply(points.map((p) => findingFromPoint(p, 'the side chat')), { showFirst, source: 'the side chat' })
-                  : undefined
-              }
+              isTable={rendererHoldsItems(stage.renderer)}
+              suggestActions={draftable && headVersion ? suggestReplyActions : undefined}
+              previewRows={previewReplyRows}
+              onRunAction={runReplyAction}
               applying={applyFindings.running}
             />
           </div>
