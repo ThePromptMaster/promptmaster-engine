@@ -102,10 +102,15 @@ function evaluateCriterion(
 
     case 'every_item_has_status': {
       const missing = ctx.itemsMissingStatus[stageId] ?? 0;
+      // A table that has not been drafted yet has no rows to be undecided,
+      // and read as "done · ready to move on" while it was still being
+      // written (production pass, 2026-10-01). A drafted table with no rows
+      // is a different thing and stays a valid, finished answer.
+      const drafted = ctx.artifactNonEmpty[stageId] === true;
       return {
         ...base,
-        satisfied: missing === 0,
-        detail: missing === 0 ? undefined : `${missing} still unresolved`,
+        satisfied: drafted && missing === 0,
+        detail: !drafted ? 'nothing drafted yet' : missing === 0 ? undefined : `${missing} still unresolved`,
       };
     }
 

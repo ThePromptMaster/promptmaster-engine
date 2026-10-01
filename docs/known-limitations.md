@@ -430,6 +430,10 @@ deciding; Guided always asks. Fact-check, runs, alternatives and validation tabl
 outcome tables and are never decided by Go; `check_literature` is **not offered** until a retrieval tool is
 connected (B0, 2026-09-28 — before that it was always offered and always blocked, so
 every Research run could walk into "no search tool is connected" and stop there);
+since 2026-10-01 `generate_outline` is offered on whichever stage holds the outline —
+Book's Outline stage, or the drafting stage of a workflow whose outline is derived
+(Research), where it is built from the stages already done with no model call; before
+that a Research run reached Drafting with no move that led to prose;
 since B2b (2026-09-28) Go has the stage's own moves — `generate_outline`,
 `draft_sections`, `revise_sections`, `apply_findings` — performed by the same functions
 the buttons call (`lib/outline/actions.ts`, `lib/jobs/sections.ts`,

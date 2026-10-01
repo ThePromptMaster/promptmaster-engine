@@ -66,7 +66,7 @@ export function allowedActions(
   }
   // B2b: the stage's own work, offered only while its preconditions hold —
   // and never over an existing outline, which is the user's editor.
-  if (stage.renderer === 'outline' && facts.outline && facts.outline.namedSections === 0) keys.push('generate_outline');
+  if (facts.outline && facts.outline.namedSections === 0) keys.push('generate_outline');
   // B3: only the routine rows; a table with none left is the user's.
   if (facts.review && facts.review.routine.length > 0) keys.push('triage_findings');
   if (stage.renderer === 'long_form' && facts.manuscript && facts.manuscript.pendingJobs.length === 0) {

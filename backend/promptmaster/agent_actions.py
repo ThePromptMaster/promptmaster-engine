@@ -4,7 +4,7 @@ A closed list, deliberately. The planner model chooses among these and cannot
 invent a new kind of action; each key maps to exactly one way of being
 performed in the client, and to the execution label that performing it can
 honestly earn. The frontend mirror is frontend/src/lib/agent/actions.ts;
-agent-action-drift.test.ts keeps the two identical.
+actions-drift.test.ts keeps the two identical.
 
 Sean, Sep 10: "For theorem/physics/research work, that next-best-action loop
 might choose among: derive; prove; simplify; test a limiting case; try a
@@ -66,7 +66,8 @@ AGENT_ACTIONS: list[AgentAction] = [
                 important=True),
     # B2b: the stage-specific work the buttons do, as moves (Sean, 28 Sep, item 2).
     AgentAction(key="generate_outline", family="writing", label="Generate the outline",
-                when="The outline stage has no named sections yet. Produces titles and abstracts "
+                when="There is no outline yet — on the outline stage, or on a drafting stage whose "
+                     "outline is built from the stages already done. Produces titles and abstracts "
                      "as a saved outline version for the user to approve or edit."),
     AgentAction(key="draft_sections", family="writing", label="Draft the sections",
                 when="Drafting: the approved outline has sections not yet written. Writes every "

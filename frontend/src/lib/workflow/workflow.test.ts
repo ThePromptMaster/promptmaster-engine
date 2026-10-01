@@ -737,3 +737,21 @@ describe('a left-open stage closed later on different work flags what came after
     expect(state.stages.research.status).toBe('completed_with_artifact');
   });
 });
+
+describe('every_item_has_status needs a drafted table (production pass, 2026-10-01)', () => {
+  const stageId = BOOK_V1.stages.find((s) => s.exit_criteria.some((c) => c.rule?.type === 'every_item_has_status'))!.id;
+  const ctx = (drafted: boolean, missing: number) => ({
+    fields: {}, itemCounts: {}, itemsMissingStatus: { [stageId]: missing }, artifactNonEmpty: { [stageId]: drafted },
+    outlineApproved: true, sections: {}, findings: {}, manualChecks: {},
+  });
+  const rule = (c: ReturnType<typeof ctx>) =>
+    evaluateStage(BOOK_V1, stageId, c).criteria.find((r) => BOOK_V1.stages.find((s) => s.id === stageId)!.exit_criteria.find((x) => x.id === r.id)?.rule?.type === 'every_item_has_status')!;
+
+  it('a table still being drafted is not "every row decided"', () => {
+    expect(rule(ctx(false, 0))).toMatchObject({ satisfied: false, detail: 'nothing drafted yet' });
+  });
+  it('a drafted table with no undecided rows — or no rows at all — is', () => {
+    expect(rule(ctx(true, 0)).satisfied).toBe(true);
+    expect(rule(ctx(true, 2))).toMatchObject({ satisfied: false, detail: '2 still unresolved' });
+  });
+});

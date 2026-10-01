@@ -138,6 +138,13 @@ export function OutlineStagePanel({
   // a version something else wrote — Go mode's outline) is silent, and never
   // replaces a draft the user is typing into.
   const loadedOnce = useRef(false);
+  /**
+   * The working copy is the untouched derivation, not the user's edits. When
+   * a version then appears from elsewhere (Go mode built the same outline),
+   * the copy gives way to it; kept, it read "Unsaved changes" over an
+   * outline the user had never touched.
+   */
+  const seededRef = useRef(false);
   useEffect(() => {
     let live = true;
     const silent = loadedOnce.current;
@@ -149,7 +156,10 @@ export function OutlineStagePanel({
         setArtifact(found);
         setVersions(rows);
         if (silent) {
-          setDraft((current) => current ?? saved);
+          if (seededRef.current && rows.length > 0) {
+            seededRef.current = false;
+            setDraft(saved);
+          } else setDraft((current) => current ?? saved);
           return;
         }
 
@@ -161,6 +171,7 @@ export function OutlineStagePanel({
         const seed = deriveRef.current;
         if (!saved && rows.length === 0 && seed) {
           const items = seed();
+          seededRef.current = items.length > 0;
           setDraft(items.length ? { ...emptyDocument(), items } : null);
         } else {
           setDraft(saved);
@@ -225,6 +236,7 @@ export function OutlineStagePanel({
   /** Persist the working copy. Debounced: typing must not be a write per keystroke. */
   const scheduleDraftSave = useCallback(
     (next: OutlineDocument | null) => {
+      seededRef.current = false;
       if (!artifact) return;
       if (saveTimer.current) clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(() => {

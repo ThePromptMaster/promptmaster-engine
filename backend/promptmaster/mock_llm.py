@@ -223,9 +223,9 @@ def _next_action(system: str, prompt: str) -> dict:
     action not yet tried. Either way it ends on declare_objective_complete, so
     a scripted run always terminates.
     """
-    allowed_block = prompt.split("ALLOWED ACTIONS:", 1)[-1]
+    allowed_block = prompt.split("MOVES AVAILABLE NOW:", 1)[-1]
     allowed = _ALLOWED_LINE.findall(allowed_block)
-    history_block = prompt.split("Moves made so far in this run", 1)[-1].split("ALLOWED ACTIONS:", 1)[0]
+    history_block = prompt.split("Moves made so far in this run", 1)[-1].split("MOVES AVAILABLE NOW:", 1)[0]
     done = _DONE_LINE.findall(history_block)
     plan_match = _PLAN.search(system + "\n" + prompt)
     if plan_match:

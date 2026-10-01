@@ -37,6 +37,17 @@ export type NeedsUser = Need & { onStage?: string };
 
 /** What the run says once the user has done what it asked for, themselves. */
 export const NEED_CLEARED = 'That is done. Press Resume and I will carry on.';
+/**
+ * …and once the project has left the stage the request was about. Nothing
+ * was done: "That is done" over findings the user chose to leave undecided
+ * was simply untrue (production pass, 2026-10-01).
+ */
+export const NEED_MOVED_ON = 'The project has moved on from the stage I was waiting on. Press Resume and I will carry on from here.';
+
+/** Whether a stop reason is one of the two "nothing is asked of you now" notes. */
+export function isClearedNote(reason: string | null | undefined): boolean {
+  return reason === NEED_CLEARED || reason === NEED_MOVED_ON;
+}
 
 /** Moves that change the stage's work; a stage with none left needs the user, not the planner. */
 const REVISE_MOVES = new Set(['revise_stage', 'apply_findings']);

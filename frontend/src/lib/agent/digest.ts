@@ -137,6 +137,13 @@ export function buildAgentState(input: {
       unwritten: sections.map(label).filter((_, i) => !hasText(sections[i])).slice(0, LIST_MAX),
     };
     excerpt = cap(formatManuscript(sections, Number.POSITIVE_INFINITY), MANUSCRIPT_EXCERPT_CHARS);
+    // A drafting stage that also holds the outline (a derived one): until
+    // sections exist, the outline is what there is to see.
+    if (facts?.outline) {
+      const lines = facts.outline.doc.items.map(outlineLine);
+      outline = { sections: lines.slice(0, LIST_MAX), named_count: facts.outline.namedSections, approved: outlineApproved };
+      if (!sections.length && lines.length) excerpt = `The outline, ${outlineApproved ? 'approved' : 'not yet approved'}:\n${lines.join('\n')}`;
+    }
   } else if (!head.trim() && stage.exit_criteria.some((c) => c.rule?.type === 'outline_approved')) {
     // A stage whose work is approving the outline holds nothing of its own.
     // Shown as empty, the planner asked the user to "generate the outline"

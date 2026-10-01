@@ -350,3 +350,22 @@ def test_mock_triage_accepts_every_routine_row(mock_http):
     })
     assert r.status_code == 200, r.text
     assert [d["id"] for d in r.json()["decisions"]] == ["i2", "i3"]
+
+
+def test_planner_is_told_to_speak_to_the_user_in_plain_language():
+    """1 Oct, items 4 and 23: "the action set did not include an action that
+    could create the outline" was the model repeating the prompt's own words."""
+    system, user = build_next_action_prompt(INPUTS, STATE, RESEARCH, "guided")
+    assert "is shown to the user, who is not a developer" in system
+    assert 'Never use the words "artifact", "action set"' in system
+    assert "MOVES AVAILABLE NOW:" in user
+    assert "WHAT THIS STAGE HOLDS NOW" in user
+    for leaked in ("ALLOWED ACTIONS", "STAGE ARTIFACT", "allowed action"):
+        assert leaked not in user
+
+
+def test_a_choice_outside_the_menu_asks_without_naming_the_key():
+    choice = parse_next_action({"action_key": "write_the_outline"}, RESEARCH)
+    assert choice.action_key == "request_user_decision"
+    assert "write_the_outline" not in (choice.decision_question or "")
+    assert "not available here" not in (choice.decision_question or "")

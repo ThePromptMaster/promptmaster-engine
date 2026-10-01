@@ -12,7 +12,7 @@
  * claim against it.
  */
 
-import { loadOutline } from '@/lib/outline/actions';
+import { loadOutline, outlineStageFor } from '@/lib/outline/actions';
 import { countNamedSections, emptyDocument, parseOutlineDocument } from '@/lib/outline/model';
 import { jobBySection, pendingJobs, revisedCount, stoppedSections, type SectionTarget } from '@/lib/jobs/sections';
 import { listProjectJobs, type ProjectJob } from '@/lib/supabase/jobs';
@@ -103,7 +103,11 @@ export async function readStageFacts(input: {
   const events = [...input.events];
   const facts: StageFacts = { outlineApproved: approvedOutlineVersionId(events) !== null };
 
-  if (stage.renderer === 'outline') {
+  // The stage that holds the outline: Book's Outline stage, or the drafting
+  // stage of a workflow whose outline is derived (Research). Reading it only
+  // for the `outline` renderer left Go on a Research drafting stage with no
+  // outline in sight and no move that could make one (1 Oct, item 4).
+  if (outlineStageFor(template)?.id === stage.id) {
     const { artifact, versions, draft } = await loadOutline({ id: project.id, user_id: project.user_id }, stage.id);
     const head = versions.at(-1) ?? null;
     const doc = draft ?? (head ? parseOutlineDocument(head.content) : emptyDocument());
