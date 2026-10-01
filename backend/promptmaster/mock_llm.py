@@ -374,6 +374,11 @@ def _prose_reply(system: str, prompt: str) -> str:
             return "# mock:unavailable\nprint(1)"
         if "[[mock:sandbox=missing]]" in prompt:
             return "import nonexistent_lib\nprint(nonexistent_lib.x)"
+        # With data attached, the scripted code reads it — so a browser test
+        # can see the project's files reach the sandbox.
+        attached = re.search(r"^- (/data/\S+) —", prompt, re.M)
+        if attached:
+            return f"import csv\nrows = list(csv.reader(open('{attached.group(1)}')))\nprint(f\"rows = {{len(rows) - 1}}\")"
         # Fenced on purpose: clean_code must strip it.
         return "```python\nresult = 2 + 2\nprint(f\"2 + 2 = {result}\")\n```"
     if agent._INTERPRET_INSTRUCTION[:60] in system:

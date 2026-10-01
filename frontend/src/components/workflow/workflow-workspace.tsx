@@ -59,6 +59,7 @@ import { revisionBrief } from '@/lib/workflow/revision';
 import { deriveOutlineItems, draftingStageId } from '@/lib/workflow/derived-outline';
 import { OutlineStagePanel } from '@/components/outline/outline-stage-panel';
 import { ProjectBrief, ProjectSetup, stageWantsSetup } from './project-setup';
+import { ProjectData } from './project-data';
 import { draftBindings } from '@/lib/outline/long-form';
 import { approveOutline, loadOutline, materialiseOutlineInto } from '@/lib/outline/actions';
 import type { OutlineDocument } from '@/types/outline';
@@ -1389,6 +1390,8 @@ export function WorkflowWorkspace({
             ) : (
               <ProjectBrief project={project} onPatch={onPatchProject} readOnly={!isEditable} />
             )}
+            {/* On every stage: data is the project's, not a stage's. */}
+            <ProjectData project={project} files={project.data_files ?? []} onChanged={() => onReload?.()} readOnly={project.status === 'finalized'} />
 
             {outlinePanelHere && (
               <div className="mb-6">

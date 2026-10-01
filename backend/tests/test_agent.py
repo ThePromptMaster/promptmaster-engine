@@ -369,3 +369,34 @@ def test_a_choice_outside_the_menu_asks_without_naming_the_key():
     assert choice.action_key == "request_user_decision"
     assert "write_the_outline" not in (choice.decision_question or "")
     assert "not available here" not in (choice.decision_question or "")
+
+
+# --- 1 Oct, items 16 and 17: the project's data reaches the prompts, and only its shape ---
+
+def _state_with_data():
+    from promptmaster.schemas import DataFileBrief
+
+    return STATE.model_copy(update={"data_files": [
+        DataFileBrief(name="accounts.csv", kind="table", columns=["account_id", "plan", "churned"],
+                      sample=[["A1", "Mid-Market", "1"]], rows=1204),
+    ]})
+
+
+def test_the_planner_is_told_what_data_exists_and_when_there_is_none():
+    _, with_data = build_next_action_prompt(INPUTS, _state_with_data(), RESEARCH, "guided")
+    assert "DATA THE PROJECT HOLDS (readable by code you run" in with_data
+    assert "- /data/accounts.csv — 1204 rows; columns: account_id, plan, churned" in with_data
+    assert "e.g. A1 | Mid-Market | 1" in with_data
+    _, without = build_next_action_prompt(INPUTS, STATE, RESEARCH, "guided")
+    assert "DATA THE PROJECT HOLDS: none" in without
+    assert "say what data is missing" in without
+
+
+def test_the_code_writer_is_told_to_read_only_listed_files_and_never_invent_data():
+    from promptmaster.agent import build_write_code_prompt
+
+    system, user = build_write_code_prompt(INPUTS, _state_with_data(), "Churn rate by plan", "computation")
+    assert "Use only files that are listed, by the exact path shown" in system
+    assert "never invent a file, a column or a value" in system
+    assert "pandas is not installed" in system
+    assert "/data/accounts.csv" in user

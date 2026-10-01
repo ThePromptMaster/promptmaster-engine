@@ -32,6 +32,7 @@ import uuid
 from .conversation import _shared_system
 from .llm_client import OpenRouterClient
 from .schemas import (
+    format_data_files,
     GenerateStageArtifactResponse,
     PMInput,
     StageDescriptor,
@@ -172,6 +173,23 @@ def build_stage_prompt(
         f"WHAT THE EARLIER STAGES ESTABLISHED:\n{_format_digest(digest)}",
         "",
         f"STAGE TO PRODUCE: {stage.label or stage.id}",
+    ]
+
+    # What data the project actually holds. Without this a stage planned its
+    # runs as though there were none, and marked every one "not run" with a
+    # dataset attached. The files can be read by code the project runs; they
+    # have not been read by you.
+    data = format_data_files(digest.data_files)
+    parts += [
+        "",
+        (
+            "DATA THE PROJECT HOLDS — files attached by the user, which code run for "
+            "this project can read. You are shown their shape, not their contents: "
+            "do not state any result from them unless it is given to you elsewhere.\n" + data
+        ) if data else (
+            "DATA THE PROJECT HOLDS: none. No dataset or file has been attached. Do "
+            "not write as though any data had been examined."
+        ),
     ]
 
     if digest.manuscript.strip():

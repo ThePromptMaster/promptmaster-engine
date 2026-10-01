@@ -40,6 +40,27 @@ export interface StageDigest {
   prior_stages: StageDigestEntry[];
   /** The drafted chapters; empty for every stage up to and including drafting. */
   manuscript: string;
+  /**
+   * The project's data files, by name, shape and first rows. Without this a
+   * stage planned its runs as though no data existed and marked every one
+   * "not run" with data sitting in the project.
+   */
+  data_files: DataFileBrief[];
+}
+
+/** What a prompt is told about one data file. Never the file. */
+export interface DataFileBrief {
+  name: string;
+  kind: string;
+  columns: string[];
+  sample: string[][];
+  rows: number;
+}
+
+export function dataFileBriefs(project: Pick<Project, 'data_files'>): DataFileBrief[] {
+  return (project.data_files ?? []).map((f) => ({
+    name: f.name, kind: f.preview.kind, columns: f.preview.columns, sample: f.preview.sample, rows: f.preview.rows,
+  }));
 }
 
 /**
@@ -141,7 +162,7 @@ export interface StageArtifactBundle {
 export function buildStageDigest(
   template: WorkflowTemplate,
   state: WorkflowState,
-  project: Pick<Project, 'objective' | 'audience'>,
+  project: Pick<Project, 'objective' | 'audience' | 'data_files'>,
   bundles: Record<string, StageArtifactBundle>,
   upToStageId: string
 ): StageDigest {
@@ -177,5 +198,6 @@ export function buildStageDigest(
     audience: project.audience ?? '',
     prior_stages,
     manuscript: formatManuscript(sections),
+    data_files: dataFileBriefs(project),
   };
 }

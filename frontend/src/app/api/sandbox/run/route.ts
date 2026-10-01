@@ -30,7 +30,7 @@ import { createClient } from '@supabase/supabase-js';
 
 import { createServiceClient } from '@/lib/jobs/supabase-store';
 import { classifyRun, truncate, type RunOutcome } from '@/lib/sandbox/outcome';
-import { MAX_ARTIFACTS, STDERR_MAX, STDOUT_MAX, makeRunner, sandboxMode, type RunResult } from '@/lib/sandbox/runner';
+import { MAX_ARTIFACTS, STDERR_MAX, STDOUT_MAX, makeRunner, sandboxMode, type RunInputFile, type RunResult } from '@/lib/sandbox/runner';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -41,6 +41,9 @@ const COMMAND_TIMEOUT_MS = 30_000;
 const MAX_CODE_CHARS = 40_000;
 const VCPUS = 2;
 const BUCKET = 'sandbox-artifacts';
+const DATA_BUCKET = 'project-files';
+/** All of a project's data files together, as copied into one run. */
+const MAX_DATA_BYTES = 20_000_000;
 
 function num(name: string, fallback: number): number {
   const v = Number((process.env[name] ?? '').trim());
@@ -111,8 +114,29 @@ export async function POST(request: NextRequest) {
     return err(429, `Today's code execution allowance (${dailySeconds}s) is used up. It resets at midnight UTC.`);
   }
 
+  // The project's data files, for /data. Read with the service role, but only
+  // rows of this project and this user — the same pair checked above.
+  const files: RunInputFile[] = [];
+  const dataFiles: { name: string; bytes: number }[] = [];
+  if (enabled()) {
+    const { data: rows } = await service
+      .from('project_files').select('name, path, bytes').eq('project_id', projectId).eq('user_id', userId).order('created_at');
+    let total = 0;
+    for (const row of rows ?? []) {
+      if (total + row.bytes > MAX_DATA_BYTES) break;
+      const { data: blob } = await service.storage.from(DATA_BUCKET).download(row.path);
+      if (!blob) continue;
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+      total += bytes.byteLength;
+      // A name is a file name, never a path out of /data.
+      const name = String(row.name).replace(/[\\/]/g, '_');
+      files.push({ name, bytes });
+      dataFiles.push({ name, bytes: bytes.byteLength });
+    }
+  }
+
   const result: RunResult = enabled()
-    ? await makeRunner().run(code, { timeoutMs: COMMAND_TIMEOUT_MS })
+    ? await makeRunner().run(code, { timeoutMs: COMMAND_TIMEOUT_MS, files })
     : {
         status: 'unavailable', stdout: '', stderr: '', exitCode: null, timedOut: false, durationMs: 0,
         detail: 'code execution is not enabled for this deployment', artifacts: [],
@@ -156,5 +180,5 @@ export async function POST(request: NextRequest) {
   if (insertError) return err(500, 'The run finished but could not be recorded, so it does not count as executed.');
 
   const outcome: RunOutcome = result;
-  return NextResponse.json({ sandbox_run: row, classification: classifyRun(outcome, kind), detail: result.detail ?? null });
+  return NextResponse.json({ sandbox_run: row, classification: classifyRun(outcome, kind), detail: result.detail ?? null, data_files: dataFiles });
 }

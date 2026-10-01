@@ -455,3 +455,21 @@ def test_generated_rows_start_in_the_schemas_default_state(basic_inputs):
 def test_a_client_that_sends_no_statuses_is_parsed_as_before(audience_schema):
     items = _parse_items({"items": [{"who": "a", "status": "accepted"}]}, audience_schema)
     assert items[0].model_dump()["status"] == "accepted"
+
+
+def test_a_stage_is_told_what_data_the_project_holds(basic_inputs, prose_stage):
+    from promptmaster.schemas import DataFileBrief
+
+    digest = StageDigest(objective="o", data_files=[
+        DataFileBrief(name="tickets.csv", columns=["account_id", "opened_at"], sample=[["A1", "2026-01-04"]], rows=88),
+    ])
+    _, user = build_stage_prompt(basic_inputs, prose_stage, digest)
+    assert "DATA THE PROJECT HOLDS — files attached by the user" in user
+    assert "- /data/tickets.csv — 88 rows; columns: account_id, opened_at" in user
+    assert "do not state any result from them unless it is given to you elsewhere" in user
+
+
+def test_a_stage_with_no_data_is_told_there_is_none(basic_inputs, prose_stage):
+    _, user = build_stage_prompt(basic_inputs, prose_stage, StageDigest(objective="o"))
+    assert "DATA THE PROJECT HOLDS: none" in user
+    assert "Do not write as though any data had been examined" in user

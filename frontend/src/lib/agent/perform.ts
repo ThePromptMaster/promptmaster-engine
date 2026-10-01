@@ -231,8 +231,15 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       }
       const { sandbox_run: run, classification } = result;
       const ran = run.exit_code !== null && !run.timed_out && (run.status === 'ok' || run.status === 'error');
+      // What the code had to read is part of what happened (1 Oct, item 16:
+      // "preserve the reason"): the files that were in /data, or that there
+      // were none.
+      const read = result.data_files ?? [];
       const output = [
         classification.summary,
+        read.length
+          ? `Data available to the code: ${read.map((f) => `${f.name} (${f.bytes.toLocaleString()} bytes)`).join(', ')}.`
+          : 'No data files are attached to this project, so the code had none to read.',
         '```python\n' + written.code + '\n```',
         run.stdout ? 'Output:\n```\n' + run.stdout + '\n```' : '',
         run.stderr ? 'Errors:\n```\n' + run.stderr.slice(-1500) + '\n```' : '',

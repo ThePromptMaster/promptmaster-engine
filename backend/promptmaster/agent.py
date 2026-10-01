@@ -29,7 +29,7 @@ from pydantic import BaseModel, Field
 from .agent_actions import ACTION_KEYS, ACTIONS_BY_KEY, AGENT_ACTIONS
 from .conversation import _shared_system
 from .llm_client import OpenRouterClient
-from .schemas import PMInput
+from .schemas import PMInput, DataFileBrief, format_data_files
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +98,8 @@ class AgentState(BaseModel):
     outline: AgentOutline | None = None
     manuscript: AgentManuscript | None = None
     findings: AgentFindings | None = None
+    #: The project's data files, which code run in the sandbox can read at /data.
+    data_files: list[DataFileBrief] = Field(default_factory=list, max_length=10)
     #: Tools the run can call; a move without its tool is not offered.
     tools: dict[str, bool] = Field(default_factory=dict)
 
@@ -179,6 +181,12 @@ def _format_state(inputs: PMInput, state: AgentState) -> str:
             f"{max(f.total - f.triaged, 0)} still undecided"
             + (": " + "; ".join(f.sample) if f.sample else "")
         )
+    data = format_data_files(state.data_files)
+    facts.append(
+        "DATA THE PROJECT HOLDS (readable by code you run, at these paths — you have not seen the contents):\n" + data
+        if data else
+        "DATA THE PROJECT HOLDS: none. A computation that needs real data cannot be run; say what data is missing."
+    )
     if state.tools:
         facts.append("TOOLS: " + ", ".join(f"{k}={'yes' if v else 'no'}" for k, v in sorted(state.tools.items())))
     return "\n".join([
@@ -294,7 +302,13 @@ _WRITE_CODE_INSTRUCTION = (
     "GO MODE — WRITE CODE. Write one self-contained Python 3 script that computes "
     "what is asked. Standard library, numpy, scipy, sympy and matplotlib are "
     "available; nothing else, and no network access. Print every result the "
-    "reader needs, clearly labelled. Save any plot to /out/<name>.png. Return "
+    "reader needs, clearly labelled. Save any plot to /out/<name>.png. "
+    "DATA: the project's files, if any, are listed in the state below with their "
+    "paths under /data, their columns and a few sample rows. Read them with the "
+    "csv or json modules or numpy (pandas is not installed). Use only files that "
+    "are listed, by the exact path shown; never invent a file, a column or a "
+    "value. If the goal needs data that is not listed, write a script that "
+    "prints exactly what is missing and exits, rather than making data up. Return "
     "ONLY the code — no prose, no fences, and never any claimed output: the code "
     "has not been run, and you do not know what it will print."
 )

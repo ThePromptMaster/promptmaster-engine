@@ -120,7 +120,7 @@ The `sessions`, `templates`, `custom_modes`, `user_presets` and `conversation_me
 (pure except `perform.ts`). **Execution labels are derived from what happened, never taken
 from a model**, and the database re-checks them; see `docs/architecture.md` § Go mode. The
 action registry exists twice (TS and Python) and `actions-drift.test.ts` keeps them equal.
-Code runs only through `/api/sandbox/run` (Vercel Sandbox; `SANDBOX_MODE=mock` in E2E).
+Code runs only through `/api/sandbox/run` (Vercel Sandbox; `SANDBOX_MODE=mock` in E2E). A project's data files (`project_files`, uploaded by the browser under RLS) are copied into `/data` for each run; prompts see only each file's columns and first rows, joined onto the project as `project.data_files`.
 
 ## Requirements
 
@@ -155,7 +155,7 @@ A separate LLM call scores three dimensions plus two optional fields (`Evaluatio
 
 ## Supabase Schema
 
-**Phase 2 (current):** `projects`, `artifacts`, `artifact_versions`, `evaluations`, `workflow_templates`, `workflow_events`, `project_stage_events`, `recommendations`, `decisions`, `project_tasks`, `jobs`, `model_usage`, `error_events`.
+**Phase 2 (current):** `projects`, `artifacts`, `artifact_versions`, `evaluations`, `workflow_templates`, `workflow_events`, `project_stage_events`, `recommendations`, `decisions`, `project_tasks`, `jobs`, `model_usage`, `error_events`, `project_files`.
 
 `model_usage` and `error_events` (FR-18/FR-19) are **insert-and-select only** —
 no update or delete policy, because a user who could edit their own usage rows

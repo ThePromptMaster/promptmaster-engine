@@ -26,9 +26,17 @@ export interface RunResult extends RunOutcome {
   artifacts: RunArtifact[];
 }
 
-export interface CodeRunner {
-  run(code: string, opts: { timeoutMs: number }): Promise<RunResult>;
+/** A project data file, placed read-only at /data/<name> before the code runs. */
+export interface RunInputFile {
+  name: string;
+  bytes: Uint8Array;
 }
+
+export interface CodeRunner {
+  run(code: string, opts: { timeoutMs: number; files?: RunInputFile[] }): Promise<RunResult>;
+}
+
+export const DATA_DIR = '/data';
 
 export const STDOUT_MAX = 20_000;
 export const STDERR_MAX = 8_000;
@@ -45,7 +53,7 @@ function unavailable(detail: string, started: number): RunResult {
 }
 
 export class VercelSandboxRunner implements CodeRunner {
-  async run(code: string, { timeoutMs }: { timeoutMs: number }): Promise<RunResult> {
+  async run(code: string, { timeoutMs, files = [] }: { timeoutMs: number; files?: RunInputFile[] }): Promise<RunResult> {
     const started = Date.now();
     let mod: typeof import('@vercel/sandbox');
     try {
@@ -82,7 +90,13 @@ export class VercelSandboxRunner implements CodeRunner {
       await sandbox.updateNetworkPolicy('deny-all');
       await sandbox.runCommand({ cmd: 'mkdir', args: ['-p', '/out'], sudo: true });
       await sandbox.runCommand({ cmd: 'chmod', args: ['777', '/out'], sudo: true });
-      await sandbox.writeFiles([{ path: `${WORKDIR}/main.py`, content: code }]);
+      // The project's data, readable by the code and by nothing outside the VM.
+      await sandbox.runCommand({ cmd: 'mkdir', args: ['-p', DATA_DIR], sudo: true });
+      await sandbox.runCommand({ cmd: 'chmod', args: ['777', DATA_DIR], sudo: true });
+      await sandbox.writeFiles([
+        { path: `${WORKDIR}/main.py`, content: code },
+        ...files.map((f) => ({ path: `${DATA_DIR}/${f.name}`, content: f.bytes })),
+      ]);
 
       const runStarted = Date.now();
       let timedOut = false;
@@ -141,7 +155,8 @@ export function contentTypeFor(name: string): string {
  *   otherwise            → prints each `print(f"… = {…}")` line with a fixed value
  */
 export class MockRunner implements CodeRunner {
-  async run(code: string): Promise<RunResult> {
+  async run(code: string, opts?: { timeoutMs: number; files?: RunInputFile[] }): Promise<RunResult> {
+    const files = opts?.files ?? [];
     if (code.includes('# mock:unavailable') || process.env.SANDBOX_MOCK_UNAVAILABLE === '1') {
       return unavailable('the code sandbox is not enabled for this deployment (mock)', Date.now());
     }
@@ -154,6 +169,14 @@ export class MockRunner implements CodeRunner {
         status: 'error', stdout: '', exitCode: 1, timedOut: false, durationMs: 40, artifacts: [],
         stderr: `Traceback (most recent call last):\n  File "main.py", line 1, in <module>\nModuleNotFoundError: No module named '${missing}'`,
       };
+    }
+    // Code that reads /data is told what was actually put there, so a test
+    // can see the project's files reached the run — or that none did.
+    if (code.includes(DATA_DIR)) {
+      const listing = files.length
+        ? files.map((f) => `${f.name}: ${new TextDecoder().decode(f.bytes).split(/\r?\n/).filter((l) => l.trim()).length - 1} rows`).join('\n')
+        : 'no data files';
+      return { status: 'ok', stdout: `${listing}\n`, stderr: '', exitCode: 0, timedOut: false, durationMs: 150, artifacts: [] };
     }
     return { status: 'ok', stdout: '2 + 2 = 4\n', stderr: '', exitCode: 0, timedOut: false, durationMs: 120, artifacts: [] };
   }

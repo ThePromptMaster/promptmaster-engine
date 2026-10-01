@@ -410,6 +410,33 @@ class StageDigestEntry(BaseModel):
     summary: str = Field(default="", description="A few lines. Not the artifact.")
 
 
+class DataFileBrief(BaseModel):
+    """One data file attached to the project, as a prompt may know it.
+
+    The name, the column names, the first few rows and the row count — computed
+    by the client when the file was attached. The file itself never reaches a
+    model; it is read only by code run in the sandbox, at /data/<name>.
+    """
+    name: str = Field(..., max_length=200)
+    kind: str = Field(default="table")
+    columns: list[str] = Field(default_factory=list, max_length=60)
+    sample: list[list[str]] = Field(default_factory=list, max_length=5)
+    rows: int = Field(default=0)
+
+
+def format_data_files(files: list["DataFileBrief"]) -> str:
+    """The data files as lines a model can write code against. '' when there are none."""
+    if not files:
+        return ""
+    lines = []
+    for f in files[:10]:
+        cols = ", ".join(f.columns[:60]) or "(no columns read)"
+        lines.append(f"- /data/{f.name} — {f.rows} {'lines' if f.kind == 'text' else 'rows'}; columns: {cols}")
+        for row in f.sample[:3]:
+            lines.append("    e.g. " + " | ".join(str(c)[:80] for c in row))
+    return "\n".join(lines)
+
+
 class StageDigest(BaseModel):
     """Everything a stage is allowed to know about the work before it.
 
@@ -427,6 +454,8 @@ class StageDigest(BaseModel):
     audience: str = Field(default="")
     prior_stages: list["StageDigestEntry"] = Field(default_factory=list)
     manuscript: str = Field(default="", max_length=200_000, description="Drafted chapters, bounded by the client.")
+    #: The project's data files; empty when none is attached.
+    data_files: list[DataFileBrief] = Field(default_factory=list, max_length=10)
 
 
 class StageItemField(BaseModel):
