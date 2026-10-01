@@ -432,6 +432,29 @@ export interface StageItemSchemaRequest {
   statuses?: { value: string; label: string; requires_reason: boolean; model_may_set: boolean; model_default: boolean }[];
 }
 
+/** One thing to do about a side-chat answer (POST /api/suggest-actions). */
+export interface ReplyAction {
+  label: string;
+  kind: 'revise' | 'row_updates' | 'add_rows';
+  instruction?: string;
+  updates?: { id: string; status?: string; reason?: string; fields?: Record<string, string> }[];
+  rows?: Record<string, string>[];
+}
+
+export interface SuggestActionsRequest {
+  inputs: PMInput;
+  stage_label: string;
+  question: string;
+  reply: string;
+  table?: {
+    item_label: string;
+    fields: { key: string; label: string }[];
+    statuses: { value: string; label: string; requires_reason: boolean }[];
+    rows: Record<string, string>[];
+  } | null;
+  model?: string;
+}
+
 export interface GenerateStageArtifactRequest {
   inputs: PMInput;
   stage: StageDescriptorRequest;

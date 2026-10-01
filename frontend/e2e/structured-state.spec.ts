@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { createProject, criterion, pressTransition, stageArtifact } from './helpers';
+import { createProject, criterion, pressTransition, serviceSelect, stageArtifact } from './helpers';
 
 /**
  * 1 Oct, items 3, 12 and 18 — what PromptMaster already knows reaches the
@@ -47,4 +47,44 @@ test('recalled works are candidates; a run the draft knows was not run arrives m
   await expect(stageArtifact(page).getByText('Completed', { exact: true })).toHaveCount(0);
   await expect(criterion(page, 'Every planned run has a result or a reason')).toContainText('2 still unresolved');
   await page.screenshot({ path: test.info().outputPath('02-experiment-not-run-prefilled.png'), fullPage: true });
+});
+
+/**
+ * 1 Oct, item 15 — on a table stage the chat answered and then offered
+ * sentence-level prose fixes. It now offers row changes, shown row by row
+ * before they are saved.
+ */
+test('on a table stage a chat answer becomes row changes, reviewed before saving', async ({ page }) => {
+  const id = await createProject(page, { workflow: 'Research', name: 'E2E chat rows', objective: 'Why customers churn' });
+  await expect(stageArtifact(page)).toContainText('Mock', { timeout: 30_000 });
+  await pressTransition(page);
+  await expect(page.getByRole('heading', { name: 'Literature context' })).toBeVisible();
+  const artifact = stageArtifact(page);
+  await expect(artifact).toContainText('Mock work 1', { timeout: 30_000 });
+
+  const chat = page.getByRole('region', { name: 'Side chat' });
+  // A discussion cannot be saved over a table as prose.
+  await chat.getByRole('textbox', { name: 'Ask a question' }).fill('Were any of these actually retrieved?');
+  await chat.getByRole('button', { name: 'Ask' }).click();
+  const act = chat.getByRole('region', { name: 'Act on this reply' });
+  // The scripted model also offers "Rewrite it as prose"; that is refused for a table.
+  await expect(act.getByRole('button')).toHaveText(['Update the first row', 'Add the missing row', 'Do nothing']);
+  await expect(chat.getByRole('button', { name: 'Save this discussion as a new version' })).toHaveCount(0);
+
+  await act.getByRole('button', { name: 'Update the first row' }).click();
+  const review = chat.getByRole('region', { name: 'Review the change' });
+  await expect(review).toContainText('Mock work 1');
+  await expect(review).toContainText('Mock: updated from the chat.');
+  await expect(review).toContainText('Status: Suggested by PromptMaster — not retrieved → Verified by me');
+  await page.screenshot({ path: test.info().outputPath('01-row-change-reviewed.png'), fullPage: true });
+  expect(await serviceSelect('artifact_versions', `project_id=eq.${id}&source_operation=eq.chat_rows&select=id`)).toHaveLength(0);
+
+  await review.getByRole('button', { name: 'Save as a new version (1 row)' }).click();
+  await expect(artifact).toContainText('Mock: updated from the chat.');
+  await expect(artifact.getByRole('listitem')).toHaveCount(3);
+  await expect(artifact.getByRole('combobox').first()).toContainText('Verified by me');
+  await page.screenshot({ path: test.info().outputPath('02-row-change-saved.png'), fullPage: true });
+  const [saved] = await serviceSelect('artifact_versions', `project_id=eq.${id}&source_operation=eq.chat_rows&select=content,change_summary`);
+  expect(saved.change_summary).toBe('From the side chat: Update the first row (1 row).');
+  expect(JSON.parse(saved.content).items[0]).toMatchObject({ status: 'verified', status_source: 'user' });
 });

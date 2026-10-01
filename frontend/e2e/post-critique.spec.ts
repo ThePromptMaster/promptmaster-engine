@@ -165,21 +165,40 @@ test('Discarding a recommendation revision keeps the recommendation pending', as
   await expect(transitionBar(page).getByRole('button', { name: 'Apply the suggested fix' })).toBeVisible();
 });
 
-test('"Buttonize it" in the side chat: a reply\'s suggestions can each be applied', async ({ page }) => {
-  const id = await createProject(page, { workflow: 'Book', name: 'E2E buttonize chat', objective: 'A book about giraffes' });
+test('a side-chat answer ends in a few buttons, not one per sentence (1 Oct, items 13 and 34)', async ({ page }) => {
+  const id = await createProject(page, { workflow: 'Book', name: 'E2E chat actions', objective: 'A book about giraffes' });
   await expect(page.getByText('Mock output').first()).toBeVisible();
   const chat = page.getByRole('region', { name: 'Side chat' });
   await chat.getByRole('textbox', { name: 'Ask a question' }).fill('How could this be better?');
   await chat.getByRole('button', { name: 'Ask' }).click();
 
+  // The scripted answer is a three-point list. It used to become three Apply
+  // rows and "Apply all 3"; it is now the two actions the model names.
   const act = chat.getByRole('region', { name: 'Act on this reply' });
-  await expect(act.getByRole('listitem')).toHaveCount(3);
-  await page.screenshot({ path: test.info().outputPath('01-chat-buttonized.png') });
-  await act.getByRole('checkbox', { name: 'Show the revised version first' }).uncheck();
-  await act.getByRole('button', { name: /^Apply: Mock: replace the abstract/ }).click();
+  await expect(act.getByRole('button')).toHaveText(['Tighten the opening', 'Add the missing example', 'Do nothing']);
+  await expect(chat.getByText(/Apply all \d+ recommended fixes/)).toHaveCount(0);
+  await page.screenshot({ path: test.info().outputPath('01-chat-actions.png') });
 
-  await expect(page.getByRole('button', { name: 'v2' })).toBeVisible();
+  // A change to the draft is shown before it is saved.
+  await act.getByRole('button', { name: 'Tighten the opening' }).click();
+  const preview = page.getByRole('dialog', { name: 'Revised version' });
+  await expect(preview).toBeVisible({ timeout: 30_000 });
+  expect(await versionsOf(id)).toHaveLength(1);
+  await preview.getByRole('button', { name: /^Keep/ }).click();
+  await expect(page.getByRole('button', { name: /^v2/ })).toBeVisible();
   const [, v2] = await versionsOf(id);
-  expect(v2.content).toContain('Applied by the mock: Mock: replace the abstract second paragraph with one example.');
-  expect(v2.content).not.toContain('open with the question');
+  expect(v2.content).toContain('Applied by the mock: Tighten the opening');
+});
+
+test('"Do nothing" puts the buttons away, and an answer that only explained offers none', async ({ page }) => {
+  await createProject(page, { workflow: 'Book', name: 'E2E chat no actions', objective: 'A book about giraffes' });
+  await expect(page.getByText('Mock output').first()).toBeVisible();
+  const chat = page.getByRole('region', { name: 'Side chat' });
+  await chat.getByRole('textbox', { name: 'Ask a question' }).fill('What does this assume? [[mock:no-actions]]');
+  await chat.getByRole('button', { name: 'Ask' }).click();
+  const act = chat.getByRole('region', { name: 'Act on this reply' });
+  await expect(act).toContainText('Nothing here needs changing');
+  await expect(act.getByRole('button')).toHaveText(['Do nothing']);
+  await act.getByRole('button', { name: 'Do nothing' }).click();
+  await expect(act).toHaveCount(0);
 });
