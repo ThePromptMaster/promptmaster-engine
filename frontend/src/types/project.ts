@@ -126,6 +126,8 @@ export interface Artifact {
    * size grows with the number of stages rather than the length of the book.
    */
   summary: string | null;
+  /** The figures this stage established, and the version they were read from (see lib/workflow/figures.ts). */
+  key_figures?: { version_id?: string; figures?: { name: string; value: string; context: string }[] } | null;
   current_version_id: string | null;
   version_count: number;
   long_form: LongFormState | null;

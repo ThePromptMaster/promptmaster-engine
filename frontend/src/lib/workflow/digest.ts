@@ -46,6 +46,8 @@ export interface StageDigest {
    * "not run" with data sitting in the project.
    */
   data_files: DataFileBrief[];
+  /** Figures earlier stages established, to be quoted rather than worked out again. */
+  figures: { stage: string; name: string; value: string; context: string }[];
 }
 
 /** What a prompt is told about one data file. Never the file. */
@@ -199,5 +201,30 @@ export function buildStageDigest(
     prior_stages,
     manuscript: formatManuscript(sections),
     data_files: dataFileBriefs(project),
+    figures: establishedFigures(template, state, bundles, upToStageId),
   };
+}
+
+/**
+ * The figures stages before this one established. Kept here, beside the
+ * digest that carries them; lib/workflow/figures.ts holds how they are read
+ * and stored. Only done stages, and only figures still about the head version.
+ */
+export function establishedFigures(
+  template: WorkflowTemplate,
+  state: WorkflowState,
+  bundles: Record<string, StageArtifactBundle>,
+  upToStageId: string
+): StageDigest['figures'] {
+  const cutoff = template.stages.findIndex((s) => s.id === upToStageId);
+  const out: StageDigest['figures'] = [];
+  template.stages.forEach((stage, index) => {
+    if (cutoff >= 0 && index >= cutoff) return;
+    if (!isDone(state.stages[stage.id]?.status)) return;
+    const bundle = bundles[stage.id];
+    const stored = bundle?.artifact?.key_figures;
+    if (!stored?.figures?.length || stored.version_id !== bundle?.versions.at(-1)?.id) return;
+    for (const f of stored.figures) out.push({ stage: stage.label, name: f.name, value: f.value, context: f.context ?? '' });
+  });
+  return out.slice(0, 60);
 }

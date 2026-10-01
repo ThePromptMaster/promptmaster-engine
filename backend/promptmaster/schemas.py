@@ -437,6 +437,14 @@ def format_data_files(files: list["DataFileBrief"]) -> str:
     return "\n".join(lines)
 
 
+class EstablishedFigure(BaseModel):
+    """One figure an earlier, completed stage established."""
+    stage: str = Field(default="", description="The stage's label.")
+    name: str = Field(default="", max_length=120)
+    value: str = Field(default="", max_length=60)
+    context: str = Field(default="", max_length=200)
+
+
 class StageDigest(BaseModel):
     """Everything a stage is allowed to know about the work before it.
 
@@ -456,6 +464,8 @@ class StageDigest(BaseModel):
     manuscript: str = Field(default="", max_length=200_000, description="Drafted chapters, bounded by the client.")
     #: The project's data files; empty when none is attached.
     data_files: list[DataFileBrief] = Field(default_factory=list, max_length=10)
+    #: Figures earlier stages established, each exactly as that stage wrote it.
+    figures: list["EstablishedFigure"] = Field(default_factory=list, max_length=60)
 
 
 class StageItemField(BaseModel):

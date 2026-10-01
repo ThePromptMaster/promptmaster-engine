@@ -500,6 +500,24 @@ PromptMaster", when the draft already knows it could not be executed. **Complete
 Alternatives and validation tables allow none. Rows in versions saved before this change
 are untouched.
 
+### L-C8 — Established figures: quoted, not checked (2026-10-01)
+
+When a stage is completed, its figures are read out of its own text once
+(`POST /api/extract-figures`) and stored on its artifact (`artifacts.key_figures`) with the
+version they came from. A value is kept only if the stage's text contains it character
+for character, so the list cannot hold a number the model computed, rounded or invented.
+Later stages are handed the list and told to use those exact values and to state any
+disagreement as a discrepancy. What this is **not**: a check. Nothing compares a later
+stage's numbers with the list after it is written, so a model can still ignore the
+instruction; and nothing judges whether the earlier figure was right. Figures come only
+from stages that are *done* and only while they are about the stage's head version — a
+stage left open contributes none, and one edited after completion drops out until it is
+completed again. Long-form stages (the drafted sections) are not read for figures. The
+call is skipped when the text has no digits, costs one small model call otherwise, and
+is given 12 seconds; if it fails or runs out, the stage completes without figures.
+Sandbox output is not added to the list directly; it reaches it when the stage that
+reports it is completed.
+
 ### L-C4 — Fact-check: nothing is verified by PromptMaster
 
 The claim table's states are provenance first, decision second (C3, 2026-09-29). PromptMaster

@@ -207,3 +207,35 @@ describe('the manuscript in the digest', () => {
     expect(text.match(/omitted to fit the review budget/g)).toHaveLength(10);
   });
 });
+
+describe('establishedFigures: what later stages are told to quote (1 Oct, item 32)', () => {
+  const version = (id: string) => ({ id, content: 'x' }) as never;
+  const bundle = (versionId: string, figuresFor: string) => ({
+    artifact: { id: 'a', key_figures: { version_id: figuresFor, figures: [{ name: 'Churn after', value: '9.4%', context: '' }] } } as never,
+    versions: [version('v1'), version(versionId)],
+  });
+  const done = { status: 'complete' as const };
+
+  it('passes on a done stage\'s figures, with the stage they came from', async () => {
+    const { establishedFigures } = await import('./digest');
+    const { BOOK_V1 } = await import('./templates/book.v1');
+    const state = { current_stage_id: 'positioning', project_status: 'active', stages: { objective: done, audience: done } } as never;
+    const figures = establishedFigures(BOOK_V1, state, { objective: bundle('v2', 'v2') }, 'positioning');
+    expect(figures).toEqual([{ stage: 'Objective and purpose', name: 'Churn after', value: '9.4%', context: '' }]);
+  });
+
+  it('drops figures read from a version that is no longer the head, and stages that are not done', async () => {
+    const { establishedFigures } = await import('./digest');
+    const { BOOK_V1 } = await import('./templates/book.v1');
+    const state = { current_stage_id: 'positioning', project_status: 'active', stages: { objective: done, audience: { status: 'in_progress', left_open: true } } } as never;
+    expect(establishedFigures(BOOK_V1, state, { objective: bundle('v3', 'v2') }, 'positioning')).toEqual([]);
+    expect(establishedFigures(BOOK_V1, state, { audience: bundle('v2', 'v2') }, 'positioning')).toEqual([]);
+  });
+
+  it('never passes a stage its own figures or a later stage\'s', async () => {
+    const { establishedFigures } = await import('./digest');
+    const { BOOK_V1 } = await import('./templates/book.v1');
+    const state = { current_stage_id: 'objective', project_status: 'active', stages: { objective: done, audience: done } } as never;
+    expect(establishedFigures(BOOK_V1, state, { objective: bundle('v2', 'v2'), audience: bundle('v2', 'v2') }, 'objective')).toEqual([]);
+  });
+});

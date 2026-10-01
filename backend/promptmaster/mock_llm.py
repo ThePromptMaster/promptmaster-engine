@@ -324,6 +324,17 @@ def _json_reply(system: str, prompt: str) -> dict:
             {"label": "Tighten the opening", "kind": "revise", "instruction": f"Mock: shorten the first paragraph.{clash}"},
             {"label": "Add the missing example.", "kind": "revise", "instruction": "Mock: add one concrete example."},
         ]}
+    from promptmaster import figures
+
+    if system.startswith(figures.FIGURES_SYSTEM[:60]):
+        # Every percentage in the text, plus one value that is NOT in it — the
+        # parser must drop that one.
+        text = prompt.split("--- THE TEXT ---", 1)[-1]
+        found = re.findall(r"\d+(?:\.\d+)?%", text)
+        return {"figures": [
+            *[{"name": f"Mock rate {n + 1}", "value": v, "context": "scripted"} for n, v in enumerate(dict.fromkeys(found))],
+            {"name": "Mock invented figure", "value": "99.9%", "context": "not in the text"},
+        ]}
     if agent._TRIAGE_INSTRUCTION[:60] in system:
         ids = re.findall(r"^- id=([^:]+):", prompt.split("FINDINGS TO DECIDE:", 1)[-1], re.M)
         return {"decisions": [{"id": i, "status": "accepted", "reason": "Mock: routine, accepted."} for i in ids]}

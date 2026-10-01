@@ -3,7 +3,7 @@ import type { Artifact, ArtifactVersion, Evaluation } from '@/types/project';
 import type { AuditFinding } from '@/types';
 
 const ARTIFACT_COLUMNS = `
-  id, user_id, project_id, kind, name, stage_id, summary, current_version_id,
+  id, user_id, project_id, kind, name, stage_id, summary, key_figures, current_version_id,
   version_count, long_form, outline_draft, revision, created_at, updated_at
 `;
 
@@ -91,6 +91,16 @@ export async function saveArtifactSummary(
     .from('artifacts')
     .update({ summary })
     .eq('id', artifactId);
+  if (error) throw error;
+}
+
+/** The figures a completed stage established, with the version they were read from. */
+export async function saveArtifactFigures(
+  artifactId: string,
+  figures: { version_id: string; figures: { name: string; value: string; context: string }[] }
+): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.from('artifacts').update({ key_figures: figures }).eq('id', artifactId);
   if (error) throw error;
 }
 

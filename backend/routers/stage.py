@@ -25,6 +25,7 @@ from promptmaster.schemas import (
     StageEvaluationResponse,
     StageItemSchema,
 )
+from promptmaster.figures import Figure, extract_figures
 from promptmaster.stage import generate_stage_artifact
 from routers._errors import llm_http_error
 from promptmaster.stage_evaluation import evaluate_stage_artifact
@@ -129,3 +130,28 @@ async def api_evaluate_stage_artifact(
         raise llm_http_error(e, PRESERVED_EVALUATION)
     result.model_used = _model_used(req.model, client)
     return result
+
+
+class ExtractFiguresRequest(BaseModel):
+    stage_label: str = ""
+    content: str = Field(min_length=1, max_length=400_000)
+    model: str = ""
+
+
+class ExtractFiguresResponse(BaseModel):
+    figures: list[Figure]
+
+
+@router.post("/extract-figures")
+async def api_extract_figures(
+    req: ExtractFiguresRequest,
+    client: OpenRouterClient = Depends(get_client),
+) -> ExtractFiguresResponse:
+    """The figures a finished stage established, each exactly as written. One
+    small JSON call; a value that is not in the text is dropped. Never a gate:
+    the client calls it when a stage completes and carries on if it fails."""
+    try:
+        figures = await extract_figures(client, req.model or None, req.stage_label, req.content)
+    except OpenRouterError as e:
+        raise llm_http_error(e, PRESERVED_STAGE_VERSIONS)
+    return ExtractFiguresResponse(figures=figures)
