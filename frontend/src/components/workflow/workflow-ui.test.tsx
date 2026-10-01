@@ -513,6 +513,16 @@ describe('the finished screen puts the work at the centre (C4, Sean 28 Sep item 
     expect(onEdit).toHaveBeenCalled();
   });
 
+  it('offers to start a new version, and says so when the finished one could not be kept', async () => {
+    const onNewVersion = vi.fn().mockRejectedValueOnce(new Error('The finished work could not be kept as a version, so nothing was reopened.')).mockResolvedValue(undefined);
+    render(<ProjectFinished bundle={bundle('One two three.')} completion={summary} onReopen={vi.fn()} onNewVersion={onNewVersion} />);
+    expect(screen.getByText(/keeps this work in the version history/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Start a new version' }));
+    expect(await screen.findByText(/could not be kept as a version/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Start a new version' }));
+    expect(onNewVersion).toHaveBeenCalledTimes(2);
+  });
+
   it('with nothing written, offers only to continue', () => {
     const onReopen = vi.fn();
     render(<ProjectFinished bundle={bundle('')} completion={summary} onReopen={onReopen} />);

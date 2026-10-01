@@ -530,7 +530,7 @@ export function useGoLoop(opts: Options) {
       const created = await createAgentRun({
         projectId: o.project.id, userId: o.project.user_id, policy: prev.policy,
         authorizationId: prev.authorization_id, budgetSteps: prev.budget_steps, leaseHolder: tabId.current,
-        continuesRunId: prev.id,
+        continuesRunId: prev.id, autoContinued: auto,
       });
       if (prev.authorization_id) {
         const windows = priorStepsRef.current.length ? 2 + Math.floor(priorStepsRef.current.length / Math.max(1, prev.budget_steps)) : 2;
@@ -551,7 +551,10 @@ export function useGoLoop(opts: Options) {
       sinceRef.current = 0;
       void loop();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not continue Go mode.');
+      // A window the loop tried to start itself and the database refused is
+      // not an error to show: the used-up window's own card asks for the click.
+      if (auto) autoLeftRef.current = 0;
+      else setError(e instanceof Error ? e.message : 'Could not continue Go mode.');
     }
   }, [commitRun, commitSteps, loop]);
   continueRef.current = continueRun;

@@ -26,6 +26,8 @@ export async function createAgentRun(args: {
   leaseHolder: string;
   /** The used-up run this one continues (B4). */
   continuesRunId?: string | null;
+  /** The loop started this window itself; the database counts these against the authorization. */
+  autoContinued?: boolean;
 }): Promise<AgentRun> {
   const { data, error } = await createClient()
     .from('agent_runs')
@@ -38,6 +40,7 @@ export async function createAgentRun(args: {
       lease_holder: args.leaseHolder,
       heartbeat_at: new Date().toISOString(),
       continues_run_id: args.continuesRunId ?? null,
+      ...(args.autoContinued ? { auto_continued: true } : {}),
     })
     .select('*')
     .single();

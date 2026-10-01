@@ -68,55 +68,89 @@ Public — no credential required:
 | GET | `/api/modes` | Static mode data from `promptmaster/modes.py`; the marketing page reads it. |
 
 Authenticated. Status was determined by finding the call sites of each `api.*` method
-in `frontend/src/` on this branch, not from memory. **Live** = something calls it.
-**Dormant** = the endpoint exists and is authenticated, but nothing calls it.
+in `frontend/src/` (last done 2026-10-01, on the branch that added this sentence), not
+from memory. **Live** = something calls it. **Dormant** = the endpoint exists and is
+authenticated, but nothing calls it.
+
+Stage work:
 
 | Method | Path | `api` method | Router | Status |
 |---|---|---|---|---|
-| POST | `/api/generate-stage-artifact` | `generateStageArtifact` | `stage.py` | **Live** — **one** LLM call, deliberately not the full pipeline |
+| POST | `/api/generate-stage-artifact` | `generateStageArtifact` | `stage.py` | **Live** — **one** LLM call, deliberately not the full pipeline. The request carries the item schema's statuses and which of them the model may set; anything else it returns is dropped |
 | POST | `/api/evaluate-stage-artifact` | `evaluateStageArtifact` | `stage.py` | **Live** |
-| POST | `/api/generate-outline` | `generateOutline` | `long_form.py` | **Live** |
-| POST | `/api/chat-message` | `chatMessage` | `conversation.py` | **Live** |
-| POST | `/api/apply-to-answer` | `applyToAnswer` | `conversation.py` | **Live** |
-| POST | `/api/export-session` | `exportSession` | `engine.py` | **Live** |
+| POST | `/api/extract-figures` | `extractFigures` | `stage.py` | **Live** — called once when a stage is completed. Returns `{figures: [{name, value, context}]}`; a value is kept only if the stage's text contains it verbatim (`promptmaster/figures.py`) |
 | POST | `/api/apply-recommendations` | `applyRecommendations` | `audit.py` | **Live** — FR-09, one call for a multi-select apply |
+| POST | `/api/check-conflicts` | `checkConflicts` | `conflicts.py` | **Live** — one JSON call per instruction (side chat, reply action buttons, Go's revisions); returns only conflicts with things actually listed |
+| POST | `/api/flow-trigger` | `flowTrigger` | `engine.py` | **Live** — Refine, Realign, Challenge, Reframe, Self-audit from the stage's More menu |
+| POST | `/api/continue-document` | `continueDocument` | `continuation.py` | **Live** — "Continue writing" on a draft that was cut off |
+| POST | `/api/export-session` | `exportSession` | `engine.py` | **Live** |
+
+Side chat:
+
+| Method | Path | `api` method | Router | Status |
+|---|---|---|---|---|
+| POST | `/api/chat-message` | `chatMessage` | `conversation.py` | **Live** |
+| POST | `/api/suggest-actions` | `suggestActions` | `conversation.py` | **Live** — given a chat reply and the stage, returns at most four actions `{label, kind: revise \| row_updates \| add_rows, …}`; "Do nothing" is added by the client. Prompt in `promptmaster/reply_actions.py` |
+| POST | `/api/apply-to-answer` | `applyToAnswer` | `conversation.py` | **Live** |
+| POST | `/api/save-as-new-version` | `saveAsNewVersion` | `conversation.py` | **Live** |
+
+Outline and long-form:
+
+| Method | Path | `api` method | Router | Status |
+|---|---|---|---|---|
+| POST | `/api/generate-outline` | `generateOutline` | `long_form.py` | **Live** |
 | POST | `/api/generate-section-prose` | *(not in `client.ts`)* | `long_form.py` | **Live — worker only**, via `lib/jobs/generator.ts` |
 | POST | `/api/extract-section-record` | *(not in `client.ts`)* | `long_form.py` | **Live — worker only**, via `lib/jobs/generator.ts` |
-| GET | `/api/models` | `getModels` | `meta.py` | Dormant — but note it carries its own `Depends(require_user)` inside the otherwise-public meta router, because it proxies OpenRouter and is billable |
-| GET | `/api/modes` | `getModes` | `meta.py` | Dormant — **and public** |
-| POST | `/api/generate-section` | `generateSection` | `long_form.py` | Dormant — superseded by the two worker calls above |
-| POST | `/api/finalize-long-form` | `finalizeLongForm` | `long_form.py` | Dormant |
-| POST | `/api/detect-long-form` | `detectLongForm` | `long_form.py` | Dormant |
-| POST | `/api/generate-setup` | `generateSetup` | `setup.py` | Dormant |
-| POST | `/api/save-as-new-version` | `saveAsNewVersion` | `conversation.py` | Dormant |
-| POST | `/api/build-prompt` | `buildPrompt` | `engine.py` | Dormant |
-| POST | `/api/run-iteration` | `runIteration` | `engine.py` | Dormant |
-| POST | `/api/flow-trigger` | `flowTrigger` | `engine.py` | Dormant |
-| POST | `/api/flow-inspect` | `flowInspect` | `engine.py` | Dormant |
-| POST | `/api/build-realignment` | `buildRealignment` | `engine.py` | Dormant |
-| POST | `/api/run-self-audit` | `runSelfAudit` | `engine.py` | Dormant |
-| POST | `/api/hard-reset-lessons` | `hardResetLessons` | `engine.py` | Dormant |
-| POST | `/api/format-summary` | `formatSummary` | `engine.py` | Dormant |
-| POST | `/api/continue-document` | `continueDocument` | `continuation.py` | Dormant |
-| POST | `/api/audit-findings` | `auditFindings` | `audit.py` | Dormant |
-| POST | `/api/apply-audit` | `applyAudit` | `audit.py` | Dormant |
-| POST | `/api/check-conflicts` | `checkConflicts` | `conflicts.py` | **Live** — PM-24: one JSON call per side-chat instruction; returns only conflicts with things actually listed (objective, constraints, prior decisions, pending instructions) |
-| GET | `/api/agent/actions` | *(B4)* | `agent.py` | Dormant until B4 — the Go mode action registry |
-| POST | `/api/agent/next-action` | *(B4)* | `agent.py` | Dormant until B4 — chooses ONE move from `allowed_actions`; anything else becomes `request_user_decision` |
-| POST | `/api/agent/reason` | *(B4)* | `agent.py` | Dormant until B4 — performs a reasoning move (label `discussed`); 422 for non-reasoning actions |
-| POST | `/api/agent/write-code` | *(B4)* | `agent.py` | Dormant until B4 — code only, never claimed output (label `code_written`) |
-| POST | `/api/agent/interpret-result` | *(B4)* | `agent.py` | Dormant until B4 — takes the real stdout/stderr/exit code from a `sandbox_runs` row (label `result_interpreted`) |
+| POST | `/api/estimate-job` | `estimateJob` | `usage.py` | **Live** — the cost estimate shown before a large drafting run |
 
-Seven of twenty-five browser-facing endpoints are live. That is a consequence of
-retiring `/session` without deleting its server side, which was the right call — but
-it means the API surface is much larger than the product.
+Project setup:
+
+| Method | Path | `api` method | Router | Status |
+|---|---|---|---|---|
+| POST | `/api/generate-setup` | `generateSetup` | `setup.py` | **Live** |
+| POST | `/api/guide-next-question` | `guideNextQuestion` | `setup.py` | **Live** — "Guide me": takes the objective and the questions answered so far, returns `{enough, question, reason}` — one question at a time, or `enough: true` |
+| GET | `/api/models` | `getModels` | `meta.py` | **Live** — carries its own `Depends(require_user)` inside the otherwise-public meta router, because it proxies OpenRouter and is billable |
+
+Go mode (the loop itself runs in the browser; see [`architecture.md`](architecture.md) § Go mode):
+
+| Method | Path | `api` method | Router | Status |
+|---|---|---|---|---|
+| POST | `/api/agent/next-action` | `agentNextAction` | `agent.py` | **Live** — chooses ONE move from `allowed_actions`; anything else becomes `request_user_decision` |
+| POST | `/api/agent/reason` | `agentReason` | `agent.py` | **Live** — performs a reasoning move (label `discussed`); 422 for non-reasoning actions |
+| POST | `/api/agent/write-code` | `agentWriteCode` | `agent.py` | **Live** — code only, never claimed output (label `code_written`). Told the project's data files by name, columns and first rows |
+| POST | `/api/agent/interpret-result` | `agentInterpretResult` | `agent.py` | **Live** — takes the real stdout/stderr/exit code from a `sandbox_runs` row (label `result_interpreted`) |
+| POST | `/api/agent/triage` | `agentTriage` | `agent.py` | **Live** — decides a review table's routine findings |
+| POST | `/api/agent/literature` | `agentLiterature` | `agent.py` | **Live** — no model. Takes up to 20 `{id, work}`; searches OpenAlex by title and returns `{matches: [{id, found, title, authors, year, doi, url, note}]}`. A match needs 80% of the title's words and a year within one (`promptmaster/literature.py`). Used by "Look up these works" and Go's `check_literature` |
+| GET | `/api/agent/actions` | *(none)* | `agent.py` | Dormant — the registry is mirrored in TypeScript and `actions-drift.test.ts` keeps the two equal |
+
+Dormant — the retired `/session` flow's server side, kept on purpose:
+
+| Method | Path | `api` method | Router |
+|---|---|---|---|
+| GET | `/api/modes` | `getModes` | `meta.py` — **public** |
+| POST | `/api/guide-questions` | `guideQuestions` | `setup.py` — the batch form `guide-next-question` replaced |
+| POST | `/api/generate-section` | `generateSection` | `long_form.py` — superseded by the two worker calls |
+| POST | `/api/finalize-long-form` | `finalizeLongForm` | `long_form.py` |
+| POST | `/api/detect-long-form` | `detectLongForm` | `long_form.py` |
+| POST | `/api/build-prompt` | `buildPrompt` | `engine.py` |
+| POST | `/api/run-iteration` | `runIteration` | `engine.py` |
+| POST | `/api/flow-inspect` | `flowInspect` | `engine.py` |
+| POST | `/api/build-realignment` | `buildRealignment` | `engine.py` |
+| POST | `/api/run-self-audit` | `runSelfAudit` | `engine.py` |
+| POST | `/api/hard-reset-lessons` | `hardResetLessons` | `engine.py` |
+| POST | `/api/format-summary` | `formatSummary` | `engine.py` |
+| POST | `/api/audit-findings` | `auditFindings` | `audit.py` |
+| POST | `/api/apply-audit` | `applyAudit` | `audit.py` |
+
+Twenty-five of the forty endpoints above are live. The rest are a consequence of retiring
+`/session` without deleting its server side, which was the right call — but it means
+the API surface is larger than the product.
 
 Dormant endpoints are still authenticated and still billable against the OpenRouter
 key. They are not a security hole — a caller must be a signed-in user — but they are
 cost surface. See [`known-limitations.md`](known-limitations.md).
 
-`GET /api/modes` is public and has no caller. `CLAUDE.md` says the marketing page
-reads it; on this branch nothing does.
+`GET /api/modes` is public and has no caller.
 
 ### Request/response contract
 
@@ -130,8 +164,13 @@ your code are validated, not raw.
 
 ## 3. Worker boundary
 
-`POST` (and `GET`) `/api/jobs/drain` on the Next.js deployment. This is the only
-server route in the frontend project. Full description in [`jobs.md`](jobs.md).
+`POST` (and `GET`) `/api/jobs/drain` on the Next.js deployment. Full description in
+[`jobs.md`](jobs.md). The frontend project has two other server routes, each there for
+the same reason — it writes or reads with the service role, which the backend never
+holds: `POST /api/sandbox/run` (runs model-written code in a Vercel Sandbox with the
+project's data files at `/data`, and writes the `sandbox_runs` row that makes an
+execution label honest; the user's JWT, with the project, run and step re-checked
+against it) and `GET /api/admin/overview` (FR-18/FR-19; `ADMIN_USER_IDS`).
 
 Authorisation accepts either credential:
 

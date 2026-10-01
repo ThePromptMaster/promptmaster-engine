@@ -432,10 +432,14 @@ more steps", which starts a new run chained by `continues_run_id` under the same
 authorization with a further `decisions` row; the chain is the project-level loop. Since
 2026-10-01 an **Autonomous** authorization may name up to three further windows the run
 starts on its own; each is still a new run with its own `decisions` row
-(`metadata.auto = true`). That allowance is enforced **in the browser**, not by the
-database: the run guard checks only that a continuation follows a used-up window under
-the same authorization, so the number of windows is a promise the client keeps, recorded
-but not policed. It is also forgotten on reload (a reloaded run asks before its next
+(`metadata.auto = true`). Since 20261010000000 the database counts them: such a window is
+inserted with `agent_runs.auto_continued = true`, and the run guard refuses one once the
+chain already holds as many consecutive self-started windows as the authorization's
+`auto_continue_windows` allows (never more than three, whatever the authorization says);
+a window the user clicks is unmarked and starts the count again. What the guard cannot do
+is tell a click from a client that leaves the mark off — the row is written by the user's
+own session, so this holds the loop to its terms rather than defending the user against
+their own browser. It is also forgotten on reload (a reloaded run asks before its next
 window), and it still needs the tab open — a run that survives a closed tab is not
 built. Also since 2026-10-01 the planner is given **what the project has already
 decided** (`lib/agent/memory.ts`: skips and overrides with their reasons, reopenings,
@@ -470,7 +474,8 @@ cursor) and a step whose change is not found is recorded as failed. If that read
 itself fails, the step keeps its status with "Not confirmed" appended rather than being
 failed on a guess. What stays the user's: approving an outline, unblocking a stage,
 ticking a manual requirement, deciding on findings; Go stops and says so (the inline
-"I need you to…" card is B4; a card with no button of its own leaves Resume in place —
+"I need you to…" card is B4; a request settled row by row — findings, claims, runs — has
+"Go to the table", which only brings the rows into view, and leaves Resume in place —
 until 2026-09-29 every card hid it, and a run stopped for material findings could not
 be continued at all). A stage with nothing to cite — Outline approval has no artifact —
 is completed by a move the user approved (Guided, Checkpoint, or an approved Autonomous

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 
 import { actionLabel } from '@/lib/agent/actions';
-import { describeNeed, isClearedNote } from '@/lib/agent/needs';
+import { describeNeed, isClearedNote, needIsDecidedOnStage } from '@/lib/agent/needs';
 import type { useGoLoop } from '../use-go-loop';
 import { AuthorizationDialog } from './authorization-dialog';
 import { DecisionPrompt, QuestionPrompt } from './decision-prompt';
@@ -25,6 +25,8 @@ export interface NeedsActions {
   tick: (criterionId: string) => Promise<void>;
   /** Skip the current stage, with the reason given. */
   skip?: (reason: string) => Promise<void>;
+  /** Bring the stage's table into view, at the first row still to decide. */
+  showTable?: () => void;
 }
 
 export function GoPanel({
@@ -89,6 +91,11 @@ export function GoPanel({
       case 'large_job':
         await go.acknowledgeLargeJob(need.sections);
         return;
+      case 'decide_rows':
+      case 'triage_findings':
+        // The rows are the user's to decide one by one; the button only takes them there.
+        needsActions?.showTable?.();
+        return;
       default:
         return;
     }
@@ -125,7 +132,8 @@ export function GoPanel({
             canContinue={canContinue}
             disabled={go.phase === 'watching' || Boolean(go.pendingStep) || Boolean(go.authorizing)}
             // A suggestion to skip has two answers: the card's button, or Resume to do the stage.
-            hideResume={Boolean(need && need.kind !== 'skip_stage' && needsActions && describeNeed(need, go.stageLabelFor).action)}
+            // A table's button only shows the way, so Resume stays beside it.
+            hideResume={Boolean(need && need.kind !== 'skip_stage' && !needIsDecidedOnStage(need) && needsActions && describeNeed(need, go.stageLabelFor).action)}
           />
           {need && <NeedsYouCard key={`${need.kind}:${go.run?.id}`} need={need} stageLabel={go.stageLabelFor} onAction={act} />}
           {go.phase === 'watching' && (

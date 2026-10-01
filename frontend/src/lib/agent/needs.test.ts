@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { BOOK_V1 } from '@/lib/workflow/templates/book.v1';
 import { initialState, projectState } from '@/lib/workflow/engine';
 import type { StageEvaluation, WorkflowEvent } from '@/lib/workflow/types';
-import { describeNeed, needStillHolds, needsUser, type NeedsUser } from './needs';
+import { describeNeed, needIsDecidedOnStage, needStillHolds, needsUser, type NeedsUser } from './needs';
 
 const stage = (id: string) => BOOK_V1.stages.find((s) => s.id === id)!;
 const evaluation = (id: string, unmet: StageEvaluation['unmet'] = []): StageEvaluation => ({ stageId: id, canAdvance: unmet.every((c) => !c.blocking), criteria: [], unmet });
@@ -92,7 +92,7 @@ describe('B3: the findings that change the work are the user\'s', () => {
   it('with only material rows left, the user is asked, with no button — the table is the control', () => {
     const need = needsUser({ ...base, stage: stage('continuity'), facts: review(0, 2), stageEvaluation: evaluation('continuity'), allowed: ['advance_stage'] });
     expect(need).toEqual({ kind: 'triage_findings', stageId: 'continuity', count: 2 });
-    expect(describeNeed(need!, label)).toEqual({ message: '2 findings would change the work, so they need your decision. Decide in the table below.', action: null });
+    expect(describeNeed(need!, label)).toEqual({ message: '2 findings would change the work, so they need your decision. Decide in the table below.', action: 'Go to the table' });
   });
 
   it('a fully decided table needs nothing', () => {
@@ -111,8 +111,11 @@ describe('needsUser: an outcome table is the user\'s to decide (production pass,
     expect(need).toEqual({ kind: 'decide_rows', stageId: 'fact_check', count: 2, itemLabel: 'claim' });
     expect(describeNeed(need!, label)).toEqual({
       message: '2 claims are waiting for your decision — only you can settle them. Decide in the table below.',
-      action: null,
+      // The button takes the user to the rows; deciding them stays theirs.
+      action: 'Go to the table',
     });
+    expect(needIsDecidedOnStage(need!)).toBe(true);
+    expect(needIsDecidedOnStage({ kind: 'tick_criterion' })).toBe(false);
   });
 });
 
