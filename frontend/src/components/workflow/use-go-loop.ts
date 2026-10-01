@@ -41,7 +41,7 @@ import { requestProjectCancel } from '@/lib/supabase/jobs';
 import { authorizeRun } from '@/lib/agent/authorize';
 import { buildAgentState } from '@/lib/agent/digest';
 import { performStep, type PerformContext, type StepOutcome } from '@/lib/agent/perform';
-import { allowedActions, withoutOverride, DEFAULT_BUDGET_STEPS, fitsBudget, plannedBeforeLatestChange, preempt, shouldPause, stepCost } from '@/lib/agent/policy';
+import { allowedActions, LIVE_TOOLS, withoutOverride, DEFAULT_BUDGET_STEPS, fitsBudget, plannedBeforeLatestChange, preempt, shouldPause, stepCost } from '@/lib/agent/policy';
 import {
   createAgentRun,
   endAgentRun,
@@ -228,7 +228,7 @@ export function useGoLoop(opts: Options) {
           template: o.template, state: o.state, stage: o.stage, bundles: o.bundles,
           stageEvaluation: evaluateStage(o.template, o.stage.id, context), latestEvaluation: o.latestEvaluation,
           steps: [...priorStepsRef.current, ...stepsRef.current],
-          context, approvedOutline: o.approvedOutline, facts, dataFiles: dataFileBriefs(o.project),
+          context, approvedOutline: o.approvedOutline, facts, dataFiles: dataFileBriefs(o.project), tools: LIVE_TOOLS,
         }),
         approvedByUser, deliverableDone: o.deliverableDone,
         interpret: interpret
@@ -375,7 +375,7 @@ export function useGoLoop(opts: Options) {
         const context = contextWithFacts(o.context, o.stage, facts);
         const stageEvaluation = evaluateStage(o.template, o.stage.id, context);
         const allowed = withoutOverride(
-          allowedActions(o.template, o.state, o.stage, hasDraft, undefined, facts), stageEvaluation.canAdvance, current.policy
+          allowedActions(o.template, o.state, o.stage, hasDraft, LIVE_TOOLS, facts), stageEvaluation.canAdvance, current.policy
         );
 
         // Before the planner is asked: is the next move the user's? (B4)
@@ -391,7 +391,7 @@ export function useGoLoop(opts: Options) {
         const digest = buildAgentState({
           template: o.template, state: o.state, stage: o.stage, bundles: o.bundles,
           stageEvaluation, latestEvaluation: o.latestEvaluation, steps: [...priorStepsRef.current, ...stepsRef.current],
-          context, approvedOutline: o.approvedOutline, facts, dataFiles: dataFileBriefs(o.project),
+          context, approvedOutline: o.approvedOutline, facts, dataFiles: dataFileBriefs(o.project), tools: LIVE_TOOLS,
         });
         const choice = await api.agentNextAction(
           { inputs: inputsFrom(o.project), state: digest, allowed_actions: allowed, policy: current.policy, model: o.project.model },
@@ -804,7 +804,7 @@ export function useGoLoop(opts: Options) {
         const context = contextWithFacts(o.context, o.stage, facts);
         const holds = needStillHolds(need, {
           state: o.state, stage: o.stage, facts, stageEvaluation: evaluateStage(o.template, o.stage.id, context),
-          allowed: allowedActions(o.template, o.state, o.stage, hasDraft, undefined, facts), policy: current.policy,
+          allowed: allowedActions(o.template, o.state, o.stage, hasDraft, LIVE_TOOLS, facts), policy: current.policy,
           outlineStageId: outlineStageFor(o.template)?.id ?? null, largeJobAcknowledged: largeJobOkRef.current,
           objective: o.project.objective, currentStageId: o.state.current_stage_id,
         });

@@ -89,7 +89,7 @@ export function TransparencyPanel({
   thinking: boolean;
 }) {
   // What was used, in the user's words rather than the record's.
-  const TOOL_NAME: Record<string, string> = { sandbox: 'code sandbox', model: 'AI model', jobs: 'background writing queue' };
+  const TOOL_NAME: Record<string, string> = { sandbox: 'code sandbox', model: 'AI model', jobs: 'background writing queue', search: 'literature search (OpenAlex)' };
   const rows: [string, React.ReactNode][] = [
     ['Stage', stageLabel],
     ['Mode', MODE_DISPLAY[mode as ModeType]?.display_name ?? mode ?? '—'],

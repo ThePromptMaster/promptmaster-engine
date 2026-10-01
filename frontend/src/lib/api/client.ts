@@ -35,6 +35,7 @@ import type {
   GenerateStageArtifactResponse,
 } from '@/types';
 import { createClient } from '@/lib/supabase/client';
+import type { WorkMatch } from '@/lib/workflow/lookup';
 import type { AgentStateDigest } from '@/lib/agent/digest';
 import type {
   AgentTextResponse,
@@ -353,6 +354,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(req),
     });
+  },
+
+  /** Look named works up in OpenAlex. No model call; nothing is stored. */
+  async agentLiterature(works: { id: string; work: string }[], signal?: AbortSignal): Promise<{ matches: WorkMatch[]; source: string }> {
+    return apiFetch('/api/agent/literature', { method: 'POST', body: JSON.stringify({ works }), signal });
   },
 
   /** A chat answer as at most four things to do about it. Changes nothing. */

@@ -438,9 +438,10 @@ Autonomous, Go decides a review table's **routine** findings itself (severity mi
 moderate, an enum since B3) and stops for the **material** ones (major, or of unknown
 severity — every finding written before B3 counts as material); Checkpoint pauses before
 deciding; Guided always asks. Fact-check, runs, alternatives and validation tables are
-outcome tables and are never decided by Go; `check_literature` is **not offered** until a retrieval tool is
-connected (B0, 2026-09-28 — before that it was always offered and always blocked, so
-every Research run could walk into "no search tool is connected" and stop there);
+outcome tables and are never decided by Go; `check_literature` was not offered between
+2026-09-28 and 2026-10-01 (no tool was connected) and now looks the project's named works
+up in OpenAlex (see L-C6) — on the Literature stage it saves the result, from any other
+stage it only reports it;
 since 2026-10-01 `generate_outline` is offered on whichever stage holds the outline —
 Book's Outline stage, or the drafting stage of a workflow whose outline is derived
 (Research), where it is built from the stages already done with no model call; before
@@ -473,8 +474,17 @@ The Literature stage's works are recalled from the model's knowledge; nothing is
 or fetched. Each generated row is stored as **Suggested by PromptMaster — not retrieved**
 (the server sets it; a status the model writes is dropped), the stage says how many rows
 are still in that state, and the checklist counts "candidate works identified" and "works
-retrieved or verified" separately. **Retrieved by PromptMaster** exists for a search tool
-to set and nothing carries it yet. **Verified by me** is the user's, with a DOI or link
+retrieved or verified" separately. **Retrieved by PromptMaster** is set by a lookup in
+OpenAlex (`POST /api/agent/literature`, `promptmaster/literature.py`; the "Look up these
+works" button, or Go's `check_literature`): the title inside the citation is searched, a
+record counts as found only if at least 80% of its title's words are in the named work,
+its title has three or more meaningful words, and its year is within one of any year
+named. **What "Retrieved" means is narrow: a record with this title exists.** Nobody has
+read the work, so it does not mean the row's "what it established" is right. Books, grey
+literature and anything OpenAlex does not index come back "not found" even when real;
+at most 20 works are looked up at a time; no API key is used, so the lookup shares
+OpenAlex's public rate limit (set `OPENALEX_MAILTO` on the backend for the polite pool).
+The lookup does not reach Book's fact-check claims, whose "source" is free text. **Verified by me** is the user's, with a DOI or link
 field the model is never asked to fill. The "retrieved or verified" item is *optional*:
 making it required would stop every Research project at stage two until a retrieval tool
 exists. Applies to Research v5; projects on earlier versions keep the old stage until

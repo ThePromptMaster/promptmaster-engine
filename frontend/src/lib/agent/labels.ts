@@ -42,8 +42,9 @@ export function deriveExecutionLabel(
     case 'compute':
       // Never more than the sandbox recorded; without a record, only code was written.
       return outcome.sandboxLabel ?? 'code_written';
+    // A lookup reads an index; it runs no code and writes no draft.
     case 'literature':
-      return 'blocked';
+      return 'discussed';
     default:
       return null;
   }

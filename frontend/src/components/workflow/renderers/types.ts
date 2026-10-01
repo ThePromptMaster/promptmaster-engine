@@ -92,6 +92,12 @@ export interface StageRendererProps {
   onSaveContent?: (content: string) => Promise<void>;
   /** List and review stages: save the whole item array as a new version. */
   onSaveItems?: (items: StageItem[]) => Promise<void>;
+  /**
+   * Look the rows up in a public index, for a stage whose schema says they can
+   * be. Returns the rows as they would be and a sentence saying what was
+   * found; the renderer shows them unsaved, for the user to review and save.
+   */
+  onLookupItems?: (items: StageItem[]) => Promise<{ items: StageItem[]; message: string }>;
 
   /** True while a draft is being generated for this stage. */
   generating: boolean;

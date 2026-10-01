@@ -88,3 +88,51 @@ test('on a table stage a chat answer becomes row changes, reviewed before saving
   expect(saved.change_summary).toBe('From the side chat: Update the first row (1 row).');
   expect(JSON.parse(saved.content).items[0]).toMatchObject({ status: 'verified', status_source: 'user' });
 });
+
+/**
+ * 1 Oct, item 12 — "How are candidate literature references supposed to
+ * become verified literature?" The first step: look each named work up. A
+ * found record makes the row "Retrieved", with its DOI; one that is not found
+ * stays a candidate.
+ */
+test('candidate works are looked up: found ones become Retrieved with a DOI, by button and by Go', async ({ page }) => {
+  test.setTimeout(120_000);
+  const id = await createProject(page, {
+    workflow: 'Research', name: 'E2E literature lookup', objective: 'Why customers churn [[mock:plan=check_literature]]',
+  });
+  await expect(stageArtifact(page)).toContainText('Mock', { timeout: 30_000 });
+  await pressTransition(page);
+  await expect(page.getByRole('heading', { name: 'Literature context' })).toBeVisible();
+  const artifact = stageArtifact(page);
+  await expect(artifact).toContainText('Mock work 1', { timeout: 30_000 });
+
+  // By hand: the result is shown unsaved, with what it does and does not mean.
+  await artifact.getByRole('button', { name: 'Look up these works' }).click();
+  await expect(artifact.getByRole('status')).toContainText('1 of 3 works found in OpenAlex.', { timeout: 30_000 });
+  await expect(artifact.getByRole('status')).toContainText('2 not found — they may be misremembered, or not exist.');
+  await expect(artifact.getByRole('status')).toContainText('means the work exists, not that it says what the row claims');
+  await expect(artifact.getByRole('combobox').first()).toContainText('Retrieved by PromptMaster');
+  await expect(artifact.getByRole('combobox').nth(1)).toContainText('Suggested by PromptMaster');
+  await expect(artifact.getByLabel('DOI or link').first()).toHaveValue('https://doi.org/10.0000/mock.1');
+  await expect(artifact.getByLabel('Record found').first()).toHaveValue('Mock work 1 (the record) — Mock, A. (2020)');
+  await page.screenshot({ path: test.info().outputPath('01-looked-up-not-yet-saved.png'), fullPage: true });
+  expect(await serviceSelect('artifact_versions', `project_id=eq.${id}&select=id`)).toHaveLength(2); // question + literature draft
+  await page.getByRole('button', { name: 'Save as new version' }).click();
+  await expect(criterion(page, 'At least three works retrieved or verified')).toContainText('1 of 3');
+
+  // By Go: the same lookup, as a step that says what it used.
+  const panel = page.getByRole('region', { name: 'Go mode', exact: true });
+  await panel.getByRole('button', { name: 'Set up Go' }).click();
+  await panel.getByRole('radio', { name: /^Guided/ }).click();
+  await panel.getByRole('button', { name: /^Go$/ }).click();
+  const prompt = page.getByRole('region', { name: 'Go mode needs your approval' });
+  await expect(prompt).toContainText('Check literature', { timeout: 30_000 });
+  await prompt.getByRole('button', { name: 'Approve' }).click();
+  await expect(panel).toContainText('1 of 3 works found in OpenAlex.', { timeout: 30_000 });
+  await expect(panel).toContainText('Not found: Mock work 2');
+  const [run] = await serviceSelect('agent_runs', `project_id=eq.${id}&select=id&order=created_at.desc&limit=1`);
+  await expect
+    .poll(async () => (await serviceSelect('agent_steps', `run_id=eq.${run.id}&action_key=eq.check_literature&select=status,execution_label,tools_used`))[0], { timeout: 15_000 })
+    .toMatchObject({ status: 'succeeded', execution_label: 'discussed', tools_used: ['search'] });
+  await page.screenshot({ path: test.info().outputPath('02-go-looked-the-works-up.png'), fullPage: true });
+});

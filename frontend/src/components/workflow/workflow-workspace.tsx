@@ -65,6 +65,7 @@ import { approveOutline, loadOutline, materialiseOutlineInto } from '@/lib/outli
 import type { OutlineDocument } from '@/types/outline';
 import { stageDrafts, itemSchemaFor, parseItems, rendererHoldsItems, serializeItems, stageContentForChat, type StageItem } from '@/lib/workflow/stage-artifact';
 import { previewRowAction } from '@/lib/workflow/row-actions';
+import { applyLookup, lookupSummary } from '@/lib/workflow/lookup';
 import type { ReplyAction } from '@/types';
 import { buildStageContext } from '@/lib/workflow/context';
 import type { StageContext, WorkflowTemplate, BlockKind } from '@/lib/workflow/types';
@@ -771,6 +772,23 @@ export function WorkflowWorkspace({
     [saveContent]
   );
 
+  // Look the rows up in OpenAlex (1 Oct, item 12). The rows come back
+  // unsaved; the user reads what was found and saves.
+  const lookupItems = useCallback(
+    async (items: StageItem[]) => {
+      const schema = itemSchemaFor(stage!);
+      const works = items
+        .map((i) => ({ id: i.id, work: (i[schema.lookup!.field] ?? '').trim() }))
+        .filter((w) => w.work)
+        .slice(0, 20);
+      if (!works.length) return { items, message: 'There is nothing named to look up yet.' };
+      const { matches } = await api.agentLiterature(works);
+      const result = applyLookup(items, matches, schema);
+      return { items: result.items, message: lookupSummary(result, schema.itemLabel) };
+    },
+    [stage]
+  );
+
   const restore = useCallback(
     async (versionId: string) => {
       if (!stage || !restoreStageVersion) return;
@@ -1436,6 +1454,7 @@ export function WorkflowWorkspace({
                 onRestore={restore}
                 onSaveContent={appendStageVersion ? saveContent : undefined}
                 onSaveItems={appendStageVersion ? saveItems : undefined}
+                onLookupItems={itemSchemaFor(stage).lookup ? lookupItems : undefined}
                 generating={generation.generating}
                 generationError={generation.error}
                 onGenerate={generation.generate}

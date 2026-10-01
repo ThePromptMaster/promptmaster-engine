@@ -20,7 +20,8 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from deps import get_client
+from deps import get_client, llm_mode
+from promptmaster.literature import MAX_WORKS, WorkMatch, WorkQuery, lookup_works
 from promptmaster.agent import (
     AgentState,
     NextAction,
@@ -191,3 +192,20 @@ async def api_triage(req: TriageRequest, client: OpenRouterClient = Depends(get_
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
     return TriageResponse(decisions=decisions, model_used=_model_used(req.model, client))
+
+
+class LiteratureRequest(BaseModel):
+    works: list[WorkQuery] = Field(min_length=1, max_length=MAX_WORKS)
+
+
+class LiteratureResponse(BaseModel):
+    matches: list[WorkMatch]
+    source: str = "OpenAlex"
+
+
+@router.post("/literature")
+async def api_literature(req: LiteratureRequest) -> LiteratureResponse:
+    """Look named works up in OpenAlex (1 Oct, item 12). No model call and
+    nothing stored: for each work, whether a record with that title exists,
+    and its real title, authors, year and DOI if it does."""
+    return LiteratureResponse(matches=await lookup_works(req.works, mock=llm_mode() == "mock"))

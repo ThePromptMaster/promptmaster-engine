@@ -19,7 +19,8 @@ import { appliedFindingsVersion, findingsInstruction, reviseWithFindings } from 
 import { findInstructionConflicts } from '@/lib/workflow/conflict-trail';
 import { describeWith, type InstructionConflict } from '@/lib/workflow/instruction-conflicts';
 import { deriveOutlineItems } from '@/lib/workflow/derived-outline';
-import { rendererHoldsItems, serializeItems } from '@/lib/workflow/stage-artifact';
+import { itemSchemaFor, parseItems, rendererHoldsItems, serializeItems } from '@/lib/workflow/stage-artifact';
+import { applyLookup, lookupSummary, recordLine } from '@/lib/workflow/lookup';
 import { applyTriage } from '@/lib/workflow/triage';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import { summariseStageContent } from '@/lib/workflow/digest';
@@ -257,11 +258,43 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       });
     }
 
-    case 'literature':
+    case 'literature': {
+      // The works are the ones the project already names: the stage whose
+      // rows can be looked up. On that stage the result is saved; from any
+      // other stage it is reported, and that stage is left as it is.
+      const holder = ctx.template.stages.find((s) => itemSchemaFor(s).lookup && parseItems(ctx.bundles[s.id]?.versions.at(-1)?.content)?.length);
+      if (!holder) {
+        return done(key, { status: 'failed', toolsUsed: [], changes: {}, output: 'There is no list of works to look up yet.' });
+      }
+      const schema = itemSchemaFor(holder);
+      const rows = parseItems(ctx.bundles[holder.id]!.versions.at(-1)!.content)!;
+      const works = rows.map((i) => ({ id: i.id, work: (i[schema.lookup!.field] ?? '').trim() })).filter((w) => w.work).slice(0, 20);
+      const { matches } = await api.agentLiterature(works, ctx.signal);
+      const result = applyLookup(rows, matches, schema);
+      const found = matches.filter((m) => m.found);
+      const lines = [
+        lookupSummary(result, schema.itemLabel).replace(' Review, then save.', ''),
+        ...found.map((m) => `- ${recordLine(m)}${m.doi ? ` — ${m.doi}` : ''}`),
+        ...matches.filter((m) => !m.found).map((m) => `- Not found: ${works.find((w) => w.id === m.id)?.work.slice(0, 160) ?? m.id}`),
+      ];
+      let versionIds: string[] = [];
+      if (holder.id === ctx.stage.id && found.length && ctx.appendStageVersion) {
+        const created = await ctx.appendStageVersion(holder.id, holder.label, {
+          content: serializeItems(result.items),
+          source_operation: 'literature_lookup',
+          instruction: ctx.step.rationale || 'Go mode looked the works up.',
+          model: '',
+          mode: ctx.project.mode,
+          change_summary: `Looked up in OpenAlex: ${result.found} found, ${result.notFound} not found.`,
+        });
+        const id = (created as { id?: unknown } | null)?.id;
+        if (typeof id === 'string') versionIds = [id];
+      }
       return done(key, {
-        status: 'blocked', blockKind: 'tool_missing', toolsUsed: [], changes: {},
-        output: 'Checking the literature needs a search tool, and none is connected yet. Nothing was looked up.',
+        status: 'succeeded', toolsUsed: ['search'], changes: versionIds.length ? { version_ids: versionIds } : {},
+        output: clip(lines.join('\n')),
       });
+    }
 
     case 'draft':
     case 'revise': {

@@ -36,6 +36,7 @@ export function ListRenderer({
   onSelectVersion,
   onRestore,
   onSaveItems,
+  onLookupItems,
   generating,
   generationError,
   generationFailure,
@@ -59,6 +60,23 @@ export function ListRenderer({
   const [items, setItems] = useState<StageItem[]>(saved);
   const [saving, setSaving] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [lookingUp, setLookingUp] = useState(false);
+  const [lookupNote, setLookupNote] = useState<string | null>(null);
+
+  async function lookUp() {
+    if (!onLookupItems || lookingUp) return;
+    setLookingUp(true);
+    setLookupNote(null);
+    try {
+      const result = await onLookupItems(items);
+      setItems(result.items);
+      setLookupNote(result.message);
+    } catch (e) {
+      setLookupNote(e instanceof Error && e.message ? `The lookup did not work: ${e.message}` : 'The lookup did not work. Nothing was changed.');
+    } finally {
+      setLookingUp(false);
+    }
+  }
 
   // Re-seed from the version being displayed. Editing then browsing history
   // and coming back must not show a stale local array.
@@ -187,6 +205,28 @@ export function ListRenderer({
         {stateNote && (
           <p role="note" className="mb-3 rounded-xl bg-[var(--surface-container-high)] px-5 py-3 text-body text-[var(--on-surface)]">
             {stateNote}
+          </p>
+        )}
+        {schema.lookup && onLookupItems && !readOnly && (
+          <div className="mb-3 flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => void lookUp()}
+              disabled={lookingUp}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-high)] px-4 py-2 text-label text-[var(--on-surface)] hover:opacity-90 disabled:opacity-50"
+            >
+              <span aria-hidden className={`material-symbols-outlined text-[16px] ${lookingUp ? 'animate-spin' : ''}`}>
+                {lookingUp ? 'progress_activity' : 'travel_explore'}
+              </span>
+              {lookingUp ? 'Looking them up…' : `Look up these ${label}s`}
+            </button>
+            <span className="text-label text-[var(--on-surface-variant)]">
+              Searches OpenAlex for each title. Nothing is saved until you save.
+            </span>
+          </div>
+        )}
+        {lookupNote && (
+          <p role="status" className="mb-3 rounded-xl bg-[var(--surface-container-low)] px-5 py-3 text-body text-[var(--on-surface)]">
+            {lookupNote}
           </p>
         )}
         <ul className="space-y-3">

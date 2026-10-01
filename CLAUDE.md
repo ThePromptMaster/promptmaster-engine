@@ -62,7 +62,7 @@ It does verify identity. `backend/auth.py` checks the Supabase JWT and attaches 
 | `setup.py` | `generate-setup` |
 | `audit.py` | `audit-findings`, `apply-audit` |
 | `conflicts.py` | `check-conflicts` — PM-24; the deterministic half lives in `lib/workflow/instruction-conflicts.ts` |
-| `agent.py` | `agent/actions`, `agent/next-action`, `agent/reason`, `agent/write-code`, `agent/interpret-result` — Go mode (PM-17/19); the loop itself runs in the browser |
+| `agent.py` | `agent/actions`, `agent/next-action`, `agent/reason`, `agent/write-code`, `agent/interpret-result`, `agent/literature` (looks named works up in OpenAlex; no model call) — Go mode (PM-17/19); the loop itself runs in the browser |
 
 `routers/_pipeline.py` — `build_iteration_with_full_pipeline()` is **the** "produce a new Iteration" path, used by every iteration-creating endpoint. It fans out eval + suggestions + summary in parallel via `asyncio`, stamps the FR-10 provenance fields (`created_at`, `model_used`, `instruction`), and enforces `finish_reason == "length"` → `completeness = incomplete`, overriding whatever the evaluator LLM said. Pass `active_iteration=None` for a first iteration: there is nothing to summarise a change against, so the summary call is skipped. Never re-implement the fan-out — until 2026-09-02 `engine.py` had its own inlined copy twice, which made every new `Iteration` field a three-site change.
 

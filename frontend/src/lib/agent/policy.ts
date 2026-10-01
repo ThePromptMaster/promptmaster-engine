@@ -45,6 +45,8 @@ export interface AgentTools {
 }
 
 export const NO_TOOLS: AgentTools = { literature: false };
+/** What a run can call today: a literature lookup (OpenAlex) is connected since 2026-10-01. */
+export const LIVE_TOOLS: AgentTools = { literature: true };
 
 export function allowedActions(
   template: WorkflowTemplate,
