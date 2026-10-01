@@ -29,6 +29,20 @@ export interface LookupResult {
   unreachable: number;
 }
 
+/** A source cell that says there is none: "none", "none found", "n/a", "unknown", "—". */
+const NAMES_NOTHING = /^(none|no source|n\/?a|unknown|not (found|known|available)|[-–—?]+)\b[\s\w]{0,12}$/i;
+
+/** The rows worth searching for: something is named, and the row does not say nothing was found. At most `max`. */
+export function lookupQueries(items: readonly StageItem[], schema: StageItemSchema, max = 20): { id: string; work: string }[] {
+  const lookup = schema.lookup;
+  if (!lookup) return [];
+  return items
+    .filter((i) => !lookup.skipStatus || i.status !== lookup.skipStatus)
+    .map((i) => ({ id: i.id, work: (i[lookup.field] ?? '').trim() }))
+    .filter((w) => w.work && !NAMES_NOTHING.test(w.work))
+    .slice(0, max);
+}
+
 export function recordLine(match: WorkMatch): string {
   const who = match.authors ? ` — ${match.authors}` : '';
   return `${match.title}${who}${match.year ? ` (${match.year})` : ''}`;
@@ -65,12 +79,12 @@ export function applyLookup(items: readonly StageItem[], matches: readonly WorkM
   return { items: next, found, notFound, unreachable };
 }
 
-/** `noun` is what was looked up, plural ("works", "sources"). */
-export function lookupSummary(result: LookupResult, noun: string): string {
+/** `noun` is what was looked up, plural ("works", "sources"); `notFoundNote` replaces the default reading of a miss. */
+export function lookupSummary(result: LookupResult, noun: string, notFoundNote?: string): string {
   const total = result.found + result.notFound + result.unreachable;
   const plural = (n: number) => `${n} ${n === 1 ? noun.replace(/s$/, '') : noun}`;
   const parts = [`${result.found} of ${plural(total)} found in OpenAlex.`];
-  if (result.notFound) parts.push(`${result.notFound} not found — ${result.notFound === 1 ? 'it' : 'they'} may be misremembered, or not exist.`);
+  if (result.notFound) parts.push(notFoundNote ? `${result.notFound} not found. ${notFoundNote}` : `${result.notFound} not found — ${result.notFound === 1 ? 'it' : 'they'} may be misremembered, or not exist.`);
   if (result.unreachable) parts.push(`${result.unreachable} could not be looked up; try again.`);
   if (result.found) parts.push('A found record means the work exists, not that it says what the row claims. Review, then save.');
   return parts.join(' ');

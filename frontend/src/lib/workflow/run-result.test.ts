@@ -26,6 +26,16 @@ describe('a sandbox run settles the row it carried out (1 Oct, item 17)', () => 
     expect(result.items[1]).toBe(rows[1]);
   });
 
+  it('empties what the draft wrote about a run it could not make — it is no longer true', () => {
+    const drafted: StageItem[] = [
+      { id: 'r1', run: 'Count the accounts', observed: 'Not provided.', deviation: 'The outcome is not available in the provided materials.', status: 'not_run', reason: 'No data.', status_source: 'model' },
+      { id: 'r2', run: 'Compare cohorts', deviation: 'Used last quarter only.' },
+    ];
+    expect(applyRunResult(drafted, 1, runs, run)!.row.deviation).toBeUndefined();
+    // A row the model had not ruled on keeps what was written beside it.
+    expect(applyRunResult(drafted, 2, runs, run)!.row.deviation).toBe('Used last quarter only.');
+  });
+
   it('takes the row number as the planner gives it, and settles an untouched row', () => {
     expect(applyRunResult(rows, '3', runs, run)!.row).toMatchObject({ id: 'r3', status: 'completed', status_source: 'sandbox' });
   });
