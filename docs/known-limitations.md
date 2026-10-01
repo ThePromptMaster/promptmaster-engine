@@ -546,6 +546,14 @@ also told to "say each thing once", which is an instruction, not a check — not
 detects repetition after the fact. Only the write-up changes: the thirteen stages are
 the same in both forms.
 
+Since 2026-10-01 (later) every section is also told to keep to any stated length, to hold a
+section of a memo, brief or short report to roughly 150 to 300 words, and to report only
+what the brief and prior context say was established — a run that was not carried out is
+written up as not carried out. These are instructions to a model, not checks: the first
+short report drafted on production ran to 2,673 words over four sections and described
+patterns in data that had never been provided, and nothing in the product would have
+stopped it. Nothing measures a section's length or compares its claims with the record.
+
 ### L-C8 — Established figures: quoted, not checked (2026-10-01)
 
 When a stage is completed, its figures are read out of its own text once

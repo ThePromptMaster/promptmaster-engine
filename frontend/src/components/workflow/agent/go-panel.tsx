@@ -55,7 +55,9 @@ export function GoPanel({
   const canResume = Boolean(live && (go.run!.status === 'blocked' || go.run!.status === 'awaiting_decision') && !go.pendingStep);
   // The "I need you to…" card (B4): shown for a stop the user can clear, live
   // or used-up. A question keeps its own prompt.
-  const need = !go.active && !go.pendingStep && go.run?.needs && go.run.needs.kind !== 'answer_question' && (live || go.run.status === 'budget_exhausted')
+  // …except a used-up window the run is about to follow with another on its own.
+  const carryingOn = go.run?.needs?.kind === 'continue_budget' && go.run.policy === 'autonomous' && go.autoPending;
+  const need = !go.active && !go.pendingStep && !carryingOn && go.run?.needs && go.run.needs.kind !== 'answer_question' && (live || go.run.status === 'budget_exhausted')
     ? go.run.needs
     : null;
   // The status panel below already says so; this only keeps it from being asked as a question.

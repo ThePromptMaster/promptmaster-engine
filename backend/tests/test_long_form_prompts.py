@@ -264,3 +264,21 @@ def test_a_section_is_told_to_say_each_thing_once(basic_inputs):
     assert "SAY EACH THING ONCE" in user
     assert "Do not restate a finding, a figure, a caveat or a recommendation that an earlier section has made" in user
     assert "write only what is new here" in user
+
+
+def test_a_section_is_told_to_keep_a_short_report_short_and_to_report_only_what_is_on_record(basic_inputs):
+    from promptmaster.long_form import build_section_prompt
+    from promptmaster.schemas import OutlineSection
+
+    outline = [
+        OutlineSection(id="answer", title="The answer", abstract="Lead with the answer, in a few sentences."),
+        OutlineSection(id="findings", title="What was found", abstract="Experiment: no run was carried out; the data was not provided."),
+    ]
+    _, user = build_section_prompt(basic_inputs, outline, 1, None, "")
+    assert "LENGTH. Keep to any length the constraints or this section's brief give." in user
+    assert "roughly 150 to 300 words" in user
+    assert "Never pad a section to look thorough." in user
+    assert "REPORT ONLY WHAT IS ON RECORD." in user
+    assert "Never write that a pattern, a number or a finding was observed unless the brief or the prior context states it." in user
+    # The brief that says nothing was run reaches the model with that instruction beside it.
+    assert "no run was carried out; the data was not provided" in user

@@ -296,7 +296,21 @@ def build_section_prompt(
         "caveat or a recommendation that an earlier section has made: build on it, "
         "or refer back to it in a clause. If this section's brief overlaps an "
         "earlier one, write only what is new here. A shorter section that adds "
-        "something is better than a full one that repeats."
+        "something is better than a full one that repeats.\n\n"
+        # A "short report" for an executive came to 2,673 words over four
+        # sections (production pass, 2026-10-01).
+        "LENGTH. Keep to any length the constraints or this section's brief give. "
+        "When the brief asks for brevity ('briefly', 'a few sentences', 'only what "
+        "bears on the decision'), or the output is a memo, a brief or a short "
+        "report for someone who has to decide, write a few short paragraphs — "
+        "roughly 150 to 300 words — and stop. Never pad a section to look thorough.\n\n"
+        # The same draft described patterns in data nobody had provided.
+        "REPORT ONLY WHAT IS ON RECORD. The section's brief and the prior context "
+        "are everything that was established. Where they say something was not "
+        "run, not provided or not measured — or give no result at all — say that "
+        "plainly: what was planned, and that there is no result yet. Never write "
+        "that a pattern, a number or a finding was observed unless the brief or "
+        "the prior context states it."
     )
     return system, user
 
