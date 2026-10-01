@@ -51,7 +51,7 @@ test('PM-24: an instruction against the constraints asks which controls, without
   await expect(page.getByText('Mock output').first()).toBeVisible();
 
   const chat = await instruct(page, 'Expand it with much more detail');
-  const ask = chat.getByRole('region', { name: 'Which should control?' });
+  const ask = chat.getByRole('region', { name: 'Which takes priority?' });
   await expect(ask).toContainText('It pulls against your constraints: Under 300 words');
   await expect(ask).toContainText('opposite way on length');
   await page.screenshot({ path: test.info().outputPath('01-which-controls.png') });
@@ -72,10 +72,10 @@ test('PM-24: a meaning-level conflict with the objective, then a prior decision 
   await expect(page.getByText('Mock output').first()).toBeVisible();
 
   const chat = await instruct(page, 'Make it about elephants instead [[mock:conflict]]');
-  const ask = chat.getByRole('region', { name: 'Which should control?' });
+  const ask = chat.getByRole('region', { name: 'Which takes priority?' });
   await expect(ask).toContainText('It pulls against your objective');
   await expect(ask).toContainText('Mock: this instruction pulls the work away from the objective.');
-  await ask.getByRole('radio', { name: 'My new instruction controls' }).click();
+  await ask.getByRole('radio', { name: 'My new instruction takes priority' }).click();
   await ask.getByRole('button', { name: 'Continue' }).click();
   await expect(chat.getByLabel('Proposed revision')).toBeVisible();
   await chat.getByRole('button', { name: 'Discard' }).click();
@@ -88,5 +88,66 @@ test('PM-24: a meaning-level conflict with the objective, then a prior decision 
   await chat.getByRole('textbox', { name: 'Give a revision instruction' }).fill('Fix the typo in the first line');
   await chat.getByRole('button', { name: 'Draft revision' }).click();
   await expect(chat.getByLabel('Proposed revision')).toBeVisible();
-  await expect(chat.getByRole('region', { name: 'Which should control?' })).toHaveCount(0);
+  await expect(chat.getByRole('region', { name: 'Which takes priority?' })).toHaveCount(0);
+});
+
+/**
+ * 1 Oct, item 33 — only a typed "Change it" was ever checked. An action
+ * button's revision, and a revision Go chose for itself, went straight to
+ * the model.
+ */
+test('an action button whose revision conflicts with the objective asks which takes priority first', async ({ page }) => {
+  const id = await createProject(page, { workflow: 'Book', name: 'E2E conflict action', objective: 'A book about giraffes' });
+  await expect(page.getByText('Mock output').first()).toBeVisible();
+  const chat = page.getByRole('region', { name: 'Side chat' });
+  await chat.getByRole('textbox', { name: 'Ask a question' }).fill('How could this be better? [[mock:conflict-action]]');
+  await chat.getByRole('button', { name: 'Ask' }).click();
+  await chat.getByRole('region', { name: 'Act on this reply' }).getByRole('button', { name: 'Tighten the opening' }).click();
+
+  const ask = chat.getByRole('region', { name: 'Which takes priority?' });
+  await expect(ask).toContainText('It pulls against your objective');
+  await page.screenshot({ path: test.info().outputPath('01-action-asks-which-takes-priority.png') });
+  expect(await serviceSelect('artifact_versions', `project_id=eq.${id}&select=id`)).toHaveLength(1);
+  await ask.getByRole('radio', { name: 'Keep the objective' }).click();
+  await ask.getByRole('button', { name: 'Continue' }).click();
+  // The revision then goes through the ordinary preview, told what was decided.
+  await expect(page.getByRole('dialog', { name: 'Revised version' })).toBeVisible({ timeout: 30_000 });
+  const [row] = await serviceSelect('recommendations', `project_id=eq.${id}&category=like.conflict:*&select=status`);
+  expect(row).toMatchObject({ status: 'dismissed' });
+});
+
+test('Go stops and asks before a revision that conflicts with the objective, then carries the answer', async ({ page }) => {
+  const id = await createProject(page, {
+    workflow: 'Book', name: 'E2E conflict go',
+    objective: 'A book about giraffes [[mock:conflicting-revise]] [[mock:plan=revise_stage,revise_stage]]',
+  });
+  await expect(page.getByText('Mock output').first()).toBeVisible();
+  const panel = page.getByRole('region', { name: 'Go mode', exact: true });
+  await panel.getByRole('button', { name: 'Set up Go' }).click();
+  await panel.getByRole('radio', { name: /^Guided/ }).click();
+  await panel.getByRole('button', { name: /^Go$/ }).click();
+  const prompt = page.getByRole('region', { name: 'Go mode needs your approval' });
+  await expect(prompt).toContainText('Revise this stage', { timeout: 30_000 });
+  await prompt.getByRole('button', { name: 'Approve' }).click();
+
+  // Nothing is rewritten: the run asks.
+  await expect(panel).toContainText('conflicts with the objective', { timeout: 30_000 });
+  await expect(panel).toContainText('Which should take priority?');
+  await page.screenshot({ path: test.info().outputPath('01-go-asks-which-takes-priority.png'), fullPage: true });
+  expect(await serviceSelect('artifact_versions', `project_id=eq.${id}&select=id`)).toHaveLength(1);
+
+  await panel.getByRole('textbox').fill('Keep the objective; only tighten the wording.');
+  await panel.getByRole('button', { name: /^(Answer|Send|Reply)/ }).click();
+  await expect(prompt).toContainText('Revise this stage', { timeout: 30_000 });
+  await prompt.getByRole('button', { name: 'Approve' }).click();
+  await expect(page.getByRole('button', { name: /^v2/ })).toBeVisible({ timeout: 30_000 });
+
+  const [run] = await serviceSelect('agent_runs', `project_id=eq.${id}&select=id&order=created_at.desc&limit=1`);
+  const steps = await serviceSelect('agent_steps', `run_id=eq.${run.id}&select=action_key,status,params&order=idx`);
+  expect(steps.slice(0, 3).map((s: { action_key: string; status: string }) => [s.action_key, s.status])).toEqual([
+    ['revise_stage', 'blocked'],
+    ['user_answer', 'succeeded'],
+    ['revise_stage', 'succeeded'],
+  ]);
+  expect(steps[0].params.conflict_question).toBe(true);
 });

@@ -136,5 +136,5 @@ export function criterion(page: Page, label: string) {
  * hold the same text hidden, and an unscoped getByText would match them first.
  */
 export function stageArtifact(page: Page) {
-  return page.getByRole('region', { name: / artifact$/ });
+  return page.getByRole('region', { name: / work$/ });
 }

@@ -11,7 +11,10 @@
 
 import { insertRecommendation, listRecommendations, recordDecision } from '@/lib/supabase/recommendations';
 import type { RecommendationScope } from './recommend';
-import { describeWith, type ConflictSource, type Controls, type InstructionConflict } from './instruction-conflicts';
+import { api } from '@/lib/api/client';
+import type { Project } from '@/types/project';
+import { describeWith, mergeConflicts, ruleConflicts, type ConflictSource, type Controls, type InstructionConflict } from './instruction-conflicts';
+import { inputsFrom } from './stage-requests';
 
 export const CONFLICT_CATEGORY = 'conflict:';
 
@@ -52,6 +55,44 @@ export async function conflictContext(
   return { decisions, others };
 }
 
+/**
+ * Does this instruction contradict the objective, the constraints, a decision
+ * already made, or another pending instruction?
+ *
+ * One function for every place an instruction comes from. It lived inside
+ * the side chat's Send, so only a typed "Change it" was ever checked: an
+ * action button, or a revision Go chose for itself, went straight to the
+ * model (1 Oct, item 33: "the latest instruction should not silently
+ * overwrite the project"). Never throws: a check that cannot run is no
+ * conflicts, not a blocked instruction.
+ */
+export async function findInstructionConflicts(args: {
+  project: Project;
+  stageId: string;
+  instruction: string;
+  recentInstructions?: string[];
+  headVersionId?: string | null;
+}): Promise<InstructionConflict[]> {
+  const { project, stageId, instruction, recentInstructions = [], headVersionId = null } = args;
+  if (!instruction.trim()) return [];
+  try {
+    const { decisions, others } = await conflictContext(project.id, stageId, recentInstructions, headVersionId);
+    const rule = ruleConflicts({ instruction, objective: project.objective, constraints: project.constraints, decisions, others });
+    let model: InstructionConflict[] = [];
+    try {
+      const res = await api.checkConflicts({
+        inputs: inputsFrom(project), instruction, decisions, other_instructions: others, model: project.model,
+      });
+      model = res.conflicts.map((c) => ({ ...c, source: 'model' as const }));
+    } catch {
+      // The model half failing never blocks an instruction; the rule's half still counts.
+    }
+    return mergeConflicts(rule, model);
+  } catch {
+    return [];
+  }
+}
+
 export async function recordConflictChoice(args: {
   projectId: string;
   userId: string;
@@ -75,7 +116,7 @@ export async function recordConflictChoice(args: {
     rationale: {
       triggering_issue: conflict.explanation,
       relevant_stage: args.stageId,
-      expected_benefit: 'The model is told which one controls instead of guessing.',
+      expected_benefit: 'PromptMaster is told which one takes priority instead of guessing.',
       scope: `Conflicts with ${conflict.kind}: ${conflict.with_text.slice(0, 300)}`,
     },
     scope: { kind: 'document', described_as: 'A conflict between instructions', stage_id: args.stageId },

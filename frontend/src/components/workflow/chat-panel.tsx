@@ -34,16 +34,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MarkdownOutput } from '@/components/shared/markdown-output';
 import { useStageChat } from './use-stage-chat';
 import { ConflictPrompt } from './conflict-prompt';
-import { api } from '@/lib/api/client';
-import { conflictContext, recordConflictChoice } from '@/lib/workflow/conflict-trail';
+import { findInstructionConflicts, recordConflictChoice } from '@/lib/workflow/conflict-trail';
 import {
-  mergeConflicts,
   precedenceNote,
-  ruleConflicts,
   type Controls,
   type InstructionConflict,
 } from '@/lib/workflow/instruction-conflicts';
-import { inputsFrom } from '@/lib/workflow/stage-requests';
 import { ReplyActions } from './reply-actions';
 import type { RowChange } from '@/lib/workflow/row-actions';
 import type { ReplyAction } from '@/types';
@@ -247,7 +243,7 @@ export function ChatPanel({
 
   // PM-24: an instruction is checked for conflicts before it is sent.
   const [checking, setChecking] = useState(false);
-  const [conflicting, setConflicting] = useState<{ text: string; conflicts: InstructionConflict[] } | null>(null);
+  const [conflicting, setConflicting] = useState<{ text: string; conflicts: InstructionConflict[]; action?: ReplyAction } | null>(null);
   const conflictRef = useRef<HTMLDivElement>(null);
 
   // The question is only useful if it can be answered: bring its top into the
@@ -301,6 +297,27 @@ export function ChatPanel({
   }, [latestReplyId, offerActions, readOnly, chat.loading]);
   useEffect(() => () => actionsAbort.current?.abort(), []);
   const [dismissedFor, setDismissedFor] = useState<string | null>(null);
+  // A revision from a button is an instruction like any other: checked
+  // against the objective and earlier decisions before it reaches the model
+  // (1 Oct, item 33). Row changes are shown row by row and are not checked.
+  const runAction = useCallback(
+    async (action: ReplyAction) => {
+      if (!onRunAction) return;
+      if (action.kind === 'revise' && action.instruction) {
+        setChecking(true);
+        const conflicts = await findInstructionConflicts({
+          project, stageId, instruction: action.instruction, headVersionId: headVersion?.id ?? null,
+        });
+        setChecking(false);
+        if (conflicts.length) {
+          setConflicting({ text: action.instruction, conflicts, action });
+          return;
+        }
+      }
+      await onRunAction(action);
+    },
+    [onRunAction, project, stageId, headVersion?.id]
+  );
 
   const canSend =
     !readOnly && !chat.busy && !checking && !conflicting && draft.trim().length > 0 && (mode === 'discuss' || scopeReady);
@@ -316,26 +333,11 @@ export function ChatPanel({
       return;
     }
     setChecking(true);
-    let conflicts: InstructionConflict[] = [];
-    try {
-      const recent = chat.messages.filter((m) => m.role === 'user' && m.mode === 'instruct').map((m) => m.content);
-      const { decisions, others } = await conflictContext(project.id, stageId, recent, headVersion?.id ?? null);
-      const rule = ruleConflicts({ instruction: text, objective: project.objective, constraints: project.constraints, decisions, others });
-      let model: InstructionConflict[] = [];
-      try {
-        const res = await api.checkConflicts({
-          inputs: inputsFrom(project), instruction: text, decisions, other_instructions: others, model: project.model,
-        });
-        model = res.conflicts.map((c) => ({ ...c, source: 'model' as const }));
-      } catch {
-        // The model half failing never blocks an instruction; the rule's half still counts.
-      }
-      conflicts = mergeConflicts(rule, model);
-    } catch {
-      // Nor does anything else about the check.
-    } finally {
-      setChecking(false);
-    }
+    const recent = chat.messages.filter((m) => m.role === 'user' && m.mode === 'instruct').map((m) => m.content);
+    const conflicts = await findInstructionConflicts({
+      project, stageId, instruction: text, recentInstructions: recent, headVersionId: headVersion?.id ?? null,
+    });
+    setChecking(false);
     if (conflicts.length) {
       setConflicting({ text, conflicts });
       return;
@@ -346,7 +348,7 @@ export function ChatPanel({
   const resolveConflicts = useCallback(
     async (choices: Controls[]) => {
       if (!conflicting) return;
-      const { text, conflicts } = conflicting;
+      const { text, conflicts, action } = conflicting;
       setConflicting(null);
       await Promise.all(
         conflicts.map((conflict, i) =>
@@ -354,13 +356,15 @@ export function ChatPanel({
             .catch(() => undefined)
         )
       );
-      await chat.propose(text, scope, {
-        selection,
-        sectionId: effectiveSectionId,
-        precedence: conflicts.map((c, i) => precedenceNote(c, text, choices[i])),
-      });
+      const precedence = conflicts.map((c, i) => precedenceNote(c, text, choices[i]));
+      if (action) {
+        // An action button's revision carries the user's answer with it.
+        await onRunAction?.({ ...action, instruction: [text, ...precedence].join('\n') });
+        return;
+      }
+      await chat.propose(text, scope, { selection, sectionId: effectiveSectionId, precedence });
     },
-    [conflicting, project, stageId, chat, scope, selection, effectiveSectionId]
+    [conflicting, project, stageId, chat, scope, selection, effectiveSectionId, onRunAction]
   );
 
   return (
@@ -421,7 +425,7 @@ export function ChatPanel({
                       error={actions?.forId === message.id ? actions.error : null}
                       busy={applying}
                       previewRows={previewRows}
-                      onRun={onRunAction}
+                      onRun={runAction}
                       onDismiss={() => setDismissedFor(message.id)}
                       onRequest={() => requestActions(message.id)}
                     />
@@ -449,7 +453,7 @@ export function ChatPanel({
               busy={chat.busy}
               onContinue={(choices) => void resolveConflicts(choices)}
               onCancel={() => {
-                setDraft(conflicting.text);
+                if (!conflicting.action) setDraft(conflicting.text);
                 setConflicting(null);
               }}
             />

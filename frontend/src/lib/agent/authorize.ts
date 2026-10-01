@@ -21,11 +21,11 @@ export const POLICY_TERMS: Record<Exclude<ExecutionPolicy, 'guided'>, string[]> 
   checkpoint: [
     'Go mode chooses and performs moves on its own.',
     'It stops for your approval before important ones: moving stages, revising a draft, running code, changing assumptions.',
-    'It can mark a stage blocked, with a reason. It cannot skip, go back or finish the project.',
+    'It can mark a stage stuck, with a reason. It cannot skip, go back or finish the project.',
   ],
   autonomous: [
-    'Go mode keeps choosing and performing moves until the work is done, it is genuinely blocked, or it needs a decision only you can make.',
-    'It can move between stages, mark a stage complete when the requirements are met, and mark a stage blocked.',
+    'Go mode keeps choosing and performing moves until the work is done, it is genuinely stuck, or it needs a decision only you can make.',
+    'It can move between stages, mark a stage complete when the requirements are met, and mark a stage stuck.',
     'It cannot skip a stage, go back, or finish the project — those stay yours.',
   ],
 };

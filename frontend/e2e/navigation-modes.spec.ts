@@ -21,7 +21,7 @@ test('a done stage can be reopened, edited, closed again, and the stages after i
   const rail = page.getByRole('navigation', { name: 'Workflow stages' });
   await rail.getByRole('button', { name: /Objective/ }).click();
   await expect(page.getByRole('heading', { name: /Objective/ })).toBeVisible();
-  const artifact = page.getByRole('region', { name: /Objective.*artifact/ });
+  const artifact = page.getByRole('region', { name: /Objective.*work/ });
   await expect(artifact.getByRole('button', { name: 'Edit' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Reopen to edit' }).click();
   await expect(page.getByText(/Reopened — edit it here, then mark it complete/)).toBeVisible();

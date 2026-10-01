@@ -88,7 +88,7 @@ AGENT_ACTIONS: list[AgentAction] = [
     # --- workflow ---------------------------------------------------------------
     AgentAction(key="advance_stage", family="workflow", label="Move to the next stage",
                 when="This stage's work is done and checked.", important=True),
-    AgentAction(key="mark_blocked", family="workflow", label="Mark this stage blocked",
+    AgentAction(key="mark_blocked", family="workflow", label="Mark this stage stuck",
                 when="A missing tool or missing data stops progress. Params: reason, block_kind."),
     AgentAction(key="request_user_decision", family="workflow", label="Ask the user",
                 when="A real choice only the user can make is needed. Set decision_question."),

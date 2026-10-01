@@ -88,6 +88,8 @@ export function TransparencyPanel({
   mode: string;
   thinking: boolean;
 }) {
+  // What was used, in the user's words rather than the record's.
+  const TOOL_NAME: Record<string, string> = { sandbox: 'code sandbox', model: 'AI model', jobs: 'background writing queue' };
   const rows: [string, React.ReactNode][] = [
     ['Stage', stageLabel],
     ['Mode', MODE_DISPLAY[mode as ModeType]?.display_name ?? mode ?? '—'],
@@ -102,7 +104,7 @@ export function TransparencyPanel({
         '—'
       ),
     ],
-    ['Tools', step?.tools_used?.length ? step.tools_used.map((t) => (t === 'sandbox' ? 'code sandbox' : t)).join(', ') : '—'],
+    ['Tools', step?.tools_used?.length ? step.tools_used.map((t) => TOOL_NAME[t] ?? t).join(', ') : '—'],
     ['Status', run ? `${RUN_STATUS[run.status]}${step ? ` · step ${STEP_STATUS[step.status].toLowerCase()}` : ''}` : 'Not started'],
     ['What changed', step && step.status !== 'running' ? changed(step) : '—'],
     ['Next', next],

@@ -559,3 +559,11 @@ def test_evaluating_a_review_stage_sees_the_manuscript(book_inputs, positioning_
     assert "MANUSCRIPT-PROSE-MARKER" in user
     _system, user = build_stage_evaluation_prompt(book_inputs, positioning_stage, "findings", book_digest)
     assert "THE MANUSCRIPT THIS STAGE WAS PRODUCED FROM" not in user
+
+
+def test_the_evaluator_is_told_to_call_the_work_the_draft():
+    """1 Oct, item 23: "the artifact is disciplined about evidence limits" was shown to the user."""
+    from promptmaster.stage_evaluation import _STAGE_EVAL_INSTRUCTION
+
+    assert 'Call the work "the draft"' in _STAGE_EVAL_INSTRUCTION
+    assert 'never "the artifact"' in _STAGE_EVAL_INSTRUCTION
