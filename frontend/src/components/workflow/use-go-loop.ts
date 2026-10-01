@@ -160,6 +160,10 @@ export function useGoLoop(opts: Options) {
   /** Further windows an Autonomous run may start on its own (chosen in the authorization). */
   const [autoWindows, setAutoWindows] = useState(0);
   const autoLeftRef = useRef(0);
+  // Whether a used-up window will be followed by another without asking.
+  // State, not the ref, so the "window used up" card is not shown for the
+  // moment between one window ending and the next starting.
+  const [autoPending, setAutoPending] = useState(false);
   const continueRef = useRef<(auto?: boolean) => Promise<void>>(async () => {});
   const [run, setRun] = useState<AgentRun | null>(null);
   const [steps, setSteps] = useState<AgentStep[]>([]);
@@ -473,7 +477,7 @@ export function useGoLoop(opts: Options) {
       const ended = runRef.current;
       if (ended?.status === 'budget_exhausted' && ended.policy === 'autonomous' && autoLeftRef.current > 0) {
         autoLeftRef.current -= 1;
-        void continueRef.current(true);
+        void continueRef.current(true).finally(() => setAutoPending(autoLeftRef.current > 0));
       }
     } catch (e) {
       if (e instanceof Stopped || signal.aborted) return;
@@ -518,6 +522,7 @@ export function useGoLoop(opts: Options) {
       followRef.current = null;
       sinceRef.current = 0;
       autoLeftRef.current = chosen === 'autonomous' ? autoWindows : 0;
+      setAutoPending(autoLeftRef.current > 0);
       void loop();
     },
     [budget, autoWindows, commitRun, commitSteps, loop]
@@ -916,7 +921,7 @@ export function useGoLoop(opts: Options) {
     continueRun,
     acknowledgeLargeJob,
     stageLabelFor,
-    autoWindows, setAutoWindows,
+    autoWindows, setAutoWindows, autoPending,
     policy, setPolicy, budget, setBudget, run, steps, phase, active, pendingStep, pendingStale, authorizing, error,
     go, suggest, replan, stop, approve, decline, answer, confirmAuthorization,
     cancelAuthorization: useCallback(() => setAuthorizing(null), []),
