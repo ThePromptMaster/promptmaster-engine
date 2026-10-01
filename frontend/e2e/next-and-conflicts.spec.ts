@@ -143,11 +143,16 @@ test('Go stops and asks before a revision that conflicts with the objective, the
   await expect(page.getByRole('button', { name: /^v2/ })).toBeVisible({ timeout: 30_000 });
 
   const [run] = await serviceSelect('agent_runs', `project_id=eq.${id}&select=id&order=created_at.desc&limit=1`);
-  const steps = await serviceSelect('agent_steps', `run_id=eq.${run.id}&select=action_key,status,params&order=idx`);
-  expect(steps.slice(0, 3).map((s: { action_key: string; status: string }) => [s.action_key, s.status])).toEqual([
-    ['revise_stage', 'blocked'],
-    ['user_answer', 'succeeded'],
-    ['revise_stage', 'succeeded'],
-  ]);
+  const stepRows = () => serviceSelect('agent_steps', `run_id=eq.${run.id}&select=action_key,status,params&order=idx`);
+  // The version appears before its step row is closed (the result is read
+  // back first), so wait for the record rather than reading it once.
+  await expect
+    .poll(async () => (await stepRows()).slice(0, 3).map((s: { action_key: string; status: string }) => [s.action_key, s.status]), { timeout: 15_000 })
+    .toEqual([
+      ['revise_stage', 'blocked'],
+      ['user_answer', 'succeeded'],
+      ['revise_stage', 'succeeded'],
+    ]);
+  const steps = await stepRows();
   expect(steps[0].params.conflict_question).toBe(true);
 });
