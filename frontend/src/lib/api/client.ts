@@ -11,6 +11,7 @@ import type {
   ChatMessageRequest,
   ChatMessageResponse,
   ApplyToAnswerRequest,
+  GuideQuestion,
   ReplyAction,
   SuggestActionsRequest,
   SaveAsNewVersionRequest,
@@ -500,6 +501,11 @@ export const api = {
   },
 
   /** PM-09 "Guide me": a few questions before recommending a setup. 1 LLM call. */
+  /** "Guide me", one question at a time: the next question given the answers so far, or that there is enough. */
+  async guideNextQuestion(req: { objective: string; answered: { question: string; answer: string }[] }): Promise<{ enough: boolean; question: GuideQuestion | null; reason: string }> {
+    return apiFetch('/api/guide-next-question', { method: 'POST', body: JSON.stringify(req) });
+  },
+
   async guideQuestions(req: { objective: string; model?: string }): Promise<GuideQuestionsResponse> {
     return apiFetch('/api/guide-questions', {
       method: 'POST',

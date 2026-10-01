@@ -212,3 +212,99 @@ async def suggest_guide_questions(
             options=options,
         ))
     return questions[:5] or list(_FALLBACK_QUESTIONS)
+
+
+# ---------------------------------------------------------------------------
+# "Guide me", one question at a time
+# ---------------------------------------------------------------------------
+#
+# The batch above asks three to five questions written before any of them is
+# answered, so the third cannot depend on the first. The client's 1 Oct
+# feedback, item 9: "optionally ask one question at a time and branch based
+# on previous answers; let the user stop questioning whenever PromptMaster has
+# enough context". This asks for the single next question given what has been
+# answered, and may answer that it has enough.
+
+MAX_GUIDE_QUESTIONS = 6
+
+GUIDE_NEXT_SYSTEM = (
+    "You are the intake layer of PromptMaster. A user has said what they want "
+    "to do or figure out and has answered some questions about it. Decide "
+    "whether ONE more question is worth asking, and if so, ask it.\n\n"
+    "Ask only a question whose answer would change how the work is set up — "
+    "who it is for, what a good result looks like, what data or evidence "
+    "exists, what must be included or avoided, how deep it should go, whether "
+    "it is one piece, a long document or an investigation. Let the answers so "
+    "far decide what to ask next: follow up on what they opened, and never ask "
+    "what the objective or an earlier answer already settles.\n\n"
+    "If you already know enough to set the work up well, say so instead of "
+    "asking: enough is a good answer, and three questions is often enough.\n\n"
+    "A question is short and plain, with a one-line reason and up to four "
+    "short example answers the user can click. Set \"multi\" to true when "
+    "several of the options could apply at once (kinds of data available, "
+    "things to include), and false when they exclude one another (one "
+    "audience, one length). Return JSON only."
+)
+
+
+def build_guide_next_prompt(objective: str, answered: list[dict[str, str]]) -> str:
+    so_far = "\n".join(
+        f"- Q: {a.get('question', '').strip()}\n  A: {a.get('answer', '').strip() or '(skipped)'}" for a in answered
+    ) or "(nothing asked yet)"
+    return (
+        f"Objective: {objective}\n\n"
+        f"ASKED AND ANSWERED SO FAR:\n{so_far}\n\n"
+        "Return JSON in exactly one of these shapes:\n"
+        '{"enough": true, "reason": "one line: what you now know"}\n'
+        '{"enough": false, "question": {"question": "...", "why": "...", "options": ["...", "..."], "multi": false}}'
+    )
+
+
+def parse_guide_next(result: object, asked: int) -> tuple[bool, GuideQuestion | None, str]:
+    """(enough, question, reason). Anything unusable is "enough": a broken
+    question must not trap the user in the intake."""
+    if not isinstance(result, dict):
+        return True, None, ""
+    raw = result.get("question")
+    if result.get("enough") or not isinstance(raw, dict) or not str(raw.get("question") or "").strip():
+        return True, None, str(result.get("reason") or "").strip()
+    options = [str(o).strip() for o in (raw.get("options") or []) if str(o).strip()][:4]
+    return False, GuideQuestion(
+        id=f"q{asked + 1}",
+        question=str(raw["question"]).strip(),
+        why=str(raw.get("why") or "").strip(),
+        options=options,
+        # Several answers only make sense when there are options to pick among.
+        multi=bool(raw.get("multi")) and len(options) > 1,
+    ), ""
+
+
+async def suggest_next_guide_question(
+    client: OpenRouterClient,
+    model: str | None,
+    objective: str,
+    answered: list[dict[str, str]],
+) -> tuple[bool, GuideQuestion | None, str]:
+    """The next question, or that there is enough. One small call.
+
+    Stops by itself at MAX_GUIDE_QUESTIONS without a call. If the call fails,
+    the generic questions are asked in turn so the path still works.
+    """
+    if len(answered) >= MAX_GUIDE_QUESTIONS:
+        return True, None, "That is enough to set this up."
+    try:
+        result, _usage = await client.generate_json(
+            prompt=build_guide_next_prompt(objective, answered),
+            system=GUIDE_NEXT_SYSTEM,
+            temperature=0.3,
+            max_tokens=400,
+            model=model,
+        )
+    except Exception as e:
+        logger.warning(f"Guide next-question LLM call failed: {e}")
+        asked = {a.get("question", "").strip() for a in answered}
+        remaining = [q for q in _FALLBACK_QUESTIONS if q.question not in asked]
+        if not remaining:
+            return True, None, ""
+        return False, remaining[0].model_copy(update={"id": f"q{len(answered) + 1}"}), ""
+    return parse_guide_next(result, len(answered))

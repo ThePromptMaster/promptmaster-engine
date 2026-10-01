@@ -36,25 +36,65 @@ test('"I know what I want to do": the setup is recommended, editable, and carrie
   await expect(page.getByRole('textbox', { name: 'Constraints' })).toHaveValue(/giraffes/);
 });
 
-test('"Guide me": a few questions, clickable answers, then a recommendation', async ({ page }) => {
+/**
+ * 1 Oct, item 9 — "Right now it feels like a smart intake form. The next
+ * level is adaptive questioning": several answers where they are not
+ * mutually exclusive, typed answers as removable chips, one question at a
+ * time branching on the last, and stopping when there is enough.
+ */
+test('"Guide me" asks one question at a time, takes several answers, and stops when it has enough', async ({ page }) => {
   await page.goto('/projects/new');
   await dismissBetaNotice(page);
   await page.getByLabel('What do you want to do or figure out?').fill('Why do giraffes have such long necks?');
   await page.getByRole('button', { name: /Guide me/ }).click();
 
   await expect(page.getByRole('heading', { name: 'A few questions' })).toBeVisible();
-  await expect(page.getByText('1. Who is this for?')).toBeVisible();
-  // "Buttonize it": the example answers are clickable.
-  await page.getByRole('button', { name: 'Adults' }).click();
-  await expect(page.getByRole('button', { name: 'Adults' })).toHaveAttribute('aria-pressed', 'true');
-  await page.getByLabel('3. What must it include?').fill('The competing hypotheses');
-  await page.screenshot({ path: test.info().outputPath('03-guide-me-questions.png'), fullPage: true });
+  const question = page.getByRole('region', { name: 'Question' });
+  await expect(question.getByRole('heading')).toHaveText('1. What data do you have?');
+  await expect(question).toContainText('Choose any that apply.');
 
-  await page.getByRole('button', { name: 'Recommend a setup' }).click();
-  await expect(page.getByText(/Recommended: Research/)).toBeVisible();
+  // Several of the offered answers, plus one typed in — which becomes a chip that can be removed.
+  await question.getByRole('button', { name: 'CRM', exact: true }).click();
+  await question.getByRole('button', { name: 'Billing', exact: true }).click();
+  await expect(question.getByRole('button', { name: 'CRM', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(question.getByRole('button', { name: 'Billing', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await question.getByLabel('Your own answer', { exact: true }).fill('Survey results');
+  await question.getByRole('button', { name: 'Add', exact: true }).click();
+  await question.getByLabel('Your own answer', { exact: true }).fill('A typo');
+  await question.getByRole('button', { name: 'Add', exact: true }).click();
+  await question.getByRole('button', { name: 'Remove "A typo"' }).click();
+  await expect(question.getByLabel('Your own answers')).toHaveText(/Survey results/);
+  await expect(question.getByLabel('Your own answers')).not.toContainText('A typo');
+  await page.screenshot({ path: test.info().outputPath('03-guide-me-several-answers.png'), fullPage: true });
+  await question.getByRole('button', { name: 'Next question' }).click();
+
+  // The second question follows from the first answer, and takes one answer.
+  await expect(question.getByRole('heading')).toHaveText('2. Mock follow-up on: CRM; Billing; Survey results');
+  await expect(question).toContainText('Choose one.');
+  await expect(page.getByRole('list', { name: 'Your answers so far' })).toContainText('CRM');
+  await question.getByRole('button', { name: 'Executives' }).click();
+  await question.getByRole('button', { name: 'My team' }).click();
+  await expect(question.getByRole('button', { name: 'Executives' })).toHaveAttribute('aria-pressed', 'false');
+  await page.screenshot({ path: test.info().outputPath('04-guide-me-follow-up.png'), fullPage: true });
+  await question.getByRole('button', { name: 'Next question' }).click();
+
+  // Two answers are enough for the scripted model: it says so and recommends.
+  await expect(page.getByText(/Recommended: Research/)).toBeVisible({ timeout: 30_000 });
   await page.getByRole('button', { name: 'Start Research' }).click();
   await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}$/);
-  await expect(page.getByRole('heading', { name: /question/i }).first()).toBeVisible();
+});
+
+test('"That\'s enough" stops the questions at any point and uses what was given', async ({ page }) => {
+  await page.goto('/projects/new');
+  await dismissBetaNotice(page);
+  await page.getByLabel('What do you want to do or figure out?').fill('Why do giraffes have such long necks?');
+  await page.getByRole('button', { name: /Guide me/ }).click();
+  const question = page.getByRole('region', { name: 'Question' });
+  await question.getByRole('button', { name: 'None yet' }).click();
+  const setup = page.waitForRequest((r) => r.url().includes('/api/generate-setup') && r.method() === 'POST');
+  await page.getByRole('button', { name: /That's enough/ }).click();
+  expect((await setup).postDataJSON().answers).toEqual([{ question: 'What data do you have?', answer: 'None yet' }]);
+  await expect(page.getByRole('heading', { name: 'Your setup' })).toBeVisible({ timeout: 30_000 });
 });
 
 test('choosing the workflow yourself is still one click away', async ({ page }) => {

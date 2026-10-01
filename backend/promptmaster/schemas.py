@@ -387,6 +387,8 @@ class GuideQuestion(BaseModel):
     why: str = ""
     #: Up to four short suggested answers the user can click. May be empty.
     options: list[str] = Field(default_factory=list)
+    #: The options are not mutually exclusive: several may apply at once.
+    multi: bool = False
 
 
 # --------------------------------------------------------------------------

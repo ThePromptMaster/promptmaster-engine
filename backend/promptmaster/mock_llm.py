@@ -348,6 +348,18 @@ def _json_reply(system: str, prompt: str) -> dict:
         return _stage_items(prompt)
     if system.startswith(setup_suggester.SETUP_SUGGESTER_SYSTEM[:60]):
         return _setup(prompt)
+    if system.startswith(setup_suggester.GUIDE_NEXT_SYSTEM[:60]):
+        # Two questions, the second depending on the first answer, then enough.
+        answered = re.findall(r"^  A: (.*)$", prompt, re.M)
+        if len(answered) == 0:
+            return {"enough": False, "question": {
+                "question": "What data do you have?", "why": "Mock: it decides what can be run.",
+                "options": ["CRM", "Billing", "Support tickets", "None yet"], "multi": True}}
+        if len(answered) == 1:
+            return {"enough": False, "question": {
+                "question": f"Mock follow-up on: {answered[0][:60]}", "why": "Mock: branches on the first answer.",
+                "options": ["Executives", "My team"], "multi": False}}
+        return {"enough": True, "reason": "Mock: that is enough to set this up."}
     if system.startswith(setup_suggester.GUIDE_QUESTIONS_SYSTEM[:60]):
         return {"questions": [
             {"id": "q1", "question": "Who is this for?", "why": "Mock: audience sets tone.",
