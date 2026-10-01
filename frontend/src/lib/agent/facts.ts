@@ -5,7 +5,11 @@
  * render or more, and which never held the outline (its own artifact) or the
  * chapters (in `artifacts.long_form`) at all. Go therefore planned against a
  * stage it could not see. These facts are read once per loop iteration and
- * again by a performer before it claims a post-condition holds.
+ * again before a step is performed. Everything the planner is then told
+ * (digest.ts) and every requirement it is judged against (`contextWithFacts`)
+ * comes from this read, not from props. After a step that claims a change,
+ * `readOutcomeProof` reads the project once more and outcome.ts checks the
+ * claim against it.
  */
 
 import { loadOutline } from '@/lib/outline/actions';
@@ -13,16 +17,20 @@ import { countNamedSections, emptyDocument, parseOutlineDocument } from '@/lib/o
 import { jobBySection, pendingJobs, revisedCount, stoppedSections, type SectionTarget } from '@/lib/jobs/sections';
 import { listProjectJobs, type ProjectJob } from '@/lib/supabase/jobs';
 import { approvedOutlineVersionId, outlineApprovals } from '@/lib/supabase/outline';
-import { getArtifact } from '@/lib/supabase/versions';
+import { checkVersions, getArtifact, getEvaluation } from '@/lib/supabase/versions';
 import { manuscriptArtifactFor } from '@/lib/workflow/context';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import { revisionBrief, type RevisionBrief } from '@/lib/workflow/revision';
 import { effectiveRenderer, itemSchemaFor, parseItems, stageDrafts, type StageItem, type StageItemSchema, isTriaged } from '@/lib/workflow/stage-artifact';
 import { isTriageTable, splitUntriaged } from '@/lib/workflow/triage';
-import type { StageDefinition, WorkflowEvent, WorkflowTemplate } from '@/lib/workflow/types';
+import { projectState } from '@/lib/workflow/engine';
+import type { StageContext, StageDefinition, WorkflowEvent, WorkflowTemplate } from '@/lib/workflow/types';
 import type { OutlineSection } from '@/types';
 import type { OutlineDocument } from '@/types/outline';
 import type { Artifact, ArtifactVersion, Evaluation, Project } from '@/types/project';
+import { actionFor } from './actions';
+import type { OutcomeProof } from './outcome';
+import type { StepOutcome } from './perform';
 
 export interface OutlineFacts {
   artifact: Artifact;
@@ -75,6 +83,8 @@ export interface ReviewFacts {
 }
 
 export interface StageFacts {
+  /** Any outline version is approved, from the event log as just read. */
+  outlineApproved?: boolean;
   outline?: OutlineFacts;
   manuscript?: ManuscriptFacts;
   evaluationFindings?: EvaluationFacts;
@@ -91,7 +101,7 @@ export async function readStageFacts(input: {
 }): Promise<StageFacts> {
   const { project, template, stage, bundles, latestEvaluation } = input;
   const events = [...input.events];
-  const facts: StageFacts = {};
+  const facts: StageFacts = { outlineApproved: approvedOutlineVersionId(events) !== null };
 
   if (stage.renderer === 'outline') {
     const { artifact, versions, draft } = await loadOutline({ id: project.id, user_id: project.user_id }, stage.id);
@@ -153,4 +163,72 @@ export async function readStageFacts(input: {
   }
 
   return facts;
+}
+
+/**
+ * The exit-criteria context with this stage's entries replaced by what was
+ * just read. Pure.
+ *
+ * The workspace builds its context from the store, which lags the section
+ * jobs (they write server-side) and the outline panel's working copy. Go
+ * judged "every section is written" and "the outline is approved" from that,
+ * while choosing its moves from the fresh read — two answers to one question
+ * (1 Oct, item 1: "Go said the drafting artifact was empty while all three
+ * chapters had already been written and were visible").
+ */
+export function contextWithFacts(context: StageContext, stage: StageDefinition, facts: StageFacts): StageContext {
+  let next = context;
+  if (facts.outlineApproved !== undefined) next = { ...next, outlineApproved: facts.outlineApproved };
+  if (facts.manuscript) {
+    const m = facts.manuscript;
+    next = {
+      ...next,
+      sections: { ...next.sections, [stage.id]: { total: m.total, complete: m.complete } },
+      artifactNonEmpty: {
+        ...next.artifactNonEmpty,
+        [stage.id]: next.artifactNonEmpty[stage.id] || m.outline.some((s) => (s.content ?? '').trim().length > 0),
+      },
+    };
+  }
+  if (facts.outline) {
+    next = { ...next, itemCounts: { ...next.itemCounts, [stage.id]: facts.outline.namedSections } };
+  }
+  return next;
+}
+
+/**
+ * Read back what a step says it changed. The check itself is pure
+ * (outcome.ts `verifyOutcome`); this only fetches.
+ */
+export async function readOutcomeProof(input: {
+  actionKey: string;
+  outcome: StepOutcome;
+  template: WorkflowTemplate;
+  stage: StageDefinition;
+  facts: StageFacts;
+  loadEvents: () => Promise<readonly WorkflowEvent[]>;
+}): Promise<OutcomeProof> {
+  const { actionKey, outcome, template, stage, facts } = input;
+  const performer = actionFor(actionKey)?.performer;
+  const proof: OutcomeProof = {};
+  const versionIds = outcome.changes.version_ids ?? [];
+
+  if (performer === 'evaluate') {
+    proof.evaluated = versionIds.length > 0 && (await getEvaluation(versionIds[0])) !== null;
+    return proof;
+  }
+  if (versionIds.length) proof.versions = await checkVersions(versionIds);
+  if (performer === 'sections' && facts.manuscript) {
+    const fresh = await getArtifact(facts.manuscript.artifact.id);
+    proof.sectionsWithContent = (fresh?.long_form?.outline ?? []).filter((s) => (s.content ?? '').trim()).map((s) => s.id);
+  }
+  if (performer === 'advance') {
+    const state = projectState(template, [...(await input.loadEvents())]);
+    proof.stage = {
+      currentStageId: state.current_stage_id,
+      status: state.stages[stage.id]?.status,
+      expectedStageId: stage.transitions.default_next ?? null,
+    };
+  }
+  return proof;
 }

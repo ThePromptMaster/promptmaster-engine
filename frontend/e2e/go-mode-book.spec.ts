@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { createProject, pressTransition, serviceSelect, skipStage, stageArtifact, transitionBar } from './helpers';
+import { createProject, pressTransition, servicePatch, serviceSelect, skipStage, stageArtifact, transitionBar } from './helpers';
 
 /**
  * B0 — Go mode on a Book (Sean, 28 Sep, items 1 and 2, screenshot 3).
@@ -74,6 +74,40 @@ test('Go on a fully drafted stage moves on and marks it complete with the manusc
   const [snapshot] = await serviceSelect('artifact_versions', `id=eq.${done.payload.evidence_version_id}&select=source_operation,content`);
   expect(snapshot.source_operation).toBe('long_form_complete');
   expect(snapshot.content).toContain('## 1. Habitat');
+});
+
+/**
+ * 1 Oct, item 1 — "Go said the drafting artifact was empty while all three
+ * chapters had already been written and were visible."
+ *
+ * The planner's picture of the manuscript came from the page's store while
+ * the loop's own decisions came from a fresh read. Here the manuscript is
+ * changed in the database behind the page's back (as a section job does),
+ * and one section's last write is marked failed with its text kept: the
+ * planner must be sent what the database holds, with both chapters counted.
+ */
+test('the planner is sent the manuscript as the database holds it, not as the page last loaded it', async ({ page }) => {
+  test.setTimeout(180_000);
+  const id = await bookDraftedToTheEnd(page, 'E2E go fresh facts', 'A short book about okapis [[mock:plan=advance_stage]]');
+
+  const [artifact] = await serviceSelect('artifacts', `project_id=eq.${id}&stage_id=eq.drafting&select=id,long_form`);
+  const outline = artifact.long_form.outline.map((s: { content: string; status: string }, i: number) =>
+    i === 1 ? { ...s, content: `${s.content}\n\nWRITTEN-BEHIND-THE-PAGE`, status: 'error' } : s
+  );
+  await servicePatch('artifacts', `id=eq.${artifact.id}`, { long_form: { ...artifact.long_form, outline } });
+
+  const panel = goPanel(page);
+  await panel.getByRole('button', { name: 'Set up Go' }).click();
+  await panel.getByRole('radio', { name: /^Guided/ }).click();
+  const planned = page.waitForRequest((r) => r.url().includes('/api/agent/next-action') && r.method() === 'POST');
+  await panel.getByRole('button', { name: /^Go$/ }).click();
+  const { state } = (await planned).postDataJSON();
+
+  expect(state.artifact_excerpt).toContain('WRITTEN-BEHIND-THE-PAGE');
+  expect(state.manuscript).toMatchObject({ total: 2, complete: 2, unwritten: [] });
+  expect(state.manuscript.written[1]).toBe('2. Diet (text kept; last write error)');
+  await expect(page.getByRole('region', { name: 'Go mode needs your approval' })).toBeVisible({ timeout: 30_000 });
+  await page.screenshot({ path: test.info().outputPath('01-planner-read-the-database.png'), fullPage: true });
 });
 
 /**

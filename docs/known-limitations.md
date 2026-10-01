@@ -433,8 +433,13 @@ every Research run could walk into "no search tool is connected" and stop there)
 since B2b (2026-09-28) Go has the stage's own moves — `generate_outline`,
 `draft_sections`, `revise_sections`, `apply_findings` — performed by the same functions
 the buttons call (`lib/outline/actions.ts`, `lib/jobs/sections.ts`,
-`lib/workflow/apply-findings.ts`), each verified against the project before it is
-recorded as succeeded. What stays the user's: approving an outline, unblocking a stage,
+`lib/workflow/apply-findings.ts`). Until 2026-10-01 "succeeded" meant the performer
+reported a change; since then the project is read back after the step
+(`readOutcomeProof` / `verifyOutcome`: the saved version exists and holds text, the
+written sections hold text, the check left an evaluation, a stage move moved the
+cursor) and a step whose change is not found is recorded as failed. If that read-back
+itself fails, the step keeps its status with "Not confirmed" appended rather than being
+failed on a guess. What stays the user's: approving an outline, unblocking a stage,
 ticking a manual requirement, deciding on findings; Go stops and says so (the inline
 "I need you to…" card is B4; a card with no button of its own leaves Resume in place —
 until 2026-09-29 every card hid it, and a run stopped for material findings could not

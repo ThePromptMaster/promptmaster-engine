@@ -242,6 +242,20 @@ export async function rateVersion(
   if (error) throw error;
 }
 
+/**
+ * Whether these versions exist, and whether each holds anything. Go mode reads
+ * this back after a step that claims to have saved one (1 Oct, item 4:
+ * "succeeded" must mean the change is in the project).
+ */
+export async function checkVersions(ids: string[]): Promise<{ id: string; found: boolean; empty: boolean }[]> {
+  if (!ids.length) return [];
+  const supabase = createClient();
+  const { data, error } = await supabase.from('artifact_versions').select('id, content').in('id', ids);
+  if (error) throw error;
+  const rows = new Map(((data ?? []) as { id: string; content: string | null }[]).map((r) => [r.id, r.content ?? '']));
+  return ids.map((id) => ({ id, found: rows.has(id), empty: !(rows.get(id) ?? '').trim() }));
+}
+
 // --- evaluations ------------------------------------------------------------
 
 export async function getEvaluation(versionId: string): Promise<Evaluation | null> {

@@ -211,6 +211,17 @@ pause for approval if the policy says so → `performStep` → close the step wi
 derived from what happened (`lib/agent/labels.ts`). `run_computation` is followed by an
 automatic `interpret_result` step that cites the sandbox run.
 
+**One read per pass (2026-10-01).** `readStageFacts` (`lib/agent/facts.ts`) reads the
+outline, the manuscript and the event log from the database, and that one read decides
+the allowed moves, the requirements (`contextWithFacts` → `evaluateStage`), whether the
+next move is the user's, and what the planner is shown (`buildAgentState` takes `facts`).
+Before this the planner's excerpt and the requirements came from the store's bundles,
+which lag the section jobs, so Go could call a written Drafting stage empty.
+
+**"Succeeded" is read back.** After a step that claims a change, `readOutcomeProof`
+re-reads the project and `verifyOutcome` (`lib/agent/outcome.ts`, pure) fails the step if
+the saved version, the written sections, the evaluation or the stage move is not there.
+
 Honesty is enforced twice: `deriveExecutionLabel` never takes a label from the model, and
 `agent_steps_label_honest` refuses `code_executed`/`simulation_run` without a sandbox run
 for the step and `result_interpreted` without one to cite. Stage moves are the user's when

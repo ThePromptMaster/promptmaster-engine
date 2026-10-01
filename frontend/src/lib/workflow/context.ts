@@ -84,6 +84,9 @@ export function buildStageContext(input: BuildContextInput): StageContext {
         total: outline.length,
         complete: outline.filter((section) => section.status === 'complete').length,
       };
+      // The chapters are this stage's work even though no version row holds
+      // them: a written manuscript is not an empty stage (1 Oct, item 1).
+      if (outline.some((section) => (section.content ?? '').trim())) artifactNonEmpty[s.id] = true;
       continue;
     }
 

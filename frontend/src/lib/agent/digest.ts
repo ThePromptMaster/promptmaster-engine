@@ -11,6 +11,11 @@
  * read "(empty — nothing drafted yet)" on a finished book and chose
  * mark_blocked (Sean, 28 Sep, items 1 and 2, screenshot 3). The digest now
  * says what exists: the outline, the sections written, the findings decided.
+ *
+ * It still read them from the store's bundles, which lag the section jobs and
+ * never held the outline panel's working copy, while the loop chose its moves
+ * from a fresh read (facts.ts). When `facts` is passed, the outline and the
+ * manuscript come from that same read (1 Oct, item 1).
  */
 
 import { countNamedSections, parseOutlineDocument } from '@/lib/outline/model';
@@ -24,6 +29,7 @@ import type { AgentStep } from '@/types/agent';
 import type { Evaluation } from '@/types/project';
 import type { AgentTools } from './policy';
 import { NO_TOOLS } from './policy';
+import type { StageFacts } from './facts';
 
 /** The backend's cap on `artifact_excerpt` (AgentState in promptmaster/agent.py) — marker included. */
 export const ARTIFACT_EXCERPT_CHARS = 12_000;
@@ -46,6 +52,7 @@ export interface AgentStateDigest {
   prior_stages: string[];
   recent_steps: { action_key: string; status: string; execution_label: string | null; output: string }[];
   outline?: { sections: string[]; named_count: number; approved: boolean };
+  /** `complete` counts the sections that hold text. */
   manuscript?: { total: number; complete: number; pending_jobs: number; written: string[]; unwritten: string[] };
   findings?: { total: number; triaged: number; sample: string[] };
   tools: AgentTools;
@@ -87,8 +94,12 @@ export function buildAgentState(input: {
   /** How many section jobs are still queued or running on this stage's manuscript. */
   pendingJobs?: number;
   tools?: AgentTools;
+  /** What the stage holds, read fresh. Preferred over `bundles` wherever both know. */
+  facts?: StageFacts;
 }): AgentStateDigest {
-  const { template, state, stage, bundles, stageEvaluation, latestEvaluation, steps, context, approvedOutline = [], pendingJobs = 0 } = input;
+  const { template, state, stage, bundles, stageEvaluation, latestEvaluation, steps, context, approvedOutline = [], facts } = input;
+  const pendingJobs = facts?.manuscript?.pendingJobs.length ?? input.pendingJobs ?? 0;
+  const outlineApproved = facts?.outline?.approved ?? facts?.outlineApproved ?? input.outlineApproved ?? approvedOutline.length > 0;
   const tools = input.tools ?? NO_TOOLS;
   const head = bundles[stage.id]?.versions.at(-1)?.content ?? '';
   const next = nextSuggestedStage(template, state);
@@ -101,23 +112,43 @@ export function buildAgentState(input: {
   let manuscript: AgentStateDigest['manuscript'];
   let findings: AgentStateDigest['findings'];
 
+  const outlineLine = (s: { title: string; abstract?: string }, i: number) =>
+    `${i + 1}. ${s.title.trim() || 'Untitled'}${s.abstract?.trim() ? ` — ${s.abstract.trim().slice(0, 120)}` : ''}`;
+
   if (stage.renderer === 'outline') {
-    const doc = parseOutlineDocument(head);
-    const sections = doc.items.map((s, i) => `${i + 1}. ${s.title.trim() || 'Untitled'}${s.abstract?.trim() ? ` — ${s.abstract.trim().slice(0, 120)}` : ''}`);
-    outline = { sections: sections.slice(0, LIST_MAX), named_count: countNamedSections(doc), approved: input.outlineApproved ?? approvedOutline.length > 0 };
+    // The working copy when there is one: it is what the user sees in the panel.
+    const doc = facts?.outline?.doc ?? parseOutlineDocument(head);
+    const sections = doc.items.map(outlineLine);
+    outline = { sections: sections.slice(0, LIST_MAX), named_count: facts?.outline?.namedSections ?? countNamedSections(doc), approved: outlineApproved };
     excerpt = sections.join('\n');
   } else if (stage.renderer === 'long_form') {
-    const sections = manuscriptArtifactFor(template, stage, bundles)?.long_form?.outline ?? [];
-    const written = sections.filter((s) => s.status === 'complete');
-    const label = (s: { title: string }, i: number) => `${i + 1}. ${s.title || 'Untitled section'}`;
+    const sections = facts?.manuscript?.outline ?? manuscriptArtifactFor(template, stage, bundles)?.long_form?.outline ?? [];
+    // Written means the section holds text. A section whose last job failed
+    // but whose text is on the page was listed as unwritten, and the planner
+    // was shown a manuscript with holes the user could not see.
+    const hasText = (s: OutlineSection) => (s.content ?? '').trim().length > 0;
+    const label = (s: OutlineSection, i: number) =>
+      `${i + 1}. ${s.title || 'Untitled section'}${hasText(s) && s.status !== 'complete' ? ` (text kept; last write ${s.status})` : ''}`;
     manuscript = {
       total: sections.length,
-      complete: written.length,
+      complete: sections.filter(hasText).length,
       pending_jobs: pendingJobs,
-      written: sections.map(label).filter((_, i) => sections[i].status === 'complete').slice(0, LIST_MAX),
-      unwritten: sections.map(label).filter((_, i) => sections[i].status !== 'complete').slice(0, LIST_MAX),
+      written: sections.map(label).filter((_, i) => hasText(sections[i])).slice(0, LIST_MAX),
+      unwritten: sections.map(label).filter((_, i) => !hasText(sections[i])).slice(0, LIST_MAX),
     };
     excerpt = cap(formatManuscript(sections, Number.POSITIVE_INFINITY), MANUSCRIPT_EXCERPT_CHARS);
+  } else if (!head.trim() && stage.exit_criteria.some((c) => c.rule?.type === 'outline_approved')) {
+    // A stage whose work is approving the outline holds nothing of its own.
+    // Shown as empty, the planner asked the user to "generate the outline"
+    // that was already written and approved.
+    const outlineStage = template.stages.find((s) => s.renderer === 'outline');
+    const saved = parseOutlineDocument(outlineStage ? (bundles[outlineStage.id]?.versions.at(-1)?.content ?? '') : '');
+    const items = approvedOutline.length ? approvedOutline : saved.items;
+    const sections = items.map(outlineLine);
+    if (sections.length) {
+      outline = { sections: sections.slice(0, LIST_MAX), named_count: items.filter((i) => i.title.trim()).length, approved: outlineApproved };
+      excerpt = `${outlineApproved ? 'The approved outline' : 'The outline waiting for the user\'s approval'}:\n${sections.join('\n')}`;
+    }
   } else if (renderer === 'review') {
     const items = parseItems(head) ?? [];
     const schema = itemSchemaFor(stage);
