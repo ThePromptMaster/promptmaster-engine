@@ -95,8 +95,14 @@ export function ReviewRenderer({
   }, [dirty, onDirtyChange]);
 
   function patch(id: string, key: string, value: string) {
-    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, [key]: value } : r)));
+    // A status or reason the user touches is theirs from then on.
+    const mine = key === 'status' || key === 'reason' ? { status_source: 'user' } : {};
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, [key]: value, ...mine } : r)));
   }
+  // Rows whose status the draft itself set, because it already knew the
+  // outcome (1 Oct, items 3 and 18). They count as resolved; the user can
+  // still change any of them.
+  const setByModel = rows.filter((r) => r.status_source === 'model' && isTriaged(r, schema)).length;
 
   async function save() {
     if (!onSaveItems || saving) return;
@@ -172,6 +178,11 @@ export function ReviewRenderer({
             >
               {outstanding === 0 ? 'all resolved' : `${outstanding} still to resolve`}
             </span>
+            {setByModel > 0 && (
+              <span className="text-label text-[var(--on-surface-variant)]">
+                · {setByModel} set by PromptMaster from what it already knew — review or change
+              </span>
+            )}
           </div>
 
           {/* The table scrolls inside its own container: at five columns it is
@@ -282,6 +293,9 @@ function ReviewRow({ row, columns, statuses, schema, readOnly, onPatch }: Review
               placeholder="Not looked at"
               onChange={(value) => onPatch(row.id, 'status', value)}
             />
+          )}
+          {row.status_source === 'model' && option && option.decided !== false && (
+            <span className="mt-1 block text-label text-[var(--on-surface-variant)]">Set by PromptMaster</span>
           )}
         </td>
       </tr>

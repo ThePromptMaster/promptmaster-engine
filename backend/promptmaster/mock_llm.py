@@ -95,11 +95,21 @@ def _stage_items(prompt: str) -> dict:
     # Say whether the drafted chapters arrived, so a browser test can see that
     # the stages after drafting are reviewing the book and not a summary of it.
     read = " (read the manuscript)" if "--- BEGIN MANUSCRIPT ---" in prompt else ""
+    # A status the stage says the model may set (stage._field_instructions):
+    # the first row uses it with a reason, the second claims an outcome that
+    # is not the model's to claim, the third says nothing — so a browser test
+    # sees one row prefilled and two left for the user.
+    may_set = re.search(r"only if already known: ([a-z_]+)", prompt)
     items = []
     for n in range(1, 4):
         item: dict[str, str] = {"id": f"i{n}"}
         for i, key in enumerate(keys):
-            if key == "status":
+            if key in ("status", "reason") and may_set:
+                if n == 1:
+                    item[key] = may_set.group(1) if key == "status" else "Mock: the data this needs was never provided."
+                elif n == 2 and key == "status":
+                    item[key] = "completed"
+            elif key == "status":
                 item[key] = "clean"
             elif key == "severity":
                 # One finding that changes the work, the rest routine (B3).

@@ -67,6 +67,7 @@ export function buildStageContext(input: BuildContextInput): StageContext {
   const itemCounts: Record<string, number> = {};
   const itemsMissingStatus: Record<string, number> = {};
   const itemFieldGaps: Record<string, Record<string, number>> = {};
+  const itemStatusCounts: Record<string, Record<string, number>> = {};
   const artifactNonEmpty: Record<string, boolean> = {};
   const sections: StageContext['sections'] = {};
   const findings: StageContext['findings'] = {};
@@ -105,6 +106,8 @@ export function buildStageContext(input: BuildContextInput): StageContext {
     const schema = itemSchemaFor(s);
     itemCounts[s.id] = items.length;
     itemsMissingStatus[s.id] = items.filter((i) => !isTriaged(i, schema)).length;
+    itemStatusCounts[s.id] = {};
+    for (const i of items) if (i.status) itemStatusCounts[s.id][i.status] = (itemStatusCounts[s.id][i.status] ?? 0) + 1;
     itemFieldGaps[s.id] = Object.fromEntries(
       schema.fields.map((f) => [f.key, items.filter((i) => !(i[f.key] ?? '').trim()).length])
     );
@@ -126,6 +129,7 @@ export function buildStageContext(input: BuildContextInput): StageContext {
     itemCounts,
     itemsMissingStatus,
     itemFieldGaps,
+    itemStatusCounts,
     artifactNonEmpty,
     // Approval is an event, not a mode the long-form machine happens to be in.
     outlineApproved: approvedOutlineVersionId(events) !== null,

@@ -74,9 +74,15 @@ export function generationRequest(
     item_schema: rendererHoldsItems(target.renderer)
       ? {
           item_label: schema.itemLabel,
-          fields: schema.fields.map((f) => ({ key: f.key, label: f.label, hint: f.hint, max_chars: f.max ?? null })),
+          fields: schema.fields.filter((f) => !f.userOnly).map((f) => ({ key: f.key, label: f.label, hint: f.hint, max_chars: f.max ?? null })),
           min_items: schema.minItems,
           max_items: schema.maxItems,
+          // Who may set which status (1 Oct, items 3, 12, 18): the server
+          // keeps a model's status only where this says it may.
+          statuses: (schema.statuses ?? []).map((s) => ({
+            value: s.value, label: s.label, requires_reason: Boolean(s.requiresReason),
+            model_may_set: Boolean(s.modelMaySet), model_default: Boolean(s.modelDefault),
+          })),
         }
       : null,
     existing_content: existingContent,

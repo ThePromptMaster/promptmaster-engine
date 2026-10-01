@@ -454,8 +454,30 @@ own must cite a version (`workflow_events_agent_authorized`) — unless the stag
 artifact at all, which the trigger checks itself (20261004000000); so Outline approval
 completes under Autonomous too, and the planner is told a left-open stage is the user's to close. A drafting step waits for its section jobs for up to ten
 minutes and is then recorded `interrupted` — the sections go on being written by cron,
-and Resume waits again without spending a step. Derived (Research) outlines are still
-generated only from the panel.
+and Resume waits again without spending a step.
+
+### L-C6 — Literature: every generated work is a candidate (2026-10-01)
+
+The Literature stage's works are recalled from the model's knowledge; nothing is searched
+or fetched. Each generated row is stored as **Suggested by PromptMaster — not retrieved**
+(the server sets it; a status the model writes is dropped), the stage says how many rows
+are still in that state, and the checklist counts "candidate works identified" and "works
+retrieved or verified" separately. **Retrieved by PromptMaster** exists for a search tool
+to set and nothing carries it yet. **Verified by me** is the user's, with a DOI or link
+field the model is never asked to fill. The "retrieved or verified" item is *optional*:
+making it required would stop every Research project at stage two until a retrieval tool
+exists. Applies to Research v5; projects on earlier versions keep the old stage until
+upgraded.
+
+### L-C7 — Statuses the model may set (2026-10-01)
+
+A generated row's status is kept only where the row's schema says the model may set it
+(`modelMaySet` in `lib/workflow/stage-artifact.ts`, enforced in `promptmaster/stage.py`).
+Today that is one value: a run may arrive as **Not run** with its reason, marked "Set by
+PromptMaster", when the draft already knows it could not be executed. **Completed** and
+**Deviated** are never the model's to set — they record what a person or a tool did.
+Alternatives and validation tables allow none. Rows in versions saved before this change
+are untouched.
 
 ### L-C4 — Fact-check: nothing is verified by PromptMaster
 
