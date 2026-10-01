@@ -56,7 +56,7 @@ import { api } from '@/lib/api/client';
 import { inputsFrom } from './use-stage-generation';
 import type { EvaluationResult } from '@/types';
 import { revisionBrief } from '@/lib/workflow/revision';
-import { deriveOutlineItems, draftingStageId } from '@/lib/workflow/derived-outline';
+import { defaultOutlineForm, deriveOutlineItems, draftingStageId, formOfItems, outlineForms } from '@/lib/workflow/derived-outline';
 import { OutlineStagePanel } from '@/components/outline/outline-stage-panel';
 import { ProjectBrief, ProjectSetup, stageWantsSetup } from './project-setup';
 import { ProjectData } from './project-data';
@@ -823,10 +823,13 @@ export function WorkflowWorkspace({
     (stage ? stageBundles[stage.id]?.artifact : null) ??
     (artifact && !artifact.stage_id ? artifact : null);
 
+  const startingForm = useMemo(() => defaultOutlineForm(template, project), [template, project]);
   const deriveOutline = useCallback(
-    () => deriveOutlineItems(template, state, stageBundles),
-    [template, state, stageBundles]
+    (form?: 'full' | 'compact') => deriveOutlineItems(template, state, stageBundles, { form: form ?? startingForm }),
+    [template, state, stageBundles, startingForm]
   );
+  const forms = useMemo(() => outlineForms(template), [template]);
+  const formOfOutline = useCallback((items: { id: string }[]) => formOfItems(template, items), [template]);
 
   /**
    * The stage an approved outline is written *for* — the one that will draft it.
@@ -1440,6 +1443,9 @@ export function WorkflowWorkspace({
                   onEventsChanged={refreshEvents}
                   refreshToken={stageBundles[stage.id]?.versions.length ?? 0}
                   derive={derivedOutlineHere ? deriveOutline : undefined}
+                  forms={derivedOutlineHere ? forms : undefined}
+                  formOf={derivedOutlineHere ? formOfOutline : undefined}
+                  defaultForm={startingForm}
                   drafts={draftBindings(
                     (draftingStage && draftingStage.id !== stage.id
                       ? stageBundles[draftingStage.id]?.artifact

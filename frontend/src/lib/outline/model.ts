@@ -267,8 +267,18 @@ export function mergeRegeneratedOutline(
 ): OutlineDocument {
   const drafted = new Set(draftedItemIds);
 
+  // An id that comes with a fresh item is kept: a derived outline's ids are
+  // the template's section ids, and they are the lineage — what binds prose
+  // to a heading, what "has upstream moved?" compares by, and what says
+  // which form an outline is in. Minting a new id for one that was not
+  // already in the document made a regenerated derived outline unrelated to
+  // the template it came from. A model's outline carries no ids, so those
+  // items are minted as before; a repeated id is minted too.
+  const used = new Set<string>();
   const items = fresh.map((raw) => {
-    const id = typeof raw.id === 'string' && doc.items.some((i) => i.id === raw.id) ? raw.id : newItemId();
+    const given = typeof raw.id === 'string' && raw.id.trim() && !used.has(raw.id) ? raw.id : null;
+    const id = given ?? newItemId();
+    used.add(id);
     return newItem({ id, title: raw.title ?? '', abstract: raw.abstract ?? '' });
   });
 

@@ -500,6 +500,20 @@ PromptMaster", when the draft already knows it could not be executed. **Complete
 Alternatives and validation tables allow none. Rows in versions saved before this change
 are untouched.
 
+### L-C9 — Research write-up: two forms, chosen at the outline (2026-10-01)
+
+Research v6 offers its write-up as a **full research paper** (nine sections) or a
+**short report** (five: the answer, what was looked at, what was found, what could change
+this, what to do next), declared as data on the template (`derived_outline.compact`). The
+form to start from is a word match on the project's audience and output format
+(`default_when`), which is a guess: the user chooses on the outline, and Go builds the
+outline in the starting form. Which form an outline is in is read from its section ids,
+not stored. Switching form regenerates the outline; sections already written under the
+other form's headings are kept as orphans to reattach, not rewritten. Section writing is
+also told to "say each thing once", which is an instruction, not a check — nothing
+detects repetition after the fact. Only the write-up changes: the thirteen stages are
+the same in both forms.
+
 ### L-C8 — Established figures: quoted, not checked (2026-10-01)
 
 When a stage is completed, its figures are read out of its own text once

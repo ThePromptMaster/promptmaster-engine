@@ -165,6 +165,24 @@ export interface DerivedOutlineSpec {
   /** The stage that owns the derived outline: the workflow's drafting stage. */
   stage_id: string;
   sections: DerivedSectionSpec[];
+  /** What the full form is called where the user chooses between forms. */
+  label?: string;
+  description?: string;
+  /**
+   * A shorter form of the same write-up, for work whose reader wants the
+   * answer and the reasons, not a paper (1 Oct, item 31: "the Research
+   * workflow sometimes becomes much more academic than the business problem
+   * requires", repeating one point across Results, Validation, Discussion,
+   * Threats, Interpretation and Conclusion). Fewer sections, each drawing on
+   * several stages, so a point is made once.
+   */
+  compact?: {
+    label: string;
+    description: string;
+    sections: DerivedSectionSpec[];
+    /** Words in the project's audience or output format that make this the form to start from. */
+    default_when?: string[];
+  };
 }
 
 export interface WorkflowTemplate {

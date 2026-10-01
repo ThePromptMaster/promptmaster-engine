@@ -638,3 +638,43 @@ describe('where an approved outline is materialised', () => {
     expect(draftingStageId(SINGLE_OUTPUT_V1)).toBeNull();
   });
 });
+
+describe('the short report form (1 Oct, item 31)', () => {
+  it('offers the paper form and a short one, and the short one has fewer sections', async () => {
+    const { outlineForms } = await import('./derived-outline');
+    const { RESEARCH_V1 } = await import('./templates/research.v1');
+    const forms = outlineForms(RESEARCH_V1);
+    expect(forms.map((f) => [f.id, f.label, f.sections.length])).toEqual([['full', 'Full research paper', 9], ['compact', 'Short report', 5]]);
+  });
+
+  it('starts from the short form when the reader is named as one who wants a decision', async () => {
+    const { defaultOutlineForm } = await import('./derived-outline');
+    const { RESEARCH_V1 } = await import('./templates/research.v1');
+    expect(defaultOutlineForm(RESEARCH_V1, { audience: 'Executive', output_format: '' })).toBe('compact');
+    expect(defaultOutlineForm(RESEARCH_V1, { audience: 'General', output_format: 'Two-section memo' })).toBe('compact');
+    expect(defaultOutlineForm(RESEARCH_V1, { audience: 'Reviewers at a physics journal', output_format: 'Paper' })).toBe('full');
+    expect(defaultOutlineForm(RESEARCH_V1, {})).toBe('full');
+  });
+
+  it('derives the short form with its own sections, each drawing on several stages', async () => {
+    const { deriveOutlineItems, formOfItems } = await import('./derived-outline');
+    const { RESEARCH_V1 } = await import('./templates/research.v1');
+    const { initialState } = await import('./engine');
+    const items = deriveOutlineItems(RESEARCH_V1, initialState(RESEARCH_V1), {}, { form: 'compact' });
+    // "What could change this" is optional and nothing fed it, so it is left out.
+    expect(items.map((i) => i.title)).toEqual(['The answer', 'What was looked at', 'What was found', 'What to do next']);
+    expect(formOfItems(RESEARCH_V1, items)).toBe('compact');
+    const full = deriveOutlineItems(RESEARCH_V1, initialState(RESEARCH_V1), {});
+    expect(formOfItems(RESEARCH_V1, full)).toBe('full');
+    // No section id is shared between the forms: an id is the lineage of the prose written under it.
+    expect(items.filter((i) => full.some((f) => f.id === i.id))).toEqual([]);
+  });
+
+  it('a workflow with no short form offers one form, and it is the default', async () => {
+    const { outlineForms, defaultOutlineForm } = await import('./derived-outline');
+    const { RESEARCH_V1 } = await import('./templates/research.v1');
+    const plain = { ...RESEARCH_V1, derived_outline: { ...RESEARCH_V1.derived_outline!, compact: undefined } };
+    expect(outlineForms(plain)).toHaveLength(1);
+    expect(defaultOutlineForm(plain, { audience: 'Executive' })).toBe('full');
+  });
+});
