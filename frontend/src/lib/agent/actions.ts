@@ -55,7 +55,7 @@ export const AGENT_ACTIONS: readonly AgentAction[] = [
   { key: 'apply_findings', family: 'writing', label: 'Apply the findings', performer: 'apply', important: true },
   { key: 'triage_findings', family: 'writing', label: 'Decide the routine findings', performer: 'triage', important: true },
   { key: 'advance_stage', family: 'workflow', label: 'Move to the next stage', performer: 'advance', important: true },
-  { key: 'mark_blocked', family: 'workflow', label: 'Mark this stage blocked', performer: 'block', important: false },
+  { key: 'mark_blocked', family: 'workflow', label: 'Mark this stage stuck', performer: 'block', important: false },
   { key: 'request_user_decision', family: 'workflow', label: 'Ask the user', performer: 'ask', important: false },
   { key: 'declare_objective_complete', family: 'workflow', label: 'Objective complete', performer: 'complete', important: true },
 ];

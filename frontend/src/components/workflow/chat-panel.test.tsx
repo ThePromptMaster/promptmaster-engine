@@ -28,8 +28,15 @@ const checkConflicts = vi.fn<(...args: unknown[]) => Promise<{ conflicts: unknow
 const recordConflictChoice = vi.fn<(...args: unknown[]) => Promise<void>>(async () => {});
 
 // PM-24's decision trail is Supabase; here it is the empty trail plus a spy.
-vi.mock('@/lib/workflow/conflict-trail', () => ({
-  conflictContext: vi.fn(async () => ({ decisions: [], others: [] })),
+// The check itself (findInstructionConflicts) is the real one; only where it
+// reads the decision trail from and where it records the answer are stubbed.
+vi.mock('@/lib/supabase/recommendations', () => ({
+  listRecommendations: vi.fn(async () => []),
+  insertRecommendation: vi.fn(),
+  recordDecision: vi.fn(),
+}));
+vi.mock('@/lib/workflow/conflict-trail', async (importActual) => ({
+  ...(await importActual<typeof import('@/lib/workflow/conflict-trail')>()),
   recordConflictChoice: (...args: unknown[]) => recordConflictChoice(...args),
 }));
 
@@ -311,7 +318,7 @@ describe('PM-24: an instruction that conflicts asks which should control', () =>
     panel();
     await instruct('Add a whole new chapter.', /whole document/i);
 
-    const prompt = await screen.findByRole('region', { name: 'Which should control?' });
+    const prompt = await screen.findByRole('region', { name: 'Which takes priority?' });
     expect(prompt).toHaveTextContent('Keep it to one page');
     // Answerable on a short window: Continue sits in a row pinned to the bottom of the thread.
     expect(screen.getByRole('button', { name: 'Continue' }).parentElement).toHaveClass('sticky', 'bottom-0');
@@ -319,7 +326,7 @@ describe('PM-24: an instruction that conflicts asks which should control', () =>
     expect(applyToAnswer).not.toHaveBeenCalled();
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole('radio', { name: 'My new instruction controls' }));
+    await user.click(screen.getByRole('radio', { name: 'My new instruction takes priority' }));
     await user.click(screen.getByRole('button', { name: 'Continue' }));
 
     await waitFor(() => expect(applyToAnswer).toHaveBeenCalledTimes(1));
@@ -334,7 +341,7 @@ describe('PM-24: an instruction that conflicts asks which should control', () =>
     });
     panel();
     await instruct('Rewrite it for adults.', /whole document/i);
-    await screen.findByRole('region', { name: 'Which should control?' });
+    await screen.findByRole('region', { name: 'Which takes priority?' });
     await userEvent.setup().click(screen.getByRole('button', { name: 'Cancel' }));
     expect(applyToAnswer).not.toHaveBeenCalled();
     expect(screen.getByLabelText('Give a revision instruction')).toHaveValue('Rewrite it for adults.');

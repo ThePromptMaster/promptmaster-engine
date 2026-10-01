@@ -15,7 +15,9 @@ import { generateOutlineDraft } from '@/lib/outline/actions';
 import { countNamedSections, parseOutlineDocument } from '@/lib/outline/model';
 import { commitOutlineVersion } from '@/lib/supabase/outline';
 import { appendWorkflowEvent } from '@/lib/supabase/workflow';
-import { appliedFindingsVersion, reviseWithFindings } from '@/lib/workflow/apply-findings';
+import { appliedFindingsVersion, findingsInstruction, reviseWithFindings } from '@/lib/workflow/apply-findings';
+import { findInstructionConflicts } from '@/lib/workflow/conflict-trail';
+import { describeWith, type InstructionConflict } from '@/lib/workflow/instruction-conflicts';
 import { deriveOutlineItems } from '@/lib/workflow/derived-outline';
 import { rendererHoldsItems, serializeItems } from '@/lib/workflow/stage-artifact';
 import { applyTriage } from '@/lib/workflow/triage';
@@ -61,6 +63,12 @@ export interface PerformContext {
   /** What the stage holds, read fresh (B1). */
   facts?: StageFacts;
   latestEvaluation?: Evaluation | null;
+  /**
+   * The user's answer to "which takes priority?", when this run asked it on
+   * this stage and no revision has been made since. The revision then goes
+   * ahead, carrying the answer, instead of asking again.
+   */
+  conflictAnswer?: string;
   /** Re-read the project after a write that the store did not make itself. */
   refresh?: () => unknown;
   /** Live progress for a long step ("2 of 5 sections written"). */
@@ -141,6 +149,28 @@ async function waitForSections(ctx: PerformContext, key: string, ids: string[], 
       });
   }
 }
+
+/**
+ * A revision Go chose for itself is an instruction like any the user types:
+ * if it contradicts the objective, the constraints or a decision already
+ * made, Go stops and asks which takes priority instead of quietly rewriting
+ * the work (1 Oct, item 33).
+ */
+function askWhichTakesPriority(key: string, params: Record<string, unknown>, instruction: string, conflicts: InstructionConflict[]): StepOutcome {
+  const c = conflicts[0];
+  const question =
+    `Before I change this: "${instruction.replace(/\s+/g, ' ').slice(0, 200)}" conflicts with ${describeWith(c)}. ` +
+    `${c.explanation.trim()} Which should take priority?`;
+  return done(key, {
+    status: 'blocked', blockKind: 'needs_decision', toolsUsed: ['model'], changes: {},
+    output: question, params: { ...params, conflict_question: true },
+    stop: { status: 'awaiting_decision', reason: question },
+    needs: { kind: 'answer_question', question },
+  });
+}
+
+const withAnswer = (instruction: string, answer?: string) =>
+  answer ? `${instruction}\nThe user was asked which takes priority and answered: "${answer}". Follow that.` : instruction;
 
 export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
   const key = ctx.step.action_key;
@@ -232,10 +262,17 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       const head = ctx.bundles[ctx.stage.id]?.versions.at(-1)?.content ?? '';
       const revising = actionFor(key)!.performer === 'revise';
       const instruction = typeof params.instruction === 'string' ? params.instruction : '';
+      if (revising && instruction && !ctx.conflictAnswer) {
+        const conflicts = await findInstructionConflicts({
+          project: ctx.project, stageId: ctx.stage.id, instruction,
+          headVersionId: ctx.bundles[ctx.stage.id]?.versions.at(-1)?.id ?? null,
+        });
+        if (conflicts.length) return askWhichTakesPriority(key, params, instruction, conflicts);
+      }
       // The instruction used to reach only the version's metadata, never the
       // model: "revise" was "regenerate with the old draft as context" (B0).
       const res = await api.generateStageArtifact(
-        generationRequest(ctx.project, ctx.template, ctx.state, ctx.bundles, ctx.stage, revising ? head : '', revising ? instruction : ''),
+        generationRequest(ctx.project, ctx.template, ctx.state, ctx.bundles, ctx.stage, revising ? head : '', revising ? withAnswer(instruction, ctx.conflictAnswer) : ''),
         ctx.signal
       );
       const content = generationContent(ctx.stage, res);
@@ -335,8 +372,18 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       if (!head?.content.trim() || !findings.length) {
         return done(key, { status: 'failed', output: 'There are no findings on the current draft to apply.', toolsUsed: [], changes: {} });
       }
+      if (!ctx.conflictAnswer) {
+        const conflicts = await findInstructionConflicts({
+          project: ctx.project, stageId: ctx.stage.id, instruction: findingsInstruction(findings), headVersionId: head.id,
+        });
+        if (conflicts.length) return askWhichTakesPriority(key, params, findings.map((f) => f.summary).join('; '), conflicts);
+      }
       const rev = await reviseWithFindings({
-        project: ctx.project, content: head.content, findings, source: 'the stage check', signal: ctx.signal,
+        project: ctx.project, content: head.content,
+        findings: ctx.conflictAnswer
+          ? [...findings, { id: 'priority', category: 'Priority', summary: 'Which takes priority, as the user decided', suggested_change: ctx.conflictAnswer }]
+          : findings,
+        source: 'the stage check', signal: ctx.signal,
         // A table is revised as rows, by the generator that drafted it.
         ...(rendererHoldsItems(ctx.stage.renderer)
           ? { table: { stage: ctx.stage, request: (instruction: string) => generationRequest(ctx.project, ctx.template, ctx.state, ctx.bundles, ctx.stage, head.content, instruction) } }

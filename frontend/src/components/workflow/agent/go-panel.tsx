@@ -95,7 +95,7 @@ export function GoPanel({
         <div className="mr-auto">
           <h2 className="text-title text-[var(--on-surface)]">Go mode</h2>
           <p className="text-label text-[var(--on-surface-variant)]">
-            Chooses the best next move for this stage and does it — and says whether it reasoned or actually ran something.
+            Chooses the best next move for this stage and does it — and says whether it analyzed something or actually ran it.
           </p>
         </div>
         {!expanded && (

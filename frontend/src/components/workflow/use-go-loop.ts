@@ -100,6 +100,23 @@ interface Options {
 class Stopped extends Error {}
 
 /**
+ * The user's answer to the last "which takes priority?" this run asked on
+ * this stage, if nothing has been revised since. One answer lets one
+ * revision through; the next revision is checked afresh.
+ */
+function answerToConflict(steps: readonly AgentStep[], stageId: string): string | undefined {
+  const asked = steps.map((s) => s.stage_id === stageId && s.params?.conflict_question === true).lastIndexOf(true);
+  if (asked < 0) return undefined;
+  const after = steps.slice(asked + 1);
+  const answer = after.findIndex((s) => s.action_key === USER_ANSWER_STEP);
+  if (answer < 0) return undefined;
+  const revisedSince = after.slice(answer + 1).some(
+    (s) => ['revise', 'apply'].includes(actionFor(s.action_key)?.performer ?? '') && s.status === 'succeeded'
+  );
+  return revisedSince ? undefined : after[answer].output.trim() || undefined;
+}
+
+/**
  * This tab's lease identity. Kept in sessionStorage, which is per tab and
  * survives a reload — so reloading resumes the run this tab was driving,
  * while a second tab gets its own id and watches instead.
@@ -220,6 +237,7 @@ export function useGoLoop(opts: Options) {
         appendStageVersion: o.appendStageVersion, recordStageEvaluation: o.recordStageEvaluation,
         setStageSummary: o.setStageSummary, afterStageEvent: o.reloadEvents, signal,
         facts, latestEvaluation: o.latestEvaluation, refresh: o.onRefresh, onProgress: setProgress,
+        conflictAnswer: answerToConflict(stepsRef.current, o.stage.id),
       };
 
       let outcome: StepOutcome;

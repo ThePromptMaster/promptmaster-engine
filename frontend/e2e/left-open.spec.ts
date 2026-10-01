@@ -76,10 +76,10 @@ test('a left-open stage is named as such, and rewriting it before closing flags 
   await expect(page.getByRole('heading', { name: /Audience/ })).toBeVisible();
   await pressTransition(page);
   await expect(page.getByRole('heading', { name: /Positioning/ })).toBeVisible();
-  await expect(page.getByRole('region', { name: / artifact$/ }).getByText(/Mock /).first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('region', { name: / work$/ }).getByText(/Mock /).first()).toBeVisible({ timeout: 30_000 });
   await pressTransition(page); // "anyway": Positioning is left open
   await expect(page.getByRole('heading', { name: /Research/ })).toBeVisible();
-  await expect(page.getByRole('region', { name: / artifact$/ }).getByText(/Mock /).first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('region', { name: / work$/ }).getByText(/Mock /).first()).toBeVisible({ timeout: 30_000 });
   await pressTransition(page); // Research is done
   await expect(page.getByRole('heading', { name: /Outline/ })).toBeVisible();
 
@@ -95,7 +95,7 @@ test('a left-open stage is named as such, and rewriting it before closing flags 
   await expect(page.locator('header').getByText('Left open', { exact: true })).toBeVisible();
 
   // Rewrite it, then close it: Research was written against the old version.
-  const artifact = page.getByRole('region', { name: / artifact$/ });
+  const artifact = page.getByRole('region', { name: / work$/ });
   await artifact.getByRole('button', { name: 'Edit' }).click();
   await page.getByLabel(/^Edit Positioning/).fill('A different positioning altogether.');
   await page.getByRole('button', { name: 'Save as new version' }).click();

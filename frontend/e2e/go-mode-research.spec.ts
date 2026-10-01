@@ -83,7 +83,7 @@ test('Go applying a check\'s findings to a list stage keeps it a list', async ({
   });
   await pressTransition(page);
   await expect(page.getByRole('heading', { name: 'Literature context' })).toBeVisible();
-  const artifact = page.getByRole('region', { name: / artifact$/ });
+  const artifact = page.getByRole('region', { name: / work$/ });
   await expect(artifact).toContainText('Mock work 1', { timeout: 30_000 });
 
   const panel = goPanel(page);

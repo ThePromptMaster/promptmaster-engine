@@ -5,7 +5,7 @@ import type { ExecutionPolicy } from '@/types/agent';
 const POLICIES: { value: ExecutionPolicy; label: string; hint: string }[] = [
   { value: 'guided', label: 'Guided', hint: 'Proposes one move at a time; you approve each' },
   { value: 'checkpoint', label: 'Checkpoint', hint: 'Works on its own, stops at important decisions' },
-  { value: 'autonomous', label: 'Autonomous', hint: 'Works until done, blocked, or it needs you' },
+  { value: 'autonomous', label: 'Autonomous', hint: 'Works until done, stuck, or it needs you' },
 ];
 
 /** PM-18: how autonomously Go continues — chosen, not implied. */

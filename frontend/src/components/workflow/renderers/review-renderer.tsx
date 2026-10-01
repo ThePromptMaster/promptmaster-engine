@@ -122,7 +122,7 @@ export function ReviewRenderer({
   const columns = schema.fields;
 
   return (
-    <section aria-label={`${stage.label} artifact`}>
+    <section aria-label={`${stage.label} work`}>
       {confirming && (
         <ConfirmOverwrite
           label={`${schema.itemLabel}s`}

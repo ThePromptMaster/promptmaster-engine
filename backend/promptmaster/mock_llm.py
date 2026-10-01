@@ -154,7 +154,7 @@ def _stage_evaluation(system: str = "", prompt: str = "") -> dict:
             },
         }
     return {
-        "alignment": {"score": "High", "explanation": f"Mock: the artifact does what this stage asked for{echo}."},
+        "alignment": {"score": "High", "explanation": f"Mock: the draft does what this stage asked for{echo}."},
         "drift": {"score": "Low", "explanation": "Mock: no drift on any of the five axes."},
         "clarity": {"score": "High", "explanation": "Mock: plainly structured and easy to follow."},
         "completeness": {"status": "complete", "reason": ""},
@@ -264,7 +264,10 @@ def _next_action(system: str, prompt: str) -> dict:
     elif choice == "mark_blocked":
         params = {"reason": "Mock: missing data", "block_kind": "data_missing"}
     elif choice == "revise_stage":
-        params = {"instruction": "Mock: tighten the argument"}
+        # "[[mock:conflicting-revise]]" in the objective makes the revision one
+        # the conflict check objects to, so a browser test can see Go ask.
+        clash = " [[mock:conflict]]" if "[[mock:conflicting-revise]]" in system + prompt else ""
+        params = {"instruction": f"Mock: tighten the argument{clash}"}
     return {
         "action_key": choice,
         "params": params,
@@ -314,8 +317,11 @@ def _json_reply(system: str, prompt: str) -> dict:
                  "rows": [{first_key.group(1): "Mock: a row added from the chat."}] if first_key else []},
                 {"label": "Rewrite it as prose", "kind": "revise", "instruction": "Mock: must be dropped on a table."},
             ]}
+        # "[[mock:conflict-action]]" in the question makes the first action one
+        # the conflict check objects to.
+        clash = " [[mock:conflict]]" if "[[mock:conflict-action]]" in prompt else ""
         return {"actions": [
-            {"label": "Tighten the opening", "kind": "revise", "instruction": "Mock: shorten the first paragraph."},
+            {"label": "Tighten the opening", "kind": "revise", "instruction": f"Mock: shorten the first paragraph.{clash}"},
             {"label": "Add the missing example.", "kind": "revise", "instruction": "Mock: add one concrete example."},
         ]}
     if agent._TRIAGE_INSTRUCTION[:60] in system:

@@ -13,7 +13,7 @@ import type { CritiqueIntensity, CritiqueTone } from '@/types';
 
 const INTENSITY: { value: CritiqueIntensity; label: string; hint: string }[] = [
   { value: 'light', label: 'Light', hint: 'Only what really matters' },
-  { value: 'standard', label: 'Standard', hint: 'What a careful editor would raise' },
+  { value: 'standard', label: 'Standard', hint: 'What a careful reviewer would raise' },
   { value: 'rigorous', label: 'Rigorous', hint: 'Every claim, number and step' },
 ];
 
@@ -79,7 +79,7 @@ export function CritiqueStyleControl({
   return (
     <section aria-label="How to critique" className="rounded-xl bg-[var(--surface-container-low)] px-5 py-4">
       <div className="flex flex-wrap items-start gap-x-8 gap-y-3">
-        <Dial label="Critique intensity" options={INTENSITY} value={intensity} disabled={readOnly}
+        <Dial label="How hard to challenge the work" options={INTENSITY} value={intensity} disabled={readOnly}
           onChange={(v) => onChange({ critique_intensity: v })} />
         <Dial label="Tone" options={TONE} value={tone} disabled={readOnly}
           onChange={(v) => onChange({ critique_tone: v })} />

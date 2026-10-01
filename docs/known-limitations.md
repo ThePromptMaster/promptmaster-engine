@@ -509,9 +509,16 @@ snapshot is read there, not restored into the sections (L-25 stands).
 
 ### L-C3 — Conflict detection: what it sees, and what it costs
 
-PM-24's check runs on **side-chat instructions** and on **combined recommendations** (the
-apply preview). It does not run on Go mode's own revise instructions or on the stage-level
-refine tools, which carry no free text. The rule-based half (`instruction-conflicts.ts`)
+PM-24's check runs on **side-chat instructions**, on **combined recommendations** (the
+apply preview), and since 2026-10-01 on a **side-chat action button's revision** and on
+**Go mode's own revisions** (`revise_stage` with an instruction, and `apply_findings`):
+Go stops with "which should take priority?", and the user's answer lets the next revision
+on that stage through, carrying the answer. One function serves all of them
+(`findInstructionConflicts`, `lib/workflow/conflict-trail.ts`). It does not run on row
+changes from the chat (shown row by row before saving), on the stage-level refine tools,
+which carry no free text, or on stage generation. It compares an instruction with the
+objective, constraints and decisions; it does not compare one stage's content with
+another's — a number in a later stage that contradicts an earlier one is not caught here. The rule-based half (`instruction-conflicts.ts`)
 reads a short phrase list on FR-15's six axes, so it catches opposite directions ("expand"
 against "under 300 words") but not paraphrase. That is the job of the model half, which costs
 one small JSON call per instruction and fails open: if the call fails, the instruction is sent

@@ -32,7 +32,7 @@ export function ConflictPrompt({
   const [choices, setChoices] = useState<(Controls | null)[]>(conflicts.map(() => null));
   const ready = choices.every((c) => c !== null);
   return (
-    <section aria-label="Which should control?" className="rounded-xl bg-[var(--surface-container-high)] px-4 py-3">
+    <section aria-label="Which takes priority?" className="rounded-xl bg-[var(--surface-container-high)] px-4 py-3">
       <p className="text-label uppercase tracking-wide text-[var(--pm-tertiary)]">
         {conflicts.length === 1 ? 'This instruction conflicts with something' : `This instruction conflicts with ${conflicts.length} things`}
       </p>
@@ -44,7 +44,7 @@ export function ConflictPrompt({
               It pulls against {KIND[c.kind]}: <span className="italic">{c.with_text}</span>
             </p>
             <p className="text-label text-[var(--on-surface-variant)]">{c.explanation}</p>
-            <div role="radiogroup" aria-label={`Which should control (${i + 1})`} className="mt-1.5 flex flex-wrap gap-2">
+            <div role="radiogroup" aria-label={`Which takes priority (${i + 1})`} className="mt-1.5 flex flex-wrap gap-2">
               {(['new', 'existing'] as const).map((value) => (
                 <button
                   key={value}
@@ -57,7 +57,7 @@ export function ConflictPrompt({
                       : 'bg-[var(--surface-container-highest)] text-[var(--on-surface)]'
                   }`}
                 >
-                  {value === 'new' ? 'My new instruction controls' : `Keep ${describeWith(c)}`}
+                  {value === 'new' ? 'My new instruction takes priority' : `Keep ${describeWith(c)}`}
                 </button>
               ))}
             </div>
@@ -78,7 +78,7 @@ export function ConflictPrompt({
           Cancel
         </button>
       </div>
-      <p className="mt-2 text-label text-[var(--on-surface-variant)]">Your choice is recorded, and the model is told which one controls.</p>
+      <p className="mt-2 text-label text-[var(--on-surface-variant)]">Your choice is recorded, and PromptMaster is told which one takes priority.</p>
     </section>
   );
 }

@@ -139,7 +139,7 @@ export function ListRenderer({
   );
 
   return (
-    <section aria-label={`${stage.label} artifact`}>
+    <section aria-label={`${stage.label} work`}>
       {confirming && (
         <ConfirmOverwrite
           label={`${label}s`}

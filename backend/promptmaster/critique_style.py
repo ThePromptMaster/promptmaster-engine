@@ -35,7 +35,7 @@ INTENSITY_RULES: dict[str, str] = {
         f"{MAX_FINDINGS['light']} findings."
     ),
     "standard": (
-        "STANDARD. Raise the concrete defects a careful expert editor would "
+        "STANDARD. Raise the concrete defects a careful expert reviewer in this field would "
         f"raise. At most {MAX_FINDINGS['standard']} findings."
     ),
     "rigorous": (

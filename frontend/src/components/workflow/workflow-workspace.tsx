@@ -826,7 +826,7 @@ export function WorkflowWorkspace({
         (ensureStageArtifact
           ? await ensureStageArtifact(destination.id, destination.label)
           : null);
-      if (!target) throw new Error('This stage has no artifact to draft into.');
+      if (!target) throw new Error('This stage has nowhere to keep a draft yet. Reload the page and try again.');
 
       await materialiseOutlineInto(doc, target);
       onReload?.();

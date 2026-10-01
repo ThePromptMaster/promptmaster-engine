@@ -142,7 +142,7 @@ export function ApplyPreview({
                 <li key={i}>
                   <p className="text-body text-[var(--pm-tertiary)]">{conflict.message}</p>
                   {/* PM-24: ask which should control, rather than leave it to the model. */}
-                  <div role="radiogroup" aria-label={`Which should control (${i + 1})`} className="mt-1.5 flex flex-wrap gap-2">
+                  <div role="radiogroup" aria-label={`Which takes priority (${i + 1})`} className="mt-1.5 flex flex-wrap gap-2">
                     {[...conflict.between, ''].map((category) => (
                       <button
                         key={category || 'balance'}
@@ -155,7 +155,7 @@ export function ApplyPreview({
                             : 'bg-[var(--surface-container-highest)] text-[var(--on-surface)]'
                         }`}
                       >
-                        {category ? `"${titleOf(category)}" controls` : 'Let the model balance them'}
+                        {category ? `"${titleOf(category)}" takes priority` : 'Let PromptMaster balance them'}
                       </button>
                     ))}
                   </div>
@@ -165,7 +165,7 @@ export function ApplyPreview({
             {/* Said out loud, because a warning beside an enabled button
                 otherwise reads as a bug. */}
             <p className="mt-2 text-label text-[var(--on-surface-variant)]">
-              You can still apply them. Pick which one controls, or let the model balance them.
+              You can still apply them. Pick which one takes priority, or let PromptMaster balance them.
             </p>
           </div>
         )}
