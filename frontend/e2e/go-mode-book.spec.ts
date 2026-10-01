@@ -111,6 +111,28 @@ test('the planner is sent the manuscript as the database holds it, not as the pa
 });
 
 /**
+ * 1 Oct, item 26 and question 12 — the whole book could only be read in one
+ * piece after Finish. It is readable as soon as there is something written.
+ */
+test('the full book can be read from the drafting stage, before the project is finished', async ({ page }) => {
+  test.setTimeout(180_000);
+  await bookDraftedToTheEnd(page, 'E2E read before finish', 'A short book about tapirs');
+  await page.getByRole('button', { name: 'Read the full book' }).click();
+  const reader = page.getByRole('dialog', { name: 'The full book' });
+  await expect(reader).toContainText('1. Habitat');
+  await expect(reader).toContainText('2. Diet');
+  await expect(reader).toContainText('reading only, nothing here changes it');
+  await page.screenshot({ path: test.info().outputPath('01-read-the-full-book-before-finish.png') });
+  await reader.getByRole('button', { name: 'Close' }).click();
+  await expect(reader).toHaveCount(0);
+
+  // Looking back at a finished stage says that looking is all it is.
+  await page.getByRole('navigation', { name: 'Workflow stages' }).getByRole('button', { name: /Objective/ }).click();
+  await expect(page.getByText('Viewing only — nothing changes while you look, and the project stays where it is.')).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath('02-viewing-only.png') });
+});
+
+/**
  * B2b + B4 — Go does the stage's own work with the functions the buttons
  * call, and when the next move is the user's it says so with the button
  * right there. One Guided run, one scripted plan that spans stages.
