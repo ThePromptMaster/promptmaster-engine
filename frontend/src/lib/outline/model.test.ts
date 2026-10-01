@@ -257,3 +257,18 @@ describe('empty document', () => {
     expect(emptyDocument()).toEqual({ schema: 1, items: [], orphans: [] });
   });
 });
+
+describe('mergeRegeneratedOutline keeps an id that comes with a fresh item', () => {
+  it('a derived outline regenerated over an empty document keeps the template\'s section ids', async () => {
+    const { emptyDocument, mergeRegeneratedOutline } = await import('./model');
+    const doc = mergeRegeneratedOutline(emptyDocument(), [{ id: 'answer', title: 'The answer' }, { id: 'findings', title: 'What was found' }], []);
+    expect(doc.items.map((i) => i.id)).toEqual(['answer', 'findings']);
+  });
+  it('items with no id, or a repeated one, are still minted', async () => {
+    const { emptyDocument, mergeRegeneratedOutline } = await import('./model');
+    const doc = mergeRegeneratedOutline(emptyDocument(), [{ title: 'From a model' }, { id: 'x', title: 'One' }, { id: 'x', title: 'Two' }], []);
+    const ids = doc.items.map((i) => i.id);
+    expect(ids[1]).toBe('x');
+    expect(new Set(ids).size).toBe(3);
+  });
+});

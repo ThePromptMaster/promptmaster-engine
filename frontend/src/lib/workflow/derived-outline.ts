@@ -115,7 +115,53 @@ export function sectionAbstract(section: DerivedSection): string {
   return `${section.guidance}\n\n${briefs}`;
 }
 
+/** One way the write-up can be laid out. */
+export interface OutlineForm {
+  id: 'full' | 'compact';
+  label: string;
+  description: string;
+  sections: DerivedSectionSpec[];
+}
+
+/** The forms a derived-outline workflow offers: the full one always, a compact one if declared. */
+export function outlineForms(template: WorkflowTemplate): OutlineForm[] {
+  const spec = template.derived_outline;
+  if (template.outline_stage !== 'derived' || !spec) return [];
+  const full: OutlineForm = {
+    id: 'full', label: spec.label ?? 'Full form', description: spec.description ?? '', sections: spec.sections,
+  };
+  return spec.compact
+    ? [full, { id: 'compact', label: spec.compact.label, description: spec.compact.description, sections: spec.compact.sections }]
+    : [full];
+}
+
+/**
+ * The form to start from. The compact form when the project's reader or
+ * format names one of the words the template gives for it; otherwise the full
+ * one. A starting point only: the user chooses on the outline itself.
+ */
+export function defaultOutlineForm(
+  template: WorkflowTemplate,
+  project: { audience?: string | null; output_format?: string | null }
+): OutlineForm['id'] {
+  const words = template.derived_outline?.compact?.default_when ?? [];
+  const text = `${project.audience ?? ''} ${project.output_format ?? ''}`.toLowerCase();
+  return words.some((w) => text.includes(w.toLowerCase())) ? 'compact' : 'full';
+}
+
+/**
+ * Which form an existing outline is in, read from its section ids — so the
+ * form needs storing nowhere, and re-deriving an approved outline to see what
+ * moved upstream compares like with like.
+ */
+export function formOfItems(template: WorkflowTemplate, items: readonly { id: string }[]): OutlineForm['id'] {
+  const compact = new Set((template.derived_outline?.compact?.sections ?? []).map((s) => s.id));
+  return items.some((i) => compact.has(i.id)) ? 'compact' : 'full';
+}
+
 export interface DeriveOptions {
+  /** Which form to lay the write-up out in. The full form when omitted. */
+  form?: OutlineForm['id'];
   /**
    * Keep optional sections whose sources produced nothing. Off by default —
    * the drafting gate is `all_sections_complete`, so an empty section is a
@@ -133,8 +179,9 @@ export function deriveSections(
 ): DerivedSection[] {
   const spec = template.derived_outline;
   if (template.outline_stage !== 'derived' || !spec) return [];
+  const sections = (options.form === 'compact' && spec.compact?.sections) || spec.sections;
 
-  return spec.sections
+  return sections
     .map((s) => ({ spec: s, derived: deriveSection(s, template, state, bundles) }))
     .filter(({ spec: s, derived }) => s.required || options.keepEmptyOptional || !derived.empty)
     .map(({ derived }) => derived);

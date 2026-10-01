@@ -46,9 +46,12 @@ export const RESEARCH_V1: WorkflowTemplate = {
   // hypothesis has a prediction and a disconfirmer" is now a rule, not a box),
   // and what is left for the user is worded as what it is — their approval
   // (1 Oct, items 6 and 11). Names its own deliverable (item 26).
+  // v6 (2026-10-01): a short report form of the write-up, beside the paper
+  // form, so a business diagnosis is not forced into nine academic sections
+  // that repeat one another (item 31).
   // v5 (2026-10-01): Literature says who established each work — suggested,
   // retrieved, or verified by the user — and counts the two separately (item 12).
-  version: 5,
+  version: 6,
   name: 'Research',
   description: 'Question through validated write-up, with the analysis plan fixed before the data.',
   outline_stage: 'derived',
@@ -74,6 +77,8 @@ export const RESEARCH_V1: WorkflowTemplate = {
    */
   derived_outline: {
     stage_id: 'drafting',
+    label: 'Full research paper',
+    description: 'Introduction, related work, method, results, validation, discussion, threats, scope, conclusion.',
     sections: [
       {
         id: 'introduction',
@@ -148,6 +153,54 @@ export const RESEARCH_V1: WorkflowTemplate = {
         required: true,
       },
     ],
+    compact: {
+      label: 'Short report',
+      description: 'The answer first, then how it was reached, what was found, what could change it, and what to do next.',
+      // A reader named like this wants a decision, not a paper.
+      default_when: ['executive', 'leadership', 'board', 'management', 'stakeholder', 'client', 'memo', 'brief', 'business', 'decision'],
+      sections: [
+        {
+          id: 'answer',
+          title: 'The answer',
+          from_stages: ['question', 'analysis'],
+          guidance:
+            'Lead with the answer to the question as it was posed, in a few sentences a busy reader could act on, and how sure it is. Say plainly what is not yet known. No method, no background: those come after.',
+          required: true,
+        },
+        {
+          id: 'approach',
+          title: 'What was looked at',
+          from_stages: ['hypothesis', 'method', 'experiment', 'literature'],
+          guidance:
+            'Say what was tested and how, briefly: the working explanations, the data or evidence used, what was actually run and what could not be. One place for all of it, so the findings below do not have to explain themselves again.',
+          required: true,
+        },
+        {
+          id: 'findings',
+          title: 'What was found',
+          from_stages: ['analysis', 'experiment', 'validation'],
+          guidance:
+            'Give each finding once, with the evidence for it and whether it was checked a second way. State numbers exactly as established. Do not restate the answer above or the approach; add what they did not say.',
+          required: true,
+        },
+        {
+          id: 'caveats',
+          title: 'What could change this',
+          from_stages: ['alternatives', 'mechanism', 'generality'],
+          guidance:
+            'The other explanations that have not been ruled out, why the result comes out as it does if that is known, and where it should not be assumed to hold. Only what bears on the decision.',
+          required: false,
+        },
+        {
+          id: 'next',
+          title: 'What to do next',
+          from_stages: ['analysis', 'generality'],
+          guidance:
+            'The actions that follow from the findings, in order of priority, each tied to the finding it rests on, and the evidence that would be worth getting before committing further. Do not summarise the report.',
+          required: true,
+        },
+      ],
+    },
   },
   stages: [
     {

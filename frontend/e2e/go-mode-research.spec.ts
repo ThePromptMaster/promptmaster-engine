@@ -146,3 +146,37 @@ test('Go suggests skipping a stage; the user skips it, and can reopen it later',
   await expect(page.getByRole('button', { name: 'Reopen to edit' })).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('02-skipped-and-reopenable.png') });
 });
+
+/**
+ * 1 Oct, item 31 — "The Research workflow sometimes becomes much more
+ * academic than the business problem requires. It can repeat the same point
+ * across Results, Validation, Discussion, Threats to Validity,
+ * Interpretation, Conclusion." The write-up can be laid out as a short
+ * report instead of a paper.
+ */
+test('a Research write-up can be laid out as a short report instead of a paper', async ({ page }) => {
+  test.setTimeout(300_000);
+  await createProject(page, { workflow: 'Research', name: 'E2E short report', objective: 'Why Mid-Market customers churn' });
+  const drafting = page.locator('header').getByRole('heading', { name: 'Drafting', exact: true });
+  for (let i = 0; i < 12 && !(await drafting.isVisible().catch(() => false)); i += 1) {
+    await pressTransition(page);
+    await page.waitForTimeout(1_200);
+  }
+  await expect(drafting).toBeVisible();
+
+  const forms = page.getByRole('radiogroup', { name: 'Form of the write-up' });
+  await expect(forms.getByRole('radio', { name: /Full research paper · 9 sections/ })).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByLabel('Title of section 1')).toHaveValue('Introduction');
+
+  await forms.getByRole('radio', { name: /Short report · 5 sections/ }).click();
+  await expect(page.getByText('The outline below is in the other form.')).toBeVisible();
+  await page.getByRole('button', { name: 'Regenerate the outline' }).click();
+  const confirm = page.getByRole('button', { name: 'Regenerate', exact: true });
+  if (await confirm.isVisible().catch(() => false)) await confirm.click();
+
+  await expect(page.getByLabel('Title of section 1')).toHaveValue('The answer');
+  await expect(page.getByLabel('Title of section 2')).toHaveValue('What was looked at');
+  await expect(page.getByLabel('Title of section 3')).toHaveValue('What was found');
+  await expect(page.getByText('The outline below is in the other form.')).toHaveCount(0);
+  await page.screenshot({ path: test.info().outputPath('01-short-report-form.png'), fullPage: true });
+});

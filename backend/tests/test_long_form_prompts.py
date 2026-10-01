@@ -252,3 +252,15 @@ async def test_generate_section_propagates_length_finish_reason(basic_inputs):
         prev_section_content="",
     )
     assert result.finish_reason == "length"
+
+
+def test_a_section_is_told_to_say_each_thing_once(basic_inputs):
+    """1 Oct, item 31: one point repeated across Results, Validation, Discussion, Threats and Conclusion."""
+    outline = [
+        OutlineSection(id="s1", title="What was found", abstract="Each finding once."),
+        OutlineSection(id="s2", title="What to do next", abstract="The actions that follow."),
+    ]
+    _, user = build_section_prompt(inputs=basic_inputs, outline=outline, section_index=1, prior_snapshot=None, prev_section_content="")
+    assert "SAY EACH THING ONCE" in user
+    assert "Do not restate a finding, a figure, a caveat or a recommendation that an earlier section has made" in user
+    assert "write only what is new here" in user

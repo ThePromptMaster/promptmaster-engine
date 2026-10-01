@@ -18,7 +18,7 @@ import { appendWorkflowEvent } from '@/lib/supabase/workflow';
 import { appliedFindingsVersion, findingsInstruction, reviseWithFindings } from '@/lib/workflow/apply-findings';
 import { findInstructionConflicts } from '@/lib/workflow/conflict-trail';
 import { describeWith, type InstructionConflict } from '@/lib/workflow/instruction-conflicts';
-import { deriveOutlineItems } from '@/lib/workflow/derived-outline';
+import { defaultOutlineForm, deriveOutlineItems } from '@/lib/workflow/derived-outline';
 import { itemSchemaFor, parseItems, rendererHoldsItems, serializeItems } from '@/lib/workflow/stage-artifact';
 import { applyLookup, lookupSummary, recordLine } from '@/lib/workflow/lookup';
 import { readStageFigures, type StageFigures } from '@/lib/workflow/figures';
@@ -353,7 +353,8 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       const derived = ctx.template.outline_stage === 'derived';
       const doc = await generateOutlineDraft({
         project: ctx.project, doc: f.doc, drafts: [],
-        ...(derived ? { derive: () => deriveOutlineItems(ctx.template, ctx.state, ctx.bundles) } : {}),
+        // In the form the project's reader calls for; the user can lay it out the other way on the outline.
+        ...(derived ? { derive: () => deriveOutlineItems(ctx.template, ctx.state, ctx.bundles, { form: defaultOutlineForm(ctx.template, ctx.project) }) } : {}),
       });
       if (countNamedSections(doc) < 2) {
         return done(key, {

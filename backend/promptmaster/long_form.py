@@ -288,7 +288,15 @@ def build_section_prompt(
         f"WRITE SECTION {section_index + 1}: {target.title}\n"
         f"This section covers: {target.abstract}\n\n"
         "Write only the prose for this section. Do not include the section title or "
-        "number; just the body content. Stay focused on what this section's abstract says."
+        "number; just the body content. Stay focused on what this section's abstract says.\n\n"
+        # The same finding was made again in Results, Validation, Discussion,
+        # Threats and Conclusion (the client's 1 Oct feedback, item 31).
+        "SAY EACH THING ONCE. The outline and the prior context show what earlier "
+        "sections have already established. Do not restate a finding, a figure, a "
+        "caveat or a recommendation that an earlier section has made: build on it, "
+        "or refer back to it in a clause. If this section's brief overlaps an "
+        "earlier one, write only what is new here. A shorter section that adds "
+        "something is better than a full one that repeats."
     )
     return system, user
 

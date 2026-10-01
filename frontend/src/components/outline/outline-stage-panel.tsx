@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DerivedOutlineNotice } from './derived-outline-notice';
 import { OutlineEditor } from './outline-editor';
 import { OutlineHistory } from './outline-history';
-import { derivedOutlineDrift } from '@/lib/workflow/derived-outline';
+import { derivedOutlineDrift, type OutlineForm } from '@/lib/workflow/derived-outline';
 import { api } from '@/lib/api/client';
 import {
   applyItemRegeneration,
@@ -64,7 +64,13 @@ interface Props {
    * as a callback rather than a value so the panel can re-run it — that is what
    * makes "the source stage changed" answerable without a model call.
    */
-  derive?: () => OutlineItem[];
+  derive?: (form?: OutlineForm['id']) => OutlineItem[];
+  /** The forms the write-up can take, when the workflow offers more than one. */
+  forms?: OutlineForm[];
+  /** Which form an existing outline is in, from its sections. */
+  formOf?: (items: OutlineItem[]) => OutlineForm['id'];
+  /** The form to start from when there is no outline yet. */
+  defaultForm?: OutlineForm['id'];
   /**
    * Called after an approval, with the version and the document it pinned.
    *
@@ -110,6 +116,9 @@ export function OutlineStagePanel({
   drafts = [],
   onRewriteSection,
   derive,
+  forms = [],
+  formOf,
+  defaultForm = 'full',
   onApproved,
   onItemCountChange,
   onPanelStep,
@@ -124,11 +133,15 @@ export function OutlineStagePanel({
   const [error, setError] = useState<string | null>(null);
   const [regeneratingItemId, setRegeneratingItemId] = useState<string | null>(null);
   const [regeneratingAll, setRegeneratingAll] = useState(false);
+  // The form to lay the write-up out in. Follows the outline once there is one.
+  const [chosenForm, setForm] = useState<OutlineForm['id'] | null>(null);
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Read inside the load effect without making the derivation a dependency of
   // it: re-deriving is cheap and deterministic, but re-fetching the artifact
   // every time the parent re-renders is not.
+  const defaultFormRef = useRef(defaultForm);
+  defaultFormRef.current = defaultForm;
   const deriveRef = useRef(derive);
   useEffect(() => {
     deriveRef.current = derive;
@@ -170,7 +183,7 @@ export function OutlineStagePanel({
         // is a row that can go stale on its own.
         const seed = deriveRef.current;
         if (!saved && rows.length === 0 && seed) {
-          const items = seed();
+          const items = seed(defaultFormRef.current);
           seededRef.current = items.length > 0;
           setDraft(items.length ? { ...emptyDocument(), items } : null);
         } else {
@@ -203,6 +216,7 @@ export function OutlineStagePanel({
   const headApproved = head ? approvedIds.has(head.id) : false;
   const doc = draft ?? headDocument;
 
+  const form: OutlineForm['id'] = chosenForm ?? (doc.items.length && formOf ? formOf(doc.items) : defaultForm);
   const namedSections = countNamedSections(doc);
   useEffect(() => {
     if (!loading) onItemCountChange?.(namedSections);
@@ -223,9 +237,12 @@ export function OutlineStagePanel({
    */
   const drift = useMemo(() => {
     if (!derive || !approvedVersion) return null;
-    const report = derivedOutlineDrift(parseOutlineDocument(approvedVersion.content).items, derive());
+    // Re-derived in the form the approved outline is in: comparing a short
+    // report with the paper form would report every section as changed.
+    const approvedItems = parseOutlineDocument(approvedVersion.content).items;
+    const report = derivedOutlineDrift(approvedItems, derive(formOf?.(approvedItems)));
     return report.stale ? report : null;
-  }, [derive, approvedVersion]);
+  }, [derive, approvedVersion, formOf]);
 
   const history = useMemo(() => outlineHistory(versions, approvals), [versions, approvals]);
   const stale = useMemo(
@@ -338,13 +355,13 @@ export function OutlineStagePanel({
       // The same call Go mode's generate_outline makes (B2a). Derived outlines
       // re-derive and never call a model; either way the merge keeps a section
       // that has left the outline in the orphan tray with its prose intact.
-      edit(await generateOutlineDraft({ project, doc, drafts, derive }));
+      edit(await generateOutlineDraft({ project, doc, drafts, derive: derive ? () => derive(form) : undefined }));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not regenerate the outline.');
     } finally {
       setRegeneratingAll(false);
     }
-  }, [project, doc, drafts, edit, derive]);
+  }, [project, doc, drafts, edit, derive, form]);
 
   const handleRegenerateItem = useCallback(
     async (itemId: string) => {
@@ -358,7 +375,7 @@ export function OutlineStagePanel({
         // id rather than position. Positions move when the user reorders; the
         // id is what the section is.
         if (derive) {
-          const fresh = derive().find((i) => i.id === itemId);
+          const fresh = derive(formOf?.(doc.items) ?? form).find((i) => i.id === itemId);
           if (!fresh) {
             throw new Error('No stage feeds this section any more — edit it here instead.');
           }
@@ -386,7 +403,7 @@ export function OutlineStagePanel({
         setRegeneratingItemId(null);
       }
     },
-    [doc, project, edit, derive]
+    [doc, project, edit, derive, formOf, form]
   );
 
   const handleDiscardDraft = useCallback(() => {
@@ -443,6 +460,35 @@ export function OutlineStagePanel({
           onRederive={readOnly ? undefined : handleRegenerateAll}
           busy={regeneratingAll || busy}
         />
+      )}
+
+      {forms.length > 1 && !readOnly && (
+        <div className="rounded-xl bg-[var(--surface-container-low)] px-5 py-4">
+          <p className="mb-2 text-label uppercase tracking-wide text-[var(--on-surface-variant)]">Form of the write-up</p>
+          <div role="radiogroup" aria-label="Form of the write-up" className="flex flex-wrap gap-2">
+            {forms.map((f) => (
+              <button
+                key={f.id}
+                role="radio"
+                aria-checked={form === f.id}
+                onClick={() => setForm(f.id)}
+                className={`min-w-[220px] flex-1 rounded-lg px-4 py-2.5 text-left transition-colors ${
+                  form === f.id
+                    ? 'bg-[var(--pm-primary)] text-[var(--on-primary)]'
+                    : 'bg-[var(--surface-container-highest)] text-[var(--on-surface)] hover:opacity-90'
+                }`}
+              >
+                <span className="block text-title">{f.label} · {f.sections.length} sections</span>
+                <span className="mt-0.5 block text-label opacity-90">{f.description}</span>
+              </button>
+            ))}
+          </div>
+          {doc.items.length > 0 && formOf && formOf(doc.items) !== form && (
+            <p className="mt-2 text-label text-[var(--on-surface-variant)]">
+              The outline below is in the other form. Regenerate it to lay it out as chosen; sections already written are kept.
+            </p>
+          )}
+        </div>
       )}
 
       <OutlineEditor
