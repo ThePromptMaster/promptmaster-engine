@@ -238,6 +238,11 @@ test('Autonomous decides the routine continuity findings and leaves the major on
   await expect(statuses.nth(0)).toContainText('Not looked at');
   await expect(statuses.nth(1)).toContainText('Accept');
   await expect(statuses.nth(2)).toContainText('Accept');
+  // The card's own button takes the user to the row that is theirs; Resume stays beside it.
+  await card.getByRole('button', { name: 'Go to the table' }).click();
+  await expect(page.locator('[data-stage-table]')).toBeInViewport();
+  await expect(page.locator('[data-undecided]')).toHaveCount(1);
+  await expect(panel.getByRole('button', { name: 'Resume' })).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('05-autonomous-decided-the-routine-findings.png'), fullPage: true });
 
   const [run] = await serviceSelect('agent_runs', `project_id=eq.${id}&select=id,status,needs&order=created_at.desc&limit=1`);

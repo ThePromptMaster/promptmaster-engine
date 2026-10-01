@@ -51,7 +51,7 @@ import {
   tickClosesStage,
 } from '@/lib/workflow/engine';
 import { buildStageDigest, formatManuscript, summariseStageContent } from '@/lib/workflow/digest';
-import { stageContentForSummary, stageEvidence } from '@/lib/workflow/evidence';
+import { keepFinishedVersion, stageContentForSummary, stageEvidence } from '@/lib/workflow/evidence';
 import { api } from '@/lib/api/client';
 import { inputsFrom } from './use-stage-generation';
 import type { EvaluationResult } from '@/types';
@@ -940,6 +940,13 @@ export function WorkflowWorkspace({
         if (!option) throw new Error('This stage cannot be skipped.');
         await handleTransition(option, reason.slice(0, 500));
       },
+      showTable: () => {
+        const table = document.querySelector<HTMLElement>('[data-stage-table]');
+        if (!table) return;
+        table.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // The first row still to decide, so the next keystroke is the decision.
+        (table.querySelector<HTMLElement>('[data-undecided] button, [data-undecided] select') ?? table).focus({ preventScroll: true });
+      },
     }),
     [project.id, project.user_id, project.model, project.mode, materialiseOutline, refreshEvents, setBlocked, handleToggleManual, onReload, transitions, handleTransition]
   );
@@ -1413,6 +1420,19 @@ export function WorkflowWorkspace({
                 const holder = deliverableStage(template);
                 void reopenProject().then(() => holder && setViewingStageId(holder.id === state.current_stage_id ? null : holder.id));
               }}
+              onNewVersion={
+                appendStageVersion
+                  ? async () => {
+                      const holder = deliverableStage(template);
+                      if (!holder) return;
+                      // The finished text is saved before anything can change it.
+                      const kept = await keepFinishedVersion({ template, stage: holder, bundles: stageBundles, project, appendStageVersion });
+                      if (!kept) throw new Error('The finished work could not be kept as a version, so nothing was reopened.');
+                      await reopenProject();
+                      setViewingStageId(holder.id === state.current_stage_id ? null : holder.id);
+                    }
+                  : undefined
+              }
             />
           )}
 

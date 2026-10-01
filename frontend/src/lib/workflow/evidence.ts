@@ -28,6 +28,7 @@ import { formatManuscript, type StageArtifactBundle } from './digest';
 import type { StageDefinition, WorkflowTemplate } from './types';
 
 export const LONG_FORM_COMPLETE = 'long_form_complete';
+export const FINISHED_VERSION = 'finished_version';
 
 export interface EvidenceInput {
   template: WorkflowTemplate;
@@ -96,4 +97,32 @@ export async function stageEvidence(input: EvidenceInput): Promise<string | unde
   });
   const id = (created as { id?: unknown } | null)?.id;
   return typeof id === 'string' ? id : undefined;
+}
+
+/**
+ * Keep the finished work before a new version of it is started (1 Oct, item
+ * 26: "create new version"). Prose, list and review stages need nothing: their
+ * versions are append-only, so the finished one stays in the history whatever
+ * is written next. A long-form stage is edited in place, so the manuscript as
+ * it stands is saved as a snapshot — unless the head already holds exactly
+ * that text. Resolves to whether the finished work is in the history.
+ */
+export async function keepFinishedVersion(input: EvidenceInput): Promise<boolean> {
+  const { template, stage, bundles, project, appendStageVersion } = input;
+  const own = bundles[stage.id];
+  const head = own?.artifact?.stage_id === stage.id ? own.versions.at(-1) : undefined;
+  if (stage.renderer !== 'long_form') return Boolean(head);
+  const text = stageContentForSummary(template, stage, bundles);
+  if (!text.trim()) return false;
+  if (head && head.content === text) return true;
+  if (!appendStageVersion) return false;
+  await appendStageVersion(stage.id, stage.label, {
+    content: text,
+    source_operation: FINISHED_VERSION,
+    instruction: 'Kept before a new version was started',
+    model: '',
+    mode: project.mode,
+    change_summary: `The finished work as it stood — ${text.split(/\s+/).filter(Boolean).length.toLocaleString()} words.`,
+  });
+  return true;
 }

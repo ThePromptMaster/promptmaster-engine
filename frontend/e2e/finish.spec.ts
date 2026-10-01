@@ -76,8 +76,13 @@ test('Finish closes the project even when the server wrote events the page has n
   await expect(finished.getByText('E2E finish')).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('02-listed-under-finished.png') });
 
-  // And it can be reopened.
+  // And a new version of it can be started: the finished one stays in the
+  // history, the project reopens, and the stage that holds the work is shown.
   await finished.getByText('E2E finish').click();
-  await page.getByRole('button', { name: 'Reopen' }).click();
-  await expect(transitionBar(page)).toBeVisible();
+  await page.getByRole('region', { name: 'Your finished work' }).getByRole('button', { name: 'Start a new version' }).click();
+  await expect(page.getByRole('region', { name: 'Your finished work' })).toHaveCount(0);
+  await expect(page.getByText('Mock output').first()).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath('03-new-version-started.png') });
+  const after = await serviceSelect('workflow_events', `project_id=eq.${projectId}&select=type&order=seq`);
+  expect(after.at(-1)).toMatchObject({ type: 'project_reopened' });
 });

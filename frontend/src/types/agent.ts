@@ -58,6 +58,8 @@ export interface AgentRun {
   needs: NeedsUser | null;
   /** The budget_exhausted run this one continues (B4): windows chain. */
   continues_run_id: string | null;
+  /** The loop started this window itself, under the authorization's `auto_continue_windows`. */
+  auto_continued?: boolean;
 }
 
 export interface AgentStep {

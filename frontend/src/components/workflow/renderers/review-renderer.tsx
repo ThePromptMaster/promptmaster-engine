@@ -188,7 +188,7 @@ export function ReviewRenderer({
           {/* The table scrolls inside its own container: at five columns it is
               wider than the 820px content well on a laptop, and a horizontally
               scrolling page is worse than a horizontally scrolling table. */}
-          <div className="overflow-x-auto rounded-xl bg-[var(--surface-container-lowest)]">
+          <div data-stage-table tabIndex={-1} className="scroll-mt-24 overflow-x-auto rounded-xl bg-[var(--surface-container-lowest)] outline-none">
             <table className="w-full min-w-[720px] border-collapse">
               <caption className="sr-only">
                 {stage.label}: one row per {schema.itemLabel}, each with a status and, where the
@@ -272,7 +272,7 @@ function ReviewRow({ row, columns, statuses, schema, readOnly, onPatch }: Review
 
   return (
     <>
-      <tr className="align-top">
+      <tr className="align-top" {...(isTriaged(row, schema) ? {} : { 'data-undecided': '' })}>
         {columns.map((c) => (
           <td
             key={c.key}

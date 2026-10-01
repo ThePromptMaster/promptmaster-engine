@@ -261,7 +261,9 @@ reopenings, priority decisions, accepted and dismissed suggestions and answers t
 questions, rebuilt from `workflow_events`, `recommendations` and the steps of this window
 and the ones it continues (`listChainSteps`, reloaded on adopt). An Autonomous
 authorization can carry `auto_continue_windows`; the loop then starts the next window
-itself when one is used up, through the same `continueRun` a click uses.
+itself when one is used up, through the same `continueRun` a click uses, marking the new
+run `auto_continued`; `agent_runs_guard` counts those against the authorization
+(20261010000000), so the allowance is the database's to keep, not the loop's.
 
 **The order is a default.** On a stage the template allows to be skipped, the planner may
 choose `propose_skip`: a suggestion with a reason, never a skip. The run stops with a

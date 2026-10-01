@@ -46,6 +46,17 @@ export const NEED_CLEARED = 'That is done. Press Resume and I will carry on.';
  */
 export const NEED_MOVED_ON = 'The project has moved on from the stage I was waiting on. Press Resume and I will carry on from here.';
 
+/** The button on a request that is settled row by row: it takes the user to the rows. */
+export const SHOW_TABLE = 'Go to the table';
+
+/**
+ * Requests whose button shows the way rather than doing the thing: deciding a
+ * row is several choices, each the user's, so no one click can stand for them.
+ */
+export function needIsDecidedOnStage(need: Pick<NeedsUser, 'kind'>): boolean {
+  return need.kind === 'decide_rows' || need.kind === 'triage_findings';
+}
+
 /** Whether a stop reason is one of the two "nothing is asked of you now" notes. */
 export function isClearedNote(reason: string | null | undefined): boolean {
   return reason === NEED_CLEARED || reason === NEED_MOVED_ON;
@@ -210,12 +221,12 @@ export function describeNeed(need: NeedsUser, stageLabel: (id: string) => string
     case 'decide_rows':
       return {
         message: `${need.count} ${need.count === 1 ? need.itemLabel : `${need.itemLabel}s`} ${need.count === 1 ? 'is' : 'are'} waiting for your decision — only you can settle ${need.count === 1 ? 'it' : 'them'}. Decide in the table below.`,
-        action: null,
+        action: SHOW_TABLE,
       };
     case 'triage_findings':
       return {
         message: `${need.count} finding${need.count === 1 ? '' : 's'} would change the work, so ${need.count === 1 ? 'it needs' : 'they need'} your decision. Decide in the table below.`,
-        action: null,
+        action: SHOW_TABLE,
       };
   }
 }

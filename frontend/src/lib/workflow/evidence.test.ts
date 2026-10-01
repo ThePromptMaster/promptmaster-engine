@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { BOOK_V1 } from './templates/book.v1';
-import { LONG_FORM_COMPLETE, completedManuscript, stageContentForSummary, stageEvidence } from './evidence';
+import { FINISHED_VERSION, LONG_FORM_COMPLETE, completedManuscript, keepFinishedVersion, stageContentForSummary, stageEvidence } from './evidence';
 import { summariseStageContent, type StageArtifactBundle } from './digest';
 import type { Artifact, ArtifactVersion } from '@/types/project';
 
@@ -118,5 +118,37 @@ describe('the stage summary of a manuscript names its sections', () => {
   it('a prose stage still summarises its head version', () => {
     const bundles = { objective: prose('objective', 'Why dogs bark, and what to do about it.') };
     expect(stageContentForSummary(BOOK_V1, stage('objective'), bundles)).toBe('Why dogs bark, and what to do about it.');
+  });
+});
+
+describe('keepFinishedVersion: the finished work stays in the history when a new version is started (1 Oct, item 26)', () => {
+  it('a prose stage needs nothing saved: its versions are append-only', async () => {
+    const append = vi.fn();
+    const bundles = { objective: prose('objective', 'Why dogs bark.') };
+    await expect(keepFinishedVersion({ template: BOOK_V1, stage: stage('objective'), bundles, project, appendStageVersion: append })).resolves.toBe(true);
+    expect(append).not.toHaveBeenCalled();
+    // …and with nothing written there is nothing to keep.
+    await expect(keepFinishedVersion({ template: BOOK_V1, stage: stage('audience'), bundles, project, appendStageVersion: append })).resolves.toBe(false);
+  });
+
+  it('a manuscript edited in place is saved as it stands, once', async () => {
+    const bundles = { drafting: manuscript('drafting', ['complete', 'complete']) };
+    const append = vi.fn(async () => ({ id: 'v-kept' }));
+    await expect(keepFinishedVersion({ template: BOOK_V1, stage: stage('drafting'), bundles, project, appendStageVersion: append })).resolves.toBe(true);
+    const [stageId, , version] = append.mock.calls[0] as unknown as [string, string, { content: string; source_operation: string }];
+    expect(stageId).toBe('drafting');
+    expect(version.source_operation).toBe(FINISHED_VERSION);
+    expect(version.content).toContain('Chapter 2 text.');
+
+    // The head already holds exactly this text: nothing more is written.
+    const again = vi.fn();
+    const kept = { drafting: manuscript('drafting', ['complete', 'complete'], [{ id: 'v-kept', content: version.content } as ArtifactVersion]) };
+    await expect(keepFinishedVersion({ template: BOOK_V1, stage: stage('drafting'), bundles: kept, project, appendStageVersion: again })).resolves.toBe(true);
+    expect(again).not.toHaveBeenCalled();
+  });
+
+  it('cannot keep a manuscript in a view that cannot save versions', async () => {
+    const bundles = { drafting: manuscript('drafting', ['complete']) };
+    await expect(keepFinishedVersion({ template: BOOK_V1, stage: stage('drafting'), bundles, project })).resolves.toBe(false);
   });
 });

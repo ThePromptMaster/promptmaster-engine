@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-import { describeNeed, type NeedsUser } from '@/lib/agent/needs';
+import { describeNeed, needIsDecidedOnStage, type NeedsUser } from '@/lib/agent/needs';
 
 /**
  * "I need you to do this before I can continue" — with that exact action
@@ -44,7 +44,9 @@ export function NeedsYouCard({
           <span className="text-label text-[var(--on-surface-variant)]">
             {need.kind === 'skip_stage'
               ? 'Or press Resume to do this stage after all.'
-              : 'Or do it yourself on the stage. I will notice, and Resume will appear here.'}
+              : needIsDecidedOnStage(need)
+                ? 'Decide each one there. I will notice when they are settled; then press Resume.'
+                : 'Or do it yourself on the stage. I will notice, and Resume will appear here.'}
           </span>
         </div>
       ) : (

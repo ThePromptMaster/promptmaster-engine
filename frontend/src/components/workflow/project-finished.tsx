@@ -18,6 +18,8 @@ interface Props {
   onReopen: () => void;
   /** Reopen the project and go to the stage that holds the work. */
   onEdit?: () => void;
+  /** Keep this finished version in the history, then reopen to work on the next one. */
+  onNewVersion?: () => Promise<void>;
 }
 
 /**
@@ -26,7 +28,7 @@ interface Props {
  * it, copy it, save it as Markdown, Word or PDF, or reopen the project to
  * keep improving it. The stage-by-stage record stays below, as it was.
  */
-export function ProjectFinished({ bundle, completion, evaluation, onReopen, onEdit }: Props) {
+export function ProjectFinished({ bundle, completion, evaluation, onReopen, onEdit, onNewVersion }: Props) {
   const { project, template } = bundle;
   const stage = deliverableStage(template);
   const inSections = stage?.renderer === 'long_form';
@@ -123,6 +125,21 @@ export function ProjectFinished({ bundle, completion, evaluation, onReopen, onEd
             Edit the {noun}
           </button>
         )}
+        {markdown && onNewVersion && (
+          <button
+            onClick={() => {
+              setBusy(true);
+              setNote(null);
+              onNewVersion()
+                .catch((e: unknown) => setNote(e instanceof Error && e.message ? e.message : 'A new version could not be started.'))
+                .finally(() => setBusy(false));
+            }}
+            disabled={busy}
+            className={secondary}
+          >
+            Start a new version
+          </button>
+        )}
         <button onClick={onReopen} className={secondary}>
           Continue improving
         </button>
@@ -135,6 +152,7 @@ export function ProjectFinished({ bundle, completion, evaluation, onReopen, onEd
       <p className="mt-2 text-label text-[var(--on-surface-variant)]">
         Export PDF opens a print view — choose “Save as PDF” in the print dialog. Word keeps headings, paragraphs and
         bullets; tables and code arrive as plain text.
+        {markdown && onNewVersion ? ` Start a new version keeps this ${noun} in the version history as it is and reopens it for the next one.` : ''}
       </p>
 
       {reading && markdown && (
