@@ -796,7 +796,7 @@ export function WorkflowWorkspace({
       if (!works.length) return { items, message: 'There is nothing named to look up yet.' };
       const { matches } = await api.agentLiterature(works);
       const result = applyLookup(items, matches, schema);
-      return { items: result.items, message: lookupSummary(result, schema.itemLabel) };
+      return { items: result.items, message: lookupSummary(result, schema.lookup!.noun) };
     },
     [stage]
   );

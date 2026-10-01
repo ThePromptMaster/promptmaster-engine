@@ -92,7 +92,7 @@ export interface StageItemSchema {
    * is searched by; a found record sets `status`, fills `linkField` if it is
    * empty, and writes what was found into `recordField`.
    */
-  lookup?: { field: string; linkField: string; recordField: string; status: string };
+  lookup?: { field: string; linkField: string; recordField: string; status: string; /** What is looked up, plural: "works", "sources". */ noun: string };
   /**
    * The rows are things to be carried out, and a sandbox run that executed
    * can settle one: it sets `status` and writes what the run printed into
@@ -186,7 +186,7 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
     ],
     defaultStateNote:
       '{n} of {total} works were suggested from the model\'s knowledge. They have not been searched for, retrieved or verified — treat them as candidates.',
-    lookup: { field: 'work', linkField: 'link', recordField: 'record', status: 'retrieved' },
+    lookup: { field: 'work', linkField: 'link', recordField: 'record', status: 'retrieved', noun: 'works' },
   },
 
   // Keyed 'hypotheses' because that is the artifact kind the Research template
@@ -217,6 +217,8 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
       { key: 'claim', label: 'Claim', long: true, max: 400 },
       { key: 'source', label: 'Source', max: 240 },
       { key: 'where', label: 'Where it appears', max: 160 },
+      { key: 'record', label: 'Record found', hint: 'Filled in when the source is looked up — the title, authors and year the index holds', max: 500, userOnly: true },
+      { key: 'link', label: 'DOI or link', hint: 'Filled in when the source is looked up', max: 300, userOnly: true },
     ],
     // C3 (Sean, 28 Sep, item 12: "If I personally click Verified, what am I
     // representing?"): who established what is on the row. PromptMaster's
@@ -228,7 +230,11 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
     statuses: [
       {
         value: 'verified_by_promptmaster', label: 'Verified by PromptMaster', tone: 'done', settable: false,
-        explain: 'A source-checking tool confirmed it. No tool is connected yet, so no claim carries this today.',
+        explain: 'A tool read the source and confirmed the claim. The lookup only finds that a source exists — it does not read it — so no claim carries this today.',
+      },
+      {
+        value: 'source_found', label: 'Source found by PromptMaster — check it says this', tone: 'neutral', decided: false, settable: false,
+        explain: 'A record with the named source\'s title was found in OpenAlex, and its DOI is on the row. Nobody has checked the claim against it; you decide.',
       },
       {
         value: 'candidate_source', label: 'Candidate source — verify it yourself', tone: 'neutral', decided: false,
@@ -242,6 +248,10 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
       { value: 'unverifiable', label: 'Unverifiable', tone: 'neutral', requiresReason: true, explain: 'No source could settle it, and you say why. An acceptable answer.' },
       { value: 'removed', label: 'Remove', tone: 'warn', requiresReason: true, explain: 'The claim should not stand, and you say why.' },
     ],
+    // The source a claim names can be searched for like any work. Finding it
+    // is not verifying the claim: the row moves to "source found", which
+    // still counts as undecided.
+    lookup: { field: 'source', linkField: 'link', recordField: 'record', status: 'source_found', noun: 'sources' },
   },
 
   runs: {

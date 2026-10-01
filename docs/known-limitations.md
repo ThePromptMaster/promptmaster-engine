@@ -575,9 +575,16 @@ sets **Candidate source — verify it yourself** when the model named where a cl
 checked and **No source found** when it could not; both count as *undecided*, so "Every claim
 has a status" still means every claim was looked at by the author. The author's decisions are
 **Verified by me**, **Unverifiable** (with a reason) and **Remove** (with a reason). **Verified
-by PromptMaster** exists in the schema for a source-checking tool to set and is never offered
-in the dropdown; no retrieval tool is connected (D2), so no claim carries it today, and the
-model's "source" is what it inferred from the manuscript, not something it fetched. The
+by PromptMaster** exists in the schema for a tool that reads a source and confirms the claim,
+and is never offered in the dropdown; nothing reads sources, so no claim carries it today, and
+the model's "source" is what it inferred from the manuscript, not something it fetched. Since
+2026-10-01 the named sources can be **looked up** ("Look up these sources", the same OpenAlex
+title search as Literature — L-C6): a source that is found moves the row to **Source found by
+PromptMaster — check it says this**, with the record's real title and DOI on the row. That is
+a provenance state like the other two and still counts as *undecided*: the lookup establishes
+that a work with that title exists, not that it supports the claim. A source that is not a
+published work (the author's own data, a website, an interview) is simply not found. On Book
+the lookup is the user's button only — Go's `check_literature` is offered on Research. The
 backend maps whatever the model says onto these states — a model "verified" becomes a
 candidate at most (`_claim_provenance` in `promptmaster/stage.py`). Book v5 carries the prompt
 text; projects on v4 and earlier keep their old statuses and see the "Upgrade workflow" button.

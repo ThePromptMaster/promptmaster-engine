@@ -52,8 +52,11 @@ export function applyLookup(items: readonly StageItem[], matches: readonly WorkM
     found += 1;
     const row: StageItem = { ...item, [lookup.recordField]: recordLine(match) };
     if (!(item[lookup.linkField] ?? '').trim()) row[lookup.linkField] = match.doi || match.url;
-    // The user's own verification outranks a lookup.
-    if (item.status_source !== 'user' || !item.status) {
+    // The user's own decision outranks a lookup — including one made before
+    // sources were recorded, when only a user could have decided a row.
+    const option = schema.statuses?.find((o) => o.value === item.status);
+    const usersOwn = item.status_source === 'user' || (!item.status_source && option !== undefined && option.decided !== false);
+    if (!usersOwn || !item.status) {
       row.status = lookup.status;
       row.status_source = 'tool';
     }
@@ -62,9 +65,10 @@ export function applyLookup(items: readonly StageItem[], matches: readonly WorkM
   return { items: next, found, notFound, unreachable };
 }
 
-export function lookupSummary(result: LookupResult, itemLabel: string): string {
+/** `noun` is what was looked up, plural ("works", "sources"). */
+export function lookupSummary(result: LookupResult, noun: string): string {
   const total = result.found + result.notFound + result.unreachable;
-  const plural = (n: number) => `${n} ${itemLabel}${n === 1 ? '' : 's'}`;
+  const plural = (n: number) => `${n} ${n === 1 ? noun.replace(/s$/, '') : noun}`;
   const parts = [`${result.found} of ${plural(total)} found in OpenAlex.`];
   if (result.notFound) parts.push(`${result.notFound} not found — ${result.notFound === 1 ? 'it' : 'they'} may be misremembered, or not exist.`);
   if (result.unreachable) parts.push(`${result.unreachable} could not be looked up; try again.`);

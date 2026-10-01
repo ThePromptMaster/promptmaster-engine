@@ -59,7 +59,8 @@ export function carryUserFields(before: readonly StageItem[], after: StageItem[]
     for (const key of userOnly) if ((was[key] ?? '').trim()) kept[key] = was[key];
     // …and so does what a sandbox run settled: the regenerating model may
     // not claim "completed", so without this the row would lose it.
-    if (was.status_source === 'user' || was.status_source === 'sandbox' || (was.status && !was.status_source)) {
+    // …and what a lookup found (its record and link are user-only fields, carried above).
+    if (was.status_source === 'user' || was.status_source === 'sandbox' || was.status_source === 'tool' || (was.status && !was.status_source)) {
       kept.status = was.status;
       kept.reason = was.reason;
       kept.status_source = was.status_source;

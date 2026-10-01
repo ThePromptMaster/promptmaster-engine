@@ -217,7 +217,7 @@ export function ListRenderer({
               <span aria-hidden className={`material-symbols-outlined text-[16px] ${lookingUp ? 'animate-spin' : ''}`}>
                 {lookingUp ? 'progress_activity' : 'travel_explore'}
               </span>
-              {lookingUp ? 'Looking them up…' : `Look up these ${label}s`}
+              {lookingUp ? 'Looking them up…' : `Look up these ${schema.lookup.noun}`}
             </button>
             <span className="text-label text-[var(--on-surface-variant)]">
               Searches OpenAlex for each title. Nothing is saved until you save.

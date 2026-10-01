@@ -50,6 +50,7 @@ export function ReviewRenderer({
   onSelectVersion,
   onRestore,
   onSaveItems,
+  onLookupItems,
   generating,
   generationError,
   generationFailure,
@@ -73,6 +74,25 @@ export function ReviewRenderer({
   const [rows, setRows] = useState<StageItem[]>(saved);
   const [saving, setSaving] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [lookingUp, setLookingUp] = useState(false);
+  const [lookupNote, setLookupNote] = useState<string | null>(null);
+
+  // The named sources, searched for in a public index. What comes back is
+  // unsaved: the user reads what was found, then saves.
+  async function lookUp() {
+    if (!onLookupItems || lookingUp) return;
+    setLookingUp(true);
+    setLookupNote(null);
+    try {
+      const result = await onLookupItems(rows);
+      setRows(result.items);
+      setLookupNote(result.message);
+    } catch (e) {
+      setLookupNote(e instanceof Error && e.message ? `The lookup did not work: ${e.message}` : 'The lookup did not work. Nothing was changed.');
+    } finally {
+      setLookingUp(false);
+    }
+  }
 
   const activeId = active?.id ?? null;
   useEffect(() => {
@@ -121,7 +141,8 @@ export function ReviewRenderer({
     else onGenerate();
   }
 
-  const columns = schema.fields;
+  // A field only a lookup or the user fills is a column once some row holds it.
+  const columns = schema.fields.filter((f) => !f.userOnly || rows.some((r) => (r[f.key] ?? '').trim()));
 
   return (
     <section aria-label={`${stage.label} work`}>
@@ -191,6 +212,30 @@ export function ReviewRenderer({
               </span>
             )}
           </div>
+
+          {schema.lookup && onLookupItems && !readOnly && (
+            <div className="mb-3 flex flex-wrap items-center gap-3">
+              <button
+                onClick={() => void lookUp()}
+                disabled={lookingUp}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-high)] px-4 py-2 text-label text-[var(--on-surface)] hover:opacity-90 disabled:opacity-50"
+              >
+                <span aria-hidden className={`material-symbols-outlined text-[16px] ${lookingUp ? 'animate-spin' : ''}`}>
+                  {lookingUp ? 'progress_activity' : 'travel_explore'}
+                </span>
+                {lookingUp ? 'Looking them up…' : `Look up these ${schema.lookup.noun}`}
+              </button>
+              <span className="text-label text-[var(--on-surface-variant)]">
+                Searches OpenAlex for each named source. It finds whether the source exists, not whether it says this.
+                Nothing is saved until you save.
+              </span>
+            </div>
+          )}
+          {lookupNote && (
+            <p role="status" className="mb-3 rounded-xl bg-[var(--surface-container-low)] px-5 py-3 text-body text-[var(--on-surface)]">
+              {lookupNote}
+            </p>
+          )}
 
           {/* The table scrolls inside its own container: at five columns it is
               wider than the 820px content well on a laptop, and a horizontally
