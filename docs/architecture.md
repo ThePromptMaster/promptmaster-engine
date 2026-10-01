@@ -255,6 +255,14 @@ and shown on the rail). An Autonomous run is not offered `advance_stage` in that
 (`withoutOverride`, `lib/agent/policy.ts`); under Guided and Checkpoint the user's Approve
 on the proposed move is the override.
 
+**What a run remembers.** Nothing is stored as "memory". On every move the planner is
+given `projectMemory()` (`lib/agent/memory.ts`, pure): the user's skips, overrides,
+reopenings, priority decisions, accepted and dismissed suggestions and answers to Go's
+questions, rebuilt from `workflow_events`, `recommendations` and the steps of this window
+and the ones it continues (`listChainSteps`, reloaded on adopt). An Autonomous
+authorization can carry `auto_continue_windows`; the loop then starts the next window
+itself when one is used up, through the same `continueRun` a click uses.
+
 **The order is a default.** On a stage the template allows to be skipped, the planner may
 choose `propose_skip`: a suggestion with a reason, never a skip. The run stops with a
 `skip_stage` need; the card's button performs the ordinary skip transition as the user

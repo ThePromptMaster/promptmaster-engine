@@ -36,7 +36,8 @@ import { contextWithFacts, readOutcomeProof, readStageFacts, type StageFacts } f
 import { describeNeed, NEED_CLEARED, NEED_MOVED_ON, needStillHolds, needsUser, type NeedsUser } from '@/lib/agent/needs';
 import { assertHonestOutcome, verifyOutcome } from '@/lib/agent/outcome';
 import { outlineStageFor } from '@/lib/outline/actions';
-import { recordDecision } from '@/lib/supabase/recommendations';
+import { listRecommendations, recordDecision } from '@/lib/supabase/recommendations';
+import { projectMemory } from '@/lib/agent/memory';
 import { requestProjectCancel } from '@/lib/supabase/jobs';
 import { authorizeRun } from '@/lib/agent/authorize';
 import { buildAgentState } from '@/lib/agent/digest';
@@ -49,6 +50,7 @@ import {
   getLatestAgentRun,
   getLiveAgentRun,
   listAgentSteps,
+  listChainSteps,
   setAgentStepStatus,
   startAgentStep,
   updateAgentRun,
@@ -101,6 +103,19 @@ interface Options {
 
 class Stopped extends Error {}
 
+/** The project's decisions for the planner, read fresh. Never throws: no memory is not a reason to stop. */
+async function readMemory(o: Options, steps: readonly AgentStep[]): Promise<string[]> {
+  try {
+    const [events, recommendations] = await Promise.all([
+      o.loadEvents ? o.loadEvents() : Promise.resolve(o.events),
+      listRecommendations(o.project.id),
+    ]);
+    return projectMemory({ template: o.template, events, recommendations, steps });
+  } catch {
+    return [];
+  }
+}
+
 /**
  * The user's answer to the last "which takes priority?" this run asked on
  * this stage, if nothing has been revised since. One answer lets one
@@ -142,6 +157,10 @@ const settle = () => new Promise((r) => setTimeout(r, 60));
 export function useGoLoop(opts: Options) {
   const [policy, setPolicy] = useState<ExecutionPolicy>('guided');
   const [budget, setBudget] = useState(DEFAULT_BUDGET_STEPS);
+  /** Further windows an Autonomous run may start on its own (chosen in the authorization). */
+  const [autoWindows, setAutoWindows] = useState(0);
+  const autoLeftRef = useRef(0);
+  const continueRef = useRef<(auto?: boolean) => Promise<void>>(async () => {});
   const [run, setRun] = useState<AgentRun | null>(null);
   const [steps, setSteps] = useState<AgentStep[]>([]);
   const [phase, setPhase] = useState<GoPhase>('idle');
@@ -220,6 +239,7 @@ export function useGoLoop(opts: Options) {
         events: o.loadEvents ? await o.loadEvents() : o.events, latestEvaluation: o.latestEvaluation,
       });
       setProgress(null);
+      const memory = await readMemory(o, [...priorStepsRef.current, ...stepsRef.current]);
       // The requirements, judged against the same read (1 Oct, item 1).
       const context = contextWithFacts(o.context, o.stage, facts);
 
@@ -230,7 +250,7 @@ export function useGoLoop(opts: Options) {
           template: o.template, state: o.state, stage: o.stage, bundles: o.bundles,
           stageEvaluation: evaluateStage(o.template, o.stage.id, context), latestEvaluation: o.latestEvaluation,
           steps: [...priorStepsRef.current, ...stepsRef.current],
-          context, approvedOutline: o.approvedOutline, facts, dataFiles: dataFileBriefs(o.project), tools: LIVE_TOOLS,
+          context, approvedOutline: o.approvedOutline, facts, dataFiles: dataFileBriefs(o.project), tools: LIVE_TOOLS, memory,
         }),
         approvedByUser, deliverableDone: o.deliverableDone,
         interpret: interpret
@@ -356,6 +376,8 @@ export function useGoLoop(opts: Options) {
           events: o.loadEvents ? await o.loadEvents() : o.events, latestEvaluation: o.latestEvaluation,
         });
         if (signal.aborted) throw new Stopped();
+        // What the project has already decided, from its own records (1 Oct, item 20).
+        const memory = await readMemory(o, [...priorStepsRef.current, ...stepsRef.current]);
 
         // Sections already being written — after a reload, or started by the
         // user — are waited for first, without a planner call or a step.
@@ -397,7 +419,7 @@ export function useGoLoop(opts: Options) {
         const digest = buildAgentState({
           template: o.template, state: o.state, stage: o.stage, bundles: o.bundles,
           stageEvaluation, latestEvaluation: o.latestEvaluation, steps: [...priorStepsRef.current, ...stepsRef.current],
-          context, approvedOutline: o.approvedOutline, facts, dataFiles: dataFileBriefs(o.project), tools: LIVE_TOOLS,
+          context, approvedOutline: o.approvedOutline, facts, dataFiles: dataFileBriefs(o.project), tools: LIVE_TOOLS, memory,
         });
         const choice = await api.agentNextAction(
           { inputs: inputsFrom(o.project), state: digest, allowed_actions: allowed, policy: current.policy, model: o.project.model },
@@ -434,6 +456,13 @@ export function useGoLoop(opts: Options) {
         if ((await perform(step, false, signal)) === 'stop') break;
       }
       setPhase('ended');
+      // A window used up under Autonomous, with further windows authorized
+      // in advance: carry on, recording the window as it starts.
+      const ended = runRef.current;
+      if (ended?.status === 'budget_exhausted' && ended.policy === 'autonomous' && autoLeftRef.current > 0) {
+        autoLeftRef.current -= 1;
+        void continueRef.current(true);
+      }
     } catch (e) {
       if (e instanceof Stopped || signal.aborted) return;
       const message = e instanceof Error && e.message ? e.message : 'Go mode hit an error.';
@@ -476,9 +505,10 @@ export function useGoLoop(opts: Options) {
       largeJobOkRef.current = null;
       followRef.current = null;
       sinceRef.current = 0;
+      autoLeftRef.current = chosen === 'autonomous' ? autoWindows : 0;
       void loop();
     },
-    [budget, commitRun, commitSteps, loop]
+    [budget, autoWindows, commitRun, commitSteps, loop]
   );
 
   /**
@@ -488,7 +518,7 @@ export function useGoLoop(opts: Options) {
    * click; when the policy needed an authorization, the click is recorded
    * against it.
    */
-  const continueRun = useCallback(async () => {
+  const continueRun = useCallback(async (auto = false) => {
     const o = latest.current;
     const prev = runRef.current;
     if (!prev || prev.status !== 'budget_exhausted') {
@@ -507,8 +537,10 @@ export function useGoLoop(opts: Options) {
         await recordDecision(o.project.id, o.project.user_id, {
           decision_type: 'accept_recommendation',
           recommendation_id: prev.authorization_id,
-          rationale: `Continue Go mode for ${prev.budget_steps} more steps.`,
-          metadata: { continues_run_id: prev.id, window: windows },
+          rationale: auto
+            ? `Go mode continued for ${prev.budget_steps} more steps on its own, as authorized in advance.`
+            : `Continue Go mode for ${prev.budget_steps} more steps.`,
+          metadata: { continues_run_id: prev.id, window: windows, auto },
         }).catch(() => undefined);
       }
       priorStepsRef.current = [...priorStepsRef.current, ...stepsRef.current];
@@ -522,6 +554,7 @@ export function useGoLoop(opts: Options) {
       setError(e instanceof Error ? e.message : 'Could not continue Go mode.');
     }
   }, [commitRun, commitSteps, loop]);
+  continueRef.current = continueRun;
 
   const go = useCallback(async () => {
     setError(null);
@@ -576,13 +609,14 @@ export function useGoLoop(opts: Options) {
     try {
       const authId = await authorizeRun({
         projectId: o.project.id, userId: o.project.user_id, policy: chosen, budgetSteps: budget, stageId: o.stage.id,
+        autoContinueWindows: chosen === 'autonomous' ? autoWindows : 0,
       });
       setAuthorizing(null);
       await startRun(chosen, authId);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not authorize Go mode.');
     }
-  }, [authorizing, budget, startRun]);
+  }, [authorizing, budget, autoWindows, startRun]);
 
   const approve = useCallback(async () => {
     const id = pendingStepId;
@@ -711,6 +745,9 @@ export function useGoLoop(opts: Options) {
       }
       commitRun(found);
       commitSteps(repaired);
+      // The windows this run continues: the planner keeps their history
+      // across a reload instead of starting from this window alone.
+      priorStepsRef.current = await listChainSteps(found).catch(() => []);
       // The no-progress guard counts from here, as it does after Resume.
       sinceRef.current = repaired.length;
       const waiting = repaired.find((s) => s.status === 'awaiting_decision');
@@ -742,6 +779,7 @@ export function useGoLoop(opts: Options) {
       setBudget(last.budget_steps);
       commitRun(last);
       commitSteps(await listAgentSteps(last.id));
+      priorStepsRef.current = await listChainSteps(last).catch(() => []);
       setPhase('ended');
     })().catch(() => undefined);
   }, [opts.enabled, opts.project.id, adopt, commitRun, commitSteps]);
@@ -863,6 +901,7 @@ export function useGoLoop(opts: Options) {
     continueRun,
     acknowledgeLargeJob,
     stageLabelFor,
+    autoWindows, setAutoWindows,
     policy, setPolicy, budget, setBudget, run, steps, phase, active, pendingStep, pendingStale, authorizing, error,
     go, suggest, replan, stop, approve, decline, answer, confirmAuthorization,
     cancelAuthorization: useCallback(() => setAuthorizing(null), []),
