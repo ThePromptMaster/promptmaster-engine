@@ -54,7 +54,7 @@ describe('needsUser: the moves that are the user\'s (B4)', () => {
     const unmet = [{ id: 'pos.differentiator', label: 'One-sentence differentiator', satisfied: false, blocking: true, manual: true }];
     const need = needsUser({ ...base, stage: stage('positioning'), facts: {}, stageEvaluation: evaluation('positioning', unmet), allowed: ['evaluate_stage', 'advance_stage'] });
     expect(need).toMatchObject({ kind: 'tick_criterion', criterionId: 'pos.differentiator' });
-    expect(describeNeed(need!, label).action).toBe('Confirm and resume');
+    expect(describeNeed(need!, label).action).toBe('Approve and resume');
     // With work still possible (a draft to write), the planner decides first.
     expect(needsUser({ ...base, stage: stage('positioning'), facts: {}, stageEvaluation: evaluation('positioning', unmet), allowed: ['draft_stage'] })).toBeNull();
     // An auto requirement among the open ones is the planner's, not a tick.

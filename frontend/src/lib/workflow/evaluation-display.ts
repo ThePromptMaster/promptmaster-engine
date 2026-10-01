@@ -78,7 +78,9 @@ const LABEL: Record<RatingKey, string> = {
   alignment: 'Alignment',
   clarity: 'Clarity',
   drift: 'Drift',
-  completeness: 'Completeness',
+  // The draft's, not the stage's: a stage can still be waiting for the
+  // user's approval with a complete draft (1 Oct, item 7).
+  completeness: 'Draft completeness',
 };
 
 /**

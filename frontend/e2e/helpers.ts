@@ -45,16 +45,22 @@ export function transitionBar(page: Page) {
 /**
  * Move to the next stage (or finish). Since PM-06 this is the primary button
  * only when moving on is the suggested next step; otherwise it is under More.
- * "… anyway" asks for an optional note first; confirm it without one.
+ * Moving past a required item is an override and needs a reason; the helper
+ * gives one.
  */
 export async function pressTransition(page: Page) {
   const bar = transitionBar(page);
-  const direct = bar.getByRole('button', { name: /^(Continue to|Finish)/ });
+  const direct = bar.getByRole('button', { name: /^(Continue to|Finish|Override and)/ });
   if (await direct.count()) {
     await direct.click();
   } else {
     await bar.getByRole('button', { name: /^More/ }).click();
-    await page.getByRole('menuitem', { name: /^(Continue to|Finish)/ }).click();
+    await page.getByRole('menuitem', { name: /^(Continue to|Finish|Override and)/ }).click();
+  }
+  const reason = page.getByLabel('Reason for the override');
+  if (await reason.isVisible().catch(() => false)) {
+    await reason.fill('Moving on for now; will come back to it.');
+    await page.getByRole('button', { name: 'Override and continue' }).click();
   }
   const moveOn = page.getByRole('button', { name: 'Move on' });
   if (await moveOn.isVisible().catch(() => false)) await moveOn.click();

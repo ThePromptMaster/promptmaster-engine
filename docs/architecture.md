@@ -238,6 +238,12 @@ planning, waiting and the user's answers count none). It is not a cost limit. Th
 selector is restored from the run on load, and the progress count always shows the run's
 own numbers.
 
+**Overrides are the user's.** Moving past a stage with something required open needs a
+reason (the transition bar's "Override and continue"; recorded on `stage_advanced.reason`
+and shown on the rail). An Autonomous run is not offered `advance_stage` in that state
+(`withoutOverride`, `lib/agent/policy.ts`); under Guided and Checkpoint the user's Approve
+on the proposed move is the override.
+
 **What the planner may say.** Its `rationale`, `expected_outcome` and `decision_question`
 are shown to the user, so the prompt (`promptmaster/agent.py`) names its own sections in
 plain words ("MOVES AVAILABLE NOW", "WHAT THIS STAGE HOLDS NOW") and forbids "artifact",

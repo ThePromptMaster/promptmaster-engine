@@ -41,7 +41,7 @@ import { requestProjectCancel } from '@/lib/supabase/jobs';
 import { authorizeRun } from '@/lib/agent/authorize';
 import { buildAgentState } from '@/lib/agent/digest';
 import { performStep, type PerformContext, type StepOutcome } from '@/lib/agent/perform';
-import { allowedActions, DEFAULT_BUDGET_STEPS, fitsBudget, plannedBeforeLatestChange, preempt, shouldPause, stepCost } from '@/lib/agent/policy';
+import { allowedActions, withoutOverride, DEFAULT_BUDGET_STEPS, fitsBudget, plannedBeforeLatestChange, preempt, shouldPause, stepCost } from '@/lib/agent/policy';
 import {
   createAgentRun,
   endAgentRun,
@@ -352,11 +352,13 @@ export function useGoLoop(opts: Options) {
         }
 
         const hasDraft = (o.bundles[o.stage.id]?.versions.at(-1)?.content ?? '').trim().length > 0;
-        const allowed = allowedActions(o.template, o.state, o.stage, hasDraft, undefined, facts);
         // One read decides the moves, the requirements and what the planner
         // is told (1 Oct, item 1).
         const context = contextWithFacts(o.context, o.stage, facts);
         const stageEvaluation = evaluateStage(o.template, o.stage.id, context);
+        const allowed = withoutOverride(
+          allowedActions(o.template, o.state, o.stage, hasDraft, undefined, facts), stageEvaluation.canAdvance, current.policy
+        );
 
         // Before the planner is asked: is the next move the user's? (B4)
         const need = needsUser({

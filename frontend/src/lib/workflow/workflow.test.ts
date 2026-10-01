@@ -755,3 +755,28 @@ describe('every_item_has_status needs a drafted table (production pass, 2026-10-
     expect(rule(ctx(true, 2))).toMatchObject({ satisfied: false, detail: '2 still unresolved' });
   });
 });
+
+describe('every_item_has_fields: what PromptMaster can see, it verifies (1 Oct, item 6)', () => {
+  const hyp = RESEARCH_V1.stages.find((s) => s.id === 'hypothesis')!;
+  const ctx = (count: number, gaps: Record<string, number>, ticks: Record<string, boolean> = {}) => ({
+    fields: {}, itemCounts: { hypothesis: count }, itemsMissingStatus: {}, itemFieldGaps: { hypothesis: gaps },
+    artifactNonEmpty: { hypothesis: count > 0 }, outlineApproved: false, sections: {}, findings: {}, manualChecks: ticks,
+  });
+  const result = (c: ReturnType<typeof ctx>) => Object.fromEntries(evaluateStage(RESEARCH_V1, 'hypothesis', c).criteria.map((r) => [r.id, r]));
+
+  it('is met when every hypothesis fills both fields, and is not a box to tick', () => {
+    const r = result(ctx(3, { statement: 0, prediction: 0, disconfirming_observation: 0 }));
+    expect(r['hyp.disconfirm']).toMatchObject({ satisfied: true });
+    expect(r['hyp.disconfirm'].manual).toBeFalsy();
+  });
+  it('says how many rows fall short', () => {
+    expect(result(ctx(3, { prediction: 0, disconfirming_observation: 2 }))['hyp.disconfirm']).toMatchObject({ satisfied: false, detail: '2 of 3 incomplete' });
+    expect(result(ctx(0, {}))['hyp.disconfirm']).toMatchObject({ satisfied: false, detail: 'nothing to check yet' });
+  });
+  it('the stage still waits for the user\'s acceptance, in their own words', () => {
+    const full = { prediction: 0, disconfirming_observation: 0 };
+    expect(hyp.exit_criteria.find((c) => c.id === 'hyp.accept')).toMatchObject({ label: 'I accept these hypotheses as the working set', check: 'manual', blocking: true });
+    expect(evaluateStage(RESEARCH_V1, 'hypothesis', ctx(1, full)).canAdvance).toBe(false);
+    expect(evaluateStage(RESEARCH_V1, 'hypothesis', ctx(1, full, { 'hyp.accept': true })).canAdvance).toBe(true);
+  });
+});

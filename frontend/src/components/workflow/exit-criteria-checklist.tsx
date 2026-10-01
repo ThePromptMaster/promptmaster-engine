@@ -37,6 +37,11 @@ export function ExitCriteriaChecklist({ criteria, manualIds = new Set(), onToggl
   const required = criteria.filter((c) => c.blocking).length;
   const optional = criteria.length - required;
   const requiredOpen = criteria.some((c) => c.blocking && !c.satisfied);
+  // The work is done as far as PromptMaster can tell, and the only thing
+  // open is the user's say-so. Said in words, because "complete" beside an
+  // unticked required box read as a contradiction (1 Oct, item 7).
+  const approvalPending =
+    checked.every((r) => r.c.satisfied || !r.c.blocking) && yours.some((r) => r.c.blocking && !r.c.satisfied);
 
   const row = ({ c, manual }: { c: CriterionResult; manual: boolean }) => {
     const Row = manual ? 'label' : 'div';
@@ -113,7 +118,9 @@ export function ExitCriteriaChecklist({ criteria, manualIds = new Set(), onToggl
       </header>
       <p className="mb-3 text-label text-[var(--on-surface-variant)]">
         {required} required{optional > 0 ? `, ${optional} optional` : ''}
-        {requiredOpen
+        {approvalPending
+          ? '. PromptMaster has verified what it can; this stage is waiting for your approval. You can still move on, but it stays open until you give it.'
+          : requiredOpen
           ? '. You can still move on, but the stage stays open until the required items are done.'
           : optional > 0 && met < criteria.length
             ? '. The required items are done; the rest are yours to take or leave.'
@@ -121,8 +128,8 @@ export function ExitCriteriaChecklist({ criteria, manualIds = new Set(), onToggl
       </p>
 
       <div className="space-y-4">
-        {checked.length > 0 && group('PromptMaster checked', 'checked for you as you work', checked, 'Checked by PromptMaster')}
-        {yours.length > 0 && group('You decide', 'tick yourself when you are satisfied', yours, 'For you to decide')}
+        {checked.length > 0 && group('PromptMaster verified', 'checked for you as you work', checked, 'Checked by PromptMaster')}
+        {yours.length > 0 && group('You approve', 'only you can give these', yours, 'For you to decide')}
       </div>
     </section>
   );

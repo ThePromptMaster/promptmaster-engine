@@ -27,6 +27,16 @@ export const DEFAULT_BUDGET_STEPS = 12;
 export const NO_PROGRESS_REPEATS = 3;
 export const MAX_CONSECUTIVE_FAILURES = 2;
 
+/**
+ * Moving past something a stage requires is an override, and an override is
+ * the user's, with their reason (1 Oct, item 8). A run acting on its own
+ * authority is not offered the move; under Guided and Checkpoint the user's
+ * Approve on the proposed move is the override.
+ */
+export function withoutOverride(allowed: readonly string[], canAdvance: boolean, policy: ExecutionPolicy): string[] {
+  return allowed.filter((k) => k !== 'advance_stage' || canAdvance || policy !== 'autonomous');
+}
+
 /** Which tools a run can actually call. Nothing retrieves literature yet (B0). */
 export interface AgentTools {
   literature: boolean;

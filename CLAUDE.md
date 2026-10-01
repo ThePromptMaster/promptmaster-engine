@@ -98,6 +98,8 @@ A project pins a **workflow template version** (`projects.workflow_template_id`)
 
 **Stage state is projected from the `workflow_events` log in exactly one place** (`projectState` in `engine.ts`). Events are the record; `projects.stage` is a denormalised cursor for the list view.
 
+**What PromptMaster can verify is a rule; what is left is the user's approval, worded in the first person** ("I approve this analysis plan for execution"). The checklist groups them as "PromptMaster verified" and "You approve".
+
 **Exit criteria are declarative predicates evaluated by pure functions** — never an LLM call. A gate that fails because a model timed out is a gate users learn to resent. Unknown rule types degrade to a manual checklist item rather than throwing.
 
 **The project's setup fields are offered by the stage whose exit criteria ask for them** (`components/workflow/project-setup.tsx`, routed on `field_non_empty`). Every template declares that criterion on its first stage, so this is what makes those blocking gates satisfiable — it is wired by data, never by workflow key.
