@@ -472,6 +472,38 @@ describe('ReviewRenderer', () => {
     expect(screen.queryByText(/still counts as unresolved/)).not.toBeInTheDocument();
   });
 
+  it('looks the named sources up: a found source is shown with its record, still to be checked, and saved by the user', async () => {
+    const user = userEvent.setup();
+    const onSaveItems = vi.fn(async () => {});
+    const onLookupItems = vi.fn(async (items: StageItem[]) => ({
+      items: items.map((i) =>
+        i.id === 'i1'
+          ? { ...i, status: 'source_found', status_source: 'tool', record: 'Why the Sky Is Blue — Mock, A. (2020)', link: 'https://doi.org/10.0000/mock.1' }
+          : i
+      ),
+      message: '1 of 2 sources found in OpenAlex.',
+    }));
+    render(<ReviewRenderer {...props(bookStage('fact_check'), { versions: [version(rows)], onLookupItems, onSaveItems })} />);
+    // The lookup's own columns are not there until a row holds something in them.
+    expect(screen.queryByRole('columnheader', { name: 'Record found' })).not.toBeInTheDocument();
+    expect(screen.getByText(/It finds whether the source exists, not whether it says this/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Look up these sources' }));
+    expect(await screen.findByText('1 of 2 sources found in OpenAlex.')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Record found' })).toBeInTheDocument();
+    expect(screen.getByText('Why the Sky Is Blue — Mock, A. (2020)')).toBeInTheDocument();
+    expect(screen.getAllByRole('combobox')[0]).toHaveTextContent('Source found by PromptMaster — check it says this');
+    // Found is not decided: both rows are still the author's.
+    expect(screen.getByText('2 still to resolve')).toBeInTheDocument();
+    // "Source found" is a tool's to set: on a row that does not carry it, it is not a choice.
+    await user.click(screen.getAllByRole('combobox')[1]);
+    expect(screen.queryByRole('option', { name: /Source found by PromptMaster/ })).not.toBeInTheDocument();
+    await user.keyboard('{Escape}');
+
+    await user.click(screen.getByRole('button', { name: 'Save as new version' }));
+    expect(onSaveItems).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ id: 'i1', status: 'source_found', status_source: 'tool' })]));
+  });
+
   it('reports what is still outstanding', () => {
     render(<ReviewRenderer {...props(bookStage('fact_check'), { versions: [version(rows)] })} />);
     expect(screen.getByText('2 still to resolve')).toBeInTheDocument();

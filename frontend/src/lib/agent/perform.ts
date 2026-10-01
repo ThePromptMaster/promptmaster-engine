@@ -332,7 +332,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       const result = applyLookup(rows, matches, schema);
       const found = matches.filter((m) => m.found);
       const lines = [
-        lookupSummary(result, schema.itemLabel).replace(' Review, then save.', ''),
+        lookupSummary(result, schema.lookup!.noun).replace(' Review, then save.', ''),
         ...found.map((m) => `- ${recordLine(m)}${m.doi ? ` — ${m.doi}` : ''}`),
         ...matches.filter((m) => !m.found).map((m) => `- Not found: ${works.find((w) => w.id === m.id)?.work.slice(0, 160) ?? m.id}`),
       ];
