@@ -263,6 +263,8 @@ def _next_action(system: str, prompt: str) -> dict:
         params = {"goal": "Mock: compute 2 + 2", "kind": "computation"}
     elif choice == "mark_blocked":
         params = {"reason": "Mock: missing data", "block_kind": "data_missing"}
+    elif choice == "propose_skip":
+        params = {"reason": "Mock: the internal data should be looked at before any outside reading."}
     elif choice == "revise_stage":
         # "[[mock:conflicting-revise]]" in the objective makes the revision one
         # the conflict check objects to, so a browser test can see Go ask.

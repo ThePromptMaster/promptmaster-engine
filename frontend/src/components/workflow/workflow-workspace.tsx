@@ -251,7 +251,8 @@ export function WorkflowWorkspace({
   // …and a done stage reopened for editing (C5) is in progress again.
   const isEditable = isCurrent || viewedState?.status === 'in_progress';
   const reopenedHere = !isCurrent && viewedState?.status === 'in_progress' && !viewedState.left_open;
-  const canReopen = !isCurrent && isDone(viewedState?.status) && project.status !== 'finalized';
+  // A skipped stage can be come back to as well as a done one (1 Oct, item 11).
+  const canReopen = !isCurrent && (isDone(viewedState?.status) || viewedState?.status === 'skipped') && project.status !== 'finalized';
 
   const stageBundles = useMemo(() => bundles ?? {}, [bundles]);
 
@@ -930,8 +931,14 @@ export function WorkflowWorkspace({
       },
       unblock: () => setBlocked(null),
       tick: (criterionId: string) => handleToggleManual(criterionId, true),
+      // The user's skip, with Go's reason as the recorded one.
+      skip: async (reason: string) => {
+        const option = transitions.find((t) => t.kind === 'skip');
+        if (!option) throw new Error('This stage cannot be skipped.');
+        await handleTransition(option, reason.slice(0, 500));
+      },
     }),
-    [project.id, project.user_id, project.model, project.mode, materialiseOutline, refreshEvents, setBlocked, handleToggleManual, onReload]
+    [project.id, project.user_id, project.model, project.mode, materialiseOutline, refreshEvents, setBlocked, handleToggleManual, onReload, transitions, handleTransition]
   );
 
   if (!stage) return null;

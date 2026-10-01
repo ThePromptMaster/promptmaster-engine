@@ -351,3 +351,14 @@ describe('withoutOverride: only the user moves past something required (1 Oct, i
     expect(withoutOverride(moves, false, 'checkpoint')).toEqual(moves);
   });
 });
+
+describe('propose_skip: the order is a default (1 Oct, item 11)', () => {
+  it('is offered on a stage the template lets you skip, and not on one it does not', () => {
+    const literature = RESEARCH_V1.stages.find((s) => s.id === 'literature')!;
+    const method = RESEARCH_V1.stages.find((s) => s.id === 'method')!;
+    expect(literature.transitions.allow_skip).toBe(true);
+    expect(allowedActions(RESEARCH_V1, research, literature, false)).toContain('propose_skip');
+    expect(method.transitions.allow_skip).toBe(false);
+    expect(allowedActions(RESEARCH_V1, research, method, false)).not.toContain('propose_skip');
+  });
+});

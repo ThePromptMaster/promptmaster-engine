@@ -24,6 +24,8 @@ type Need =
   | { kind: 'continue_budget'; budgetSteps: number }
   | { kind: 'large_job'; stageId: string; sections: number }
   | { kind: 'triage_findings'; stageId: string; count: number }
+  /** Go thinks this stage is not the best next move; skipping it is the user's call. */
+  | { kind: 'skip_stage'; stageId: string; reason: string }
   /** An outcome table's rows (claims, runs…) are all the user's to decide. */
   | { kind: 'decide_rows'; stageId: string; count: number; itemLabel: string };
 
@@ -147,6 +149,7 @@ export function needStillHolds(
     case 'set_objective':
       return !input.objective.trim();
     case 'answer_question':
+    case 'skip_stage':
       return true;
     case 'unblock_stage':
       return input.state.stages[need.stageId]?.status === 'blocked';
@@ -184,6 +187,11 @@ export function describeNeed(need: NeedsUser, stageLabel: (id: string) => string
       };
     case 'answer_question':
       return { message: need.question, action: null };
+    case 'skip_stage':
+      return {
+        message: `${stageLabel(need.stageId)} is normally next, but I would skip it for now. ${need.reason.replace(/\s+$/, '')} It is your call, and a skipped stage can be reopened later.`,
+        action: `Skip ${stageLabel(need.stageId)} for now`,
+      };
     case 'wait_for_jobs':
       return {
         message: `${need.pending} section${need.pending === 1 ? ' is' : 's are'} still being written (${need.complete} of ${need.total} done). I can keep waiting.`,

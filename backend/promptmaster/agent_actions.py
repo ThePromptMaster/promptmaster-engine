@@ -86,6 +86,11 @@ AGENT_ACTIONS: list[AgentAction] = [
                      "those (accept, defer or reject, with a reason); major ones are left for the user.",
                 important=True),
     # --- workflow ---------------------------------------------------------------
+    AgentAction(key="propose_skip", family="workflow", label="Suggest skipping this stage",
+                when="This stage may be skipped, and for THIS objective an expert would not do it next "
+                     "(for example: external literature before any internal data has been looked at). "
+                     "Params: reason (one or two plain sentences: why not now, and what to do instead). "
+                     "The user decides; nothing is skipped unless they agree."),
     AgentAction(key="advance_stage", family="workflow", label="Move to the next stage",
                 when="This stage's work is done and checked.", important=True),
     AgentAction(key="mark_blocked", family="workflow", label="Mark this stage stuck",

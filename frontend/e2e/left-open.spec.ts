@@ -81,7 +81,7 @@ test('a left-open stage is named as such, and rewriting it before closing flags 
   await expect(page.getByRole('heading', { name: /Research/ })).toBeVisible();
   await expect(page.getByRole('region', { name: / work$/ }).getByText(/Mock /).first()).toBeVisible({ timeout: 30_000 });
   await pressTransition(page); // Research is done
-  await expect(page.getByRole('heading', { name: /Outline/ })).toBeVisible();
+  await expect(page.locator('header').getByRole('heading', { name: 'Outline', exact: true })).toBeVisible();
 
   const rail = page.getByRole('navigation', { name: 'Workflow stages' });
   const positioningRow = rail.getByRole('button', { name: /Positioning/ });

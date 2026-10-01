@@ -173,3 +173,18 @@ describe('needStillHolds: a recorded stop is checked against the project (1 Oct,
     expect(needStillHolds({ kind: 'set_objective' }, at('objective'))).toBe(false);
   });
 });
+
+describe('a suggestion to skip is the user\'s call (1 Oct, item 11)', () => {
+  const need: NeedsUser = { kind: 'skip_stage', stageId: 'audience', reason: 'The audience is already fixed by the brief.', onStage: 'audience' };
+  it('says what is normally next, why not now, and that it can be undone', () => {
+    expect(describeNeed(need, label)).toEqual({
+      message: 'Audience is normally next, but I would skip it for now. The audience is already fixed by the brief. It is your call, and a skipped stage can be reopened later.',
+      action: 'Skip Audience for now',
+    });
+  });
+  it('stands while the project is on that stage, and goes once it has moved', () => {
+    const at = (stageId: string) => ({ ...base, stage: stage(stageId), facts: {}, stageEvaluation: evaluation(stageId), objective: 'A book', currentStageId: stageId });
+    expect(needStillHolds(need, at('audience'))).toBe(true);
+    expect(needStillHolds(need, at('positioning'))).toBe(false);
+  });
+});

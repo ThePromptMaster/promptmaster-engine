@@ -23,6 +23,8 @@ export interface NeedsActions {
   approveOutline: (stageId: string) => Promise<void>;
   unblock: () => Promise<void>;
   tick: (criterionId: string) => Promise<void>;
+  /** Skip the current stage, with the reason given. */
+  skip?: (reason: string) => Promise<void>;
 }
 
 export function GoPanel({
@@ -74,6 +76,10 @@ export function GoPanel({
         await needsActions?.tick(need.criterionId);
         await go.go();
         return;
+      case 'skip_stage':
+        await needsActions?.skip?.(need.reason);
+        await go.go();
+        return;
       case 'wait_for_jobs':
         await go.go();
         return;
@@ -118,7 +124,8 @@ export function GoPanel({
             canResume={canResume}
             canContinue={canContinue}
             disabled={go.phase === 'watching' || Boolean(go.pendingStep) || Boolean(go.authorizing)}
-            hideResume={Boolean(need && needsActions && describeNeed(need, go.stageLabelFor).action)}
+            // A suggestion to skip has two answers: the card's button, or Resume to do the stage.
+            hideResume={Boolean(need && need.kind !== 'skip_stage' && needsActions && describeNeed(need, go.stageLabelFor).action)}
           />
           {need && <NeedsYouCard key={`${need.kind}:${go.run?.id}`} need={need} stageLabel={go.stageLabelFor} onAction={act} />}
           {go.phase === 'watching' && (

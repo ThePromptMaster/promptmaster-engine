@@ -376,9 +376,13 @@ export function useGoLoop(opts: Options) {
         // is told (1 Oct, item 1).
         const context = contextWithFacts(o.context, o.stage, facts);
         const stageEvaluation = evaluateStage(o.template, o.stage.id, context);
+        const proposedSkipHere = [...priorStepsRef.current, ...stepsRef.current].some(
+          (s) => s.action_key === 'propose_skip' && s.stage_id === o.stage!.id
+        );
         const allowed = withoutOverride(
           allowedActions(o.template, o.state, o.stage, hasDraft, LIVE_TOOLS, facts), stageEvaluation.canAdvance, current.policy
-        );
+          // Asked once: if the user stayed, the stage is to be done.
+        ).filter((k) => k !== 'propose_skip' || !proposedSkipHere);
 
         // Before the planner is asked: is the next move the user's? (B4)
         const need = needsUser({
@@ -417,7 +421,8 @@ export function useGoLoop(opts: Options) {
         });
         upsertStep(step);
 
-        const asking = actionFor(choice.action_key)?.performer === 'ask';
+        // A question, or a suggestion to skip, is itself the pause.
+        const asking = ['ask', 'skip'].includes(actionFor(choice.action_key)?.performer ?? '');
         if (!asking && shouldPause(current.policy, choice.action_key, choice.needs_user_decision)) {
           await setAgentStepStatus(step.id, 'awaiting_decision');
           upsertStep({ ...step, status: 'awaiting_decision' });

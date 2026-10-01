@@ -108,3 +108,41 @@ test('Go applying a check\'s findings to a list stage keeps it a list', async ({
   const [head] = await serviceSelect('artifact_versions', `project_id=eq.${id}&source_operation=eq.applied_findings&select=content`);
   expect(JSON.parse(head.content).items).toHaveLength(3);
 });
+
+/**
+ * 1 Oct, item 11 — "Literature is normally next, but based on this objective
+ * and available internal evidence, the better next action is X." Go can say
+ * so; skipping is the user's click, recorded as theirs, and can be undone.
+ */
+test('Go suggests skipping a stage; the user skips it, and can reopen it later', async ({ page }) => {
+  test.setTimeout(120_000);
+  const id = await createProject(page, {
+    workflow: 'Research', name: 'E2E go suggests a skip', objective: 'Why Mid-Market customers churn [[mock:plan=propose_skip]]',
+  });
+  await pressTransition(page);
+  await expect(page.getByRole('heading', { name: 'Literature context' })).toBeVisible();
+
+  const panel = goPanel(page);
+  await panel.getByRole('button', { name: 'Set up Go' }).click();
+  await panel.getByRole('radio', { name: /^Guided/ }).click();
+  await panel.getByRole('button', { name: /^Go$/ }).click();
+
+  // The suggestion is itself the pause: no "approve this move" in front of it.
+  const card = page.getByRole('region', { name: 'Go mode needs you' });
+  await expect(card).toContainText('Literature is normally next, but I would skip it for now.', { timeout: 30_000 });
+  await expect(card).toContainText('Mock: the internal data should be looked at before any outside reading.');
+  await expect(card).toContainText('a skipped stage can be reopened later');
+  await expect(panel.getByRole('button', { name: /^Resume$/ })).toBeVisible(); // the other answer: do the stage
+  await page.screenshot({ path: test.info().outputPath('01-go-suggests-skipping.png'), fullPage: true });
+  expect(await serviceSelect('workflow_events', `project_id=eq.${id}&type=eq.stage_skipped&select=id`)).toHaveLength(0);
+
+  await card.getByRole('button', { name: 'Skip Literature for now' }).click();
+  await expect(page.getByRole('heading', { name: 'Hypothesis or proposition' })).toBeVisible({ timeout: 30_000 });
+  const [skipped] = await serviceSelect('workflow_events', `project_id=eq.${id}&type=eq.stage_skipped&select=actor,reason,stage_id`);
+  expect(skipped).toMatchObject({ actor: 'user', stage_id: 'literature', reason: 'Mock: the internal data should be looked at before any outside reading.' });
+
+  // And back: a skipped stage can be reopened.
+  await page.getByRole('navigation', { name: 'Workflow stages' }).getByRole('button', { name: /Literature/ }).click();
+  await expect(page.getByRole('button', { name: 'Reopen to edit' })).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath('02-skipped-and-reopenable.png') });
+});

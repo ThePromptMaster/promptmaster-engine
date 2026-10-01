@@ -549,6 +549,18 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       });
     }
 
+    case 'skip': {
+      // A proposal, never a skip: the stage is skipped only if the user
+      // presses the card's button, and that event is theirs.
+      const reason = (typeof params.reason === 'string' && params.reason.trim()) || ctx.step.rationale || 'It is not the best next move for this objective.';
+      const need: NeedsUser = { kind: 'skip_stage', stageId: ctx.stage.id, reason };
+      const message = `Suggested skipping ${ctx.stage.label} for now: ${reason}`;
+      return done(key, {
+        status: 'succeeded', toolsUsed: [], changes: {}, output: message,
+        stop: { status: 'awaiting_decision', reason: message }, needs: need,
+      });
+    }
+
     case 'block': {
       const kind = (['tool_missing', 'data_missing', 'needs_decision'] as const).find((k) => k === params.block_kind) ?? 'needs_decision';
       const reason = (typeof params.reason === 'string' && params.reason.trim()) || ctx.step.rationale || 'Go mode could not continue.';

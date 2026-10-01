@@ -24,7 +24,7 @@ export function NeedsYouCard({
   const [error, setError] = useState<string | null>(null);
   return (
     <section aria-label="Go mode needs you" className="rounded-xl bg-[var(--surface-container-highest)] px-5 py-4">
-      <p className="text-label uppercase tracking-wide text-[var(--on-surface-variant)]">I need you to…</p>
+      <p className="text-label uppercase tracking-wide text-[var(--on-surface-variant)]">{need.kind === 'skip_stage' ? 'A suggestion — your call' : 'I need you to…'}</p>
       <p className="mt-1 text-body text-[var(--on-surface)]">{message}</p>
       {action ? (
         <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -41,7 +41,11 @@ export function NeedsYouCard({
           >
             {busy ? 'Working…' : action}
           </button>
-          <span className="text-label text-[var(--on-surface-variant)]">Or do it yourself on the stage. I will notice, and Resume will appear here.</span>
+          <span className="text-label text-[var(--on-surface-variant)]">
+            {need.kind === 'skip_stage'
+              ? 'Or press Resume to do this stage after all.'
+              : 'Or do it yourself on the stage. I will notice, and Resume will appear here.'}
+          </span>
         </div>
       ) : (
         <p className="mt-2 text-label text-[var(--on-surface-variant)]">Then press Resume.</p>
