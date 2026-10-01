@@ -506,6 +506,13 @@ describe('the finished screen puts the work at the centre (C4, Sean 28 Sep item 
     expect(screen.queryByText(/book|chapter/i)).not.toBeInTheDocument();
   });
 
+  it('offers to edit the work, which reopens the project at the stage that holds it', async () => {
+    const onEdit = vi.fn();
+    render(<ProjectFinished bundle={bundle('One two three.')} completion={summary} onReopen={vi.fn()} onEdit={onEdit} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Edit the work' }));
+    expect(onEdit).toHaveBeenCalled();
+  });
+
   it('with nothing written, offers only to continue', () => {
     const onReopen = vi.fn();
     render(<ProjectFinished bundle={bundle('')} completion={summary} onReopen={onReopen} />);

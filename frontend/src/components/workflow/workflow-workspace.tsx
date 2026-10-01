@@ -31,6 +31,7 @@ import { useApplyFindings } from './use-apply-findings';
 import { generationRequest } from '@/lib/workflow/stage-requests';
 import { findingFromPoint, pointsFromCommentary } from '@/lib/workflow/critique-points';
 import { ExportMenu } from './export-menu';
+import { FullDocumentReader } from './full-document-reader';
 import { listWorkflowEvents } from '@/lib/supabase/workflow';
 import { ChatPanel } from './chat-panel';
 import { RecommendationsPanel } from './recommendations-panel';
@@ -1271,6 +1272,17 @@ export function WorkflowWorkspace({
               </button>
               {/* PM-13: moved past, not finished — and closable from here, which
                   is the only place it could be once the cursor has moved on. */}
+              {/* Which of the three it is, said first: looking, finishing, or
+                  editing (1 Oct, item 28: "not always obvious whether I am
+                  viewing it, reopening it, editing it, or changing the
+                  current project state"). */}
+              {!isEditable && (
+                <span className="text-label text-[var(--on-surface-variant)]">
+                  {state.stages[stage.id]?.status === 'not_started' || !state.stages[stage.id]
+                    ? 'Viewing only — the project has not reached this stage yet.'
+                    : 'Viewing only — nothing changes while you look, and the project stays where it is.'}
+                </span>
+              )}
               {isEditable && !reopenedHere && (
                 <span className="text-label text-[var(--on-surface-variant)]">
                   Left open — you moved on with requirements still unticked. Tick them here, or mark it complete.
@@ -1307,7 +1319,10 @@ export function WorkflowWorkspace({
           {/* FR-20. Above the stage header rather than inside it: exporting is
               a property of the project, not of whichever stage happens to be
               open, and burying it in a stage would make it look like one. */}
-          <div className="mb-3 flex justify-end">
+          <div className="mb-3 flex flex-wrap justify-end gap-2">
+            <FullDocumentReader
+              bundle={{ project, template, state, events: events ?? [], stages: bundles ?? {}, evaluations: evaluations ?? {} }}
+            />
             <ExportMenu
               bundle={{
                 project,
@@ -1352,6 +1367,11 @@ export function WorkflowWorkspace({
               completion={completion}
               evaluation={deliverableEvaluation}
               onReopen={() => void reopenProject()}
+              onEdit={() => {
+                // Reopen, and land on the stage that holds the work itself.
+                const holder = deliverableStage(template);
+                void reopenProject().then(() => holder && setViewingStageId(holder.id === state.current_stage_id ? null : holder.id));
+              }}
             />
           )}
 

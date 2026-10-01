@@ -16,6 +16,8 @@ interface Props {
   /** The deliverable's latest objective check, when one was ever run. */
   evaluation?: Evaluation;
   onReopen: () => void;
+  /** Reopen the project and go to the stage that holds the work. */
+  onEdit?: () => void;
 }
 
 /**
@@ -24,7 +26,7 @@ interface Props {
  * it, copy it, save it as Markdown, Word or PDF, or reopen the project to
  * keep improving it. The stage-by-stage record stays below, as it was.
  */
-export function ProjectFinished({ bundle, completion, evaluation, onReopen }: Props) {
+export function ProjectFinished({ bundle, completion, evaluation, onReopen, onEdit }: Props) {
   const { project, template } = bundle;
   const stage = deliverableStage(template);
   const inSections = stage?.renderer === 'long_form';
@@ -115,6 +117,11 @@ export function ProjectFinished({ bundle, completion, evaluation, onReopen }: Pr
               Export PDF
             </a>
           </>
+        )}
+        {markdown && onEdit && (
+          <button onClick={onEdit} className={secondary}>
+            Edit the {noun}
+          </button>
         )}
         <button onClick={onReopen} className={secondary}>
           Continue improving

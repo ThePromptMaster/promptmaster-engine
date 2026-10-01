@@ -6,6 +6,7 @@ import { OutlineRow } from './outline-row';
 import { OrphanTray } from './orphan-tray';
 import { StaleDraftsNotice } from './stale-drafts-notice';
 import {
+  countNamedSections,
   discardOrphan,
   insertItemAt,
   moveItemBy,
@@ -74,6 +75,9 @@ export function OutlineEditor({
   regeneratingItemId = null,
   regeneratingAll = false,
 }: OutlineEditorProps) {
+  // Keyed on named sections, like the stage bar's own button: an outline of
+  // blank rows said "Regenerate" here and "Generate" there (1 Oct, item 27).
+  const nothingNamed = countNamedSections(doc) === 0;
   const [announcement, setAnnouncement] = useState('');
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const pendingFocus = useRef<string | null>(null);
@@ -207,14 +211,14 @@ export function OutlineEditor({
                   aria-hidden
                   className={`material-symbols-outlined text-[18px] ${regeneratingAll ? 'animate-spin' : ''}`}
                 >
-                  {regeneratingAll ? 'progress_activity' : doc.items.length === 0 ? 'auto_awesome' : 'autorenew'}
+                  {regeneratingAll ? 'progress_activity' : nothingNamed ? 'auto_awesome' : 'autorenew'}
                 </span>
                 {/* "Regenerate" before anything exists read as a step already
                     missed (Sean, 28 Sep, item 8). Generate first; regenerate
                     once there is an outline to replace. */}
                 {regeneratingAll
-                  ? doc.items.length === 0 ? 'Generating…' : 'Regenerating…'
-                  : doc.items.length === 0 ? 'Generate the outline' : 'Regenerate the outline'}
+                  ? nothingNamed ? 'Generating…' : 'Regenerating…'
+                  : nothingNamed ? 'Generate the outline' : 'Regenerate the outline'}
               </button>
             )}
           </div>
