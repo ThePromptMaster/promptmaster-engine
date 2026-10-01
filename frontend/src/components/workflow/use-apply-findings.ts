@@ -16,7 +16,7 @@
 
 import { useCallback, useRef, useState } from 'react';
 
-import { appliedFindingsVersion, reviseWithFindings, type PendingRevision } from '@/lib/workflow/apply-findings';
+import { type TableRevision, appliedFindingsVersion, reviseWithFindings, type PendingRevision } from '@/lib/workflow/apply-findings';
 import type { StageDefinition } from '@/lib/workflow/types';
 import type { NewVersion } from '@/lib/supabase/versions';
 import type { AuditFinding } from '@/types';
@@ -29,11 +29,14 @@ export function useApplyFindings({
   stage,
   headVersion,
   appendStageVersion,
+  table,
 }: {
   project: Project;
   stage: StageDefinition | undefined;
   headVersion: ArtifactVersion | null;
   appendStageVersion?: (stageId: string, name: string, version: NewVersion) => Promise<unknown>;
+  /** Set when the stage's draft is a table: it is revised as rows, not as text. */
+  table?: TableRevision;
 }) {
   const [running, setRunning] = useState(false);
   const [pending, setPending] = useState<PendingRevision | null>(null);
@@ -58,9 +61,11 @@ export function useApplyFindings({
       setRunning(true);
       setError(null);
       try {
-        const rev = await reviseWithFindings({ project, content, findings, source: opts.source, signal: controller.signal });
+        const rev = await reviseWithFindings({ project, content, findings, source: opts.source, signal: controller.signal, table });
         if (controller.signal.aborted) return;
-        if (opts.showFirst) setPending(rev);
+        // The before/after preview is a text view; a table is saved as a
+        // version straight away, and the one before it is a click to restore.
+        if (opts.showFirst && !table) setPending(rev);
         else await save(rev);
       } catch (e) {
         if (controller.signal.aborted || (e as Error)?.name === 'AbortError') return;
@@ -70,7 +75,7 @@ export function useApplyFindings({
         setRunning(false);
       }
     },
-    [headVersion, running, project, save]
+    [headVersion, running, project, save, table]
   );
 
   const keep = useCallback(async () => {
