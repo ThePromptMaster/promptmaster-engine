@@ -33,7 +33,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '@/lib/api/client';
 import { actionFor, actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, USER_ANSWER_STEP } from '@/lib/agent/actions';
 import { contextWithFacts, readOutcomeProof, readStageFacts, type StageFacts } from '@/lib/agent/facts';
-import { describeNeed, NEED_CLEARED, needStillHolds, needsUser, type NeedsUser } from '@/lib/agent/needs';
+import { describeNeed, NEED_CLEARED, NEED_MOVED_ON, needStillHolds, needsUser, type NeedsUser } from '@/lib/agent/needs';
 import { assertHonestOutcome, verifyOutcome } from '@/lib/agent/outcome';
 import { outlineStageFor } from '@/lib/outline/actions';
 import { recordDecision } from '@/lib/supabase/recommendations';
@@ -789,8 +789,9 @@ export function useGoLoop(opts: Options) {
           objective: o.project.objective, currentStageId: o.state.current_stage_id,
         });
         if (holds) return;
-        await updateAgentRun(current.id, { needs: null, stop_reason: NEED_CLEARED });
-        if (runRef.current?.id === current.id) commitRun({ ...runRef.current, needs: null, stop_reason: NEED_CLEARED });
+        const note = need.onStage && need.onStage !== o.state.current_stage_id ? NEED_MOVED_ON : NEED_CLEARED;
+        await updateAgentRun(current.id, { needs: null, stop_reason: note });
+        if (runRef.current?.id === current.id) commitRun({ ...runRef.current, needs: null, stop_reason: note });
       } catch {
         // Could not read: leave the request as it stands; the next change retries.
       }

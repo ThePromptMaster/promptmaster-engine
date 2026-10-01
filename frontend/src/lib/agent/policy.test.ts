@@ -271,6 +271,14 @@ describe("B2b: the stage's own work is offered only while its preconditions hold
     },
   }) as never;
 
+  it('generate_outline on a drafting stage that holds a derived outline with nothing in it (1 Oct, item 4)', () => {
+    const drafting = RESEARCH_V1.stages.find((s) => s.id === RESEARCH_V1.derived_outline!.stage_id)!;
+    expect(allowedActions(RESEARCH_V1, research, drafting, false, undefined, outlineFacts(0))).toContain('generate_outline');
+    expect(allowedActions(RESEARCH_V1, research, drafting, false, undefined, outlineFacts(4))).not.toContain('generate_outline');
+    // No outline read for the stage: nothing to say about it either way.
+    expect(allowedActions(RESEARCH_V1, research, drafting, false)).not.toContain('generate_outline');
+  });
+
   it('generate_outline only on an empty outline stage', () => {
     expect(allowedActions(BOOK_V1, book, stage('outline'), false, undefined, outlineFacts(0))).toContain('generate_outline');
     expect(allowedActions(BOOK_V1, book, stage('outline'), false, undefined, outlineFacts(3))).not.toContain('generate_outline');

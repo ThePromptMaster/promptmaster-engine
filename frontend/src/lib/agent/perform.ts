@@ -16,6 +16,7 @@ import { countNamedSections, parseOutlineDocument } from '@/lib/outline/model';
 import { commitOutlineVersion } from '@/lib/supabase/outline';
 import { appendWorkflowEvent } from '@/lib/supabase/workflow';
 import { appliedFindingsVersion, reviseWithFindings } from '@/lib/workflow/apply-findings';
+import { deriveOutlineItems } from '@/lib/workflow/derived-outline';
 import { serializeItems } from '@/lib/workflow/stage-artifact';
 import { applyTriage } from '@/lib/workflow/triage';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
@@ -261,14 +262,28 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
 
     case 'outline': {
       const f = ctx.facts?.outline;
-      if (!f) return done(key, { status: 'failed', output: 'This stage has no outline artifact.', toolsUsed: [], changes: {} });
+      if (!f) return done(key, { status: 'failed', output: 'This stage does not hold an outline.', toolsUsed: [], changes: {} });
       if (f.namedSections > 0) {
         return done(key, { status: 'failed', output: 'There is already an outline; edit or regenerate it yourself.', toolsUsed: [], changes: {} });
       }
       // The same function "Generate the outline" calls (B2a), then committed
       // as a version straight away: something the user can approve or edit,
       // not a draft that exists only in this tab.
-      const doc = await generateOutlineDraft({ project: ctx.project, doc: f.doc, drafts: [] });
+      // A derived outline (Research) is built from the stages already done,
+      // by the same function the panel's own button calls; no model is asked.
+      const derived = ctx.template.outline_stage === 'derived';
+      const doc = await generateOutlineDraft({
+        project: ctx.project, doc: f.doc, drafts: [],
+        ...(derived ? { derive: () => deriveOutlineItems(ctx.template, ctx.state, ctx.bundles) } : {}),
+      });
+      if (countNamedSections(doc) < 2) {
+        return done(key, {
+          status: 'failed', toolsUsed: [], changes: {},
+          output: derived
+            ? 'The earlier stages have not produced enough to build an outline from yet.'
+            : 'The outline came back with fewer than two named sections; nothing usable to approve.',
+        });
+      }
       const created = await commitOutlineVersion(f.artifact, doc, {
         sourceOperation: 'agent_outline',
         instruction: ctx.step.rationale || 'Go mode generated the outline.',
@@ -279,17 +294,17 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       ctx.refresh?.();
       const named = countNamedSections(parseOutlineDocument(created.content));
       if (named < 2) {
-        return done(key, { status: 'failed', output: `The outline came back with ${named} named section(s); nothing usable to approve.`, toolsUsed: ['model'], changes: { version_ids: [created.id] } });
+        return done(key, { status: 'failed', output: `The outline came back with ${named} named section(s); nothing usable to approve.`, toolsUsed: derived ? [] : ['model'], changes: { version_ids: [created.id] } });
       }
       return done(key, {
-        status: 'succeeded', toolsUsed: ['model'], changes: { version_ids: [created.id] },
-        output: `Generated an outline of ${named} sections, saved as version ${created.version_number}: ${parseOutlineDocument(created.content).items.map((i, n) => `${n + 1}. ${i.title}`).join('; ')}. Approve it to draft against it.`,
+        status: 'succeeded', toolsUsed: derived ? [] : ['model'], changes: { version_ids: [created.id] },
+        output: `${derived ? 'Built an outline from the stages already done:' : 'Generated an outline of'} ${named} sections, saved as version ${created.version_number}: ${parseOutlineDocument(created.content).items.map((i, n) => `${n + 1}. ${i.title}`).join('; ')}. Approve it to draft against it.`,
       });
     }
 
     case 'sections': {
       const m = ctx.facts?.manuscript;
-      if (!m) return done(key, { status: 'failed', output: 'This stage has no manuscript.', toolsUsed: [], changes: {} });
+      if (!m) return done(key, { status: 'failed', output: 'There is nothing to write sections into yet — the outline has not been approved.', toolsUsed: [], changes: {} });
       if (m.pendingJobs.length) return done(key, { status: 'failed', output: 'Sections are already being written; wait for them first.', toolsUsed: [], changes: {} });
       if (key === 'draft_sections') {
         if (!m.approvedOutlineVersionId) return done(key, { status: 'failed', output: 'No approved outline to draft against.', toolsUsed: [], changes: {} });
@@ -449,7 +464,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       await ctx.afterStageEvent();
       return done(key, {
         status: 'blocked', blockKind: kind, toolsUsed: [], changes: { event_types: ['stage_blocked'] },
-        output: `Blocked: ${reason}`, stop: { status: 'blocked', reason },
+        output: `Could not continue: ${reason}`, stop: { status: 'blocked', reason },
       });
     }
 

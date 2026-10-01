@@ -238,6 +238,11 @@ planning, waiting and the user's answers count none). It is not a cost limit. Th
 selector is restored from the run on load, and the progress count always shows the run's
 own numbers.
 
+**What the planner may say.** Its `rationale`, `expected_outcome` and `decision_question`
+are shown to the user, so the prompt (`promptmaster/agent.py`) names its own sections in
+plain words ("MOVES AVAILABLE NOW", "WHAT THIS STAGE HOLDS NOW") and forbids "artifact",
+"action set", "model call" and action keys in what it writes. A test pins this.
+
 **"Succeeded" is read back.** After a step that claims a change, `readOutcomeProof`
 re-reads the project and `verifyOutcome` (`lib/agent/outcome.ts`, pure) fails the step if
 the saved version, the written sections, the evaluation or the stage move is not there.

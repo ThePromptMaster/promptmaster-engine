@@ -3,7 +3,7 @@
 import { useState } from 'react';
 
 import { actionLabel } from '@/lib/agent/actions';
-import { describeNeed, NEED_CLEARED } from '@/lib/agent/needs';
+import { describeNeed, isClearedNote } from '@/lib/agent/needs';
 import type { useGoLoop } from '../use-go-loop';
 import { AuthorizationDialog } from './authorization-dialog';
 import { DecisionPrompt, QuestionPrompt } from './decision-prompt';
@@ -55,7 +55,7 @@ export function GoPanel({
     ? go.run.needs
     : null;
   // The status panel below already says so; this only keeps it from being asked as a question.
-  const cleared = canResume && !need && go.run?.stop_reason === NEED_CLEARED;
+  const cleared = canResume && !need && isClearedNote(go.run?.stop_reason);
   const canContinue = Boolean(
     go.run && go.run.status === 'budget_exhausted' && go.run.policy === go.policy && go.run.budget_steps === go.budget
   );

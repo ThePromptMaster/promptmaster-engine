@@ -117,7 +117,7 @@ _NEXT_ACTION_INSTRUCTION = (
     "project. Read the state below and choose the single best next move: the one "
     "an expert in this field would make now to advance the objective. Prefer "
     "moves that do the work over moves that talk about it. Choose ONLY from the "
-    "allowed actions listed; never invent one.\n\n"
+    "moves listed under MOVES AVAILABLE NOW; never invent one.\n\n"
     "If the objective is met and nothing needs another pass, choose "
     "declare_objective_complete and set objective_complete true. If a choice only "
     "the user can make is needed, choose request_user_decision and ask one "
@@ -126,9 +126,16 @@ _NEXT_ACTION_INSTRUCTION = (
     "failed or produced nothing new.\n\n"
     "Work that the stage's own controls do — generating or approving an outline, "
     "drafting or revising sections, deciding on findings — is not missing data: "
-    "if it is needed and no allowed action does it, choose request_user_decision "
-    "and name that control exactly (\"press Generate the outline\"). Never "
+    "if it is needed and no listed move does it, choose request_user_decision "
+    "and name that button exactly (\"press Generate the outline\"). Never "
     "mark_blocked for it: a blocked stage stops every later move too.\n\n"
+    "Everything you write in rationale, expected_outcome and decision_question "
+    "is shown to the user, who is not a developer. Write it in plain language "
+    "about their work: say \"the draft\", \"the outline\", \"the table\", "
+    "\"the sections\". Never use the words \"artifact\", \"action set\", "
+    "\"allowed actions\", \"model call\", \"renderer\" or an action key; "
+    "never describe your own menu of moves. Say what you will do, or what you "
+    "need from them, and why.\n\n"
     "Return JSON only, in exactly this shape:\n"
     "{\n"
     '  "action_key": "one of the allowed keys",\n'
@@ -187,9 +194,9 @@ def _format_state(inputs: PMInput, state: AgentState) -> str:
         "Earlier stages: " + ("; ".join(state.prior_stages) or "(none)"),
         *facts,
         "",
-        "--- CURRENT STAGE ARTIFACT (may be trimmed) ---",
-        state.artifact_excerpt.strip() or "(empty — nothing drafted yet)",
-        "--- END ARTIFACT ---",
+        "--- WHAT THIS STAGE HOLDS NOW (may be trimmed) ---",
+        state.artifact_excerpt.strip() or "(nothing has been drafted on this stage yet)",
+        "--- END ---",
         "",
         "Moves made so far in this run (oldest first):",
         steps,
@@ -204,7 +211,7 @@ def build_next_action_prompt(
     menu = "\n".join(
         f"- {a.key}: {a.label}. {a.when}" for a in AGENT_ACTIONS if a.key in set(allowed)
     )
-    user = f"{_format_state(inputs, state)}\n\nALLOWED ACTIONS:\n{menu}\n\nChoose the next move."
+    user = f"{_format_state(inputs, state)}\n\nMOVES AVAILABLE NOW:\n{menu}\n\nChoose the next move."
     return system, user
 
 
@@ -217,7 +224,7 @@ def parse_next_action(result: object, allowed: list[str]) -> NextAction:
     key = str(result.get("action_key") or "")
     if key not in permitted:
         logger.warning(f"Planner chose {key!r}, outside the allowed actions; asking the user instead")
-        return _ask(f"I considered '{key or 'nothing'}', which is not available here. What would you like to do next?")
+        return _ask("I could not settle on a next step that I can carry out from here. What would you like to do next?")
     params = result.get("params") if isinstance(result.get("params"), dict) else {}
     question = result.get("decision_question")
     return NextAction(
