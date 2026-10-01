@@ -175,6 +175,23 @@ def build_stage_prompt(
         f"STAGE TO PRODUCE: {stage.label or stage.id}",
     ]
 
+    # The numbers already on the record. A later stage that restates one from
+    # its own reading of a summary can get it wrong, and a validation stage
+    # did (1 Oct, item 32): these are to be quoted, not worked out again.
+    if digest.figures:
+        parts += [
+            "",
+            "FIGURES ALREADY ESTABLISHED by earlier stages. Wherever you refer to one of "
+            "these, use this exact value: do not recompute it, round it differently or "
+            "restate it from memory. If something in this stage genuinely disagrees with "
+            "one, do not silently replace it — say so in words, naming both values, as a "
+            "discrepancy to be resolved.",
+            *[
+                f"- [{f.stage}] {f.name}: {f.value}" + (f" ({f.context})" if f.context else "")
+                for f in digest.figures
+            ],
+        ]
+
     # What data the project actually holds. Without this a stage planned its
     # runs as though there were none, and marked every one "not run" with a
     # dataset attached. The files can be read by code the project runs; they

@@ -405,6 +405,8 @@ export interface StageDigestRequest {
   prior_stages: StageDigestEntry[];
   /** Drafted chapters, for stages after drafting only. */
   manuscript?: string;
+  /** Figures earlier stages established, each exactly as that stage wrote it. */
+  figures?: { stage: string; name: string; value: string; context: string }[];
   /** The project's data files: name, shape and first rows. */
   data_files?: { name: string; kind: string; columns: string[]; sample: string[][]; rows: number }[];
 }

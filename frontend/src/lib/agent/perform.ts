@@ -21,6 +21,7 @@ import { describeWith, type InstructionConflict } from '@/lib/workflow/instructi
 import { deriveOutlineItems } from '@/lib/workflow/derived-outline';
 import { itemSchemaFor, parseItems, rendererHoldsItems, serializeItems } from '@/lib/workflow/stage-artifact';
 import { applyLookup, lookupSummary, recordLine } from '@/lib/workflow/lookup';
+import { readStageFigures, type StageFigures } from '@/lib/workflow/figures';
 import { applyTriage } from '@/lib/workflow/triage';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import { summariseStageContent } from '@/lib/workflow/digest';
@@ -77,6 +78,7 @@ export interface PerformContext {
   appendStageVersion?: (stageId: string, name: string, version: NewVersion) => Promise<unknown>;
   recordStageEvaluation?: (stageId: string, versionId: string, evaluation: NewEvaluation) => Promise<Evaluation>;
   setStageSummary?: (stageId: string, summary: string) => Promise<void>;
+  setStageFigures?: (stageId: string, figures: StageFigures) => Promise<void>;
   /** Re-read the event log (and move the cursor) after a stage event. */
   afterStageEvent: () => Promise<void>;
   signal: AbortSignal;
@@ -520,6 +522,11 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       if (ctx.setStageSummary) {
         const summary = summariseStageContent(ctx.stage, stageContentForSummary(ctx.template, ctx.stage, ctx.bundles));
         if (summary) await ctx.setStageSummary(ctx.stage.id, summary).catch(() => undefined);
+      }
+      // The figures the stage established, for later stages to quote.
+      if (type === 'stage_marked_complete' && ctx.setStageFigures) {
+        const figures = await readStageFigures(ctx.project, ctx.stage, ctx.bundles[ctx.stage.id]?.versions.at(-1));
+        if (figures) await ctx.setStageFigures(ctx.stage.id, figures).catch(() => undefined);
       }
       await appendWorkflowEvent(ctx.project.id, ctx.project.user_id, {
         type,

@@ -54,6 +54,7 @@ import {
   updateAgentRun,
 } from '@/lib/supabase/agent';
 import { dataFileBriefs, type StageArtifactBundle } from '@/lib/workflow/digest';
+import type { StageFigures } from '@/lib/workflow/figures';
 import { evaluateStage, getStage } from '@/lib/workflow/engine';
 import { inputsFrom } from '@/lib/workflow/stage-requests';
 import type { StageContext, StageDefinition, StageEvaluation, WorkflowEvent, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
@@ -83,6 +84,7 @@ interface Options {
   appendStageVersion?: (stageId: string, name: string, version: NewVersion) => Promise<unknown>;
   recordStageEvaluation?: (stageId: string, versionId: string, evaluation: NewEvaluation) => Promise<Evaluation>;
   setStageSummary?: (stageId: string, summary: string) => Promise<void>;
+  setStageFigures?: (stageId: string, figures: StageFigures) => Promise<void>;
   /** Re-read the event log after a stage event; resolves once the page has it. */
   reloadEvents: () => Promise<void>;
   /** The event log, for the facts a stage's own controls need (approvals). */
@@ -235,7 +237,7 @@ export function useGoLoop(opts: Options) {
           ? { sandboxRunId: interpret.sandboxRunId, code: interpret.code, stdout: interpret.stdout, stderr: interpret.stderr, exitCode: interpret.exitCode }
           : undefined,
         appendStageVersion: o.appendStageVersion, recordStageEvaluation: o.recordStageEvaluation,
-        setStageSummary: o.setStageSummary, afterStageEvent: o.reloadEvents, signal,
+        setStageSummary: o.setStageSummary, setStageFigures: o.setStageFigures, afterStageEvent: o.reloadEvents, signal,
         facts, latestEvaluation: o.latestEvaluation, refresh: o.onRefresh, onProgress: setProgress,
         conflictAnswer: answerToConflict(stepsRef.current, o.stage.id),
       };

@@ -66,6 +66,8 @@ import type { OutlineDocument } from '@/types/outline';
 import { stageDrafts, itemSchemaFor, parseItems, rendererHoldsItems, serializeItems, stageContentForChat, type StageItem } from '@/lib/workflow/stage-artifact';
 import { previewRowAction } from '@/lib/workflow/row-actions';
 import { applyLookup, lookupSummary } from '@/lib/workflow/lookup';
+import { readStageFigures, type StageFigures } from '@/lib/workflow/figures';
+import { FiguresOnRecord } from './figures-on-record';
 import type { ReplyAction } from '@/types';
 import { buildStageContext } from '@/lib/workflow/context';
 import type { StageContext, WorkflowTemplate, BlockKind } from '@/lib/workflow/types';
@@ -106,6 +108,7 @@ interface Props {
   ) => Promise<Evaluation>;
   restoreStageVersion?: (stageId: string, versionId: string) => Promise<void>;
   setStageSummary?: (stageId: string, summary: string) => Promise<void>;
+  setStageFigures?: (stageId: string, figures: StageFigures) => Promise<void>;
   /**
    * Create a stage's artifact if it has none yet.
    *
@@ -134,6 +137,7 @@ export function WorkflowWorkspace({
   recordStageEvaluation,
   restoreStageVersion,
   setStageSummary,
+  setStageFigures,
   ensureStageArtifact,
   onReload,
 }: Props) {
@@ -443,6 +447,13 @@ export function WorkflowWorkspace({
           const summary = summariseStageContent(stage, stageContentForSummary(template, stage, stageBundles));
           if (summary) await setStageSummary(stage.id, summary).catch(() => {});
         }
+        // ...and the figures it established, so later stages quote them
+        // instead of working them out again (1 Oct, item 32). Read from the
+        // stage's own text; never a reason the move fails.
+        if (type === 'stage_marked_complete' && setStageFigures) {
+          const figures = await readStageFigures(project, stage, stageBundles[stage.id]?.versions.at(-1));
+          if (figures) await setStageFigures(stage.id, figures).catch(() => {});
+        }
 
         let fresh = await appendEvent({
           type,
@@ -505,7 +516,7 @@ export function WorkflowWorkspace({
         setBusy(false);
       }
     },
-    [stage, busy, project, template, onPatchProject, setStageSummary, stageBundles, evaluation, appendEvent, appendStageVersion]
+    [stage, busy, project, template, onPatchProject, setStageSummary, setStageFigures, stageBundles, evaluation, appendEvent, appendStageVersion]
   );
 
   /** PM-13: mark the current stage blocked, or lift the block. */
@@ -885,6 +896,7 @@ export function WorkflowWorkspace({
     appendStageVersion,
     recordStageEvaluation,
     setStageSummary,
+    setStageFigures,
     reloadEvents: reloadAfterAgent,
     events: events ?? [],
     loadEvents: () => listWorkflowEvents(project.id),
@@ -1408,6 +1420,7 @@ export function WorkflowWorkspace({
             ) : (
               <ProjectBrief project={project} onPatch={onPatchProject} readOnly={!isEditable} />
             )}
+            <FiguresOnRecord template={template} state={state} bundles={stageBundles} />
             {/* On every stage: data is the project's, not a stage's. */}
             <ProjectData project={project} files={project.data_files ?? []} onChanged={() => onReload?.()} readOnly={project.status === 'finalized'} />
 

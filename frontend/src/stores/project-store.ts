@@ -2,6 +2,7 @@
 
 import { create } from 'zustand';
 import { listProjectFiles } from '@/lib/supabase/project-files';
+import type { StageFigures } from '@/lib/workflow/figures';
 
 import {
   getProject,
@@ -16,6 +17,7 @@ import {
   rateVersion as rateVersionRow,
   restoreVersion as restoreVersionRow,
   saveArtifactSummary,
+  saveArtifactFigures,
   saveEvaluation,
   type NewEvaluation,
   type NewVersion,
@@ -194,6 +196,8 @@ interface ProjectState {
   ) => Promise<Evaluation>;
   /** Record what a stage concluded, for the digest later stages generate against. */
   setStageSummary: (stageId: string, summary: string) => Promise<void>;
+  /** Record the figures a completed stage established (lib/workflow/figures.ts). */
+  setStageFigures: (stageId: string, figures: StageFigures) => Promise<void>;
 
   rateVersion: (versionId: string, rating: 'positive' | 'negative' | null) => Promise<void>;
   setActiveVersion: (versionId: string | null) => void;
@@ -608,6 +612,17 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
           [stageId]: { ...current, artifact: { ...current.artifact, summary } },
         },
       };
+    });
+  },
+
+  async setStageFigures(stageId, figures) {
+    const bundle = get().stages[stageId];
+    if (!bundle?.artifact) return;
+    await saveArtifactFigures(bundle.artifact.id, figures);
+    set((s) => {
+      const current = s.stages[stageId];
+      if (!current?.artifact) return {};
+      return { stages: { ...s.stages, [stageId]: { ...current, artifact: { ...current.artifact, key_figures: figures } } } };
     });
   },
 

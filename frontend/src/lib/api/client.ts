@@ -356,6 +356,11 @@ export const api = {
     });
   },
 
+  /** The figures a finished stage established, each exactly as written. */
+  async extractFigures(req: { stage_label: string; content: string; model?: string }): Promise<{ figures: { name: string; value: string; context: string }[] }> {
+    return apiFetch('/api/extract-figures', { method: 'POST', body: JSON.stringify(req) });
+  },
+
   /** Look named works up in OpenAlex. No model call; nothing is stored. */
   async agentLiterature(works: { id: string; work: string }[], signal?: AbortSignal): Promise<{ matches: WorkMatch[]; source: string }> {
     return apiFetch('/api/agent/literature', { method: 'POST', body: JSON.stringify({ works }), signal });
