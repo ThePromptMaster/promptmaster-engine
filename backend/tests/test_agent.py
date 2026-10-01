@@ -398,8 +398,21 @@ def test_the_code_writer_is_told_to_read_only_listed_files_and_never_invent_data
     system, user = build_write_code_prompt(INPUTS, _state_with_data(), "Churn rate by plan", "computation")
     assert "Use only files that are listed, by the exact path shown" in system
     assert "never invent a file, a column or a value" in system
-    assert "pandas is not installed" in system
+    # pandas is in the sandbox image now, and results are printed so they can be recorded.
+    assert "numpy, scipy, sympy, matplotlib and pandas" in system
+    assert "Read them with pandas, or the csv or json modules" in system
+    assert "on its own line as `label: value`" in system
     assert "/data/accounts.csv" in user
+
+
+def test_a_computation_can_name_the_row_of_the_table_it_carries_out():
+    from promptmaster.agent_actions import ACTIONS_BY_KEY
+
+    when = ACTIONS_BY_KEY["run_computation"].when
+    assert "row (the number of the row in this stage's table that the computation carries out" in when
+    assert "otherwise leave it out" in when
+    _, user = build_next_action_prompt(INPUTS, _state_with_data(), ["run_computation"], "guided")
+    assert "row (the number of the row" in user
 
 
 def test_the_planner_is_told_the_order_is_a_default_and_can_suggest_a_skip():

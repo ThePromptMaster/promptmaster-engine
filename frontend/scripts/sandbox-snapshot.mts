@@ -5,14 +5,14 @@
  *     node --env-file .env.sandbox --experimental-strip-types scripts/sandbox-snapshot.mts
  *
  * Prints a snapshot id; set it as SANDBOX_SNAPSHOT_ID on the Vercel project.
- * Without it every run installs numpy/scipy/sympy/matplotlib first (~20s);
+ * Without it every run installs numpy/scipy/sympy/matplotlib/pandas first (~25s);
  * with it a run starts deny-all with the packages already present. Re-run it to
  * change the package set — snapshots are immutable, like workflow templates.
  */
 
 import { Sandbox } from '@vercel/sandbox';
 
-const PACKAGES = ['numpy', 'scipy', 'sympy', 'matplotlib'];
+const PACKAGES = ['numpy', 'scipy', 'sympy', 'matplotlib', 'pandas'];
 
 const sandbox = await Sandbox.create({
   runtime: 'python3.13',
@@ -27,7 +27,7 @@ if (install.exitCode !== 0) {
 }
 const check = await sandbox.runCommand({
   cmd: 'python3',
-  args: ['-c', 'import numpy, scipy, sympy, matplotlib; print("ok", numpy.__version__, scipy.__version__)'],
+  args: ['-c', 'import numpy, scipy, sympy, matplotlib, pandas; print("ok", numpy.__version__, scipy.__version__, pandas.__version__)'],
 });
 console.error(await check.stdout());
 // The sandbox stops as part of snapshotting. 0 = never expires.

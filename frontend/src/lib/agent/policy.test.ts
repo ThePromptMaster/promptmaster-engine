@@ -239,6 +239,25 @@ describe('B0: the planner sees what exists on outline, long-form and review stag
     expect(digest.artifact_excerpt).toBe('[accepted] Ch 3 repeats Ch 1\n[undecided] Terminology drifts');
   });
 
+  it('a run table is numbered, and with data attached says a computation can carry a row out', async () => {
+    const { buildAgentState } = await import('./digest');
+    const { serializeItems } = await import('@/lib/workflow/stage-artifact');
+    const experiment = RESEARCH_V1.stages.find((s) => s.id === 'experiment')!;
+    const content = serializeItems([
+      { id: 'r1', run: 'Count the accounts', status: 'not_run', reason: 'No data.', status_source: 'model' },
+      { id: 'r2', run: 'Compare cohorts' },
+    ]);
+    const args = {
+      template: RESEARCH_V1, state: research, stage: experiment, steps: [],
+      stageEvaluation: { stageId: 'experiment', canAdvance: false, criteria: [], unmet: [] },
+      bundles: { experiment: { artifact: { id: 'e', stage_id: 'experiment', long_form: null }, versions: [{ id: 'v', content }] } } as never,
+    };
+    expect(buildAgentState(args).artifact_excerpt).toBe('1. [not_run] Count the accounts\n2. [undecided] Compare cohorts');
+    const withData = buildAgentState({ ...args, dataFiles: [{ name: 'accounts.csv', path: '/data/accounts.csv', kind: 'table', columns: ['id'], sample: [], rows: 3 }] as never });
+    expect(withData.artifact_excerpt).toContain('give the row\'s number as `row`');
+    expect(withData.artifact_excerpt).toContain('A row no code can carry out is the user\'s to decide.');
+  });
+
   it('a prose stage is unchanged: the head version, no facts', async () => {
     const { buildAgentState } = await import('./digest');
     const digest = buildAgentState({

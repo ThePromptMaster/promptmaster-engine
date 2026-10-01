@@ -398,7 +398,7 @@ which would silently stop bumping `revision` and disable the concurrency guard.
 ### L-B3 — Go mode code execution: Python only, fixed package set, no network
 
 `/api/sandbox/run` runs model-written Python 3.13 in a Vercel Sandbox microVM with
-numpy, scipy, sympy and matplotlib and **no network** while the code runs. Anything
+numpy, scipy, sympy, matplotlib and (since 2026-10-01) pandas, and **no network** while the code runs. Anything
 else — another language, another library, a dataset fetched from the internet —
 is recorded as `blocked` / `tool_missing` (or `data_missing` for a missing input
 file) rather than attempted another way.
@@ -408,10 +408,23 @@ project (`project_files` + the private `project-files` bucket; ≤5 MB each, 10 
 project). The sandbox route copies them into `/data` for every run of that project
 (≤20 MB in total; files past that are left out, in upload order). Prompts are shown
 each file's name, columns, first rows and row count — computed in the browser at
-upload — never the file. What this does **not** do: read spreadsheets (.xlsx; save as
-CSV), query a database, or use pandas (not in the sandbox image; the code is told to
-use `csv`, `json` or numpy). A run that succeeds does **not** set an Experiment row to
-"Completed" — the user still records that, with the run's output in front of them.
+upload — never the file. An Excel workbook (.xlsx) is converted in the browser to one
+CSV per sheet that holds anything (`lib/data/spreadsheet.ts`); the CSVs are what is
+stored, previewed and run against, and the workbook itself is not kept. Values survive;
+formulas arrive as their last computed results, and formatting, charts, merged cells and
+the old `.xls` format do not arrive at all. What this does **not** do: query a database.
+
+**A run that executed settles its row (2026-10-01).** When the planner names the row of
+the stage's table a computation carries out (`params.row`) and the code exits cleanly,
+that row becomes **Completed** with "Recorded from a sandbox run", the run's id and the
+first 300 characters of what it printed (`lib/workflow/run-result.ts`), saved as a
+version. It is the planner's word that the code *was* that run — nothing checks the code
+against the row's description — which is why the row says where its status came from and
+stays the user's to change; a row the user decided is never overwritten. With data
+attached, Go tries a computation at most once per row before handing an undecided run
+table to the user; without data it stops for the user as before. A snapshot built before
+pandas was added lacks it: rebuild with `scripts/sandbox-snapshot.mts` and update
+`SANDBOX_SNAPSHOT_ID`.
 Removing a file does not touch runs already recorded. Limits: 30 s per command, 10 runs per Go
 run (`SANDBOX_MAX_PER_RUN`), 600 s of execution per user per UTC day
 (`SANDBOX_DAILY_SECONDS`), 5 output files of ≤1 MB each. Without
@@ -514,7 +527,8 @@ A generated row's status is kept only where the row's schema says the model may 
 (`modelMaySet` in `lib/workflow/stage-artifact.ts`, enforced in `promptmaster/stage.py`).
 Today that is one value: a run may arrive as **Not run** with its reason, marked "Set by
 PromptMaster", when the draft already knows it could not be executed. **Completed** and
-**Deviated** are never the model's to set — they record what a person or a tool did.
+**Deviated** are never the model's to set — they record what a person or a tool did
+(a sandbox run that executed sets **Completed** on the row it carried out; see L-B3).
 Alternatives and validation tables allow none. Rows in versions saved before this change
 are untouched.
 
@@ -547,8 +561,12 @@ stage left open contributes none, and one edited after completion drops out unti
 completed again. Long-form stages (the drafted sections) are not read for figures. The
 call is skipped when the text has no digits, costs one small model call otherwise, and
 is given 12 seconds; if it fails or runs out, the stage completes without figures.
-Sandbox output is not added to the list directly; it reaches it when the stage that
-reports it is completed.
+Since 2026-10-01 a clean sandbox run's labelled output lines (`label: value` or
+`label = value`, the value holding a number; at most twelve) are added to the stage's
+figures directly, marked as printed by that run, with no model reading them
+(`figuresFromOutput`); they are kept when the stage's text is later re-read for figures.
+They still reach later stages only once the stage is done, like every other figure, and a
+line the code did not print in that shape is not picked up.
 
 ### L-C4 — Fact-check: nothing is verified by PromptMaster
 

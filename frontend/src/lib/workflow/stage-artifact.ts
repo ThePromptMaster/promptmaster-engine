@@ -93,6 +93,12 @@ export interface StageItemSchema {
    * empty, and writes what was found into `recordField`.
    */
   lookup?: { field: string; linkField: string; recordField: string; status: string };
+  /**
+   * The rows are things to be carried out, and a sandbox run that executed
+   * can settle one: it sets `status` and writes what the run printed into
+   * `field`. Never the model's to set (see `modelMaySet`).
+   */
+  execution?: { status: string; field: string };
 }
 
 // --- the registry -----------------------------------------------------------
@@ -256,6 +262,8 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
       // needed was never provided. "Completed" is never the model's to say.
       { value: 'not_run', label: 'Not run', tone: 'warn', requiresReason: true, modelMaySet: true },
     ],
+    // …but a run that really executed in the sandbox is.
+    execution: { status: 'completed', field: 'observed' },
   },
 
   alternatives: {

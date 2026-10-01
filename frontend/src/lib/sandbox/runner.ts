@@ -8,7 +8,7 @@
  *   MockRunner — SANDBOX_MODE=mock, for Playwright and CI. Never in production.
  *
  * The VM has no network while user code runs. With SANDBOX_SNAPSHOT_ID set it
- * boots from a snapshot that already holds numpy/scipy/sympy/matplotlib and is
+ * boots from a snapshot that already holds numpy/scipy/sympy/matplotlib/pandas and is
  * deny-all from the start; without one it installs them with egress limited to
  * PyPI and then switches to deny-all before the code is written, so model-written
  * code never runs with a network.
@@ -42,7 +42,8 @@ export const STDOUT_MAX = 20_000;
 export const STDERR_MAX = 8_000;
 export const MAX_ARTIFACTS = 5;
 export const MAX_ARTIFACT_BYTES = 1_000_000;
-const PACKAGES = ['numpy', 'scipy', 'sympy', 'matplotlib'];
+/** Keep in step with scripts/sandbox-snapshot.mts and the code-writer's prompt (promptmaster/agent.py). */
+export const PACKAGES = ['numpy', 'scipy', 'sympy', 'matplotlib', 'pandas'];
 const WORKDIR = '/vercel/sandbox';
 
 function unavailable(detail: string, started: number): RunResult {

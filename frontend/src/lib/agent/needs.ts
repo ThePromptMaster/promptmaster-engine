@@ -87,6 +87,12 @@ export function needsUser(input: {
   outlineStageId: string | null;
   /** The user already said "draft them anyway" for this many sections. */
   largeJobAcknowledged?: number | null;
+  /**
+   * How many more computations the run may try against this stage's table:
+   * above zero only when the table's rows are things a sandbox run can carry
+   * out, the project holds data, and the run has not yet tried once per row.
+   */
+  runAttemptsLeft?: number;
 }): NeedsUser | null {
   const { state, stage, facts, stageEvaluation, allowed, policy, outlineStageId } = input;
 
@@ -120,7 +126,10 @@ export function needsUser(input: {
   }
 
   // The findings left are the ones that change the work: the user's call (B3).
-  if (facts.review && facts.review.material.length > 0 && facts.review.routine.length === 0) {
+  // …unless they are runs and the data to carry them out is here: then a
+  // computation can settle a row, and stopping first would leave the data unused.
+  const canRun = Boolean(facts.review?.outcome && facts.review.schema.execution && (input.runAttemptsLeft ?? 0) > 0);
+  if (facts.review && facts.review.material.length > 0 && facts.review.routine.length === 0 && !canRun) {
     return facts.review.outcome
       ? { kind: 'decide_rows', stageId: stage.id, count: facts.review.material.length, itemLabel: facts.review.schema.itemLabel }
       : { kind: 'triage_findings', stageId: stage.id, count: facts.review.material.length };

@@ -62,7 +62,7 @@ does not exist in the repository**; and `[db.network_restrictions]` is disabled 
 | `CRON_SECRET` | Yes | The bearer token Vercel Cron presents to `/api/jobs/drain`. Compared in constant time; an unset value cannot match, so the cron simply stops working. |
 | `WORKER_SHARED_SECRET` | Yes | The credential the drain presents to FastAPI. **Must be byte-identical to the backend's.** |
 | `SANDBOX_ENABLED` | For Go mode code | Must be `true` for `/api/sandbox/run` to execute anything. Unset or anything else records every computation as blocked / `tool_missing` — the kill switch. |
-| `SANDBOX_SNAPSHOT_ID` | Recommended | From `frontend/scripts/sandbox-snapshot.mts`. Without it each run installs the Python packages first (~20 s). |
+| `SANDBOX_SNAPSHOT_ID` | Recommended | From `frontend/scripts/sandbox-snapshot.mts`. Without it each run installs the Python packages first (~25 s). Rebuild it whenever the package list changes (pandas was added 2026-10-01) — a stale snapshot makes `import pandas` fail as a missing tool. |
 | `SANDBOX_MAX_PER_RUN` / `SANDBOX_DAILY_SECONDS` | No | Code runs per Go run (10) and execution seconds per user per UTC day (600). |
 | `SANDBOX_USD_PER_VCPU_SECOND` | No | Enables a cost figure on `sandbox_runs`; unset records cost as null (unknown), never $0. |
 | `SANDBOX_MODE` | Never in production | `mock` for Playwright/CI; refused when `VERCEL_ENV=production`. Sandbox credentials are the project's Vercel OIDC token — nothing to set on Vercel. |

@@ -317,12 +317,13 @@ def build_reason_prompt(
 
 _WRITE_CODE_INSTRUCTION = (
     "GO MODE — WRITE CODE. Write one self-contained Python 3 script that computes "
-    "what is asked. Standard library, numpy, scipy, sympy and matplotlib are "
-    "available; nothing else, and no network access. Print every result the "
-    "reader needs, clearly labelled. Save any plot to /out/<name>.png. "
+    "what is asked. Standard library, numpy, scipy, sympy, matplotlib and pandas "
+    "are available; nothing else, and no network access. Print every result the "
+    "reader needs on its own line as `label: value`, so each can be recorded. "
+    "Save any plot to /out/<name>.png. "
     "DATA: the project's files, if any, are listed in the state below with their "
-    "paths under /data, their columns and a few sample rows. Read them with the "
-    "csv or json modules or numpy (pandas is not installed). Use only files that "
+    "paths under /data, their columns and a few sample rows. Read them with "
+    "pandas, or the csv or json modules. Use only files that "
     "are listed, by the exact path shown; never invent a file, a column or a "
     "value. If the goal needs data that is not listed, write a script that "
     "prints exactly what is missing and exits, rather than making data up. Return "

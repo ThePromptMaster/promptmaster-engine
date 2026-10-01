@@ -406,10 +406,22 @@ export function useGoLoop(opts: Options) {
           // Asked once: if the user stayed, the stage is to be done.
         ).filter((k) => k !== 'propose_skip' || !proposedSkipHere);
 
+        // Runs the data could carry out are tried before the table is handed
+        // to the user: at most once per row, so a row no code can settle
+        // still ends with the user.
+        const runsTried = [...priorStepsRef.current, ...stepsRef.current].filter(
+          (s) => s.action_key === 'run_computation' && s.stage_id === o.stage!.id
+        ).length;
+        const runAttemptsLeft =
+          facts.review?.schema.execution && allowed.includes('run_computation') && dataFileBriefs(o.project).length
+            ? Math.max(0, facts.review.items.length - runsTried)
+            : 0;
+
         // Before the planner is asked: is the next move the user's? (B4)
         const need = needsUser({
           state: o.state, stage: o.stage, facts, stageEvaluation, allowed, policy: current.policy,
           outlineStageId: outlineStageFor(o.template)?.id ?? null, largeJobAcknowledged: largeJobOkRef.current,
+          runAttemptsLeft,
         });
         if (need) {
           await setRunStatus('awaiting_decision', describeNeed(need, stageLabelFor).message, need);
