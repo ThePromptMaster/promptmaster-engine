@@ -14,6 +14,7 @@
  * no callers since /session was retired. This is what it was for.
  */
 
+import { deliverableNouns } from '@/lib/workflow/labels';
 import { useEffect, useRef, useState } from 'react';
 
 import { downloadBlob, downloadFile } from '@/lib/utils';
@@ -47,6 +48,7 @@ export function ExportMenu({ bundle }: { bundle: ExportBundle }) {
   }
 
   const manuscript = toManuscriptMarkdown(bundle);
+  const { deliverable: noun, unit } = deliverableNouns(bundle.template);
   async function exportWord() {
     const { manuscriptToDocx } = await import('@/lib/export/docx-export');
     const blob = await manuscriptToDocx(manuscript, bundle.project.title || 'Untitled project');
@@ -101,7 +103,7 @@ export function ExportMenu({ bundle }: { bundle: ExportBundle }) {
               >
                 <span className="block text-body text-[var(--on-surface)]">Word document (.docx)</span>
                 <span className="mt-0.5 block text-label text-[var(--on-surface-variant)]">
-                  The manuscript alone — title and chapters.
+                  The {noun} alone — title and {unit}s.
                 </span>
               </button>
               <a
@@ -114,7 +116,7 @@ export function ExportMenu({ bundle }: { bundle: ExportBundle }) {
               >
                 <span className="block text-body text-[var(--on-surface)]">PDF (print view)</span>
                 <span className="mt-0.5 block text-label text-[var(--on-surface-variant)]">
-                  Opens the manuscript to print; choose “Save as PDF”.
+                  Opens the {noun} to print; choose “Save as PDF”.
                 </span>
               </a>
             </>

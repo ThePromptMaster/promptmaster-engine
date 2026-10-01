@@ -22,10 +22,18 @@ interface Props {
   onPickMode?: (mode: string) => void;
   /** The project's current mode, so the card in use is marked. */
   currentMode?: string;
+  /** Moved past with something required still open. */
+  leftOpen?: boolean;
+  /** The stage the project is on. An open stage that is not, was left open or reopened. */
+  isCurrent?: boolean;
 }
 
-export function StageHeader({ stage, status, skippedReason, position, onPickMode, currentMode }: Props) {
+export function StageHeader({ stage, status, skippedReason, position, onPickMode, currentMode, leftOpen, isCurrent = true }: Props) {
   const [showGuidance, setShowGuidance] = useState(true);
+  // The header said nothing for an open stage, so the rail's "open" tag was
+  // the only place a left-open stage was named (1 Oct, item 1).
+  const statusLabel =
+    status === 'in_progress' && !isCurrent ? (leftOpen ? 'Left open' : 'Reopened') : STATUS_LABEL[status];
 
   return (
     <header className="mb-8">
@@ -37,9 +45,9 @@ export function StageHeader({ stage, status, skippedReason, position, onPickMode
 
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <h2 className="text-headline text-[var(--on-surface)]">{stage.label}</h2>
-        {STATUS_LABEL[status] && (
+        {statusLabel && (
           <span className="rounded-full bg-[var(--surface-container-high)] px-2.5 py-0.5 text-label uppercase tracking-wide text-[var(--on-surface-variant)]">
-            {STATUS_LABEL[status]}
+            {statusLabel}
           </span>
         )}
         {!stage.required && status !== 'skipped' && (

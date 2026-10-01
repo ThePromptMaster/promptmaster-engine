@@ -1,3 +1,4 @@
+import type { WorkflowTemplate } from './types';
 /**
  * Words a user can read, for codes the database stores (PM-07).
  *
@@ -32,10 +33,10 @@ const OPERATION_LABEL: Record<string, string> = {
   agent_draft: 'Go mode draft',
   agent_revise: 'Go mode revision',
   // A2: a long-form stage's versions are snapshots of the manuscript.
-  long_form_complete: 'Manuscript saved',
+  long_form_complete: 'Full draft saved',
   agent_outline: 'Go mode outline',
   agent_triage: 'Go mode: routine findings decided',
-  manuscript_snapshot: 'Manuscript before revision',
+  manuscript_snapshot: 'Full draft before revision',
 };
 
 /**
@@ -69,4 +70,20 @@ export function versionTitle(versionNumber: number, operation: string | null | u
   return versionNumber === 1
     ? `Version 1 — ${what}. Every change saves a new version you can go back to.`
     : `Version ${versionNumber} — ${what}. Earlier versions are kept; select one to view or restore it.`;
+}
+
+/**
+ * What this workflow's finished thing and its parts are called.
+ *
+ * The finished screen said "Your book is complete" and counted "chapters" for
+ * any workflow that drafts in sections — Research included (1 Oct, item 26).
+ * Templates published since carry `nouns`; for the versions pinned before
+ * that, the outline flag decides: an outline built by hand is a book's, one
+ * derived from the stages is a report's.
+ */
+export function deliverableNouns(template: Pick<WorkflowTemplate, 'nouns' | 'outline_stage' | 'name'>): { deliverable: string; unit: string } {
+  if (template.nouns) return template.nouns;
+  if (template.outline_stage === 'explicit') return { deliverable: template.name.toLowerCase(), unit: 'chapter' };
+  if (template.outline_stage === 'derived') return { deliverable: `${template.name.toLowerCase()} report`, unit: 'section' };
+  return { deliverable: 'work', unit: 'section' };
 }

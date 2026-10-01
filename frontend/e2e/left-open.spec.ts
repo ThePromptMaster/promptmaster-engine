@@ -63,3 +63,46 @@ test('ticking the last required box on a stage you moved past closes it, and the
   // A stage that is done is viewed, not edited: the box is shown but not live.
   await expect(box).toBeDisabled();
 });
+
+/**
+ * 1 Oct, item 1 — "If an upstream decision changes, anything downstream that
+ * may have been affected should be flagged for recheck", and a stage left
+ * open must not look like the stage the project is on.
+ */
+test('a left-open stage is named as such, and rewriting it before closing flags the stage done after it', async ({ page }) => {
+  await createProject(page, { workflow: 'Book', name: 'E2E left open recheck', objective: 'A book about okapis' });
+  await expect(page.getByText('Mock output').first()).toBeVisible();
+  await pressTransition(page);
+  await expect(page.getByRole('heading', { name: /Audience/ })).toBeVisible();
+  await pressTransition(page);
+  await expect(page.getByRole('heading', { name: /Positioning/ })).toBeVisible();
+  await expect(page.getByRole('region', { name: / artifact$/ }).getByText(/Mock /).first()).toBeVisible({ timeout: 30_000 });
+  await pressTransition(page); // "anyway": Positioning is left open
+  await expect(page.getByRole('heading', { name: /Research/ })).toBeVisible();
+  await expect(page.getByRole('region', { name: / artifact$/ }).getByText(/Mock /).first()).toBeVisible({ timeout: 30_000 });
+  await pressTransition(page); // Research is done
+  await expect(page.getByRole('heading', { name: /Outline/ })).toBeVisible();
+
+  const rail = page.getByRole('navigation', { name: 'Workflow stages' });
+  const positioningRow = rail.getByRole('button', { name: /Positioning/ });
+  const researchRow = rail.getByRole('button', { name: /Research/ });
+  await expect(positioningRow).toContainText('left open');
+  await expect(positioningRow).not.toHaveAttribute('aria-current', 'step');
+  await page.screenshot({ path: test.info().outputPath('01-left-open-is-not-you-are-here.png') });
+
+  await positioningRow.click();
+  await expect(page.getByRole('heading', { name: /Positioning/ })).toBeVisible();
+  await expect(page.locator('header').getByText('Left open', { exact: true })).toBeVisible();
+
+  // Rewrite it, then close it: Research was written against the old version.
+  const artifact = page.getByRole('region', { name: / artifact$/ });
+  await artifact.getByRole('button', { name: 'Edit' }).click();
+  await page.getByLabel(/^Edit Positioning/).fill('A different positioning altogether.');
+  await page.getByRole('button', { name: 'Save as new version' }).click();
+  await expect(artifact.getByRole('button', { name: 'Edit' })).toBeVisible();
+  await criterion(page, 'One-sentence differentiator').getByRole('checkbox').check();
+
+  await expect(positioningRow).not.toContainText('left open');
+  await expect(researchRow).toContainText('recheck');
+  await page.screenshot({ path: test.info().outputPath('02-closed-on-new-work-research-flagged.png'), fullPage: true });
+});

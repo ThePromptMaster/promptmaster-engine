@@ -421,6 +421,9 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         agent_run_id: actor === 'system' ? ctx.run.id : null,
         reason: ctx.step.rationale || undefined,
         ...(type === 'stage_marked_complete' && evidence ? { payload: { evidence_version_id: evidence } } : {}),
+        ...(type === 'stage_advanced' && ctx.bundles[ctx.stage.id]?.versions.at(-1)
+          ? { payload: { left_version_id: ctx.bundles[ctx.stage.id]!.versions.at(-1)!.id } }
+          : {}),
       });
       await ctx.afterStageEvent();
       return done(key, {

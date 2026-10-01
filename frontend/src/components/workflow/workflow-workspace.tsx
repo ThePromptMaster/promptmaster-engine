@@ -445,6 +445,11 @@ export function WorkflowWorkspace({
           reason: note,
           proposal_id: proposalId ?? null,
           ...(evidenceId ? { payload: { evidence_version_id: evidenceId } } : {}),
+          // What the stage held when it was left open, so that closing it
+          // later on something else can flag the stages after it.
+          ...(type === 'stage_advanced' && stageBundles[stage.id]?.versions.at(-1)
+            ? { payload: { left_version_id: stageBundles[stage.id]!.versions.at(-1)!.id } }
+            : {}),
         });
 
         // PM-14: finishing the project is its own event, separate from the
@@ -1256,6 +1261,8 @@ export function WorkflowWorkspace({
             position={{ index: stageIndex + 1, total: template.stages.length }}
             onPickMode={isCurrent ? (mode) => onPatchProject({ mode: mode as Project['mode'] }) : undefined}
             currentMode={project.mode}
+            leftOpen={Boolean(state.stages[stage.id]?.left_open)}
+            isCurrent={isCurrent}
           />
 
           {isCurrent && appendStageVersion && project.status !== 'finalized' && (

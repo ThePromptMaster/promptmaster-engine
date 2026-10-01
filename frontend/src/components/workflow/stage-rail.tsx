@@ -37,6 +37,9 @@ const STATUS_ICON: Record<StageStatus, string> = {
   not_started: 'radio_button_unchecked',
 };
 
+/** Open but not where the project is: left open, or reopened to edit. */
+const OPEN_ELSEWHERE_ICON = 'pending';
+
 function statusColor(status: StageStatus, isCurrent: boolean): string {
   if (isCurrent) return 'text-[var(--pm-primary)]';
   switch (status) {
@@ -86,6 +89,11 @@ export function StageRail({ template, state, nextSuggestedId, onSelect }: Props)
               const isCurrent = state.current_stage_id === stage.id;
               const isNext = !isCurrent && nextSuggestedId === stage.id;
               const skipReason = state.stages[stage.id]?.skipped_reason;
+              // A stage moved past with something required still open, or one
+              // reopened to edit, used the "You are here" glyph: two stages
+              // looked current at once (1 Oct, item 1).
+              const openElsewhere = status === 'in_progress' && !isCurrent;
+              const leftOpen = openElsewhere && Boolean(state.stages[stage.id]?.left_open);
 
               return (
                 <li key={stage.id}>
@@ -101,9 +109,9 @@ export function StageRail({ template, state, nextSuggestedId, onSelect }: Props)
                   >
                     <span
                       aria-hidden
-                      className={`material-symbols-outlined text-[18px] ${statusColor(status, isCurrent)}`}
+                      className={`material-symbols-outlined text-[18px] ${openElsewhere ? 'text-[var(--pm-tertiary)]' : statusColor(status, isCurrent)}`}
                     >
-                      {STATUS_ICON[status]}
+                      {openElsewhere ? OPEN_ELSEWHERE_ICON : STATUS_ICON[status]}
                     </span>
 
                     <span
@@ -129,12 +137,20 @@ export function StageRail({ template, state, nextSuggestedId, onSelect }: Props)
                     )}
 
                     {/* PM-13: moved past, not finished. */}
-                    {state.stages[stage.id]?.left_open && status === 'in_progress' && !isCurrent && (
+                    {leftOpen && (
                       <span
-                        title="You moved on with requirements still open — this stage is not complete"
+                        title="You moved on with something required still open — this stage is not complete"
                         className="shrink-0 text-label uppercase tracking-wide text-[var(--pm-tertiary)]"
                       >
-                        open
+                        left open
+                      </span>
+                    )}
+                    {openElsewhere && !leftOpen && (
+                      <span
+                        title="Reopened to edit — mark it complete again when you are done"
+                        className="shrink-0 text-label uppercase tracking-wide text-[var(--pm-tertiary)]"
+                      >
+                        reopened
                       </span>
                     )}
 
@@ -160,10 +176,10 @@ export function StageRail({ template, state, nextSuggestedId, onSelect }: Props)
           What the icons mean
         </summary>
         <ul className="mt-2 space-y-1.5">
-          {LEGEND.map(([status, words]) => (
-            <li key={status} className="flex items-center gap-2">
+          {LEGEND.map(([icon, words]) => (
+            <li key={icon} className="flex items-center gap-2">
               <span aria-hidden className="material-symbols-outlined text-[16px]">
-                {STATUS_ICON[status]}
+                {icon}
               </span>
               {words}
             </li>
@@ -174,12 +190,13 @@ export function StageRail({ template, state, nextSuggestedId, onSelect }: Props)
   );
 }
 
-const LEGEND: [StageStatus, string][] = [
-  ['completed_with_artifact', 'Done, with its work saved'],
-  ['complete', 'Done'],
-  ['in_progress', 'You are here'],
-  ['not_started', 'Not started yet'],
-  ['skipped', 'Skipped on purpose, with a reason'],
-  ['blocked', 'Stuck — waiting on something'],
-  ['stale', 'Recheck — something before it changed'],
+const LEGEND: [string, string][] = [
+  [STATUS_ICON.completed_with_artifact, 'Done, with its work saved'],
+  [STATUS_ICON.complete, 'Done'],
+  [STATUS_ICON.in_progress, 'You are here'],
+  [OPEN_ELSEWHERE_ICON, 'Left open or reopened — something required is still pending'],
+  [STATUS_ICON.not_started, 'Not started yet'],
+  [STATUS_ICON.skipped, 'Skipped on purpose, with a reason'],
+  [STATUS_ICON.blocked, 'Stuck — waiting on something'],
+  [STATUS_ICON.stale, 'Recheck — something before it changed'],
 ];

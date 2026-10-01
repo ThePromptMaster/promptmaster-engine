@@ -175,6 +175,21 @@ describe('StageRail', () => {
     expect(screen.getByText('recheck')).toBeInTheDocument();
   });
 
+  it('a stage left open is not drawn as the stage you are on (1 Oct, item 1)', () => {
+    const state = projectState(BOOK_V1, [
+      ev('stage_marked_complete', 'objective', { to_stage_id: 'audience' }),
+      ev('stage_marked_complete', 'audience', { to_stage_id: 'positioning' }),
+      ev('stage_advanced', 'positioning', { to_stage_id: 'research' }),
+    ]);
+    render(<StageRail template={BOOK_V1} state={state} nextSuggestedId={null} onSelect={vi.fn()} />);
+    const leftOpen = screen.getByRole('button', { name: /Positioning/ });
+    const current = screen.getByRole('button', { name: /Research/ });
+    expect(leftOpen).toHaveTextContent('left open');
+    expect(leftOpen.querySelector('.material-symbols-outlined')).toHaveTextContent('pending');
+    expect(current.querySelector('.material-symbols-outlined')).toHaveTextContent('radio_button_checked');
+    expect(current).toHaveAttribute('aria-current', 'step');
+  });
+
   it('selects a stage without moving the workflow cursor', async () => {
     const onSelect = vi.fn();
     render(
@@ -464,6 +479,28 @@ describe('the finished screen puts the work at the centre (C4, Sean 28 Sep item 
     expect(screen.getByRole('link', { name: 'Export PDF' })).toHaveAttribute('href', '/projects/p1/print');
     await userEvent.click(screen.getByRole('button', { name: 'Read the full work' }));
     expect(screen.getByText('One two three four five.')).toBeInTheDocument();
+  });
+
+  it('a research project is a research report in sections, not a book in chapters (1 Oct, item 26)', () => {
+    const drafting = deliverableStage(RESEARCH_V1)!;
+    const outline = ['Question', 'Results'].map((title, i) => ({
+      id: `s${i}`, title, abstract: '', status: 'complete', content: `Body of ${title}.`, revision: 1, finish_reason: null, error: null, generated_at: null,
+    }));
+    render(
+      <ProjectFinished
+        bundle={{
+          project: { id: 'p2', title: 'Churn', workflow: 'research', status: 'finalized' } as never,
+          template: RESEARCH_V1, state: initialState(RESEARCH_V1), events: [], evaluations: {},
+          stages: { [drafting.id]: { artifact: { id: 'a', stage_id: drafting.id, long_form: { outline } } as never, versions: [] } },
+        }}
+        completion={{ ...summary, deliverable: drafting }}
+        onReopen={vi.fn()}
+      />
+    );
+    expect(screen.getByRole('heading', { name: 'Your research report is complete' })).toBeInTheDocument();
+    expect(screen.getByText(/^2 sections · /)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Read the full research report' })).toBeInTheDocument();
+    expect(screen.queryByText(/book|chapter/i)).not.toBeInTheDocument();
   });
 
   it('with nothing written, offers only to continue', () => {

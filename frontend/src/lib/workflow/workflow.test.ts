@@ -704,3 +704,36 @@ describe('a done stage can be reopened and closed again (C5, Sean 28 Sep item 16
     expect(state.current_stage_id).toBe('positioning');
   });
 });
+
+describe('a left-open stage closed later on different work flags what came after (1 Oct, item 1)', () => {
+  const leftWith = (version?: string) => [
+    event('stage_marked_complete', 'objective', { to_stage_id: 'audience', payload: { evidence_version_id: 'obj-v1' } }),
+    event('stage_marked_complete', 'audience', { to_stage_id: 'positioning', payload: { evidence_version_id: 'aud-v1' } }),
+    event('stage_advanced', 'positioning', { to_stage_id: 'research', ...(version ? { payload: { left_version_id: version } } : {}) }),
+    event('stage_marked_complete', 'research', { to_stage_id: 'outline', payload: { evidence_version_id: 'res-v1' } }),
+  ];
+
+  it('remembers the version the stage was left with', () => {
+    const state = projectState(BOOK_V1, leftWith('pos-v1'));
+    expect(state.stages.positioning).toMatchObject({ status: 'in_progress', left_open: true, left_version_id: 'pos-v1' });
+  });
+
+  it('closing it on that same version — a box ticked, nothing rewritten — flags nothing', () => {
+    const state = projectState(BOOK_V1, [...leftWith('pos-v1'), event('stage_marked_complete', 'positioning', { payload: { evidence_version_id: 'pos-v1' } })]);
+    expect(state.stages.positioning.status).toBe('completed_with_artifact');
+    expect(state.stages.research.status).toBe('completed_with_artifact');
+  });
+
+  it('closing it on a later version marks the done stages after it for a recheck, and only those', () => {
+    const state = projectState(BOOK_V1, [...leftWith('pos-v1'), event('stage_marked_complete', 'positioning', { payload: { evidence_version_id: 'pos-v2' } })]);
+    expect(state.stages.research.status).toBe('stale');
+    expect(state.stages.audience.status).toBe('completed_with_artifact');
+    expect(state.stages.outline.status).toBe('in_progress');
+    expect(state.current_stage_id).toBe('outline');
+  });
+
+  it('a log written before the version was recorded projects as it always did', () => {
+    const state = projectState(BOOK_V1, [...leftWith(), event('stage_marked_complete', 'positioning', { payload: { evidence_version_id: 'pos-v2' } })]);
+    expect(state.stages.research.status).toBe('completed_with_artifact');
+  });
+});

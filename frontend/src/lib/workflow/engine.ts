@@ -302,7 +302,14 @@ export function projectState(
         // means the work after it was built on something else. Mark that
         // work stale (the rail's "recheck"), never delete it — derived from
         // the events alone, no timestamps.
-        const before = state.stages[event.stage_id]?.evidence_version_id;
+        // The same holds for a stage that was left open and is closed later
+        // on a different version than it was left with: the stages after it
+        // were written against the earlier one (1 Oct, item 1: "if an
+        // upstream decision changes, anything downstream that may have been
+        // affected should be flagged for recheck"). Closing it by ticking a
+        // box, on the version it was left with, flags nothing.
+        const prior = state.stages[event.stage_id];
+        const before = prior?.evidence_version_id ?? prior?.left_version_id;
         if (!event.to_stage_id && typeof evidence === 'string' && before && before !== evidence) {
           const cutoff = order.indexOf(event.stage_id);
           order.forEach((id, i) => {
@@ -325,13 +332,18 @@ export function projectState(
 
       // Moving on is not finishing (PM-13): the stage stays in progress,
       // flagged as left open, and says so on the rail.
-      case 'stage_advanced':
-        set(event.stage_id, { status: 'in_progress', left_open: true });
+      case 'stage_advanced': {
+        const left = event.payload?.left_version_id;
+        set(event.stage_id, {
+          status: 'in_progress', left_open: true,
+          ...(typeof left === 'string' ? { left_version_id: left } : {}),
+        });
         if (event.to_stage_id) {
           set(event.to_stage_id, { status: 'in_progress', entered_at: event.created_at });
           state.current_stage_id = event.to_stage_id;
         }
         break;
+      }
 
       case 'stage_blocked': {
         const kind = event.payload?.block_kind;
