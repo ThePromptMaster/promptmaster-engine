@@ -44,11 +44,10 @@ export function CritiqueFollowUp({
     suggestRef.current = suggest;
   });
 
-  // Asked once per critique: its text is what identifies it.
+  // Asked once per critique. The parent keys this component on the critique,
+  // so a new one starts from the loading state without resetting it here.
   useEffect(() => {
     const controller = new AbortController();
-    setState({ list: null, loading: true, error: null });
-    setDismissed(false);
     suggestRef.current(`${commentary.title}: what should be done about the current draft?`, commentary.text, controller.signal).then(
       (list) => !controller.signal.aborted && setState({ list, loading: false, error: null }),
       () =>

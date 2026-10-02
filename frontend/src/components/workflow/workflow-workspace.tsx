@@ -1578,6 +1578,7 @@ export function WorkflowWorkspace({
           {isCurrent && draftable && tools.commentary && (
             <div className="mb-6">
               <CritiqueFollowUp
+                key={`${tools.commentary.title}:${tools.commentary.text}`}
                 commentary={tools.commentary}
                 points={critiquePoints}
                 busy={applyFindings.running}
