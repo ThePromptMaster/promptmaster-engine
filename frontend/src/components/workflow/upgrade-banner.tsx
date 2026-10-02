@@ -18,8 +18,10 @@ interface Props {
  * "A newer version of this workflow is available" — the way out for projects
  * pinned to a version with a since-fixed dead end (A5).
  *
- * Collapsed to one line until asked; opening it says exactly what would
- * change before anything does. Nothing already written is touched: the log
+ * One line with the upgrade button on it; "What changes?" says exactly what
+ * would change before anything does. The button used to sit behind that
+ * disclosure, and a project kept its old wording and checks for weeks beside
+ * a notice nobody opened (2 Oct). Nothing already written is touched: the log
  * refers to stages by id, and stages that still exist keep everything.
  */
 export function UpgradeBanner({ name, fromVersion, toVersion, diff, busy, onUpgrade, onDismiss }: Props) {
@@ -37,9 +39,17 @@ export function UpgradeBanner({ name, fromVersion, toVersion, diff, busy, onUpgr
         <p className="mr-auto text-body text-[var(--on-surface)]">
           A newer version of the {name} workflow is available.
           <span className="ml-1 text-label text-[var(--on-surface-variant)]">
-            (You are on v{fromVersion}; v{toVersion} is current.)
+            (You are on v{fromVersion}; v{toVersion} is current.) This project keeps the older checks and wording until
+            you upgrade. Everything you have written is kept.
           </span>
         </p>
+        <button
+          onClick={onUpgrade}
+          disabled={busy}
+          className="rounded-lg bg-[var(--pm-primary)] px-4 py-1.5 text-label font-semibold text-[var(--on-primary)] disabled:opacity-50"
+        >
+          {busy ? 'Upgrading…' : `Upgrade to v${toVersion}`}
+        </button>
         <button
           onClick={() => setOpen((v) => !v)}
           className="rounded-lg px-3 py-1.5 text-label text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)] hover:text-[var(--on-surface)]"
@@ -60,13 +70,6 @@ export function UpgradeBanner({ name, fromVersion, toVersion, diff, busy, onUpgr
           <p className="mt-2 text-label text-[var(--on-surface-variant)]">
             Everything you have written, every version and every decision is kept.
           </p>
-          <button
-            onClick={onUpgrade}
-            disabled={busy}
-            className="mt-3 rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-title text-[var(--on-primary)] disabled:opacity-50"
-          >
-            {busy ? 'Upgrading…' : `Upgrade to v${toVersion}`}
-          </button>
         </div>
       )}
     </section>

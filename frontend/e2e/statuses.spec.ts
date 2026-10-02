@@ -104,6 +104,10 @@ test('a project on an old workflow version can be upgraded, keeping its work', a
 
   const banner = page.getByRole('region', { name: 'Workflow update' });
   await expect(banner).toContainText(`You are on v1; v${latest.version} is current.`);
+  // The upgrade itself is on the banner's one line, not behind the disclosure.
+  await expect(banner.getByRole('button', { name: `Upgrade to v${latest.version}` })).toBeVisible();
+  await expect(banner).toContainText('keeps the older checks and wording until you upgrade');
+  await page.screenshot({ path: test.info().outputPath('upgrade-banner.png') });
   await banner.getByRole('button', { name: 'What changes?' }).click();
   await expect(banner).toContainText('Experiment');
   await page.screenshot({ path: test.info().outputPath('04-upgrade-offer.png') });

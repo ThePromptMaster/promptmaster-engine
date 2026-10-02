@@ -178,6 +178,18 @@ export function evaluateStage(
   };
 }
 
+/**
+ * The work is done as far as PromptMaster can tell, and the only required
+ * thing open is the user's say-so. One function, so the checklist, the stage
+ * header and the rail cannot disagree about it: "complete" beside a stage
+ * that is still open read as a contradiction (1 Oct, item 7; 2 Oct, item 3).
+ */
+export function approvalPending(criteria: readonly Pick<CriterionResult, 'satisfied' | 'blocking' | 'manual'>[]): boolean {
+  const verified = criteria.filter((c) => !c.manual);
+  const yours = criteria.filter((c) => c.manual);
+  return verified.every((c) => c.satisfied || !c.blocking) && yours.some((c) => c.blocking && !c.satisfied);
+}
+
 // --- navigation -------------------------------------------------------------
 
 export function nextSuggestedStage(

@@ -26,14 +26,25 @@ interface Props {
   leftOpen?: boolean;
   /** The stage the project is on. An open stage that is not, was left open or reopened. */
   isCurrent?: boolean;
+  /**
+   * PromptMaster has verified what it can and the only required thing open is
+   * the user's approval; `hasDraft` says whether there is a draft to call complete.
+   */
+  approvalPending?: boolean;
+  hasDraft?: boolean;
 }
 
-export function StageHeader({ stage, status, skippedReason, position, onPickMode, currentMode, leftOpen, isCurrent = true }: Props) {
+export function StageHeader({ stage, status, skippedReason, position, onPickMode, currentMode, leftOpen, isCurrent = true, approvalPending = false, hasDraft = false }: Props) {
   const [showGuidance, setShowGuidance] = useState(true);
   // The header said nothing for an open stage, so the rail's "open" tag was
   // the only place a left-open stage was named (1 Oct, item 1).
   const statusLabel =
     status === 'in_progress' && !isCurrent ? (leftOpen ? 'Left open' : 'Reopened') : STATUS_LABEL[status];
+
+  // The check said "Draft completeness: complete" while the stage stayed open,
+  // and only the checklist's caption said why (2 Oct, item 3).
+  const approvalLabel =
+    approvalPending && status === 'in_progress' ? (hasDraft ? 'Draft complete · Your approval pending' : 'Your approval pending') : null;
 
   return (
     <header className="mb-8">
@@ -48,6 +59,14 @@ export function StageHeader({ stage, status, skippedReason, position, onPickMode
         {statusLabel && (
           <span className="rounded-full bg-[var(--surface-container-high)] px-2.5 py-0.5 text-label uppercase tracking-wide text-[var(--on-surface-variant)]">
             {statusLabel}
+          </span>
+        )}
+        {approvalLabel && (
+          <span
+            title="PromptMaster has verified what it can. This stage stays open until you give the approval in the checklist below."
+            className="rounded-full bg-[var(--surface-container-high)] px-2.5 py-0.5 text-label uppercase tracking-wide text-[var(--pm-tertiary)]"
+          >
+            {approvalLabel}
           </span>
         )}
         {!stage.required && status !== 'skipped' && (

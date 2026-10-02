@@ -40,6 +40,7 @@ import { ApplyPreview } from './apply-preview';
 import { useRecommendations } from './use-recommendations';
 import {
   availableTransitions,
+  approvalPending,
   evaluateStage,
   getStage,
   nextSuggestedStage,
@@ -352,6 +353,17 @@ export function WorkflowWorkspace({
     () => evaluateStage(template, stageId, context),
     [template, stageId, context]
   );
+
+  // Open stages whose only required item left is the user's approval: said in
+  // the header and on the rail, not only in the checklist (2 Oct, item 3).
+  const approvalPendingIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const s of template.stages) {
+      if (state.stages[s.id]?.status !== 'in_progress') continue;
+      if (approvalPending(evaluateStage(template, s.id, context).criteria)) ids.add(s.id);
+    }
+    return ids;
+  }, [template, state, context]);
 
   const nextSuggested = useMemo(
     () => nextSuggestedStage(template, state),
@@ -1206,6 +1218,7 @@ export function WorkflowWorkspace({
           state={state}
           nextSuggestedId={nextSuggested}
           onSelect={setViewingStageId}
+          approvalPendingIds={approvalPendingIds}
         />
       </aside>
 
@@ -1249,6 +1262,7 @@ export function WorkflowWorkspace({
               template={template}
               state={state}
               nextSuggestedId={nextSuggested}
+              approvalPendingIds={approvalPendingIds}
               onSelect={(stageId) => {
                 setViewingStageId(stageId);
                 // Picking a stage is the point of the drawer; leaving it open
@@ -1403,6 +1417,8 @@ export function WorkflowWorkspace({
             currentMode={project.mode}
             leftOpen={Boolean(state.stages[stage.id]?.left_open)}
             isCurrent={isCurrent}
+            approvalPending={approvalPendingIds.has(stage.id)}
+            hasDraft={Boolean(context.artifactNonEmpty[stage.id])}
           />
 
           {isCurrent && appendStageVersion && project.status !== 'finalized' && (

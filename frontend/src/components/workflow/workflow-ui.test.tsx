@@ -3,6 +3,8 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { StageRail } from './stage-rail';
+import { StageHeader } from './stage-header';
+import { approvalPending } from '@/lib/workflow/engine';
 import { ExitCriteriaChecklist } from './exit-criteria-checklist';
 import { StageTransitionBar } from './stage-transition-bar';
 import { CompletionDialog } from './stage-status-panels';
@@ -67,6 +69,40 @@ const ev = (
   stage_id: string,
   extra: Partial<WorkflowEvent> = {}
 ): WorkflowEvent => ({ type, stage_id, actor: 'user', created_at: '2026-09-04T00:00:00Z', ...extra });
+
+describe('approval pending reads the same everywhere (2 Oct, item 3)', () => {
+  const c = (over: Partial<CriterionResult>): CriterionResult => ({ id: 'x', label: 'x', satisfied: false, blocking: true, ...over });
+
+  it('is the case only when what PromptMaster verifies is met and a required approval is open', () => {
+    expect(approvalPending([c({ satisfied: true }), c({ manual: true })])).toBe(true);
+    // Something PromptMaster checks is still open: that is unfinished work, not an approval.
+    expect(approvalPending([c({}), c({ manual: true })])).toBe(false);
+    // An optional tick is not an approval gate.
+    expect(approvalPending([c({ satisfied: true }), c({ manual: true, blocking: false })])).toBe(false);
+    expect(approvalPending([c({ satisfied: true }), c({ manual: true, satisfied: true })])).toBe(false);
+  });
+
+  it('says so in the stage header, and calls the draft complete only when there is one', () => {
+    const stage = RESEARCH_V1.stages.find((s) => s.id === 'method')!;
+    const { rerender } = render(<StageHeader stage={stage} status="in_progress" approvalPending hasDraft />);
+    expect(screen.getByText('Draft complete · Your approval pending')).toBeInTheDocument();
+    rerender(<StageHeader stage={stage} status="in_progress" approvalPending />);
+    expect(screen.getByText('Your approval pending')).toBeInTheDocument();
+    rerender(<StageHeader stage={stage} status="in_progress" />);
+    expect(screen.queryByText(/approval pending/i)).not.toBeInTheDocument();
+    // A finished stage is not waiting for anything.
+    rerender(<StageHeader stage={stage} status="complete" approvalPending hasDraft />);
+    expect(screen.queryByText(/approval pending/i)).not.toBeInTheDocument();
+  });
+
+  it('says so on the rail for the stage the project is on', () => {
+    const state = projectState(RESEARCH_V1, []);
+    render(
+      <StageRail template={RESEARCH_V1} state={state} nextSuggestedId={null} onSelect={vi.fn()} approvalPendingIds={new Set([state.current_stage_id])} />
+    );
+    expect(screen.getByRole('button', { name: /Question/ })).toHaveTextContent('your approval');
+  });
+});
 
 describe('StageRail', () => {
   it('renders every stage of whichever template it is given', () => {
