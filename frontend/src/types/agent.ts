@@ -157,6 +157,8 @@ export interface SandboxRunResponse {
     executionLabel: ExecutionLabel;
     blockKind: BlockKind | null;
     summary: string;
+    /** For a run blocked on missing data: what was missing, as the row's reason. */
+    missing?: string;
   };
   detail: string | null;
 }

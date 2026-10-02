@@ -10,6 +10,11 @@
  * keeps `code_written`. A sandbox that could not start, or code needing a
  * library it does not have, is blocked on a missing tool, never "failed
  * quietly". The database checks the same thing again (agent_steps_label_honest).
+ *
+ * Code that ran only to say it had nothing to work on did not carry out the
+ * analysis. The code-writer is told to print `MISSING_DATA: <what>` in that
+ * case; that line, at any exit code, is blocked on missing data — never
+ * `code_executed`, which would settle the run's row as Completed.
  */
 
 import type { BlockKind, ExecutionLabel } from '@/types/agent';
@@ -33,10 +38,21 @@ export interface Classification {
   blockKind: BlockKind | null;
   /** One line for the step timeline. */
   summary: string;
+  /** For `data_missing`: what was missing, as a sentence a table row can carry as its reason. */
+  missing?: string;
 }
 
 const MISSING_MODULE = /ModuleNotFoundError: No module named '([^']+)'/;
 const MISSING_FILE = /FileNotFoundError: \[Errno 2\] No such file or directory: '([^']+)'/;
+
+const MISSING_DATA = /^[ \t]*MISSING_DATA:[ \t]*(.*)$/m;
+
+/** What the code itself said it could not run without, or null. */
+export function missingData(stdout: string, stderr = ''): string | null {
+  const said = MISSING_DATA.exec(stdout) ?? MISSING_DATA.exec(stderr);
+  if (!said) return null;
+  return said[1].trim().replace(/\s+/g, ' ').slice(0, 300) || 'the data this run needs has not been provided';
+}
 
 export function missingModule(stderr: string): string | null {
   return MISSING_MODULE.exec(stderr)?.[1] ?? null;
@@ -59,6 +75,16 @@ export function classifyRun(outcome: RunOutcome, kind: 'computation' | 'simulati
       summary: 'The code was written but did not finish within the time limit, so nothing was executed to completion.',
     };
   }
+  const data = missingData(outcome.stdout, outcome.stderr);
+  if (data) {
+    return {
+      stepStatus: 'blocked',
+      executionLabel: 'blocked',
+      blockKind: 'data_missing',
+      summary: `The analysis was not carried out. The code reported what it was missing: ${data}`,
+      missing: data,
+    };
+  }
   const mod = missingModule(outcome.stderr);
   if (outcome.exitCode !== 0 && mod) {
     return {
@@ -75,6 +101,7 @@ export function classifyRun(outcome: RunOutcome, kind: 'computation' | 'simulati
       executionLabel: 'blocked',
       blockKind: 'data_missing',
       summary: `The code needs the input file "${file}", which has not been provided.`,
+      missing: `The input file "${file}" has not been provided.`,
     };
   }
   const label: ExecutionLabel = kind === 'simulation' ? 'simulation_run' : 'code_executed';

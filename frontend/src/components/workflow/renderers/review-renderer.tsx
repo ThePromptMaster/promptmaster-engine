@@ -24,6 +24,7 @@ import { useEffect, useMemo, useState, useRef } from 'react';
 
 import { CustomSelect } from '@/components/shared/custom-select';
 import { ReasonField } from '@/components/shared/reason-field';
+import { reasonFromRow } from '@/lib/workflow/run-result';
 import {
   isTriaged,
   parseItems,
@@ -117,14 +118,28 @@ export function ReviewRenderer({
   function patch(id: string, key: string, value: string) {
     // A status or reason the user touches is theirs from then on.
     const mine = key === 'status' || key === 'reason' ? { status_source: 'user' } : {};
-    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, [key]: value, ...mine } : r)));
+    setRows((prev) => prev.map((r) => {
+      if (r.id !== id) return r;
+      const next: StageItem = { ...r, [key]: value, ...mine };
+      // The row often already says why ("no source data were provided"):
+      // offer that as the reason rather than have it typed a second time.
+      if (key === 'status' && statuses.find((s) => s.value === value)?.requiresReason && !(r.reason ?? '').trim()) {
+        const known = reasonFromRow(r, schema);
+        if (known) Object.assign(next, { reason: known, reason_source: 'row' });
+      }
+      if (key === 'reason') delete next.reason_source;
+      return next;
+    }));
   }
   // Rows whose status the draft itself set, because it already knew the
   // outcome (1 Oct, items 3 and 18). They count as resolved; the user can
   // still change any of them.
   const setByModel = rows.filter((r) => r.status_source === 'model' && isTriaged(r, schema)).length;
   // …and rows a sandbox run settled: the code ran, and what it printed is on the row.
-  const setByRun = rows.filter((r) => r.status_source === 'sandbox' && isTriaged(r, schema)).length;
+  const blockedStatus = schema.execution?.blocked;
+  const setByRun = rows.filter((r) => r.status_source === 'sandbox' && r.status !== blockedStatus && isTriaged(r, schema)).length;
+  // …and rows whose run could not be made: the run's own reason is on the row.
+  const blockedRuns = rows.filter((r) => r.status_source === 'sandbox' && r.status === blockedStatus && isTriaged(r, schema)).length;
 
   async function save() {
     if (!onSaveItems || saving) return;
@@ -209,6 +224,11 @@ export function ReviewRenderer({
             {setByRun > 0 && (
               <span className="text-label text-[var(--on-surface-variant)]">
                 · {setByRun} recorded from code that ran in the sandbox
+              </span>
+            )}
+            {blockedRuns > 0 && (
+              <span className="text-label text-[var(--on-surface-variant)]">
+                · {blockedRuns} could not be run — PromptMaster recorded why; review or change
               </span>
             )}
           </div>
@@ -350,7 +370,9 @@ function ReviewRow({ row, columns, statuses, schema, readOnly, onPatch }: Review
             <span className="mt-1 block text-label text-[var(--on-surface-variant)]">Set by PromptMaster</span>
           )}
           {row.status_source === 'sandbox' && option && (
-            <span className="mt-1 block text-label text-[var(--on-surface-variant)]">Recorded from a sandbox run</span>
+            <span className="mt-1 block text-label text-[var(--on-surface-variant)]">
+              {row.status === schema.execution?.blocked ? 'Recorded by PromptMaster: the run could not be made' : 'Recorded from a sandbox run'}
+            </span>
           )}
         </td>
       </tr>
@@ -373,6 +395,11 @@ function ReviewRow({ row, columns, statuses, schema, readOnly, onPatch }: Review
               missingMessage="This one still counts as unresolved until you say why."
               onChange={(value) => onPatch(row.id, 'reason', value)}
             />
+            {row.reason_source === 'row' && !reasonMissing && (
+              <span className="mt-1 block text-label text-[var(--on-surface-variant)]">
+                Filled in from what this row already says — edit it if that is not the reason.
+              </span>
+            )}
           </td>
         </tr>
       )}

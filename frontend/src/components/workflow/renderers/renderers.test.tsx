@@ -504,6 +504,46 @@ describe('ReviewRenderer', () => {
     expect(onSaveItems).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ id: 'i1', status: 'source_found', status_source: 'tool' })]));
   });
 
+  it('offers the reason the row already gives, so it is not typed a second time (2 Oct, item 1)', async () => {
+    const user = userEvent.setup();
+    const stage = getStage(RESEARCH_V1, 'experiment')!;
+    const runs = serializeItems([
+      { id: 'r1', run: 'Compare churn by cohort', deviation: 'Required source data were not provided, so the planned run could not be executed.' },
+      { id: 'r2', run: 'Interview five customers' },
+    ]);
+    render(<ReviewRenderer {...props(stage, { versions: [version(runs)] })} />);
+    expect(screen.getByText('2 still to resolve')).toBeInTheDocument();
+
+    await user.click(screen.getAllByRole('combobox')[0]);
+    await user.click(screen.getByRole('option', { name: 'Not run' }));
+    // Resolved at once: the reason came from the row, and says so.
+    expect(screen.getByLabelText(/Why not run\?/)).toHaveValue('Required source data were not provided, so the planned run could not be executed.');
+    expect(screen.getByText(/Filled in from what this row already says/)).toBeInTheDocument();
+    expect(screen.getByText('1 still to resolve')).toBeInTheDocument();
+
+    // A row that says nothing still asks.
+    await user.click(screen.getAllByRole('combobox')[1]);
+    await user.click(screen.getByRole('option', { name: 'Not run' }));
+    expect(screen.getByText(/still counts as unresolved/)).toBeInTheDocument();
+
+    // Once edited, the reason is the user's own.
+    await user.type(screen.getByLabelText(/Why not run\?/, { selector: '#r1-reason' }), ' Confirmed.');
+    expect(screen.queryByText(/Filled in from what this row already says/)).not.toBeInTheDocument();
+  });
+
+  it('says of a run that could not be made that PromptMaster recorded why', () => {
+    const stage = getStage(RESEARCH_V1, 'experiment')!;
+    const runs = serializeItems([
+      { id: 'r1', run: 'Compare churn by cohort', status: 'not_run', status_source: 'sandbox', reason: 'Could not be run: churn records were not provided.' },
+      { id: 'r2', run: 'Count accounts', status: 'completed', status_source: 'sandbox', observed: 'Ran in the sandbox.' },
+    ]);
+    render(<ReviewRenderer {...props(stage, { versions: [version(runs)] })} />);
+    expect(screen.getByText('all resolved')).toBeInTheDocument();
+    expect(screen.getByText(/1 could not be run — PromptMaster recorded why/)).toBeInTheDocument();
+    expect(screen.getByText(/1 recorded from code that ran in the sandbox/)).toBeInTheDocument();
+    expect(screen.getByText('Recorded by PromptMaster: the run could not be made')).toBeInTheDocument();
+  });
+
   it('reports what is still outstanding', () => {
     render(<ReviewRenderer {...props(bookStage('fact_check'), { versions: [version(rows)] })} />);
     expect(screen.getByText('2 still to resolve')).toBeInTheDocument();

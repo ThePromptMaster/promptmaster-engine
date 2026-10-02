@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { carryUserFields } from './apply-findings';
 import { figuresFromOutput, mergeFigures, withRunFigures } from './figures';
-import { applyRunResult, runObservation } from './run-result';
+import { applyRunBlocked, applyRunResult, reasonFromRow, runObservation } from './run-result';
 import { ITEM_SCHEMAS, isTriaged, type StageItem } from './stage-artifact';
 
 const runs = ITEM_SCHEMAS.runs;
@@ -60,6 +60,49 @@ describe('a sandbox run settles the row it carried out (1 Oct, item 17)', () => 
     expect(kept[0]).toMatchObject({ run: 'Count the accounts, by segment', status: 'completed', status_source: 'sandbox', sandbox_run_id: run.id });
     expect(kept[0].observed).toContain('rows: 240');
     expect(kept[1]).toMatchObject({ status: 'not_run', reason: 'We chose not to.', status_source: 'user' });
+  });
+});
+
+describe('a run that could not be made settles its row as not run, with the reason (2 Oct, item 1)', () => {
+  const blocked = { runId: run.id, reason: 'Account-level churn records were not provided.' };
+
+  it('marks an untouched row Not run with the run\'s reason, so nobody types it again', () => {
+    const result = applyRunBlocked(rows, 3, runs, blocked)!;
+    expect(result.row).toMatchObject({
+      id: 'r3', status: 'not_run', status_source: 'sandbox', sandbox_run_id: run.id,
+      reason: 'Could not be run: Account-level churn records were not provided.',
+    });
+    expect(isTriaged(result.row, runs)).toBe(true);
+    expect(result.items[0]).toBe(rows[0]);
+  });
+
+  it('replaces the draft\'s guess, but never the user\'s decision or a run that did execute', () => {
+    expect(applyRunBlocked(rows, 1, runs, blocked)!.row.status_source).toBe('sandbox');
+    expect(applyRunBlocked(rows, 2, runs, blocked)).toBeNull();
+    const executed = applyRunResult(rows, 3, runs, run)!.items;
+    expect(applyRunBlocked(executed, 3, runs, blocked)).toBeNull();
+  });
+
+  it('does nothing without a row, a reason, or a table that has a "not run"', () => {
+    expect(applyRunBlocked(rows, undefined, runs, blocked)).toBeNull();
+    expect(applyRunBlocked(rows, 9, runs, blocked)).toBeNull();
+    expect(applyRunBlocked(rows, 3, runs, { runId: null, reason: '  ' })).toBeNull();
+    expect(applyRunBlocked(rows, 3, ITEM_SCHEMAS.validation_table, blocked)).toBeNull();
+  });
+
+  it('survives the table being regenerated', () => {
+    const before = applyRunBlocked(rows, 3, runs, blocked)!.items;
+    const after = carryUserFields(before, [{ id: 'r3', run: 'Compare cohorts' }], runs);
+    expect(after[0]).toMatchObject({ status: 'not_run', status_source: 'sandbox', reason: expect.stringContaining('were not provided') });
+  });
+});
+
+describe('a reason the row already gives is not typed twice (2 Oct, item 1)', () => {
+  it('offers the row\'s own deviation, then what happened', () => {
+    expect(reasonFromRow({ id: 'a', run: 'x', deviation: ' No source data were provided. ', observed: 'Nothing ran.' }, runs)).toBe('No source data were provided.');
+    expect(reasonFromRow({ id: 'a', run: 'x', observed: 'Nothing ran.' }, runs)).toBe('Nothing ran.');
+    expect(reasonFromRow({ id: 'a', run: 'x' }, runs)).toBe('');
+    expect(reasonFromRow({ id: 'a', notes: 'text' }, ITEM_SCHEMAS.validation_table)).toBe('');
   });
 });
 

@@ -325,8 +325,11 @@ _WRITE_CODE_INSTRUCTION = (
     "paths under /data, their columns and a few sample rows. Read them with "
     "pandas, or the csv or json modules. Use only files that "
     "are listed, by the exact path shown; never invent a file, a column or a "
-    "value. If the goal needs data that is not listed, write a script that "
-    "prints exactly what is missing and exits, rather than making data up. Return "
+    "value. If the goal needs data that is not listed, do not make data up and "
+    "do not compute on placeholders: write a script that prints one line, "
+    "`MISSING_DATA: <exactly what is missing, as one plain sentence>`, and then "
+    "calls `raise SystemExit(2)`. That line is recorded as the reason the run "
+    "was not made. Return "
     "ONLY the code — no prose, no fences, and never any claimed output: the code "
     "has not been run, and you do not know what it will print."
 )

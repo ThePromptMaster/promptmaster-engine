@@ -22,7 +22,7 @@ import { defaultOutlineForm, deriveOutlineItems } from '@/lib/workflow/derived-o
 import { itemSchemaFor, parseItems, rendererHoldsItems, serializeItems } from '@/lib/workflow/stage-artifact';
 import { applyLookup, lookupQueries, lookupSummary, recordLine } from '@/lib/workflow/lookup';
 import { figuresFromOutput, readStageFigures, withRunFigures, type StageFigures } from '@/lib/workflow/figures';
-import { applyRunResult } from '@/lib/workflow/run-result';
+import { applyRunBlocked, applyRunResult } from '@/lib/workflow/run-result';
 import { applyTriage } from '@/lib/workflow/triage';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import { summariseStageContent } from '@/lib/workflow/digest';
@@ -224,6 +224,42 @@ async function recordRun(
   return { changes, notes };
 }
 
+/**
+ * A run that was blocked for want of data, onto the row it was for: the row
+ * becomes "Not run" with the reason the run gave, so the table agrees with
+ * the step and the user is not asked to type that reason again.
+ */
+async function recordBlockedRun(
+  ctx: PerformContext,
+  rowNumber: unknown,
+  blocked: { runId: string | null; reason: string }
+): Promise<{ changes: AgentStep['changes']; notes: string[] }> {
+  try {
+    const schema = itemSchemaFor(ctx.stage);
+    const rows = rendererHoldsItems(ctx.stage.renderer) ? parseItems(ctx.bundles[ctx.stage.id]?.versions.at(-1)?.content) : null;
+    const result = rows && ctx.appendStageVersion ? applyRunBlocked(rows, rowNumber, schema, blocked) : null;
+    if (!result || !ctx.appendStageVersion) return { changes: {}, notes: [] };
+    const statusLabel = schema.statuses?.find((s) => s.value === result.row.status)?.label ?? result.row.status;
+    const created = await ctx.appendStageVersion(ctx.stage.id, ctx.stage.label, {
+      content: serializeItems(result.items),
+      source_operation: 'sandbox_result',
+      instruction: ctx.step.rationale || 'Go mode tried to run the computation.',
+      model: '',
+      mode: ctx.project.mode,
+      change_summary: `Row ${rowNumber} marked ${statusLabel}: the run could not be made. ${blocked.reason}`.slice(0, 300),
+    });
+    const id = (created as { id?: unknown } | null)?.id;
+    if (typeof id !== 'string') return { changes: {}, notes: [] };
+    return {
+      changes: { version_ids: [id], items_run: [result.row.id] },
+      notes: [`Recorded on the table: row ${rowNumber} is now "${statusLabel}", with this reason. Change it if that is not right.`],
+    };
+  } catch {
+    // The step itself says what happened; what could not be added to the table is simply not claimed.
+    return { changes: {}, notes: [] };
+  }
+}
+
 const withAnswer = (instruction: string, answer?: string) =>
   answer ? `${instruction}\nThe user was asked which takes priority and answered: "${answer}". Follow that.` : instruction;
 
@@ -303,7 +339,9 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // model: on the row it carried out, and as the figures it printed.
       const recorded = ran && classification.stepStatus === 'succeeded' && run.exit_code === 0
         ? await recordRun(ctx, params.row, { id: run.id, stdout: run.stdout })
-        : { changes: {}, notes: [] };
+        : classification.blockKind === 'data_missing'
+          ? await recordBlockedRun(ctx, params.row, { runId: run.id, reason: classification.missing ?? classification.summary })
+          : { changes: {}, notes: [] };
       return done(key, {
         status: classification.stepStatus,
         blockKind: classification.blockKind,
