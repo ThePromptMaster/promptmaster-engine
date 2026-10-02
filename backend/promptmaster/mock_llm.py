@@ -266,6 +266,15 @@ def _next_action(system: str, prompt: str) -> dict:
         row = re.search(r"\[\[mock:row=(\d+)\]\]", prompt)
         if row:
             params["row"] = int(row.group(1))
+    elif choice == "request_user_decision":
+        # "[[mock:control=listed]]" names the first button the page really
+        # has; "[[mock:control=invented]]" names one it does not — so a browser
+        # test can see the first pointed to and the second dropped.
+        listed = re.search(r'^- "([^"]+)" — ', prompt, re.M)
+        if "[[mock:control=invented]]" in prompt:
+            params = {"control": "Generate the outline/results artifact"}
+        elif "[[mock:control=listed]]" in prompt and listed:
+            params = {"control": listed.group(1)}
     elif choice == "mark_blocked":
         params = {"reason": "Mock: missing data", "block_kind": "data_missing"}
     elif choice == "propose_skip":

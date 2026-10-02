@@ -76,6 +76,13 @@ class AgentFindings(BaseModel):
     sample: list[str] = Field(default_factory=list, max_length=8)
 
 
+class AgentControl(BaseModel):
+    """One button on the stage's page: its exact words, and where it is."""
+
+    label: str = Field(max_length=200)
+    where: str = Field(default="", max_length=200)
+
+
 class AgentState(BaseModel):
     """What the planner may know. Assembled by the client from the project.
 
@@ -104,6 +111,9 @@ class AgentState(BaseModel):
     data_files: list[DataFileBrief] = Field(default_factory=list, max_length=10)
     #: Tools the run can call; a move without its tool is not offered.
     tools: dict[str, bool] = Field(default_factory=dict)
+    #: The buttons on the stage's page now, by their exact words (the frontend's
+    #: `lib/workflow/stage-controls.ts`). None when the page is not known.
+    controls: list[AgentControl] | None = Field(default=None, max_length=40)
 
 
 class NextAction(BaseModel):
@@ -132,11 +142,20 @@ _NEXT_ACTION_INSTRUCTION = (
     "may be skipped (propose_skip is listed) and an expert would not do it next for "
     "this particular objective, choose propose_skip and give the reason — do not "
     "work through a stage only because it comes next.\n\n"
-    "Work that the stage's own controls do — generating or approving an outline, "
-    "drafting or revising sections, deciding on findings — is not missing data: "
-    "if it is needed and no listed move does it, choose request_user_decision "
-    "and name that button exactly (\"press Generate the outline\"). Never "
+    "Work that only the user can do on the page — approving, ticking a "
+    "requirement, deciding rows, attaching data — is not missing data. If it is "
+    "needed and no listed move does it, choose request_user_decision. Never "
     "mark_blocked for it: a blocked stage stops every later move too.\n\n"
+    "BUTTONS. The state lists the buttons that are on the user's page now, "
+    "under BUTTONS ON THIS PAGE NOW. You may name a button ONLY if it is in "
+    "that list, in exactly those words, and when you do, also put those exact "
+    "words in params.control. Never guess that a button exists, never write "
+    "\"if your interface has\", and never name a button from memory or from "
+    "another stage. If nothing in the list does what is needed, say so "
+    "plainly — \"there is no button for this on this stage\" — and then "
+    "either ask for the missing input (request_user_decision) or, when data "
+    "or a tool is what is missing, choose mark_blocked and give the exact "
+    "reason.\n\n"
     "Everything you write in rationale, expected_outcome and decision_question "
     "is shown to the user, who is not a developer. Write it in plain language "
     "about their work: say \"the draft\", \"the outline\", \"the table\", "
@@ -193,6 +212,15 @@ def _format_state(inputs: PMInput, state: AgentState) -> str:
         if data else
         "DATA THE PROJECT HOLDS: none. A computation that needs real data cannot be run; say what data is missing."
     )
+    if state.controls is None:
+        facts.append("BUTTONS ON THIS PAGE NOW: not known. Do not name any button.")
+    elif state.controls:
+        facts.append(
+            "BUTTONS ON THIS PAGE NOW (the user presses these; you cannot — name one only in these exact words):\n"
+            + "\n".join(f'- "{c.label}" — {c.where}' for c in state.controls)
+        )
+    else:
+        facts.append("BUTTONS ON THIS PAGE NOW: none. Do not name any button.")
     if state.tools:
         facts.append("TOOLS: " + ", ".join(f"{k}={'yes' if v else 'no'}" for k, v in sorted(state.tools.items())))
     return "\n".join([
@@ -240,7 +268,22 @@ def build_next_action_prompt(
     return system, user
 
 
-def parse_next_action(result: object, allowed: list[str]) -> NextAction:
+def _named_control(params: dict, controls: list[AgentControl] | None) -> dict:
+    """Keep `params.control` only when it is a button the page really has, in the
+    page's own words; anything else the planner named is dropped."""
+    if "control" not in params:
+        return params
+    named = str(params.get("control") or "").strip().lower()
+    real = next((c.label for c in (controls or []) if c.label.strip().lower() == named), None)
+    kept = {k: v for k, v in params.items() if k != "control"}
+    if real:
+        kept["control"] = real
+    else:
+        logger.warning(f"Planner named a button that is not on the page: {params.get('control')!r}")
+    return kept
+
+
+def parse_next_action(result: object, allowed: list[str], controls: list[AgentControl] | None = None) -> NextAction:
     """Validate the planner's choice. Anything outside the list becomes a question
     to the user rather than an invented action."""
     permitted = set(allowed) & ACTION_KEYS
@@ -250,7 +293,7 @@ def parse_next_action(result: object, allowed: list[str]) -> NextAction:
     if key not in permitted:
         logger.warning(f"Planner chose {key!r}, outside the allowed actions; asking the user instead")
         return _ask("I could not settle on a next step that I can carry out from here. What would you like to do next?")
-    params = result.get("params") if isinstance(result.get("params"), dict) else {}
+    params = _named_control(result.get("params") if isinstance(result.get("params"), dict) else {}, controls)
     question = result.get("decision_question")
     return NextAction(
         action_key=key,
@@ -280,7 +323,7 @@ async def choose_next_action(
     result, _usage = await client.generate_json(
         prompt=user, system=system, temperature=0.2, max_tokens=900, model=model,
     )
-    return parse_next_action(result, allowed)
+    return parse_next_action(result, allowed, state.controls)
 
 
 # --- performing a reasoning move --------------------------------------------------

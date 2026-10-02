@@ -57,6 +57,7 @@ import {
 } from '@/lib/supabase/agent';
 import { dataFileBriefs, type StageArtifactBundle } from '@/lib/workflow/digest';
 import type { StageFigures } from '@/lib/workflow/figures';
+import type { StageControl } from '@/lib/workflow/stage-controls';
 import { evaluateStage, getStage } from '@/lib/workflow/engine';
 import { inputsFrom } from '@/lib/workflow/stage-requests';
 import type { StageContext, StageDefinition, StageEvaluation, WorkflowEvent, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
@@ -99,6 +100,8 @@ interface Options {
   loadEvents?: () => Promise<readonly WorkflowEvent[]>;
   /** Re-read the project after a write the store did not make itself. */
   onRefresh?: () => unknown;
+  /** The buttons on the current stage's page now; null while another stage is on show. */
+  getControls?: () => StageControl[] | null;
 }
 
 class Stopped extends Error {}
@@ -254,7 +257,7 @@ export function useGoLoop(opts: Options) {
           template: o.template, state: o.state, stage: o.stage, bundles: o.bundles,
           stageEvaluation: evaluateStage(o.template, o.stage.id, context), latestEvaluation: o.latestEvaluation,
           steps: [...priorStepsRef.current, ...stepsRef.current],
-          context, approvedOutline: o.approvedOutline, facts, dataFiles: dataFileBriefs(o.project), tools: LIVE_TOOLS, memory,
+          context, approvedOutline: o.approvedOutline, facts, dataFiles: dataFileBriefs(o.project), tools: LIVE_TOOLS, memory, controls: o.getControls?.() ?? undefined,
         }),
         approvedByUser, deliverableDone: o.deliverableDone,
         interpret: interpret
@@ -435,7 +438,7 @@ export function useGoLoop(opts: Options) {
         const digest = buildAgentState({
           template: o.template, state: o.state, stage: o.stage, bundles: o.bundles,
           stageEvaluation, latestEvaluation: o.latestEvaluation, steps: [...priorStepsRef.current, ...stepsRef.current],
-          context, approvedOutline: o.approvedOutline, facts, dataFiles: dataFileBriefs(o.project), tools: LIVE_TOOLS, memory,
+          context, approvedOutline: o.approvedOutline, facts, dataFiles: dataFileBriefs(o.project), tools: LIVE_TOOLS, memory, controls: o.getControls?.() ?? undefined,
         });
         const choice = await api.agentNextAction(
           { inputs: inputsFrom(o.project), state: digest, allowed_actions: allowed, policy: current.policy, model: o.project.model },

@@ -5,6 +5,7 @@ import { useRef, useState } from 'react';
 import { MAX_FILE_BYTES, MAX_FILES, PICKABLE_EXTENSIONS, describePreview, isSpreadsheet, previewOf, rejectReason } from '@/lib/data/preview';
 import { spreadsheetToCsvFiles } from '@/lib/data/spreadsheet';
 import { attachProjectFile, removeProjectFile } from '@/lib/supabase/project-files';
+import { ATTACH_DATA_LABEL } from '@/lib/workflow/stage-controls';
 import type { Project, ProjectFile } from '@/types/project';
 
 /**
@@ -118,7 +119,7 @@ export function ProjectData({
               disabled={busy}
               className="rounded-lg bg-[var(--surface-container-high)] px-3 py-1.5 text-label text-[var(--on-surface)] hover:opacity-90 disabled:opacity-50"
             >
-              {busy ? 'Working…' : 'Attach a data file'}
+              {busy ? 'Working…' : ATTACH_DATA_LABEL}
             </button>
           </>
         )}

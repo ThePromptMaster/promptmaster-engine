@@ -278,6 +278,17 @@ are shown to the user, so the prompt (`promptmaster/agent.py`) names its own sec
 plain words ("MOVES AVAILABLE NOW", "WHAT THIS STAGE HOLDS NOW") and forbids "artifact",
 "action set", "model call" and action keys in what it writes. A test pins this.
 
+**Which buttons the planner may name (2026-10-02).** The planner is sent the buttons that
+are on the current stage's page (`state.controls`, built by `stageControls` in
+`lib/workflow/stage-controls.ts` from the same primary action, More menu, transitions,
+open approvals and panel labels the page draws). It may name a button only from that
+list; a `params.control` that is not in it is dropped by `parse_next_action`, and one
+that is in it is pointed to in fixed words by the performer. With no list (another stage
+is on show) it is told to name none. The stage bar's transitions under More are built by
+`transitionEntries` in the same file, and a browser test checks every listed label is on
+the page. What this does not do: read the question's free text — a button named there in
+other words is not caught.
+
 **"Succeeded" is read back.** After a step that claims a change, `readOutcomeProof`
 re-reads the project and `verifyOutcome` (`lib/agent/outcome.ts`, pure) fails the step if
 the saved version, the written sections, the evaluation or the stage move is not there.
