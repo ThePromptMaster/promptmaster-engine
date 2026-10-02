@@ -34,7 +34,7 @@ test('Book: comparables can be ticked (PM-02) and the outline counter updates li
 
   // PM-02: "At least two comparables named" was a count rule on a prose stage,
   // so nothing the user did could satisfy it. It is now a box they tick.
-  const comparables = criterion(page, 'At least two comparables named');
+  const comparables = criterion(page, 'I have named at least two comparable books');
   await comparables.getByRole('checkbox').check();
   await expect(comparables.getByRole('checkbox')).toBeChecked();
   await criterion(page, 'One-sentence differentiator').getByRole('checkbox').check();
