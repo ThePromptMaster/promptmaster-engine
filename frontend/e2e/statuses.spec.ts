@@ -41,7 +41,7 @@ test('moving on does not complete a stage; finished stages carry their evidence;
 
   // Positioning (v3): the comparables hint explains the requirement (PM-02).
   await expect(page.getByRole('heading', { name: /Positioning/ })).toBeVisible();
-  await expect(criterion(page, 'At least two comparables named')).toContainText('existing books your reader would shelve beside yours');
+  await expect(criterion(page, 'I have named at least two comparable books')).toContainText('existing books your reader would shelve beside yours');
   // Its blocking "differentiator" is unticked: moving on is "anyway", and leaves it OPEN.
   await pressTransition(page);
   await expect(page.getByRole('heading', { name: /Research/ })).toBeVisible();

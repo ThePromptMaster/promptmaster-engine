@@ -10,7 +10,9 @@ import type { WorkflowTemplate } from '../types';
  */
 export const SINGLE_OUTPUT_V1: WorkflowTemplate = {
   key: 'single_output',
-  version: 1,
+  // v2 (2026-10-02): approvals worded as what the user is certifying (2 Oct,
+  // items 2 and 13). Criterion ids are unchanged.
+  version: 2,
   name: 'Single output',
   description: 'One prompt, evaluated and refined.',
   outline_stage: 'none',
@@ -47,7 +49,7 @@ export const SINGLE_OUTPUT_V1: WorkflowTemplate = {
       renderer: 'prose',
       entry_guidance: 'Check the assembled prompt before spending a call on it. Edit anything that reads wrong.',
       exit_criteria: [
-        { id: 'review.checked', label: 'Prompt looks right', check: 'manual' },
+        { id: 'review.checked', label: 'I have read the prompt and it asks for what I want', check: 'manual' },
       ],
       expected_artifacts: [{ kind: 'prompt', cardinality: 'one', primary: true }],
       recommended_modes: [],
@@ -80,7 +82,7 @@ export const SINGLE_OUTPUT_V1: WorkflowTemplate = {
       entry_guidance:
         'Offered every time, worth taking only when the output drifted. Correct the instruction rather than the text where you can.',
       exit_criteria: [
-        { id: 'realign.applied', label: 'Correction applied', check: 'manual' },
+        { id: 'realign.applied', label: 'I am satisfied the correction was applied', check: 'manual' },
       ],
       expected_artifacts: [{ kind: 'output', cardinality: 'one', primary: true }],
       recommended_modes: [{ mode: 'clarity', reason: 'Drift usually starts in the instruction, not the output' }],
@@ -96,7 +98,7 @@ export const SINGLE_OUTPUT_V1: WorkflowTemplate = {
       renderer: 'review',
       entry_guidance: 'Confirm this is what you needed, then export it or carry the lessons into the next piece of work.',
       exit_criteria: [
-        { id: 'summary.accepted', label: 'Output accepted', check: 'manual' },
+        { id: 'summary.accepted', label: 'I accept this output as finished', check: 'manual' },
       ],
       expected_artifacts: [{ kind: 'output', cardinality: 'one', primary: true }],
       recommended_modes: [],

@@ -51,7 +51,11 @@ export const RESEARCH_V1: WorkflowTemplate = {
   // that repeat one another (item 31).
   // v5 (2026-10-01): Literature says who established each work — suggested,
   // retrieved, or verified by the user — and counts the two separately (item 12).
-  version: 6,
+  // v7 (2026-10-02): the remaining approvals are worded as what the user is
+  // certifying, in plain words (2 Oct, items 2 and 13), and Validation's
+  // guidance names the kinds of check its statuses now tell apart (item 12).
+  // Criterion ids are unchanged, so ticks already given carry over.
+  version: 7,
   name: 'Research',
   description: 'Question through validated write-up, with the analysis plan fixed before the data.',
   outline_stage: 'derived',
@@ -216,8 +220,8 @@ export const RESEARCH_V1: WorkflowTemplate = {
         'Produce the research question stated as a question, then what would count as an answer to it, then what result would count against the answer you expect. A few short paragraphs, no headings. Some possible state of the world has to be able to settle this against you: if you cannot say what finding would disappoint you, what you have written is a topic, and a topic runs for years without ever closing.',
       exit_criteria: [
         { id: 'q.stated', label: 'Question is stated', check: 'auto', rule: { type: 'field_non_empty', field: 'objective' }, blocking: true },
-        { id: 'q.answerable', label: 'Says what would count as an answer', check: 'manual' },
-        { id: 'q.falsifiable', label: 'Says what would falsify it', check: 'manual' },
+        { id: 'q.answerable', label: 'I can say what would count as an answer', check: 'manual' },
+        { id: 'q.falsifiable', label: 'I can say what would show the answer is wrong', check: 'manual' },
       ],
       expected_artifacts: [{ kind: 'research_question', cardinality: 'one', primary: true }],
       recommended_modes: [
@@ -241,7 +245,7 @@ export const RESEARCH_V1: WorkflowTemplate = {
       exit_criteria: [
         { id: 'lit.three', label: 'At least three candidate works identified', check: 'auto', rule: { type: 'min_items', n: 3 } },
         { id: 'lit.verified', label: 'At least three works retrieved or verified', check: 'auto', rule: { type: 'min_items_with_status', n: 3, statuses: ['retrieved', 'verified'] }, hint: 'Works suggested from the model\'s knowledge are candidates. Find each one, add its DOI or link, and mark it "Verified by me".' },
-        { id: 'lit.gap', label: 'I confirm the gap this work addresses is identified', check: 'manual', blocking: true },
+        { id: 'lit.gap', label: 'I agree this says what is not yet known, and that this work addresses it', check: 'manual', blocking: true },
       ],
       expected_artifacts: [{ kind: 'literature_map', cardinality: 'many', primary: true }],
       recommended_modes: [{ mode: 'analyst', reason: 'Relation to your question matters more than summary' }],
@@ -329,7 +333,7 @@ export const RESEARCH_V1: WorkflowTemplate = {
       entry_prompt_hint:
         'Take each hypothesis in turn and give it a verdict — supported, not supported, or inconclusive — naming the particular runs or measurements that decide it and what they showed. Apply the analysis plan as it was written; where you depart from it, say where and why in the same sentence rather than in a footnote. Inconclusive is a legitimate verdict and often the honest one. A verdict resting on the overall impression of the results is not a verdict, it is a preference wearing the vocabulary of one, and this is precisely the stage the analysis plan was written to bind.',
       exit_criteria: [
-        { id: 'ana.verdicts', label: 'I confirm each hypothesis has an evidence-backed verdict', check: 'manual', blocking: true },
+        { id: 'ana.verdicts', label: 'I accept the verdict given for each hypothesis as supported by the evidence shown', check: 'manual', blocking: true },
       ],
       expected_artifacts: [{ kind: 'analysis', cardinality: 'one', primary: true }],
       recommended_modes: [{ mode: 'analyst', reason: 'Holds the verdict to the evidence actually collected' }],
@@ -367,9 +371,9 @@ export const RESEARCH_V1: WorkflowTemplate = {
       required: false,
       renderer: 'review',
       entry_guidance:
-        'Each result gets a status: reproduced, not reproduced, or not attempted with a reason. Not attempted is honest; unexamined is not.',
+        'Each result gets a status that says how it was checked: independently reproduced, supported by prior evidence, a consistency check only, not reproduced, or not attempted with a reason. Not attempted is honest; unexamined is not.',
       entry_prompt_hint:
-        'Produce one row per result that matters, named in the terms the analysis used rather than restated in new words. \'result\' is the finding; \'attempt\' is what was done to reproduce or validate it — a rerun, an independent sample, a different instrument, someone else\'s data; \'notes\' records what came back, including how closely it matched. Every row needs a status. Not attempted is honest when the reason is given; reproduced is not a status you may award to a result nobody re-ran. A row that lets "we did not check" read as "it held" is the exact failure this stage exists to prevent.',
+        'Produce one row per result that matters, named in the terms the analysis used rather than restated in new words. \'result\' is the finding; \'attempt\' is what was actually done to check it, said exactly: recalculated or re-run from the data, compared with earlier studies or records, or only checked for consistency with the rest of the work; \'notes\' records what came back, including how closely it matched. The user gives every row its status. Not attempted is honest when the reason is given; a comparison with earlier work is support from prior evidence, never a reproduction, and you may not describe it as one. A row that lets "we did not check" read as "it held" is the exact failure this stage exists to prevent.',
       exit_criteria: [
         { id: 'val.status', label: 'Every result has a status', check: 'auto', rule: { type: 'every_item_has_status' }, blocking: true },
       ],
@@ -389,7 +393,7 @@ export const RESEARCH_V1: WorkflowTemplate = {
       entry_prompt_hint:
         'Produce a causal account of why the result comes out the way it does: the proposed mechanism, what in the evidence supports it, and what it predicts somewhere else that could be checked. Where the mechanism is unknown, say so outright and say what would be needed to establish it — a named unknown is a finding, and an honest one. A restatement of the result in causal-sounding language is not a mechanism: if striking the word "because" leaves the sentence saying only what the analysis already said, nothing has been explained.',
       exit_criteria: [
-        { id: 'mech.stated', label: 'A causal account, or an explicit unknown', check: 'manual' },
+        { id: 'mech.stated', label: 'I am satisfied it explains why this happens, or says plainly that the reason is not known', check: 'manual' },
       ],
       expected_artifacts: [{ kind: 'mechanism', cardinality: 'one', primary: true }],
       recommended_modes: [{ mode: 'architect', reason: 'Mechanism is structure behind the result' }],
@@ -407,7 +411,7 @@ export const RESEARCH_V1: WorkflowTemplate = {
       entry_prompt_hint:
         'Produce the scope conditions: where the finding holds, where it should be expected to fail, and which features of the setting it depends on — population, scale, instrument, time period, the particular configuration tested. State each boundary as something a reader could cross to test it. "Further work is needed to establish generality" says nothing at all; name the conditions under which you would expect the result to break, and mark which of those you have evidence for and which are a guess.',
       exit_criteria: [
-        { id: 'gen.scope', label: 'Scope conditions and limits stated', check: 'manual' },
+        { id: 'gen.scope', label: 'I am satisfied it says where the finding applies and where it does not', check: 'manual' },
       ],
       expected_artifacts: [{ kind: 'scope_conditions', cardinality: 'one', primary: true }],
       recommended_modes: [{ mode: 'critic', reason: 'Overclaiming happens here more than anywhere else' }],
@@ -463,7 +467,7 @@ export const RESEARCH_V1: WorkflowTemplate = {
       entry_prompt_hint:
         'Produce the closing account of the study. Rows should cover what the write-up now claims against the question as it was originally posed, which stages were skipped and what that leaves unverified, which alternative explanations were left open, and which results were never reproduced. \'item\' states the open point; \'where\' says where it stands. Give every row a status and state the unfinished work plainly — this is the last place an unexamined result is recorded before the work leaves, and a clean summary of a study with three open alternatives is not a summary, it is a cover.',
       exit_criteria: [
-        { id: 'final.accepted', label: 'Write-up accepted', check: 'manual' },
+        { id: 'final.accepted', label: 'I accept this write-up as finished', check: 'manual' },
       ],
       expected_artifacts: [{ kind: 'final_evaluation', cardinality: 'one', primary: true }],
       recommended_modes: [],
