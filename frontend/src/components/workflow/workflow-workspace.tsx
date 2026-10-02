@@ -194,6 +194,7 @@ export function WorkflowWorkspace({
   // A5: a newer published version of this project's workflow, if any.
   const [latestTemplate, setLatestTemplate] = useState<(WorkflowTemplate & { id: string }) | null>(null);
   const [upgradeDismissed, setUpgradeDismissed] = useState(false);
+  const [goDockHost, setGoDockHost] = useState<HTMLDivElement | null>(null);
   const [upgrading, setUpgrading] = useState(false);
   const [finishing, setFinishing] = useState<{ option: TransitionOption; note?: string } | null>(null);
   // PM-14: the deliverable scored against the objective before finishing.
@@ -1322,6 +1323,11 @@ export function WorkflowWorkspace({
 
       <main className="min-w-0 flex-1 px-6 py-10 md:px-10">
         <div className="mx-auto max-w-[820px]">
+          {/* Go's controls, pinned while its panel is scrolled away (2 Oct: "you should see
+              [the play button] all the time"). The panel fills this; it is empty otherwise. */}
+          {isCurrent && appendStageVersion && project.status !== 'finalized' && (
+            <div ref={setGoDockHost} className="sticky top-3 z-20 empty:hidden" />
+          )}
           {/* The narrow-viewport counterpart to the rail: where you are, how
               much is left, and the way to the rest of the stages. Hidden from
               md up, where the rail itself says all three. */}
@@ -1468,7 +1474,7 @@ export function WorkflowWorkspace({
           />
 
           {isCurrent && appendStageVersion && project.status !== 'finalized' && (
-            <GoPanel go={go} stageLabel={stage.label} mode={project.mode} needsActions={goNeedsActions} needContext={goNeedContext} />
+            <GoPanel go={go} stageLabel={stage.label} mode={project.mode} needsActions={goNeedsActions} needContext={goNeedContext} dockHost={goDockHost} />
           )}
           {isCurrent && project.status === 'finalized' && (
             <ProjectFinished

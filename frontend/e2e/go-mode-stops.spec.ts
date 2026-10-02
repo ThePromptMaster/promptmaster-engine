@@ -276,3 +276,37 @@ test('a stuck stage says whether anything changed; a retry is called a retry; ne
   const blocks = events.filter((e: { type: string }) => e.type === 'stage_blocked');
   expect(blocks[0].payload.inputs_at_block).toMatchObject({ files: [] });
 });
+
+/**
+ * 2 Oct — "the big thing with the play button is that you should see it all
+ * the time so you don't have to keep scrolling back and forth". While the Go
+ * panel's own controls are scrolled out of view, a copy is pinned at the top
+ * of the work column, and says when Go is waiting for the user.
+ */
+test('the Go controls stay in view while the page is scrolled, and point back when Go needs the user', async ({ page }) => {
+  await createProject(page, { workflow: 'Research', name: 'E2E go dock', objective: 'Pendulum [[mock:plan=derive,prove]]' });
+  await expect(stageArtifact(page)).toContainText('Mock', { timeout: 30_000 });
+  const panel = goPanel(page);
+  await panel.getByRole('button', { name: 'Set up Go' }).click();
+  await panel.getByRole('radio', { name: /^Guided/ }).click();
+  // Nothing is pinned while the panel's own controls are on screen.
+  await expect(page.getByRole('region', { name: 'Go controls' })).toHaveCount(0);
+
+  await page.keyboard.press('End');
+  const dock = page.getByRole('region', { name: 'Go controls' });
+  await expect(dock).toBeVisible();
+  await expect(dock).toBeInViewport();
+  await expect(dock.getByRole('button', { name: /^Go$/ })).toBeVisible();
+  await expect(dock.getByLabel('Step budget')).toHaveValue('12');
+  await page.screenshot({ path: test.info().outputPath('01-go-controls-pinned.png') });
+
+  // Go from the pinned copy; the proposal waits on the panel, and the copy says so.
+  await dock.getByRole('button', { name: /^Go$/ }).click();
+  await expect(page.getByRole('region', { name: 'Go mode needs your approval' })).toBeVisible({ timeout: 30_000 });
+  await page.keyboard.press('End');
+  await expect(dock.getByRole('button', { name: 'Go needs you — show' })).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath('02-go-needs-you-pinned.png') });
+  await dock.getByRole('button', { name: 'Go needs you — show' }).click();
+  await expect(panel.getByRole('region', { name: 'Go mode needs your approval' })).toBeInViewport();
+  await expect(page.getByRole('region', { name: 'Go controls' })).toHaveCount(0);
+});
