@@ -15,6 +15,7 @@ import { StageToolResult } from './stage-tool-result';
 import { CRITIQUE_TOOLS, REWRITE_TOOLS, useStageTools } from './use-stage-tools';
 import { nextStageAction, type ReportedPanelStep } from '@/lib/workflow/next-action';
 import { stageControls, type StageControl } from '@/lib/workflow/stage-controls';
+import { inputsChanged, stageInputs } from '@/lib/workflow/stage-inputs';
 import { isApplyable } from '@/lib/workflow/recommend';
 import { ProjectFinished } from './project-finished';
 import { ProjectFinishedBanner } from './project-finished-banner';
@@ -540,14 +541,17 @@ export function WorkflowWorkspace({
       setTransitionError(null);
       try {
         await appendEvent(block
-          ? { type: 'stage_blocked', stage_id: stage.id, reason: block.reason, payload: { block_kind: block.kind } }
+          ? {
+              type: 'stage_blocked', stage_id: stage.id, reason: block.reason,
+              payload: { block_kind: block.kind, inputs_at_block: stageInputs(project, stageBundles[stage.id]?.versions.at(-1)?.id) },
+            }
           : { type: 'stage_unblocked', stage_id: stage.id });
         setBlocking(false);
       } catch (e) {
         setTransitionError(`That didn't go through${e instanceof Error && e.message ? `: ${e.message}` : ''}. Nothing was changed.`);
       }
     },
-    [stage, appendEvent]
+    [stage, appendEvent, project, stageBundles]
   );
 
   /**
@@ -964,9 +968,26 @@ export function WorkflowWorkspace({
         // is not in front it does not move at all (production pass, 2026-10-01).
         table.scrollIntoView({ block: 'start' });
       },
+      showData: () => {
+        const panel = document.querySelector<HTMLElement>('section[aria-label="Project data"]');
+        if (!panel) return;
+        panel.querySelector<HTMLElement>('button')?.focus({ preventScroll: true });
+        panel.scrollIntoView({ block: 'center' });
+      },
     }),
     [project.id, project.user_id, project.model, project.mode, materialiseOutline, refreshEvents, setBlocked, handleToggleManual, onReload, transitions, handleTransition]
   );
+
+  // For Go's card on a stuck stage: has anything changed since it was marked
+  // stuck, and may the stage be skipped (2 Oct, item 9).
+  const currentStageDef = getStage(template, state.current_stage_id);
+  const blockedNow = state.stages[state.current_stage_id]?.blocked;
+  const goNeedContext = {
+    blockInputs: blockedNow
+      ? inputsChanged(blockedNow.inputs, stageInputs(project, stageBundles[state.current_stage_id]?.versions.at(-1)?.id))
+      : null,
+    canSkip: Boolean(currentStageDef?.transitions.allow_skip && currentStageDef.transitions.default_next),
+  };
 
   if (!stage) return null;
 
@@ -1445,7 +1466,7 @@ export function WorkflowWorkspace({
           />
 
           {isCurrent && appendStageVersion && project.status !== 'finalized' && (
-            <GoPanel go={go} stageLabel={stage.label} mode={project.mode} needsActions={goNeedsActions} />
+            <GoPanel go={go} stageLabel={stage.label} mode={project.mode} needsActions={goNeedsActions} needContext={goNeedContext} />
           )}
           {isCurrent && project.status === 'finalized' && (
             <ProjectFinished

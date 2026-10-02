@@ -218,3 +218,61 @@ test('a button Go invents is dropped, not shown to the user as if it existed', a
   const [step] = await serviceSelect('agent_steps', `project_id=eq.${id}&action_key=eq.request_user_decision&select=params`);
   expect(step.params.control).toBeUndefined();
 });
+
+/**
+ * 2 Oct, item 9 — "Continue the stage and resume currently looks like a retry,
+ * not a true continuation." The button cleared the block whatever had
+ * happened since; Go took one step and stopped for the same reason. The card
+ * now says whether anything changed and names each way forward for what it
+ * is; a retry that stops at the same place says so and costs no step.
+ */
+test('a stuck stage says whether anything changed; a retry is called a retry; new data is a real resume', async ({ page }) => {
+  const id = await createProject(page, {
+    workflow: 'Research', name: 'E2E go stuck',
+    objective: 'Why churn rose [[mock:plan=mark_blocked,mark_blocked]]',
+  });
+  await expect(stageArtifact(page)).toContainText('Mock', { timeout: 30_000 });
+  const panel = goPanel(page);
+  await panel.getByRole('button', { name: 'Set up Go' }).click();
+  await panel.getByRole('radio', { name: /^Autonomous/ }).click();
+  await panel.getByRole('button', { name: /^Go$/ }).click();
+  await page.getByRole('button', { name: 'Authorize and go' }).click();
+
+  // The card is there at once — no second press of Resume to find it — and it does not say "continue".
+  const card = page.getByRole('region', { name: 'Go mode needs you' });
+  await expect(card).toContainText('Question is marked stuck: Mock: missing data. Nothing in the project has changed since', { timeout: 30_000 });
+  await expect(card.getByRole('button', { name: 'Add the missing data' })).toBeVisible();
+  await expect(card.getByRole('button', { name: 'Try again without changes' })).toBeVisible();
+  await expect(card.getByRole('button', { name: /Continue the stage/ })).toHaveCount(0);
+  await expect(card).toContainText('Override and continue');
+  await page.screenshot({ path: test.info().outputPath('01-stuck-nothing-changed.png'), fullPage: true });
+
+  // A retry with nothing changed stops at the same place, says so, and is not counted against the window.
+  await card.getByRole('button', { name: 'Try again without changes' }).click();
+  const transparency = page.getByRole('region', { name: 'What Go mode is doing' });
+  await expect(transparency).toContainText('Nothing has changed since this stage was last marked stuck', { timeout: 30_000 });
+  await expect(panel.getByLabel('Budget used')).toContainText('1 / 12 steps');
+  await page.screenshot({ path: test.info().outputPath('02-retry-stops-at-the-same-place.png'), fullPage: true });
+
+  // "Add the missing data" goes to the Data panel; with a file attached the card says what changed.
+  await card.getByRole('button', { name: 'Add the missing data' }).click();
+  const data = page.getByRole('region', { name: 'Project data' });
+  await expect(data).toBeInViewport();
+  await data.getByLabel('Attach data files').setInputFiles({
+    name: 'accounts.csv', mimeType: 'text/csv', buffer: Buffer.from('account_id,churned\nA1,1\nA2,0\n'),
+  });
+  await expect(data).toContainText('accounts.csv');
+  await expect(card).toContainText('Question is marked stuck: Mock: missing data. Since then, a data file was added.');
+  await expect(card.getByRole('button', { name: 'Try again without changes' })).toHaveCount(0);
+  await page.screenshot({ path: test.info().outputPath('03-stuck-inputs-changed.png'), fullPage: true });
+
+  await card.getByRole('button', { name: 'Resume with what has changed' }).click();
+  await expect(transparency).toContainText(/Objective complete|objective is met|deliverable is not/, { timeout: 30_000 });
+
+  const events = await serviceSelect('workflow_events', `project_id=eq.${id}&stage_id=eq.question&select=type,payload&order=seq`);
+  expect(events.map((e: { type: string }) => e.type).filter((t: string) => t.startsWith('stage_'))).toEqual(
+    expect.arrayContaining(['stage_blocked', 'stage_unblocked', 'stage_blocked', 'stage_unblocked'])
+  );
+  const blocks = events.filter((e: { type: string }) => e.type === 'stage_blocked');
+  expect(blocks[0].payload.inputs_at_block).toMatchObject({ files: [] });
+});

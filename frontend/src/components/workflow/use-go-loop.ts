@@ -305,7 +305,8 @@ export function useGoLoop(opts: Options) {
       upsertStep(finished);
       setProgress(null);
       // Waiting for sections already queued is not a move; it costs no step.
-      if (step.action_key !== AWAIT_SECTIONS_STEP) {
+      // …and neither is a stop that only repeated one already made (2 Oct, item 9).
+      if (step.action_key !== AWAIT_SECTIONS_STEP && !outcome.free) {
         const used = (runRef.current?.steps_used ?? 0) + 1;
         await updateAgentRun(current.id, { steps_used: used, heartbeat_at: new Date().toISOString() });
         commitRun({ ...runRef.current!, steps_used: used });
