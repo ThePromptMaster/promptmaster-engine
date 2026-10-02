@@ -96,7 +96,9 @@ AGENT_ACTIONS: list[AgentAction] = [
     AgentAction(key="advance_stage", family="workflow", label="Move to the next stage",
                 when="This stage's work is done and checked.", important=True),
     AgentAction(key="mark_blocked", family="workflow", label="Mark this stage stuck",
-                when="A missing tool or missing data stops progress. Params: reason, block_kind."),
+                when="A missing tool or missing data stops progress. Params: reason (one plain sentence saying exactly what is missing), "
+                     "block_kind — exactly one of 'data_missing' (data, a file, a source or a measurement has not been provided), "
+                     "'tool_missing' (a tool or capability is not available), 'needs_decision' (only a choice by the user is missing)."),
     AgentAction(key="request_user_decision", family="workflow", label="Ask the user",
                 when="A real choice only the user can make is needed. Set decision_question."),
     AgentAction(key="declare_objective_complete", family="workflow", label="Objective complete",
