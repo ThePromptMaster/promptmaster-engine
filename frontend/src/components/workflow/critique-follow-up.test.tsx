@@ -15,7 +15,9 @@ const actions: ReplyAction[] = [
   { kind: 'revise', label: 'Add a verification plan', instruction: 'Add how each source will be verified.' },
 ];
 
-function setup(suggest = vi.fn(async () => actions)) {
+type Suggest = (question: string, reply: string, signal: AbortSignal) => Promise<ReplyAction[]>;
+
+function setup(suggest = vi.fn<Suggest>(async () => actions)) {
   const onRun = vi.fn();
   const onApplyPoints = vi.fn();
   render(<CritiqueFollowUp commentary={commentary} points={points} busy={false} suggest={suggest} onRun={onRun} onApplyPoints={onApplyPoints} />);
@@ -47,7 +49,7 @@ describe('a critique ends in a few actions, not one per point (2 Oct, item 6)', 
   });
 
   it('"Do nothing" puts the actions away; a failed request leaves the points', async () => {
-    setup(vi.fn(async () => { throw new Error('down'); }));
+    setup(vi.fn<Suggest>(async () => { throw new Error('down'); }));
     const few = await screen.findByRole('region', { name: 'Act on this critique' });
     expect(within(few).getByText('Could not work out actions for this. The points are below.')).toBeInTheDocument();
     await userEvent.click(within(few).getByRole('button', { name: 'Do nothing' }));
