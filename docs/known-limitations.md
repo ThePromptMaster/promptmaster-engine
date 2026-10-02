@@ -486,7 +486,12 @@ written sections hold text, the check left an evaluation, a stage move moved the
 cursor) and a step whose change is not found is recorded as failed. If that read-back
 itself fails, the step keeps its status with "Not confirmed" appended rather than being
 failed on a guess. What stays the user's: approving an outline, unblocking a stage,
-ticking a manual requirement, deciding on findings; Go stops and says so (the inline
+ticking a manual requirement, deciding on findings; Go stops and says so. On Research a
+reasoning move is always on offer, so the stop for a required approval is not raised before
+the planner is asked; since 2026-10-02, when the planner then answers "objective complete"
+on a stage whose only open requirement is that approval, the run asks for the approval
+with its button instead of ending on "the model thinks the work is done" (until then an
+Autonomous Research run stopped that way at the first such stage). (The inline
 "I need you to…" card is B4; a request settled row by row — findings, claims, runs — has
 "Go to the table", which only brings the rows into view, and leaves Resume in place —
 until 2026-09-29 every card hid it, and a run stopped for material findings could not

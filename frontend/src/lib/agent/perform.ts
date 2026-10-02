@@ -646,19 +646,36 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         needs: { kind: 'answer_question', question: ctx.step.decision_question || 'Which way should this go?' },
       });
 
-    case 'complete':
+    case 'complete': {
       // PM-25: the model's opinion is not enough — the deliverable has to exist.
-      return ctx.deliverableDone
-        ? done(key, {
-            status: 'succeeded', toolsUsed: [], changes: {},
-            output: 'The objective is met and the deliverable is done. Nothing needs another pass.',
-            stop: { status: 'completed', reason: 'Objective met.' },
-          })
-        : done(key, {
+      if (ctx.deliverableDone) {
+        return done(key, {
+          status: 'succeeded', toolsUsed: [], changes: {},
+          output: 'The objective is met and the deliverable is done. Nothing needs another pass.',
+          stop: { status: 'completed', reason: 'Objective met.' },
+        });
+      }
+      // What the planner usually means by it mid-project is "nothing more for
+      // me on this stage". When the stage is only waiting for the user's
+      // approval, say that, with the button: on production an Autonomous run
+      // reached Analysis, could not move past its one required approval, and
+      // "declared the objective complete" twice instead of asking for it.
+      const waiting = evaluateStage(ctx.template, ctx.stage.id, ctx.context).unmet.filter((c) => c.blocking);
+      if (waiting.length > 0 && waiting.every((c) => c.manual)) {
+        const c = waiting[0];
+        const reason = `${ctx.stage.label} has nothing left that I can do by myself. It is waiting for your approval: "${c.label}".`;
+        return done(key, {
+          status: 'succeeded', toolsUsed: [], changes: {}, output: reason,
+          stop: { status: 'awaiting_decision', reason },
+          needs: { kind: 'tick_criterion', stageId: ctx.stage.id, criterionId: c.id, label: c.label, ...(c.hint ? { hint: c.hint } : {}) },
+        });
+      }
+      return done(key, {
             status: 'succeeded', toolsUsed: [], changes: {},
             output: 'The model judged the objective met, but the deliverable is not done yet, so the run stops here for you to decide.',
             stop: { status: 'awaiting_decision', reason: 'The model thinks the work is done, but the deliverable is not. Your call.' },
           });
+    }
 
     default:
       return done(key, { status: 'failed', output: `Unknown action "${key}".`, toolsUsed: [], changes: {} });

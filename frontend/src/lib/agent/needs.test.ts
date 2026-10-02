@@ -156,6 +156,16 @@ describe('needStillHolds: a recorded stop is checked against the project (1 Oct,
     expect(needStillHolds(need, at('positioning', { stageEvaluation: evaluation('positioning', other) }))).toBe(false);
   });
 
+  it('an approval asked for while other moves were still on offer holds until it is given (production pass, 2026-10-02)', () => {
+    // On Research the reasoning moves are always available, so needsUser itself would not raise this.
+    const unmet = [{ id: 'analysis.verdicts', label: 'I confirm each hypothesis has an evidence-backed verdict', satisfied: false, blocking: true, manual: true }];
+    const need: NeedsUser = { kind: 'tick_criterion', stageId: 'positioning', criterionId: 'analysis.verdicts', label: unmet[0].label, onStage: 'positioning' };
+    const allowed = ['derive', 'prove', 'run_computation', 'evaluate_stage', 'revise_stage'];
+    expect(needsUser({ ...at('positioning', { stageEvaluation: evaluation('positioning', unmet) }), allowed })).toBeNull();
+    expect(needStillHolds(need, { ...at('positioning', { stageEvaluation: evaluation('positioning', unmet) }), allowed })).toBe(true);
+    expect(needStillHolds(need, { ...at('positioning'), allowed })).toBe(false);
+  });
+
   it('a request raised on a stage the project has left no longer holds', () => {
     const need: NeedsUser = { kind: 'answer_question', question: 'Which audience?', onStage: 'audience' };
     expect(needStillHolds(need, at('audience'))).toBe(true);

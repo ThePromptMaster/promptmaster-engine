@@ -175,10 +175,14 @@ export function needStillHolds(
       return input.state.stages[need.stageId]?.status === 'blocked';
     case 'wait_for_jobs':
       return (input.facts.manuscript?.pendingJobs.length ?? 0) > 0;
+    case 'tick_criterion':
+      // Asked for directly: the box is either still unticked or it is not.
+      // (Going back through needsUser would drop a request raised while other
+      // moves were still on offer — see the 'complete' performer.)
+      return input.stageEvaluation.unmet.some((c) => c.id === need.criterionId);
     default: {
       const now = needsUser(input);
-      if (!now || now.kind !== need.kind) return false;
-      return need.kind !== 'tick_criterion' || (now.kind === 'tick_criterion' && now.criterionId === need.criterionId);
+      return Boolean(now && now.kind === need.kind);
     }
   }
 }

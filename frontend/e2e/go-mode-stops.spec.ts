@@ -123,3 +123,42 @@ test('the planner is told what the user already decided, and an autonomous run c
   await expect(page.getByRole('region', { name: 'What Go mode is doing' })).toContainText(/Objective complete|Nothing — the objective is met/, { timeout: 30_000 });
   await page.screenshot({ path: test.info().outputPath('02-second-window-ran-on-its-own.png'), fullPage: true });
 });
+
+/**
+ * Production pass, 2026-10-02 — an Autonomous run on Research reached a stage
+ * whose one requirement was the user's approval. It may not move past that by
+ * itself, and on Research there is always some reasoning move on offer, so
+ * the "I need your approval" stop never fired: the planner "declared the
+ * objective complete" instead, twice, and the run ended on "the model thinks
+ * the work is done". It now asks for the approval, with the button.
+ */
+test('on Research, "nothing more for me here" on a stage waiting for approval becomes the approval request', async ({ page }) => {
+  test.setTimeout(120_000);
+  const id = await createProject(page, { workflow: 'Research', name: 'E2E go asks for approval', objective: 'Why pendulums slow down [[mock:plan=derive]]' });
+  await expect(stageArtifact(page)).toContainText('Mock', { timeout: 30_000 });
+  for (const heading of ['Literature context', 'Hypothesis or proposition']) {
+    await pressTransition(page);
+    await expect(page.getByRole('heading', { name: heading })).toBeVisible();
+    await expect(stageArtifact(page)).toContainText('Mock', { timeout: 30_000 });
+  }
+
+  const panel = goPanel(page);
+  await panel.getByRole('button', { name: 'Set up Go' }).click();
+  await panel.getByRole('radio', { name: /^Autonomous/ }).click();
+  await panel.getByRole('button', { name: /^Go$/ }).click();
+  await page.getByRole('button', { name: 'Authorize and go' }).click();
+
+  // One reasoning move, then the scripted planner says the objective is met.
+  const card = page.getByRole('region', { name: 'Go mode needs you' });
+  await expect(card).toContainText('I need your approval before I can continue: "I accept these hypotheses as the working set"', { timeout: 30_000 });
+  await expect(panel).toContainText('has nothing left that I can do by myself. It is waiting for your approval');
+  await expect(panel).not.toContainText('The model thinks the work is done');
+  await page.screenshot({ path: test.info().outputPath('03-research-asks-for-the-approval.png'), fullPage: true });
+  const [run] = await serviceSelect('agent_runs', `project_id=eq.${id}&select=status,needs&order=created_at.desc&limit=1`);
+  expect(run).toMatchObject({ status: 'awaiting_decision', needs: { kind: 'tick_criterion', onStage: 'hypothesis' } });
+
+  // The card's button gives the approval, as the user, and the run carries on.
+  await card.getByRole('button', { name: 'Approve and resume' }).click();
+  await expect(criterion(page, 'I accept these hypotheses as the working set').getByRole('checkbox')).toBeChecked({ timeout: 30_000 });
+  await expect(card).toHaveCount(0);
+});
