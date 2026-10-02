@@ -32,7 +32,9 @@ export function GoControl({
 }) {
   // Both numbers come from the run on show. The selector is the size of the
   // *next* window; mixing it in printed "20 / 12" for an ended run and
-  // "3 / 25" beside a selector reading 12 (1 Oct, item 21).
+  // "3 / 25" beside a selector reading 12 (1 Oct, item 21). While a window is
+  // live the selector is locked and shows that window's size: a window
+  // continued from the card keeps the old size whatever was picked since.
   const used = run?.steps_used ?? 0;
   const cap = run?.budget_steps ?? budget;
   const live = Boolean(run && !run.ended_at);
@@ -61,7 +63,7 @@ export function GoControl({
       <label className="flex items-center gap-2 text-label text-[var(--on-surface-variant)]">
         Window
         <select
-          value={budget}
+          value={live ? cap : budget}
           onChange={(e) => onBudget(Number(e.target.value))}
           disabled={running || live}
           aria-label="Step budget"

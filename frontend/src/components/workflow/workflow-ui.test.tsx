@@ -318,7 +318,7 @@ describe('StageTransitionBar', () => {
   it('never disables advancing, even with a blocking criterion unmet', () => {
     setup();
     // "Guidance is suggestive, not restrictive."
-    const advance = screen.getByRole('button', { name: 'Advance anyway' });
+    const advance = screen.getByRole('button', { name: 'Override and advance' });
     expect(advance).toBeEnabled();
   });
 
@@ -336,7 +336,7 @@ describe('StageTransitionBar', () => {
 
   it('asks why before advancing past unmet criteria, and lists them', async () => {
     const { onTransition } = setup();
-    await userEvent.click(screen.getByRole('button', { name: 'Advance anyway' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Override and advance' }));
 
     expect(onTransition).not.toHaveBeenCalled();
     // A required item is open: this is an override, and it needs its reason.

@@ -246,7 +246,8 @@ run's steps as planner history.
 
 **The window.** `budget_steps` counts performed actions (a computation counts two;
 planning, waiting and the user's answers count none). It is not a cost limit. The
-selector is restored from the run on load, and the progress count always shows the run's
+selector is restored from the run on load and when a window is continued, and while a
+window is live it shows that window's size; the progress count always shows the run's
 own numbers.
 
 **Overrides are the user's.** Moving past a stage with something required open needs a

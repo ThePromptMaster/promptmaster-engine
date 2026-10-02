@@ -200,7 +200,7 @@ export interface TransitionOption {
   kind: 'advance' | 'skip' | 'return' | 'finish';
   toStageId: string | null;
   label: string;
-  /** True when a criterion is unmet — the UI relabels to "Advance anyway". */
+  /** True when a criterion is unmet — the UI relabels to "Override and advance". */
   requiresNote: boolean;
 }
 
@@ -219,7 +219,7 @@ export function availableTransitions(
     options.push({
       kind: 'advance',
       toStageId: next,
-      label: evaluation.canAdvance ? 'Advance' : 'Advance anyway',
+      label: evaluation.canAdvance ? 'Advance' : 'Override and advance',
       requiresNote: !evaluation.canAdvance,
     });
   } else {
@@ -228,7 +228,7 @@ export function availableTransitions(
     options.push({
       kind: 'finish',
       toStageId: null,
-      label: evaluation.canAdvance ? 'Finish' : 'Finish anyway',
+      label: evaluation.canAdvance ? 'Finish' : 'Override and finish',
       requiresNote: !evaluation.canAdvance,
     });
   }

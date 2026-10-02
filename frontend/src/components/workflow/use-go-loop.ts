@@ -562,6 +562,7 @@ export function useGoLoop(opts: Options) {
       }
       priorStepsRef.current = [...priorStepsRef.current, ...stepsRef.current];
       setPolicy(prev.policy);
+      setBudget(prev.budget_steps);
       commitRun(created);
       commitSteps([]);
       followRef.current = null;

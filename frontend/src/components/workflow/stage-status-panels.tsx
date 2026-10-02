@@ -201,7 +201,7 @@ export function CompletionDialog({
           disabled={busy}
           className="rounded-lg bg-[var(--pm-primary)] px-5 py-2 text-title text-[var(--on-primary)] disabled:opacity-50"
         >
-          {summary.deliverableDone ? 'Finish project' : 'Finish anyway'}
+          {summary.deliverableDone ? 'Finish project' : 'Override and finish'}
         </button>
         <button onClick={onCancel} className="rounded-lg px-4 py-2 text-title text-[var(--on-surface-variant)]">
           Not yet
