@@ -23,6 +23,7 @@ import { itemSchemaFor, parseItems, rendererHoldsItems, serializeItems } from '@
 import { applyLookup, lookupQueries, lookupSummary, recordLine } from '@/lib/workflow/lookup';
 import { figuresFromOutput, readStageFigures, withRunFigures, type StageFigures } from '@/lib/workflow/figures';
 import { applyRunBlocked, applyRunResult } from '@/lib/workflow/run-result';
+import { inputsChanged, stageInputs } from '@/lib/workflow/stage-inputs';
 import { applyTriage } from '@/lib/workflow/triage';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import { summariseStageContent } from '@/lib/workflow/digest';
@@ -100,6 +101,8 @@ export interface StepOutcome {
   stop?: { status: 'completed' | 'awaiting_decision' | 'blocked'; reason: string };
   /** What the run needs from the user now (B4): the card with its one button. */
   needs?: NeedsUser;
+  /** The step changed nothing and repeated a stop already made: it is not counted against the window. */
+  free?: boolean;
 }
 
 const MAX_OUTPUT = 6_000;
@@ -661,18 +664,30 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       const kind = (['tool_missing', 'data_missing', 'needs_decision'] as const).find((k) => k === params.block_kind) ?? 'needs_decision';
       const reason = (typeof params.reason === 'string' && params.reason.trim()) || ctx.step.rationale || 'Go mode could not continue.';
       const actor = ctx.approvedByUser || ctx.run.policy === 'guided' ? 'user' : 'system';
+      // What the stage has to work with now goes on the record with the
+      // block, so the card can later say whether anything changed (2 Oct, item 9).
+      const inputs = stageInputs(ctx.project, ctx.bundles[ctx.stage.id]?.versions.at(-1)?.id);
+      // Marked stuck again, for the same kind of thing, with nothing changed
+      // since it was last cleared: that was a retry, not progress. It is said
+      // in those words and costs no step.
+      const last = ctx.state.stages[ctx.stage.id]?.last_block;
+      const repeat = last?.kind === kind && inputsChanged(last.inputs, inputs)?.changed === false;
       await appendWorkflowEvent(ctx.project.id, ctx.project.user_id, {
         type: 'stage_blocked',
         stage_id: ctx.stage.id,
         actor,
         agent_run_id: actor === 'system' ? ctx.run.id : null,
         reason,
-        payload: { block_kind: kind },
+        payload: { block_kind: kind, inputs_at_block: inputs },
       });
       await ctx.afterStageEvent();
+      const said = repeat ? `Nothing has changed since this stage was last marked stuck, so it stops at the same place: ${reason}` : reason;
       return done(key, {
         status: 'blocked', blockKind: kind, toolsUsed: [], changes: { event_types: ['stage_blocked'] },
-        output: `Could not continue: ${reason}`, stop: { status: 'blocked', reason },
+        output: `Could not continue: ${said}`, stop: { status: 'blocked', reason: said },
+        // The card with its options, at once: it used to take a second press of Resume to appear.
+        needs: { kind: 'unblock_stage', stageId: ctx.stage.id, reason, blockKind: kind },
+        ...(repeat ? { free: true } : {}),
       });
     }
 

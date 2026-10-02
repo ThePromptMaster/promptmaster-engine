@@ -13,6 +13,7 @@ import { isLargeJob } from '@/components/workflow/large-job-warning';
 import type { ExecutionPolicy } from '@/types/agent';
 import type { StageDefinition, StageEvaluation, WorkflowState } from '@/lib/workflow/types';
 import type { StageFacts } from './facts';
+import type { InputsChange } from '@/lib/workflow/stage-inputs';
 
 type Need =
   | { kind: 'set_objective' }
@@ -187,16 +188,63 @@ export function needStillHolds(
   }
 }
 
-/** The sentence the card shows, and the label of the one button that clears it (null: no button, just Resume). */
-export function describeNeed(need: NeedsUser, stageLabel: (id: string) => string): { message: string; action: string | null } {
+/** What the card for a stuck stage can do. Each is a different thing; none is called "continue". */
+export type StuckOption = 'resume' | 'add_data' | 'skip' | 'retry';
+
+/** What is true of the project now, for a request whose wording depends on it. */
+export interface NeedContext {
+  /** Whether the stuck stage's inputs changed since it was marked stuck; null when that was not recorded. */
+  blockInputs?: InputsChange | null;
+  /** The stuck stage may be skipped. */
+  canSkip?: boolean;
+}
+
+/**
+ * A stuck stage, described honestly (2 Oct, item 9). The one button used to
+ * read "Continue the stage and resume" and cleared the block whatever had
+ * happened since: with nothing changed, Go took a step and stopped at the
+ * same place. Now the card says whether anything changed. If it did, resuming
+ * leads. If it did not, the ways forward are named for what they are —
+ * add what is missing, skip the stage, or try again knowing nothing changed.
+ * Overriding stays on the stage's own "Override and continue".
+ */
+function describeStuck(
+  need: Extract<NeedsUser, { kind: 'unblock_stage' }>,
+  stage: string,
+  ctx: NeedContext
+): { message: string; action: string; options: { id: StuckOption; label: string }[] } {
+  const why = `${stage} is marked stuck${need.reason ? `: ${need.reason.replace(/[.\s]+$/, '')}` : ''}.`;
+  const skip = ctx.canSkip ? [{ id: 'skip' as const, label: `Skip ${stage} for now` }] : [];
+  if (ctx.blockInputs?.changed) {
+    const options = [{ id: 'resume' as const, label: 'Resume with what has changed' }, ...skip];
+    return { message: `${why} Since then, ${ctx.blockInputs.what.join(' and ')}.`, action: options[0].label, options };
+  }
+  const options = [
+    ...(need.blockKind === 'data_missing' ? [{ id: 'add_data' as const, label: 'Add the missing data' }] : []),
+    ...skip,
+    { id: 'retry' as const, label: 'Try again without changes' },
+  ];
+  const unchanged = ctx.blockInputs
+    ? ' Nothing in the project has changed since, so trying again will most likely stop at the same place.'
+    : ' I need that cleared before I can continue.';
+  return { message: `${why}${unchanged}`, action: options[0].label, options };
+}
+
+/**
+ * The sentence the card shows, and the label of the one button that clears it
+ * (null: no button, just Resume). A stuck stage has several `options`; the
+ * first is the one `action` names.
+ */
+export function describeNeed(
+  need: NeedsUser,
+  stageLabel: (id: string) => string,
+  ctx: NeedContext = {}
+): { message: string; action: string | null; options?: { id: StuckOption; label: string }[] } {
   switch (need.kind) {
     case 'set_objective':
       return { message: 'I need an objective before I can choose a move. Set one above.', action: null };
     case 'unblock_stage':
-      return {
-        message: `${stageLabel(need.stageId)} is marked stuck${need.reason ? `: ${need.reason.replace(/[.\s]+$/, '')}` : ''}. I need that cleared before I can continue.`,
-        action: 'Continue the stage and resume',
-      };
+      return describeStuck(need, stageLabel(need.stageId), ctx);
     case 'approve_outline':
       return need.unsavedDraft
         ? { message: `I need your approval of the outline on ${stageLabel(need.stageId)} before I can continue. It has edits that are not saved yet.`, action: 'Save and approve the outline' }

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 
 import { actionLabel } from '@/lib/agent/actions';
-import { describeNeed, isClearedNote, needIsDecidedOnStage } from '@/lib/agent/needs';
+import { describeNeed, isClearedNote, needIsDecidedOnStage, type NeedContext, type StuckOption } from '@/lib/agent/needs';
 import type { useGoLoop } from '../use-go-loop';
 import { AuthorizationDialog } from './authorization-dialog';
 import { DecisionPrompt, QuestionPrompt } from './decision-prompt';
@@ -27,6 +27,8 @@ export interface NeedsActions {
   skip?: (reason: string) => Promise<void>;
   /** Bring the stage's table into view, at the first row still to decide. */
   showTable?: () => void;
+  /** Bring the Data panel into view, where a file is attached. */
+  showData?: () => void;
 }
 
 export function GoPanel({
@@ -34,11 +36,14 @@ export function GoPanel({
   stageLabel,
   mode,
   needsActions,
+  needContext,
 }: {
   go: ReturnType<typeof useGoLoop>;
   stageLabel: string;
   mode: string;
   needsActions?: NeedsActions;
+  /** What is true of the project now, for a request whose wording depends on it. */
+  needContext?: NeedContext;
 }) {
   const [open, setOpen] = useState(false);
   const live = go.run && !go.run.ended_at;
@@ -65,7 +70,7 @@ export function GoPanel({
   const canContinue = Boolean(
     go.run && go.run.status === 'budget_exhausted' && go.run.policy === go.policy && go.run.budget_steps === go.budget
   );
-  const act = async () => {
+  const act = async (option?: StuckOption) => {
     if (!need) return;
     switch (need.kind) {
       case 'approve_outline':
@@ -73,6 +78,17 @@ export function GoPanel({
         await go.go();
         return;
       case 'unblock_stage':
+        // Adding data is done on the page; the card notices and offers Resume.
+        if (option === 'add_data') {
+          needsActions?.showData?.();
+          return;
+        }
+        if (option === 'skip') {
+          await needsActions?.unblock();
+          await needsActions?.skip?.(`Marked stuck and skipped for now: ${need.reason}`);
+          await go.go();
+          return;
+        }
         await needsActions?.unblock();
         await go.go();
         return;
@@ -135,9 +151,9 @@ export function GoPanel({
             disabled={go.phase === 'watching' || Boolean(go.pendingStep) || Boolean(go.authorizing)}
             // A suggestion to skip has two answers: the card's button, or Resume to do the stage.
             // A table's button only shows the way, so Resume stays beside it.
-            hideResume={Boolean(need && need.kind !== 'skip_stage' && !needIsDecidedOnStage(need) && needsActions && describeNeed(need, go.stageLabelFor).action)}
+            hideResume={Boolean(need && need.kind !== 'skip_stage' && !needIsDecidedOnStage(need) && needsActions && describeNeed(need, go.stageLabelFor, needContext).action)}
           />
-          {need && <NeedsYouCard key={`${need.kind}:${go.run?.id}`} need={need} stageLabel={go.stageLabelFor} onAction={act} />}
+          {need && <NeedsYouCard key={`${need.kind}:${go.run?.id}`} need={need} stageLabel={go.stageLabelFor} onAction={act} context={needContext} />}
           {go.phase === 'watching' && (
             <p role="status" className="text-body text-[var(--on-surface-variant)]">
               This run is being driven from another tab. It will continue here if that tab closes.

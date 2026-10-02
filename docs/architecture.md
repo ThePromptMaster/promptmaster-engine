@@ -244,6 +244,17 @@ cleared and Resume is offered. A used-up window is continued by the main button 
 policy and window size are unchanged; any new run started over a stopped one keeps that
 run's steps as planner history.
 
+**A stuck stage (2026-10-02).** A `stage_blocked` event records what the stage had to
+work with (`payload.inputs_at_block`: data file ids, the stage's head version, the brief —
+`lib/workflow/stage-inputs.ts`). Go's card compares that with the project now. Changed:
+it says what changed and leads with "Resume with what has changed". Unchanged: it says so
+and offers, by kind of block, "Add the missing data" (goes to the Data panel), "Skip
+<stage> for now" where the stage allows it, and "Try again without changes". A block
+recorded before this has no inputs, and the card claims neither. A retry that marks the
+stage stuck again for the same kind of thing with nothing changed says so and is not
+counted against the window. What "changed" does not see: an answer typed into Go's
+question, or a tool that has since become available.
+
 **The window.** `budget_steps` counts performed actions (a computation counts two;
 planning, waiting and the user's answers count none). It is not a cost limit. The
 selector is restored from the run on load and when a window is continued, and while a

@@ -391,14 +391,20 @@ export function projectState(
           blocked: {
             kind: kind === 'tool_missing' || kind === 'data_missing' ? kind : 'needs_decision',
             reason: event.reason ?? '',
+            ...(event.payload?.inputs_at_block ? { inputs: event.payload.inputs_at_block } : {}),
           },
         });
         break;
       }
 
-      case 'stage_unblocked':
-        set(event.stage_id, { status: 'in_progress', blocked: undefined });
+      case 'stage_unblocked': {
+        const was = state.stages[event.stage_id]?.blocked;
+        set(event.stage_id, {
+          status: 'in_progress', blocked: undefined,
+          ...(was ? { last_block: { kind: was.kind, ...(was.inputs ? { inputs: was.inputs } : {}) } } : {}),
+        });
         break;
+      }
 
       // C5: back to in progress, cursor unmoved, earlier evidence remembered
       // so that closing it again on new evidence can flag the work after it.

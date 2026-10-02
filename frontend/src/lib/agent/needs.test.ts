@@ -47,7 +47,34 @@ describe('needsUser: the moves that are the user\'s (B4)', () => {
     const state = projectState(BOOK_V1, events);
     const need = needsUser({ ...base, state, stage: stage('objective'), facts: {}, stageEvaluation: evaluation('objective') });
     expect(need).toEqual({ kind: 'unblock_stage', stageId: 'objective', reason: 'Waiting on the survey.', blockKind: 'data_missing' });
-    expect(describeNeed(need!, label)).toEqual({ message: 'Objective is marked stuck: Waiting on the survey. I need that cleared before I can continue.', action: 'Continue the stage and resume' });
+    // Whether anything changed since is not on record: the card does not claim either way.
+    expect(describeNeed(need!, label)).toEqual({
+      message: 'Objective is marked stuck: Waiting on the survey. I need that cleared before I can continue.',
+      action: 'Add the missing data',
+      options: [{ id: 'add_data', label: 'Add the missing data' }, { id: 'retry', label: 'Try again without changes' }],
+    });
+  });
+
+  it('a stuck stage says whether anything changed, and never calls a retry "continue" (2 Oct, item 9)', () => {
+    const need = { kind: 'unblock_stage' as const, stageId: 'objective', reason: 'The source extracts are missing.', blockKind: 'data_missing' };
+    const unchanged = describeNeed(need, label, { blockInputs: { changed: false, what: [] }, canSkip: true });
+    expect(unchanged.message).toBe(
+      'Objective is marked stuck: The source extracts are missing. Nothing in the project has changed since, so trying again will most likely stop at the same place.'
+    );
+    expect(unchanged.options).toEqual([
+      { id: 'add_data', label: 'Add the missing data' },
+      { id: 'skip', label: 'Skip Objective for now' },
+      { id: 'retry', label: 'Try again without changes' },
+    ]);
+
+    const changed = describeNeed(need, label, { blockInputs: { changed: true, what: ['a data file was added'] }, canSkip: true });
+    expect(changed.message).toBe('Objective is marked stuck: The source extracts are missing. Since then, a data file was added.');
+    expect(changed.options?.[0]).toEqual({ id: 'resume', label: 'Resume with what has changed' });
+
+    // A decision, not data: there is nothing to attach.
+    const decision = describeNeed({ ...need, blockKind: 'needs_decision' }, label, { blockInputs: { changed: false, what: [] } });
+    expect(decision.options).toEqual([{ id: 'retry', label: 'Try again without changes' }]);
+    for (const d of [unchanged, changed, decision]) expect(JSON.stringify(d)).not.toMatch(/Continue the stage/);
   });
 
   it('a stage whose only open requirements are manual boxes, with no work left, needs a tick', () => {
