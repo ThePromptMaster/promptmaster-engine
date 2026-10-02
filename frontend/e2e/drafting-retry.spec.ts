@@ -20,7 +20,7 @@ test('a chapter that fails says why, names itself, and can be retried', async ({
     objective: 'A short book about giraffes',
   });
 
-  // Planning stages. (Gates are passed with "Advance anyway" where needed; this
+  // Planning stages. (Gates are passed with "Override and continue" where needed; this
   // test is about drafting.)
   await expect(page.getByText('Mock output').first()).toBeVisible();
   await pressTransition(page);

@@ -213,8 +213,14 @@ test('The step budget ends the run', async ({ page }) => {
   await expect(card).toContainText('This window of 5 steps is used up');
   // The main button offers the same continuation, not a run that starts over.
   await expect(goPanel(page).getByRole('button', { name: /^Continue$/ })).toBeVisible();
+  // A different size picked meanwhile is for a *new* run; the card continues
+  // this one at its own size, and the selector must say so ("Window 12 steps"
+  // beside "14 / 25 steps this window").
+  await goPanel(page).getByLabel('Step budget').selectOption('12');
   await card.getByRole('button', { name: 'Continue for 5 more steps' }).click();
   await expect(page.getByRole('region', { name: 'What Go mode is doing' })).toContainText(/Objective complete|Nothing — the objective is met/, { timeout: 30_000 });
+  await expect(goPanel(page).getByLabel('Step budget')).toHaveValue('5');
+  await expect(goPanel(page).getByLabel('Budget used')).toContainText('3 / 5 steps');
   const next = await runOf(id);
   expect(next.id).not.toBe(run.id);
   expect(next).toMatchObject({ policy: 'autonomous', authorization_id: run.authorization_id });

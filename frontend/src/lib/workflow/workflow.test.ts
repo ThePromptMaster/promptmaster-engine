@@ -416,7 +416,7 @@ describe('transitions', () => {
     const state = initialState(BOOK_V1);
     const evaluation = evaluateStage(BOOK_V1, 'objective', emptyContext());
     const advance = availableTransitions(BOOK_V1, state, evaluation).find((t) => t.kind === 'advance')!;
-    expect(advance.label).toBe('Advance anyway');
+    expect(advance.label).toBe('Override and advance');
     expect(advance.requiresNote).toBe(true);
   });
 
@@ -438,7 +438,7 @@ describe('transitions', () => {
     const clear = { ...blocked, canAdvance: true };
 
     const finishWhenBlocked = availableTransitions(BOOK_V1, state, blocked).find((t) => t.kind === 'finish');
-    expect(finishWhenBlocked).toMatchObject({ label: 'Finish anyway', requiresNote: true });
+    expect(finishWhenBlocked).toMatchObject({ label: 'Override and finish', requiresNote: true });
 
     const finish = availableTransitions(BOOK_V1, state, clear).find((t) => t.kind === 'finish');
     expect(finish).toMatchObject({ label: 'Finish', requiresNote: false });
