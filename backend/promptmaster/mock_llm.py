@@ -266,6 +266,9 @@ def _next_action(system: str, prompt: str) -> dict:
         row = re.search(r"\[\[mock:row=(\d+)\]\]", prompt)
         if row:
             params["row"] = int(row.group(1))
+    elif choice == "check_literature" and "[[mock:search]]" in system + prompt:
+        # "[[mock:search]]" in the objective makes the lookup a topic search.
+        params = {"query": "Mock: customer churn"}
     elif choice == "mark_blocked":
         params = {"reason": "Mock: missing data", "block_kind": "data_missing"}
     elif choice == "propose_skip":

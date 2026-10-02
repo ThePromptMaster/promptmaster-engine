@@ -20,7 +20,7 @@ import { findInstructionConflicts } from '@/lib/workflow/conflict-trail';
 import { describeWith, type InstructionConflict } from '@/lib/workflow/instruction-conflicts';
 import { defaultOutlineForm, deriveOutlineItems } from '@/lib/workflow/derived-outline';
 import { itemSchemaFor, parseItems, rendererHoldsItems, serializeItems } from '@/lib/workflow/stage-artifact';
-import { applyLookup, lookupQueries, lookupSummary, recordLine } from '@/lib/workflow/lookup';
+import { applyLookup, lookupQueries, lookupSummary, recordLine, rowsFromSearch } from '@/lib/workflow/lookup';
 import { figuresFromOutput, readStageFigures, withRunFigures, type StageFigures } from '@/lib/workflow/figures';
 import { applyRunBlocked, applyRunResult } from '@/lib/workflow/run-result';
 import { applyTriage } from '@/lib/workflow/triage';
@@ -260,6 +260,63 @@ async function recordBlockedRun(
   }
 }
 
+const SEARCH_RESULTS = 8;
+/** LiteratureSearchRequest.query's cap in routers/agent.py. */
+const MAX_QUERY = 300;
+
+/**
+ * Search the index by topic and, on the stage whose rows are works, add what
+ * it found as rows the tool retrieved. From any other stage the records are
+ * reported and nothing is saved. What each work says is not claimed anywhere:
+ * the search read an index, not the works.
+ */
+async function searchLiterature(ctx: PerformContext, key: string, wanted: string): Promise<StepOutcome> {
+  const query = wanted.replace(/\[\[[^\]]*\]\]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, MAX_QUERY);
+  if (!query) return done(key, { status: 'failed', toolsUsed: [], changes: {}, output: 'There was nothing to search for: no search words were given and the project has no objective.' });
+  const { works, reached } = await api.agentLiteratureSearch(query, SEARCH_RESULTS, ctx.signal);
+  const params = { ...(ctx.step.params ?? {}), query };
+  if (!reached) {
+    return done(key, { status: 'failed', toolsUsed: [], changes: {}, params, output: `OpenAlex could not be reached, so nothing was looked up for "${query}". Try again.` });
+  }
+  if (!works.length) {
+    return done(key, { status: 'succeeded', toolsUsed: ['search'], changes: {}, params, output: `OpenAlex returned no records for "${query}". Nothing was added.` });
+  }
+  const schema = itemSchemaFor(ctx.stage);
+  const holds = Boolean(schema.lookup?.search) && rendererHoldsItems(ctx.stage.renderer);
+  const rows = holds ? parseItems(ctx.bundles[ctx.stage.id]?.versions.at(-1)?.content) ?? [] : [];
+  const added = holds ? rowsFromSearch(works, rows, schema) : [];
+  const plural = (n: number) => `${n} work${n === 1 ? '' : 's'}`;
+  let versionIds: string[] = [];
+  if (added.length && ctx.appendStageVersion) {
+    const created = await ctx.appendStageVersion(ctx.stage.id, ctx.stage.label, {
+      content: serializeItems([...rows, ...added]),
+      source_operation: 'literature_search',
+      instruction: ctx.step.rationale || 'Go mode searched for works.',
+      model: '',
+      mode: ctx.project.mode,
+      change_summary: `Found in OpenAlex for "${query}": ${plural(added.length)} added.`.slice(0, 300),
+    });
+    const id = (created as { id?: unknown } | null)?.id;
+    if (typeof id === 'string') versionIds = [id];
+  }
+  const saved = versionIds.length > 0;
+  const lines = [
+    `Searched OpenAlex for "${query}": ${plural(works.length)} returned.`,
+    ...works.map((m) => `- ${recordLine(m)}${m.doi ? ` — ${m.doi}` : ''}`),
+    saved
+      ? `${plural(added.length)} added to this stage as "${schema.statuses?.find((s) => s.value === schema.lookup!.status)?.label ?? 'Retrieved'}", each with its DOI or link${added.length < works.length ? '; the rest were already listed or there was no room' : ''}.`
+      : holds
+        ? 'Nothing was added: these are already listed, or the list is full.'
+        : 'Nothing was saved: this stage does not hold a list of works.',
+    'These are the records the search returned. Nobody has read them: say what each established and how it bears on your question, and remove any that do not belong.',
+  ];
+  return done(key, {
+    status: 'succeeded', toolsUsed: ['search'], params,
+    changes: saved ? { version_ids: versionIds } : {},
+    output: clip(lines.join('\n')),
+  });
+}
+
 const withAnswer = (instruction: string, answer?: string) =>
   answer ? `${instruction}\nThe user was asked which takes priority and answered: "${answer}". Follow that.` : instruction;
 
@@ -360,9 +417,11 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // rows can be looked up. On that stage the result is saved; from any
       // other stage it is reported, and that stage is left as it is.
       const holder = ctx.template.stages.find((s) => itemSchemaFor(s).lookup && parseItems(ctx.bundles[s.id]?.versions.at(-1)?.content)?.length);
-      if (!holder) {
-        return done(key, { status: 'failed', toolsUsed: [], changes: {}, output: 'There is no list of works to look up yet.' });
-      }
+      // No works are named yet, or the planner asked for more than the list
+      // has: the index is searched by topic instead (2 Oct). This used to end
+      // "There is no list of works to look up yet."
+      const asked = typeof params.query === 'string' ? params.query.trim() : '';
+      if (asked || !holder) return searchLiterature(ctx, key, asked || inputs.objective);
       const schema = itemSchemaFor(holder);
       const rows = parseItems(ctx.bundles[holder.id]!.versions.at(-1)!.content)!;
       const works = lookupQueries(rows, schema);

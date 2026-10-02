@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { applyLookup, lookupQueries, lookupSummary, type WorkMatch } from './lookup';
+import { applyLookup, lookupQueries, lookupSummary, rowsFromSearch, type WorkMatch } from './lookup';
 import { ITEM_SCHEMAS } from './stage-artifact';
 
 const lit = ITEM_SCHEMAS.literature_map;
@@ -95,5 +95,42 @@ describe('what is worth searching for (production pass, 2026-10-01)', () => {
     expect(text).toContain('0 of 16 sources found in OpenAlex.');
     expect(text).toContain('16 not found. The index holds published research; a guide, a website or the author\'s own data will not be in it');
     expect(text).not.toContain('may be misremembered, or not exist');
+  });
+});
+
+describe('rowsFromSearch (2 Oct: no works are listed yet)', () => {
+  const found = [
+    match('W1', { title: 'Retention Futility: Targeting High-Risk Customers Might be Ineffective' }),
+    match('W2', { title: 'Customer switching behavior in service industries', authors: 'Susan Keaveney', year: 1995, doi: 'https://doi.org/10.2307/1252074' }),
+  ];
+
+  it('a returned record becomes a Retrieved row naming the work, with its DOI, and claims nothing about what it says', () => {
+    const [row] = rowsFromSearch(found, [], lit);
+    expect(row).toMatchObject({
+      work: 'Eva Ascarza (2018). Retention Futility: Targeting High-Risk Customers Might be Ineffective',
+      link: 'https://doi.org/10.1509/jmr.16.0163',
+      record: 'Retention Futility: Targeting High-Risk Customers Might be Ineffective — Eva Ascarza (2018)',
+      status: 'retrieved', status_source: 'tool', finding: '', relation: '',
+    });
+    expect(row.id).toBeTruthy();
+  });
+
+  it('does not add a work already on the list, by DOI or by title', () => {
+    const existing = [
+      { id: 'a', work: 'Ascarza (2018), "Retention Futility: Targeting High-Risk Customers Might Be Ineffective"', status: 'candidate' },
+      { id: 'b', work: 'Keaveney', link: 'https://doi.org/10.2307/1252074', status: 'verified', status_source: 'user' },
+    ];
+    expect(rowsFromSearch(found, existing, lit)).toEqual([]);
+    expect(rowsFromSearch([found[0], found[0]], [], lit)).toHaveLength(1);
+  });
+
+  it('never grows the list past what the stage holds', () => {
+    const full = Array.from({ length: lit.maxItems - 1 }, (_, n) => ({ id: `r${n}`, work: `Some other work number ${n}` }));
+    expect(rowsFromSearch(found, full, lit)).toHaveLength(1);
+  });
+
+  it('adds nothing to a table whose rows are not works', () => {
+    expect(rowsFromSearch(found, [], ITEM_SCHEMAS.claim_table)).toEqual([]);
+    expect(rowsFromSearch(found, [], ITEM_SCHEMAS.hypotheses)).toEqual([]);
   });
 });

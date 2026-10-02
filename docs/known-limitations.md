@@ -482,7 +482,8 @@ deciding; Guided always asks. Fact-check, runs, alternatives and validation tabl
 outcome tables and are never decided by Go; `check_literature` was not offered between
 2026-09-28 and 2026-10-01 (no tool was connected) and now looks the project's named works
 up in OpenAlex (see L-C6) — on the Literature stage it saves the result, from any other
-stage it only reports it;
+stage it only reports it; since 2026-10-02, given search words or no list of works, it
+searches OpenAlex by topic instead (L-C6);
 since 2026-10-01 `generate_outline` is offered on whichever stage holds the outline —
 Book's Outline stage, or the drafting stage of a workflow whose outline is derived
 (Research), where it is built from the stages already done with no model call; before
@@ -536,6 +537,21 @@ field the model is never asked to fill. The "retrieved or verified" item is *opt
 making it required would stop every Research project at stage two until a retrieval tool
 exists. Applies to Research v5; projects on earlier versions keep the old stage until
 upgraded.
+
+**Topic search (2026-10-02).** Go's `check_literature` can also *find* works: given search
+words by the planner (`query`), or when no works are listed yet (the project's objective
+is then the query), it searches OpenAlex (`POST /api/agent/literature-search`) and, on
+the Literature stage, adds up to 8 returned records as new **Retrieved by PromptMaster**
+rows with their DOI. The limits: it is a keyword search of one index, in the index's own
+relevance order — not a systematic review, and not a judgement that a work is relevant or
+good; "what it established" and "how it bears on this question" are left **empty**,
+because no abstract or full text is read; a record already listed (same DOI or title) is
+not added again and the list never exceeds 15; from any other stage the records are
+reported and nothing is saved; there is no button for it — only Go searches. Reading a
+source, open web search and paywalled full text are not built. A model revision of
+the stage ("Revise this stage", or applying a check's fixes) rewrites the rows, and rows
+it rewrites go back to **Suggested by PromptMaster** — the same as for looked-up rows —
+so fill in the empty fields by hand or through the chat's row changes, which keep them.
 
 ### L-C7 — Statuses the model may set (2026-10-01)
 

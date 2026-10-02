@@ -136,3 +136,51 @@ test('candidate works are looked up: found ones become Retrieved with a DOI, by 
     .toMatchObject({ status: 'succeeded', execution_label: 'discussed', tools_used: ['search'] });
   await page.screenshot({ path: test.info().outputPath('02-go-looked-the-works-up.png'), fullPage: true });
 });
+
+/**
+ * 2 Oct — Go chose "Check literature" on a stage with no works to check and
+ * stopped. It now searches OpenAlex by topic and adds the records it finds as
+ * rows the tool retrieved, with nothing said about what they establish.
+ */
+test('Go searches for works by topic and adds what it finds as Retrieved rows', async ({ page }) => {
+  test.setTimeout(120_000);
+  const id = await createProject(page, {
+    workflow: 'Research', name: 'E2E literature search', objective: 'Why customers churn [[mock:plan=check_literature]] [[mock:search]]',
+  });
+  await expect(stageArtifact(page)).toContainText('Mock', { timeout: 30_000 });
+  await pressTransition(page);
+  await expect(page.getByRole('heading', { name: 'Literature context' })).toBeVisible();
+  const artifact = stageArtifact(page);
+  await expect(artifact).toContainText('Mock work 1', { timeout: 30_000 });
+  await expect(criterion(page, 'At least three works retrieved or verified')).toContainText('0 of 3');
+
+  const panel = page.getByRole('region', { name: 'Go mode', exact: true });
+  await panel.getByRole('button', { name: 'Set up Go' }).click();
+  await panel.getByRole('radio', { name: /^Guided/ }).click();
+  await panel.getByRole('button', { name: /^Go$/ }).click();
+  const prompt = page.getByRole('region', { name: 'Go mode needs your approval' });
+  await expect(prompt).toContainText('Check literature', { timeout: 30_000 });
+  await prompt.getByRole('button', { name: 'Approve' }).click();
+
+  await expect(panel).toContainText('Searched OpenAlex for "Mock: customer churn": 3 works returned.', { timeout: 30_000 });
+  await expect(panel).toContainText('3 works added to this stage as "Retrieved by PromptMaster"');
+  await expect(panel).toContainText('Nobody has read them');
+  await expect(artifact).toContainText('Mock found work 1 on the topic', { timeout: 15_000 });
+  // Three retrieved works meet the criterion, so it no longer shows a count.
+  await expect(criterion(page, 'At least three works retrieved or verified')).toContainText('check_circle');
+  await expect(criterion(page, 'At least three works retrieved or verified')).not.toContainText(' of ');
+  await page.screenshot({ path: test.info().outputPath('01-go-searched-and-added-works.png'), fullPage: true });
+
+  const [run] = await serviceSelect('agent_runs', `project_id=eq.${id}&select=id&order=created_at.desc&limit=1`);
+  await expect
+    .poll(async () => (await serviceSelect('agent_steps', `run_id=eq.${run.id}&action_key=eq.check_literature&select=status,execution_label,tools_used`))[0], { timeout: 15_000 })
+    .toMatchObject({ status: 'succeeded', execution_label: 'discussed', tools_used: ['search'] });
+  const [saved] = await serviceSelect('artifact_versions', `project_id=eq.${id}&source_operation=eq.literature_search&select=content,change_summary`);
+  expect(saved.change_summary).toBe('Found in OpenAlex for "Mock: customer churn": 3 works added.');
+  const items = JSON.parse(saved.content).items;
+  expect(items).toHaveLength(6);
+  expect(items[3]).toMatchObject({
+    work: 'Mock, A. (2021). Mock found work 1 on the topic', link: 'https://doi.org/10.0000/mock.found.1',
+    status: 'retrieved', status_source: 'tool', finding: '', relation: '',
+  });
+});
