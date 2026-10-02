@@ -544,6 +544,30 @@ describe('ReviewRenderer', () => {
     expect(screen.getByText('Recorded by PromptMaster: the run could not be made')).toBeInTheDocument();
   });
 
+  it('Validation offers what was actually done, in plain words, and keeps an older "Reproduced" readable (2 Oct, items 12 and 13)', async () => {
+    const user = userEvent.setup();
+    const stage = getStage(RESEARCH_V1, 'validation')!;
+    const table = serializeItems([
+      { id: 'v1', result: 'Churn is concentrated in recent cohorts', attempt: 'Compared with earlier-cited studies; not recalculated.' },
+      { id: 'v2', result: 'Tickets are 40% higher', status: 'reproduced' },
+    ]);
+    render(<ReviewRenderer {...props(stage, { versions: [version(table)] })} />);
+    expect(screen.getByText(/do you accept it as sufficiently supported to move forward\?/)).toBeInTheDocument();
+    // The older row keeps its status, relabelled, and still counts as resolved.
+    expect(screen.getAllByRole('combobox')[1]).toHaveTextContent('Reproduced — kind not recorded');
+    expect(screen.getByText('1 still to resolve')).toBeInTheDocument();
+
+    await user.click(screen.getAllByRole('combobox')[0]);
+    const offered = screen.getAllByRole('option').map((o) => o.textContent);
+    expect(offered).toEqual(['Independently reproduced', 'Supported by prior evidence', 'Consistency check only', 'Not reproduced', 'Not attempted']);
+    await user.click(screen.getByRole('option', { name: 'Supported by prior evidence' }));
+    expect(screen.getByText('all resolved')).toBeInTheDocument();
+
+    const legend = screen.getByLabelText('What the statuses mean');
+    expect(within(legend).getByText('It agrees with earlier studies or records. Nothing was recalculated.')).toBeInTheDocument();
+    expect(within(legend).getByText(/Only you can say this — PromptMaster never sets it\./)).toBeInTheDocument();
+  });
+
   it('reports what is still outstanding', () => {
     render(<ReviewRenderer {...props(bookStage('fact_check'), { versions: [version(rows)] })} />);
     expect(screen.getByText('2 still to resolve')).toBeInTheDocument();

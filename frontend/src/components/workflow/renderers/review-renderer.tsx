@@ -257,6 +257,12 @@ export function ReviewRenderer({
             </p>
           )}
 
+          {schema.decisionQuestion && !readOnly && (
+            <p data-decision-question className="mb-3 max-w-[70ch] text-body text-[var(--on-surface)]">
+              {schema.decisionQuestion}
+            </p>
+          )}
+
           {/* The table scrolls inside its own container: at five columns it is
               wider than the 820px content well on a laptop, and a horizontally
               scrolling page is worse than a horizontally scrolling table. */}
@@ -302,7 +308,7 @@ export function ReviewRenderer({
           </div>
           {statuses.some((s) => s.explain) && (
             <dl aria-label="What the statuses mean" className="mt-3 grid gap-x-4 gap-y-1 text-label sm:grid-cols-[max-content_1fr]">
-              {statuses.filter((s) => s.explain).map((s) => (
+              {statuses.filter((s) => s.explain && (!s.legacy || rows.some((r) => r.status === s.value))).map((s) => (
                 <div key={s.value} className="contents">
                   <dt className={TONE_CLASS[s.tone]}>{s.label}</dt>
                   <dd className="text-[var(--on-surface-variant)]">{s.explain}</dd>
@@ -361,7 +367,7 @@ function ReviewRow({ row, columns, statuses, schema, readOnly, onPatch }: Review
           ) : (
             <CustomSelect
               value={row.status ?? ''}
-              options={statuses.filter((s) => s.settable !== false || s.value === row.status).map((s) => ({ value: s.value, label: s.label }))}
+              options={statuses.filter((s) => (s.settable !== false && !s.legacy) || s.value === row.status).map((s) => ({ value: s.value, label: s.label }))}
               placeholder="Not looked at"
               onChange={(value) => onPatch(row.id, 'status', value)}
             />

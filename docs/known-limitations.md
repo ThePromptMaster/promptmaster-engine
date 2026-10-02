@@ -545,8 +545,23 @@ Today that is one value: a run may arrive as **Not run** with its reason, marked
 PromptMaster", when the draft already knows it could not be executed. **Completed** and
 **Deviated** are never the model's to set — they record what a person or a tool did
 (a sandbox run that executed sets **Completed** on the row it carried out; see L-B3).
-Alternatives and validation tables allow none. Rows in versions saved before this change
+Alternatives tables allow none. Rows in versions saved before this change
 are untouched.
+
+**Validation statuses (2026-10-02).** A validation row is now one of *Independently
+reproduced*, *Supported by prior evidence*, *Consistency check only*, *Not reproduced* or
+*Not attempted*, each with a one-line meaning under the table. *Independently reproduced*
+is the user's alone to choose: the model, Go's triage and a change proposed from the chat
+are never offered it (`requiresExecution`; `proposableStatuses` in
+`lib/workflow/stage-artifact.ts`). The draft may set *Not attempted* with its reason. A
+row saved earlier as `reproduced` keeps that value, counts as resolved, and reads
+"Reproduced — kind not recorded" until the user reclassifies it; it is not converted,
+because nothing on record says which kind it was. Nothing checks that the status a user
+picks matches what the row's text says was done, and a sandbox run cannot set a
+validation status. There is no separate "outcome" (supported / mixed / contradicted)
+column yet. The statuses live in code, so they apply to every pinned workflow version;
+the Validation stage's own guidance text still says "reproduced" until the next Research
+template version.
 
 ### L-C9 — Research write-up: two forms, chosen at the outline (2026-10-01)
 

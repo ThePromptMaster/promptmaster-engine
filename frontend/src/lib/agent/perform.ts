@@ -19,7 +19,7 @@ import { appliedFindingsVersion, findingsInstruction, reviseWithFindings } from 
 import { findInstructionConflicts } from '@/lib/workflow/conflict-trail';
 import { describeWith, type InstructionConflict } from '@/lib/workflow/instruction-conflicts';
 import { defaultOutlineForm, deriveOutlineItems } from '@/lib/workflow/derived-outline';
-import { itemSchemaFor, parseItems, rendererHoldsItems, serializeItems } from '@/lib/workflow/stage-artifact';
+import { itemSchemaFor, parseItems, proposableStatuses, rendererHoldsItems, serializeItems } from '@/lib/workflow/stage-artifact';
 import { applyLookup, lookupQueries, lookupSummary, recordLine } from '@/lib/workflow/lookup';
 import { figuresFromOutput, readStageFigures, withRunFigures, type StageFigures } from '@/lib/workflow/figures';
 import { applyRunBlocked, applyRunResult } from '@/lib/workflow/run-result';
@@ -544,7 +544,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         {
           inputs, state: ctx.digest,
           items: r.routine.map((i) => Object.fromEntries(Object.entries(i).filter(([k, v]) => k !== 'status' && k !== 'reason' && typeof v === 'string')) as Record<string, string>),
-          statuses: (r.schema.statuses ?? []).map((s) => ({ value: s.value, label: s.label, requires_reason: Boolean(s.requiresReason) })),
+          statuses: proposableStatuses(r.schema).map((s) => ({ value: s.value, label: s.label, requires_reason: Boolean(s.requiresReason) })),
           model,
         },
         ctx.signal

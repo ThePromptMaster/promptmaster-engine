@@ -29,7 +29,8 @@ test('Research, start to finish: prefilled runs, Go derives and drafts the repor
   // What the draft already knew is on the row, as the model's word, with its reason.
   await expect(stageArtifact(page).getByRole('row').nth(1)).toContainText('Not run');
   await expect(stageArtifact(page).getByRole('row').nth(1)).toContainText('Set by PromptMaster');
-  await expect(stageArtifact(page).getByText('Completed', { exact: true })).toHaveCount(0);
+  // (The legend under the table names every status; the rows are what is checked.)
+  await expect(stageArtifact(page).getByRole('combobox').filter({ hasText: 'Completed' })).toHaveCount(0);
 
   // Experiment → Drafting.
   const drafting = page.locator('header').getByRole('heading', { name: 'Drafting', exact: true });

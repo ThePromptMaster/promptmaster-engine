@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { BOOK_V1 } from './templates/book.v1';
-import { isTriaged, itemSchemaFor, stageContentForChat, type StageItem } from './stage-artifact';
+import { ITEM_SCHEMAS, isTriaged, itemSchemaFor, proposableStatuses, statusOption, stageContentForChat, type StageItem } from './stage-artifact';
+import { previewRowAction } from './row-actions';
 import { applyTriage, findingRisk, isTriageTable, splitUntriaged } from './triage';
 
 const continuity = itemSchemaFor(BOOK_V1.stages.find((s) => s.id === 'continuity')!);
@@ -77,5 +78,35 @@ describe('stageContentForChat (C7)', () => {
       '2. What is wrong: No fallback path — Where: Ch 2 — Severity: major [Reject: Out of scope]'
     );
     expect(stageContentForChat(continuity, 'Plain prose stays.')).toBe('Plain prose stays.');
+  });
+});
+
+describe('what a validation status certifies (2 Oct, item 12)', () => {
+  const validation = ITEM_SCHEMAS.validation_table;
+  const rows: StageItem[] = [
+    { id: 'v1', result: 'Churn is concentrated in recent cohorts', attempt: 'Compared with earlier-cited studies; not recalculated.' },
+    { id: 'v2', result: 'Tickets are 40% higher', status: 'reproduced' },
+  ];
+
+  it('tells independent reproduction from support by earlier evidence and from a consistency check', () => {
+    expect(validation.statuses!.filter((s) => !s.legacy).map((s) => s.label)).toEqual([
+      'Independently reproduced', 'Supported by prior evidence', 'Consistency check only', 'Not reproduced', 'Not attempted',
+    ]);
+    expect(validation.statuses!.every((s) => s.explain)).toBe(true);
+    expect(validation.decisionQuestion).toMatch(/sufficiently supported to move forward/);
+  });
+
+  it('"Independently reproduced" is never offered to the model, to Go, or to a change proposed from the chat', () => {
+    expect(proposableStatuses(validation).map((s) => s.value)).toEqual(['supported_by_prior', 'consistency_check', 'not_reproduced', 'not_attempted']);
+    expect(applyTriage(rows, [{ id: 'v1', status: 'independently_reproduced' }], validation).applied).toEqual([]);
+    expect(applyTriage(rows, [{ id: 'v1', status: 'supported_by_prior' }], validation).applied).toEqual(['v1']);
+    const fromChat = previewRowAction(rows, { kind: 'row_updates', label: 'x', updates: [{ id: 'v1', status: 'independently_reproduced' }] } as never, validation);
+    expect(fromChat.changes).toEqual([]);
+  });
+
+  it('a row marked "Reproduced" before the change stays resolved, and says its kind was not recorded', () => {
+    expect(isTriaged(rows[1], validation)).toBe(true);
+    expect(statusOption(validation, 'reproduced')).toMatchObject({ label: 'Reproduced — kind not recorded', legacy: true });
+    expect(applyTriage([{ id: 'v3', result: 'x' }], [{ id: 'v3', status: 'reproduced' }], validation).applied).toEqual([]);
   });
 });
