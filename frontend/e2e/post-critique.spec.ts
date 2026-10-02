@@ -109,16 +109,26 @@ test('Apply all recommended fixes', async ({ page }) => {
   await expect(page.getByRole('region', { name: 'Act on this check' })).toHaveCount(0);
 });
 
-test('"Buttonize it": each point of a Challenge can be applied as you go', async ({ page }) => {
+// 2 Oct, item 6: a Challenge used to become one Apply per point, up to twenty
+// ("around 20 recommended fixes"). It now ends in a few actions, as a chat
+// answer does; the points are still there one by one, behind a disclosure.
+test('a Challenge ends in a few actions; its points can still be applied one by one', async ({ page }) => {
   const id = await createProject(page, { workflow: 'Book', name: 'E2E buttonize critique', objective: 'A book about giraffes' });
   await expect(page.getByText('Mock output').first()).toBeVisible();
   await transitionBar(page).getByRole('button', { name: /^More/ }).click();
   await page.getByRole('menuitem', { name: 'Challenge this draft' }).click();
 
-  const act = page.getByRole('region', { name: 'Act on this critique' });
+  const few = page.getByRole('region', { name: 'Act on this critique' });
+  await expect(few.getByRole('button')).toHaveText(['Tighten the opening', 'Add the missing example', 'Do nothing']);
+  await expect(page.getByText(/Apply all \d+ recommended fixes/)).not.toBeVisible();
+  await few.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: test.info().outputPath('01-critique-few-actions.png'), fullPage: true });
+
+  // One by one, for anyone who wants it.
+  await page.getByText('Review the 3 points one by one').click();
+  const act = page.getByRole('region', { name: 'Each point of this critique' });
   await expect(act.getByRole('listitem')).toHaveCount(3);
-  await act.scrollIntoViewIfNeeded();
-  await page.screenshot({ path: test.info().outputPath('01-critique-buttonized.png'), fullPage: true });
+  await page.screenshot({ path: test.info().outputPath('02-critique-points-one-by-one.png'), fullPage: true });
   await act.getByRole('button', { name: /^Apply: Weak reasoning/ }).click();
 
   const preview = page.getByRole('dialog', { name: 'Revised version' });
