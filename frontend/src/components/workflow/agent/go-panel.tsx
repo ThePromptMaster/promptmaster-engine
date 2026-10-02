@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import { actionLabel } from '@/lib/agent/actions';
 import { describeNeed, isClearedNote, needIsDecidedOnStage, type NeedContext, type StuckOption } from '@/lib/agent/needs';
@@ -37,6 +38,7 @@ export function GoPanel({
   mode,
   needsActions,
   needContext,
+  dockHost = null,
 }: {
   go: ReturnType<typeof useGoLoop>;
   stageLabel: string;
@@ -44,8 +46,25 @@ export function GoPanel({
   needsActions?: NeedsActions;
   /** What is true of the project now, for a request whose wording depends on it. */
   needContext?: NeedContext;
+  /**
+   * Where a pinned copy of the controls goes while the panel's own are
+   * scrolled out of view: a sticky host at the top of the work column. The
+   * client, 2 Oct: "you should see [the play button] all the time so you
+   * don't have to keep scrolling back and forth".
+   */
+  dockHost?: HTMLElement | null;
 }) {
   const [open, setOpen] = useState(false);
+  const sectionRef = useRef<HTMLElement>(null);
+  const controlsRef = useRef<HTMLDivElement>(null);
+  const [controlsInView, setControlsInView] = useState(true);
+  useEffect(() => {
+    const el = controlsRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(([entry]) => setControlsInView(entry.isIntersecting), { threshold: 0.2 });
+    observer.observe(el);
+    return () => observer.disconnect();
+  });
   const live = go.run && !go.run.ended_at;
   const expanded = open || Boolean(live) || go.steps.length > 0 || Boolean(go.authorizing);
   const current = go.steps.at(-1) ?? null;
@@ -119,8 +138,47 @@ export function GoPanel({
     }
   };
 
+  const controlProps = {
+    run: go.run,
+    running: go.active,
+    budget: go.budget,
+    onBudget: go.setBudget,
+    onGo: () => void go.go(),
+    onStop: () => void go.stop(),
+    canResume,
+    canContinue,
+    disabled: go.phase === 'watching' || Boolean(go.pendingStep) || Boolean(go.authorizing),
+    // A suggestion to skip has two answers: the card's button, or Resume to do the stage.
+    // A table's button only shows the way, so Resume stays beside it.
+    hideResume: Boolean(need && need.kind !== 'skip_stage' && !needIsDecidedOnStage(need) && needsActions && describeNeed(need, go.stageLabelFor, needContext).action),
+  };
+  // Something on the panel is waiting for the user: the pinned copy says so and takes them there.
+  const waiting = Boolean(go.pendingStep || need || askingUser || go.authorizing);
+  const dock =
+    expanded && dockHost && !controlsInView
+      ? createPortal(
+          <section aria-label="Go controls" className="rounded-xl bg-[var(--surface-container)] px-4 py-2 shadow-[0_8px_24px_rgba(0,0,0,0.12)]">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <GoControl {...controlProps} compact />
+              </div>
+              <button
+                onClick={() => sectionRef.current?.scrollIntoView({ block: 'start' })}
+                className={`shrink-0 rounded-lg px-3 py-1.5 text-label ${
+                  waiting ? 'bg-[var(--pm-tertiary)] text-white' : 'bg-[var(--surface-container-highest)] text-[var(--on-surface)]'
+                }`}
+              >
+                {waiting ? 'Go needs you — show' : go.active ? 'Show what Go is doing' : 'Show Go'}
+              </button>
+            </div>
+          </section>,
+          dockHost
+        )
+      : null;
+
   return (
-    <section aria-label="Go mode" className="mb-6 rounded-2xl bg-[var(--surface-container)] px-5 py-4">
+    <section ref={sectionRef} aria-label="Go mode" className="mb-6 scroll-mt-20 rounded-2xl bg-[var(--surface-container)] px-5 py-4">
+      {dock}
       <div className="flex flex-wrap items-center gap-3">
         <span aria-hidden className="material-symbols-outlined text-[var(--pm-primary)]">rocket_launch</span>
         <div className="mr-auto">
@@ -139,20 +197,9 @@ export function GoPanel({
       {expanded && (
         <div className="mt-4 space-y-4">
           <PolicySelector value={go.policy} onChange={go.setPolicy} disabled={go.active || go.phase === 'watching'} />
-          <GoControl
-            run={go.run}
-            running={go.active}
-            budget={go.budget}
-            onBudget={go.setBudget}
-            onGo={() => void go.go()}
-            onStop={() => void go.stop()}
-            canResume={canResume}
-            canContinue={canContinue}
-            disabled={go.phase === 'watching' || Boolean(go.pendingStep) || Boolean(go.authorizing)}
-            // A suggestion to skip has two answers: the card's button, or Resume to do the stage.
-            // A table's button only shows the way, so Resume stays beside it.
-            hideResume={Boolean(need && need.kind !== 'skip_stage' && !needIsDecidedOnStage(need) && needsActions && describeNeed(need, go.stageLabelFor, needContext).action)}
-          />
+          <div ref={controlsRef}>
+            <GoControl {...controlProps} />
+          </div>
           {need && <NeedsYouCard key={`${need.kind}:${go.run?.id}`} need={need} stageLabel={go.stageLabelFor} onAction={act} context={needContext} />}
           {go.phase === 'watching' && (
             <p role="status" className="text-body text-[var(--on-surface-variant)]">
