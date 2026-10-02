@@ -33,6 +33,7 @@ import {
 } from '@/lib/workflow/stage-artifact';
 import { ConfirmOverwrite, EmptyStage, GenerationBar, VersionBar } from './stage-chrome';
 import type { StageRendererProps } from './types';
+import { lookupLabel } from '@/lib/workflow/stage-controls';
 
 const TONE_CLASS: Record<string, string> = {
   done: 'text-[var(--pm-secondary)]',
@@ -243,7 +244,7 @@ export function ReviewRenderer({
                 <span aria-hidden className={`material-symbols-outlined text-[16px] ${lookingUp ? 'animate-spin' : ''}`}>
                   {lookingUp ? 'progress_activity' : 'travel_explore'}
                 </span>
-                {lookingUp ? 'Looking them up…' : `Look up these ${schema.lookup.noun}`}
+                {lookingUp ? 'Looking them up…' : lookupLabel(schema.lookup.noun)}
               </button>
               <span className="text-label text-[var(--on-surface-variant)]">
                 Searches OpenAlex for each named source. It finds whether the source exists, not whether it says this.

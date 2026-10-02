@@ -30,6 +30,7 @@ import type { Evaluation } from '@/types/project';
 import type { AgentTools } from './policy';
 import { NO_TOOLS } from './policy';
 import type { StageFacts } from './facts';
+import { PLACE_WORDS, type StageControl } from '@/lib/workflow/stage-controls';
 
 /** The backend's cap on `artifact_excerpt` (AgentState in promptmaster/agent.py) — marker included. */
 export const ARTIFACT_EXCERPT_CHARS = 12_000;
@@ -39,6 +40,8 @@ const TRIMMED = '\n[… trimmed …]';
 export const RECENT_STEPS = 8;
 const LIST_MAX = 60;
 const SAMPLE_MAX = 8;
+/** The backend's cap on `controls`. */
+export const CONTROLS_MAX = 40;
 
 export interface AgentStateDigest {
   stage_id: string;
@@ -59,6 +62,12 @@ export interface AgentStateDigest {
   memory?: string[];
   /** The project's data files, so the planner knows a computation has something to read. */
   data_files?: DataFileBrief[];
+  /**
+   * The buttons on the stage's page now, by their exact words. Absent when
+   * the page is not known (another stage is on show): the planner is then
+   * told it may not name a button at all.
+   */
+  controls?: { label: string; where: string }[];
   tools: AgentTools;
 }
 
@@ -102,6 +111,8 @@ export function buildAgentState(input: {
   facts?: StageFacts;
   dataFiles?: DataFileBrief[];
   memory?: string[];
+  /** The page's buttons (lib/workflow/stage-controls.ts). */
+  controls?: readonly StageControl[];
 }): AgentStateDigest {
   const { template, state, stage, bundles, stageEvaluation, latestEvaluation, steps, context, approvedOutline = [], facts } = input;
   const pendingJobs = facts?.manuscript?.pendingJobs.length ?? input.pendingJobs ?? 0;
@@ -234,6 +245,7 @@ export function buildAgentState(input: {
     ...(findings ? { findings } : {}),
     ...(input.memory?.length ? { memory: input.memory } : {}),
     ...(dataFiles.length ? { data_files: dataFiles } : {}),
+    ...(input.controls ? { controls: input.controls.slice(0, CONTROLS_MAX).map((c) => ({ label: c.label, where: PLACE_WORDS[c.place] })) } : {}),
     tools,
   };
 }

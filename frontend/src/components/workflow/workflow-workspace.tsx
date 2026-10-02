@@ -14,6 +14,7 @@ import { BlockForm, BlockedNotice, CompletionDialog } from './stage-status-panel
 import { StageToolResult } from './stage-tool-result';
 import { CRITIQUE_TOOLS, REWRITE_TOOLS, useStageTools } from './use-stage-tools';
 import { nextStageAction, type ReportedPanelStep } from '@/lib/workflow/next-action';
+import { stageControls, type StageControl } from '@/lib/workflow/stage-controls';
 import { isApplyable } from '@/lib/workflow/recommend';
 import { ProjectFinished } from './project-finished';
 import { ProjectFinishedBanner } from './project-finished-banner';
@@ -893,6 +894,10 @@ export function WorkflowWorkspace({
     [template, state, context]
   );
 
+  // The buttons on the current stage's page, for Go to name (2 Oct, item 10).
+  // Filled in further down, once the stage bar's own actions are built.
+  const controlsRef = useRef<StageControl[] | null>(null);
+
   const go = useGoLoop({
     project,
     template,
@@ -914,6 +919,7 @@ export function WorkflowWorkspace({
     events: events ?? [],
     loadEvents: () => listWorkflowEvents(project.id),
     onRefresh: onReload,
+    getControls: () => controlsRef.current,
   });
   useEffect(() => setGoDriving(go.active || go.phase === 'awaiting'), [go.active, go.phase]);
 
@@ -1145,6 +1151,23 @@ export function WorkflowWorkspace({
         }]
       : []),
   ];
+
+  // What Go may name is what the stage bar and the page draw, built from the
+  // same values. Only for the stage the project is on: a stage being browsed
+  // shows other buttons, and Go does not work there.
+  const pageControls = isCurrent && project.status !== 'finalized'
+    ? stageControls({
+        primary: primaryAction,
+        more: moreActions,
+        options: transitions,
+        nextStageLabel: nextStage?.short_label ?? null,
+        openApprovals: evaluation.criteria.filter((c) => c.manual && !c.satisfied),
+        lookupNoun: rendererHoldsItems(stage.renderer) && hasContent ? (itemSchemaFor(stage).lookup?.noun ?? null) : null,
+        dataPanel: true,
+      })
+    : null;
+  // Read by the Go loop when it plans a move, never during render.
+  controlsRef.current = pageControls;
 
   // Revision and editing are long-form stages with no manuscript of their own:
   // they work on the one Drafting wrote. Without this they showed "no approved

@@ -285,7 +285,41 @@ def test_without_facts_the_prompt_is_as_before():
 def test_the_planner_is_told_not_to_block_for_work_the_stage_controls_do():
     system, _ = build_next_action_prompt(INPUTS, STATE, RESEARCH, "guided")
     assert "Never mark_blocked for it" in system
-    assert "press Generate the outline" in system
+    # It is no longer given a button to name from memory (2 Oct, item 10).
+    assert "press Generate the outline" not in system
+
+
+def test_the_planner_is_given_the_page_s_buttons_and_may_name_only_those():
+    from promptmaster.agent import AgentControl
+
+    state = STATE.model_copy(update={"controls": [
+        AgentControl(label="Run revision on every section", where="the main button at the bottom of the stage"),
+        AgentControl(label="Mark as stuck…", where='under "More" at the bottom of the stage'),
+    ]})
+    system, user = build_next_action_prompt(INPUTS, state, RESEARCH, "guided")
+    assert "You may name a button ONLY if it is in that list, in exactly those words" in system
+    assert 'never write "if your interface has"' in system
+    assert "there is no button for this on this stage" in system
+    assert "BUTTONS ON THIS PAGE NOW (the user presses these; you cannot" in user
+    assert '- "Run revision on every section" — the main button at the bottom of the stage' in user
+
+    # A page that is not known, and a page with no buttons, both forbid naming one.
+    _, unknown = build_next_action_prompt(INPUTS, STATE, RESEARCH, "guided")
+    assert "BUTTONS ON THIS PAGE NOW: not known. Do not name any button." in unknown
+    _, empty = build_next_action_prompt(INPUTS, STATE.model_copy(update={"controls": []}), RESEARCH, "guided")
+    assert "BUTTONS ON THIS PAGE NOW: none. Do not name any button." in empty
+
+
+def test_a_button_the_planner_names_is_kept_only_if_the_page_has_it():
+    from promptmaster.agent import AgentControl, parse_next_action
+
+    controls = [AgentControl(label="Run revision on every section", where="x")]
+    ask = {"action_key": "request_user_decision", "decision_question": "Please run the revision.", "params": {}}
+    real = parse_next_action({**ask, "params": {"control": "run revision on every section "}}, RESEARCH, controls)
+    assert real.params == {"control": "Run revision on every section"}
+    invented = parse_next_action({**ask, "params": {"control": "Generate the outline/results artifact", "x": 1}}, RESEARCH, controls)
+    assert invented.params == {"x": 1}
+    assert parse_next_action({**ask, "params": {"control": "Run revision on every section"}}, RESEARCH, None).params == {}
 
 
 # --- B3: deciding the routine findings ----------------------------------------

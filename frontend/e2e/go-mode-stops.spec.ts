@@ -162,3 +162,59 @@ test('on Research, "nothing more for me here" on a stage waiting for approval be
   await expect(criterion(page, 'I accept these hypotheses as the working set').getByRole('checkbox')).toBeChecked({ timeout: 30_000 });
   await expect(card).toHaveCount(0);
 });
+
+/**
+ * 2 Oct, item 10 — Go told the user "if your interface has that control,
+ * press Generate the outline/results artifact", on a page with no such
+ * button. The planner is now given the buttons that are on the page, built
+ * from the same values the page draws them from, and a button it names is
+ * kept only if it is one of them.
+ */
+test('Go is given the buttons that are really on the page, and may name only those', async ({ page }) => {
+  await createProject(page, {
+    workflow: 'Research', name: 'E2E go controls',
+    objective: 'Pendulum [[mock:plan=request_user_decision]] [[mock:control=listed]]',
+  });
+  await expect(stageArtifact(page)).toContainText('Mock', { timeout: 30_000 });
+  const panel = goPanel(page);
+  await panel.getByRole('button', { name: 'Set up Go' }).click();
+  await panel.getByRole('radio', { name: /^Autonomous/ }).click();
+  const planned = page.waitForRequest((r) => r.url().includes('/api/agent/next-action') && r.method() === 'POST');
+  await panel.getByRole('button', { name: /^Go$/ }).click();
+  await page.getByRole('button', { name: /^Authorize/ }).click();
+  const { state } = (await planned).postDataJSON();
+  const controls: { label: string; where: string }[] = state.controls;
+  expect(controls.length).toBeGreaterThan(3);
+
+  // The question names the first listed button, with where it is, in fixed words.
+  const ask = page.getByRole('region', { name: 'Go mode asks you' });
+  await expect(ask).toContainText(`The button is "${controls[0].label}", ${controls[0].where}.`, { timeout: 30_000 });
+  await page.screenshot({ path: test.info().outputPath('01-go-names-a-real-button.png'), fullPage: true });
+
+  // Every button Go was told about is on the page, under the words it was given.
+  const bar = page.getByRole('group', { name: 'Stage actions' });
+  await bar.getByRole('button', { name: /^More/ }).click();
+  for (const c of controls) {
+    if (c.where.includes('checklist')) await expect(page.getByRole('checkbox', { name: c.label })).toBeVisible();
+    else await expect(page.getByRole('button', { name: c.label, exact: true }).or(page.getByRole('menuitem', { name: c.label, exact: true })).first()).toBeVisible();
+  }
+  await page.screenshot({ path: test.info().outputPath('02-the-listed-buttons-are-on-the-page.png'), fullPage: true });
+});
+
+test('a button Go invents is dropped, not shown to the user as if it existed', async ({ page }) => {
+  const id = await createProject(page, {
+    workflow: 'Research', name: 'E2E go invented control',
+    objective: 'Pendulum [[mock:plan=request_user_decision]] [[mock:control=invented]]',
+  });
+  await expect(stageArtifact(page)).toContainText('Mock', { timeout: 30_000 });
+  const panel = goPanel(page);
+  await panel.getByRole('button', { name: 'Set up Go' }).click();
+  await panel.getByRole('radio', { name: /^Autonomous/ }).click();
+  await panel.getByRole('button', { name: /^Go$/ }).click();
+  await page.getByRole('button', { name: /^Authorize/ }).click();
+  const ask = page.getByRole('region', { name: 'Go mode asks you' });
+  await expect(ask).toContainText('Mock: which way should this go?', { timeout: 30_000 });
+  await expect(ask).not.toContainText('The button is');
+  const [step] = await serviceSelect('agent_steps', `project_id=eq.${id}&action_key=eq.request_user_decision&select=params`);
+  expect(step.params.control).toBeUndefined();
+});

@@ -676,13 +676,22 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       });
     }
 
-    case 'ask':
+    case 'ask': {
+      // A button the planner names is checked against the page's own list;
+      // one that is really there is pointed to in fixed words, so the user is
+      // never sent looking for a control that does not exist (2 Oct, item 10).
+      const named = (ctx.digest.controls ?? []).find(
+        (c) => typeof params.control === 'string' && c.label.toLowerCase() === params.control.trim().toLowerCase()
+      );
+      const pointer = named ? `\n\nThe button is "${named.label}", ${named.where}.` : '';
+      const question = `${ctx.step.decision_question || 'Which way should this go?'}${pointer}`;
       return done(key, {
         status: 'succeeded', toolsUsed: [], changes: {},
-        output: ctx.step.decision_question || 'Which way should this go?',
-        stop: { status: 'awaiting_decision', reason: ctx.step.decision_question || 'Go mode needs your decision.' },
-        needs: { kind: 'answer_question', question: ctx.step.decision_question || 'Which way should this go?' },
+        output: question,
+        stop: { status: 'awaiting_decision', reason: question },
+        needs: { kind: 'answer_question', question },
       });
+    }
 
     case 'complete': {
       // PM-25: the model's opinion is not enough — the deliverable has to exist.
