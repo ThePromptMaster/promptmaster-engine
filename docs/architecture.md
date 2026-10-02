@@ -288,6 +288,14 @@ for the step and `result_interpreted` without one to cite. Stage moves are the u
 they approved them; only an Autonomous run records them as `actor='system'`, citing the run,
 which `workflow_events_agent_authorized` checks against its accepted authorization.
 
+Go's tools are few and each is called by the browser loop, never by a model: the code
+sandbox (`/api/sandbox/run`), the project's data files it copies into `/data`, and
+OpenAlex — a lookup of works the project names (`/api/agent/literature`) and a topic
+search (`/api/agent/literature-search`), both without a model call. A search step is
+labelled `discussed` ("Analyzed") with `tools_used: ['search']`: it read an index, ran no
+code, and read no source. A tool the run does not have is not offered as a move
+(`policy.ts`, `AgentTools`), so adding one is a performer plus a registry entry.
+
 ## Extension points
 
 These are the seams the system was built to be extended at. Working with them is

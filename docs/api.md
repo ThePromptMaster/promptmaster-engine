@@ -121,6 +121,7 @@ Go mode (the loop itself runs in the browser; see [`architecture.md`](architectu
 | POST | `/api/agent/interpret-result` | `agentInterpretResult` | `agent.py` | **Live** — takes the real stdout/stderr/exit code from a `sandbox_runs` row (label `result_interpreted`) |
 | POST | `/api/agent/triage` | `agentTriage` | `agent.py` | **Live** — decides a review table's routine findings |
 | POST | `/api/agent/literature` | `agentLiterature` | `agent.py` | **Live** — no model. Takes up to 20 `{id, work}`; searches OpenAlex by title and returns `{matches: [{id, found, title, authors, year, doi, url, note}]}`. A match needs 80% of the title's words and a year within one (`promptmaster/literature.py`). Used by "Look up these works" (Literature), "Look up these sources" (Fact-check) and Go's `check_literature` |
+| POST | `/api/agent/literature-search` | `agentLiteratureSearch` | `agent.py` | **Live** — no model. Takes `{query (≤300), limit (≤10, default 8)}`; searches OpenAlex by topic and returns `{works: [{id, found, title, authors, year, doi, url, note}], reached}`. `reached: false` means OpenAlex could not be asked, which is not "nothing found". Titles under three meaningful words and repeats are dropped. Used by Go's `check_literature` when it is given a `query` or no works are listed yet |
 | GET | `/api/agent/actions` | *(none)* | `agent.py` | Dormant — the registry is mirrored in TypeScript and `actions-drift.test.ts` keeps the two equal |
 
 Dormant — the retired `/session` flow's server side, kept on purpose:

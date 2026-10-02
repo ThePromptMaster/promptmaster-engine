@@ -12,7 +12,7 @@ export type ActionFamily = 'research' | 'writing' | 'workflow';
 export type Performer =
   | 'reason' // /api/agent/reason — label: discussed
   | 'compute' // write-code → /api/sandbox/run → (follow-up) interpret
-  | 'literature' // looks named works up in OpenAlex
+  | 'literature' // looks named works up in OpenAlex, or searches it by topic when given a query
   | 'draft' // generate-stage-artifact
   | 'evaluate' // evaluate-stage-artifact
   | 'revise' // generate-stage-artifact with the current draft

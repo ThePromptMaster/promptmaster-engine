@@ -21,7 +21,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from deps import get_client, llm_mode
-from promptmaster.literature import MAX_WORKS, WorkMatch, WorkQuery, lookup_works
+from promptmaster.literature import MAX_SEARCH_RESULTS, MAX_WORKS, WorkMatch, WorkQuery, lookup_works, search_works
 from promptmaster.agent import (
     AgentState,
     NextAction,
@@ -209,3 +209,24 @@ async def api_literature(req: LiteratureRequest) -> LiteratureResponse:
     nothing stored: for each work, whether a record with that title exists,
     and its real title, authors, year and DOI if it does."""
     return LiteratureResponse(matches=await lookup_works(req.works, mock=llm_mode() == "mock"))
+
+
+class LiteratureSearchRequest(BaseModel):
+    query: str = Field(min_length=1, max_length=300)
+    limit: int = Field(default=8, ge=1, le=MAX_SEARCH_RESULTS)
+
+
+class LiteratureSearchResponse(BaseModel):
+    works: list[WorkMatch]
+    #: False when the index could not be reached: "nothing found" must not be read from an empty list then.
+    reached: bool
+    source: str = "OpenAlex"
+
+
+@router.post("/literature-search")
+async def api_literature_search(req: LiteratureSearchRequest) -> LiteratureSearchResponse:
+    """Search OpenAlex by topic (2 Oct): the records it holds for these words,
+    with their real titles, authors, years and DOIs. No model call and nothing
+    stored. Nobody has read what is returned."""
+    works, reached = await search_works(req.query, req.limit, mock=llm_mode() == "mock")
+    return LiteratureSearchResponse(works=works, reached=reached)

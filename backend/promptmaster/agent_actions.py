@@ -54,7 +54,10 @@ AGENT_ACTIONS: list[AgentAction] = [
     AgentAction(key="compare_alternatives", family="research", label="Compare alternatives",
                 when="Weigh competing explanations or approaches against the evidence."),
     AgentAction(key="check_literature", family="research", label="Check literature",
-                when="What is already known or published would change the next step."),
+                when="What is already known or published would change the next step. With no params it looks "
+                     "the works this project already lists up in OpenAlex. Params: query (a few plain search "
+                     "words for the topic) searches OpenAlex for works not yet listed; give it when no works "
+                     "are listed, or the list is missing what the question needs."),
     AgentAction(key="update_assumptions", family="research", label="Update assumptions",
                 when="Something found so far means an assumption no longer holds.",
                 important=True),
