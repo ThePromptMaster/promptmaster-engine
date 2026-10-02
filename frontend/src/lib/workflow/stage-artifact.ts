@@ -106,8 +106,16 @@ export interface StageItemSchema {
    * can settle one: it sets `status` and writes what the run printed into
    * `field`. Never the model's to set (see `modelMaySet`).
    */
+  /**
+   * Fields of the row that may already say why, in order of preference. When
+   * the user picks a status that needs a reason and has given none, the first
+   * that has text is offered as the reason, so nothing is typed twice.
+   */
+  reasonFrom?: string[];
   execution?: {
     status: string; field: string;
+    /** The status of a row whose run could not be made for want of data; it takes the reason the run gave. */
+    blocked?: string;
     /** Fields the draft filled in about a run it could not make; emptied when a run settles the row, because they are no longer true. */
     clears?: string[];
   };
@@ -288,7 +296,8 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
       { value: 'not_run', label: 'Not run', tone: 'warn', requiresReason: true, modelMaySet: true },
     ],
     // …but a run that really executed in the sandbox is.
-    execution: { status: 'completed', field: 'observed', clears: ['deviation'] },
+    execution: { status: 'completed', field: 'observed', blocked: 'not_run', clears: ['deviation'] },
+    reasonFrom: ['deviation', 'observed'],
   },
 
   alternatives: {

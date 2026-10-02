@@ -425,6 +425,17 @@ attached, Go tries a computation at most once per row before handing an undecide
 table to the user; without data it stops for the user as before. A snapshot built before
 pandas was added lacks it: rebuild with `scripts/sandbox-snapshot.mts` and update
 `SANDBOX_SNAPSHOT_ID`.
+**A run that could not be made settles its row too (2026-10-02).** When the code needs a
+file that is not there, or prints `MISSING_DATA: <what>` (which the code-writer is told to
+do, with a non-zero exit, when the goal needs data the project does not hold), the step is
+`blocked` / `data_missing` at any exit code — never `code_executed` — and the named row
+becomes **Not run** with that reason, "Recorded by PromptMaster: the run could not be
+made". The sentinel is an instruction to a model: code that reports missing data in other
+words and exits cleanly is still recorded as executed, and its row as Completed. In the
+table, picking a status that needs a reason offers the row's own "Deviation" or "What
+actually happened" text as the reason (`reasonFrom`), marked as filled in from the row;
+no model reads it.
+
 Removing a file does not touch runs already recorded. Limits: 30 s per command, 10 runs per Go
 run (`SANDBOX_MAX_PER_RUN`), 600 s of execution per user per UTC day
 (`SANDBOX_DAILY_SECONDS`), 5 output files of ≤1 MB each. Without

@@ -153,6 +153,7 @@ export function contentTypeFor(name: string): string {
  *   # mock:unavailable   → the sandbox is down
  *   # mock:timeout       → never finishes
  *   import <missing>     → ModuleNotFoundError
+ *   print("MISSING_DATA: …") → that line, exit 2 (the code said it had no data)
  *   otherwise            → prints each `print(f"… = {…}")` line with a fixed value
  */
 export class MockRunner implements CodeRunner {
@@ -170,6 +171,10 @@ export class MockRunner implements CodeRunner {
         status: 'error', stdout: '', exitCode: 1, timedOut: false, durationMs: 40, artifacts: [],
         stderr: `Traceback (most recent call last):\n  File "main.py", line 1, in <module>\nModuleNotFoundError: No module named '${missing}'`,
       };
+    }
+    const noData = /print\("(MISSING_DATA:[^"]*)"\)/.exec(code)?.[1];
+    if (noData) {
+      return { status: 'error', stdout: `${noData}\n`, stderr: '', exitCode: 2, timedOut: false, durationMs: 60, artifacts: [] };
     }
     // Code that reads /data is told what was actually put there, so a test
     // can see the project's files reached the run — or that none did.

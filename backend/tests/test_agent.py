@@ -402,6 +402,11 @@ def test_the_code_writer_is_told_to_read_only_listed_files_and_never_invent_data
     assert "numpy, scipy, sympy, matplotlib and pandas" in system
     assert "Read them with pandas, or the csv or json modules" in system
     assert "on its own line as `label: value`" in system
+    # Missing data is said in one recognisable line and a non-zero exit, so
+    # the run is recorded as not made — never as executed (2 Oct, item 1).
+    assert "`MISSING_DATA: <exactly what is missing, as one plain sentence>`" in system
+    assert "raise SystemExit(2)" in system
+    assert "do not compute on placeholders" in system
     assert "/data/accounts.csv" in user
 
 

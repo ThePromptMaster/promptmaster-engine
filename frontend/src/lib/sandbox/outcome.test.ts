@@ -45,6 +45,16 @@ describe('classifyRun — PM-12: the label is what happened', () => {
     expect(c).toMatchObject({ stepStatus: 'blocked', blockKind: 'data_missing' });
   });
 
+  it('code that ran only to say it had no data did not carry out the analysis', () => {
+    // The code-writer is told to print this line; on a clean exit it used to
+    // be `code_executed`, and its row was marked Completed.
+    for (const exitCode of [0, 2]) {
+      const c = classifyRun({ ...base, status: exitCode ? 'error' : 'ok', exitCode, stdout: 'checking inputs\nMISSING_DATA: Signup dates per account were not provided.\n' });
+      expect(c).toMatchObject({ stepStatus: 'blocked', executionLabel: 'blocked', blockKind: 'data_missing', missing: 'Signup dates per account were not provided.' });
+    }
+    expect(classifyRun({ ...base, stdout: 'the MISSING_DATA: marker mid-line is not the signal' }).executionLabel).toBe('code_executed');
+  });
+
   it('a module name in stdout of a clean run does not block it', () => {
     expect(classifyRun({ ...base, stdout: "No module named 'x'" }).executionLabel).toBe('code_executed');
   });
@@ -73,6 +83,7 @@ describe('MockRunner and the production guard', () => {
     expect((await r.run('# mock:timeout')).timedOut).toBe(true);
     expect((await r.run('# mock:unavailable')).status).toBe('unavailable');
     expect(missingModule((await r.run('import nonexistent_lib')).stderr)).toBe('nonexistent_lib');
+    expect(await r.run('print("MISSING_DATA: no churn records")\nraise SystemExit(2)')).toMatchObject({ exitCode: 2, stdout: 'MISSING_DATA: no churn records\n' });
   });
 
   it('mock mode refuses production', () => {

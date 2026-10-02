@@ -402,6 +402,8 @@ def _prose_reply(system: str, prompt: str) -> str:
         # reads these back out of the code).
         if "[[mock:sandbox=unavailable]]" in prompt:
             return "# mock:unavailable\nprint(1)"
+        if "[[mock:sandbox=nodata]]" in prompt:
+            return 'print("MISSING_DATA: Account-level churn records were not provided, so the cohort comparison could not be run.")\nraise SystemExit(2)'
         if "[[mock:sandbox=missing]]" in prompt:
             return "import nonexistent_lib\nprint(nonexistent_lib.x)"
         # With data attached, the scripted code reads it — so a browser test

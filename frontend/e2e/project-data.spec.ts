@@ -140,3 +140,61 @@ test('a computation that ran marks its row Completed and records what it printed
   expect(step).toMatchObject({ status: 'succeeded', execution_label: 'code_executed' });
   expect(step.changes).toMatchObject({ sandbox_run_id: run.id, version_ids: [version.id], figures_recorded: 1 });
 });
+
+/**
+ * 2 Oct, item 1 — "Reasoning knows the answer, but structured state still
+ * makes me enter it again." A run Go tried and could not make, because the
+ * data it needed was not there, said so only in the step's text; its row went
+ * on reading "Not looked at", and the reason had to be typed by hand. And code
+ * that ran only to report it had nothing to work on counted as executed. The
+ * row now becomes "Not run" with the run's own reason, and the step is
+ * blocked on missing data — never executed.
+ */
+test('a computation that lacks its data marks its row Not run, with the reason', async ({ page }) => {
+  test.setTimeout(180_000);
+  const id = await createProject(page, {
+    workflow: 'Research', name: 'E2E run not made',
+    objective: 'Why Mid-Market customers churn [[mock:plan=run_computation]] [[mock:row=2]] [[mock:sandbox=nodata]]',
+  });
+  await expect(stageArtifact(page)).toContainText('Mock', { timeout: 30_000 });
+  await page.getByRole('region', { name: 'Project data' }).getByLabel('Attach data files').setInputFiles({
+    name: 'accounts.csv', mimeType: 'text/csv',
+    buffer: Buffer.from('account_id,plan\nA1,Mid-Market\nA2,Enterprise\n'),
+  });
+  await expect(page.getByRole('region', { name: 'Project data' })).toContainText('accounts.csv');
+
+  for (const heading of ['Literature context', 'Hypothesis or proposition', 'Method', 'Experiment or investigation']) {
+    await pressTransition(page);
+    await expect(page.getByRole('heading', { name: heading })).toBeVisible();
+    await expect(stageArtifact(page)).toContainText('Mock', { timeout: 30_000 });
+  }
+  const rows = stageArtifact(page).getByRole('row');
+  await expect(stageArtifact(page)).toContainText('2 still to resolve');
+
+  const panel = page.getByRole('region', { name: 'Go mode', exact: true });
+  await panel.getByRole('button', { name: 'Set up Go' }).click();
+  await panel.getByRole('radio', { name: /^Guided/ }).click();
+  await panel.getByRole('button', { name: /^Go$/ }).click();
+  const prompt = page.getByRole('region', { name: 'Go mode needs your approval' });
+  await expect(prompt).toContainText('Run a computation', { timeout: 30_000 });
+  await prompt.getByRole('button', { name: 'Approve' }).click();
+
+  await expect(panel).toContainText('Recorded on the table: row 2 is now "Not run", with this reason', { timeout: 30_000 });
+  await expect(rows.nth(3)).toContainText('Not run');
+  await expect(rows.nth(3)).toContainText('Recorded by PromptMaster: the run could not be made');
+  await expect(stageArtifact(page).getByLabel(/Why not run\?/).nth(1)).toHaveValue(
+    'Could not be run: Account-level churn records were not provided, so the cohort comparison could not be run.'
+  );
+  await expect(stageArtifact(page)).toContainText('1 still to resolve');
+  await expect(stageArtifact(page)).toContainText('1 could not be run — PromptMaster recorded why');
+  await stageArtifact(page).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: test.info().outputPath('04-run-not-made-on-its-row.png'), fullPage: true });
+
+  const [version] = await serviceSelect('artifact_versions', `project_id=eq.${id}&source_operation=eq.sandbox_result&select=id,content`);
+  const items = JSON.parse(version.content).items;
+  expect(items[1]).toMatchObject({ status: 'not_run', status_source: 'sandbox' });
+  expect(items[1].observed ?? '').not.toContain('Ran in the sandbox');
+  const [step] = await serviceSelect('agent_steps', `project_id=eq.${id}&action_key=eq.run_computation&select=status,execution_label,block_kind,changes`);
+  expect(step).toMatchObject({ status: 'blocked', execution_label: 'blocked', block_kind: 'data_missing' });
+  expect(step.changes.version_ids).toEqual([version.id]);
+});
