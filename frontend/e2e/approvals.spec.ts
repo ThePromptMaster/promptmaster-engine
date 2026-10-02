@@ -42,6 +42,10 @@ test('an override needs a reason; verified and approval items are told apart', a
   await expect(yours).toContainText('You approve');
   await expect(yours.getByRole('checkbox', { name: /I accept these hypotheses as the working set/ })).toBeVisible();
   await expect(page.getByText(/this stage is waiting for your approval/)).toBeVisible();
+  // …and the same thing is said where the stage is named: the header and the
+  // rail, not only the checklist's caption (2 Oct, item 3).
+  await expect(page.getByText('Draft complete · Your approval pending')).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Workflow stages' }).getByRole('button', { name: /Hypothesis/ })).toContainText('your approval');
   await page.screenshot({ path: test.info().outputPath('02-verified-and-approval.png'), fullPage: true });
 
   const rail = page.getByRole('navigation', { name: 'Workflow stages' });

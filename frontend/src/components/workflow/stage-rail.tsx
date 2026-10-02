@@ -62,9 +62,11 @@ interface Props {
   state: WorkflowState;
   nextSuggestedId: string | null;
   onSelect: (stageId: string) => void;
+  /** Open stages where the only required thing left is the user's approval. */
+  approvalPendingIds?: ReadonlySet<string>;
 }
 
-export function StageRail({ template, state, nextSuggestedId, onSelect }: Props) {
+export function StageRail({ template, state, nextSuggestedId, onSelect, approvalPendingIds }: Props) {
   // Group consecutive stages so the rail reads as phases rather than a flat
   // list of 13. Consecutive, not sorted: a template may legitimately revisit a
   // group later (Research returns to planning for Mechanism).
@@ -94,6 +96,7 @@ export function StageRail({ template, state, nextSuggestedId, onSelect }: Props)
               // looked current at once (1 Oct, item 1).
               const openElsewhere = status === 'in_progress' && !isCurrent;
               const leftOpen = openElsewhere && Boolean(state.stages[stage.id]?.left_open);
+              const awaitingApproval = status === 'in_progress' && Boolean(approvalPendingIds?.has(stage.id));
 
               return (
                 <li key={stage.id}>
@@ -140,11 +143,21 @@ export function StageRail({ template, state, nextSuggestedId, onSelect }: Props)
                     {leftOpen && (
                       <span
                         title={`You moved on with something required still open — this stage is not complete.${
+                          awaitingApproval ? ' The only thing it is waiting for is your approval.' : ''
+                        }${
                           state.stages[stage.id]?.left_reason ? ` Your reason: ${state.stages[stage.id]!.left_reason}` : ''
                         }`}
                         className="shrink-0 text-label uppercase tracking-wide text-[var(--pm-tertiary)]"
                       >
                         left open
+                      </span>
+                    )}
+                    {awaitingApproval && isCurrent && (
+                      <span
+                        title="PromptMaster has verified what it can — this stage is waiting for your approval"
+                        className="shrink-0 text-label uppercase tracking-wide text-[var(--pm-tertiary)]"
+                      >
+                        your approval
                       </span>
                     )}
                     {openElsewhere && !leftOpen && (

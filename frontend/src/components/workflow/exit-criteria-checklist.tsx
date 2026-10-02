@@ -1,5 +1,6 @@
 'use client';
 
+import { approvalPending as isApprovalPending } from '@/lib/workflow/engine';
 import type { CriterionResult } from '@/lib/workflow/types';
 
 interface Props {
@@ -40,8 +41,7 @@ export function ExitCriteriaChecklist({ criteria, manualIds = new Set(), onToggl
   // The work is done as far as PromptMaster can tell, and the only thing
   // open is the user's say-so. Said in words, because "complete" beside an
   // unticked required box read as a contradiction (1 Oct, item 7).
-  const approvalPending =
-    checked.every((r) => r.c.satisfied || !r.c.blocking) && yours.some((r) => r.c.blocking && !r.c.satisfied);
+  const approvalPending = isApprovalPending(withKind.map((r) => ({ ...r.c, manual: r.manual })));
 
   const row = ({ c, manual }: { c: CriterionResult; manual: boolean }) => {
     const Row = manual ? 'label' : 'div';
