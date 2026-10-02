@@ -282,6 +282,16 @@ def test_without_facts_the_prompt_is_as_before():
     assert "OUTLINE:" not in user and "MANUSCRIPT:" not in user and "FINDINGS:" not in user
 
 
+def test_the_planner_is_told_the_kinds_of_block_it_may_record():
+    """Production pass, 2 Oct: the model marked a stage stuck for missing CRM and
+    billing data, gave no kind the client knew, and the block was recorded as
+    "needs a decision" — so the card did not offer to add the data."""
+    _, user = build_next_action_prompt(INPUTS, STATE, [*RESEARCH, "mark_blocked"], "guided")
+    assert "block_kind — exactly one of 'data_missing'" in user
+    assert "'tool_missing' (a tool or capability is not available)" in user
+    assert "'needs_decision' (only a choice by the user is missing)" in user
+
+
 def test_the_planner_is_told_not_to_block_for_work_the_stage_controls_do():
     system, _ = build_next_action_prompt(INPUTS, STATE, RESEARCH, "guided")
     assert "Never mark_blocked for it" in system
