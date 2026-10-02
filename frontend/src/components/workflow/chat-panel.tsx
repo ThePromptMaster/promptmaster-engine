@@ -611,7 +611,7 @@ function ModeSwitch({
         </span>
         <span>
           {mode === 'discuss'
-            ? 'Ask only — talking here cannot change your document. Only a point you choose to Apply does, as a new version.'
+            ? 'Ask only — talking here cannot change your document. Only an action you choose does, as a new version.'
             : 'Revisions are shown for review first, and never replace a version.'}
         </span>
       </p>

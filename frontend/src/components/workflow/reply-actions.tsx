@@ -24,7 +24,10 @@ export function ReplyActions({
   onRun,
   onDismiss,
   onRequest,
+  label = 'Act on this reply',
 }: {
+  /** What these actions are about, for assistive technology. */
+  label?: string;
   /** null: not asked for yet. */
   actions: ReplyAction[] | null;
   loading: boolean;
@@ -114,7 +117,7 @@ export function ReplyActions({
   }
 
   return (
-    <section aria-label="Act on this reply" className="rounded-xl bg-[var(--surface-container-low)] px-4 py-3">
+    <section aria-label={label} className="rounded-xl bg-[var(--surface-container-low)] px-4 py-3">
       <p className="text-label uppercase tracking-wide text-[var(--on-surface-variant)]">
         {actions.length ? 'What next?' : 'Nothing here needs changing'}
       </p>

@@ -28,6 +28,7 @@ import { NextMoveCard } from './next-move-card';
 import { StageEvaluationPanel } from './evaluation-panel';
 import { CritiqueStyleControl } from './critique-style-control';
 import { CritiqueActions } from './critique-actions';
+import { CritiqueFollowUp } from './critique-follow-up';
 import { RevisedPreview } from './revised-preview';
 import { useApplyFindings } from './use-apply-findings';
 import { generationRequest } from '@/lib/workflow/stage-requests';
@@ -696,13 +697,14 @@ export function WorkflowWorkspace({
     [stage, headItems]
   );
   const runReplyAction = useCallback(
-    async (action: ReplyAction) => {
+    // `from` names where the action came from when it is not the side chat: a Challenge, a Reframe, a Self-audit.
+    async (action: ReplyAction, from?: string) => {
       if (!stage || !appendStageVersion) return;
       if (action.kind === 'revise') {
         // One finding, the ordinary apply path: previewed before it is saved.
         await applyFindings.apply(
-          [{ id: `chat-${Date.now()}`, category: 'Side chat', summary: action.label, suggested_change: action.instruction ?? '' }],
-          { showFirst: true, source: 'the side chat' }
+          [{ id: `chat-${Date.now()}`, category: from ?? 'Side chat', summary: action.label, suggested_change: action.instruction ?? '' }],
+          { showFirst: true, source: from ?? 'the side chat' }
         );
         return;
       }
@@ -714,7 +716,7 @@ export function WorkflowWorkspace({
         instruction: action.label,
         model: project.model,
         mode: project.mode,
-        change_summary: `From the side chat: ${action.label} (${changes.length} row${changes.length === 1 ? '' : 's'}).`,
+        change_summary: `From ${from ?? 'the side chat'}: ${action.label} (${changes.length} row${changes.length === 1 ? '' : 's'}).`,
       });
     },
     [stage, appendStageVersion, applyFindings, headItems, project.model, project.mode]
@@ -1615,14 +1617,19 @@ export function WorkflowWorkspace({
             />
           )}
 
-          {/* PM-22 "buttonize it": each point the critique made is its own Apply. */}
-          {isCurrent && draftable && tools.commentary && critiquePoints.length > 0 && (
+          {/* A critique ends in a few actions, like a chat answer (2 Oct, item 6);
+              its points are still there one by one, behind a disclosure. */}
+          {isCurrent && draftable && tools.commentary && (
             <div className="mb-6">
-              <CritiqueActions
-                title="Act on this critique"
+              <CritiqueFollowUp
+                key={`${tools.commentary.title}:${tools.commentary.text}`}
+                commentary={tools.commentary}
                 points={critiquePoints}
                 busy={applyFindings.running}
-                onApply={(ids, showFirst) =>
+                suggest={suggestReplyActions}
+                previewRows={previewReplyRows}
+                onRun={(action) => runReplyAction(action, tools.commentary!.title)}
+                onApplyPoints={(ids, showFirst) =>
                   void applyFindings.apply(
                     critiquePoints.filter((p) => ids.includes(p.id)).map((p) => findingFromPoint(p, tools.commentary!.title)),
                     { showFirst, source: tools.commentary!.title }

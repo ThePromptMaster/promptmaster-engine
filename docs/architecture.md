@@ -198,9 +198,11 @@ the user chose to keep, and the rest behind "Full history". The claim table's st
 provenance first (`candidate_source`, `no_source`, both undecided) and decisions second.
 
 **Side-chat actions (2026-10-01).** An Ask reply is offered as at most four actions from
-`POST /api/suggest-actions`, not one Apply per bullet (the list parser in
-`critique-points.ts` still serves Challenge / Reframe / Self-audit, where each point is a
-finding). On a prose stage an action is a revision instruction and goes through the
+`POST /api/suggest-actions`, not one Apply per bullet. Since 2026-10-02
+Challenge / Reframe / Self-audit end the same way: their text goes through the same call
+(`critique-follow-up.tsx`), and the per-point list from `critique-points.ts` sits behind a
+closed "Review the points one by one" disclosure. The stage check's own findings are
+unchanged (capped at 3 / 7 / 10 by intensity). On a prose stage an action is a revision instruction and goes through the
 ordinary apply-findings preview. On a table stage it is row changes: `previewRowAction`
 (`lib/workflow/row-actions.ts`, pure) works out the rows as they would be and a plain list
 of what changes, the user reviews it in the chat panel, and saving appends a version with
