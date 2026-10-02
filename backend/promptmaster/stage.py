@@ -91,6 +91,17 @@ def _format_item_schema(schema: StageItemSchema) -> str:
         # clipped and flagged red before the user has touched it.
         limit = f" At most {field.max_chars} characters." if field.max_chars else ""
         lines.append(f"- {field.key}: {label}.{hint}{limit}".rstrip())
+    explained = [s for s in schema.statuses if s.explain]
+    if explained:
+        # The user picks from these; the draft has to describe what was done
+        # in terms that let them pick honestly (2 Oct, item 12: "validated
+        # against earlier-cited studies" sat under a status reading "Reproduced").
+        lines.append(
+            "The user will give each row one of these statuses. Write each row so that it is plain which one applies — "
+            "say what was actually done, and never describe a comparison with earlier work or a consistency check "
+            "as a reproduction or recalculation:"
+        )
+        lines.extend(f"  · {s.label or s.value}: {s.explain}" for s in explained)
     settable = [s for s in schema.statuses if s.model_may_set]
     if settable:
         # What the draft already knows should not have to be typed in again by

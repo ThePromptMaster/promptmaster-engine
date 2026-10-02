@@ -394,6 +394,28 @@ def _runs_schema() -> StageItemSchema:
     )
 
 
+def test_the_prompt_tells_the_draft_what_each_validation_status_certifies(basic_inputs, digest):
+    """2 Oct, item 12: rows read "Reproduced" over text that said nothing had been
+    recalculated. The draft is told what each status means, so what it writes
+    lets the user pick honestly."""
+    schema = StageItemSchema(
+        item_label="result",
+        fields=[_Field(key="result", label="The result"), _Field(key="attempt", label="What was done to validate it")],
+        statuses=[
+            _Status(value="independently_reproduced", label="Independently reproduced", explain="The result was recalculated or re-run from the data and came out the same."),
+            _Status(value="supported_by_prior", label="Supported by prior evidence", explain="It agrees with earlier studies or records. Nothing was recalculated."),
+            _Status(value="not_attempted", label="Not attempted", requires_reason=True, model_may_set=True, explain="No validation was tried. Say why."),
+        ],
+    )
+    stage = StageDescriptor(id="validation", label="Validation", renderer="review", entry_prompt_hint="", artifact_kind="validation_table")
+    system, user = build_stage_prompt(basic_inputs, stage, digest, schema)
+    text = system + user
+    assert "never describe a comparison with earlier work or a consistency check as a reproduction or recalculation" in text
+    assert "· Supported by prior evidence: It agrees with earlier studies or records. Nothing was recalculated." in text
+    assert "You may set: 'not_attempted' (Not attempted)" in text
+    assert "Never set 'independently_reproduced', 'supported_by_prior'" in text
+
+
 def test_the_prompt_says_which_status_the_model_may_set_and_which_it_may_not(basic_inputs, digest):
     stage = StageDescriptor(id="experiment", label="Experiment", renderer="review", entry_prompt_hint="", artifact_kind="runs")
     system, user = build_stage_prompt(basic_inputs, stage, digest, _runs_schema())

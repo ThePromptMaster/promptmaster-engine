@@ -435,7 +435,7 @@ export interface StageItemSchemaRequest {
   min_items: number;
   max_items: number;
   /** Who may set which status; the server keeps a model's status only where this allows. */
-  statuses?: { value: string; label: string; requires_reason: boolean; model_may_set: boolean; model_default: boolean }[];
+  statuses?: { value: string; label: string; requires_reason: boolean; model_may_set: boolean; model_default: boolean; explain?: string }[];
 }
 
 /** One thing to do about a side-chat answer (POST /api/suggest-actions). */

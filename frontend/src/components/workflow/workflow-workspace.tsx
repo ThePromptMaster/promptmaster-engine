@@ -66,7 +66,7 @@ import { ProjectData } from './project-data';
 import { draftBindings } from '@/lib/outline/long-form';
 import { approveOutline, loadOutline, materialiseOutlineInto } from '@/lib/outline/actions';
 import type { OutlineDocument } from '@/types/outline';
-import { stageDrafts, itemSchemaFor, parseItems, rendererHoldsItems, serializeItems, stageContentForChat, type StageItem } from '@/lib/workflow/stage-artifact';
+import { proposableStatuses, stageDrafts, itemSchemaFor, parseItems, rendererHoldsItems, serializeItems, stageContentForChat, type StageItem } from '@/lib/workflow/stage-artifact';
 import { previewRowAction } from '@/lib/workflow/row-actions';
 import { applyLookup, lookupQueries, lookupSummary } from '@/lib/workflow/lookup';
 import { readStageFigures, type StageFigures } from '@/lib/workflow/figures';
@@ -674,9 +674,9 @@ export function WorkflowWorkspace({
             ? {
                 item_label: schema.itemLabel,
                 fields: schema.fields.map((f) => ({ key: f.key, label: f.label })),
-                // Only what the user could choose themselves.
-                statuses: (schema.statuses ?? [])
-                  .filter((s) => s.settable !== false && s.decided !== false)
+                // Only what a change proposed from the chat may set: not a tool's
+                // status, and not one that says something was actually carried out.
+                statuses: proposableStatuses(schema)
                   .map((s) => ({ value: s.value, label: s.label, requires_reason: Boolean(s.requiresReason) })),
                 rows: headItems.map((item) =>
                   Object.fromEntries(Object.entries(item).filter(([k, v]) => typeof v === 'string' && k !== 'status_source')) as Record<string, string>
