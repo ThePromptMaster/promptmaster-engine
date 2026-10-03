@@ -14,6 +14,7 @@ import {
   projectState,
 } from './index';
 import { itemSchemaFor, rendererHoldsItems } from './stage-artifact';
+import { validateTemplate } from './validate';
 import type { StageContext, WorkflowEvent, WorkflowTemplate } from './types';
 
 function emptyContext(overrides: Partial<StageContext> = {}): StageContext {
@@ -50,6 +51,10 @@ describe.each(WORKFLOW_TEMPLATES.map((t) => [t.key, t] as const))(
 
     it('has stages', () => {
       expect(template.stages.length).toBeGreaterThan(0);
+    });
+
+    it('passes the run-time validator a generated workflow must pass', () => {
+      expect(validateTemplate(template, { requireHints: template.key !== 'single_output' })).toEqual([]);
     });
 
     it('has unique stage ids', () => {

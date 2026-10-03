@@ -31,6 +31,7 @@ const rows = TEMPLATES.map((t) => {
     // Book and single_output seed exactly the JSON they seeded before.
     ...(t.derived_outline ? { derived_outline: t.derived_outline } : {}),
     ...(t.nouns ? { nouns: t.nouns } : {}),
+    ...(t.inquiry ? { inquiry: true } : {}),
     stages: t.stages,
   });
   return `  (${sqlString(t.key)}, ${t.version}, ${sqlString(t.name)}, ${sqlString(t.description)}, ${sqlString(definition)}::jsonb)`;
