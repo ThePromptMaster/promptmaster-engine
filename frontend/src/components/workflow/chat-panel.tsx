@@ -128,6 +128,8 @@ interface Props {
   isTable?: boolean;
   /** Where the user is, sent with every question (3 Oct call). */
   getChatContext?: () => ChatContext;
+  /** Questions offered before the user types, from the stage's state (3 Oct call). */
+  starters?: string[];
 }
 
 /**
@@ -169,6 +171,7 @@ export function ChatPanel({
   applying = false,
   isTable = false,
   getChatContext,
+  starters = [],
 }: Props) {
   const [offerActions, setOfferActions] = useState(true);
   useEffect(() => setOfferActions(readOfferActions()), []);
@@ -520,6 +523,21 @@ export function ChatPanel({
               selection={selection}
               hasContent={content.trim().length > 0}
             />
+          )}
+
+          {mode === 'discuss' && !chat.loading && chat.messages.length === 0 && !chat.busy && !conflicting && starters.length > 0 && (
+            <div role="group" aria-label="Suggested questions" className="mb-2 flex flex-col gap-1.5">
+              {starters.map((q) => (
+                <button
+                  key={q}
+                  type="button"
+                  onClick={() => void chat.discuss(q)}
+                  className="rounded-lg bg-[var(--surface-container-low)] px-3 py-1.5 text-left text-label text-[var(--on-surface)] hover:bg-[var(--surface-container-high)]"
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
           )}
 
           <div
