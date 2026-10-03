@@ -280,6 +280,18 @@ not while the stage can advance (`withoutOverride`), so Go cannot sit a "Stuck" 
 a "Nothing outstanding — move on" suggestion (screenshot 2). The user can still mark any
 stage stuck by hand.
 
+**A run going round in circles stops (2026-10-03).** Two guards, both pure and both before
+any model call. `stateFingerprint` (`lib/agent/policy.ts`) reduces a fresh read to one
+string — current stage, every stage's head version id, the event count, the blocking
+criteria met, chapters written, rows decided, outline approved — and the loop records it
+after each performed move; three in a row the same stops the run with "The last 3 moves
+changed nothing on this stage … Tell me what to do differently, or do the next part
+yourself and press Resume." `alternating` catches two moves taking turns on one stage for
+three rounds (check, apply, check, apply, check, apply), which the same-move guard never
+saw. The step timeline folds consecutive identical steps into one row with a count
+(`collapseSteps`). The client's 2 Oct execution log was that loop: "Move to the next
+stage", "Apply the findings", "Check this stage", repeated, then "Could not continue".
+
 **A stop is re-checked (2026-10-01).** When a run stops for the user it records what it
 needs (`agent_runs.needs`, with `onStage`). `useGoLoop` re-reads the stage whenever the
 project changes and asks `needStillHolds` (`lib/agent/needs.ts`, pure); a request the user

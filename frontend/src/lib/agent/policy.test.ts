@@ -3,9 +3,10 @@ import { describe, expect, it } from 'vitest';
 import { RESEARCH_V1, SINGLE_OUTPUT_V1 } from '@/lib/workflow';
 import { BOOK_V1 } from '@/lib/workflow/templates/book.v1';
 import { initialState } from '@/lib/workflow/engine';
+import type { StageEvaluation } from '@/lib/workflow/types';
 import type { AgentStep } from '@/types/agent';
 import { deriveExecutionLabel } from './labels';
-import { allowedActions, withoutOverride, fitsBudget, noProgress, plannedBeforeLatestChange, preempt, shouldPause, stageMoveActor } from './policy';
+import { allowedActions, alternating, withoutOverride, fitsBudget, noChange, noProgress, plannedBeforeLatestChange, preempt, shouldPause, stageMoveActor, stateFingerprint } from './policy';
 
 function step(over: Partial<AgentStep>): AgentStep {
   return {
@@ -414,5 +415,41 @@ describe('withoutOverride: a stage whose requirements are met is not stuck (2 Oc
 
   it('keeps the stuck move on the last stage, where there is nowhere to advance to', () => {
     expect(withoutOverride(['mark_blocked', 'declare_objective_complete'], true, 'guided')).toContain('mark_blocked');
+  });
+});
+
+describe('a run going round in circles stops (2 Oct, screenshot 7)', () => {
+  it('two moves taking turns on one stage is no progress; a third move breaks the pattern', () => {
+    const check = (idx: number) => step({ idx, action_key: 'evaluate_stage' });
+    const apply = (idx: number) => step({ idx, action_key: 'apply_findings' });
+    const circle = [check(0), apply(1), check(2), apply(3), check(4), apply(5)];
+    expect(alternating(circle)).toEqual(['evaluate_stage', 'apply_findings']);
+    expect(noProgress(circle)).toBe(true);
+    expect(preempt({ ...base, steps: circle })?.reason).toBe(
+      '"Check this stage" and "Apply the findings" have been taking turns on this stage without it moving on. It needs your direction.'
+    );
+    // A check, a revision and a second check is ordinary work, not a loop.
+    expect(alternating([check(0), apply(1), check(2), apply(3)])).toBeNull();
+    expect(alternating([...circle.slice(0, 5), step({ idx: 5, action_key: 'advance_stage' })])).toBeNull();
+    // Different stages are different work.
+    expect(alternating([check(0), apply(1), check(2), apply(3), { ...check(4), stage_id: 'other' }, apply(5)])).toBeNull();
+  });
+
+  it('a fingerprint changes when the project does, and not otherwise', () => {
+    const bundles = { experiment: { artifact: null, versions: [{ id: 'v1' }] } } as never;
+    const evaluation: StageEvaluation = { stageId: 'experiment', canAdvance: false, criteria: [{ id: 'a', label: 'A', satisfied: false, blocking: true }], unmet: [] };
+    const base = { state: research, bundles, events: [1, 2], facts: {}, stageEvaluation: evaluation };
+    const same = stateFingerprint(base);
+    expect(stateFingerprint({ ...base, facts: {} })).toBe(same);
+    expect(stateFingerprint({ ...base, events: [1, 2, 3] })).not.toBe(same);
+    expect(stateFingerprint({ ...base, bundles: { experiment: { artifact: null, versions: [{ id: 'v2' }] } } as never })).not.toBe(same);
+    expect(stateFingerprint({ ...base, stageEvaluation: { ...evaluation, criteria: [{ id: 'a', label: 'A', satisfied: true, blocking: true }] } })).not.toBe(same);
+    expect(stateFingerprint({ ...base, state: { ...research, current_stage_id: 'literature' } })).not.toBe(same);
+  });
+
+  it('three performed moves that left the project as it was is a stop, said as what to do', () => {
+    expect(noChange(['x', 'x'])).toBeNull();
+    expect(noChange(['y', 'x', 'x', 'x'])).toMatch(/^The last 3 moves changed nothing on this stage/);
+    expect(noChange(['x', 'x', 'y'])).toBeNull();
   });
 });
