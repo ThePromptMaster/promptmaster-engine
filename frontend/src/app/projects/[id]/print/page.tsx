@@ -3,6 +3,7 @@
 import { use, useEffect, useMemo, useState } from 'react';
 
 import { MarkdownOutput } from '@/components/shared/markdown-output';
+import { ProjectImagesProvider } from '@/components/shared/project-images';
 import { toManuscriptMarkdown } from '@/lib/export/project-export';
 import { getLatestTemplate, getTemplateById } from '@/lib/supabase/workflow';
 import { initialState } from '@/lib/workflow/engine';
@@ -17,6 +18,7 @@ import { useProjectStore } from '@/stores/project-store';
 export default function PrintPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const project = useProjectStore((s) => s.project);
+  const files = useProjectStore((s) => s.files);
   const stages = useProjectStore((s) => s.stages);
   const loading = useProjectStore((s) => s.loading);
   const error = useProjectStore((s) => s.error);
@@ -56,7 +58,9 @@ export default function PrintPage({ params }: { params: Promise<{ id: string }> 
         <span className="text-label text-[var(--on-surface-variant)]">Choose “Save as PDF” as the printer.</span>
       </div>
       {markdown ? (
-        <MarkdownOutput content={markdown} />
+        <ProjectImagesProvider files={files}>
+          <MarkdownOutput content={markdown} />
+        </ProjectImagesProvider>
       ) : (
         <p className="text-body text-[var(--on-surface-variant)]">Nothing has been written yet.</p>
       )}

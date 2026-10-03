@@ -21,7 +21,7 @@ test('a CSV attached to the project is read by the code Go runs', async ({ page 
   await expect(stageArtifact(page)).toContainText('Mock', { timeout: 30_000 });
 
   const data = page.getByRole('region', { name: 'Project data' });
-  await expect(data).toContainText('No data attached. Without data, analyses can be planned but not run');
+  await expect(data).toContainText('No data or images attached. Without data, analyses can be planned but not run');
   await data.getByLabel('Attach data files').setInputFiles({
     name: 'accounts.csv', mimeType: 'text/csv',
     buffer: Buffer.from('account_id,plan,churned\nA1,Mid-Market,1\nA2,Enterprise,0\nA3,Mid-Market,1\n'),
@@ -34,10 +34,10 @@ test('a CSV attached to the project is read by the code Go runs', async ({ page 
   await expect(data).toContainText('churn-workbook - Accounts.csv');
   await expect(data).toContainText('12 rows · account_id, segment, seats, churned');
   await expect(data).toContainText('churn-workbook - Notes.csv');
-  await expect(data).toContainText('Data · 3 files');
+  await expect(data).toContainText('Data and images · 3 files');
   // Something that is not data is refused, and says what is accepted.
   await data.getByLabel('Attach data files').setInputFiles({ name: 'deck.pdf', mimeType: 'application/pdf', buffer: Buffer.from('x') });
-  await expect(data.getByRole('alert')).toContainText('not a spreadsheet (.xlsx), CSV, TSV, JSON or text file');
+  await expect(data.getByRole('alert')).toContainText('not a spreadsheet (.xlsx), CSV, TSV, JSON, text or image');
   await page.screenshot({ path: test.info().outputPath('01-data-attached.png'), fullPage: true });
 
   const panel = page.getByRole('region', { name: 'Go mode', exact: true });
