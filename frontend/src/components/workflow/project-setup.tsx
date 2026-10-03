@@ -107,7 +107,8 @@ export function ProjectSetup({ project, stage, onPatch, readOnly }: Props) {
         Project setup
       </h3>
       <p className="mt-1 mb-5 text-label text-[var(--on-surface-variant)]">
-        Carried into every stage of this project, not just this one.
+        Carried into every stage of this project, not just this one. Your objective is what every stage is
+        written against: what PromptMaster drafts below sharpens it and never replaces it.
       </p>
 
       <div className="space-y-5">
@@ -176,7 +177,8 @@ export function ProjectBrief({ project, onPatch, readOnly }: Omit<Props, 'stage'
         )}
       </summary>
       <p className="mt-3 mb-4 text-label text-[var(--on-surface-variant)]">
-        Every stage is written against this. Change it here and the next draft follows.
+        Every stage is written against this — your words, not any stage&apos;s restatement of them. Change it here
+        and the next draft follows.
       </p>
       <div className="space-y-4">
         {ORDER.map((key) => {

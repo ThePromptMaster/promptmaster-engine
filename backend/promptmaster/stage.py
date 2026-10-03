@@ -150,6 +150,10 @@ def _example_json(schema: StageItemSchema) -> str:
     )
 
 
+# The first stage's artifact in each workflow: a restatement of the objective.
+_OBJECTIVE_KINDS = {"objective_statement", "research_question"}
+
+
 def build_stage_prompt(
     inputs: PMInput,
     stage: StageDescriptor,
@@ -185,6 +189,24 @@ def build_stage_prompt(
         f"Output format: {inputs.output_format or '(none)'}",
         "",
         f"WHAT THE EARLIER STAGES ESTABLISHED:\n{_format_digest(digest)}",
+        "",
+        # The user's words govern. The first stage writes a statement of the
+        # objective, and later stages saw that statement beside the original
+        # with nothing saying which wins — so "write a book about lions"
+        # drifted into whatever the statement made of it (the client, 2 Oct).
+        "THE ORIGINAL OBJECTIVE IS THE USER'S OWN WORDS AND GOVERNS. The earlier "
+        "stages elaborate it; none of them changes what is being made, for whom, "
+        "or about what. Where a summary above and the original objective "
+        "disagree, the original objective wins.",
+        *(
+            [
+                "This stage's statement sharpens the user's objective; it keeps the "
+                "deliverable and the subject exactly as the user named them. It may say "
+                "what success looks like and what is out of scope; it may not make "
+                "something else."
+            ]
+            if stage.artifact_kind in _OBJECTIVE_KINDS else []
+        ),
         "",
         f"STAGE TO PRODUCE: {stage.label or stage.id}",
     ]

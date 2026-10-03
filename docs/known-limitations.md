@@ -371,6 +371,16 @@ enough to know the draft exists and what it covers. The full text, bounded at 12
 goes only to the call that drafts the review. A planner that needs to judge a late chapter
 cannot; it can only draft the review, which can. The planner runs on every step, so the
 whole manuscript on every call would pay for the same text over and over.
+### L-27 · The user's brief has no copy of its own · `accepted`
+
+`projects.objective` is the user's typed brief, and nothing in setup or any stage
+rewrites it (the setup suggester returns no objective). But it is editable in place from
+the first stage and from the project brief, so an edit replaces the original with no
+record of what it was. A separate immutable `brief` column was considered on 2026-10-03
+and not added: the drift the client saw came from the first stage's *statement* of the
+objective being read as if it governed, which the prompt now says it does not, and from
+the brief being easy to overlook, which the page now addresses. If a record of the
+original wording is ever needed, it is a nullable column set at creation.
 
 ---
 
@@ -404,6 +414,7 @@ whole manuscript on every call would pay for the same text over and over.
 | L-24 | Review stages see the manuscript up to 120k characters | accepted |
 | L-25 | Revision snapshots have no one-click restore into sections | open |
 | L-26 | Go's planner reads a 6,000-character opening of the manuscript on review stages | accepted |
+| L-27 | The user's brief has no immutable copy; edits replace it in place | accepted |
 
 ### L-B3 — Go mode code execution: Python only, fixed package set, no network
 
