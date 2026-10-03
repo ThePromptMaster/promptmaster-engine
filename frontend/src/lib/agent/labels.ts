@@ -81,3 +81,32 @@ export const RUN_STATUS_TEXT: Record<AgentRun['status'], string> = {
   stopped: 'Stopped',
   failed: 'Failed',
 };
+
+/**
+ * Consecutive steps that read the same — same move, same status, same label,
+ * same output — folded into one row with a count. The client's execution log
+ * showed "Move to the next stage", "Apply the findings", "Check this stage"
+ * repeated down the screen before "Could not continue" (2 Oct, screenshot 7).
+ * A row carries the latest of its steps, so the last row is still the last step.
+ */
+export function collapseSteps<T extends Pick<AgentStep, 'action_key' | 'status' | 'execution_label' | 'output'>>(
+  steps: readonly T[]
+): { step: T; repeats: number }[] {
+  const out: { step: T; repeats: number }[] = [];
+  for (const s of steps) {
+    const prev = out.at(-1);
+    if (
+      prev &&
+      prev.step.action_key === s.action_key &&
+      prev.step.status === s.status &&
+      prev.step.execution_label === s.execution_label &&
+      prev.step.output === s.output
+    ) {
+      prev.step = s;
+      prev.repeats += 1;
+    } else {
+      out.push({ step: s, repeats: 1 });
+    }
+  }
+  return out;
+}

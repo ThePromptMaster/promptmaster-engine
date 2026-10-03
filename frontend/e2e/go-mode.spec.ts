@@ -264,7 +264,9 @@ test('A run making no progress stops for direction, and Resume carries on', asyn
 
   // Resuming is the user's direction to continue — it must not re-trip on the same three steps.
   await goPanel(page).getByRole('button', { name: 'Resume' }).click();
-  await expect(steps(page).nth(3)).toContainText('Prove');
+  // The three identical derives are one row with a count; Prove is the next row (2 Oct, screenshot 7).
+  await expect(steps(page).nth(0)).toContainText('×3');
+  await expect(steps(page).nth(1)).toContainText('Prove');
   await expect(transparency).toContainText('the deliverable is not');
   const recorded = await stepsOf((await runOf(id)).id);
   expect(recorded.map((s) => s.action_key)).toEqual(['derive', 'derive', 'derive', 'prove', 'declare_objective_complete']);

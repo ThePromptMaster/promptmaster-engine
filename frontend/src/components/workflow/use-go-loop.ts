@@ -42,7 +42,7 @@ import { requestProjectCancel } from '@/lib/supabase/jobs';
 import { authorizeRun } from '@/lib/agent/authorize';
 import { buildAgentState } from '@/lib/agent/digest';
 import { performStep, type PerformContext, type StepOutcome } from '@/lib/agent/perform';
-import { allowedActions, LIVE_TOOLS, withoutOverride, DEFAULT_BUDGET_STEPS, fitsBudget, plannedBeforeLatestChange, preempt, shouldPause, stepCost } from '@/lib/agent/policy';
+import { allowedActions, LIVE_TOOLS, withoutOverride, DEFAULT_BUDGET_STEPS, fitsBudget, noChange, plannedBeforeLatestChange, preempt, shouldPause, stateFingerprint, stepCost } from '@/lib/agent/policy';
 import {
   createAgentRun,
   endAgentRun,
@@ -193,6 +193,14 @@ export function useGoLoop(opts: Options) {
    * on, and re-reading the same three steps made it an instant dead end.
    */
   const sinceRef = useRef(0);
+  /**
+   * What the project was after each performed move since the last Go/Resume
+   * (`stateFingerprint`). Three in a row the same is a run going round in
+   * circles (2 Oct, screenshot 7), whatever the moves were called.
+   */
+  const fingerprintsRef = useRef<string[]>([]);
+  /** A move that counted against the window was performed since the last read. */
+  const performedRef = useRef(false);
   const tabId = useRef<string>('');
   if (!tabId.current && typeof window !== 'undefined') tabId.current = tabIdentity();
 
@@ -310,6 +318,10 @@ export function useGoLoop(opts: Options) {
         const used = (runRef.current?.steps_used ?? 0) + 1;
         await updateAgentRun(current.id, { steps_used: used, heartbeat_at: new Date().toISOString() });
         commitRun({ ...runRef.current!, steps_used: used });
+        // A reasoning move (derive, prove, …) is work that lives in the step
+        // itself and changes nothing on the stage by design; only the moves
+        // that are supposed to change the project are judged by whether they did.
+        if (actionFor(step.action_key)?.performer !== 'reason') performedRef.current = true;
       }
 
       if (outcome.followUp) followRef.current = outcome.followUp;
@@ -379,9 +391,10 @@ export function useGoLoop(opts: Options) {
         }
 
         setPhase('thinking');
+        const freshEvents = o.loadEvents ? await o.loadEvents() : o.events;
         const facts: StageFacts = await readStageFacts({
           project: o.project, template: o.template, stage: o.stage, bundles: o.bundles,
-          events: o.loadEvents ? await o.loadEvents() : o.events, latestEvaluation: o.latestEvaluation,
+          events: freshEvents, latestEvaluation: o.latestEvaluation,
         });
         if (signal.aborted) throw new Stopped();
         // What the project has already decided, from its own records (1 Oct, item 20).
@@ -406,6 +419,20 @@ export function useGoLoop(opts: Options) {
         // is told (1 Oct, item 1).
         const context = contextWithFacts(o.context, o.stage, facts);
         const stageEvaluation = evaluateStage(o.template, o.stage.id, context);
+
+        // After a performed move, what the project is now. Three moves that
+        // left it exactly as it was is a run going round in circles — the
+        // client's log of repeated "Check this stage" / "Apply the findings"
+        // (2 Oct, screenshot 7) — and stops here, before another model call.
+        if (performedRef.current) {
+          performedRef.current = false;
+          fingerprintsRef.current.push(stateFingerprint({ state: o.state, bundles: o.bundles, events: freshEvents, facts, stageEvaluation }));
+          const circling = noChange(fingerprintsRef.current);
+          if (circling) {
+            await setRunStatus('blocked', circling);
+            break;
+          }
+        }
         const proposedSkipHere = [...priorStepsRef.current, ...stepsRef.current].some(
           (s) => s.action_key === 'propose_skip' && s.stage_id === o.stage!.id
         );
@@ -525,6 +552,8 @@ export function useGoLoop(opts: Options) {
       largeJobOkRef.current = null;
       followRef.current = null;
       sinceRef.current = 0;
+      fingerprintsRef.current = [];
+      performedRef.current = false;
       autoLeftRef.current = chosen === 'autonomous' ? autoWindows : 0;
       setAutoPending(autoLeftRef.current > 0);
       void loop();
@@ -571,6 +600,8 @@ export function useGoLoop(opts: Options) {
       commitSteps([]);
       followRef.current = null;
       sinceRef.current = 0;
+      fingerprintsRef.current = [];
+      performedRef.current = false;
       void loop();
     } catch (e) {
       // A window the loop tried to start itself and the database refused is
@@ -589,6 +620,8 @@ export function useGoLoop(opts: Options) {
       // it keeps its budget and its history.
       if (live && !live.ended_at && live.policy === policy && (live.status === 'blocked' || live.status === 'awaiting_decision') && !pendingStepId) {
         sinceRef.current = stepsRef.current.length;
+        fingerprintsRef.current = [];
+        performedRef.current = false;
         await updateAgentRun(live.id, { status: 'running', stop_reason: null, needs: null, lease_holder: tabId.current, heartbeat_at: new Date().toISOString() });
         commitRun({ ...live, status: 'running', stop_reason: null, needs: null });
         void loop();
@@ -775,6 +808,8 @@ export function useGoLoop(opts: Options) {
       priorStepsRef.current = await listChainSteps(found).catch(() => []);
       // The no-progress guard counts from here, as it does after Resume.
       sinceRef.current = repaired.length;
+      fingerprintsRef.current = [];
+      performedRef.current = false;
       const waiting = repaired.find((s) => s.status === 'awaiting_decision');
       if (waiting) {
         setPendingStepId(waiting.id);

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 
 import { MarkdownOutput } from '@/components/shared/markdown-output';
 import { actionLabel } from '@/lib/agent/actions';
-import { STEP_STATUS_TEXT } from '@/lib/agent/labels';
+import { collapseSteps, STEP_STATUS_TEXT } from '@/lib/agent/labels';
 import { createClient } from '@/lib/supabase/client';
 import { getSandboxRun } from '@/lib/supabase/agent';
 import type { AgentStep } from '@/types/agent';
@@ -59,10 +59,12 @@ function SandboxFiles({ runId }: { runId: string }) {
 
 export function StepTimeline({ steps }: { steps: AgentStep[] }) {
   if (!steps.length) return null;
+  // Repeated identical steps are one row with a count (2 Oct, screenshot 7).
+  const rows = collapseSteps(steps);
   return (
     <ol aria-label="Go mode steps" className="space-y-2">
-      {steps.map((s) => (
-        <li key={s.id} data-step-status={s.status} className="rounded-xl bg-[var(--surface-container-low)] px-4 py-3">
+      {rows.map(({ step: s, repeats }) => (
+        <li key={s.id} data-step-status={s.status} data-repeats={repeats > 1 ? repeats : undefined} className="rounded-xl bg-[var(--surface-container-low)] px-4 py-3">
           <details open={s.status === 'running' || s.idx === steps.at(-1)?.idx}>
             <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2">
               <span
@@ -75,6 +77,7 @@ export function StepTimeline({ steps }: { steps: AgentStep[] }) {
               </span>
               <span className="text-label text-[var(--on-surface-variant)]">{s.idx + 1}.</span>
               <span className="text-title text-[var(--on-surface)]">{actionLabel(s.action_key)}</span>
+              {repeats > 1 && <span className="text-label text-[var(--on-surface-variant)]">×{repeats}</span>}
               <ExecutionBadge label={s.execution_label} />
               <span className="ml-auto text-label text-[var(--on-surface-variant)]">{STEP_STATUS_TEXT[s.status]}</span>
             </summary>

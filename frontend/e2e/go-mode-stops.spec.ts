@@ -300,6 +300,33 @@ test('a stuck stage says whether anything changed; a retry is called a retry; ne
  * panel's own controls are scrolled out of view, a copy is pinned at the top
  * of the work column, and says when Go is waiting for the user.
  */
+/**
+ * 2 Oct, screenshot 7 — the execution log showed the same move repeated down
+ * the screen before "Could not continue". Identical consecutive steps are now
+ * one row with a count, and the run stops on its own when it goes round in
+ * circles.
+ */
+test('repeated identical steps fold into one row, and the run stops rather than repeat a fourth time', async ({ page }) => {
+  await createProject(page, {
+    workflow: 'Research', name: 'E2E go repeats',
+    objective: 'Pendulum [[mock:plan=derive,derive,derive,derive]]',
+  });
+  await expect(stageArtifact(page)).toContainText('Mock', { timeout: 30_000 });
+  const panel = goPanel(page);
+  await panel.getByRole('button', { name: 'Set up Go' }).click();
+  await panel.getByRole('radio', { name: /^Autonomous/ }).click();
+  await panel.getByRole('button', { name: /^Go$/ }).click();
+  await page.getByRole('button', { name: 'Authorize and go' }).click();
+
+  const transparency = page.getByRole('region', { name: 'What Go mode is doing' });
+  await expect(transparency).toContainText('was chosen 3 times in a row on this stage without moving on', { timeout: 60_000 });
+  const steps = page.getByRole('list', { name: 'Go mode steps' });
+  await expect(steps.locator('[data-repeats="3"]')).toHaveCount(1);
+  await expect(steps.locator('[data-repeats="3"]')).toContainText('×3');
+  await expect(steps.getByRole('listitem')).toHaveCount(1);
+  await page.screenshot({ path: test.info().outputPath('01-repeated-steps-fold-into-one-row.png'), fullPage: true });
+});
+
 test('the Go controls stay in view while the page is scrolled, and point back when Go needs the user', async ({ page }) => {
   await createProject(page, { workflow: 'Research', name: 'E2E go dock', objective: 'Pendulum [[mock:plan=derive,prove]]' });
   await expect(stageArtifact(page)).toContainText('Mock', { timeout: 30_000 });

@@ -17,7 +17,8 @@
 
 import { stageDrafts } from '@/lib/workflow/stage-artifact';
 import { nextSuggestedStage } from '@/lib/workflow/engine';
-import type { StageDefinition, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
+import type { StageArtifactBundle } from '@/lib/workflow/digest';
+import type { StageDefinition, StageEvaluation, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
 import type { AgentRunStatus, AgentStep, ExecutionPolicy } from '@/types/agent';
 import { actionFor } from './actions';
 import type { StageFacts } from './facts';
@@ -26,6 +27,8 @@ export const DEFAULT_BUDGET_STEPS = 12;
 /** The same move on the same stage this many times running is not progress. */
 export const NO_PROGRESS_REPEATS = 3;
 export const MAX_CONSECUTIVE_FAILURES = 2;
+/** This many performed moves in a row that left the project exactly as it was is not progress either. */
+export const NO_CHANGE_STEPS = 3;
 
 /**
  * Moving past something a stage requires is an override, and an override is
@@ -146,6 +149,14 @@ export function preempt(input: {
   if (tail.length === MAX_CONSECUTIVE_FAILURES && tail.every((s) => s.status === 'failed')) {
     return { status: 'failed', reason: `The last ${MAX_CONSECUTIVE_FAILURES} steps failed. Stopping rather than retrying blind.` };
   }
+  const pair = alternating(finished);
+  if (pair) {
+    const name = (k: string) => actionFor(k)?.label ?? k;
+    return {
+      status: 'blocked',
+      reason: `"${name(pair[0])}" and "${name(pair[1])}" have been taking turns on this stage without it moving on. It needs your direction.`,
+    };
+  }
   if (noProgress(finished)) {
     const last = finished.at(-1)!;
     return {
@@ -158,8 +169,75 @@ export function preempt(input: {
 
 export function noProgress(finished: readonly AgentStep[]): boolean {
   const tail = finished.slice(-NO_PROGRESS_REPEATS);
-  if (tail.length < NO_PROGRESS_REPEATS) return false;
-  return tail.every((s) => s.action_key === tail[0].action_key && s.stage_id === tail[0].stage_id);
+  if (tail.length >= NO_PROGRESS_REPEATS && tail.every((s) => s.action_key === tail[0].action_key && s.stage_id === tail[0].stage_id)) {
+    return true;
+  }
+  return alternating(finished) !== null;
+}
+
+/** Two moves taking turns this many times over is a loop, not a second pass. */
+export const ALTERNATING_ROUNDS = 3;
+
+/**
+ * Two moves taking turns on one stage — check, apply, check, apply, check,
+ * apply — is the loop the client's execution log showed (2 Oct, screenshot 7:
+ * "Check this stage", "Apply the findings", over and over, then "Mark this
+ * stage stuck"). The same-move guard never saw it. Three rounds, not two: a
+ * check followed by a revision and a second check is ordinary work. Returns
+ * the pair, or null.
+ */
+export function alternating(finished: readonly AgentStep[]): [string, string] | null {
+  const n = ALTERNATING_ROUNDS * 2;
+  const tail = finished.slice(-n);
+  if (tail.length < n) return null;
+  const [a, b] = tail;
+  if (a.action_key === b.action_key || !tail.every((s) => s.stage_id === a.stage_id)) return null;
+  const holds = tail.every((s, i) => s.action_key === (i % 2 === 0 ? a.action_key : b.action_key));
+  return holds ? [a.action_key, b.action_key] : null;
+}
+
+/**
+ * What the project is, in one string, so two reads can be compared (2 Oct,
+ * screenshot 7). Pure. Changes when a stage moves, a version lands, an event
+ * is recorded, a blocking requirement is met, a chapter is written, a row is
+ * decided or the outline is approved — and not otherwise.
+ */
+export function stateFingerprint(input: {
+  state: WorkflowState;
+  bundles: Record<string, StageArtifactBundle>;
+  events: readonly unknown[];
+  facts: StageFacts;
+  stageEvaluation: StageEvaluation;
+}): string {
+  const { state, bundles, events, facts, stageEvaluation } = input;
+  const heads = Object.keys(bundles)
+    .sort()
+    .map((id) => `${id}=${bundles[id]?.versions.at(-1)?.id ?? ''}`)
+    .join(',');
+  const met = stageEvaluation.criteria.filter((c) => c.blocking && c.satisfied).map((c) => c.id).sort().join(',');
+  return [
+    state.current_stage_id,
+    heads,
+    `events:${events.length}`,
+    `met:${met}`,
+    `chapters:${facts.manuscript?.complete ?? ''}`,
+    `decided:${facts.review ? facts.review.items.length - facts.review.routine.length - facts.review.material.length : ''}`,
+    `outline:${facts.outline?.approved ?? ''}`,
+  ].join('|');
+}
+
+/**
+ * The last NO_CHANGE_STEPS performed moves left the project exactly as it
+ * was: the stop, said as what the user can do about it. Null while the run
+ * is changing something.
+ */
+export function noChange(fingerprints: readonly string[]): string | null {
+  const tail = fingerprints.slice(-NO_CHANGE_STEPS);
+  if (tail.length < NO_CHANGE_STEPS || !tail.every((f) => f === tail[0])) return null;
+  return (
+    `The last ${NO_CHANGE_STEPS} moves changed nothing on this stage — no new version, no decision recorded, ` +
+    'no requirement met. Tell me what to do differently, or do the next part yourself and press Resume.'
+  );
 }
 
 /**
