@@ -248,6 +248,19 @@ Resume / Stop / Go). It handles near misses differently from names that don't ex
 - A near miss ("Generate Outline" for "Generate the outline") is corrected to the page's words.
 - Any other name is rewritten as plain words, followed by "(there is no button for this on this page)".
 
+**Precedence (2026-10-03).** `promptmaster/precedence.py` defines one order for contradictions:
+1. the objective
+2. the user's decisions
+3. the user's latest instruction
+4. the stage's instruction
+5. constraints and format
+6. the mode
+7. anything a model wrote earlier
+
+The self-model states this order, so it reaches every prompt. A reply says which side it followed; the work itself just follows it. The self-model also says that a "write a book" objective is what the outline serves, not an order to write chapters on that stage.
+
+The PM-24 conflict prompt still asks the user. It preselects the side the order favours (`recommendedControl`, `lib/workflow/precedence.ts`), and `precedence-drift.test.ts` keeps the two copies of the order equal.
+
 ## Go mode (Phase B: PM-12, PM-15, PM-17 … PM-20)
 
 The next-best-action loop runs **in the browser** (`components/workflow/use-go-loop.ts`)

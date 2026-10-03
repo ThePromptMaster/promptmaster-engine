@@ -3,6 +3,7 @@
 import { useState } from 'react';
 
 import { describeWith, type Controls, type InstructionConflict } from '@/lib/workflow/instruction-conflicts';
+import { recommendedControl } from '@/lib/workflow/precedence';
 
 const KIND: Record<InstructionConflict['kind'], string> = {
   objective: 'your objective',
@@ -29,7 +30,9 @@ export function ConflictPrompt({
   onContinue: (choices: Controls[]) => void;
   onCancel: () => void;
 }) {
-  const [choices, setChoices] = useState<(Controls | null)[]>(conflicts.map(() => null));
+  // The order recommends a side ("choose the higher one", 3 Oct call); the
+  // user still chooses, and can change it with one click.
+  const [choices, setChoices] = useState<(Controls | null)[]>(conflicts.map((c) => recommendedControl(c.kind)));
   const ready = choices.every((c) => c !== null);
   return (
     <section aria-label="Which takes priority?" className="rounded-xl bg-[var(--surface-container-high)] px-4 py-3">
@@ -58,6 +61,7 @@ export function ConflictPrompt({
                   }`}
                 >
                   {value === 'new' ? 'My new instruction takes priority' : `Keep ${describeWith(c)}`}
+                  {recommendedControl(c.kind) === value && ' (recommended)'}
                 </button>
               ))}
             </div>
@@ -78,7 +82,7 @@ export function ConflictPrompt({
           Cancel
         </button>
       </div>
-      <p className="mt-2 text-label text-[var(--on-surface-variant)]">Your choice is recorded, and PromptMaster is told which one takes priority.</p>
+      <p className="mt-2 text-label text-[var(--on-surface-variant)]">Recommended follows PromptMaster's order — your objective, then your decisions, then your newest instruction, then the stage and the constraints. Your choice is recorded, and PromptMaster is told which one takes priority.</p>
     </section>
   );
 }
