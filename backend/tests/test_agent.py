@@ -479,6 +479,42 @@ def test_the_planner_is_told_what_data_exists_and_when_there_is_none():
     assert "say what data is missing" in without
 
 
+def _book_workflow():
+    from promptmaster.agent import AgentWorkflow, AgentWorkflowStage
+
+    return AgentWorkflow(key="book", label="Book", has_data_stages=False, stages=[
+        AgentWorkflowStage(label="Objective and purpose", renderer="prose"),
+        AgentWorkflowStage(label="Drafting", renderer="long_form"),
+        AgentWorkflowStage(label="Critique", renderer="review"),
+    ])
+
+
+def test_the_planner_is_told_the_workflow_and_its_stages():
+    """2 Oct, screenshot 8: Go asked a book project for "the planned runs with
+    their observed outcomes". It had never been told which workflow it was on."""
+    state = STATE.model_copy(update={"workflow": _book_workflow()})
+    _, user = build_next_action_prompt(INPUTS, state, RESEARCH, "guided")
+    assert "WORKFLOW: Book — Objective and purpose › Drafting [chapters] › Critique [review table]" in user
+    assert user.index("WORKFLOW: Book") < user.index("CURRENT STAGE:")
+
+
+def test_the_data_line_is_for_workflows_with_a_stage_a_computation_serves():
+    from promptmaster.agent import AgentWorkflow
+
+    # A book: no stage runs anything, so "no data" is not a lack.
+    _, book = build_next_action_prompt(INPUTS, STATE.model_copy(update={"workflow": _book_workflow()}), RESEARCH, "guided")
+    assert "DATA THE PROJECT HOLDS: none" not in book
+    assert "DATA: this is a book workflow — writing, not computation." in book
+    assert "never mark a stage stuck for the lack of one" in book
+    # Research: as before.
+    research = AgentWorkflow(key="research", label="Research", has_data_stages=True)
+    _, res = build_next_action_prompt(INPUTS, STATE.model_copy(update={"workflow": research}), RESEARCH, "guided")
+    assert "DATA THE PROJECT HOLDS: none" in res
+    # A book with a file attached is shown the file, like anyone.
+    _, with_file = build_next_action_prompt(INPUTS, _state_with_data().model_copy(update={"workflow": _book_workflow()}), RESEARCH, "guided")
+    assert "DATA THE PROJECT HOLDS (readable by code you run" in with_file
+
+
 def test_the_code_writer_is_told_to_read_only_listed_files_and_never_invent_data():
     from promptmaster.agent import build_write_code_prompt
 

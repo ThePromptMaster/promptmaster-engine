@@ -35,10 +35,18 @@ describe('allowedActions', () => {
     expect(drafted).not.toContain('draft_stage');
   });
 
-  it('always lets the run ask, block or finish', () => {
-    expect(allowedActions(RESEARCH_V1, research, RESEARCH_V1.stages[0], false)).toEqual(
-      expect.arrayContaining(['mark_blocked', 'request_user_decision', 'declare_objective_complete'])
-    );
+  it('always lets the run ask or finish, and block once the stage has been tried', () => {
+    const undrafted = allowedActions(RESEARCH_V1, research, RESEARCH_V1.stages[0], false);
+    expect(undrafted).toEqual(expect.arrayContaining(['draft_stage', 'request_user_decision', 'declare_objective_complete']));
+    // Nothing is stuck before it has been drafted (2 Oct screenshots: an empty
+    // review stage was marked stuck for "no draft text" instead of drafted).
+    expect(undrafted).not.toContain('mark_blocked');
+    expect(allowedActions(RESEARCH_V1, research, RESEARCH_V1.stages[0], true)).toContain('mark_blocked');
+  });
+
+  it('a stage that cannot be drafted by Go can still be marked stuck', () => {
+    const approval = BOOK_V1.stages.find((s) => s.exit_criteria.some((c) => c.rule?.type === 'outline_approved') && s.renderer !== 'long_form')!;
+    expect(allowedActions(BOOK_V1, initialState(BOOK_V1), approval, false)).toContain('mark_blocked');
   });
 });
 
@@ -382,5 +390,29 @@ describe('propose_skip: the order is a default (1 Oct, item 11)', () => {
     expect(allowedActions(RESEARCH_V1, research, literature, false)).toContain('propose_skip');
     expect(method.transitions.allow_skip).toBe(false);
     expect(allowedActions(RESEARCH_V1, research, method, false)).not.toContain('propose_skip');
+  });
+});
+
+describe('withoutOverride: a stage whose requirements are met is not stuck (2 Oct, screenshot 2)', () => {
+  const all = ['evaluate_stage', 'advance_stage', 'mark_blocked', 'request_user_decision', 'declare_objective_complete'];
+
+  it('drops the stuck move when the stage can advance, under every policy', () => {
+    for (const policy of ['guided', 'checkpoint', 'autonomous'] as const) {
+      const kept = withoutOverride(all, true, policy);
+      expect(kept).not.toContain('mark_blocked');
+      expect(kept).toContain('advance_stage');
+    }
+  });
+
+  it('keeps the stuck move while something blocking is open', () => {
+    expect(withoutOverride(all, false, 'guided')).toContain('mark_blocked');
+    // Autonomous may not override, but it may still say it is stuck.
+    const autonomous = withoutOverride(all, false, 'autonomous');
+    expect(autonomous).toContain('mark_blocked');
+    expect(autonomous).not.toContain('advance_stage');
+  });
+
+  it('keeps the stuck move on the last stage, where there is nowhere to advance to', () => {
+    expect(withoutOverride(['mark_blocked', 'declare_objective_complete'], true, 'guided')).toContain('mark_blocked');
   });
 });
