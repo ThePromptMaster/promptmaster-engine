@@ -29,6 +29,7 @@ from pydantic import BaseModel, Field
 from .agent_actions import ACTION_KEYS, ACTIONS_BY_KEY, AGENT_ACTIONS
 from .conversation import _shared_system
 from .llm_client import OpenRouterClient
+from .page_context import scrub_button_mentions
 from .schemas import PMInput, DataFileBrief, format_data_files
 
 logger = logging.getLogger(__name__)
@@ -344,6 +345,10 @@ def build_next_action_prompt(
     return system, user
 
 
+#: The Go panel's own buttons, on every page Go runs on.
+_GO_BUTTONS = ("Resume", "Stop", "Go")
+
+
 def _named_control(params: dict, controls: list[AgentControl] | None) -> dict:
     """Keep `params.control` only when it is a button the page really has, in the
     page's own words; anything else the planner named is dropped."""
@@ -371,13 +376,20 @@ def parse_next_action(result: object, allowed: list[str], controls: list[AgentCo
         return _ask("I could not settle on a next step that I can carry out from here. What would you like to do next?")
     params = _named_control(result.get("params") if isinstance(result.get("params"), dict) else {}, controls)
     question = result.get("decision_question")
+
+    # The words around params.control are shown to the user too; a button
+    # named there that the page lacks is rewritten (3 Oct: "Press Generate
+    # Outline" on the Approval stage). Go's own Resume and Stop always exist.
+    def shown(text: object) -> str:
+        return scrub_button_mentions(str(text or "").strip(), controls, also=_GO_BUTTONS)
+
     return NextAction(
         action_key=key,
         params=params,
-        rationale=str(result.get("rationale") or "").strip(),
-        expected_outcome=str(result.get("expected_outcome") or "").strip(),
+        rationale=shown(result.get("rationale")),
+        expected_outcome=shown(result.get("expected_outcome")),
         needs_user_decision=bool(result.get("needs_user_decision")) or key == "request_user_decision",
-        decision_question=str(question).strip() if question else None,
+        decision_question=shown(question) if question else None,
         objective_complete=bool(result.get("objective_complete")) or key == "declare_objective_complete",
     )
 
