@@ -71,7 +71,8 @@ export function allowedActions(
   facts: StageFacts = {}
 ): string[] {
   const keys: string[] = [];
-  if (template.key === 'research') {
+  // Research predates the flag; anything else says so on the template.
+  if (template.key === 'research' || template.inquiry) {
     keys.push(
       'derive', 'prove', 'simplify', 'limiting_case', 'try_contradiction', 'run_computation',
       'falsify_hypothesis', 'compare_alternatives', 'update_assumptions'

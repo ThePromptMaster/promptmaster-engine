@@ -1,0 +1,43 @@
+import { expect, test } from '@playwright/test';
+
+import { dismissBetaNotice } from './helpers';
+
+/**
+ * H4 — a workflow that "designs itself" (3 Oct call). Describe the work,
+ * PromptMaster proposes stages, the user edits them, and it is saved as the
+ * user's own workflow; a second project offers it again.
+ */
+test('design a workflow, edit a stage, start a project on it, and find it again', async ({ page }) => {
+  await page.goto('/projects/new');
+  await dismissBetaNotice(page);
+  await page.getByLabel('What do you want to do or figure out?').fill('Profile a chef for a food magazine');
+  await page.getByRole('button', { name: /I know what I want to do/ }).click();
+  await expect(page.getByRole('heading', { name: 'Your setup' })).toBeVisible();
+
+  await page.getByRole('button', { name: /Design a workflow for this work/ }).click();
+  const designer = page.getByRole('region', { name: 'Design a workflow' });
+  await designer.getByLabel('What kind of work is this?').fill('a magazine feature');
+  await designer.getByRole('button', { name: 'Design it' }).click();
+  const stages = designer.getByRole('list', { name: 'Proposed stages' }).getByRole('listitem');
+  await expect(stages).toHaveCount(5, { timeout: 30_000 });
+  await designer.getByLabel('Name of stage 2').fill('People to interview');
+  await designer.getByRole('button', { name: 'Remove stage 4' }).click();
+  await expect(stages).toHaveCount(4);
+  await page.screenshot({ path: test.info().outputPath('01-designed.png'), fullPage: true });
+
+  await designer.getByRole('button', { name: 'Use this workflow' }).click();
+  await expect(page.getByRole('radio', { name: /^Magazine feature/ })).toHaveAttribute('aria-checked', 'true', { timeout: 15_000 });
+  await page.getByLabel('Project name').fill('E2E custom workflow');
+  await page.getByRole('button', { name: /^Start / }).click();
+  await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}$/);
+  await expect(page.getByRole('heading', { name: 'Pitch and angle' })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText('People to interview').first()).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath('02-project-on-it.png'), fullPage: true });
+
+  // Saved as the user's own: offered for the next project.
+  await page.goto('/projects/new');
+  await page.getByLabel('What do you want to do or figure out?').fill('Another feature');
+  await page.getByRole('button', { name: /I know what I want to do/ }).click();
+  await expect(page.getByRole('radio', { name: /^Magazine feature.*Yours/ })).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath('03-offered-again.png'), fullPage: true });
+});

@@ -10,6 +10,7 @@ from promptmaster.errors import PRESERVED_NOTHING_WRITTEN
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError
 from routers._errors import llm_http_error
 from promptmaster.schemas import GuideAnswer, GuideQuestion, SetupSuggestion
+from promptmaster.workflow_designer import DesignedWorkflow, design_workflow
 from promptmaster.setup_suggester import suggest_guide_questions, suggest_next_guide_question, suggest_setup
 
 router = APIRouter(prefix="/api", tags=["setup"])
@@ -93,3 +94,29 @@ async def api_guide_next_question(
         answered=[a.model_dump() for a in req.answered],
     )
     return GuideNextResponse(enough=enough, question=question, reason=reason)
+
+
+class GenerateWorkflowRequest(BaseModel):
+    #: What kind of work this is, in the user's words ("a magazine feature").
+    description: str = Field(..., min_length=3, max_length=2_000)
+    objective: str = Field(default="", max_length=4_000)
+    model: str = ""
+
+
+class GenerateWorkflowResponse(BaseModel):
+    workflow: DesignedWorkflow
+
+
+@router.post("/generate-workflow")
+async def api_generate_workflow(
+    req: GenerateWorkflowRequest,
+    client: OpenRouterClient = Depends(get_client),
+) -> GenerateWorkflowResponse:
+    """Propose the stages of a workflow for this kind of work. 1 LLM call; saves nothing."""
+    try:
+        workflow = await design_workflow(client, req.model or None, req.description, req.objective)
+    except OpenRouterError as e:
+        raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    return GenerateWorkflowResponse(workflow=workflow)

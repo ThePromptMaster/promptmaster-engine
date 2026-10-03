@@ -308,6 +308,24 @@ def _json_reply(system: str, prompt: str) -> dict:
 
     from promptmaster import conflicts
 
+    if "You design workflows for PromptMaster" in system:
+        # A scripted magazine-feature workflow: write, list, write, check, write.
+        return {
+            "name": "Magazine feature", "description": "Mock: a feature from pitch to final copy.",
+            "deliverable": "article", "inquiry": False,
+            "stages": [
+                {"label": "Pitch and angle", "short_label": "Pitch", "kind": "write", "purpose": "Mock: say what the piece argues.",
+                 "instruction": "Mock: state the angle in two sentences.", "required": True, "approval": "I approve this angle"},
+                {"label": "Sources to interview", "short_label": "Sources", "kind": "list", "purpose": "Mock: who to talk to.",
+                 "instruction": "Mock: list the people to interview.", "required": True, "approval": ""},
+                {"label": "First draft", "short_label": "Draft", "kind": "write", "purpose": "Mock: the whole piece.",
+                 "instruction": "Mock: write the feature.", "required": True, "approval": ""},
+                {"label": "Fact check", "short_label": "Facts", "kind": "check", "purpose": "Mock: check the claims.",
+                 "instruction": "Mock: list the claims to verify.", "required": False, "approval": ""},
+                {"label": "Final copy", "short_label": "Final", "kind": "write", "purpose": "Mock: ready to file.",
+                 "instruction": "Mock: the final copy.", "required": True, "approval": "I approve this for publication"},
+            ],
+        }
     if conflicts._CONFLICT_INSTRUCTION[:60] in system:
         # "[[mock:conflict]]" in the instruction conflicts with the objective;
         # anything else is the usual answer: no conflict.

@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { GuideInterview } from '@/components/projects/guide-interview';
 import { SetupCard, type SetupDraft } from '@/components/projects/setup-card';
+import { CustomWorkflowDesigner } from '@/components/projects/custom-workflow-designer';
 import { AutoGrowTextarea } from '@/components/shared/auto-grow-textarea';
 import { api } from '@/lib/api/client';
 import { createProject } from '@/lib/supabase/projects';
@@ -275,6 +276,16 @@ export default function NewProjectPage() {
             draft={draft}
             rationale={rationale}
             onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))}
+            designer={
+              <CustomWorkflowDesigner
+                objective={draft.objective}
+                ownerId={user?.id ?? null}
+                onPublished={(t) => {
+                  setTemplates((prior) => [...prior, t]);
+                  setTemplateId(t.id);
+                }}
+              />
+            }
           />
           <div className="mt-10 flex items-center gap-3">
             <button

@@ -209,6 +209,13 @@ export interface WorkflowTemplate {
    * (`deliverableNouns` in labels.ts).
    */
   nouns?: { deliverable: string; unit: string };
+  /**
+   * Work that investigates rather than writes (Research, Exploration, a
+   * generated inquiry workflow): Go may reason, derive, test and compute on
+   * it. Set on the template rather than inferred from its key, so a workflow a
+   * user generates gets the same moves (3 Oct call).
+   */
+  inquiry?: boolean;
   stages: StageDefinition[];
 }
 

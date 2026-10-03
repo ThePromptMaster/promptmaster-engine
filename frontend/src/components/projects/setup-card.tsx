@@ -25,6 +25,8 @@ interface Props {
   draft: SetupDraft;
   rationale: SetupRationale | null;
   onChange: (patch: Partial<SetupDraft>) => void;
+  /** Shown under the workflow picker: designing one of your own. */
+  designer?: React.ReactNode;
 }
 
 const SELECTABLE_MODES = (Object.keys(MODE_DISPLAY) as ModeType[]).filter((m) => m !== 'custom');
@@ -43,6 +45,7 @@ export function SetupCard({
   draft,
   rationale,
   onChange,
+  designer,
 }: Props) {
   const field =
     'w-full rounded-lg bg-[var(--surface-container-low)] px-4 py-3 text-body leading-relaxed text-[var(--on-surface)] outline-none placeholder:text-[var(--on-surface-variant)]/70 focus:ring-2 focus:ring-[var(--pm-primary)]/40';
@@ -65,6 +68,7 @@ export function SetupCard({
           </p>
         )}
         <WorkflowPicker templates={templates} selectedId={templateId} onSelect={onSelectTemplate} />
+        {designer}
       </section>
 
       <section>
