@@ -16,7 +16,7 @@ test('new project offers each workflow once, then drafts and evaluates a stage',
 
   // Each built-in workflow once. Workflows a user designed (H4) are offered
   // too, so the total depends on what earlier tests saved for this user.
-  for (const name of ['Book', 'Research', 'Single output']) {
+  for (const name of ['Book', 'Research', 'Single output', 'Exploration']) {
     await expect(page.getByRole('radio', { name: new RegExp(`^${name}`) })).toHaveCount(1);
   }
 

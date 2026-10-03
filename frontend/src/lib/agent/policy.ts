@@ -85,6 +85,24 @@ export const NO_TOOLS: AgentTools = { literature: false };
 /** What a run can call today: a literature lookup (OpenAlex) is connected since 2026-10-01. */
 export const LIVE_TOOLS: AgentTools = { literature: true };
 
+/**
+ * Whether the stage holds a draft for the work now in hand. Ordinarily any
+ * draft; in a workflow that loops, only one written since the stage was last
+ * entered — last round's Explore is not this round's, and Go should draft the
+ * new round rather than revise the old one.
+ */
+export function stageHasCurrentDraft(
+  template: WorkflowTemplate,
+  state: WorkflowState,
+  stageId: string,
+  head: { content?: string | null; created_at?: string } | undefined
+): boolean {
+  if (!(head?.content ?? '').trim()) return false;
+  if (!template.stages.some((s) => s.transitions.loop_to)) return true;
+  const entered = state.stages[stageId]?.entered_at;
+  return !entered || !head?.created_at || head.created_at >= entered;
+}
+
 export function allowedActions(
   template: WorkflowTemplate,
   state: WorkflowState,
@@ -130,6 +148,8 @@ export function allowedActions(
   // proposed for skipping (the user decides). Offered once per stage per run
   // — the loop removes it after a proposal.
   if (stage.transitions.allow_skip && stage.transitions.default_next) keys.push('propose_skip');
+  // A round that has produced its question can propose the next one (the user starts it).
+  if (stage.transitions.loop_to && stageHasDraft) keys.push('propose_next_round');
   if (nextSuggestedStage(template, state)) keys.push('advance_stage');
   // Nothing is stuck before it has been tried: a stage that drafts and has no
   // draft yet is drafted first. Offered both, the planner on an empty review

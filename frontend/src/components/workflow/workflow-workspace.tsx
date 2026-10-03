@@ -969,6 +969,12 @@ export function WorkflowWorkspace({
         if (!option) throw new Error('This stage cannot be skipped.');
         await handleTransition(option, reason.slice(0, 500));
       },
+      // The user's return to where the next round starts, with Go's reason.
+      nextRound: async (toStageId: string, reason: string) => {
+        const option = transitions.find((t) => t.kind === 'return' && t.toStageId === toStageId);
+        if (!option) throw new Error('This stage does not start another round.');
+        await handleTransition(option, reason.slice(0, 500));
+      },
       showTable: () => {
         const table = document.querySelector<HTMLElement>('[data-stage-table]');
         if (!table) return;

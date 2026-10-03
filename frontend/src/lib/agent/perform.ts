@@ -650,6 +650,20 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       });
     }
 
+    case 'loop': {
+      // A proposal, as with skipping: going back is the user's decision (the
+      // database records a return only as theirs), so each round is a check-in.
+      const to = ctx.stage.transitions.loop_to;
+      if (!to) return done(key, { status: 'failed', toolsUsed: [], changes: {}, output: 'This stage does not start another round.' });
+      const reason = (typeof params.reason === 'string' && params.reason.trim()) || ctx.step.rationale || 'The question this round ended on is worth pursuing.';
+      const need: NeedsUser = { kind: 'next_round', stageId: ctx.stage.id, toStageId: to, reason };
+      const message = `Suggested another round: ${reason}`;
+      return done(key, {
+        status: 'succeeded', toolsUsed: [], changes: {}, output: message,
+        stop: { status: 'awaiting_decision', reason: message }, needs: need,
+      });
+    }
+
     case 'skip': {
       // A proposal, never a skip: the stage is skipped only if the user
       // presses the card's button, and that event is theirs.

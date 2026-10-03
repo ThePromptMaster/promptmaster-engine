@@ -42,7 +42,7 @@ import { requestProjectCancel } from '@/lib/supabase/jobs';
 import { authorizeRun } from '@/lib/agent/authorize';
 import { buildAgentState } from '@/lib/agent/digest';
 import { performStep, type PerformContext, type StepOutcome } from '@/lib/agent/perform';
-import { allowedActions, LIVE_TOOLS, POLISH_MOVES, withoutEndlessPolish, withoutOverride, DEFAULT_BUDGET_STEPS, fitsBudget, noChange, plannedBeforeLatestChange, preempt, shouldPause, stateFingerprint, stepCost } from '@/lib/agent/policy';
+import { allowedActions, stageHasCurrentDraft, LIVE_TOOLS, POLISH_MOVES, withoutEndlessPolish, withoutOverride, DEFAULT_BUDGET_STEPS, fitsBudget, noChange, plannedBeforeLatestChange, preempt, shouldPause, stateFingerprint, stepCost } from '@/lib/agent/policy';
 import {
   createAgentRun,
   endAgentRun,
@@ -414,7 +414,7 @@ export function useGoLoop(opts: Options) {
           continue;
         }
 
-        const hasDraft = (o.bundles[o.stage.id]?.versions.at(-1)?.content ?? '').trim().length > 0;
+        const hasDraft = stageHasCurrentDraft(o.template, o.state, o.stage.id, o.bundles[o.stage.id]?.versions.at(-1));
         // One read decides the moves, the requirements and what the planner
         // is told (1 Oct, item 1).
         const context = contextWithFacts(o.context, o.stage, facts);
@@ -912,7 +912,7 @@ export function useGoLoop(opts: Options) {
         });
         const current = runRef.current;
         if (cancelled || abortRef.current || !current || current.id !== liveRunId || current.needs !== need) return;
-        const hasDraft = (o.bundles[o.stage.id]?.versions.at(-1)?.content ?? '').trim().length > 0;
+        const hasDraft = stageHasCurrentDraft(o.template, o.state, o.stage.id, o.bundles[o.stage.id]?.versions.at(-1));
         const context = contextWithFacts(o.context, o.stage, facts);
         const holds = needStillHolds(need, {
           state: o.state, stage: o.stage, facts, stageEvaluation: evaluateStage(o.template, o.stage.id, context),
