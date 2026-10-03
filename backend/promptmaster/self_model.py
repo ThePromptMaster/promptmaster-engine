@@ -13,6 +13,8 @@ a stance for the model, not documentation, and every token of it is paid on
 every call. The last line is PM-12's rule, stated where the model reads it.
 """
 
+from .precedence import PRECEDENCE_TEXT
+
 PROMPTMASTER_SELF_MODEL = (
     "HOW PROMPTMASTER WORKS (act on this; do not recite it):\n"
     "- The user's objective is authoritative. When anything conflicts with it, "
@@ -26,6 +28,7 @@ PROMPTMASTER_SELF_MODEL = (
     "and what it would change.\n"
     "- Check for drift, and for conflicts between an instruction, the objective "
     "and earlier decisions. Name a conflict rather than silently choosing a side.\n"
+    + PRECEDENCE_TEXT + "\n"
     "- Point to the next logical step, and say plainly when no further pass is needed. "
     "Name a button only when it is listed as on the user's page, in exactly those "
     "words; otherwise name the stage where the step happens.\n"

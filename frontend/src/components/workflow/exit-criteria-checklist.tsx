@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+
 import { approvalPending as isApprovalPending } from '@/lib/workflow/engine';
 import type { CriterionResult } from '@/lib/workflow/types';
 
@@ -13,6 +15,12 @@ interface Props {
   onToggleManual: (id: string, checked: boolean) => void;
   /** Viewing a stage that cannot be worked on from here: boxes shown, not clickable. */
   readOnly?: boolean;
+  /**
+   * Fold to one summary line unless something needs the user (3 Oct call:
+   * on check stages "it's all right there in front of you"). Open by default
+   * whenever the stage has a box only the user can tick.
+   */
+  collapsible?: boolean;
 }
 
 /**
@@ -28,8 +36,13 @@ interface Props {
  * required — the stage stays open until the required ones are done — or
  * optional.
  */
-export function ExitCriteriaChecklist({ criteria, manualIds = new Set(), onToggleManual, readOnly = false }: Props) {
+export function ExitCriteriaChecklist({ criteria, manualIds = new Set(), onToggleManual, readOnly = false, collapsible = false }: Props) {
+  // A box only the user can tick is never folded away, ticked or not.
+  const needsYou = criteria.some((c) => c.manual ?? manualIds.has(c.id));
+  const [open, setOpen] = useState<boolean | null>(null);
   if (criteria.length === 0) return null;
+  // Until the user toggles it, follow whether it needs them.
+  const expanded = !collapsible || (open ?? needsYou);
 
   const withKind = criteria.map((c) => ({ c, manual: c.manual ?? manualIds.has(c.id) }));
   const checked = withKind.filter((r) => !r.manual);
@@ -110,12 +123,30 @@ export function ExitCriteriaChecklist({ criteria, manualIds = new Set(), onToggl
   return (
     <section className="rounded-xl bg-[var(--surface-container-low)] px-5 py-4">
       <header className="mb-1 flex items-baseline justify-between">
-        <h3 className="text-title text-[var(--on-surface)]">To finish this stage</h3>
+        <h3 className="text-title text-[var(--on-surface)]">
+          {collapsible ? (
+            <button
+              type="button"
+              aria-expanded={expanded}
+              onClick={() => setOpen(!expanded)}
+              className="inline-flex items-center gap-1"
+            >
+              <span aria-hidden className="material-symbols-outlined text-[20px] text-[var(--on-surface-variant)]">
+                {expanded ? 'expand_less' : 'expand_more'}
+              </span>
+              To finish this stage
+            </button>
+          ) : (
+            'To finish this stage'
+          )}
+        </h3>
         <span className="text-label text-[var(--on-surface-variant)]">
           {met} of {criteria.length} done
+          {requiredOpen && !expanded && ' · required items open'}
           {readOnly && ' · viewing only'}
         </span>
       </header>
+      <div hidden={!expanded}>
       <p className="mb-3 text-label text-[var(--on-surface-variant)]">
         {required} required{optional > 0 ? `, ${optional} optional` : ''}
         {approvalPending
@@ -130,6 +161,7 @@ export function ExitCriteriaChecklist({ criteria, manualIds = new Set(), onToggl
       <div className="space-y-4">
         {checked.length > 0 && group('PromptMaster verified', 'checked for you as you work', checked, 'Checked by PromptMaster')}
         {yours.length > 0 && group('You approve', 'only you can give these', yours, 'For you to decide')}
+      </div>
       </div>
     </section>
   );
