@@ -488,7 +488,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         if (!m.approvedOutlineVersionId) return done(key, { status: 'failed', output: 'No approved outline to draft against.', toolsUsed: [], changes: {} });
         const ids = await enqueueDraftJobs({
           project: ctx.project, artifactId: m.artifact.id, stageId: ctx.stage.id, outline: m.outline,
-          approvedOutlineVersionId: m.approvedOutlineVersionId, jobs: m.jobs,
+          approvedOutlineVersionId: m.approvedOutlineVersionId, jobs: m.jobs, stageHint: ctx.stage.entry_prompt_hint,
         });
         if (!ids.length) return done(key, { status: 'failed', output: 'Every section is already written.', toolsUsed: [], changes: {} });
         return waitForSections(ctx, key, ids, 'Wrote');
@@ -499,7 +499,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       const append = ctx.appendStageVersion;
       const ids = await enqueueRevisionJobs({
         project: ctx.project, artifactId: m.artifact.id, stageId: ctx.stage.id, outline: m.outline,
-        approvedOutlineVersionId: m.approvedOutlineVersionId, brief: m.brief,
+        approvedOutlineVersionId: m.approvedOutlineVersionId, brief: m.brief, stageHint: ctx.stage.entry_prompt_hint,
         saveSnapshot: (v) => append(m.holderStageId, holderLabel, v),
       });
       if (!ids.length) return done(key, { status: 'failed', output: 'No written section to revise.', toolsUsed: [], changes: {} });

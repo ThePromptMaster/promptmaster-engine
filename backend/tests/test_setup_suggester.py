@@ -158,3 +158,14 @@ async def test_guide_questions_are_capped_cleaned_and_have_a_fallback():
     client.generate_json = AsyncMock(side_effect=RuntimeError("down"))
     fallback = await suggest_guide_questions(client=client, model=None, objective="x")
     assert len(fallback) == 3
+
+
+def test_output_format_guidance_names_manuscript_prose_for_a_book():
+    """2 Oct: "it really wants to make outlines" — the suggested format for a
+    book was one of the structural examples, and every chapter was told to
+    produce it."""
+    from promptmaster.setup_suggester import SETUP_SUGGESTER_SYSTEM
+
+    assert "For a book (workflow book) that is manuscript prose" in SETUP_SUGGESTER_SYSTEM
+    assert "never an outline, a list or a table: the outline is scaffolding, not the product" in SETUP_SUGGESTER_SYSTEM
+    assert "pick the mode for the finished prose instead" in SETUP_SUGGESTER_SYSTEM

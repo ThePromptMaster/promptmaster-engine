@@ -33,6 +33,9 @@ import type { SetupRationale } from '@/types';
 
 type Step = 'ask' | 'questions' | 'setup';
 
+/** The output format a Book gets when setup suggested none. */
+export const BOOK_OUTPUT_FORMAT = 'A book manuscript in continuous prose, chapter by chapter';
+
 function titleFrom(objective: string): string {
   const firstLine = objective.trim().split('\n')[0] ?? '';
   return firstLine.length <= 60 ? firstLine : `${firstLine.slice(0, 57).trimEnd()}…`;
@@ -127,7 +130,10 @@ export default function NewProjectPage() {
           objective: draft.objective.trim(),
           audience: draft.audience.trim() || 'General',
           constraints: draft.constraints.trim(),
-          output_format: draft.output_format.trim(),
+          // A book's deliverable is prose. Left empty, every chapter prompt
+          // read "Output format: (none)" and the mode's structural habits
+          // filled the gap (2 Oct: "it really wants to make outlines").
+          output_format: draft.output_format.trim() || (selected.key === 'book' ? BOOK_OUTPUT_FORMAT : ''),
           mode: draft.mode,
           workflow: selected.key,
         },

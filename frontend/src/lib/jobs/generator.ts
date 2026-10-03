@@ -210,6 +210,7 @@ export class HttpSectionGenerator implements SectionGenerator {
     model: string;
     userId: string;
     revision?: SectionRevisionBrief;
+    stage_hint?: string;
   }): Promise<{ content: string; finish_reason: string }> {
     return this.post(
       '/api/generate-section-prose',
@@ -221,6 +222,7 @@ export class HttpSectionGenerator implements SectionGenerator {
         prev_section_content: req.prev_section_content,
         model: req.model,
         ...(req.revision ? { revision: req.revision } : {}),
+        ...(req.stage_hint ? { stage_hint: req.stage_hint } : {}),
       },
       req.userId
     );

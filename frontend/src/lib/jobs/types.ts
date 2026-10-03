@@ -56,6 +56,13 @@ export interface DraftSectionPayload {
   model: string;
   inputs: PMInput;
   /**
+   * The long-form stage's own `entry_prompt_hint` — how this workflow wants a
+   * section written. Carried in the payload like `inputs`, because the drain
+   * may run later without the template in hand. Absent on jobs queued before
+   * 2026-10-03, which the drain sends as no hint.
+   */
+  stage_hint?: string;
+  /**
    * Set by the Revision and Editing stages: rewrite the section as it stands,
    * applying these notes, instead of drafting it from the outline. The current
    * text is read when the job runs, not when it is queued, so a hand edit made
@@ -192,6 +199,8 @@ export interface SectionGenerator {
     model: string;
     userId: string;
     revision?: SectionRevisionBrief;
+    /** The stage's `entry_prompt_hint`, from the job's payload. */
+    stage_hint?: string;
   }): Promise<{ content: string; finish_reason: string }>;
 
   extractSectionRecord(req: {

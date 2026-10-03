@@ -35,6 +35,11 @@ export interface LongFormContext {
    */
   emptyHint?: string;
   /**
+   * The stage's `entry_prompt_hint` — how this workflow wants a section
+   * written. Carried into every section job so the chapter prompt sees it.
+   */
+  stageHint?: string;
+  /**
    * Set on Revision and Editing: the stage rewrites the manuscript drafting
    * wrote, applying the findings accepted in the review stages before it.
    * Null on the drafting stage itself.

@@ -80,6 +80,8 @@ export interface EnqueueSectionArgs {
   revision: number;
   /** Revision and Editing stages: rewrite the section with these notes. */
   revise?: SectionRevisePayload;
+  /** The stage's `entry_prompt_hint`, for the chapter prompt. */
+  stageHint?: string;
 }
 
 /** A job that stopped for good: nothing will run it again unless asked. */
@@ -121,6 +123,7 @@ export async function enqueueSectionJob(args: EnqueueSectionArgs): Promise<strin
     // hours afterwards, in a process that has never seen this user.
     inputs: inputsFromProject(args.project),
     ...(args.revise ? { revise: args.revise } : {}),
+    ...(args.stageHint?.trim() ? { stage_hint: args.stageHint.trim() } : {}),
   };
 
   const { data, error } = await supabase.rpc('enqueue_job', {

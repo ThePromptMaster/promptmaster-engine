@@ -52,8 +52,11 @@ _PROSE_INSTRUCTION = (
     "later stages will cover, do not restate the earlier stages back to the "
     "user, and do not add meta commentary about the process. Produce the "
     "artifact itself — the actual text this stage calls for, written in full — "
-    "never a plan, an outline or notes about how it could be written. Return "
-    "Markdown prose, no code fences around the whole answer."
+    "never a plan, an outline or notes about how it could be written. If your "
+    "mode prefers scaffolds, headings or structured breakdowns, that applies to "
+    "how you think, not to the form of this artifact: the stage's instruction "
+    "decides the form. Return Markdown prose, no code fences around the whole "
+    "answer."
 )
 
 _LIST_INSTRUCTION = (
