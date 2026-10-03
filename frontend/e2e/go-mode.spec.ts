@@ -126,8 +126,9 @@ test('Checkpoint: reasoning runs on its own, code waits for approval, then runs 
 
 test('Autonomous moves stages on its own authority and stops, blocked, at data it does not have', async ({ page }) => {
   // B0: check_literature is no longer offered without a search tool, so the
-  // honest stop is the planner's own mark_blocked.
-  const id = await researchProject(page, 'E2E go autonomous', 'Pendulum period [[mock:plan=derive,advance_stage,mark_blocked]]');
+  // honest stop is the planner's own mark_blocked — once Literature has been
+  // drafted: nothing is stuck before it has been tried (2 Oct screenshots).
+  const id = await researchProject(page, 'E2E go autonomous', 'Pendulum period [[mock:plan=derive,advance_stage,draft_stage,mark_blocked]]');
   await choose(page, 'Autonomous');
 
   const transparency = page.getByRole('region', { name: 'What Go mode is doing' });
@@ -141,6 +142,7 @@ test('Autonomous moves stages on its own authority and stops, blocked, at data i
   expect(await stepsOf(run.id)).toMatchObject([
     { action_key: 'derive', status: 'succeeded' },
     { action_key: 'advance_stage', status: 'succeeded', execution_label: null },
+    { action_key: 'draft_stage', status: 'succeeded' },
     { action_key: 'mark_blocked', status: 'blocked', execution_label: 'blocked', block_kind: 'data_missing' },
   ]);
   // The stage moves are the run's, cited and checked by the database.
