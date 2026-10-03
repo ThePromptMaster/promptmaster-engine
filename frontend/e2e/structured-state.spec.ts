@@ -46,6 +46,8 @@ test('recalled works are candidates; a run the draft knows was not run arrives m
   await expect(stageArtifact(page)).toContainText('1 set by PromptMaster from what it already knew');
   // (The legend under the table names every status; the rows are what is checked.)
   await expect(stageArtifact(page).getByRole('combobox').filter({ hasText: 'Completed' })).toHaveCount(0);
+  // On a check stage the checklist folds to one line until opened (3 Oct call).
+  await page.getByRole('button', { name: /To finish this stage/ }).click();
   await expect(criterion(page, 'Every planned run has a result or a reason')).toContainText('2 still unresolved');
   await page.screenshot({ path: test.info().outputPath('02-experiment-not-run-prefilled.png'), fullPage: true });
 });

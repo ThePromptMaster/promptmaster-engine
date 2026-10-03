@@ -33,6 +33,9 @@ import {
 } from '@/lib/workflow/stage-artifact';
 import { ConfirmOverwrite, EmptyStage, GenerationBar, VersionBar } from './stage-chrome';
 import type { StageRendererProps } from './types';
+
+/** A table longer than this folds the rows already decided. */
+const FOLD_AFTER = 6;
 import { lookupLabel } from '@/lib/workflow/stage-controls';
 
 const TONE_CLASS: Record<string, string> = {
@@ -78,6 +81,7 @@ export function ReviewRenderer({
   const [confirming, setConfirming] = useState(false);
   const [lookingUp, setLookingUp] = useState(false);
   const [lookupNote, setLookupNote] = useState<string | null>(null);
+  const [showSettled, setShowSettled] = useState(false);
 
   // The named sources, searched for in a public index. What comes back is
   // unsaved: the user reads what was found, then saves.
@@ -105,6 +109,16 @@ export function ReviewRenderer({
   const dirty = useMemo(() => JSON.stringify(rows) !== JSON.stringify(saved), [rows, saved]);
   const statuses = schema.statuses ?? [];
   const triaged = rows.filter((r) => isTriaged(r, schema)).length;
+  // "It's all right there in front of you" (3 Oct call): rows already settled
+  // in the saved version fold away once the table is long. Taken from the
+  // saved version, not the live edits, so a row never jumps out from under the
+  // pointer while it is being decided.
+  const settledIds = useMemo(
+    () => new Set(saved.length > FOLD_AFTER ? saved.filter((r) => isTriaged(r, schema)).map((r) => r.id) : []),
+    [saved, schema]
+  );
+  const openRows = rows.filter((r) => !settledIds.has(r.id));
+  const foldedRows = rows.filter((r) => settledIds.has(r.id));
   const outstanding = rows.length - triaged;
 
   // PM-06: tell the workspace about unsaved edits, so "Save changes" can lead.
@@ -263,6 +277,14 @@ export function ReviewRenderer({
               {schema.decisionQuestion}
             </p>
           )}
+          {/* A check stage works differently from a writing stage, and said so
+              nowhere ("where do I go?", 3 Oct call). */}
+          {!readOnly && outstanding > 0 && (
+            <p data-check-stage-note className="mb-3 max-w-[70ch] text-label text-[var(--on-surface-variant)]">
+              This is a check stage: PromptMaster lists what it found, and you decide on each row with its
+              status. Nothing in your work changes here — later stages act on what you decide.
+            </p>
+          )}
 
           {/* The table scrolls inside its own container: at five columns it is
               wider than the 820px content well on a laptop, and a horizontally
@@ -293,7 +315,7 @@ export function ReviewRenderer({
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => (
+                {openRows.map((row) => (
                   <ReviewRow
                     key={row.id}
                     row={row}
@@ -304,11 +326,44 @@ export function ReviewRenderer({
                     onPatch={patch}
                   />
                 ))}
+                {foldedRows.length > 0 && (
+                  <tr>
+                    <td colSpan={columns.length + 1} className="px-4 py-2">
+                      <button
+                        type="button"
+                        aria-expanded={showSettled}
+                        onClick={() => setShowSettled((v) => !v)}
+                        className="inline-flex items-center gap-1 text-label text-[var(--pm-primary)]"
+                      >
+                        <span aria-hidden className="material-symbols-outlined text-[18px]">
+                          {showSettled ? 'expand_less' : 'expand_more'}
+                        </span>
+                        {showSettled
+                          ? `Hide the ${foldedRows.length} already decided`
+                          : `${foldedRows.length} already decided — show`}
+                      </button>
+                    </td>
+                  </tr>
+                )}
+                {showSettled &&
+                  foldedRows.map((row) => (
+                    <ReviewRow
+                      key={row.id}
+                      row={row}
+                      columns={columns}
+                      statuses={statuses}
+                      schema={schema}
+                      readOnly={readOnly}
+                      onPatch={patch}
+                    />
+                  ))}
               </tbody>
             </table>
           </div>
           {statuses.some((s) => s.explain) && (
-            <dl aria-label="What the statuses mean" className="mt-3 grid gap-x-4 gap-y-1 text-label sm:grid-cols-[max-content_1fr]">
+            <details className="mt-3">
+            <summary className="cursor-pointer text-label text-[var(--on-surface-variant)]">What the statuses mean</summary>
+            <dl aria-label="What the statuses mean" className="mt-2 grid gap-x-4 gap-y-1 text-label sm:grid-cols-[max-content_1fr]">
               {statuses.filter((s) => s.explain && (!s.legacy || rows.some((r) => r.status === s.value))).map((s) => (
                 <div key={s.value} className="contents">
                   <dt className={TONE_CLASS[s.tone]}>{s.label}</dt>
@@ -316,6 +371,7 @@ export function ReviewRenderer({
                 </div>
               ))}
             </dl>
+            </details>
           )}
         </>
       )}

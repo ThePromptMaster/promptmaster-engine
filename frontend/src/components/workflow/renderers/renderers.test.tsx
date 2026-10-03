@@ -588,6 +588,36 @@ describe('ReviewRenderer', () => {
 // Research v1 stranded projects at Experiment (Sean's screenshot, Sep 10)
 // ---------------------------------------------------------------------------
 
+describe('a long check table folds what is already decided (3 Oct call)', () => {
+  const findings = serializeItems(
+    Array.from({ length: 9 }, (_, i) => ({
+      id: `f${i}`,
+      finding: `Finding ${i}`,
+      where: `Ch ${i}`,
+      severity: 'minor',
+      ...(i < 5 ? { status: 'accepted' } : {}),
+    }))
+  );
+
+  it('shows the open rows, folds the decided ones behind one button, and explains the stage', async () => {
+    const user = userEvent.setup();
+    render(<ReviewRenderer {...props(bookStage('continuity'), { versions: [version(findings)] })} />);
+    expect(screen.getByText('Finding 7')).toBeInTheDocument();
+    expect(screen.queryByText('Finding 1')).not.toBeInTheDocument();
+    expect(screen.getByText(/This is a check stage/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '5 already decided — show' }));
+    expect(screen.getByText('Finding 1')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Hide the 5 already decided' })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('does not fold a short table', () => {
+    const short = serializeItems([{ id: 'a', finding: 'Only one', status: 'accepted' }]);
+    render(<ReviewRenderer {...props(bookStage('continuity'), { versions: [version(short)] })} />);
+    expect(screen.getByText('Only one')).toBeInTheDocument();
+  });
+});
+
 describe('a list stage that needs a status on every row', () => {
   // v1 authored Experiment as `list` with `every_item_has_status`. The list
   // renderer draws no status control, so "Every planned run has a result or a
