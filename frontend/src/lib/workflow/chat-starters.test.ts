@@ -8,7 +8,7 @@ describe('the chat opens on the question the page poses (3 Oct call)', () => {
   it('asks about the open rows on a check stage', () => {
     const q = starterQuestions({ ...base, renderer: 'review', openRows: 3 });
     expect(q[0]).toBe('Which of the 3 open rows matter most, and why?');
-    expect(q).toContain('Is this ready to move on to Revision?');
+    expect(q).toContain('Is this ready for Revision?');
   });
 
   it('names what the stage still needs before suggesting moving on', () => {

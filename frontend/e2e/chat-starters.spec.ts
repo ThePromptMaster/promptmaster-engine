@@ -15,7 +15,7 @@ test('the side chat offers the page’s own questions, and one press asks it', a
   await expect(starters.getByRole('button')).toHaveText([
     'What is the weakest part of this draft?',
     'Does this still serve the objective?',
-    'Is this ready to move on to Audience?',
+    'Is this ready for Audience?',
   ]);
   await page.screenshot({ path: test.info().outputPath('01-chat-starters.png'), fullPage: true });
 

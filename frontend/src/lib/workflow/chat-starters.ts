@@ -49,7 +49,7 @@ export function starterQuestions(input: StarterInput): string[] {
   if (requiredOpen.length > 0) {
     out.push(`What does this stage still need from me? (${requiredOpen[0]})`);
   } else if (nextStageLabel) {
-    out.push(`Is this ready to move on to ${nextStageLabel}?`);
+    out.push(`Is this ready for ${nextStageLabel}?`);
   }
 
   return out.slice(0, STARTERS_MAX);
