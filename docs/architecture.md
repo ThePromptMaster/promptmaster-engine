@@ -241,6 +241,13 @@ discuss but not splice: Change it and Save-as-version are off there, because the
 sees is a rendering, not the stored version. Save-as-new-version now revises the current
 text instead of rewriting from the thread alone.
 
+**Button names in free text (2026-10-03).** `scrub_button_mentions` (`promptmaster/page_context.py`)
+checks every "press / click / tap X" in Go's rationale, expected outcome and question, and in a
+chat reply when the page's buttons were sent, against the page's buttons (plus Go's own
+Resume / Stop / Go). It handles near misses differently from names that don't exist:
+- A near miss ("Generate Outline" for "Generate the outline") is corrected to the page's words.
+- Any other name is rewritten as plain words, followed by "(there is no button for this on this page)".
+
 ## Go mode (Phase B: PM-12, PM-15, PM-17 … PM-20)
 
 The next-best-action loop runs **in the browser** (`components/workflow/use-go-loop.ts`)

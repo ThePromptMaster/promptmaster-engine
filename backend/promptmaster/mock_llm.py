@@ -290,7 +290,11 @@ def _next_action(system: str, prompt: str) -> dict:
         "rationale": f"Mock: {choice} is the next scripted move.",
         "expected_outcome": f"Mock: the result of {choice}.",
         "needs_user_decision": choice == "request_user_decision",
-        "decision_question": "Mock: which way should this go?" if choice == "request_user_decision" else None,
+        "decision_question": (
+            "Mock: which way should this go?"
+            # The client's 3 Oct example: a button named in the words, not in params.
+            + (" Press Generate Outline to start." if "[[mock:control=invented]]" in prompt else "")
+        ) if choice == "request_user_decision" else None,
         "objective_complete": choice == "declare_objective_complete",
     }
 

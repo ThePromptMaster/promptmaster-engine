@@ -11,6 +11,8 @@ stays stateless.
 
 from __future__ import annotations
 
+import re
+
 from pydantic import BaseModel, Field
 
 from .schemas import StageDigestEntry
@@ -91,3 +93,76 @@ def format_chat_context(ctx: ChatContext | None) -> str:
         ]
     lines += ["", format_buttons(ctx.buttons), "", NEVER_PASTE_RULE]
     return "\n".join(lines)
+
+
+# --------------------------------------------------------------------------
+# Button names in free text
+# --------------------------------------------------------------------------
+#
+# Go's `params.control` was already checked against the page, but the words
+# around it were not: "Press Generate Outline" reached the client on a stage
+# with no such button (3 Oct call). Telling the model is not enough on its
+# own, so what it writes for the user is checked here too.
+
+_QUOTES = "\"'“”‘’"
+_VERBS = r"(?i:press|click(?:\s+on)?|tap|hit|select|use)"
+# "press 'X'" / "click “X” button"
+_QUOTED = re.compile(
+    rf"\b({_VERBS})\s+(?:the\s+)?[{_QUOTES}]([^{_QUOTES}\n]{{2,60}})[{_QUOTES}](\s+button)?",
+    re.IGNORECASE,
+)
+# "Press Generate Outline" — a run of capitalised words after the verb.
+_TITLED = re.compile(
+    rf"\b({_VERBS})\s+(?:the\s+)?((?:[A-Z][\w'/-]*)(?:\s+(?:the\s+|a\s+|to\s+|and\s+)?[A-Z][\w'/-]*){{0,5}})(\s+button)?",
+)
+_ARTICLES = re.compile(r"\b(the|a|an|this|your)\b", re.IGNORECASE)
+
+
+def _norm(label: str) -> str:
+    return " ".join(_ARTICLES.sub(" ", label.lower()).split())
+
+
+def scrub_button_mentions(text: str, buttons: list | None, also: tuple[str, ...] = ()) -> str:
+    """Rewrite any "press X" whose X is not a button on the page.
+
+    A name that matches a real button but for case or an article ("Generate
+    Outline" for "Generate the outline") is corrected to the page's words. Any
+    other is replaced by its plain words, said not to be a button here — the
+    user is never sent looking for something that does not exist.
+    """
+    if not text:
+        return text
+    real = {_norm(b.label): b.label for b in (buttons or []) if getattr(b, "label", "").strip()}
+    # Buttons that are always there for this caller (Go's own: Resume, Stop).
+    real.update({_norm(label): label for label in also})
+
+    def fix(m: re.Match) -> str:
+        verb, name = m.group(1), m.group(2).strip()
+        hit = real.get(_norm(name))
+        if hit:
+            return f'{verb} "{hit}"'
+        words = name.lower()
+        before = m.string[: m.start()].rstrip()
+        if not before or before.endswith((".", "!", "?", ":", "\n")):
+            words = words[0].upper() + words[1:]
+        return f"{words} (there is no button for this on this page)"
+
+    def fix_quoted(m: re.Match) -> str:
+        # "use 'Stay within scope' as a constraint" quotes words, not a button.
+        if m.group(1).lower() in ("use", "select") and not m.group(3) and _norm(m.group(2)) not in real:
+            return m.group(0)
+        return fix(m)
+
+    out = _QUOTED.sub(fix_quoted, text)
+    # Only capitalised runs that are not a real button's words; a sentence that
+    # merely starts a clause ("Use Chapter 2 as…") is left alone unless it ends
+    # in "button".
+    def fix_titled(m: re.Match) -> str:
+        name = m.group(2).strip()
+        if _norm(name) in real:
+            return f'{m.group(1)} "{real[_norm(name)]}"'
+        if m.group(3) or m.group(1).lower().split()[0] in ("press", "click", "tap", "hit"):
+            return fix(m)
+        return m.group(0)
+
+    return _TITLED.sub(fix_titled, out)

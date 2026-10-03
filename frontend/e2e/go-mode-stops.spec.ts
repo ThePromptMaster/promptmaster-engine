@@ -215,6 +215,11 @@ test('a button Go invents is dropped, not shown to the user as if it existed', a
   const ask = page.getByRole('region', { name: 'Go mode asks you' });
   await expect(ask).toContainText('Mock: which way should this go?', { timeout: 30_000 });
   await expect(ask).not.toContainText('The button is');
+  // Named in the words too (3 Oct call: "Press Generate Outline" where no
+  // button exists): rewritten, never sent looking for it.
+  await expect(ask).toContainText('Generate outline (there is no button for this on this page)');
+  await expect(ask).not.toContainText('Press Generate Outline');
+  await page.screenshot({ path: test.info().outputPath('01-invented-button-in-words-rewritten.png'), fullPage: true });
   const [step] = await serviceSelect('agent_steps', `project_id=eq.${id}&action_key=eq.request_user_decision&select=params`);
   expect(step.params.control).toBeUndefined();
 });
@@ -327,17 +332,17 @@ test('repeated identical steps fold into one row, and the run stops rather than 
   await page.screenshot({ path: test.info().outputPath('01-repeated-steps-fold-into-one-row.png'), fullPage: true });
 });
 
-test('the Go controls stay in view while the page is scrolled, and point back when Go needs the user', async ({ page }) => {
+test('the Go buttons stay in view while the page is scrolled, and point back when Go needs the user', async ({ page }) => {
   await createProject(page, { workflow: 'Research', name: 'E2E go dock', objective: 'Pendulum [[mock:plan=derive,prove]]' });
   await expect(stageArtifact(page)).toContainText('Mock', { timeout: 30_000 });
   const panel = goPanel(page);
   await panel.getByRole('button', { name: 'Set up Go' }).click();
   await panel.getByRole('radio', { name: /^Guided/ }).click();
   // Nothing is pinned while the panel's own controls are on screen.
-  await expect(page.getByRole('region', { name: 'Go controls' })).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Go buttons' })).toHaveCount(0);
 
   await page.keyboard.press('End');
-  const dock = page.getByRole('region', { name: 'Go controls' });
+  const dock = page.getByRole('region', { name: 'Go buttons' });
   await expect(dock).toBeVisible();
   await expect(dock).toBeInViewport();
   await expect(dock.getByRole('button', { name: /^Go$/ })).toBeVisible();
@@ -352,5 +357,5 @@ test('the Go controls stay in view while the page is scrolled, and point back wh
   await page.screenshot({ path: test.info().outputPath('02-go-needs-you-pinned.png') });
   await dock.getByRole('button', { name: 'Go needs you — show' }).click();
   await expect(panel.getByRole('region', { name: 'Go mode needs your approval' })).toBeInViewport();
-  await expect(page.getByRole('region', { name: 'Go controls' })).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Go buttons' })).toHaveCount(0);
 });
