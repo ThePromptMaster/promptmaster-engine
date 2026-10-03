@@ -56,6 +56,7 @@ import {
 } from '@/lib/workflow/engine';
 import { buildStageDigest, formatManuscript, summariseStageContent } from '@/lib/workflow/digest';
 import { buildChatContext, chatContentFor } from '@/lib/workflow/chat-context';
+import { starterQuestions } from '@/lib/workflow/chat-starters';
 import { keepFinishedVersion, stageContentForSummary, stageEvidence } from '@/lib/workflow/evidence';
 import { api } from '@/lib/api/client';
 import { inputsFrom } from './use-stage-generation';
@@ -68,7 +69,7 @@ import { ProjectData } from './project-data';
 import { draftBindings } from '@/lib/outline/long-form';
 import { approveOutline, loadOutline, materialiseOutlineInto } from '@/lib/outline/actions';
 import type { OutlineDocument } from '@/types/outline';
-import { proposableStatuses, stageDrafts, itemSchemaFor, parseItems, rendererHoldsItems, serializeItems, type StageItem } from '@/lib/workflow/stage-artifact';
+import { isTriaged, proposableStatuses, stageDrafts, itemSchemaFor, parseItems, rendererHoldsItems, serializeItems, type StageItem } from '@/lib/workflow/stage-artifact';
 import { previewRowAction } from '@/lib/workflow/row-actions';
 import { applyLookup, lookupQueries, lookupSummary } from '@/lib/workflow/lookup';
 import { readStageFigures, type StageFigures } from '@/lib/workflow/figures';
@@ -1211,6 +1212,17 @@ export function WorkflowWorkspace({
     : null;
   // Read by the Go loop when it plans a move, never during render.
   controlsRef.current = pageControls;
+  // Check and chapter stages: the work is the table or the chapters, so the
+  // supporting panels fold to a line each (3 Oct call).
+  const foldStageExtras = stage.renderer === 'review' || stage.renderer === 'long_form';
+  const showDials = isCurrent && draftable && hasContent;
+  const dials = (
+    <CritiqueStyleControl
+      intensity={project.critique_intensity ?? 'standard'}
+      tone={project.critique_tone ?? 'neutral'}
+      onChange={onPatchProject}
+    />
+  );
   const chatEditsProse =
     !rendererHoldsItems(stage.renderer) && stage.renderer !== 'outline' && stage.renderer !== 'long_form';
   // The stuck card names the stage bar's own transition button in the words
@@ -1684,6 +1696,7 @@ export function WorkflowWorkspace({
               manualIds={manualIds}
               onToggleManual={(id, checked) => void handleToggleManual(id, checked)}
               readOnly={!isEditable}
+              collapsible={foldStageExtras}
             />
 
             <RecommendationsPanel
@@ -1702,15 +1715,24 @@ export function WorkflowWorkspace({
                 the declarative half of the same question the evaluation
                 answers by judgment. */}
             {/* PM-21: the dials sit with the critique they shape. */}
-            {isCurrent && draftable && hasContent && (
-              <CritiqueStyleControl
-                intensity={project.critique_intensity ?? 'standard'}
-                tone={project.critique_tone ?? 'neutral'}
-                onChange={onPatchProject}
-              />
+            {foldStageExtras ? (
+              (showDials || shownEvaluation) && (
+                <details data-stage-extras className="rounded-xl bg-[var(--surface-container-low)] px-5 py-3">
+                  <summary className="cursor-pointer text-label text-[var(--on-surface-variant)]">
+                    {shownEvaluation ? 'The stage check, and how tough feedback is' : 'How tough feedback is'}
+                  </summary>
+                  <div className="mt-3 space-y-4">
+                    {showDials && dials}
+                    <StageEvaluationPanel evaluation={shownEvaluation} />
+                  </div>
+                </details>
+              )
+            ) : (
+              <>
+                {showDials && dials}
+                <StageEvaluationPanel evaluation={shownEvaluation} />
+              </>
             )}
-
-            <StageEvaluationPanel evaluation={shownEvaluation} />
 
             {/* PM-22: the easy actions after a check, on the version it checked. */}
             {isCurrent && draftable && headVersion && (evaluations?.[headVersion.id]?.findings ?? []).length > 0 && (
@@ -1863,6 +1885,14 @@ export function WorkflowWorkspace({
               )}
               // Built when a message is sent, not on every render: it carries the chapters.
               getChatContext={() => buildChatContext({ template, state, project, stage, bundles: stageBundles, controls: pageControls })}
+              starters={isCurrent ? starterQuestions({
+                renderer: stage.renderer,
+                stageLabel: stage.short_label,
+                hasContent: hasContent || (stage.renderer === 'long_form' && (stageBundles[draftingStageId(template) ?? '']?.artifact?.long_form?.outline ?? []).some((sec) => (sec.content ?? '').trim())),
+                openRows: rendererHoldsItems(stage.renderer) ? headItems.filter((i) => !isTriaged(i, itemSchemaFor(stage))).length : 0,
+                requiredOpen: evaluation.criteria.filter((c) => c.blocking && !c.satisfied).map((c) => c.label),
+                nextStageLabel: nextStage?.short_label ?? null,
+              }) : []}
               headVersion={stageVersions.at(-1) ?? null}
               appendStageVersion={appendStageVersion}
               restoreStageVersion={restoreStageVersion}
