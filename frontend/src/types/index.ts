@@ -218,6 +218,19 @@ export interface ChatMessage {
   created_at: string;
 }
 
+/** Where the user is: mirrors `ChatContext` in backend/promptmaster/page_context.py. */
+export interface ChatContext {
+  stage_label: string;
+  stage_instruction: string;
+  workflow_label: string;
+  workflow_stages: string[];
+  prior_stages: StageDigestEntry[];
+  outline: string;
+  manuscript: string;
+  /** null when not known; [] when the page has none. */
+  buttons: { label: string; where: string }[] | null;
+}
+
 export interface ChatMessageRequest {
   inputs: PMInput;
   active_iteration: Iteration;
@@ -225,6 +238,7 @@ export interface ChatMessageRequest {
   user_message: string;
   iteration_history?: Iteration[];
   model?: string;
+  context?: ChatContext;
 }
 
 export interface ChatMessageResponse {
@@ -247,6 +261,7 @@ export interface SaveAsNewVersionRequest {
   iteration_number: number;
   iteration_history?: Iteration[];
   model?: string;
+  context?: ChatContext;
 }
 
 export interface IterationFromConversationResponse {

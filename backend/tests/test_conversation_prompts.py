@@ -97,17 +97,19 @@ def test_apply_to_answer_system_instructs_to_revise(basic_inputs, basic_iteratio
 
 # --- save-as-new-version ---
 
-def test_save_as_new_version_omits_current_output(basic_inputs, basic_iteration):
-    """Save creates a fresh version — should not pass the previous output as content to keep."""
+def test_save_as_new_version_revises_the_current_text(basic_inputs, basic_iteration):
+    """The new version starts from what is there. Withholding it made the model
+    rewrite from the brief and the thread, and lose what the chat never mentioned."""
     system, user = build_save_as_new_version_prompt(
         inputs=basic_inputs,
         active_iteration=basic_iteration,
         chat_history=_chat(),
         iterations=[basic_iteration],
     )
-    # Objective and chat must be present
     assert basic_inputs.objective in user
     assert "Make it shorter" in user
+    assert basic_iteration.output in user
+    assert "keep the rest" in system.lower()
 
 
 def test_save_as_new_version_system_instructs_fresh_generation(basic_inputs, basic_iteration):

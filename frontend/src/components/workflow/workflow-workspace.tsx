@@ -55,6 +55,7 @@ import {
   tickClosesStage,
 } from '@/lib/workflow/engine';
 import { buildStageDigest, formatManuscript, summariseStageContent } from '@/lib/workflow/digest';
+import { buildChatContext, chatContentFor } from '@/lib/workflow/chat-context';
 import { keepFinishedVersion, stageContentForSummary, stageEvidence } from '@/lib/workflow/evidence';
 import { api } from '@/lib/api/client';
 import { inputsFrom } from './use-stage-generation';
@@ -67,7 +68,7 @@ import { ProjectData } from './project-data';
 import { draftBindings } from '@/lib/outline/long-form';
 import { approveOutline, loadOutline, materialiseOutlineInto } from '@/lib/outline/actions';
 import type { OutlineDocument } from '@/types/outline';
-import { proposableStatuses, stageDrafts, itemSchemaFor, parseItems, rendererHoldsItems, serializeItems, stageContentForChat, type StageItem } from '@/lib/workflow/stage-artifact';
+import { proposableStatuses, stageDrafts, itemSchemaFor, parseItems, rendererHoldsItems, serializeItems, type StageItem } from '@/lib/workflow/stage-artifact';
 import { previewRowAction } from '@/lib/workflow/row-actions';
 import { applyLookup, lookupQueries, lookupSummary } from '@/lib/workflow/lookup';
 import { readStageFigures, type StageFigures } from '@/lib/workflow/figures';
@@ -1210,6 +1211,8 @@ export function WorkflowWorkspace({
     : null;
   // Read by the Go loop when it plans a move, never during render.
   controlsRef.current = pageControls;
+  const chatEditsProse =
+    !rendererHoldsItems(stage.renderer) && stage.renderer !== 'outline' && stage.renderer !== 'long_form';
   // The stuck card names the stage bar's own transition button in the words
   // that are on the page ("Continue to X" or "Override and continue to X").
   const goNeedContextOnPage = {
@@ -1848,14 +1851,18 @@ export function WorkflowWorkspace({
               project={project}
               stageId={stage.id}
               stageLabel={stage.label}
-              content={stageContentForChat(
-                itemSchemaFor(stage),
+              content={chatContentFor(
+                template,
+                stage,
+                stageBundles,
                 (activeVersionId
                   ? stageVersions.find((v) => v.id === activeVersionId)?.content
                   : undefined) ??
                   stageVersions.at(-1)?.content ??
                   ''
               )}
+              // Built when a message is sent, not on every render: it carries the chapters.
+              getChatContext={() => buildChatContext({ template, state, project, stage, bundles: stageBundles, controls: pageControls })}
               headVersion={stageVersions.at(-1) ?? null}
               appendStageVersion={appendStageVersion}
               restoreStageVersion={restoreStageVersion}
@@ -1863,15 +1870,21 @@ export function WorkflowWorkspace({
               // Revising splices into the content it was handed, so instructing
               // while reading an older version would append a version built
               // from it and lose everything since. Discussion is unaffected.
+              // The chat sees an outline or the chapters as readable text, so
+              // it cannot splice into them: they change in their own editors.
               canInstruct={
-                (activeVersionId === null || activeVersionId === stageVersions.at(-1)?.id) && !rendererHoldsItems(stage.renderer)
+                (activeVersionId === null || activeVersionId === stageVersions.at(-1)?.id) && chatEditsProse
               }
               cannotChangeBecause={
                 rendererHoldsItems(stage.renderer)
                   ? 'This stage is a table. Ask about it here and the answer will offer row changes you can review, or change the rows in the table itself.'
-                  : undefined
+                  : stage.renderer === 'outline'
+                    ? 'Ask about the outline here; change it in the outline editor on the page.'
+                    : stage.renderer === 'long_form'
+                      ? 'Ask about the chapters here; rewrite one from its own section on the page.'
+                      : undefined
               }
-              isTable={rendererHoldsItems(stage.renderer)}
+              isTable={!chatEditsProse}
               suggestActions={draftable && headVersion ? suggestReplyActions : undefined}
               previewRows={previewReplyRows}
               onRunAction={runReplyAction}

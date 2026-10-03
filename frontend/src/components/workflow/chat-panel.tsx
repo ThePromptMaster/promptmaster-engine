@@ -42,7 +42,7 @@ import {
 } from '@/lib/workflow/instruction-conflicts';
 import { ReplyActions } from './reply-actions';
 import type { RowChange } from '@/lib/workflow/row-actions';
-import type { ReplyAction } from '@/types';
+import type { ChatContext, ReplyAction } from '@/types';
 import { documentSections, type ScopeKind } from './chat-scope';
 import type { StageChatMessage } from '@/lib/supabase/conversation';
 import type { NewVersion } from '@/lib/supabase/versions';
@@ -121,8 +121,13 @@ interface Props {
   previewRows?: (action: ReplyAction) => RowChange[];
   onRunAction?: (action: ReplyAction) => Promise<void> | void;
   applying?: boolean;
-  /** The stage's work is a table: a discussion cannot be saved over it as prose. */
+  /**
+   * The stage's work is not a prose version — a table, an outline or chapters —
+   * so a discussion cannot be saved over it as prose.
+   */
   isTable?: boolean;
+  /** Where the user is, sent with every question (3 Oct call). */
+  getChatContext?: () => ChatContext;
 }
 
 /**
@@ -163,6 +168,7 @@ export function ChatPanel({
   onRunAction,
   applying = false,
   isTable = false,
+  getChatContext,
 }: Props) {
   const [offerActions, setOfferActions] = useState(true);
   useEffect(() => setOfferActions(readOfferActions()), []);
@@ -174,6 +180,7 @@ export function ChatPanel({
     headVersion,
     appendStageVersion,
     restoreStageVersion,
+    getChatContext,
   });
 
   const [requestedMode, setMode] = useState<Mode>(initialMode);

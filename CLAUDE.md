@@ -56,7 +56,7 @@ It does verify identity. `backend/auth.py` checks the Supabase JWT and attaches 
 |---|---|
 | `meta.py` | `GET /api/modes`, `GET /api/models` |
 | `engine.py` | `build-prompt`, `run-iteration`, `flow-trigger`, `flow-inspect`, `build-realignment`, `run-self-audit`, `hard-reset-lessons`, `format-summary`, `export-session` |
-| `conversation.py` | `chat-message`, `apply-to-answer`, `save-as-new-version`, `suggest-actions` (a chat answer as at most four actions; prompt and parser in `promptmaster/reply_actions.py`) |
+| `conversation.py` | `chat-message`, `apply-to-answer`, `save-as-new-version`, `suggest-actions` (a chat answer as at most four actions; prompt and parser in `promptmaster/reply_actions.py`). The chat is told where the user is — stage, workflow, outline, chapters, page buttons — via `context` (`lib/workflow/chat-context.ts` → `promptmaster/page_context.py`), so it never asks for anything to be pasted |
 | `continuation.py` | `continue-document` |
 | `long_form.py` | `detect-long-form`, `generate-outline`, `generate-section`, `finalize-long-form` |
 | `setup.py` | `generate-setup`, `guide-questions` (the batch; no longer used by the UI), `guide-next-question` ("Guide me" one question at a time: the next question given the answers so far, or that there is enough) |

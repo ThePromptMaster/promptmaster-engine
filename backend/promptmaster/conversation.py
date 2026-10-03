@@ -7,6 +7,7 @@ instruction and what they put in the user message.
 
 from __future__ import annotations
 
+from .page_context import ChatContext, format_chat_context
 from .prompt_builder import build_prompt, resolve_mode_config
 from .schemas import ChatMessage, Iteration, PMInput
 from .self_model import PROMPTMASTER_SELF_MODEL
@@ -19,6 +20,12 @@ _PROMPTMASTER_CONTEXT = (
     "Stay aligned with the original objective at all times.\n\n"
     + PROMPTMASTER_SELF_MODEL
 )
+
+
+def _where(context: ChatContext | None) -> str:
+    """The stage/workflow/manuscript block, followed by a blank line; '' when absent."""
+    block = format_chat_context(context)
+    return f"{block}\n\n" if block else ""
 
 
 def _format_chat_thread(chat_history: list[ChatMessage]) -> str:
@@ -77,7 +84,10 @@ _CHAT_REPLY_INSTRUCTION = (
     "answer they generated. Reply naturally and helpfully, like a thoughtful "
     "collaborator. Do not produce a fully restructured 'next iteration' here — "
     "you are exploring ideas with the user. Stay grounded in the original "
-    "objective; if the user asks something off-topic, gently steer back."
+    "objective; if the user asks something off-topic, gently steer back. "
+    "When you point the user to a next step, name a button only if it is listed "
+    "under BUTTONS ON THIS PAGE NOW, in exactly those words; otherwise name the "
+    "stage where it happens."
 )
 
 
@@ -87,6 +97,7 @@ def build_chat_reply_prompt(
     chat_history: list[ChatMessage],
     user_message: str,
     iterations: list[Iteration],
+    context: ChatContext | None = None,
 ) -> tuple[str, str]:
     """Build (system, user) prompt for a fluid chat reply."""
     system = _shared_system(inputs, iterations, _CHAT_REPLY_INSTRUCTION)
@@ -96,6 +107,7 @@ def build_chat_reply_prompt(
         f"Audience: {inputs.audience}\n"
         f"Constraints: {inputs.constraints or '(none)'}\n"
         f"Output format: {inputs.output_format or '(none)'}\n\n"
+        f"{_where(context)}"
         f"CURRENT VERSION (#{active_iteration.iteration_number}):\n"
         f"{active_iteration.output}\n\n"
         f"CHAT SO FAR:\n{chat_block}\n\n"
@@ -123,6 +135,7 @@ def build_apply_to_answer_prompt(
     active_iteration: Iteration,
     chat_history: list[ChatMessage],
     iterations: list[Iteration],
+    context: ChatContext | None = None,
 ) -> tuple[str, str]:
     """Build (system, user) prompt for Apply to Answer."""
     system = _shared_system(inputs, iterations, _APPLY_INSTRUCTION)
@@ -132,6 +145,7 @@ def build_apply_to_answer_prompt(
         f"Audience: {inputs.audience}\n"
         f"Constraints: {inputs.constraints or '(none)'}\n"
         f"Output format: {inputs.output_format or '(none)'}\n\n"
+        f"{_where(context)}"
         f"CURRENT VERSION (#{active_iteration.iteration_number}):\n"
         f"{active_iteration.output}\n\n"
         f"CHAT THREAD:\n{chat_block}\n\n"
@@ -145,12 +159,15 @@ def build_apply_to_answer_prompt(
 # 3. Save as new version — fresh generation using chat as additional context
 # --------------------------------------------------------------------------
 
+# The current text used to be withheld here ("previous version was #n" and no
+# more), so the new version was rewritten from the brief and the thread alone
+# and lost whatever the chat never mentioned. It now revises what is there.
 _SAVE_AS_NEW_INSTRUCTION = (
-    "FRESH-GENERATION MODE: The user has had a chat about an existing answer and "
-    "now wants a brand new version informed by that conversation. Treat the chat "
-    "thread as additional constraints and guidance. Produce a fresh answer that "
-    "fully addresses the original objective; do not simply copy the existing "
-    "version's structure. Output only the new answer text."
+    "NEW-VERSION MODE: The user has had a chat about the current version and now "
+    "wants a new version that takes that conversation into account. Treat what "
+    "the chat settled as instructions. Start from the current version, change "
+    "what the chat asked for, and keep the rest. Output only the full text of "
+    "the new version, ready to read."
 )
 
 
@@ -159,6 +176,7 @@ def build_save_as_new_version_prompt(
     active_iteration: Iteration,
     chat_history: list[ChatMessage],
     iterations: list[Iteration],
+    context: ChatContext | None = None,
 ) -> tuple[str, str]:
     """Build (system, user) prompt for Save as New Version."""
     system = _shared_system(inputs, iterations, _SAVE_AS_NEW_INSTRUCTION)
@@ -168,8 +186,11 @@ def build_save_as_new_version_prompt(
         f"Audience: {inputs.audience}\n"
         f"Constraints: {inputs.constraints or '(none)'}\n"
         f"Output format: {inputs.output_format or '(none)'}\n\n"
+        f"{_where(context)}"
+        f"CURRENT VERSION (#{active_iteration.iteration_number}):\n"
+        f"{active_iteration.output}\n\n"
         f"CHAT THREAD:\n{chat_block}\n\n"
-        f"(Reference: previous version was #{active_iteration.iteration_number}.)\n\n"
-        "Produce a fresh new version of the answer."
+        "Produce the new version: the current version with everything the chat "
+        "settled applied, and everything the chat did not touch kept."
     )
     return system, user_prompt

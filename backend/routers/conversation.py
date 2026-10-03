@@ -18,6 +18,7 @@ from promptmaster.engine import generate
 from promptmaster.errors import PRESERVED_NOTHING_WRITTEN
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError
 from routers._errors import llm_http_error
+from promptmaster.page_context import ChatContext
 from promptmaster.schemas import ChatMessage, Iteration, PMInput
 from promptmaster.session_context import _label_trigger
 from promptmaster.reply_actions import ActionTable, ReplyAction, suggest_reply_actions
@@ -35,6 +36,9 @@ class ChatMessageRequest(BaseModel):
     user_message: str
     iteration_history: list[Iteration] = []
     model: str = ""
+    #: Where the user is (stage, workflow, outline, chapters, buttons). Optional,
+    #: so a caller that predates it gets the old prompt.
+    context: ChatContext | None = None
 
 
 class ChatMessageResponse(BaseModel):
@@ -48,6 +52,9 @@ class ApplyToAnswerRequest(BaseModel):
     iteration_number: int
     iteration_history: list[Iteration] = []
     model: str = ""
+    #: Where the user is (stage, workflow, outline, chapters, buttons). Optional,
+    #: so a caller that predates it gets the old prompt.
+    context: ChatContext | None = None
 
 
 class SaveAsNewVersionRequest(BaseModel):
@@ -57,6 +64,9 @@ class SaveAsNewVersionRequest(BaseModel):
     iteration_number: int
     iteration_history: list[Iteration] = []
     model: str = ""
+    #: Where the user is (stage, workflow, outline, chapters, buttons). Optional,
+    #: so a caller that predates it gets the old prompt.
+    context: ChatContext | None = None
 
 
 class IterationFromConversationResponse(BaseModel):
@@ -100,6 +110,7 @@ async def api_chat_message(
             chat_history=req.chat_history,
             user_message=req.user_message,
             iterations=req.iteration_history,
+            context=req.context,
         )
         reply = await generate(
             client=client,
@@ -132,6 +143,7 @@ async def api_apply_to_answer(
             active_iteration=req.active_iteration,
             chat_history=req.chat_history,
             iterations=req.iteration_history,
+            context=req.context,
         )
         output, _usage, finish_reason = await client.generate_with_meta(
             prompt=prompt_text,
@@ -172,6 +184,7 @@ async def api_save_as_new_version(
             active_iteration=req.active_iteration,
             chat_history=req.chat_history,
             iterations=req.iteration_history,
+            context=req.context,
         )
         output, _usage, finish_reason = await client.generate_with_meta(
             prompt=prompt_text,
