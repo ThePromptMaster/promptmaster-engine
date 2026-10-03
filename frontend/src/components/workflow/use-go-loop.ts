@@ -42,7 +42,7 @@ import { requestProjectCancel } from '@/lib/supabase/jobs';
 import { authorizeRun } from '@/lib/agent/authorize';
 import { buildAgentState } from '@/lib/agent/digest';
 import { performStep, type PerformContext, type StepOutcome } from '@/lib/agent/perform';
-import { allowedActions, LIVE_TOOLS, withoutOverride, DEFAULT_BUDGET_STEPS, fitsBudget, noChange, plannedBeforeLatestChange, preempt, shouldPause, stateFingerprint, stepCost } from '@/lib/agent/policy';
+import { allowedActions, LIVE_TOOLS, POLISH_MOVES, withoutEndlessPolish, withoutOverride, DEFAULT_BUDGET_STEPS, fitsBudget, noChange, plannedBeforeLatestChange, preempt, shouldPause, stateFingerprint, stepCost } from '@/lib/agent/policy';
 import {
   createAgentRun,
   endAgentRun,
@@ -436,10 +436,17 @@ export function useGoLoop(opts: Options) {
         const proposedSkipHere = [...priorStepsRef.current, ...stepsRef.current].some(
           (s) => s.action_key === 'propose_skip' && s.stage_id === o.stage!.id
         );
-        const allowed = withoutOverride(
-          allowedActions(o.template, o.state, o.stage, hasDraft, LIVE_TOOLS, facts), stageEvaluation.canAdvance, current.policy
-          // Asked once: if the user stayed, the stage is to be done.
-        ).filter((k) => k !== 'propose_skip' || !proposedSkipHere);
+        const polishedHere = [...priorStepsRef.current, ...stepsRef.current].filter(
+          (s) => s.stage_id === o.stage!.id && (POLISH_MOVES as readonly string[]).includes(s.action_key)
+        ).length;
+        const allowed = withoutEndlessPolish(
+          withoutOverride(
+            allowedActions(o.template, o.state, o.stage, hasDraft, LIVE_TOOLS, facts), stageEvaluation.canAdvance, current.policy
+            // Asked once: if the user stayed, the stage is to be done.
+          ).filter((k) => k !== 'propose_skip' || !proposedSkipHere),
+          polishedHere,
+          stageEvaluation.canAdvance
+        );
 
         // Runs the data could carry out are tried before the table is handed
         // to the user: at most once per row, so a row no code can settle

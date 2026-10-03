@@ -6,7 +6,7 @@ import { initialState } from '@/lib/workflow/engine';
 import type { StageEvaluation } from '@/lib/workflow/types';
 import type { AgentStep } from '@/types/agent';
 import { deriveExecutionLabel } from './labels';
-import { allowedActions, alternating, withoutOverride, fitsBudget, noChange, noProgress, plannedBeforeLatestChange, preempt, shouldPause, stageMoveActor, stateFingerprint } from './policy';
+import { allowedActions, alternating, withoutOverride, withoutEndlessPolish, fitsBudget, noChange, noProgress, plannedBeforeLatestChange, preempt, shouldPause, stageMoveActor, stateFingerprint } from './policy';
 
 function step(over: Partial<AgentStep>): AgentStep {
   return {
@@ -451,5 +451,22 @@ describe('a run going round in circles stops (2 Oct, screenshot 7)', () => {
     expect(noChange(['x', 'x'])).toBeNull();
     expect(noChange(['y', 'x', 'x', 'x'])).toMatch(/^The last 3 moves changed nothing on this stage/);
     expect(noChange(['x', 'x', 'y'])).toBeNull();
+  });
+});
+
+describe('Go stops polishing a stage that is good enough (production Research pass, 3 Oct)', () => {
+  const allowed = ['evaluate_stage', 'apply_findings', 'revise_stage', 'advance_stage', 'request_user_decision'];
+
+  it('keeps polishing while there is room', () => {
+    expect(withoutEndlessPolish(allowed, 1, true)).toEqual(allowed);
+    expect(withoutEndlessPolish(allowed, 3, false)).toEqual(allowed);
+  });
+
+  it('moves on after two polishing moves once the stage can advance', () => {
+    expect(withoutEndlessPolish(allowed, 2, true)).toEqual(['advance_stage', 'request_user_decision']);
+  });
+
+  it('never polishes one stage more than four times in a run', () => {
+    expect(withoutEndlessPolish(allowed, 4, false)).toEqual(['advance_stage', 'request_user_decision']);
   });
 });

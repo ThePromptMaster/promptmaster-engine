@@ -51,6 +51,29 @@ export function withoutOverride(allowed: readonly string[], canAdvance: boolean,
   );
 }
 
+/** Moves that polish a stage rather than move the work on. */
+export const POLISH_MOVES = ['evaluate_stage', 'apply_findings', 'revise_stage'] as const;
+/** Polishing moves on one stage in one run, once it could move on — and at most, whatever. */
+export const POLISH_WHEN_READY = 2;
+export const POLISH_MAX = 4;
+
+/**
+ * Stop polishing a stage that is good enough. On a production Research run
+ * (3 Oct) Go spent its whole window on Literature — check, apply, check,
+ * revise, check — every step producing a version, so the no-change stop never
+ * fired. Once the stage can move on, two polishing moves are enough; four
+ * are the most it gets either way. The planner is then left to move on, or
+ * to ask.
+ */
+export function withoutEndlessPolish(
+  allowed: readonly string[],
+  polishedHere: number,
+  canAdvance: boolean
+): string[] {
+  const capped = polishedHere >= POLISH_MAX || (canAdvance && polishedHere >= POLISH_WHEN_READY);
+  return capped ? allowed.filter((k) => !(POLISH_MOVES as readonly string[]).includes(k)) : [...allowed];
+}
+
 /** Which tools a run can actually call. Nothing retrieves literature yet (B0). */
 export interface AgentTools {
   literature: boolean;
