@@ -451,6 +451,7 @@ def test_the_code_writer_is_told_to_read_only_listed_files_and_never_invent_data
     assert "`MISSING_DATA: <exactly what is missing, as one plain sentence>`" in system
     assert "raise SystemExit(2)" in system
     assert "do not compute on placeholders" in system
+    assert "Never report a run that could not be made as a `status:` line" in system
     assert "/data/accounts.csv" in user
 
 

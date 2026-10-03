@@ -55,6 +55,16 @@ describe('classifyRun — PM-12: the label is what happened', () => {
     expect(classifyRun({ ...base, stdout: 'the MISSING_DATA: marker mid-line is not the signal' }).executionLabel).toBe('code_executed');
   });
 
+  it('"status: not_run" in the code\'s own label: value lines is the same thing said differently (production, 3 Oct)', () => {
+    const stdout = 'row: 4 run: Analyze billing signals\nstatus: not_run\nobserved: The attached file holds no billing fields.\n';
+    const c = classifyRun({ ...base, stdout });
+    expect(c).toMatchObject({ stepStatus: 'blocked', blockKind: 'data_missing', missing: 'The attached file holds no billing fields.' });
+    expect(classifyRun({ ...base, stdout: 'status: "not run"\n' }).missing).toBe('the code reported that this run could not be made from the data provided');
+    // A result that merely mentions the words is not a status line.
+    expect(classifyRun({ ...base, stdout: 'rows_not_run: 3\nstatus: completed\n' }).executionLabel).toBe('code_executed');
+    expect(classifyRun({ ...base, stdout: 'note: two runs were not_run earlier\n' }).executionLabel).toBe('code_executed');
+  });
+
   it('a module name in stdout of a clean run does not block it', () => {
     expect(classifyRun({ ...base, stdout: "No module named 'x'" }).executionLabel).toBe('code_executed');
   });
