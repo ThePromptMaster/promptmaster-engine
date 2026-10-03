@@ -363,6 +363,15 @@ Dead function in `20260902000000_projects_core.sql`. Cosmetic, but it sits next 
 `touch_and_bump_revision()`, and a future editor could easily attach the wrong one —
 which would silently stop bumping `revision` and disable the concurrency guard.
 
+### L-26 · Go's planner reads the opening of the manuscript, not all of it · `accepted`
+
+On a stage after Drafting, the planner is sent the chapter list, the counts and the first
+6,000 characters of the manuscript (`MANUSCRIPT_EXCERPT_CHARS`, `lib/agent/digest.ts`),
+enough to know the draft exists and what it covers. The full text, bounded at 120k (L-24),
+goes only to the call that drafts the review. A planner that needs to judge a late chapter
+cannot; it can only draft the review, which can. The planner runs on every step, so the
+whole manuscript on every call would pay for the same text over and over.
+
 ---
 
 ## Summary
@@ -394,6 +403,7 @@ which would silently stop bumping `revision` and disable the concurrency guard.
 | L-23 | `touch_updated_at()` dead and adjacent to a load-bearing function | open |
 | L-24 | Review stages see the manuscript up to 120k characters | accepted |
 | L-25 | Revision snapshots have no one-click restore into sections | open |
+| L-26 | Go's planner reads a 6,000-character opening of the manuscript on review stages | accepted |
 
 ### L-B3 — Go mode code execution: Python only, fixed package set, no network
 

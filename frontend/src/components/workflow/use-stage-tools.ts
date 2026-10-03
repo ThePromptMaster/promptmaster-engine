@@ -52,10 +52,17 @@ interface Options {
   project: Project;
   stage: StageDefinition | null;
   headVersion: ArtifactVersion | null;
+  /**
+   * The text to work on when the stage has no version of its own: a long-form
+   * stage keeps its chapters in `artifacts.long_form`, and a version appears
+   * only when it completes. Without this Challenge, Reframe and Self-audit saw
+   * nothing on a Drafting stage with a whole book on it (2 Oct).
+   */
+  fallbackContent?: string;
   appendStageVersion?: (stageId: string, name: string, version: NewVersion) => Promise<unknown>;
 }
 
-export function useStageTools({ project, stage, headVersion, appendStageVersion }: Options) {
+export function useStageTools({ project, stage, headVersion, fallbackContent = '', appendStageVersion }: Options) {
   const [running, setRunning] = useState<ToolKind | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [commentary, setCommentary] = useState<Commentary | null>(null);
@@ -63,20 +70,20 @@ export function useStageTools({ project, stage, headVersion, appendStageVersion 
 
   const run = useCallback(
     async (kind: ToolKind) => {
-      if (!stage || !headVersion || guard.current) return;
-      const content = headVersion.content;
+      if (!stage || guard.current) return;
+      const content = headVersion?.content.trim() ? headVersion.content : fallbackContent;
       if (!content.trim()) return;
 
       guard.current = true;
       setRunning(kind);
       setError(null);
-      const next = headVersion.version_number + 1;
+      const next = (headVersion?.version_number ?? 0) + 1;
 
       try {
         if (kind === 'continue') {
           const { iteration } = await api.continueDocument({
             inputs: inputsFrom(project),
-            incomplete_iteration: asIteration(content, headVersion.version_number, project.mode),
+            incomplete_iteration: asIteration(content, headVersion?.version_number ?? 0, project.mode),
             iteration_number: next,
             model: project.model,
           });
@@ -126,7 +133,7 @@ export function useStageTools({ project, stage, headVersion, appendStageVersion 
         setRunning(null);
       }
     },
-    [stage, headVersion, project, appendStageVersion]
+    [stage, headVersion, fallbackContent, project, appendStageVersion]
   );
 
   return {

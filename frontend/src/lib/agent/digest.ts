@@ -19,7 +19,7 @@
  */
 
 import { countNamedSections, parseOutlineDocument } from '@/lib/outline/model';
-import { manuscriptArtifactFor } from '@/lib/workflow/context';
+import { manuscriptArtifactFor, manuscriptSourceFor } from '@/lib/workflow/context';
 import { formatManuscript, type DataFileBrief, type StageArtifactBundle } from '@/lib/workflow/digest';
 import { nextSuggestedStage } from '@/lib/workflow/engine';
 import { effectiveRenderer, isTriaged, itemSchemaFor, parseItems } from '@/lib/workflow/stage-artifact';
@@ -55,8 +55,25 @@ export interface AgentStateDigest {
   prior_stages: string[];
   recent_steps: { action_key: string; status: string; execution_label: string | null; output: string }[];
   outline?: { sections: string[]; named_count: number; approved: boolean };
-  /** `complete` counts the sections that hold text. */
-  manuscript?: { total: number; complete: number; pending_jobs: number; written: string[]; unwritten: string[] };
+  /**
+   * `complete` counts the sections that hold text. `own` is true on the
+   * long-form stage that writes the chapters; on a stage after drafting that
+   * reads them (Continuity, Critique, Fact-check, Final review) it is false
+   * and `excerpt` carries the opening of the text, so the planner knows the
+   * draft exists and drafts the review from it instead of marking the stage
+   * stuck for "no draft text" (2 Oct screenshots).
+   */
+  manuscript?: {
+    total: number;
+    complete: number;
+    pending_jobs: number;
+    written: string[];
+    unwritten: string[];
+    stage_label: string;
+    words: number;
+    own: boolean;
+    excerpt: string;
+  };
   findings?: { total: number; triaged: number; sample: string[] };
   /** What the user has already decided on this project (lib/agent/memory.ts). */
   memory?: string[];
@@ -132,6 +149,26 @@ export function buildAgentState(input: {
 
   const outlineLine = (s: { title: string; abstract?: string }, i: number) =>
     `${i + 1}. ${s.title.trim() || 'Untitled'}${s.abstract?.trim() ? ` — ${s.abstract.trim().slice(0, 120)}` : ''}`;
+  // Written means the section holds text. A section whose last job failed
+  // but whose text is on the page was listed as unwritten, and the planner
+  // was shown a manuscript with holes the user could not see.
+  const hasText = (s: OutlineSection) => (s.content ?? '').trim().length > 0;
+  const sectionLabel = (s: OutlineSection, i: number) =>
+    `${i + 1}. ${s.title || 'Untitled section'}${hasText(s) && s.status !== 'complete' ? ` (text kept; last write ${s.status})` : ''}`;
+  const wordCount = (sections: OutlineSection[]) =>
+    sections.reduce((n, s) => n + (s.content ?? '').trim().split(/\s+/).filter(Boolean).length, 0);
+  const describeManuscript = (sections: OutlineSection[], stageLabel: string, own: boolean) => ({
+    total: sections.length,
+    complete: sections.filter(hasText).length,
+    pending_jobs: own ? pendingJobs : 0,
+    written: sections.map(sectionLabel).filter((_, i) => hasText(sections[i])).slice(0, LIST_MAX),
+    unwritten: sections.map(sectionLabel).filter((_, i) => !hasText(sections[i])).slice(0, LIST_MAX),
+    stage_label: stageLabel,
+    words: wordCount(sections),
+    own,
+    // The reading stage's own excerpt is its table; the chapters travel here.
+    excerpt: own ? '' : cap(formatManuscript(sections, Number.POSITIVE_INFINITY), MANUSCRIPT_EXCERPT_CHARS),
+  });
 
   if (stage.renderer === 'outline') {
     // The working copy when there is one: it is what the user sees in the panel.
@@ -141,19 +178,7 @@ export function buildAgentState(input: {
     excerpt = sections.join('\n');
   } else if (stage.renderer === 'long_form') {
     const sections = facts?.manuscript?.outline ?? manuscriptArtifactFor(template, stage, bundles)?.long_form?.outline ?? [];
-    // Written means the section holds text. A section whose last job failed
-    // but whose text is on the page was listed as unwritten, and the planner
-    // was shown a manuscript with holes the user could not see.
-    const hasText = (s: OutlineSection) => (s.content ?? '').trim().length > 0;
-    const label = (s: OutlineSection, i: number) =>
-      `${i + 1}. ${s.title || 'Untitled section'}${hasText(s) && s.status !== 'complete' ? ` (text kept; last write ${s.status})` : ''}`;
-    manuscript = {
-      total: sections.length,
-      complete: sections.filter(hasText).length,
-      pending_jobs: pendingJobs,
-      written: sections.map(label).filter((_, i) => hasText(sections[i])).slice(0, LIST_MAX),
-      unwritten: sections.map(label).filter((_, i) => !hasText(sections[i])).slice(0, LIST_MAX),
-    };
+    manuscript = describeManuscript(sections, stage.label, true);
     excerpt = cap(formatManuscript(sections, Number.POSITIVE_INFINITY), MANUSCRIPT_EXCERPT_CHARS);
     // A drafting stage that also holds the outline (a derived one): until
     // sections exist, the outline is what there is to see.
@@ -193,6 +218,14 @@ export function buildAgentState(input: {
     }
   }
 
+  // A stage after drafting reads the chapters it does not own. From the fresh
+  // read when the loop made one, else from the store.
+  const source = manuscriptSourceFor(template, stage);
+  if (source && !manuscript) {
+    const sections = facts?.reads_manuscript?.outline ?? bundles[source.id]?.artifact?.long_form?.outline ?? [];
+    if (sections.some(hasText)) manuscript = describeManuscript(sections, source.label, false);
+  }
+
   return {
     stage_id: stage.id,
     stage_label: stage.label,
@@ -227,9 +260,15 @@ export function buildAgentState(input: {
       .slice(0, Math.max(0, index))
       .map((s) => {
         const st = state.stages[s.id];
-        return st?.status === 'in_progress' && st.left_open
-          ? `${s.label}: left open (moved past; only the user can close it — nothing for you to do there)`
-          : `${s.label}: ${st?.status ?? 'not_started'}`;
+        if (st?.status === 'in_progress' && st.left_open) {
+          return `${s.label}: left open (moved past; only the user can close it — nothing for you to do there)`;
+        }
+        // The stage that holds the chapters says so, so the status list itself
+        // points at the manuscript rather than reading as "done, nothing here".
+        const holds = manuscript && !manuscript.own && s.id === source?.id
+          ? ` — ${manuscript.complete} chapter(s) written, ${manuscript.words.toLocaleString()} words (see MANUSCRIPT)`
+          : '';
+        return `${s.label}: ${st?.status ?? 'not_started'}${holds}`;
       }),
     recent_steps: steps
       .filter((s) => s.status !== 'running')

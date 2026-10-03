@@ -238,6 +238,21 @@ next move is the user's, and what the planner is shown (`buildAgentState` takes 
 Before this the planner's excerpt and the requirements came from the store's bundles,
 which lag the section jobs, so Go could call a written Drafting stage empty.
 
+**The manuscript on every stage after Drafting (2026-10-03).** The chapters live on the
+first long-form stage's artifact, and the stages after it that are not themselves
+long-form — Continuity, Critique, Fact-check, Final review — exist to read them. One pure
+function says which stages those are (`manuscriptSourceFor`, `lib/workflow/context.ts`),
+and both readers use it: the stage digest that generates a review (`buildStageDigest`,
+bounded at 120k characters) and Go's planner state (`buildAgentState`, via the fresh
+`facts.reads_manuscript`), which carries the counts, the word count and a 6,000-character
+opening as `manuscript` with `own: false`. The backend prints it under "THE MANUSCRIPT
+THIS STAGE REVIEWS" and tells the planner that an empty review table means "not drafted
+yet — draft_stage drafts it from this text", never "missing data". Before this the planner
+on a review stage saw an empty stage and "DATA THE PROJECT HOLDS: none", and marked
+Fact-check, Critique and Continuity stuck for a draft that existed (the client's 2 Oct
+screenshots). The stage's critique tools (Challenge, Reframe, Self-audit) read the same
+text on a long-form stage, where there is no version to read until the stage completes.
+
 **A stop is re-checked (2026-10-01).** When a run stops for the user it records what it
 needs (`agent_runs.needs`, with `onStage`). `useGoLoop` re-reads the stage whenever the
 project changes and asks `needStillHolds` (`lib/agent/needs.ts`, pure); a request the user
