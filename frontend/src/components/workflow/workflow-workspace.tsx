@@ -56,6 +56,7 @@ import {
 } from '@/lib/workflow/engine';
 import { buildStageDigest, formatManuscript, summariseStageContent } from '@/lib/workflow/digest';
 import { buildChatContext, chatContentFor } from '@/lib/workflow/chat-context';
+import { starterQuestions } from '@/lib/workflow/chat-starters';
 import { keepFinishedVersion, stageContentForSummary, stageEvidence } from '@/lib/workflow/evidence';
 import { api } from '@/lib/api/client';
 import { inputsFrom } from './use-stage-generation';
@@ -68,7 +69,7 @@ import { ProjectData } from './project-data';
 import { draftBindings } from '@/lib/outline/long-form';
 import { approveOutline, loadOutline, materialiseOutlineInto } from '@/lib/outline/actions';
 import type { OutlineDocument } from '@/types/outline';
-import { proposableStatuses, stageDrafts, itemSchemaFor, parseItems, rendererHoldsItems, serializeItems, type StageItem } from '@/lib/workflow/stage-artifact';
+import { isTriaged, proposableStatuses, stageDrafts, itemSchemaFor, parseItems, rendererHoldsItems, serializeItems, type StageItem } from '@/lib/workflow/stage-artifact';
 import { previewRowAction } from '@/lib/workflow/row-actions';
 import { applyLookup, lookupQueries, lookupSummary } from '@/lib/workflow/lookup';
 import { readStageFigures, type StageFigures } from '@/lib/workflow/figures';
@@ -1884,6 +1885,14 @@ export function WorkflowWorkspace({
               )}
               // Built when a message is sent, not on every render: it carries the chapters.
               getChatContext={() => buildChatContext({ template, state, project, stage, bundles: stageBundles, controls: pageControls })}
+              starters={isCurrent ? starterQuestions({
+                renderer: stage.renderer,
+                stageLabel: stage.short_label,
+                hasContent: hasContent || (stage.renderer === 'long_form' && (stageBundles[draftingStageId(template) ?? '']?.artifact?.long_form?.outline ?? []).some((sec) => (sec.content ?? '').trim())),
+                openRows: rendererHoldsItems(stage.renderer) ? headItems.filter((i) => !isTriaged(i, itemSchemaFor(stage))).length : 0,
+                requiredOpen: evaluation.criteria.filter((c) => c.blocking && !c.satisfied).map((c) => c.label),
+                nextStageLabel: nextStage?.short_label ?? null,
+              }) : []}
               headVersion={stageVersions.at(-1) ?? null}
               appendStageVersion={appendStageVersion}
               restoreStageVersion={restoreStageVersion}
