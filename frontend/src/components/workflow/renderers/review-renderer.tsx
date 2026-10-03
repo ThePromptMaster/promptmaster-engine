@@ -113,10 +113,13 @@ export function ReviewRenderer({
   // in the saved version fold away once the table is long. Taken from the
   // saved version, not the live edits, so a row never jumps out from under the
   // pointer while it is being decided.
-  const settledIds = useMemo(
-    () => new Set(saved.length > FOLD_AFTER ? saved.filter((r) => isTriaged(r, schema)).map((r) => r.id) : []),
-    [saved, schema]
-  );
+  // Only while something is still open: a table that is all decided (a
+  // sandbox run settled every row, production Research pass) folded to a lone
+  // "8 already decided — show" and hid the whole result.
+  const settledIds = useMemo(() => {
+    const settled = saved.filter((r) => isTriaged(r, schema));
+    return new Set(saved.length > FOLD_AFTER && settled.length < saved.length ? settled.map((r) => r.id) : []);
+  }, [saved, schema]);
   const openRows = rows.filter((r) => !settledIds.has(r.id));
   const foldedRows = rows.filter((r) => settledIds.has(r.id));
   const outstanding = rows.length - triaged;

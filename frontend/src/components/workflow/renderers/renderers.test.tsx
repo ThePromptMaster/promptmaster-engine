@@ -611,6 +611,15 @@ describe('a long check table folds what is already decided (3 Oct call)', () => 
     expect(screen.getByRole('button', { name: 'Hide the 5 already decided' })).toHaveAttribute('aria-expanded', 'true');
   });
 
+  it('does not fold a table that is all decided — there is nothing else to show', () => {
+    const allDone = serializeItems(
+      Array.from({ length: 9 }, (_, i) => ({ id: `d${i}`, finding: `Done ${i}`, where: 'x', severity: 'minor', status: 'accepted' }))
+    );
+    render(<ReviewRenderer {...props(bookStage('continuity'), { versions: [version(allDone)] })} />);
+    expect(screen.getByText('Done 0')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /already decided/ })).not.toBeInTheDocument();
+  });
+
   it('does not fold a short table', () => {
     const short = serializeItems([{ id: 'a', finding: 'Only one', status: 'accepted' }]);
     render(<ReviewRenderer {...props(bookStage('continuity'), { versions: [version(short)] })} />);
