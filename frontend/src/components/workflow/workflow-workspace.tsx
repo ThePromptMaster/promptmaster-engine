@@ -1210,6 +1210,17 @@ export function WorkflowWorkspace({
     : null;
   // Read by the Go loop when it plans a move, never during render.
   controlsRef.current = pageControls;
+  // Check and chapter stages: the work is the table or the chapters, so the
+  // supporting panels fold to a line each (3 Oct call).
+  const foldStageExtras = stage.renderer === 'review' || stage.renderer === 'long_form';
+  const showDials = isCurrent && draftable && hasContent;
+  const dials = (
+    <CritiqueStyleControl
+      intensity={project.critique_intensity ?? 'standard'}
+      tone={project.critique_tone ?? 'neutral'}
+      onChange={onPatchProject}
+    />
+  );
   // The stuck card names the stage bar's own transition button in the words
   // that are on the page ("Continue to X" or "Override and continue to X").
   const goNeedContextOnPage = {
@@ -1681,6 +1692,7 @@ export function WorkflowWorkspace({
               manualIds={manualIds}
               onToggleManual={(id, checked) => void handleToggleManual(id, checked)}
               readOnly={!isEditable}
+              collapsible={foldStageExtras}
             />
 
             <RecommendationsPanel
@@ -1699,15 +1711,24 @@ export function WorkflowWorkspace({
                 the declarative half of the same question the evaluation
                 answers by judgment. */}
             {/* PM-21: the dials sit with the critique they shape. */}
-            {isCurrent && draftable && hasContent && (
-              <CritiqueStyleControl
-                intensity={project.critique_intensity ?? 'standard'}
-                tone={project.critique_tone ?? 'neutral'}
-                onChange={onPatchProject}
-              />
+            {foldStageExtras ? (
+              (showDials || shownEvaluation) && (
+                <details data-stage-extras className="rounded-xl bg-[var(--surface-container-low)] px-5 py-3">
+                  <summary className="cursor-pointer text-label text-[var(--on-surface-variant)]">
+                    {shownEvaluation ? 'The stage check, and how tough feedback is' : 'How tough feedback is'}
+                  </summary>
+                  <div className="mt-3 space-y-4">
+                    {showDials && dials}
+                    <StageEvaluationPanel evaluation={shownEvaluation} />
+                  </div>
+                </details>
+              )
+            ) : (
+              <>
+                {showDials && dials}
+                <StageEvaluationPanel evaluation={shownEvaluation} />
+              </>
             )}
-
-            <StageEvaluationPanel evaluation={shownEvaluation} />
 
             {/* PM-22: the easy actions after a check, on the version it checked. */}
             {isCurrent && draftable && headVersion && (evaluations?.[headVersion.id]?.findings ?? []).length > 0 && (
