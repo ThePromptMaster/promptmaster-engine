@@ -139,7 +139,7 @@ describe('B3: the findings that change the work are the user\'s', () => {
   it('with only material rows left, the user is asked, with no button — the table is the control', () => {
     const need = needsUser({ ...base, stage: stage('continuity'), facts: review(0, 2), stageEvaluation: evaluation('continuity'), allowed: ['advance_stage'] });
     expect(need).toEqual({ kind: 'triage_findings', stageId: 'continuity', count: 2 });
-    expect(describeNeed(need!, label)).toEqual({ message: '2 findings would change the work, so they need your decision. Decide in the table below.', action: 'Go to the table' });
+    expect(describeNeed(need!, label)).toEqual({ message: '2 findings would change the work, so they need your decision. Accept or reject each in the table below — that is how a check stage works.', action: 'Go to the table' });
   });
 
   it('a fully decided table needs nothing', () => {
@@ -157,7 +157,7 @@ describe('needsUser: an outcome table is the user\'s to decide (production pass,
     });
     expect(need).toEqual({ kind: 'decide_rows', stageId: 'fact_check', count: 2, itemLabel: 'claim' });
     expect(describeNeed(need!, label)).toEqual({
-      message: '2 claims are waiting for your decision — only you can settle them. Decide in the table below.',
+      message: '2 claims are waiting for your decision — only you can settle them. Set a status on each in the table below — that is how a check stage works.',
       // The button takes the user to the rows; deciding them stays theirs.
       action: 'Go to the table',
     });

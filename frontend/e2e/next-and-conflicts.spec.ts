@@ -75,6 +75,10 @@ test('PM-24: a meaning-level conflict with the objective, then a prior decision 
   const ask = chat.getByRole('region', { name: 'Which takes priority?' });
   await expect(ask).toContainText('It pulls against your objective');
   await expect(ask).toContainText('Mock: this instruction pulls the work away from the objective.');
+  // The order recommends keeping the objective (3 Oct call: "choose the
+  // higher one"); the user can still choose otherwise.
+  await expect(ask.getByRole('radio', { name: 'Keep the objective (recommended)' })).toHaveAttribute('aria-checked', 'true');
+  await page.screenshot({ path: test.info().outputPath('01-objective-recommended.png'), fullPage: true });
   await ask.getByRole('radio', { name: 'My new instruction takes priority' }).click();
   await ask.getByRole('button', { name: 'Continue' }).click();
   await expect(chat.getByLabel('Proposed revision')).toBeVisible();
