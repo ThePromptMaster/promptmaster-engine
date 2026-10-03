@@ -286,7 +286,7 @@ export interface SetupRationale {
   output_format: string;
 }
 
-export type WorkflowKey = 'book' | 'research' | 'single_output';
+export type WorkflowKey = 'book' | 'research' | 'single_output' | 'exploration';
 
 export interface SetupSuggestion {
   mode: ModeType;
