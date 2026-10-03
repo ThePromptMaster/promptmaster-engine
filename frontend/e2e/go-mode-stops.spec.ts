@@ -67,7 +67,7 @@ test('after a reload the window selector and the progress count show the same ru
   await expect(page.getByRole('region', { name: 'Go mode needs your approval' })).toBeVisible({ timeout: 30_000 });
   await expect(goPanel(page).getByLabel('Step budget')).toHaveValue('25');
   await expect(goPanel(page).getByLabel('Budget used')).toContainText('0 / 25 steps this window');
-  await expect(goPanel(page)).toContainText('A step is one action PromptMaster performs');
+  await expect(goPanel(page)).toContainText('A step is one thing PromptMaster does');
   await page.screenshot({ path: test.info().outputPath('01-window-matches-after-reload.png'), fullPage: true });
 });
 

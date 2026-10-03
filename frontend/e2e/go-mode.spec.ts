@@ -203,7 +203,7 @@ test('The step budget ends the run', async ({ page }) => {
   );
   await choose(page, 'Autonomous', 5);
   await expect(page.getByRole('region', { name: 'What Go mode is doing' })).toContainText('Used all 5 steps', { timeout: 30_000 });
-  await expect(goPanel(page).getByLabel('Budget used')).toContainText('5 / 5 steps');
+  await expect(goPanel(page).getByLabel('Budget used')).toContainText('5 of 5 steps used in the last window');
   await page.screenshot({ path: test.info().outputPath('01-budget-exhausted.png'), fullPage: true });
   const run = await runOf(id);
   expect(run).toMatchObject({ status: 'budget_exhausted', steps_used: 5 });

@@ -79,14 +79,15 @@ export function CritiqueStyleControl({
   return (
     <section aria-label="How to critique" className="rounded-xl bg-[var(--surface-container-low)] px-5 py-4">
       <div className="flex flex-wrap items-start gap-x-8 gap-y-3">
-        <Dial label="How hard to challenge the work" options={INTENSITY} value={intensity} disabled={readOnly}
+        <Dial label="How tough the feedback is" options={INTENSITY} value={intensity} disabled={readOnly}
           onChange={(v) => onChange({ critique_intensity: v })} />
-        <Dial label="Tone" options={TONE} value={tone} disabled={readOnly}
+        <Dial label="How it is worded" options={TONE} value={tone} disabled={readOnly}
           onChange={(v) => onChange({ critique_tone: v })} />
       </div>
+      {/* The old note named the tools ("the stage check, Challenge, Reframe and
+          Self-audit"), which the client's testers read as jargon (2 Oct, screenshot 8). */}
       <p className="mt-2 text-label text-[var(--on-surface-variant)]">
-        Separate on purpose: intensity decides what gets found; tone only changes how it is said. Used by the stage check,
-        Challenge, Reframe and Self-audit.
+        Applies to every review and critique on this project.
       </p>
     </section>
   );
