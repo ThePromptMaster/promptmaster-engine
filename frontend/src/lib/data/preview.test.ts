@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { describePreview, previewOf, rejectReason, splitLine } from './preview';
+import { describePreview, imagePreview, previewOf, rejectReason, splitLine } from './preview';
 
 describe('previewOf: what a model is shown of an attached file', () => {
   it('reads a CSV header, the first rows and the row count', () => {
@@ -31,10 +31,19 @@ describe('previewOf: what a model is shown of an attached file', () => {
 
 describe('rejectReason', () => {
   it('says why a file cannot be attached', () => {
-    expect(rejectReason('book.pdf', 10, [])).toMatch(/not a spreadsheet \(\.xlsx\), CSV, TSV, JSON or text file/);
+    expect(rejectReason('book.pdf', 10, [])).toMatch(/not a spreadsheet \(\.xlsx\), CSV, TSV, JSON, text or image/);
+    expect(rejectReason('lion.jpg', 10, [])).toBeNull();
     expect(rejectReason('big.csv', 6_000_000, [])).toMatch(/larger than 5 MB/);
     expect(rejectReason('a.csv', 10, ['a.csv'])).toMatch(/already attached/);
     expect(rejectReason('a.csv', 0, [])).toMatch(/empty/);
     expect(rejectReason('a.csv', 10, [])).toBeNull();
+  });
+});
+
+describe('images (3 Oct call)', () => {
+  it('records a caption, falling back to the file name', () => {
+    expect(imagePreview('pride-at-dusk.jpg', '')).toMatchObject({ kind: 'image', caption: 'pride at dusk' });
+    expect(imagePreview('a.png', 'A lioness', 800, 600)).toMatchObject({ caption: 'A lioness', width: 800, height: 600 });
+    expect(describePreview(imagePreview('a.png', 'A lioness', 800, 600))).toBe('image · 800×600 · A lioness');
   });
 });

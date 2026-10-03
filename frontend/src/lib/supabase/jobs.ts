@@ -7,6 +7,7 @@
  * SECURITY DEFINER function that re-checks ownership for itself.
  */
 
+import { hintWithImages } from '@/lib/data/images';
 import { createClient } from '@/lib/supabase/client';
 import { DRAFT_SECTION, type DraftSectionPayload, type SectionRevisePayload } from '@/lib/jobs/types';
 import type { PMInput } from '@/types';
@@ -123,7 +124,9 @@ export async function enqueueSectionJob(args: EnqueueSectionArgs): Promise<strin
     // hours afterwards, in a process that has never seen this user.
     inputs: inputsFromProject(args.project),
     ...(args.revise ? { revise: args.revise } : {}),
-    ...(args.stageHint?.trim() ? { stage_hint: args.stageHint.trim() } : {}),
+    // The images ride with the stage's hint: the chapter prompt is where they
+    // get placed, and the drain has no other way to know they exist.
+    ...(hintWithImages(args.stageHint, args.project.data_files) ? { stage_hint: hintWithImages(args.stageHint, args.project.data_files) } : {}),
   };
 
   const { data, error } = await supabase.rpc('enqueue_job', {

@@ -48,3 +48,25 @@ export async function removeProjectFile(file: Pick<ProjectFile, 'id' | 'path'>):
   if (error) throw error;
   await supabase.storage.from(BUCKET).remove([file.path]).catch(() => undefined);
 }
+
+/**
+ * Links that display the given files for an hour, by file id. The bucket is
+ * private; a link is made when a page needs to draw the file, never stored.
+ */
+export async function signedFileUrls(
+  files: readonly Pick<ProjectFile, 'id' | 'path'>[],
+  seconds = 3600
+): Promise<Record<string, string>> {
+  if (!files.length) return {};
+  const supabase = createClient();
+  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrls(files.map((f) => f.path), seconds);
+  if (error) throw error;
+  const byPath = new Map<string, string>();
+  for (const d of (data ?? []) as { path: string | null; signedUrl: string }[]) if (d.path) byPath.set(d.path, d.signedUrl);
+  const out: Record<string, string> = {};
+  for (const f of files) {
+    const url = byPath.get(f.path);
+    if (url) out[f.id] = url;
+  }
+  return out;
+}
