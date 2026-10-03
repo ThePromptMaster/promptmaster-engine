@@ -244,21 +244,22 @@ test('a stuck stage says whether anything changed; a retry is called a retry; ne
   await panel.getByRole('button', { name: /^Go$/ }).click();
   await page.getByRole('button', { name: 'Authorize and go' }).click();
 
-  // The card is there at once — no second press of Resume to find it — and it does not say "continue".
+  // The card is there at once — no second press of Resume to find it. At most
+  // three ways forward, named for what they do (2 Oct screenshots: five on one
+  // screen), and the footer names the stage bar's own button in its words.
   const card = page.getByRole('region', { name: 'Go mode needs you' });
   await expect(card).toContainText('Literature is marked stuck: Mock: missing data. Nothing in the project has changed since', { timeout: 30_000 });
+  await expect(card.getByRole('button')).toHaveCount(3);
   await expect(card.getByRole('button', { name: 'Add the missing data' })).toBeVisible();
-  await expect(card.getByRole('button', { name: 'Try again without changes' })).toBeVisible();
-  await expect(card.getByRole('button', { name: /Continue the stage/ })).toHaveCount(0);
-  await expect(card).toContainText('Override and continue');
-  await page.screenshot({ path: test.info().outputPath('01-stuck-nothing-changed.png'), fullPage: true });
-
-  // A retry with nothing changed stops at the same place, says so, and is not counted against the window.
-  await card.getByRole('button', { name: 'Try again without changes' }).click();
+  await expect(card.getByRole('button', { name: 'Skip Literature for now' })).toBeVisible();
+  await expect(card.getByRole('button', { name: 'Continue this stage by hand' })).toBeVisible();
+  await expect(card.getByRole('button', { name: /Try again|Continue the stage/ })).toHaveCount(0);
+  await expect(card).toContainText('use “Override and continue to Hypothesis” under More');
+  // One surface: the stage's own "Stuck" notice and the "move on" suggestion stay out of it.
+  await expect(page.getByText(/^Stuck — /)).toHaveCount(0);
+  await expect(page.getByText(/^Move on to/)).toHaveCount(0);
+  await page.screenshot({ path: test.info().outputPath('01-stuck-three-ways-forward.png'), fullPage: true });
   const transparency = page.getByRole('region', { name: 'What Go mode is doing' });
-  await expect(transparency).toContainText('Nothing has changed since this stage was last marked stuck', { timeout: 30_000 });
-  await expect(panel.getByLabel('Budget used')).toContainText('1 / 12 steps');
-  await page.screenshot({ path: test.info().outputPath('02-retry-stops-at-the-same-place.png'), fullPage: true });
 
   // "Add the missing data" goes to the Data panel; with a file attached the card says what changed.
   await card.getByRole('button', { name: 'Add the missing data' }).click();
@@ -269,11 +270,21 @@ test('a stuck stage says whether anything changed; a retry is called a retry; ne
   });
   await expect(data).toContainText('accounts.csv');
   await expect(card).toContainText('Literature is marked stuck: Mock: missing data. Since then, a data file was added.');
-  await expect(card.getByRole('button', { name: 'Try again without changes' })).toHaveCount(0);
+  await expect(card.getByRole('button', { name: 'Add the missing data' })).toHaveCount(0);
   await page.screenshot({ path: test.info().outputPath('03-stuck-inputs-changed.png'), fullPage: true });
 
+  // The scripted planner marks it stuck once more — a new block, with the
+  // file on record — and this time the user carries on by hand: the block is
+  // lifted, Go stays stopped, and Resume is back. No step is spent on it.
   await card.getByRole('button', { name: 'Resume with what has changed' }).click();
-  await expect(transparency).toContainText(/Objective complete|objective is met|deliverable is not/, { timeout: 30_000 });
+  await expect(card).toContainText('Nothing in the project has changed since', { timeout: 30_000 });
+  await expect(panel.getByLabel('Budget used')).toContainText('2 / 12 steps');
+  await card.getByRole('button', { name: 'Continue this stage by hand' }).click();
+  await expect(card).toHaveCount(0, { timeout: 30_000 });
+  await expect(panel.getByRole('button', { name: /^Resume$/ })).toBeVisible();
+  await expect(panel.getByLabel('Budget used')).toContainText('2 / 12 steps');
+  await expect(transparency).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath('02-continued-by-hand.png'), fullPage: true });
 
   const events = await serviceSelect('workflow_events', `project_id=eq.${id}&stage_id=eq.literature&select=type,payload&order=seq`);
   expect(events.map((e: { type: string }) => e.type).filter((t: string) => t.startsWith('stage_'))).toEqual(

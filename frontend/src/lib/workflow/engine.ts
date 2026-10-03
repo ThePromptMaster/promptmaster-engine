@@ -141,10 +141,16 @@ function evaluateCriterion(
     case 'all_findings_triaged': {
       const held = ctx.findings[stageId] ?? { total: 0, triaged: 0 };
       const outstanding = held.total - held.triaged;
+      // A review that has not been drafted has no findings to be untriaged,
+      // and read as "nothing outstanding — move on" on a Critique stage Go
+      // had just marked stuck for having no table (2 Oct, screenshot 2).
+      // The same guard every_item_has_status has. A drafted table with no
+      // rows is still a finished answer.
+      const drafted = ctx.artifactNonEmpty[stageId] === true;
       return {
         ...base,
-        satisfied: outstanding <= 0,
-        detail: outstanding <= 0 ? undefined : `${outstanding} untriaged`,
+        satisfied: drafted && outstanding <= 0,
+        detail: !drafted ? 'nothing drafted yet' : outstanding <= 0 ? undefined : `${outstanding} untriaged`,
       };
     }
 

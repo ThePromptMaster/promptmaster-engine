@@ -737,6 +737,7 @@ export function WorkflowWorkspace({
     template,
     stage,
     stageEvaluation: evaluation,
+    blocked: Boolean(stage && state.stages[stage.id]?.status === 'blocked'),
     headVersion,
     storedEvaluation: shownEvaluation,
     modelRecommendation: stageEvaluation.recommendation,
@@ -1097,6 +1098,13 @@ export function WorkflowWorkspace({
   };
 
   const stageState = state.stages[stage.id];
+  // Go's card and the stage's own notice described the same stuck stage with
+  // two sets of buttons (2 Oct screenshots). While Go's run holds this block,
+  // its card is the one surface; the notice returns once the run lets go.
+  const goHoldsThisBlock = Boolean(
+    go.run && go.run.needs?.kind === 'unblock_stage' && go.run.needs.stageId === stage.id &&
+    (!go.run.ended_at || go.run.status === 'budget_exhausted')
+  );
   const isBlocked = stageState?.status === 'blocked';
 
   // PM-14: what finishing would be finishing.
@@ -1202,6 +1210,12 @@ export function WorkflowWorkspace({
     : null;
   // Read by the Go loop when it plans a move, never during render.
   controlsRef.current = pageControls;
+  // The stuck card names the stage bar's own transition button in the words
+  // that are on the page ("Continue to X" or "Override and continue to X").
+  const goNeedContextOnPage = {
+    ...goNeedContext,
+    advanceControl: pageControls?.find((c) => c.id === 'advance')?.label ?? null,
+  };
 
   // Revision and editing are long-form stages with no manuscript of their own:
   // they work on the one Drafting wrote. Without this they showed "no approved
@@ -1485,7 +1499,7 @@ export function WorkflowWorkspace({
           />
 
           {isCurrent && appendStageVersion && project.status !== 'finalized' && (
-            <GoPanel go={go} stageLabel={stage.label} mode={project.mode} needsActions={goNeedsActions} needContext={goNeedContext} dockHost={goDockHost} />
+            <GoPanel go={go} stageLabel={stage.label} mode={project.mode} needsActions={goNeedsActions} needContext={goNeedContextOnPage} dockHost={goDockHost} />
           )}
           {isCurrent && project.status === 'finalized' && (
             <ProjectFinished
@@ -1735,7 +1749,7 @@ export function WorkflowWorkspace({
                 onViewStage={setViewingStageId}
               />
             )}
-            {isCurrent && isBlocked && stageState?.blocked && (
+            {isCurrent && isBlocked && stageState?.blocked && !goHoldsThisBlock && (
               <BlockedNotice kind={stageState.blocked.kind} reason={stageState.blocked.reason} onUnblock={() => void setBlocked(null)} />
             )}
             {isCurrent && blocking && (

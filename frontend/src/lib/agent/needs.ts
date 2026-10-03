@@ -188,8 +188,15 @@ export function needStillHolds(
   }
 }
 
-/** What the card for a stuck stage can do. Each is a different thing; none is called "continue". */
-export type StuckOption = 'resume' | 'add_data' | 'skip' | 'retry';
+/**
+ * What the card for a stuck stage can do. Each is a different thing. `clear`
+ * lifts the block and leaves the user on the stage — what the More menu's
+ * "Continue this stage" does — without Go resuming.
+ */
+export type StuckOption = 'resume' | 'add_data' | 'skip' | 'retry' | 'clear';
+
+/** At most this many ways forward on a stuck card (2 Oct screenshots: five was too many). */
+export const STUCK_OPTIONS_MAX = 3;
 
 /** What is true of the project now, for a request whose wording depends on it. */
 export interface NeedContext {
@@ -197,37 +204,50 @@ export interface NeedContext {
   blockInputs?: InputsChange | null;
   /** The stuck stage may be skipped. */
   canSkip?: boolean;
+  /**
+   * The exact label of the stage bar's own transition button, from the
+   * controls registry (`stageControls`), so the card can point to it in the
+   * words that are on the page. Null when there is none.
+   */
+  advanceControl?: string | null;
 }
 
 /**
- * A stuck stage, described honestly (2 Oct, item 9). The one button used to
- * read "Continue the stage and resume" and cleared the block whatever had
- * happened since: with nothing changed, Go took a step and stopped at the
- * same place. Now the card says whether anything changed. If it did, resuming
- * leads. If it did not, the ways forward are named for what they are —
- * add what is missing, skip the stage, or try again knowing nothing changed.
- * Overriding stays on the stage's own "Override and continue".
+ * A stuck stage, described honestly (2 Oct, item 9), with at most three ways
+ * forward (2 Oct screenshots: "Skip for now", "Try again without changes",
+ * "Resume with what has changed", "Continue this stage" and "Override and
+ * continue" were on one screen, and the client could not tell which to pick).
+ *
+ * The card says whether anything changed. One option leads by situation:
+ * resuming when something changed, adding the data when data is what is
+ * missing, trying again otherwise. Skipping is offered where the stage
+ * allows it. The last is always the plain way out — clear the block and
+ * carry on by hand. Overriding stays on the stage bar, and the footer names
+ * that button in the words that are on the page.
  */
 function describeStuck(
   need: Extract<NeedsUser, { kind: 'unblock_stage' }>,
   stage: string,
   ctx: NeedContext
-): { message: string; action: string; options: { id: StuckOption; label: string }[] } {
+): { message: string; action: string; options: { id: StuckOption; label: string }[]; footer?: string } {
   const why = `${stage} is marked stuck${need.reason ? `: ${need.reason.replace(/[.\s]+$/, '')}` : ''}.`;
   const skip = ctx.canSkip ? [{ id: 'skip' as const, label: `Skip ${stage} for now` }] : [];
-  if (ctx.blockInputs?.changed) {
-    const options = [{ id: 'resume' as const, label: 'Resume with what has changed' }, ...skip];
-    return { message: `${why} Since then, ${ctx.blockInputs.what.join(' and ')}.`, action: options[0].label, options };
-  }
-  const options = [
-    ...(need.blockKind === 'data_missing' ? [{ id: 'add_data' as const, label: 'Add the missing data' }] : []),
-    ...skip,
-    { id: 'retry' as const, label: 'Try again without changes' },
-  ];
-  const unchanged = ctx.blockInputs
-    ? ' Nothing in the project has changed since, so trying again will most likely stop at the same place.'
-    : ' I need that cleared before I can continue.';
-  return { message: `${why}${unchanged}`, action: options[0].label, options };
+  const clear = { id: 'clear' as const, label: 'Continue this stage by hand' };
+  const footer = ctx.advanceControl
+    ? `To move on with this still open, use “${ctx.advanceControl}” under More at the bottom of the stage; it asks for your reason.`
+    : undefined;
+  const lead = ctx.blockInputs?.changed
+    ? { id: 'resume' as const, label: 'Resume with what has changed' }
+    : need.blockKind === 'data_missing'
+      ? { id: 'add_data' as const, label: 'Add the missing data' }
+      : { id: 'retry' as const, label: 'Try again' };
+  const options = [lead, ...skip, clear].slice(0, STUCK_OPTIONS_MAX);
+  const since = ctx.blockInputs?.changed
+    ? ` Since then, ${ctx.blockInputs.what.join(' and ')}.`
+    : ctx.blockInputs
+      ? ' Nothing in the project has changed since, so trying again will most likely stop at the same place.'
+      : ' I need that cleared before I can continue.';
+  return { message: `${why}${since}`, action: options[0].label, options, footer };
 }
 
 /**
@@ -239,7 +259,7 @@ export function describeNeed(
   need: NeedsUser,
   stageLabel: (id: string) => string,
   ctx: NeedContext = {}
-): { message: string; action: string | null; options?: { id: StuckOption; label: string }[] } {
+): { message: string; action: string | null; options?: { id: StuckOption; label: string }[]; footer?: string } {
   switch (need.kind) {
     case 'set_objective':
       return { message: 'I need an objective before I can choose a move. Set one above.', action: null };

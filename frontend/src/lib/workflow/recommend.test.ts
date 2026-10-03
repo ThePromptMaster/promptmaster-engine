@@ -245,6 +245,19 @@ describe('FR-13: the three rules, in priority order', () => {
       expect(advance?.title).toBe(`Move on to ${next!.label}`);
     }
   });
+
+  it('does not say "Move on" while the stage is marked stuck (2 Oct, screenshot 2)', () => {
+    // "Suggestion: Move on to Editing — nothing outstanding" sat directly above
+    // "Stuck — needs a decision" for the same stage.
+    const stage = BOOK_V1.stages[0];
+    const evaluation = evaluateStage(BOOK_V1, stage.id, satisfiedContext(BOOK_V1));
+    expect(evaluation.canAdvance).toBe(true);
+    const stuck = deriveWorkflowRecommendations({ template: BOOK_V1, stage, evaluation, blocked: true });
+    expect(stuck.find((r) => r.kind === 'stage_transition')).toBeUndefined();
+    // Cleared, the suggestion is back.
+    const cleared = deriveWorkflowRecommendations({ template: BOOK_V1, stage, evaluation, blocked: false });
+    expect(cleared.find((r) => r.kind === 'stage_transition')?.title).toMatch(/^Move on to/);
+  });
 });
 
 describe('FR-01: a dismissal survives a refresh', () => {

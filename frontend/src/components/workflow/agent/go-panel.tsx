@@ -108,6 +108,12 @@ export function GoPanel({
           await go.go();
           return;
         }
+        // Carry on by hand: the block is lifted and Go stays stopped; Resume
+        // appears once the card notices the stage is no longer stuck.
+        if (option === 'clear') {
+          await needsActions?.unblock();
+          return;
+        }
         await needsActions?.unblock();
         await go.go();
         return;
