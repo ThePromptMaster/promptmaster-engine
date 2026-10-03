@@ -18,7 +18,7 @@ from promptmaster.engine import generate
 from promptmaster.errors import PRESERVED_NOTHING_WRITTEN
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError
 from routers._errors import llm_http_error
-from promptmaster.page_context import ChatContext
+from promptmaster.page_context import ChatContext, scrub_button_mentions
 from promptmaster.schemas import ChatMessage, Iteration, PMInput
 from promptmaster.session_context import _label_trigger
 from promptmaster.reply_actions import ActionTable, ReplyAction, suggest_reply_actions
@@ -122,7 +122,13 @@ async def api_chat_message(
             id=uuid.uuid4().hex,
             iteration_number=req.active_iteration.iteration_number,
             role="assistant",
-            content=reply.strip(),
+            # Only when the page's buttons were sent: then any other button
+            # the reply names is one the user cannot find.
+            content=(
+                scrub_button_mentions(reply.strip(), req.context.buttons)
+                if req.context is not None and req.context.buttons is not None
+                else reply.strip()
+            ),
             created_at=_now_iso(),
         )
         return ChatMessageResponse(assistant_message=msg)
