@@ -406,6 +406,25 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
     statuses: TRIAGE,
   },
 
+  // Exploration (3 Oct call): each claim of the round put to a test — a
+  // thought experiment, a limiting case, a known result. Whether it held is
+  // the user's call; the model proposes the tests.
+  exploration_tests: {
+    itemLabel: 'test',
+    minItems: 2,
+    maxItems: 8,
+    fields: [
+      { key: 'claim', label: 'Claim', long: true, max: 300 },
+      { key: 'test', label: 'How to test it', long: true, max: 400 },
+      { key: 'expected', label: 'What would show it wrong', long: true, max: 300 },
+    ],
+    statuses: [
+      { value: 'holds', label: 'Holds up', tone: 'done' },
+      { value: 'open', label: 'Still open', tone: 'neutral', requiresReason: true },
+      { value: 'fails', label: 'Breaks', tone: 'warn', requiresReason: true },
+    ],
+  },
+
   critique_report: {
     itemLabel: 'finding',
     minItems: 3,

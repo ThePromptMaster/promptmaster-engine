@@ -27,6 +27,8 @@ type Need =
   | { kind: 'triage_findings'; stageId: string; count: number }
   /** Go thinks this stage is not the best next move; skipping it is the user's call. */
   | { kind: 'skip_stage'; stageId: string; reason: string }
+  /** Go's proposal to start another round of a looping workflow; the user starts it. */
+  | { kind: 'next_round'; stageId: string; toStageId: string; reason: string }
   /** An outcome table's rows (claims, runs…) are all the user's to decide. */
   | { kind: 'decide_rows'; stageId: string; count: number; itemLabel: string };
 
@@ -171,6 +173,7 @@ export function needStillHolds(
       return !input.objective.trim();
     case 'answer_question':
     case 'skip_stage':
+    case 'next_round':
       return true;
     case 'unblock_stage':
       return input.state.stages[need.stageId]?.status === 'blocked';
@@ -283,6 +286,11 @@ export function describeNeed(
       return {
         message: `${stageLabel(need.stageId)} is normally next, but I would skip it for now. ${need.reason.replace(/\s+$/, '')} It is your call, and a skipped stage can be reopened later.`,
         action: `Skip ${stageLabel(need.stageId)} for now`,
+      };
+    case 'next_round':
+      return {
+        message: `This round is done. ${need.reason.replace(/\s+$/, '')} Start the next round from ${stageLabel(need.toStageId)} when you are ready — or stop here and write it up.`,
+        action: `Start the next round from ${stageLabel(need.toStageId)}`,
       };
     case 'wait_for_jobs':
       return {

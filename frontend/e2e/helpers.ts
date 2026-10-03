@@ -23,7 +23,7 @@ export function e2eUser(): { id: string; email: string; password: string } {
  */
 export async function createProject(
   page: Page,
-  { workflow, name, objective }: { workflow: 'Book' | 'Research' | 'Single output'; name: string; objective: string }
+  { workflow, name, objective }: { workflow: 'Book' | 'Research' | 'Single output' | 'Exploration'; name: string; objective: string }
 ): Promise<string> {
   await page.goto('/projects/new');
   await dismissBetaNotice(page);

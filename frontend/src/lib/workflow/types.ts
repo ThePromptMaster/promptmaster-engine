@@ -101,6 +101,12 @@ export interface StageTransitions {
   allow_return_to: string[];
   /** Present only where the user genuinely chooses a path (Book's stage 8). */
   branch_options?: BranchOption[];
+  /**
+   * The stage a new round starts from (3 Oct call: work that "is going to go
+   * on forever"). Offered as "Start the next round", a return the user makes;
+   * Go proposes it and the user starts it, so every round is a check-in.
+   */
+  loop_to?: string;
 }
 
 export interface StageDefinition {

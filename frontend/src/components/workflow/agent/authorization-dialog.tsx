@@ -1,6 +1,6 @@
 'use client';
 
-import { POLICY_TERMS } from '@/lib/agent/authorize';
+import { KEEP_GOING_WINDOWS, POLICY_TERMS } from '@/lib/agent/authorize';
 import type { ExecutionPolicy } from '@/types/agent';
 
 /**
@@ -55,10 +55,13 @@ export function AuthorizationDialog({
             <option value={1}>1 more window</option>
             <option value={2}>2 more windows</option>
             <option value={3}>3 more windows</option>
+            <option value={KEEP_GOING_WINDOWS}>keep going — up to {KEEP_GOING_WINDOWS} more windows</option>
           </select>
           <span className="text-label text-[var(--on-surface-variant)]">
             {autoWindows > 0
-              ? `At most ${budget * (autoWindows + 1)} steps before it stops and asks. Each window is recorded.`
+              ? `At most ${budget * (autoWindows + 1)} steps before it stops and asks. Each window is recorded${
+                  autoWindows >= KEEP_GOING_WINDOWS ? '; it still stops whenever it needs you, and each new round of open-ended work is yours to start' : ''
+                }.`
               : 'It stops and asks after each window.'}
           </span>
         </label>

@@ -248,6 +248,22 @@ Resume / Stop / Go). It handles near misses differently from names that don't ex
 - A near miss ("Generate Outline" for "Generate the outline") is corrected to the page's words.
 - Any other name is rewritten as plain words, followed by "(there is no button for this on this page)".
 
+**Workflows a user designs, and Exploration (2026-10-03).**
+
+User-designed workflows: `POST /api/generate-workflow` plus `lib/workflow/custom.ts` build a
+template, and `lib/workflow/validate.ts` checks it (every system template passes the same check).
+The template is saved to `workflow_templates` as the user's own (`custom_` key, `wft_insert_own`).
+
+Exploration loops: `transitions.loop_to` names where the next round starts. The stage bar
+offers "Start the next round from X", and Go proposes it with `propose_next_round`; the user
+always starts it. In a looping workflow:
+- the digest carries the last round's stale stages, labelled "(last round)";
+- Go treats a stage's draft as current only if it was written since the stage was last
+  entered (`stageHasCurrentDraft`).
+
+`template.inquiry` gives a workflow Go's reasoning moves. An Autonomous authorization may allow
+up to 20 further windows.
+
 ## Go mode (Phase B: PM-12, PM-15, PM-17 … PM-20)
 
 The next-best-action loop runs **in the browser** (`components/workflow/use-go-loop.ts`)

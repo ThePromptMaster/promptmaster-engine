@@ -214,6 +214,9 @@ export function nextSuggestedStage(
   return pending?.id ?? null;
 }
 
+/** The words on the button that starts a new round. */
+export const nextRoundLabel = (stageShortLabel: string) => `Start the next round from ${stageShortLabel}`;
+
 export interface TransitionOption {
   kind: 'advance' | 'skip' | 'return' | 'finish';
   toStageId: string | null;
@@ -255,9 +258,13 @@ export function availableTransitions(
     options.push({ kind: 'skip', toStageId: next, label: 'Skip this stage', requiresNote: true });
   }
 
+  const loop = stage.transitions.loop_to ? getStage(template, stage.transitions.loop_to) : undefined;
+  if (loop) {
+    options.push({ kind: 'return', toStageId: loop.id, label: nextRoundLabel(loop.short_label), requiresNote: false });
+  }
   for (const id of stage.transitions.allow_return_to) {
     const target = getStage(template, id);
-    if (target) {
+    if (target && id !== loop?.id) {
       options.push({
         kind: 'return',
         toStageId: id,

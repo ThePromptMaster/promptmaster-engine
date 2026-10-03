@@ -172,9 +172,14 @@ export function buildStageDigest(
   const cutoff = template.stages.findIndex((s) => s.id === upToStageId);
   const prior_stages: StageDigestEntry[] = [];
 
+  // A workflow that loops starts each round with the last one's work marked
+  // stale (a return). The round being worked on is built on it, so it is
+  // shown — labelled as last round's — rather than dropped.
+  const loops = template.stages.some((s) => s.transitions.loop_to);
   template.stages.forEach((stage, index) => {
-    if (cutoff >= 0 && index >= cutoff) return;
-    if (!isDone(state.stages[stage.id]?.status)) return;
+    const lastRound = loops && index >= cutoff && state.stages[stage.id]?.status === 'stale';
+    if (!lastRound && cutoff >= 0 && index >= cutoff) return;
+    if (!lastRound && !isDone(state.stages[stage.id]?.status)) return;
 
     const bundle = bundles[stage.id];
     const stored = bundle?.artifact?.summary?.trim();
@@ -182,7 +187,7 @@ export function buildStageDigest(
     const summary = stored ? truncate(stored) : summariseStageContent(stage, head);
     if (!summary) return;
 
-    prior_stages.push({ stage_id: stage.id, label: stage.label, summary });
+    prior_stages.push({ stage_id: stage.id, label: lastRound ? `${stage.label} (last round)` : stage.label, summary });
   });
 
   // The stages after drafting that are not themselves long-form read the

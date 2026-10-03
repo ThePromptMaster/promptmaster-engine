@@ -704,3 +704,22 @@ admits only those (`wft_insert_own`).
 change today is to design another. There is no rename or archive UI yet, and no update
 policy.
 
+---
+
+### L-30 · Exploration rounds and "Keep going": each round is the user's to start · `accepted`
+
+Exploration (2026-10-03) works in rounds: Explore, Test, Findings, Next question, then
+the next round from Explore (`transitions.loop_to`).
+
+**Each round is started by the user.** The database records a return to an earlier
+stage only as the user's own decision, and a new round is such a return. So Go
+*proposes* the next round (`propose_next_round`) and stops, and one click starts it.
+Within a round, an Autonomous run may continue for up to 20 windows ("Keep going",
+`20261014000000_agent_keep_going.sql`, up from 3) and still stops whenever it needs the
+user.
+
+**Earlier rounds are summarised, not kept whole.** A new round marks the last one's
+stages *stale*, as any return does. The next round is shown their summaries, labelled
+"(last round)". The full text of each round stays in version history, but only the most
+recent round is summarised into the prompts.
+

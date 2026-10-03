@@ -6,6 +6,7 @@ const ICON: Record<string, string> = {
   book: 'menu_book',
   research: 'science',
   single_output: 'bolt',
+  exploration: 'explore',
 };
 
 /**
@@ -16,6 +17,7 @@ const PITCH: Record<string, string> = {
   book: 'Long-form writing that has to hold together across chapters.',
   research: 'An investigation where the method matters as much as the result.',
   single_output: 'One thing, done well. No stages to work through.',
+  exploration: 'An idea taken as far as it goes — round after round, tested as you go.',
 };
 
 interface Props {

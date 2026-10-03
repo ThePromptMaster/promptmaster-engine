@@ -17,6 +17,13 @@ import { insertRecommendation, recordDecision } from '@/lib/supabase/recommendat
 import type { RecommendationScope } from '@/lib/workflow/recommend';
 import type { ExecutionPolicy } from '@/types/agent';
 
+/**
+ * "Keep going" (3 Oct call): the most further windows an Autonomous run may
+ * start on its own. The database holds it to the same ceiling
+ * (20261014000000_agent_keep_going.sql).
+ */
+export const KEEP_GOING_WINDOWS = 20;
+
 export const POLICY_TERMS: Record<Exclude<ExecutionPolicy, 'guided'>, string[]> = {
   checkpoint: [
     'Go mode chooses and performs moves on its own.',
