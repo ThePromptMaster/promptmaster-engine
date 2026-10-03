@@ -74,3 +74,18 @@ def test_route_requires_auth():
         assert TestClient(app, raise_server_exceptions=False).post("/api/check-conflicts", json={}).status_code == 401
     finally:
         app.dependency_overrides[require_user] = saved
+
+
+def test_the_check_is_told_the_stage_and_that_its_own_work_is_no_conflict(basic_inputs):
+    """Production Research pass, 3 Oct: tidying a Literature stage was called a
+    conflict with constraints about analysing a CSV."""
+    from promptmaster.conflicts import ConflictStage, build_conflict_prompt
+
+    _, user = build_conflict_prompt(
+        basic_inputs, "Normalise the citations", [], [],
+        ConflictStage(label="Literature", instruction="A map of prior work, each with its source."),
+    )
+    assert "THE STAGE THIS INSTRUCTION IS FOR: Literature — it produces: A map of prior work" in user
+    assert "this stage's product differs from the final one" in user
+    _, bare = build_conflict_prompt(basic_inputs, "Normalise the citations", [], [])
+    assert "THE STAGE THIS INSTRUCTION IS FOR" not in bare

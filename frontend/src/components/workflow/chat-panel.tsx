@@ -317,6 +317,7 @@ export function ChatPanel({
         setChecking(true);
         const conflicts = await findInstructionConflicts({
           project, stageId, instruction: action.instruction, headVersionId: headVersion?.id ?? null,
+          stage: { label: stageLabel, instruction: getChatContext?.().stage_instruction },
         });
         setChecking(false);
         if (conflicts.length) {
@@ -326,7 +327,7 @@ export function ChatPanel({
       }
       await onRunAction(action);
     },
-    [onRunAction, project, stageId, headVersion?.id]
+    [onRunAction, project, stageId, stageLabel, getChatContext, headVersion?.id]
   );
 
   const canSend =
@@ -346,6 +347,7 @@ export function ChatPanel({
     const recent = chat.messages.filter((m) => m.role === 'user' && m.mode === 'instruct').map((m) => m.content);
     const conflicts = await findInstructionConflicts({
       project, stageId, instruction: text, recentInstructions: recent, headVersionId: headVersion?.id ?? null,
+      stage: { label: stageLabel, instruction: getChatContext?.().stage_instruction },
     });
     setChecking(false);
     if (conflicts.length) {
@@ -353,7 +355,7 @@ export function ChatPanel({
       return;
     }
     await chat.propose(text, scope, { selection, sectionId: effectiveSectionId });
-  }, [draft, mode, scope, selection, effectiveSectionId, chat, project, stageId, headVersion?.id]);
+  }, [draft, mode, scope, selection, effectiveSectionId, chat, project, stageId, stageLabel, getChatContext, headVersion?.id]);
 
   const resolveConflicts = useCallback(
     async (choices: Controls[]) => {

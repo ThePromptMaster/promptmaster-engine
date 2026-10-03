@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
 from deps import get_client
-from promptmaster.conflicts import Conflict, ConflictSource, find_conflicts
+from promptmaster.conflicts import Conflict, ConflictSource, ConflictStage, find_conflicts
 from promptmaster.errors import PRESERVED_NOTHING_WRITTEN
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError
 from promptmaster.schemas import PMInput
@@ -20,6 +20,8 @@ class CheckConflictsRequest(BaseModel):
     instruction: str = Field(min_length=1, max_length=4_000)
     decisions: list[ConflictSource] = Field(default_factory=list, max_length=30)
     other_instructions: list[ConflictSource] = Field(default_factory=list, max_length=20)
+    #: The stage the instruction is for. Optional, for callers that predate it.
+    stage: ConflictStage | None = None
     model: str = ""
 
 
@@ -34,7 +36,7 @@ async def api_check_conflicts(
     """One cheap JSON call. Never changes anything; the user decides what controls."""
     try:
         conflicts = await find_conflicts(
-            client, req.model or None, req.inputs, req.instruction, req.decisions, req.other_instructions
+            client, req.model or None, req.inputs, req.instruction, req.decisions, req.other_instructions, req.stage
         )
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)

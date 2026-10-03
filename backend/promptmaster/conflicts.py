@@ -35,6 +35,12 @@ class ConflictSource(BaseModel):
     text: str = Field(max_length=2_000)
 
 
+class ConflictStage(BaseModel):
+    """The stage the instruction is for: its name and what it produces."""
+    label: str = Field(default="", max_length=200)
+    instruction: str = Field(default="", max_length=2_000)
+
+
 class Conflict(BaseModel):
     kind: ConflictKind
     #: The id of the decision or instruction it conflicts with; "" for the objective or constraints.
@@ -62,8 +68,22 @@ _CONFLICT_INSTRUCTION = (
 )
 
 
+# A stage's own work is not a conflict with constraints written for the whole
+# deliverable. Told only "analyse the 200-customer CSV", the check stopped Go
+# from tidying a Literature stage's map of sources, as "a different deliverable
+# from analysing the CSV" (production Research pass, 3 Oct). The stage's
+# instruction outranks the constraints (precedence.py); the check now knows it.
+_STAGE_RULE = (
+    "THE STAGE THIS INSTRUCTION IS FOR is given below with what it produces. The "
+    "objective and constraints describe the finished deliverable as a whole; an "
+    "instruction that serves this stage's own work, as the stage describes it, does "
+    "not conflict with them because this stage's product differs from the final one."
+)
+
+
 def build_conflict_prompt(
-    inputs: PMInput, instruction: str, decisions: list[ConflictSource], others: list[ConflictSource]
+    inputs: PMInput, instruction: str, decisions: list[ConflictSource], others: list[ConflictSource],
+    stage: ConflictStage | None = None,
 ) -> tuple[str, str]:
     system = _shared_system(inputs, [], _CONFLICT_INSTRUCTION)
     listed = lambda items: "\n".join(f"- [{i.id}] {i.text}" for i in items) or "(none)"  # noqa: E731
@@ -77,6 +97,12 @@ def build_conflict_prompt(
         "OTHER PENDING INSTRUCTIONS:",
         listed(others),
         "",
+        *(
+            ["", f"THE STAGE THIS INSTRUCTION IS FOR: {stage.label}"
+             + (f" — it produces: {stage.instruction.strip()}" if stage.instruction.strip() else ""),
+             _STAGE_RULE, ""]
+            if stage is not None and stage.label.strip() else []
+        ),
         "--- THE NEW INSTRUCTION ---",
         instruction.strip(),
         "--- END ---",
@@ -116,8 +142,8 @@ def parse_conflicts(raw: object, decisions: list[ConflictSource], others: list[C
 
 async def find_conflicts(
     client: OpenRouterClient, model: str | None, inputs: PMInput, instruction: str,
-    decisions: list[ConflictSource], others: list[ConflictSource],
+    decisions: list[ConflictSource], others: list[ConflictSource], stage: ConflictStage | None = None,
 ) -> list[Conflict]:
-    system, user = build_conflict_prompt(inputs, instruction, decisions, others)
+    system, user = build_conflict_prompt(inputs, instruction, decisions, others, stage)
     raw, _usage = await client.generate_json(prompt=user, system=system, temperature=0.0, max_tokens=700, model=model)
     return parse_conflicts(raw, decisions, others)

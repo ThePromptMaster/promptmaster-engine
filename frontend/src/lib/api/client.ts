@@ -668,6 +668,7 @@ export const api = {
     instruction: string;
     decisions: { id: string; text: string }[];
     other_instructions: { id: string; text: string }[];
+    stage?: { label: string; instruction: string };
     model?: string;
   }): Promise<{ conflicts: { kind: 'objective' | 'constraint' | 'decision' | 'instruction'; with_id: string; with_text: string; explanation: string }[] }> {
     return apiFetch('/api/check-conflicts', { method: 'POST', body: JSON.stringify(req) });
