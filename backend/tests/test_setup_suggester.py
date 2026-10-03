@@ -169,3 +169,21 @@ def test_output_format_guidance_names_manuscript_prose_for_a_book():
     assert "For a book (workflow book) that is manuscript prose" in SETUP_SUGGESTER_SYSTEM
     assert "never an outline, a list or a table: the outline is scaffolding, not the product" in SETUP_SUGGESTER_SYSTEM
     assert "pick the mode for the finished prose instead" in SETUP_SUGGESTER_SYSTEM
+
+
+@pytest.mark.asyncio
+async def test_an_exploration_recommendation_is_kept_and_valid():
+    """3 Oct production: the suggester recommended "exploration", the schema
+    allowed only three workflows, and /api/generate-setup returned 500."""
+    from unittest.mock import AsyncMock
+
+    from promptmaster.setup_suggester import suggest_setup
+
+    client = AsyncMock()
+    client.generate_json = AsyncMock(return_value=({
+        "mode": "architect", "audience": "General", "constraints": "", "output_format": "Free-form prose",
+        "workflow": "exploration", "workflow_reason": "Open-ended idea.",
+        "rationale": {"mode": "", "audience": "", "constraints": "", "output_format": ""},
+    }, {}))
+    suggestion = await suggest_setup(client=client, model=None, objective="Is spacetime emergent?")
+    assert suggestion.workflow == "exploration"
