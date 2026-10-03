@@ -23,7 +23,7 @@ export function NeedsYouCard({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { message, action, options } = describeNeed(need, stageLabel, context);
+  const { message, action, options, footer } = describeNeed(need, stageLabel, context);
   const run = (option?: StuckOption) => {
     setBusy(true);
     setError(null);
@@ -51,9 +51,7 @@ export function NeedsYouCard({
               {busy && i === 0 ? 'Working…' : o.label}
             </button>
           ))}
-          <span className="basis-full text-label text-[var(--on-surface-variant)]">
-            To move on with this still open, use “Override and continue” at the bottom of the stage; it asks for your reason.
-          </span>
+          {footer && <span className="basis-full text-label text-[var(--on-surface-variant)]">{footer}</span>}
         </div>
       ) : action ? (
         <div className="mt-3 flex flex-wrap items-center gap-3">

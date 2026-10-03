@@ -292,8 +292,15 @@ run's steps as planner history.
 work with (`payload.inputs_at_block`: data file ids, the stage's head version, the brief —
 `lib/workflow/stage-inputs.ts`). Go's card compares that with the project now. Changed:
 it says what changed and leads with "Resume with what has changed". Unchanged: it says so
-and offers, by kind of block, "Add the missing data" (goes to the Data panel), "Skip
-<stage> for now" where the stage allows it, and "Try again without changes". A block
+and leads, by kind of block, with "Add the missing data" (goes to the Data panel) or "Try
+again". Then "Skip <stage> for now" where the stage allows it, and always "Continue this
+stage by hand", which lifts the block and leaves Go stopped — **at most three buttons**
+(2026-10-03; the client's 2 Oct screenshots showed five ways forward on one screen). The
+footer names the stage bar's own transition button in its exact words, from the controls
+registry. While Go's run holds the block, its card is the one surface: the stage's own
+"Stuck" notice is not drawn beside it, and the "Move on — nothing outstanding" suggestion
+is not derived for a stuck stage (`deriveWorkflowRecommendations`, `blocked`). A review
+stage that has not been drafted is no longer "every finding triaged" (`engine.ts`). A block
 recorded before this has no inputs, and the card claims neither. A retry that marks the
 stage stuck again for the same kind of thing with nothing changed says so and is not
 counted against the window. What "changed" does not see: an answer typed into Go's

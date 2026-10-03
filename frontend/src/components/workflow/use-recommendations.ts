@@ -64,6 +64,8 @@ interface Options {
   stage: StageDefinition | undefined;
   /** The pure exit-criteria evaluation from `engine.ts`. */
   stageEvaluation: StageEvaluation;
+  /** The stage is marked stuck: no "move on" suggestion while it is. */
+  blocked?: boolean;
   /** The version a correction would be applied to. */
   headVersion: ArtifactVersion | null;
   /** The stored evaluation for that version, when there is one. */
@@ -115,6 +117,7 @@ export function useRecommendations({
   template,
   stage,
   stageEvaluation,
+  blocked = false,
   headVersion,
   storedEvaluation,
   modelRecommendation,
@@ -211,8 +214,9 @@ export function useRecommendations({
       stage,
       evaluation: stageEvaluation,
       dismissed,
+      blocked,
     });
-  }, [template, stage, stageEvaluation, dismissed]);
+  }, [template, stage, stageEvaluation, dismissed, blocked]);
 
   const panelRows: PanelRecommendation[] = useMemo(() => {
     const persisted = rows

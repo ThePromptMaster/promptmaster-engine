@@ -803,3 +803,22 @@ describe('Literature counts candidates and established works separately (1 Oct, 
     expect(result({ candidate: 9, verified: 2 })['lit.verified']).toMatchObject({ satisfied: false, detail: '2 of 3' });
   });
 });
+
+describe('all_findings_triaged needs a drafted table (2 Oct, screenshot 2)', () => {
+  const stageId = BOOK_V1.stages.find((s) => s.renderer === 'review' && s.exit_criteria.some((c) => c.rule?.type === 'all_findings_triaged'))!.id;
+  const ctx = (drafted: boolean, total: number, triaged: number) => ({
+    fields: {}, itemCounts: {}, itemsMissingStatus: {}, artifactNonEmpty: { [stageId]: drafted },
+    outlineApproved: true, sections: {}, findings: { [stageId]: { total, triaged } }, manualChecks: {},
+  });
+  const rule = (c: ReturnType<typeof ctx>) =>
+    evaluateStage(BOOK_V1, stageId, c).criteria.find((r) => BOOK_V1.stages.find((s) => s.id === stageId)!.exit_criteria.find((x) => x.id === r.id)?.rule?.type === 'all_findings_triaged')!;
+
+  it('an undrafted review is not "every finding triaged" — it read as nothing outstanding beside a stuck card', () => {
+    expect(rule(ctx(false, 0, 0))).toMatchObject({ satisfied: false, detail: 'nothing drafted yet' });
+  });
+  it('a drafted table with every row decided — or no rows — is', () => {
+    expect(rule(ctx(true, 3, 3)).satisfied).toBe(true);
+    expect(rule(ctx(true, 0, 0)).satisfied).toBe(true);
+    expect(rule(ctx(true, 3, 1))).toMatchObject({ satisfied: false, detail: '2 untriaged' });
+  });
+});

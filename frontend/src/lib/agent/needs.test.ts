@@ -51,7 +51,8 @@ describe('needsUser: the moves that are the user\'s (B4)', () => {
     expect(describeNeed(need!, label)).toEqual({
       message: 'Objective is marked stuck: Waiting on the survey. I need that cleared before I can continue.',
       action: 'Add the missing data',
-      options: [{ id: 'add_data', label: 'Add the missing data' }, { id: 'retry', label: 'Try again without changes' }],
+      options: [{ id: 'add_data', label: 'Add the missing data' }, { id: 'clear', label: 'Continue this stage by hand' }],
+      footer: undefined,
     });
   });
 
@@ -61,20 +62,39 @@ describe('needsUser: the moves that are the user\'s (B4)', () => {
     expect(unchanged.message).toBe(
       'Objective is marked stuck: The source extracts are missing. Nothing in the project has changed since, so trying again will most likely stop at the same place.'
     );
+    // At most three ways forward (2 Oct screenshots): the one that fits the
+    // situation, skipping where allowed, and carrying on by hand.
     expect(unchanged.options).toEqual([
       { id: 'add_data', label: 'Add the missing data' },
       { id: 'skip', label: 'Skip Objective for now' },
-      { id: 'retry', label: 'Try again without changes' },
+      { id: 'clear', label: 'Continue this stage by hand' },
     ]);
 
     const changed = describeNeed(need, label, { blockInputs: { changed: true, what: ['a data file was added'] }, canSkip: true });
     expect(changed.message).toBe('Objective is marked stuck: The source extracts are missing. Since then, a data file was added.');
-    expect(changed.options?.[0]).toEqual({ id: 'resume', label: 'Resume with what has changed' });
+    expect(changed.options).toEqual([
+      { id: 'resume', label: 'Resume with what has changed' },
+      { id: 'skip', label: 'Skip Objective for now' },
+      { id: 'clear', label: 'Continue this stage by hand' },
+    ]);
 
-    // A decision, not data: there is nothing to attach.
+    // A decision, not data: there is nothing to attach, so trying again leads.
     const decision = describeNeed({ ...need, blockKind: 'needs_decision' }, label, { blockInputs: { changed: false, what: [] } });
-    expect(decision.options).toEqual([{ id: 'retry', label: 'Try again without changes' }]);
-    for (const d of [unchanged, changed, decision]) expect(JSON.stringify(d)).not.toMatch(/Continue the stage/);
+    expect(decision.options).toEqual([{ id: 'retry', label: 'Try again' }, { id: 'clear', label: 'Continue this stage by hand' }]);
+    for (const d of [unchanged, changed, decision]) {
+      expect(JSON.stringify(d)).not.toMatch(/Continue the stage/);
+      expect(d.options!.length).toBeLessThanOrEqual(3);
+    }
+  });
+
+  it('the card points to the stage bar\'s own button, in its exact words, or to nothing (2 Oct screenshots)', () => {
+    const need = { kind: 'unblock_stage' as const, stageId: 'objective', reason: 'No data.', blockKind: 'data_missing' };
+    // The menu read "Continue to Audience" while the card said to use "Override and continue".
+    expect(describeNeed(need, label, { advanceControl: 'Continue to Audience' }).footer).toBe(
+      'To move on with this still open, use “Continue to Audience” under More at the bottom of the stage; it asks for your reason.'
+    );
+    expect(describeNeed(need, label, { advanceControl: 'Override and continue to Audience' }).footer).toContain('“Override and continue to Audience”');
+    expect(describeNeed(need, label, { advanceControl: null }).footer).toBeUndefined();
   });
 
   it('a stage whose only open requirements are manual boxes, with no work left, needs a tick', () => {

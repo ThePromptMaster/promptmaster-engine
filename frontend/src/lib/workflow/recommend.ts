@@ -467,6 +467,13 @@ export interface DeriveOptions {
   evaluation: StageEvaluation;
   /** Category keys the user has dismissed; filtered on reload so they stick. */
   dismissed?: ReadonlySet<string>;
+  /**
+   * The stage is marked stuck. "Move on — nothing outstanding" sat directly
+   * above "Stuck — needs a decision" for the same stage (2 Oct, screenshot 2):
+   * both true by their own rules, and a contradiction to the reader. While a
+   * stage is stuck, the stuck card is the one surface that says what to do.
+   */
+  blocked?: boolean;
 }
 
 /*
@@ -508,6 +515,7 @@ export function deriveWorkflowRecommendations({
   stage,
   evaluation,
   dismissed,
+  blocked = false,
 }: DeriveOptions): ProposedRecommendation[] {
   const out: ProposedRecommendation[] = [];
   const setupCriterionIds = new Set<string>();
@@ -578,7 +586,8 @@ export function deriveWorkflowRecommendations({
   }
 
   // --- 3. ready to advance, or to finish -----------------------------------
-  if (out.length < MAX_DERIVED && evaluation.canAdvance) {
+  // Not while the stage is marked stuck: the stuck card says what to do.
+  if (out.length < MAX_DERIVED && evaluation.canAdvance && !blocked) {
     // canAdvance means nothing BLOCKING is open. Unticked optional items are
     // still open, and "nothing is outstanding" beside "0 of 2 done" read as a
     // contradiction.

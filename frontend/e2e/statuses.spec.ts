@@ -34,9 +34,12 @@ test('moving on does not complete a stage; finished stages carry their evidence;
   await page.getByLabel('What exactly is missing').fill('Reader survey results');
   await page.getByRole('button', { name: 'Mark as stuck' }).click();
   await expect(page.getByText('Stuck — waiting on information')).toBeVisible();
-  await page.screenshot({ path: test.info().outputPath('01-blocked-with-reason.png') });
+  // No "Move on — nothing outstanding" beside a stuck stage (2 Oct, screenshot 2).
+  await expect(page.getByText(/^Move on to Positioning/)).toHaveCount(0);
+  await page.screenshot({ path: test.info().outputPath('01-blocked-with-reason.png'), fullPage: true });
   await page.getByRole('button', { name: 'Continue this stage' }).click();
   await expect(page.getByText('Stuck — waiting on information')).toHaveCount(0);
+  await expect(page.getByText(/^Move on to Positioning/)).toBeVisible();
   await pressTransition(page);
 
   // Positioning (v3): the comparables hint explains the requirement (PM-02).
