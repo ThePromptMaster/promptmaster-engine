@@ -15,8 +15,8 @@ test('new project offers each workflow once, then drafts and evaluates a stage',
   await expect(page.getByRole('heading', { name: 'Your setup' })).toBeVisible();
 
   const workflows = page.getByRole('radiogroup', { name: 'Workflow' }).getByRole('radio');
-  await expect(workflows).toHaveCount(3);
-  for (const name of ['Book', 'Research', 'Single output']) {
+  await expect(workflows).toHaveCount(4);
+  for (const name of ['Book', 'Research', 'Single output', 'Exploration']) {
     await expect(page.getByRole('radio', { name: new RegExp(`^${name}`) })).toHaveCount(1);
   }
 
