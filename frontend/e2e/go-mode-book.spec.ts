@@ -130,7 +130,16 @@ test('on a review stage after drafting, the planner is sent the manuscript and d
   await panel.getByRole('radio', { name: /^Guided/ }).click();
   const planned = page.waitForRequest((r) => r.url().includes('/api/agent/next-action') && r.method() === 'POST');
   await panel.getByRole('button', { name: /^Go$/ }).click();
-  const { state } = (await planned).postDataJSON();
+  const { state, allowed_actions } = (await planned).postDataJSON();
+
+  // The planner is told it is on a Book, with no stage a computation serves
+  // (2 Oct, screenshot 8: it asked a book for experiment results).
+  expect(state.workflow).toMatchObject({ key: 'book', label: 'Book', has_data_stages: false });
+  expect(state.workflow.stages.map((s: { label: string }) => s.label)).toContain('Continuity review or controlled expansion');
+  // Every blocking requirement on Continuity is met, so "stuck" is not on the
+  // menu (screenshot 2: "Nothing outstanding" above "Stuck — needs a decision").
+  expect(allowed_actions).toContain('advance_stage');
+  expect(allowed_actions).not.toContain('mark_blocked');
 
   // The review stage's own excerpt is its table; the chapters travel beside
   // it, with the stage that holds them named.

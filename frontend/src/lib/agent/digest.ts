@@ -85,6 +85,14 @@ export interface AgentStateDigest {
    * told it may not name a button at all.
    */
   controls?: { label: string; where: string }[];
+  /**
+   * Which workflow the project is on, and its stages in order. Without it
+   * the planner spoke Research to a book — asking for "planned runs with
+   * their observed outcomes" on "Write a book about lions" — and was told
+   * "DATA THE PROJECT HOLDS: none" on a workflow with no stage that could
+   * run anything (2 Oct, screenshot 8).
+   */
+  workflow: { key: string; label: string; stages: { label: string; renderer: string }[]; has_data_stages: boolean };
   tools: AgentTools;
 }
 
@@ -100,6 +108,20 @@ function firstField(item: Record<string, string | undefined>): string {
     ([key, value]) => key !== 'id' && key !== 'status' && key !== 'reason' && (value ?? '').trim()
   );
   return (entry?.[1] ?? '').replace(/\s+/g, ' ').trim().slice(0, 140);
+}
+
+/**
+ * The workflow as the planner is told it. `has_data_stages` is read off the
+ * template, not off the workflow key: a stage whose table carries runs out
+ * (`execution` on its item schema) is one a computation can serve.
+ */
+export function describeWorkflow(template: WorkflowTemplate): AgentStateDigest['workflow'] {
+  return {
+    key: template.key,
+    label: template.name,
+    stages: template.stages.map((s) => ({ label: s.label, renderer: s.renderer })),
+    has_data_stages: template.stages.some((s) => Boolean(itemSchemaFor(s).execution)),
+  };
 }
 
 export function buildAgentState(input: {
@@ -285,6 +307,7 @@ export function buildAgentState(input: {
     ...(input.memory?.length ? { memory: input.memory } : {}),
     ...(dataFiles.length ? { data_files: dataFiles } : {}),
     ...(input.controls ? { controls: input.controls.slice(0, CONTROLS_MAX).map((c) => ({ label: c.label, where: PLACE_WORDS[c.place] })) } : {}),
+    workflow: describeWorkflow(template),
     tools,
   };
 }

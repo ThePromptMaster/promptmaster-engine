@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { BOOK_V1 } from '@/lib/workflow/templates/book.v1';
+import { RESEARCH_V1 } from '@/lib/workflow/templates/research.v1';
 import { initialState, projectState } from '@/lib/workflow/engine';
 import type { StageEvaluation, WorkflowEvent } from '@/lib/workflow/types';
 import { buildStageContext, manuscriptSourceFor } from '@/lib/workflow/context';
@@ -171,5 +172,20 @@ describe('manuscriptSourceFor: one definition of which stages read the chapters'
     for (const id of ['objective', 'outline', 'outline_approval', 'drafting', 'revision', 'editing']) {
       expect(manuscriptSourceFor(BOOK_V1, stage(id))).toBeNull();
     }
+  });
+});
+
+describe('buildAgentState: the planner is told which workflow it is on (2 Oct, screenshot 8)', () => {
+  it('names the workflow and its stages, and whether any stage can be served by a computation', () => {
+    const book = buildAgentState({ template: BOOK_V1, state: initialState(BOOK_V1), stage: stage('objective'), bundles: {}, steps: [], stageEvaluation: evaluation('objective') });
+    expect(book.workflow).toMatchObject({ key: 'book', label: 'Book', has_data_stages: false });
+    expect(book.workflow.stages.map((s) => s.label)).toEqual(BOOK_V1.stages.map((s) => s.label));
+    expect(book.workflow.stages.find((s) => s.label === 'Drafting')?.renderer).toBe('long_form');
+
+    const research = buildAgentState({
+      template: RESEARCH_V1, state: initialState(RESEARCH_V1), stage: RESEARCH_V1.stages[0], bundles: {}, steps: [],
+      stageEvaluation: evaluation(RESEARCH_V1.stages[0].id),
+    });
+    expect(research.workflow).toMatchObject({ key: 'research', has_data_stages: true });
   });
 });

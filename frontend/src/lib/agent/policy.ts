@@ -32,9 +32,20 @@ export const MAX_CONSECUTIVE_FAILURES = 2;
  * the user's, with their reason (1 Oct, item 8). A run acting on its own
  * authority is not offered the move; under Guided and Checkpoint the user's
  * Approve on the proposed move is the override.
+ *
+ * The converse too: a stage whose every requirement is met is not stuck. Go
+ * marked Critique stuck for "no draft content" while the page said "Nothing
+ * on Critique is outstanding — move on to Fact-check", and the two cards sat
+ * one above the other (2 Oct, screenshot 2). When the stage can advance the
+ * planner moves on, asks, or finishes; the user can still mark it stuck by
+ * hand.
  */
 export function withoutOverride(allowed: readonly string[], canAdvance: boolean, policy: ExecutionPolicy): string[] {
-  return allowed.filter((k) => k !== 'advance_stage' || canAdvance || policy !== 'autonomous');
+  return allowed.filter((k) =>
+    k === 'advance_stage' ? canAdvance || policy !== 'autonomous'
+    : k === 'mark_blocked' ? !canAdvance || !allowed.includes('advance_stage')
+    : true
+  );
 }
 
 /** Which tools a run can actually call. Nothing retrieves literature yet (B0). */
@@ -93,7 +104,13 @@ export function allowedActions(
   // — the loop removes it after a proposal.
   if (stage.transitions.allow_skip && stage.transitions.default_next) keys.push('propose_skip');
   if (nextSuggestedStage(template, state)) keys.push('advance_stage');
-  keys.push('mark_blocked', 'request_user_decision', 'declare_objective_complete');
+  // Nothing is stuck before it has been tried: a stage that drafts and has no
+  // draft yet is drafted first. Offered both, the planner on an empty review
+  // stage chose "stuck — no draft text" over drafting the review from the
+  // manuscript (2 Oct screenshots). Missing data shows itself once the draft
+  // exists (rows that cannot be run, a check that cannot be made).
+  if (!keys.includes('draft_stage')) keys.push('mark_blocked');
+  keys.push('request_user_decision', 'declare_objective_complete');
   return keys;
 }
 

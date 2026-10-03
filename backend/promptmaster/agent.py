@@ -89,6 +89,26 @@ class AgentFindings(BaseModel):
     sample: list[str] = Field(default_factory=list, max_length=8)
 
 
+class AgentWorkflowStage(BaseModel):
+    label: str = Field(max_length=200)
+    renderer: str = Field(default="", max_length=40)
+
+
+class AgentWorkflow(BaseModel):
+    """The workflow the project is on and its stages in order.
+
+    Not knowing it, the planner spoke Research to a book — "paste the planned
+    runs with their observed outcomes" on "Write a book about lions" — and was
+    told the project held no data on a workflow with no stage that could run
+    anything (2 Oct, screenshot 8). `has_data_stages`: some stage's table
+    carries runs out, so a computation can serve it.
+    """
+    key: str = Field(max_length=40)
+    label: str = Field(max_length=200)
+    stages: list[AgentWorkflowStage] = Field(default_factory=list, max_length=40)
+    has_data_stages: bool = False
+
+
 class AgentControl(BaseModel):
     """One button on the stage's page: its exact words, and where it is."""
 
@@ -127,6 +147,8 @@ class AgentState(BaseModel):
     #: The buttons on the stage's page now, by their exact words (the frontend's
     #: `lib/workflow/stage-controls.ts`). None when the page is not known.
     controls: list[AgentControl] | None = Field(default=None, max_length=40)
+    #: The workflow and its stages. None from a client that predates it.
+    workflow: AgentWorkflow | None = None
 
 
 class NextAction(BaseModel):
@@ -238,11 +260,22 @@ def _format_state(inputs: PMInput, state: AgentState) -> str:
             + (": " + "; ".join(f.sample) if f.sample else "")
         )
     data = format_data_files(state.data_files)
-    facts.append(
-        "DATA THE PROJECT HOLDS (readable by code you run, at these paths — you have not seen the contents):\n" + data
-        if data else
-        "DATA THE PROJECT HOLDS: none. A computation that needs real data cannot be run; say what data is missing."
-    )
+    if data:
+        facts.append(
+            "DATA THE PROJECT HOLDS (readable by code you run, at these paths — you have not seen the contents):\n" + data
+        )
+    elif state.workflow is None or state.workflow.has_data_stages:
+        facts.append(
+            "DATA THE PROJECT HOLDS: none. A computation that needs real data cannot be run; say what data is missing."
+        )
+    else:
+        # A writing workflow has no stage a computation serves. Told "no data",
+        # the planner asked a book for experiment results.
+        facts.append(
+            f"DATA: this is a {state.workflow.label.lower()} workflow — writing, not computation. "
+            "No stage of it needs a dataset, a run or a measurement; never ask the user for one "
+            "and never mark a stage stuck for the lack of one."
+        )
     if state.controls is None:
         facts.append("BUTTONS ON THIS PAGE NOW: not known. Do not name any button.")
     elif state.controls:
@@ -254,10 +287,21 @@ def _format_state(inputs: PMInput, state: AgentState) -> str:
         facts.append("BUTTONS ON THIS PAGE NOW: none. Do not name any button.")
     if state.tools:
         facts.append("TOOLS: " + ", ".join(f"{k}={'yes' if v else 'no'}" for k, v in sorted(state.tools.items())))
+    workflow_line = (
+        [
+            f"WORKFLOW: {state.workflow.label} — "
+            + " › ".join(
+                s.label + (" [chapters]" if s.renderer == "long_form" else " [review table]" if s.renderer == "review" else "")
+                for s in state.workflow.stages
+            )
+        ]
+        if state.workflow is not None and state.workflow.stages else []
+    )
     return "\n".join([
         f"OBJECTIVE (authoritative): {inputs.objective}",
         f"Audience: {inputs.audience or '(not set)'}",
         "",
+        *workflow_line,
         f"CURRENT STAGE: {state.stage_label or state.stage_id}",
         f"What this stage asks for: {state.stage_instruction or '(no instruction)'}",
         f"Next stage: {state.next_stage_label or '(this is the last stage)'}",

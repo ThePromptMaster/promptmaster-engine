@@ -253,6 +253,18 @@ Fact-check, Critique and Continuity stuck for a draft that existed (the client's
 screenshots). The stage's critique tools (Challenge, Reframe, Self-audit) read the same
 text on a long-form stage, where there is no version to read until the stage completes.
 
+**What the planner knows of the workflow, and when it may say "stuck" (2026-10-03).** The
+state carries `workflow` — key, name, the stages in order with their renderers, and
+`has_data_stages`, read off the templates (a stage whose item schema has `execution`). The
+prompt prints the order as a WORKFLOW line, and the "DATA THE PROJECT HOLDS: none" line is
+printed only for a workflow with such a stage; a Book is told it is a writing workflow and
+never to ask for a dataset. Before this the planner asked "Write a book about lions" for
+"the planned runs with their observed outcomes" (2 Oct, screenshot 8). `mark_blocked` is
+offered only once the stage has been tried — not while `draft_stage` is on the menu — and
+not while the stage can advance (`withoutOverride`), so Go cannot sit a "Stuck" card under
+a "Nothing outstanding — move on" suggestion (screenshot 2). The user can still mark any
+stage stuck by hand.
+
 **A stop is re-checked (2026-10-01).** When a run stops for the user it records what it
 needs (`agent_runs.needs`, with `onStage`). `useGoLoop` re-reads the stage whenever the
 project changes and asks `needStillHolds` (`lib/agent/needs.ts`, pure); a request the user

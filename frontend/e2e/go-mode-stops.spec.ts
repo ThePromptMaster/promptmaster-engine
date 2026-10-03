@@ -232,6 +232,12 @@ test('a stuck stage says whether anything changed; a retry is called a retry; ne
     objective: 'Why churn rose [[mock:plan=mark_blocked,mark_blocked]]',
   });
   await expect(stageArtifact(page)).toContainText('Mock', { timeout: 30_000 });
+  // Question can advance as soon as it is drafted, and a stage that can
+  // advance is not offered "stuck" (2 Oct, screenshot 2). Literature has a
+  // blocking box only the user ticks, so there Go can still say it is stuck.
+  await pressTransition(page);
+  await expect(page.getByRole('heading', { name: /Literature/ })).toBeVisible();
+  await expect(stageArtifact(page)).toContainText('Mock', { timeout: 30_000 });
   const panel = goPanel(page);
   await panel.getByRole('button', { name: 'Set up Go' }).click();
   await panel.getByRole('radio', { name: /^Autonomous/ }).click();
@@ -240,7 +246,7 @@ test('a stuck stage says whether anything changed; a retry is called a retry; ne
 
   // The card is there at once — no second press of Resume to find it — and it does not say "continue".
   const card = page.getByRole('region', { name: 'Go mode needs you' });
-  await expect(card).toContainText('Question is marked stuck: Mock: missing data. Nothing in the project has changed since', { timeout: 30_000 });
+  await expect(card).toContainText('Literature is marked stuck: Mock: missing data. Nothing in the project has changed since', { timeout: 30_000 });
   await expect(card.getByRole('button', { name: 'Add the missing data' })).toBeVisible();
   await expect(card.getByRole('button', { name: 'Try again without changes' })).toBeVisible();
   await expect(card.getByRole('button', { name: /Continue the stage/ })).toHaveCount(0);
@@ -262,14 +268,14 @@ test('a stuck stage says whether anything changed; a retry is called a retry; ne
     name: 'accounts.csv', mimeType: 'text/csv', buffer: Buffer.from('account_id,churned\nA1,1\nA2,0\n'),
   });
   await expect(data).toContainText('accounts.csv');
-  await expect(card).toContainText('Question is marked stuck: Mock: missing data. Since then, a data file was added.');
+  await expect(card).toContainText('Literature is marked stuck: Mock: missing data. Since then, a data file was added.');
   await expect(card.getByRole('button', { name: 'Try again without changes' })).toHaveCount(0);
   await page.screenshot({ path: test.info().outputPath('03-stuck-inputs-changed.png'), fullPage: true });
 
   await card.getByRole('button', { name: 'Resume with what has changed' }).click();
   await expect(transparency).toContainText(/Objective complete|objective is met|deliverable is not/, { timeout: 30_000 });
 
-  const events = await serviceSelect('workflow_events', `project_id=eq.${id}&stage_id=eq.question&select=type,payload&order=seq`);
+  const events = await serviceSelect('workflow_events', `project_id=eq.${id}&stage_id=eq.literature&select=type,payload&order=seq`);
   expect(events.map((e: { type: string }) => e.type).filter((t: string) => t.startsWith('stage_'))).toEqual(
     expect.arrayContaining(['stage_blocked', 'stage_unblocked', 'stage_blocked', 'stage_unblocked'])
   );
