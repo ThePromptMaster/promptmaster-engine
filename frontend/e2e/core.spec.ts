@@ -65,6 +65,8 @@ test('the project brief travels with every stage', async ({ page }) => {
   await expect(brief).toBeVisible();
   await expect(page.locator('details').filter({ hasText: 'Project brief' })).toContainText('A book about giraffes');
   await brief.click();
+  // 2 Oct: the brief is the user's words, and the page says they govern.
+  await expect(page.getByText(/your words, not any stage.s restatement of them/)).toBeVisible();
   await page.locator('#brief-constraints').fill('No more than 40 pages');
   await expect(page.locator('#brief-constraints')).toHaveValue('No more than 40 pages');
   await page.screenshot({ path: test.info().outputPath('04-project-brief.png') });
