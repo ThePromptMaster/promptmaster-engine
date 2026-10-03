@@ -277,6 +277,49 @@ def test_state_facts_reach_the_prompt():
     assert "TOOLS: literature=no" in user
 
 
+def test_a_review_stage_is_shown_the_manuscript_it_reviews():
+    """The client's 2 Oct screenshots: Fact-check, Critique and Continuity were
+    marked stuck for "no draft text in project state" after Drafting was done.
+    The planner had never been shown the chapters on a stage that does not own
+    them."""
+    from promptmaster.agent import AgentManuscript
+
+    state = STATE.model_copy(update={
+        "stage_label": "Critique",
+        "artifact_excerpt": "",
+        "prior_stages": ["Drafting: complete — 3 chapter(s) written, 4,200 words (see MANUSCRIPT)"],
+        "manuscript": AgentManuscript(
+            total=3, complete=3, written=["1. Habitat", "2. Diet", "3. Prides"],
+            stage_label="Drafting", words=4200, own=False,
+            excerpt="## 1. Habitat\n\nLions live in savannah.",
+        ),
+    })
+    _, user = build_next_action_prompt(INPUTS, state, [*RESEARCH, "draft_stage", "mark_blocked"], "guided")
+    assert "MANUSCRIPT (drafted on Drafting; 4,200 words; this stage reads it): 3 of 3 section(s) written" in user
+    assert "--- THE MANUSCRIPT THIS STAGE REVIEWS" in user
+    assert "Lions live in savannah." in user
+    assert "A review stage's table is produced FROM this manuscript: choose draft_stage to write it." in user
+    assert "never mark_blocked because the stage's own table is empty" in user
+    # The stage's own excerpt is still reported as its own, empty.
+    assert "(nothing has been drafted on this stage yet)" in user
+
+
+def test_the_drafting_stage_s_own_manuscript_prints_as_before():
+    from promptmaster.agent import AgentManuscript
+
+    state = STATE.model_copy(update={"manuscript": AgentManuscript(total=2, complete=2, own=True, stage_label="Drafting")})
+    _, user = build_next_action_prompt(INPUTS, state, RESEARCH, "guided")
+    assert "MANUSCRIPT: 2 of 2 section(s) written" in user
+    assert "THE MANUSCRIPT THIS STAGE REVIEWS" not in user
+
+
+def test_the_planner_is_told_text_elsewhere_in_the_project_is_not_missing():
+    system, _ = build_next_action_prompt(INPUTS, STATE, RESEARCH, "guided")
+    assert "and nothing listed can produce it, choose mark_blocked" in system
+    assert "the manuscript, the outline, an earlier stage's work — is not missing" in system
+    assert "draft_stage drafts it from that text" in system
+
+
 def test_without_facts_the_prompt_is_as_before():
     _, user = build_next_action_prompt(INPUTS, STATE, RESEARCH, "guided")
     assert "OUTLINE:" not in user and "MANUSCRIPT:" not in user and "FINDINGS:" not in user

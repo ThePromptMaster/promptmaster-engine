@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { BOOK_V1 } from '@/lib/workflow/templates/book.v1';
 import { initialState, projectState } from '@/lib/workflow/engine';
 import type { StageEvaluation, WorkflowEvent } from '@/lib/workflow/types';
-import { buildStageContext } from '@/lib/workflow/context';
+import { buildStageContext, manuscriptSourceFor } from '@/lib/workflow/context';
 import { evaluateStage } from '@/lib/workflow/engine';
 import type { OutlineSection } from '@/types';
 import type { Artifact } from '@/types/project';
@@ -107,5 +107,69 @@ describe('contextWithFacts: requirements judged against the same read', () => {
     expect(fresh.outlineApproved).toBe(true);
     // Other stages are untouched.
     expect(fresh.sections.revision).toEqual(stale.sections.revision);
+  });
+});
+
+describe('buildAgentState: a stage after drafting is shown the chapters it reviews (2 Oct screenshots)', () => {
+  const chapters = [section('1'), section('2'), section('3')];
+  const drafted = {
+    drafting: {
+      artifact: { id: 'a-drafting', stage_id: 'drafting', long_form: { outline: chapters } } as unknown as Artifact,
+      versions: [],
+    },
+  };
+  const afterDrafting = projectState(BOOK_V1, [
+    ...['objective', 'audience', 'positioning', 'research', 'outline', 'outline_approval'].map((id, i, all) =>
+      event({ stage_id: id, to_stage_id: all[i + 1] ?? 'drafting' })
+    ),
+    event({ stage_id: 'drafting', to_stage_id: 'continuity' }),
+  ]);
+
+  it('names the drafting stage that holds the manuscript, and carries its opening', () => {
+    const digest = buildAgentState({
+      template: BOOK_V1, state: afterDrafting, stage: stage('critique'), bundles: drafted, steps: [],
+      stageEvaluation: evaluation('critique'),
+    });
+    expect(digest.manuscript).toMatchObject({ own: false, total: 3, complete: 3, stage_label: 'Drafting', pending_jobs: 0 });
+    expect(digest.manuscript?.words).toBe(9);
+    expect(digest.manuscript?.excerpt).toContain('## 2. Chapter 2');
+    expect(digest.manuscript?.excerpt).toContain('Text of 2.');
+    // The stage's own excerpt stays its own table — empty until it is drafted.
+    expect(digest.artifact_excerpt).toBe('');
+    expect(digest.prior_stages).toContain('Drafting: complete — 3 chapter(s) written, 9 words (see MANUSCRIPT)');
+  });
+
+  it('prefers the fresh read over the store', () => {
+    const digest = buildAgentState({
+      template: BOOK_V1, state: afterDrafting, stage: stage('continuity'), bundles: {}, steps: [],
+      stageEvaluation: evaluation('continuity'),
+      facts: { reads_manuscript: { holderStageId: 'drafting', holderLabel: 'Drafting', outline: chapters.slice(0, 2), total: 2, complete: 2, words: 6 } },
+    });
+    expect(digest.manuscript).toMatchObject({ own: false, total: 2, complete: 2 });
+  });
+
+  it('is the long-form stage\'s own on Drafting, and absent before it', () => {
+    const own = buildAgentState({
+      template: BOOK_V1, state: afterDrafting, stage: stage('drafting'), bundles: drafted, steps: [],
+      stageEvaluation: evaluation('drafting'),
+    });
+    expect(own.manuscript).toMatchObject({ own: true, stage_label: 'Drafting', excerpt: '' });
+    expect(own.artifact_excerpt).toContain('Text of 2.');
+
+    const before = buildAgentState({
+      template: BOOK_V1, state: initialState(BOOK_V1), stage: stage('outline'), bundles: drafted, steps: [],
+      stageEvaluation: evaluation('outline'),
+    });
+    expect(before.manuscript).toBeUndefined();
+  });
+});
+
+describe('manuscriptSourceFor: one definition of which stages read the chapters', () => {
+  it('is the drafting stage for the stages after it that are not long-form, and null otherwise', () => {
+    const reads = BOOK_V1.stages.filter((s) => manuscriptSourceFor(BOOK_V1, s)?.id === 'drafting').map((s) => s.id);
+    expect(reads).toEqual(['continuity', 'critique', 'fact_check', 'final_review']);
+    for (const id of ['objective', 'outline', 'outline_approval', 'drafting', 'revision', 'editing']) {
+      expect(manuscriptSourceFor(BOOK_V1, stage(id))).toBeNull();
+    }
   });
 });

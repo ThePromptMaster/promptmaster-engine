@@ -61,12 +61,25 @@ class AgentOutline(BaseModel):
 
 
 class AgentManuscript(BaseModel):
-    """The chapters, which live in artifacts.long_form rather than in a version."""
+    """The chapters, which live in artifacts.long_form rather than in a version.
+
+    `own` is true on the long-form stage that writes them. On a stage after
+    drafting that reads them — Continuity, Critique, Fact-check, Final review
+    — it is false, `stage_label` names the stage that holds them and `excerpt`
+    carries the opening of the text. Without that the planner on a review
+    stage saw an empty stage and no data, and marked it stuck for a draft that
+    existed (the client's 2 Oct screenshots).
+    """
     total: int = 0
     complete: int = 0
     pending_jobs: int = 0
     written: list[str] = Field(default_factory=list, max_length=60)
     unwritten: list[str] = Field(default_factory=list, max_length=60)
+    stage_label: str = Field(default="", max_length=200)
+    words: int = 0
+    own: bool = True
+    #: The frontend's MANUSCRIPT_EXCERPT_CHARS (lib/agent/digest.ts); marker included.
+    excerpt: str = Field(default="", max_length=6_000)
 
 
 class AgentFindings(BaseModel):
@@ -135,9 +148,12 @@ _NEXT_ACTION_INSTRUCTION = (
     "If the objective is met and nothing needs another pass, choose "
     "declare_objective_complete and set objective_complete true. If a choice only "
     "the user can make is needed, choose request_user_decision and ask one "
-    "specific question. If a missing tool or missing data stops you, choose "
-    "mark_blocked and say what is missing. Do not repeat a move that just "
-    "failed or produced nothing new.\n\n"
+    "specific question. If a missing tool or missing data stops you, and nothing "
+    "listed can produce it, choose mark_blocked and say what is missing. Text that "
+    "exists elsewhere in the project — the manuscript, the outline, an earlier "
+    "stage's work — is not missing: a stage's own table being empty means it has "
+    "not been drafted yet, and draft_stage drafts it from that text. Do not repeat "
+    "a move that just failed or produced nothing new.\n\n"
     "The workflow's order is a sensible default, not a rule. If the current stage "
     "may be skipped (propose_skip is listed) and an expert would not do it next for "
     "this particular objective, choose propose_skip and give the reason — do not "
@@ -191,14 +207,29 @@ def _format_state(inputs: PMInput, state: AgentState) -> str:
             + ("approved for drafting — approval is done; never ask the user to approve it again" if o.approved else "not yet approved")
             + (": " + "; ".join(o.sections[:20]) if o.sections else "")
         )
+    manuscript_block: list[str] = []
     if state.manuscript is not None:
         m = state.manuscript
+        where = (
+            f" (drafted on {m.stage_label or 'the drafting stage'}; {m.words:,} words; this stage reads it)"
+            if not m.own else ""
+        )
         facts.append(
-            f"MANUSCRIPT: {m.complete} of {m.total} section(s) written"
+            f"MANUSCRIPT{where}: {m.complete} of {m.total} section(s) written"
             + (f", {m.pending_jobs} being written now" if m.pending_jobs else "")
             + (f"; written: {'; '.join(m.written[:20])}" if m.written else "")
             + (f"; still unwritten: {'; '.join(m.unwritten[:20])}" if m.unwritten else "")
         )
+        if not m.own and m.excerpt.strip():
+            manuscript_block = [
+                "",
+                "--- THE MANUSCRIPT THIS STAGE REVIEWS (the opening; the whole text goes to the draft) ---",
+                m.excerpt.strip(),
+                "--- END ---",
+                "A review stage's table is produced FROM this manuscript: choose draft_stage "
+                "to write it. The manuscript is not missing data; never mark_blocked because "
+                "the stage's own table is empty.",
+            ]
     if state.findings is not None:
         f = state.findings
         facts.append(
@@ -250,6 +281,7 @@ def _format_state(inputs: PMInput, state: AgentState) -> str:
         "--- WHAT THIS STAGE HOLDS NOW (may be trimmed) ---",
         state.artifact_excerpt.strip() or "(nothing has been drafted on this stage yet)",
         "--- END ---",
+        *manuscript_block,
         "",
         "Moves made so far in this run (oldest first):",
         steps,

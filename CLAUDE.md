@@ -122,6 +122,7 @@ The `sessions`, `templates`, `custom_modes`, `user_presets` and `conversation_me
 from a model**, and the database re-checks them; see `docs/architecture.md` § Go mode. The
 action registry exists twice (TS and Python) and `actions-drift.test.ts` keeps them equal.
 The buttons Go may name to the user come from `lib/workflow/stage-controls.ts` (`stageControls`), which the page draws its own labels from — add a stage button's label there, not as a literal in a component.
+Which stages read the manuscript is decided once, in `lib/workflow/context.ts::manuscriptSourceFor`; the stage digest and Go's planner state both use it, so a review stage is never shown an empty project while the chapters sit two stages back.
 Code runs only through `/api/sandbox/run` (Vercel Sandbox; `SANDBOX_MODE=mock` in E2E). A project's data files (`project_files`, uploaded by the browser under RLS) are copied into `/data` for each run; prompts see only each file's columns and first rows, joined onto the project as `project.data_files`.
 
 ## Requirements

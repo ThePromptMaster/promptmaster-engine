@@ -21,6 +21,7 @@
 
 import type { Artifact, ArtifactVersion, Project } from '@/types/project';
 import type { OutlineSection } from '@/types';
+import { manuscriptSourceFor } from './context';
 import type { StageDefinition, WorkflowState, WorkflowTemplate } from './types';
 import { parseItems, rendererHoldsItems } from './stage-artifact';
 import { isDone } from './types';
@@ -184,16 +185,11 @@ export function buildStageDigest(
     prior_stages.push({ stage_id: stage.id, label: stage.label, summary });
   });
 
-  // The manuscript lives on the first long-form stage's artifact (Revision and
-  // Editing rewrite it in place). Stages after it that are not themselves
-  // long-form are the ones that read it.
-  const draftingIndex = template.stages.findIndex((s) => s.renderer === 'long_form');
+  // The stages after drafting that are not themselves long-form read the
+  // chapters (`manuscriptSourceFor`, shared with Go's planner state).
   const target = template.stages[cutoff];
-  const readsManuscript =
-    draftingIndex >= 0 && cutoff > draftingIndex && target?.renderer !== 'long_form';
-  const sections = readsManuscript
-    ? (bundles[template.stages[draftingIndex].id]?.artifact?.long_form?.outline ?? [])
-    : [];
+  const source = target ? manuscriptSourceFor(template, target) : null;
+  const sections = source ? (bundles[source.id]?.artifact?.long_form?.outline ?? []) : [];
 
   return {
     objective: project.objective ?? '',

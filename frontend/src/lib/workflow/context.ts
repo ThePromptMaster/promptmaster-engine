@@ -61,6 +61,24 @@ export function manuscriptArtifactFor(
   return bundles[drafting]?.artifact ?? own;
 }
 
+/**
+ * The stage whose chapters a later stage reads.
+ *
+ * The manuscript lives on the first long-form stage's artifact (Revision and
+ * Editing rewrite it in place). A stage after it that is not itself long-form
+ * — Continuity, Critique, Fact-check, Final review — exists to read those
+ * chapters. One definition, used by the stage digest that generates the
+ * review and by Go's planner state: until 2026-10-03 only the first knew, so
+ * Go marked every review stage stuck for "no draft text" while the draft sat
+ * two stages back (the client's 2 Oct screenshots).
+ */
+export function manuscriptSourceFor(template: WorkflowTemplate, stage: StageDefinition): StageDefinition | null {
+  const draftingIndex = template.stages.findIndex((s) => s.renderer === 'long_form');
+  if (draftingIndex < 0 || stage.renderer === 'long_form') return null;
+  const index = template.stages.findIndex((s) => s.id === stage.id);
+  return index > draftingIndex ? template.stages[draftingIndex] : null;
+}
+
 export function buildStageContext(input: BuildContextInput): StageContext {
   const { template, project, bundles, projectVersions = [], events, outlineCounts = {} } = input;
 

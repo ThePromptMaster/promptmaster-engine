@@ -215,7 +215,10 @@ describe('B0: the planner sees what exists on outline, long-form and review stag
     const digest = buildAgentState({
       template: BOOK_V1, state: book, stage: stage('drafting'), steps: [], stageEvaluation: evaluation('drafting'), bundles, pendingJobs: 1,
     });
-    expect(digest.manuscript).toEqual({ total: 2, complete: 1, pending_jobs: 1, written: ['1. Habitat'], unwritten: ['2. Diet'] });
+    expect(digest.manuscript).toEqual({
+      total: 2, complete: 1, pending_jobs: 1, written: ['1. Habitat'], unwritten: ['2. Diet'],
+      stage_label: 'Drafting', words: 5, own: true, excerpt: '',
+    });
     expect(digest.artifact_excerpt).toContain('## 1. Habitat');
     // Revision reads the same manuscript.
     const revision = buildAgentState({

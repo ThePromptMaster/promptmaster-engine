@@ -644,7 +644,11 @@ export function WorkflowWorkspace({
    * evaluation: acting on a stage you are only looking at is never what was
    * meant.
    */
-  const tools = useStageTools({ project, stage: stage ?? null, headVersion, appendStageVersion });
+  const tools = useStageTools({
+    project, stage: stage ?? null, headVersion, appendStageVersion,
+    // A long-form stage's text lives in its chapters, not in a version.
+    fallbackContent: stage?.renderer === 'long_form' ? stageContentForSummary(template, stage, stageBundles) : '',
+  });
   // PM-22: every "apply" after a critique goes through one path.
   // A table stage is revised as rows by the generator that drafted it; sent
   // through the text revision it came back as prose and the table was lost.
@@ -1063,8 +1067,12 @@ export function WorkflowWorkspace({
   });
 
   // PM-10: the original core's actions — refine, realign, challenge, reframe,
-  // self-audit, continue — on a prose stage that has a draft.
+  // self-audit, continue — on a prose stage that has a draft. On a long-form
+  // stage with chapters written, only the critiques: a rewrite would land as a
+  // prose version beside a manuscript that lives in `long_form.outline`.
   const toolsAvailable = isCurrent && draftable && stage.renderer === 'prose' && hasContent;
+  const critiqueOnly =
+    isCurrent && stage.renderer === 'long_form' && stageContentForSummary(template, stage, stageBundles).trim().length > 0;
   const runPrimary = () => {
     switch (primaryAction.kind) {
       case 'save':
@@ -1165,7 +1173,9 @@ export function WorkflowWorkspace({
           ...REWRITE_TOOLS.map((t) => ({ id: t.kind, label: t.label, icon: t.icon, onSelect: () => void tools.run(t.kind) })),
           ...CRITIQUE_TOOLS.map((t) => ({ id: t.kind, label: t.label, icon: t.icon, onSelect: () => void tools.run(t.kind) })),
         ]
-      : []),
+      : critiqueOnly
+        ? CRITIQUE_TOOLS.map((t) => ({ id: t.kind, label: t.label, icon: t.icon, onSelect: () => void tools.run(t.kind) }))
+        : []),
     ...(draftable && hasContent && Boolean(stageEvaluation.evaluate) && primaryAction.kind !== 'evaluate'
       ? [{
           id: 'evaluate',
