@@ -20,6 +20,10 @@ test('"I know what I want to do": the setup is recommended, editable, and carrie
   await expect(page.getByRole('heading', { name: 'Your setup' })).toBeVisible();
   // Recommended workflow, with the reason.
   await expect(page.getByText(/Recommended: Book/)).toBeVisible();
+  // 2 Oct: "people won't read the generated objective, constraints, output" —
+  // the suggested fields are marked as suggestions to be read and corrected.
+  await expect(page.getByText(/Suggested from your brief — read these and change anything that is wrong/)).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath('00-setup-suggested-fields-marked.png'), fullPage: true });
   await expect(page.getByRole('radio', { name: /^Book/ })).toHaveAttribute('aria-checked', 'true');
   // Mode, audience, constraints and format are pre-filled and editable.
   await expect(page.getByLabel('How PromptMaster should think')).toHaveValue('architect');

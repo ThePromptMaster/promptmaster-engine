@@ -495,3 +495,29 @@ def test_a_stage_with_no_data_is_told_there_is_none(basic_inputs, prose_stage):
     _, user = build_stage_prompt(basic_inputs, prose_stage, StageDigest(objective="o"))
     assert "DATA THE PROJECT HOLDS: none" in user
     assert "Do not write as though any data had been examined" in user
+
+
+# --- 2 Oct: the objective "changes" after the first stage ---------------------
+
+
+def test_every_stage_is_told_the_original_objective_governs(basic_inputs, prose_stage):
+    """The first stage's statement sat beside the original objective with
+    nothing saying which wins, and "write a book about lions" drifted into
+    whatever the statement made of it."""
+    digest = StageDigest(objective="Write a book about lions", prior_stages=[
+        StageDigestEntry(stage_id="objective", label="Objective and purpose", summary="A field guide to big cats."),
+    ])
+    _, user = build_stage_prompt(basic_inputs, prose_stage, digest)
+    assert "THE ORIGINAL OBJECTIVE IS THE USER'S OWN WORDS AND GOVERNS." in user
+    assert "Where a summary above and the original objective disagree, the original objective wins." in user
+    assert user.index("Original objective: Write a book about lions") < user.index("GOVERNS")
+    # Only the objective-stating stage is told it is sharpening.
+    assert "keeps the deliverable and the subject exactly as the user named them" not in user
+
+
+@pytest.mark.parametrize("kind", ["objective_statement", "research_question"])
+def test_the_objective_stage_sharpens_and_does_not_replace(basic_inputs, kind):
+    stage = StageDescriptor(id="objective", label="Objective and purpose", renderer="prose",
+                            entry_prompt_hint="Produce a statement of what this book is for.", artifact_kind=kind)
+    _, user = build_stage_prompt(basic_inputs, stage, StageDigest(objective="Write a book about lions"))
+    assert "This stage's statement sharpens the user's objective; it keeps the deliverable and the subject exactly as the user named them." in user

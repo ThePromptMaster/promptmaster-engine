@@ -106,6 +106,14 @@ export function SetupCard({
       </div>
       </section>
 
+      {rationale && (
+        <p className="text-body text-[var(--on-surface-variant)]">
+          <span className="material-symbols-outlined mr-1 align-[-4px] text-[18px] text-[var(--pm-primary)]" aria-hidden>
+            edit_note
+          </span>
+          Suggested from your brief — read these and change anything that is wrong. They travel into every stage.
+        </p>
+      )}
       <div className="grid gap-6 md:grid-cols-3">
         <section>
           <label htmlFor="setup-audience" className={label}>Audience</label>
