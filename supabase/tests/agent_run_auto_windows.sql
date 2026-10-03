@@ -28,7 +28,7 @@ begin
     values (u, proj, 'workflow', 'none on its own', 'accepted', '{"kind":"agent_authorization","policy":"autonomous"}')
     returning id into auth_0;
   insert into public.recommendations (user_id, project_id, kind, summary, status, scope)
-    values (u, proj, 'workflow', 'asks for nine', 'accepted', '{"kind":"agent_authorization","policy":"autonomous","auto_continue_windows":9}')
+    values (u, proj, 'workflow', 'asks for ninety-nine', 'accepted', '{"kind":"agent_authorization","policy":"autonomous","auto_continue_windows":99}')
     returning id into auth_9;
   insert into public.recommendations (user_id, project_id, kind, summary, status, scope)
     values (u, proj, 'workflow', 'checkpoint', 'accepted', '{"kind":"agent_authorization","policy":"checkpoint","auto_continue_windows":2}')
@@ -69,10 +69,10 @@ begin
   exception when check_violation then failed := true; end;
   if not failed then raise exception 'test 3: a window started on its own with no allowance'; end if;
 
-  -- 4. An authorization that asks for nine gets three.
+  -- 4. An authorization that asks for ninety-nine gets twenty ("Keep going", 20261014000000).
   insert into public.agent_runs (user_id, project_id, policy, authorization_id, budget_steps, status)
     values (u, proj, 'autonomous', auth_9, 5, 'running') returning id into prev;
-  for i in 1..3 loop
+  for i in 1..20 loop
     update public.agent_runs set status = 'budget_exhausted', ended_at = now() where id = prev;
     insert into public.agent_runs (user_id, project_id, policy, authorization_id, budget_steps, continues_run_id, auto_continued)
       values (u, proj, 'autonomous', auth_9, 5, prev, true) returning id into prev;
@@ -83,7 +83,7 @@ begin
     insert into public.agent_runs (user_id, project_id, policy, authorization_id, budget_steps, continues_run_id, auto_continued)
       values (u, proj, 'autonomous', auth_9, 5, prev, true);
   exception when check_violation then failed := true; end;
-  if not failed then raise exception 'test 4: a fourth window started on its own'; end if;
+  if not failed then raise exception 'test 4: a twenty-first window started on its own'; end if;
 
   -- 5. Only Autonomous continues on its own, and only as a continuation.
   insert into public.agent_runs (user_id, project_id, policy, authorization_id, budget_steps, status)
