@@ -46,12 +46,23 @@ const MISSING_MODULE = /ModuleNotFoundError: No module named '([^']+)'/;
 const MISSING_FILE = /FileNotFoundError: \[Errno 2\] No such file or directory: '([^']+)'/;
 
 const MISSING_DATA = /^[ \t]*MISSING_DATA:[ \t]*(.*)$/m;
+/**
+ * The same thing said in the code-writer's own `label: value` convention. On
+ * production (2026-10-03) the model printed `status: not_run` and a reason
+ * line, exited 0, and its row was marked Completed "from a sandbox run".
+ */
+const STATUS_NOT_RUN = /^[ \t]*(?:status|run_status|result)[ \t]*:[ \t]*["']?(?:not[_ ]run|not[_ ]executed|missing[_ ]data|blocked)["']?[ \t]*$/im;
+const WHY_LINE = /^[ \t]*(?:reason|missing|missing_data|why|why_not_run|observed|note|notes?)[ \t]*:[ \t]*(.+)$/im;
 
 /** What the code itself said it could not run without, or null. */
 export function missingData(stdout: string, stderr = ''): string | null {
   const said = MISSING_DATA.exec(stdout) ?? MISSING_DATA.exec(stderr);
-  if (!said) return null;
-  return said[1].trim().replace(/\s+/g, ' ').slice(0, 300) || 'the data this run needs has not been provided';
+  if (said) return said[1].trim().replace(/\s+/g, ' ').slice(0, 300) || 'the data this run needs has not been provided';
+  if (STATUS_NOT_RUN.test(stdout)) {
+    const why = WHY_LINE.exec(stdout)?.[1]?.trim().replace(/\s+/g, ' ');
+    return (why || 'the code reported that this run could not be made from the data provided').slice(0, 300);
+  }
+  return null;
 }
 
 export function missingModule(stderr: string): string | null {

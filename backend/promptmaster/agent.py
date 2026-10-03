@@ -372,7 +372,9 @@ _WRITE_CODE_INSTRUCTION = (
     "do not compute on placeholders: write a script that prints one line, "
     "`MISSING_DATA: <exactly what is missing, as one plain sentence>`, and then "
     "calls `raise SystemExit(2)`. That line is recorded as the reason the run "
-    "was not made. Return "
+    "was not made. Never report a run that could not be made as a `status:` "
+    "line or as an ordinary result: a clean exit means the analysis was "
+    "carried out, and the row is marked Completed. Return "
     "ONLY the code — no prose, no fences, and never any claimed output: the code "
     "has not been run, and you do not know what it will print."
 )
