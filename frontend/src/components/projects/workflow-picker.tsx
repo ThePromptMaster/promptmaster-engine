@@ -54,7 +54,12 @@ export function WorkflowPicker({ templates, selectedId, onSelect }: Props) {
               {ICON[template.key] ?? 'workspaces'}
             </span>
 
-            <span className="text-title text-[var(--on-surface)]">{template.name}</span>
+            <span className="text-title text-[var(--on-surface)]">
+              {template.name}
+              {template.key.startsWith('custom_') && (
+                <span className="ml-2 rounded-md bg-[var(--surface-container-high)] px-1.5 py-0.5 align-middle text-label text-[var(--on-surface-variant)]">Yours</span>
+              )}
+            </span>
 
             <span className="mt-1.5 text-body text-[var(--on-surface-variant)]">
               {PITCH[template.key] ?? template.description}

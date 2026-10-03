@@ -683,3 +683,24 @@ one small JSON call per instruction and fails open: if the call fails, the instr
 with whatever conflicts the rules found. Answers are stored as accepted or dismissed
 `recommendations` rows with a `decisions` row (category `conflict:*`), so `decisions_type_chk`
 is not widened.
+
+---
+
+### L-29 · Workflows a user designs: three page kinds, no chapters · `accepted`
+
+Since 2026-10-03, "Design a workflow" (`POST /api/generate-workflow`, then
+`templateFromDesign` and `validateTemplate`) saves a user's own template to
+`workflow_templates`. The row has `is_system = false` and a `custom_` key, and RLS
+admits only those (`wft_insert_own`).
+
+**What a generated stage can be.** Only a writing page, a list or a check table:
+- A list uses the `research_notes` columns.
+- A check uses the `critique_report` columns.
+- There is no outline or chapter (long-form) stage. Drafting chapters needs an approved
+  outline wired to a drafting stage, which a generated design cannot yet set up. Book
+  remains the workflow for chapter-length work.
+
+**Editing a saved workflow.** A saved workflow is immutable, like a system one. The only
+change today is to design another. There is no rename or archive UI yet, and no update
+policy.
+
