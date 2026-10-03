@@ -41,6 +41,10 @@ export function validateTemplate(template: WorkflowTemplate, { requireHints = tr
     for (const back of s.transitions.allow_return_to) {
       if (!ids.has(back)) errors.push(`"${s.label}" returns to a stage that does not exist.`);
     }
+    const loop = s.transitions.loop_to;
+    if (loop && (!ids.has(loop) || stages.findIndex((x) => x.id === loop) >= stages.indexOf(s))) {
+      errors.push(`"${s.label}" starts its next round from a stage that is not before it.`);
+    }
     if (s.transitions.allow_skip && !s.skip_reasons.length) errors.push(`"${s.label}" can be skipped but gives no reason to.`);
     for (const c of s.exit_criteria) {
       if (c.check === 'auto' && !c.rule) errors.push(`"${s.label}": "${c.label}" is checked automatically but has no rule.`);
