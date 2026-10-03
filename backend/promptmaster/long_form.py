@@ -78,7 +78,9 @@ async def detect_long_form(
 _OUTLINE_SYSTEM = (
     "You design clear, well-scoped outlines for long-form documents. "
     "Each section title is concrete and non-overlapping. Each abstract is a "
-    "single sentence describing what that section covers. Return JSON only."
+    "single sentence describing what that section covers. You produce the "
+    "outline only: an objective such as \"write a book\" is what the outline "
+    "serves, and the sections are written later, from it. Return JSON only."
 )
 
 
