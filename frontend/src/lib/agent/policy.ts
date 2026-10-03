@@ -15,12 +15,12 @@
  *     comes from the registry, not from the response.
  */
 
-import { stageDrafts } from '@/lib/workflow/stage-artifact';
+import { isTriaged, stageDrafts, type StageItem, type StageItemSchema } from '@/lib/workflow/stage-artifact';
 import { nextSuggestedStage } from '@/lib/workflow/engine';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import type { StageDefinition, StageEvaluation, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
 import type { AgentRunStatus, AgentStep, ExecutionPolicy } from '@/types/agent';
-import { actionFor } from './actions';
+import { actionFor, INTERPRET_STEP, USER_ANSWER_STEP } from './actions';
 import type { StageFacts } from './facts';
 
 export const DEFAULT_BUDGET_STEPS = 12;
@@ -49,6 +49,24 @@ export function withoutOverride(allowed: readonly string[], canAdvance: boolean,
     : k === 'mark_blocked' ? !canAdvance || !allowed.includes('advance_stage')
     : true
   );
+}
+
+/** The automatic steps, in words, for anything that names a step to the user. */
+const STEP_WORDS: Record<string, string> = { [INTERPRET_STEP]: 'Interpret the result', [USER_ANSWER_STEP]: 'Your answer' };
+
+/**
+ * No computation once every planned run has its result. On a production
+ * Research run (3 Oct) one sandbox run settled all eight rows, and Go went on
+ * running the computation again — eight tries were budgeted, one per row —
+ * instead of moving on to Analysis.
+ */
+export function withoutSettledRuns(
+  allowed: readonly string[],
+  review: { items: StageItem[]; schema: StageItemSchema } | undefined
+): string[] {
+  if (!review?.schema.execution) return [...allowed];
+  const open = review.items.filter((i) => !isTriaged(i, review.schema)).length;
+  return open > 0 ? [...allowed] : allowed.filter((k) => k !== 'run_computation');
 }
 
 /** Moves that polish a stage rather than move the work on. */
@@ -195,7 +213,7 @@ export function preempt(input: {
   }
   const pair = alternating(finished);
   if (pair) {
-    const name = (k: string) => actionFor(k)?.label ?? k;
+    const name = (k: string) => actionFor(k)?.label ?? STEP_WORDS[k] ?? k;
     return {
       status: 'blocked',
       reason: `"${name(pair[0])}" and "${name(pair[1])}" have been taking turns on this stage without it moving on. It needs your direction.`,
@@ -232,7 +250,9 @@ export const ALTERNATING_ROUNDS = 3;
  */
 export function alternating(finished: readonly AgentStep[]): [string, string] | null {
   const n = ALTERNATING_ROUNDS * 2;
-  const tail = finished.slice(-n);
+  // A computation and its interpretation are one move in two steps; counted
+  // apart they looked like two moves taking turns (production Research pass).
+  const tail = finished.filter((s) => s.action_key !== INTERPRET_STEP).slice(-n);
   if (tail.length < n) return null;
   const [a, b] = tail;
   if (a.action_key === b.action_key || !tail.every((s) => s.stage_id === a.stage_id)) return null;
