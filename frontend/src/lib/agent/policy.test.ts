@@ -6,7 +6,8 @@ import { initialState } from '@/lib/workflow/engine';
 import type { StageEvaluation } from '@/lib/workflow/types';
 import type { AgentStep } from '@/types/agent';
 import { deriveExecutionLabel } from './labels';
-import { allowedActions, alternating, withoutOverride, withoutEndlessPolish, fitsBudget, noChange, noProgress, plannedBeforeLatestChange, preempt, shouldPause, stageMoveActor, stateFingerprint } from './policy';
+import { ITEM_SCHEMAS } from '@/lib/workflow/stage-artifact';
+import { allowedActions, alternating, withoutOverride, withoutEndlessPolish, withoutSettledRuns, fitsBudget, noChange, noProgress, plannedBeforeLatestChange, preempt, shouldPause, stageMoveActor, stateFingerprint } from './policy';
 
 function step(over: Partial<AgentStep>): AgentStep {
   return {
@@ -468,5 +469,24 @@ describe('Go stops polishing a stage that is good enough (production Research pa
 
   it('never polishes one stage more than four times in a run', () => {
     expect(withoutEndlessPolish(allowed, 4, false)).toEqual(['advance_stage', 'request_user_decision']);
+  });
+});
+
+describe('a computation that settled every run is not run again (production Research pass, 3 Oct)', () => {
+  const schema = ITEM_SCHEMAS.runs;
+  const allowed = ['run_computation', 'advance_stage'];
+  const done = schema.statuses!.find((s) => s.value === 'completed')!.value;
+
+  it('is offered while a planned run has no result', () => {
+    expect(withoutSettledRuns(allowed, { schema, items: [{ id: 'a', status: done }, { id: 'b' }] })).toEqual(allowed);
+  });
+
+  it('is not offered once every run has one', () => {
+    expect(withoutSettledRuns(allowed, { schema, items: [{ id: 'a', status: done }, { id: 'b', status: done }] })).toEqual(['advance_stage']);
+  });
+
+  it('counts a computation and its interpretation as one move, not two taking turns', () => {
+    const pairs = [1, 2, 3].flatMap(() => [step({ action_key: 'run_computation' }), step({ action_key: 'interpret_result' })]);
+    expect(alternating(pairs)).toBeNull();
   });
 });
