@@ -82,7 +82,7 @@ export function ConflictPrompt({
           Cancel
         </button>
       </div>
-      <p className="mt-2 text-label text-[var(--on-surface-variant)]">Recommended follows PromptMaster's order — your objective, then your decisions, then your newest instruction, then the stage and the constraints. Your choice is recorded, and PromptMaster is told which one takes priority.</p>
+      <p className="mt-2 text-label text-[var(--on-surface-variant)]">Recommended follows PromptMaster&apos;s order — your objective, then your decisions, then your newest instruction, then the stage and the constraints. Your choice is recorded, and PromptMaster is told which one takes priority.</p>
     </section>
   );
 }
