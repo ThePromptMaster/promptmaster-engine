@@ -435,8 +435,21 @@ def _prose_reply(system: str, prompt: str) -> str:
     if conversation._CHAT_REPLY_INSTRUCTION[:60] in system:
         # A discussion reply that suggests changes as a list — so the side
         # chat's "buttonize it" has points to apply.
+        # Say what the chat was given, so a browser test can see the stage,
+        # the outline and the chapters reached it (3 Oct call: "paste the
+        # chapters back in the box").
+        seen = []
+        stage = re.search(r"^Current stage: (.+)$", prompt, re.M)
+        if stage:
+            seen.append(f"the {stage.group(1).strip()} stage")
+        if "THE OUTLINE:" in prompt:
+            seen.append("the outline")
+        if "--- BEGIN MANUSCRIPT ---" in prompt or re.search(r"^## \d+\. ", prompt, re.M):
+            seen.append("the chapters")
+        where = f"Mock: I can see {', '.join(seen)}; nothing needs pasting.\n\n" if seen else ""
         return (
-            "Mock reply: it reads well, but three things would help.\n\n"
+            where
+            + "Mock reply: it reads well, but three things would help.\n\n"
             "- Mock: open with the question the reader actually has.\n"
             "- Mock: replace the abstract second paragraph with one example.\n"
             "- Mock: end on what the reader should do next.\n"
