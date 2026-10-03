@@ -10,12 +10,11 @@ from .modes import MODES
 from .schemas import PMInput, AssembledPrompt
 
 
-def build_prompt(inputs: PMInput) -> AssembledPrompt:
-    """Assemble an optimized prompt from user inputs and selected mode.
+def resolve_mode_config(inputs: PMInput) -> dict:
+    """The mode's text for these inputs, with a custom persona's fields applied.
 
-    The assembled prompt has two layers (Prompt Stack concept from Ch5 S6):
-    1. System prompt: mode lock + tone guidance + invisible scaffolding
-    2. User prompt: objective + audience + constraints with anchoring
+    Shared by `build_prompt` (the full mode lock) and the prose builders in
+    `conversation.py`, which take only the mode's voice.
     """
     mode_config = dict(MODES[inputs.mode])
 
@@ -35,6 +34,17 @@ def build_prompt(inputs: PMInput) -> AssembledPrompt:
             "- DRIFT CHECK: Stay true to the custom persona throughout. Do not revert to a generic AI voice\n"
             "- ANCHOR: Re-read the objective before each section"
         )
+    return mode_config
+
+
+def build_prompt(inputs: PMInput) -> AssembledPrompt:
+    """Assemble an optimized prompt from user inputs and selected mode.
+
+    The assembled prompt has two layers (Prompt Stack concept from Ch5 S6):
+    1. System prompt: mode lock + tone guidance + invisible scaffolding
+    2. User prompt: objective + audience + constraints with anchoring
+    """
+    mode_config = resolve_mode_config(inputs)
 
     # System prompt: mode lock + scaffolding
     system_prompt = (

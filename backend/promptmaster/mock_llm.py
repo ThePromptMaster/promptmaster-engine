@@ -464,6 +464,22 @@ def _prose_reply(system: str, prompt: str) -> str:
         first = notes.group(1).splitlines()[0].strip() if notes else "(no findings)"
         return f"## Mock revision\n\nRevised by the mock model, applying: {first[:160]}"
     objective = _objective(prompt) if "Objective:" in prompt else "the task"
+    if _WRITING_NOW in prompt:
+        # A chapter. Say what the prompt carried, so a browser test can see
+        # that the stage's own hint reached it and that the mode came as a
+        # voice, not as scaffolding (2 Oct: "it really wants to make outlines").
+        seen = []
+        if "THIS STAGE:" in system:
+            seen.append("stage hint seen")
+        if "[INTERNAL SCAFFOLDING]" not in system and "You do not write final prose" not in system:
+            seen.append("mode as voice only")
+        note = f" ({'; '.join(seen)})" if seen else ""
+        return (
+            "## Mock output\n\n"
+            f"This is scripted prose produced by the mock model for: {objective[:120]}{note}.\n\n"
+            "It has two paragraphs so that renderers, word counts and version history "
+            "have something realistic to hold. Nothing here came from a real model."
+        )
     return (
         "## Mock output\n\n"
         f"This is scripted text produced by the mock model for: {objective[:120]}.\n\n"

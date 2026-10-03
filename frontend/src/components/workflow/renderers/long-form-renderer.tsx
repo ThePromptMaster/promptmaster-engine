@@ -113,7 +113,7 @@ interface DraftingProps {
 }
 
 function Drafting({ ctx, readOnly }: DraftingProps) {
-  const { project, artifactId, state, approvedOutlineVersionId, stageId, onRefresh, appendManuscriptVersion } = ctx;
+  const { project, artifactId, state, approvedOutlineVersionId, stageId, onRefresh, appendManuscriptVersion, stageHint } = ctx;
   const revise = ctx.revise ?? null;
 
   const [jobs, setJobs] = useState<ProjectJob[]>([]);
@@ -201,7 +201,7 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
       setConfirmingLargeJob(false);
       if (!artifactId) throw new Error('This stage has no artifact to draft into.');
       // The same call Go mode's draft_sections makes (B2a).
-      await enqueueDraftJobs({ project, artifactId, stageId, outline, approvedOutlineVersionId, jobs });
+      await enqueueDraftJobs({ project, artifactId, stageId, outline, approvedOutlineVersionId, jobs, stageHint });
     });
 
   const pause = () => run(async () => void (await requestProjectCancel(project.id)));
@@ -219,6 +219,7 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
         sectionId: section.id,
         sectionIndex: index,
         revision: (section.revision ?? 0) + 1,
+        stageHint,
       });
     });
 
@@ -234,6 +235,7 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
         sectionId: section.id,
         sectionIndex: index,
         revision: revisionToEnqueue(section, jobBySection.get(section.id) ?? null),
+        stageHint,
       });
     });
 
@@ -251,7 +253,7 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
       // through the store when the workspace provides it, so it is in the
       // bundle at once; the raw write is only for a caller without one.
       await enqueueRevisionJobs({
-        project, artifactId, stageId, outline, approvedOutlineVersionId, brief: revise, targets,
+        project, artifactId, stageId, outline, approvedOutlineVersionId, brief: revise, targets, stageHint,
         saveSnapshot: (snapshot) =>
           appendManuscriptVersion
             ? appendManuscriptVersion(snapshot)

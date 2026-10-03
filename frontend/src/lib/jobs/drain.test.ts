@@ -88,7 +88,8 @@ class FakeStore implements JobStore {
     sectionIndex: number,
     section: OutlineSectionState,
     revision = 0,
-    revise?: DraftSectionPayload['revise']
+    revise?: DraftSectionPayload['revise'],
+    stageHint?: string
   ): void {
     const key = `draft:${OUTLINE_VERSION}:${section.id}:${revision}`;
     // on conflict do nothing — the idempotency guarantee.
@@ -105,6 +106,7 @@ class FakeStore implements JobStore {
       model: 'test-model',
       inputs: INPUTS,
       ...(revise ? { revise } : {}),
+      ...(stageHint ? { stage_hint: stageHint } : {}),
     };
     this.jobs.push({
       id: `job-${section.id}-${revision}`,
@@ -302,14 +304,18 @@ class CountingGenerator implements SectionGenerator {
 
   /** The revision brief each prose call carried, by section id. */
   revisions = new Map<string, unknown>();
+  /** The stage hint each prose call carried, by section id. */
+  hints = new Map<string, string | undefined>();
 
   async generateSectionProse(req: {
     outline: OutlineSectionState[];
     section_index: number;
     revision?: unknown;
+    stage_hint?: string;
   }): Promise<{ content: string; finish_reason: string }> {
     const section = req.outline[req.section_index];
     if (req.revision) this.revisions.set(section.id, req.revision);
+    this.hints.set(section.id, req.stage_hint);
     this.clock.advance(this.msPerCall);
     const failure = this.proseFailures.get(section.id);
     if (failure) throw failure;
@@ -507,6 +513,18 @@ describe('FR-05: resumable ten-section drafting', () => {
     expect(generator.proseCalls.filter((c) => c === 's0')).toHaveLength(2);
     expect(store.outline[0].revision).toBe(2);
     expect(first).toBeTruthy();
+  });
+
+  it('the stage hint in a job reaches the prose call, and a job without one sends none', async () => {
+    const { clock, store, generator } = setup();
+    // setup() queued every section without a hint.
+    await drain(store, generator, clock, 'worker-1', 10_000_000);
+    expect(generator.hints.get('s0')).toBeUndefined();
+    // A regenerate of s0 carries the stage's hint.
+    store.enqueue(0, store.outline[0], (store.outline[0].revision ?? 0) + 1, undefined, 'Stay inside that abstract.');
+    await drain(store, generator, clock, 'worker-1', 10_000_000);
+    expect(generator.hints.get('s0')).toBe('Stay inside that abstract.');
+    expect(generator.hints.get('s1')).toBeUndefined();
   });
 
   it('a revision job rewrites the section from its current text and notes', async () => {

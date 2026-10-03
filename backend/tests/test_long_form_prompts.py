@@ -282,3 +282,63 @@ def test_a_section_is_told_to_keep_a_short_report_short_and_to_report_only_what_
     assert "Never write that a pattern, a number or a finding was observed unless the brief or the prior context states it." in user
     # The brief that says nothing was run reaches the model with that instruction beside it.
     assert "no run was carried out; the data was not provided" in user
+
+
+# --- 2 Oct: "it really wants to make outlines" -------------------------------
+
+
+def _book_outline():
+    return [
+        OutlineSection(id="s1", title="Habitat", abstract="Where lions live."),
+        OutlineSection(id="s2", title="Diet", abstract="What lions eat."),
+    ]
+
+
+def test_a_section_takes_the_mode_as_a_voice_not_a_scaffold(basic_inputs):
+    """Architect's lock ("You do not write final prose — you build scaffolding")
+    reached every chapter prompt beside "Do NOT outline", and the chapters came
+    out as outlines."""
+    from promptmaster.long_form import build_section_prompt
+
+    inputs = basic_inputs.model_copy(update={"mode": "architect"})
+    system, _ = build_section_prompt(inputs, _book_outline(), 0, None, "")
+    assert "You do not write final prose" not in system
+    assert "scaffold-first" not in system
+    assert "[INTERNAL SCAFFOLDING]" not in system
+    assert "MODE: Architect." in system
+    assert "TONE GUIDANCE: Neutral, strategic" in system
+    assert "a mode's structural habits — scaffolds, headings, numbered sub-plans" in system
+    assert "Headings, bullet scaffolds and numbered sub-plans are wrong here" in system
+    # The self-model still travels with it.
+    from tests.test_self_model import _assert_self_model
+    _assert_self_model(system)
+
+
+def test_a_custom_persona_keeps_its_preamble_in_a_section(basic_inputs):
+    from promptmaster.long_form import build_section_prompt
+
+    inputs = basic_inputs.model_copy(update={
+        "mode": "custom", "custom_name": "Grandmother", "custom_preamble": "You tell it like a bedtime story.",
+        "custom_tone": "Warm, unhurried.",
+    })
+    system, _ = build_section_prompt(inputs, _book_outline(), 0, None, "")
+    assert "MODE: Grandmother." in system
+    assert "You tell it like a bedtime story." in system
+    assert "TONE GUIDANCE: Warm, unhurried." in system
+    assert "[INTERNAL SCAFFOLDING]" not in system
+
+
+def test_the_drafting_stage_s_hint_reaches_the_section_prompt(basic_inputs):
+    from promptmaster.long_form import build_section_prompt, build_section_revision_prompt
+    from promptmaster.schemas import SectionRevisionBrief
+
+    hint = "Write to the audience segments as described: assume what they already know."
+    system, _ = build_section_prompt(basic_inputs, _book_outline(), 0, None, "", stage_hint=hint)
+    assert f"THIS STAGE:\n{hint}" in system
+    plain, _ = build_section_prompt(basic_inputs, _book_outline(), 0, None, "")
+    assert "THIS STAGE:" not in plain
+
+    revision = SectionRevisionBrief(stage_label="Revision", instruction="Tighten it.", notes="", current_content="Old text.")
+    rev_system, _ = build_section_revision_prompt(basic_inputs, _book_outline(), 0, revision, stage_hint=hint)
+    assert f"THIS STAGE:\n{hint}" in rev_system
+    assert "[INTERNAL SCAFFOLDING]" not in rev_system

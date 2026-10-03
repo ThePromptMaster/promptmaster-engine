@@ -171,6 +171,21 @@ the renderer switch. (`CLAUDE.md` said "five renderers cover 26 stages across bo
 workflows"; that was true when written, before `single_output` and the later template
 versions. Corrected there in the same change that added these documents.)
 
+**A chapter takes the mode as a voice, not as a scaffold (2026-10-03).** Every stage
+prompt goes through `_shared_system` (`backend/promptmaster/conversation.py`): the
+PromptMaster context, then the mode's lock, tone and `[INTERNAL SCAFFOLDING]`. Architect
+is the default mode, and its lock says "You do not write final prose — you build
+scaffolding"; through `_shared_system` that reached every chapter prompt beside "Do NOT
+outline", and the chapters came out as outlines (the client, 2 Oct). Section prose
+(`build_section_prompt`, `build_section_revision_prompt`) now goes through
+`_prose_system`: the context, the mode's name and tone (and a custom persona's preamble),
+and a sentence saying the mode's structural habits do not apply. The long-form stage's
+own `entry_prompt_hint` travels in each section job's payload as `stage_hint` and reaches
+the chapter prompt; it never did before. Prose stages keep the full mode lock, with one
+added sentence that the stage's instruction decides the form. The setup suggester is told
+a book's output format is manuscript prose, and a Book created with no format gets one
+(`BOOK_OUTPUT_FORMAT`).
+
 **No renderer branches on which workflow it is**, and a test in
 `renderers.test.tsx` asserts that. Book's fact-check table and Research's
 reproduction table are the same `review` renderer with different columns. This is the

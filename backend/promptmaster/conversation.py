@@ -7,7 +7,7 @@ instruction and what they put in the user message.
 
 from __future__ import annotations
 
-from .prompt_builder import build_prompt
+from .prompt_builder import build_prompt, resolve_mode_config
 from .schemas import ChatMessage, Iteration, PMInput
 from .self_model import PROMPTMASTER_SELF_MODEL
 from .session_context import format_session_history
@@ -39,6 +39,31 @@ def _shared_system(inputs: PMInput, iterations: list[Iteration], extra: str) -> 
         f"{_PROMPTMASTER_CONTEXT}\n\n"
         f"{base.system_prompt}\n\n"
         f"Session history:\n{history}\n\n"
+        f"{extra}"
+    )
+
+
+def _prose_system(inputs: PMInput, extra: str) -> str:
+    """The system prompt for finished prose: the mode as a voice, never as a scaffold.
+
+    Architect mode's lock says "You do not write final prose — you build
+    scaffolding", and its scaffolding asks for headings, submodules and
+    numbered sub-plans. Through `_shared_system` that text reached every
+    chapter prompt beside "Do NOT outline", and the chapters came out as
+    outlines ("it really wants to make outlines", the client, 2 Oct). Here the
+    mode contributes its name and tone, and a custom persona its preamble;
+    the structural instructions stay out.
+    """
+    mode = resolve_mode_config(inputs)
+    voice = [f"MODE: {mode['display_name']}.", f"TONE GUIDANCE: {mode['tone']}"]
+    if inputs.mode == "custom":
+        voice.insert(1, mode["system_preamble"])
+    return (
+        f"{_PROMPTMASTER_CONTEXT}\n\n"
+        + "\n".join(voice)
+        + "\n\nThe mode shapes voice and emphasis only. What you write here is finished "
+        "prose for a reader, so a mode's structural habits — scaffolds, headings, "
+        "numbered sub-plans, tables in place of narrative — do not apply.\n\n"
         f"{extra}"
     )
 
