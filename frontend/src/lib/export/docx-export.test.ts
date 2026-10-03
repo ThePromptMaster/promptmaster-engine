@@ -41,3 +41,18 @@ describe('manuscriptToDocx', () => {
     expect(blob.type).toContain('wordprocessingml');
   });
 });
+
+describe('placed images (3 Oct call)', () => {
+  it('reads an image on its own line as an image block', () => {
+    expect(markdownToBlocks('Text\n\n![A lioness](project-file:11111111-aaaa)\n\nMore')).toEqual([
+      { kind: 'paragraph', text: 'Text' },
+      { kind: 'image', id: '11111111-aaaa', text: 'A lioness' },
+      { kind: 'paragraph', text: 'More' },
+    ]);
+  });
+
+  it('builds a Word file with an image it cannot embed captioned instead', async () => {
+    const blob = await manuscriptToDocx('# T\n\n![Gone](project-file:22222222-bbbb)', 'T', {});
+    expect(blob.size).toBeGreaterThan(0);
+  });
+});

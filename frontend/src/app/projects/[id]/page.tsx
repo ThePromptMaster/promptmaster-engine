@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useProjectStore } from '@/stores/project-store';
 import { useProjectFlush } from '@/lib/persistence/use-project-flush';
 import { MarkdownOutput } from '@/components/shared/markdown-output';
+import { ProjectImagesProvider } from '@/components/shared/project-images';
 import { WorkflowWorkspace } from '@/components/workflow/workflow-workspace';
 import { getLatestTemplate, getTemplateById } from '@/lib/supabase/workflow';
 import type { WorkflowTemplate } from '@/lib/workflow/types';
@@ -191,6 +192,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   }
 
   return (
+    <ProjectImagesProvider files={files}>
     <div>
       {/* The header shares an edge with the work below it.
           It used to be a centred max-w-[1200px] row sitting above a workspace
@@ -240,5 +242,6 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         onReload={() => void loadProject(id, { background: true })}
       />
     </div>
+    </ProjectImagesProvider>
   );
 }

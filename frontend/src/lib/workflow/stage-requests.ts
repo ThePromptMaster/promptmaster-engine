@@ -8,6 +8,7 @@
  * or the version history would record two kinds of "AI draft".
  */
 
+import { hintWithImages } from '@/lib/data/images';
 import { buildStageDigest, type StageArtifactBundle } from '@/lib/workflow/digest';
 import {
   itemSchemaFor,
@@ -67,7 +68,10 @@ export function generationRequest(
       id: target.id,
       label: target.label,
       renderer: target.renderer,
-      entry_prompt_hint: target.entry_prompt_hint ?? '',
+      // A prose stage can place the project's images; a table cannot.
+      entry_prompt_hint: target.renderer === 'prose'
+        ? hintWithImages(target.entry_prompt_hint, project.data_files)
+        : (target.entry_prompt_hint ?? ''),
       artifact_kind: target.expected_artifacts[0]?.kind ?? '',
     },
     digest: buildStageDigest(template, state, project, bundles, target.id),

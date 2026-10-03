@@ -44,7 +44,8 @@ export function ProjectFinished({ bundle, completion, evaluation, onReopen, onEd
   const stem = () => exportFilename(project, 'md').replace(/\.md$/, '');
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(markdown);
+      const { markdownWithImageLinks } = await import('@/lib/export/images-export');
+      await navigator.clipboard.writeText(await markdownWithImageLinks(markdown, project.data_files));
       setNote('Copied.');
     } catch {
       setNote('Could not copy — select the text and copy it yourself.');
@@ -55,7 +56,8 @@ export function ProjectFinished({ bundle, completion, evaluation, onReopen, onEd
     setNote(null);
     try {
       const { manuscriptToDocx } = await import('@/lib/export/docx-export');
-      downloadBlob(await manuscriptToDocx(markdown, project.title || 'Untitled project'), `${stem()}.docx`);
+      const { imagesForDocx } = await import('@/lib/export/images-export');
+      downloadBlob(await manuscriptToDocx(markdown, project.title || 'Untitled project', await imagesForDocx(markdown, project.data_files)), `${stem()}.docx`);
     } catch (e) {
       setNote(e instanceof Error && e.message ? e.message : 'The Word file could not be built.');
     } finally {

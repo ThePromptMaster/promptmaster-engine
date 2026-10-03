@@ -38,9 +38,10 @@ export function ExportMenu({ bundle }: { bundle: ExportBundle }) {
     return () => document.removeEventListener('mousedown', onClick);
   }, []);
 
-  function exportMarkdown() {
+  async function exportMarkdown() {
+    const { markdownWithImageLinks } = await import('@/lib/export/images-export');
     downloadFile(
-      toMarkdown(bundle),
+      await markdownWithImageLinks(toMarkdown(bundle), bundle.project.data_files),
       exportFilename(bundle.project, 'md'),
       'text/markdown;charset=utf-8'
     );
@@ -51,7 +52,8 @@ export function ExportMenu({ bundle }: { bundle: ExportBundle }) {
   const { deliverable: noun, unit } = deliverableNouns(bundle.template);
   async function exportWord() {
     const { manuscriptToDocx } = await import('@/lib/export/docx-export');
-    const blob = await manuscriptToDocx(manuscript, bundle.project.title || 'Untitled project');
+    const { imagesForDocx } = await import('@/lib/export/images-export');
+    const blob = await manuscriptToDocx(manuscript, bundle.project.title || 'Untitled project', await imagesForDocx(manuscript, bundle.project.data_files));
     downloadBlob(blob, exportFilename(bundle.project, 'md').replace(/\.md$/, '.docx'));
     setOpen(false);
   }
@@ -86,7 +88,7 @@ export function ExportMenu({ bundle }: { bundle: ExportBundle }) {
         >
           <button
             role="menuitem"
-            onClick={exportMarkdown}
+            onClick={() => void exportMarkdown()}
             className="block w-full px-4 py-3 text-left transition-colors hover:bg-[var(--surface-container-low)]"
           >
             <span className="block text-body text-[var(--on-surface)]">Markdown document</span>
