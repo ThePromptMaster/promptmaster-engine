@@ -14,8 +14,8 @@ test('new project offers each workflow once, then drafts and evaluates a stage',
   await page.getByRole('button', { name: /I know what I want to do/ }).click();
   await expect(page.getByRole('heading', { name: 'Your setup' })).toBeVisible();
 
-  const workflows = page.getByRole('radiogroup', { name: 'Workflow' }).getByRole('radio');
-  await expect(workflows).toHaveCount(4);
+  // Each built-in workflow once. Workflows a user designed (H4) are offered
+  // too, so the total depends on what earlier tests saved for this user.
   for (const name of ['Book', 'Research', 'Single output', 'Exploration']) {
     await expect(page.getByRole('radio', { name: new RegExp(`^${name}`) })).toHaveCount(1);
   }
