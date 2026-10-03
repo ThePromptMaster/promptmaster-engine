@@ -7,12 +7,22 @@
  */
 
 export const MAX_FILE_BYTES = 5_000_000;
-export const MAX_FILES = 10;
+export const MAX_FILES = 20;
 export const ACCEPTED_EXTENSIONS = ['.csv', '.tsv', '.json', '.txt'] as const;
+/**
+ * Photos and figures (3 Oct call: "attachments, pictures, photos"). They are
+ * placed in the work, never shown to a model: a prompt gets each one's name,
+ * caption and id, so it can say where it belongs.
+ */
+export const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp', '.gif'] as const;
+
+export function isImage(name: string): boolean {
+  return (IMAGE_EXTENSIONS as readonly string[]).includes(extensionOf(name));
+}
 /** Converted to CSV in the browser when attached (lib/data/spreadsheet.ts); never stored as it is. */
 export const SPREADSHEET_EXTENSION = '.xlsx';
 /** What the file picker offers. */
-export const PICKABLE_EXTENSIONS = [...ACCEPTED_EXTENSIONS, SPREADSHEET_EXTENSION] as const;
+export const PICKABLE_EXTENSIONS = [...ACCEPTED_EXTENSIONS, SPREADSHEET_EXTENSION, ...IMAGE_EXTENSIONS] as const;
 
 export function isSpreadsheet(name: string): boolean {
   return extensionOf(name) === SPREADSHEET_EXTENSION;
@@ -22,7 +32,11 @@ const MAX_COLUMNS = 60;
 const CELL_MAX = 80;
 
 export interface DataPreview {
-  kind: 'table' | 'json' | 'text';
+  kind: 'table' | 'json' | 'text' | 'image';
+  /** Images only: what the user says it shows, used as its alt text and by prompts. */
+  caption?: string;
+  width?: number;
+  height?: number;
   /** Column names (table), top-level keys (json). */
   columns: string[];
   /** The first rows, each cell clipped. */
@@ -38,15 +52,15 @@ export function extensionOf(name: string): string {
 
 /** Why a file cannot be attached, or null when it can. */
 export function rejectReason(name: string, bytes: number, existing: readonly string[]): string | null {
-  if (!(ACCEPTED_EXTENSIONS as readonly string[]).includes(extensionOf(name))) {
+  if (!(ACCEPTED_EXTENSIONS as readonly string[]).includes(extensionOf(name)) && !isImage(name)) {
     return extensionOf(name) === '.xls'
       ? `${name} is in the old Excel format. Save it as .xlsx or CSV first.`
-      : `${name} is not a spreadsheet (.xlsx), CSV, TSV, JSON or text file.`;
+      : `${name} is not a spreadsheet (.xlsx), CSV, TSV, JSON, text or image (PNG, JPEG, WebP, GIF) file.`;
   }
   if (bytes > MAX_FILE_BYTES) return `${name} is larger than ${MAX_FILE_BYTES / 1_000_000} MB.`;
   if (bytes === 0) return `${name} is empty.`;
   if (existing.includes(name)) return `A file called ${name} is already attached. Remove it first to replace it.`;
-  if (existing.length >= MAX_FILES) return `A project can hold ${MAX_FILES} data files.`;
+  if (existing.length >= MAX_FILES) return `A project can hold ${MAX_FILES} files.`;
   return null;
 }
 
@@ -101,8 +115,18 @@ export function previewOf(name: string, text: string): DataPreview {
   return { kind: 'text', columns: [], sample: lines.slice(0, SAMPLE_ROWS).map((l) => [clip(l)]), rows: lines.length };
 }
 
+/** An image's record. The caption defaults to the file's name without its extension. */
+export function imagePreview(name: string, caption: string, width = 0, height = 0): DataPreview {
+  const fallback = name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').trim();
+  return { kind: 'image', columns: [], sample: [], rows: 0, caption: (caption.trim() || fallback).slice(0, 200), width, height };
+}
+
 /** One line a person reads: "1,204 rows · account_id, plan, churned…". */
 export function describePreview(preview: DataPreview): string {
+  if (preview.kind === 'image') {
+    const size = preview.width && preview.height ? ` · ${preview.width}×${preview.height}` : '';
+    return `image${size}${preview.caption ? ` · ${preview.caption}` : ''}`;
+  }
   const count = `${preview.rows.toLocaleString()} ${preview.kind === 'text' ? 'line' : 'row'}${preview.rows === 1 ? '' : 's'}`;
   if (!preview.columns.length) return count;
   const shown = preview.columns.slice(0, 6).join(', ');

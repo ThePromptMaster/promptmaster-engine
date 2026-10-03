@@ -18,6 +18,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { MarkdownOutput } from '@/components/shared/markdown-output';
+import { useProjectImageList } from '@/components/shared/project-images';
+import { imageMarkdown } from '@/lib/data/images';
 import { ConfirmOverwrite, EmptyStage, GenerationBar, VersionBar } from './stage-chrome';
 import type { StageRendererProps } from './types';
 import { operationLabel } from '@/lib/workflow/labels';
@@ -58,6 +60,23 @@ export function ProseRenderer({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const images = useProjectImageList();
+  const [choosingImage, setChoosingImage] = useState(false);
+
+  /** Put an image on its own line where the cursor is (3 Oct call: photos in the work). */
+  const insertImage = (image: (typeof images)[number]) => {
+    const el = textareaRef.current;
+    const at = el ? el.selectionStart : draft.length;
+    const before = draft.slice(0, at);
+    const after = draft.slice(at);
+    const tag = `${before && !before.endsWith('\n\n') ? (before.endsWith('\n') ? '\n' : '\n\n') : ''}${imageMarkdown(image)}\n\n`;
+    setDraft(before + tag + after);
+    setChoosingImage(false);
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(at + tag.length, at + tag.length);
+    });
+  };
 
   // Leaving edit mode when the underlying version changes under you (a
   // generation landed, or another tab appended) is safer than silently
@@ -188,6 +207,33 @@ export function ProseRenderer({
               <div className="ml-auto flex items-center gap-2">
                 {editing ? (
                   <>
+                    {images.length > 0 && !preview && (
+                      <div className="relative">
+                        <button
+                          onClick={() => setChoosingImage((v) => !v)}
+                          aria-expanded={choosingImage}
+                          className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-label text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)] hover:text-[var(--on-surface)]"
+                        >
+                          <span aria-hidden className="material-symbols-outlined text-[16px]">image</span>
+                          Insert image
+                        </button>
+                        {choosingImage && (
+                          <ul role="menu" aria-label="Images" className="absolute right-0 z-10 mt-1 w-64 rounded-lg bg-[var(--surface-container-lowest)] py-1 shadow-[0_8px_24px_rgba(0,0,0,0.12)]">
+                            {images.map((image) => (
+                              <li key={image.id}>
+                                <button
+                                  role="menuitem"
+                                  onClick={() => insertImage(image)}
+                                  className="block w-full truncate px-3 py-2 text-left text-label text-[var(--on-surface)] hover:bg-[var(--surface-container-high)]"
+                                >
+                                  {image.caption}
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
                     <button
                       onClick={() => setPreview((p) => !p)}
                       aria-pressed={preview}

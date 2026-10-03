@@ -384,6 +384,29 @@ original wording is ever needed, it is a nullable column set at creation.
 
 ---
 
+### L-28 · Images: placed by caption, never seen · `accepted`
+
+Since 2026-10-03 a project can hold images (PNG, JPEG, WebP, GIF, up to 5 MB each, in
+`project_files` with `preview.kind = 'image'`). A draft places one as
+`![caption](project-file:<id>)`. The image's id is stable, so the text does not depend on
+a link that expires.
+
+What is not done:
+- **No model sees the pixels.** A prompt is told each image's caption and the exact text
+  that places it, so placement is only as good as the caption. Vision input would need
+  multimodal content in `llm_client` and a cost decision.
+- **Chapters cannot be edited by hand.** They get images only when the model places them
+  while drafting or revising. Prose stages also have an "Insert image" button in the editor.
+- **Exports:**
+  - Word embeds PNG, JPEG and GIF. A WebP image appears as a caption, because Word cannot
+    hold it.
+  - A Markdown export or copy links each image for seven days.
+  - PDF (the print page) draws images while the page is open.
+- **Captions are fixed at upload,** because `project_files` has no update policy. To
+  change a caption, remove the image and add it again.
+
+---
+
 ## Summary
 
 | ID | Limitation | Status |

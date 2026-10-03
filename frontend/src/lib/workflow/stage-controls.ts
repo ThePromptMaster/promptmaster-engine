@@ -34,6 +34,7 @@ export const PLACE_WORDS: Record<ControlPlace, string> = {
 };
 
 export const ATTACH_DATA_LABEL = 'Attach a data file';
+export const ADD_IMAGES_LABEL = 'Add images';
 export const lookupLabel = (noun: string) => `Look up these ${noun}`;
 
 export interface MenuEntry {
