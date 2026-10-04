@@ -18,6 +18,10 @@
  * - **It fires once per stage.** Attempts are remembered per stage id, so a
  *   generation that failed or came back empty does not become a retry loop
  *   billing the user on every render.
+ * - **Its status belongs to a stage.** "Drafting…" and a failure are reported
+ *   only for the stage they are about. One flag for the whole hook showed a
+ *   draft in progress on whichever stage was being browsed, and that stage's
+ *   Stop aborted the real draft somewhere else (4 Oct).
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -62,8 +66,9 @@ export function useStageGeneration({
   enabled,
   appendStageVersion,
 }: Options) {
-  const [generating, setGenerating] = useState(false);
-  const [failure, setFailure] = useState<StageFailure | null>(null);
+  /** The stage a draft is running for, if any. */
+  const [generatingFor, setGeneratingFor] = useState<string | null>(null);
+  const [failure, setFailure] = useState<{ stageId: string; failure: StageFailure } | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
   /** The stage the in-flight draft is for. */
@@ -78,7 +83,7 @@ export function useStageGeneration({
   const cancel = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
-    setGenerating(false);
+    setGeneratingFor(null);
   }, []);
 
   useEffect(() => cancel, [cancel]);
@@ -89,8 +94,15 @@ export function useStageGeneration({
   // and wrote an artifact onto a stage the user had just said they did not need.
   // Browsing another stage does not move the cursor, so it does not cancel.
   const currentStageId = state.current_stage_id;
+  // The stage was never drafted, so it is no longer "attempted": coming back
+  // to it (a return) drafts it, rather than opening blank with only a menu
+  // item to recover it.
   useEffect(() => {
-    if (abortRef.current && inFlightFor.current && inFlightFor.current !== currentStageId) cancel();
+    const left = inFlightFor.current;
+    if (abortRef.current && left && left !== currentStageId) {
+      cancel();
+      attempted.current.delete(left);
+    }
   }, [currentStageId, cancel]);
 
   const generate = useCallback(
@@ -107,7 +119,7 @@ export function useStageGeneration({
       abortRef.current = controller;
       inFlightFor.current = target.id;
       attempted.current.add(target.id);
-      setGenerating(true);
+      setGeneratingFor(target.id);
       setFailure(null);
 
       // FR-16: what the user can be told is still there. The version count is
@@ -130,13 +142,14 @@ export function useStageGeneration({
         if (!content) {
           // Not a provider failure, so it must not be dressed as one — but it
           // owes the same reassurance, because it raises the same question.
-          setFailure(
-            localFailure(
+          setFailure({
+            stageId: target.id,
+            failure: localFailure(
               'The draft came back empty',
               'The model returned nothing usable. Trying again often works, and you can always write it yourself.',
               preserved
-            )
-          );
+            ),
+          });
           return;
         }
 
@@ -154,10 +167,10 @@ export function useStageGeneration({
         // Everything goes through stageFailure, including a fetch that never
         // reached the server: it is the only path that guarantees the message
         // says what survived.
-        setFailure(stageFailure(err, preserved));
+        setFailure({ stageId: target.id, failure: stageFailure(err, preserved) });
       } finally {
         if (abortRef.current === controller) abortRef.current = null;
-        if (!controller.signal.aborted) setGenerating(false);
+        if (!controller.signal.aborted) setGeneratingFor(null);
       }
     },
     []
@@ -190,11 +203,15 @@ export function useStageGeneration({
     [stage, generate]
   );
 
+  // Reported for the stage on screen only.
+  const here = stage?.id ?? null;
+  const shownFailure = failure && failure.stageId === here ? failure.failure : null;
+
   return {
-    generating,
-    failure,
+    generating: generatingFor !== null && generatingFor === here,
+    failure: shownFailure,
     /** The plain string, for surfaces that have not adopted the panel. */
-    error: failure?.message ?? null,
+    error: shownFailure?.message ?? null,
     dismissFailure: useCallback(() => setFailure(null), []),
     generate: regenerate,
     cancel,
