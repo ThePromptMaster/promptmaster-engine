@@ -93,8 +93,14 @@ test('a reset link to the bare callback still reaches the new-password page in t
   await dismissBetaNotice(page);
   await page.getByRole('button', { name: 'Forgot password?' }).click();
   await page.getByLabel('Email Address').fill(email);
+  // The send reports an error, as it does in CI (no mail server) and could in
+  // production while the email still goes out: the request was made here.
+  await page.route('**/auth/v1/recover*', (route) =>
+    route.fulfill({ status: 500, contentType: 'application/json', body: '{"msg":"Error sending recovery email"}' })
+  );
   await page.getByRole('button', { name: 'Send Reset Link' }).click();
-  await expect(page.getByText(/check your email|reset link/i).first()).toBeVisible();
+  await expect(page.getByText(/Error sending recovery email/)).toBeVisible();
+  await page.unroute('**/auth/v1/recover*');
 
   // A sign-in that arrives without saying "recovery" — as the code exchange
   // does when its event fires before the page listens.
