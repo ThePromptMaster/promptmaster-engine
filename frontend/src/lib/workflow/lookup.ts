@@ -8,7 +8,7 @@
  * and a row the user has already verified is never downgraded.
  */
 
-import type { StageItem, StageItemSchema } from './stage-artifact';
+import { newItemId, type StageItem, type StageItemSchema } from './stage-artifact';
 
 export interface WorkMatch {
   id: string;
@@ -88,4 +88,46 @@ export function lookupSummary(result: LookupResult, noun: string, notFoundNote?:
   if (result.unreachable) parts.push(`${result.unreachable} could not be looked up; try again.`);
   if (result.found) parts.push('A found record means the work exists, not that it says what the row claims. Review, then save.');
   return parts.join(' ');
+}
+
+const words = (text: string) => (text.toLowerCase().match(/[a-z0-9]+/g) ?? []).join(' ');
+
+/**
+ * The records a topic search returned, as new rows. Pure apart from row ids.
+ *
+ * Each row names the work as the index holds it, carries its DOI, and is
+ * "Retrieved" by the tool. What the work established and how it bears on the
+ * question are left empty: nobody has read it, and a sentence there would be
+ * the model's guess sitting next to a real DOI. A record already on the list
+ * (by DOI, or by title) is not added twice, and the list is never grown past
+ * what the stage holds.
+ */
+export function rowsFromSearch(matches: readonly WorkMatch[], existing: readonly StageItem[], schema: StageItemSchema): StageItem[] {
+  const lookup = schema.lookup;
+  if (!lookup?.search) return [];
+  const have = existing.map((i) => ({
+    link: (i[lookup.linkField] ?? '').trim().toLowerCase(),
+    text: words(`${i[lookup.field] ?? ''} ${i[lookup.recordField] ?? ''}`),
+  }));
+  const max = schema.fields.find((f) => f.key === lookup.field)?.max ?? 240;
+  const room = Math.max(0, schema.maxItems - existing.length);
+  const rows: StageItem[] = [];
+  for (const match of matches) {
+    if (rows.length >= room) break;
+    if (!match.found || !match.title.trim()) continue;
+    const link = (match.doi || match.url).trim();
+    const title = words(match.title);
+    if (have.some((h) => (link && h.link === link.toLowerCase()) || (title && h.text.includes(title)))) continue;
+    have.push({ link: link.toLowerCase(), text: title });
+    const row: StageItem = { id: newItemId() };
+    for (const field of schema.fields) row[field.key] = '';
+    const lead = [match.authors, match.year ? `(${match.year})` : ''].filter(Boolean).join(' ');
+    row[lookup.field] = `${lead ? `${lead}. ` : ''}${match.title}`.slice(0, max);
+    row[lookup.linkField] = link;
+    row[lookup.recordField] = recordLine(match);
+    row.status = lookup.status;
+    row.status_source = 'tool';
+    rows.push(row);
+  }
+  return rows;
 }

@@ -367,6 +367,11 @@ export const api = {
     return apiFetch('/api/agent/literature', { method: 'POST', body: JSON.stringify({ works }), signal });
   },
 
+  /** Search OpenAlex by topic. No model call; nothing is stored. `reached` false means the index could not be asked. */
+  async agentLiteratureSearch(query: string, limit: number, signal?: AbortSignal): Promise<{ works: WorkMatch[]; reached: boolean; source: string }> {
+    return apiFetch('/api/agent/literature-search', { method: 'POST', body: JSON.stringify({ query, limit }), signal });
+  },
+
   /** A chat answer as at most four things to do about it. Changes nothing. */
   async suggestActions(req: SuggestActionsRequest, signal?: AbortSignal): Promise<{ actions: ReplyAction[] }> {
     return apiFetch('/api/suggest-actions', { method: 'POST', body: JSON.stringify(req), signal });

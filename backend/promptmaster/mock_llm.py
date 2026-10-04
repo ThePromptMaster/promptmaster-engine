@@ -266,6 +266,9 @@ def _next_action(system: str, prompt: str) -> dict:
         row = re.search(r"\[\[mock:row=(\d+)\]\]", prompt)
         if row:
             params["row"] = int(row.group(1))
+    elif choice == "check_literature" and "[[mock:search]]" in system + prompt:
+        # "[[mock:search]]" in the objective makes the lookup a topic search.
+        params = {"query": "Mock: customer churn"}
     elif choice == "request_user_decision":
         # "[[mock:control=listed]]" names the first button the page really
         # has; "[[mock:control=invented]]" names one it does not — so a browser

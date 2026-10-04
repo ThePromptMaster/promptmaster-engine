@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 from main import app
-from promptmaster.literature import WorkQuery, best_match, search_text, title_of, title_overlap, to_match
+from promptmaster.literature import WorkQuery, best_match, offered, search_text, title_of, title_overlap, to_match
 
 ASCARZA = {
     "id": "https://openalex.org/W1", "doi": "https://doi.org/10.1509/jmr.16.0163",
@@ -82,3 +82,39 @@ def test_what_is_sent_to_the_index_has_no_characters_it_rejects():
     """Production, 2026-10-01: a question mark in a title was a 400, reported as "could not be reached"."""
     assert search_text("Does Working from Home Work? Evidence from a Chinese Experiment") == "Does Working from Home Work Evidence from a Chinese Experiment"
     assert search_text("Software Developers' Perceptions (of Productivity)") == "Software Developers Perceptions of Productivity"
+
+
+# --- searching by topic (2 Oct): no work is named yet ------------------------
+
+def test_a_topic_search_offers_records_as_the_index_holds_them():
+    [work] = offered([ASCARZA], 8)
+    assert work.found
+    assert work.id == "https://openalex.org/W1"
+    assert work.title == ASCARZA["display_name"]
+    assert (work.authors, work.year, work.doi) == ("Eva Ascarza", 2018, "https://doi.org/10.1509/jmr.16.0163")
+
+
+def test_a_topic_search_drops_fragments_and_repeats_and_stops_at_the_limit():
+    fragment = {"id": "W2", "display_name": "Customer Churn"}
+    untitled = {"id": "W3", "display_name": None}
+    preprint = {**ASCARZA, "id": "https://openalex.org/W4", "doi": None}
+    other = {"id": "W5", "display_name": "Customer switching behavior in service industries", "publication_year": 1995}
+    assert [w.id for w in offered([fragment, untitled, ASCARZA, preprint, other], 8)] == ["https://openalex.org/W1", "W5"]
+    assert len(offered([ASCARZA, other], 1)) == 1
+
+
+def test_the_search_route_in_mock_mode_never_touches_the_network(monkeypatch):
+    monkeypatch.setenv("PM_LLM_MODE", "mock")
+    res = TestClient(app).post("/api/agent/literature-search", json={"query": "customer churn"})
+    assert res.status_code == 200
+    body = res.json()
+    assert (body["source"], body["reached"]) == ("OpenAlex", True)
+    assert [w["title"] for w in body["works"]] == [f"Mock found work {n} on the topic" for n in (1, 2, 3)]
+    assert all(w["found"] and w["doi"].startswith("https://doi.org/") for w in body["works"])
+
+
+def test_the_search_route_refuses_an_empty_query_and_too_many_results(monkeypatch):
+    monkeypatch.setenv("PM_LLM_MODE", "mock")
+    client = TestClient(app)
+    assert client.post("/api/agent/literature-search", json={"query": ""}).status_code == 422
+    assert client.post("/api/agent/literature-search", json={"query": "churn", "limit": 50}).status_code == 422

@@ -14,6 +14,11 @@ the user's.
 
 Stateless and keyless: one GET per work, nothing stored. Matching is a pure
 function so it can be tested without a network.
+
+`search_works` is the other direction (2 Oct): no work is named yet, so the
+index is searched by topic and what it returns is offered. The same limit on
+what that means applies: these are records the index holds for those words.
+Nobody has read them, and whether each belongs is still the user's to say.
 """
 
 from __future__ import annotations
@@ -30,6 +35,9 @@ OPENALEX_URL = "https://api.openalex.org/works"
 #: How much of the looked-up title must be found in the named work, by word.
 MATCH_THRESHOLD = 0.8
 MAX_WORKS = 20
+#: How many records a topic search may offer. A stage holds 15 works; a screenful is enough to choose from.
+MAX_SEARCH_RESULTS = 10
+_SELECT = "id,doi,display_name,publication_year,authorships"
 _STOP = {"a", "an", "the", "of", "and", "in", "on", "for", "to", "with", "is", "are", "at", "by", "from", "how", "do", "does"}
 _WORD = re.compile(r"[a-z0-9]+")
 _YEAR = re.compile(r"\b(19|20)\d{2}\b")
@@ -156,11 +164,9 @@ def _mock(query: WorkQuery) -> WorkMatch:
     return WorkMatch(id=query.id, found=False, note="No record with this title was found.")
 
 
-async def _lookup_one(http: httpx.AsyncClient, query: WorkQuery) -> WorkMatch:
-    name = " ".join(query.work.split())
-    if not name:
-        return WorkMatch(id=query.id, note="There is no work named on this row.")
-    params = {"search": search_text(title_of(name))[:300], "per-page": "10", "select": "id,doi,display_name,publication_year,authorships"}
+async def _search(http: httpx.AsyncClient, text: str, per_page: int) -> list[dict[str, Any]] | None:
+    """One search of the index. None when it could not be reached, which is not the same as nothing found."""
+    params = {"search": text[:300], "per-page": str(per_page), "select": _SELECT}
     mailto = os.getenv("OPENALEX_MAILTO", "").strip()
     if mailto:
         params["mailto"] = mailto
@@ -174,8 +180,18 @@ async def _lookup_one(http: httpx.AsyncClient, query: WorkQuery) -> WorkMatch:
         response.raise_for_status()
         results = response.json().get("results") or []
     except (httpx.HTTPError, ValueError):
+        return None
+    return [r for r in results if isinstance(r, dict)]
+
+
+async def _lookup_one(http: httpx.AsyncClient, query: WorkQuery) -> WorkMatch:
+    name = " ".join(query.work.split())
+    if not name:
+        return WorkMatch(id=query.id, note="There is no work named on this row.")
+    results = await _search(http, search_text(title_of(name)), 10)
+    if results is None:
         return WorkMatch(id=query.id, note="The search could not be reached; this work was not looked up.")
-    return to_match(query, best_match(name, [r for r in results if isinstance(r, dict)]))
+    return to_match(query, best_match(name, results))
 
 
 async def lookup_works(queries: list[WorkQuery], *, mock: bool = False) -> list[WorkMatch]:
@@ -185,3 +201,47 @@ async def lookup_works(queries: list[WorkQuery], *, mock: bool = False) -> list[
         return [_mock(q) for q in queries]
     async with httpx.AsyncClient() as http:
         return list(await asyncio.gather(*(_lookup_one(http, q) for q in queries)))
+
+
+def offered(results: list[dict[str, Any]], limit: int) -> list[WorkMatch]:
+    """The records of a topic search worth offering: titled, not a fragment, each once, in the index's order."""
+    out: list[WorkMatch] = []
+    seen: set[str] = set()
+    for record in results:
+        title = str(record.get("display_name") or record.get("title") or "")
+        # A one- or two-word title is an index entry for a term, an erratum or a section heading more often than a work.
+        if len(_words(title)) < 3:
+            continue
+        key = " ".join(sorted(_words(title)))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(to_match(WorkQuery(id=str(record.get("id") or f"r{len(out)}"), work=""), record))
+        if len(out) >= limit:
+            break
+    return out
+
+
+def _mock_search(limit: int) -> list[WorkMatch]:
+    """Scripted search results for the browser tests."""
+    return [
+        WorkMatch(id=f"https://openalex.org/Wmock{n}", found=True, title=f"Mock found work {n} on the topic", authors="Mock, A.",
+                  year=2020 + n, doi=f"https://doi.org/10.0000/mock.found.{n}", url=f"https://doi.org/10.0000/mock.found.{n}")
+        for n in range(1, min(limit, 3) + 1)
+    ]
+
+
+async def search_works(query: str, limit: int = 8, *, mock: bool = False) -> tuple[list[WorkMatch], bool]:
+    """Search the index by topic. Returns the records and whether the index was reached. Never raises."""
+    limit = max(1, min(limit, MAX_SEARCH_RESULTS))
+    if mock:
+        return _mock_search(limit), True
+    text = search_text(" ".join(query.split()))
+    if not text:
+        return [], True
+    async with httpx.AsyncClient() as http:
+        # More than is offered are asked for, because fragments and repeats are dropped.
+        results = await _search(http, text, min(limit * 2, 25))
+    if results is None:
+        return [], False
+    return offered(results, limit), True

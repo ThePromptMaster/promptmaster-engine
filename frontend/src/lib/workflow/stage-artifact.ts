@@ -117,6 +117,8 @@ export interface StageItemSchema {
     noun: string;
     /** A row in this status names nothing to search for (a claim with no source found). */
     skipStatus?: string;
+    /** The rows are works, so a topic search may add the records it finds as new rows. */
+    search?: true;
     /** Said of what was not found, when "misremembered" is not the likely reason. */
     notFoundNote?: string;
   };
@@ -211,7 +213,7 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
     // 1 Oct, item 12: eleven works recalled from the model's knowledge met
     // "at least three works" and looked exactly like eleven sources. Who
     // established that the work exists is now on the row. "Retrieved" is a
-    // search tool's to set; none is connected, so nothing carries it yet.
+    // search tool's to set: the OpenAlex lookup and topic search (lib/workflow/lookup.ts).
     statuses: [
       {
         value: 'candidate', label: 'Suggested by PromptMaster — not retrieved', tone: 'neutral', decided: false, modelDefault: true,
@@ -225,7 +227,7 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
     ],
     defaultStateNote:
       '{n} of {total} works were suggested from the model\'s knowledge. They have not been searched for, retrieved or verified — treat them as candidates.',
-    lookup: { field: 'work', linkField: 'link', recordField: 'record', status: 'retrieved', noun: 'works' },
+    lookup: { field: 'work', linkField: 'link', recordField: 'record', status: 'retrieved', noun: 'works', search: true },
   },
 
   // Keyed 'hypotheses' because that is the artifact kind the Research template

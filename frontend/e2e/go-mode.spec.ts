@@ -125,9 +125,9 @@ test('Checkpoint: reasoning runs on its own, code waits for approval, then runs 
 });
 
 test('Autonomous moves stages on its own authority and stops, blocked, at data it does not have', async ({ page }) => {
-  // B0: check_literature is no longer offered without a search tool, so the
-  // honest stop is the planner's own mark_blocked — once Literature has been
-  // drafted: nothing is stuck before it has been tried (2 Oct screenshots).
+  // check_literature no longer blocks (it searches OpenAlex), so the honest
+  // stop is the planner's own mark_blocked — once Literature has been drafted:
+  // nothing is stuck before it has been tried (2 Oct screenshots).
   const id = await researchProject(page, 'E2E go autonomous', 'Pendulum period [[mock:plan=derive,advance_stage,draft_stage,mark_blocked]]');
   await choose(page, 'Autonomous');
 
@@ -135,7 +135,7 @@ test('Autonomous moves stages on its own authority and stops, blocked, at data i
   await expect(transparency).toContainText('Mock: missing data', { timeout: 30_000 });
   await expect(transparency.locator('[data-field="Status"]')).toContainText('Could not continue');
   await expect(steps(page).last()).toContainText('Could not continue');
-  await page.screenshot({ path: test.info().outputPath('01-autonomous-blocked-on-literature.png'), fullPage: true });
+  await page.screenshot({ path: test.info().outputPath('01-autonomous-blocked-on-missing-data.png'), fullPage: true });
 
   const run = await runOf(id);
   expect(run.status).toBe('blocked');
