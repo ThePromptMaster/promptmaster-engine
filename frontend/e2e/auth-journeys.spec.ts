@@ -82,3 +82,26 @@ test('an expired reset link says so and points back to sign in', async ({ page }
   await expect(page.getByRole('link', { name: 'Back to sign in' })).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('01-expired-link.png') });
 });
+
+test('a reset link to the bare callback still reaches the new-password page in the browser that asked', async ({ page }) => {
+  // Production's redirect allow-list holds /auth/callback exactly (4 Oct), so
+  // the email links there with no ?next. The browser that asked remembers it.
+  const email = `e2e+reset2${Date.now()}@promptmaster.test`;
+  await admin('users', { email, password: 'the-old-password', email_confirm: true });
+
+  await page.goto('/auth/login');
+  await dismissBetaNotice(page);
+  await page.getByRole('button', { name: 'Forgot password?' }).click();
+  await page.getByLabel('Email Address').fill(email);
+  await page.getByRole('button', { name: 'Send Reset Link' }).click();
+  await expect(page.getByText(/check your email|reset link/i).first()).toBeVisible();
+
+  // A sign-in that arrives without saying "recovery" — as the code exchange
+  // does when its event fires before the page listens.
+  const link = await admin('generate_link', { type: 'magiclink', email });
+  const tokenHash = link.hashed_token ?? link.properties?.hashed_token;
+  await page.goto(`/auth/callback?token_hash=${tokenHash}&type=magiclink`);
+  await expect(page).toHaveURL(/\/auth\/reset$/);
+  await expect(page.getByRole('heading', { name: 'Set a new password' })).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath('01-bare-callback-to-reset.png') });
+});

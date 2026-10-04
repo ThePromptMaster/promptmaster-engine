@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { safeNext } from '@/lib/auth/next-path';
+import { resetWasRequested, safeNext } from '@/lib/auth/next-path';
 
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -43,6 +43,9 @@ export default function AuthCallbackPage() {
       clearTimeout(timeout);
       router.replace(to);
     };
+    // A reset this browser asked for goes to the page that sets the password,
+    // whichever event (or none, if it fired before this listener) arrives.
+    const signedIn = () => go(resetWasRequested() ? '/auth/reset' : next);
 
     // A link carrying a token hash (an email template pointing here, or an
     // admin-issued link) is verified directly. Unlike the code exchange it does
@@ -56,7 +59,8 @@ export default function AuthCallbackPage() {
             done = true;
             clearTimeout(timeout);
             setVerifyError(otpError.message || 'This link has expired or was already used.');
-          } else go(otpType === 'recovery' ? '/auth/reset' : next);
+          } else if (otpType === 'recovery') go('/auth/reset');
+          else signedIn();
         });
     }
 
@@ -64,7 +68,7 @@ export default function AuthCallbackPage() {
       // A password-reset link signs in with a recovery session; that one goes
       // to the page that sets the new password, wherever `next` says.
       if (event === 'PASSWORD_RECOVERY') go('/auth/reset');
-      else if (event === 'SIGNED_IN') go(next);
+      else if (event === 'SIGNED_IN') signedIn();
     });
 
     // The browser client is a singleton that exchanges the URL's code as soon
@@ -72,7 +76,7 @@ export default function AuthCallbackPage() {
     // already in hand is the same as having heard SIGNED_IN.
     if (!tokenHash) {
       void supabase.auth.getSession().then(({ data }: { data: { session: unknown } }) => {
-        if (data.session) go(next);
+        if (data.session) signedIn();
       });
     }
 

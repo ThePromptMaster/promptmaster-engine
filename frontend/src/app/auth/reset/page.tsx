@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { forgetResetRequest } from '@/lib/auth/next-path';
 
 /**
  * Set a new password, reached from the reset email through the callback.
@@ -51,6 +52,7 @@ export default function ResetPasswordPage() {
       const supabase = createClient();
       const { error: updateError } = await supabase.auth.updateUser({ password });
       if (updateError) throw updateError;
+      forgetResetRequest();
       router.replace('/projects');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not set the new password.');
