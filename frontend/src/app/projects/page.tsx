@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 import { useAuth } from '@/hooks/use-auth';
 import { listProjects, softDeleteProject } from '@/lib/supabase/projects';
@@ -34,21 +35,33 @@ function relativeTime(iso: string): string {
 
 export default function ProjectsPage() {
   const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
 
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
 
+  const [listFailed, setListFailed] = useState(false);
+
   const load = useCallback(() => {
     listProjects()
       .then(setProjects)
-      .catch((e) => setError(e instanceof Error ? e.message : 'Could not load projects.'));
+      .catch((e) => {
+        setListFailed(true);
+        setError(e instanceof Error ? e.message : 'Could not load projects.');
+      });
   }, []);
 
   useEffect(() => {
     if (!user) return;
     load();
   }, [user, load]);
+
+  // Signed out by the time the page ran (an expired session the server had
+  // not yet noticed): the list would otherwise be a skeleton forever.
+  useEffect(() => {
+    if (!authLoading && !user) router.replace('/auth/login?next=/projects');
+  }, [authLoading, user, router]);
 
   async function handleDelete(id: string) {
     const previous = projects;
@@ -89,12 +102,25 @@ export default function ProjectsPage() {
       <GuestBanner />
 
       {error && (
-        <div className="mb-8 rounded-xl bg-[var(--error-container)] px-4 py-3 text-body text-[var(--on-error-container)]">
-          {error}
+        <div role="alert" className="mb-8 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[var(--error-container)] px-4 py-3 text-body text-[var(--on-error-container)]">
+          <span>{listFailed ? `Your projects could not be loaded. Nothing has been lost. (${error})` : error}</span>
+          {listFailed && (
+            <button
+              type="button"
+              onClick={() => {
+                setError(null);
+                setListFailed(false);
+                load();
+              }}
+              className="rounded-lg bg-[var(--surface-container-lowest)] px-3 py-1.5 text-label text-[var(--on-surface)]"
+            >
+              Retry
+            </button>
+          )}
         </div>
       )}
 
-      {projects === null && (
+      {projects === null && !listFailed && (
         <div className="space-y-3" aria-busy>
           {[0, 1, 2].map((i) => (
             <div
@@ -194,7 +220,7 @@ export default function ProjectsPage() {
                         <button
                           onClick={() => setPendingDelete(p.id)}
                           aria-label={`Delete ${p.title || 'project'}`}
-                          className="rounded-lg p-2 text-[var(--on-surface-variant)] opacity-0 transition-opacity hover:bg-[var(--surface-container-high)] focus-visible:opacity-100 group-hover:opacity-100"
+                          className="rounded-lg p-2 text-[var(--on-surface-variant)] opacity-0 transition-opacity hover:bg-[var(--surface-container-high)] focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
                         >
                           <span className="material-symbols-outlined text-[20px]">delete</span>
                         </button>
