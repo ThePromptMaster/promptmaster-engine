@@ -24,7 +24,7 @@ import type { OutlineSection } from '@/types';
 import { manuscriptSourceFor } from './context';
 import type { StageDefinition, WorkflowState, WorkflowTemplate } from './types';
 import { parseItems, rendererHoldsItems } from './stage-artifact';
-import { isDone } from './types';
+import { carriesForward, isDone } from './types';
 
 /** Per-stage budget. Twelve stages of this is a paragraph, not a book. */
 export const SUMMARY_MAX = 320;
@@ -159,10 +159,11 @@ export interface StageArtifactBundle {
 /**
  * Build the digest for the stage about to be generated.
  *
- * Only stages the user actually completed contribute. A skipped stage produced
- * no conclusion, and a stage marked stale is by definition no longer trusted;
- * feeding either forward would have the model build on something the user has
- * already walked away from.
+ * Only stages the user completed, or moved past and left open, contribute. A
+ * skipped stage produced no conclusion, and a stage marked stale is by
+ * definition no longer trusted; feeding either forward would have the model
+ * build on something the user has already walked away from. A stage left open
+ * is labelled so, since its work was never signed off.
  */
 export function buildStageDigest(
   template: WorkflowTemplate,
@@ -179,9 +180,11 @@ export function buildStageDigest(
   // shown — labelled as last round's — rather than dropped.
   const loops = template.stages.some((s) => s.transitions.loop_to);
   template.stages.forEach((stage, index) => {
-    const lastRound = loops && index >= cutoff && state.stages[stage.id]?.status === 'stale';
+    const st = state.stages[stage.id];
+    const lastRound = loops && index >= cutoff && st?.status === 'stale';
     if (!lastRound && cutoff >= 0 && index >= cutoff) return;
-    if (!lastRound && !isDone(state.stages[stage.id]?.status)) return;
+    if (!lastRound && !carriesForward(st)) return;
+    const leftOpen = !lastRound && !isDone(st?.status);
 
     const bundle = bundles[stage.id];
     const stored = bundle?.artifact?.summary?.trim();
@@ -189,7 +192,8 @@ export function buildStageDigest(
     const summary = stored ? truncate(stored) : summariseStageContent(stage, head);
     if (!summary) return;
 
-    prior_stages.push({ stage_id: stage.id, label: lastRound ? `${stage.label} (last round)` : stage.label, summary });
+    const label = lastRound ? `${stage.label} (last round)` : leftOpen ? `${stage.label} (left open)` : stage.label;
+    prior_stages.push({ stage_id: stage.id, label, summary });
   });
 
   // The stages after drafting that are not themselves long-form read the

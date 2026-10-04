@@ -277,6 +277,17 @@ export function isDone(status: StageStatus | undefined): boolean {
 }
 
 /**
+ * Whether a stage's work is handed to later stages. Done stages, and a stage
+ * the user moved past with something unticked: the work is still the work they
+ * chose to build on, so dropping it would make it vanish from every later
+ * prompt while the rail still shows it. Not a completion — exit criteria and
+ * progress keep using `isDone`.
+ */
+export function carriesForward(state: StageState | undefined): boolean {
+  return isDone(state?.status) || (state?.status === 'in_progress' && Boolean(state.left_open));
+}
+
+/**
  * Must stay in step with the workflow_events type CHECK constraint. A value
  * the database rejects fails at insert time, which is the worst place to find
  * out — see the seed-drift guard for the same problem solved for templates.

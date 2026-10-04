@@ -29,7 +29,7 @@ import type {
 } from './types';
 import { emptyDocument } from '@/lib/outline/model';
 import type { OutlineDocument, OutlineItem } from '@/types/outline';
-import { isDone } from './types';
+import { carriesForward } from './types';
 
 /** One source stage's contribution, before it is folded into an abstract. */
 export interface SectionSource {
@@ -51,7 +51,7 @@ export interface DerivedSection {
  * What one stage has to say for itself, or '' if nothing.
  *
  * The same rule as `buildStageDigest`, and for the same reason: only stages the
- * user actually completed contribute. A skipped stage reached no conclusion and
+ * user completed, or moved past and left open, contribute. A skipped stage reached no conclusion and
  * a stale one is by definition no longer trusted, so briefing a section off
  * either would have the draft build on something already walked away from.
  *
@@ -65,7 +65,7 @@ export function stageBrief(
   state: WorkflowState,
   bundles: Record<string, StageArtifactBundle>
 ): string {
-  if (!isDone(state.stages[stage.id]?.status)) return '';
+  if (!carriesForward(state.stages[stage.id])) return '';
   const bundle = bundles[stage.id];
   const stored = bundle?.artifact?.summary?.trim();
   if (stored) return stored;
