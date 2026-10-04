@@ -1,3 +1,4 @@
+import { approvalsAskedFor } from './needs';
 import { describe, expect, it } from 'vitest';
 
 import { BOOK_V1 } from '@/lib/workflow/templates/book.v1';
@@ -270,5 +271,21 @@ describe('needsUser: runs the data can carry out are tried before the table is t
     const claims = { ...schema, itemLabel: 'claim', execution: undefined };
     expect(needsUser({ ...input, runAttemptsLeft: 5, facts: { review: { items: rows, schema: claims, routine: [], material: rows, outcome: true } } as never }))
       .toMatchObject({ kind: 'decide_rows', itemLabel: 'claim' });
+  });
+});
+
+describe('approvalsAskedFor: a question asking for an approval offers the tick (4 Oct, production)', () => {
+  const gap = { id: 'lit.gap', label: 'I agree this says what is not yet known, and that this work addresses it' };
+  const other = { id: 'x.other', label: 'I approve this analysis plan for execution' };
+  const asked =
+    'Does this literature context clearly state the knowledge gap for your question — not just novelty, but what is still not known about whether pair programming reduces defects in professional teams, and why that matters to engineering managers? If yes, use “I agree this says what is not yet known, and that this work addresses it”; if no, say the one thing that still needs changing.';
+
+  it('matches the requirement the question quotes, curly quotes and all', () => {
+    expect(approvalsAskedFor(asked, [gap, other])).toEqual([gap]);
+  });
+
+  it('offers nothing for a question that does not quote a requirement', () => {
+    expect(approvalsAskedFor('Which of the three segments should the book address first?', [gap, other])).toEqual([]);
+    expect(approvalsAskedFor(asked, [])).toEqual([]);
   });
 });

@@ -1025,6 +1025,9 @@ export function WorkflowWorkspace({
       ? inputsChanged(blockedNow.inputs, stageInputs(project, stageBundles[state.current_stage_id]?.versions.at(-1)?.id))
       : null,
     canSkip: Boolean(currentStageDef?.transitions.allow_skip && currentStageDef.transitions.default_next),
+    openApprovals: (currentStageDef?.exit_criteria ?? [])
+      .filter((c) => c.check === 'manual' && !project.manual_checks?.[c.id])
+      .map((c) => ({ id: c.id, label: c.label })),
   };
 
   if (!stage) return null;

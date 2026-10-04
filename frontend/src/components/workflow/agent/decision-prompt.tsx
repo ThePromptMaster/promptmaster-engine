@@ -57,12 +57,51 @@ export function DecisionPrompt({
  * done but the deliverable is not"). Answer it here, or change the project —
  * tick a requirement, edit the draft — and press Resume.
  */
-export function QuestionPrompt({ question, onAnswer }: { question: string; onAnswer: (text: string) => void }) {
+export function QuestionPrompt({
+  question,
+  onAnswer,
+  approvals = [],
+  onTick,
+}: {
+  question: string;
+  onAnswer: (text: string) => void;
+  /** Approvals the question asks for, offered as the tick itself (4 Oct). */
+  approvals?: { id: string; label: string }[];
+  onTick?: (approval: { id: string; label: string }) => Promise<void>;
+}) {
   const [text, setText] = useState('');
+  const [ticking, setTicking] = useState<string | null>(null);
+  const [tickError, setTickError] = useState<string | null>(null);
   return (
     <section aria-label="Go mode asks you" className="rounded-xl bg-[var(--surface-container-highest)] px-5 py-4">
       <p className="text-label uppercase tracking-wide text-[var(--on-surface-variant)]">Go mode asks</p>
       <p className="mt-1 text-body text-[var(--on-surface)]">{question}</p>
+      {onTick && approvals.length > 0 && (
+        <div className="mt-3 flex flex-col items-start gap-2">
+          {approvals.map((a) => (
+            <button
+              key={a.id}
+              type="button"
+              disabled={ticking !== null}
+              onClick={() => {
+                setTicking(a.id);
+                setTickError(null);
+                void onTick(a)
+                  .catch((e) => setTickError(e instanceof Error && e.message ? e.message : 'That did not go through.'))
+                  .finally(() => setTicking(null));
+              }}
+              className="flex items-center gap-2 rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-left text-title text-[var(--on-primary)] disabled:opacity-60"
+            >
+              <span aria-hidden className="material-symbols-outlined text-[20px]">check_box</span>
+              {ticking === a.id ? 'Recording…' : `Tick: “${a.label}”`}
+            </button>
+          ))}
+          <span className="text-label text-[var(--on-surface-variant)]">
+            Ticking records your approval and Go carries on. If it is not right yet, say what to change below.
+          </span>
+          {tickError && <span role="alert" className="text-label text-[var(--pm-error)]">{tickError}</span>}
+        </div>
+      )}
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}

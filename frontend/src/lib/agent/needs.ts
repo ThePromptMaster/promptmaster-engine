@@ -213,6 +213,31 @@ export interface NeedContext {
    * words that are on the page. Null when there is none.
    */
   advanceControl?: string | null;
+  /** The current stage's approvals the user has not given yet (manual criteria, unticked). */
+  openApprovals?: { id: string; label: string }[];
+}
+
+const norm = (text: string) =>
+  text.toLowerCase().replace(/[\u2018\u2019\u201c\u201d"'`]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+
+/**
+ * The approvals a question from Go is asking the user to give.
+ *
+ * Go asks for an approval in its own words and quotes the requirement — on
+ * production (4 Oct) it asked "If yes, use 'I agree this says what is not yet
+ * known…'", and the card offered only a text box: the client's "it asks me to
+ * tick something and there is no tick". A requirement whose label the question
+ * contains is offered as the tick itself. Matched on the label, never guessed.
+ */
+export function approvalsAskedFor(
+  question: string,
+  approvals: readonly { id: string; label: string }[] = []
+): { id: string; label: string }[] {
+  const q = norm(question);
+  return approvals.filter((a) => {
+    const label = norm(a.label);
+    return label.length >= 12 && q.includes(label);
+  });
 }
 
 /**

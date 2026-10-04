@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { actionLabel } from '@/lib/agent/actions';
-import { describeNeed, isClearedNote, needIsDecidedOnStage, type NeedContext, type StuckOption } from '@/lib/agent/needs';
+import { approvalsAskedFor, describeNeed, isClearedNote, needIsDecidedOnStage, type NeedContext, type StuckOption } from '@/lib/agent/needs';
 import type { useGoLoop } from '../use-go-loop';
 import { AuthorizationDialog } from './authorization-dialog';
 import { DecisionPrompt, QuestionPrompt } from './decision-prompt';
@@ -244,7 +244,20 @@ export function GoPanel({
             />
           )}
           {askingUser && !need && !cleared && go.run?.stop_reason && (
-            <QuestionPrompt key={go.run.stop_reason} question={go.run.stop_reason} onAnswer={(t) => void go.answer(t)} />
+            <QuestionPrompt
+              key={go.run.stop_reason}
+              question={go.run.stop_reason}
+              onAnswer={(t) => void go.answer(t)}
+              approvals={approvalsAskedFor(go.run.stop_reason, needContext?.openApprovals)}
+              onTick={
+                needsActions
+                  ? async (a) => {
+                      await needsActions.tick(a.id);
+                      await go.answer(`I ticked “${a.label}”.`);
+                    }
+                  : undefined
+              }
+            />
           )}
           {(go.run || go.steps.length > 0) && (
             <TransparencyPanel
