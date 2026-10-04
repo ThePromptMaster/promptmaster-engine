@@ -143,6 +143,36 @@ describe('patchProject', () => {
     expect(updateProject).toHaveBeenCalledWith('p1', { title: 'A', audience: 'Engineers' }, 3);
   });
 
+  it('a failed save retries by itself, a bounded number of times (4 Oct)', async () => {
+    await loadFixture();
+    useProjectStore.getState().patchProject({ title: 'A' });
+    updateProject.mockRejectedValueOnce(new Error('network'));
+    await vi.advanceTimersByTimeAsync(900);
+    expect(useProjectStore.getState().saveState).toBe('error');
+    expect(updateProject).toHaveBeenCalledTimes(1);
+
+    // No keystroke, no tab switch: it tries again on its own, with the edit.
+    updateProject.mockResolvedValueOnce(project({ title: 'A', revision: 4 }));
+    await vi.advanceTimersByTimeAsync(2_100);
+    expect(updateProject).toHaveBeenCalledTimes(2);
+    expect(updateProject.mock.calls[1][1]).toEqual({ title: 'A' });
+    expect(useProjectStore.getState().saveState).toBe('saved');
+    expect(useProjectStore.getState().error).toBeNull();
+  });
+
+  it('stops retrying after three automatic attempts, and Retry now sends at once', async () => {
+    await loadFixture();
+    useProjectStore.getState().patchProject({ title: 'A' });
+    updateProject.mockRejectedValue(new Error('down'));
+    await vi.advanceTimersByTimeAsync(900 + 2_000 + 5_000 + 15_000 + 60_000);
+    expect(updateProject).toHaveBeenCalledTimes(4);
+
+    updateProject.mockResolvedValueOnce(project({ title: 'A', revision: 4 }));
+    await useProjectStore.getState().retrySave();
+    expect(updateProject).toHaveBeenCalledTimes(5);
+    expect(useProjectStore.getState().saveState).toBe('saved');
+  });
+
   it('guards the write with the revision it loaded', async () => {
     await loadFixture();
     useProjectStore.getState().patchProject({ title: 'A' });
@@ -422,6 +452,16 @@ describe('the store owns the event log and the recommendations (A4, SN-01)', () 
     expect(appendWorkflowEvent).toHaveBeenCalledWith('p1', 'u1', { type: 'stage_advanced', stage_id: 'input' });
     expect(fresh.map((e) => e.type)).toEqual(['section_written', 'stage_advanced']);
     expect(useProjectStore.getState().events).toEqual(fresh);
+  });
+
+  it('a write that landed but could not be re-read says so, rather than "nothing changed" (4 Oct)', async () => {
+    await loadFixture();
+    listWorkflowEvents.mockRejectedValueOnce(new Error('network'));
+    const { EventRecordedError } = await import('./project-store');
+    await expect(
+      useProjectStore.getState().appendEvent({ type: 'stage_advanced', stage_id: 'input' })
+    ).rejects.toBeInstanceOf(EventRecordedError);
+    expect(appendWorkflowEvent).toHaveBeenCalledTimes(1);
   });
 
   it('a failed write leaves the log as it was', async () => {
