@@ -189,6 +189,47 @@ test('Go searches for works by topic and adds what it finds as Retrieved rows', 
 });
 
 /**
+ * 4 Oct, production — after revising, Go asked for a second topic search on a
+ * list that already had its three found works, and added five off-topic rows
+ * it then had to revise out. Once the stage's requirement is met, Check
+ * literature looks up what is listed instead of searching again.
+ */
+test('once the stage has its works, Go looks up what is listed instead of searching again', async ({ page }) => {
+  test.setTimeout(150_000);
+  const id = await createProject(page, {
+    workflow: 'Research', name: 'E2E no second search', objective: 'Why customers churn [[mock:plan=check_literature,check_literature]] [[mock:search]]',
+  });
+  await expect(stageArtifact(page)).toContainText('Mock', { timeout: 30_000 });
+  await pressTransition(page);
+  await expect(page.getByRole('heading', { name: 'Literature context' })).toBeVisible();
+  await expect(stageArtifact(page)).toContainText('Mock work 1', { timeout: 30_000 });
+
+  const panel = page.getByRole('region', { name: 'Go mode', exact: true });
+  await panel.getByRole('button', { name: 'Set up Go' }).click();
+  await panel.getByRole('radio', { name: /^Guided/ }).click();
+  await panel.getByRole('button', { name: /^Go$/ }).click();
+  const prompt = page.getByRole('region', { name: 'Go mode needs your approval' });
+  await expect(prompt).toContainText('Check literature', { timeout: 30_000 });
+  await prompt.getByRole('button', { name: 'Approve' }).click();
+  await expect(panel).toContainText('3 works added to this stage as "Retrieved by PromptMaster"', { timeout: 30_000 });
+
+  // The second Check literature, asked with a query again.
+  await expect(prompt).toContainText('Check literature', { timeout: 30_000 });
+  await prompt.getByRole('button', { name: 'Approve' }).click();
+  await expect
+    .poll(async () => (await serviceSelect('agent_steps', `action_key=eq.check_literature&run_id=in.(${(await serviceSelect('agent_runs', `project_id=eq.${id}&select=id`)).map((r: { id: string }) => r.id).join(',')})&status=eq.succeeded&select=id`)).length, { timeout: 30_000 })
+    .toBe(2);
+  await page.screenshot({ path: test.info().outputPath('01-second-check-looked-up-not-searched.png'), fullPage: true });
+
+  // The second step looked the listed works up; it did not search the index again.
+  const runs = (await serviceSelect('agent_runs', `project_id=eq.${id}&select=id`)).map((r: { id: string }) => r.id).join(',');
+  const steps = await serviceSelect('agent_steps', `run_id=in.(${runs})&action_key=eq.check_literature&select=output,idx&order=idx`);
+  expect(steps[0].output).toContain('Searched OpenAlex for');
+  expect(steps[1].output).not.toContain('Searched OpenAlex for');
+  expect(await serviceSelect('artifact_versions', `project_id=eq.${id}&source_operation=eq.literature_search&select=id`)).toHaveLength(1);
+});
+
+/**
  * 2 Oct, items 12 and 13 — rows on Validation read "Reproduced" over text
  * saying nothing had been recalculated. The statuses now say what was
  * actually done, each with one plain line, and the table asks its question

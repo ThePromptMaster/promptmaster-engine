@@ -20,7 +20,7 @@ import { findInstructionConflicts } from '@/lib/workflow/conflict-trail';
 import { describeWith, type InstructionConflict } from '@/lib/workflow/instruction-conflicts';
 import { defaultOutlineForm, deriveOutlineItems } from '@/lib/workflow/derived-outline';
 import { itemSchemaFor, parseItems, proposableStatuses, rendererHoldsItems, serializeItems } from '@/lib/workflow/stage-artifact';
-import { applyLookup, lookupQueries, lookupSummary, recordLine, rowsFromSearch } from '@/lib/workflow/lookup';
+import { applyLookup, enoughWorksFound, lookupQueries, lookupSummary, recordLine, rowsFromSearch } from '@/lib/workflow/lookup';
 import { figuresFromOutput, readStageFigures, withRunFigures, type StageFigures } from '@/lib/workflow/figures';
 import { applyRunBlocked, applyRunResult } from '@/lib/workflow/run-result';
 import { inputsChanged, stageInputs } from '@/lib/workflow/stage-inputs';
@@ -424,10 +424,19 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // has: the index is searched by topic instead (2 Oct). This used to end
       // "There is no list of works to look up yet."
       const asked = typeof params.query === 'string' ? params.query.trim() : '';
-      if (asked || !holder) return searchLiterature(ctx, key, asked || inputs.objective);
-      const schema = itemSchemaFor(holder);
-      const rows = parseItems(ctx.bundles[holder.id]!.versions.at(-1)!.content)!;
+      const schema = holder ? itemSchemaFor(holder) : null;
+      const rows = holder ? parseItems(ctx.bundles[holder.id]!.versions.at(-1)!.content)! : [];
+      // Asked for more, but the list already has the works its stage asks
+      // for: a search would only add rows nobody chose (4 Oct, production).
+      const enough = Boolean(holder && schema && enoughWorksFound(holder, rows, schema));
+      if (!holder || !schema || (asked && !enough)) return searchLiterature(ctx, key, asked || inputs.objective);
       const works = lookupQueries(rows, schema);
+      if (enough && !works.length) {
+        return done(key, {
+          status: 'succeeded', toolsUsed: [], changes: {},
+          output: `No new search was run: ${holder.label} already lists the works it needs, found in OpenAlex. What is left is yours — say what each work established and how it bears on the question, and remove any that do not belong.`,
+        });
+      }
       const { matches } = await api.agentLiterature(works, ctx.signal);
       const result = applyLookup(rows, matches, schema);
       const found = matches.filter((m) => m.found);

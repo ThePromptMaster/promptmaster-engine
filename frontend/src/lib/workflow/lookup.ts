@@ -9,6 +9,7 @@
  */
 
 import { newItemId, type StageItem, type StageItemSchema } from './stage-artifact';
+import type { StageDefinition } from './types';
 
 export interface WorkMatch {
   id: string;
@@ -130,4 +131,23 @@ export function rowsFromSearch(matches: readonly WorkMatch[], existing: readonly
     rows.push(row);
   }
   return rows;
+}
+
+/**
+ * Whether the stage already holds as many found works as it asks for.
+ *
+ * Read from the stage's own `min_items_with_status` requirement on the status
+ * a lookup sets. Once that is met, another topic search only adds rows nobody
+ * chose: on production (4 Oct) Go searched a second time after revising,
+ * added five off-topic works, then spent its next step revising them out.
+ */
+export function enoughWorksFound(stage: StageDefinition, items: readonly StageItem[], schema: StageItemSchema): boolean {
+  const status = schema.lookup?.status;
+  if (!status) return false;
+  const rule = stage.exit_criteria
+    .map((c) => c.rule)
+    .find((r): r is Extract<NonNullable<typeof r>, { type: 'min_items_with_status' }> =>
+      r?.type === 'min_items_with_status' && r.statuses.includes(status));
+  if (!rule) return false;
+  return items.filter((i) => rule.statuses.includes(i.status ?? '')).length >= rule.n;
 }
