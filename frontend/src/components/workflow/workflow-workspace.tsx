@@ -67,7 +67,7 @@ import { OutlineStagePanel } from '@/components/outline/outline-stage-panel';
 import { ProjectBrief, ProjectSetup, stageWantsSetup } from './project-setup';
 import { ProjectData } from './project-data';
 import { draftBindings } from '@/lib/outline/long-form';
-import { approveOutline, loadOutline, materialiseOutlineInto } from '@/lib/outline/actions';
+import { approveOutline, loadOutline, materialiseOutlineInto, outlineStageFor } from '@/lib/outline/actions';
 import type { OutlineDocument } from '@/types/outline';
 import { isTriaged, proposableStatuses, stageDrafts, itemSchemaFor, parseItems, rendererHoldsItems, serializeItems, type StageItem } from '@/lib/workflow/stage-artifact';
 import { previewRowAction } from '@/lib/workflow/row-actions';
@@ -82,7 +82,7 @@ import { getLatestTemplate } from '@/lib/supabase/workflow';
 import { setUsageProject } from '@/lib/supabase/model-usage';
 import type { NewEvaluation, NewVersion } from '@/lib/supabase/versions';
 import { useProjectStore, type StageBundle } from '@/stores/project-store';
-import { commitOutlineVersion, approvedOutlineVersionId } from '@/lib/supabase/outline';
+import { commitOutlineVersion, approvedOutlineVersionId, ensureOutlineArtifact } from '@/lib/supabase/outline';
 import type { Artifact, ArtifactVersion, Evaluation, Project, ProjectPatch } from '@/types/project';
 
 interface Props {
@@ -878,19 +878,25 @@ export function WorkflowWorkspace({
       const destination = draftingStage ?? stage;
       if (!destination) throw new Error('This workflow has no drafting stage.');
 
-      const existing =
-        destination.id === stage?.id ? stageArtifact : stageBundles[destination.id]?.artifact ?? null;
+      // Only an artifact filed under the drafting stage. The project-level
+      // row (no stage) is never the manuscript of a staged workflow, and before
+      // a reload the stage's bundle can still be empty. A derived outline keeps
+      // the manuscript on its own outline row, so that is where it goes.
+      const existing = stageBundles[destination.id]?.artifact ?? null;
+      const derivedHere = outlineStageFor(template)?.id === destination.id;
       const target =
         existing ??
-        (ensureStageArtifact
-          ? await ensureStageArtifact(destination.id, destination.label)
-          : null);
+        (derivedHere
+          ? await ensureOutlineArtifact(project.id, project.user_id, destination.id)
+          : ensureStageArtifact
+            ? await ensureStageArtifact(destination.id, destination.label)
+            : null);
       if (!target) throw new Error('This stage has nowhere to keep a draft yet. Reload the page and try again.');
 
       await materialiseOutlineInto(doc, target);
       onReload?.();
     },
-    [draftingStage, stage, stageArtifact, stageBundles, ensureStageArtifact, onReload]
+    [draftingStage, stage, stageBundles, template, project.id, project.user_id, ensureStageArtifact, onReload]
   );
 
   // --- Go mode (B4, PM-17 … PM-20) ------------------------------------------------
