@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { createProject, serviceSelect, stageArtifact } from './helpers';
+import { createProject, pressTransition, serviceSelect, stageArtifact } from './helpers';
 
 /**
  * B4 — Go mode (PM-12, PM-15, PM-17 … PM-20), end to end in the browser.
@@ -285,6 +285,39 @@ test('A question the run asks can be answered in place, and the answer is on the
   await expect(steps(page).nth(2)).toContainText('Prove');
   const recorded = await stepsOf((await runOf(id)).id);
   expect(recorded.slice(0, 3).map((s) => s.action_key)).toEqual(['request_user_decision', 'user_answer', 'prove']);
+});
+
+/**
+ * 4 Oct, production — Go asked for the Literature approval in its own words,
+ * quoting the requirement, and the card offered only a text box ("it asks me
+ * to tick something and there is no tick"). The quoted requirement is now the
+ * button: ticking it records the approval and Go carries on.
+ */
+test('a question that asks for an approval offers the tick itself, and Go carries on', async ({ page }) => {
+  const id = await createProject(page, {
+    workflow: 'Research', name: 'E2E go asks approval',
+    objective: 'Pendulum [[mock:plan=request_user_decision,prove]] [[mock:ask=lit-gap]]',
+  });
+  await expect(stageArtifact(page)).toContainText('Mock', { timeout: 30_000 });
+  await pressTransition(page);
+  await expect(page.getByRole('heading', { name: 'Literature context' })).toBeVisible();
+  await expect(stageArtifact(page)).toContainText('Mock', { timeout: 30_000 });
+  await goPanel(page).getByRole('button', { name: 'Set up Go' }).click();
+  await choose(page, 'Autonomous');
+
+  const ask = page.getByRole('region', { name: 'Go mode asks you' });
+  const tick = ask.getByRole('button', { name: 'Tick: “I agree this says what is not yet known, and that this work addresses it”' });
+  await expect(tick).toBeVisible({ timeout: 30_000 });
+  await page.screenshot({ path: test.info().outputPath('01-question-offers-the-tick.png'), fullPage: true });
+  await tick.click();
+
+  await expect(steps(page).nth(1)).toContainText('Your answer', { timeout: 30_000 });
+  await expect(steps(page).nth(2)).toContainText('Prove', { timeout: 30_000 });
+  // The tick is a project field, saved on the debounce.
+  await expect
+    .poll(async () => (await serviceSelect('projects', `id=eq.${id}&select=manual_checks`))[0].manual_checks?.['lit.gap'], { timeout: 10_000 })
+    .toBe(true);
+  await page.screenshot({ path: test.info().outputPath('02-ticked-and-carried-on.png'), fullPage: true });
 });
 
 test('a draft longer than the planner excerpt still gets a next move', async ({ page }) => {

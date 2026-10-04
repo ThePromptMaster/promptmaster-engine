@@ -297,6 +297,12 @@ def _next_action(system: str, prompt: str) -> dict:
             "Mock: which way should this go?"
             # The client's 3 Oct example: a button named in the words, not in params.
             + (" Press Generate Outline to start." if "[[mock:control=invented]]" in prompt else "")
+            # 4 Oct production: Go asks for an approval by quoting the requirement.
+            + (
+                " If yes, use “I agree this says what is not yet known, and that this work addresses it”."
+                if "[[mock:ask=lit-gap]]" in system + prompt
+                else ""
+            )
         ) if choice == "request_user_decision" else None,
         "objective_complete": choice == "declare_objective_complete",
     }
