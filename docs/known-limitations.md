@@ -431,16 +431,17 @@ that would project from the oldest 1,000 and lose its newest state. Stage moves 
 dozen per project and Go's steps are in `agent_steps`, not here, so no project is near
 it; page the read before one is.
 
-### L-33 · The password reset depends on the Supabase redirect allow-list · `open`
+### L-33 · A password reset works in the browser that asked for it · `accepted`
 
-Since 2026-10-04 a reset email links to `/auth/callback?next=/auth/reset`, and the callback
-sends the recovery session to a page that sets the new password. Supabase only redirects
-to URLs on the project's allow-list (Auth → URL Configuration); one that is not listed
-falls back to the Site URL, which never reads a session. The production list has to
-include `https://promptmaster-engine.vercel.app/auth/callback` (a wildcard such as
-`/auth/callback*` covers the query). The callback also accepts `token_hash` links, which
-work on a device other than the one that asked; using them needs the email template to
-point at the callback, a dashboard change.
+Supabase only redirects to URLs on the project's allow-list (Auth → URL Configuration);
+production lists `https://promptmaster-engine.vercel.app/auth/callback` exactly. So the
+reset email links to that bare callback, and the browser that asked for the reset
+remembers it for an hour (`rememberResetRequest`, `lib/auth/next-path.ts`); the callback
+sends that browser — or any `PASSWORD_RECOVERY` session — to `/auth/reset`. The link's
+code exchange needs the same browser anyway (its verifier is stored there), so a reset
+email opened on another device fails with "link expired". Making it work across devices
+needs the email template to send a `token_hash` link to `/auth/callback`, which the
+callback already accepts: a dashboard change.
 
 ### L-34 · Research keeps its outline and its manuscript on one row · `accepted`
 
@@ -498,7 +499,7 @@ belong); filtering by the index's relevance score or by reading abstracts is not
 | L-30 | Exploration rounds start by the user; earlier rounds summarised | accepted |
 | L-31 | Exit criteria enforced by the app, not the database | accepted |
 | L-32 | Event log read without paging; PostgREST caps at 1,000 rows | open |
-| L-33 | Password reset depends on the production redirect allow-list | open |
+| L-33 | Password reset works in the browser that asked; cross-device needs a template change | accepted |
 | L-34 | Research outline and manuscript share one artifact row | accepted |
 | L-35 | Literature topic search returns index matches, not judged relevance | accepted |
 | L-B3 | Go code execution: Python only, fixed packages, no network | accepted |

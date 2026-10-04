@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { createClient } from '@/lib/supabase/client';
-import { nextFromLocation } from '@/lib/auth/next-path';
+import { forgetResetRequest, nextFromLocation, rememberResetRequest } from '@/lib/auth/next-path';
 
 /**
  * The field and label treatments are shared with the sign-up page, which was
@@ -58,6 +58,7 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       await signIn(email, password);
+      forgetResetRequest();
       router.push(nextFromLocation() ?? '/projects');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Invalid email or password.');
@@ -69,6 +70,8 @@ export default function LoginPage() {
   const handleGoogleSignIn = async () => {
     setError(null);
     setIsGoogleLoading(true);
+    // A Google sign-in also lands on the callback; it is not the reset.
+    forgetResetRequest();
     try {
       await signInWithGoogle();
     } catch (err) {
@@ -88,11 +91,13 @@ export default function LoginPage() {
     try {
       const supabase = createClient();
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-        // The callback sends a recovery session on to the page that sets the
-        // new password. It used to land on /projects with the old one intact.
-        redirectTo: `${window.location.origin}/auth/callback?next=/auth/reset`,
+        // The bare callback, which is what the redirect allow-list holds; the
+        // callback sends this browser's recovery on to the page that sets the
+        // new password (it used to land on /projects with the old one intact).
+        redirectTo: `${window.location.origin}/auth/callback`,
       });
       if (resetError) throw resetError;
+      rememberResetRequest();
       setResetSent(true);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to send reset email.');
