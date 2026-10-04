@@ -35,6 +35,10 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const error = useProjectStore((s) => s.error);
   const saveState = useProjectStore((s) => s.saveState);
   const conflict = useProjectStore((s) => s.conflict);
+  const events = useProjectStore((s) => s.events);
+  const eventsError = useProjectStore((s) => s.eventsError);
+  const refreshEvents = useProjectStore((s) => s.refreshEvents);
+  const [retryingEvents, setRetryingEvents] = useState(false);
 
   const loadProject = useProjectStore((s) => s.loadProject);
   const patchProject = useProjectStore((s) => s.patchProject);
@@ -222,6 +226,39 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         </div>
       </div>
 
+      {events === null && eventsError ? (
+        // Without the log there is no telling where the project stands. Showing
+        // the stages anyway would project an empty log — every stage "not
+        // started" — which reads as the project having been reset (4 Oct).
+        <div className="flex">
+          <div aria-hidden className="hidden w-[248px] shrink-0 md:block" />
+          <div className="min-w-0 flex-1 px-6 py-10 md:px-10">
+            <div role="alert" className="max-w-[820px] rounded-2xl bg-[var(--surface-container-low)] px-8 py-7">
+              <p className="text-title text-[var(--on-surface)]">
+                Couldn&apos;t load where this project stands.
+              </p>
+              <p className="mt-2 text-body text-[var(--on-surface-variant)]">
+                Its history did not load, so its stages can&apos;t be shown yet. Nothing has been lost:
+                your work and every stage&apos;s progress are saved.
+              </p>
+              <button
+                type="button"
+                disabled={retryingEvents}
+                onClick={() => {
+                  setRetryingEvents(true);
+                  void refreshEvents()
+                    .catch(() => undefined)
+                    .finally(() => setRetryingEvents(false));
+                }}
+                className="mt-5 rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label text-[var(--on-primary)] disabled:opacity-60"
+              >
+                {retryingEvents ? 'Retrying…' : 'Retry'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+      <>
       {/* Every workflow renders through its stages now, single output included.
           The workspace used to take a `children` pane for that one template; it
           does not any more, which is what retired /session. */}
@@ -241,6 +278,8 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         ensureStageArtifact={ensureStageArtifact}
         onReload={() => void loadProject(id, { background: true })}
       />
+      </>
+      )}
     </div>
     </ProjectImagesProvider>
   );
