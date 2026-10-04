@@ -433,6 +433,65 @@ labelled `discussed` ("Analyzed") with `tools_used: ['search']`: it read an inde
 code, and read no source. A tool the run does not have is not offered as a move
 (`policy.ts`, `AgentTools`), so adding one is a performer plus a registry entry.
 
+## Governance layer and autonomy (2026-10-04)
+
+The client asked (3–4 Oct) whether the stages sit on top of an authoritative project
+state that agents could execute against without owning — a "project graph" of
+objective, constraints, decisions, evidence, artifacts, actions, approvals, unresolved
+issues and next permissible actions. They do. This section is where each part lives, what
+the database guarantees, and what is missing for the two directions discussed: outside
+agents connected to PromptMaster, and agents running underneath it.
+
+**The record.** Stage state is never stored as a status: it is projected from the
+append-only `workflow_events` log in one place (`projectState`, `lib/workflow/engine.ts`).
+The stage rail is a view of that projection.
+
+| Part of the project | Where it lives |
+|---|---|
+| Objective, constraints, audience, format | `projects` |
+| Decisions | `decisions` (append-only) |
+| Proposals and approvals | `recommendations` (`pending → accepted / dismissed / superseded`, forward only) |
+| Evidence | evidence-cited stage events, `sandbox_runs`, `artifacts.key_figures`, review rows |
+| Artifacts and versions | `artifacts`, `artifact_versions` (append-only; restore appends) |
+| Actions and results | `agent_runs`, `agent_steps` |
+| Unresolved | `stage_blocked` events (with what the stage had), `project_tasks`, pending recommendations, `agent_runs.needs` |
+| Next permissible actions | `availableTransitions` (engine) and Go's `allowedActions` / `shouldPause` (`lib/agent/policy.ts`) |
+
+**What the database guarantees** (a client with the user's token cannot get round
+these): `actor` is `user | system`, never a model; a stage move on a model's suggestion
+needs an accepted recommendation and is then the user's; a `system` move needs a running
+agent run under a recorded authorization, and each policy may record only certain moves;
+skip, go back, finalize and reopen are user-only; versions are append-only; execution
+labels are re-checked against real sandbox runs; one running agent run per project.
+
+**What only the app enforces:** exit criteria, which transitions are offered, the
+override reason beyond skips, and Go's pause rules (L-31).
+
+**Autonomy levels already exist.** Go's Guided / Checkpoint / Autonomous are the
+three levels discussed — the user works stage by stage; PromptMaster progresses and stops
+at important decisions; PromptMaster works underneath and stops only when it needs the
+user — and the database fixes what each may record (`workflow_events_agent_authorized`,
+`agent_runs_guard`).
+
+**Agents running underneath PromptMaster** needs, beyond what exists:
+1. the Go loop on a server rather than in the tab (L-B4). The pieces exist — the `jobs`
+   queue with leases and a cron drain, and `agent_runs.lease_holder` / `heartbeat_at` —
+   but `use-go-loop.ts` and `perform.ts` are browser code;
+2. one "where the project stands" view: what was done, what changed, what is blocked,
+   what is next, what needs the user (today spread across the Go panel, the stage
+   checklist and the needs card), and a way to reach the user when it does.
+
+**Outside agents connected to PromptMaster** needs:
+1. an agent identity distinct from the user (an `agent_principal` on events and steps),
+   so an agent's moves are not recorded as the user's own;
+2. the engine's pure functions evaluated server-side before a write (L-31) — a Next.js
+   route with ownership-checking `SECURITY DEFINER` writes, as `/api/jobs/drain` already
+   does, keeps FastAPI stateless;
+3. a small API: read the projected state and permissible actions, propose an action
+   (a pending recommendation), submit a result (a version or evidence).
+
+Neither direction changes the record or the guarantees above; both add a way in.
+
 ## Extension points
 
 These are the seams the system was built to be extended at. Working with them is

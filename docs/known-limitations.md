@@ -256,24 +256,23 @@ behind a flag (L-14) or be removed.
 
 Inventory in [`api.md`](api.md).
 
-### L-16 · Usage metering is not wired up · `open`
+### L-16 · Usage is metered and rate-limited; the hard spend ceiling is the provider's · `resolved 2026-10-04 (register corrected)`
 
 Section 9 asks for "Rate limiting and usage metering appropriate for controlled beta",
-and FR-18 for per-user cost controls.
+and FR-18 for per-user cost controls. This entry said neither existed; both have since
+been built, and the register had not caught up.
 
-`recordUsage()` exists in `frontend/src/lib/supabase/usage.ts`, writes to
-`usage_tracking`, and **has zero importers**. The only occurrence of the identifier in
-the frontend is its own definition. Nothing meters generation, and nothing meters
-saves.
-
-There is no rate limiting on the save path either — the 800 ms debounce is a debounce,
-not a rate limit. The `rate limit` handling that does exist
-(`lib/errors/recovery.ts`, `lib/jobs/errors.ts`) *classifies* a 429 received from
-upstream; it does not impose one.
-
-**A single authenticated user can currently drive unbounded OpenRouter spend.** For a
-controlled beta with known participants this is a manageable risk; it should not
-outlive the beta.
+- **Rate limiting.** `backend/ratelimit.py` is applied to every protected router at
+  include time (`main.py`, `_protected`), per user, with `RATE_LIMIT_PER_MINUTE` /
+  `RATE_LIMIT_PER_HOUR` and a kill switch. It is an in-process sliding window: a burst
+  limiter and circuit breaker against a runaway client, not a billing quota — under
+  fan-out to N cold instances a caller gets up to N windows.
+- **Metering.** Every model call is recorded in `model_usage` (insert/select only;
+  `cost_usd` null means "price unknown"), and `/api/admin/overview` shows it.
+  `usage_tracking` / `recordUsage()` are superseded, not extended.
+- **The hard ceiling** is the spend cap on the OpenRouter account, plus the per-request
+  generation-size caps in `promptmaster/limits.py`. There is no per-user dollar cap in
+  the product; `agent_runs.budget_usd` exists and is not enforced (L-B4).
 
 ### L-17 · `AUTH_ENFORCED` can disable authentication · `accepted`
 
@@ -407,6 +406,62 @@ What is not done:
 
 ---
 
+### L-31 · Exit criteria are enforced by the app, not by the database · `accepted`
+
+What a stage needs before it can be completed (`exit_criteria`, evaluated by pure
+functions in `lib/workflow/engine.ts`) is checked in the browser. The database enforces
+who may record a stage move (`actor` is `user | system`, a model only through an accepted
+recommendation, Go only within a recorded authorization), that cited evidence belongs to
+the stage, and that skips and blocks carry a reason — but a `user`-actor
+`stage_marked_complete` is accepted whether or not the requirements are met, and the
+override-needs-a-reason rule is enforced only in the UI.
+
+For the product as it is, the user *is* the authority, so this is the right side of the
+line. It matters for the governance direction discussed on 4 Oct: an external agent
+writing through the API with a user's token would bypass the app's checks. Before agents
+other than PromptMaster's own may act on a project, the same pure functions need to run
+server-side (a route that evaluates them before writing), and an agent needs an identity
+of its own rather than the user's (`docs/architecture.md`, § Governance layer).
+
+### L-32 · The event log is read 1,000 rows at a time · `open`
+
+`listWorkflowEvents` reads `workflow_events` in `seq` order with no paging, and the
+PostgREST `max_rows` is 1,000 (`supabase/config.toml`). A project with more events than
+that would project from the oldest 1,000 and lose its newest state. Stage moves are a few
+dozen per project and Go's steps are in `agent_steps`, not here, so no project is near
+it; page the read before one is.
+
+### L-33 · The password reset depends on the Supabase redirect allow-list · `open`
+
+Since 2026-10-04 a reset email links to `/auth/callback?next=/auth/reset`, and the callback
+sends the recovery session to a page that sets the new password. Supabase only redirects
+to URLs on the project's allow-list (Auth → URL Configuration); one that is not listed
+falls back to the Site URL, which never reads a session. The production list has to
+include `https://promptmaster-engine.vercel.app/auth/callback` (a wildcard such as
+`/auth/callback*` covers the query). The callback also accepts `token_hash` links, which
+work on a device other than the one that asked; using them needs the email template to
+point at the callback, a dashboard change.
+
+### L-34 · Research keeps its outline and its manuscript on one row · `accepted`
+
+A derived outline (Research) lives on the drafting stage's outline artifact, and so does
+the paper written from it; completing Drafting appends the full report there as a "Full
+draft saved" version. Since 2026-10-04 the outline panel reads only outline versions (JSON)
+from that row, so the prose snapshot no longer shows as an empty outline. Splitting the
+manuscript onto its own artifact would be cleaner and needs a data migration for every
+existing Research project; not worth it for the beta.
+
+### L-35 · A literature topic search returns what the index matches, not what is relevant · `accepted`
+
+"Check literature" on a list with no works searches OpenAlex by topic and adds what it
+returns as "Retrieved by PromptMaster" rows — a record with that title exists, nothing
+more. Some returns are off-topic. Since 2026-10-04 a topic search runs only while the
+stage is short of the works its own requirement asks for; after that, Check literature
+looks up what is listed. Relevance is the user's to judge (they remove rows that do not
+belong); filtering by the index's relevance score or by reading abstracts is not built.
+
+---
+
 ## Summary
 
 | ID | Limitation | Status |
@@ -426,7 +481,7 @@ What is not done:
 | L-13 | `config.toml` references a missing `seed.sql` | open |
 | L-14 | No feature flags | open |
 | L-15 | 18 of 25 endpoints have no caller | accepted |
-| L-16 | Usage metering not wired; no spend cap | open |
+| L-16 | ~~Usage metering not wired~~ — rate limit + `model_usage` built; hard ceiling is the OpenRouter cap | **resolved** |
 | L-17 | `AUTH_ENFORCED` can disable auth | accepted |
 | L-18 | Stale cross-tab reads never warned | open |
 | L-19 | ~~Version appends have no concurrency guard~~ | **resolved** |
@@ -438,6 +493,23 @@ What is not done:
 | L-25 | Revision snapshots have no one-click restore into sections | open |
 | L-26 | Go's planner reads a 6,000-character opening of the manuscript on review stages | accepted |
 | L-27 | The user's brief has no immutable copy; edits replace it in place | accepted |
+| L-28 | Images placed by caption; no model sees pixels; plain exports | accepted |
+| L-29 | User-designed workflows: no chapter stages, no rename/archive | accepted |
+| L-30 | Exploration rounds start by the user; earlier rounds summarised | accepted |
+| L-31 | Exit criteria enforced by the app, not the database | accepted |
+| L-32 | Event log read without paging; PostgREST caps at 1,000 rows | open |
+| L-33 | Password reset depends on the production redirect allow-list | open |
+| L-34 | Research outline and manuscript share one artifact row | accepted |
+| L-35 | Literature topic search returns index matches, not judged relevance | accepted |
+| L-B3 | Go code execution: Python only, fixed packages, no network | accepted |
+| L-B4 | Go runs while the tab is open; windows, not dollars | accepted |
+| L-C3 | Conflict detection misses paraphrase and cross-stage contradiction | accepted |
+| L-C4 | Fact-check verifies nothing itself | accepted |
+| L-C5 | Word/PDF export fidelity is plain | accepted |
+| L-C6 | Literature: generated works are candidates until found or verified | accepted |
+| L-C7 | Statuses the model may set are limited; no Validation outcome column | accepted |
+| L-C8 | Established figures are quoted, not checked | accepted |
+| L-C9 | Research write-up length/“on record only” are instructions, not checks | accepted |
 
 ### L-B3 — Go mode code execution: Python only, fixed package set, no network
 
@@ -503,7 +575,8 @@ starts on its own; each is still a new run with its own `decisions` row
 (`metadata.auto = true`). Since 20261010000000 the database counts them: such a window is
 inserted with `agent_runs.auto_continued = true`, and the run guard refuses one once the
 chain already holds as many consecutive self-started windows as the authorization's
-`auto_continue_windows` allows (never more than three, whatever the authorization says);
+`auto_continue_windows` allows (never more than three at first; since `20261014000000_agent_keep_going.sql` the
+database ceiling is 20, the Autonomous "Keep going" setting);
 a window the user clicks is unmarked and starts the count again. What the guard cannot do
 is tell a click from a client that leaves the mark off — the row is written by the user's
 own session, so this holds the loop to its terms rather than defending the user against
