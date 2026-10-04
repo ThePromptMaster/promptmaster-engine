@@ -51,6 +51,12 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const ensureStageArtifact = useProjectStore((s) => s.ensureStageArtifact);
 
   const [template, setTemplate] = useState<WorkflowTemplate | null>(null);
+  // "Not loaded yet", "failed" and "genuinely missing" are three different
+  // pages. With one null for all three, every project opened on "this
+  // project's workflow could not be loaded … nothing generated yet" for a
+  // moment, and a failed fetch stayed there with no way back (4 Oct).
+  const [templateLoad, setTemplateLoad] = useState<'loading' | 'loaded' | 'failed' | 'missing'>('loading');
+  const [templateAttempt, setTemplateAttempt] = useState(0);
 
   useProjectFlush();
 
@@ -65,14 +71,29 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     const load = project.workflow_template_id
       ? getTemplateById(project.workflow_template_id)
       : getLatestTemplate(project.workflow);
-    load.then(setTemplate).catch(() => setTemplate(null));
+    let live = true;
+    setTemplateLoad('loading');
+    load
+      .then((t) => {
+        if (!live) return;
+        setTemplate(t);
+        setTemplateLoad(t ? 'loaded' : 'missing');
+      })
+      .catch(() => {
+        if (!live) return;
+        setTemplate(null);
+        setTemplateLoad('failed');
+      });
+    return () => {
+      live = false;
+    };
     // Keyed on the pin, not the project: every keystroke produces a new
     // project object, and re-fetching the template for each one rebuilt every
     // memo in the workspace on every character typed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project?.workflow_template_id, project?.workflow]);
+  }, [project?.workflow_template_id, project?.workflow, templateAttempt]);
 
-  if (loading) {
+  if (loading || (storedProject && templateLoad === 'loading')) {
     // A skeleton in the shape of the thing being loaded, rather than the bare
     // "Loading…" string this used to be. The project list one click earlier
     // already shows three shaped cards; arriving here from it and getting a
@@ -165,6 +186,34 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
    * and had an objective editor, version pills and evaluation scores in it.
    * Those all live in the workspace now.
    */
+  if (templateLoad === 'failed') {
+    return (
+      <main className="mx-auto max-w-[900px] px-6 py-12">
+        <Link
+          href="/projects"
+          className="mb-8 inline-flex items-center gap-1 text-body text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
+        >
+          <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+          Projects
+        </Link>
+        {header}
+        <div role="alert" className="mt-6 rounded-2xl bg-[var(--surface-container-low)] px-8 py-7">
+          <p className="text-title text-[var(--on-surface)]">Couldn&apos;t load this project&apos;s workflow.</p>
+          <p className="mt-2 text-body text-[var(--on-surface-variant)]">
+            Nothing has been lost — this is a loading problem, not a missing project.
+          </p>
+          <button
+            type="button"
+            onClick={() => setTemplateAttempt((n) => n + 1)}
+            className="mt-5 rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label text-[var(--on-primary)]"
+          >
+            Retry
+          </button>
+        </div>
+      </main>
+    );
+  }
+
   if (!template) {
     const head = versions.at(-1) ?? null;
     return (
