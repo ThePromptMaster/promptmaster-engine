@@ -81,7 +81,7 @@ import { isDone } from '@/lib/workflow/types';
 import { getLatestTemplate } from '@/lib/supabase/workflow';
 import { setUsageProject } from '@/lib/supabase/model-usage';
 import type { NewEvaluation, NewVersion } from '@/lib/supabase/versions';
-import { useProjectStore, type StageBundle } from '@/stores/project-store';
+import { EventRecordedError, useProjectStore, type StageBundle } from '@/stores/project-store';
 import { commitOutlineVersion, approvedOutlineVersionId, ensureOutlineArtifact } from '@/lib/supabase/outline';
 import type { Artifact, ArtifactVersion, Evaluation, Project, ProjectPatch } from '@/types/project';
 
@@ -435,6 +435,9 @@ export function WorkflowWorkspace({
       if (!stage || busy) return;
       setBusy(true);
       setTransitionError(null);
+      // Once the move itself is written, a later failure is not "nothing was
+      // changed": saying so invited a retry that recorded the move twice.
+      let recorded = false;
       try {
         // PM-13: moving on with the stage's requirements met completes it;
         // moving on without them ("Continue anyway") leaves it open. The
@@ -486,7 +489,11 @@ export function WorkflowWorkspace({
           ...(type === 'stage_advanced' && stageBundles[stage.id]?.versions.at(-1)
             ? { payload: { left_version_id: stageBundles[stage.id]!.versions.at(-1)!.id } }
             : {}),
+        }).catch((e) => {
+          if (e instanceof EventRecordedError) recorded = true;
+          throw e;
         });
+        recorded = true;
 
         // PM-14: finishing the project is its own event, separate from the
         // last stage — the project can be finished with stages left open.
@@ -524,6 +531,15 @@ export function WorkflowWorkspace({
         if (option.kind === 'finish') onPatchProject({ status: 'finalized', stage: moved });
         else if (moved !== project.stage) onPatchProject({ stage: moved });
       } catch (e) {
+        if (recorded) {
+          setTransitionError(
+            option.kind === 'finish' && !(e instanceof EventRecordedError)
+              ? "This stage was recorded, but finishing the project didn't go through. The page is reloading; finish the project from there."
+              : "That was recorded, but the page couldn't catch up. Don't do it again — reloading shows where the project stands."
+          );
+          onReload?.();
+          return;
+        }
         // Was swallowed: the bar did not await this, so a failed insert became
         // an unhandled rejection and the click looked like it did nothing.
         setTransitionError(
@@ -535,7 +551,7 @@ export function WorkflowWorkspace({
         setBusy(false);
       }
     },
-    [stage, busy, project, template, onPatchProject, setStageSummary, setStageFigures, stageBundles, evaluation, appendEvent, appendStageVersion]
+    [stage, busy, project, template, onPatchProject, setStageSummary, setStageFigures, stageBundles, evaluation, appendEvent, appendStageVersion, onReload]
   );
 
   /** PM-13: mark the current stage blocked, or lift the block. */

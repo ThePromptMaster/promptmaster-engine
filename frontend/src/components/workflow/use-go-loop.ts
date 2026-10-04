@@ -106,6 +106,14 @@ interface Options {
 
 class Stopped extends Error {}
 
+/**
+ * The project's current stage is not in its workflow. Was a silent `Stopped`:
+ * the loop returned with the run still "running", the phase stuck on
+ * performing and the heartbeat going, and nothing on screen said why (4 Oct).
+ * As an ordinary error it is recorded on the run and shown.
+ */
+const NO_STAGE = "Go stopped: this project's current stage isn't part of its workflow. Reload the page, then start Go again.";
+
 /** The project's decisions for the planner, read fresh. Never throws: no memory is not a reason to stop. */
 async function readMemory(o: Options, steps: readonly AgentStep[]): Promise<string[]> {
   try {
@@ -242,7 +250,7 @@ export function useGoLoop(opts: Options) {
     async (step: AgentStep, approvedByUser: boolean, signal: AbortSignal): Promise<'continue' | 'stop'> => {
       const o = latest.current;
       const current = runRef.current!;
-      if (!o.stage) throw new Stopped();
+      if (!o.stage) throw new Error(NO_STAGE);
       setPhase('performing');
 
       const interpret = step.action_key === INTERPRET_STEP ? followRef.current ?? undefined : undefined;
@@ -357,7 +365,7 @@ export function useGoLoop(opts: Options) {
         if (signal.aborted) throw new Stopped();
         const o = latest.current;
         const current = runRef.current!;
-        if (!o.stage) throw new Stopped();
+        if (!o.stage) throw new Error(NO_STAGE);
 
         // The second half of run_computation is not a choice: interpret what ran.
         if (followRef.current) {

@@ -43,6 +43,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const loadProject = useProjectStore((s) => s.loadProject);
   const patchProject = useProjectStore((s) => s.patchProject);
   const resolveConflict = useProjectStore((s) => s.resolveConflict);
+  const retrySave = useProjectStore((s) => s.retrySave);
   const appendStageVersion = useProjectStore((s) => s.appendStageVersion);
   const recordStageEvaluation = useProjectStore((s) => s.recordStageEvaluation);
   const restoreStageVersion = useProjectStore((s) => s.restoreStageVersion);
@@ -142,6 +143,25 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
   // A concurrent edit has to be visible whichever pane is showing — it is a
   // property of the project, not of the single-output view it used to live in.
+  // A background reload that failed (after an approval, a drafted section)
+  // set `error` but nothing showed it while a project was on screen, so the
+  // page silently kept stale state. A save failure has its own label above.
+  const refreshBanner =
+    error && saveState !== 'error' && !conflict ? (
+      <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[var(--surface-container-high)] px-5 py-3 text-body">
+        <span className="text-[var(--on-surface)]">
+          The latest changes could not be loaded, so this page may be out of date. Nothing has been lost.
+        </span>
+        <button
+          type="button"
+          onClick={() => void loadProject(id, { background: true })}
+          className="rounded-lg bg-[var(--pm-primary)] px-3 py-1.5 text-label text-[var(--on-primary)]"
+        >
+          Reload
+        </button>
+      </div>
+    ) : null;
+
   const conflictBanner = conflict ? (
     <div className="rounded-xl bg-[var(--surface-container-high)] px-5 py-4 text-body">
       <p className="text-[var(--on-surface)]">This project was changed in another tab.</p>
@@ -170,8 +190,18 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         aria-label="Project title"
         className="min-w-0 flex-1 bg-transparent text-headline text-[var(--on-surface)] outline-none"
       />
-      <span className="shrink-0 text-label text-[var(--on-surface-variant)]">
+      <span className="flex shrink-0 items-center gap-2 text-label text-[var(--on-surface-variant)]">
         {SAVE_LABEL[saveState]}
+        {saveState === 'error' && (
+          // Retries itself a few times; this is for not waiting.
+          <button
+            type="button"
+            onClick={() => void retrySave()}
+            className="rounded-md bg-[var(--surface-container-high)] px-2 py-1 text-label text-[var(--on-surface)]"
+          >
+            Retry now
+          </button>
+        )}
       </span>
     </div>
   );
@@ -270,6 +300,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                 <div className="min-w-0 flex-1">{header}</div>
               </div>
               {conflictBanner && <div className="mt-4">{conflictBanner}</div>}
+              {refreshBanner && <div className="mt-4">{refreshBanner}</div>}
             </div>
           </div>
         </div>
