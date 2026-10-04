@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { applyLookup, lookupQueries, lookupSummary, rowsFromSearch, type WorkMatch } from './lookup';
+import { applyLookup, enoughWorksFound, lookupQueries, lookupSummary, rowsFromSearch, type WorkMatch } from './lookup';
+import { RESEARCH_V1 } from './templates/research.v1';
 import { ITEM_SCHEMAS } from './stage-artifact';
 
 const lit = ITEM_SCHEMAS.literature_map;
@@ -132,5 +133,24 @@ describe('rowsFromSearch (2 Oct: no works are listed yet)', () => {
   it('adds nothing to a table whose rows are not works', () => {
     expect(rowsFromSearch(found, [], ITEM_SCHEMAS.claim_table)).toEqual([]);
     expect(rowsFromSearch(found, [], ITEM_SCHEMAS.hypotheses)).toEqual([]);
+  });
+});
+
+describe('enoughWorksFound: no more topic searches once the stage has its works (4 Oct)', () => {
+  const stage = RESEARCH_V1.stages.find((s) => s.id === 'literature')!;
+  const row = (status: string) => ({ id: status + Math.random(), work: 'A work', status });
+
+  it('is met by the stage\'s own "at least three retrieved or verified"', () => {
+    expect(enoughWorksFound(stage, [row('retrieved'), row('verified'), row('retrieved')], lit)).toBe(true);
+  });
+
+  it('is not met by candidates the model suggested, or by too few found', () => {
+    expect(enoughWorksFound(stage, [row('candidate'), row('candidate'), row('candidate'), row('retrieved')], lit)).toBe(false);
+    expect(enoughWorksFound(stage, [row('retrieved'), row('verified')], lit)).toBe(false);
+  });
+
+  it('says nothing for a stage without such a requirement', () => {
+    const question = RESEARCH_V1.stages.find((s) => s.id === 'question')!;
+    expect(enoughWorksFound(question, [row('retrieved'), row('retrieved'), row('retrieved')], lit)).toBe(false);
   });
 });
