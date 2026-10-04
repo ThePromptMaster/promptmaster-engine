@@ -113,6 +113,22 @@ describe('buildStageDigest', () => {
     expect(digest.prior_stages.map((s) => s.stage_id)).toEqual(['audience']);
   });
 
+  it('carries a stage the user moved past and left open, labelled so', () => {
+    // "Override and advance" leaves the stage open, not complete. Its work is
+    // still what the user chose to build on; before 4 Oct it vanished from
+    // every later prompt while the rail still showed it.
+    const leftOpen = projectState(BOOK_V1, [
+      ev('stage_completed', 'objective', 'audience'),
+      ev('stage_advanced', 'audience', 'positioning'),
+    ]);
+    expect(leftOpen.stages.audience).toMatchObject({ status: 'in_progress', left_open: true });
+    const digest = buildStageDigest(BOOK_V1, leftOpen, PROJECT, bundles, 'positioning');
+    expect(digest.prior_stages.map((s) => s.stage_id)).toEqual(['objective', 'audience']);
+    expect(digest.prior_stages[1].label).toMatch(/\(left open\)$/);
+    expect(digest.prior_stages[1].summary).toContain('Engineering leads');
+    expect(digest.prior_stages[0].label).not.toMatch(/left open/);
+  });
+
   it('prefers the summary stored when the stage completed', () => {
     const withStored = {
       ...bundles,
