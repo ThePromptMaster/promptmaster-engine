@@ -90,6 +90,9 @@ export default function LoginPage() {
     setResetLoading(true);
     try {
       const supabase = createClient();
+      // Remembered before the request: a send that reports an error may still
+      // have gone out, and remembering costs nothing if it did not.
+      rememberResetRequest();
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
         // The bare callback, which is what the redirect allow-list holds; the
         // callback sends this browser's recovery on to the page that sets the
@@ -97,7 +100,6 @@ export default function LoginPage() {
         redirectTo: `${window.location.origin}/auth/callback`,
       });
       if (resetError) throw resetError;
-      rememberResetRequest();
       setResetSent(true);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to send reset email.');
