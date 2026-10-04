@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useProjectStore } from '@/stores/project-store';
 import { useProjectFlush } from '@/lib/persistence/use-project-flush';
 import { MarkdownOutput } from '@/components/shared/markdown-output';
+import { ProjectImagesProvider } from '@/components/shared/project-images';
 import { WorkflowWorkspace } from '@/components/workflow/workflow-workspace';
 import { getLatestTemplate, getTemplateById } from '@/lib/supabase/workflow';
 import type { WorkflowTemplate } from '@/lib/workflow/types';
@@ -34,10 +35,15 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const error = useProjectStore((s) => s.error);
   const saveState = useProjectStore((s) => s.saveState);
   const conflict = useProjectStore((s) => s.conflict);
+  const events = useProjectStore((s) => s.events);
+  const eventsError = useProjectStore((s) => s.eventsError);
+  const refreshEvents = useProjectStore((s) => s.refreshEvents);
+  const [retryingEvents, setRetryingEvents] = useState(false);
 
   const loadProject = useProjectStore((s) => s.loadProject);
   const patchProject = useProjectStore((s) => s.patchProject);
   const resolveConflict = useProjectStore((s) => s.resolveConflict);
+  const retrySave = useProjectStore((s) => s.retrySave);
   const appendStageVersion = useProjectStore((s) => s.appendStageVersion);
   const recordStageEvaluation = useProjectStore((s) => s.recordStageEvaluation);
   const restoreStageVersion = useProjectStore((s) => s.restoreStageVersion);
@@ -46,6 +52,12 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const ensureStageArtifact = useProjectStore((s) => s.ensureStageArtifact);
 
   const [template, setTemplate] = useState<WorkflowTemplate | null>(null);
+  // "Not loaded yet", "failed" and "genuinely missing" are three different
+  // pages. With one null for all three, every project opened on "this
+  // project's workflow could not be loaded … nothing generated yet" for a
+  // moment, and a failed fetch stayed there with no way back (4 Oct).
+  const [templateLoad, setTemplateLoad] = useState<'loading' | 'loaded' | 'failed' | 'missing'>('loading');
+  const [templateAttempt, setTemplateAttempt] = useState(0);
 
   useProjectFlush();
 
@@ -60,14 +72,29 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     const load = project.workflow_template_id
       ? getTemplateById(project.workflow_template_id)
       : getLatestTemplate(project.workflow);
-    load.then(setTemplate).catch(() => setTemplate(null));
+    let live = true;
+    setTemplateLoad('loading');
+    load
+      .then((t) => {
+        if (!live) return;
+        setTemplate(t);
+        setTemplateLoad(t ? 'loaded' : 'missing');
+      })
+      .catch(() => {
+        if (!live) return;
+        setTemplate(null);
+        setTemplateLoad('failed');
+      });
+    return () => {
+      live = false;
+    };
     // Keyed on the pin, not the project: every keystroke produces a new
     // project object, and re-fetching the template for each one rebuilt every
     // memo in the workspace on every character typed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project?.workflow_template_id, project?.workflow]);
+  }, [project?.workflow_template_id, project?.workflow, templateAttempt]);
 
-  if (loading) {
+  if (loading || (storedProject && templateLoad === 'loading')) {
     // A skeleton in the shape of the thing being loaded, rather than the bare
     // "Loading…" string this used to be. The project list one click earlier
     // already shows three shaped cards; arriving here from it and getting a
@@ -116,6 +143,25 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
   // A concurrent edit has to be visible whichever pane is showing — it is a
   // property of the project, not of the single-output view it used to live in.
+  // A background reload that failed (after an approval, a drafted section)
+  // set `error` but nothing showed it while a project was on screen, so the
+  // page silently kept stale state. A save failure has its own label above.
+  const refreshBanner =
+    error && saveState !== 'error' && !conflict ? (
+      <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[var(--surface-container-high)] px-5 py-3 text-body">
+        <span className="text-[var(--on-surface)]">
+          The latest changes could not be loaded, so this page may be out of date. Nothing has been lost.
+        </span>
+        <button
+          type="button"
+          onClick={() => void loadProject(id, { background: true })}
+          className="rounded-lg bg-[var(--pm-primary)] px-3 py-1.5 text-label text-[var(--on-primary)]"
+        >
+          Reload
+        </button>
+      </div>
+    ) : null;
+
   const conflictBanner = conflict ? (
     <div className="rounded-xl bg-[var(--surface-container-high)] px-5 py-4 text-body">
       <p className="text-[var(--on-surface)]">This project was changed in another tab.</p>
@@ -144,8 +190,18 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         aria-label="Project title"
         className="min-w-0 flex-1 bg-transparent text-headline text-[var(--on-surface)] outline-none"
       />
-      <span className="shrink-0 text-label text-[var(--on-surface-variant)]">
+      <span className="flex shrink-0 items-center gap-2 text-label text-[var(--on-surface-variant)]">
         {SAVE_LABEL[saveState]}
+        {saveState === 'error' && (
+          // Retries itself a few times; this is for not waiting.
+          <button
+            type="button"
+            onClick={() => void retrySave()}
+            className="rounded-md bg-[var(--surface-container-high)] px-2 py-1 text-label text-[var(--on-surface)]"
+          >
+            Retry now
+          </button>
+        )}
       </span>
     </div>
   );
@@ -160,6 +216,34 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
    * and had an objective editor, version pills and evaluation scores in it.
    * Those all live in the workspace now.
    */
+  if (templateLoad === 'failed') {
+    return (
+      <main className="mx-auto max-w-[900px] px-6 py-12">
+        <Link
+          href="/projects"
+          className="mb-8 inline-flex items-center gap-1 text-body text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
+        >
+          <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+          Projects
+        </Link>
+        {header}
+        <div role="alert" className="mt-6 rounded-2xl bg-[var(--surface-container-low)] px-8 py-7">
+          <p className="text-title text-[var(--on-surface)]">Couldn&apos;t load this project&apos;s workflow.</p>
+          <p className="mt-2 text-body text-[var(--on-surface-variant)]">
+            Nothing has been lost — this is a loading problem, not a missing project.
+          </p>
+          <button
+            type="button"
+            onClick={() => setTemplateAttempt((n) => n + 1)}
+            className="mt-5 rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label text-[var(--on-primary)]"
+          >
+            Retry
+          </button>
+        </div>
+      </main>
+    );
+  }
+
   if (!template) {
     const head = versions.at(-1) ?? null;
     return (
@@ -191,6 +275,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   }
 
   return (
+    <ProjectImagesProvider files={files}>
     <div>
       {/* The header shares an edge with the work below it.
           It used to be a centred max-w-[1200px] row sitting above a workspace
@@ -215,11 +300,45 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                 <div className="min-w-0 flex-1">{header}</div>
               </div>
               {conflictBanner && <div className="mt-4">{conflictBanner}</div>}
+              {refreshBanner && <div className="mt-4">{refreshBanner}</div>}
             </div>
           </div>
         </div>
       </div>
 
+      {events === null && eventsError ? (
+        // Without the log there is no telling where the project stands. Showing
+        // the stages anyway would project an empty log — every stage "not
+        // started" — which reads as the project having been reset (4 Oct).
+        <div className="flex">
+          <div aria-hidden className="hidden w-[248px] shrink-0 md:block" />
+          <div className="min-w-0 flex-1 px-6 py-10 md:px-10">
+            <div role="alert" className="max-w-[820px] rounded-2xl bg-[var(--surface-container-low)] px-8 py-7">
+              <p className="text-title text-[var(--on-surface)]">
+                Couldn&apos;t load where this project stands.
+              </p>
+              <p className="mt-2 text-body text-[var(--on-surface-variant)]">
+                Its history did not load, so its stages can&apos;t be shown yet. Nothing has been lost:
+                your work and every stage&apos;s progress are saved.
+              </p>
+              <button
+                type="button"
+                disabled={retryingEvents}
+                onClick={() => {
+                  setRetryingEvents(true);
+                  void refreshEvents()
+                    .catch(() => undefined)
+                    .finally(() => setRetryingEvents(false));
+                }}
+                className="mt-5 rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label text-[var(--on-primary)] disabled:opacity-60"
+              >
+                {retryingEvents ? 'Retrying…' : 'Retry'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+      <>
       {/* Every workflow renders through its stages now, single output included.
           The workspace used to take a `children` pane for that one template; it
           does not any more, which is what retired /session. */}
@@ -239,6 +358,9 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         ensureStageArtifact={ensureStageArtifact}
         onReload={() => void loadProject(id, { background: true })}
       />
+      </>
+      )}
     </div>
+    </ProjectImagesProvider>
   );
 }

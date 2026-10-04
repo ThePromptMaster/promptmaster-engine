@@ -16,6 +16,7 @@ export function GoControl({
   canContinue = false,
   disabled,
   hideResume = false,
+  compact = false,
 }: {
   run: AgentRun | null;
   running: boolean;
@@ -29,6 +30,8 @@ export function GoControl({
   disabled: boolean;
   /** The "I need you to…" card carries the one button that resumes; a bare Resume beside it re-trips the same stop. */
   hideResume?: boolean;
+  /** The pinned copy at the top of the page: the controls, without the explanation under them. */
+  compact?: boolean;
 }) {
   // Both numbers come from the run on show. The selector is the size of the
   // *next* window; mixing it in printed "20 / 12" for an ended run and
@@ -61,7 +64,9 @@ export function GoControl({
         </button>
       )}
       <label className="flex items-center gap-2 text-label text-[var(--on-surface-variant)]">
-        Window
+        {/* After a run ends the selector is the size of the *next* window, and says so
+            beside a count that is about the last one (2 Oct, screenshot 8). */}
+        {live || !run ? 'Window' : 'Next window'}
         <select
           value={live ? cap : budget}
           onChange={(e) => onBudget(Number(e.target.value))}
@@ -82,15 +87,16 @@ export function GoControl({
             <div className="h-full rounded-full bg-[var(--pm-primary)]" style={{ width: `${pct}%` }} />
           </div>
           <span className="text-label text-[var(--on-surface-variant)]">
-            {used} / {cap} steps {live ? 'this window' : 'in the last window'}
+            {live ? `${used} / ${cap} steps this window` : `${used} of ${cap} steps used in the last window`}
           </span>
         </div>
       )}
     </div>
+    {!compact && (
     <p className="mt-2 text-label text-[var(--on-surface-variant)]">
-      A step is one action PromptMaster performs, such as drafting a stage or checking it. It is not credits or tokens.
-      Running code counts as two (run it, then read the result); planning, waiting and your answers count as none.
+      A step is one thing PromptMaster does, like drafting or checking a stage. Running code counts as two.
     </p>
+    )}
     </div>
   );
 }

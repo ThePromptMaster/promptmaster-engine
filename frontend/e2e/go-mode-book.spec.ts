@@ -111,6 +111,51 @@ test('the planner is sent the manuscript as the database holds it, not as the pa
 });
 
 /**
+ * 2 Oct screenshots — Fact-check, Critique and Continuity were marked stuck
+ * by Go for "no draft text in project state" after Drafting was done. The
+ * planner had never been shown the chapters on a stage that does not own
+ * them. Now a stage after drafting is sent the manuscript it reviews, with
+ * the stage that holds it named, and Go drafts the review from it.
+ */
+test('on a review stage after drafting, the planner is sent the manuscript and drafts the review from it', async ({ page }) => {
+  test.setTimeout(180_000);
+  await bookDraftedToTheEnd(page, 'E2E go review reads draft', 'A short book about lions [[mock:plan=triage_findings]]');
+  await pressTransition(page);
+  await expect(page.getByRole('heading', { name: /Continuity/ })).toBeVisible();
+  // Entering the stage drafts its table, and the draft was given the manuscript.
+  await expect(stageArtifact(page).getByText(/\(read the manuscript\)/).first()).toBeVisible();
+
+  const panel = goPanel(page);
+  await panel.getByRole('button', { name: 'Set up Go' }).click();
+  await panel.getByRole('radio', { name: /^Guided/ }).click();
+  const planned = page.waitForRequest((r) => r.url().includes('/api/agent/next-action') && r.method() === 'POST');
+  await panel.getByRole('button', { name: /^Go$/ }).click();
+  const { state, allowed_actions } = (await planned).postDataJSON();
+
+  // The planner is told it is on a Book, with no stage a computation serves
+  // (2 Oct, screenshot 8: it asked a book for experiment results).
+  expect(state.workflow).toMatchObject({ key: 'book', label: 'Book', has_data_stages: false });
+  expect(state.workflow.stages.map((s: { label: string }) => s.label)).toContain('Continuity review or controlled expansion');
+  // Every blocking requirement on Continuity is met, so "stuck" is not on the
+  // menu (screenshot 2: "Nothing outstanding" above "Stuck — needs a decision").
+  expect(allowed_actions).toContain('advance_stage');
+  expect(allowed_actions).not.toContain('mark_blocked');
+
+  // The review stage's own excerpt is its table; the chapters travel beside
+  // it, with the stage that holds them named.
+  expect(state.artifact_excerpt).toContain('(read the manuscript)');
+  expect(state.manuscript).toMatchObject({ own: false, total: 2, complete: 2, stage_label: 'Drafting' });
+  expect(state.manuscript.excerpt).toContain('## 1. Habitat');
+  expect(state.prior_stages).toContainEqual(expect.stringMatching(/^Drafting: completed_with_artifact — 2 chapter\(s\) written, [\d,]+ words \(see MANUSCRIPT\)$/));
+
+  // The planner proposes work on the review — not "no draft text, mark stuck".
+  const prompt = page.getByRole('region', { name: 'Go mode needs your approval' });
+  await expect(prompt).toBeVisible({ timeout: 30_000 });
+  await expect(prompt).not.toContainText('Mark this stage stuck');
+  await page.screenshot({ path: test.info().outputPath('01-review-stage-planner-sees-the-draft.png'), fullPage: true });
+});
+
+/**
  * 1 Oct, item 26 and question 12 — the whole book could only be read in one
  * piece after Finish. It is readable as soon as there is something written.
  */

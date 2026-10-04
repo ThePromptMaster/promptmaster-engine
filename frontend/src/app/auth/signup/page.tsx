@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 
 /**
@@ -28,6 +29,7 @@ const LABEL_CLASS =
 
 export default function SignupPage() {
   const { signUp } = useAuth();
+  const router = useRouter();
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -52,8 +54,11 @@ export default function SignupPage() {
 
     setIsLoading(true);
     try {
-      await signUp(email, password, fullName);
-      setSuccess(true);
+      // Where confirmation is off the account is already signed in: "check
+      // your email" would send them looking for a message that never comes.
+      const signedIn = await signUp(email, password, fullName);
+      if (signedIn) router.push('/projects');
+      else setSuccess(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create account.');
     } finally {

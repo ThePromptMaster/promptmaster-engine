@@ -263,7 +263,7 @@ describe('the single-output workflow walks its five stages in the workspace', ()
     expect(screen.queryByRole('region', { name: 'Project setup' })).not.toBeInTheDocument();
     expect(screen.getByText('Project brief')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('checkbox', { name: /Prompt looks right/ }));
+    await user.click(screen.getByRole('checkbox', { name: /I have read the prompt and it asks for what I want/ }));
     await advance(user);
 
     // --- 3. Output ----------------------------------------------------------
@@ -289,7 +289,7 @@ describe('the single-output workflow walks its five stages in the workspace', ()
 
     // --- 5. Summary ---------------------------------------------------------
     expect(await screen.findByRole('heading', { name: /Final review/ })).toBeInTheDocument();
-    await user.click(screen.getByRole('checkbox', { name: /Output accepted/ }));
+    await user.click(screen.getByRole('checkbox', { name: /I accept this output as finished/ }));
     await advance(user);
 
     // PM-14: Finish first says what is being finished — the deliverable is the

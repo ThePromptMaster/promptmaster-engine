@@ -3,9 +3,11 @@ import { describe, expect, it } from 'vitest';
 import { RESEARCH_V1, SINGLE_OUTPUT_V1 } from '@/lib/workflow';
 import { BOOK_V1 } from '@/lib/workflow/templates/book.v1';
 import { initialState } from '@/lib/workflow/engine';
+import type { StageEvaluation } from '@/lib/workflow/types';
 import type { AgentStep } from '@/types/agent';
 import { deriveExecutionLabel } from './labels';
-import { allowedActions, withoutOverride, fitsBudget, noProgress, plannedBeforeLatestChange, preempt, shouldPause, stageMoveActor } from './policy';
+import { ITEM_SCHEMAS } from '@/lib/workflow/stage-artifact';
+import { allowedActions, alternating, withoutOverride, withoutEndlessPolish, withoutSettledRuns, fitsBudget, noChange, noProgress, plannedBeforeLatestChange, preempt, shouldPause, stageMoveActor, stateFingerprint } from './policy';
 
 function step(over: Partial<AgentStep>): AgentStep {
   return {
@@ -35,10 +37,18 @@ describe('allowedActions', () => {
     expect(drafted).not.toContain('draft_stage');
   });
 
-  it('always lets the run ask, block or finish', () => {
-    expect(allowedActions(RESEARCH_V1, research, RESEARCH_V1.stages[0], false)).toEqual(
-      expect.arrayContaining(['mark_blocked', 'request_user_decision', 'declare_objective_complete'])
-    );
+  it('always lets the run ask or finish, and block once the stage has been tried', () => {
+    const undrafted = allowedActions(RESEARCH_V1, research, RESEARCH_V1.stages[0], false);
+    expect(undrafted).toEqual(expect.arrayContaining(['draft_stage', 'request_user_decision', 'declare_objective_complete']));
+    // Nothing is stuck before it has been drafted (2 Oct screenshots: an empty
+    // review stage was marked stuck for "no draft text" instead of drafted).
+    expect(undrafted).not.toContain('mark_blocked');
+    expect(allowedActions(RESEARCH_V1, research, RESEARCH_V1.stages[0], true)).toContain('mark_blocked');
+  });
+
+  it('a stage that cannot be drafted by Go can still be marked stuck', () => {
+    const approval = BOOK_V1.stages.find((s) => s.exit_criteria.some((c) => c.rule?.type === 'outline_approved') && s.renderer !== 'long_form')!;
+    expect(allowedActions(BOOK_V1, initialState(BOOK_V1), approval, false)).toContain('mark_blocked');
   });
 });
 
@@ -215,7 +225,10 @@ describe('B0: the planner sees what exists on outline, long-form and review stag
     const digest = buildAgentState({
       template: BOOK_V1, state: book, stage: stage('drafting'), steps: [], stageEvaluation: evaluation('drafting'), bundles, pendingJobs: 1,
     });
-    expect(digest.manuscript).toEqual({ total: 2, complete: 1, pending_jobs: 1, written: ['1. Habitat'], unwritten: ['2. Diet'] });
+    expect(digest.manuscript).toEqual({
+      total: 2, complete: 1, pending_jobs: 1, written: ['1. Habitat'], unwritten: ['2. Diet'],
+      stage_label: 'Drafting', words: 5, own: true, excerpt: '',
+    });
     expect(digest.artifact_excerpt).toContain('## 1. Habitat');
     // Revision reads the same manuscript.
     const revision = buildAgentState({
@@ -379,5 +392,101 @@ describe('propose_skip: the order is a default (1 Oct, item 11)', () => {
     expect(allowedActions(RESEARCH_V1, research, literature, false)).toContain('propose_skip');
     expect(method.transitions.allow_skip).toBe(false);
     expect(allowedActions(RESEARCH_V1, research, method, false)).not.toContain('propose_skip');
+  });
+});
+
+describe('withoutOverride: a stage whose requirements are met is not stuck (2 Oct, screenshot 2)', () => {
+  const all = ['evaluate_stage', 'advance_stage', 'mark_blocked', 'request_user_decision', 'declare_objective_complete'];
+
+  it('drops the stuck move when the stage can advance, under every policy', () => {
+    for (const policy of ['guided', 'checkpoint', 'autonomous'] as const) {
+      const kept = withoutOverride(all, true, policy);
+      expect(kept).not.toContain('mark_blocked');
+      expect(kept).toContain('advance_stage');
+    }
+  });
+
+  it('keeps the stuck move while something blocking is open', () => {
+    expect(withoutOverride(all, false, 'guided')).toContain('mark_blocked');
+    // Autonomous may not override, but it may still say it is stuck.
+    const autonomous = withoutOverride(all, false, 'autonomous');
+    expect(autonomous).toContain('mark_blocked');
+    expect(autonomous).not.toContain('advance_stage');
+  });
+
+  it('keeps the stuck move on the last stage, where there is nowhere to advance to', () => {
+    expect(withoutOverride(['mark_blocked', 'declare_objective_complete'], true, 'guided')).toContain('mark_blocked');
+  });
+});
+
+describe('a run going round in circles stops (2 Oct, screenshot 7)', () => {
+  it('two moves taking turns on one stage is no progress; a third move breaks the pattern', () => {
+    const check = (idx: number) => step({ idx, action_key: 'evaluate_stage' });
+    const apply = (idx: number) => step({ idx, action_key: 'apply_findings' });
+    const circle = [check(0), apply(1), check(2), apply(3), check(4), apply(5)];
+    expect(alternating(circle)).toEqual(['evaluate_stage', 'apply_findings']);
+    expect(noProgress(circle)).toBe(true);
+    expect(preempt({ ...base, steps: circle })?.reason).toBe(
+      '"Check this stage" and "Apply the findings" have been taking turns on this stage without it moving on. It needs your direction.'
+    );
+    // A check, a revision and a second check is ordinary work, not a loop.
+    expect(alternating([check(0), apply(1), check(2), apply(3)])).toBeNull();
+    expect(alternating([...circle.slice(0, 5), step({ idx: 5, action_key: 'advance_stage' })])).toBeNull();
+    // Different stages are different work.
+    expect(alternating([check(0), apply(1), check(2), apply(3), { ...check(4), stage_id: 'other' }, apply(5)])).toBeNull();
+  });
+
+  it('a fingerprint changes when the project does, and not otherwise', () => {
+    const bundles = { experiment: { artifact: null, versions: [{ id: 'v1' }] } } as never;
+    const evaluation: StageEvaluation = { stageId: 'experiment', canAdvance: false, criteria: [{ id: 'a', label: 'A', satisfied: false, blocking: true }], unmet: [] };
+    const base = { state: research, bundles, events: [1, 2], facts: {}, stageEvaluation: evaluation };
+    const same = stateFingerprint(base);
+    expect(stateFingerprint({ ...base, facts: {} })).toBe(same);
+    expect(stateFingerprint({ ...base, events: [1, 2, 3] })).not.toBe(same);
+    expect(stateFingerprint({ ...base, bundles: { experiment: { artifact: null, versions: [{ id: 'v2' }] } } as never })).not.toBe(same);
+    expect(stateFingerprint({ ...base, stageEvaluation: { ...evaluation, criteria: [{ id: 'a', label: 'A', satisfied: true, blocking: true }] } })).not.toBe(same);
+    expect(stateFingerprint({ ...base, state: { ...research, current_stage_id: 'literature' } })).not.toBe(same);
+  });
+
+  it('three performed moves that left the project as it was is a stop, said as what to do', () => {
+    expect(noChange(['x', 'x'])).toBeNull();
+    expect(noChange(['y', 'x', 'x', 'x'])).toMatch(/^The last 3 moves changed nothing on this stage/);
+    expect(noChange(['x', 'x', 'y'])).toBeNull();
+  });
+});
+
+describe('Go stops polishing a stage that is good enough (production Research pass, 3 Oct)', () => {
+  const allowed = ['evaluate_stage', 'apply_findings', 'revise_stage', 'advance_stage', 'request_user_decision'];
+
+  it('keeps polishing while there is room', () => {
+    expect(withoutEndlessPolish(allowed, 1, true)).toEqual(allowed);
+    expect(withoutEndlessPolish(allowed, 3, false)).toEqual(allowed);
+  });
+
+  it('moves on after two polishing moves once the stage can advance', () => {
+    expect(withoutEndlessPolish(allowed, 2, true)).toEqual(['advance_stage', 'request_user_decision']);
+  });
+
+  it('never polishes one stage more than four times in a run', () => {
+    expect(withoutEndlessPolish(allowed, 4, false)).toEqual(['advance_stage', 'request_user_decision']);
+  });
+});
+
+describe('a computation that settled every run is not run again (production Research pass, 3 Oct)', () => {
+  const schema = ITEM_SCHEMAS.runs;
+  const allowed = ['run_computation', 'advance_stage'];
+  const done = schema.statuses!.find((s) => s.value === 'completed')!.value;
+
+  it('is offered while a planned run has no result', () => {
+    expect(withoutSettledRuns(allowed, { schema, items: [{ id: 'a', status: done }, { id: 'b' }] })).toEqual(allowed);
+  });
+
+  it('is not offered once every run has one', () => {
+    expect(withoutSettledRuns(allowed, { schema, items: [{ id: 'a', status: done }, { id: 'b', status: done }] })).toEqual(['advance_stage']);
+  });
+
+  it('counts a computation and its interpretation as one move, not two taking turns', () => {
+    const pairs = [1, 2, 3].flatMap(() => [step({ action_key: 'run_computation' }), step({ action_key: 'interpret_result' })]);
+    expect(alternating(pairs)).toBeNull();
   });
 });

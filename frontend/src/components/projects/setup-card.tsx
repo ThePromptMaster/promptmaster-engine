@@ -25,6 +25,8 @@ interface Props {
   draft: SetupDraft;
   rationale: SetupRationale | null;
   onChange: (patch: Partial<SetupDraft>) => void;
+  /** Shown under the workflow picker: designing one of your own. */
+  designer?: React.ReactNode;
 }
 
 const SELECTABLE_MODES = (Object.keys(MODE_DISPLAY) as ModeType[]).filter((m) => m !== 'custom');
@@ -43,6 +45,7 @@ export function SetupCard({
   draft,
   rationale,
   onChange,
+  designer,
 }: Props) {
   const field =
     'w-full rounded-lg bg-[var(--surface-container-low)] px-4 py-3 text-body leading-relaxed text-[var(--on-surface)] outline-none placeholder:text-[var(--on-surface-variant)]/70 focus:ring-2 focus:ring-[var(--pm-primary)]/40';
@@ -65,6 +68,7 @@ export function SetupCard({
           </p>
         )}
         <WorkflowPicker templates={templates} selectedId={templateId} onSelect={onSelectTemplate} />
+        {designer}
       </section>
 
       <section>
@@ -106,6 +110,14 @@ export function SetupCard({
       </div>
       </section>
 
+      {rationale && (
+        <p className="text-body text-[var(--on-surface-variant)]">
+          <span className="material-symbols-outlined mr-1 align-[-4px] text-[18px] text-[var(--pm-primary)]" aria-hidden>
+            edit_note
+          </span>
+          Suggested from your brief — read these and change anything that is wrong. They travel into every stage.
+        </p>
+      )}
       <div className="grid gap-6 md:grid-cols-3">
         <section>
           <label htmlFor="setup-audience" className={label}>Audience</label>

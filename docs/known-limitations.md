@@ -363,6 +363,48 @@ Dead function in `20260902000000_projects_core.sql`. Cosmetic, but it sits next 
 `touch_and_bump_revision()`, and a future editor could easily attach the wrong one —
 which would silently stop bumping `revision` and disable the concurrency guard.
 
+### L-26 · Go's planner reads the opening of the manuscript, not all of it · `accepted`
+
+On a stage after Drafting, the planner is sent the chapter list, the counts and the first
+6,000 characters of the manuscript (`MANUSCRIPT_EXCERPT_CHARS`, `lib/agent/digest.ts`),
+enough to know the draft exists and what it covers. The full text, bounded at 120k (L-24),
+goes only to the call that drafts the review. A planner that needs to judge a late chapter
+cannot; it can only draft the review, which can. The planner runs on every step, so the
+whole manuscript on every call would pay for the same text over and over.
+### L-27 · The user's brief has no copy of its own · `accepted`
+
+`projects.objective` is the user's typed brief, and nothing in setup or any stage
+rewrites it (the setup suggester returns no objective). But it is editable in place from
+the first stage and from the project brief, so an edit replaces the original with no
+record of what it was. A separate immutable `brief` column was considered on 2026-10-03
+and not added: the drift the client saw came from the first stage's *statement* of the
+objective being read as if it governed, which the prompt now says it does not, and from
+the brief being easy to overlook, which the page now addresses. If a record of the
+original wording is ever needed, it is a nullable column set at creation.
+
+---
+
+### L-28 · Images: placed by caption, never seen · `accepted`
+
+Since 2026-10-03 a project can hold images (PNG, JPEG, WebP, GIF, up to 5 MB each, in
+`project_files` with `preview.kind = 'image'`). A draft places one as
+`![caption](project-file:<id>)`. The image's id is stable, so the text does not depend on
+a link that expires.
+
+What is not done:
+- **No model sees the pixels.** A prompt is told each image's caption and the exact text
+  that places it, so placement is only as good as the caption. Vision input would need
+  multimodal content in `llm_client` and a cost decision.
+- **Chapters cannot be edited by hand.** They get images only when the model places them
+  while drafting or revising. Prose stages also have an "Insert image" button in the editor.
+- **Exports:**
+  - Word embeds PNG, JPEG and GIF. A WebP image appears as a caption, because Word cannot
+    hold it.
+  - A Markdown export or copy links each image for seven days.
+  - PDF (the print page) draws images while the page is open.
+- **Captions are fixed at upload,** because `project_files` has no update policy. To
+  change a caption, remove the image and add it again.
+
 ---
 
 ## Summary
@@ -394,6 +436,8 @@ which would silently stop bumping `revision` and disable the concurrency guard.
 | L-23 | `touch_updated_at()` dead and adjacent to a load-bearing function | open |
 | L-24 | Review stages see the manuscript up to 120k characters | accepted |
 | L-25 | Revision snapshots have no one-click restore into sections | open |
+| L-26 | Go's planner reads a 6,000-character opening of the manuscript on review stages | accepted |
+| L-27 | The user's brief has no immutable copy; edits replace it in place | accepted |
 
 ### L-B3 — Go mode code execution: Python only, fixed package set, no network
 
@@ -561,8 +605,23 @@ Today that is one value: a run may arrive as **Not run** with its reason, marked
 PromptMaster", when the draft already knows it could not be executed. **Completed** and
 **Deviated** are never the model's to set — they record what a person or a tool did
 (a sandbox run that executed sets **Completed** on the row it carried out; see L-B3).
-Alternatives and validation tables allow none. Rows in versions saved before this change
+Alternatives tables allow none. Rows in versions saved before this change
 are untouched.
+
+**Validation statuses (2026-10-02).** A validation row is now one of *Independently
+reproduced*, *Supported by prior evidence*, *Consistency check only*, *Not reproduced* or
+*Not attempted*, each with a one-line meaning under the table. *Independently reproduced*
+is the user's alone to choose: the model, Go's triage and a change proposed from the chat
+are never offered it (`requiresExecution`; `proposableStatuses` in
+`lib/workflow/stage-artifact.ts`). The draft may set *Not attempted* with its reason. A
+row saved earlier as `reproduced` keeps that value, counts as resolved, and reads
+"Reproduced — kind not recorded" until the user reclassifies it; it is not converted,
+because nothing on record says which kind it was. Nothing checks that the status a user
+picks matches what the row's text says was done, and a sandbox run cannot set a
+validation status. There is no separate "outcome" (supported / mixed / contradicted)
+column yet. The statuses live in code, so they apply to every pinned workflow version;
+the Validation stage's own guidance text still says "reproduced" until the next Research
+template version.
 
 ### L-C9 — Research write-up: two forms, chosen at the outline (2026-10-01)
 
@@ -663,3 +722,43 @@ one small JSON call per instruction and fails open: if the call fails, the instr
 with whatever conflicts the rules found. Answers are stored as accepted or dismissed
 `recommendations` rows with a `decisions` row (category `conflict:*`), so `decisions_type_chk`
 is not widened.
+
+---
+
+### L-29 · Workflows a user designs: three page kinds, no chapters · `accepted`
+
+Since 2026-10-03, "Design a workflow" (`POST /api/generate-workflow`, then
+`templateFromDesign` and `validateTemplate`) saves a user's own template to
+`workflow_templates`. The row has `is_system = false` and a `custom_` key, and RLS
+admits only those (`wft_insert_own`).
+
+**What a generated stage can be.** Only a writing page, a list or a check table:
+- A list uses the `research_notes` columns.
+- A check uses the `critique_report` columns.
+- There is no outline or chapter (long-form) stage. Drafting chapters needs an approved
+  outline wired to a drafting stage, which a generated design cannot yet set up. Book
+  remains the workflow for chapter-length work.
+
+**Editing a saved workflow.** A saved workflow is immutable, like a system one. The only
+change today is to design another. There is no rename or archive UI yet, and no update
+policy.
+
+---
+
+### L-30 · Exploration rounds and "Keep going": each round is the user's to start · `accepted`
+
+Exploration (2026-10-03) works in rounds: Explore, Test, Findings, Next question, then
+the next round from Explore (`transitions.loop_to`).
+
+**Each round is started by the user.** The database records a return to an earlier
+stage only as the user's own decision, and a new round is such a return. So Go
+*proposes* the next round (`propose_next_round`) and stops, and one click starts it.
+Within a round, an Autonomous run may continue for up to 20 windows ("Keep going",
+`20261014000000_agent_keep_going.sql`, up from 3) and still stops whenever it needs the
+user.
+
+**Earlier rounds are summarised, not kept whole.** A new round marks the last one's
+stages *stale*, as any return does. The next round is shown their summaries, labelled
+"(last round)". The full text of each round stays in version history, but only the most
+recent round is summarised into the prompts.
+

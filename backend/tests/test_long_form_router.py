@@ -379,3 +379,18 @@ def test_section_prose_without_a_revision_is_still_a_first_draft(client_for_app)
         "section_index": 0,
     })
     assert "WRITE SECTION 1: Intro" in captured["prompt"]
+
+
+def test_section_prose_carries_the_stage_hint_into_the_prompt(client_for_app):
+    api_client, mock_client = client_for_app
+    mock_client.generate_with_meta = AsyncMock(return_value=("Prose.", {}, "stop"))
+    api_client.post("/api/generate-section-prose", json={
+        "inputs": {"objective": "A book about lions", "audience": "General", "mode": "architect"},
+        "outline": [{"id": "s1", "title": "Habitat", "abstract": "Where lions live."}],
+        "section_index": 0,
+        "stage_hint": "Stay inside that abstract.",
+    })
+    call = mock_client.generate_with_meta.call_args
+    system = call.kwargs.get("system") or call.args[1]
+    assert "THIS STAGE:\nStay inside that abstract." in system
+    assert "You do not write final prose" not in system

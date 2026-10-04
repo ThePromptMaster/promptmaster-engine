@@ -11,7 +11,21 @@
  */
 
 export type DocBlock =
-  | { kind: 'title' | 'h1' | 'h2' | 'h3' | 'paragraph' | 'bullet'; text: string };
+  | { kind: 'title' | 'h1' | 'h2' | 'h3' | 'paragraph' | 'bullet'; text: string }
+  /** An image placed on its own line as `![caption](project-file:<id>)`. */
+  | { kind: 'image'; id: string; text: string };
+
+/** An image's bytes, ready to embed. `type` is what Word can hold; others are captioned instead. */
+export interface DocImage {
+  data: ArrayBuffer;
+  type: 'png' | 'jpg' | 'gif' | null;
+  width: number;
+  height: number;
+}
+
+const IMAGE_LINE = /^!\[([^\]]*)\]\(project-file:([0-9a-f-]{8,})\)$/i;
+/** Word's text width on an A4/Letter page at default margins, in pixels. */
+const PAGE_WIDTH_PX = 600;
 
 /** Markdown headings, paragraphs and bullets, as blocks. Pure. */
 export function markdownToBlocks(markdown: string): DocBlock[] {
@@ -23,6 +37,12 @@ export function markdownToBlocks(markdown: string): DocBlock[] {
   };
   for (const raw of markdown.replace(/\r\n?/g, '\n').split('\n')) {
     const line = raw.trimEnd();
+    const image = IMAGE_LINE.exec(line.trim());
+    if (image) {
+      flush();
+      blocks.push({ kind: 'image', id: image[2], text: image[1] });
+      continue;
+    }
     const heading = /^(#{1,3})\s+(.*)$/.exec(line);
     if (heading) {
       flush();
@@ -65,12 +85,35 @@ function inline(text: string): string {
 }
 
 /** Build the .docx. Loads `docx` on demand; returns the file as a Blob. */
-export async function manuscriptToDocx(markdown: string, title: string): Promise<Blob> {
+export async function manuscriptToDocx(
+  markdown: string,
+  title: string,
+  images: Record<string, DocImage> = {}
+): Promise<Blob> {
   const docx = await import('docx');
-  const { Document, HeadingLevel, Packer, Paragraph, TextRun } = docx;
+  const { Document, HeadingLevel, ImageRun, Packer, Paragraph, TextRun } = docx;
   const blocks = markdownToBlocks(markdown);
-  const children = blocks.map((b) => {
+  const children = blocks.flatMap((b) => {
     switch (b.kind) {
+      case 'image': {
+        const img = images[b.id];
+        const caption = new Paragraph({ children: [new TextRun({ text: b.text, italics: true })], spacing: { after: 200 } });
+        if (!img?.type) return [new Paragraph({ children: [new TextRun({ text: `[Image: ${b.text}]`, italics: true })] })];
+        const scale = img.width > PAGE_WIDTH_PX ? PAGE_WIDTH_PX / img.width : 1;
+        return [
+          new Paragraph({
+            children: [
+              new ImageRun({
+                type: img.type,
+                data: img.data,
+                transformation: { width: Math.round((img.width || PAGE_WIDTH_PX) * scale), height: Math.round((img.height || 400) * scale) },
+                altText: { name: b.text, description: b.text, title: b.text },
+              }),
+            ],
+          }),
+          caption,
+        ];
+      }
       case 'title':
         return new Paragraph({ text: b.text, heading: HeadingLevel.TITLE });
       case 'h1':
@@ -84,7 +127,7 @@ export async function manuscriptToDocx(markdown: string, title: string): Promise
       default:
         return new Paragraph({ children: [new TextRun(b.text)], spacing: { after: 200 } });
     }
-  });
+  }) as InstanceType<typeof Paragraph>[];
   const doc = new Document({
     creator: 'PromptMaster',
     title,

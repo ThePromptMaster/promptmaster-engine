@@ -16,8 +16,9 @@
 import { BOOK_V1 } from '../src/lib/workflow/templates/book.v1.ts';
 import { RESEARCH_V1 } from '../src/lib/workflow/templates/research.v1.ts';
 import { SINGLE_OUTPUT_V1 } from '../src/lib/workflow/templates/single-output.v1.ts';
+import { EXPLORATION_V1 } from '../src/lib/workflow/templates/exploration.v1.ts';
 
-const TEMPLATES = [BOOK_V1, RESEARCH_V1, SINGLE_OUTPUT_V1];
+const TEMPLATES = [BOOK_V1, RESEARCH_V1, SINGLE_OUTPUT_V1, EXPLORATION_V1];
 
 const sqlString = (value: string) => `'${value.replace(/'/g, "''")}'`;
 
@@ -31,6 +32,7 @@ const rows = TEMPLATES.map((t) => {
     // Book and single_output seed exactly the JSON they seeded before.
     ...(t.derived_outline ? { derived_outline: t.derived_outline } : {}),
     ...(t.nouns ? { nouns: t.nouns } : {}),
+    ...(t.inquiry ? { inquiry: true } : {}),
     stages: t.stages,
   });
   return `  (${sqlString(t.key)}, ${t.version}, ${sqlString(t.name)}, ${sqlString(t.description)}, ${sqlString(definition)}::jsonb)`;

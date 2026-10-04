@@ -56,7 +56,7 @@ It does verify identity. `backend/auth.py` checks the Supabase JWT and attaches 
 |---|---|
 | `meta.py` | `GET /api/modes`, `GET /api/models` |
 | `engine.py` | `build-prompt`, `run-iteration`, `flow-trigger`, `flow-inspect`, `build-realignment`, `run-self-audit`, `hard-reset-lessons`, `format-summary`, `export-session` |
-| `conversation.py` | `chat-message`, `apply-to-answer`, `save-as-new-version`, `suggest-actions` (a chat answer as at most four actions; prompt and parser in `promptmaster/reply_actions.py`) |
+| `conversation.py` | `chat-message`, `apply-to-answer`, `save-as-new-version`, `suggest-actions` (a chat answer as at most four actions; prompt and parser in `promptmaster/reply_actions.py`). The chat is told where the user is — stage, workflow, outline, chapters, page buttons — via `context` (`lib/workflow/chat-context.ts` → `promptmaster/page_context.py`), so it never asks for anything to be pasted |
 | `continuation.py` | `continue-document` |
 | `long_form.py` | `detect-long-form`, `generate-outline`, `generate-section`, `finalize-long-form` |
 | `setup.py` | `generate-setup`, `guide-questions` (the batch; no longer used by the UI), `guide-next-question` ("Guide me" one question at a time: the next question given the answers so far, or that there is enough) |
@@ -91,6 +91,7 @@ retired on 2026-09-07; the route is a redirect to `/projects`.
 A project pins a **workflow template version** (`projects.workflow_template_id`) and moves through its stages. Templates are rows in `workflow_templates`, immutable once published — revising one publishes a new version, so a book halfway through drafting is unaffected.
 
 - `src/lib/workflow/` — the engine. `engine.ts` is pure functions (evaluate a stage's exit criteria, project state from events, list transitions); `templates/*.v1.ts` are the authoring source for `book`, `research` and `single_output`.
+- **A user may also publish their own** (`custom_` keys, `is_system = false`): designed with `POST /api/generate-workflow`, built by `lib/workflow/custom.ts`, checked by `lib/workflow/validate.ts` (which the system templates also pass, in `workflow.test.ts`). `template.inquiry` — not the key — gives Go its reasoning moves.
 - **Templates are generated into a seed migration**, never hand-written as JSON: `npm run --silent gen:templates > ../supabase/migrations/<ts>_seed_workflow_templates.sql`. `seed-drift.test.ts` fails if the TypeScript and the migration disagree. The `--silent` matters — without it npm's banner lands in the SQL.
 - `src/components/workflow/` — stage rail, header, exit-criteria checklist, transition bar, workspace. `workflow-workspace.tsx` dispatches on `stage.renderer`.
 - `src/components/workflow/renderers/` — `prose`, `list`, `review`, `long_form` (the `outline` stage is served by `OutlineStagePanel`, mounted by the workspace rather than through the renderer switch). **Four renderers cover 33 stages across the three workflows; no renderer branches on which workflow it is**, and a test asserts that.
@@ -121,6 +122,8 @@ The `sessions`, `templates`, `custom_modes`, `user_presets` and `conversation_me
 (pure except `perform.ts`). **Execution labels are derived from what happened, never taken
 from a model**, and the database re-checks them; see `docs/architecture.md` § Go mode. The
 action registry exists twice (TS and Python) and `actions-drift.test.ts` keeps them equal.
+The buttons Go may name to the user come from `lib/workflow/stage-controls.ts` (`stageControls`), which the page draws its own labels from — add a stage button's label there, not as a literal in a component.
+Which stages read the manuscript is decided once, in `lib/workflow/context.ts::manuscriptSourceFor`; the stage digest and Go's planner state both use it, so a review stage is never shown an empty project while the chapters sit two stages back.
 Code runs only through `/api/sandbox/run` (Vercel Sandbox; `SANDBOX_MODE=mock` in E2E). A project's data files (`project_files`, uploaded by the browser under RLS) are copied into `/data` for each run; prompts see only each file's columns and first rows, joined onto the project as `project.data_files`.
 
 ## Requirements

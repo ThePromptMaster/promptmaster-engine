@@ -357,7 +357,7 @@ class SetupRationale(BaseModel):
     output_format: str = Field(default="")
 
 
-WorkflowKey = Literal["book", "research", "single_output"]
+WorkflowKey = Literal["book", "research", "single_output", "exploration"]
 
 
 class SetupSuggestion(BaseModel):
@@ -497,6 +497,9 @@ class StageItemStatus(BaseModel):
     requires_reason: bool = False
     model_may_set: bool = False
     model_default: bool = False
+    #: What the status certifies, in one plain line; told to the model so the
+    #: draft describes what was done in the same terms.
+    explain: str = Field(default="", max_length=300)
 
 
 class StageItemSchema(BaseModel):

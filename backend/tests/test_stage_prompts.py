@@ -394,6 +394,28 @@ def _runs_schema() -> StageItemSchema:
     )
 
 
+def test_the_prompt_tells_the_draft_what_each_validation_status_certifies(basic_inputs, digest):
+    """2 Oct, item 12: rows read "Reproduced" over text that said nothing had been
+    recalculated. The draft is told what each status means, so what it writes
+    lets the user pick honestly."""
+    schema = StageItemSchema(
+        item_label="result",
+        fields=[_Field(key="result", label="The result"), _Field(key="attempt", label="What was done to validate it")],
+        statuses=[
+            _Status(value="independently_reproduced", label="Independently reproduced", explain="The result was recalculated or re-run from the data and came out the same."),
+            _Status(value="supported_by_prior", label="Supported by prior evidence", explain="It agrees with earlier studies or records. Nothing was recalculated."),
+            _Status(value="not_attempted", label="Not attempted", requires_reason=True, model_may_set=True, explain="No validation was tried. Say why."),
+        ],
+    )
+    stage = StageDescriptor(id="validation", label="Validation", renderer="review", entry_prompt_hint="", artifact_kind="validation_table")
+    system, user = build_stage_prompt(basic_inputs, stage, digest, schema)
+    text = system + user
+    assert "never describe a comparison with earlier work or a consistency check as a reproduction or recalculation" in text
+    assert "· Supported by prior evidence: It agrees with earlier studies or records. Nothing was recalculated." in text
+    assert "You may set: 'not_attempted' (Not attempted)" in text
+    assert "Never set 'independently_reproduced', 'supported_by_prior'" in text
+
+
 def test_the_prompt_says_which_status_the_model_may_set_and_which_it_may_not(basic_inputs, digest):
     stage = StageDescriptor(id="experiment", label="Experiment", renderer="review", entry_prompt_hint="", artifact_kind="runs")
     system, user = build_stage_prompt(basic_inputs, stage, digest, _runs_schema())
@@ -473,3 +495,29 @@ def test_a_stage_with_no_data_is_told_there_is_none(basic_inputs, prose_stage):
     _, user = build_stage_prompt(basic_inputs, prose_stage, StageDigest(objective="o"))
     assert "DATA THE PROJECT HOLDS: none" in user
     assert "Do not write as though any data had been examined" in user
+
+
+# --- 2 Oct: the objective "changes" after the first stage ---------------------
+
+
+def test_every_stage_is_told_the_original_objective_governs(basic_inputs, prose_stage):
+    """The first stage's statement sat beside the original objective with
+    nothing saying which wins, and "write a book about lions" drifted into
+    whatever the statement made of it."""
+    digest = StageDigest(objective="Write a book about lions", prior_stages=[
+        StageDigestEntry(stage_id="objective", label="Objective and purpose", summary="A field guide to big cats."),
+    ])
+    _, user = build_stage_prompt(basic_inputs, prose_stage, digest)
+    assert "THE ORIGINAL OBJECTIVE IS THE USER'S OWN WORDS AND GOVERNS." in user
+    assert "Where a summary above and the original objective disagree, the original objective wins." in user
+    assert user.index("Original objective: Write a book about lions") < user.index("GOVERNS")
+    # Only the objective-stating stage is told it is sharpening.
+    assert "keeps the deliverable and the subject exactly as the user named them" not in user
+
+
+@pytest.mark.parametrize("kind", ["objective_statement", "research_question"])
+def test_the_objective_stage_sharpens_and_does_not_replace(basic_inputs, kind):
+    stage = StageDescriptor(id="objective", label="Objective and purpose", renderer="prose",
+                            entry_prompt_hint="Produce a statement of what this book is for.", artifact_kind=kind)
+    _, user = build_stage_prompt(basic_inputs, stage, StageDigest(objective="Write a book about lions"))
+    assert "This stage's statement sharpens the user's objective; it keeps the deliverable and the subject exactly as the user named them." in user

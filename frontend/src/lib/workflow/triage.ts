@@ -62,7 +62,8 @@ export function applyTriage(
     const d = byId.get(item.id);
     if (!d || isTriaged(item, schema)) return item;
     const option = schema.statuses?.find((s) => s.value === d.status);
-    if (!option) return item;
+    // Not Go's to claim: a status that says something was actually carried out, or one no longer offered.
+    if (!option || option.requiresExecution || option.legacy) return item;
     const reason = (d.reason ?? '').trim();
     if (option.requiresReason && !reason) return item;
     applied.push(item.id);

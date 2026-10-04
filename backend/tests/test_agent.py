@@ -277,15 +277,102 @@ def test_state_facts_reach_the_prompt():
     assert "TOOLS: literature=no" in user
 
 
+def test_a_review_stage_is_shown_the_manuscript_it_reviews():
+    """The client's 2 Oct screenshots: Fact-check, Critique and Continuity were
+    marked stuck for "no draft text in project state" after Drafting was done.
+    The planner had never been shown the chapters on a stage that does not own
+    them."""
+    from promptmaster.agent import AgentManuscript
+
+    state = STATE.model_copy(update={
+        "stage_label": "Critique",
+        "artifact_excerpt": "",
+        "prior_stages": ["Drafting: complete — 3 chapter(s) written, 4,200 words (see MANUSCRIPT)"],
+        "manuscript": AgentManuscript(
+            total=3, complete=3, written=["1. Habitat", "2. Diet", "3. Prides"],
+            stage_label="Drafting", words=4200, own=False,
+            excerpt="## 1. Habitat\n\nLions live in savannah.",
+        ),
+    })
+    _, user = build_next_action_prompt(INPUTS, state, [*RESEARCH, "draft_stage", "mark_blocked"], "guided")
+    assert "MANUSCRIPT (drafted on Drafting; 4,200 words; this stage reads it): 3 of 3 section(s) written" in user
+    assert "--- THE MANUSCRIPT THIS STAGE REVIEWS" in user
+    assert "Lions live in savannah." in user
+    assert "A review stage's table is produced FROM this manuscript: choose draft_stage to write it." in user
+    assert "never mark_blocked because the stage's own table is empty" in user
+    # The stage's own excerpt is still reported as its own, empty.
+    assert "(nothing has been drafted on this stage yet)" in user
+
+
+def test_the_drafting_stage_s_own_manuscript_prints_as_before():
+    from promptmaster.agent import AgentManuscript
+
+    state = STATE.model_copy(update={"manuscript": AgentManuscript(total=2, complete=2, own=True, stage_label="Drafting")})
+    _, user = build_next_action_prompt(INPUTS, state, RESEARCH, "guided")
+    assert "MANUSCRIPT: 2 of 2 section(s) written" in user
+    assert "THE MANUSCRIPT THIS STAGE REVIEWS" not in user
+
+
+def test_the_planner_is_told_text_elsewhere_in_the_project_is_not_missing():
+    system, _ = build_next_action_prompt(INPUTS, STATE, RESEARCH, "guided")
+    assert "and nothing listed can produce it, choose mark_blocked" in system
+    assert "the manuscript, the outline, an earlier stage's work — is not missing" in system
+    assert "draft_stage drafts it from that text" in system
+
+
 def test_without_facts_the_prompt_is_as_before():
     _, user = build_next_action_prompt(INPUTS, STATE, RESEARCH, "guided")
     assert "OUTLINE:" not in user and "MANUSCRIPT:" not in user and "FINDINGS:" not in user
 
 
+def test_the_planner_is_told_the_kinds_of_block_it_may_record():
+    """Production pass, 2 Oct: the model marked a stage stuck for missing CRM and
+    billing data, gave no kind the client knew, and the block was recorded as
+    "needs a decision" — so the card did not offer to add the data."""
+    _, user = build_next_action_prompt(INPUTS, STATE, [*RESEARCH, "mark_blocked"], "guided")
+    assert "block_kind — exactly one of 'data_missing'" in user
+    assert "'tool_missing' (a tool or capability is not available)" in user
+    assert "'needs_decision' (only a choice by the user is missing)" in user
+
+
 def test_the_planner_is_told_not_to_block_for_work_the_stage_controls_do():
     system, _ = build_next_action_prompt(INPUTS, STATE, RESEARCH, "guided")
     assert "Never mark_blocked for it" in system
-    assert "press Generate the outline" in system
+    # It is no longer given a button to name from memory (2 Oct, item 10).
+    assert "press Generate the outline" not in system
+
+
+def test_the_planner_is_given_the_page_s_buttons_and_may_name_only_those():
+    from promptmaster.agent import AgentControl
+
+    state = STATE.model_copy(update={"controls": [
+        AgentControl(label="Run revision on every section", where="the main button at the bottom of the stage"),
+        AgentControl(label="Mark as stuck…", where='under "More" at the bottom of the stage'),
+    ]})
+    system, user = build_next_action_prompt(INPUTS, state, RESEARCH, "guided")
+    assert "You may name a button ONLY if it is in that list, in exactly those words" in system
+    assert 'never write "if your interface has"' in system
+    assert "there is no button for this on this stage" in system
+    assert "BUTTONS ON THIS PAGE NOW (the user presses these; you cannot" in user
+    assert '- "Run revision on every section" — the main button at the bottom of the stage' in user
+
+    # A page that is not known, and a page with no buttons, both forbid naming one.
+    _, unknown = build_next_action_prompt(INPUTS, STATE, RESEARCH, "guided")
+    assert "BUTTONS ON THIS PAGE NOW: not known. Do not name any button." in unknown
+    _, empty = build_next_action_prompt(INPUTS, STATE.model_copy(update={"controls": []}), RESEARCH, "guided")
+    assert "BUTTONS ON THIS PAGE NOW: none. Do not name any button." in empty
+
+
+def test_a_button_the_planner_names_is_kept_only_if_the_page_has_it():
+    from promptmaster.agent import AgentControl, parse_next_action
+
+    controls = [AgentControl(label="Run revision on every section", where="x")]
+    ask = {"action_key": "request_user_decision", "decision_question": "Please run the revision.", "params": {}}
+    real = parse_next_action({**ask, "params": {"control": "run revision on every section "}}, RESEARCH, controls)
+    assert real.params == {"control": "Run revision on every section"}
+    invented = parse_next_action({**ask, "params": {"control": "Generate the outline/results artifact", "x": 1}}, RESEARCH, controls)
+    assert invented.params == {"x": 1}
+    assert parse_next_action({**ask, "params": {"control": "Run revision on every section"}}, RESEARCH, None).params == {}
 
 
 # --- B3: deciding the routine findings ----------------------------------------
@@ -392,6 +479,42 @@ def test_the_planner_is_told_what_data_exists_and_when_there_is_none():
     assert "say what data is missing" in without
 
 
+def _book_workflow():
+    from promptmaster.agent import AgentWorkflow, AgentWorkflowStage
+
+    return AgentWorkflow(key="book", label="Book", has_data_stages=False, stages=[
+        AgentWorkflowStage(label="Objective and purpose", renderer="prose"),
+        AgentWorkflowStage(label="Drafting", renderer="long_form"),
+        AgentWorkflowStage(label="Critique", renderer="review"),
+    ])
+
+
+def test_the_planner_is_told_the_workflow_and_its_stages():
+    """2 Oct, screenshot 8: Go asked a book project for "the planned runs with
+    their observed outcomes". It had never been told which workflow it was on."""
+    state = STATE.model_copy(update={"workflow": _book_workflow()})
+    _, user = build_next_action_prompt(INPUTS, state, RESEARCH, "guided")
+    assert "WORKFLOW: Book — Objective and purpose › Drafting [chapters] › Critique [review table]" in user
+    assert user.index("WORKFLOW: Book") < user.index("CURRENT STAGE:")
+
+
+def test_the_data_line_is_for_workflows_with_a_stage_a_computation_serves():
+    from promptmaster.agent import AgentWorkflow
+
+    # A book: no stage runs anything, so "no data" is not a lack.
+    _, book = build_next_action_prompt(INPUTS, STATE.model_copy(update={"workflow": _book_workflow()}), RESEARCH, "guided")
+    assert "DATA THE PROJECT HOLDS: none" not in book
+    assert "DATA: this is a book workflow — writing, not computation." in book
+    assert "never mark a stage stuck for the lack of one" in book
+    # Research: as before.
+    research = AgentWorkflow(key="research", label="Research", has_data_stages=True)
+    _, res = build_next_action_prompt(INPUTS, STATE.model_copy(update={"workflow": research}), RESEARCH, "guided")
+    assert "DATA THE PROJECT HOLDS: none" in res
+    # A book with a file attached is shown the file, like anyone.
+    _, with_file = build_next_action_prompt(INPUTS, _state_with_data().model_copy(update={"workflow": _book_workflow()}), RESEARCH, "guided")
+    assert "DATA THE PROJECT HOLDS (readable by code you run" in with_file
+
+
 def test_the_code_writer_is_told_to_read_only_listed_files_and_never_invent_data():
     from promptmaster.agent import build_write_code_prompt
 
@@ -407,6 +530,7 @@ def test_the_code_writer_is_told_to_read_only_listed_files_and_never_invent_data
     assert "`MISSING_DATA: <exactly what is missing, as one plain sentence>`" in system
     assert "raise SystemExit(2)" in system
     assert "do not compute on placeholders" in system
+    assert "Never report a run that could not be made as a `status:` line" in system
     assert "/data/accounts.csv" in user
 
 

@@ -18,7 +18,7 @@ import { jobBySection, pendingJobs, revisedCount, stoppedSections, type SectionT
 import { listProjectJobs, type ProjectJob } from '@/lib/supabase/jobs';
 import { approvedOutlineVersionId, outlineApprovals } from '@/lib/supabase/outline';
 import { checkVersions, getArtifact, getEvaluation } from '@/lib/supabase/versions';
-import { manuscriptArtifactFor } from '@/lib/workflow/context';
+import { manuscriptArtifactFor, manuscriptSourceFor } from '@/lib/workflow/context';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import { revisionBrief, type RevisionBrief } from '@/lib/workflow/revision';
 import { effectiveRenderer, itemSchemaFor, parseItems, stageDrafts, type StageItem, type StageItemSchema, isTriaged } from '@/lib/workflow/stage-artifact';
@@ -60,6 +60,22 @@ export interface ManuscriptFacts {
   revisedInStage: number;
 }
 
+/**
+ * The chapters a stage after drafting reads but does not own — Continuity,
+ * Critique, Fact-check, Final review. Read-only: nothing in the policy turns
+ * on it, so a review stage is never offered the drafting moves. Kept apart
+ * from `manuscript`, which is the long-form stage's own and drives them.
+ */
+export interface ManuscriptBrief {
+  holderStageId: string;
+  holderLabel: string;
+  outline: OutlineSection[];
+  total: number;
+  /** Sections that hold text. */
+  complete: number;
+  words: number;
+}
+
 export interface EvaluationFacts {
   count: number;
   /** The findings are about the head version, so applying them is meaningful. */
@@ -87,6 +103,8 @@ export interface StageFacts {
   outlineApproved?: boolean;
   outline?: OutlineFacts;
   manuscript?: ManuscriptFacts;
+  /** The manuscript this stage reviews, when it is a stage after drafting. */
+  reads_manuscript?: ManuscriptBrief;
   evaluationFindings?: EvaluationFacts;
   review?: ReviewFacts;
 }
@@ -144,6 +162,29 @@ export async function readStageFacts(input: {
         revisedInStage: revisedCount(outline, own, stage.id),
       };
       void jobBySection; // re-exported helper used by callers; keeps the import honest
+    }
+  }
+
+  // A stage after drafting reads the chapters. Read fresh for the same reason
+  // as above: Revision and Editing rewrite them in place, and the store's
+  // bundle can lag that by a render or more. Without this the planner saw an
+  // empty review stage and "no data", and marked it stuck for a draft that
+  // existed (2 Oct screenshots).
+  const source = manuscriptSourceFor(template, stage);
+  if (source) {
+    const holder = bundles[source.id]?.artifact ?? null;
+    const fresh = holder ? await getArtifact(holder.id).catch(() => null) : null;
+    const outline = (fresh ?? holder)?.long_form?.outline ?? [];
+    if (outline.length) {
+      const written = outline.filter((s) => (s.content ?? '').trim().length > 0);
+      facts.reads_manuscript = {
+        holderStageId: source.id,
+        holderLabel: source.label,
+        outline,
+        total: outline.length,
+        complete: written.length,
+        words: written.reduce((n, s) => n + (s.content ?? '').trim().split(/\s+/).filter(Boolean).length, 0),
+      };
     }
   }
 

@@ -21,7 +21,7 @@ _VALID_MODES = {
     "therapist", "cold_critic", "analyst",
 }
 
-_VALID_WORKFLOWS = {"book", "research", "single_output"}
+_VALID_WORKFLOWS = {"book", "research", "single_output", "exploration"}
 
 
 SETUP_SUGGESTER_SYSTEM = (
@@ -29,7 +29,9 @@ SETUP_SUGGESTER_SYSTEM = (
     "recommend the most fitting mode, audience, constraints, and output format "
     "to produce a high-quality structured response.\n\n"
     "Available modes:\n"
-    "- architect: Structure, systems, frameworks\n"
+    "- architect: Structure, systems, frameworks — right for designing a plan or "
+    "an outline; for a book the Outline stage already recommends it, so pick the "
+    "mode for the finished prose instead\n"
     "- critic: Find weak points and contradictions\n"
     "- clarity: Make complex ideas simple and crisp\n"
     "- coach: Encouraging, action-oriented\n"
@@ -42,9 +44,14 @@ SETUP_SUGGESTER_SYSTEM = (
     "General, Technical, Executive, Academic, Student.\n\n"
     "Constraints: a short paragraph describing scope limits, focus areas, or "
     "deadlines. Be specific. If none apply, return an empty string.\n\n"
-    "Output format: a short phrase describing structure (e.g., \"Numbered list "
-    "with 3-5 items\", \"Two-section memo: Findings / Recommendations\", "
-    "\"Markdown table\"). If none clearly apply, return \"Free-form prose\".\n\n"
+    "Output format: a short phrase describing what the finished deliverable looks "
+    "like. For a book (workflow book) that is manuscript prose — e.g. \"Chapter-"
+    "by-chapter manuscript in continuous prose, about 3,000 words a chapter\" or "
+    "\"Narrative prose with section headings only\" — never an outline, a list "
+    "or a table: the outline is scaffolding, not the product. For a single "
+    "output, e.g. \"Numbered list with 3-5 items\", \"Two-section memo: Findings "
+    "/ Recommendations\", \"Markdown table\". If none clearly apply, return "
+    "\"Free-form prose\".\n\n"
     "Rationale: one line per field (≤80 chars) explaining why you picked it. "
     "Be brief and useful, not generic.\n\n"
     "Workflow: which PromptMaster workflow fits the objective.\n"
@@ -54,6 +61,9 @@ SETUP_SUGGESTER_SYSTEM = (
     "result — a question to answer, a hypothesis to test, evidence to weigh.\n"
     "- single_output: one thing, done well, in one sitting — a memo, an email, "
     "an analysis, a plan, an answer.\n"
+    "- exploration: an open-ended idea to take as far as it goes, round after "
+    "round — a thought experiment, a speculative theory, a 'what if' with no "
+    "fixed end.\n"
     "Pick the smallest workflow that fits; most everyday objectives are "
     "single_output. Give workflow_reason as one line (≤100 chars).\n\n"
     "Return JSON only."
@@ -74,7 +84,7 @@ def build_setup_prompt(objective: str, answers: list[GuideAnswer] | None = None)
         f"{_format_answers(answers)}"
         "Recommend a setup. Return JSON in this exact shape:\n"
         "{\n"
-        '  "workflow": "book|research|single_output",\n'
+        '  "workflow": "book|research|single_output|exploration",\n'
         '  "workflow_reason": "...",\n'
         '  "mode": "architect|critic|clarity|coach|therapist|cold_critic|analyst",\n'
         '  "audience": "...",\n'

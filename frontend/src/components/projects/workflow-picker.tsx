@@ -6,6 +6,7 @@ const ICON: Record<string, string> = {
   book: 'menu_book',
   research: 'science',
   single_output: 'bolt',
+  exploration: 'explore',
 };
 
 /**
@@ -16,6 +17,7 @@ const PITCH: Record<string, string> = {
   book: 'Long-form writing that has to hold together across chapters.',
   research: 'An investigation where the method matters as much as the result.',
   single_output: 'One thing, done well. No stages to work through.',
+  exploration: 'An idea taken as far as it goes — round after round, tested as you go.',
 };
 
 interface Props {
@@ -54,7 +56,12 @@ export function WorkflowPicker({ templates, selectedId, onSelect }: Props) {
               {ICON[template.key] ?? 'workspaces'}
             </span>
 
-            <span className="text-title text-[var(--on-surface)]">{template.name}</span>
+            <span className="text-title text-[var(--on-surface)]">
+              {template.name}
+              {template.key.startsWith('custom_') && (
+                <span className="ml-2 rounded-md bg-[var(--surface-container-high)] px-1.5 py-0.5 align-middle text-label text-[var(--on-surface-variant)]">Yours</span>
+              )}
+            </span>
 
             <span className="mt-1.5 text-body text-[var(--on-surface-variant)]">
               {PITCH[template.key] ?? template.description}

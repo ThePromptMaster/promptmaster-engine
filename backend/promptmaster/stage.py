@@ -52,8 +52,11 @@ _PROSE_INSTRUCTION = (
     "later stages will cover, do not restate the earlier stages back to the "
     "user, and do not add meta commentary about the process. Produce the "
     "artifact itself — the actual text this stage calls for, written in full — "
-    "never a plan, an outline or notes about how it could be written. Return "
-    "Markdown prose, no code fences around the whole answer."
+    "never a plan, an outline or notes about how it could be written. If your "
+    "mode prefers scaffolds, headings or structured breakdowns, that applies to "
+    "how you think, not to the form of this artifact: the stage's instruction "
+    "decides the form. Return Markdown prose, no code fences around the whole "
+    "answer."
 )
 
 _LIST_INSTRUCTION = (
@@ -91,6 +94,17 @@ def _format_item_schema(schema: StageItemSchema) -> str:
         # clipped and flagged red before the user has touched it.
         limit = f" At most {field.max_chars} characters." if field.max_chars else ""
         lines.append(f"- {field.key}: {label}.{hint}{limit}".rstrip())
+    explained = [s for s in schema.statuses if s.explain]
+    if explained:
+        # The user picks from these; the draft has to describe what was done
+        # in terms that let them pick honestly (2 Oct, item 12: "validated
+        # against earlier-cited studies" sat under a status reading "Reproduced").
+        lines.append(
+            "The user will give each row one of these statuses. Write each row so that it is plain which one applies — "
+            "say what was actually done, and never describe a comparison with earlier work or a consistency check "
+            "as a reproduction or recalculation:"
+        )
+        lines.extend(f"  · {s.label or s.value}: {s.explain}" for s in explained)
     settable = [s for s in schema.statuses if s.model_may_set]
     if settable:
         # What the draft already knows should not have to be typed in again by
@@ -136,6 +150,10 @@ def _example_json(schema: StageItemSchema) -> str:
     )
 
 
+# The first stage's artifact in each workflow: a restatement of the objective.
+_OBJECTIVE_KINDS = {"objective_statement", "research_question"}
+
+
 def build_stage_prompt(
     inputs: PMInput,
     stage: StageDescriptor,
@@ -171,6 +189,24 @@ def build_stage_prompt(
         f"Output format: {inputs.output_format or '(none)'}",
         "",
         f"WHAT THE EARLIER STAGES ESTABLISHED:\n{_format_digest(digest)}",
+        "",
+        # The user's words govern. The first stage writes a statement of the
+        # objective, and later stages saw that statement beside the original
+        # with nothing saying which wins — so "write a book about lions"
+        # drifted into whatever the statement made of it (the client, 2 Oct).
+        "THE ORIGINAL OBJECTIVE IS THE USER'S OWN WORDS AND GOVERNS. The earlier "
+        "stages elaborate it; none of them changes what is being made, for whom, "
+        "or about what. Where a summary above and the original objective "
+        "disagree, the original objective wins.",
+        *(
+            [
+                "This stage's statement sharpens the user's objective; it keeps the "
+                "deliverable and the subject exactly as the user named them. It may say "
+                "what success looks like and what is out of scope; it may not make "
+                "something else."
+            ]
+            if stage.artifact_kind in _OBJECTIVE_KINDS else []
+        ),
         "",
         f"STAGE TO PRODUCE: {stage.label or stage.id}",
     ]

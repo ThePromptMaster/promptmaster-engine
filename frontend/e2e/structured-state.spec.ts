@@ -44,7 +44,10 @@ test('recalled works are candidates; a run the draft knows was not run arrives m
   await expect(stageArtifact(page).getByLabel(/Why not run/i)).toHaveValue('Mock: the data this needs was never provided.');
   await expect(stageArtifact(page)).toContainText('2 still to resolve');
   await expect(stageArtifact(page)).toContainText('1 set by PromptMaster from what it already knew');
-  await expect(stageArtifact(page).getByText('Completed', { exact: true })).toHaveCount(0);
+  // (The legend under the table names every status; the rows are what is checked.)
+  await expect(stageArtifact(page).getByRole('combobox').filter({ hasText: 'Completed' })).toHaveCount(0);
+  // On a check stage the checklist folds to one line until opened (3 Oct call).
+  await page.getByRole('button', { name: /To finish this stage/ }).click();
   await expect(criterion(page, 'Every planned run has a result or a reason')).toContainText('2 still unresolved');
   await page.screenshot({ path: test.info().outputPath('02-experiment-not-run-prefilled.png'), fullPage: true });
 });
@@ -183,4 +186,36 @@ test('Go searches for works by topic and adds what it finds as Retrieved rows', 
     work: 'Mock, A. (2021). Mock found work 1 on the topic', link: 'https://doi.org/10.0000/mock.found.1',
     status: 'retrieved', status_source: 'tool', finding: '', relation: '',
   });
+});
+
+/**
+ * 2 Oct, items 12 and 13 — rows on Validation read "Reproduced" over text
+ * saying nothing had been recalculated. The statuses now say what was
+ * actually done, each with one plain line, and the table asks its question
+ * in plain words.
+ */
+test('Validation tells independent reproduction from support by earlier evidence, in plain words', async ({ page }) => {
+  test.setTimeout(180_000);
+  await createProject(page, { workflow: 'Research', name: 'E2E validation statuses', objective: 'Why customers churn' });
+  await expect(stageArtifact(page)).toContainText('Mock', { timeout: 30_000 });
+  for (const heading of ['Literature context', 'Hypothesis or proposition', 'Method', 'Experiment or investigation', 'Analysis', 'Alternative explanations', 'Reproduction or validation']) {
+    await pressTransition(page);
+    await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible();
+    await expect(stageArtifact(page)).toContainText('Mock', { timeout: 30_000 });
+  }
+  const artifact = stageArtifact(page);
+  await expect(artifact).toContainText('do you accept it as sufficiently supported to move forward?');
+  const legend = artifact.getByLabel('What the statuses mean');
+  await expect(legend).toContainText('It agrees with earlier studies or records. Nothing was recalculated.');
+  await expect(legend).toContainText('Only you can say this — PromptMaster never sets it.');
+
+  await artifact.getByRole('combobox').first().click();
+  await expect(page.getByRole('option')).toHaveText([
+    'Independently reproduced', 'Supported by prior evidence', 'Consistency check only', 'Not reproduced', 'Not attempted',
+  ]);
+  await page.screenshot({ path: test.info().outputPath('03-validation-status-choices.png') });
+  await page.getByRole('option', { name: 'Supported by prior evidence' }).click();
+  await expect(artifact.getByRole('combobox').first()).toContainText('Supported by prior evidence');
+  await artifact.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: test.info().outputPath('04-validation-table.png'), fullPage: true });
 });

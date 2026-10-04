@@ -47,7 +47,54 @@ describe('needsUser: the moves that are the user\'s (B4)', () => {
     const state = projectState(BOOK_V1, events);
     const need = needsUser({ ...base, state, stage: stage('objective'), facts: {}, stageEvaluation: evaluation('objective') });
     expect(need).toEqual({ kind: 'unblock_stage', stageId: 'objective', reason: 'Waiting on the survey.', blockKind: 'data_missing' });
-    expect(describeNeed(need!, label)).toEqual({ message: 'Objective is marked stuck: Waiting on the survey. I need that cleared before I can continue.', action: 'Continue the stage and resume' });
+    // Whether anything changed since is not on record: the card does not claim either way.
+    expect(describeNeed(need!, label)).toEqual({
+      message: 'Objective is marked stuck: Waiting on the survey. I need that cleared before I can continue.',
+      action: 'Add the missing data',
+      options: [{ id: 'add_data', label: 'Add the missing data' }, { id: 'clear', label: 'Continue this stage by hand' }],
+      footer: undefined,
+    });
+  });
+
+  it('a stuck stage says whether anything changed, and never calls a retry "continue" (2 Oct, item 9)', () => {
+    const need = { kind: 'unblock_stage' as const, stageId: 'objective', reason: 'The source extracts are missing.', blockKind: 'data_missing' };
+    const unchanged = describeNeed(need, label, { blockInputs: { changed: false, what: [] }, canSkip: true });
+    expect(unchanged.message).toBe(
+      'Objective is marked stuck: The source extracts are missing. Nothing in the project has changed since, so trying again will most likely stop at the same place.'
+    );
+    // At most three ways forward (2 Oct screenshots): the one that fits the
+    // situation, skipping where allowed, and carrying on by hand.
+    expect(unchanged.options).toEqual([
+      { id: 'add_data', label: 'Add the missing data' },
+      { id: 'skip', label: 'Skip Objective for now' },
+      { id: 'clear', label: 'Continue this stage by hand' },
+    ]);
+
+    const changed = describeNeed(need, label, { blockInputs: { changed: true, what: ['a data file was added'] }, canSkip: true });
+    expect(changed.message).toBe('Objective is marked stuck: The source extracts are missing. Since then, a data file was added.');
+    expect(changed.options).toEqual([
+      { id: 'resume', label: 'Resume with what has changed' },
+      { id: 'skip', label: 'Skip Objective for now' },
+      { id: 'clear', label: 'Continue this stage by hand' },
+    ]);
+
+    // A decision, not data: there is nothing to attach, so trying again leads.
+    const decision = describeNeed({ ...need, blockKind: 'needs_decision' }, label, { blockInputs: { changed: false, what: [] } });
+    expect(decision.options).toEqual([{ id: 'retry', label: 'Try again' }, { id: 'clear', label: 'Continue this stage by hand' }]);
+    for (const d of [unchanged, changed, decision]) {
+      expect(JSON.stringify(d)).not.toMatch(/Continue the stage/);
+      expect(d.options!.length).toBeLessThanOrEqual(3);
+    }
+  });
+
+  it('the card points to the stage bar\'s own button, in its exact words, or to nothing (2 Oct screenshots)', () => {
+    const need = { kind: 'unblock_stage' as const, stageId: 'objective', reason: 'No data.', blockKind: 'data_missing' };
+    // The menu read "Continue to Audience" while the card said to use "Override and continue".
+    expect(describeNeed(need, label, { advanceControl: 'Continue to Audience' }).footer).toBe(
+      'To move on with this still open, use “Continue to Audience” under More at the bottom of the stage; it asks for your reason.'
+    );
+    expect(describeNeed(need, label, { advanceControl: 'Override and continue to Audience' }).footer).toContain('“Override and continue to Audience”');
+    expect(describeNeed(need, label, { advanceControl: null }).footer).toBeUndefined();
   });
 
   it('a stage whose only open requirements are manual boxes, with no work left, needs a tick', () => {
@@ -92,7 +139,7 @@ describe('B3: the findings that change the work are the user\'s', () => {
   it('with only material rows left, the user is asked, with no button — the table is the control', () => {
     const need = needsUser({ ...base, stage: stage('continuity'), facts: review(0, 2), stageEvaluation: evaluation('continuity'), allowed: ['advance_stage'] });
     expect(need).toEqual({ kind: 'triage_findings', stageId: 'continuity', count: 2 });
-    expect(describeNeed(need!, label)).toEqual({ message: '2 findings would change the work, so they need your decision. Decide in the table below.', action: 'Go to the table' });
+    expect(describeNeed(need!, label)).toEqual({ message: '2 findings would change the work, so they need your decision. Accept or reject each in the table below — that is how a check stage works.', action: 'Go to the table' });
   });
 
   it('a fully decided table needs nothing', () => {
@@ -110,7 +157,7 @@ describe('needsUser: an outcome table is the user\'s to decide (production pass,
     });
     expect(need).toEqual({ kind: 'decide_rows', stageId: 'fact_check', count: 2, itemLabel: 'claim' });
     expect(describeNeed(need!, label)).toEqual({
-      message: '2 claims are waiting for your decision — only you can settle them. Decide in the table below.',
+      message: '2 claims are waiting for your decision — only you can settle them. Set a status on each in the table below — that is how a check stage works.',
       // The button takes the user to the rows; deciding them stays theirs.
       action: 'Go to the table',
     });

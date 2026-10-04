@@ -88,7 +88,7 @@ export function previewRowAction(items: readonly StageItem[], action: ReplyActio
 
     const option = statusOption(schema, update.status);
     const reason = (update.reason ?? '').trim();
-    if (option && option.settable !== false && (!option.requiresReason || reason)) {
+    if (option && option.settable !== false && !option.requiresExecution && !option.legacy && (!option.requiresReason || reason)) {
       const was = statusOption(schema, item.status)?.label ?? 'Not looked at';
       if (item.status !== option.value || (option.requiresReason && reason !== (item.reason ?? ''))) {
         lines.push(`Status: ${was} → ${option.label}`);

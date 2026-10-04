@@ -103,6 +103,13 @@ interface ProjectState {
    * from "not read yet" and not generate against an empty log.
    */
   events: WorkflowEvent[] | null;
+  /**
+   * Set when the log could not be read and there is none on hand. `events`
+   * then stays null rather than becoming `[]`: an empty log projects to "every
+   * stage not started", which a user reads as their project having been reset,
+   * and generation, Go and transitions would all act on it.
+   */
+  eventsError: string | null;
   recommendations: Recommendation[];
   tasks: ProjectTask[];
   /** Data files attached to the project; read by code the project runs. */
@@ -203,6 +210,22 @@ interface ProjectState {
   setActiveVersion: (versionId: string | null) => void;
 
   resolveConflict: (choice: 'reload' | 'keep-mine') => Promise<void>;
+  /** "Retry now" on a failed save: send it immediately, with a fresh set of automatic retries behind it. */
+  retrySave: () => Promise<void>;
+}
+
+/**
+ * The event was written, but the log could not be re-read afterwards. Distinct
+ * from a failed write: telling the user "nothing was changed" here invites a
+ * retry that records the same move twice (4 Oct).
+ */
+export class EventRecordedError extends Error {
+  constructor(cause?: unknown) {
+    super(
+      `Recorded, but the page could not catch up${cause instanceof Error && cause.message ? ` (${cause.message})` : ''}.`
+    );
+    this.name = 'EventRecordedError';
+  }
 }
 
 // Module-level rather than store state: a timer and an in-flight patch are
@@ -214,6 +237,12 @@ let pendingPatch: ProjectPatch = {};
 // the second one a conflict with the first, and the user saw "This project was
 // changed in another tab" with only one tab open.
 let inFlight: Promise<void> | null = null;
+
+// A failed save retries on its own (4 Oct): it used to sit at "Not saved"
+// until the next keystroke or tab switch, which a user who had stopped typing
+// never produced. Bounded, so a server that is down is not hammered.
+const RETRY_DELAYS_MS = [2_000, 5_000, 15_000];
+let retryAttempt = 0;
 
 function clearTimer() {
   if (timer) {
@@ -230,6 +259,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
   stages: {},
   evaluations: {},
   events: null,
+  eventsError: null,
   recommendations: [],
   tasks: [],
   files: [],
@@ -247,6 +277,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     } else {
       clearTimer();
       pendingPatch = {};
+      retryAttempt = 0;
       set({ loading: true, error: null, projectId: id, saveState: 'idle', conflict: null });
     }
 
@@ -258,11 +289,12 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       }
 
       // A missing recommendations or tasks row set must not take the project
-      // down: the derived half of the panel still works. Events fail closed to
-      // an empty log, as the workspace's own loader did.
-      const [artifacts, events, recommendations, tasks, files] = await Promise.all([
+      // down: the derived half of the panel still works. Events do not fail to
+      // an empty log — that reads as a reset project (4 Oct). They stay null,
+      // or keep the log already on hand on a background reload, and say so.
+      const [artifacts, loadedEvents, recommendations, tasks, files] = await Promise.all([
         listArtifacts(id),
-        listWorkflowEvents(id).catch(() => [] as WorkflowEvent[]),
+        listWorkflowEvents(id).catch(() => null),
         listRecommendations(id).catch(() => [] as Recommendation[]),
         listTasks(id).catch(() => [] as ProjectTask[]),
         listProjectFiles(id).catch(() => [] as ProjectFile[]),
@@ -318,6 +350,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         if (evaluation) evaluations[id] = evaluation;
       }
       const head = projectHead;
+      const events = loadedEvents ?? (background ? get().events : null);
 
       set({
         // Unsaved local edits stay on screen over the freshly loaded row; the
@@ -328,11 +361,15 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         stages,
         evaluations,
         events,
+        eventsError: events === null ? "This project's history could not be loaded." : null,
         recommendations,
         tasks,
         files,
         activeVersionId: head?.id ?? null,
         loading: false,
+        // A reload that worked clears a refresh failure; a save failure keeps
+        // its own state and label.
+        ...(get().saveState === 'error' ? {} : { error: null }),
       });
     } catch (err) {
       set({ loading: false, error: err instanceof Error ? err.message : 'Failed to load project.' });
@@ -342,6 +379,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
   closeProject() {
     clearTimer();
     pendingPatch = {};
+    retryAttempt = 0;
     set({
       projectId: null,
       project: null,
@@ -350,6 +388,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       stages: {},
       evaluations: {},
       events: null,
+      eventsError: null,
       recommendations: [],
       tasks: [],
       files: [],
@@ -374,7 +413,12 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         : event.type === 'project_finalized'
           ? supersedePending(project.id, { kind: 'stage_transition' })
           : Promise.resolve([]);
-    const [events, retired] = await Promise.all([get().refreshEvents(), retire.catch(() => [] as string[])]);
+    const [events, retired] = await Promise.all([
+      get().refreshEvents().catch((err) => {
+        throw new EventRecordedError(err);
+      }),
+      retire.catch(() => [] as string[]),
+    ]);
     if (retired.length) get().markSuperseded(retired);
     return events;
   },
@@ -395,7 +439,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     const events = await listWorkflowEvents(projectId);
     // Only if the same project is still open: a reload that lands after the
     // user has moved on must not file one project's log under another.
-    if (get().projectId === projectId) set({ events });
+    if (get().projectId === projectId) set({ events, eventsError: null });
     return events;
   },
 
@@ -442,6 +486,11 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     timer = setTimeout(() => void get().flush(), DEBOUNCE_MS);
   },
 
+  async retrySave() {
+    retryAttempt = 0;
+    await get().flush();
+  },
+
   async flush() {
     clearTimer();
     // Serialise: wait for the save already on the wire, then send what has
@@ -462,7 +511,8 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       const updated = await request;
       // Characters typed while the request was out are still in pendingPatch;
       // replacing the project with the server row alone made the text jump back.
-      set({ project: { ...updated, ...pendingPatch }, saveState: 'saved' });
+      retryAttempt = 0;
+      set({ project: { ...updated, ...pendingPatch }, saveState: 'saved', error: null });
       if (Object.keys(pendingPatch).length > 0) set({ saveState: 'saving' });
     } catch (err) {
       if (err instanceof ProjectConflictError) {
@@ -477,6 +527,11 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       // Keep the patch so the next flush retries it rather than dropping the edit.
       pendingPatch = { ...patch, ...pendingPatch };
       set({ saveState: 'error', error: err instanceof Error ? err.message : 'Save failed.' });
+      const delay = RETRY_DELAYS_MS[retryAttempt];
+      if (delay !== undefined && !timer) {
+        retryAttempt += 1;
+        timer = setTimeout(() => void get().flush(), delay);
+      }
     } finally {
       inFlight = null;
     }

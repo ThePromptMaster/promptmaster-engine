@@ -42,7 +42,7 @@ import { requestProjectCancel } from '@/lib/supabase/jobs';
 import { authorizeRun } from '@/lib/agent/authorize';
 import { buildAgentState } from '@/lib/agent/digest';
 import { performStep, type PerformContext, type StepOutcome } from '@/lib/agent/perform';
-import { allowedActions, LIVE_TOOLS, withoutOverride, DEFAULT_BUDGET_STEPS, fitsBudget, plannedBeforeLatestChange, preempt, shouldPause, stepCost } from '@/lib/agent/policy';
+import { allowedActions, stageHasCurrentDraft, LIVE_TOOLS, POLISH_MOVES, withoutEndlessPolish, withoutSettledRuns, withoutOverride, DEFAULT_BUDGET_STEPS, fitsBudget, noChange, plannedBeforeLatestChange, preempt, shouldPause, stateFingerprint, stepCost } from '@/lib/agent/policy';
 import {
   createAgentRun,
   endAgentRun,
@@ -57,6 +57,7 @@ import {
 } from '@/lib/supabase/agent';
 import { dataFileBriefs, type StageArtifactBundle } from '@/lib/workflow/digest';
 import type { StageFigures } from '@/lib/workflow/figures';
+import type { StageControl } from '@/lib/workflow/stage-controls';
 import { evaluateStage, getStage } from '@/lib/workflow/engine';
 import { inputsFrom } from '@/lib/workflow/stage-requests';
 import type { StageContext, StageDefinition, StageEvaluation, WorkflowEvent, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
@@ -99,9 +100,19 @@ interface Options {
   loadEvents?: () => Promise<readonly WorkflowEvent[]>;
   /** Re-read the project after a write the store did not make itself. */
   onRefresh?: () => unknown;
+  /** The buttons on the current stage's page now; null while another stage is on show. */
+  getControls?: () => StageControl[] | null;
 }
 
 class Stopped extends Error {}
+
+/**
+ * The project's current stage is not in its workflow. Was a silent `Stopped`:
+ * the loop returned with the run still "running", the phase stuck on
+ * performing and the heartbeat going, and nothing on screen said why (4 Oct).
+ * As an ordinary error it is recorded on the run and shown.
+ */
+const NO_STAGE = "Go stopped: this project's current stage isn't part of its workflow. Reload the page, then start Go again.";
 
 /** The project's decisions for the planner, read fresh. Never throws: no memory is not a reason to stop. */
 async function readMemory(o: Options, steps: readonly AgentStep[]): Promise<string[]> {
@@ -190,6 +201,14 @@ export function useGoLoop(opts: Options) {
    * on, and re-reading the same three steps made it an instant dead end.
    */
   const sinceRef = useRef(0);
+  /**
+   * What the project was after each performed move since the last Go/Resume
+   * (`stateFingerprint`). Three in a row the same is a run going round in
+   * circles (2 Oct, screenshot 7), whatever the moves were called.
+   */
+  const fingerprintsRef = useRef<string[]>([]);
+  /** A move that counted against the window was performed since the last read. */
+  const performedRef = useRef(false);
   const tabId = useRef<string>('');
   if (!tabId.current && typeof window !== 'undefined') tabId.current = tabIdentity();
 
@@ -231,7 +250,7 @@ export function useGoLoop(opts: Options) {
     async (step: AgentStep, approvedByUser: boolean, signal: AbortSignal): Promise<'continue' | 'stop'> => {
       const o = latest.current;
       const current = runRef.current!;
-      if (!o.stage) throw new Stopped();
+      if (!o.stage) throw new Error(NO_STAGE);
       setPhase('performing');
 
       const interpret = step.action_key === INTERPRET_STEP ? followRef.current ?? undefined : undefined;
@@ -254,7 +273,7 @@ export function useGoLoop(opts: Options) {
           template: o.template, state: o.state, stage: o.stage, bundles: o.bundles,
           stageEvaluation: evaluateStage(o.template, o.stage.id, context), latestEvaluation: o.latestEvaluation,
           steps: [...priorStepsRef.current, ...stepsRef.current],
-          context, approvedOutline: o.approvedOutline, facts, dataFiles: dataFileBriefs(o.project), tools: LIVE_TOOLS, memory,
+          context, approvedOutline: o.approvedOutline, facts, dataFiles: dataFileBriefs(o.project), tools: LIVE_TOOLS, memory, controls: o.getControls?.() ?? undefined,
         }),
         approvedByUser, deliverableDone: o.deliverableDone,
         interpret: interpret
@@ -302,10 +321,15 @@ export function useGoLoop(opts: Options) {
       upsertStep(finished);
       setProgress(null);
       // Waiting for sections already queued is not a move; it costs no step.
-      if (step.action_key !== AWAIT_SECTIONS_STEP) {
+      // …and neither is a stop that only repeated one already made (2 Oct, item 9).
+      if (step.action_key !== AWAIT_SECTIONS_STEP && !outcome.free) {
         const used = (runRef.current?.steps_used ?? 0) + 1;
         await updateAgentRun(current.id, { steps_used: used, heartbeat_at: new Date().toISOString() });
         commitRun({ ...runRef.current!, steps_used: used });
+        // A reasoning move (derive, prove, …) is work that lives in the step
+        // itself and changes nothing on the stage by design; only the moves
+        // that are supposed to change the project are judged by whether they did.
+        if (actionFor(step.action_key)?.performer !== 'reason') performedRef.current = true;
       }
 
       if (outcome.followUp) followRef.current = outcome.followUp;
@@ -341,7 +365,7 @@ export function useGoLoop(opts: Options) {
         if (signal.aborted) throw new Stopped();
         const o = latest.current;
         const current = runRef.current!;
-        if (!o.stage) throw new Stopped();
+        if (!o.stage) throw new Error(NO_STAGE);
 
         // The second half of run_computation is not a choice: interpret what ran.
         if (followRef.current) {
@@ -375,9 +399,10 @@ export function useGoLoop(opts: Options) {
         }
 
         setPhase('thinking');
+        const freshEvents = o.loadEvents ? await o.loadEvents() : o.events;
         const facts: StageFacts = await readStageFacts({
           project: o.project, template: o.template, stage: o.stage, bundles: o.bundles,
-          events: o.loadEvents ? await o.loadEvents() : o.events, latestEvaluation: o.latestEvaluation,
+          events: freshEvents, latestEvaluation: o.latestEvaluation,
         });
         if (signal.aborted) throw new Stopped();
         // What the project has already decided, from its own records (1 Oct, item 20).
@@ -397,18 +422,39 @@ export function useGoLoop(opts: Options) {
           continue;
         }
 
-        const hasDraft = (o.bundles[o.stage.id]?.versions.at(-1)?.content ?? '').trim().length > 0;
+        const hasDraft = stageHasCurrentDraft(o.template, o.state, o.stage.id, o.bundles[o.stage.id]?.versions.at(-1));
         // One read decides the moves, the requirements and what the planner
         // is told (1 Oct, item 1).
         const context = contextWithFacts(o.context, o.stage, facts);
         const stageEvaluation = evaluateStage(o.template, o.stage.id, context);
+
+        // After a performed move, what the project is now. Three moves that
+        // left it exactly as it was is a run going round in circles — the
+        // client's log of repeated "Check this stage" / "Apply the findings"
+        // (2 Oct, screenshot 7) — and stops here, before another model call.
+        if (performedRef.current) {
+          performedRef.current = false;
+          fingerprintsRef.current.push(stateFingerprint({ state: o.state, bundles: o.bundles, events: freshEvents, facts, stageEvaluation }));
+          const circling = noChange(fingerprintsRef.current);
+          if (circling) {
+            await setRunStatus('blocked', circling);
+            break;
+          }
+        }
         const proposedSkipHere = [...priorStepsRef.current, ...stepsRef.current].some(
           (s) => s.action_key === 'propose_skip' && s.stage_id === o.stage!.id
         );
-        const allowed = withoutOverride(
-          allowedActions(o.template, o.state, o.stage, hasDraft, LIVE_TOOLS, facts), stageEvaluation.canAdvance, current.policy
-          // Asked once: if the user stayed, the stage is to be done.
-        ).filter((k) => k !== 'propose_skip' || !proposedSkipHere);
+        const polishedHere = [...priorStepsRef.current, ...stepsRef.current].filter(
+          (s) => s.stage_id === o.stage!.id && (POLISH_MOVES as readonly string[]).includes(s.action_key)
+        ).length;
+        const allowed = withoutSettledRuns(withoutEndlessPolish(
+          withoutOverride(
+            allowedActions(o.template, o.state, o.stage, hasDraft, LIVE_TOOLS, facts), stageEvaluation.canAdvance, current.policy
+            // Asked once: if the user stayed, the stage is to be done.
+          ).filter((k) => k !== 'propose_skip' || !proposedSkipHere),
+          polishedHere,
+          stageEvaluation.canAdvance
+        ), facts.review);
 
         // Runs the data could carry out are tried before the table is handed
         // to the user: at most once per row, so a row no code can settle
@@ -435,7 +481,7 @@ export function useGoLoop(opts: Options) {
         const digest = buildAgentState({
           template: o.template, state: o.state, stage: o.stage, bundles: o.bundles,
           stageEvaluation, latestEvaluation: o.latestEvaluation, steps: [...priorStepsRef.current, ...stepsRef.current],
-          context, approvedOutline: o.approvedOutline, facts, dataFiles: dataFileBriefs(o.project), tools: LIVE_TOOLS, memory,
+          context, approvedOutline: o.approvedOutline, facts, dataFiles: dataFileBriefs(o.project), tools: LIVE_TOOLS, memory, controls: o.getControls?.() ?? undefined,
         });
         const choice = await api.agentNextAction(
           { inputs: inputsFrom(o.project), state: digest, allowed_actions: allowed, policy: current.policy, model: o.project.model },
@@ -521,6 +567,8 @@ export function useGoLoop(opts: Options) {
       largeJobOkRef.current = null;
       followRef.current = null;
       sinceRef.current = 0;
+      fingerprintsRef.current = [];
+      performedRef.current = false;
       autoLeftRef.current = chosen === 'autonomous' ? autoWindows : 0;
       setAutoPending(autoLeftRef.current > 0);
       void loop();
@@ -567,6 +615,8 @@ export function useGoLoop(opts: Options) {
       commitSteps([]);
       followRef.current = null;
       sinceRef.current = 0;
+      fingerprintsRef.current = [];
+      performedRef.current = false;
       void loop();
     } catch (e) {
       // A window the loop tried to start itself and the database refused is
@@ -585,6 +635,8 @@ export function useGoLoop(opts: Options) {
       // it keeps its budget and its history.
       if (live && !live.ended_at && live.policy === policy && (live.status === 'blocked' || live.status === 'awaiting_decision') && !pendingStepId) {
         sinceRef.current = stepsRef.current.length;
+        fingerprintsRef.current = [];
+        performedRef.current = false;
         await updateAgentRun(live.id, { status: 'running', stop_reason: null, needs: null, lease_holder: tabId.current, heartbeat_at: new Date().toISOString() });
         commitRun({ ...live, status: 'running', stop_reason: null, needs: null });
         void loop();
@@ -771,6 +823,8 @@ export function useGoLoop(opts: Options) {
       priorStepsRef.current = await listChainSteps(found).catch(() => []);
       // The no-progress guard counts from here, as it does after Resume.
       sinceRef.current = repaired.length;
+      fingerprintsRef.current = [];
+      performedRef.current = false;
       const waiting = repaired.find((s) => s.status === 'awaiting_decision');
       if (waiting) {
         setPendingStepId(waiting.id);
@@ -866,7 +920,7 @@ export function useGoLoop(opts: Options) {
         });
         const current = runRef.current;
         if (cancelled || abortRef.current || !current || current.id !== liveRunId || current.needs !== need) return;
-        const hasDraft = (o.bundles[o.stage.id]?.versions.at(-1)?.content ?? '').trim().length > 0;
+        const hasDraft = stageHasCurrentDraft(o.template, o.state, o.stage.id, o.bundles[o.stage.id]?.versions.at(-1));
         const context = contextWithFacts(o.context, o.stage, facts);
         const holds = needStillHolds(need, {
           state: o.state, stage: o.stage, facts, stageEvaluation: evaluateStage(o.template, o.stage.id, context),

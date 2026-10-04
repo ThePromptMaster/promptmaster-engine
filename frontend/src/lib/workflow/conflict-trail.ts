@@ -72,8 +72,10 @@ export async function findInstructionConflicts(args: {
   instruction: string;
   recentInstructions?: string[];
   headVersionId?: string | null;
+  /** The stage the instruction is for: its own work is not a conflict with the constraints. */
+  stage?: { label: string; instruction?: string };
 }): Promise<InstructionConflict[]> {
-  const { project, stageId, instruction, recentInstructions = [], headVersionId = null } = args;
+  const { project, stageId, instruction, recentInstructions = [], headVersionId = null, stage } = args;
   if (!instruction.trim()) return [];
   try {
     const { decisions, others } = await conflictContext(project.id, stageId, recentInstructions, headVersionId);
@@ -82,6 +84,7 @@ export async function findInstructionConflicts(args: {
     try {
       const res = await api.checkConflicts({
         inputs: inputsFrom(project), instruction, decisions, other_instructions: others, model: project.model,
+        ...(stage ? { stage: { label: stage.label, instruction: (stage.instruction ?? '').slice(0, 2_000) } } : {}),
       });
       model = res.conflicts.map((c) => ({ ...c, source: 'model' as const }));
     } catch {

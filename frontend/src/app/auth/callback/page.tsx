@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
+import { safeNext } from '@/lib/auth/next-path';
 
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -14,12 +15,16 @@ export default function AuthCallbackPage() {
   // render rather than copied into state from an effect.
   const errorParam = searchParams.get('error');
   const errorDescription = searchParams.get('error_description');
+  const next = safeNext(searchParams.get('next')) ?? '/projects';
+  const tokenHash = searchParams.get('token_hash');
+  const otpType = searchParams.get('type');
+  const [verifyError, setVerifyError] = useState<string | null>(null);
   const urlError = errorParam
     ? errorDescription
       ? errorDescription.replace(/\+/g, ' ')
       : 'Authentication failed. Please try again.'
     : null;
-  const error = urlError ?? timeoutError;
+  const error = urlError ?? verifyError ?? timeoutError;
 
   useEffect(() => {
     if (urlError) return;
@@ -27,22 +32,56 @@ export default function AuthCallbackPage() {
     // No error — proceed with auth exchange
     const supabase = createClient();
 
+    let done = false;
+    // Timeout — if nothing has signed in after 10s, say so.
+    const timeout = setTimeout(() => {
+      if (!done) setTimeoutError('Sign in timed out. Please try again.');
+    }, 10000);
+    const go = (to: string) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timeout);
+      router.replace(to);
+    };
+
+    // A link carrying a token hash (an email template pointing here, or an
+    // admin-issued link) is verified directly. Unlike the code exchange it does
+    // not depend on this browser having asked for the email, so a reset link
+    // opened on a phone works too.
+    if (tokenHash && otpType) {
+      void supabase.auth
+        .verifyOtp({ token_hash: tokenHash, type: otpType as 'recovery' | 'signup' | 'magiclink' | 'invite' | 'email' | 'email_change' })
+        .then(({ error: otpError }: { error: { message: string } | null }) => {
+          if (otpError) {
+            done = true;
+            clearTimeout(timeout);
+            setVerifyError(otpError.message || 'This link has expired or was already used.');
+          } else go(otpType === 'recovery' ? '/auth/reset' : next);
+        });
+    }
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string) => {
-      if (event === 'SIGNED_IN') {
-        router.push('/projects');
-      }
+      // A password-reset link signs in with a recovery session; that one goes
+      // to the page that sets the new password, wherever `next` says.
+      if (event === 'PASSWORD_RECOVERY') go('/auth/reset');
+      else if (event === 'SIGNED_IN') go(next);
     });
 
-    // Timeout — if no auth event after 10s, show error
-    const timeout = setTimeout(() => {
-      setTimeoutError('Sign in timed out. Please try again.');
-    }, 10000);
+    // The browser client is a singleton that exchanges the URL's code as soon
+    // as it is created, which can be before this listener exists. A session
+    // already in hand is the same as having heard SIGNED_IN.
+    if (!tokenHash) {
+      void supabase.auth.getSession().then(({ data }: { data: { session: unknown } }) => {
+        if (data.session) go(next);
+      });
+    }
+
 
     return () => {
       subscription.unsubscribe();
       clearTimeout(timeout);
     };
-  }, [router, urlError]);
+  }, [router, urlError, next, tokenHash, otpType]);
 
   if (error) {
     return (

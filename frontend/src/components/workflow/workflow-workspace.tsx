@@ -14,6 +14,8 @@ import { BlockForm, BlockedNotice, CompletionDialog } from './stage-status-panel
 import { StageToolResult } from './stage-tool-result';
 import { CRITIQUE_TOOLS, REWRITE_TOOLS, useStageTools } from './use-stage-tools';
 import { nextStageAction, type ReportedPanelStep } from '@/lib/workflow/next-action';
+import { stageControls, type StageControl } from '@/lib/workflow/stage-controls';
+import { inputsChanged, stageInputs } from '@/lib/workflow/stage-inputs';
 import { isApplyable } from '@/lib/workflow/recommend';
 import { ProjectFinished } from './project-finished';
 import { ProjectFinishedBanner } from './project-finished-banner';
@@ -26,6 +28,7 @@ import { NextMoveCard } from './next-move-card';
 import { StageEvaluationPanel } from './evaluation-panel';
 import { CritiqueStyleControl } from './critique-style-control';
 import { CritiqueActions } from './critique-actions';
+import { CritiqueFollowUp } from './critique-follow-up';
 import { RevisedPreview } from './revised-preview';
 import { useApplyFindings } from './use-apply-findings';
 import { generationRequest } from '@/lib/workflow/stage-requests';
@@ -52,6 +55,8 @@ import {
   tickClosesStage,
 } from '@/lib/workflow/engine';
 import { buildStageDigest, formatManuscript, summariseStageContent } from '@/lib/workflow/digest';
+import { buildChatContext, chatContentFor } from '@/lib/workflow/chat-context';
+import { starterQuestions } from '@/lib/workflow/chat-starters';
 import { keepFinishedVersion, stageContentForSummary, stageEvidence } from '@/lib/workflow/evidence';
 import { api } from '@/lib/api/client';
 import { inputsFrom } from './use-stage-generation';
@@ -62,9 +67,9 @@ import { OutlineStagePanel } from '@/components/outline/outline-stage-panel';
 import { ProjectBrief, ProjectSetup, stageWantsSetup } from './project-setup';
 import { ProjectData } from './project-data';
 import { draftBindings } from '@/lib/outline/long-form';
-import { approveOutline, loadOutline, materialiseOutlineInto } from '@/lib/outline/actions';
+import { approveOutline, loadOutline, materialiseOutlineInto, outlineStageFor } from '@/lib/outline/actions';
 import type { OutlineDocument } from '@/types/outline';
-import { stageDrafts, itemSchemaFor, parseItems, rendererHoldsItems, serializeItems, stageContentForChat, type StageItem } from '@/lib/workflow/stage-artifact';
+import { isTriaged, proposableStatuses, stageDrafts, itemSchemaFor, parseItems, rendererHoldsItems, serializeItems, type StageItem } from '@/lib/workflow/stage-artifact';
 import { previewRowAction } from '@/lib/workflow/row-actions';
 import { applyLookup, lookupQueries, lookupSummary } from '@/lib/workflow/lookup';
 import { readStageFigures, type StageFigures } from '@/lib/workflow/figures';
@@ -76,8 +81,8 @@ import { isDone } from '@/lib/workflow/types';
 import { getLatestTemplate } from '@/lib/supabase/workflow';
 import { setUsageProject } from '@/lib/supabase/model-usage';
 import type { NewEvaluation, NewVersion } from '@/lib/supabase/versions';
-import { useProjectStore, type StageBundle } from '@/stores/project-store';
-import { commitOutlineVersion, approvedOutlineVersionId } from '@/lib/supabase/outline';
+import { EventRecordedError, useProjectStore, type StageBundle } from '@/stores/project-store';
+import { commitOutlineVersion, approvedOutlineVersionId, ensureOutlineArtifact } from '@/lib/supabase/outline';
 import type { Artifact, ArtifactVersion, Evaluation, Project, ProjectPatch } from '@/types/project';
 
 interface Props {
@@ -191,6 +196,7 @@ export function WorkflowWorkspace({
   // A5: a newer published version of this project's workflow, if any.
   const [latestTemplate, setLatestTemplate] = useState<(WorkflowTemplate & { id: string }) | null>(null);
   const [upgradeDismissed, setUpgradeDismissed] = useState(false);
+  const [goDockHost, setGoDockHost] = useState<HTMLDivElement | null>(null);
   const [upgrading, setUpgrading] = useState(false);
   const [finishing, setFinishing] = useState<{ option: TransitionOption; note?: string } | null>(null);
   // PM-14: the deliverable scored against the objective before finishing.
@@ -429,6 +435,9 @@ export function WorkflowWorkspace({
       if (!stage || busy) return;
       setBusy(true);
       setTransitionError(null);
+      // Once the move itself is written, a later failure is not "nothing was
+      // changed": saying so invited a retry that recorded the move twice.
+      let recorded = false;
       try {
         // PM-13: moving on with the stage's requirements met completes it;
         // moving on without them ("Continue anyway") leaves it open. The
@@ -480,7 +489,11 @@ export function WorkflowWorkspace({
           ...(type === 'stage_advanced' && stageBundles[stage.id]?.versions.at(-1)
             ? { payload: { left_version_id: stageBundles[stage.id]!.versions.at(-1)!.id } }
             : {}),
+        }).catch((e) => {
+          if (e instanceof EventRecordedError) recorded = true;
+          throw e;
         });
+        recorded = true;
 
         // PM-14: finishing the project is its own event, separate from the
         // last stage — the project can be finished with stages left open.
@@ -518,6 +531,15 @@ export function WorkflowWorkspace({
         if (option.kind === 'finish') onPatchProject({ status: 'finalized', stage: moved });
         else if (moved !== project.stage) onPatchProject({ stage: moved });
       } catch (e) {
+        if (recorded) {
+          setTransitionError(
+            option.kind === 'finish' && !(e instanceof EventRecordedError)
+              ? "This stage was recorded, but finishing the project didn't go through. The page is reloading; finish the project from there."
+              : "That was recorded, but the page couldn't catch up. Don't do it again — reloading shows where the project stands."
+          );
+          onReload?.();
+          return;
+        }
         // Was swallowed: the bar did not await this, so a failed insert became
         // an unhandled rejection and the click looked like it did nothing.
         setTransitionError(
@@ -529,7 +551,7 @@ export function WorkflowWorkspace({
         setBusy(false);
       }
     },
-    [stage, busy, project, template, onPatchProject, setStageSummary, setStageFigures, stageBundles, evaluation, appendEvent, appendStageVersion]
+    [stage, busy, project, template, onPatchProject, setStageSummary, setStageFigures, stageBundles, evaluation, appendEvent, appendStageVersion, onReload]
   );
 
   /** PM-13: mark the current stage blocked, or lift the block. */
@@ -539,14 +561,17 @@ export function WorkflowWorkspace({
       setTransitionError(null);
       try {
         await appendEvent(block
-          ? { type: 'stage_blocked', stage_id: stage.id, reason: block.reason, payload: { block_kind: block.kind } }
+          ? {
+              type: 'stage_blocked', stage_id: stage.id, reason: block.reason,
+              payload: { block_kind: block.kind, inputs_at_block: stageInputs(project, stageBundles[stage.id]?.versions.at(-1)?.id) },
+            }
           : { type: 'stage_unblocked', stage_id: stage.id });
         setBlocking(false);
       } catch (e) {
         setTransitionError(`That didn't go through${e instanceof Error && e.message ? `: ${e.message}` : ''}. Nothing was changed.`);
       }
     },
-    [stage, appendEvent]
+    [stage, appendEvent, project, stageBundles]
   );
 
   /**
@@ -637,7 +662,11 @@ export function WorkflowWorkspace({
    * evaluation: acting on a stage you are only looking at is never what was
    * meant.
    */
-  const tools = useStageTools({ project, stage: stage ?? null, headVersion, appendStageVersion });
+  const tools = useStageTools({
+    project, stage: stage ?? null, headVersion, appendStageVersion,
+    // A long-form stage's text lives in its chapters, not in a version.
+    fallbackContent: stage?.renderer === 'long_form' ? stageContentForSummary(template, stage, stageBundles) : '',
+  });
   // PM-22: every "apply" after a critique goes through one path.
   // A table stage is revised as rows by the generator that drafted it; sent
   // through the text revision it came back as prose and the table was lost.
@@ -669,9 +698,9 @@ export function WorkflowWorkspace({
             ? {
                 item_label: schema.itemLabel,
                 fields: schema.fields.map((f) => ({ key: f.key, label: f.label })),
-                // Only what the user could choose themselves.
-                statuses: (schema.statuses ?? [])
-                  .filter((s) => s.settable !== false && s.decided !== false)
+                // Only what a change proposed from the chat may set: not a tool's
+                // status, and not one that says something was actually carried out.
+                statuses: proposableStatuses(schema)
                   .map((s) => ({ value: s.value, label: s.label, requires_reason: Boolean(s.requiresReason) })),
                 rows: headItems.map((item) =>
                   Object.fromEntries(Object.entries(item).filter(([k, v]) => typeof v === 'string' && k !== 'status_source')) as Record<string, string>
@@ -691,13 +720,14 @@ export function WorkflowWorkspace({
     [stage, headItems]
   );
   const runReplyAction = useCallback(
-    async (action: ReplyAction) => {
+    // `from` names where the action came from when it is not the side chat: a Challenge, a Reframe, a Self-audit.
+    async (action: ReplyAction, from?: string) => {
       if (!stage || !appendStageVersion) return;
       if (action.kind === 'revise') {
         // One finding, the ordinary apply path: previewed before it is saved.
         await applyFindings.apply(
-          [{ id: `chat-${Date.now()}`, category: 'Side chat', summary: action.label, suggested_change: action.instruction ?? '' }],
-          { showFirst: true, source: 'the side chat' }
+          [{ id: `chat-${Date.now()}`, category: from ?? 'Side chat', summary: action.label, suggested_change: action.instruction ?? '' }],
+          { showFirst: true, source: from ?? 'the side chat' }
         );
         return;
       }
@@ -709,7 +739,7 @@ export function WorkflowWorkspace({
         instruction: action.label,
         model: project.model,
         mode: project.mode,
-        change_summary: `From the side chat: ${action.label} (${changes.length} row${changes.length === 1 ? '' : 's'}).`,
+        change_summary: `From ${from ?? 'the side chat'}: ${action.label} (${changes.length} row${changes.length === 1 ? '' : 's'}).`,
       });
     },
     [stage, appendStageVersion, applyFindings, headItems, project.model, project.mode]
@@ -725,6 +755,7 @@ export function WorkflowWorkspace({
     template,
     stage,
     stageEvaluation: evaluation,
+    blocked: Boolean(stage && state.stages[stage.id]?.status === 'blocked'),
     headVersion,
     storedEvaluation: shownEvaluation,
     modelRecommendation: stageEvaluation.recommendation,
@@ -863,19 +894,25 @@ export function WorkflowWorkspace({
       const destination = draftingStage ?? stage;
       if (!destination) throw new Error('This workflow has no drafting stage.');
 
-      const existing =
-        destination.id === stage?.id ? stageArtifact : stageBundles[destination.id]?.artifact ?? null;
+      // Only an artifact filed under the drafting stage. The project-level
+      // row (no stage) is never the manuscript of a staged workflow, and before
+      // a reload the stage's bundle can still be empty. A derived outline keeps
+      // the manuscript on its own outline row, so that is where it goes.
+      const existing = stageBundles[destination.id]?.artifact ?? null;
+      const derivedHere = outlineStageFor(template)?.id === destination.id;
       const target =
         existing ??
-        (ensureStageArtifact
-          ? await ensureStageArtifact(destination.id, destination.label)
-          : null);
+        (derivedHere
+          ? await ensureOutlineArtifact(project.id, project.user_id, destination.id)
+          : ensureStageArtifact
+            ? await ensureStageArtifact(destination.id, destination.label)
+            : null);
       if (!target) throw new Error('This stage has nowhere to keep a draft yet. Reload the page and try again.');
 
       await materialiseOutlineInto(doc, target);
       onReload?.();
     },
-    [draftingStage, stage, stageArtifact, stageBundles, ensureStageArtifact, onReload]
+    [draftingStage, stage, stageBundles, template, project.id, project.user_id, ensureStageArtifact, onReload]
   );
 
   // --- Go mode (B4, PM-17 … PM-20) ------------------------------------------------
@@ -892,6 +929,10 @@ export function WorkflowWorkspace({
     () => completionSummary(template, state, context).deliverableDone,
     [template, state, context]
   );
+
+  // The buttons on the current stage's page, for Go to name (2 Oct, item 10).
+  // Filled in further down, once the stage bar's own actions are built.
+  const controlsRef = useRef<StageControl[] | null>(null);
 
   const go = useGoLoop({
     project,
@@ -914,6 +955,7 @@ export function WorkflowWorkspace({
     events: events ?? [],
     loadEvents: () => listWorkflowEvents(project.id),
     onRefresh: onReload,
+    getControls: () => controlsRef.current,
   });
   useEffect(() => setGoDriving(go.active || go.phase === 'awaiting'), [go.active, go.phase]);
 
@@ -949,6 +991,12 @@ export function WorkflowWorkspace({
         if (!option) throw new Error('This stage cannot be skipped.');
         await handleTransition(option, reason.slice(0, 500));
       },
+      // The user's return to where the next round starts, with Go's reason.
+      nextRound: async (toStageId: string, reason: string) => {
+        const option = transitions.find((t) => t.kind === 'return' && t.toStageId === toStageId);
+        if (!option) throw new Error('This stage does not start another round.');
+        await handleTransition(option, reason.slice(0, 500));
+      },
       showTable: () => {
         const table = document.querySelector<HTMLElement>('[data-stage-table]');
         if (!table) return;
@@ -958,9 +1006,26 @@ export function WorkflowWorkspace({
         // is not in front it does not move at all (production pass, 2026-10-01).
         table.scrollIntoView({ block: 'start' });
       },
+      showData: () => {
+        const panel = document.querySelector<HTMLElement>('section[aria-label="Project data"]');
+        if (!panel) return;
+        panel.querySelector<HTMLElement>('button')?.focus({ preventScroll: true });
+        panel.scrollIntoView({ block: 'center' });
+      },
     }),
     [project.id, project.user_id, project.model, project.mode, materialiseOutline, refreshEvents, setBlocked, handleToggleManual, onReload, transitions, handleTransition]
   );
+
+  // For Go's card on a stuck stage: has anything changed since it was marked
+  // stuck, and may the stage be skipped (2 Oct, item 9).
+  const currentStageDef = getStage(template, state.current_stage_id);
+  const blockedNow = state.stages[state.current_stage_id]?.blocked;
+  const goNeedContext = {
+    blockInputs: blockedNow
+      ? inputsChanged(blockedNow.inputs, stageInputs(project, stageBundles[state.current_stage_id]?.versions.at(-1)?.id))
+      : null,
+    canSkip: Boolean(currentStageDef?.transitions.allow_skip && currentStageDef.transitions.default_next),
+  };
 
   if (!stage) return null;
 
@@ -1033,8 +1098,12 @@ export function WorkflowWorkspace({
   });
 
   // PM-10: the original core's actions — refine, realign, challenge, reframe,
-  // self-audit, continue — on a prose stage that has a draft.
+  // self-audit, continue — on a prose stage that has a draft. On a long-form
+  // stage with chapters written, only the critiques: a rewrite would land as a
+  // prose version beside a manuscript that lives in `long_form.outline`.
   const toolsAvailable = isCurrent && draftable && stage.renderer === 'prose' && hasContent;
+  const critiqueOnly =
+    isCurrent && stage.renderer === 'long_form' && stageContentForSummary(template, stage, stageBundles).trim().length > 0;
   const runPrimary = () => {
     switch (primaryAction.kind) {
       case 'save':
@@ -1059,6 +1128,13 @@ export function WorkflowWorkspace({
   };
 
   const stageState = state.stages[stage.id];
+  // Go's card and the stage's own notice described the same stuck stage with
+  // two sets of buttons (2 Oct screenshots). While Go's run holds this block,
+  // its card is the one surface; the notice returns once the run lets go.
+  const goHoldsThisBlock = Boolean(
+    go.run && go.run.needs?.kind === 'unblock_stage' && go.run.needs.stageId === stage.id &&
+    (!go.run.ended_at || go.run.status === 'budget_exhausted')
+  );
   const isBlocked = stageState?.status === 'blocked';
 
   // PM-14: what finishing would be finishing.
@@ -1135,7 +1211,9 @@ export function WorkflowWorkspace({
           ...REWRITE_TOOLS.map((t) => ({ id: t.kind, label: t.label, icon: t.icon, onSelect: () => void tools.run(t.kind) })),
           ...CRITIQUE_TOOLS.map((t) => ({ id: t.kind, label: t.label, icon: t.icon, onSelect: () => void tools.run(t.kind) })),
         ]
-      : []),
+      : critiqueOnly
+        ? CRITIQUE_TOOLS.map((t) => ({ id: t.kind, label: t.label, icon: t.icon, onSelect: () => void tools.run(t.kind) }))
+        : []),
     ...(draftable && hasContent && Boolean(stageEvaluation.evaluate) && primaryAction.kind !== 'evaluate'
       ? [{
           id: 'evaluate',
@@ -1145,6 +1223,42 @@ export function WorkflowWorkspace({
         }]
       : []),
   ];
+
+  // What Go may name is what the stage bar and the page draw, built from the
+  // same values. Only for the stage the project is on: a stage being browsed
+  // shows other buttons, and Go does not work there.
+  const pageControls = isCurrent && project.status !== 'finalized'
+    ? stageControls({
+        primary: primaryAction,
+        more: moreActions,
+        options: transitions,
+        nextStageLabel: nextStage?.short_label ?? null,
+        openApprovals: evaluation.criteria.filter((c) => c.manual && !c.satisfied),
+        lookupNoun: rendererHoldsItems(stage.renderer) && hasContent ? (itemSchemaFor(stage).lookup?.noun ?? null) : null,
+        dataPanel: true,
+      })
+    : null;
+  // Read by the Go loop when it plans a move, never during render.
+  controlsRef.current = pageControls;
+  // Check and chapter stages: the work is the table or the chapters, so the
+  // supporting panels fold to a line each (3 Oct call).
+  const foldStageExtras = stage.renderer === 'review' || stage.renderer === 'long_form';
+  const showDials = isCurrent && draftable && hasContent;
+  const dials = (
+    <CritiqueStyleControl
+      intensity={project.critique_intensity ?? 'standard'}
+      tone={project.critique_tone ?? 'neutral'}
+      onChange={onPatchProject}
+    />
+  );
+  const chatEditsProse =
+    !rendererHoldsItems(stage.renderer) && stage.renderer !== 'outline' && stage.renderer !== 'long_form';
+  // The stuck card names the stage bar's own transition button in the words
+  // that are on the page ("Continue to X" or "Override and continue to X").
+  const goNeedContextOnPage = {
+    ...goNeedContext,
+    advanceControl: pageControls?.find((c) => c.id === 'advance')?.label ?? null,
+  };
 
   // Revision and editing are long-form stages with no manuscript of their own:
   // they work on the one Drafting wrote. Without this they showed "no approved
@@ -1167,6 +1281,7 @@ export function WorkflowWorkspace({
           approvedOutlineVersionId: approvedOutlineVersionId(events ?? []),
           onRefresh: () => onReload?.(),
           revise: revisionBrief(template, stage.id, stageBundles),
+          stageHint: stage.entry_prompt_hint,
           onPanelStep: reportPanelStep,
           // Snapshots go on the artifact that holds the manuscript — Drafting's,
           // for Revision and Editing — through the store.
@@ -1276,6 +1391,11 @@ export function WorkflowWorkspace({
 
       <main className="min-w-0 flex-1 px-6 py-10 md:px-10">
         <div className="mx-auto max-w-[820px]">
+          {/* Go's controls, pinned while its panel is scrolled away (2 Oct: "you should see
+              [the play button] all the time"). The panel fills this; it is empty otherwise. */}
+          {isCurrent && appendStageVersion && project.status !== 'finalized' && (
+            <div ref={setGoDockHost} className="sticky top-3 z-20 empty:hidden" />
+          )}
           {/* The narrow-viewport counterpart to the rail: where you are, how
               much is left, and the way to the rest of the stages. Hidden from
               md up, where the rail itself says all three. */}
@@ -1422,7 +1542,7 @@ export function WorkflowWorkspace({
           />
 
           {isCurrent && appendStageVersion && project.status !== 'finalized' && (
-            <GoPanel go={go} stageLabel={stage.label} mode={project.mode} needsActions={goNeedsActions} />
+            <GoPanel go={go} stageLabel={stage.label} mode={project.mode} needsActions={goNeedsActions} needContext={goNeedContextOnPage} dockHost={goDockHost} />
           )}
           {isCurrent && project.status === 'finalized' && (
             <ProjectFinished
@@ -1571,14 +1691,19 @@ export function WorkflowWorkspace({
             />
           )}
 
-          {/* PM-22 "buttonize it": each point the critique made is its own Apply. */}
-          {isCurrent && draftable && tools.commentary && critiquePoints.length > 0 && (
+          {/* A critique ends in a few actions, like a chat answer (2 Oct, item 6);
+              its points are still there one by one, behind a disclosure. */}
+          {isCurrent && draftable && tools.commentary && (
             <div className="mb-6">
-              <CritiqueActions
-                title="Act on this critique"
+              <CritiqueFollowUp
+                key={`${tools.commentary.title}:${tools.commentary.text}`}
+                commentary={tools.commentary}
                 points={critiquePoints}
                 busy={applyFindings.running}
-                onApply={(ids, showFirst) =>
+                suggest={suggestReplyActions}
+                previewRows={previewReplyRows}
+                onRun={(action) => runReplyAction(action, tools.commentary!.title)}
+                onApplyPoints={(ids, showFirst) =>
                   void applyFindings.apply(
                     critiquePoints.filter((p) => ids.includes(p.id)).map((p) => findingFromPoint(p, tools.commentary!.title)),
                     { showFirst, source: tools.commentary!.title }
@@ -1599,6 +1724,7 @@ export function WorkflowWorkspace({
               manualIds={manualIds}
               onToggleManual={(id, checked) => void handleToggleManual(id, checked)}
               readOnly={!isEditable}
+              collapsible={foldStageExtras}
             />
 
             <RecommendationsPanel
@@ -1617,15 +1743,24 @@ export function WorkflowWorkspace({
                 the declarative half of the same question the evaluation
                 answers by judgment. */}
             {/* PM-21: the dials sit with the critique they shape. */}
-            {isCurrent && draftable && hasContent && (
-              <CritiqueStyleControl
-                intensity={project.critique_intensity ?? 'standard'}
-                tone={project.critique_tone ?? 'neutral'}
-                onChange={onPatchProject}
-              />
+            {foldStageExtras ? (
+              (showDials || shownEvaluation) && (
+                <details data-stage-extras className="rounded-xl bg-[var(--surface-container-low)] px-5 py-3">
+                  <summary className="cursor-pointer text-label text-[var(--on-surface-variant)]">
+                    {shownEvaluation ? 'The stage check, and how tough feedback is' : 'How tough feedback is'}
+                  </summary>
+                  <div className="mt-3 space-y-4">
+                    {showDials && dials}
+                    <StageEvaluationPanel evaluation={shownEvaluation} />
+                  </div>
+                </details>
+              )
+            ) : (
+              <>
+                {showDials && dials}
+                <StageEvaluationPanel evaluation={shownEvaluation} />
+              </>
             )}
-
-            <StageEvaluationPanel evaluation={shownEvaluation} />
 
             {/* PM-22: the easy actions after a check, on the version it checked. */}
             {isCurrent && draftable && headVersion && (evaluations?.[headVersion.id]?.findings ?? []).length > 0 && (
@@ -1667,7 +1802,7 @@ export function WorkflowWorkspace({
                 onViewStage={setViewingStageId}
               />
             )}
-            {isCurrent && isBlocked && stageState?.blocked && (
+            {isCurrent && isBlocked && stageState?.blocked && !goHoldsThisBlock && (
               <BlockedNotice kind={stageState.blocked.kind} reason={stageState.blocked.reason} onUnblock={() => void setBlocked(null)} />
             )}
             {isCurrent && blocking && (
@@ -1766,14 +1901,26 @@ export function WorkflowWorkspace({
               project={project}
               stageId={stage.id}
               stageLabel={stage.label}
-              content={stageContentForChat(
-                itemSchemaFor(stage),
+              content={chatContentFor(
+                template,
+                stage,
+                stageBundles,
                 (activeVersionId
                   ? stageVersions.find((v) => v.id === activeVersionId)?.content
                   : undefined) ??
                   stageVersions.at(-1)?.content ??
                   ''
               )}
+              // Built when a message is sent, not on every render: it carries the chapters.
+              getChatContext={() => buildChatContext({ template, state, project, stage, bundles: stageBundles, controls: pageControls })}
+              starters={isCurrent ? starterQuestions({
+                renderer: stage.renderer,
+                stageLabel: stage.short_label,
+                hasContent: hasContent || (stage.renderer === 'long_form' && (stageBundles[draftingStageId(template) ?? '']?.artifact?.long_form?.outline ?? []).some((sec) => (sec.content ?? '').trim())),
+                openRows: rendererHoldsItems(stage.renderer) ? headItems.filter((i) => !isTriaged(i, itemSchemaFor(stage))).length : 0,
+                requiredOpen: evaluation.criteria.filter((c) => c.blocking && !c.satisfied).map((c) => c.label),
+                nextStageLabel: nextStage?.short_label ?? null,
+              }) : []}
               headVersion={stageVersions.at(-1) ?? null}
               appendStageVersion={appendStageVersion}
               restoreStageVersion={restoreStageVersion}
@@ -1781,15 +1928,21 @@ export function WorkflowWorkspace({
               // Revising splices into the content it was handed, so instructing
               // while reading an older version would append a version built
               // from it and lose everything since. Discussion is unaffected.
+              // The chat sees an outline or the chapters as readable text, so
+              // it cannot splice into them: they change in their own editors.
               canInstruct={
-                (activeVersionId === null || activeVersionId === stageVersions.at(-1)?.id) && !rendererHoldsItems(stage.renderer)
+                (activeVersionId === null || activeVersionId === stageVersions.at(-1)?.id) && chatEditsProse
               }
               cannotChangeBecause={
                 rendererHoldsItems(stage.renderer)
                   ? 'This stage is a table. Ask about it here and the answer will offer row changes you can review, or change the rows in the table itself.'
-                  : undefined
+                  : stage.renderer === 'outline'
+                    ? 'Ask about the outline here; change it in the outline editor on the page.'
+                    : stage.renderer === 'long_form'
+                      ? 'Ask about the chapters here; rewrite one from its own section on the page.'
+                      : undefined
               }
-              isTable={rendererHoldsItems(stage.renderer)}
+              isTable={!chatEditsProse}
               suggestActions={draftable && headVersion ? suggestReplyActions : undefined}
               previewRows={previewReplyRows}
               onRunAction={runReplyAction}

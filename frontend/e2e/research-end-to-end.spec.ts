@@ -29,7 +29,8 @@ test('Research, start to finish: prefilled runs, Go derives and drafts the repor
   // What the draft already knew is on the row, as the model's word, with its reason.
   await expect(stageArtifact(page).getByRole('row').nth(1)).toContainText('Not run');
   await expect(stageArtifact(page).getByRole('row').nth(1)).toContainText('Set by PromptMaster');
-  await expect(stageArtifact(page).getByText('Completed', { exact: true })).toHaveCount(0);
+  // (The legend under the table names every status; the rows are what is checked.)
+  await expect(stageArtifact(page).getByRole('combobox').filter({ hasText: 'Completed' })).toHaveCount(0);
 
   // Experiment → Drafting.
   const drafting = page.locator('header').getByRole('heading', { name: 'Drafting', exact: true });
@@ -74,6 +75,20 @@ test('Research, start to finish: prefilled runs, Go derives and drafts the repor
   await finished.getByRole('button', { name: 'Read the full research report' }).click();
   await expect(finished.getByRole('heading', { name: /Introduction/ }).first()).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('02-finished-as-a-research-report.png'), fullPage: true });
+
+  // 4 Oct: completing Drafting files the full report on the outline's own row
+  // ("Full draft saved"). The approved outline must still be there afterwards,
+  // not parsed from that prose into an empty plan.
+  const draftingRows = await serviceSelect('artifacts', `project_id=eq.${id}&stage_id=eq.drafting&select=id`);
+  const versionsOnDrafting = await serviceSelect(
+    'artifact_versions',
+    `artifact_id=in.(${draftingRows.map((a: { id: string }) => a.id).join(',')})&select=source_operation`
+  );
+  expect(versionsOnDrafting.map((v: { source_operation: string }) => v.source_operation)).toContain('long_form_complete');
+  await page.getByRole('navigation', { name: 'Workflow stages' }).getByRole('button', { name: /Drafting/ }).click();
+  await expect(page.locator('header').getByRole('heading', { name: 'Drafting', exact: true })).toBeVisible();
+  await expect(page.getByLabel('Title of section 1').first()).toHaveValue(/\S/, { timeout: 15_000 });
+  await page.screenshot({ path: test.info().outputPath('03-outline-still-there-after-drafting.png'), fullPage: true });
 
   const [project] = await serviceSelect('projects', `id=eq.${id}&select=status`);
   expect(project.status).toBe('finalized');

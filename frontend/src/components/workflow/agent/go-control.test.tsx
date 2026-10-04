@@ -30,10 +30,19 @@ describe('GoControl', () => {
     expect(screen.getByText('14 / 25 steps this window')).toBeInTheDocument();
   });
 
-  it('shows the size of the next window once the run has ended', () => {
+  it('shows the size of the next window once the run has ended, and says which window each number is about', () => {
+    // "12 steps" beside "14 / 25 steps this window" read as a contradiction
+    // (2 Oct, screenshot 8). Ended, the selector is the next window and says so.
     const select = setup(run({ status: 'budget_exhausted', steps_used: 25, ended_at: '2026-10-02T01:00:00Z' }), 12);
     expect(select.value).toBe('12');
     expect(select).toBeEnabled();
-    expect(screen.getByText('25 / 25 steps in the last window')).toBeInTheDocument();
+    expect(screen.getByText('Next window')).toBeInTheDocument();
+    expect(screen.getByText('25 of 25 steps used in the last window')).toBeInTheDocument();
+  });
+
+  it('explains a step in one sentence', () => {
+    setup(run({}), 12);
+    expect(screen.getByText('A step is one thing PromptMaster does, like drafting or checking a stage. Running code counts as two.')).toBeInTheDocument();
+    expect(screen.queryByText(/credits or tokens/)).toBeNull();
   });
 });

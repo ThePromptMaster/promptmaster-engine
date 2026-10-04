@@ -15,26 +15,81 @@
  *     comes from the registry, not from the response.
  */
 
-import { stageDrafts } from '@/lib/workflow/stage-artifact';
+import { isTriaged, stageDrafts, type StageItem, type StageItemSchema } from '@/lib/workflow/stage-artifact';
 import { nextSuggestedStage } from '@/lib/workflow/engine';
-import type { StageDefinition, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
+import type { StageArtifactBundle } from '@/lib/workflow/digest';
+import type { StageDefinition, StageEvaluation, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
 import type { AgentRunStatus, AgentStep, ExecutionPolicy } from '@/types/agent';
-import { actionFor } from './actions';
+import { actionFor, INTERPRET_STEP, USER_ANSWER_STEP } from './actions';
 import type { StageFacts } from './facts';
 
 export const DEFAULT_BUDGET_STEPS = 12;
 /** The same move on the same stage this many times running is not progress. */
 export const NO_PROGRESS_REPEATS = 3;
 export const MAX_CONSECUTIVE_FAILURES = 2;
+/** This many performed moves in a row that left the project exactly as it was is not progress either. */
+export const NO_CHANGE_STEPS = 3;
 
 /**
  * Moving past something a stage requires is an override, and an override is
  * the user's, with their reason (1 Oct, item 8). A run acting on its own
  * authority is not offered the move; under Guided and Checkpoint the user's
  * Approve on the proposed move is the override.
+ *
+ * The converse too: a stage whose every requirement is met is not stuck. Go
+ * marked Critique stuck for "no draft content" while the page said "Nothing
+ * on Critique is outstanding — move on to Fact-check", and the two cards sat
+ * one above the other (2 Oct, screenshot 2). When the stage can advance the
+ * planner moves on, asks, or finishes; the user can still mark it stuck by
+ * hand.
  */
 export function withoutOverride(allowed: readonly string[], canAdvance: boolean, policy: ExecutionPolicy): string[] {
-  return allowed.filter((k) => k !== 'advance_stage' || canAdvance || policy !== 'autonomous');
+  return allowed.filter((k) =>
+    k === 'advance_stage' ? canAdvance || policy !== 'autonomous'
+    : k === 'mark_blocked' ? !canAdvance || !allowed.includes('advance_stage')
+    : true
+  );
+}
+
+/** The automatic steps, in words, for anything that names a step to the user. */
+const STEP_WORDS: Record<string, string> = { [INTERPRET_STEP]: 'Interpret the result', [USER_ANSWER_STEP]: 'Your answer' };
+
+/**
+ * No computation once every planned run has its result. On a production
+ * Research run (3 Oct) one sandbox run settled all eight rows, and Go went on
+ * running the computation again — eight tries were budgeted, one per row —
+ * instead of moving on to Analysis.
+ */
+export function withoutSettledRuns(
+  allowed: readonly string[],
+  review: { items: StageItem[]; schema: StageItemSchema } | undefined
+): string[] {
+  if (!review?.schema.execution) return [...allowed];
+  const open = review.items.filter((i) => !isTriaged(i, review.schema)).length;
+  return open > 0 ? [...allowed] : allowed.filter((k) => k !== 'run_computation');
+}
+
+/** Moves that polish a stage rather than move the work on. */
+export const POLISH_MOVES = ['evaluate_stage', 'apply_findings', 'revise_stage'] as const;
+/** Polishing moves on one stage in one run, once it could move on — and at most, whatever. */
+export const POLISH_WHEN_READY = 2;
+export const POLISH_MAX = 4;
+
+/**
+ * Stop polishing a stage that is good enough. On a production Research run
+ * (3 Oct) Go spent its whole window on Literature — check, apply, check,
+ * revise, check — every step producing a version, so the no-change stop never
+ * fired. Once the stage can move on, two polishing moves are enough; four
+ * are the most it gets either way. The planner is then left to move on, or
+ * to ask.
+ */
+export function withoutEndlessPolish(
+  allowed: readonly string[],
+  polishedHere: number,
+  canAdvance: boolean
+): string[] {
+  const capped = polishedHere >= POLISH_MAX || (canAdvance && polishedHere >= POLISH_WHEN_READY);
+  return capped ? allowed.filter((k) => !(POLISH_MOVES as readonly string[]).includes(k)) : [...allowed];
 }
 
 /** Which tools a run can actually call. */
@@ -48,6 +103,24 @@ export const NO_TOOLS: AgentTools = { literature: false };
 /** What a run can call today: a literature lookup (OpenAlex) is connected since 2026-10-01, and a topic search of it since 2026-10-02. */
 export const LIVE_TOOLS: AgentTools = { literature: true };
 
+/**
+ * Whether the stage holds a draft for the work now in hand. Ordinarily any
+ * draft; in a workflow that loops, only one written since the stage was last
+ * entered — last round's Explore is not this round's, and Go should draft the
+ * new round rather than revise the old one.
+ */
+export function stageHasCurrentDraft(
+  template: WorkflowTemplate,
+  state: WorkflowState,
+  stageId: string,
+  head: { content?: string | null; created_at?: string } | undefined
+): boolean {
+  if (!(head?.content ?? '').trim()) return false;
+  if (!template.stages.some((s) => s.transitions.loop_to)) return true;
+  const entered = state.stages[stageId]?.entered_at;
+  return !entered || !head?.created_at || head.created_at >= entered;
+}
+
 export function allowedActions(
   template: WorkflowTemplate,
   state: WorkflowState,
@@ -57,7 +130,8 @@ export function allowedActions(
   facts: StageFacts = {}
 ): string[] {
   const keys: string[] = [];
-  if (template.key === 'research') {
+  // Research predates the flag; anything else says so on the template.
+  if (template.key === 'research' || template.inquiry) {
     keys.push(
       'derive', 'prove', 'simplify', 'limiting_case', 'try_contradiction', 'run_computation',
       'falsify_hypothesis', 'compare_alternatives', 'update_assumptions'
@@ -92,8 +166,16 @@ export function allowedActions(
   // proposed for skipping (the user decides). Offered once per stage per run
   // — the loop removes it after a proposal.
   if (stage.transitions.allow_skip && stage.transitions.default_next) keys.push('propose_skip');
+  // A round that has produced its question can propose the next one (the user starts it).
+  if (stage.transitions.loop_to && stageHasDraft) keys.push('propose_next_round');
   if (nextSuggestedStage(template, state)) keys.push('advance_stage');
-  keys.push('mark_blocked', 'request_user_decision', 'declare_objective_complete');
+  // Nothing is stuck before it has been tried: a stage that drafts and has no
+  // draft yet is drafted first. Offered both, the planner on an empty review
+  // stage chose "stuck — no draft text" over drafting the review from the
+  // manuscript (2 Oct screenshots). Missing data shows itself once the draft
+  // exists (rows that cannot be run, a check that cannot be made).
+  if (!keys.includes('draft_stage')) keys.push('mark_blocked');
+  keys.push('request_user_decision', 'declare_objective_complete');
   return keys;
 }
 
@@ -129,6 +211,14 @@ export function preempt(input: {
   if (tail.length === MAX_CONSECUTIVE_FAILURES && tail.every((s) => s.status === 'failed')) {
     return { status: 'failed', reason: `The last ${MAX_CONSECUTIVE_FAILURES} steps failed. Stopping rather than retrying blind.` };
   }
+  const pair = alternating(finished);
+  if (pair) {
+    const name = (k: string) => actionFor(k)?.label ?? STEP_WORDS[k] ?? k;
+    return {
+      status: 'blocked',
+      reason: `"${name(pair[0])}" and "${name(pair[1])}" have been taking turns on this stage without it moving on. It needs your direction.`,
+    };
+  }
   if (noProgress(finished)) {
     const last = finished.at(-1)!;
     return {
@@ -141,8 +231,77 @@ export function preempt(input: {
 
 export function noProgress(finished: readonly AgentStep[]): boolean {
   const tail = finished.slice(-NO_PROGRESS_REPEATS);
-  if (tail.length < NO_PROGRESS_REPEATS) return false;
-  return tail.every((s) => s.action_key === tail[0].action_key && s.stage_id === tail[0].stage_id);
+  if (tail.length >= NO_PROGRESS_REPEATS && tail.every((s) => s.action_key === tail[0].action_key && s.stage_id === tail[0].stage_id)) {
+    return true;
+  }
+  return alternating(finished) !== null;
+}
+
+/** Two moves taking turns this many times over is a loop, not a second pass. */
+export const ALTERNATING_ROUNDS = 3;
+
+/**
+ * Two moves taking turns on one stage — check, apply, check, apply, check,
+ * apply — is the loop the client's execution log showed (2 Oct, screenshot 7:
+ * "Check this stage", "Apply the findings", over and over, then "Mark this
+ * stage stuck"). The same-move guard never saw it. Three rounds, not two: a
+ * check followed by a revision and a second check is ordinary work. Returns
+ * the pair, or null.
+ */
+export function alternating(finished: readonly AgentStep[]): [string, string] | null {
+  const n = ALTERNATING_ROUNDS * 2;
+  // A computation and its interpretation are one move in two steps; counted
+  // apart they looked like two moves taking turns (production Research pass).
+  const tail = finished.filter((s) => s.action_key !== INTERPRET_STEP).slice(-n);
+  if (tail.length < n) return null;
+  const [a, b] = tail;
+  if (a.action_key === b.action_key || !tail.every((s) => s.stage_id === a.stage_id)) return null;
+  const holds = tail.every((s, i) => s.action_key === (i % 2 === 0 ? a.action_key : b.action_key));
+  return holds ? [a.action_key, b.action_key] : null;
+}
+
+/**
+ * What the project is, in one string, so two reads can be compared (2 Oct,
+ * screenshot 7). Pure. Changes when a stage moves, a version lands, an event
+ * is recorded, a blocking requirement is met, a chapter is written, a row is
+ * decided or the outline is approved — and not otherwise.
+ */
+export function stateFingerprint(input: {
+  state: WorkflowState;
+  bundles: Record<string, StageArtifactBundle>;
+  events: readonly unknown[];
+  facts: StageFacts;
+  stageEvaluation: StageEvaluation;
+}): string {
+  const { state, bundles, events, facts, stageEvaluation } = input;
+  const heads = Object.keys(bundles)
+    .sort()
+    .map((id) => `${id}=${bundles[id]?.versions.at(-1)?.id ?? ''}`)
+    .join(',');
+  const met = stageEvaluation.criteria.filter((c) => c.blocking && c.satisfied).map((c) => c.id).sort().join(',');
+  return [
+    state.current_stage_id,
+    heads,
+    `events:${events.length}`,
+    `met:${met}`,
+    `chapters:${facts.manuscript?.complete ?? ''}`,
+    `decided:${facts.review ? facts.review.items.length - facts.review.routine.length - facts.review.material.length : ''}`,
+    `outline:${facts.outline?.approved ?? ''}`,
+  ].join('|');
+}
+
+/**
+ * The last NO_CHANGE_STEPS performed moves left the project exactly as it
+ * was: the stop, said as what the user can do about it. Null while the run
+ * is changing something.
+ */
+export function noChange(fingerprints: readonly string[]): string | null {
+  const tail = fingerprints.slice(-NO_CHANGE_STEPS);
+  if (tail.length < NO_CHANGE_STEPS || !tail.every((f) => f === tail[0])) return null;
+  return (
+    `The last ${NO_CHANGE_STEPS} moves changed nothing on this stage — no new version, no decision recorded, ` +
+    'no requirement met. Tell me what to do differently, or do the next part yourself and press Resume.'
+  );
 }
 
 /**

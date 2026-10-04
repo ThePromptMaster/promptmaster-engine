@@ -50,7 +50,7 @@ import {
 } from './chat-scope';
 import type { NewVersion } from '@/lib/supabase/versions';
 import type { ArtifactVersion, Project } from '@/types/project';
-import type { ChatMessage } from '@/types';
+import type { ChatContext, ChatMessage } from '@/types';
 
 /** A revision the user has been shown but has not yet accepted. */
 export interface ChatProposal {
@@ -93,6 +93,8 @@ interface Options {
     version: NewVersion
   ) => Promise<unknown>;
   restoreStageVersion?: (stageId: string, versionId: string) => Promise<void>;
+  /** Where the user is: stage, workflow, outline, chapters, buttons (3 Oct call). */
+  getChatContext?: () => ChatContext;
 }
 
 /**
@@ -128,6 +130,7 @@ export function useStageChat({
   headVersion,
   appendStageVersion,
   restoreStageVersion,
+  getChatContext,
 }: Options) {
   const [messages, setMessages] = useState<StageChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -218,6 +221,7 @@ export function useStageChat({
           chat_history: priorHistory,
           user_message: message,
           model: project.model,
+          context: getChatContext?.(),
         });
 
         await persist('assistant', response.assistant_message.content, 'discuss');
@@ -229,7 +233,7 @@ export function useStageChat({
         if (live.current) setBusy(false);
       }
     },
-    [busy, messages, persist, project, content, versionNumber]
+    [busy, messages, persist, project, content, versionNumber, getChatContext]
   );
 
   /**
@@ -343,6 +347,7 @@ export function useStageChat({
         chat_history: asHistory(messages),
         iteration_number: versionNumber + 1,
         model: project.model,
+        context: getChatContext?.(),
       });
       const after = response.iteration.output.trim();
       if (!after) {
@@ -365,7 +370,7 @@ export function useStageChat({
     } finally {
       if (live.current) setBusy(false);
     }
-  }, [busy, messages, content, project, versionNumber]);
+  }, [busy, messages, content, project, versionNumber, getChatContext]);
 
   /**
    * Accept the proposal: append it as a new version.

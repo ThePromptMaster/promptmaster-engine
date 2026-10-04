@@ -1,15 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 import { useAuth } from '@/hooks/use-auth';
 import { GuideInterview } from '@/components/projects/guide-interview';
 import { SetupCard, type SetupDraft } from '@/components/projects/setup-card';
+import { CustomWorkflowDesigner } from '@/components/projects/custom-workflow-designer';
 import { AutoGrowTextarea } from '@/components/shared/auto-grow-textarea';
 import { api } from '@/lib/api/client';
-import { createProject } from '@/lib/supabase/projects';
+import { createProject, hardDeleteProject } from '@/lib/supabase/projects';
 import { appendWorkflowEvent, listTemplates } from '@/lib/supabase/workflow';
 import { createArtifact } from '@/lib/supabase/versions';
 import type { WorkflowTemplate } from '@/lib/workflow/types';
@@ -32,6 +33,9 @@ import type { SetupRationale } from '@/types';
  */
 
 type Step = 'ask' | 'questions' | 'setup';
+
+/** The output format a Book gets when setup suggested none. */
+export const BOOK_OUTPUT_FORMAT = 'A book manuscript in continuous prose, chapter by chapter';
 
 function titleFrom(objective: string): string {
   const firstLine = objective.trim().split('\n')[0] ?? '';
@@ -59,15 +63,36 @@ export default function NewProjectPage() {
   });
   const [working, setWorking] = useState<null | 'questions' | 'setup' | 'creating'>(null);
   const [error, setError] = useState<string | null>(null);
+  // Kept apart from `error`: every other action clears that, and a failed
+  // workflow list then left "Start" disabled with nothing saying why (4 Oct).
+  const [templatesError, setTemplatesError] = useState<string | null>(null);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
 
-  useEffect(() => {
+  const loadTemplates = useCallback(() => {
+    setLoadingTemplates(true);
+    setTemplatesError(null);
     listTemplates()
       .then(setTemplates)
-      .catch((e) => setError(e instanceof Error ? e.message : 'Could not load workflows.'));
+      .catch((e) => setTemplatesError(e instanceof Error && e.message ? e.message : 'Could not load workflows.'))
+      .finally(() => setLoadingTemplates(false));
   }, []);
+
+  useEffect(() => {
+    loadTemplates();
+  }, [loadTemplates]);
 
   const templateFor = (key: string) => templates.find((t) => t.key === key) ?? null;
   const selected = templates.find((t) => t.id === templateId) ?? null;
+
+  // The list arrived after the setup was recommended (a retry): select what
+  // was recommended, so the user is not left to find it again.
+  const [prevTemplates, setPrevTemplates] = useState(templates);
+  if (prevTemplates !== templates) {
+    setPrevTemplates(templates);
+    if (step === 'setup' && !templateId && templates.length) {
+      setTemplateId((templates.find((t) => t.key === (recommendedKey ?? 'book')) ?? templates[0]).id);
+    }
+  }
   const hasObjective = objective.trim().length > 0;
 
   async function recommend(given?: { question: string; answer: string }[]) {
@@ -120,6 +145,7 @@ export default function NewProjectPage() {
     if (!user || !selected || working) return;
     setWorking('creating');
     setError(null);
+    let createdId: string | null = null;
     try {
       const project = await createProject(
         {
@@ -127,23 +153,28 @@ export default function NewProjectPage() {
           objective: draft.objective.trim(),
           audience: draft.audience.trim() || 'General',
           constraints: draft.constraints.trim(),
-          output_format: draft.output_format.trim(),
+          // A book's deliverable is prose. Left empty, every chapter prompt
+          // read "Output format: (none)" and the mode's structural habits
+          // filled the gap (2 Oct: "it really wants to make outlines").
+          output_format: draft.output_format.trim() || (selected.key === 'book' ? BOOK_OUTPUT_FORMAT : ''),
           mode: draft.mode,
           workflow: selected.key,
         },
         user.id
       );
+      createdId = project.id;
 
       // Pin the exact template version, so a later revision cannot reshape a
       // project that is already under way.
       const { createClient } = await import('@/lib/supabase/client');
-      await createClient()
+      const { error: pinError } = await createClient()
         .from('projects')
         .update({
           workflow_template_id: selected.id,
           stage: selected.stages[0]?.id ?? '',
         })
         .eq('id', project.id);
+      if (pinError) throw pinError;
 
       await createArtifact(project.id, user.id, 'output', 'Output');
       await appendWorkflowEvent(project.id, user.id, {
@@ -153,7 +184,12 @@ export default function NewProjectPage() {
 
       router.push(`/projects/${project.id}`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not create the project.');
+      // Four writes, not one transaction: a failure part-way left a project
+      // with no workflow pinned and no history, and pressing Start again made
+      // a second one. Take the half-made one back out, so a retry starts clean.
+      if (createdId) await hardDeleteProject(createdId).catch(() => undefined);
+      const reason = e instanceof Error && e.message ? e.message : 'Could not create the project.';
+      setError(`${reason} Nothing was created — press Start to try again.`);
       setWorking(null);
     }
   }
@@ -176,6 +212,20 @@ export default function NewProjectPage() {
       {error && (
         <div role="alert" className="mb-6 rounded-xl bg-[var(--error-container)] px-4 py-3 text-body text-[var(--on-error-container)]">
           {error}
+        </div>
+      )}
+
+      {templatesError && (
+        <div role="alert" className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[var(--error-container)] px-4 py-3 text-body text-[var(--on-error-container)]">
+          <span>The workflows could not be loaded, so a project can&apos;t be started yet. ({templatesError})</span>
+          <button
+            type="button"
+            onClick={loadTemplates}
+            disabled={loadingTemplates}
+            className="rounded-lg bg-[var(--surface-container-lowest)] px-3 py-1.5 text-label text-[var(--on-surface)] disabled:opacity-60"
+          >
+            {loadingTemplates ? 'Retrying…' : 'Retry'}
+          </button>
         </div>
       )}
 
@@ -269,6 +319,16 @@ export default function NewProjectPage() {
             draft={draft}
             rationale={rationale}
             onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))}
+            designer={
+              <CustomWorkflowDesigner
+                objective={draft.objective}
+                ownerId={user?.id ?? null}
+                onPublished={(t) => {
+                  setTemplates((prior) => [...prior, t]);
+                  setTemplateId(t.id);
+                }}
+              />
+            }
           />
           <div className="mt-10 flex items-center gap-3">
             <button

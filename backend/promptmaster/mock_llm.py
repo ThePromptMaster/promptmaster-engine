@@ -269,6 +269,15 @@ def _next_action(system: str, prompt: str) -> dict:
     elif choice == "check_literature" and "[[mock:search]]" in system + prompt:
         # "[[mock:search]]" in the objective makes the lookup a topic search.
         params = {"query": "Mock: customer churn"}
+    elif choice == "request_user_decision":
+        # "[[mock:control=listed]]" names the first button the page really
+        # has; "[[mock:control=invented]]" names one it does not — so a browser
+        # test can see the first pointed to and the second dropped.
+        listed = re.search(r'^- "([^"]+)" — ', prompt, re.M)
+        if "[[mock:control=invented]]" in prompt:
+            params = {"control": "Generate the outline/results artifact"}
+        elif "[[mock:control=listed]]" in prompt and listed:
+            params = {"control": listed.group(1)}
     elif choice == "mark_blocked":
         params = {"reason": "Mock: missing data", "block_kind": "data_missing"}
     elif choice == "propose_skip":
@@ -284,7 +293,11 @@ def _next_action(system: str, prompt: str) -> dict:
         "rationale": f"Mock: {choice} is the next scripted move.",
         "expected_outcome": f"Mock: the result of {choice}.",
         "needs_user_decision": choice == "request_user_decision",
-        "decision_question": "Mock: which way should this go?" if choice == "request_user_decision" else None,
+        "decision_question": (
+            "Mock: which way should this go?"
+            # The client's 3 Oct example: a button named in the words, not in params.
+            + (" Press Generate Outline to start." if "[[mock:control=invented]]" in prompt else "")
+        ) if choice == "request_user_decision" else None,
         "objective_complete": choice == "declare_objective_complete",
     }
 
@@ -298,6 +311,24 @@ def _json_reply(system: str, prompt: str) -> dict:
 
     from promptmaster import conflicts
 
+    if "You design workflows for PromptMaster" in system:
+        # A scripted magazine-feature workflow: write, list, write, check, write.
+        return {
+            "name": "Magazine feature", "description": "Mock: a feature from pitch to final copy.",
+            "deliverable": "article", "inquiry": False,
+            "stages": [
+                {"label": "Pitch and angle", "short_label": "Pitch", "kind": "write", "purpose": "Mock: say what the piece argues.",
+                 "instruction": "Mock: state the angle in two sentences.", "required": True, "approval": "I approve this angle"},
+                {"label": "Sources to interview", "short_label": "Sources", "kind": "list", "purpose": "Mock: who to talk to.",
+                 "instruction": "Mock: list the people to interview.", "required": True, "approval": ""},
+                {"label": "First draft", "short_label": "Draft", "kind": "write", "purpose": "Mock: the whole piece.",
+                 "instruction": "Mock: write the feature.", "required": True, "approval": ""},
+                {"label": "Fact check", "short_label": "Facts", "kind": "check", "purpose": "Mock: check the claims.",
+                 "instruction": "Mock: list the claims to verify.", "required": False, "approval": ""},
+                {"label": "Final copy", "short_label": "Final", "kind": "write", "purpose": "Mock: ready to file.",
+                 "instruction": "Mock: the final copy.", "required": True, "approval": "I approve this for publication"},
+            ],
+        }
     if conflicts._CONFLICT_INSTRUCTION[:60] in system:
         # "[[mock:conflict]]" in the instruction conflicts with the objective;
         # anything else is the usual answer: no conflict.
@@ -429,8 +460,21 @@ def _prose_reply(system: str, prompt: str) -> str:
     if conversation._CHAT_REPLY_INSTRUCTION[:60] in system:
         # A discussion reply that suggests changes as a list — so the side
         # chat's "buttonize it" has points to apply.
+        # Say what the chat was given, so a browser test can see the stage,
+        # the outline and the chapters reached it (3 Oct call: "paste the
+        # chapters back in the box").
+        seen = []
+        stage = re.search(r"^Current stage: (.+)$", prompt, re.M)
+        if stage:
+            seen.append(f"the {stage.group(1).strip()} stage")
+        if "THE OUTLINE:" in prompt:
+            seen.append("the outline")
+        if "--- BEGIN MANUSCRIPT ---" in prompt or re.search(r"^## \d+\. ", prompt, re.M):
+            seen.append("the chapters")
+        where = f"Mock: I can see {', '.join(seen)}; nothing needs pasting.\n\n" if seen else ""
         return (
-            "Mock reply: it reads well, but three things would help.\n\n"
+            where
+            + "Mock reply: it reads well, but three things would help.\n\n"
             "- Mock: open with the question the reader actually has.\n"
             "- Mock: replace the abstract second paragraph with one example.\n"
             "- Mock: end on what the reader should do next.\n"
@@ -458,6 +502,22 @@ def _prose_reply(system: str, prompt: str) -> str:
         first = notes.group(1).splitlines()[0].strip() if notes else "(no findings)"
         return f"## Mock revision\n\nRevised by the mock model, applying: {first[:160]}"
     objective = _objective(prompt) if "Objective:" in prompt else "the task"
+    if _WRITING_NOW in prompt:
+        # A chapter. Say what the prompt carried, so a browser test can see
+        # that the stage's own hint reached it and that the mode came as a
+        # voice, not as scaffolding (2 Oct: "it really wants to make outlines").
+        seen = []
+        if "THIS STAGE:" in system:
+            seen.append("stage hint seen")
+        if "[INTERNAL SCAFFOLDING]" not in system and "You do not write final prose" not in system:
+            seen.append("mode as voice only")
+        note = f" ({'; '.join(seen)})" if seen else ""
+        return (
+            "## Mock output\n\n"
+            f"This is scripted prose produced by the mock model for: {objective[:120]}{note}.\n\n"
+            "It has two paragraphs so that renderers, word counts and version history "
+            "have something realistic to hold. Nothing here came from a real model."
+        )
     return (
         "## Mock output\n\n"
         f"This is scripted text produced by the mock model for: {objective[:120]}.\n\n"

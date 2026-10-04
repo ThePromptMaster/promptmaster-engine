@@ -21,9 +21,10 @@
 
 import type { Artifact, ArtifactVersion, Project } from '@/types/project';
 import type { OutlineSection } from '@/types';
+import { manuscriptSourceFor } from './context';
 import type { StageDefinition, WorkflowState, WorkflowTemplate } from './types';
 import { parseItems, rendererHoldsItems } from './stage-artifact';
-import { isDone } from './types';
+import { carriesForward, isDone } from './types';
 
 /** Per-stage budget. Twelve stages of this is a paragraph, not a book. */
 export const SUMMARY_MAX = 320;
@@ -60,7 +61,9 @@ export interface DataFileBrief {
 }
 
 export function dataFileBriefs(project: Pick<Project, 'data_files'>): DataFileBrief[] {
-  return (project.data_files ?? []).map((f) => ({
+  // Images are placed in the work, not read by code; they reach prompts as
+  // captions (lib/data/images.ts), never as "data the project holds".
+  return (project.data_files ?? []).filter((f) => f.preview.kind !== 'image').map((f) => ({
     name: f.name, kind: f.preview.kind, columns: f.preview.columns, sample: f.preview.sample, rows: f.preview.rows,
   }));
 }
@@ -156,10 +159,11 @@ export interface StageArtifactBundle {
 /**
  * Build the digest for the stage about to be generated.
  *
- * Only stages the user actually completed contribute. A skipped stage produced
- * no conclusion, and a stage marked stale is by definition no longer trusted;
- * feeding either forward would have the model build on something the user has
- * already walked away from.
+ * Only stages the user completed, or moved past and left open, contribute. A
+ * skipped stage produced no conclusion, and a stage marked stale is by
+ * definition no longer trusted; feeding either forward would have the model
+ * build on something the user has already walked away from. A stage left open
+ * is labelled so, since its work was never signed off.
  */
 export function buildStageDigest(
   template: WorkflowTemplate,
@@ -171,9 +175,16 @@ export function buildStageDigest(
   const cutoff = template.stages.findIndex((s) => s.id === upToStageId);
   const prior_stages: StageDigestEntry[] = [];
 
+  // A workflow that loops starts each round with the last one's work marked
+  // stale (a return). The round being worked on is built on it, so it is
+  // shown — labelled as last round's — rather than dropped.
+  const loops = template.stages.some((s) => s.transitions.loop_to);
   template.stages.forEach((stage, index) => {
-    if (cutoff >= 0 && index >= cutoff) return;
-    if (!isDone(state.stages[stage.id]?.status)) return;
+    const st = state.stages[stage.id];
+    const lastRound = loops && index >= cutoff && st?.status === 'stale';
+    if (!lastRound && cutoff >= 0 && index >= cutoff) return;
+    if (!lastRound && !carriesForward(st)) return;
+    const leftOpen = !lastRound && !isDone(st?.status);
 
     const bundle = bundles[stage.id];
     const stored = bundle?.artifact?.summary?.trim();
@@ -181,19 +192,15 @@ export function buildStageDigest(
     const summary = stored ? truncate(stored) : summariseStageContent(stage, head);
     if (!summary) return;
 
-    prior_stages.push({ stage_id: stage.id, label: stage.label, summary });
+    const label = lastRound ? `${stage.label} (last round)` : leftOpen ? `${stage.label} (left open)` : stage.label;
+    prior_stages.push({ stage_id: stage.id, label, summary });
   });
 
-  // The manuscript lives on the first long-form stage's artifact (Revision and
-  // Editing rewrite it in place). Stages after it that are not themselves
-  // long-form are the ones that read it.
-  const draftingIndex = template.stages.findIndex((s) => s.renderer === 'long_form');
+  // The stages after drafting that are not themselves long-form read the
+  // chapters (`manuscriptSourceFor`, shared with Go's planner state).
   const target = template.stages[cutoff];
-  const readsManuscript =
-    draftingIndex >= 0 && cutoff > draftingIndex && target?.renderer !== 'long_form';
-  const sections = readsManuscript
-    ? (bundles[template.stages[draftingIndex].id]?.artifact?.long_form?.outline ?? [])
-    : [];
+  const source = target ? manuscriptSourceFor(template, target) : null;
+  const sections = source ? (bundles[source.id]?.artifact?.long_form?.outline ?? []) : [];
 
   return {
     objective: project.objective ?? '',

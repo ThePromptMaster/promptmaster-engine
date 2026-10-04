@@ -65,4 +65,12 @@ test('a chapter that fails says why, names itself, and can be retried', async ({
   await expect(page.getByText('3 of 3 sections written')).toBeVisible({ timeout: 60_000 });
   await expect(page.getByText(/Section 2, “Diet/)).toHaveCount(0);
   await page.screenshot({ path: test.info().outputPath('02-retried-and-written.png'), fullPage: true });
+
+  // 2 Oct, "it really wants to make outlines": each chapter prompt carried the
+  // Drafting stage's own hint (it never did before) and the mode as a voice,
+  // not Architect's "you do not write final prose" scaffolding. The mock says
+  // what it was given.
+  await page.getByRole('button', { name: /Habitat/ }).first().click();
+  await expect(page.getByText('(stage hint seen; mode as voice only)').first()).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath('03-chapter-prompt-carried-the-hint-and-the-voice.png'), fullPage: true });
 });

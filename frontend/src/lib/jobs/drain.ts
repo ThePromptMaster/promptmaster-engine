@@ -263,6 +263,7 @@ async function runProseStep(args: StepArgs, context: SectionContext): Promise<St
     prev_section_content: context.prevSectionContent,
     model: payload.model,
     userId: job.user_id,
+    ...(payload.stage_hint ? { stage_hint: payload.stage_hint } : {}),
     ...(payload.revise && context.section?.content
       ? { revision: { ...payload.revise, current_content: context.section.content } }
       : {}),

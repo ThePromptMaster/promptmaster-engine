@@ -71,6 +71,20 @@ export interface ReviewStatusOption {
   modelDefault?: true;
   /** One line for the legend under the table. */
   explain?: string;
+  /**
+   * The status says something was actually carried out — a result recomputed
+   * from the data. Only the user, choosing it themselves, or a run that
+   * executed may set it: never the model, Go's triage, or a change proposed
+   * from the chat (2 Oct, item 12: rows read "Reproduced" over text that said
+   * nothing had been recalculated).
+   */
+  requiresExecution?: true;
+  /**
+   * A value older rows carry that is no longer offered. It still shows, with
+   * its label, on the rows that have it — a stored value that vanished from
+   * the schema would read as "Not looked at".
+   */
+  legacy?: true;
 }
 
 export interface StageItemSchema {
@@ -79,6 +93,11 @@ export interface StageItemSchema {
   fields: ItemFieldSpec[];
   minItems: number;
   maxItems: number;
+  /**
+   * What the user is being asked to decide, in plain words, shown above the
+   * rows (2 Oct, item 13: "I'm not always sure what I am certifying").
+   */
+  decisionQuestion?: string;
   /** Present for review stages: the per-row triage enum. */
   statuses?: ReviewStatusOption[];
   /**
@@ -291,12 +310,16 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
     // A run that was not done is fine; a run that vanishes between the method
     // and the results is not — so "not run" costs a sentence.
     statuses: [
-      { value: 'completed', label: 'Completed', tone: 'done' },
-      { value: 'deviated', label: 'Deviated', tone: 'neutral', requiresReason: true },
+      { value: 'completed', label: 'Completed', tone: 'done', explain: 'It was carried out as planned, and the result is in the row.' },
+      { value: 'deviated', label: 'Deviated', tone: 'neutral', requiresReason: true, explain: 'It was carried out, but not as planned. Say what changed.' },
       // The one outcome the draft can know: nothing ran because what it
       // needed was never provided. "Completed" is never the model's to say.
-      { value: 'not_run', label: 'Not run', tone: 'warn', requiresReason: true, modelMaySet: true },
+      {
+        value: 'not_run', label: 'Not run', tone: 'warn', requiresReason: true, modelMaySet: true,
+        explain: 'It was not carried out. Say why — for example, the data it needed was not provided.',
+      },
     ],
+    decisionQuestion: 'For each planned run: was it carried out, and what happened? A run that was not done needs a reason, not silence.',
     // …but a run that really executed in the sandbox is.
     execution: { status: 'completed', field: 'observed', blocked: 'not_run', clears: ['deviation'] },
     reasonFrom: ['deviation', 'observed'],
@@ -320,10 +343,11 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
     // Left open is an acceptable outcome. Left unmentioned is not, which is
     // why there is no status meaning "not considered".
     statuses: [
-      { value: 'ruled_out', label: 'Ruled out', tone: 'done' },
-      { value: 'addressed', label: 'Addressed', tone: 'done' },
-      { value: 'left_open', label: 'Left open', tone: 'neutral', requiresReason: true },
+      { value: 'ruled_out', label: 'Ruled out', tone: 'done', explain: 'The evidence shows this explanation does not hold.' },
+      { value: 'addressed', label: 'Addressed', tone: 'done', explain: 'It has been dealt with in the work, though not excluded outright.' },
+      { value: 'left_open', label: 'Left open', tone: 'neutral', requiresReason: true, explain: 'It could still be true. Say why it is being left.' },
     ],
+    decisionQuestion: 'For each rival explanation: has the evidence ruled it out, has the work dealt with it, or is it still open?',
   },
 
   validation_table: {
@@ -332,15 +356,43 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
     maxItems: 20,
     fields: [
       { key: 'result', label: 'The result', hint: "In the analysis's own terms", long: true, max: 400 },
-      { key: 'attempt', label: 'What was done to validate it', long: true, max: 400 },
+      {
+        key: 'attempt', label: 'What was done to validate it',
+        hint: 'Say exactly which: recalculated from the data, compared with earlier studies or records, or only checked for consistency. If nothing was done, say so',
+        long: true, max: 400,
+      },
       { key: 'notes', label: 'What came back', long: true, max: 400 },
     ],
+    decisionQuestion:
+      'For each result: how was it checked, and do you accept it as sufficiently supported to move forward? Pick the status that says what was actually done.',
     // Not attempted is honest; unexamined is not. There is no status that lets
-    // "we did not check" read as "it held".
+    // "we did not check" read as "it held" — and, since 2 Oct, none that lets
+    // "it agrees with earlier studies" read as "we reproduced it".
     statuses: [
-      { value: 'reproduced', label: 'Reproduced', tone: 'done' },
-      { value: 'not_reproduced', label: 'Not reproduced', tone: 'warn', requiresReason: true },
-      { value: 'not_attempted', label: 'Not attempted', tone: 'neutral', requiresReason: true },
+      {
+        value: 'independently_reproduced', label: 'Independently reproduced', tone: 'done', requiresExecution: true,
+        explain: 'The result was recalculated or re-run from the data and came out the same. Only you can say this — PromptMaster never sets it.',
+      },
+      {
+        value: 'supported_by_prior', label: 'Supported by prior evidence', tone: 'done',
+        explain: 'It agrees with earlier studies or records. Nothing was recalculated.',
+      },
+      {
+        value: 'consistency_check', label: 'Consistency check only', tone: 'neutral',
+        explain: 'It fits with the rest of this work. That is not an independent test.',
+      },
+      {
+        value: 'not_reproduced', label: 'Not reproduced', tone: 'warn', requiresReason: true,
+        explain: 'A re-run or recalculation gave a different answer. Say what differed.',
+      },
+      {
+        value: 'not_attempted', label: 'Not attempted', tone: 'neutral', requiresReason: true, modelMaySet: true,
+        explain: 'No validation was tried. Say why.',
+      },
+      {
+        value: 'reproduced', label: 'Reproduced — kind not recorded', tone: 'neutral', legacy: true,
+        explain: 'Set before the kinds of validation were told apart. Choose which of the above it was.',
+      },
     ],
   },
 
@@ -354,6 +406,25 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
       { key: 'severity', label: 'Severity', hint: SEVERITY_HINT, options: SEVERITY_VALUES, max: 80 },
     ],
     statuses: TRIAGE,
+  },
+
+  // Exploration (3 Oct call): each claim of the round put to a test — a
+  // thought experiment, a limiting case, a known result. Whether it held is
+  // the user's call; the model proposes the tests.
+  exploration_tests: {
+    itemLabel: 'test',
+    minItems: 2,
+    maxItems: 8,
+    fields: [
+      { key: 'claim', label: 'Claim', long: true, max: 300 },
+      { key: 'test', label: 'How to test it', long: true, max: 400 },
+      { key: 'expected', label: 'What would show it wrong', long: true, max: 300 },
+    ],
+    statuses: [
+      { value: 'holds', label: 'Holds up', tone: 'done' },
+      { value: 'open', label: 'Still open', tone: 'neutral', requiresReason: true },
+      { value: 'fails', label: 'Breaks', tone: 'warn', requiresReason: true },
+    ],
   },
 
   critique_report: {
@@ -467,6 +538,14 @@ export function emptyItem(schema: StageItemSchema): StageItem {
 /** True when a row carries no text in any declared field. */
 export function isBlankItem(item: StageItem, schema: StageItemSchema): boolean {
   return schema.fields.every((f) => !(item[f.key] ?? '').trim());
+}
+
+/**
+ * The statuses anything other than the user's own choice may set: what the
+ * model, Go's triage and a change proposed from the chat are offered.
+ */
+export function proposableStatuses(schema: StageItemSchema): ReviewStatusOption[] {
+  return (schema.statuses ?? []).filter((s) => s.settable !== false && s.decided !== false && !s.requiresExecution && !s.legacy);
 }
 
 export function statusOption(

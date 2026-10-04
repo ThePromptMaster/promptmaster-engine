@@ -129,8 +129,9 @@ def build_reframe_prompt(
         "this problem. For each, state what it would change about the answer.\n\n"
         "**3. The Reframe** — Propose ONE specific reframe that would make the current answer "
         "obsolete in a good way. State the new framing as a one-sentence question or directive.\n\n"
-        "**4. What to Do Next** — Tell the user exactly how to apply this reframe in PromptMaster: "
-        "e.g., 'Click Refine Prompt and replace your objective with: [new objective]'.\n\n"
+        "**4. What to Do Next** — Tell the user exactly how to apply this reframe: give the new "
+        "objective as one sentence they could adopt, and what it would change in the work. Do not "
+        "name buttons or screens.\n\n"
         "Be specific, not abstract. Reference the actual content of the current answer."
     )
     return system, user

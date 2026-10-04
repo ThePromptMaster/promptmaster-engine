@@ -29,6 +29,7 @@ from pydantic import BaseModel, Field
 from .agent_actions import ACTION_KEYS, ACTIONS_BY_KEY, AGENT_ACTIONS
 from .conversation import _shared_system
 from .llm_client import OpenRouterClient
+from .page_context import scrub_button_mentions
 from .schemas import PMInput, DataFileBrief, format_data_files
 
 logger = logging.getLogger(__name__)
@@ -61,12 +62,25 @@ class AgentOutline(BaseModel):
 
 
 class AgentManuscript(BaseModel):
-    """The chapters, which live in artifacts.long_form rather than in a version."""
+    """The chapters, which live in artifacts.long_form rather than in a version.
+
+    `own` is true on the long-form stage that writes them. On a stage after
+    drafting that reads them — Continuity, Critique, Fact-check, Final review
+    — it is false, `stage_label` names the stage that holds them and `excerpt`
+    carries the opening of the text. Without that the planner on a review
+    stage saw an empty stage and no data, and marked it stuck for a draft that
+    existed (the client's 2 Oct screenshots).
+    """
     total: int = 0
     complete: int = 0
     pending_jobs: int = 0
     written: list[str] = Field(default_factory=list, max_length=60)
     unwritten: list[str] = Field(default_factory=list, max_length=60)
+    stage_label: str = Field(default="", max_length=200)
+    words: int = 0
+    own: bool = True
+    #: The frontend's MANUSCRIPT_EXCERPT_CHARS (lib/agent/digest.ts); marker included.
+    excerpt: str = Field(default="", max_length=6_000)
 
 
 class AgentFindings(BaseModel):
@@ -74,6 +88,33 @@ class AgentFindings(BaseModel):
     total: int = 0
     triaged: int = 0
     sample: list[str] = Field(default_factory=list, max_length=8)
+
+
+class AgentWorkflowStage(BaseModel):
+    label: str = Field(max_length=200)
+    renderer: str = Field(default="", max_length=40)
+
+
+class AgentWorkflow(BaseModel):
+    """The workflow the project is on and its stages in order.
+
+    Not knowing it, the planner spoke Research to a book — "paste the planned
+    runs with their observed outcomes" on "Write a book about lions" — and was
+    told the project held no data on a workflow with no stage that could run
+    anything (2 Oct, screenshot 8). `has_data_stages`: some stage's table
+    carries runs out, so a computation can serve it.
+    """
+    key: str = Field(max_length=40)
+    label: str = Field(max_length=200)
+    stages: list[AgentWorkflowStage] = Field(default_factory=list, max_length=40)
+    has_data_stages: bool = False
+
+
+class AgentControl(BaseModel):
+    """One button on the stage's page: its exact words, and where it is."""
+
+    label: str = Field(max_length=200)
+    where: str = Field(default="", max_length=200)
 
 
 class AgentState(BaseModel):
@@ -104,6 +145,11 @@ class AgentState(BaseModel):
     data_files: list[DataFileBrief] = Field(default_factory=list, max_length=10)
     #: Tools the run can call; a move without its tool is not offered.
     tools: dict[str, bool] = Field(default_factory=dict)
+    #: The buttons on the stage's page now, by their exact words (the frontend's
+    #: `lib/workflow/stage-controls.ts`). None when the page is not known.
+    controls: list[AgentControl] | None = Field(default=None, max_length=40)
+    #: The workflow and its stages. None from a client that predates it.
+    workflow: AgentWorkflow | None = None
 
 
 class NextAction(BaseModel):
@@ -125,18 +171,30 @@ _NEXT_ACTION_INSTRUCTION = (
     "If the objective is met and nothing needs another pass, choose "
     "declare_objective_complete and set objective_complete true. If a choice only "
     "the user can make is needed, choose request_user_decision and ask one "
-    "specific question. If a missing tool or missing data stops you, choose "
-    "mark_blocked and say what is missing. Do not repeat a move that just "
-    "failed or produced nothing new.\n\n"
+    "specific question. If a missing tool or missing data stops you, and nothing "
+    "listed can produce it, choose mark_blocked and say what is missing. Text that "
+    "exists elsewhere in the project — the manuscript, the outline, an earlier "
+    "stage's work — is not missing: a stage's own table being empty means it has "
+    "not been drafted yet, and draft_stage drafts it from that text. Do not repeat "
+    "a move that just failed or produced nothing new.\n\n"
     "The workflow's order is a sensible default, not a rule. If the current stage "
     "may be skipped (propose_skip is listed) and an expert would not do it next for "
     "this particular objective, choose propose_skip and give the reason — do not "
     "work through a stage only because it comes next.\n\n"
-    "Work that the stage's own controls do — generating or approving an outline, "
-    "drafting or revising sections, deciding on findings — is not missing data: "
-    "if it is needed and no listed move does it, choose request_user_decision "
-    "and name that button exactly (\"press Generate the outline\"). Never "
+    "Work that only the user can do on the page — approving, ticking a "
+    "requirement, deciding rows, attaching data — is not missing data. If it is "
+    "needed and no listed move does it, choose request_user_decision. Never "
     "mark_blocked for it: a blocked stage stops every later move too.\n\n"
+    "BUTTONS. The state lists the buttons that are on the user's page now, "
+    "under BUTTONS ON THIS PAGE NOW. You may name a button ONLY if it is in "
+    "that list, in exactly those words, and when you do, also put those exact "
+    "words in params.control. Never guess that a button exists, never write "
+    "\"if your interface has\", and never name a button from memory or from "
+    "another stage. If nothing in the list does what is needed, say so "
+    "plainly — \"there is no button for this on this stage\" — and then "
+    "either ask for the missing input (request_user_decision) or, when data "
+    "or a tool is what is missing, choose mark_blocked and give the exact "
+    "reason.\n\n"
     "Everything you write in rationale, expected_outcome and decision_question "
     "is shown to the user, who is not a developer. Write it in plain language "
     "about their work: say \"the draft\", \"the outline\", \"the table\", "
@@ -172,14 +230,29 @@ def _format_state(inputs: PMInput, state: AgentState) -> str:
             + ("approved for drafting — approval is done; never ask the user to approve it again" if o.approved else "not yet approved")
             + (": " + "; ".join(o.sections[:20]) if o.sections else "")
         )
+    manuscript_block: list[str] = []
     if state.manuscript is not None:
         m = state.manuscript
+        where = (
+            f" (drafted on {m.stage_label or 'the drafting stage'}; {m.words:,} words; this stage reads it)"
+            if not m.own else ""
+        )
         facts.append(
-            f"MANUSCRIPT: {m.complete} of {m.total} section(s) written"
+            f"MANUSCRIPT{where}: {m.complete} of {m.total} section(s) written"
             + (f", {m.pending_jobs} being written now" if m.pending_jobs else "")
             + (f"; written: {'; '.join(m.written[:20])}" if m.written else "")
             + (f"; still unwritten: {'; '.join(m.unwritten[:20])}" if m.unwritten else "")
         )
+        if not m.own and m.excerpt.strip():
+            manuscript_block = [
+                "",
+                "--- THE MANUSCRIPT THIS STAGE REVIEWS (the opening; the whole text goes to the draft) ---",
+                m.excerpt.strip(),
+                "--- END ---",
+                "A review stage's table is produced FROM this manuscript: choose draft_stage "
+                "to write it. The manuscript is not missing data; never mark_blocked because "
+                "the stage's own table is empty.",
+            ]
     if state.findings is not None:
         f = state.findings
         facts.append(
@@ -188,17 +261,48 @@ def _format_state(inputs: PMInput, state: AgentState) -> str:
             + (": " + "; ".join(f.sample) if f.sample else "")
         )
     data = format_data_files(state.data_files)
-    facts.append(
-        "DATA THE PROJECT HOLDS (readable by code you run, at these paths — you have not seen the contents):\n" + data
-        if data else
-        "DATA THE PROJECT HOLDS: none. A computation that needs real data cannot be run; say what data is missing."
-    )
+    if data:
+        facts.append(
+            "DATA THE PROJECT HOLDS (readable by code you run, at these paths — you have not seen the contents):\n" + data
+        )
+    elif state.workflow is None or state.workflow.has_data_stages:
+        facts.append(
+            "DATA THE PROJECT HOLDS: none. A computation that needs real data cannot be run; say what data is missing."
+        )
+    else:
+        # A writing workflow has no stage a computation serves. Told "no data",
+        # the planner asked a book for experiment results.
+        facts.append(
+            f"DATA: this is a {state.workflow.label.lower()} workflow — writing, not computation. "
+            "No stage of it needs a dataset, a run or a measurement; never ask the user for one "
+            "and never mark a stage stuck for the lack of one."
+        )
+    if state.controls is None:
+        facts.append("BUTTONS ON THIS PAGE NOW: not known. Do not name any button.")
+    elif state.controls:
+        facts.append(
+            "BUTTONS ON THIS PAGE NOW (the user presses these; you cannot — name one only in these exact words):\n"
+            + "\n".join(f'- "{c.label}" — {c.where}' for c in state.controls)
+        )
+    else:
+        facts.append("BUTTONS ON THIS PAGE NOW: none. Do not name any button.")
     if state.tools:
         facts.append("TOOLS: " + ", ".join(f"{k}={'yes' if v else 'no'}" for k, v in sorted(state.tools.items())))
+    workflow_line = (
+        [
+            f"WORKFLOW: {state.workflow.label} — "
+            + " › ".join(
+                s.label + (" [chapters]" if s.renderer == "long_form" else " [review table]" if s.renderer == "review" else "")
+                for s in state.workflow.stages
+            )
+        ]
+        if state.workflow is not None and state.workflow.stages else []
+    )
     return "\n".join([
         f"OBJECTIVE (authoritative): {inputs.objective}",
         f"Audience: {inputs.audience or '(not set)'}",
         "",
+        *workflow_line,
         f"CURRENT STAGE: {state.stage_label or state.stage_id}",
         f"What this stage asks for: {state.stage_instruction or '(no instruction)'}",
         f"Next stage: {state.next_stage_label or '(this is the last stage)'}",
@@ -222,6 +326,7 @@ def _format_state(inputs: PMInput, state: AgentState) -> str:
         "--- WHAT THIS STAGE HOLDS NOW (may be trimmed) ---",
         state.artifact_excerpt.strip() or "(nothing has been drafted on this stage yet)",
         "--- END ---",
+        *manuscript_block,
         "",
         "Moves made so far in this run (oldest first):",
         steps,
@@ -240,7 +345,26 @@ def build_next_action_prompt(
     return system, user
 
 
-def parse_next_action(result: object, allowed: list[str]) -> NextAction:
+#: The Go panel's own buttons, on every page Go runs on.
+_GO_BUTTONS = ("Resume", "Stop", "Go")
+
+
+def _named_control(params: dict, controls: list[AgentControl] | None) -> dict:
+    """Keep `params.control` only when it is a button the page really has, in the
+    page's own words; anything else the planner named is dropped."""
+    if "control" not in params:
+        return params
+    named = str(params.get("control") or "").strip().lower()
+    real = next((c.label for c in (controls or []) if c.label.strip().lower() == named), None)
+    kept = {k: v for k, v in params.items() if k != "control"}
+    if real:
+        kept["control"] = real
+    else:
+        logger.warning(f"Planner named a button that is not on the page: {params.get('control')!r}")
+    return kept
+
+
+def parse_next_action(result: object, allowed: list[str], controls: list[AgentControl] | None = None) -> NextAction:
     """Validate the planner's choice. Anything outside the list becomes a question
     to the user rather than an invented action."""
     permitted = set(allowed) & ACTION_KEYS
@@ -250,15 +374,22 @@ def parse_next_action(result: object, allowed: list[str]) -> NextAction:
     if key not in permitted:
         logger.warning(f"Planner chose {key!r}, outside the allowed actions; asking the user instead")
         return _ask("I could not settle on a next step that I can carry out from here. What would you like to do next?")
-    params = result.get("params") if isinstance(result.get("params"), dict) else {}
+    params = _named_control(result.get("params") if isinstance(result.get("params"), dict) else {}, controls)
     question = result.get("decision_question")
+
+    # The words around params.control are shown to the user too; a button
+    # named there that the page lacks is rewritten (3 Oct: "Press Generate
+    # Outline" on the Approval stage). Go's own Resume and Stop always exist.
+    def shown(text: object) -> str:
+        return scrub_button_mentions(str(text or "").strip(), controls, also=_GO_BUTTONS)
+
     return NextAction(
         action_key=key,
         params=params,
-        rationale=str(result.get("rationale") or "").strip(),
-        expected_outcome=str(result.get("expected_outcome") or "").strip(),
+        rationale=shown(result.get("rationale")),
+        expected_outcome=shown(result.get("expected_outcome")),
         needs_user_decision=bool(result.get("needs_user_decision")) or key == "request_user_decision",
-        decision_question=str(question).strip() if question else None,
+        decision_question=shown(question) if question else None,
         objective_complete=bool(result.get("objective_complete")) or key == "declare_objective_complete",
     )
 
@@ -280,7 +411,7 @@ async def choose_next_action(
     result, _usage = await client.generate_json(
         prompt=user, system=system, temperature=0.2, max_tokens=900, model=model,
     )
-    return parse_next_action(result, allowed)
+    return parse_next_action(result, allowed, state.controls)
 
 
 # --- performing a reasoning move --------------------------------------------------
@@ -329,7 +460,9 @@ _WRITE_CODE_INSTRUCTION = (
     "do not compute on placeholders: write a script that prints one line, "
     "`MISSING_DATA: <exactly what is missing, as one plain sentence>`, and then "
     "calls `raise SystemExit(2)`. That line is recorded as the reason the run "
-    "was not made. Return "
+    "was not made. Never report a run that could not be made as a `status:` "
+    "line or as an ordinary result: a clean exit means the analysis was "
+    "carried out, and the row is marked Completed. Return "
     "ONLY the code — no prose, no fences, and never any claimed output: the code "
     "has not been run, and you do not know what it will print."
 )

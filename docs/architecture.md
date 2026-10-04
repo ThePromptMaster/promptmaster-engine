@@ -171,6 +171,21 @@ the renderer switch. (`CLAUDE.md` said "five renderers cover 26 stages across bo
 workflows"; that was true when written, before `single_output` and the later template
 versions. Corrected there in the same change that added these documents.)
 
+**A chapter takes the mode as a voice, not as a scaffold (2026-10-03).** Every stage
+prompt goes through `_shared_system` (`backend/promptmaster/conversation.py`): the
+PromptMaster context, then the mode's lock, tone and `[INTERNAL SCAFFOLDING]`. Architect
+is the default mode, and its lock says "You do not write final prose — you build
+scaffolding"; through `_shared_system` that reached every chapter prompt beside "Do NOT
+outline", and the chapters came out as outlines (the client, 2 Oct). Section prose
+(`build_section_prompt`, `build_section_revision_prompt`) now goes through
+`_prose_system`: the context, the mode's name and tone (and a custom persona's preamble),
+and a sentence saying the mode's structural habits do not apply. The long-form stage's
+own `entry_prompt_hint` travels in each section job's payload as `stage_hint` and reaches
+the chapter prompt; it never did before. Prose stages keep the full mode lock, with one
+added sentence that the stage's instruction decides the form. The setup suggester is told
+a book's output format is manuscript prose, and a Book created with no format gets one
+(`BOOK_OUTPUT_FORMAT`).
+
 **No renderer branches on which workflow it is**, and a test in
 `renderers.test.tsx` asserts that. Book's fact-check table and Research's
 reproduction table are the same `review` renderer with different columns. This is the
@@ -198,15 +213,69 @@ the user chose to keep, and the rest behind "Full history". The claim table's st
 provenance first (`candidate_source`, `no_source`, both undecided) and decisions second.
 
 **Side-chat actions (2026-10-01).** An Ask reply is offered as at most four actions from
-`POST /api/suggest-actions`, not one Apply per bullet (the list parser in
-`critique-points.ts` still serves Challenge / Reframe / Self-audit, where each point is a
-finding). On a prose stage an action is a revision instruction and goes through the
+`POST /api/suggest-actions`, not one Apply per bullet. Since 2026-10-02
+Challenge / Reframe / Self-audit end the same way: their text goes through the same call
+(`critique-follow-up.tsx`), and the per-point list from `critique-points.ts` sits behind a
+closed "Review the points one by one" disclosure. The stage check's own findings are
+unchanged (capped at 3 / 7 / 10 by intensity). On a prose stage an action is a revision instruction and goes through the
 ordinary apply-findings preview. On a table stage it is row changes: `previewRowAction`
 (`lib/workflow/row-actions.ts`, pure) works out the rows as they would be and a plain list
 of what changes, the user reviews it in the chat panel, and saving appends a version with
 `source_operation: 'chat_rows'`. Both the server and the client drop rows, statuses and
 fields the table does not have. Actions are requested only for replies given while the
 panel is open; an older reply gets a "Suggest actions" button.
+
+**What the side chat is told (2026-10-03).** Every Ask, and "Save this discussion as a new
+version", carries a `context` (`buildChatContext`, `lib/workflow/chat-context.ts`):
+- the stage and its instruction
+- the workflow's stages, in order
+- the earlier stages' digest summaries
+- the outline as "1. Title — abstract" lines
+- the chapters (`formatManuscript`, bounded at 60k for chat)
+- the page's buttons, from the same `stageControls` list Go is given
+
+The backend renders this as the "WHERE THE USER IS" block (`promptmaster/page_context.py`),
+with a rule never to ask the user to paste what the project holds. An outline stage is
+read as titles and abstracts, and a chapter stage as its chapters. On both, the chat can
+discuss but not splice: Change it and Save-as-version are off there, because the text it
+sees is a rendering, not the stored version. Save-as-new-version now revises the current
+text instead of rewriting from the thread alone.
+
+**Button names in free text (2026-10-03).** `scrub_button_mentions` (`promptmaster/page_context.py`)
+checks every "press / click / tap X" in Go's rationale, expected outcome and question, and in a
+chat reply when the page's buttons were sent, against the page's buttons (plus Go's own
+Resume / Stop / Go). It handles near misses differently from names that don't exist:
+- A near miss ("Generate Outline" for "Generate the outline") is corrected to the page's words.
+- Any other name is rewritten as plain words, followed by "(there is no button for this on this page)".
+
+**Precedence (2026-10-03).** `promptmaster/precedence.py` defines one order for contradictions:
+1. the objective
+2. the user's decisions
+3. the user's latest instruction
+4. the stage's instruction
+5. constraints and format
+6. the mode
+7. anything a model wrote earlier
+
+The self-model states this order, so it reaches every prompt. A reply says which side it followed; the work itself just follows it. The self-model also says that a "write a book" objective is what the outline serves, not an order to write chapters on that stage.
+
+The PM-24 conflict prompt still asks the user. It preselects the side the order favours (`recommendedControl`, `lib/workflow/precedence.ts`), and `precedence-drift.test.ts` keeps the two copies of the order equal.
+
+**Workflows a user designs, and Exploration (2026-10-03).**
+
+User-designed workflows: `POST /api/generate-workflow` plus `lib/workflow/custom.ts` build a
+template, and `lib/workflow/validate.ts` checks it (every system template passes the same check).
+The template is saved to `workflow_templates` as the user's own (`custom_` key, `wft_insert_own`).
+
+Exploration loops: `transitions.loop_to` names where the next round starts. The stage bar
+offers "Start the next round from X", and Go proposes it with `propose_next_round`; the user
+always starts it. In a looping workflow:
+- the digest carries the last round's stale stages, labelled "(last round)";
+- Go treats a stage's draft as current only if it was written since the stage was last
+  entered (`stageHasCurrentDraft`).
+
+`template.inquiry` gives a workflow Go's reasoning moves. An Autonomous authorization may allow
+up to 20 further windows.
 
 ## Go mode (Phase B: PM-12, PM-15, PM-17 … PM-20)
 
@@ -236,6 +305,45 @@ next move is the user's, and what the planner is shown (`buildAgentState` takes 
 Before this the planner's excerpt and the requirements came from the store's bundles,
 which lag the section jobs, so Go could call a written Drafting stage empty.
 
+**The manuscript on every stage after Drafting (2026-10-03).** The chapters live on the
+first long-form stage's artifact, and the stages after it that are not themselves
+long-form — Continuity, Critique, Fact-check, Final review — exist to read them. One pure
+function says which stages those are (`manuscriptSourceFor`, `lib/workflow/context.ts`),
+and both readers use it: the stage digest that generates a review (`buildStageDigest`,
+bounded at 120k characters) and Go's planner state (`buildAgentState`, via the fresh
+`facts.reads_manuscript`), which carries the counts, the word count and a 6,000-character
+opening as `manuscript` with `own: false`. The backend prints it under "THE MANUSCRIPT
+THIS STAGE REVIEWS" and tells the planner that an empty review table means "not drafted
+yet — draft_stage drafts it from this text", never "missing data". Before this the planner
+on a review stage saw an empty stage and "DATA THE PROJECT HOLDS: none", and marked
+Fact-check, Critique and Continuity stuck for a draft that existed (the client's 2 Oct
+screenshots). The stage's critique tools (Challenge, Reframe, Self-audit) read the same
+text on a long-form stage, where there is no version to read until the stage completes.
+
+**What the planner knows of the workflow, and when it may say "stuck" (2026-10-03).** The
+state carries `workflow` — key, name, the stages in order with their renderers, and
+`has_data_stages`, read off the templates (a stage whose item schema has `execution`). The
+prompt prints the order as a WORKFLOW line, and the "DATA THE PROJECT HOLDS: none" line is
+printed only for a workflow with such a stage; a Book is told it is a writing workflow and
+never to ask for a dataset. Before this the planner asked "Write a book about lions" for
+"the planned runs with their observed outcomes" (2 Oct, screenshot 8). `mark_blocked` is
+offered only once the stage has been tried — not while `draft_stage` is on the menu — and
+not while the stage can advance (`withoutOverride`), so Go cannot sit a "Stuck" card under
+a "Nothing outstanding — move on" suggestion (screenshot 2). The user can still mark any
+stage stuck by hand.
+
+**A run going round in circles stops (2026-10-03).** Two guards, both pure and both before
+any model call. `stateFingerprint` (`lib/agent/policy.ts`) reduces a fresh read to one
+string — current stage, every stage's head version id, the event count, the blocking
+criteria met, chapters written, rows decided, outline approved — and the loop records it
+after each performed move; three in a row the same stops the run with "The last 3 moves
+changed nothing on this stage … Tell me what to do differently, or do the next part
+yourself and press Resume." `alternating` catches two moves taking turns on one stage for
+three rounds (check, apply, check, apply, check, apply), which the same-move guard never
+saw. The step timeline folds consecutive identical steps into one row with a count
+(`collapseSteps`). The client's 2 Oct execution log was that loop: "Move to the next
+stage", "Apply the findings", "Check this stage", repeated, then "Could not continue".
+
 **A stop is re-checked (2026-10-01).** When a run stops for the user it records what it
 needs (`agent_runs.needs`, with `onStage`). `useGoLoop` re-reads the stage whenever the
 project changes and asks `needStillHolds` (`lib/agent/needs.ts`, pure); a request the user
@@ -243,6 +351,24 @@ has satisfied on the stage itself, or one raised on a stage the project has left
 cleared and Resume is offered. A used-up window is continued by the main button when the
 policy and window size are unchanged; any new run started over a stopped one keeps that
 run's steps as planner history.
+
+**A stuck stage (2026-10-02).** A `stage_blocked` event records what the stage had to
+work with (`payload.inputs_at_block`: data file ids, the stage's head version, the brief —
+`lib/workflow/stage-inputs.ts`). Go's card compares that with the project now. Changed:
+it says what changed and leads with "Resume with what has changed". Unchanged: it says so
+and leads, by kind of block, with "Add the missing data" (goes to the Data panel) or "Try
+again". Then "Skip <stage> for now" where the stage allows it, and always "Continue this
+stage by hand", which lifts the block and leaves Go stopped — **at most three buttons**
+(2026-10-03; the client's 2 Oct screenshots showed five ways forward on one screen). The
+footer names the stage bar's own transition button in its exact words, from the controls
+registry. While Go's run holds the block, its card is the one surface: the stage's own
+"Stuck" notice is not drawn beside it, and the "Move on — nothing outstanding" suggestion
+is not derived for a stuck stage (`deriveWorkflowRecommendations`, `blocked`). A review
+stage that has not been drafted is no longer "every finding triaged" (`engine.ts`). A block
+recorded before this has no inputs, and the card claims neither. A retry that marks the
+stage stuck again for the same kind of thing with nothing changed says so and is not
+counted against the window. What "changed" does not see: an answer typed into Go's
+question, or a tool that has since become available.
 
 **The window.** `budget_steps` counts performed actions (a computation counts two;
 planning, waiting and the user's answers count none). It is not a cost limit. The
@@ -277,6 +403,17 @@ a done one.
 are shown to the user, so the prompt (`promptmaster/agent.py`) names its own sections in
 plain words ("MOVES AVAILABLE NOW", "WHAT THIS STAGE HOLDS NOW") and forbids "artifact",
 "action set", "model call" and action keys in what it writes. A test pins this.
+
+**Which buttons the planner may name (2026-10-02).** The planner is sent the buttons that
+are on the current stage's page (`state.controls`, built by `stageControls` in
+`lib/workflow/stage-controls.ts` from the same primary action, More menu, transitions,
+open approvals and panel labels the page draws). It may name a button only from that
+list; a `params.control` that is not in it is dropped by `parse_next_action`, and one
+that is in it is pointed to in fixed words by the performer. With no list (another stage
+is on show) it is told to name none. The stage bar's transitions under More are built by
+`transitionEntries` in the same file, and a browser test checks every listed label is on
+the page. What this does not do: read the question's free text — a button named there in
+other words is not caught.
 
 **"Succeeded" is read back.** After a step that claims a change, `readOutcomeProof`
 re-reads the project and `verifyOutcome` (`lib/agent/outcome.ts`, pure) fails the step if

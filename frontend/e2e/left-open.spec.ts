@@ -106,3 +106,36 @@ test('a left-open stage is named as such, and rewriting it before closing flags 
   await expect(researchRow).toContainText('recheck');
   await page.screenshot({ path: test.info().outputPath('02-closed-on-new-work-research-flagged.png'), fullPage: true });
 });
+
+/**
+ * 4 Oct — "an artifact disappears between stages". A stage moved past and
+ * left open stayed on the rail but its work never reached a later stage's
+ * prompt: the digest took done stages only. Now it is carried, labelled.
+ */
+test('a stage left open still reaches the next stage\'s prompt, labelled as left open', async ({ page }) => {
+  await createProject(page, { workflow: 'Book', name: 'E2E left open carries', objective: 'A book about tapirs' });
+  await expect(page.getByText('Mock output').first()).toBeVisible();
+  await pressTransition(page);
+  await expect(page.getByRole('heading', { name: /Audience/ })).toBeVisible();
+  await pressTransition(page);
+  await expect(page.getByRole('heading', { name: /Positioning/ })).toBeVisible();
+  await expect(page.getByRole('region', { name: / work$/ }).getByText(/Mock /).first()).toBeVisible({ timeout: 30_000 });
+
+  // The next stage's draft request, captured as it leaves the browser.
+  const drafted = page.waitForRequest(
+    (r) => r.url().endsWith('/api/generate-stage-artifact') && /Research/.test(r.postData() ?? ''),
+    { timeout: 30_000 }
+  );
+  await pressTransition(page); // "anyway": Positioning is left open
+  await expect(page.getByRole('heading', { name: /Research/ })).toBeVisible();
+
+  const body = (await drafted).postDataJSON() as { digest: { prior_stages: { stage_id: string; label: string; summary: string }[] } };
+  const positioning = body.digest.prior_stages.find((s) => s.stage_id === 'positioning');
+  expect(positioning, 'Positioning reaches the Research prompt').toBeTruthy();
+  expect(positioning!.label).toMatch(/\(left open\)$/);
+  expect(positioning!.summary.length).toBeGreaterThan(0);
+  expect(body.digest.prior_stages.map((s) => s.stage_id)).toEqual(['objective', 'audience', 'positioning']);
+
+  await expect(page.getByRole('region', { name: / work$/ }).getByText(/Mock /).first()).toBeVisible({ timeout: 30_000 });
+  await page.screenshot({ path: test.info().outputPath('01-research-drafted-with-left-open-positioning.png'), fullPage: true });
+});

@@ -126,8 +126,9 @@ test('Checkpoint: reasoning runs on its own, code waits for approval, then runs 
 
 test('Autonomous moves stages on its own authority and stops, blocked, at data it does not have', async ({ page }) => {
   // check_literature no longer blocks (it searches OpenAlex), so the honest
-  // stop is the planner's own mark_blocked.
-  const id = await researchProject(page, 'E2E go autonomous', 'Pendulum period [[mock:plan=derive,advance_stage,mark_blocked]]');
+  // stop is the planner's own mark_blocked — once Literature has been drafted:
+  // nothing is stuck before it has been tried (2 Oct screenshots).
+  const id = await researchProject(page, 'E2E go autonomous', 'Pendulum period [[mock:plan=derive,advance_stage,draft_stage,mark_blocked]]');
   await choose(page, 'Autonomous');
 
   const transparency = page.getByRole('region', { name: 'What Go mode is doing' });
@@ -141,6 +142,7 @@ test('Autonomous moves stages on its own authority and stops, blocked, at data i
   expect(await stepsOf(run.id)).toMatchObject([
     { action_key: 'derive', status: 'succeeded' },
     { action_key: 'advance_stage', status: 'succeeded', execution_label: null },
+    { action_key: 'draft_stage', status: 'succeeded' },
     { action_key: 'mark_blocked', status: 'blocked', execution_label: 'blocked', block_kind: 'data_missing' },
   ]);
   // The stage moves are the run's, cited and checked by the database.
@@ -201,7 +203,7 @@ test('The step budget ends the run', async ({ page }) => {
   );
   await choose(page, 'Autonomous', 5);
   await expect(page.getByRole('region', { name: 'What Go mode is doing' })).toContainText('Used all 5 steps', { timeout: 30_000 });
-  await expect(goPanel(page).getByLabel('Budget used')).toContainText('5 / 5 steps');
+  await expect(goPanel(page).getByLabel('Budget used')).toContainText('5 of 5 steps used in the last window');
   await page.screenshot({ path: test.info().outputPath('01-budget-exhausted.png'), fullPage: true });
   const run = await runOf(id);
   expect(run).toMatchObject({ status: 'budget_exhausted', steps_used: 5 });
@@ -262,7 +264,9 @@ test('A run making no progress stops for direction, and Resume carries on', asyn
 
   // Resuming is the user's direction to continue — it must not re-trip on the same three steps.
   await goPanel(page).getByRole('button', { name: 'Resume' }).click();
-  await expect(steps(page).nth(3)).toContainText('Prove');
+  // The three identical derives are one row with a count; Prove is the next row (2 Oct, screenshot 7).
+  await expect(steps(page).nth(0)).toContainText('×3');
+  await expect(steps(page).nth(1)).toContainText('Prove');
   await expect(transparency).toContainText('the deliverable is not');
   const recorded = await stepsOf((await runOf(id)).id);
   expect(recorded.map((s) => s.action_key)).toEqual(['derive', 'derive', 'derive', 'prove', 'declare_objective_complete']);

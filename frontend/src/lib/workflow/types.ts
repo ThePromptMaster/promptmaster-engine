@@ -101,6 +101,12 @@ export interface StageTransitions {
   allow_return_to: string[];
   /** Present only where the user genuinely chooses a path (Book's stage 8). */
   branch_options?: BranchOption[];
+  /**
+   * The stage a new round starts from (3 Oct call: work that "is going to go
+   * on forever"). Offered as "Start the next round", a return the user makes;
+   * Go proposes it and the user starts it, so every round is a check-in.
+   */
+  loop_to?: string;
 }
 
 export interface StageDefinition {
@@ -209,6 +215,13 @@ export interface WorkflowTemplate {
    * (`deliverableNouns` in labels.ts).
    */
   nouns?: { deliverable: string; unit: string };
+  /**
+   * Work that investigates rather than writes (Research, Exploration, a
+   * generated inquiry workflow): Go may reason, derive, test and compute on
+   * it. Set on the template rather than inferred from its key, so a workflow a
+   * user generates gets the same moves (3 Oct call).
+   */
+  inquiry?: boolean;
   stages: StageDefinition[];
 }
 
@@ -245,7 +258,10 @@ export interface StageState {
   left_reason?: string;
   /** The head version when the stage was moved past and left open. */
   left_version_id?: string;
-  blocked?: { kind: BlockKind; reason: string };
+  /** `inputs` is what the stage had to work with when it was marked stuck (lib/workflow/stage-inputs.ts). */
+  blocked?: { kind: BlockKind; reason: string; inputs?: unknown };
+  /** The block that was last cleared, so a stage marked stuck again for the same thing can say so. */
+  last_block?: { kind: BlockKind; inputs?: unknown };
 }
 
 export interface WorkflowState {
@@ -258,6 +274,17 @@ export interface WorkflowState {
 /** Both kinds of completed. */
 export function isDone(status: StageStatus | undefined): boolean {
   return status === 'complete' || status === 'completed_with_artifact';
+}
+
+/**
+ * Whether a stage's work is handed to later stages. Done stages, and a stage
+ * the user moved past with something unticked: the work is still the work they
+ * chose to build on, so dropping it would make it vanish from every later
+ * prompt while the rail still shows it. Not a completion — exit criteria and
+ * progress keep using `isDone`.
+ */
+export function carriesForward(state: StageState | undefined): boolean {
+  return isDone(state?.status) || (state?.status === 'in_progress' && Boolean(state.left_open));
 }
 
 /**

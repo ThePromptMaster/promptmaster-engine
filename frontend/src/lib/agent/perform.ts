@@ -19,10 +19,11 @@ import { appliedFindingsVersion, findingsInstruction, reviseWithFindings } from 
 import { findInstructionConflicts } from '@/lib/workflow/conflict-trail';
 import { describeWith, type InstructionConflict } from '@/lib/workflow/instruction-conflicts';
 import { defaultOutlineForm, deriveOutlineItems } from '@/lib/workflow/derived-outline';
-import { itemSchemaFor, parseItems, rendererHoldsItems, serializeItems } from '@/lib/workflow/stage-artifact';
+import { itemSchemaFor, parseItems, proposableStatuses, rendererHoldsItems, serializeItems } from '@/lib/workflow/stage-artifact';
 import { applyLookup, lookupQueries, lookupSummary, recordLine, rowsFromSearch } from '@/lib/workflow/lookup';
 import { figuresFromOutput, readStageFigures, withRunFigures, type StageFigures } from '@/lib/workflow/figures';
 import { applyRunBlocked, applyRunResult } from '@/lib/workflow/run-result';
+import { inputsChanged, stageInputs } from '@/lib/workflow/stage-inputs';
 import { applyTriage } from '@/lib/workflow/triage';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import { summariseStageContent } from '@/lib/workflow/digest';
@@ -100,6 +101,8 @@ export interface StepOutcome {
   stop?: { status: 'completed' | 'awaiting_decision' | 'blocked'; reason: string };
   /** What the run needs from the user now (B4): the card with its one button. */
   needs?: NeedsUser;
+  /** The step changed nothing and repeated a stop already made: it is not counted against the window. */
+  free?: boolean;
 }
 
 const MAX_OUTPUT = 6_000;
@@ -462,6 +465,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         const conflicts = await findInstructionConflicts({
           project: ctx.project, stageId: ctx.stage.id, instruction,
           headVersionId: ctx.bundles[ctx.stage.id]?.versions.at(-1)?.id ?? null,
+          stage: { label: ctx.stage.label, instruction: ctx.stage.entry_prompt_hint },
         });
         if (conflicts.length) return askWhichTakesPriority(key, params, instruction, conflicts);
       }
@@ -544,7 +548,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         if (!m.approvedOutlineVersionId) return done(key, { status: 'failed', output: 'No approved outline to draft against.', toolsUsed: [], changes: {} });
         const ids = await enqueueDraftJobs({
           project: ctx.project, artifactId: m.artifact.id, stageId: ctx.stage.id, outline: m.outline,
-          approvedOutlineVersionId: m.approvedOutlineVersionId, jobs: m.jobs,
+          approvedOutlineVersionId: m.approvedOutlineVersionId, jobs: m.jobs, stageHint: ctx.stage.entry_prompt_hint,
         });
         if (!ids.length) return done(key, { status: 'failed', output: 'Every section is already written.', toolsUsed: [], changes: {} });
         return waitForSections(ctx, key, ids, 'Wrote');
@@ -555,7 +559,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       const append = ctx.appendStageVersion;
       const ids = await enqueueRevisionJobs({
         project: ctx.project, artifactId: m.artifact.id, stageId: ctx.stage.id, outline: m.outline,
-        approvedOutlineVersionId: m.approvedOutlineVersionId, brief: m.brief,
+        approvedOutlineVersionId: m.approvedOutlineVersionId, brief: m.brief, stageHint: ctx.stage.entry_prompt_hint,
         saveSnapshot: (v) => append(m.holderStageId, holderLabel, v),
       });
       if (!ids.length) return done(key, { status: 'failed', output: 'No written section to revise.', toolsUsed: [], changes: {} });
@@ -572,6 +576,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       if (!ctx.conflictAnswer) {
         const conflicts = await findInstructionConflicts({
           project: ctx.project, stageId: ctx.stage.id, instruction: findingsInstruction(findings), headVersionId: head.id,
+          stage: { label: ctx.stage.label, instruction: ctx.stage.entry_prompt_hint },
         });
         if (conflicts.length) return askWhichTakesPriority(key, params, findings.map((f) => f.summary).join('; '), conflicts);
       }
@@ -603,7 +608,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         {
           inputs, state: ctx.digest,
           items: r.routine.map((i) => Object.fromEntries(Object.entries(i).filter(([k, v]) => k !== 'status' && k !== 'reason' && typeof v === 'string')) as Record<string, string>),
-          statuses: (r.schema.statuses ?? []).map((s) => ({ value: s.value, label: s.label, requires_reason: Boolean(s.requiresReason) })),
+          statuses: proposableStatuses(r.schema).map((s) => ({ value: s.value, label: s.label, requires_reason: Boolean(s.requiresReason) })),
           model,
         },
         ctx.signal
@@ -704,6 +709,20 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       });
     }
 
+    case 'loop': {
+      // A proposal, as with skipping: going back is the user's decision (the
+      // database records a return only as theirs), so each round is a check-in.
+      const to = ctx.stage.transitions.loop_to;
+      if (!to) return done(key, { status: 'failed', toolsUsed: [], changes: {}, output: 'This stage does not start another round.' });
+      const reason = (typeof params.reason === 'string' && params.reason.trim()) || ctx.step.rationale || 'The question this round ended on is worth pursuing.';
+      const need: NeedsUser = { kind: 'next_round', stageId: ctx.stage.id, toStageId: to, reason };
+      const message = `Suggested another round: ${reason}`;
+      return done(key, {
+        status: 'succeeded', toolsUsed: [], changes: {}, output: message,
+        stop: { status: 'awaiting_decision', reason: message }, needs: need,
+      });
+    }
+
     case 'skip': {
       // A proposal, never a skip: the stage is skipped only if the user
       // presses the card's button, and that event is theirs.
@@ -720,28 +739,49 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       const kind = (['tool_missing', 'data_missing', 'needs_decision'] as const).find((k) => k === params.block_kind) ?? 'needs_decision';
       const reason = (typeof params.reason === 'string' && params.reason.trim()) || ctx.step.rationale || 'Go mode could not continue.';
       const actor = ctx.approvedByUser || ctx.run.policy === 'guided' ? 'user' : 'system';
+      // What the stage has to work with now goes on the record with the
+      // block, so the card can later say whether anything changed (2 Oct, item 9).
+      const inputs = stageInputs(ctx.project, ctx.bundles[ctx.stage.id]?.versions.at(-1)?.id);
+      // Marked stuck again, for the same kind of thing, with nothing changed
+      // since it was last cleared: that was a retry, not progress. It is said
+      // in those words and costs no step.
+      const last = ctx.state.stages[ctx.stage.id]?.last_block;
+      const repeat = last?.kind === kind && inputsChanged(last.inputs, inputs)?.changed === false;
       await appendWorkflowEvent(ctx.project.id, ctx.project.user_id, {
         type: 'stage_blocked',
         stage_id: ctx.stage.id,
         actor,
         agent_run_id: actor === 'system' ? ctx.run.id : null,
         reason,
-        payload: { block_kind: kind },
+        payload: { block_kind: kind, inputs_at_block: inputs },
       });
       await ctx.afterStageEvent();
+      const said = repeat ? `Nothing has changed since this stage was last marked stuck, so it stops at the same place: ${reason}` : reason;
       return done(key, {
         status: 'blocked', blockKind: kind, toolsUsed: [], changes: { event_types: ['stage_blocked'] },
-        output: `Could not continue: ${reason}`, stop: { status: 'blocked', reason },
+        output: `Could not continue: ${said}`, stop: { status: 'blocked', reason: said },
+        // The card with its options, at once: it used to take a second press of Resume to appear.
+        needs: { kind: 'unblock_stage', stageId: ctx.stage.id, reason, blockKind: kind },
+        ...(repeat ? { free: true } : {}),
       });
     }
 
-    case 'ask':
+    case 'ask': {
+      // A button the planner names is checked against the page's own list;
+      // one that is really there is pointed to in fixed words, so the user is
+      // never sent looking for a control that does not exist (2 Oct, item 10).
+      const named = (ctx.digest.controls ?? []).find(
+        (c) => typeof params.control === 'string' && c.label.toLowerCase() === params.control.trim().toLowerCase()
+      );
+      const pointer = named ? `\n\nThe button is "${named.label}", ${named.where}.` : '';
+      const question = `${ctx.step.decision_question || 'Which way should this go?'}${pointer}`;
       return done(key, {
         status: 'succeeded', toolsUsed: [], changes: {},
-        output: ctx.step.decision_question || 'Which way should this go?',
-        stop: { status: 'awaiting_decision', reason: ctx.step.decision_question || 'Go mode needs your decision.' },
-        needs: { kind: 'answer_question', question: ctx.step.decision_question || 'Which way should this go?' },
+        output: question,
+        stop: { status: 'awaiting_decision', reason: question },
+        needs: { kind: 'answer_question', question },
       });
+    }
 
     case 'complete': {
       // PM-25: the model's opinion is not enough — the deliverable has to exist.

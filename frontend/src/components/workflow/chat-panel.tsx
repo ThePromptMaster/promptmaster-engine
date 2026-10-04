@@ -42,7 +42,7 @@ import {
 } from '@/lib/workflow/instruction-conflicts';
 import { ReplyActions } from './reply-actions';
 import type { RowChange } from '@/lib/workflow/row-actions';
-import type { ReplyAction } from '@/types';
+import type { ChatContext, ReplyAction } from '@/types';
 import { documentSections, type ScopeKind } from './chat-scope';
 import type { StageChatMessage } from '@/lib/supabase/conversation';
 import type { NewVersion } from '@/lib/supabase/versions';
@@ -121,8 +121,15 @@ interface Props {
   previewRows?: (action: ReplyAction) => RowChange[];
   onRunAction?: (action: ReplyAction) => Promise<void> | void;
   applying?: boolean;
-  /** The stage's work is a table: a discussion cannot be saved over it as prose. */
+  /**
+   * The stage's work is not a prose version — a table, an outline or chapters —
+   * so a discussion cannot be saved over it as prose.
+   */
   isTable?: boolean;
+  /** Where the user is, sent with every question (3 Oct call). */
+  getChatContext?: () => ChatContext;
+  /** Questions offered before the user types, from the stage's state (3 Oct call). */
+  starters?: string[];
 }
 
 /**
@@ -163,6 +170,8 @@ export function ChatPanel({
   onRunAction,
   applying = false,
   isTable = false,
+  getChatContext,
+  starters = [],
 }: Props) {
   const [offerActions, setOfferActions] = useState(true);
   useEffect(() => setOfferActions(readOfferActions()), []);
@@ -174,6 +183,7 @@ export function ChatPanel({
     headVersion,
     appendStageVersion,
     restoreStageVersion,
+    getChatContext,
   });
 
   const [requestedMode, setMode] = useState<Mode>(initialMode);
@@ -307,6 +317,7 @@ export function ChatPanel({
         setChecking(true);
         const conflicts = await findInstructionConflicts({
           project, stageId, instruction: action.instruction, headVersionId: headVersion?.id ?? null,
+          stage: { label: stageLabel, instruction: getChatContext?.().stage_instruction },
         });
         setChecking(false);
         if (conflicts.length) {
@@ -316,7 +327,7 @@ export function ChatPanel({
       }
       await onRunAction(action);
     },
-    [onRunAction, project, stageId, headVersion?.id]
+    [onRunAction, project, stageId, stageLabel, getChatContext, headVersion?.id]
   );
 
   const canSend =
@@ -336,6 +347,7 @@ export function ChatPanel({
     const recent = chat.messages.filter((m) => m.role === 'user' && m.mode === 'instruct').map((m) => m.content);
     const conflicts = await findInstructionConflicts({
       project, stageId, instruction: text, recentInstructions: recent, headVersionId: headVersion?.id ?? null,
+      stage: { label: stageLabel, instruction: getChatContext?.().stage_instruction },
     });
     setChecking(false);
     if (conflicts.length) {
@@ -343,7 +355,7 @@ export function ChatPanel({
       return;
     }
     await chat.propose(text, scope, { selection, sectionId: effectiveSectionId });
-  }, [draft, mode, scope, selection, effectiveSectionId, chat, project, stageId, headVersion?.id]);
+  }, [draft, mode, scope, selection, effectiveSectionId, chat, project, stageId, stageLabel, getChatContext, headVersion?.id]);
 
   const resolveConflicts = useCallback(
     async (choices: Controls[]) => {
@@ -515,6 +527,21 @@ export function ChatPanel({
             />
           )}
 
+          {mode === 'discuss' && !chat.loading && chat.messages.length === 0 && !chat.busy && !conflicting && starters.length > 0 && (
+            <div role="group" aria-label="Suggested questions" className="mb-2 flex flex-col gap-1.5">
+              {starters.map((q) => (
+                <button
+                  key={q}
+                  type="button"
+                  onClick={() => void chat.discuss(q)}
+                  className="rounded-lg bg-[var(--surface-container-low)] px-3 py-1.5 text-left text-label text-[var(--on-surface)] hover:bg-[var(--surface-container-high)]"
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+          )}
+
           <div
             className={`rounded-xl px-3 py-2 ${
               mode === 'instruct'
@@ -611,7 +638,7 @@ function ModeSwitch({
         </span>
         <span>
           {mode === 'discuss'
-            ? 'Ask only — talking here cannot change your document. Only a point you choose to Apply does, as a new version.'
+            ? 'Ask only — talking here cannot change your document. Only an action you choose does, as a new version.'
             : 'Revisions are shown for review first, and never replace a version.'}
         </span>
       </p>

@@ -122,6 +122,9 @@ class GenerateSectionProseRequest(BaseModel):
     budget_seconds: float | None = Field(default=None, gt=0, le=780)
     #: Set by the Revision and Editing stages: rewrite the existing section.
     revision: SectionRevisionBrief | None = None
+    #: The long-form stage's own `entry_prompt_hint` — how this workflow wants
+    #: a section written. It never reached the chapter prompt before 2026-10-03.
+    stage_hint: str = Field(default="", max_length=4_000)
 
 
 class ExtractSectionRecordRequest(BaseModel):
@@ -311,6 +314,7 @@ async def api_generate_section_prose(
             records=req.records or None,
             deadline=_deadline(req.budget_seconds),
             revision=req.revision,
+            stage_hint=req.stage_hint,
         )
     except OpenRouterError as e:
         raise llm_http_error(

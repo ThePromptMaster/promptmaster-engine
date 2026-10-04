@@ -80,6 +80,8 @@ export interface DraftJobsArgs {
   jobs: readonly ProjectJob[];
   /** Only these sections; every unwritten one when omitted. */
   sectionIds?: readonly string[];
+  /** The stage's `entry_prompt_hint`: how this workflow wants a section written. */
+  stageHint?: string;
 }
 
 /**
@@ -89,7 +91,7 @@ export interface DraftJobsArgs {
  * the sections a job was queued for.
  */
 export async function enqueueDraftJobs(args: DraftJobsArgs): Promise<string[]> {
-  const { project, artifactId, stageId, outline, approvedOutlineVersionId, jobs, sectionIds } = args;
+  const { project, artifactId, stageId, outline, approvedOutlineVersionId, jobs, sectionIds, stageHint } = args;
   const wanted = sectionIds ? new Set(sectionIds) : null;
   const latest = jobBySection(jobs);
   const queued: string[] = [];
@@ -98,6 +100,7 @@ export async function enqueueDraftJobs(args: DraftJobsArgs): Promise<string[]> {
     await enqueueSectionJob({
       project,
       artifactId,
+      stageHint,
       stageId,
       outlineVersionId: approvedOutlineVersionId,
       sectionId: section.id,
@@ -138,6 +141,8 @@ export interface RevisionJobsArgs {
   targets?: readonly SectionTarget[];
   /** Saves the pre-pass snapshot — through the project store when there is one. */
   saveSnapshot: (version: NewVersion) => Promise<unknown>;
+  /** The stage's `entry_prompt_hint`: how this workflow wants a section written. */
+  stageHint?: string;
 }
 
 /**
@@ -148,7 +153,7 @@ export interface RevisionJobsArgs {
  * against" is what the stage promises.
  */
 export async function enqueueRevisionJobs(args: RevisionJobsArgs): Promise<string[]> {
-  const { project, artifactId, stageId, outline, approvedOutlineVersionId, brief, saveSnapshot } = args;
+  const { project, artifactId, stageId, outline, approvedOutlineVersionId, brief, saveSnapshot, stageHint } = args;
   const targets = args.targets ?? writtenSections(outline);
   await saveSnapshot(manuscriptSnapshot(outline, brief.stageLabel, project.mode));
   const revise = {
@@ -161,6 +166,7 @@ export async function enqueueRevisionJobs(args: RevisionJobsArgs): Promise<strin
     await enqueueSectionJob({
       project,
       artifactId,
+      stageHint,
       stageId,
       outlineVersionId: approvedOutlineVersionId,
       sectionId: section.id,

@@ -358,6 +358,15 @@ describe('deriving the outline', () => {
     expect(stageBrief(question, state, bundles)).toBe(CONCLUSIONS.question);
     expect(stageBrief(literature, state, bundles)).toBe('');
   });
+
+  it('briefs from a stage the user moved past and left open', () => {
+    const { state, bundles } = upstream();
+    const literature = RESEARCH_V1.stages.find((s) => s.id === 'literature')!;
+    const leftOpen = { ...state, stages: { ...state.stages, literature: { status: 'in_progress' as const, left_open: true } } };
+    const reopened = { ...state, stages: { ...state.stages, literature: { status: 'in_progress' as const } } };
+    expect(stageBrief(literature, leftOpen, bundles)).toBe(CONCLUSIONS.literature);
+    expect(stageBrief(literature, reopened, bundles)).toBe('');
+  });
 });
 
 describe('a skipped source stage does not produce a broken outline', () => {

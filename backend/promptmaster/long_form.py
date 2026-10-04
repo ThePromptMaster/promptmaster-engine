@@ -10,7 +10,7 @@ import logging
 import uuid
 
 from .continuity import generate_continuity_snapshot
-from .conversation import _shared_system
+from .conversation import _prose_system, _shared_system
 from .llm_client import OpenRouterClient, OpenRouterDeadlineError
 from .schemas import (
     ContinuitySnapshot,
@@ -78,7 +78,9 @@ async def detect_long_form(
 _OUTLINE_SYSTEM = (
     "You design clear, well-scoped outlines for long-form documents. "
     "Each section title is concrete and non-overlapping. Each abstract is a "
-    "single sentence describing what that section covers. Return JSON only."
+    "single sentence describing what that section covers. You produce the "
+    "outline only: an objective such as \"write a book\" is what the outline "
+    "serves, and the sections are written later, from it. Return JSON only."
 )
 
 
@@ -245,8 +247,21 @@ _SECTION_INSTRUCTION = (
     "LONG-FORM EXECUTION MODE: You are writing ONE section of a multi-section "
     "document. Write only the section indicated below. Do NOT outline, do NOT "
     "summarize what other sections will cover, do NOT include meta commentary. "
-    "Write the actual prose for this section in the style and tone of the mode."
+    "Write the actual prose for this section, in the voice the tone guidance "
+    "describes. Headings, bullet scaffolds and numbered sub-plans are wrong here "
+    "even if your mode normally produces them: the reader gets continuous prose."
 )
+
+
+def _section_system(stage_hint: str) -> str:
+    """The section instruction, with the drafting stage's own hint when it has one.
+
+    The Book's Drafting stage says how a chapter is to be written ("stay inside
+    that abstract", "write to the audience segments as described"). It never
+    reached the chapter prompt: the request had no field for it.
+    """
+    hint = stage_hint.strip()
+    return _SECTION_INSTRUCTION + (f"\n\nTHIS STAGE:\n{hint}" if hint else "")
 
 
 def build_section_prompt(
@@ -256,6 +271,7 @@ def build_section_prompt(
     prior_snapshot: ContinuitySnapshot | None,
     prev_section_content: str,
     records: list[SectionRecord] | None = None,
+    stage_hint: str = "",
 ) -> tuple[str, str]:
     """Build (system, user) prompts for one section's generation.
 
@@ -275,7 +291,7 @@ def build_section_prompt(
     else:
         context_text = _format_snapshot_for_prompt(prior_snapshot)
 
-    system = _shared_system(inputs, [], _SECTION_INSTRUCTION)
+    system = _prose_system(inputs, _section_system(stage_hint))
     user = (
         f"Original objective: {inputs.objective}\n"
         f"Audience: {inputs.audience}\n"
@@ -320,6 +336,7 @@ def build_section_revision_prompt(
     outline: list[OutlineSection],
     section_index: int,
     revision: SectionRevisionBrief,
+    stage_hint: str = "",
 ) -> tuple[str, str]:
     """Build (system, user) prompts to rewrite one existing section.
 
@@ -329,7 +346,7 @@ def build_section_revision_prompt(
     told to act only on the ones that concern this section.
     """
     target = outline[section_index]
-    system = _shared_system(inputs, [], _SECTION_INSTRUCTION)
+    system = _prose_system(inputs, _section_system(stage_hint))
     notes = revision.notes.strip() or "(none — work from the stage brief alone)"
     user = (
         f"Original objective: {inputs.objective}\n"
@@ -359,6 +376,7 @@ async def generate_section_prose(
     records: list[SectionRecord] | None = None,
     deadline: float | None = None,
     revision: SectionRevisionBrief | None = None,
+    stage_hint: str = "",
 ) -> GenerateSectionProseResponse:
     """Write one section. One LLM call, and nothing else.
 
@@ -371,7 +389,7 @@ async def generate_section_prose(
     """
     if revision is not None:
         system, user = build_section_revision_prompt(
-            inputs=inputs, outline=outline, section_index=section_index, revision=revision
+            inputs=inputs, outline=outline, section_index=section_index, revision=revision, stage_hint=stage_hint
         )
     else:
         system, user = build_section_prompt(
@@ -381,6 +399,7 @@ async def generate_section_prose(
             prior_snapshot=prior_snapshot,
             prev_section_content=prev_section_content,
             records=records,
+            stage_hint=stage_hint,
         )
 
     content, _usage, finish_reason = await client.generate_with_meta(

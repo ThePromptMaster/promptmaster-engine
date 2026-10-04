@@ -15,7 +15,7 @@ test('an override needs a reason; verified and approval items are told apart', a
   await expect(stageArtifact(page)).toContainText('Mock', { timeout: 30_000 });
 
   // Literature: the gap is the user's to confirm. Moving past it is an override.
-  await expect(criterion(page, 'I confirm the gap this work addresses is identified')).toBeVisible();
+  await expect(criterion(page, 'I agree this says what is not yet known, and that this work addresses it')).toBeVisible();
   const bar = transitionBar(page);
   const direct = bar.getByRole('button', { name: /^Override and continue to/ });
   if (await direct.count()) await direct.click();

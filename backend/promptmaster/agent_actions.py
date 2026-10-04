@@ -96,10 +96,16 @@ AGENT_ACTIONS: list[AgentAction] = [
                      "(for example: external literature before any internal data has been looked at). "
                      "Params: reason (one or two plain sentences: why not now, and what to do instead). "
                      "The user decides; nothing is skipped unless they agree."),
+    AgentAction(key="propose_next_round", family="workflow", label="Suggest the next round",
+                when="This stage closes a round of open-ended work and the question it ends on is worth "
+                     "another round. Params: reason (one or two plain sentences: what the next round should "
+                     "pursue, and why it is worth it). The user starts the round; it is their decision."),
     AgentAction(key="advance_stage", family="workflow", label="Move to the next stage",
                 when="This stage's work is done and checked.", important=True),
     AgentAction(key="mark_blocked", family="workflow", label="Mark this stage stuck",
-                when="A missing tool or missing data stops progress. Params: reason, block_kind."),
+                when="A missing tool or missing data stops progress. Params: reason (one plain sentence saying exactly what is missing), "
+                     "block_kind — exactly one of 'data_missing' (data, a file, a source or a measurement has not been provided), "
+                     "'tool_missing' (a tool or capability is not available), 'needs_decision' (only a choice by the user is missing)."),
     AgentAction(key="request_user_decision", family="workflow", label="Ask the user",
                 when="A real choice only the user can make is needed. Set decision_question."),
     AgentAction(key="declare_objective_complete", family="workflow", label="Objective complete",

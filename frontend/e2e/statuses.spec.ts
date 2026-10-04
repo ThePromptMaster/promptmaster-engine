@@ -34,14 +34,17 @@ test('moving on does not complete a stage; finished stages carry their evidence;
   await page.getByLabel('What exactly is missing').fill('Reader survey results');
   await page.getByRole('button', { name: 'Mark as stuck' }).click();
   await expect(page.getByText('Stuck — waiting on information')).toBeVisible();
-  await page.screenshot({ path: test.info().outputPath('01-blocked-with-reason.png') });
+  // No "Move on — nothing outstanding" beside a stuck stage (2 Oct, screenshot 2).
+  await expect(page.getByText(/^Move on to Positioning/)).toHaveCount(0);
+  await page.screenshot({ path: test.info().outputPath('01-blocked-with-reason.png'), fullPage: true });
   await page.getByRole('button', { name: 'Continue this stage' }).click();
   await expect(page.getByText('Stuck — waiting on information')).toHaveCount(0);
+  await expect(page.getByText(/^Move on to Positioning/)).toBeVisible();
   await pressTransition(page);
 
   // Positioning (v3): the comparables hint explains the requirement (PM-02).
   await expect(page.getByRole('heading', { name: /Positioning/ })).toBeVisible();
-  await expect(criterion(page, 'At least two comparables named')).toContainText('existing books your reader would shelve beside yours');
+  await expect(criterion(page, 'I have named at least two comparable books')).toContainText('existing books your reader would shelve beside yours');
   // Its blocking "differentiator" is unticked: moving on is "anyway", and leaves it OPEN.
   await pressTransition(page);
   await expect(page.getByRole('heading', { name: /Research/ })).toBeVisible();

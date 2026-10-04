@@ -5,6 +5,7 @@ import { useState } from 'react';
 import type { StageDefinition, StageEvaluation } from '@/lib/workflow/types';
 import type { TransitionOption } from '@/lib/workflow/engine';
 import type { StageAction } from '@/lib/workflow/next-action';
+import { transitionEntries } from '@/lib/workflow/stage-controls';
 
 /** An action offered under "More" (PM-06). */
 export interface MoreAction {
@@ -177,27 +178,14 @@ export function StageTransitionBar({
         ? [{ id: 'suggest', label: suggesting ? 'Thinking…' : 'Suggest a move', icon: 'lightbulb', onSelect: onSuggest, disabled: suggesting }]
         : []),
       ...more,
-      // The transition, when something else leads: moving on is always one
-      // click away, never hidden, just not the suggestion.
-      ...(!primaryIsTransition && advance
-        ? [{
-            id: 'advance',
-            // "anyway" here as on the primary: moving on with requirements open leaves the stage open.
-            label: advance.kind === 'finish'
-              ? (advance.requiresNote ? 'Override and finish' : 'Finish project')
-              : advance.requiresNote
-                ? `Override and continue to ${nextStageLabel ?? 'the next stage'}`
-                : `Continue to ${nextStageLabel ?? 'the next stage'}`,
-            icon: 'arrow_forward',
-            onSelect: () => start(advance),
-          }]
-        : []),
-      ...(skip ? [{ id: 'skip', label: 'Skip this stage', icon: 'redo', onSelect: () => start(skip) }] : []),
-      ...returns.map((option) => ({
-        id: `return-${option.toStageId}`,
-        label: option.label.replace(/^Return to/, 'Go back to'),
-        icon: 'undo',
-        onSelect: () => start(option),
+      // The transitions come from the same function Go's list of this page's
+      // buttons is built from (lib/workflow/stage-controls.ts).
+      ...transitionEntries({ primary, options, nextStageLabel }).map((entry) => ({
+        ...entry,
+        onSelect: () => {
+          const option = entry.id === 'advance' ? advance : entry.id === 'skip' ? skip : returns.find((o) => `return-${o.toStageId}` === entry.id);
+          if (option) start(option);
+        },
       })),
     ];
 

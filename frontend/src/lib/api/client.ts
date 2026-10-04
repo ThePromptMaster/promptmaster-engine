@@ -498,6 +498,11 @@ export const api = {
     });
   },
 
+  /** Propose the stages of a workflow for this kind of work (3 Oct call). 1 LLM call; saves nothing. */
+  async generateWorkflow(req: { description: string; objective?: string }): Promise<{ workflow: import('@/lib/workflow/custom').DesignedWorkflow }> {
+    return apiFetch('/api/generate-workflow', { method: 'POST', body: JSON.stringify(req) });
+  },
+
   async generateSetup(req: GenerateSetupRequest): Promise<GenerateSetupResponse> {
     return apiFetch('/api/generate-setup', {
       method: 'POST',
@@ -673,6 +678,7 @@ export const api = {
     instruction: string;
     decisions: { id: string; text: string }[];
     other_instructions: { id: string; text: string }[];
+    stage?: { label: string; instruction: string };
     model?: string;
   }): Promise<{ conflicts: { kind: 'objective' | 'constraint' | 'decision' | 'instruction'; with_id: string; with_text: string; explanation: string }[] }> {
     return apiFetch('/api/check-conflicts', { method: 'POST', body: JSON.stringify(req) });

@@ -82,6 +82,25 @@ describe('enqueueing (B2a) — the same calls the buttons make', () => {
     expect(calls.every((c) => c.revise === undefined)).toBe(true);
   });
 
+  it('carries the stage\'s own hint to every job it queues (2 Oct: the Drafting hint never reached a chapter)', async () => {
+    enqueueSectionJob.mockClear();
+    await enqueueDraftJobs({
+      project, artifactId: 'art', stageId: 'drafting', outline, approvedOutlineVersionId: 'ov', jobs: [],
+      stageHint: 'Write this section\'s prose in full.',
+    });
+    await enqueueRevisionJobs({
+      project, artifactId: 'art', stageId: 'revision', outline, approvedOutlineVersionId: 'ov',
+      brief: { stageLabel: 'Revision', instruction: 'Tighten it.', findings: [], sources: [] },
+      saveSnapshot: async () => undefined, stageHint: 'Apply the accepted findings.',
+    });
+    const hints = enqueueSectionJob.mock.calls.map((c) => (c[0] as { stageId: string; stageHint?: string }));
+    expect(hints.map((h) => [h.stageId, h.stageHint])).toEqual([
+      ['drafting', 'Write this section\'s prose in full.'],
+      ['drafting', 'Write this section\'s prose in full.'],
+      ['revision', 'Apply the accepted findings.'],
+    ]);
+  });
+
   it('drafts only the sections named when asked', async () => {
     enqueueSectionJob.mockClear();
     const queued = await enqueueDraftJobs({

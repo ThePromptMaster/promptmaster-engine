@@ -55,13 +55,18 @@ export function useAuth() {
     if (error) throw error;
   }, [supabase]);
 
+  /** Resolves to whether a session came back — false when the email must be confirmed first. */
   const signUp = useCallback(async (email: string, password: string, fullName: string) => {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName } },
+      // The confirmation link signs them in through the callback. Without it
+      // the link went to the site root, which never reads a session, and the
+      // new user arrived signed out.
+      options: { data: { full_name: fullName }, emailRedirectTo: `${window.location.origin}/auth/callback` },
     });
     if (error) throw error;
+    return Boolean(data.session);
   }, [supabase]);
 
   const signInWithGoogle = useCallback(async () => {

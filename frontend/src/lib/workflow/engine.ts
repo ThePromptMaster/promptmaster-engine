@@ -141,10 +141,16 @@ function evaluateCriterion(
     case 'all_findings_triaged': {
       const held = ctx.findings[stageId] ?? { total: 0, triaged: 0 };
       const outstanding = held.total - held.triaged;
+      // A review that has not been drafted has no findings to be untriaged,
+      // and read as "nothing outstanding — move on" on a Critique stage Go
+      // had just marked stuck for having no table (2 Oct, screenshot 2).
+      // The same guard every_item_has_status has. A drafted table with no
+      // rows is still a finished answer.
+      const drafted = ctx.artifactNonEmpty[stageId] === true;
       return {
         ...base,
-        satisfied: outstanding <= 0,
-        detail: outstanding <= 0 ? undefined : `${outstanding} untriaged`,
+        satisfied: drafted && outstanding <= 0,
+        detail: !drafted ? 'nothing drafted yet' : outstanding <= 0 ? undefined : `${outstanding} untriaged`,
       };
     }
 
@@ -208,6 +214,9 @@ export function nextSuggestedStage(
   return pending?.id ?? null;
 }
 
+/** The words on the button that starts a new round. */
+export const nextRoundLabel = (stageShortLabel: string) => `Start the next round from ${stageShortLabel}`;
+
 export interface TransitionOption {
   kind: 'advance' | 'skip' | 'return' | 'finish';
   toStageId: string | null;
@@ -249,9 +258,13 @@ export function availableTransitions(
     options.push({ kind: 'skip', toStageId: next, label: 'Skip this stage', requiresNote: true });
   }
 
+  const loop = stage.transitions.loop_to ? getStage(template, stage.transitions.loop_to) : undefined;
+  if (loop) {
+    options.push({ kind: 'return', toStageId: loop.id, label: nextRoundLabel(loop.short_label), requiresNote: false });
+  }
   for (const id of stage.transitions.allow_return_to) {
     const target = getStage(template, id);
-    if (target) {
+    if (target && id !== loop?.id) {
       options.push({
         kind: 'return',
         toStageId: id,
@@ -391,14 +404,20 @@ export function projectState(
           blocked: {
             kind: kind === 'tool_missing' || kind === 'data_missing' ? kind : 'needs_decision',
             reason: event.reason ?? '',
+            ...(event.payload?.inputs_at_block ? { inputs: event.payload.inputs_at_block } : {}),
           },
         });
         break;
       }
 
-      case 'stage_unblocked':
-        set(event.stage_id, { status: 'in_progress', blocked: undefined });
+      case 'stage_unblocked': {
+        const was = state.stages[event.stage_id]?.blocked;
+        set(event.stage_id, {
+          status: 'in_progress', blocked: undefined,
+          ...(was ? { last_block: { kind: was.kind, ...(was.inputs ? { inputs: was.inputs } : {}) } } : {}),
+        });
         break;
+      }
 
       // C5: back to in progress, cursor unmoved, earlier evidence remembered
       // so that closing it again on new evidence can flag the work after it.

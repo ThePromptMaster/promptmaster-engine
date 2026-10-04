@@ -11,6 +11,7 @@ interface TemplateRow {
     outline_stage: WorkflowTemplate['outline_stage'];
     derived_outline?: WorkflowTemplate['derived_outline'];
     nouns?: WorkflowTemplate['nouns'];
+    inquiry?: boolean;
     stages: StageDefinition[];
   };
 }
@@ -25,6 +26,7 @@ function toTemplate(row: TemplateRow): WorkflowTemplate & { id: string } {
     outline_stage: row.definition.outline_stage,
     derived_outline: row.definition.derived_outline,
     ...(row.definition.nouns ? { nouns: row.definition.nouns } : {}),
+    ...(row.definition.inquiry ? { inquiry: true } : {}),
     stages: row.definition.stages,
   };
 }
@@ -84,6 +86,40 @@ export function latestPerKey<T extends { key: string; version: number }>(rows: T
     if (!held || row.version > held.version) latest.set(row.key, row);
   }
   return [...latest.values()];
+}
+
+/**
+ * Publish a workflow the user designed (3 Oct call). Inserted published and
+ * never changed afterwards, exactly like a system template; RLS admits only
+ * the user's own `custom_` keys. Validate it first (`validateTemplate`).
+ */
+export async function publishUserTemplate(
+  template: WorkflowTemplate,
+  ownerId: string
+): Promise<WorkflowTemplate & { id: string }> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('workflow_templates')
+    .insert({
+      key: template.key,
+      version: template.version,
+      name: template.name,
+      description: template.description,
+      definition: {
+        outline_stage: template.outline_stage,
+        ...(template.nouns ? { nouns: template.nouns } : {}),
+        ...(template.inquiry ? { inquiry: true } : {}),
+        stages: template.stages,
+      },
+      status: 'published',
+      is_system: false,
+      owner_id: ownerId,
+      published_at: new Date().toISOString(),
+    })
+    .select(TEMPLATE_COLUMNS)
+    .single();
+  if (error) throw error;
+  return toTemplate(data as unknown as TemplateRow);
 }
 
 /** The latest published version of every template. Used by the new-project picker. */
