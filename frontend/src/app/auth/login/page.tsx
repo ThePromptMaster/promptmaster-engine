@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { createClient } from '@/lib/supabase/client';
+import { nextFromLocation } from '@/lib/auth/next-path';
 
 /**
  * The field and label treatments are shared with the sign-up page, which was
@@ -57,7 +58,7 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       await signIn(email, password);
-      router.push('/projects');
+      router.push(nextFromLocation() ?? '/projects');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Invalid email or password.');
     } finally {
@@ -87,7 +88,9 @@ export default function LoginPage() {
     try {
       const supabase = createClient();
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        // The callback sends a recovery session on to the page that sets the
+        // new password. It used to land on /projects with the old one intact.
+        redirectTo: `${window.location.origin}/auth/callback?next=/auth/reset`,
       });
       if (resetError) throw resetError;
       setResetSent(true);
