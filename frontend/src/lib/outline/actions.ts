@@ -13,7 +13,7 @@ import { api } from '@/lib/api/client';
 import { coerceOutlineDocument, mergeRegeneratedOutline } from '@/lib/outline/model';
 import { longFormFromOutline } from '@/lib/outline/long-form';
 import { approveOutlineVersion, ensureOutlineArtifact } from '@/lib/supabase/outline';
-import { listVersions, saveLongForm } from '@/lib/supabase/versions';
+import { getArtifact, listVersions, saveLongForm } from '@/lib/supabase/versions';
 import { inputsFrom } from '@/lib/workflow/stage-requests';
 import { draftingStageId } from '@/lib/workflow/derived-outline';
 import type { StageDefinition, WorkflowTemplate } from '@/lib/workflow/types';
@@ -38,10 +38,23 @@ export interface LoadedOutline {
   draft: OutlineDocument | null;
 }
 
+/**
+ * Whether a version holds an outline, rather than prose filed on the same row.
+ *
+ * A derived outline (Research) lives on the drafting stage's artifact, and so
+ * does the paper: completing Drafting appends the manuscript there as a
+ * "Full draft saved" version. Read as the outline's head, that prose parsed to
+ * an empty outline and the approved plan vanished from the stage (4 Oct).
+ */
+export function isOutlineVersion(version: Pick<ArtifactVersion, 'content'>): boolean {
+  const text = version.content.trimStart();
+  return text.startsWith('{') || text.startsWith('[');
+}
+
 /** The outline artifact for a stage, its versions, and its working draft. Creates the artifact if needed. */
 export async function loadOutline(project: Pick<Project, 'id' | 'user_id'>, stageId: string): Promise<LoadedOutline> {
   const artifact = await ensureOutlineArtifact(project.id, project.user_id, stageId);
-  const versions = await listVersions(artifact.id);
+  const versions = (await listVersions(artifact.id)).filter(isOutlineVersion);
   const draft = artifact.outline_draft ? coerceOutlineDocument(artifact.outline_draft) : null;
   return { artifact, versions, draft };
 }
@@ -82,7 +95,12 @@ export async function generateOutlineDraft(args: GenerateOutlineArgs): Promise<O
  * drafting reads `artifacts.long_form`, and approving crosses that gap.
  */
 export async function materialiseOutlineInto(doc: OutlineDocument, target: Artifact): Promise<void> {
-  await saveLongForm(target.id, longFormFromOutline(doc, target.long_form ?? null));
+  // Merge over the row as it is now, not the copy the caller loaded: the job
+  // queue writes sections server-side, and a cached long_form from before them
+  // would roll those chapters back out of the manuscript.
+  const fresh = await getArtifact(target.id).catch(() => null);
+  const existing = fresh ? fresh.long_form : (target.long_form ?? null);
+  await saveLongForm(target.id, longFormFromOutline(doc, existing ?? null));
 }
 
 export interface ApproveOutlineArgs {
