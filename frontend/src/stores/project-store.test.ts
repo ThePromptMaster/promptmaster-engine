@@ -378,6 +378,39 @@ describe('the store owns the event log and the recommendations (A4, SN-01)', () 
     expect(useProjectStore.getState().events).toEqual([]);
   });
 
+  it('a log that fails to load stays unread and says so, rather than reading as a reset project (4 Oct)', async () => {
+    getProject.mockResolvedValue(project());
+    listArtifacts.mockResolvedValue([ARTIFACT]);
+    listVersions.mockResolvedValue([V1]);
+    getEvaluation.mockResolvedValue(null);
+    listWorkflowEvents.mockRejectedValueOnce(new Error('network'));
+
+    await useProjectStore.getState().loadProject('p1');
+    let s = useProjectStore.getState();
+    expect(s.project?.id).toBe('p1');
+    expect(s.events).toBeNull();
+    expect(s.eventsError).toMatch(/history could not be loaded/);
+
+    // Retry reads it and clears the error.
+    listWorkflowEvents.mockResolvedValueOnce([EVENT('stage_marked_complete', 1)]);
+    await useProjectStore.getState().refreshEvents();
+    s = useProjectStore.getState();
+    expect(s.events?.map((e) => e.type)).toEqual(['stage_marked_complete']);
+    expect(s.eventsError).toBeNull();
+  });
+
+  it('a background reload that cannot read the log keeps the one on hand', async () => {
+    await loadFixture();
+    listWorkflowEvents.mockResolvedValue([EVENT('stage_marked_complete', 1)]);
+    await useProjectStore.getState().refreshEvents();
+    listWorkflowEvents.mockRejectedValueOnce(new Error('network'));
+
+    await useProjectStore.getState().loadProject('p1', { background: true });
+    const s = useProjectStore.getState();
+    expect(s.events?.map((e) => e.type)).toEqual(['stage_marked_complete']);
+    expect(s.eventsError).toBeNull();
+  });
+
   it('appendEvent writes, then re-reads the log rather than trusting its own copy', async () => {
     await loadFixture();
     // What the database holds after the insert — including a row the server

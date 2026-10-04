@@ -103,6 +103,13 @@ interface ProjectState {
    * from "not read yet" and not generate against an empty log.
    */
   events: WorkflowEvent[] | null;
+  /**
+   * Set when the log could not be read and there is none on hand. `events`
+   * then stays null rather than becoming `[]`: an empty log projects to "every
+   * stage not started", which a user reads as their project having been reset,
+   * and generation, Go and transitions would all act on it.
+   */
+  eventsError: string | null;
   recommendations: Recommendation[];
   tasks: ProjectTask[];
   /** Data files attached to the project; read by code the project runs. */
@@ -230,6 +237,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
   stages: {},
   evaluations: {},
   events: null,
+  eventsError: null,
   recommendations: [],
   tasks: [],
   files: [],
@@ -258,11 +266,12 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       }
 
       // A missing recommendations or tasks row set must not take the project
-      // down: the derived half of the panel still works. Events fail closed to
-      // an empty log, as the workspace's own loader did.
-      const [artifacts, events, recommendations, tasks, files] = await Promise.all([
+      // down: the derived half of the panel still works. Events do not fail to
+      // an empty log — that reads as a reset project (4 Oct). They stay null,
+      // or keep the log already on hand on a background reload, and say so.
+      const [artifacts, loadedEvents, recommendations, tasks, files] = await Promise.all([
         listArtifacts(id),
-        listWorkflowEvents(id).catch(() => [] as WorkflowEvent[]),
+        listWorkflowEvents(id).catch(() => null),
         listRecommendations(id).catch(() => [] as Recommendation[]),
         listTasks(id).catch(() => [] as ProjectTask[]),
         listProjectFiles(id).catch(() => [] as ProjectFile[]),
@@ -318,6 +327,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         if (evaluation) evaluations[id] = evaluation;
       }
       const head = projectHead;
+      const events = loadedEvents ?? (background ? get().events : null);
 
       set({
         // Unsaved local edits stay on screen over the freshly loaded row; the
@@ -328,6 +338,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         stages,
         evaluations,
         events,
+        eventsError: events === null ? "This project's history could not be loaded." : null,
         recommendations,
         tasks,
         files,
@@ -350,6 +361,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       stages: {},
       evaluations: {},
       events: null,
+      eventsError: null,
       recommendations: [],
       tasks: [],
       files: [],
@@ -395,7 +407,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     const events = await listWorkflowEvents(projectId);
     // Only if the same project is still open: a reload that lands after the
     // user has moved on must not file one project's log under another.
-    if (get().projectId === projectId) set({ events });
+    if (get().projectId === projectId) set({ events, eventsError: null });
     return events;
   },
 
