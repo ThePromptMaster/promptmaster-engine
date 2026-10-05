@@ -90,6 +90,25 @@ export interface DraftFacts {
   checked: boolean;
 }
 
+/**
+ * What a prose draft still needs.
+ *
+ * Cut off means the model stopped at its length limit — nothing else. A
+ * check's "incomplete" is a judgement, and on production (6 Oct) it meant
+ * "overshoots this stage": Go read it as cut off, continued the draft, and
+ * wrote a whole chapter into Positioning, three times over. That verdict is a
+ * finding to apply, not text to add.
+ */
+export function draftFacts(
+  head: { id: string; finish_reason?: string | null },
+  latestEvaluation?: { version_id: string } | null
+): DraftFacts {
+  return {
+    truncated: head.finish_reason === 'length',
+    checked: Boolean(latestEvaluation && latestEvaluation.version_id === head.id),
+  };
+}
+
 export interface ReviewFacts {
   items: StageItem[];
   schema: StageItemSchema;
@@ -216,15 +235,9 @@ export async function readStageFacts(input: {
     };
   }
 
-  // What the stage's own draft still needs, read the way the page's primary
-  // action reads it (workflow-workspace: "Continue writing" when cut off).
   const head = bundles[stage.id]?.versions.at(-1);
   if (stageDrafts(stage) && !rendererHoldsItems(stage.renderer) && head?.content.trim()) {
-    const checked = Boolean(latestEvaluation && latestEvaluation.version_id === head.id);
-    facts.draft = {
-      truncated: head.finish_reason === 'length' || (checked && latestEvaluation?.completeness_status === 'incomplete'),
-      checked,
-    };
+    facts.draft = draftFacts(head, latestEvaluation);
   }
 
   return facts;
