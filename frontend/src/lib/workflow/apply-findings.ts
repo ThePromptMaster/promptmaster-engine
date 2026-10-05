@@ -45,15 +45,24 @@ export function findingsInstruction(findings: readonly AuditFinding[]): string {
   ].join('\n');
 }
 
+const words = (text: string) => (text.toLowerCase().match(/[a-z0-9]+/g) ?? []).join(' ');
+
 /**
  * What the user set on a row survives a regeneration of it: their status and
- * reason, and any field only they fill. Matched by row id.
+ * reason, and any field only they fill. Matched by row id — or, on a stage of
+ * works, by the work itself, since a rewrite can renumber rows (4 Oct: Go's
+ * "Revise this stage" reset every work a lookup had found to "Suggested", and
+ * Go then searched again, and revised again).
  */
 export function carryUserFields(before: readonly StageItem[], after: StageItem[], schema: StageItemSchema): StageItem[] {
   const old = new Map(before.map((r) => [r.id, r]));
+  const field = schema.lookup?.field;
+  const byWork = new Map(
+    field ? before.filter((r) => words(r[field] ?? '')).map((r) => [words(r[field] ?? ''), r] as const) : []
+  );
   const userOnly = schema.fields.filter((f) => f.userOnly).map((f) => f.key);
   return after.map((row) => {
-    const was = old.get(row.id);
+    const was = old.get(row.id) ?? (field ? byWork.get(words(row[field] ?? '')) : undefined);
     if (!was) return row;
     const kept: StageItem = { ...row };
     for (const key of userOnly) if ((was[key] ?? '').trim()) kept[key] = was[key];
