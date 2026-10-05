@@ -31,6 +31,16 @@ export class RefusedRevision extends Error {
   }
 }
 
+/** The rows of a stage table — never an outline, which also carries `items`. */
+function tableRows(content: string | null | undefined) {
+  try {
+    if ((JSON.parse((content ?? '').trim()) as { kind?: unknown })?.kind !== 'stage_items') return null;
+  } catch {
+    return null;
+  }
+  return parseItems(content);
+}
+
 export function checkCommit(input: {
   before: string | null | undefined;
   after: string;
@@ -40,24 +50,24 @@ export function checkCommit(input: {
   const byUser = USER_OPERATIONS.has(operation);
 
   if (!after.trim()) {
-    return byUser ? null : 'The revision came back empty, so the current version was kept.';
+    return byUser ? null : 'The revision came back empty, so the current version was kept';
   }
 
-  const beforeItems = parseItems(before);
+  const beforeItems = tableRows(before);
   if (beforeItems && !byUser) {
     const afterItems = parseItems(after);
     if (afterItems === null) {
-      return 'The revision came back as text instead of a table, so the current version was kept.';
+      return 'The revision came back as text instead of a table, so the current version was kept';
     }
     if (afterItems.length === 0 && beforeItems.length > 0) {
-      return 'The revised table came back with no rows, so the current version was kept.';
+      return 'The revised table came back with no rows, so the current version was kept';
     }
   }
 
   if (!beforeItems && before && REWRITE_OPERATIONS.has(operation)) {
     const was = before.trim().length;
     if (was >= SHRINK_CHECK_FROM && after.trim().length < was * MIN_REWRITE_SHARE) {
-      return 'The revision lost most of the text it was revising, so the current version was kept.';
+      return 'The revision lost most of the text it was revising, so the current version was kept';
     }
   }
 

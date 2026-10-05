@@ -34,6 +34,11 @@ describe('checkCommit: what may become the current version', () => {
     expect(checkCommit({ before: PROSE, after: 'Short.', operation: 'continuation' })).toBeNull();
   });
 
+  it('an outline is not a table: the finished report can be filed on its row (Research, Drafting)', () => {
+    const outline = JSON.stringify({ schema: 1, items: [{ id: 's1', title: 'Introduction' }], orphans: [] });
+    expect(checkCommit({ before: outline, after: '# The full report', operation: 'long_form_complete' })).toBeNull();
+  });
+
   it('lets the user empty a table or a draft by hand', () => {
     expect(checkCommit({ before: TABLE, after: serializeItems([]), operation: 'stage_edit' })).toBeNull();
     expect(checkCommit({ before: PROSE, after: '', operation: 'stage_edit' })).toBeNull();
