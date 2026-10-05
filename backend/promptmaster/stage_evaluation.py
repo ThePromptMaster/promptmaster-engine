@@ -52,6 +52,7 @@ from .schemas import (
     StageRecommendation,
     WhyThisWorks,
 )
+from .project_context import context_block
 
 logger = logging.getLogger(__name__)
 
@@ -224,6 +225,7 @@ def build_stage_evaluation_prompt(
         "",
         f"Requested output format: {inputs.output_format or '(none)'}",
         "",
+        *([context_block(inputs), ""] if context_block(inputs) else []),
         f"WHAT THE EARLIER STAGES ESTABLISHED:\n{_format_prior_stages(digest)}",
         "",
         *(

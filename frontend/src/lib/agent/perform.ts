@@ -29,6 +29,7 @@ import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import { summariseStageContent } from '@/lib/workflow/digest';
 import { stageContentForSummary, stageEvidence } from '@/lib/workflow/evidence';
 import { evaluateStage } from '@/lib/workflow/engine';
+import { figureFindings, figureSources } from '@/lib/workflow/figure-support';
 import { asIteration } from '@/lib/workflow/legacy';
 import {
   evaluationRecord,
@@ -694,7 +695,10 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         evaluationRequest(ctx.project, ctx.template, ctx.state, ctx.bundles, ctx.stage, version.content, ctx.approvedOutline),
         ctx.signal
       );
-      await ctx.recordStageEvaluation(ctx.stage.id, version.id, evaluationRecord(res, ctx.project.model, 'manual'));
+      await ctx.recordStageEvaluation(
+        ctx.stage.id, version.id,
+        evaluationRecord(res, ctx.project.model, 'manual', figureFindings(version.content, figureSources(ctx.project, ctx.bundles, ctx.stage.id)))
+      );
       const e = res.evaluation;
       return done(key, {
         status: 'succeeded', toolsUsed: ['model'], changes: { version_ids: [version.id] },

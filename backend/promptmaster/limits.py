@@ -37,6 +37,10 @@ MAX_OBJECTIVE_CHARS = 8_000
 MAX_SHORT_TEXT_CHARS = 4_000
 #: A custom persona preamble is a system prompt, so it gets more room.
 MAX_PREAMBLE_CHARS = 8_000
+#: Project context is source material the user pasted (4 Oct: a board-level
+#: brief with the company's figures). It rides on every stage call, so it is
+#: bounded: about 15k tokens, a long brief, not a document library.
+MAX_CONTEXT_CHARS = 60_000
 
 #: Session facts are pinned one-liners injected into *every* prompt, so their
 #: cost is multiplied by the length of the session. Bounded on both axes.

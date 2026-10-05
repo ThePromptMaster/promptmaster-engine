@@ -11,6 +11,7 @@ import logging
 from .conversation import _shared_system
 from .llm_client import OpenRouterClient
 from .schemas import ContinuitySnapshot, Iteration, PMInput
+from .project_context import context_line
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,7 @@ def build_snapshot_prompt(
         f"Original objective: {inputs.objective}\n"
         f"Audience: {inputs.audience}\n"
         f"Constraints: {inputs.constraints or '(none)'}\n"
+        f"{context_line(inputs)}"
         f"Output format: {inputs.output_format or '(none)'}\n\n"
         "Identify each of the following from the partial output below:\n"
         "- completed_topics: list of short phrases naming sections/topics already covered\n"
@@ -109,6 +111,7 @@ def build_continuation_prompt(
         f"Original objective: {inputs.objective}\n"
         f"Audience: {inputs.audience}\n"
         f"Constraints: {inputs.constraints or '(none)'}\n"
+        f"{context_line(inputs)}"
         f"Output format: {inputs.output_format or '(none)'}\n\n"
         "PREVIOUS OUTPUT (do not repeat any of this):\n"
         f"{incomplete_iteration.output}\n\n"

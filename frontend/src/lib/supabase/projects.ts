@@ -12,7 +12,7 @@ const LIST_COLUMNS =
   'id, title, objective, mode, workflow, stage, status, updated_at, created_at';
 
 const FULL_COLUMNS = `
-  id, user_id, title, objective, audience, constraints, output_format,
+  id, user_id, title, objective, audience, constraints, output_format, context,
   mode, custom_name, custom_preamble, custom_tone,
   model, session_facts, active_stack_id, constraint_presets, format_presets,
   workflow, workflow_template_id, stage, status, manual_checks, revision,
@@ -59,6 +59,8 @@ export async function createProject(
       audience: input.audience ?? 'General',
       constraints: input.constraints ?? '',
       output_format: input.output_format ?? '',
+      // Only when given, so a client ahead of the migration still creates projects.
+      ...(input.context ? { context: input.context } : {}),
       mode: input.mode ?? 'architect',
       model: input.model ?? '',
       workflow: input.workflow ?? 'single_output',

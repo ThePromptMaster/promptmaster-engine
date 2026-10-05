@@ -33,6 +33,8 @@ from fastapi.exceptions import RequestValidationError
 _FRIENDLY: dict[str, str] = {
     "suggested_section_count": "the number of sections",
     "objective": "the objective",
+    "context": "the project context",
+    "description": "the description of the work",
     "constraints": "the constraints",
     "output_format": "the output format",
     "audience": "the audience",
