@@ -34,7 +34,9 @@ const ROW = {
   status: 'active',
   updated_at: '2026-09-04T00:00:00Z',
   created_at: '2026-09-01T00:00:00Z',
-  deleted_at: '2026-09-06T00:00:00Z',
+  // Relative to now: a fixed date ran out of retention window as the calendar
+  // moved (on 5 Oct the page said "in 1 day", then "due to be removed").
+  deleted_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
 };
 
 beforeEach(() => {
