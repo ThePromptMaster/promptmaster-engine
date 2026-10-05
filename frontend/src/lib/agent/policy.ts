@@ -83,6 +83,24 @@ export const POLISH_MAX = 4;
  * are the most it gets either way. The planner is then left to move on, or
  * to ask.
  */
+/**
+ * Polishing moves on this stage since the user last gave a direction.
+ *
+ * The cap is for Go deciding on its own to polish again. A user who answers
+ * "revise it so that…" has asked for exactly that move: on production (5 Oct)
+ * the cap counted the whole run chain, so after that answer Revise was no
+ * longer allowed and Go replied it could not settle on a next step.
+ */
+export function polishSinceDirection(
+  steps: readonly { action_key: string; stage_id?: string | null }[],
+  stageId: string
+): number {
+  const lastAnswer = steps.map((s) => s.action_key).lastIndexOf(USER_ANSWER_STEP);
+  return steps
+    .slice(lastAnswer + 1)
+    .filter((s) => s.stage_id === stageId && (POLISH_MOVES as readonly string[]).includes(s.action_key)).length;
+}
+
 export function withoutEndlessPolish(
   allowed: readonly string[],
   polishedHere: number,

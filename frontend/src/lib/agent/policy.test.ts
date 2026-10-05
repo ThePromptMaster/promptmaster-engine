@@ -7,7 +7,7 @@ import type { StageEvaluation } from '@/lib/workflow/types';
 import type { AgentStep } from '@/types/agent';
 import { deriveExecutionLabel } from './labels';
 import { ITEM_SCHEMAS } from '@/lib/workflow/stage-artifact';
-import { allowedActions, alternating, withoutOverride, withoutEndlessPolish, withoutSettledRuns, fitsBudget, noChange, noProgress, plannedBeforeLatestChange, preempt, shouldPause, stageMoveActor, stateFingerprint } from './policy';
+import { allowedActions, alternating, polishSinceDirection, withoutOverride, withoutEndlessPolish, withoutSettledRuns, fitsBudget, noChange, noProgress, plannedBeforeLatestChange, preempt, shouldPause, stageMoveActor, stateFingerprint } from './policy';
 
 function step(over: Partial<AgentStep>): AgentStep {
   return {
@@ -488,5 +488,23 @@ describe('a computation that settled every run is not run again (production Rese
   it('counts a computation and its interpretation as one move, not two taking turns', () => {
     const pairs = [1, 2, 3].flatMap(() => [step({ action_key: 'run_computation' }), step({ action_key: 'interpret_result' })]);
     expect(alternating(pairs)).toBeNull();
+  });
+});
+
+describe('polishSinceDirection: the user asking for a revision restarts the polish count (5 Oct, production)', () => {
+  const step = (action_key: string, stage_id = 'literature') => ({ action_key, stage_id });
+  const loop = [step('check_literature'), step('revise_stage'), step('check_literature'), step('revise_stage'), step('evaluate_stage'), step('revise_stage'), step('revise_stage')];
+
+  it('counts every polishing move on the stage while the user has said nothing', () => {
+    expect(polishSinceDirection(loop, 'literature')).toBe(5);
+  });
+
+  it('counts only what came after the user\'s answer', () => {
+    expect(polishSinceDirection([...loop, step('user_answer')], 'literature')).toBe(0);
+    expect(polishSinceDirection([...loop, step('user_answer'), step('revise_stage')], 'literature')).toBe(1);
+  });
+
+  it('counts only this stage', () => {
+    expect(polishSinceDirection([step('revise_stage', 'question'), step('revise_stage')], 'literature')).toBe(1);
   });
 });
