@@ -43,7 +43,10 @@ function titleFrom(objective: string): string {
 }
 
 export default function NewProjectPage() {
-  const { user, loading: authLoading } = useAuth();
+  // Not gated on the session check: that is a network round trip, and the page
+  // used to be blank for it — on production long enough to type into nothing
+  // (4 Oct). Start stays disabled until the user is known.
+  const { user } = useAuth();
   const router = useRouter();
 
   const [templates, setTemplates] = useState<(WorkflowTemplate & { id: string })[]>([]);
@@ -194,7 +197,6 @@ export default function NewProjectPage() {
     }
   }
 
-  if (authLoading) return null;
 
   const busyLabel =
     working === 'questions' ? 'Thinking of questions…' : working === 'setup' ? 'Working out a setup…' : null;

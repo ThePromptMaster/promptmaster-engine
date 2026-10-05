@@ -76,7 +76,7 @@ export default function ProjectsPage() {
     }
   }
 
-  if (authLoading) return null;
+  // While the session is checked the list shows its skeleton, not a blank page.
 
   const active = projects?.filter((p) => p.status !== 'finalized') ?? [];
   const finalized = projects?.filter((p) => p.status === 'finalized') ?? [];
