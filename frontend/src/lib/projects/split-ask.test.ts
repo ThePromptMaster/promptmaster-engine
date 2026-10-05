@@ -17,7 +17,7 @@ describe('splitAsk (4 Oct, item 7)', () => {
   });
 
   it('a shorter message laid out as a brief — title, ask, facts — is a brief too (6 Oct)', () => {
-    const brief = `Northstar — board brief\n\nThe Board has asked management to determine why profitability has deteriorated despite revenue growth.\n\nCompany facts:\n${facts.split('\n').slice(0, 12).join('\n')}`;
+    const brief = `Northstar — board brief\n\nThe Board has asked management to determine why profitability has deteriorated despite revenue growth.\n\nCompany facts:\n${facts.split('\n').slice(0, 25).join('\n')}`;
     expect(brief.length).toBeLessThan(BRIEF_FROM_CHARS);
     const { objective, context } = splitAsk(brief);
     expect(objective).toMatch(/^The Board has asked/);
