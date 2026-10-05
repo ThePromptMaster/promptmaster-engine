@@ -251,9 +251,81 @@ function meter(res: Response, path: string, requestId: string): void {
   void recordModelUsage(events, { route: path, requestId });
 }
 
+/** `fetch` rejects with a TypeError when the connection itself failed. */
+function isNetworkFailure(e: unknown): boolean {
+  return e instanceof TypeError;
+}
+
+function pageHidden(): boolean {
+  return typeof document !== 'undefined' && document.visibilityState === 'hidden';
+}
+
+/** Resolve once the page is visible again (or at once outside a browser). */
+function untilVisible(signal?: AbortSignal | null): Promise<void> {
+  if (!pageHidden()) return Promise.resolve();
+  return new Promise((resolve) => {
+    const done = () => {
+      if (pageHidden() && !signal?.aborted) return;
+      document.removeEventListener('visibilitychange', done);
+      signal?.removeEventListener('abort', done);
+      resolve();
+    };
+    document.addEventListener('visibilitychange', done);
+    signal?.addEventListener('abort', done);
+  });
+}
+
+export const RECONNECT_DELAY_MS = 1500;
+
+/**
+ * One request, retried once if the connection dropped.
+ *
+ * On 4 Oct "Apply the findings" failed with Safari's "Load failed" on an iPad
+ * while the backend logged a 200 after 63s: iOS suspends a tab's requests when
+ * you switch to another app. The backend holds no state, so asking again is
+ * safe — nothing is saved until an answer arrives. If the page was hidden, the
+ * retry waits until it is visible again; a second failure says, in words, what
+ * happened rather than "Load failed".
+ */
+async function sendWithReconnect(path: string, options: RequestInit | undefined, requestId: string): Promise<Response> {
+  const signal = options?.signal;
+  let wasHidden = pageHidden();
+  const onVisibility = () => {
+    if (pageHidden()) wasHidden = true;
+  };
+  if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisibility);
+  try {
+    try {
+      return await rawFetch(path, options, requestId);
+    } catch (e) {
+      if (!isNetworkFailure(e) || signal?.aborted) throw e;
+      if (wasHidden || pageHidden()) await untilVisible(signal);
+      else await new Promise((r) => setTimeout(r, RECONNECT_DELAY_MS));
+      if (signal?.aborted) throw e;
+    }
+    try {
+      return await rawFetch(path, options, newRequestId());
+    } catch (e) {
+      if (!isNetworkFailure(e) || signal?.aborted) throw e;
+      const error = new ApiError(
+        'The connection dropped before PromptMaster answered, twice. Nothing was changed. Try again when the connection is steady.',
+        0,
+        { code: 'network', title: 'The connection dropped', retryable: true, technical: e instanceof Error ? e.message : String(e) }
+      );
+      void recordErrorEvent({
+        code: 'network', title: error.title ?? '', message: error.message, technical: error.technical,
+        route: path, requestId, httpStatus: 0,
+      });
+      throw error;
+    }
+  } finally {
+    if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisibility);
+  }
+}
+
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const requestId = newRequestId();
-  let res = await rawFetch(path, options, requestId);
+  let res = await sendWithReconnect(path, options, requestId);
 
   // An expired token is the common case and is silently recoverable; retry once.
   if (res.status === 401 && (await refreshSessionOnce())) {
