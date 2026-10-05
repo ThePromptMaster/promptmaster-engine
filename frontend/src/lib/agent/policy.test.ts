@@ -521,6 +521,7 @@ describe('an exploration round ends in a proposed round, not the write-up (produ
     const allowed = allowedActions(EXPLORATION_V1, state, next, true);
     expect(allowed).toContain('propose_next_round');
     expect(allowed).not.toContain('advance_stage');
+    expect(allowed).not.toContain('declare_objective_complete');
   });
 
   it('still lets Go move on from the other stages of a round', () => {
