@@ -153,3 +153,54 @@ describe('errors', () => {
     await expect(api.buildPrompt(INPUTS)).rejects.toMatchObject({ status: 504 });
   });
 });
+
+describe('a dropped connection (4 Oct, "Load failed")', () => {
+  it('asks again once, and the caller gets the answer', async () => {
+    vi.useFakeTimers();
+    fetchMock
+      .mockRejectedValueOnce(new TypeError('Load failed'))
+      .mockResolvedValueOnce(jsonResponse({ system_prompt: 's', user_prompt: 'u' }));
+    const pending = api.buildPrompt(INPUTS);
+    await vi.runAllTimersAsync();
+    await expect(pending).resolves.toEqual({ system_prompt: 's', user_prompt: 'u' });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
+  });
+
+  it('waits for the page to be visible again before asking (iOS suspends a hidden tab)', async () => {
+    let state: DocumentVisibilityState = 'hidden';
+    vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() => state);
+    fetchMock
+      .mockRejectedValueOnce(new TypeError('Load failed'))
+      .mockResolvedValueOnce(jsonResponse({ system_prompt: 's', user_prompt: 'u' }));
+    const pending = api.buildPrompt(INPUTS);
+    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    state = 'visible';
+    document.dispatchEvent(new Event('visibilitychange'));
+    await expect(pending).resolves.toEqual({ system_prompt: 's', user_prompt: 'u' });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    vi.restoreAllMocks();
+  });
+
+  it('a second drop says what happened in words', async () => {
+    vi.useFakeTimers();
+    fetchMock.mockRejectedValue(new TypeError('Load failed'));
+    const pending = api.buildPrompt(INPUTS);
+    const settled = expect(pending).rejects.toMatchObject({ code: 'network', message: expect.stringMatching(/connection dropped/) });
+    await vi.runAllTimersAsync();
+    await settled;
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
+  });
+
+  it('a cancelled request is not retried', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    fetchMock.mockRejectedValue(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+    await expect(api.generateStageArtifact({} as never, controller.signal)).rejects.toThrow('aborted');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
