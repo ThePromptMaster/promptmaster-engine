@@ -35,6 +35,7 @@ import type { StageDefinition, WorkflowState, WorkflowTemplate } from '@/lib/wor
 import type { NewEvaluation } from '@/lib/supabase/versions';
 import type { Evaluation, Project } from '@/types/project';
 import type { OutlineSection, StageRecommendation } from '@/types';
+import { figureFindings, figureSources } from '@/lib/workflow/figure-support';
 
 interface Options {
   project: Project;
@@ -144,7 +145,10 @@ export function useStageEvaluation({
 
       // 'manual' is the source this is: a user pressed a button, rather than
       // the four-call pipeline producing one as a side effect.
-      await record(stage.id, version.id, evaluationRecord(response, p.model, 'manual'));
+      await record(
+        stage.id, version.id,
+        evaluationRecord(response, p.model, 'manual', figureFindings(version.content, figureSources(p, b, stage.id)))
+      );
 
       setRecommendation(response.recommendation);
     } catch (err) {

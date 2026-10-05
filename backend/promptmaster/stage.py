@@ -40,6 +40,7 @@ from .schemas import (
     StageItem,
     StageItemSchema,
 )
+from .project_context import context_block
 
 logger = logging.getLogger(__name__)
 
@@ -187,7 +188,7 @@ def build_stage_prompt(
         f"Audience: {digest.audience or inputs.audience}",
         f"Constraints: {inputs.constraints or '(none)'}",
         f"Output format: {inputs.output_format or '(none)'}",
-        "",
+        *([context_block(inputs), ""] if context_block(inputs) else [""]),
         f"WHAT THE EARLIER STAGES ESTABLISHED:\n{_format_digest(digest)}",
         "",
         # The user's words govern. The first stage writes a statement of the
@@ -209,6 +210,14 @@ def build_stage_prompt(
         ),
         "",
         f"STAGE TO PRODUCE: {stage.label or stage.id}",
+        # 4 Oct: a memo that said it would not invent figures then gave
+        # recovery ranges no source supported. PromptMaster checks each figure
+        # against the project's material after the draft; this says so first.
+        "FIGURES: every percentage, amount or other quantity you state must come from the "
+        "material above — the objective, the project context, an earlier stage or a data file — "
+        "quoted as written there. Where none supports a number, do not supply one: say what is "
+        "missing, or, if a working figure is genuinely needed, label it plainly as "
+        "\"Assumption: …\". Calling a number a scenario or a range does not give it a source.",
     ]
 
     # The numbers already on the record. A later stage that restates one from

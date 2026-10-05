@@ -8,6 +8,7 @@ Implements:
 
 from .modes import MODES
 from .schemas import PMInput, AssembledPrompt
+from .project_context import context_block
 
 
 def resolve_mode_config(inputs: PMInput) -> dict:
@@ -65,6 +66,10 @@ def build_prompt(inputs: PMInput) -> AssembledPrompt:
             f"- {fact}" for fact in facts
         )
         parts.append(facts_block)
+
+    # The project's source material (4 Oct), kept apart from the objective.
+    if (inputs.context or "").strip():
+        parts.append(context_block(inputs))
 
     context_pieces = []
     if inputs.audience:

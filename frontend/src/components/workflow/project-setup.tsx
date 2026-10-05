@@ -30,6 +30,7 @@ import { useMemo } from 'react';
 import type { StageDefinition } from '@/lib/workflow/types';
 import type { Project, ProjectPatch } from '@/types/project';
 import { AutoGrowTextarea } from '@/components/shared/auto-grow-textarea';
+import { MAX_CONTEXT_CHARS } from '@/lib/projects/split-ask';
 
 /** The project columns a criterion is allowed to require, and how to label one. */
 const FIELDS = {
@@ -53,11 +54,17 @@ const FIELDS = {
     placeholder: 'Length, structure, tone.',
     rows: 2,
   },
+  // 4 Oct, item 7: the material behind the objective, kept apart from it.
+  context: {
+    label: 'Project context — facts, figures, background',
+    placeholder: 'Source material every stage may quote. Optional.',
+    rows: 3,
+  },
 } as const;
 
 type FieldKey = keyof typeof FIELDS;
 
-const ORDER: FieldKey[] = ['objective', 'audience', 'constraints', 'output_format'];
+const ORDER: FieldKey[] = ['objective', 'audience', 'constraints', 'output_format', 'context'];
 
 function isFieldKey(key: string): key is FieldKey {
   return key in FIELDS;
@@ -141,7 +148,7 @@ export function ProjectSetup({ project, stage, onPatch, readOnly }: Props) {
                 readOnly={readOnly}
                 rows={field.rows}
                 placeholder={field.placeholder}
-                onChange={(e) => onPatch({ [key]: e.target.value })}
+                onChange={(e) => onPatch({ [key]: key === 'context' ? e.target.value.slice(0, MAX_CONTEXT_CHARS) : e.target.value })}
                 className="w-full rounded-lg bg-[var(--surface-container-low)] px-4 py-3 text-body leading-relaxed text-[var(--on-surface)] outline-none placeholder:text-[var(--on-surface-variant)] focus:ring-2 focus:ring-[var(--pm-primary)]/40 read-only:opacity-70"
               />
             </div>
@@ -188,6 +195,17 @@ export function ProjectBrief({ project, onPatch, readOnly }: Omit<Props, 'stage'
               <label htmlFor={`brief-${key}`} className="mb-1.5 block text-label text-[var(--on-surface-variant)]">
                 {field.label}
               </label>
+              {key === 'context' ? (
+                <textarea
+                  id="brief-context"
+                  value={project.context ?? ''}
+                  readOnly={readOnly}
+                  rows={project.context ? 8 : 2}
+                  placeholder={field.placeholder}
+                  onChange={(e) => onPatch({ context: e.target.value.slice(0, MAX_CONTEXT_CHARS) })}
+                  className="max-h-96 w-full resize-y overflow-y-auto rounded-lg bg-[var(--surface-container-low)] px-4 py-2.5 text-body leading-relaxed text-[var(--on-surface)] outline-none placeholder:text-[var(--on-surface-variant)] focus:ring-2 focus:ring-[var(--pm-primary)]/40 read-only:opacity-70"
+                />
+              ) : (
               <AutoGrowTextarea
                 id={`brief-${key}`}
                 value={project[key] ?? ''}
@@ -197,6 +215,7 @@ export function ProjectBrief({ project, onPatch, readOnly }: Omit<Props, 'stage'
                 onChange={(e) => onPatch({ [key]: e.target.value })}
                 className="w-full rounded-lg bg-[var(--surface-container-low)] px-4 py-2.5 text-body leading-relaxed text-[var(--on-surface)] outline-none placeholder:text-[var(--on-surface-variant)] focus:ring-2 focus:ring-[var(--pm-primary)]/40 read-only:opacity-70"
               />
+              )}
             </div>
           );
         })}

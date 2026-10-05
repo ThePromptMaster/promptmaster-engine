@@ -7,6 +7,8 @@ export interface PMInput {
   audience: string;
   constraints: string;
   output_format: string;
+  /** The user's source material — facts, figures, background — kept apart from the objective. */
+  context?: string;
   mode: ModeType;
   custom_name?: string;
   custom_preamble?: string;

@@ -34,6 +34,7 @@ export function inputsFromProject(project: Project): PMInput {
     audience: project.audience,
     constraints: project.constraints,
     output_format: project.output_format,
+    context: project.context ?? '',
     mode: project.mode,
     custom_name: project.custom_name,
     custom_preamble: project.custom_preamble,

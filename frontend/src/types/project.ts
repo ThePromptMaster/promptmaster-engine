@@ -49,6 +49,12 @@ export interface Project {
   audience: string;
   constraints: string;
   output_format: string;
+  /**
+   * Source material the user pasted: facts, figures, background. The
+   * objective stays short and authoritative; this can be long (4 Oct: a
+   * board-level brief overloaded the objective past its limit).
+   */
+  context?: string;
 
   mode: ModeType;
   custom_name: string;
@@ -214,6 +220,7 @@ export interface ProjectInput {
   audience?: string;
   constraints?: string;
   output_format?: string;
+  context?: string;
   mode?: ModeType;
   model?: string;
   workflow?: string;
@@ -231,6 +238,7 @@ export type ProjectPatch = Partial<
     | 'objective'
     | 'audience'
     | 'constraints'
+    | 'context'
     | 'output_format'
     | 'mode'
     | 'custom_name'

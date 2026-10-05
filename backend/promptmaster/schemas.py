@@ -6,6 +6,7 @@ from uuid import uuid4
 from pydantic import BaseModel, Field, field_validator
 
 from .limits import (
+    MAX_CONTEXT_CHARS,
     MAX_OBJECTIVE_CHARS,
     MAX_PREAMBLE_CHARS,
     MAX_SESSION_FACT_CHARS,
@@ -29,6 +30,9 @@ class PMInput(BaseModel):
     audience: str = Field(default="General", max_length=MAX_SHORT_TEXT_CHARS, description="Target audience")
     constraints: str = Field(default="", max_length=MAX_SHORT_TEXT_CHARS, description="Optional constraints")
     output_format: str = Field(default="", max_length=MAX_SHORT_TEXT_CHARS, description="Desired output structure (e.g. bullet points, numbered list)")
+    # 4 Oct: the facts, figures and background behind the objective, kept apart
+    # from it so the objective stays short. Material to use, not instructions.
+    context: str = Field(default="", max_length=MAX_CONTEXT_CHARS, description="The project's source material")
     mode: ModeType = Field(..., description="Selected operational mode")
     # Custom mode fields (only used when mode == 'custom')
     custom_name: str = Field(default="", max_length=MAX_SHORT_TEXT_CHARS, description="Custom mode persona name")
@@ -61,7 +65,7 @@ class PMInput(BaseModel):
                 f"A session fact is {len(oversized):,} characters; "
                 f"the limit is {MAX_SESSION_FACT_CHARS:,}. "
                 "Session facts are short anchors injected into every prompt — "
-                "put long material in the objective instead."
+                "put long material in the project context instead."
             )
         return facts
 
