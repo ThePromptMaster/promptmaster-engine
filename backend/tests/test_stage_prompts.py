@@ -521,3 +521,12 @@ def test_the_objective_stage_sharpens_and_does_not_replace(basic_inputs, kind):
                             entry_prompt_hint="Produce a statement of what this book is for.", artifact_kind=kind)
     _, user = build_stage_prompt(basic_inputs, stage, StageDigest(objective="Write a book about lions"))
     assert "This stage's statement sharpens the user's objective; it keeps the deliverable and the subject exactly as the user named them." in user
+
+
+def test_later_stages_are_named_as_out_of_scope(basic_inputs, prose_stage, digest):
+    """A Diagnosis draft wrote much of the Options and the 12-month plan (4 Oct)."""
+    scoped = digest.model_copy(update={"later_stages": ["Turnaround options", "12-month plan"]})
+    _system, user = build_stage_prompt(basic_inputs, prose_stage, scoped)
+    assert "LATER STAGES (out of scope here): Turnaround options, 12-month plan" in user
+    _system, user = build_stage_prompt(basic_inputs, prose_stage, digest)
+    assert "LATER STAGES" not in user

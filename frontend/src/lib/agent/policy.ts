@@ -167,6 +167,7 @@ export function allowedActions(
     // revised it (wiping every decision) and triaged it again.
     else if (stage.renderer !== 'review') {
       keys.push('evaluate_stage', 'revise_stage');
+      if (facts.draft?.truncated) keys.push('continue_writing');
       if (facts.evaluationFindings?.aboutHead && facts.evaluationFindings.count > 0) keys.push('apply_findings');
     }
   }
@@ -245,15 +246,37 @@ export function preempt(input: {
     const last = finished.at(-1)!;
     return {
       status: 'blocked',
-      reason: `"${actionFor(last.action_key)?.label ?? last.action_key}" was chosen ${NO_PROGRESS_REPEATS} times in a row on this stage without moving on. It needs your direction.`,
+      reason: `"${actionFor(last.action_key)?.label ?? last.action_key}" was chosen ${NO_PROGRESS_REPEATS} times in a row on this stage without changing it. It needs your direction.`,
     };
   }
   return null;
 }
 
+/** Performers whose step saves a new version when it succeeds. */
+const SAVING = new Set(['draft', 'revise', 'continue', 'outline', 'apply', 'triage']);
+
+/** The step saved something new to the project. */
+function savedSomething(s: AgentStep): boolean {
+  if (s.status !== 'succeeded' || !SAVING.has(actionFor(s.action_key)?.performer ?? '')) return false;
+  const ids = (s.changes as { version_ids?: unknown } | null)?.version_ids;
+  return Array.isArray(ids) && ids.length > 0;
+}
+
+/**
+ * The same move three times on one stage with nothing to show for it.
+ *
+ * A repeated name alone is not a loop (Sean, 4 Oct): three "Revise this
+ * stage" steps with different reasons that each saved a new version are
+ * three revisions, and the polish cap bounds them. Three that saved nothing
+ * — or three of a reasoning move, which never saves — are a run going round.
+ */
 export function noProgress(finished: readonly AgentStep[]): boolean {
   const tail = finished.slice(-NO_PROGRESS_REPEATS);
-  if (tail.length >= NO_PROGRESS_REPEATS && tail.every((s) => s.action_key === tail[0].action_key && s.stage_id === tail[0].stage_id)) {
+  if (
+    tail.length >= NO_PROGRESS_REPEATS &&
+    tail.every((s) => s.action_key === tail[0].action_key && s.stage_id === tail[0].stage_id) &&
+    !tail.every(savedSomething)
+  ) {
     return true;
   }
   return alternating(finished) !== null;

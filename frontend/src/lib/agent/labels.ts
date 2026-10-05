@@ -35,6 +35,7 @@ export function deriveExecutionLabel(
       return 'discussed';
     case 'draft':
     case 'revise':
+    case 'continue':
     case 'outline':
     case 'sections':
     case 'apply':
