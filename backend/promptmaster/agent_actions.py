@@ -69,6 +69,10 @@ AGENT_ACTIONS: list[AgentAction] = [
     AgentAction(key="revise_stage", family="writing", label="Revise this stage",
                 when="The draft has specific problems worth fixing. Params: instruction.",
                 important=True),
+    # 4 Oct: a cut-off draft is finished before anything else is done to it.
+    AgentAction(key="continue_writing", family="writing", label="Continue writing",
+                when="The current draft was cut off before it finished. Continues it from where "
+                     "it stopped, as a new version."),
     # B2b: the stage-specific work the buttons do, as moves (Sean, 28 Sep, item 2).
     AgentAction(key="generate_outline", family="writing", label="Generate the outline",
                 when="There is no outline yet — on the outline stage, or on a drafting stage whose "

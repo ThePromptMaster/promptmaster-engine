@@ -49,6 +49,12 @@ export interface StageDigest {
   data_files: DataFileBrief[];
   /** Figures earlier stages established, to be quoted rather than worked out again. */
   figures: { stage: string; name: string; value: string; context: string }[];
+  /**
+   * The stages after this one, by label: their content is out of scope here.
+   * A Diagnosis draft spent much of itself on Turnaround Options and the
+   * 12-month plan, two stages later (4 Oct).
+   */
+  later_stages?: string[];
 }
 
 /** What a prompt is told about one data file. Never the file. */
@@ -212,6 +218,7 @@ export function buildStageDigest(
     manuscript: formatManuscript(sections),
     data_files: dataFileBriefs(project),
     figures: establishedFigures(template, state, bundles, upToStageId),
+    later_stages: cutoff >= 0 ? template.stages.slice(cutoff + 1).map((s) => s.label.slice(0, 120)) : [],
   };
 }
 

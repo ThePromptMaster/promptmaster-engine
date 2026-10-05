@@ -19,7 +19,7 @@ import type { StepOutcome } from './perform';
 import { actionFor } from './actions';
 
 /** Performers whose success is a change to the project, not a piece of text. */
-const MUTATING = new Set(['draft', 'revise', 'outline', 'sections', 'apply', 'triage']);
+const MUTATING = new Set(['draft', 'revise', 'continue', 'outline', 'sections', 'apply', 'triage']);
 
 export function changedSomething(changes: StepOutcome['changes'] | undefined): boolean {
   if (!changes) return false;
@@ -50,7 +50,7 @@ export interface OutcomeProof {
 }
 
 /** Performers whose success names a saved version. */
-const SAVES_VERSION = new Set(['draft', 'revise', 'outline', 'apply', 'triage']);
+const SAVES_VERSION = new Set(['draft', 'revise', 'continue', 'outline', 'apply', 'triage']);
 
 function missing(outcome: StepOutcome, what: string): StepOutcome {
   return {

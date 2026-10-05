@@ -463,10 +463,11 @@ export const api = {
     });
   },
 
-  async continueDocument(req: ContinueDocumentRequest): Promise<IterationFromConversationResponse> {
+  async continueDocument(req: ContinueDocumentRequest, signal?: AbortSignal): Promise<IterationFromConversationResponse> {
     return apiFetch('/api/continue-document', {
       method: 'POST',
       body: JSON.stringify(req),
+      signal,
     });
   },
 

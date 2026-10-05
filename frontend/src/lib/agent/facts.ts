@@ -21,7 +21,7 @@ import { checkVersions, getArtifact, getEvaluation } from '@/lib/supabase/versio
 import { manuscriptArtifactFor, manuscriptSourceFor } from '@/lib/workflow/context';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import { revisionBrief, type RevisionBrief } from '@/lib/workflow/revision';
-import { effectiveRenderer, itemSchemaFor, parseItems, stageDrafts, type StageItem, type StageItemSchema, isTriaged } from '@/lib/workflow/stage-artifact';
+import { effectiveRenderer, itemSchemaFor, parseItems, rendererHoldsItems, stageDrafts, type StageItem, type StageItemSchema, isTriaged } from '@/lib/workflow/stage-artifact';
 import { isTriageTable, splitUntriaged } from '@/lib/workflow/triage';
 import { projectState } from '@/lib/workflow/engine';
 import type { StageContext, StageDefinition, WorkflowEvent, WorkflowTemplate } from '@/lib/workflow/types';
@@ -82,6 +82,14 @@ export interface EvaluationFacts {
   aboutHead: boolean;
 }
 
+/** The current draft of a stage that drafts prose. */
+export interface DraftFacts {
+  /** It was cut off: the model hit its limit, or the check found it incomplete. */
+  truncated: boolean;
+  /** The stage check has been run on this exact version. */
+  checked: boolean;
+}
+
 export interface ReviewFacts {
   items: StageItem[];
   schema: StageItemSchema;
@@ -106,6 +114,7 @@ export interface StageFacts {
   /** The manuscript this stage reviews, when it is a stage after drafting. */
   reads_manuscript?: ManuscriptBrief;
   evaluationFindings?: EvaluationFacts;
+  draft?: DraftFacts;
   review?: ReviewFacts;
 }
 
@@ -204,6 +213,17 @@ export async function readStageFacts(input: {
     facts.evaluationFindings = {
       count: latestEvaluation.findings?.length ?? 0,
       aboutHead: Boolean(head && latestEvaluation.version_id === head.id),
+    };
+  }
+
+  // What the stage's own draft still needs, read the way the page's primary
+  // action reads it (workflow-workspace: "Continue writing" when cut off).
+  const head = bundles[stage.id]?.versions.at(-1);
+  if (stageDrafts(stage) && !rendererHoldsItems(stage.renderer) && head?.content.trim()) {
+    const checked = Boolean(latestEvaluation && latestEvaluation.version_id === head.id);
+    facts.draft = {
+      truncated: head.finish_reason === 'length' || (checked && latestEvaluation?.completeness_status === 'incomplete'),
+      checked,
     };
   }
 

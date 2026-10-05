@@ -33,7 +33,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '@/lib/api/client';
 import { actionFor, actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, USER_ANSWER_STEP } from '@/lib/agent/actions';
 import { contextWithFacts, readOutcomeProof, readStageFacts, type StageFacts } from '@/lib/agent/facts';
-import { describeNeed, NEED_CLEARED, NEED_MOVED_ON, needStillHolds, needsUser, type NeedsUser } from '@/lib/agent/needs';
+import { describeNeed, NEED_CLEARED, NEED_MOVED_ON, needStillHolds, needsUser, requiredWork, type NeedsUser } from '@/lib/agent/needs';
 import { assertHonestOutcome, verifyOutcome } from '@/lib/agent/outcome';
 import { outlineStageFor } from '@/lib/outline/actions';
 import { listRecommendations, recordDecision } from '@/lib/supabase/recommendations';
@@ -476,15 +476,27 @@ export function useGoLoop(opts: Options) {
           break;
         }
 
-        const digest = buildAgentState({
-          template: o.template, state: o.state, stage: o.stage, bundles: o.bundles,
-          stageEvaluation, latestEvaluation: o.latestEvaluation, steps: [...priorStepsRef.current, ...stepsRef.current],
-          context, approvedOutline: o.approvedOutline, facts, dataFiles: dataFileBriefs(o.project), tools: LIVE_TOOLS, memory, controls: o.getControls?.() ?? undefined,
-        });
-        const choice = await api.agentNextAction(
-          { inputs: inputsFrom(o.project), state: digest, allowed_actions: allowed, policy: current.policy, model: o.project.model },
-          signal
-        );
+        // What the stage itself still requires comes before anything the
+        // planner might prefer (4 Oct): a cut-off draft is finished, and at an
+        // approval the findings are applied and the work checked first.
+        const required = requiredWork({ stage: o.stage, facts, stageEvaluation, allowed });
+        const choice = required
+          ? {
+              action_key: required.key, params: {}, rationale: required.rationale, expected_outcome: required.expected,
+              needs_user_decision: false, decision_question: null,
+            }
+          : await api.agentNextAction(
+              {
+                inputs: inputsFrom(o.project),
+                state: buildAgentState({
+                  template: o.template, state: o.state, stage: o.stage, bundles: o.bundles,
+                  stageEvaluation, latestEvaluation: o.latestEvaluation, steps: [...priorStepsRef.current, ...stepsRef.current],
+                  context, approvedOutline: o.approvedOutline, facts, dataFiles: dataFileBriefs(o.project), tools: LIVE_TOOLS, memory, controls: o.getControls?.() ?? undefined,
+                }),
+                allowed_actions: allowed, policy: current.policy, model: o.project.model,
+              },
+              signal
+            );
         if (signal.aborted) throw new Stopped();
         if (!fitsBudget(choice.action_key, current.steps_used, current.budget_steps)) {
           await setRunStatus(

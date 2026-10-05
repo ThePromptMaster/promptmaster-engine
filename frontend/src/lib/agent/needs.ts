@@ -65,13 +65,88 @@ export function isClearedNote(reason: string | null | undefined): boolean {
   return reason === NEED_CLEARED || reason === NEED_MOVED_ON;
 }
 
-/** Moves that change the stage's work; a stage with none left needs the user, not the planner. */
-const REVISE_MOVES = new Set(['revise_stage', 'apply_findings']);
-const WORK_MOVES = new Set([
-  'draft_stage', 'revise_stage', 'apply_findings', 'generate_outline', 'draft_sections', 'revise_sections', 'triage_findings',
+/**
+ * Moves that produce the stage's own work. With none of these left and only
+ * boxes the user ticks unmet, the next move is the user's.
+ *
+ * The research moves (Compare alternatives, Derive, …) are not here: they
+ * reason about the work but cannot tick an approval. Counting them let a
+ * custom workflow's Evidence stage, whose only open item was "I approve this
+ * evidence base", run Compare alternatives three times and stop on the
+ * repeat instead of at the approval (4 Oct). Revise is not here either:
+ * revising cannot tick a box (Positioning, 2026-09-29).
+ */
+const STAGE_WORK_MOVES = new Set(['draft_stage', 'generate_outline', 'draft_sections', 'revise_sections', 'triage_findings']);
+
+/**
+ * Everything still open on the stage is a box only the user ticks, and at
+ * least one of them is required. An optional automatic item still open
+ * ("three works verified") is work Go can do, so it is not the boundary yet.
+ */
+export function onlyApprovalLeft(stageEvaluation: StageEvaluation): boolean {
+  const blockingUnmet = stageEvaluation.unmet.filter((c) => c.blocking);
+  return blockingUnmet.length > 0 && stageEvaluation.unmet.every((c) => c.manual);
+}
+
+/** Moves that reason about the work; they cannot tick an approval. */
+const REASONING_MOVES = new Set([
   'derive', 'prove', 'simplify', 'limiting_case', 'try_contradiction', 'run_computation',
   'falsify_hypothesis', 'compare_alternatives', 'check_literature', 'update_assumptions',
 ]);
+
+export interface RequiredMove {
+  key: string;
+  rationale: string;
+  expected: string;
+}
+
+/**
+ * What the stage itself still requires, in order, before anything optional:
+ * finish a cut-off draft; then — once only the user's approval is left —
+ * apply the check's findings and check again, so the user is asked to approve
+ * work that has had its fixes (Sean, 4 Oct: "finish the incomplete artifact;
+ * apply the stage-check findings it can handle; re-check; if only a human
+ * approval remains, stop and ask me; only then choose optional actions").
+ *
+ * Pure. Only moves in `allowed` are returned, so the polish cap still bounds
+ * apply and check.
+ */
+export function requiredWork(input: {
+  stage: StageDefinition;
+  facts: StageFacts;
+  stageEvaluation: StageEvaluation;
+  allowed: readonly string[];
+}): RequiredMove | null {
+  const { stage, facts, stageEvaluation, allowed } = input;
+  const can = (k: string) => allowed.includes(k);
+
+  if (facts.draft?.truncated && can('continue_writing')) {
+    return {
+      key: 'continue_writing',
+      rationale: `The ${stage.label} draft was cut off before it finished; finishing it comes before anything else.`,
+      expected: 'The draft continues from where it stopped, as a new version.',
+    };
+  }
+
+  if (!onlyApprovalLeft(stageEvaluation) || !facts.draft) return null;
+
+  const findings = facts.evaluationFindings;
+  if (findings?.aboutHead && findings.count > 0 && can('apply_findings')) {
+    return {
+      key: 'apply_findings',
+      rationale: `Only your approval is left on ${stage.label}, and the stage check raised ${findings.count} finding${findings.count === 1 ? '' : 's'} Go can fix first.`,
+      expected: 'A new version with the findings applied.',
+    };
+  }
+  if (!facts.draft.checked && can('evaluate_stage')) {
+    return {
+      key: 'evaluate_stage',
+      rationale: `Only your approval is left on ${stage.label}; checking this version first, so you approve work that has been checked.`,
+      expected: 'A check of the current version against the objective.',
+    };
+  }
+  return null;
+}
 
 /**
  * Decide, before the planner is asked, whether the next move is the user's.
@@ -143,7 +218,13 @@ export function needsUser(input: {
   // it let an autonomous run move past Positioning with its one required
   // box unticked instead of stopping here (production pass, 2026-09-29).
   const blockingUnmet = stageEvaluation.unmet.filter((c) => c.blocking);
-  const workLeft = allowed.some((k) => WORK_MOVES.has(k) && !REVISE_MOVES.has(k));
+  const workLeft =
+    allowed.some((k) => STAGE_WORK_MOVES.has(k)) ||
+    // Computations the project's data can still carry out are work, not reasoning.
+    (allowed.includes('run_computation') && (input.runAttemptsLeft ?? 0) > 0) ||
+    // An optional automatic item still open is something a lookup or a run may settle.
+    (!onlyApprovalLeft(stageEvaluation) && allowed.some((k) => REASONING_MOVES.has(k))) ||
+    requiredWork({ stage, facts, stageEvaluation, allowed }) !== null;
   if (blockingUnmet.length > 0 && blockingUnmet.every((c) => c.manual) && !workLeft) {
     const c = blockingUnmet[0];
     return { kind: 'tick_criterion', stageId: stage.id, criterionId: c.id, label: c.label, ...(c.hint ? { hint: c.hint } : {}) };

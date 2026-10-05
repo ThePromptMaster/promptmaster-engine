@@ -210,6 +210,16 @@ def build_stage_prompt(
         "",
         f"STAGE TO PRODUCE: {stage.label or stage.id}",
     ]
+    # A Diagnosis draft spent much of itself on Turnaround Options and the
+    # 12-month plan — two stages later — and a later check had to flag it
+    # (4 Oct). Each stage does its own work; the later ones get theirs.
+    if digest.later_stages:
+        later = ", ".join(s[:120] for s in digest.later_stages[:40])
+        parts.append(
+            f"LATER STAGES (out of scope here): {later}. Do not draft their content in this "
+            "stage. Where this stage's work leads into one of them, say so in a sentence and "
+            "leave the work to that stage."
+        )
 
     # The numbers already on the record. A later stage that restates one from
     # its own reading of a summary can get it wrong, and a validation stage

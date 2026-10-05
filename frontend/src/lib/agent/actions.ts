@@ -16,6 +16,7 @@ export type Performer =
   | 'draft' // generate-stage-artifact
   | 'evaluate' // evaluate-stage-artifact
   | 'revise' // generate-stage-artifact with the current draft
+  | 'continue' // continue-document: finish a draft that was cut off
   | 'outline' // generate an outline and commit it as a version (B2b)
   | 'sections' // enqueue section jobs and wait for them (B2b)
   | 'apply' // apply the latest check's findings as a new version (B2b)
@@ -50,6 +51,8 @@ export const AGENT_ACTIONS: readonly AgentAction[] = [
   { key: 'draft_stage', family: 'writing', label: 'Draft this stage', performer: 'draft', important: false },
   { key: 'evaluate_stage', family: 'writing', label: 'Check this stage', performer: 'evaluate', important: false },
   { key: 'revise_stage', family: 'writing', label: 'Revise this stage', performer: 'revise', important: true },
+  // 4 Oct: a cut-off draft is finished before anything else is done to it.
+  { key: 'continue_writing', family: 'writing', label: 'Continue writing', performer: 'continue', important: false },
   // B2b: the stage-specific work the buttons do, as moves (Sean, 28 Sep, item 2).
   { key: 'generate_outline', family: 'writing', label: 'Generate the outline', performer: 'outline', important: false },
   { key: 'draft_sections', family: 'writing', label: 'Draft the sections', performer: 'sections', important: true },

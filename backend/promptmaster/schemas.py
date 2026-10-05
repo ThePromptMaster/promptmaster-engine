@@ -468,6 +468,8 @@ class StageDigest(BaseModel):
     data_files: list[DataFileBrief] = Field(default_factory=list, max_length=10)
     #: Figures earlier stages established, each exactly as that stage wrote it.
     figures: list["EstablishedFigure"] = Field(default_factory=list, max_length=60)
+    #: The stages after this one, by label. Their content is out of scope here.
+    later_stages: list[str] = Field(default_factory=list, max_length=40)
 
 
 class StageItemField(BaseModel):

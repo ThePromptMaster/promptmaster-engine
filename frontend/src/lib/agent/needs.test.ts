@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { BOOK_V1 } from '@/lib/workflow/templates/book.v1';
 import { initialState, projectState } from '@/lib/workflow/engine';
 import type { StageEvaluation, WorkflowEvent } from '@/lib/workflow/types';
-import { describeNeed, needIsDecidedOnStage, needStillHolds, needsUser, type NeedsUser } from './needs';
+import { describeNeed, needIsDecidedOnStage, needStillHolds, needsUser, requiredWork, type NeedsUser } from './needs';
 
 const stage = (id: string) => BOOK_V1.stages.find((s) => s.id === id)!;
 const evaluation = (id: string, unmet: StageEvaluation['unmet'] = []): StageEvaluation => ({ stageId: id, canAdvance: unmet.every((c) => !c.blocking), criteria: [], unmet });
@@ -205,11 +205,13 @@ describe('needStillHolds: a recorded stop is checked against the project (1 Oct,
   });
 
   it('an approval asked for while other moves were still on offer holds until it is given (production pass, 2026-10-02)', () => {
-    // On Research the reasoning moves are always available, so needsUser itself would not raise this.
     const unmet = [{ id: 'analysis.verdicts', label: 'I confirm each hypothesis has an evidence-backed verdict', satisfied: false, blocking: true, manual: true }];
     const need: NeedsUser = { kind: 'tick_criterion', stageId: 'positioning', criterionId: 'analysis.verdicts', label: unmet[0].label, onStage: 'positioning' };
     const allowed = ['derive', 'prove', 'run_computation', 'evaluate_stage', 'revise_stage'];
-    expect(needsUser({ ...at('positioning', { stageEvaluation: evaluation('positioning', unmet) }), allowed })).toBeNull();
+    // Reasoning moves cannot tick an approval (4 Oct): needsUser raises it itself now…
+    expect(needsUser({ ...at('positioning', { stageEvaluation: evaluation('positioning', unmet) }), allowed })).toMatchObject({ kind: 'tick_criterion' });
+    // …unless the project's data can still carry out a computation.
+    expect(needsUser({ ...at('positioning', { stageEvaluation: evaluation('positioning', unmet) }), allowed, runAttemptsLeft: 2 })).toBeNull();
     expect(needStillHolds(need, { ...at('positioning', { stageEvaluation: evaluation('positioning', unmet) }), allowed })).toBe(true);
     expect(needStillHolds(need, { ...at('positioning'), allowed })).toBe(false);
   });
@@ -287,5 +289,44 @@ describe('approvalsAskedFor: a question asking for an approval offers the tick (
   it('offers nothing for a question that does not quote a requirement', () => {
     expect(approvalsAskedFor('Which of the three segments should the book address first?', [gap, other])).toEqual([]);
     expect(approvalsAskedFor(asked, [])).toEqual([]);
+  });
+});
+
+describe('requiredWork: the stage\'s own requirements come before optional moves (4 Oct)', () => {
+  const approval = [{ id: 'evidence.approved', label: 'I approve this evidence base and hypothesis set', satisfied: false, blocking: true, manual: true }];
+  const ruleUnmet = [{ id: 'x', label: 'At least one item', satisfied: false, blocking: true, manual: false }];
+  const research = ['derive', 'compare_alternatives', 'evaluate_stage', 'revise_stage', 'apply_findings', 'continue_writing'];
+  const draft = (over: Record<string, unknown> = {}) => ({ draft: { truncated: false, checked: true, ...over } }) as Record<string, unknown> as never;
+  const args = (facts: never, unmet = approval, allowed = research) => ({
+    stage: stage('positioning'), facts, stageEvaluation: evaluation('positioning', unmet), allowed,
+  });
+
+  it('a cut-off draft is finished first, whatever else is open', () => {
+    expect(requiredWork(args(draft({ truncated: true }), ruleUnmet))?.key).toBe('continue_writing');
+    expect(requiredWork(args(draft({ truncated: true })))?.key).toBe('continue_writing');
+  });
+
+  it('at an approval: open findings on this version are applied, then the new version is checked', () => {
+    const withFindings = { ...(draft() as object), evaluationFindings: { count: 4, aboutHead: true } } as never;
+    expect(requiredWork(args(withFindings))?.key).toBe('apply_findings');
+    expect(requiredWork(args(draft({ checked: false })))?.key).toBe('evaluate_stage');
+    expect(requiredWork(args(draft()))).toBeNull();
+  });
+
+  it('only what the polish cap still allows is required', () => {
+    const withFindings = { ...(draft({ checked: false }) as object), evaluationFindings: { count: 4, aboutHead: true } } as never;
+    expect(requiredWork(args(withFindings, approval, ['derive', 'compare_alternatives']))).toBeNull();
+  });
+
+  it('with a rule still unmet, polishing is the planner\'s choice, not required', () => {
+    expect(requiredWork(args(draft({ checked: false }), ruleUnmet))).toBeNull();
+  });
+
+  it('once the required work is done, the only thing left is the user\'s approval — not Compare alternatives', () => {
+    const need = needsUser({ ...base, stage: stage('positioning'), facts: draft(), stageEvaluation: evaluation('positioning', approval), allowed: research });
+    expect(need).toMatchObject({ kind: 'tick_criterion', criterionId: 'evidence.approved' });
+    // …but not while there are findings Go can still apply.
+    const pending = { ...(draft() as object), evaluationFindings: { count: 4, aboutHead: true } } as never;
+    expect(needsUser({ ...base, stage: stage('positioning'), facts: pending, stageEvaluation: evaluation('positioning', approval), allowed: research })).toBeNull();
   });
 });
