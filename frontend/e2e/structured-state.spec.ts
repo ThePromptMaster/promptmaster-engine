@@ -266,6 +266,28 @@ test("Go's revision of a table keeps the works a lookup found", async ({ page })
 });
 
 /**
+ * 5 Oct, production — one field two characters over its limit kept a whole
+ * table (lookup results and all) from being saved, and nothing said why.
+ */
+test('a field over its limit says what to shorten instead of silently blocking Save', async ({ page }) => {
+  await createProject(page, { workflow: 'Research', name: 'E2E over limit', objective: 'Why customers churn' });
+  await expect(stageArtifact(page)).toContainText('Mock', { timeout: 30_000 });
+  await pressTransition(page);
+  await expect(page.getByRole('heading', { name: 'Literature context' })).toBeVisible();
+  const artifact = stageArtifact(page);
+  await expect(artifact).toContainText('Mock work 1', { timeout: 30_000 });
+
+  await artifact.getByLabel('The work').first().fill('A '.repeat(125));
+  await expect(artifact.getByRole('status').filter({ hasText: 'Shorten “The work” to 240 characters to save.' })).toBeVisible();
+  await expect(artifact.getByRole('button', { name: 'Save as new version' })).toBeDisabled();
+  await page.screenshot({ path: test.info().outputPath('01-says-what-to-shorten.png'), fullPage: true });
+
+  await artifact.getByLabel('The work').first().fill('Ascarza, E. (2018). Retention Futility.');
+  await expect(artifact.getByRole('status').filter({ hasText: 'Shorten' })).toHaveCount(0);
+  await expect(artifact.getByRole('button', { name: 'Save as new version' })).toBeEnabled();
+});
+
+/**
  * 2 Oct, items 12 and 13 — rows on Validation read "Reproduced" over text
  * saying nothing had been recalculated. The statuses now say what was
  * actually done, each with one plain line, and the table asks its question

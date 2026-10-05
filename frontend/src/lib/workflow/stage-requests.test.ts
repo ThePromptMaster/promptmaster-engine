@@ -17,6 +17,17 @@ describe('generationContent', () => {
   it('still treats an empty findings table as unusable', () => {
     expect(generationContent(stage('critique'), empty)).toBe('');
   });
+
+  it('keeps every row field within its limit, so the table can be saved (5 Oct, production)', () => {
+    const literature = RESEARCH_V1.stages.find((s) => s.id === 'literature')!;
+    const long = 'Michael E. Fagan (1976). Design and Code Inspections to Reduce Errors in Program Development. IBM Systems Journal 15(3), 182–211. A field study across several large projects at IBM. DOI 10.1147/sj.153.0182 and more words to run past the limit set for this field.';
+    const res = { content: '', items: [{ id: 'w1', work: long, finding: 'f', relation: 'r', status: 'candidate' }], finish_reason: 'stop', model_used: 'm' } as never;
+    const [row] = parseItems(generationContent(literature, res))!;
+    expect(long.length).toBeGreaterThan(240);
+    expect(row.work.length).toBeLessThanOrEqual(240);
+    expect(row.work.endsWith('…')).toBe(true);
+    expect(row.finding).toBe('f');
+  });
 });
 
 describe('the request says who may set which status (1 Oct, items 3, 12, 18)', () => {
