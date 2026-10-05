@@ -156,6 +156,12 @@ export function ListRenderer({
   const overLimit = items.some((item) =>
     schema.fields.some((f) => f.max && (item[f.key] ?? '').length > f.max)
   );
+  // Which field is over, so a disabled Save says why (5 Oct: one field two
+  // characters over its limit kept a whole table, lookup results and all,
+  // from being saved, with nothing on the page saying so).
+  const overField = overLimit
+    ? schema.fields.find((f) => f.max && items.some((item) => (item[f.key] ?? '').length > f.max!))
+    : undefined;
 
   return (
     <section aria-label={`${stage.label} work`}>
@@ -277,6 +283,11 @@ export function ListRenderer({
             {items.length < schema.minItems && ` · ${schema.minItems} expected`}
           </span>
 
+          {onSaveItems && overField && (
+            <span role="status" className="ml-auto text-label text-[var(--pm-error)]">
+              Shorten “{overField.label}” to {overField.max} characters to save.
+            </span>
+          )}
           {onSaveItems && (
             <button
               onClick={() => void save()}

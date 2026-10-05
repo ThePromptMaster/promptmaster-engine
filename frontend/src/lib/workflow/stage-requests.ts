@@ -103,10 +103,32 @@ export function generationRequest(
  * open is the good outcome) stores an empty table rather than reading as
  * "the draft came back empty" (end-to-end pass, 2026-09-29).
  */
+/**
+ * A row field cut to the schema's limit, at a word where one is near.
+ *
+ * The model is told each limit but does not always keep to it, and a table
+ * with any field over its limit cannot be saved at all (5 Oct, production: a
+ * work 242 of 240 characters kept the whole Literature table unsaveable).
+ */
+export function withinLimits(items: readonly StageItem[], target: StageDefinition): StageItem[] {
+  const fields = itemSchemaFor(target).fields.filter((f) => f.max);
+  return items.map((item) => {
+    const row = { ...item };
+    for (const f of fields) {
+      const value = row[f.key];
+      if (typeof value !== 'string' || value.length <= f.max!) continue;
+      const cut = value.slice(0, f.max! - 1);
+      const space = cut.lastIndexOf(' ');
+      row[f.key] = `${space > f.max! * 0.8 ? cut.slice(0, space) : cut}…`;
+    }
+    return row;
+  });
+}
+
 export function generationContent(target: StageDefinition, response: GenerateStageArtifactResponse): string {
   if (!rendererHoldsItems(target.renderer)) return response.content.trim() ? response.content : '';
   if (response.items.length === 0) return itemSchemaFor(target).minItems === 0 ? serializeItems([]) : '';
-  const content = serializeItems(response.items as unknown as StageItem[]);
+  const content = serializeItems(withinLimits(response.items as unknown as StageItem[], target));
   return content.trim() ? content : '';
 }
 
