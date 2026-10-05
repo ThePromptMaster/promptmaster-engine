@@ -474,11 +474,12 @@ inside `appendStageVersion`. A model's revision is refused, and the current vers
 when it is:
 - empty;
 - text where the stage holds a table;
-- a table that lost every row;
-- a rewrite that kept under 30% of a text of 400+ characters.
+- a table that lost every row.
 
 It does not judge whether a revision is *better*, and it does not refuse a table that lost
-some of its rows. Hand edits and restores are exempt, so a user may empty a stage on purpose.
+some of its rows. It does not judge length either: a rule that refused rewrites keeping
+under 30% of the text was removed on 2026-10-06, the day it shipped. Findings that ask for
+a 23,000-character overshoot to be cut back to a statement are asking for exactly that. Hand edits and restores are exempt, so a user may empty a stage on purpose.
 
 ### L-37 · "Figures must have a source" is a lexical check · `accepted`
 
@@ -576,7 +577,7 @@ direction. Two things still count as work Go may do first:
 | L-33 | Password reset works on any device; email delivery needs a custom SMTP provider | open |
 | L-34 | Research outline and manuscript share one artifact row | accepted |
 | L-35 | Literature topic search returns index matches, not judged relevance | accepted |
-| L-36 | The commit check guards shape (empty, prose-for-table, no rows), not quality | accepted |
+| L-36 | The commit check guards shape (empty, prose-for-table, no rows), not quality or length | accepted |
 | L-37 | Figures must have a source: lexical, unit-aware; other spellings and derived figures are reported | accepted |
 | L-38 | Project context capped at 60k characters, sent whole on every stage call | accepted |
 | L-39 | No dependency graph; staleness is per stage, not per claim | open |
