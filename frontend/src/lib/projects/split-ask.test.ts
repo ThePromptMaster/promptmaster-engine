@@ -16,6 +16,16 @@ describe('splitAsk (4 Oct, item 7)', () => {
     expect(context).toBe(brief);
   });
 
+  it('a shorter message laid out as a brief — title, ask, facts — is a brief too (6 Oct)', () => {
+    const brief = `Northstar — board brief\n\nThe Board has asked management to determine why profitability has deteriorated despite revenue growth.\n\nCompany facts:\n${facts.split('\n').slice(0, 12).join('\n')}`;
+    expect(brief.length).toBeLessThan(BRIEF_FROM_CHARS);
+    const { objective, context } = splitAsk(brief);
+    expect(objective).toMatch(/^The Board has asked/);
+    expect(context).toBe(brief);
+    // Two short paragraphs are still just an objective.
+    expect(splitAsk('A book about giraffes.\n\nFor ten-year-olds.').context).toBe('');
+  });
+
   it('an opening paragraph that is itself long is cut at a sentence', () => {
     const long = Array.from({ length: 40 }, (_, i) => `Sentence ${i} says something about the plan.`).join(' ');
     const { objective } = splitAsk(`${long}\n\n${facts}`);
