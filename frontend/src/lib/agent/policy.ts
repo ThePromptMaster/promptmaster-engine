@@ -191,7 +191,13 @@ export function allowedActions(
   // choice: open-ended work "is going to go on forever" (3 Oct call), and on
   // production Go took the write-up after one round. It proposes the next
   // round; ending the exploration is the user's, from the stage bar.
-  if (nextSuggestedStage(template, state) && !stage.transitions.loop_to) keys.push('advance_stage');
+  // In a workflow that loops, a stage entered again holds last round's draft,
+  // which still satisfies its requirements; moving on would carry it into the
+  // new round unchanged (production, 4 Oct: Findings and Next question were
+  // passed through, and the round could not be proposed). Draft it first.
+  const staleRoundDraft =
+    template.stages.some((s) => s.transitions.loop_to) && stageDrafts(stage) && !stageHasDraft;
+  if (nextSuggestedStage(template, state) && !stage.transitions.loop_to && !staleRoundDraft) keys.push('advance_stage');
   // Nothing is stuck before it has been tried: a stage that drafts and has no
   // draft yet is drafted first. Offered both, the planner on an empty review
   // stage chose "stuck — no draft text" over drafting the review from the
