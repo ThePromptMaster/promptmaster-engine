@@ -203,6 +203,9 @@ test('once the stage has its works, Go looks up what is listed instead of search
   await pressTransition(page);
   await expect(page.getByRole('heading', { name: 'Literature context' })).toBeVisible();
   await expect(stageArtifact(page)).toContainText('Mock work 1', { timeout: 30_000 });
+  // Agreed up front: once the works are found, the gap statement would be the
+  // only item left, and Go would stop for it (4 Oct) before a second lookup.
+  await criterion(page, 'I agree this says what is not yet known, and that this work addresses it').getByRole('checkbox').check();
 
   const panel = page.getByRole('region', { name: 'Go mode', exact: true });
   await panel.getByRole('button', { name: 'Set up Go' }).click();
