@@ -15,7 +15,7 @@ import { generateOutlineDraft } from '@/lib/outline/actions';
 import { countNamedSections, parseOutlineDocument } from '@/lib/outline/model';
 import { commitOutlineVersion } from '@/lib/supabase/outline';
 import { appendWorkflowEvent } from '@/lib/supabase/workflow';
-import { appliedFindingsVersion, findingsInstruction, reviseWithFindings } from '@/lib/workflow/apply-findings';
+import { appliedFindingsVersion, carryUserFields, findingsInstruction, reviseWithFindings } from '@/lib/workflow/apply-findings';
 import { findInstructionConflicts } from '@/lib/workflow/conflict-trail';
 import { describeWith, type InstructionConflict } from '@/lib/workflow/instruction-conflicts';
 import { defaultOutlineForm, deriveOutlineItems } from '@/lib/workflow/derived-outline';
@@ -484,7 +484,13 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         generationRequest(ctx.project, ctx.template, ctx.state, ctx.bundles, ctx.stage, revising ? head : '', revising ? withAnswer(instruction, ctx.conflictAnswer) : ''),
         ctx.signal
       );
-      const content = generationContent(ctx.stage, res);
+      const generated = generationContent(ctx.stage, res);
+      // A revised table keeps what a lookup, a run or the user established on
+      // its rows: the model may not claim "Retrieved", so without this every
+      // found work went back to "Suggested" (4 Oct, production).
+      const before = revising && rendererHoldsItems(ctx.stage.renderer) ? parseItems(head) : null;
+      const after = before ? parseItems(generated) : null;
+      const content = before && after ? serializeItems(carryUserFields(before, after, itemSchemaFor(ctx.stage))) : generated;
       if (!content) {
         return done(key, { status: 'failed', output: 'The model returned nothing usable.', toolsUsed: ['model'], changes: {} });
       }

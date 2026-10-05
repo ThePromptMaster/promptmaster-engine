@@ -44,6 +44,20 @@ describe('applying findings to a table stage (production, 2026-10-01)', () => {
     expect(api.applyRecommendations).not.toHaveBeenCalled();
   });
 
+  it('carryUserFields keeps what a lookup found when a rewrite renumbers the rows (4 Oct, production)', () => {
+    const schema = itemSchemaFor(literature);
+    const found = [{
+      id: 'w1', work: 'Erdogmus, H. (2003). The Economics of Software Development by Pair Programmers', finding: '', relation: '',
+      status: 'retrieved', status_source: 'tool', link: 'https://doi.org/10.1080/00137910309408770', record: 'The Economics… — Erdogmus (2003)',
+    }];
+    const rewritten = [{
+      id: 'new-1', work: 'Erdogmus, H. (2003). The economics of software development by pair programmers.', finding: 'Pairs cost more per feature, fewer defects.', relation: 'Supports the question.',
+      status: 'candidate',
+    }];
+    const [row] = carryUserFields(found, rewritten, schema);
+    expect(row).toMatchObject({ status: 'retrieved', status_source: 'tool', link: 'https://doi.org/10.1080/00137910309408770', finding: 'Pairs cost more per feature, fewer defects.' });
+  });
+
   it('carryUserFields leaves a model-set status to the new draft', () => {
     const schema = itemSchemaFor(literature);
     const out = carryUserFields(rows, [{ id: 'b', work: 'Lee 2021', finding: 'z', relation: 'z', status: 'candidate' }], schema);

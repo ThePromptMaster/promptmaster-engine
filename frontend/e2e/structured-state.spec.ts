@@ -230,6 +230,42 @@ test('once the stage has its works, Go looks up what is listed instead of search
 });
 
 /**
+ * 5 Oct, production — every "Revise this stage" Go ran on Literature reset the
+ * works a lookup had found to "Suggested", so the stage fell back to 0 of 3
+ * and Go searched again, then revised again, until the no-progress stop.
+ */
+test("Go's revision of a table keeps the works a lookup found", async ({ page }) => {
+  test.setTimeout(150_000);
+  const id = await createProject(page, {
+    workflow: 'Research', name: 'E2E revise keeps found', objective: 'Why customers churn [[mock:plan=check_literature,revise_stage]]',
+  });
+  await expect(stageArtifact(page)).toContainText('Mock', { timeout: 30_000 });
+  await pressTransition(page);
+  await expect(page.getByRole('heading', { name: 'Literature context' })).toBeVisible();
+  await expect(stageArtifact(page)).toContainText('Mock work 1', { timeout: 30_000 });
+
+  const panel = page.getByRole('region', { name: 'Go mode', exact: true });
+  await panel.getByRole('button', { name: 'Set up Go' }).click();
+  await panel.getByRole('radio', { name: /^Guided/ }).click();
+  await panel.getByRole('button', { name: /^Go$/ }).click();
+  const prompt = page.getByRole('region', { name: 'Go mode needs your approval' });
+  await expect(prompt).toContainText('Check literature', { timeout: 30_000 });
+  await prompt.getByRole('button', { name: 'Approve' }).click();
+  await expect(panel).toContainText('1 of 3 works found in OpenAlex.', { timeout: 30_000 });
+  await expect(prompt).toContainText('Revise this stage', { timeout: 30_000 });
+  await prompt.getByRole('button', { name: 'Approve' }).click();
+
+  await expect
+    .poll(async () => (await serviceSelect('artifact_versions', `project_id=eq.${id}&source_operation=eq.agent_revise&select=id`)).length, { timeout: 30_000 })
+    .toBe(1);
+  const [revised] = await serviceSelect('artifact_versions', `project_id=eq.${id}&source_operation=eq.agent_revise&select=content`);
+  const items = JSON.parse(revised.content).items;
+  expect(items[0]).toMatchObject({ status: 'retrieved', status_source: 'tool', link: 'https://doi.org/10.0000/mock.1' });
+  await expect(stageArtifact(page).getByRole('combobox').first()).toContainText('Retrieved by PromptMaster', { timeout: 15_000 });
+  await page.screenshot({ path: test.info().outputPath('01-revised-table-keeps-retrieved.png'), fullPage: true });
+});
+
+/**
  * 2 Oct, items 12 and 13 — rows on Validation read "Reproduced" over text
  * saying nothing had been recalculated. The statuses now say what was
  * actually done, each with one plain line, and the table asks its question
