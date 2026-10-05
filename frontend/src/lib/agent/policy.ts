@@ -186,7 +186,11 @@ export function allowedActions(
   if (stage.transitions.allow_skip && stage.transitions.default_next) keys.push('propose_skip');
   // A round that has produced its question can propose the next one (the user starts it).
   if (stage.transitions.loop_to && stageHasDraft) keys.push('propose_next_round');
-  if (nextSuggestedStage(template, state)) keys.push('advance_stage');
+  // The stage that closes a round does not move on to the write-up by Go's
+  // choice: open-ended work "is going to go on forever" (3 Oct call), and on
+  // production Go took the write-up after one round. It proposes the next
+  // round; ending the exploration is the user's, from the stage bar.
+  if (nextSuggestedStage(template, state) && !stage.transitions.loop_to) keys.push('advance_stage');
   // Nothing is stuck before it has been tried: a stage that drafts and has no
   // draft yet is drafted first. Offered both, the planner on an empty review
   // stage chose "stuck — no draft text" over drafting the review from the

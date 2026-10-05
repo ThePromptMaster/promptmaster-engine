@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { RESEARCH_V1, SINGLE_OUTPUT_V1 } from '@/lib/workflow';
+import { EXPLORATION_V1, RESEARCH_V1, SINGLE_OUTPUT_V1, getStage, projectState } from '@/lib/workflow';
 import { BOOK_V1 } from '@/lib/workflow/templates/book.v1';
 import { initialState } from '@/lib/workflow/engine';
 import type { StageEvaluation } from '@/lib/workflow/types';
@@ -506,5 +506,25 @@ describe('polishSinceDirection: the user asking for a revision restarts the poli
 
   it('counts only this stage', () => {
     expect(polishSinceDirection([step('revise_stage', 'question'), step('revise_stage')], 'literature')).toBe(1);
+  });
+});
+
+describe('an exploration round ends in a proposed round, not the write-up (production pass, 4 Oct)', () => {
+  const ids = EXPLORATION_V1.stages.map((s) => s.id);
+  const events = ids.slice(0, ids.indexOf('next_question')).map((id, i) => ({
+    type: 'stage_completed' as const, stage_id: id, to_stage_id: ids[i + 1], actor: 'user' as const, created_at: `2026-10-04T00:00:0${i}Z`,
+  }));
+  const state = projectState(EXPLORATION_V1, events);
+  const next = getStage(EXPLORATION_V1, 'next_question')!;
+
+  it('offers the next round and not moving on, once the question is drafted', () => {
+    const allowed = allowedActions(EXPLORATION_V1, state, next, true);
+    expect(allowed).toContain('propose_next_round');
+    expect(allowed).not.toContain('advance_stage');
+  });
+
+  it('still lets Go move on from the other stages of a round', () => {
+    const findingsState = projectState(EXPLORATION_V1, events.slice(0, ids.indexOf('findings')));
+    expect(allowedActions(EXPLORATION_V1, findingsState, getStage(EXPLORATION_V1, 'findings')!, true)).toContain('advance_stage');
   });
 });
