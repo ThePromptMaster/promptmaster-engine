@@ -308,7 +308,7 @@ async function sendWithReconnect(path: string, options: RequestInit | undefined,
     } catch (e) {
       if (!isNetworkFailure(e) || signal?.aborted) throw e;
       const error = new ApiError(
-        'The connection dropped before PromptMaster answered, twice. Nothing was changed — try again when the connection is steady.',
+        'The connection dropped before PromptMaster answered, twice. Nothing was changed. Try again when the connection is steady.',
         0,
         { code: 'network', title: 'The connection dropped', retryable: true, technical: e instanceof Error ? e.message : String(e) }
       );

@@ -69,7 +69,8 @@ export function useApplyFindings({
         else await save(rev);
       } catch (e) {
         if (controller.signal.aborted || (e as Error)?.name === 'AbortError') return;
-        setError(`${e instanceof Error && e.message ? e.message : 'That did not work'}. Nothing was changed.`);
+        const message = e instanceof Error && e.message ? e.message.replace(/\.$/, '') : 'That did not work';
+        setError(/nothing was changed/i.test(message) ? `${message}.` : `${message}. Nothing was changed.`);
       } finally {
         if (abortRef.current === controller) abortRef.current = null;
         setRunning(false);
