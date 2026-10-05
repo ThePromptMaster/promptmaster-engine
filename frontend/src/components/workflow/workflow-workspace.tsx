@@ -1071,8 +1071,11 @@ export function WorkflowWorkspace({
   const hasContent = (headVersion?.content ?? '').trim().length > 0;
   const applyable = recommendations.rows.filter((r) => r.kind !== 'stage_transition' && isApplyable(r));
   const nextStage = stage.transitions.default_next ? getStage(template, stage.transitions.default_next) : null;
-  const truncated =
-    headVersion?.finish_reason === 'length' || headEvaluation?.completeness_status === 'incomplete';
+  // Cut off means the model stopped at its length limit. A check's
+  // "incomplete" is a judgement — on 6 Oct it meant "overshoots this stage" —
+  // and comes with findings to apply; offering Continue writing for it added
+  // more of what was already too much (same rule as Go's, lib/agent/facts).
+  const truncated = headVersion?.finish_reason === 'length';
   const primaryAction = nextStageAction({
     finished: project.status === 'finalized',
     busy: generation.generating || stageEvaluation.evaluating || busy || tools.running !== null,
