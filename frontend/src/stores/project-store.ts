@@ -23,6 +23,7 @@ import {
   type NewVersion,
 } from '@/lib/supabase/versions';
 import { OUTLINE_ARTIFACT_KIND } from '@/lib/supabase/outline';
+import { checkCommit, RefusedRevision } from '@/lib/workflow/commit-check';
 import { listRecommendations, supersedePending, type Recommendation } from '@/lib/supabase/recommendations';
 import { listTasks, type ProjectTask } from '@/lib/supabase/tasks';
 import {
@@ -580,6 +581,13 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     // above: version_count and revision move with every append, and a stale
     // copy would write version 2 twice.
     const current = get().stages[stageId]?.artifact ?? artifact;
+
+    // A revision is a proposal until it passes the commit check: nothing
+    // empty or wrong-shaped becomes the stage's current work (4 Oct, Options).
+    const head = get().stages[stageId]?.versions.find((v) => v.id === current.current_version_id);
+    const refused = checkCommit({ before: head?.content, after: version.content, operation: version.source_operation });
+    if (refused) throw new RefusedRevision(refused);
+
     const created = await appendVersionRow(current, version);
 
     let saved: Evaluation | null = null;
