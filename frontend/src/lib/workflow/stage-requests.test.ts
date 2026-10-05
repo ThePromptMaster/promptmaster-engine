@@ -24,8 +24,8 @@ describe('generationContent', () => {
     const res = { content: '', items: [{ id: 'w1', work: long, finding: 'f', relation: 'r', status: 'candidate' }], finish_reason: 'stop', model_used: 'm' } as never;
     const [row] = parseItems(generationContent(literature, res))!;
     expect(long.length).toBeGreaterThan(240);
-    expect(row.work.length).toBeLessThanOrEqual(240);
-    expect(row.work.endsWith('…')).toBe(true);
+    expect(row.work!.length).toBeLessThanOrEqual(240);
+    expect(row.work!.endsWith('…')).toBe(true);
     expect(row.finding).toBe('f');
   });
 });
