@@ -444,7 +444,10 @@ async def generate_stage_artifact(
                 prompt=user,
                 system=system,
                 temperature=0.4,
-                max_tokens=2048,
+                # A full table of up to 12 rows of three or four fields runs past
+                # 2048 tokens; the JSON was cut off, the repair pass failed the
+                # same way, and a revision "came back empty" (4 Oct, Options).
+                max_tokens=8192,
                 model=model,
             )
         except Exception as e:

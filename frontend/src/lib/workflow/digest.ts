@@ -181,13 +181,16 @@ export function buildStageDigest(
   const cutoff = template.stages.findIndex((s) => s.id === upToStageId);
   const prior_stages: StageDigestEntry[] = [];
 
-  // A workflow that loops starts each round with the last one's work marked
-  // stale (a return). The round being worked on is built on it, so it is
-  // shown — labelled as last round's — rather than dropped.
+  // A workflow that loops starts each round with a return, so the last
+  // round's stages sit after the one being worked on. The round is built on
+  // them, so they are shown, labelled as last round's, rather than dropped.
+  // Not only the stale ones: the stage a round was started from (Next
+  // question) is usually still open, and on production round two never saw
+  // the question round one ended on (4 Oct).
   const loops = template.stages.some((s) => s.transitions.loop_to);
   template.stages.forEach((stage, index) => {
     const st = state.stages[stage.id];
-    const lastRound = loops && index >= cutoff && st?.status === 'stale';
+    const lastRound = loops && index > cutoff && Boolean(st) && st!.status !== 'not_started' && st!.status !== 'skipped';
     if (!lastRound && cutoff >= 0 && index >= cutoff) return;
     if (!lastRound && !carriesForward(st)) return;
     const leftOpen = !lastRound && !isDone(st?.status);

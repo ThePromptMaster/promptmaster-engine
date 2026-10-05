@@ -271,6 +271,16 @@ async def test_list_stage_returns_items(basic_inputs, list_stage, digest, audien
 
 
 @pytest.mark.asyncio
+async def test_a_table_has_room_for_every_row(basic_inputs, list_stage, digest, audience_schema):
+    """A 12-row revision ran past 2048 tokens: the JSON was cut off and the
+    revision "came back empty" (4 Oct, Options)."""
+    client = AsyncMock()
+    client.generate_json = AsyncMock(return_value=({"items": []}, {}))
+    await generate_stage_artifact(client, None, basic_inputs, list_stage, digest, audience_schema)
+    assert client.generate_json.call_args.kwargs["max_tokens"] >= 8192
+
+
+@pytest.mark.asyncio
 async def test_a_failed_list_call_degrades_to_an_empty_stage(
     basic_inputs, list_stage, digest, audience_schema
 ):

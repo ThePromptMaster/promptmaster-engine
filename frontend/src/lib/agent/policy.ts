@@ -198,7 +198,11 @@ export function allowedActions(
   // manuscript (2 Oct screenshots). Missing data shows itself once the draft
   // exists (rows that cannot be run, a check that cannot be made).
   if (!keys.includes('draft_stage')) keys.push('mark_blocked');
-  keys.push('request_user_decision', 'declare_objective_complete');
+  keys.push('request_user_decision');
+  // Nor is open-ended work declared complete by Go at the end of a round: on
+  // production, with the write-up no longer offered, it proposed "Objective
+  // complete" instead of the next round (4 Oct). Ending it is the user's.
+  if (!stage.transitions.loop_to) keys.push('declare_objective_complete');
   return keys;
 }
 
