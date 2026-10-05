@@ -42,7 +42,7 @@ import { requestProjectCancel } from '@/lib/supabase/jobs';
 import { authorizeRun } from '@/lib/agent/authorize';
 import { buildAgentState } from '@/lib/agent/digest';
 import { performStep, type PerformContext, type StepOutcome } from '@/lib/agent/perform';
-import { allowedActions, stageHasCurrentDraft, LIVE_TOOLS, POLISH_MOVES, withoutEndlessPolish, withoutSettledRuns, withoutOverride, DEFAULT_BUDGET_STEPS, fitsBudget, noChange, plannedBeforeLatestChange, preempt, shouldPause, stateFingerprint, stepCost } from '@/lib/agent/policy';
+import { allowedActions, stageHasCurrentDraft, LIVE_TOOLS, polishSinceDirection, withoutEndlessPolish, withoutSettledRuns, withoutOverride, DEFAULT_BUDGET_STEPS, fitsBudget, noChange, plannedBeforeLatestChange, preempt, shouldPause, stateFingerprint, stepCost } from '@/lib/agent/policy';
 import {
   createAgentRun,
   endAgentRun,
@@ -444,9 +444,7 @@ export function useGoLoop(opts: Options) {
         const proposedSkipHere = [...priorStepsRef.current, ...stepsRef.current].some(
           (s) => s.action_key === 'propose_skip' && s.stage_id === o.stage!.id
         );
-        const polishedHere = [...priorStepsRef.current, ...stepsRef.current].filter(
-          (s) => s.stage_id === o.stage!.id && (POLISH_MOVES as readonly string[]).includes(s.action_key)
-        ).length;
+        const polishedHere = polishSinceDirection([...priorStepsRef.current, ...stepsRef.current], o.stage!.id);
         const allowed = withoutSettledRuns(withoutEndlessPolish(
           withoutOverride(
             allowedActions(o.template, o.state, o.stage, hasDraft, LIVE_TOOLS, facts), stageEvaluation.canAdvance, current.policy
