@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { BOOK_V1, RESEARCH_V1, projectState } from './index';
+import { BOOK_V1, EXPLORATION_V1, RESEARCH_V1, projectState } from './index';
 import {
   MANUSCRIPT_MAX,
   SUMMARY_MAX,
@@ -253,5 +253,34 @@ describe('establishedFigures: what later stages are told to quote (1 Oct, item 3
     const { BOOK_V1 } = await import('./templates/book.v1');
     const state = { current_stage_id: 'objective', project_status: 'active', stages: { objective: done, audience: done } } as never;
     expect(establishedFigures(BOOK_V1, state, { objective: bundle('v2', 'v2'), audience: bundle('v2', 'v2') }, 'objective')).toEqual([]);
+  });
+});
+
+describe('the next round is built on the last one (production pass, 4 Oct)', () => {
+  const ids = EXPLORATION_V1.stages.map((s) => s.id);
+  const to = (i: number) => ({ type: 'stage_completed' as const, stage_id: ids[i], to_stage_id: ids[i + 1], actor: 'user' as const, created_at: `2026-10-04T00:00:0${i}Z` });
+  // Idea → … → Next question, then the round restarts from Explore while
+  // Next question is still open (the usual way: "Start the next round").
+  const events: WorkflowEvent[] = [
+    to(0), to(1), to(2), to(3),
+    { type: 'stage_returned', stage_id: 'next_question', to_stage_id: 'explore', actor: 'user', created_at: '2026-10-04T00:01:00Z' },
+  ];
+  const state = projectState(EXPLORATION_V1, events);
+  const bundles = {
+    findings: bundle('Entanglement reproduces distance; it does not pick the dimension.'),
+    next_question: bundle('What principle could force a 3+1-dimensional spacetime?'),
+  };
+
+  it('shows the open Next question and the stale Findings to the new round, labelled as last round', () => {
+    const digest = buildStageDigest(EXPLORATION_V1, state, PROJECT, bundles, 'explore');
+    const labels = digest.prior_stages.map((e) => e.label);
+    expect(labels).toContain('Next question (last round)');
+    expect(labels).toContain('Findings (last round)');
+    expect(digest.prior_stages.find((e) => e.stage_id === 'next_question')?.summary).toContain('3+1');
+  });
+
+  it('leaves later stages out of a workflow that does not loop', () => {
+    const book = buildStageDigest(BOOK_V1, projectState(BOOK_V1, []), PROJECT, { audience: bundle('x') }, 'objective');
+    expect(book.prior_stages).toEqual([]);
   });
 });
