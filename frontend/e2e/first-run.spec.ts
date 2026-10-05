@@ -77,3 +77,34 @@ test('a workflow list that fails to load says why Start is unavailable, and Retr
   await expect(page.getByRole('button', { name: /^Start / })).toBeEnabled();
   await page.screenshot({ path: test.info().outputPath('02-retry-start-enabled.png') });
 });
+
+test('the new-project page is usable while the session is still being checked', async ({ page }) => {
+  // Production's session check is a network round trip; the page used to be
+  // blank for it, long enough to type into nothing (4 Oct).
+  // Reproduced the way it happens there: the stored access token has expired,
+  // so the first auth answer waits on a refresh — slowed here to 3 s.
+  await page.goto('/projects');
+  const cookies = await page.context().cookies();
+  const auth = cookies.find((c) => /^sb-.*-auth-token$/.test(c.name));
+  expect(auth, 'a single-chunk session cookie').toBeTruthy();
+  const raw = auth!.value.startsWith('base64-') ? Buffer.from(auth!.value.slice(7), 'base64').toString('utf8') : decodeURIComponent(auth!.value);
+  const session = JSON.parse(raw);
+  session.expires_at = Math.floor(Date.now() / 1000) - 60;
+  await page.context().addCookies([{ ...auth!, value: 'base64-' + Buffer.from(JSON.stringify(session)).toString('base64') }]);
+  await page.route('**/auth/v1/token*', async (route) => {
+    await new Promise((r) => setTimeout(r, 3000));
+    await route.fallback();
+  });
+  await page.route('**/auth/v1/user*', async (route) => {
+    await new Promise((r) => setTimeout(r, 3000));
+    await route.fallback();
+  });
+  await page.goto('/projects/new');
+  await dismissBetaNotice(page);
+  const box = page.getByLabel('What do you want to do or figure out?');
+  await expect(box).toBeVisible({ timeout: 1500 });
+  await box.fill('A book about owls');
+  await page.screenshot({ path: test.info().outputPath('01-typing-while-session-loads.png') });
+  await page.waitForTimeout(3500);
+  await expect(box).toHaveValue('A book about owls');
+});
