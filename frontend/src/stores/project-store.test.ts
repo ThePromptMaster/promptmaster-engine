@@ -496,6 +496,25 @@ describe('the store owns the event log and the recommendations (A4, SN-01)', () 
   });
 });
 
+describe('the commit check (4 Oct, Options)', () => {
+  it('a revision that turns a table into prose is refused and the head stays', async () => {
+    await loadFixture();
+    const table = '{"kind":"stage_items","items":[{"id":"a","claim":"Option A"}]}';
+    useProjectStore.setState({
+      stages: { output: { artifact: { ...ARTIFACT, stage_id: 'output' } as never, versions: [{ ...V1, content: table } as never] } },
+    });
+
+    await expect(
+      useProjectStore.getState().appendStageVersion('output', 'Output', { content: 'No claims yet.', source_operation: 'applied_recommendations' })
+    ).rejects.toThrow(/current version was kept/);
+
+    expect(appendVersionRow).not.toHaveBeenCalled();
+    const bundle = useProjectStore.getState().stages.output;
+    expect(bundle.artifact?.current_version_id).toBe('v1');
+    expect(bundle.versions).toHaveLength(1);
+  });
+});
+
 describe('leaving a stage retires the proposals raised on it (A5, SN-01)', () => {
   it('a stage-leaving event supersedes that stage\'s pending rows, and the store reflects it', async () => {
     await loadFixture();
