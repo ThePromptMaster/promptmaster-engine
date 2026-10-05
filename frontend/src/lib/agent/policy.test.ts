@@ -7,7 +7,7 @@ import type { StageEvaluation } from '@/lib/workflow/types';
 import type { AgentStep } from '@/types/agent';
 import { deriveExecutionLabel } from './labels';
 import { ITEM_SCHEMAS } from '@/lib/workflow/stage-artifact';
-import { allowedActions, alternating, polishSinceDirection, withoutOverride, withoutEndlessPolish, withoutSettledRuns, fitsBudget, noChange, noProgress, plannedBeforeLatestChange, preempt, shouldPause, stageMoveActor, stateFingerprint } from './policy';
+import { allowedActions, alternating, NO_TOOLS, polishSinceDirection, withoutOverride, withoutEndlessPolish, withoutSettledRuns, fitsBudget, noChange, noProgress, plannedBeforeLatestChange, preempt, shouldPause, stageMoveActor, stateFingerprint } from './policy';
 
 function step(over: Partial<AgentStep>): AgentStep {
   return {
@@ -27,6 +27,12 @@ describe('allowedActions', () => {
     expect(allowedActions(RESEARCH_V1, research, stage, false)).toContain('run_computation');
     const single = initialState(SINGLE_OUTPUT_V1);
     expect(allowedActions(SINGLE_OUTPUT_V1, single, SINGLE_OUTPUT_V1.stages[0], false)).not.toContain('run_computation');
+  });
+
+  it('offers Continue writing only on a draft that was cut off (4 Oct)', () => {
+    const stage = RESEARCH_V1.stages.find((s) => s.renderer === 'prose')!;
+    expect(allowedActions(RESEARCH_V1, research, stage, true, NO_TOOLS, { draft: { truncated: true, checked: false } })).toContain('continue_writing');
+    expect(allowedActions(RESEARCH_V1, research, stage, true, NO_TOOLS, { draft: { truncated: false, checked: false } })).not.toContain('continue_writing');
   });
 
   it('offers drafting to an empty stage and checking/revising to a drafted one', () => {
@@ -82,6 +88,19 @@ describe('preempt — checked before any model call', () => {
     expect(noProgress(same)).toBe(true);
     expect(preempt({ ...base, steps: same })?.status).toBe('blocked');
     expect(noProgress([step({}), step({ action_key: 'prove' }), step({})])).toBe(false);
+  });
+
+  it('the same move that saved a new version each time is work, not a loop (Sean, 4 Oct)', () => {
+    const revise = (idx: number, changes: Record<string, unknown>) =>
+      step({ idx, action_key: 'revise_stage', execution_label: 'designed', changes });
+    const saved = [revise(0, { version_ids: ['v2'] }), revise(1, { version_ids: ['v3'] }), revise(2, { version_ids: ['v4'] })];
+    expect(noProgress(saved)).toBe(false);
+    // One of the three saved nothing: that is the circle.
+    expect(noProgress([saved[0], saved[1], revise(2, {})])).toBe(true);
+    // A reasoning move never saves: three of it in a row still stop.
+    expect(preempt({ ...base, steps: [0, 1, 2].map((idx) => step({ idx, action_key: 'compare_alternatives' })) })?.reason).toBe(
+      '"Compare alternatives" was chosen 3 times in a row on this stage without changing it. It needs your direction.'
+    );
   });
 });
 
@@ -521,6 +540,7 @@ describe('an exploration round ends in a proposed round, not the write-up (produ
     const allowed = allowedActions(EXPLORATION_V1, state, next, true);
     expect(allowed).toContain('propose_next_round');
     expect(allowed).not.toContain('advance_stage');
+    expect(allowed).not.toContain('declare_objective_complete');
   });
 
   it('still lets Go move on from the other stages of a round', () => {

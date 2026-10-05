@@ -271,6 +271,16 @@ async def test_list_stage_returns_items(basic_inputs, list_stage, digest, audien
 
 
 @pytest.mark.asyncio
+async def test_a_table_has_room_for_every_row(basic_inputs, list_stage, digest, audience_schema):
+    """A 12-row revision ran past 2048 tokens: the JSON was cut off and the
+    revision "came back empty" (4 Oct, Options)."""
+    client = AsyncMock()
+    client.generate_json = AsyncMock(return_value=({"items": []}, {}))
+    await generate_stage_artifact(client, None, basic_inputs, list_stage, digest, audience_schema)
+    assert client.generate_json.call_args.kwargs["max_tokens"] >= 8192
+
+
+@pytest.mark.asyncio
 async def test_a_failed_list_call_degrades_to_an_empty_stage(
     basic_inputs, list_stage, digest, audience_schema
 ):
@@ -521,3 +531,12 @@ def test_the_objective_stage_sharpens_and_does_not_replace(basic_inputs, kind):
                             entry_prompt_hint="Produce a statement of what this book is for.", artifact_kind=kind)
     _, user = build_stage_prompt(basic_inputs, stage, StageDigest(objective="Write a book about lions"))
     assert "This stage's statement sharpens the user's objective; it keeps the deliverable and the subject exactly as the user named them." in user
+
+
+def test_later_stages_are_named_as_out_of_scope(basic_inputs, prose_stage, digest):
+    """A Diagnosis draft wrote much of the Options and the 12-month plan (4 Oct)."""
+    scoped = digest.model_copy(update={"later_stages": ["Turnaround options", "12-month plan"]})
+    _system, user = build_stage_prompt(basic_inputs, prose_stage, scoped)
+    assert "LATER STAGES (out of scope here): Turnaround options, 12-month plan" in user
+    _system, user = build_stage_prompt(basic_inputs, prose_stage, digest)
+    assert "LATER STAGES" not in user

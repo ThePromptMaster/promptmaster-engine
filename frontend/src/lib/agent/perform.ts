@@ -30,6 +30,7 @@ import { summariseStageContent } from '@/lib/workflow/digest';
 import { stageContentForSummary, stageEvidence } from '@/lib/workflow/evidence';
 import { evaluateStage } from '@/lib/workflow/engine';
 import { figureFindings, figureSources } from '@/lib/workflow/figure-support';
+import { asIteration } from '@/lib/workflow/legacy';
 import {
   evaluationRecord,
   evaluationRequest,
@@ -510,6 +511,39 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         // What changed, so the record can be checked against the project (SN-25).
         changes: typeof versionId === 'string' ? { version_ids: [versionId] } : {},
         output: `${revising ? 'Revised' : 'Drafted'} ${ctx.stage.label} — saved as a new version (${content.length.toLocaleString()} characters).`,
+      });
+    }
+
+    case 'continue': {
+      if (!ctx.appendStageVersion) throw new Error('This view cannot save versions.');
+      const head = ctx.bundles[ctx.stage.id]?.versions.at(-1);
+      if (!head?.content.trim()) {
+        return done(key, { status: 'failed', output: 'There is no draft to continue.', toolsUsed: [], changes: {} });
+      }
+      // The same call as the page's "Continue writing" (use-stage-tools).
+      const { iteration } = await api.continueDocument(
+        {
+          inputs,
+          incomplete_iteration: asIteration(head.content, head.version_number, ctx.project.mode),
+          iteration_number: head.version_number + 1,
+          model,
+        },
+        ctx.signal
+      );
+      const created = await ctx.appendStageVersion(ctx.stage.id, ctx.stage.label, {
+        content: iteration.output,
+        source_operation: 'continuation',
+        instruction: 'Continue from where the draft stopped.',
+        model: iteration.model_used || ctx.project.model,
+        mode: ctx.project.mode,
+        change_summary: iteration.summary || 'Go mode continued the draft from where it was cut off.',
+        finish_reason: null,
+      });
+      const versionId = (created as { id?: unknown } | null)?.id;
+      return done(key, {
+        status: 'succeeded', toolsUsed: ['model'],
+        changes: typeof versionId === 'string' ? { version_ids: [versionId] } : {},
+        output: `Continued ${ctx.stage.label} from where the draft was cut off — saved as a new version.`,
       });
     }
 

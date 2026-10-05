@@ -36,7 +36,12 @@ describe('applying findings to a table stage (production, 2026-10-01)', () => {
 
   it('refuses a result with no rows, so nothing is saved over the table', async () => {
     vi.mocked(api.generateStageArtifact).mockResolvedValueOnce({ content: 'Some prose.', items: [], finish_reason: 'stop', model_used: 'm' } as never);
-    await expect(reviseWithFindings({ project, content: serializeItems(rows), findings, source: 's', table })).rejects.toThrow('came back empty');
+    await expect(reviseWithFindings({ project, content: serializeItems(rows), findings, source: 's', table })).rejects.toThrow('came back with no rows');
+  });
+
+  it('says when the table did not come back in a usable form', async () => {
+    vi.mocked(api.generateStageArtifact).mockResolvedValueOnce({ content: '', items: [], finish_reason: 'error', model_used: 'm' } as never);
+    await expect(reviseWithFindings({ project, content: serializeItems(rows), findings, source: 's', table })).rejects.toThrow('usable form');
   });
 
   it('refuses to send a table through the text revision at all', async () => {

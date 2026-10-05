@@ -31,8 +31,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { api, ApiError } from '@/lib/api/client';
+import { ApiError } from '@/lib/api/client';
 import { asFinding } from '@/lib/workflow/combine';
+import { reviseWithFindings, type TableRevision } from '@/lib/workflow/apply-findings';
 import {
   belongsToStage,
   bySeverity,
@@ -55,7 +56,6 @@ import type { NewVersion } from '@/lib/supabase/versions';
 import type { StageDefinition, StageEvaluation, WorkflowTemplate } from '@/lib/workflow/types';
 import type { ArtifactVersion, Evaluation, Project } from '@/types/project';
 import type { StageRecommendation } from '@/types';
-import { inputsFrom } from './use-stage-evaluation';
 import type { PanelRecommendation, TriageStatus } from './recommendations-panel';
 
 interface Options {
@@ -92,6 +92,8 @@ interface Options {
    * not a comment, it is the only sequence that can be persisted.
    */
   onAcceptTransition?: (proposalId: string) => Promise<void>;
+  /** Set when the stage's draft is a table: it is revised as rows, not as text. */
+  table?: TableRevision;
   enabled: boolean;
 }
 
@@ -124,6 +126,7 @@ export function useRecommendations({
   onModelRecommendationConsumed,
   appendStageVersion,
   onAcceptTransition,
+  table,
   enabled,
 }: Options) {
   // Rows live in the project store, loaded with the project and re-read
@@ -434,28 +437,33 @@ export function useRecommendations({
     setError(null);
 
     try {
-      const response = await api.applyRecommendations(
-        {
-          inputs: inputsFrom(project),
-          content,
-          // PM-24: which fix controls where two pull against each other.
-          findings: [
-            ...chosen.map(asFinding),
-            ...precedence.map((summary, i) => ({
-              id: `precedence-${i + 1}`,
-              category: 'precedence',
-              summary,
-              suggested_change: 'Follow this wherever the fixes above disagree.',
-            })),
-          ],
-          model: project.model,
-        },
-        controller.signal
-      );
+      // One revision path for every apply (PM-22): a stage that holds a table
+      // is revised as rows by the generator that drafted it. This panel used
+      // to send the rows through the prose endpoint, and on 4 Oct an Options
+      // table came back as text and was saved as an empty v3.
+      const rev = await reviseWithFindings({
+        project,
+        content,
+        // PM-24: which fix controls where two pull against each other.
+        findings: [
+          ...chosen.map(asFinding),
+          ...precedence.map((summary, i) => ({
+            id: `precedence-${i + 1}`,
+            category: 'precedence',
+            summary,
+            suggested_change: 'Follow this wherever the fixes above disagree.',
+          })),
+        ],
+        source: 'the recommendations',
+        signal: controller.signal,
+        table,
+      });
+      const response = { content: rev.after, instruction: rev.instruction, finish_reason: rev.finishReason ?? '' };
       if (controller.signal.aborted) return;
 
-      // PM-22: "Show revised version first" — hold it until Keep.
-      if (opts.showFirst) {
+      // PM-22: "Show revised version first" — hold it until Keep. The preview
+      // is a text diff; a table is saved straight away, as Apply findings does.
+      if (opts.showFirst && !table) {
         setRevision({ chosen, before: content, response, precedence });
         setPreviewing(null);
         return;
@@ -469,7 +477,9 @@ export function useRecommendations({
       setError(
         err instanceof ApiError
           ? err.message
-          : 'Could not apply that. Nothing was changed.'
+          : err instanceof Error && err.message
+            ? `${err.message.replace(/\.$/, '')}. Nothing was changed.`
+            : 'Could not apply that. Nothing was changed.'
       );
     } finally {
       if (abortRef.current === controller) abortRef.current = null;
@@ -485,6 +495,7 @@ export function useRecommendations({
     project,
     reload,
     commitRevision,
+    table,
   ]);
 
   const keepRevision = useCallback(async () => {

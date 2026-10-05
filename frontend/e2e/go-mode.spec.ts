@@ -259,7 +259,7 @@ test('A run making no progress stops for direction, and Resume carries on', asyn
   const id = await researchProject(page, 'E2E go no progress', 'Pendulum [[mock:plan=derive,derive,derive,prove]]');
   await choose(page, 'Autonomous');
   const transparency = page.getByRole('region', { name: 'What Go mode is doing' });
-  await expect(transparency).toContainText('was chosen 3 times in a row on this stage without moving on');
+  await expect(transparency).toContainText('was chosen 3 times in a row on this stage without changing it');
   await page.screenshot({ path: test.info().outputPath('01-no-progress-stop.png'), fullPage: true });
 
   // Resuming is the user's direction to continue — it must not re-trip on the same three steps.

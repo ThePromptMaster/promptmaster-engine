@@ -97,7 +97,13 @@ export async function reviseWithFindings(args: {
     const instruction = findingsInstruction(findings);
     const res = await api.generateStageArtifact(table.request(instruction), signal);
     const rows = parseItems(generationContent(table.stage, res));
-    if (!rows || rows.length === 0) throw new Error('The revised table came back empty');
+    if (!rows || rows.length === 0) {
+      throw new Error(
+        res.finish_reason === 'error'
+          ? 'The revised table did not come back in a usable form'
+          : 'The revised table came back with no rows'
+      );
+    }
     return {
       findings,
       before: content,

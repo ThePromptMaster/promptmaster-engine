@@ -92,6 +92,10 @@ test('the planner is told what the user already decided, and an autonomous run c
   await page.getByPlaceholder('Or write your own reason').fill('Internal diagnosis; outside reading can wait.');
   await page.getByRole('button', { name: 'Skip stage' }).click();
   await expect(page.getByRole('heading', { name: 'Hypothesis or proposition' })).toBeVisible();
+  // Accepted up front: a stage whose only open item is this approval is the
+  // user's, and Go would stop there (4 Oct) instead of using its windows.
+  await expect(stageArtifact(page)).toContainText('Mock', { timeout: 30_000 });
+  await criterion(page, 'I accept these hypotheses as the working set').getByRole('checkbox').check();
 
   const panel = goPanel(page);
   await panel.getByRole('button', { name: 'Set up Go' }).click();
@@ -148,11 +152,13 @@ test('on Research, "nothing more for me here" on a stage waiting for approval be
   await panel.getByRole('button', { name: /^Go$/ }).click();
   await page.getByRole('button', { name: 'Authorize and go' }).click();
 
-  // One reasoning move, then the scripted planner says the objective is met.
+  // Only the user's approval is open, so Go asks for it at once — no
+  // reasoning move first (4 Oct: Compare alternatives ×3 on an approval).
   const card = page.getByRole('region', { name: 'Go mode needs you' });
   await expect(card).toContainText('I need your approval before I can continue: "I accept these hypotheses as the working set"', { timeout: 30_000 });
-  await expect(panel).toContainText('has nothing left that I can do by myself. It is waiting for your approval');
   await expect(panel).not.toContainText('The model thinks the work is done');
+  const [first] = await serviceSelect('agent_runs', `project_id=eq.${id}&select=id&order=created_at.desc&limit=1`);
+  expect(await serviceSelect('agent_steps', `run_id=eq.${first.id}&select=action_key`)).toEqual([]);
   await page.screenshot({ path: test.info().outputPath('03-research-asks-for-the-approval.png'), fullPage: true });
   const [run] = await serviceSelect('agent_runs', `project_id=eq.${id}&select=status,needs&order=created_at.desc&limit=1`);
   expect(run).toMatchObject({ status: 'awaiting_decision', needs: { kind: 'tick_criterion', onStage: 'hypothesis' } });
@@ -324,7 +330,7 @@ test('repeated identical steps fold into one row, and the run stops rather than 
   await page.getByRole('button', { name: 'Authorize and go' }).click();
 
   const transparency = page.getByRole('region', { name: 'What Go mode is doing' });
-  await expect(transparency).toContainText('was chosen 3 times in a row on this stage without moving on', { timeout: 60_000 });
+  await expect(transparency).toContainText('was chosen 3 times in a row on this stage without changing it', { timeout: 60_000 });
   const steps = page.getByRole('list', { name: 'Go mode steps' });
   await expect(steps.locator('[data-repeats="3"]')).toHaveCount(1);
   await expect(steps.locator('[data-repeats="3"]')).toContainText('×3');

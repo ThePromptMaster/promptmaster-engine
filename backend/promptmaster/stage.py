@@ -219,6 +219,16 @@ def build_stage_prompt(
         "missing, or, if a working figure is genuinely needed, label it plainly as "
         "\"Assumption: …\". Calling a number a scenario or a range does not give it a source.",
     ]
+    # A Diagnosis draft spent much of itself on Turnaround Options and the
+    # 12-month plan — two stages later — and a later check had to flag it
+    # (4 Oct). Each stage does its own work; the later ones get theirs.
+    if digest.later_stages:
+        later = ", ".join(s[:120] for s in digest.later_stages[:40])
+        parts.append(
+            f"LATER STAGES (out of scope here): {later}. Do not draft their content in this "
+            "stage. Where this stage's work leads into one of them, say so in a sentence and "
+            "leave the work to that stage."
+        )
 
     # The numbers already on the record. A later stage that restates one from
     # its own reading of a summary can get it wrong, and a validation stage
@@ -443,7 +453,10 @@ async def generate_stage_artifact(
                 prompt=user,
                 system=system,
                 temperature=0.4,
-                max_tokens=2048,
+                # A full table of up to 12 rows of three or four fields runs past
+                # 2048 tokens; the JSON was cut off, the repair pass failed the
+                # same way, and a revision "came back empty" (4 Oct, Options).
+                max_tokens=8192,
                 model=model,
             )
         except Exception as e:

@@ -775,6 +775,7 @@ export function WorkflowWorkspace({
       const move = transitions.find((t) => t.kind === 'advance' || t.kind === 'finish');
       if (move) await handleTransition(move, undefined, proposalId);
     },
+    table: tableRevision,
     enabled: isCurrent && events !== null,
   });
 
