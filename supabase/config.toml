@@ -248,6 +248,14 @@ otp_expiry = 3600
 # subject = "You have been invited"
 # content_path = "./supabase/templates/invite.html"
 
+# The reset link verifies a token hash at /auth/callback, so it works on any
+# device; the default {{ .ConfirmationURL }} is a code exchange that only works
+# in the browser that asked. Production carries the same template (set
+# 2026-10-05 through the Management API; see docs/known-limitations.md L-33).
+[auth.email.template.recovery]
+subject = "Reset your PromptMaster password"
+content_path = "./supabase/templates/recovery.html"
+
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]
 # enabled = true
