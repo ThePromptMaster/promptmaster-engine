@@ -116,9 +116,31 @@ export function requiredWork(input: {
   facts: StageFacts;
   stageEvaluation: StageEvaluation;
   allowed: readonly string[];
+  /**
+   * A workflow that loops (Exploration): `staleDraft` when this stage still
+   * holds last round's draft. Left to the planner, both moves below were
+   * skipped on production (5 Oct) — it reasoned, or asked, instead of
+   * drafting, and never proposed the next round.
+   */
+  round?: { staleDraft: boolean };
 }): RequiredMove | null {
-  const { stage, facts, stageEvaluation, allowed } = input;
+  const { stage, facts, stageEvaluation, allowed, round } = input;
   const can = (k: string) => allowed.includes(k);
+
+  if (round?.staleDraft && can('draft_stage')) {
+    return {
+      key: 'draft_stage',
+      rationale: `${stage.label} still holds last round's draft; this round needs its own.`,
+      expected: `A new draft of ${stage.label} built on what this round found.`,
+    };
+  }
+  if (round && stage.transitions.loop_to && stageEvaluation.canAdvance && can('propose_next_round')) {
+    return {
+      key: 'propose_next_round',
+      rationale: `This round's question is written; the next round can take it on.`,
+      expected: 'A proposal to start the next round, for you to accept.',
+    };
+  }
 
   if (facts.draft?.truncated && can('continue_writing')) {
     return {
