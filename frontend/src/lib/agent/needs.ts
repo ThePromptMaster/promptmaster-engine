@@ -11,7 +11,8 @@
 
 import { isLargeJob } from '@/components/workflow/large-job-warning';
 import type { ExecutionPolicy } from '@/types/agent';
-import type { StageDefinition, StageEvaluation, WorkflowState } from '@/lib/workflow/types';
+import type { ExitCriterion, StageDefinition, StageEvaluation, WorkflowState } from '@/lib/workflow/types';
+import type { RoutineDecisions } from '@/types/project';
 import type { StageFacts } from './facts';
 import type { InputsChange } from '@/lib/workflow/stage-inputs';
 import { confirmableProposals } from '@/lib/workflow/stage-artifact';
@@ -21,7 +22,16 @@ type Need =
   | { kind: 'set_objective' }
   | { kind: 'unblock_stage'; stageId: string; reason: string; blockKind: string }
   | { kind: 'approve_outline'; stageId: string; versionNumber: number | null; unsavedDraft: boolean }
-  | { kind: 'tick_criterion'; stageId: string; criterionId: string; label: string; hint?: string }
+  | {
+      kind: 'tick_criterion'; stageId: string; criterionId: string; label: string; hint?: string;
+      /**
+       * Why the policy cannot cover it (Sean, 5 Oct: "say what decision is
+       * needed, why it cannot resolve it under the current policy, and what
+       * answering will unlock"). 'reserved': only the user decides it;
+       * 'policy_ask': routine, but routine decisions are set to Ask me.
+       */
+      authority?: 'reserved' | 'policy_ask';
+    }
   | { kind: 'answer_question'; question: string }
   | { kind: 'wait_for_jobs'; stageId: string; pending: number; complete: number; total: number }
   | { kind: 'continue_budget'; budgetSteps: number }
@@ -90,6 +100,10 @@ export function onlyApprovalLeft(stageEvaluation: StageEvaluation): boolean {
   return blockingUnmet.length > 0 && stageEvaluation.unmet.every((c) => c.manual);
 }
 
+function authorityOf(stage: StageDefinition, criterionId: string): 'delegable' | 'reserved' {
+  return stage.exit_criteria.find((c) => c.id === criterionId)?.authority === 'delegable' ? 'delegable' : 'reserved';
+}
+
 /** Moves that reason about the work; they cannot tick an approval. */
 const REASONING_MOVES = new Set([
   'derive', 'prove', 'simplify', 'limiting_case', 'try_contradiction', 'run_computation',
@@ -100,6 +114,29 @@ export interface RequiredMove {
   key: string;
   rationale: string;
   expected: string;
+  params?: Record<string, unknown>;
+}
+
+/**
+ * The routine approval Go may commit on this stage now, or null (5 Oct).
+ *
+ * Only under "Routine decisions: handle them for me"; only a blocking box the
+ * template marks delegable; and not one whose check already failed on the
+ * current version (`tried`) — that is work to revise toward, not to re-check.
+ */
+export function delegableToCommit(
+  stage: StageDefinition,
+  stageEvaluation: StageEvaluation,
+  routine: RoutineDecisions | undefined,
+  tried: readonly string[] = []
+): ExitCriterion | null {
+  if (routine !== 'handle') return null;
+  for (const unmet of stageEvaluation.unmet) {
+    if (!unmet.blocking || !unmet.manual || tried.includes(unmet.id)) continue;
+    const c = stage.exit_criteria.find((x) => x.id === unmet.id);
+    if (c?.check === 'manual' && c.authority === 'delegable') return c;
+  }
+  return null;
 }
 
 /**
@@ -118,6 +155,9 @@ export function requiredWork(input: {
   facts: StageFacts;
   stageEvaluation: StageEvaluation;
   allowed: readonly string[];
+  /** The project's "Routine decisions", and approvals whose check failed on the current version. */
+  routine?: RoutineDecisions;
+  commitTried?: readonly string[];
   /**
    * The stage's rows name sources Go has not yet looked up and read in this
    * run (5 Oct: verify what it legitimately can before asking).
@@ -182,6 +222,16 @@ export function requiredWork(input: {
       expected: 'A check of the current version against the objective.',
     };
   }
+  // A routine approval, under "handle them for me": checked, then committed (5 Oct).
+  const routine = delegableToCommit(stage, stageEvaluation, input.routine, input.commitTried);
+  if (routine && can('commit_delegated')) {
+    return {
+      key: 'commit_delegated',
+      rationale: `"${routine.label}" is a routine approval, and your routine decisions are mine to handle; checking ${stage.label} against it before committing it.`,
+      expected: 'The approval checked against the stage and, if it holds, committed under your routine-decision policy.',
+      params: { criterion_id: routine.id },
+    };
+  }
   return null;
 }
 
@@ -204,6 +254,9 @@ export function needsUser(input: {
   largeJobAcknowledged?: number | null;
   /** Sources on the rows Go has not yet looked up and read in this run. */
   lookupDue?: boolean;
+  /** The project's "Routine decisions", and approvals whose check failed on the current version. */
+  routine?: RoutineDecisions;
+  commitTried?: readonly string[];
   /**
    * How many more computations the run may try against this stage's table:
    * above zero only when the table's rows are things a sandbox run can carry
@@ -271,10 +324,23 @@ export function needsUser(input: {
     (allowed.includes('run_computation') && (input.runAttemptsLeft ?? 0) > 0) ||
     // An optional automatic item still open is something a lookup or a run may settle.
     (!onlyApprovalLeft(stageEvaluation) && allowed.some((k) => REASONING_MOVES.has(k))) ||
-    requiredWork({ stage, facts, stageEvaluation, allowed }) !== null;
-  if (blockingUnmet.length > 0 && blockingUnmet.every((c) => c.manual) && !workLeft) {
-    const c = blockingUnmet[0];
-    return { kind: 'tick_criterion', stageId: stage.id, criterionId: c.id, label: c.label, ...(c.hint ? { hint: c.hint } : {}) };
+    requiredWork({ stage, facts, stageEvaluation, allowed, routine: input.routine, commitTried: input.commitTried }) !== null;
+  // A routine approval whose check failed is repaired, not asked about: Go
+  // revises toward it and checks again (Sean, 5 Oct: "'Ask the user' should
+  // not be the default response to every failed check").
+  const repairable =
+    input.routine === 'handle' &&
+    allowed.includes('revise_stage') &&
+    blockingUnmet.some((c) => (input.commitTried ?? []).includes(c.id) && authorityOf(stage, c.id) === 'delegable');
+  if (blockingUnmet.length > 0 && blockingUnmet.every((c) => c.manual) && !workLeft && !repairable) {
+    // The user's own decisions first; a routine one is asked only when the policy says ask.
+    const c = [...blockingUnmet].sort((a, b) => Number(authorityOf(stage, a.id) === 'delegable') - Number(authorityOf(stage, b.id) === 'delegable'))[0];
+    const authority = authorityOf(stage, c.id) === 'delegable' ? (input.routine === 'handle' ? undefined : 'policy_ask') : 'reserved';
+    return {
+      kind: 'tick_criterion', stageId: stage.id, criterionId: c.id, label: c.label,
+      ...(c.hint ? { hint: c.hint } : {}),
+      ...(authority ? { authority } : {}),
+    };
   }
 
   return null;
@@ -428,11 +494,19 @@ export function describeNeed(
             message: `I need your approval of ${need.versionNumber ? `outline version ${need.versionNumber}` : 'the outline'} before I can continue.`,
             action: 'Approve the outline',
           };
-    case 'tick_criterion':
+    case 'tick_criterion': {
+      // What is needed, why the policy cannot cover it, and what answering unlocks (5 Oct).
+      const why =
+        need.authority === 'reserved'
+          ? ' This one is yours alone: it records your own judgment, not something I can check.'
+          : need.authority === 'policy_ask'
+            ? ' It is a routine approval, but your routine decisions are set to "Ask me".'
+            : '';
       return {
-        message: `I need your approval before I can continue: "${need.label}".${need.hint ? ` ${need.hint}` : ''}`,
+        message: `I need your approval before I can continue: "${need.label}".${why}${need.hint ? ` ${need.hint}` : ''} Approving it lets me carry on from ${stageLabel(need.stageId)}.`,
         action: 'Approve and resume',
       };
+    }
     case 'answer_question':
       return { message: need.question, action: null };
     case 'skip_stage':

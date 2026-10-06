@@ -22,6 +22,7 @@ export type Performer =
   | 'apply' // apply the latest check's findings as a new version (B2b)
   | 'triage' // decide the routine findings of a review table (B3)
   | 'propose' // propose a status for each undecided row of a check table; the user confirms (3 Oct)
+  | 'commit' // check a routine approval, then commit it under the routine-decision policy
   | 'advance' // a stage event
   | 'skip' // proposes skipping the stage; the user decides
   | 'loop' // proposes the next round of a looping workflow; the user starts it
@@ -66,6 +67,8 @@ export const AGENT_ACTIONS: readonly AgentAction[] = [
   { key: 'propose_skip', family: 'workflow', label: 'Suggest skipping this stage', performer: 'skip', important: false },
   // 3 Oct call: work that goes on round after round; the user starts each one.
   { key: 'propose_next_round', family: 'workflow', label: 'Suggest the next round', performer: 'loop', important: false },
+  // 5 Oct: a routine approval Go may commit under "Routine decisions: handle them for me", once checked.
+  { key: 'commit_delegated', family: 'workflow', label: 'Commit a routine approval', performer: 'commit', important: false },
   { key: 'advance_stage', family: 'workflow', label: 'Move to the next stage', performer: 'advance', important: true },
   { key: 'mark_blocked', family: 'workflow', label: 'Mark this stage stuck', performer: 'block', important: false },
   { key: 'request_user_decision', family: 'workflow', label: 'Ask the user', performer: 'ask', important: false },

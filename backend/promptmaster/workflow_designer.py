@@ -40,6 +40,13 @@ class DesignedStage(BaseModel):
     required: bool = True
     #: The user's sign-off in the first person, or "" for none.
     approval: str = Field(default="", max_length=120)
+    #: "routine" when the sign-off certifies what can be checked against the
+    #: supplied material (Go may commit it under the project's routine-decision
+    #: policy); "decision" when it needs the user's judgment (Sean, 5 Oct).
+    approval_kind: str = Field(default="decision", pattern="^(routine|decision)$")
+    #: A separate, reserved sign-off for new commitments the stage proposes —
+    #: a deadline, a budget, a promise not in the source — or "".
+    decision: str = Field(default="", max_length=120)
 
 
 class DesignedWorkflow(BaseModel):
@@ -76,14 +83,25 @@ def build_workflow_prompt(description: str, objective: str) -> tuple[str, str]:
         "kind of work, including what a lazy answer would look like so it is avoided\n"
         "- required: false only for a stage an expert would often skip\n"
         "- approval: the user's sign-off in the first person (\"I approve this angle\"), "
-        "or \"\" when none is needed\n\n"
+        "or \"\" when none is needed\n"
+        "- approval_kind: \"routine\" when the sign-off only certifies something that can be "
+        "checked against the supplied material — an extraction matches its source, every "
+        "requirement is covered, the format is followed; \"decision\" when it needs the "
+        "user's preference, judgment or authority — choosing an option, accepting a "
+        "recommendation, approving something for use or for execution\n"
+        "- decision: when a stage both extracts what the user supplied AND may introduce new "
+        "commitments (a deadline, a budget, a promise, a scope change not in the source), keep "
+        "those apart — approval is the routine check of the extraction, and decision is the "
+        "user's own sign-off on the new commitments, in the first person (\"I accept the new "
+        "commitments it proposes\"). Otherwise \"\"\n\n"
         "Set inquiry true only when the work investigates or tests ideas (science, "
         "analysis, a thought experiment) rather than writes something.\n\n"
         "Return JSON only:\n"
         '{"name": "...", "description": "one sentence", "deliverable": "noun for the '
         'finished thing, e.g. article", "inquiry": false, "stages": [{"label": "...", '
         '"short_label": "...", "kind": "write|list|check", "purpose": "...", '
-        '"instruction": "...", "required": true, "approval": ""}]}'
+        '"instruction": "...", "required": true, "approval": "", "approval_kind": "decision", '
+        '"decision": ""}]}'
     )
     return _SYSTEM, user
 
@@ -113,6 +131,9 @@ def parse_workflow(result: object) -> DesignedWorkflow:
                 instruction=_clip(raw.get("instruction"), 1_200) or f"Produce the {label.lower()}.",
                 required=raw.get("required") is not False,
                 approval=_clip(raw.get("approval"), 120),
+                # Anything unclear is the user's: only an explicit "routine" is delegable.
+                approval_kind="routine" if str(raw.get("approval_kind") or "").strip().lower() == "routine" else "decision",
+                decision=_clip(raw.get("decision"), 120),
             )
         )
     stages = stages[:MAX_STAGES]

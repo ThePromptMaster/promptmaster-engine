@@ -34,6 +34,7 @@ from promptmaster.agent import (
     write_code,
 )
 from promptmaster.verify_sources import MAX_VERIFY, SourceToVerify, SourceVerdict, verify_sources
+from promptmaster.criterion_check import CriterionCheck, check_criterion
 from promptmaster.agent_actions import ACTION_KEYS, AGENT_ACTIONS, REASONING_ACTIONS, AgentAction
 from promptmaster.errors import PRESERVED_NOTHING_WRITTEN
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError
@@ -256,3 +257,26 @@ async def api_verify_sources(req: VerifySourcesRequest, client: OpenRouterClient
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
     return VerifySourcesResponse(verdicts=verdicts, model_used=_model_used(req.model, client))
+
+
+class CheckCriterionRequest(BaseModel):
+    inputs: PMInput
+    stage_label: str = Field(max_length=200)
+    criterion: str = Field(min_length=1, max_length=400)
+    content: str = Field(min_length=1, max_length=400_000)
+    model: str = ""
+
+
+class CheckCriterionResponse(CriterionCheck):
+    model_used: str = ""
+
+
+@router.post("/check-criterion")
+async def api_check_criterion(req: CheckCriterionRequest, client: OpenRouterClient = Depends(get_client)) -> CheckCriterionResponse:
+    """Whether a stage's text satisfies a routine approval, before Go commits it
+    under the routine-decision policy (5 Oct). 1 small LLM call; commits nothing."""
+    try:
+        result = await check_criterion(client, req.model or None, req.inputs, req.stage_label, req.criterion, req.content)
+    except OpenRouterError as e:
+        raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
+    return CheckCriterionResponse(**result.model_dump(), model_used=_model_used(req.model, client))

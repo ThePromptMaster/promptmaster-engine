@@ -55,7 +55,10 @@ export const RESEARCH_V1: WorkflowTemplate = {
   // certifying, in plain words (2 Oct, items 2 and 13), and Validation's
   // guidance names the kinds of check its statuses now tell apart (item 12).
   // Criterion ids are unchanged, so ticks already given carry over.
-  version: 7,
+  // v8 (2026-10-06): each approval says who may satisfy it — a routine one
+  // Go may commit under the project's "Routine decisions: handle them for me",
+  // a reserved one only the user (Sean, 5 Oct). Criterion ids are unchanged.
+  version: 8,
   name: 'Research',
   description: 'Question through validated write-up, with the analysis plan fixed before the data.',
   outline_stage: 'derived',
@@ -220,8 +223,8 @@ export const RESEARCH_V1: WorkflowTemplate = {
         'Produce the research question stated as a question, then what would count as an answer to it, then what result would count against the answer you expect. A few short paragraphs, no headings. Some possible state of the world has to be able to settle this against you: if you cannot say what finding would disappoint you, what you have written is a topic, and a topic runs for years without ever closing.',
       exit_criteria: [
         { id: 'q.stated', label: 'Question is stated', check: 'auto', rule: { type: 'field_non_empty', field: 'objective' }, blocking: true },
-        { id: 'q.answerable', label: 'I can say what would count as an answer', check: 'manual' },
-        { id: 'q.falsifiable', label: 'I can say what would show the answer is wrong', check: 'manual' },
+        { id: 'q.answerable', label: 'I can say what would count as an answer', check: 'manual', authority: 'delegable' },
+        { id: 'q.falsifiable', label: 'I can say what would show the answer is wrong', check: 'manual', authority: 'delegable' },
       ],
       expected_artifacts: [{ kind: 'research_question', cardinality: 'one', primary: true }],
       recommended_modes: [
@@ -245,7 +248,7 @@ export const RESEARCH_V1: WorkflowTemplate = {
       exit_criteria: [
         { id: 'lit.three', label: 'At least three candidate works identified', check: 'auto', rule: { type: 'min_items', n: 3 } },
         { id: 'lit.verified', label: 'At least three works retrieved or verified', check: 'auto', rule: { type: 'min_items_with_status', n: 3, statuses: ['retrieved', 'verified'] }, hint: 'Works suggested from the model\'s knowledge are candidates. Find each one, add its DOI or link, and mark it "Verified by me".' },
-        { id: 'lit.gap', label: 'I agree this says what is not yet known, and that this work addresses it', check: 'manual', blocking: true },
+        { id: 'lit.gap', label: 'I agree this says what is not yet known, and that this work addresses it', check: 'manual', authority: 'reserved', blocking: true },
       ],
       expected_artifacts: [{ kind: 'literature_map', cardinality: 'many', primary: true }],
       recommended_modes: [{ mode: 'analyst', reason: 'Relation to your question matters more than summary' }],
@@ -266,7 +269,7 @@ export const RESEARCH_V1: WorkflowTemplate = {
       exit_criteria: [
         { id: 'hyp.one', label: 'At least one hypothesis', check: 'auto', rule: { type: 'min_items', n: 1 }, blocking: true },
         { id: 'hyp.disconfirm', label: 'Each hypothesis has a prediction and a disconfirmer', check: 'auto', rule: { type: 'every_item_has_fields', fields: ['prediction', 'disconfirming_observation'] }, blocking: true },
-        { id: 'hyp.accept', label: 'I accept these hypotheses as the working set', check: 'manual', blocking: true },
+        { id: 'hyp.accept', label: 'I accept these hypotheses as the working set', check: 'manual', authority: 'reserved', blocking: true },
       ],
       expected_artifacts: [{ kind: 'hypotheses', cardinality: 'many', primary: true }],
       recommended_modes: [
@@ -291,7 +294,7 @@ export const RESEARCH_V1: WorkflowTemplate = {
         { id: 'meth.stated', label: 'Method is described', check: 'auto', rule: { type: 'artifact_non_empty' }, blocking: true },
         // Ordering-sensitive on purpose: this is pre-registration, and it only
         // means anything if it happens before the experiment stage opens.
-        { id: 'meth.analysisplan', label: 'I approve this analysis plan for execution', check: 'manual', blocking: true, hint: 'Fixed now, before anything runs, so the data cannot choose the analysis.' },
+        { id: 'meth.analysisplan', label: 'I approve this analysis plan for execution', check: 'manual', authority: 'reserved', blocking: true, hint: 'Fixed now, before anything runs, so the data cannot choose the analysis.' },
       ],
       expected_artifacts: [{ kind: 'method', cardinality: 'one', primary: true }],
       recommended_modes: [
@@ -333,7 +336,7 @@ export const RESEARCH_V1: WorkflowTemplate = {
       entry_prompt_hint:
         'Take each hypothesis in turn and give it a verdict — supported, not supported, or inconclusive — naming the particular runs or measurements that decide it and what they showed. Apply the analysis plan as it was written; where you depart from it, say where and why in the same sentence rather than in a footnote. Inconclusive is a legitimate verdict and often the honest one. A verdict resting on the overall impression of the results is not a verdict, it is a preference wearing the vocabulary of one, and this is precisely the stage the analysis plan was written to bind.',
       exit_criteria: [
-        { id: 'ana.verdicts', label: 'I accept the verdict given for each hypothesis as supported by the evidence shown', check: 'manual', blocking: true },
+        { id: 'ana.verdicts', label: 'I accept the verdict given for each hypothesis as supported by the evidence shown', check: 'manual', authority: 'reserved', blocking: true },
       ],
       expected_artifacts: [{ kind: 'analysis', cardinality: 'one', primary: true }],
       recommended_modes: [{ mode: 'analyst', reason: 'Holds the verdict to the evidence actually collected' }],
@@ -393,7 +396,7 @@ export const RESEARCH_V1: WorkflowTemplate = {
       entry_prompt_hint:
         'Produce a causal account of why the result comes out the way it does: the proposed mechanism, what in the evidence supports it, and what it predicts somewhere else that could be checked. Where the mechanism is unknown, say so outright and say what would be needed to establish it — a named unknown is a finding, and an honest one. A restatement of the result in causal-sounding language is not a mechanism: if striking the word "because" leaves the sentence saying only what the analysis already said, nothing has been explained.',
       exit_criteria: [
-        { id: 'mech.stated', label: 'I am satisfied it explains why this happens, or says plainly that the reason is not known', check: 'manual' },
+        { id: 'mech.stated', label: 'I am satisfied it explains why this happens, or says plainly that the reason is not known', check: 'manual', authority: 'delegable' },
       ],
       expected_artifacts: [{ kind: 'mechanism', cardinality: 'one', primary: true }],
       recommended_modes: [{ mode: 'architect', reason: 'Mechanism is structure behind the result' }],
@@ -411,7 +414,7 @@ export const RESEARCH_V1: WorkflowTemplate = {
       entry_prompt_hint:
         'Produce the scope conditions: where the finding holds, where it should be expected to fail, and which features of the setting it depends on — population, scale, instrument, time period, the particular configuration tested. State each boundary as something a reader could cross to test it. "Further work is needed to establish generality" says nothing at all; name the conditions under which you would expect the result to break, and mark which of those you have evidence for and which are a guess.',
       exit_criteria: [
-        { id: 'gen.scope', label: 'I am satisfied it says where the finding applies and where it does not', check: 'manual' },
+        { id: 'gen.scope', label: 'I am satisfied it says where the finding applies and where it does not', check: 'manual', authority: 'delegable' },
       ],
       expected_artifacts: [{ kind: 'scope_conditions', cardinality: 'one', primary: true }],
       recommended_modes: [{ mode: 'critic', reason: 'Overclaiming happens here more than anywhere else' }],
@@ -467,7 +470,7 @@ export const RESEARCH_V1: WorkflowTemplate = {
       entry_prompt_hint:
         'Produce the closing account of the study. Rows should cover what the write-up now claims against the question as it was originally posed, which stages were skipped and what that leaves unverified, which alternative explanations were left open, and which results were never reproduced. \'item\' states the open point; \'where\' says where it stands. Give every row a status and state the unfinished work plainly — this is the last place an unexamined result is recorded before the work leaves, and a clean summary of a study with three open alternatives is not a summary, it is a cover.',
       exit_criteria: [
-        { id: 'final.accepted', label: 'I accept this write-up as finished', check: 'manual' },
+        { id: 'final.accepted', label: 'I accept this write-up as finished', check: 'manual', authority: 'reserved' },
       ],
       expected_artifacts: [{ kind: 'final_evaluation', cardinality: 'one', primary: true }],
       recommended_modes: [],

@@ -405,6 +405,13 @@ def _json_reply(system: str, prompt: str) -> dict:
         # Every item supported, quoting the scripted abstract's second sentence.
         ids = re.findall(r"^ITEM id=(\S+)", prompt, re.M)
         return {"verdicts": [{"id": i, "verdict": "supports", "quote": "This study shows the effect holds in every case examined."} for i in ids]}
+    from promptmaster import criterion_check
+
+    if system.startswith(criterion_check._CHECK_INSTRUCTION[:60]):
+        # Met, unless the stage's text says "[[mock:criterion=unmet]]".
+        if "[[mock:criterion=unmet]]" in prompt:
+            return {"met": False, "reason": "Mock: the text does not say it."}
+        return {"met": True, "reason": "Mock: the text states it in its second paragraph."}
     if agent._NEXT_ACTION_INSTRUCTION[:60] in system:
         return _next_action(system, prompt)
     if _STAGE_EVAL_INSTRUCTION[:60] in system:

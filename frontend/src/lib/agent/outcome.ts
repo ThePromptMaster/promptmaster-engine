@@ -19,7 +19,7 @@ import type { StepOutcome } from './perform';
 import { actionFor } from './actions';
 
 /** Performers whose success is a change to the project, not a piece of text. */
-const MUTATING = new Set(['draft', 'revise', 'continue', 'outline', 'sections', 'apply', 'triage']);
+const MUTATING = new Set(['draft', 'revise', 'continue', 'outline', 'sections', 'apply', 'triage', 'commit']);
 
 export function changedSomething(changes: StepOutcome['changes'] | undefined): boolean {
   if (!changes) return false;

@@ -29,6 +29,24 @@ describe('a designed workflow becomes a template the engine can walk (3 Oct call
     expect(t.stages[0].exit_criteria.at(-1)).toMatchObject({ label: 'I approve this angle', check: 'manual', blocking: true });
   });
 
+  it('an approval is the user’s unless the design says it is routine; new commitments are always theirs (5 Oct)', () => {
+    expect(t.stages[0].exit_criteria.at(-1)).toMatchObject({ authority: 'reserved' });
+    const split = templateFromDesign({
+      ...design,
+      stages: [
+        design.stages[0],
+        { ...design.stages[1], approval: 'I confirm the extracted terms match the contract', approval_kind: 'routine', decision: 'I accept the new commitments it proposes' },
+        design.stages[3],
+      ],
+    }, 'y');
+    const criteria = split.stages[1].exit_criteria.filter((c) => c.check === 'manual');
+    expect(criteria.map((c) => [c.label, c.authority])).toEqual([
+      ['I confirm the extracted terms match the contract', 'delegable'],
+      ['I accept the new commitments it proposes', 'reserved'],
+    ]);
+    expect(validateTemplate(split)).toEqual([]);
+  });
+
   it('can be walked from the first stage to the last', () => {
     let events: WorkflowEvent[] = [];
     let state = initialState(t);

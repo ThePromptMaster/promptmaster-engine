@@ -46,7 +46,7 @@ function evaluateCriterion(
 
   const manual = { ...base, manual: true, satisfied: Boolean(ctx.manualChecks[criterion.id]) };
 
-  if (criterion.check === 'manual') return manual;
+  if (criterion.check === 'manual') return criterion.authority === 'delegable' ? { ...manual, authority: 'delegable' } : manual;
 
   const rule = criterion.rule;
   if (!rule) {
