@@ -399,6 +399,12 @@ def _json_reply(system: str, prompt: str) -> dict:
     if agent._TRIAGE_INSTRUCTION[:60] in system:
         ids = re.findall(r"^- id=([^:]+):", prompt.split("FINDINGS TO DECIDE:", 1)[-1], re.M)
         return {"decisions": [{"id": i, "status": "accepted", "reason": "Mock: routine, accepted."} for i in ids]}
+    from promptmaster import verify_sources
+
+    if system.startswith(verify_sources._VERIFY_INSTRUCTION[:60]):
+        # Every item supported, quoting the scripted abstract's second sentence.
+        ids = re.findall(r"^ITEM id=(\S+)", prompt, re.M)
+        return {"verdicts": [{"id": i, "verdict": "supports", "quote": "This study shows the effect holds in every case examined."} for i in ids]}
     from promptmaster import criterion_check
 
     if system.startswith(criterion_check._CHECK_INSTRUCTION[:60]):

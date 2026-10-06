@@ -66,6 +66,7 @@ import { defaultOutlineForm, deriveOutlineItems, draftingStageId, formOfItems, o
 import { OutlineStagePanel } from '@/components/outline/outline-stage-panel';
 import { ProjectBrief, ProjectSetup, stageWantsSetup } from './project-setup';
 import { ProjectData } from './project-data';
+import { lookupAndVerify } from '@/lib/workflow/verify';
 import { RefusedRevisions, refusedSince } from './refused-revisions';
 import { contextFromDocuments } from '@/lib/data/extract-text';
 import { INPUT_LIMITS } from '@/lib/projects/input-limits';
@@ -74,7 +75,6 @@ import { approveOutline, loadOutline, materialiseOutlineInto, outlineStageFor } 
 import type { OutlineDocument } from '@/types/outline';
 import { isTriaged, proposableStatuses, stageDrafts, itemSchemaFor, parseItems, rendererHoldsItems, serializeItems, type StageItem } from '@/lib/workflow/stage-artifact';
 import { previewRowAction } from '@/lib/workflow/row-actions';
-import { applyLookup, lookupQueries, lookupSummary } from '@/lib/workflow/lookup';
 import { readStageFigures, type StageFigures } from '@/lib/workflow/figures';
 import { FiguresOnRecord } from './figures-on-record';
 import type { ReplyAction } from '@/types';
@@ -864,13 +864,12 @@ export function WorkflowWorkspace({
   const lookupItems = useCallback(
     async (items: StageItem[]) => {
       const schema = itemSchemaFor(stage!);
-      const works = lookupQueries(items, schema);
-      if (!works.length) return { items, message: 'There is nothing named to look up yet.' };
-      const { matches } = await api.agentLiterature(works);
-      const result = applyLookup(items, matches, schema);
-      return { items: result.items, message: lookupSummary(result, schema.lookup!.noun, schema.lookup!.notFoundNote) };
+      // Found, then read: what PromptMaster can check itself, it checks (5 Oct).
+      const result = await lookupAndVerify(project, items, schema);
+      if (!result) return { items, message: 'There is nothing named to look up yet.' };
+      return { items: result.items, message: `${result.message} Review, then save.` };
     },
-    [stage]
+    [stage, project]
   );
 
   const proposeItems = useCallback(
