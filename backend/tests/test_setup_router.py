@@ -147,3 +147,48 @@ def test_guide_questions_endpoint():
     assert r.status_code == 200
     assert r.json()["questions"][0]["question"] == "Who is this for?"
     assert "A book about giraffes" in client.generate_json.await_args.kwargs["prompt"]
+
+
+BRIEF = "Northstar board brief\n\nGross margin fell from 31.2% to 24.8% in FY2025. Audience: the board."
+
+
+def _capture_prompt(path: str, body: dict, reply: dict) -> str:
+    fake_client = AsyncMock()
+    fake_client.generate_json = AsyncMock(return_value=(reply, {}))
+    app.dependency_overrides[get_client] = lambda: fake_client
+    try:
+        response = TestClient(app).post(path, json=body)
+    finally:
+        app.dependency_overrides.pop(get_client, None)
+    assert response.status_code == 200
+    return fake_client.generate_json.call_args.kwargs["prompt"]
+
+
+def test_setup_reads_the_brief_attached_on_the_start_screen():
+    """5 Oct, email 8: attachments on the beginning screen, recognised when the setup is made."""
+    prompt = _capture_prompt(
+        "/api/generate-setup",
+        {"objective": "Explain the margin decline", "material": BRIEF},
+        {"mode": "analyst", "audience": "Board", "constraints": "", "output_format": "", "rationale": {}},
+    )
+    assert "MATERIAL THE USER ATTACHED" in prompt
+    assert "31.2% to 24.8%" in prompt
+
+
+def test_guide_does_not_ask_what_the_brief_answers():
+    prompt = _capture_prompt(
+        "/api/guide-next-question",
+        {"objective": "Explain the margin decline", "answered": [], "material": BRIEF},
+        {"enough": True, "reason": "The brief says."},
+    )
+    assert "31.2% to 24.8%" in prompt
+    assert "never ask what it already answers" in prompt
+
+
+def test_no_material_adds_nothing_and_a_long_brief_is_cut_for_setup():
+    from promptmaster.setup_suggester import SETUP_MATERIAL_MAX, build_setup_prompt
+
+    assert "MATERIAL" not in build_setup_prompt("x")
+    long_prompt = build_setup_prompt("x", None, "y" * (SETUP_MATERIAL_MAX * 3))
+    assert long_prompt.count("y") <= SETUP_MATERIAL_MAX + 5
+    assert "the rest is in the project context" in long_prompt

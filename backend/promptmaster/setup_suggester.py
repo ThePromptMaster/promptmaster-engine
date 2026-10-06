@@ -77,10 +77,32 @@ def _format_answers(answers: list[GuideAnswer] | None) -> str:
     return "What the user told us when asked:\n" + "\n".join(lines) + "\n\n"
 
 
-def build_setup_prompt(objective: str, answers: list[GuideAnswer] | None = None) -> str:
+#: How much attached material a setup call reads. Setup decides a workflow,
+#: an audience and constraints — the opening of a brief settles those, and the
+#: whole of it goes into the project context for the stages that need it.
+SETUP_MATERIAL_MAX = 12_000
+
+
+def material_block(material: str) -> str:
+    """The attached brief's text, for the intake calls (5 Oct, email 8)."""
+    text = (material or "").strip()
+    if not text:
+        return ""
+    if len(text) > SETUP_MATERIAL_MAX:
+        text = text[:SETUP_MATERIAL_MAX] + "\n[…the rest is in the project context]"
+    return (
+        "MATERIAL THE USER ATTACHED (their brief, data or notes). Read it: base the "
+        "audience, constraints and format on what it says, and never ask what it "
+        "already answers.\n"
+        f"<<<\n{text}\n>>>\n\n"
+    )
+
+
+def build_setup_prompt(objective: str, answers: list[GuideAnswer] | None = None, material: str = "") -> str:
     """Build the user prompt for the setup-suggestion LLM call."""
     return (
         f"Objective: {objective}\n\n"
+        f"{material_block(material)}"
         f"{_format_answers(answers)}"
         "Recommend a setup. Return JSON in this exact shape:\n"
         "{\n"
@@ -105,9 +127,10 @@ async def suggest_setup(
     model: str | None,
     objective: str,
     answers: list[GuideAnswer] | None = None,
+    material: str = "",
 ) -> SetupSuggestion:
     """Run the Smart Setup LLM call. Defensive on missing/invalid fields."""
-    prompt = build_setup_prompt(objective, answers)
+    prompt = build_setup_prompt(objective, answers, material)
 
     try:
         result, _usage = await client.generate_json(
@@ -169,9 +192,10 @@ GUIDE_QUESTIONS_SYSTEM = (
 )
 
 
-def build_guide_questions_prompt(objective: str) -> str:
+def build_guide_questions_prompt(objective: str, material: str = "") -> str:
     return (
         f"Objective: {objective}\n\n"
+        f"{material_block(material)}"
         "Return JSON in this exact shape:\n"
         "{\n"
         '  "questions": [\n'
@@ -196,11 +220,12 @@ async def suggest_guide_questions(
     client: OpenRouterClient,
     model: str | None,
     objective: str,
+    material: str = "",
 ) -> list[GuideQuestion]:
     """3-5 questions for the 'Guide me' path. Falls back to a generic three."""
     try:
         result, _usage = await client.generate_json(
-            prompt=build_guide_questions_prompt(objective),
+            prompt=build_guide_questions_prompt(objective, material),
             system=GUIDE_QUESTIONS_SYSTEM,
             temperature=0.4,
             max_tokens=700,
@@ -257,12 +282,13 @@ GUIDE_NEXT_SYSTEM = (
 )
 
 
-def build_guide_next_prompt(objective: str, answered: list[dict[str, str]]) -> str:
+def build_guide_next_prompt(objective: str, answered: list[dict[str, str]], material: str = "") -> str:
     so_far = "\n".join(
         f"- Q: {a.get('question', '').strip()}\n  A: {a.get('answer', '').strip() or '(skipped)'}" for a in answered
     ) or "(nothing asked yet)"
     return (
         f"Objective: {objective}\n\n"
+        f"{material_block(material)}"
         f"ASKED AND ANSWERED SO FAR:\n{so_far}\n\n"
         "Return JSON in exactly one of these shapes:\n"
         '{"enough": true, "reason": "one line: what you now know"}\n'
@@ -294,6 +320,7 @@ async def suggest_next_guide_question(
     model: str | None,
     objective: str,
     answered: list[dict[str, str]],
+    material: str = "",
 ) -> tuple[bool, GuideQuestion | None, str]:
     """The next question, or that there is enough. One small call.
 
@@ -304,7 +331,7 @@ async def suggest_next_guide_question(
         return True, None, "That is enough to set this up."
     try:
         result, _usage = await client.generate_json(
-            prompt=build_guide_next_prompt(objective, answered),
+            prompt=build_guide_next_prompt(objective, answered, material),
             system=GUIDE_NEXT_SYSTEM,
             temperature=0.3,
             max_tokens=400,

@@ -30,11 +30,14 @@ export function answersForSetup(answered: readonly GuideAnswered[]): { question:
  */
 export function GuideInterview({
   objective,
+  material = '',
   busy = false,
   onDone,
   onBack,
 }: {
   objective: string;
+  /** What was attached on the start screen, so no question asks what it says. */
+  material?: string;
   /** The setup is being worked out from the answers. */
   busy?: boolean;
   onDone: (answers: { question: string; answer: string }[]) => void;
@@ -56,6 +59,7 @@ export function GuideInterview({
       try {
         const res = await api.guideNextQuestion({
           objective,
+          ...(material ? { material } : {}),
           answered: soFar.map((a) => ({ question: a.question.question, answer: a.answers.join('; ') })),
         });
         if (res.enough || !res.question) {
@@ -72,7 +76,7 @@ export function GuideInterview({
         setLoading(false);
       }
     },
-    [objective, onDone]
+    [objective, material, onDone]
   );
 
   useEffect(() => {

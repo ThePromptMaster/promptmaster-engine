@@ -437,7 +437,8 @@ def format_data_files(files: list["DataFileBrief"]) -> str:
     if not files:
         return ""
     lines = []
-    for f in files[:10]:
+    # As many as a project may hold (MAX_FILES in lib/data/preview.ts).
+    for f in files[:20]:
         cols = ", ".join(f.columns[:60]) or "(no columns read)"
         lines.append(f"- /data/{f.name} — {f.rows} {'lines' if f.kind == 'text' else 'rows'}; columns: {cols}")
         for row in f.sample[:3]:
@@ -471,7 +472,7 @@ class StageDigest(BaseModel):
     prior_stages: list["StageDigestEntry"] = Field(default_factory=list)
     manuscript: str = Field(default="", max_length=200_000, description="Drafted chapters, bounded by the client.")
     #: The project's data files; empty when none is attached.
-    data_files: list[DataFileBrief] = Field(default_factory=list, max_length=10)
+    data_files: list[DataFileBrief] = Field(default_factory=list, max_length=20)
     #: Figures earlier stages established, each exactly as that stage wrote it.
     figures: list["EstablishedFigure"] = Field(default_factory=list, max_length=60)
     #: The stages after this one, by label. Their content is out of scope here.
