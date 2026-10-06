@@ -6,10 +6,8 @@ vi.mock('@/lib/supabase/recommendations', () => ({
   insertRecommendation: vi.fn(),
   recordDecision: vi.fn(),
 }));
-const checkConflicts = vi.hoisted(() => vi.fn());
-vi.mock('@/lib/api/client', () => ({ api: { checkConflicts } }));
 
-import { conflictContext, findInstructionConflicts } from './conflict-trail';
+import { conflictContext } from './conflict-trail';
 
 function row(over: Record<string, unknown>) {
   return {
@@ -48,30 +46,5 @@ describe('conflictContext: which pending proposals count as live instructions (A
     const { decisions } = await conflictContext('p1', 'objective', [], 'v2');
     expect(decisions.map((d) => d.id)).toEqual(['yes', 'no']);
     expect(decisions[0].text).toMatch(/^Accepted: T — Make it shorter\./);
-  });
-});
-
-describe('Go\'s revision toward its own stage (Sean, 2 Oct screenshot)', () => {
-  const project = { id: 'p', objective: 'Write a book about lions', audience: 'General', constraints: 'Under 300 words', mode: 'architect', model: 'm' } as never;
-  const args = {
-    project, stageId: 'research', instruction: 'Reformat the research notes into a table: claim, source, confidence. Make it longer.',
-    stage: { label: 'Research notes', instruction: 'A table of the claims: claim, source, confidence.' },
-  };
-  beforeEach(() => {
-    listRecommendations.mockResolvedValue([]);
-    checkConflicts.mockResolvedValue({ conflicts: [
-      { kind: 'objective', with_id: '', with_text: 'Write a book about lions', explanation: 'A table is a different deliverable from the book.' },
-    ] });
-  });
-
-  it('is not stopped by the objective or the constraints, and says so to the server', async () => {
-    expect(await findInstructionConflicts({ ...args, origin: 'go' })).toEqual([]);
-    expect(checkConflicts.mock.calls[0][0]).toMatchObject({ origin: 'go' });
-  });
-
-  it('the same words typed by the user are still checked against the objective', async () => {
-    const found = await findInstructionConflicts(args);
-    expect(found.map((c) => c.kind)).toContain('objective');
-    expect(checkConflicts.mock.calls[0][0].origin).toBeUndefined();
   });
 });

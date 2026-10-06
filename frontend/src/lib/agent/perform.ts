@@ -478,7 +478,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         const conflicts = await findInstructionConflicts({
           project: ctx.project, stageId: ctx.stage.id, instruction,
           headVersionId: ctx.bundles[ctx.stage.id]?.versions.at(-1)?.id ?? null,
-          stage: { label: ctx.stage.label, instruction: ctx.stage.entry_prompt_hint }, origin: 'go',
+          stage: { label: ctx.stage.label, instruction: ctx.stage.entry_prompt_hint },
         });
         if (conflicts.length) return askWhichTakesPriority(key, params, instruction, conflicts);
       }
@@ -628,7 +628,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       if (!ctx.conflictAnswer) {
         const conflicts = await findInstructionConflicts({
           project: ctx.project, stageId: ctx.stage.id, instruction: findingsInstruction(findings), headVersionId: head.id,
-          stage: { label: ctx.stage.label, instruction: ctx.stage.entry_prompt_hint }, origin: 'go',
+          stage: { label: ctx.stage.label, instruction: ctx.stage.entry_prompt_hint },
         });
         if (conflicts.length) return askWhichTakesPriority(key, params, findings.map((f) => f.summary).join('; '), conflicts);
       }

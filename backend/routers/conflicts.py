@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Literal
-
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
@@ -24,9 +22,6 @@ class CheckConflictsRequest(BaseModel):
     other_instructions: list[ConflictSource] = Field(default_factory=list, max_length=20)
     #: The stage the instruction is for. Optional, for callers that predate it.
     stage: ConflictStage | None = None
-    #: "go": Go's own revision toward the stage's work; only decisions and the
-    #: user's instructions can conflict with it (the stage outranks the rest).
-    origin: Literal["user", "go"] = "user"
     model: str = ""
 
 
@@ -41,8 +36,7 @@ async def api_check_conflicts(
     """One cheap JSON call. Never changes anything; the user decides what controls."""
     try:
         conflicts = await find_conflicts(
-            client, req.model or None, req.inputs, req.instruction, req.decisions, req.other_instructions, req.stage,
-            stage_own_work=req.origin == "go" and req.stage is not None and bool(req.stage.label.strip()),
+            client, req.model or None, req.inputs, req.instruction, req.decisions, req.other_instructions, req.stage
         )
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)

@@ -74,19 +74,8 @@ export async function findInstructionConflicts(args: {
   headVersionId?: string | null;
   /** The stage the instruction is for: its own work is not a conflict with the constraints. */
   stage?: { label: string; instruction?: string };
-  /**
-   * 'go': Go's own revision of the stage, toward what the stage asks for. The
-   * stage outranks the objective and the constraints (precedence.py), so only
-   * a conflict with the user's decisions or instructions stops it — Go was
-   * stopped turning Book's research notes into the claim/source/confidence
-   * table the stage itself asks for, as "a different deliverable from the
-   * book" (Sean, 2 Oct screenshot). Enforced here and on the server, not left
-   * to the model's reading of the prompt.
-   */
-  origin?: 'user' | 'go';
 }): Promise<InstructionConflict[]> {
-  const { project, stageId, instruction, recentInstructions = [], headVersionId = null, stage, origin = 'user' } = args;
-  const stageOwnWork = origin === 'go' && Boolean(stage?.label.trim());
+  const { project, stageId, instruction, recentInstructions = [], headVersionId = null, stage } = args;
   if (!instruction.trim()) return [];
   try {
     const { decisions, others } = await conflictContext(project.id, stageId, recentInstructions, headVersionId);
@@ -96,14 +85,12 @@ export async function findInstructionConflicts(args: {
       const res = await api.checkConflicts({
         inputs: inputsFrom(project), instruction, decisions, other_instructions: others, model: project.model,
         ...(stage ? { stage: { label: stage.label, instruction: (stage.instruction ?? '').slice(0, 2_000) } } : {}),
-        ...(stageOwnWork ? { origin: 'go' as const } : {}),
       });
       model = res.conflicts.map((c) => ({ ...c, source: 'model' as const }));
     } catch {
       // The model half failing never blocks an instruction; the rule's half still counts.
     }
-    const all = mergeConflicts(rule, model);
-    return stageOwnWork ? all.filter((c) => c.kind === 'decision' || c.kind === 'instruction') : all;
+    return mergeConflicts(rule, model);
   } catch {
     return [];
   }
