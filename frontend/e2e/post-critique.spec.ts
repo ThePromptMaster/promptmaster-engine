@@ -157,9 +157,11 @@ test('A recommendation can be shown revised first, too — then accepted and rec
 
   await expect(page.getByRole('button', { name: 'v2' })).toBeVisible();
   expect((await versionsOf(id)).map((v) => v.source_operation)).toEqual(['stage_draft', 'applied_recommendations']);
+  // The version pill appears before the accept and its decision are written; wait for both.
+  await expect
+    .poll(async () => (await serviceSelect('recommendations', `project_id=eq.${id}&kind=neq.workflow&select=status`))[0]?.status, { timeout: 10_000 })
+    .toBe('accepted');
   const [rec] = await serviceSelect('recommendations', `project_id=eq.${id}&kind=neq.workflow&select=id,status`);
-  expect(rec.status).toBe('accepted');
-  // The version pill appears before the accept and its decision are written; wait for the record.
   await expect.poll(() => serviceSelect('decisions', `recommendation_id=eq.${rec.id}&select=decision_type`), { timeout: 10_000 })
     .toEqual([{ decision_type: 'accept_recommendation' }]);
 });
