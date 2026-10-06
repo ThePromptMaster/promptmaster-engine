@@ -754,6 +754,8 @@ export const api = {
     decisions: { id: string; text: string }[];
     other_instructions: { id: string; text: string }[];
     stage?: { label: string; instruction: string };
+    /** 'go': Go's revision toward the stage's own work; objective and constraint conflicts are not raised. */
+    origin?: 'user' | 'go';
     model?: string;
   }): Promise<{ conflicts: { kind: 'objective' | 'constraint' | 'decision' | 'instruction'; with_id: string; with_text: string; explanation: string }[] }> {
     return apiFetch('/api/check-conflicts', { method: 'POST', body: JSON.stringify(req) });

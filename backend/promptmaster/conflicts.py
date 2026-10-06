@@ -112,8 +112,17 @@ def build_conflict_prompt(
     return system, user
 
 
-def parse_conflicts(raw: object, decisions: list[ConflictSource], others: list[ConflictSource]) -> list[Conflict]:
-    """Keep only well-formed conflicts that point at something that was actually listed."""
+def parse_conflicts(
+    raw: object, decisions: list[ConflictSource], others: list[ConflictSource], stage_own_work: bool = False
+) -> list[Conflict]:
+    """Keep only well-formed conflicts that point at something that was actually listed.
+
+    `stage_own_work`: the instruction is Go's revision toward what its stage
+    asks for. The stage outranks the objective and the constraints
+    (precedence.py), so a conflict with either is dropped here, in code — the
+    prompt's stage rule alone let one through (Sean, 2 Oct screenshot: a Book
+    research-notes table "a different deliverable from writing the book").
+    """
     if not isinstance(raw, dict) or not isinstance(raw.get("conflicts"), list):
         return []
     known = {s.id: s.text for s in [*decisions, *others]}
@@ -124,6 +133,8 @@ def parse_conflicts(raw: object, decisions: list[ConflictSource], others: list[C
         kind = item.get("kind")
         explanation = str(item.get("explanation") or "").strip()
         if kind not in ("objective", "constraint", "decision", "instruction") or not explanation:
+            continue
+        if stage_own_work and kind in ("objective", "constraint"):
             continue
         with_id = str(item.get("with_id") or "")
         if kind in ("decision", "instruction"):
@@ -143,7 +154,8 @@ def parse_conflicts(raw: object, decisions: list[ConflictSource], others: list[C
 async def find_conflicts(
     client: OpenRouterClient, model: str | None, inputs: PMInput, instruction: str,
     decisions: list[ConflictSource], others: list[ConflictSource], stage: ConflictStage | None = None,
+    stage_own_work: bool = False,
 ) -> list[Conflict]:
     system, user = build_conflict_prompt(inputs, instruction, decisions, others, stage)
     raw, _usage = await client.generate_json(prompt=user, system=system, temperature=0.0, max_tokens=700, model=model)
-    return parse_conflicts(raw, decisions, others)
+    return parse_conflicts(raw, decisions, others, stage_own_work)
