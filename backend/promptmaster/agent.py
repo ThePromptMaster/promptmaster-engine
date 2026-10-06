@@ -143,7 +143,7 @@ class AgentState(BaseModel):
     #: What the user has already decided on this project, from its own records.
     memory: list[str] = Field(default_factory=list, max_length=24)
     #: The project's data files, which code run in the sandbox can read at /data.
-    data_files: list[DataFileBrief] = Field(default_factory=list, max_length=10)
+    data_files: list[DataFileBrief] = Field(default_factory=list, max_length=20)
     #: Tools the run can call; a move without its tool is not offered.
     tools: dict[str, bool] = Field(default_factory=dict)
     #: The buttons on the stage's page now, by their exact words (the frontend's

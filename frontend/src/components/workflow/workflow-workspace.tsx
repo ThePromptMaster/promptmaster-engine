@@ -67,6 +67,8 @@ import { OutlineStagePanel } from '@/components/outline/outline-stage-panel';
 import { ProjectBrief, ProjectSetup, stageWantsSetup } from './project-setup';
 import { ProjectData } from './project-data';
 import { RefusedRevisions, refusedSince } from './refused-revisions';
+import { contextFromDocuments } from '@/lib/data/extract-text';
+import { INPUT_LIMITS } from '@/lib/projects/input-limits';
 import { draftBindings } from '@/lib/outline/long-form';
 import { approveOutline, loadOutline, materialiseOutlineInto, outlineStageFor } from '@/lib/outline/actions';
 import type { OutlineDocument } from '@/types/outline';
@@ -1650,7 +1652,15 @@ export function WorkflowWorkspace({
             )}
             <FiguresOnRecord template={template} state={state} bundles={stageBundles} />
             {/* On every stage: data is the project's, not a stage's. */}
-            <ProjectData project={project} files={project.data_files ?? []} onChanged={() => onReload?.()} readOnly={project.status === 'finalized'} />
+            <ProjectData
+              project={project}
+              files={project.data_files ?? []}
+              onChanged={() => onReload?.()}
+              onAddToContext={(documents) =>
+                onPatchProject({ context: contextFromDocuments(project.context ?? '', documents, INPUT_LIMITS.context).context })
+              }
+              readOnly={project.status === 'finalized'}
+            />
 
             {outlinePanelHere && (
               <div className="mb-6">

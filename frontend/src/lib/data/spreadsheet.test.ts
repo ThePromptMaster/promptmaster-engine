@@ -38,6 +38,6 @@ describe('a spreadsheet becomes CSV (1 Oct, item 17)', () => {
 
   it('the old .xls format is refused with what to do about it', () => {
     expect(rejectReason('old.xls', 10, [])).toMatch(/old Excel format/);
-    expect(rejectReason('notes.docx', 10, [])).toMatch(/not a spreadsheet \(\.xlsx\), CSV/);
+    expect(rejectReason('notes.docx', 10, [])).toBeNull();
   });
 });
