@@ -2,9 +2,9 @@
 
 import { useRef, useState } from 'react';
 
-import { ACCEPTED_EXTENSIONS, IMAGE_EXTENSIONS, MAX_FILE_BYTES, MAX_FILES, SPREADSHEET_EXTENSION, describePreview, imagePreview, isSpreadsheet, previewOf, rejectReason } from '@/lib/data/preview';
+import { IMAGE_EXTENSIONS, MAX_FILE_BYTES, MAX_FILES, PICKABLE_EXTENSIONS, describePreview, imagePreview, rejectReason } from '@/lib/data/preview';
+import { prepareFiles } from '@/lib/data/attachments';
 import { useProjectImageUrls } from '@/components/shared/project-images';
-import { spreadsheetToCsvFiles } from '@/lib/data/spreadsheet';
 import { attachProjectFile, removeProjectFile } from '@/lib/supabase/project-files';
 import { ADD_IMAGES_LABEL, ATTACH_DATA_LABEL } from '@/lib/workflow/stage-controls';
 import type { Project, ProjectFile } from '@/types/project';
@@ -22,11 +22,14 @@ export function ProjectData({
   project,
   files,
   onChanged,
+  onAddToContext,
   readOnly = false,
 }: {
   project: Pick<Project, 'id' | 'user_id'>;
   files: ProjectFile[];
   onChanged: () => void | Promise<void>;
+  /** A document's words into the project context, when the user says so. */
+  onAddToContext?: (documents: { name: string; text: string }[]) => void;
   readOnly?: boolean;
 }) {
   const input = useRef<HTMLInputElement>(null);
@@ -38,48 +41,21 @@ export function ProjectData({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  // Documents just attached whose words could go into the project context.
+  const [readable, setReadable] = useState<{ name: string; text: string }[]>([]);
 
   const attach = async (picked: FileList | null) => {
     if (!picked?.length) return;
     setBusy(true);
     setError(null);
     setNote(null);
-    const names = files.map((f) => f.name);
+    setReadable([]);
     try {
-      for (const original of Array.from(picked)) {
-        // A spreadsheet is attached as one CSV per sheet: that is what the
-        // preview, the model and the code that runs can all read.
-        let parts = [original];
-        if (isSpreadsheet(original.name)) {
-          if (original.size > MAX_FILE_BYTES) {
-            setError(`${original.name} is larger than ${MAX_FILE_BYTES / 1_000_000} MB.`);
-            continue;
-          }
-          try {
-            parts = await spreadsheetToCsvFiles(original);
-          } catch {
-            setError(`${original.name} could not be read as a spreadsheet. Save it as CSV and attach that.`);
-            continue;
-          }
-          if (!parts.length) {
-            setError(`${original.name} has no sheet with anything in it.`);
-            continue;
-          }
-          setNote(
-            `${original.name} was converted to CSV — ${parts.length === 1 ? 'one file' : `${parts.length} files, one per sheet`}. ` +
-              'Values are kept; formulas arrive as their results, and formatting and charts are left behind.'
-          );
-        }
-        for (const file of parts) {
-          const reason = rejectReason(file.name, file.size, names);
-          if (reason) {
-            setError(reason);
-            continue;
-          }
-          await attachProjectFile(project, file, previewOf(file.name, await file.text()));
-          names.push(file.name);
-        }
-      }
+      const prepared = await prepareFiles(Array.from(picked), files.map((f) => f.name));
+      for (const { file, preview } of prepared.ready) await attachProjectFile(project, file, preview);
+      if (prepared.errors.length) setError(prepared.errors.join(' '));
+      if (prepared.notes.length) setNote(prepared.notes.join(' '));
+      setReadable(prepared.ready.flatMap((p) => (p.text ? [{ name: p.file.name, text: p.text }] : [])));
       await onChanged();
     } catch (e) {
       setError(e instanceof Error && e.message ? `Could not attach the file: ${e.message}` : 'Could not attach the file.');
@@ -159,7 +135,7 @@ export function ProjectData({
               ref={input}
               type="file"
               multiple
-              accept={[...ACCEPTED_EXTENSIONS, SPREADSHEET_EXTENSION].join(',')}
+              accept={PICKABLE_EXTENSIONS.filter((e) => !(IMAGE_EXTENSIONS as readonly string[]).includes(e)).join(',')}
               aria-label="Attach data files"
               className="sr-only"
               onChange={(e) => void attach(e.target.files)}
@@ -261,7 +237,7 @@ export function ProjectData({
           <p className="mt-2 text-label text-[var(--on-surface-variant)]">
             No data or images attached. Without data, analyses can be planned but not run, and PromptMaster will say so.
             Attach CSV, TSV, JSON or text files, or an Excel workbook (.xlsx, converted to CSV), and Go can run code
-            against them. Add photos or figures (PNG, JPEG, WebP, GIF) to place them in your work. Up to{' '}
+            against them. Attach a PDF or Word brief and its text can go into the project context. Add photos or figures (PNG, JPEG, WebP, GIF) to place them in your work. Up to{' '}
             {MAX_FILE_BYTES / 1_000_000} MB each.
           </p>
         )
@@ -291,6 +267,26 @@ export function ProjectData({
         </>
       )}
 
+      {readable.length > 0 && onAddToContext && !readOnly && (
+        <div role="group" aria-label="Add document text" className="mt-3 flex flex-wrap items-center gap-3 rounded-lg bg-[var(--surface-container-low)] px-4 py-2.5">
+          <span className="mr-auto text-label text-[var(--on-surface-variant)]">
+            {readable.length === 1 ? `${readable[0].name} has text` : `${readable.length} documents have text`} every stage could quote.
+          </span>
+          <button
+            onClick={() => {
+              onAddToContext(readable);
+              setNote(`Added to the project context: ${readable.map((r) => r.name).join(', ')}.`);
+              setReadable([]);
+            }}
+            className="rounded-lg bg-[var(--pm-primary)] px-3 py-1.5 text-label text-[var(--on-primary)]"
+          >
+            Add its text to the project context
+          </button>
+          <button onClick={() => setReadable([])} className="px-2 text-label text-[var(--on-surface-variant)]">
+            Not now
+          </button>
+        </div>
+      )}
       {note && (
         <p role="status" className="mt-2 text-label text-[var(--on-surface-variant)]">{note}</p>
       )}

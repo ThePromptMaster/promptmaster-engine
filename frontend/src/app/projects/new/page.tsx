@@ -16,6 +16,12 @@ import { createArtifact } from '@/lib/supabase/versions';
 import type { WorkflowTemplate } from '@/lib/workflow/types';
 import type { SetupRationale } from '@/types';
 import { splitAsk } from '@/lib/projects/split-ask';
+import { StartAttachments, type StartImage } from '@/components/projects/start-attachments';
+import { documentsOf, materialFrom, type PreparedFile } from '@/lib/data/attachments';
+import { contextFromDocuments } from '@/lib/data/extract-text';
+import { imagePreview } from '@/lib/data/preview';
+import { INPUT_LIMITS } from '@/lib/projects/input-limits';
+import { attachProjectFile } from '@/lib/supabase/project-files';
 
 /**
  * PM-09 — the unified entry.
@@ -66,6 +72,15 @@ export default function NewProjectPage() {
     context: '',
     mode: 'architect',
   });
+  // Held until Start: a project's files are stored under its id (5 Oct, email 8).
+  const [startFiles, setStartFiles] = useState<PreparedFile[]>([]);
+  const [startImages, setStartImages] = useState<StartImage[]>([]);
+  const material = materialFrom(startFiles, INPUT_LIMITS.context);
+  /** The ask split into objective and context, with any attached documents' words after it. */
+  const withDocuments = (text: string) => {
+    const ask = splitAsk(text);
+    return { ...ask, context: contextFromDocuments(ask.context, documentsOf(startFiles), INPUT_LIMITS.context).context };
+  };
   const [working, setWorking] = useState<null | 'questions' | 'setup' | 'creating'>(null);
   const [error, setError] = useState<string | null>(null);
   // Kept apart from `error`: every other action clears that, and a failed
@@ -107,13 +122,14 @@ export default function NewProjectPage() {
       const { suggestion } = await api.generateSetup({
         objective: objective.trim(),
         answers: given?.length ? given.slice(0, 8) : undefined,
+        ...(material ? { material } : {}),
       });
       const recommended = templateFor(suggestion.workflow) ?? templateFor('single_output');
       setTemplateId(recommended?.id ?? null);
       setRecommendedKey(suggestion.workflow);
       setWorkflowReason(suggestion.workflow_reason);
       setRationale(suggestion.rationale);
-      const ask = splitAsk(objective);
+      const ask = withDocuments(objective);
       setDraft({
         title: titleFrom(objective),
         objective: ask.objective,
@@ -144,7 +160,7 @@ export default function NewProjectPage() {
     setRecommendedKey(null);
     setWorkflowReason('');
     setRationale(null);
-    setDraft((d) => ({ ...d, title: titleFrom(objective), ...splitAsk(objective) }));
+    setDraft((d) => ({ ...d, title: titleFrom(objective), ...withDocuments(objective) }));
     setStep('setup');
   }
 
@@ -189,6 +205,22 @@ export default function NewProjectPage() {
         type: 'project_created',
         stage_id: selected.stages[0]?.id ?? '',
       });
+
+      // What was attached before the project existed.
+      for (const { file, preview } of startFiles) await attachProjectFile(project, file, preview);
+      for (const { file, caption } of startImages) {
+        let width = 0;
+        let height = 0;
+        try {
+          const bitmap = await createImageBitmap(file);
+          width = bitmap.width;
+          height = bitmap.height;
+          bitmap.close();
+        } catch {
+          // Stored all the same; its size is just unknown.
+        }
+        await attachProjectFile(project, file, imagePreview(file.name, caption, width, height));
+      }
 
       router.push(`/projects/${project.id}`);
     } catch (e) {
@@ -254,6 +286,13 @@ export default function NewProjectPage() {
               placeholder="e.g. Write a short book about giraffes for curious ten-year-olds"
               className="w-full bg-transparent text-title leading-relaxed text-[var(--on-surface)] outline-none placeholder:text-[var(--outline)]"
             />
+            <StartAttachments
+              files={startFiles}
+              images={startImages}
+              onFiles={setStartFiles}
+              onImages={setStartImages}
+              disabled={working !== null}
+            />
           </div>
 
           <div className="mt-6 grid gap-3 sm:grid-cols-2">
@@ -302,6 +341,7 @@ export default function NewProjectPage() {
           </p>
           <GuideInterview
             objective={objective.trim()}
+            material={material}
             busy={working === 'setup'}
             onDone={(given) => void recommend(given)}
             onBack={() => setStep('ask')}

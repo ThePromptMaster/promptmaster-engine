@@ -608,7 +608,7 @@ is recorded as `blocked` / `tool_missing` (or `data_missing` for a missing input
 file) rather than attempted another way.
 
 **Data files (2026-10-01).** A user can attach CSV, TSV, JSON or text files to a
-project (`project_files` + the private `project-files` bucket; ≤5 MB each, 10 per
+project (`project_files` + the private `project-files` bucket; ≤5 MB each, 20 per
 project). The sandbox route copies them into `/data` for every run of that project
 (≤20 MB in total; files past that are left out, in upload order). Prompts are shown
 each file's name, columns, first rows and row count — computed in the browser at
@@ -617,6 +617,15 @@ CSV per sheet that holds anything (`lib/data/spreadsheet.ts`); the CSVs are what
 stored, previewed and run against, and the workbook itself is not kept. Values survive;
 formulas arrive as their last computed results, and formatting, charts, merged cells and
 the old `.xls` format do not arrive at all. What this does **not** do: query a database.
+
+**Documents (2026-10-06).** PDF, Word (.docx) and Markdown files can be attached too, on
+the start screen or on any stage (20 per project). Their text is read in the browser
+(`lib/data/extract-text.ts`, pdf.js and mammoth) and goes into the project context —
+on the start screen straight away, so the suggested setup and the Guide questions read
+it (their calls see the first 12,000 characters); on a stage when the user presses "Add
+its text to the project context". A scanned PDF has no text layer and is refused with
+that reason: there is no OCR. Tables, images and layout inside a document are not kept,
+only its words; the file itself is stored and copied into `/data` like any other.
 
 **A run that executed settles its row (2026-10-01).** When the planner names the row of
 the stage's table a computation carries out (`params.row`) and the code exits cleanly,

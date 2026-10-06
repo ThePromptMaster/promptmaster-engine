@@ -10,6 +10,12 @@ export const MAX_FILE_BYTES = 5_000_000;
 export const MAX_FILES = 20;
 export const ACCEPTED_EXTENSIONS = ['.csv', '.tsv', '.json', '.txt'] as const;
 /**
+ * Briefs and reports (5 Oct, email 8). Their text is read in the browser
+ * (lib/data/extract-text.ts) and offered as project context; the file itself
+ * is kept like any other.
+ */
+export const DOCUMENT_ONLY_EXTENSIONS = ['.pdf', '.docx', '.md'] as const;
+/**
  * Photos and figures (3 Oct call: "attachments, pictures, photos"). They are
  * placed in the work, never shown to a model: a prompt gets each one's name,
  * caption and id, so it can say where it belongs.
@@ -22,7 +28,7 @@ export function isImage(name: string): boolean {
 /** Converted to CSV in the browser when attached (lib/data/spreadsheet.ts); never stored as it is. */
 export const SPREADSHEET_EXTENSION = '.xlsx';
 /** What the file picker offers. */
-export const PICKABLE_EXTENSIONS = [...ACCEPTED_EXTENSIONS, SPREADSHEET_EXTENSION, ...IMAGE_EXTENSIONS] as const;
+export const PICKABLE_EXTENSIONS = [...ACCEPTED_EXTENSIONS, ...DOCUMENT_ONLY_EXTENSIONS, SPREADSHEET_EXTENSION, ...IMAGE_EXTENSIONS] as const;
 
 export function isSpreadsheet(name: string): boolean {
   return extensionOf(name) === SPREADSHEET_EXTENSION;
@@ -52,10 +58,17 @@ export function extensionOf(name: string): string {
 
 /** Why a file cannot be attached, or null when it can. */
 export function rejectReason(name: string, bytes: number, existing: readonly string[]): string | null {
-  if (!(ACCEPTED_EXTENSIONS as readonly string[]).includes(extensionOf(name)) && !isImage(name)) {
-    return extensionOf(name) === '.xls'
+  const ext = extensionOf(name);
+  if (
+    !(ACCEPTED_EXTENSIONS as readonly string[]).includes(ext) &&
+    !(DOCUMENT_ONLY_EXTENSIONS as readonly string[]).includes(ext) &&
+    !isImage(name)
+  ) {
+    return ext === '.xls'
       ? `${name} is in the old Excel format. Save it as .xlsx or CSV first.`
-      : `${name} is not a spreadsheet (.xlsx), CSV, TSV, JSON, text or image (PNG, JPEG, WebP, GIF) file.`;
+      : ext === '.doc'
+        ? `${name} is in the old Word format. Save it as .docx or PDF first.`
+        : `${name} is not a PDF, Word (.docx), Markdown, text, spreadsheet (.xlsx), CSV, TSV, JSON or image (PNG, JPEG, WebP, GIF) file.`;
   }
   if (bytes > MAX_FILE_BYTES) return `${name} is larger than ${MAX_FILE_BYTES / 1_000_000} MB.`;
   if (bytes === 0) return `${name} is empty.`;

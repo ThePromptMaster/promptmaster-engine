@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 from deps import get_client
 from promptmaster.errors import PRESERVED_NOTHING_WRITTEN
-from promptmaster.limits import MAX_OBJECTIVE_CHARS
+from promptmaster.limits import MAX_CONTEXT_CHARS, MAX_OBJECTIVE_CHARS
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError
 from routers._errors import llm_http_error
 from promptmaster.schemas import GuideAnswer, GuideQuestion, SetupSuggestion
@@ -22,6 +22,8 @@ class GenerateSetupRequest(BaseModel):
     model: str = ""
     #: Answers from the "Guide me" path; empty on "I know what I want to do".
     answers: list[GuideAnswer] = Field(default=[], max_length=8)
+    #: What the user attached on the start screen, as text (5 Oct, email 8).
+    material: str = Field(default="", max_length=MAX_CONTEXT_CHARS)
 
 
 class GenerateSetupResponse(BaseModel):
@@ -40,6 +42,7 @@ async def api_generate_setup(
             model=req.model or None,
             objective=req.objective,
             answers=req.answers or None,
+            material=req.material,
         )
         return GenerateSetupResponse(suggestion=suggestion)
     except OpenRouterError as e:
@@ -49,6 +52,7 @@ async def api_generate_setup(
 class GuideQuestionsRequest(BaseModel):
     objective: str = Field(..., min_length=1, max_length=MAX_OBJECTIVE_CHARS)
     model: str = ""
+    material: str = Field(default="", max_length=MAX_CONTEXT_CHARS)
 
 
 class GuideQuestionsResponse(BaseModel):
@@ -61,7 +65,9 @@ async def api_guide_questions(
     client: OpenRouterClient = Depends(get_client),
 ) -> GuideQuestionsResponse:
     """PM-09 "Guide me": a few questions before recommending a setup. 1 LLM call."""
-    questions = await suggest_guide_questions(client=client, model=req.model or None, objective=req.objective)
+    questions = await suggest_guide_questions(
+        client=client, model=req.model or None, objective=req.objective, material=req.material
+    )
     return GuideQuestionsResponse(questions=questions)
 
 
@@ -74,6 +80,7 @@ class GuideNextRequest(BaseModel):
     objective: str = Field(..., min_length=1, max_length=MAX_OBJECTIVE_CHARS)
     answered: list[GuideAnswered] = Field(default_factory=list, max_length=12)
     model: str = ""
+    material: str = Field(default="", max_length=MAX_CONTEXT_CHARS)
 
 
 class GuideNextResponse(BaseModel):
@@ -93,6 +100,7 @@ async def api_guide_next_question(
     enough, question, reason = await suggest_next_guide_question(
         client=client, model=req.model or None, objective=req.objective,
         answered=[a.model_dump() for a in req.answered],
+        material=req.material,
     )
     return GuideNextResponse(enough=enough, question=question, reason=reason)
 
