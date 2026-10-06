@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 
 from deps import get_client
 from promptmaster.errors import PRESERVED_EVALUATION, PRESERVED_STAGE_VERSIONS
+from promptmaster.limits import MAX_INSTRUCTION_CHARS
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError
 from promptmaster.schemas import (
     GenerateStageArtifactResponse,
@@ -55,7 +56,7 @@ class GenerateStageArtifactRequest(BaseModel):
     # What the stage already holds, when the user asked to regenerate.
     existing_content: str = ""
     # What to change about it: a revision instruction from the user or Go mode.
-    instruction: str = Field(default="", max_length=4_000)
+    instruction: str = Field(default="", max_length=MAX_INSTRUCTION_CHARS)
     model: str = ""
 
 

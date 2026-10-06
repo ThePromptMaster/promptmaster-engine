@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from deps import get_client
 from promptmaster.conflicts import Conflict, ConflictSource, ConflictStage, find_conflicts
 from promptmaster.errors import PRESERVED_NOTHING_WRITTEN
+from promptmaster.limits import MAX_INSTRUCTION_CHARS
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError
 from promptmaster.schemas import PMInput
 from routers._errors import llm_http_error
@@ -17,7 +18,7 @@ router = APIRouter(prefix="/api", tags=["conflicts"])
 
 class CheckConflictsRequest(BaseModel):
     inputs: PMInput
-    instruction: str = Field(min_length=1, max_length=4_000)
+    instruction: str = Field(min_length=1, max_length=MAX_INSTRUCTION_CHARS)
     decisions: list[ConflictSource] = Field(default_factory=list, max_length=30)
     other_instructions: list[ConflictSource] = Field(default_factory=list, max_length=20)
     #: The stage the instruction is for. Optional, for callers that predate it.
