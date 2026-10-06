@@ -582,6 +582,8 @@ direction. Two things still count as work Go may do first:
 | L-38 | Project context capped at 60k characters, sent whole on every stage call | accepted |
 | L-39 | No dependency graph; staleness is per stage, not per claim | open |
 | L-40 | At an approval Go asks rather than reasoning further | accepted |
+| L-41 | Proposed statuses wait for the user; Carry forward is listed, not tracked | accepted |
+| L-42 | Go's own revisions are not checked against the objective or constraints | accepted |
 | L-B3 | Go code execution: Python only, fixed packages, no network | accepted |
 | L-B4 | Go runs while the tab is open; windows, not dollars | accepted |
 | L-C3 | Conflict detection misses paraphrase and cross-stage contradiction | accepted |
@@ -777,6 +779,9 @@ column yet. The statuses live in code, so they apply to every pinned workflow ve
 the Validation stage's own guidance text still says "reproduced" until the next Research
 template version.
 
+**Proposed statuses (2026-10-06).** Superseded in part by L-41: judgments the draft can
+see in its own words are now *proposed* — see there.
+
 ### L-C9 — Research write-up: two forms, chosen at the outline (2026-10-01)
 
 Research v6 offers its write-up as a **full research paper** (nine sections) or a
@@ -916,3 +921,32 @@ stages *stale*, as any return does. The next round is shown their summaries, lab
 "(last round)". The full text of each round stays in version history, but only the most
 recent round is summarised into the prompts.
 
+### L-41 — Proposed statuses wait for the user; Carry forward is listed, not tracked (2026-10-06)
+
+Sean, 3 Oct: PromptMaster wrote "addressed but not ruled out" while the status read *Not
+looked at*. A status may now be **proposed** (`modelMayPropose` in
+`lib/workflow/stage-artifact.ts`; `model_may_propose`, enforced in `promptmaster/stage.py`):
+Alternatives' *Ruled out*, *Addressed*, *Left open*; Validation's *Supported by prior
+evidence* and *Consistency check only*; Final review's *Settled* and *Carry forward*. The
+row is stored `status_source: 'proposed'` with its reason and **counts as undecided**
+(`isTriaged`) until the user confirms it — "Confirm the N proposals" above the table, or
+by changing the row. Go proposes for rows that have none (`propose_statuses`, once per
+stage per run) and then stops at that button; it never confirms. *Independently
+reproduced*, *Not reproduced*, *Completed* and *Deviated* are never proposed. Nothing
+checks that a proposal matches what the row's text says beyond the model's own reading;
+the user's confirmation is the check.
+
+**Carry forward** lists the issue, with its reason, on the finished page and at the end
+of the exported document ("Open issues carried forward"). It does not create a task, a
+new project or a tracker, and Final review does not require a status on its rows —
+marking them is optional, and the table says so.
+
+### L-42 — Go's own revisions are not checked against the objective or constraints (2026-10-06)
+
+A revision Go makes toward what its stage asks for (`origin: 'go'`) raises no objective or
+constraint conflict, in the browser and in `parse_conflicts`: the stage outranks both
+(`precedence.py`), and a prompt-only rule had let "a table is a different deliverable from
+the book" stop Go on Book's research notes. Conflicts with the user's decisions and
+instructions still stop it, and anything the user types is checked as before. A Go
+revision that really did drift from the objective is caught by the stage check and the
+evaluator, not by the conflict check.

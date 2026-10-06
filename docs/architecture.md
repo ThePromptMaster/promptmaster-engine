@@ -502,7 +502,7 @@ gaps are.
 | Kind | Held in | Who may change it |
 |---|---|---|
 | **Intent**: objective, constraints, audience, format, context, critique dials | `projects` | the user (patches with a `revision` guard) |
-| **Knowledge**: figures, evidence, results, literature | `artifacts.key_figures` (only values found verbatim), `sandbox_runs`, review rows with `status_source`, evidence-cited stage events | a model's rows are candidates until a lookup, a run or the user settles them |
+| **Knowledge**: figures, evidence, results, literature | `artifacts.key_figures` (only values found verbatim), `sandbox_runs`, review rows with `status_source` (`proposed` = PromptMaster's proposal, undecided until the user confirms; `model` = an outcome it may set; `sandbox`/`tool`/`user`), evidence-cited stage events | a model's rows are candidates until a lookup, a run or the user settles them |
 | **Authority**: decisions, approvals, overrides, authorisations | `decisions`, `recommendations`, manual criteria (`projects.manual_checks`), Go authorisations | the user; a model only *proposes* (DB-enforced, above) |
 | **Execution**: what ran and what it produced | `agent_runs`, `agent_steps`, `artifact_versions`, `workflow_events` | append-only; labels derived from what happened |
 
