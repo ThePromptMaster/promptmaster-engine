@@ -75,6 +75,34 @@ export interface UsageWriteContext {
 }
 
 /**
+ * Usage rows are written in batches (6 Oct). One insert per response, each
+ * after a network round trip for the user, held the auth lock that every other
+ * request waits on; under a Go run that was a stall the browser tests caught.
+ * The user is read from the local session, and rows go out together.
+ */
+const USAGE_FLUSH_MS = 1_500;
+let pendingRows: Record<string, unknown>[] = [];
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
+// Rows still waiting when the tab goes away are sent then, not dropped.
+if (typeof window !== 'undefined') window.addEventListener('pagehide', () => void flushUsage());
+
+export async function flushUsage(): Promise<void> {
+  flushTimer = null;
+  const rows = pendingRows;
+  pendingRows = [];
+  if (!rows.length) return;
+  try {
+    const supabase = createClient();
+    const { data } = await supabase.auth.getSession();
+    const userId = data.session?.user.id;
+    if (!userId) return;
+    await supabase.from('model_usage').insert(rows.map((r) => ({ ...r, user_id: userId })));
+  } catch {
+    // Deliberately silent. See the module docstring.
+  }
+}
+
+/**
  * Persist one row per provider call.
  *
  * Batched into a single insert: a stage generation fans out to four calls plus
@@ -96,39 +124,28 @@ export async function recordModelUsage(
     stepCosts.set(op.agentStepId, entry);
   }
 
-  try {
-    const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const projectId =
-      context.projectId === undefined ? currentProjectId : context.projectId;
-
-    await supabase.from('model_usage').insert(
-      events.map((event) => ({
-        user_id: user.id,
-        project_id: projectId,
-        request_id: context.requestId ?? '',
-        route: context.route,
-        model: event.model,
-        tokens_in: event.tokensIn,
-        tokens_out: event.tokensOut,
-        // Nulls are meaningful: "we did not know the price", not "it was free".
-        cost_usd: event.costUsd,
-        prompt_price_usd: event.promptPriceUsd,
-        completion_price_usd: event.completionPriceUsd,
-        source: context.source ?? 'app',
-        elapsed_ms: Math.round(event.elapsedMs),
-        attempt: event.attempt ?? 'first',
-        operation: op?.operation ?? context.route,
-        agent_step_id: op?.agentStepId ?? null,
-      }))
-    );
-  } catch {
-    // Deliberately silent. See the module docstring.
-  }
+  const projectId =
+    context.projectId === undefined ? currentProjectId : context.projectId;
+  pendingRows.push(
+    ...events.map((event) => ({
+      project_id: projectId,
+      request_id: context.requestId ?? '',
+      route: context.route,
+      model: event.model,
+      tokens_in: event.tokensIn,
+      tokens_out: event.tokensOut,
+      // Nulls are meaningful: "we did not know the price", not "it was free".
+      cost_usd: event.costUsd,
+      prompt_price_usd: event.promptPriceUsd,
+      completion_price_usd: event.completionPriceUsd,
+      source: context.source ?? 'app',
+      elapsed_ms: Math.round(event.elapsedMs),
+      attempt: event.attempt ?? 'first',
+      operation: op?.operation ?? context.route,
+      agent_step_id: op?.agentStepId ?? null,
+    }))
+  );
+  if (!flushTimer) flushTimer = setTimeout(() => void flushUsage(), USAGE_FLUSH_MS);
 }
 
 export interface ErrorReport {
@@ -156,9 +173,9 @@ export interface ErrorReport {
 export async function recordErrorEvent(report: ErrorReport): Promise<void> {
   try {
     const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    // The local session, not a network round trip (see the batching note above).
+    const { data } = await supabase.auth.getSession();
+    const user = data.session?.user;
     if (!user) return;
 
     await supabase.from('error_events').insert({
