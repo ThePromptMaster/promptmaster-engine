@@ -32,7 +32,10 @@ export const BOOK_V1: WorkflowTemplate = {
   // author's confirmation, and the template names its own deliverable.
   // v7 (2026-10-02): every approval is worded as what the user is certifying,
   // in plain words (2 Oct, items 2 and 13). Criterion ids are unchanged.
-  version: 7,
+  // v8 (2026-10-06): each approval says who may satisfy it — a routine one
+  // Go may commit under the project's "Routine decisions: handle them for me",
+  // a reserved one only the user (Sean, 5 Oct). Criterion ids are unchanged.
+  version: 8,
   name: 'Book',
   description: 'Objective through final review, with an approved outline driving the draft.',
   outline_stage: 'explicit',
@@ -51,8 +54,8 @@ export const BOOK_V1: WorkflowTemplate = {
         'Produce a statement of what this book is for: the change it should make in a reader, what would count as having succeeded, and what it deliberately does not cover. A few short paragraphs, no headings. A good one is usable as a test — it can be held up against a chapter idea and reject it; one that could justify any book has done nothing.',
       exit_criteria: [
         { id: 'obj.stated', label: 'Objective is stated', check: 'auto', rule: { type: 'field_non_empty', field: 'objective' }, blocking: true },
-        { id: 'obj.success', label: 'I am satisfied it says what success looks like', check: 'manual' },
-        { id: 'obj.scope', label: 'I am satisfied it says what is out of scope', check: 'manual' },
+        { id: 'obj.success', label: 'I am satisfied it says what success looks like', check: 'manual', authority: 'delegable' },
+        { id: 'obj.scope', label: 'I am satisfied it says what is out of scope', check: 'manual', authority: 'delegable' },
       ],
       expected_artifacts: [{ kind: 'objective_statement', cardinality: 'one', primary: true }],
       recommended_modes: [
@@ -75,7 +78,7 @@ export const BOOK_V1: WorkflowTemplate = {
         'Produce audience segments, not an essay about the audience. Each item names one group in \'who\', states what that group already knows in \'prior_knowledge\', and says what they came to the book for in \'what_they_want\'. A segment that could describe anyone is not a segment: name a group specific enough that you could picture one of them putting the book down, and say what would make them do it.',
       exit_criteria: [
         { id: 'aud.one', label: 'At least one audience segment', check: 'auto', rule: { type: 'min_items', n: 1 }, blocking: true },
-        { id: 'aud.knowledge', label: 'I am satisfied each reader group has its prior knowledge and its reason to read filled in', check: 'manual' },
+        { id: 'aud.knowledge', label: 'I am satisfied each reader group has its prior knowledge and its reason to read filled in', check: 'manual', authority: 'delegable' },
       ],
       expected_artifacts: [{ kind: 'audience_profile', cardinality: 'many', primary: true }],
       recommended_modes: [
@@ -97,9 +100,9 @@ export const BOOK_V1: WorkflowTemplate = {
       entry_prompt_hint:
         'Produce a positioning statement: the books this one sits beside, named as actual titles rather than categories, and the single thing it does that they do not. Put the differentiator in one sentence a reader could later judge false. If the claim cannot fail, it is not positioning.',
       exit_criteria: [
-        { id: 'pos.comparables', label: 'I have named at least two comparable books', check: 'manual', hint: 'Comparables are 2–3 existing books your reader would shelve beside yours. Name them in the draft above, say how yours differs, then tick this.' },
-        { id: 'pos.differentiator', label: 'I confirm the one-sentence differentiator is stated', check: 'manual', blocking: true },
-        { id: 'pos.falsifiable', label: 'I am satisfied a reader could tell whether the book kept its promise', check: 'manual' },
+        { id: 'pos.comparables', label: 'I have named at least two comparable books', check: 'manual', authority: 'delegable', hint: 'Comparables are 2–3 existing books your reader would shelve beside yours. Name them in the draft above, say how yours differs, then tick this.' },
+        { id: 'pos.differentiator', label: 'I confirm the one-sentence differentiator is stated', check: 'manual', authority: 'delegable', blocking: true },
+        { id: 'pos.falsifiable', label: 'I am satisfied a reader could tell whether the book kept its promise', check: 'manual', authority: 'delegable' },
       ],
       expected_artifacts: [{ kind: 'positioning_statement', cardinality: 'one', primary: true }],
       // Critic is the default here on purpose: positioning claims exist to be
@@ -124,7 +127,7 @@ export const BOOK_V1: WorkflowTemplate = {
         'Produce a table of the claims the book intends to make. Each item carries \'claim\' — one assertion, stated flatly and in full; \'source\' — where it can be checked, named as specifically as you can manage, or an honest \'none, author experience\'; and \'confidence\' — how firm it is and what would shake it. Do not invent citations. An unsourced row is useful; a plausible-looking reference that does not exist costs a day at fact-checking.',
       exit_criteria: [
         { id: 'res.notes', label: 'Research notes captured', check: 'auto', rule: { type: 'min_items', n: 1 } },
-        { id: 'res.openquestions', label: 'I have noted the open questions, or decided to leave them', check: 'manual' },
+        { id: 'res.openquestions', label: 'I have noted the open questions, or decided to leave them', check: 'manual', authority: 'delegable' },
       ],
       expected_artifacts: [{ kind: 'research_notes', cardinality: 'many', primary: true }],
       recommended_modes: [{ mode: 'analyst', reason: 'Separates what you know from what you assume' }],
@@ -144,7 +147,7 @@ export const BOOK_V1: WorkflowTemplate = {
         'Produce the ordered sections of the book. Each has a title and a short abstract saying what that section does and why it belongs here rather than three chapters later. The order is the argument: someone reading only the abstracts, in sequence, should see the case being built. Cover every need the audience stage identified, and nothing outside the stated scope.',
       exit_criteria: [
         { id: 'out.sections', label: 'Outline has sections', check: 'auto', rule: { type: 'min_items', n: 2 }, blocking: true, hint: 'Add at least two named sections below — each becomes a chapter or section when drafting.' },
-        { id: 'out.covers', label: 'I am satisfied every reader need has a section that covers it', check: 'manual' },
+        { id: 'out.covers', label: 'I am satisfied every reader need has a section that covers it', check: 'manual', authority: 'delegable' },
       ],
       expected_artifacts: [{ kind: 'outline', cardinality: 'one', primary: true }],
       recommended_modes: [{ mode: 'architect', reason: 'Structure is the whole job at this stage' }],
@@ -287,7 +290,7 @@ export const BOOK_V1: WorkflowTemplate = {
       entry_prompt_hint:
         'Work at the line, not the argument. Cut padding, break up sentences that have collapsed under their own clauses, remove the second sentence that says what the first already said, and vary rhythm that has gone flat. Meaning, structure and voice stay exactly as they are. Return the full edited text; a passage needing nothing comes back unchanged.',
       exit_criteria: [
-        { id: 'edit.done', label: 'I am done editing', check: 'manual' },
+        { id: 'edit.done', label: 'I am done editing', check: 'manual', authority: 'reserved' },
       ],
       expected_artifacts: [{ kind: 'manuscript', cardinality: 'one', primary: true }],
       recommended_modes: [{ mode: 'clarity', reason: 'The last stage where being understood still beats being clever' }],
@@ -306,7 +309,7 @@ export const BOOK_V1: WorkflowTemplate = {
       entry_prompt_hint:
         'Produce the closing account of the manuscript. Rows should cover what it now delivers against the original objective, which stages were skipped and what that leaves unchecked, and what remains open. State unfinished work plainly — this is the last place it gets recorded before the book leaves.',
       exit_criteria: [
-        { id: 'final.accepted', label: 'I accept this manuscript as finished', check: 'manual' },
+        { id: 'final.accepted', label: 'I accept this manuscript as finished', check: 'manual', authority: 'reserved' },
       ],
       expected_artifacts: [{ kind: 'final_evaluation', cardinality: 'one', primary: true }],
       recommended_modes: [],

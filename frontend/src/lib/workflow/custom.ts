@@ -20,6 +20,10 @@ export interface DesignedStage {
   instruction: string;
   required: boolean;
   approval: string;
+  /** 'routine': checkable against the material, so Go may commit it under the routine-decision policy. */
+  approval_kind?: 'routine' | 'decision';
+  /** A separate, reserved sign-off on new commitments the stage proposes; '' for none. */
+  decision?: string;
 }
 
 export interface DesignedWorkflow {
@@ -52,7 +56,15 @@ function criteriaFor(stage: DesignedStage, id: string, first: boolean): ExitCrit
   if (stage.kind === 'write') out.push({ id: `${id}.written`, label: `${stage.label} is written`, check: 'auto', rule: { type: 'artifact_non_empty' }, blocking: true });
   if (stage.kind === 'list') out.push({ id: `${id}.items`, label: 'At least one item', check: 'auto', rule: { type: 'min_items', n: 1 }, blocking: true });
   if (stage.kind === 'check') out.push({ id: `${id}.triaged`, label: 'Every finding accepted or rejected', check: 'auto', rule: { type: 'all_findings_triaged' }, blocking: false });
-  if (stage.approval.trim()) out.push({ id: `${id}.approved`, label: stage.approval.trim(), check: 'manual', blocking: true });
+  if (stage.approval.trim()) {
+    // Only an explicit "routine" is delegable; a design from before 6 Oct has
+    // no kind and stays the user's.
+    const authority = stage.approval_kind === 'routine' ? 'delegable' : 'reserved';
+    out.push({ id: `${id}.approved`, label: stage.approval.trim(), check: 'manual', blocking: true, authority });
+  }
+  if (stage.decision?.trim()) {
+    out.push({ id: `${id}.decision`, label: stage.decision.trim(), check: 'manual', blocking: true, authority: 'reserved' });
+  }
   return out;
 }
 

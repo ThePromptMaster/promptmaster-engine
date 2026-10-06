@@ -87,6 +87,8 @@ export interface PerformContext {
   setStageFigures?: (stageId: string, figures: StageFigures) => Promise<void>;
   /** Re-read the event log (and move the cursor) after a stage event. */
   afterStageEvent: () => Promise<void>;
+  /** Tick an approval the routine-decision policy committed; the event is written first, by the performer. */
+  commitCriterion?: (stageId: string, criterionId: string) => Promise<void>;
   signal: AbortSignal;
 }
 
@@ -501,6 +503,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       const created = await ctx.appendStageVersion(ctx.stage.id, ctx.stage.label, {
         content,
         source_operation: revising ? 'agent_revise' : 'agent_draft',
+        base_content: head,
         instruction: instruction || ctx.step.rationale || ctx.stage.entry_prompt_hint || '',
         model: res.model_used || ctx.project.model,
         mode: ctx.project.mode,
@@ -643,7 +646,8 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
           ? { table: { stage: ctx.stage, request: (instruction: string) => generationRequest(ctx.project, ctx.template, ctx.state, ctx.bundles, ctx.stage, head.content, instruction) } }
           : {}),
       });
-      const created = await ctx.appendStageVersion(ctx.stage.id, ctx.stage.label, appliedFindingsVersion(rev, ctx.project));
+      // Go's own apply, told apart from the user's Apply button in the history.
+      const created = await ctx.appendStageVersion(ctx.stage.id, ctx.stage.label, { ...appliedFindingsVersion(rev, ctx.project), source_operation: 'agent_apply' });
       const versionId = (created as { id?: unknown } | null)?.id;
       return done(key, {
         status: 'succeeded', toolsUsed: ['model'],
@@ -672,6 +676,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       const created = await ctx.appendStageVersion(ctx.stage.id, ctx.stage.label, {
         content: serializeItems(items),
         source_operation: 'agent_triage',
+        base_content: ctx.bundles[ctx.stage.id]?.versions.at(-1)?.content ?? '',
         instruction: ctx.step.rationale || 'Go mode decided the routine findings.',
         model: res.model_used || ctx.project.model,
         mode: ctx.project.mode,
@@ -697,6 +702,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       const created = await ctx.appendStageVersion(ctx.stage.id, ctx.stage.label, {
         content: serializeItems(res.items),
         source_operation: 'agent_triage',
+        base_content: ctx.bundles[ctx.stage.id]?.versions.at(-1)?.content ?? '',
         instruction: ctx.step.rationale || 'Go mode proposed a status for each row from its own text.',
         model: res.model_used || ctx.project.model,
         mode: ctx.project.mode,
@@ -731,6 +737,51 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         output: `Alignment ${e.alignment.score} · Clarity ${e.clarity.score} · Drift ${e.drift.score}` +
           (e.findings?.length ? ` · ${e.findings.length} finding(s)` : '') +
           (e.interpretation?.bullets.length ? `\n\n${e.interpretation.label}:\n${e.interpretation.bullets.map((l) => `- ${l}`).join('\n')}` : ''),
+      });
+    }
+
+    case 'commit': {
+      // A routine approval under "Routine decisions: handle them for me"
+      // (Sean, 5 Oct). Validation first — delegation satisfies authority, it
+      // never bypasses a failed check — then the commit, which the database
+      // refuses unless the project's policy is 'handle' at that moment and the
+      // pinned template marks the approval delegable.
+      const id = typeof params.criterion_id === 'string' ? params.criterion_id : '';
+      const criterion = ctx.stage.exit_criteria.find((c) => c.id === id);
+      if (!criterion || criterion.check !== 'manual' || criterion.authority !== 'delegable') {
+        return done(key, { status: 'failed', output: `That approval is not a routine one; it is yours to give.`, toolsUsed: [], changes: {} });
+      }
+      if (ctx.project.routine_decisions !== 'handle') {
+        return done(key, { status: 'failed', output: `Your routine decisions are set to "Ask me", so "${criterion.label}" waits for you.`, toolsUsed: [], changes: {} });
+      }
+      const head = ctx.bundles[ctx.stage.id]?.versions.at(-1);
+      if (!head?.content.trim()) {
+        return done(key, { status: 'failed', output: `There is nothing on ${ctx.stage.label} to check "${criterion.label}" against yet.`, toolsUsed: [], changes: {} });
+      }
+      const check = await api.agentCheckCriterion(
+        { inputs: inputsFrom(ctx.project), stage_label: ctx.stage.label, criterion: criterion.label, content: head.content, model: ctx.project.model },
+        ctx.signal
+      );
+      if (!check.met) {
+        return done(key, {
+          status: 'failed', toolsUsed: ['model'], changes: {},
+          output: `Checked "${criterion.label}" on version ${head.version_number}: not met — ${check.reason} I will revise toward it rather than ask you; it is committed only once it holds.`,
+        });
+      }
+      if (!ctx.commitCriterion) throw new Error('This view cannot record approvals.');
+      await appendWorkflowEvent(ctx.project.id, ctx.project.user_id, {
+        type: 'criterion_committed',
+        stage_id: ctx.stage.id,
+        actor: 'system',
+        agent_run_id: ctx.run.id,
+        reason: check.reason,
+        payload: { criterion_id: criterion.id, policy: 'routine_decisions', evidence_version_id: head.id },
+      });
+      await ctx.commitCriterion(ctx.stage.id, criterion.id);
+      await ctx.afterStageEvent();
+      return done(key, {
+        status: 'succeeded', toolsUsed: ['model'], changes: { event_types: ['criterion_committed'] },
+        output: `"${criterion.label}": checked against version ${head.version_number} — ${check.reason} Committed under your routine-decision policy.`,
       });
     }
 
@@ -774,10 +825,15 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         actor,
         agent_run_id: actor === 'system' ? ctx.run.id : null,
         reason: ctx.step.rationale || undefined,
-        ...(type === 'stage_marked_complete' && evidence ? { payload: { evidence_version_id: evidence } } : {}),
-        ...(type === 'stage_advanced' && ctx.bundles[ctx.stage.id]?.versions.at(-1)
-          ? { payload: { left_version_id: ctx.bundles[ctx.stage.id]!.versions.at(-1)!.id } }
-          : {}),
+        // The user's Approve on Go's proposal is recorded as theirs, and as
+        // given through Go — not as a click on the stage (5 Oct, history).
+        payload: {
+          ...(type === 'stage_marked_complete' && evidence ? { evidence_version_id: evidence } : {}),
+          ...(type === 'stage_advanced' && ctx.bundles[ctx.stage.id]?.versions.at(-1)
+            ? { left_version_id: ctx.bundles[ctx.stage.id]!.versions.at(-1)!.id }
+            : {}),
+          ...(actor === 'user' && ctx.approvedByUser ? { via: 'go_approve' } : {}),
+        },
       });
       await ctx.afterStageEvent();
       return done(key, {

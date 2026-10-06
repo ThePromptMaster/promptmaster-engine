@@ -142,6 +142,12 @@ export interface NewVersion {
   finish_reason?: string | null;
   continuity_snapshot?: ArtifactVersion['continuity_snapshot'];
   restored_from_version_id?: string | null;
+  /**
+   * The content this version was made from. Never stored: the commit check
+   * refuses the version when the stage has moved on since (6 Oct), so a held
+   * revision or a Go step cannot overwrite a change made in between.
+   */
+  base_content?: string | null;
 }
 
 /**

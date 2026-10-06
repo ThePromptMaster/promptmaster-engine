@@ -402,14 +402,20 @@ def _json_reply(system: str, prompt: str) -> dict:
     from promptmaster import change_impact
 
     if system.startswith(change_impact._IMPACT_INSTRUCTION[:60]):
-        # The stages whose summary mentions a word that changed; an invented id is added and must be dropped.
+        # The last finished stage relied on what changed; an invented id is added and must be dropped.
         after = prompt.split("--- AFTER ---", 1)[-1].split("FINISHED STAGES:", 1)[0].lower()
         before = prompt.split("--- BEFORE ---", 1)[-1].split("--- AFTER ---", 1)[0].lower()
-        changed = set(re.findall(r"[a-z]{4,}", before)) ^ set(re.findall(r"[a-z]{4,}", after))
-        stages = re.findall(r"^- id=(\S+) — [^:]*: (.*)$", prompt.split("FINISHED STAGES:", 1)[-1], re.M)
-        hit = [sid for sid, text in stages if changed & set(re.findall(r"[a-z]{4,}", text.lower()))]
+        changed = sorted(set(re.findall(r"[a-z]{4,}", before)) ^ set(re.findall(r"[a-z]{4,}", after))) or ["the brief"]
+        stages = re.findall(r"^- id=(\S+) — ", prompt.split("FINISHED STAGES:", 1)[-1], re.M)
         return {"kind": "fact", "calculations_hold": True,
-                "affected": [{"stage_id": s, "reason": f"Mock: relied on {sorted(changed)[0]}."} for s in hit] + [{"stage_id": "invented", "reason": "x"}]}
+                "affected": [{"stage_id": s, "reason": f"Mock: it relied on '{changed[0]}'."} for s in stages[-1:]] + [{"stage_id": "invented", "reason": "x"}]}
+    from promptmaster import criterion_check
+
+    if system.startswith(criterion_check._CHECK_INSTRUCTION[:60]):
+        # Met, unless the stage's text says "[[mock:criterion=unmet]]".
+        if "[[mock:criterion=unmet]]" in prompt:
+            return {"met": False, "reason": "Mock: the text does not say it."}
+        return {"met": True, "reason": "Mock: the text states it in its second paragraph."}
     if agent._NEXT_ACTION_INSTRUCTION[:60] in system:
         return _next_action(system, prompt)
     if _STAGE_EVAL_INSTRUCTION[:60] in system:

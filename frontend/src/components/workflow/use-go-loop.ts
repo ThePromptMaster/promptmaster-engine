@@ -28,13 +28,14 @@
  * open. Closing it pauses the run, and reopening the project resumes it.
  */
 
+import { RefusedRevision } from '@/lib/workflow/commit-check';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { api } from '@/lib/api/client';
 import { actionFor, actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, USER_ANSWER_STEP } from '@/lib/agent/actions';
 import { contextWithFacts, readOutcomeProof, readStageFacts, type StageFacts } from '@/lib/agent/facts';
 import { stageDrafts } from '@/lib/workflow/stage-artifact';
-import { describeNeed, NEED_CLEARED, NEED_MOVED_ON, needStillHolds, needsUser, requiredWork, type NeedsUser } from '@/lib/agent/needs';
+import { delegableToCommit, describeNeed, NEED_CLEARED, NEED_MOVED_ON, needStillHolds, needsUser, requiredWork, type NeedsUser } from '@/lib/agent/needs';
 import { assertHonestOutcome, verifyOutcome } from '@/lib/agent/outcome';
 import { outlineStageFor } from '@/lib/outline/actions';
 import { listRecommendations, recordDecision } from '@/lib/supabase/recommendations';
@@ -91,6 +92,8 @@ interface Options {
   setStageFigures?: (stageId: string, figures: StageFigures) => Promise<void>;
   /** Re-read the event log after a stage event; resolves once the page has it. */
   reloadEvents: () => Promise<void>;
+  /** Tick an approval committed under the routine-decision policy, saved before it resolves. */
+  commitCriterion?: (stageId: string, criterionId: string) => Promise<void>;
   /** The event log, for the facts a stage's own controls need (approvals). */
   events: readonly WorkflowEvent[];
   /**
@@ -281,7 +284,7 @@ export function useGoLoop(opts: Options) {
           ? { sandboxRunId: interpret.sandboxRunId, code: interpret.code, stdout: interpret.stdout, stderr: interpret.stderr, exitCode: interpret.exitCode }
           : undefined,
         appendStageVersion: o.appendStageVersion, recordStageEvaluation: o.recordStageEvaluation,
-        setStageSummary: o.setStageSummary, setStageFigures: o.setStageFigures, afterStageEvent: o.reloadEvents, signal,
+        setStageSummary: o.setStageSummary, setStageFigures: o.setStageFigures, afterStageEvent: o.reloadEvents, commitCriterion: o.commitCriterion, signal,
         facts, latestEvaluation: o.latestEvaluation, refresh: o.onRefresh, onProgress: setProgress,
         conflictAnswer: answerToConflict(stepsRef.current, o.stage.id),
       };
@@ -294,7 +297,11 @@ export function useGoLoop(opts: Options) {
         if (signal.aborted || (e as Error)?.name === 'AbortError') throw new Stopped();
         outcome = {
           status: 'failed', label: null, toolsUsed: [], changes: {},
-          output: e instanceof Error && e.message ? e.message : 'The step failed.',
+          // A refused revision tells the next plan what a retry must do; a
+          // second failure in a row stops the run (MAX_CONSECUTIVE_FAILURES).
+          output: e instanceof RefusedRevision
+            ? `${e.message}. A retry must start from the current version and keep every row the user decided.`
+            : e instanceof Error && e.message ? e.message : 'The step failed.',
         };
       }
       if (signal.aborted) throw new Stopped();
@@ -470,11 +477,21 @@ export function useGoLoop(opts: Options) {
             ? Math.max(0, facts.review.items.length - runsTried)
             : 0;
 
+        // Routine approvals (5 Oct): the project's policy, read each move so a
+        // change mid-run applies at once; and the ones whose check failed on
+        // the current version, which are revised toward rather than re-checked.
+        const routine = o.project.routine_decisions ?? 'ask';
+        const headAt = o.bundles[o.stage.id]?.versions.at(-1)?.created_at ?? '';
+        const commitTried = [...priorStepsRef.current, ...stepsRef.current]
+          .filter((s) => s.action_key === 'commit_delegated' && s.stage_id === o.stage!.id && s.status === 'failed' && (s.finished_at ?? s.started_at ?? '') >= headAt)
+          .map((s) => String(s.params?.criterion_id ?? ''));
+        if (delegableToCommit(o.stage, stageEvaluation, routine, commitTried)) allowed.push('commit_delegated');
+
         // Before the planner is asked: is the next move the user's? (B4)
         const need = needsUser({
           state: o.state, stage: o.stage, facts, stageEvaluation, allowed, policy: current.policy,
           outlineStageId: outlineStageFor(o.template)?.id ?? null, largeJobAcknowledged: largeJobOkRef.current,
-          runAttemptsLeft,
+          runAttemptsLeft, routine, commitTried,
         });
         if (need) {
           await setRunStatus('awaiting_decision', describeNeed(need, stageLabelFor).message, need);
@@ -486,12 +503,12 @@ export function useGoLoop(opts: Options) {
         // approval the findings are applied and the work checked first.
         const loops = o.template.stages.some((s) => s.transitions.loop_to);
         const required = requiredWork({
-          stage: o.stage, facts, stageEvaluation, allowed,
+          stage: o.stage, facts, stageEvaluation, allowed, routine, commitTried,
           ...(loops ? { round: { staleDraft: stageDrafts(o.stage) && !hasDraft } } : {}),
         });
         const choice = required
           ? {
-              action_key: required.key, params: {}, rationale: required.rationale, expected_outcome: required.expected,
+              action_key: required.key, params: required.params ?? {}, rationale: required.rationale, expected_outcome: required.expected,
               needs_user_decision: false, decision_question: null,
             }
           : await api.agentNextAction(
@@ -729,6 +746,21 @@ export function useGoLoop(opts: Options) {
       });
       upsertStep(closed);
       await setRunStatus('stopped', `That move was planned for ${was}; the project is now on ${now}. Press Go to plan again.`);
+      setPhase('ended');
+      return;
+    }
+    // …nor one planned before the stage last changed (Sean, 5 Oct: "an approval
+    // that was valid when work started may no longer be sufficient when it
+    // finishes"). The card offers "Propose again" then; this holds even if
+    // Approve was pressed first.
+    const lastVersion = latest.current.bundles[step.stage_id]?.versions.at(-1);
+    if (plannedBeforeLatestChange(step, [lastVersion?.created_at, latest.current.latestEvaluation?.created_at])) {
+      const closed = await finishAgentStep(step.id, {
+        status: 'cancelled', label: null,
+        output: 'The stage changed after this move was planned. Not performed; it is planned again from the stage as it is now.',
+      });
+      upsertStep(closed);
+      await setRunStatus('stopped', 'The stage changed after that move was planned, so it was not performed. Press Go to plan again.');
       setPhase('ended');
       return;
     }
