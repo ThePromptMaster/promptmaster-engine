@@ -612,3 +612,25 @@ def test_a_proposal_that_needs_a_reason_and_has_none_is_dropped():
     rows = [i.model_dump() for i in items]
     assert "status" not in rows[0]
     assert rows[1]["status"] == "addressed" and rows[1]["status_source"] == "proposed"
+
+
+# --- 3 Oct (Single Output): the prompt and the deliverable are separate artifacts ---
+
+
+def test_a_prompt_stage_writes_the_instruction_not_the_deliverable(basic_inputs, digest):
+    stage = StageDescriptor(id="review", label="Review the prompt", renderer="prose", entry_prompt_hint="", artifact_kind="prompt")
+    system, _ = build_stage_prompt(basic_inputs, stage, digest)
+    assert "THIS STAGE'S ARTIFACT IS A PROMPT" in system
+    assert "Do NOT write the deliverable itself" in system
+    output = StageDescriptor(id="output", label="Output", renderer="prose", entry_prompt_hint="", artifact_kind="output")
+    assert "ARTIFACT IS A PROMPT" not in build_stage_prompt(basic_inputs, output, digest)[0]
+
+
+def test_the_deliverable_is_produced_from_the_reviewed_prompt(basic_inputs, digest):
+    stage = StageDescriptor(id="output", label="Output and evaluation", renderer="prose", entry_prompt_hint="", artifact_kind="output")
+    reviewed = digest.model_copy(update={"reviewed_prompt": "Write an internal audit memo on vendor payments: findings, risk ratings, actions."})
+    _, user = build_stage_prompt(basic_inputs, stage, reviewed)
+    assert "THE REVIEWED PROMPT" in user
+    assert "--- BEGIN PROMPT ---\nWrite an internal audit memo on vendor payments" in user
+    _, without = build_stage_prompt(basic_inputs, stage, digest)
+    assert "THE REVIEWED PROMPT" not in without

@@ -23,7 +23,7 @@ import type { Artifact, ArtifactVersion, Project } from '@/types/project';
 import type { OutlineSection } from '@/types';
 import { manuscriptSourceFor } from './context';
 import type { StageDefinition, WorkflowState, WorkflowTemplate } from './types';
-import { parseItems, rendererHoldsItems } from './stage-artifact';
+import { parseItems, primaryArtifactKind, rendererHoldsItems } from './stage-artifact';
 import { carriesForward, isDone } from './types';
 
 /** Per-stage budget. Twelve stages of this is a paragraph, not a book. */
@@ -47,6 +47,13 @@ export interface StageDigest {
    * "not run" with data sitting in the project.
    */
   data_files: DataFileBrief[];
+  /**
+   * The instruction the user reviewed for the deliverable — the head of the
+   * latest earlier stage whose artifact is a prompt. Sent in full: it is what
+   * the deliverable is produced from (3 Oct, Single Output: the prompt and the
+   * deliverable are separate artifacts).
+   */
+  reviewed_prompt?: string;
   /** Figures earlier stages established, to be quoted rather than worked out again. */
   figures: { stage: string; name: string; value: string; context: string }[];
   /**
@@ -220,7 +227,33 @@ export function buildStageDigest(
     data_files: dataFileBriefs(project),
     figures: establishedFigures(template, state, bundles, upToStageId),
     later_stages: cutoff >= 0 ? template.stages.slice(cutoff + 1).map((s) => s.label.slice(0, 120)) : [],
+    ...reviewedPrompt(template, state, bundles, cutoff),
   };
+}
+
+const PROMPT_MAX = 20_000;
+
+/**
+ * The prompt a later stage is produced from: the head version of the latest
+ * stage before `cutoff` whose primary artifact is a prompt, when it holds one
+ * and was not skipped. By kind, never by workflow.
+ */
+function reviewedPrompt(
+  template: WorkflowTemplate,
+  state: WorkflowState,
+  bundles: Record<string, StageArtifactBundle>,
+  cutoff: number
+): { reviewed_prompt?: string } {
+  if (cutoff < 0) return {};
+  if (primaryArtifactKind(template.stages[cutoff]) === 'prompt') return {};
+  for (let i = cutoff - 1; i >= 0; i -= 1) {
+    const stage = template.stages[i];
+    if (primaryArtifactKind(stage) !== 'prompt') continue;
+    if (state.stages[stage.id]?.status === 'skipped') return {};
+    const text = bundles[stage.id]?.versions.at(-1)?.content?.trim();
+    return text ? { reviewed_prompt: text.slice(0, PROMPT_MAX) } : {};
+  }
+  return {};
 }
 
 /**

@@ -474,6 +474,9 @@ class StageDigest(BaseModel):
     figures: list["EstablishedFigure"] = Field(default_factory=list, max_length=60)
     #: The stages after this one, by label. Their content is out of scope here.
     later_stages: list[str] = Field(default_factory=list, max_length=40)
+    #: The instruction the user reviewed, which this stage's deliverable is
+    #: produced from (Single Output: Review → Output). Empty when there is none.
+    reviewed_prompt: str = Field(default="", max_length=20_000)
 
 
 class StageItemField(BaseModel):
