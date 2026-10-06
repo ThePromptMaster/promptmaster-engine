@@ -22,6 +22,7 @@ import type { StageDefinition, StageEvaluation, WorkflowState, WorkflowTemplate 
 import type { AgentRunStatus, AgentStep, ExecutionPolicy } from '@/types/agent';
 import { actionFor, INTERPRET_STEP, USER_ANSWER_STEP } from './actions';
 import type { StageFacts } from './facts';
+import { proposeTargets } from '@/lib/workflow/proposals';
 
 export const DEFAULT_BUDGET_STEPS = 12;
 /** The same move on the same stage this many times running is not progress. */
@@ -176,6 +177,9 @@ export function allowedActions(
   if (facts.outline && facts.outline.namedSections === 0) keys.push('generate_outline');
   // B3: only the routine rows; a table with none left is the user's.
   if (facts.review && facts.review.routine.length > 0) keys.push('triage_findings');
+  // 3 Oct: rows the draft left without a status get a proposal from their own
+  // text before the table is handed over; the user confirms.
+  if (facts.review?.outcome && proposeTargets(facts.review.items, facts.review.schema).length > 0) keys.push('propose_statuses');
   if (stage.renderer === 'long_form' && facts.manuscript && facts.manuscript.pendingJobs.length === 0) {
     const m = facts.manuscript;
     if (!m.brief && m.approvedOutlineVersionId && m.total > 0 && m.complete < m.total) keys.push('draft_sections');

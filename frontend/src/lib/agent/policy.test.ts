@@ -6,7 +6,7 @@ import { initialState } from '@/lib/workflow/engine';
 import type { StageEvaluation } from '@/lib/workflow/types';
 import type { AgentStep } from '@/types/agent';
 import { deriveExecutionLabel } from './labels';
-import { ITEM_SCHEMAS } from '@/lib/workflow/stage-artifact';
+import { ITEM_SCHEMAS, itemSchemaFor } from '@/lib/workflow/stage-artifact';
 import { allowedActions, alternating, LIVE_TOOLS, NO_TOOLS, polishSinceDirection, withoutOverride, withoutEndlessPolish, withoutSettledRuns, fitsBudget, noChange, noProgress, plannedBeforeLatestChange, preempt, shouldPause, stageMoveActor, stateFingerprint } from './policy';
 
 function step(over: Partial<AgentStep>): AgentStep {
@@ -590,5 +590,16 @@ describe('the stages of a round stay on their task (production pass, 5 Oct)', ()
   it('the other stages of a round may still reason', () => {
     const findingsState = projectState(EXPLORATION_V1, events.slice(0, ids.indexOf('findings')));
     expect(allowedActions(EXPLORATION_V1, findingsState, getStage(EXPLORATION_V1, 'findings')!, true, LIVE_TOOLS)).toContain('derive');
+  });
+});
+
+describe('R1c: propose_statuses is offered while a check table has rows with neither a decision nor a proposal', () => {
+  const alternatives = getStage(RESEARCH_V1, 'alternatives')!;
+  const schema = itemSchemaFor(alternatives);
+  const facts = (items: { id: string; [k: string]: string }[]) => ({ review: { items, schema, routine: [], material: items, outcome: true } });
+  it('offered for an unmarked row, not once every row is proposed or decided', () => {
+    expect(allowedActions(RESEARCH_V1, research, alternatives, true, undefined, facts([{ id: 'a', explanation: 'x' }]) as never)).toContain('propose_statuses');
+    expect(allowedActions(RESEARCH_V1, research, alternatives, true, undefined, facts([{ id: 'a', explanation: 'x', status: 'ruled_out', status_source: 'proposed' }]) as never)).not.toContain('propose_statuses');
+    expect(allowedActions(RESEARCH_V1, research, alternatives, true, undefined, facts([{ id: 'a', explanation: 'x', status: 'ruled_out', status_source: 'user' }]) as never)).not.toContain('propose_statuses');
   });
 });

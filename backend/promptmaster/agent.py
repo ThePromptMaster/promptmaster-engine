@@ -576,11 +576,27 @@ _TRIAGE_INSTRUCTION = (
 )
 
 
+_PROPOSE_INSTRUCTION = (
+    "PROPOSE A STATUS FOR EACH ROW. Below are the rows of a check table, each "
+    "with an id, as the draft wrote them. For each id, propose the one status "
+    "the row's OWN text supports, with a one-sentence reason in the row's own "
+    "terms. The user will confirm or change every proposal, so choose what the "
+    "text actually says was done or found — never a stronger status than it "
+    "supports: a comparison with earlier work is not a reproduction, and "
+    "'partly addressed' is not 'ruled out'. If a row's text does not settle "
+    "it, leave that id out. Decide only the ids given; never invent one.\n\n"
+    "Return JSON only, in exactly this shape:\n"
+    "{\n"
+    '  "decisions": [ {"id": "...", "status": "one of the statuses", "reason": "one sentence"} ]\n'
+    "}"
+)
+
+
 def build_triage_prompt(
-    inputs: PMInput, state: AgentState, items: list[dict], statuses: list[TriageStatus]
+    inputs: PMInput, state: AgentState, items: list[dict], statuses: list[TriageStatus], mode: str = "triage"
 ) -> tuple[str, str]:
-    """Build (system, user) for deciding routine findings. Pure."""
-    system = _shared_system(inputs, [], _TRIAGE_INSTRUCTION)
+    """Build (system, user) for deciding routine findings, or proposing row statuses. Pure."""
+    system = _shared_system(inputs, [], _PROPOSE_INSTRUCTION if mode == "propose" else _TRIAGE_INSTRUCTION)
     menu = "\n".join(
         f"- {s.value}: {s.label or s.value}" + (" (reason required)" if s.requires_reason else "")
         for s in statuses
@@ -589,12 +605,18 @@ def build_triage_prompt(
         f"- id={item.get('id', '?')}: " + "; ".join(f"{k}: {v}" for k, v in item.items() if k != "id" and str(v).strip())
         for item in items
     ) or "(none)"
-    user = f"{_format_state(inputs, state)}\n\nSTATUSES OFFERED:\n{menu}\n\nFINDINGS TO DECIDE:\n{rows}\n\nDecide each one."
+    if mode == "propose":
+        user = f"{_format_state(inputs, state)}\n\nSTATUSES OFFERED:\n{menu}\n\nROWS:\n{rows}\n\nPropose a status for each row its text settles."
+    else:
+        user = f"{_format_state(inputs, state)}\n\nSTATUSES OFFERED:\n{menu}\n\nFINDINGS TO DECIDE:\n{rows}\n\nDecide each one."
     return system, user
 
 
-def parse_triage(result: object, item_ids: set[str], statuses: list[TriageStatus]) -> list[TriageDecision]:
-    """Keep only decisions for the ids given, with a status offered, and a reason where demanded."""
+def parse_triage(
+    result: object, item_ids: set[str], statuses: list[TriageStatus], reason_always: bool = False
+) -> list[TriageDecision]:
+    """Keep only decisions for the ids given, with a status offered, and a reason where demanded
+    (always, for a proposal: the reason is what the user confirms)."""
     if not isinstance(result, dict) or not isinstance(result.get("decisions"), list):
         return []
     by_value = {s.value: s for s in statuses}
@@ -608,7 +630,7 @@ def parse_triage(result: object, item_ids: set[str], statuses: list[TriageStatus
         reason = str(raw.get("reason") or "").strip()
         if item_id not in item_ids or item_id in seen or status not in by_value:
             continue
-        if by_value[status].requires_reason and not reason:
+        if (reason_always or by_value[status].requires_reason) and not reason:
             continue
         seen.add(item_id)
         out.append(TriageDecision(id=item_id, status=status, reason=reason))
@@ -617,10 +639,10 @@ def parse_triage(result: object, item_ids: set[str], statuses: list[TriageStatus
 
 async def triage_findings(
     client: OpenRouterClient, model: str | None, inputs: PMInput, state: AgentState,
-    items: list[dict], statuses: list[TriageStatus],
+    items: list[dict], statuses: list[TriageStatus], mode: str = "triage",
 ) -> list[TriageDecision]:
-    system, user = build_triage_prompt(inputs, state, items, statuses)
+    system, user = build_triage_prompt(inputs, state, items, statuses, mode)
     result, _usage = await client.generate_json(
         prompt=user, system=system, temperature=0.2, max_tokens=1_500, model=model,
     )
-    return parse_triage(result, {str(i.get("id")) for i in items if i.get("id")}, statuses)
+    return parse_triage(result, {str(i.get("id")) for i in items if i.get("id")}, statuses, reason_always=mode == "propose")

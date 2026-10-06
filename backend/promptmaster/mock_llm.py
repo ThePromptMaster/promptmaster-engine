@@ -390,6 +390,12 @@ def _json_reply(system: str, prompt: str) -> dict:
             *[{"name": f"Mock rate {n + 1}", "value": v, "context": "scripted"} for n, v in enumerate(dict.fromkeys(found))],
             {"name": "Mock invented figure", "value": "99.9%", "context": "not in the text"},
         ]}
+    if agent._PROPOSE_INSTRUCTION[:60] in system:
+        # The first status offered for each row; of several, the last is left
+        # out, as a row whose text does not settle it.
+        ids = re.findall(r"^- id=([^:]+):", prompt.split("ROWS:", 1)[-1], re.M)
+        first = re.search(r"STATUSES OFFERED:\n- ([a-z_]+):", prompt)
+        return {"decisions": [{"id": i, "status": first.group(1) if first else "", "reason": "Mock: the row says so."} for i in (ids[:-1] if len(ids) > 1 else ids)]}
     if agent._TRIAGE_INSTRUCTION[:60] in system:
         ids = re.findall(r"^- id=([^:]+):", prompt.split("FINDINGS TO DECIDE:", 1)[-1], re.M)
         return {"decisions": [{"id": i, "status": "accepted", "reason": "Mock: routine, accepted."} for i in ids]}

@@ -14,6 +14,7 @@
 
 import type { StageAction } from './next-action';
 import type { TransitionOption } from './engine';
+import { PROPOSE_LABEL } from './proposals';
 
 export type ControlPlace = 'stage_bar' | 'more_menu' | 'checklist' | 'data_panel' | 'table';
 
@@ -92,6 +93,8 @@ export function stageControls(input: {
   dataPanel?: boolean;
   /** Rows whose proposed status can be confirmed as it stands. */
   proposals?: number;
+  /** Rows with no status or proposal yet, on a table that takes proposals. */
+  proposeRows?: boolean;
 }): StageControl[] {
   const controls: StageControl[] = [];
   if (input.primary && input.primary.kind !== 'none' && input.primary.label) {
@@ -102,6 +105,7 @@ export function stageControls(input: {
   }
   for (const t of transitionEntries(input)) controls.push({ id: t.id, label: t.label, place: 'more_menu' });
   for (const c of input.openApprovals ?? []) controls.push({ id: `tick-${c.id}`, label: c.label, place: 'checklist' });
+  if (input.proposeRows) controls.push({ id: 'propose-statuses', label: PROPOSE_LABEL, place: 'table' });
   if (input.proposals) controls.push({ id: 'confirm-proposals', label: confirmProposalsLabel(input.proposals), place: 'table' });
   if (input.lookupNoun) controls.push({ id: 'lookup', label: lookupLabel(input.lookupNoun), place: 'table' });
   if (input.dataPanel) controls.push({ id: 'attach-data', label: ATTACH_DATA_LABEL, place: 'data_panel' });

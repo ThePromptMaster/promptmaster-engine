@@ -103,6 +103,8 @@ export interface StageRendererProps {
    * found; the renderer shows them unsaved, for the user to review and save.
    */
   onLookupItems?: (items: StageItem[]) => Promise<{ items: StageItem[]; message: string }>;
+  /** Proposals for the rows still without a status, from their own text (3 Oct). Nothing is saved. */
+  onProposeStatuses?: (items: StageItem[]) => Promise<{ items: StageItem[]; message: string }>;
 
   /** True while a draft is being generated for this stage. */
   generating: boolean;

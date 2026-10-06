@@ -445,12 +445,16 @@ export function useGoLoop(opts: Options) {
         const proposedSkipHere = [...priorStepsRef.current, ...stepsRef.current].some(
           (s) => s.action_key === 'propose_skip' && s.stage_id === o.stage!.id
         );
+        // Proposals are asked for once per stage per run: what the rows do not settle is the user's.
+        const proposedStatusesHere = [...priorStepsRef.current, ...stepsRef.current].some(
+          (s) => s.action_key === 'propose_statuses' && s.stage_id === o.stage!.id
+        );
         const polishedHere = polishSinceDirection([...priorStepsRef.current, ...stepsRef.current], o.stage!.id);
         const allowed = withoutSettledRuns(withoutEndlessPolish(
           withoutOverride(
             allowedActions(o.template, o.state, o.stage, hasDraft, LIVE_TOOLS, facts), stageEvaluation.canAdvance, current.policy
             // Asked once: if the user stayed, the stage is to be done.
-          ).filter((k) => k !== 'propose_skip' || !proposedSkipHere),
+          ).filter((k) => (k !== 'propose_skip' || !proposedSkipHere) && (k !== 'propose_statuses' || !proposedStatusesHere)),
           polishedHere,
           stageEvaluation.canAdvance
         ), facts.review);
