@@ -15,7 +15,7 @@
  *     comes from the registry, not from the response.
  */
 
-import { isTriaged, stageDrafts, type StageItem, type StageItemSchema } from '@/lib/workflow/stage-artifact';
+import { isTriaged, itemSchemaFor, stageDrafts, type StageItem, type StageItemSchema } from '@/lib/workflow/stage-artifact';
 import { nextSuggestedStage } from '@/lib/workflow/engine';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import type { StageDefinition, StageEvaluation, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
@@ -159,6 +159,10 @@ export function allowedActions(
     // be able to walk into "no search tool is connected" and stop there
     // (Sean, 28 Sep, Research note).
     if (tools.literature) keys.push('check_literature');
+  } else if (tools.literature && itemSchemaFor(stage).lookup && facts.review?.items.length) {
+    // 5 Oct: on any stage whose rows name sources (Book's Fact-check), Go looks
+    // them up and reads their abstracts before handing the table to the user.
+    keys.push('check_literature');
   }
   if (stageDrafts(stage)) {
     if (!stageHasDraft) keys.push('draft_stage');

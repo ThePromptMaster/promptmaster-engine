@@ -695,6 +695,14 @@ export const api = {
     return apiFetch('/api/agent/triage', { method: 'POST', body: JSON.stringify(req), signal });
   },
 
+  /** Read each found source's abstract and judge it against its row (5 Oct). Stores nothing. */
+  async agentVerifySources(
+    req: { inputs: PMInput; sources: { id: string; claim: string; link: string }[]; model?: string },
+    signal?: AbortSignal
+  ): Promise<{ verdicts: import('@/lib/workflow/lookup').SourceVerdict[]; model_used: string }> {
+    return apiFetch('/api/agent/verify-sources', { method: 'POST', body: JSON.stringify(req), signal });
+  },
+
   async agentReason(
     req: { inputs: PMInput; state: AgentStateDigest; action_key: string; params: Record<string, unknown>; model?: string },
     signal?: AbortSignal

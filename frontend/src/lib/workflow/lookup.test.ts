@@ -1,8 +1,10 @@
+import { applyVerification, sourcesToCheck, verifyQueries } from './lookup';
+import { ITEM_SCHEMAS, isTriaged, itemSchemaFor } from './stage-artifact';
+import { BOOK_V1 } from './templates/book.v1';
 import { describe, expect, it } from 'vitest';
 
 import { applyLookup, enoughWorksFound, lookupQueries, lookupSummary, rowsFromSearch, type WorkMatch } from './lookup';
 import { RESEARCH_V1 } from './templates/research.v1';
-import { ITEM_SCHEMAS } from './stage-artifact';
 
 const lit = ITEM_SCHEMAS.literature_map;
 const match = (id: string, over: Partial<WorkMatch> = {}): WorkMatch => ({
@@ -152,5 +154,53 @@ describe('enoughWorksFound: no more topic searches once the stage has its works 
   it('says nothing for a stage without such a requirement', () => {
     const question = RESEARCH_V1.stages.find((s) => s.id === 'question')!;
     expect(enoughWorksFound(question, [row('retrieved'), row('retrieved'), row('retrieved')], lit)).toBe(false);
+  });
+});
+
+describe('AI verified vs Human verified (Sean, 5 Oct)', () => {
+  const claims = itemSchemaFor(BOOK_V1.stages.find((s) => s.id === 'fact_check')!);
+  const row = (id: string, over: Record<string, string> = {}) => ({
+    id, claim: `Claim ${id}`, source: `Source ${id}`, where: 'ch 1', record: 'A record — Someone (2020)', link: `https://doi.org/10.1/${id}`,
+    status: 'source_found', status_source: 'tool', ...over,
+  });
+
+  it('reads only found, linked rows nobody decided', () => {
+    const q = verifyQueries([row('a'), row('b', { status: 'verified', status_source: 'user' }), row('c', { link: '' }), row('d', { status: 'no_source' })], claims);
+    expect(q).toEqual([{ id: 'a', claim: 'Claim a', link: 'https://doi.org/10.1/a' }]);
+  });
+
+  it('supported is AI verified, contradicted waits for the user, the rest stays found — each with what was read', () => {
+    const { items, supported, contradicted, open } = applyVerification(
+      [row('a'), row('b'), row('c'), row('d', { status: 'verified', status_source: 'user' })],
+      [
+        { id: 'a', verdict: 'supports', quote: 'The effect holds in every case.', basis: 'abstract', note: '' },
+        { id: 'b', verdict: 'does_not', quote: 'No effect was found.', basis: 'abstract', note: '' },
+        { id: 'c', verdict: 'cannot_tell', quote: '', basis: 'none', note: 'The index holds no abstract for this work; it needs reading in full.' },
+        { id: 'd', verdict: 'does_not', quote: 'x', basis: 'abstract', note: '' },
+      ],
+      claims,
+      '2026-10-06'
+    );
+    expect([supported, contradicted, open]).toEqual([1, 1, 1]);
+    expect(items[0]).toMatchObject({ status: 'ai_verified', status_source: 'tool' });
+    expect(items[0].record).toContain('AI check of the abstract (2026-10-06): supports this — “The effect holds in every case.”');
+    expect(items[1]).toMatchObject({ status: 'ai_not_supported' });
+    expect(items[2]).toMatchObject({ status: 'source_found' });
+    expect(items[2].record).toContain('needs reading in full');
+    // The user's own verification is never touched.
+    expect(items[3]).toMatchObject({ status: 'verified', status_source: 'user', record: 'A record — Someone (2020)' });
+    expect(isTriaged(items[0], claims)).toBe(true);
+    expect(isTriaged(items[1], claims)).toBe(false);
+  });
+
+  it('"Human verified" and "AI verified" are separate statuses, and AI verified counts as retrieved', () => {
+    expect(lit.statuses!.find((s) => s.value === 'verified')!.label).toBe('Human verified');
+    expect(lit.statuses!.find((s) => s.value === 'ai_verified')).toMatchObject({ settable: false, implies: ['retrieved'] });
+  });
+
+  it('a stage still has sources to check until each found one has been read', () => {
+    const stage = BOOK_V1.stages.find((s) => s.id === 'fact_check')!;
+    expect(sourcesToCheck(stage, [row('a')])).toBe(true);
+    expect(sourcesToCheck(stage, [row('a', { status: 'ai_verified' }), row('b', { status: 'verified', status_source: 'user' })])).toBe(false);
   });
 });

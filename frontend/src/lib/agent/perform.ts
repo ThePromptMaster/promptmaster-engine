@@ -20,7 +20,8 @@ import { findInstructionConflicts } from '@/lib/workflow/conflict-trail';
 import { describeWith, type InstructionConflict } from '@/lib/workflow/instruction-conflicts';
 import { defaultOutlineForm, deriveOutlineItems } from '@/lib/workflow/derived-outline';
 import { itemSchemaFor, parseItems, proposableStatuses, rendererHoldsItems, serializeItems } from '@/lib/workflow/stage-artifact';
-import { applyLookup, enoughWorksFound, lookupQueries, lookupSummary, recordLine, rowsFromSearch } from '@/lib/workflow/lookup';
+import { enoughWorksFound, lookupQueries, recordLine, rowsFromSearch } from '@/lib/workflow/lookup';
+import { lookupAndVerify } from '@/lib/workflow/verify';
 import { figuresFromOutput, readStageFigures, withRunFigures, type StageFigures } from '@/lib/workflow/figures';
 import { applyRunBlocked, applyRunResult } from '@/lib/workflow/run-result';
 import { inputsChanged, stageInputs } from '@/lib/workflow/stage-inputs';
@@ -441,29 +442,33 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
           output: `No new search was run: ${holder.label} already lists the works it needs, found in OpenAlex. What is left is yours — say what each work established and how it bears on the question, and remove any that do not belong.`,
         });
       }
-      const { matches } = await api.agentLiterature(works, ctx.signal);
-      const result = applyLookup(rows, matches, schema);
-      const found = matches.filter((m) => m.found);
+      // Found, then read: each found source's abstract is judged against its
+      // row before anything is handed to the user (5 Oct).
+      const checked = await lookupAndVerify(ctx.project, rows, schema, ctx.signal);
+      if (!checked) return done(key, { status: 'failed', output: 'There is nothing named to look up yet.', toolsUsed: [], changes: {} });
+      const result = checked.lookup;
       const lines = [
-        lookupSummary(result, schema.lookup!.noun, schema.lookup!.notFoundNote).replace(' Review, then save.', ''),
-        ...found.map((m) => `- ${recordLine(m)}${m.doi ? ` — ${m.doi}` : ''}`),
-        ...matches.filter((m) => !m.found).map((m) => `- Not found: ${works.find((w) => w.id === m.id)?.work.slice(0, 160) ?? m.id}`),
+        checked.message,
+        ...checked.items
+          .filter((i) => works.some((w) => w.id === i.id) && (i[schema.lookup!.recordField] ?? '').trim())
+          .map((i) => `- ${(i[schema.lookup!.recordField] ?? '').slice(0, 300)}`),
+        ...works.filter((w) => !checked.items.find((i) => i.id === w.id && (i[schema.lookup!.recordField] ?? '').trim())).map((w) => `- Not found: ${w.work.slice(0, 160)}`),
       ];
       let versionIds: string[] = [];
-      if (holder.id === ctx.stage.id && found.length && ctx.appendStageVersion) {
+      if (holder.id === ctx.stage.id && result.found && ctx.appendStageVersion) {
         const created = await ctx.appendStageVersion(holder.id, holder.label, {
-          content: serializeItems(result.items),
+          content: serializeItems(checked.items),
           source_operation: 'literature_lookup',
-          instruction: ctx.step.rationale || 'Go mode looked the works up.',
-          model: '',
+          instruction: ctx.step.rationale || 'Go mode looked the works up and read their abstracts.',
+          model: checked.verify ? ctx.project.model : '',
           mode: ctx.project.mode,
-          change_summary: `Looked up in OpenAlex: ${result.found} found, ${result.notFound} not found.`,
+          change_summary: `Looked up in OpenAlex: ${result.found} found, ${result.notFound} not found${checked.verify ? `; ${checked.verify.supported} AI verified from the abstract` : ''}.`,
         });
         const id = (created as { id?: unknown } | null)?.id;
         if (typeof id === 'string') versionIds = [id];
       }
       return done(key, {
-        status: 'succeeded', toolsUsed: ['search'], changes: versionIds.length ? { version_ids: versionIds } : {},
+        status: 'succeeded', toolsUsed: checked.verify ? ['search', 'model'] : ['search'], changes: versionIds.length ? { version_ids: versionIds } : {},
         output: clip(lines.join('\n')),
       });
     }
