@@ -58,7 +58,8 @@ export const RESEARCH_V1: WorkflowTemplate = {
   // v8 (2026-10-06): each approval says who may satisfy it — a routine one
   // Go may commit under the project's "Routine decisions: handle them for me",
   // a reserved one only the user (Sean, 5 Oct). Criterion ids are unchanged.
-  version: 8,
+  // v9 (2026-10-06): the Literature hint names AI verified and Human verified.
+  version: 9,
   name: 'Research',
   description: 'Question through validated write-up, with the analysis plan fixed before the data.',
   outline_stage: 'derived',
@@ -247,7 +248,7 @@ export const RESEARCH_V1: WorkflowTemplate = {
         'Produce the works this study sits against, one per item, not a summary essay. \'work\' names it specifically enough to be found again — authors, title and year, or the named result if that is how the field refers to it; \'finding\' states what it actually established, not what it was about; \'relation\' says what it does to your question: supports it, contradicts it, answers a neighbouring question, or supplies the method you intend to borrow. Across the set the gap should be visible, and it has to be a gap in knowledge — "nobody has run exactly this combination" is a description of novelty, not a gap. Say what is not known and why it matters that it is not. Do not invent citations: a work you are unsure exists costs more than one fewer row.',
       exit_criteria: [
         { id: 'lit.three', label: 'At least three candidate works identified', check: 'auto', rule: { type: 'min_items', n: 3 } },
-        { id: 'lit.verified', label: 'At least three works retrieved or verified', check: 'auto', rule: { type: 'min_items_with_status', n: 3, statuses: ['retrieved', 'verified'] }, hint: 'Works suggested from the model\'s knowledge are candidates. Find each one, add its DOI or link, and mark it "Verified by me".' },
+        { id: 'lit.verified', label: 'At least three works retrieved or verified', check: 'auto', rule: { type: 'min_items_with_status', n: 3, statuses: ['retrieved', 'verified'] }, hint: 'Works suggested from the model\'s knowledge are candidates. "Look up these works" finds each one in OpenAlex and reads its abstract ("AI verified"); check the full work yourself and mark it "Human verified".' },
         { id: 'lit.gap', label: 'I agree this says what is not yet known, and that this work addresses it', check: 'manual', authority: 'reserved', blocking: true },
       ],
       expected_artifacts: [{ kind: 'literature_map', cardinality: 'many', primary: true }],

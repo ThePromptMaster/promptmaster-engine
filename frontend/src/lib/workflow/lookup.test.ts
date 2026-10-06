@@ -1,4 +1,4 @@
-import { applyVerification, sourcesToCheck, verifyQueries } from './lookup';
+import { applyVerification, clipAtWord, sourcesToCheck, verifyQueries } from './lookup';
 import { ITEM_SCHEMAS, isTriaged, itemSchemaFor } from './stage-artifact';
 import { BOOK_V1 } from './templates/book.v1';
 import { describe, expect, it } from 'vitest';
@@ -202,5 +202,16 @@ describe('AI verified vs Human verified (Sean, 5 Oct)', () => {
     const stage = BOOK_V1.stages.find((s) => s.id === 'fact_check')!;
     expect(sourcesToCheck(stage, [row('a')])).toBe(true);
     expect(sourcesToCheck(stage, [row('a', { status: 'ai_verified' }), row('b', { status: 'verified', status_source: 'user' })])).toBe(false);
+  });
+});
+
+describe('a quote on the row is cut at a word, not mid-word (6 Oct, production)', () => {
+  it('clips at the last space and marks the cut', () => {
+    const q = 'Publicly available data was significantly (p = 0.006) associated with a 69% increase in citations, independently of journal impact factor, date of publication, and author country of origin';
+    const out = clipAtWord(q, 180);
+    expect(out.endsWith('…')).toBe(true);
+    expect(out).not.toMatch(/ o…$/);
+    expect(out.length).toBeLessThanOrEqual(181);
+    expect(clipAtWord('short', 180)).toBe('short');
   });
 });

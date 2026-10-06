@@ -535,6 +535,31 @@ specific claims that depended on it. The intended shape is additive:
 Stable ids already exist on versions, rows and figures, so this needs no change to what is
 stored today.
 
+### Delegation, verification and change (2026-10-06)
+
+The client's 5 Oct emails separate three kinds of gate: **validation** (does the work
+meet the standard — PromptMaster checks it), a **delegable decision** (a choice the user
+has authorised PromptMaster to make within bounds), and a **reserved decision** (the
+user's judgment or authority). Delegation can satisfy authority; it never bypasses a
+failed check. Assessment: `docs/assessments/2026-10-06-delegation-and-efficiency.md`.
+
+| Concern | Where it lives |
+|---|---|
+| Validation | automatic exit criteria (`engine.ts`), the commit check (`commit-check.ts`), figure support, the source check (`verify_sources.py`) |
+| Which approvals are routine | `ExitCriterion.authority` (`'delegable'` / `'reserved'`; absent = reserved) in template data; custom workflows from the designer's `approval_kind`, with new commitments as a separate reserved sign-off |
+| Whether routine ones are delegated | `projects.routine_decisions` (`ask` / `handle`), set by the user (`routine_policy_changed`) |
+| A delegated commit | Go's `commit_delegated`: `check-criterion` first, then a `criterion_committed` event as the run, then the box; the database checks policy and authority when the row is written (`20261018000100`) |
+| Safe commits | `checkCommit`: empty, prose-for-table, no rows, a dropped user decision (unless the user reviewed it), or a stale base are refused; each refusal is a `revision_refused` event shown on the stage |
+| AI vs Human verified | review statuses `ai_verified` / `ai_not_supported` (a tool sets them, from the abstract, with the quote on the row) vs `verified` ("Human verified") |
+| A change to the brief | `brief_changed` marks only the finished stages a one-call judgment names, with why; `brief_change_dismissed` keeps them |
+| Cost of all this | `model_usage.operation` / `attempt` / `elapsed_ms` / `agent_step_id`; per operation and project on the admin page |
+
+**Reading `status_source` and events together.** A row's status says what is known; its
+`status_source` says who established it (`user`, `tool`, `sandbox`, `model`, `proposed`).
+An approval says what was decided; the event says who decided it (`stage_marked_complete`
+by the user, `via: go_approve` when given through Go, `criterion_committed` under the
+policy). Neither ever promotes the other: approving a stage changes no row.
+
 ## Extension points
 
 These are the seams the system was built to be extended at. Working with them is

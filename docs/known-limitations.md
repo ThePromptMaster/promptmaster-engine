@@ -589,6 +589,14 @@ direction. Two things still count as work Go may do first:
 | L-40 | At an approval Go asks rather than reasoning further | accepted |
 | L-41 | Proposed statuses wait for the user; Carry forward is listed, not tracked | accepted |
 | L-42 | Go's own revisions are not checked against the objective or constraints | accepted |
+| L-43 | Cumulative limits (budget, scope) are not enforced across decisions | open |
+| L-44 | A conflict between sources is not investigated before the user is asked | open |
+| L-45 | A brief change reopens whole stages, and marks them rather than repairing them | accepted |
+| L-46 | Extracted material has no "supported by supplied material" status of its own | open |
+| L-47 | AI verification reads the abstract only | accepted |
+| L-48 | PromptMaster takes no external actions, so operational recovery is not built | accepted |
+| L-49 | Routine decisions: only blocking approvals in current templates are delegated | accepted |
+| L-50 | One model for every call; no routing by task | open |
 | L-B3 | Go code execution: Python only, fixed packages, no network | accepted |
 | L-B4 | Go runs while the tab is open; windows, not dollars | accepted |
 | L-C3 | Conflict detection misses paraphrase and cross-stage contradiction | accepted |
@@ -964,3 +972,92 @@ the book" stop Go on Book's research notes. Conflicts with the user's decisions 
 instructions still stop it, and anything the user types is checked as before. A Go
 revision that really did drift from the objective is caught by the stage check and the
 evaluator, not by the conflict check.
+
+### L-43 — Cumulative limits are not enforced across decisions (2026-10-06)
+
+Sean, 5 Oct: "a sequence of small changes should not bypass a boundary that one larger
+change would trigger." Delegation is per approval (L-49): Go may commit a routine one, and
+each is checked on its own. Nothing adds them up. The only cumulative bound that exists is
+the run's step budget (12 by default) and the 20-window "keep going" limit;
+`agent_runs.budget_usd` is still not enforced (L-B4). A spend or scope limit would be a
+project-level field read by the same database guard that reads `routine_decisions`
+(`20261018000100`), summing the committed changes of a kind. With per-call cost now
+attributed to Go steps (E1), the spend half has its data.
+
+### L-44 — A conflict between sources is not investigated before the user is asked (2026-10-06)
+
+When two rows, two sources or a source and the context disagree, nothing detects it as a
+conflict of evidence. The conflict check (`check-conflicts`) compares an instruction with
+the objective, constraints and decisions, not sources with each other. What exists is the
+step before: Go looks sources up and reads their abstracts before handing a source table
+to the user (L-47), and a contradicting abstract is flagged on its row. Detecting a
+material disagreement and choosing a tool to settle it is a planner move still to add.
+
+### L-45 — A brief change reopens whole stages, and marks them rather than repairing them (2026-10-06)
+
+A saved change to the objective, audience, constraints, format or context is judged by
+one call against each finished stage's stored summary and recorded figures
+(`/api/assess-change`); only the stages it names are marked **recheck**, with why
+(`brief_changed`). A wording-only edit is caught in the browser and reopens nothing.
+- **Stage-level, not claim-level.** A stage that relied on the change is reopened whole;
+  the row or paragraph is not identified (L-39).
+- **A judgment.** Which stages relied on it is the model's reading of short summaries; a
+  stage whose summary omits what it relied on can be missed. "Keep them as they are"
+  undoes an over-wide call.
+- **Marked, not repaired.** Go works on the current stage, so a reopened earlier stage
+  waits until the user goes back to it; nothing revises it against the change yet.
+- Edits made in the first 2.5 seconds after typing stops are one change; a stage finished
+  after the edit is never reopened by it.
+
+### L-46 — Extracted material has no "supported by supplied material" status of its own (2026-10-06)
+
+Sean's first acceptance test: an extracted deadline should be recorded as "supported by
+supplied material", not as verified. Claim and literature tables carry provenance per
+row (`status_source`; *Source found*, *AI verified*, *Human verified*), and a custom
+workflow's extraction approval is now a routine check, separate from accepting new
+commitments (D). But a general extraction table — terms, deadlines, figures from the
+brief — has no status that says "taken from the supplied material, checked against it".
+Figures are the exception: `key_figures` keeps a value only if the stage's text contains
+it verbatim. A status of that kind is a registry change (`ITEM_SCHEMAS`), not a schema one.
+
+### L-47 — AI verification reads the abstract only (2026-10-06)
+
+"AI verified" means PromptMaster fetched the work's abstract from OpenAlex, judged that it
+states what the row says, and quoted the sentence it relied on — and code checked the
+quote is in the abstract. The full work is not read. An abstract that is withheld by the
+publisher (OpenAlex returns none for many Nature papers), a source outside the index
+(guides, websites, the author's data), or an abstract that does not settle the claim
+leaves the row as *Retrieved* / *Source found*, said so on the row, and the user's.
+*Human verified* remains the only status that says a person checked the full source.
+
+### L-48 — PromptMaster takes no external actions, so operational recovery is not built (2026-10-06)
+
+Sean, 5 Oct: "Reverting an artifact also does not undo an external action already taken."
+PromptMaster sends nothing outside the project — no email, no commitment, no purchase.
+Project-state recovery exists (versions are append-only and restore appends; a refused
+revision leaves the current version; a reopened stage can be kept as it was). When an
+external action is added, it needs its own permission, separate from routine decisions,
+and its own record of what was done outside, because restoring a version cannot reach it.
+
+### L-49 — Routine decisions: only blocking approvals in current templates are delegated (2026-10-06)
+
+Under "Routine decisions: handle them for me" Go commits an approval the pinned template
+marks `authority: 'delegable'`, after one call checks the stage's text against it
+(`/api/agent/check-criterion`). The database accepts the commit only from a running run,
+on a project whose policy is `handle` when the row is written, for a delegable criterion.
+- **Blocking ones only.** Optional routine boxes are left for the user to tick or leave.
+- **Template versions.** Book 8, Research 8+, Single output 4 and Exploration 2 carry the
+  classification; projects pinned to earlier versions see every approval as the user's
+  until they upgrade. Custom workflows designed before 6 Oct are likewise all reserved.
+- **The check is a judgment.** It reads the text only, and anything but an explicit
+  "met" is "not met": a false "not met" costs a revision, a false "met" commits a routine
+  box the user can untick. History says "Committed under your routine-decision policy".
+
+### L-50 — One model for every call; no routing by task (2026-10-06)
+
+Every call uses the project's model (`openai/gpt-5.4` by default), from drafting a
+chapter to checking a routine approval. The small calls — conflict checks, figure
+extraction, criterion checks, change impact, source verification — would likely run as
+well on a smaller model at a fraction of the cost. Per-operation cost and time are now
+recorded (E1); routing should follow measurement on matched tasks, not precede it.
+

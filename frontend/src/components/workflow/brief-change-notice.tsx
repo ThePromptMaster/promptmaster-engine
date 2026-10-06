@@ -23,7 +23,9 @@ export function BriefChangeNotice({
   const affected = (event.payload?.affected as { stage_id: string; reason: string }[] | undefined) ?? [];
   const names = stageIds.map(stageLabel);
   const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
-  const holds = event.payload?.calculations_hold !== false && event.payload?.kind === 'intent';
+  // Only where something was computed: on a project with no calculations the
+  // sentence would describe nothing (production, 6 Oct).
+  const holds = event.payload?.calculations_hold !== false && event.payload?.kind === 'intent' && event.payload?.had_computed === true;
   return (
     <div role="status" aria-label="Brief change" className="mb-6 rounded-xl bg-[var(--surface-container-low)] px-5 py-3 text-body text-[var(--on-surface-variant)]">
       <p>
