@@ -12,7 +12,11 @@ export const SINGLE_OUTPUT_V1: WorkflowTemplate = {
   key: 'single_output',
   // v2 (2026-10-02): approvals worded as what the user is certifying (2 Oct,
   // items 2 and 13). Criterion ids are unchanged.
-  version: 2,
+  // v3 (2026-10-06): the prompt and the deliverable are separate artifacts
+  // (Sean, 3 Oct: Review held the audit itself, and Go found "a deliverable,
+  // not a prompt"). Input states the objective, Review writes the prompt,
+  // Output produces the deliverable from the reviewed prompt.
+  version: 3,
   name: 'Single output',
   description: 'One prompt, evaluated and refined.',
   outline_stage: 'none',
@@ -26,6 +30,8 @@ export const SINGLE_OUTPUT_V1: WorkflowTemplate = {
       renderer: 'prose',
       entry_guidance:
         'Say what you want and who it is for. The clearer the objective, the less work the later stages have to do.',
+      entry_prompt_hint:
+        'State the objective sharply: what is to be produced, for whom, what it must cover, what success looks like and what is out of scope. This is a statement of the objective, not the deliverable — do not write any of the deliverable here; a later stage produces it.',
       exit_criteria: [
         {
           id: 'input.objective',
@@ -47,7 +53,10 @@ export const SINGLE_OUTPUT_V1: WorkflowTemplate = {
       group: 'planning',
       required: true,
       renderer: 'prose',
-      entry_guidance: 'Check the assembled prompt before spending a call on it. Edit anything that reads wrong.',
+      entry_guidance:
+        'This is the instruction PromptMaster will send to produce your deliverable — not the deliverable itself. Check it asks for what you want, edit anything that reads wrong, then move on to Output.',
+      entry_prompt_hint:
+        'Write the prompt that will be sent to produce the deliverable the objective describes. Address it to the model that will do the work: the task, the audience, what the deliverable must contain and in what structure, the constraints, the format and length, and what to avoid. It is an instruction, not the deliverable: write none of the deliverable itself.',
       exit_criteria: [
         { id: 'review.checked', label: 'I have read the prompt and it asks for what I want', check: 'manual' },
       ],
@@ -64,6 +73,8 @@ export const SINGLE_OUTPUT_V1: WorkflowTemplate = {
       required: true,
       renderer: 'prose',
       entry_guidance: 'Read the output against the objective, not in isolation. The scores are a prompt to look, not a verdict.',
+      entry_prompt_hint:
+        'Produce the deliverable itself, by following the reviewed prompt from the Review stage. Where there is no reviewed prompt, produce it from the objective. Write the finished thing, not a plan or a description of it.',
       exit_criteria: [
         { id: 'output.exists', label: 'An output exists', check: 'auto', rule: { type: 'artifact_non_empty' }, blocking: true },
       ],

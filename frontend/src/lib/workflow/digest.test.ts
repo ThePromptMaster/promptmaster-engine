@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { BOOK_V1, EXPLORATION_V1, RESEARCH_V1, projectState } from './index';
+import { BOOK_V1, EXPLORATION_V1, RESEARCH_V1, SINGLE_OUTPUT_V1, projectState } from './index';
 import {
   MANUSCRIPT_MAX,
   SUMMARY_MAX,
@@ -284,3 +284,25 @@ describe('the next round is built on the last one (production pass, 4 Oct)', () 
     expect(book.prior_stages).toEqual([]);
   });
 });
+
+describe('the deliverable is produced from the reviewed prompt (3 Oct, Single Output)', () => {
+  const state = projectState(SINGLE_OUTPUT_V1, [ev('stage_entered', 'input'), ev('stage_advanced', 'input', 'review'), ev('stage_advanced', 'review', 'output')]);
+  const bundles = {
+    input: bundle('An internal audit of vendor payments.'),
+    review: bundle('Write an internal audit memo on vendor payments: findings, risk ratings, actions.'),
+  };
+  it('Output carries the prompt in full; the prompt stage itself does not', () => {
+    expect(buildStageDigest(SINGLE_OUTPUT_V1, state, PROJECT, bundles, 'output').reviewed_prompt)
+      .toBe('Write an internal audit memo on vendor payments: findings, risk ratings, actions.');
+    expect(buildStageDigest(SINGLE_OUTPUT_V1, state, PROJECT, bundles, 'review').reviewed_prompt).toBeUndefined();
+    expect(buildStageDigest(BOOK_V1, initialStateFor(), PROJECT, {}, 'positioning').reviewed_prompt).toBeUndefined();
+  });
+  it('a skipped Review leaves Output to work from the objective', () => {
+    const skipped = projectState(SINGLE_OUTPUT_V1, [ev('stage_entered', 'input'), ev('stage_advanced', 'input', 'review'), ev('stage_skipped', 'review', 'output')]);
+    expect(buildStageDigest(SINGLE_OUTPUT_V1, skipped, PROJECT, bundles, 'output').reviewed_prompt).toBeUndefined();
+  });
+});
+
+function initialStateFor() {
+  return projectState(BOOK_V1, []);
+}

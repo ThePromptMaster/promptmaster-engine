@@ -175,6 +175,18 @@ def _example_json(schema: StageItemSchema) -> str:
 # The first stage's artifact in each workflow: a restatement of the objective.
 _OBJECTIVE_KINDS = {"objective_statement", "research_question"}
 
+# A stage whose artifact is the instruction for the deliverable, not the
+# deliverable. Single Output's Review drafted the audit itself, and Go then
+# found "a deliverable, not a prompt" on a stage meant to hold the prompt
+# (Sean, 3 Oct: "Prompt/instructions → Review → Execute → Output").
+_PROMPT_KIND_RULE = (
+    "THIS STAGE'S ARTIFACT IS A PROMPT — the instruction that will be sent to produce "
+    "the deliverable, which the user reviews before anything is produced. Write it "
+    "addressed to the model that will do the work: the task, the audience, what the "
+    "deliverable must contain and how it is structured, the constraints and format, "
+    "and what to avoid. Do NOT write the deliverable itself, or any part of it."
+)
+
 
 def build_stage_prompt(
     inputs: PMInput,
@@ -197,6 +209,8 @@ def build_stage_prompt(
     schema_block = _format_item_schema(item_schema) if (wants_items and item_schema) else ""
 
     instruction_parts = [base_instruction]
+    if stage.artifact_kind == "prompt":
+        instruction_parts.append(_PROMPT_KIND_RULE)
     if hint:
         instruction_parts.append(f"THIS STAGE — {stage.label or stage.id}:\n{hint}")
     if schema_block:
@@ -284,6 +298,17 @@ def build_stage_prompt(
             "not write as though any data had been examined."
         ),
     ]
+
+    if digest.reviewed_prompt.strip():
+        parts += [
+            "",
+            "THE REVIEWED PROMPT — the instruction the user reviewed for this deliverable. "
+            "Produce what it asks for, as it asks for it. The original objective still "
+            "governs; where a summary above and this prompt differ, follow the prompt:",
+            "--- BEGIN PROMPT ---",
+            digest.reviewed_prompt.strip(),
+            "--- END PROMPT ---",
+        ]
 
     if digest.manuscript.strip():
         parts += [
