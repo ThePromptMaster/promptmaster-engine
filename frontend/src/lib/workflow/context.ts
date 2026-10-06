@@ -127,7 +127,13 @@ export function buildStageContext(input: BuildContextInput): StageContext {
     itemsMissingStatus[s.id] = items.filter((i) => !isTriaged(i, schema)).length;
     itemsProposed[s.id] = confirmableProposals(items, schema).length;
     itemStatusCounts[s.id] = {};
-    for (const i of items) if (i.status) itemStatusCounts[s.id][i.status] = (itemStatusCounts[s.id][i.status] ?? 0) + 1;
+    for (const i of items) {
+      if (!i.status) continue;
+      // A stronger status counts as the weaker ones it includes (5 Oct):
+      // "AI verified" is also "Retrieved" for "at least three works retrieved".
+      const implied = schema.statuses?.find((o) => o.value === i.status)?.implies ?? [];
+      for (const s2 of new Set([i.status, ...implied])) itemStatusCounts[s.id][s2] = (itemStatusCounts[s.id][s2] ?? 0) + 1;
+    }
     itemFieldGaps[s.id] = Object.fromEntries(
       schema.fields.map((f) => [f.key, items.filter((i) => !(i[f.key] ?? '').trim()).length])
     );

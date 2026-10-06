@@ -409,6 +409,12 @@ def _json_reply(system: str, prompt: str) -> dict:
         stages = re.findall(r"^- id=(\S+) — ", prompt.split("FINISHED STAGES:", 1)[-1], re.M)
         return {"kind": "fact", "calculations_hold": True,
                 "affected": [{"stage_id": s, "reason": f"Mock: it relied on '{changed[0]}'."} for s in stages[-1:]] + [{"stage_id": "invented", "reason": "x"}]}
+    from promptmaster import verify_sources
+
+    if system.startswith(verify_sources._VERIFY_INSTRUCTION[:60]):
+        # Every item supported, quoting the scripted abstract's second sentence.
+        ids = re.findall(r"^ITEM id=(\S+)", prompt, re.M)
+        return {"verdicts": [{"id": i, "verdict": "supports", "quote": "This study shows the effect holds in every case examined."} for i in ids]}
     from promptmaster import criterion_check
 
     if system.startswith(criterion_check._CHECK_INSTRUCTION[:60]):

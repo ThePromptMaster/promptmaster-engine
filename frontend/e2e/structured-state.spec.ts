@@ -24,7 +24,7 @@ test('recalled works are candidates; a run the draft knows was not run arrives m
 
   // The user verifies one: the count follows once it is saved.
   await artifact.getByRole('combobox').first().click();
-  await page.getByRole('option', { name: 'Verified by me' }).click();
+  await page.getByRole('option', { name: 'Human verified' }).click();
   await page.getByRole('button', { name: 'Save as new version' }).click();
   await expect(criterion(page, 'At least three works retrieved or verified')).toContainText('1 of 3');
   await expect(artifact.getByRole('note')).toContainText('2 of 3 works');
@@ -78,14 +78,14 @@ test('on a table stage a chat answer becomes row changes, reviewed before saving
   const review = chat.getByRole('region', { name: 'Review the change' });
   await expect(review).toContainText('Mock work 1');
   await expect(review).toContainText('Mock: updated from the chat.');
-  await expect(review).toContainText('Status: Suggested by PromptMaster — not retrieved → Verified by me');
+  await expect(review).toContainText('Status: Suggested by PromptMaster — not retrieved → Human verified');
   await page.screenshot({ path: test.info().outputPath('01-row-change-reviewed.png'), fullPage: true });
   expect(await serviceSelect('artifact_versions', `project_id=eq.${id}&source_operation=eq.chat_rows&select=id`)).toHaveLength(0);
 
   await review.getByRole('button', { name: 'Save as a new version (1 row)' }).click();
   await expect(artifact).toContainText('Mock: updated from the chat.');
   await expect(artifact.getByRole('listitem')).toHaveCount(3);
-  await expect(artifact.getByRole('combobox').first()).toContainText('Verified by me');
+  await expect(artifact.getByRole('combobox').first()).toContainText('Human verified');
   await page.screenshot({ path: test.info().outputPath('02-row-change-saved.png'), fullPage: true });
   const [saved] = await serviceSelect('artifact_versions', `project_id=eq.${id}&source_operation=eq.chat_rows&select=content,change_summary`);
   expect(saved.change_summary).toBe('From the side chat: Update the first row (1 row).');
@@ -113,11 +113,14 @@ test('candidate works are looked up: found ones become Retrieved with a DOI, by 
   await artifact.getByRole('button', { name: 'Look up these works' }).click();
   await expect(artifact.getByRole('status')).toContainText('1 of 3 works found in OpenAlex.', { timeout: 30_000 });
   await expect(artifact.getByRole('status')).toContainText('2 not found — they may be misremembered, or not exist.');
-  await expect(artifact.getByRole('status')).toContainText('means the work exists, not that it says what the row claims');
-  await expect(artifact.getByRole('combobox').first()).toContainText('Retrieved by PromptMaster');
+  // 5 Oct: the found work's abstract is read, and it supports the row.
+  await expect(artifact.getByRole('status')).toContainText('1 AI verified from the abstract.');
+  await expect(artifact.getByRole('combobox').first()).toContainText('AI verified — the abstract supports it');
   await expect(artifact.getByRole('combobox').nth(1)).toContainText('Suggested by PromptMaster');
   await expect(artifact.getByLabel('DOI or link').first()).toHaveValue('https://doi.org/10.0000/mock.1');
-  await expect(artifact.getByLabel('Record found').first()).toHaveValue('Mock work 1 (the record) — Mock, A. (2020)');
+  await expect(artifact.getByLabel('Record found').first()).toHaveValue(
+    /^Mock work 1 \(the record\) — Mock, A\. \(2020\) · AI check of the abstract \(\d{4}-\d{2}-\d{2}\): supports this — “This study shows the effect holds in every case examined\.”$/
+  );
   await page.screenshot({ path: test.info().outputPath('01-looked-up-not-yet-saved.png'), fullPage: true });
   expect(await serviceSelect('artifact_versions', `project_id=eq.${id}&select=id`)).toHaveLength(2); // question + literature draft
   await page.getByRole('button', { name: 'Save as new version' }).click();
@@ -136,7 +139,7 @@ test('candidate works are looked up: found ones become Retrieved with a DOI, by 
   const [run] = await serviceSelect('agent_runs', `project_id=eq.${id}&select=id&order=created_at.desc&limit=1`);
   await expect
     .poll(async () => (await serviceSelect('agent_steps', `run_id=eq.${run.id}&action_key=eq.check_literature&select=status,execution_label,tools_used`))[0], { timeout: 15_000 })
-    .toMatchObject({ status: 'succeeded', execution_label: 'discussed', tools_used: ['search'] });
+    .toMatchObject({ status: 'succeeded', execution_label: 'discussed', tools_used: ['search', 'model'] });
   await page.screenshot({ path: test.info().outputPath('02-go-looked-the-works-up.png'), fullPage: true });
 });
 
@@ -263,8 +266,9 @@ test("Go's revision of a table keeps the works a lookup found", async ({ page })
     .toBe(1);
   const [revised] = await serviceSelect('artifact_versions', `project_id=eq.${id}&source_operation=eq.agent_revise&select=content`);
   const items = JSON.parse(revised.content).items;
-  expect(items[0]).toMatchObject({ status: 'retrieved', status_source: 'tool', link: 'https://doi.org/10.0000/mock.1' });
-  await expect(stageArtifact(page).getByRole('combobox').first()).toContainText('Retrieved by PromptMaster', { timeout: 15_000 });
+  // Found and read before the revision (5 Oct); the revision keeps both.
+  expect(items[0]).toMatchObject({ status: 'ai_verified', status_source: 'tool', link: 'https://doi.org/10.0000/mock.1' });
+  await expect(stageArtifact(page).getByRole('combobox').first()).toContainText('AI verified — the abstract supports it', { timeout: 15_000 });
   await page.screenshot({ path: test.info().outputPath('01-revised-table-keeps-retrieved.png'), fullPage: true });
 });
 
