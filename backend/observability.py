@@ -78,6 +78,8 @@ class UsageEvent:
     cost_usd: float | None = None
     prompt_price_usd: float | None = None
     completion_price_usd: float | None = None
+    #: 'first', 'retry' (succeeded after a retryable failure) or 'repair' (the JSON repair pass).
+    attempt: str = "first"
 
     def as_header_entry(self) -> dict[str, Any]:
         """Compact form for the response header — short keys, small payload."""
@@ -93,6 +95,8 @@ class UsageEvent:
             entry["pp"] = self.prompt_price_usd
         if self.completion_price_usd is not None:
             entry["cp"] = self.completion_price_usd
+        if self.attempt != "first":
+            entry["a"] = self.attempt
         return entry
 
 

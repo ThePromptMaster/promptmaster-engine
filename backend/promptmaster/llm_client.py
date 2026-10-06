@@ -1,6 +1,7 @@
 """OpenRouter LLM client for PromptMaster Engine."""
 
 import asyncio
+import contextvars
 import os
 import json
 import logging
@@ -19,6 +20,11 @@ _RETRY_BASE_DELAY = 1.5
 _RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 
 
+#: Whether the call being made is a JSON repair pass. Set around the repair in
+#: `generate_json`, read by `_meter` (E1, 6 Oct: repair work is measured).
+_REPAIRING: contextvars.ContextVar[bool] = contextvars.ContextVar("pm_repairing", default=False)
+
+
 def _meter(
     *,
     model: str,
@@ -26,6 +32,7 @@ def _meter(
     tokens_out: int,
     elapsed: float,
     finish_reason: str,
+    attempt: int = 1,
 ) -> None:
     """FR-18/FR-19: record one provider call, both to the log and to the meter.
 
@@ -48,6 +55,7 @@ def _meter(
         "tokens_out": tokens_out,
         "duration_ms": int(elapsed * 1000),
         "finish_reason": finish_reason,
+        "attempt": "repair" if _REPAIRING.get() else "retry" if attempt > 1 else "first",
     }
 
     try:
@@ -74,6 +82,7 @@ def _meter(
                     cost_usd=cost,
                     prompt_price_usd=price.prompt if price else None,
                     completion_price_usd=price.completion if price else None,
+                    attempt=line_extra["attempt"],
                 )
             )
     except Exception:  # pragma: no cover - defensive, see docstring
@@ -315,6 +324,7 @@ class OpenRouterClient:
             f"Fix it and return only valid JSON."
         )
 
+        token = _REPAIRING.set(True)
         try:
             repaired, repair_usage = await self.generate(
                 prompt=repair_prompt,
@@ -340,6 +350,8 @@ class OpenRouterClient:
             raise OpenRouterError(
                 f"Failed to parse JSON after repair attempt: {repair_error}"
             )
+        finally:
+            _REPAIRING.reset(token)
 
 
     async def _request_with_retries(
@@ -449,6 +461,7 @@ class OpenRouterClient:
                 tokens_out=usage_stats["tokens_out"],
                 elapsed=elapsed,
                 finish_reason=finish_reason,
+                attempt=attempt,
             )
 
             return content, usage_stats, finish_reason

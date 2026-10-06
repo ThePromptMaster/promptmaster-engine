@@ -28,6 +28,7 @@
  * open. Closing it pauses the run, and reopening the project resumes it.
  */
 
+import { setUsageOperation, takeStepCost } from '@/lib/supabase/model-usage';
 import { RefusedRevision } from '@/lib/workflow/commit-check';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -290,6 +291,8 @@ export function useGoLoop(opts: Options) {
       };
 
       let outcome: StepOutcome;
+      // Every model call this move makes is attributed to it (E1).
+      setUsageOperation({ operation: `go:${step.action_key}`, agentStepId: step.id });
       try {
         // "Succeeded" means the project changed (SN-25).
         outcome = assertHonestOutcome(step.action_key, await performStep(ctx));
@@ -322,9 +325,11 @@ export function useGoLoop(opts: Options) {
         if (signal.aborted) throw new Stopped();
       }
 
+      setUsageOperation(null);
       const finished = await finishAgentStep(step.id, {
         status: outcome.status, label: outcome.label, output: outcome.output, blockKind: outcome.blockKind ?? null,
         toolsUsed: outcome.toolsUsed, changes: outcome.changes, params: outcome.params,
+        costUsd: takeStepCost(step.id),
       });
       upsertStep(finished);
       setProgress(null);

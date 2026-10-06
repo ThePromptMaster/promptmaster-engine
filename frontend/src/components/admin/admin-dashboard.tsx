@@ -91,6 +91,8 @@ export function AdminDashboard({ overview, onWindowChange, refreshing, onRefresh
 
       <FailedJobsPanel overview={overview} />
       <UsagePanel overview={overview} />
+      <OperationsPanel overview={overview} />
+      <ProjectsCostPanel overview={overview} />
       <ErrorsPanel overview={overview} />
     </div>
   );
@@ -439,6 +441,90 @@ function UsagePanel({ overview }: { overview: AdminOverview }) {
 }
 
 // ---------------------------------------------------------------------------
+
+const seconds = (ms: number | null) => (ms === null ? '—' : ms < 10_000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.round(ms / 1000)} s`);
+const share = (x: number) => (x === 0 ? '—' : `${Math.round(x * 100)}%`);
+
+/** E1 (5 Oct): where the spend went — by Go move or route — how long calls took, and how much was rework. */
+function OperationsPanel({ overview }: { overview: AdminOverview }) {
+  const rows = overview.usageByOperation ?? [];
+  return (
+    <Panel
+      title="Cost and time by operation"
+      description="Each Go move, and every other call by its route. Rework is calls that were retries or JSON repair passes."
+    >
+      {rows.length === 0 ? (
+        <EmptyState icon="info">Nothing recorded with operation detail in this period.</EmptyState>
+      ) : (
+        <TableScroll>
+          <table className="w-full min-w-[42rem] border-collapse">
+            <thead>
+              <tr className="bg-[var(--surface-container)]">
+                <Th>Operation</Th>
+                <Th align="right">Cost</Th>
+                <Th align="right">Calls</Th>
+                <Th align="right">Median time</Th>
+                <Th align="right">95th percentile</Th>
+                <Th align="right">Rework</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.operation} className="odd:bg-[var(--surface-container-lowest)]">
+                  <Td>{r.operation}</Td>
+                  <Td align="right">
+                    {formatUsd(r.costUsd)}
+                    {r.unpricedCalls > 0 && <span className="ml-1 text-label text-[var(--on-surface-variant)]">+{r.unpricedCalls}?</span>}
+                  </Td>
+                  <Td align="right" muted>{formatTokens(r.calls)}</Td>
+                  <Td align="right" muted>{seconds(r.p50Ms)}</Td>
+                  <Td align="right" muted>{seconds(r.p95Ms)}</Td>
+                  <Td align="right" muted>{share(r.reworkShare)}</Td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TableScroll>
+      )}
+    </Panel>
+  );
+}
+
+/** E1: what each project cost, in money and model time, and how much of it Go spent. */
+function ProjectsCostPanel({ overview }: { overview: AdminOverview }) {
+  const rows = overview.usageByProject ?? [];
+  if (!rows.length) return null;
+  return (
+    <Panel title="Cost by project" description="Model spend and model time per project in this period, with the calls Go made and the calls that were rework.">
+      <TableScroll>
+        <table className="w-full min-w-[42rem] border-collapse">
+          <thead>
+            <tr className="bg-[var(--surface-container)]">
+              <Th>Project</Th>
+              <Th align="right">Cost</Th>
+              <Th align="right">Calls</Th>
+              <Th align="right">Model time</Th>
+              <Th align="right">By Go</Th>
+              <Th align="right">Rework</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.projectId} className="odd:bg-[var(--surface-container-lowest)]">
+                <Td>{r.title ?? shortId(r.projectId)}</Td>
+                <Td align="right">{formatUsd(r.costUsd)}</Td>
+                <Td align="right" muted>{formatTokens(r.calls)}</Td>
+                <Td align="right" muted>{`${Math.round(r.modelMs / 60_000)} min`}</Td>
+                <Td align="right" muted>{formatTokens(r.goCalls)}</Td>
+                <Td align="right" muted>{formatTokens(r.reworkCalls)}</Td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </TableScroll>
+    </Panel>
+  );
+}
 
 function ErrorsPanel({ overview }: { overview: AdminOverview }) {
   const tally = useMemo(() => overview.errorTally.slice(0, 6), [overview.errorTally]);

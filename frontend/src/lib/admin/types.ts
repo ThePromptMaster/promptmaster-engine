@@ -81,6 +81,10 @@ export interface AdminOverview {
     errors: number;
   };
   usageByUser: AdminUsageRow[];
+  /** E1: spend by Go move or route, with call times and the share that was rework. */
+  usageByOperation: import('./usage-rollups').OperationRollup[];
+  /** E1: spend and model time by project. */
+  usageByProject: import('./usage-rollups').ProjectRollup[];
   failedJobs: AdminFailedJob[];
   recentErrors: AdminErrorRow[];
   errorTally: AdminErrorTally[];

@@ -44,6 +44,29 @@ export function currentUsageProject(): string | null {
   return currentProjectId;
 }
 
+/**
+ * What the calls being made now are for, beyond their route (E1, 6 Oct): a Go
+ * move ("go:revise_stage") and the step that made it. Set by the Go loop around
+ * each move and cleared after; a call made while it is unset is attributed to
+ * its route alone. Attribution only, like the project above.
+ */
+let currentOperation: { operation: string; agentStepId: string | null } | null = null;
+const stepCosts = new Map<string, { cost: number; priced: boolean }>();
+
+export function setUsageOperation(op: { operation: string; agentStepId?: string | null } | null): void {
+  currentOperation = op ? { operation: op.operation, agentStepId: op.agentStepId ?? null } : null;
+}
+
+/**
+ * What a Go step's calls cost, as far as prices were known — null when none of
+ * them were priced (never 0 for "unknown"). Taken once, when the step finishes.
+ */
+export function takeStepCost(stepId: string): number | null {
+  const entry = stepCosts.get(stepId);
+  stepCosts.delete(stepId);
+  return entry?.priced ? entry.cost : null;
+}
+
 export interface UsageWriteContext {
   route: string;
   requestId: string | null;
@@ -63,6 +86,15 @@ export async function recordModelUsage(
   context: UsageWriteContext
 ): Promise<void> {
   if (events.length === 0) return;
+
+  // Before the first await: the response that carried these events reaches its
+  // caller right after this, and a Go step totals its cost when it finishes.
+  const op = currentOperation;
+  if (op?.agentStepId) {
+    const entry = stepCosts.get(op.agentStepId) ?? { cost: 0, priced: false };
+    for (const e of events) if (e.costUsd !== null) Object.assign(entry, { cost: entry.cost + e.costUsd, priced: true });
+    stepCosts.set(op.agentStepId, entry);
+  }
 
   try {
     const supabase = createClient();
@@ -88,6 +120,10 @@ export async function recordModelUsage(
         prompt_price_usd: event.promptPriceUsd,
         completion_price_usd: event.completionPriceUsd,
         source: context.source ?? 'app',
+        elapsed_ms: Math.round(event.elapsedMs),
+        attempt: event.attempt ?? 'first',
+        operation: op?.operation ?? context.route,
+        agent_step_id: op?.agentStepId ?? null,
       }))
     );
   } catch {

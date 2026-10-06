@@ -321,3 +321,41 @@ def test_a_very_chatty_request_folds_its_header_by_model():
     assert entries[0]["i"] == 300
     assert entries[0]["o"] == 150
     assert entries[0]["c"] == pytest.approx(0.3)
+
+
+# ---------------------------------------------------------------------------
+# E1 (Sean, 5 Oct): retries and repair work are measured, not just counted
+# ---------------------------------------------------------------------------
+
+
+def test_a_call_says_whether_it_was_a_retry_or_a_repair(accumulator):
+    from promptmaster.llm_client import _REPAIRING
+
+    _meter(model="m", tokens_in=1, tokens_out=1, elapsed=0.1, finish_reason="stop")
+    _meter(model="m", tokens_in=1, tokens_out=1, elapsed=0.1, finish_reason="stop", attempt=2)
+    token = _REPAIRING.set(True)
+    try:
+        _meter(model="m", tokens_in=1, tokens_out=1, elapsed=0.1, finish_reason="stop")
+    finally:
+        _REPAIRING.reset(token)
+    assert [e.attempt for e in accumulator.events] == ["first", "retry", "repair"]
+    assert "a" not in accumulator.events[0].as_header_entry()
+    assert accumulator.events[2].as_header_entry()["a"] == "repair"
+
+
+@pytest.mark.asyncio
+async def test_the_json_repair_pass_is_metered_as_a_repair(accumulator, monkeypatch):
+    from promptmaster.llm_client import OpenRouterClient
+
+    client = OpenRouterClient(api_key="k")
+    replies = iter([("{not json", {"tokens_in": 5, "tokens_out": 5}), ('{"ok": true}', {"tokens_in": 3, "tokens_out": 3})])
+
+    async def fake_generate(**kwargs):
+        content, usage = next(replies)
+        _meter(model="m", tokens_in=usage["tokens_in"], tokens_out=usage["tokens_out"], elapsed=0.1, finish_reason="stop")
+        return content, usage
+
+    monkeypatch.setattr(client, "generate", fake_generate)
+    result, _ = await client.generate_json(prompt="p")
+    assert result == {"ok": True}
+    assert [e.attempt for e in accumulator.events] == ["first", "repair"]

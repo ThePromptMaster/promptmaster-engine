@@ -37,8 +37,14 @@ describe('parseUsageHeader', () => {
         costUsd: 0.0111,
         promptPriceUsd: null,
         completionPriceUsd: null,
+        attempt: 'first',
       },
     ]);
+  });
+
+  it('says when a call was a retry or a JSON repair pass (E1)', () => {
+    const raw = JSON.stringify([{ m: 'a', i: 1, o: 1, a: 'repair' }, { m: 'a', i: 1, o: 1, a: 'retry' }, { m: 'a', i: 1, o: 1, a: 'bogus' }]);
+    expect(parseUsageHeader(raw).map((e) => e.attempt)).toEqual(['repair', 'retry', 'first']);
   });
 
   it('reads one entry per provider call', () => {
