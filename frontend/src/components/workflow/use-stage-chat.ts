@@ -1,5 +1,7 @@
 'use client';
 
+import { RefusedRevision } from '@/lib/workflow/commit-check';
+
 /**
  * The side chat's machinery: two modes, and the boundary between them.
  *
@@ -420,8 +422,12 @@ export function useStageChat({
         setApplied({ scope: proposal.target.label, previousVersionId });
         setProposal(null);
       }
-    } catch {
-      if (live.current) setError('Could not save that revision. Nothing was changed.');
+    } catch (e) {
+      // A refusal says why (6 Oct production pass: the stage had been edited
+      // under the proposal, and the chat only said "Could not save").
+      if (live.current) {
+        setError(e instanceof RefusedRevision ? `${e.message}. Draft it again from the current version.` : 'Could not save that revision. Nothing was changed.');
+      }
     } finally {
       if (live.current) setBusy(false);
     }

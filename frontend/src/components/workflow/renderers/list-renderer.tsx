@@ -227,7 +227,7 @@ export function ListRenderer({
               {lookingUp ? 'Looking them up…' : lookupLabel(schema.lookup.noun)}
             </button>
             <span className="text-label text-[var(--on-surface-variant)]">
-              Searches OpenAlex for each title. Nothing is saved until you save.
+              Searches OpenAlex for each title and reads the abstract of each one it finds. Nothing is saved until you save.
             </span>
           </div>
         )}

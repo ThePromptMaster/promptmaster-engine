@@ -486,7 +486,7 @@ describe('ReviewRenderer', () => {
     render(<ReviewRenderer {...props(bookStage('fact_check'), { versions: [version(rows)], onLookupItems, onSaveItems })} />);
     // The lookup's own columns are not there until a row holds something in them.
     expect(screen.queryByRole('columnheader', { name: 'Record found' })).not.toBeInTheDocument();
-    expect(screen.getByText(/It finds whether the source exists, not whether it says this/)).toBeInTheDocument();
+    expect(screen.getByText(/reads the abstract of each one it finds: one that states the claim becomes AI verified/)).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Look up these sources' }));
     expect(await screen.findByText('1 of 2 sources found in OpenAlex.')).toBeInTheDocument();

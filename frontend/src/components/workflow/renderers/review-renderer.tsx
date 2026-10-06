@@ -317,8 +317,8 @@ export function ReviewRenderer({
                 {lookingUp ? 'Looking them up…' : lookupLabel(schema.lookup.noun)}
               </button>
               <span className="text-label text-[var(--on-surface-variant)]">
-                Searches OpenAlex for each named source. It finds whether the source exists, not whether it says this.
-                Nothing is saved until you save.
+                Searches OpenAlex for each named source and reads the abstract of each one it finds: one that states the
+                claim becomes AI verified, with the sentence it relied on. Nothing is saved until you save.
               </span>
             </div>
           )}

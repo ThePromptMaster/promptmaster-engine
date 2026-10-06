@@ -35,7 +35,8 @@ export const BOOK_V1: WorkflowTemplate = {
   // v8 (2026-10-06): each approval says who may satisfy it — a routine one
   // Go may commit under the project's "Routine decisions: handle them for me",
   // a reserved one only the user (Sean, 5 Oct). Criterion ids are unchanged.
-  version: 8,
+  // v9 (2026-10-07): Fact-check's intro says what the source check now does.
+  version: 9,
   name: 'Book',
   description: 'Objective through final review, with an approved outline driving the draft.',
   outline_stage: 'explicit',
@@ -268,7 +269,7 @@ export const BOOK_V1: WorkflowTemplate = {
       required: true,
       renderer: 'review',
       entry_guidance:
-        'Each claim starts as what PromptMaster found — a candidate source for you to verify, or none. You decide: verified by you, unverifiable, or removed. Unverifiable is an acceptable answer; unexamined is not. Nothing is verified by PromptMaster until a source-checking tool is connected.',
+        'Each claim starts as what PromptMaster found — a candidate source for you to verify, or none. You decide: verified by you, unverifiable, or removed. Unverifiable is an acceptable answer; unexamined is not. "Look up these sources" finds each published source and reads its abstract: one that states the claim is AI verified, with the sentence it relied on; Human verified is yours.',
       entry_prompt_hint:
         'Extract the factual claims the draft actually makes and give each one a row: \'claim\' in the draft\'s own terms, and \'source\' naming where it could be checked. You have retrieved nothing, so you can never mark a claim verified. Set \'status\' to \'candidate_source\' when you name a specific place the author could check, \'no_source\' when you cannot (and write \'none found\' as the source), \'unverifiable\' (with a reason) when no source could ever settle it, or \'removed\' (with a reason) when the claim should not stand. A source you are not certain exists is not a source — say \'none found\' instead. Arguments, judgements and opinions are not factual claims — leave them out.',
       exit_criteria: [
