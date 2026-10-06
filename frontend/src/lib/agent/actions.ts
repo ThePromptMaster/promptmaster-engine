@@ -21,6 +21,7 @@ export type Performer =
   | 'sections' // enqueue section jobs and wait for them (B2b)
   | 'apply' // apply the latest check's findings as a new version (B2b)
   | 'triage' // decide the routine findings of a review table (B3)
+  | 'propose' // propose a status for each undecided row of a check table; the user confirms (3 Oct)
   | 'advance' // a stage event
   | 'skip' // proposes skipping the stage; the user decides
   | 'loop' // proposes the next round of a looping workflow; the user starts it
@@ -59,6 +60,8 @@ export const AGENT_ACTIONS: readonly AgentAction[] = [
   { key: 'revise_sections', family: 'writing', label: 'Revise the sections', performer: 'sections', important: true },
   { key: 'apply_findings', family: 'writing', label: 'Apply the findings', performer: 'apply', important: true },
   { key: 'triage_findings', family: 'writing', label: 'Decide the routine findings', performer: 'triage', important: true },
+  // 3 Oct: what the draft already concluded reaches the status, as a proposal the user confirms.
+  { key: 'propose_statuses', family: 'writing', label: 'Propose a status for each row', performer: 'propose', important: true },
   // 1 Oct, item 11: the template guides the order; it does not imprison it.
   { key: 'propose_skip', family: 'workflow', label: 'Suggest skipping this stage', performer: 'skip', important: false },
   // 3 Oct call: work that goes on round after round; the user starts each one.

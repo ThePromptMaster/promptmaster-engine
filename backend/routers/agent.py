@@ -176,6 +176,8 @@ class TriageRequest(BaseModel):
     items: list[dict] = Field(min_length=1, max_length=40)
     statuses: list[TriageStatus] = Field(min_length=1, max_length=8)
     model: str = ""
+    #: "propose": a status for each row of a check table, which the user confirms (3 Oct).
+    mode: Literal["triage", "propose"] = "triage"
 
 
 class TriageResponse(BaseModel):
@@ -188,7 +190,7 @@ async def api_triage(req: TriageRequest, client: OpenRouterClient = Depends(get_
     """Decide the routine findings of a review table (B3). 1 LLM call. The client
     applies the decisions to its rows; nothing is stored here."""
     try:
-        decisions = await triage_findings(client, req.model or None, req.inputs, req.state, req.items, req.statuses)
+        decisions = await triage_findings(client, req.model or None, req.inputs, req.state, req.items, req.statuses, req.mode)
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
     return TriageResponse(decisions=decisions, model_used=_model_used(req.model, client))

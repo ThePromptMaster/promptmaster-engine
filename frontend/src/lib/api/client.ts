@@ -687,6 +687,8 @@ export const api = {
       items: Record<string, string>[];
       statuses: { value: string; label: string; requires_reason: boolean }[];
       model?: string;
+      /** 'propose': a status for each row of a check table, which the user confirms (3 Oct). */
+      mode?: 'triage' | 'propose';
     },
     signal?: AbortSignal
   ): Promise<{ decisions: { id: string; status: string; reason: string }[]; model_used: string }> {

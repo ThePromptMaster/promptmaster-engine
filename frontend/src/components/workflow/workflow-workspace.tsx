@@ -76,6 +76,8 @@ import { readStageFigures, type StageFigures } from '@/lib/workflow/figures';
 import { FiguresOnRecord } from './figures-on-record';
 import type { ReplyAction } from '@/types';
 import { buildStageContext } from '@/lib/workflow/context';
+import { proposeSummary, proposeTargets } from '@/lib/workflow/proposals';
+import { proposeStatuses } from '@/lib/workflow/propose';
 import type { StageContext, WorkflowTemplate, BlockKind } from '@/lib/workflow/types';
 import { isDone } from '@/lib/workflow/types';
 import { getLatestTemplate } from '@/lib/supabase/workflow';
@@ -842,6 +844,16 @@ export function WorkflowWorkspace({
     [stage]
   );
 
+  const proposeItems = useCallback(
+    async (items: StageItem[]) => {
+      const schema = itemSchemaFor(stage!);
+      const asked = proposeTargets(items, schema).length;
+      const result = await proposeStatuses({ project, items, schema });
+      return { items: result.items, message: proposeSummary(result.applied.length, asked) };
+    },
+    [stage, project]
+  );
+
   const restore = useCallback(
     async (versionId: string) => {
       if (!stage || !restoreStageVersion) return;
@@ -1244,6 +1256,7 @@ export function WorkflowWorkspace({
         lookupNoun: rendererHoldsItems(stage.renderer) && hasContent ? (itemSchemaFor(stage).lookup?.noun ?? null) : null,
         dataPanel: true,
         proposals: context.itemsProposed?.[stage.id] ?? 0,
+        proposeRows: rendererHoldsItems(stage.renderer) && proposeTargets(parseItems(stageBundles[stage.id]?.versions.at(-1)?.content) ?? [], itemSchemaFor(stage)).length > 0,
       })
     : null;
   // Read by the Go loop when it plans a move, never during render.
@@ -1644,6 +1657,7 @@ export function WorkflowWorkspace({
                 onSaveContent={appendStageVersion ? saveContent : undefined}
                 onSaveItems={appendStageVersion ? saveItems : undefined}
                 onLookupItems={itemSchemaFor(stage).lookup ? lookupItems : undefined}
+                onProposeStatuses={(itemSchemaFor(stage).statuses ?? []).some((s) => s.modelMayPropose) ? proposeItems : undefined}
                 generating={generation.generating}
                 generationError={generation.error}
                 onGenerate={generation.generate}

@@ -94,6 +94,10 @@ AGENT_ACTIONS: list[AgentAction] = [
                 when="A review table has undecided minor or moderate findings. Decides each of "
                      "those (accept, defer or reject, with a reason); major ones are left for the user.",
                 important=True),
+    AgentAction(key="propose_statuses", family="writing", label="Propose a status for each row",
+                when="A check table (alternatives, validation, final open items) has rows with no status. "
+                     "Proposes the status each row's own text supports, with its reason; the user confirms.",
+                important=True),
     # --- workflow ---------------------------------------------------------------
     AgentAction(key="propose_skip", family="workflow", label="Suggest skipping this stage",
                 when="This stage may be skipped, and for THIS objective an expert would not do it next "

@@ -40,6 +40,7 @@ import type { StageRendererProps } from './types';
 /** A table longer than this folds the rows already decided. */
 const FOLD_AFTER = 6;
 import { confirmProposalsLabel, lookupLabel } from '@/lib/workflow/stage-controls';
+import { PROPOSE_LABEL, proposeTargets } from '@/lib/workflow/proposals';
 
 const TONE_CLASS: Record<string, string> = {
   done: 'text-[var(--pm-secondary)]',
@@ -59,6 +60,7 @@ export function ReviewRenderer({
   onRestore,
   onSaveItems,
   onLookupItems,
+  onProposeStatuses,
   generating,
   generationError,
   generationFailure,
@@ -100,6 +102,24 @@ export function ReviewRenderer({
       setLookupNote(e instanceof Error && e.message ? `The lookup did not work: ${e.message}` : 'The lookup did not work. Nothing was changed.');
     } finally {
       setLookingUp(false);
+    }
+  }
+
+  // Rows the draft left without a status: PromptMaster reads each and
+  // proposes one from its own text (3 Oct). Unsaved until confirmed or saved.
+  const [proposing, setProposing] = useState(false);
+  async function propose() {
+    if (!onProposeStatuses || proposing) return;
+    setProposing(true);
+    setLookupNote(null);
+    try {
+      const result = await onProposeStatuses(rows);
+      setRows(result.items);
+      setLookupNote(result.message);
+    } catch (e) {
+      setLookupNote(e instanceof Error && e.message ? `No proposals: ${e.message}` : 'No proposals could be made. Nothing was changed.');
+    } finally {
+      setProposing(false);
     }
   }
 
@@ -291,6 +311,24 @@ export function ReviewRenderer({
               <span className="text-label text-[var(--on-surface-variant)]">
                 Searches OpenAlex for each named source. It finds whether the source exists, not whether it says this.
                 Nothing is saved until you save.
+              </span>
+            </div>
+          )}
+          {onProposeStatuses && !readOnly && proposeTargets(rows, schema).length > 0 && (
+            <div className="mb-3 flex flex-wrap items-center gap-3">
+              <button
+                data-propose-statuses
+                onClick={() => void propose()}
+                disabled={proposing}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-high)] px-4 py-2 text-label text-[var(--on-surface)] hover:opacity-90 disabled:opacity-50"
+              >
+                <span aria-hidden className={`material-symbols-outlined text-[16px] ${proposing ? 'animate-spin' : ''}`}>
+                  {proposing ? 'progress_activity' : 'auto_awesome'}
+                </span>
+                {proposing ? 'Reading the rows…' : PROPOSE_LABEL}
+              </button>
+              <span className="text-label text-[var(--on-surface-variant)]">
+                PromptMaster reads each row without a status and proposes the one its text supports, with the reason. You confirm.
               </span>
             </div>
           )}

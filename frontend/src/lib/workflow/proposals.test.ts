@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { applyProposals, proposalStatuses, proposeSummary, proposeTargets } from './proposals';
 import { ITEM_SCHEMAS, confirmProposals, confirmableProposals, isProposed, isTriaged, stageContentForChat, type StageItem } from './stage-artifact';
 
 // 3 Oct (Research run): "PromptMaster proposes a status → user confirms or
@@ -38,5 +39,41 @@ describe('a proposed status', () => {
     expect(ITEM_SCHEMAS.alternatives.reasonFrom).toEqual(['how_addressed']);
     expect(ITEM_SCHEMAS.validation_table.reasonFrom).toEqual(['attempt', 'notes']);
     expect(ITEM_SCHEMAS.final_evaluation.reasonFrom).toEqual(['where']);
+  });
+});
+
+describe('proposals for a table already drafted (R1c)', () => {
+  const finalSchema = ITEM_SCHEMAS.final_evaluation;
+  const open: StageItem[] = [
+    { id: 'f1', item: 'Primary-cause attribution unverified', where: 'No driver-level cost data' },
+    { id: 'f2', item: 'Measurement artefact', where: 'Unresolved', status: 'deferred', reason: 'Kept open.', status_source: 'proposed' },
+    { id: 'f3', item: 'Commercial pressure', where: 'Plausible', status: 'accepted', status_source: 'user' },
+    { id: 'f4', item: 'Mix shift', where: '' },
+  ];
+
+  it('targets only rows with neither a decision nor a proposal, on tables that take proposals', () => {
+    expect(proposeTargets(open, finalSchema).map((r) => r.id)).toEqual(['f1', 'f4']);
+    expect(proposeTargets([{ id: 'r1', run: 'x' }], ITEM_SCHEMAS.runs)).toEqual([]);
+  });
+
+  it('applies a proposal only to a target, with a proposable status and a reason', () => {
+    const { items, applied } = applyProposals(open, [
+      { id: 'f1', status: 'deferred', reason: 'No driver-level cost data, so it stays open.' },
+      { id: 'f3', status: 'deferred', reason: 'Not a target: the user decided it.' },
+      { id: 'f4', status: 'accepted', reason: '' },
+    ], finalSchema);
+    expect(applied).toEqual(['f1']);
+    expect(items[0]).toMatchObject({ status: 'deferred', status_source: 'proposed' });
+    expect(items[2]).toEqual(open[2]);
+    expect(items[3]).toEqual(open[3]);
+  });
+
+  it('never proposes a reproduction', () => {
+    expect(proposalStatuses(ITEM_SCHEMAS.validation_table).map((s) => s.value)).toEqual(['supported_by_prior', 'consistency_check', 'not_attempted']);
+  });
+
+  it('says what it did, and that nothing is saved yet', () => {
+    expect(proposeSummary(2, 3)).toBe('PromptMaster proposed a status for 2 rows, each with its reason. 1 row does not say enough to tell. Nothing is saved until you confirm or save.');
+    expect(proposeSummary(0, 3)).toMatch(/could not tell a status/);
   });
 });

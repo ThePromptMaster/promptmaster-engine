@@ -566,3 +566,28 @@ def test_the_planner_is_given_what_the_user_already_decided():
     assert '- Asked "Which segment first?", the user answered: Mid-Market.' in user
     _, without = build_next_action_prompt(INPUTS, STATE, RESEARCH, "autonomous")
     assert "ALREADY DECIDED ON THIS PROJECT" not in without
+
+
+def test_propose_mode_asks_for_what_each_row_supports_and_always_a_reason(client_with):
+    """3 Oct: a check table drafted before proposals existed gets them on request."""
+    from promptmaster.agent import TriageStatus, build_triage_prompt, parse_triage
+
+    statuses = [TriageStatus(value="ruled_out", label="Ruled out"), TriageStatus(value="addressed", label="Addressed")]
+    system, user = build_triage_prompt(INPUTS, STATE, [{"id": "a1", "explanation": "Mix shift", "how_addressed": "Partly addressed"}], statuses, "propose")
+    assert "PROPOSE A STATUS FOR EACH ROW" in system
+    assert "never a stronger status than it supports" in system
+    assert "'partly addressed' is not 'ruled out'" in system
+    assert "ROWS:\n- id=a1: explanation: Mix shift; how_addressed: Partly addressed" in user
+    # A proposal without a reason is not one.
+    assert parse_triage({"decisions": [{"id": "a1", "status": "addressed", "reason": ""}]}, {"a1"}, statuses, reason_always=True) == []
+
+    stub = AsyncMock()
+    stub.model = "test/model"
+    stub.generate_json = AsyncMock(return_value=({"decisions": [{"id": "a1", "status": "addressed", "reason": "Partly addressed."}]}, {}))
+    r = client_with(stub).post("/api/agent/triage", json={
+        **J, "mode": "propose", "items": [{"id": "a1", "explanation": "Mix shift"}],
+        "statuses": [{"value": "addressed", "label": "Addressed", "requires_reason": False}],
+    })
+    assert r.status_code == 200, r.text
+    assert r.json()["decisions"] == [{"id": "a1", "status": "addressed", "reason": "Partly addressed."}]
+    assert "PROPOSE A STATUS" in stub.generate_json.call_args.kwargs["system"]

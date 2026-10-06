@@ -25,6 +25,8 @@ import { figuresFromOutput, readStageFigures, withRunFigures, type StageFigures 
 import { applyRunBlocked, applyRunResult } from '@/lib/workflow/run-result';
 import { inputsChanged, stageInputs } from '@/lib/workflow/stage-inputs';
 import { applyTriage } from '@/lib/workflow/triage';
+import { proposeTargets } from '@/lib/workflow/proposals';
+import { proposeStatuses } from '@/lib/workflow/propose';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import { summariseStageContent } from '@/lib/workflow/digest';
 import { stageContentForSummary, stageEvidence } from '@/lib/workflow/evidence';
@@ -682,6 +684,30 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         changes: { ...(typeof versionId === 'string' ? { version_ids: [versionId] } : {}), items_triaged: applied },
         output: `Decided ${applied.length} routine finding${applied.length === 1 ? '' : 's'}:\n${decided.map((d) => `- ${d}`).join('\n')}` +
           (r.material.length ? `\n\n${r.material.length} finding${r.material.length === 1 ? '' : 's'} would change the work and ${r.material.length === 1 ? 'is' : 'are'} left for you.` : ''),
+      });
+    }
+
+    case 'propose': {
+      const r = ctx.facts?.review;
+      const asked = r ? proposeTargets(r.items, r.schema).length : 0;
+      if (!r || !asked) return done(key, { status: 'failed', output: 'No row is left without a status or a proposal.', toolsUsed: [], changes: {} });
+      if (!ctx.appendStageVersion) throw new Error('This view cannot save versions.');
+      const res = await proposeStatuses({ project: ctx.project, items: r.items, schema: r.schema, state: ctx.digest, signal: ctx.signal });
+      if (!res.applied.length) return done(key, { status: 'failed', output: 'The rows do not say enough to tell their status; they are left for you.', toolsUsed: ['model'], changes: {} });
+      const created = await ctx.appendStageVersion(ctx.stage.id, ctx.stage.label, {
+        content: serializeItems(res.items),
+        source_operation: 'agent_triage',
+        instruction: ctx.step.rationale || 'Go mode proposed a status for each row from its own text.',
+        model: res.model_used || ctx.project.model,
+        mode: ctx.project.mode,
+        change_summary: `Go mode proposed a status for ${res.applied.length} row${res.applied.length === 1 ? '' : 's'}; they count once you confirm them.`,
+      });
+      const versionId = (created as { id?: unknown } | null)?.id;
+      const lines = res.items.filter((i) => res.applied.includes(i.id)).map((i) => `${(r.schema.statuses ?? []).find((s) => s.value === i.status)?.label ?? i.status}: ${i.reason}`);
+      return done(key, {
+        status: 'succeeded', toolsUsed: ['model'],
+        changes: { ...(typeof versionId === 'string' ? { version_ids: [versionId] } : {}) },
+        output: `Proposed a status for ${res.applied.length} of ${asked} row${asked === 1 ? '' : 's'}, from what each row says. They count once you confirm them:\n${lines.map((l) => `- ${l}`).join('\n')}`,
       });
     }
 

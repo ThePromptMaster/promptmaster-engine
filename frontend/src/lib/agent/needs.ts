@@ -78,7 +78,7 @@ export function isClearedNote(reason: string | null | undefined): boolean {
  * repeat instead of at the approval (4 Oct). Revise is not here either:
  * revising cannot tick a box (Positioning, 2026-09-29).
  */
-const STAGE_WORK_MOVES = new Set(['draft_stage', 'generate_outline', 'draft_sections', 'revise_sections', 'triage_findings']);
+const STAGE_WORK_MOVES = new Set(['draft_stage', 'generate_outline', 'draft_sections', 'revise_sections', 'triage_findings', 'propose_statuses']);
 
 /**
  * Everything still open on the stage is a box only the user ticks, and at
@@ -231,7 +231,9 @@ export function needsUser(input: {
   // …unless they are runs and the data to carry them out is here: then a
   // computation can settle a row, and stopping first would leave the data unused.
   const canRun = Boolean(facts.review?.outcome && facts.review.schema.execution && (input.runAttemptsLeft ?? 0) > 0);
-  if (facts.review && facts.review.material.length > 0 && facts.review.routine.length === 0 && !canRun) {
+  // …or rows still waiting for a proposal Go can make first (3 Oct).
+  const canPropose = allowed.includes('propose_statuses');
+  if (facts.review && facts.review.material.length > 0 && facts.review.routine.length === 0 && !canRun && !canPropose) {
     const proposed = confirmableProposals(facts.review.material, facts.review.schema).length;
     return facts.review.outcome
       ? {
