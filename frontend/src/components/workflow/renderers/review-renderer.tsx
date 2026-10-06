@@ -26,6 +26,9 @@ import { CustomSelect } from '@/components/shared/custom-select';
 import { ReasonField } from '@/components/shared/reason-field';
 import { reasonFromRow } from '@/lib/workflow/run-result';
 import {
+  confirmableProposals,
+  confirmProposals,
+  isProposed,
   isTriaged,
   parseItems,
   statusOption,
@@ -36,7 +39,7 @@ import type { StageRendererProps } from './types';
 
 /** A table longer than this folds the rows already decided. */
 const FOLD_AFTER = 6;
-import { lookupLabel } from '@/lib/workflow/stage-controls';
+import { confirmProposalsLabel, lookupLabel } from '@/lib/workflow/stage-controls';
 
 const TONE_CLASS: Record<string, string> = {
   done: 'text-[var(--pm-secondary)]',
@@ -159,6 +162,23 @@ export function ReviewRenderer({
   // …and rows whose run could not be made: the run's own reason is on the row.
   const blockedRuns = rows.filter((r) => r.status_source === 'sandbox' && r.status === blockedStatus && isTriaged(r, schema)).length;
 
+  // Rows whose status PromptMaster proposed from what the row already says
+  // (3 Oct). They count only once the user confirms them — one click for all
+  // of them, or by changing any one.
+  const proposed = rows.filter(isProposed).length;
+  const confirmable = confirmableProposals(rows, schema).length;
+  async function confirmAll() {
+    if (!onSaveItems || saving) return;
+    const next = confirmProposals(rows, schema);
+    setRows(next);
+    setSaving(true);
+    try {
+      await onSaveItems(next);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function save() {
     if (!onSaveItems || saving) return;
     setSaving(true);
@@ -234,6 +254,11 @@ export function ReviewRenderer({
             >
               {outstanding === 0 ? 'all resolved' : `${outstanding} still to resolve`}
             </span>
+            {proposed > 0 && (
+              <span data-proposals className="text-label text-[var(--on-surface-variant)]">
+                · {proposed} proposed by PromptMaster — confirm or change
+              </span>
+            )}
             {setByModel > 0 && (
               <span className="text-label text-[var(--on-surface-variant)]">
                 · {setByModel} set by PromptMaster from what it already knew — review or change
@@ -273,6 +298,24 @@ export function ReviewRenderer({
             <p role="status" className="mb-3 rounded-xl bg-[var(--surface-container-low)] px-5 py-3 text-body text-[var(--on-surface)]">
               {lookupNote}
             </p>
+          )}
+
+          {confirmable > 0 && !readOnly && onSaveItems && (
+            <div className="mb-3 flex flex-wrap items-center gap-3">
+              <button
+                data-confirm-proposals
+                onClick={() => void confirmAll()}
+                disabled={saving}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label text-[var(--on-primary)] hover:opacity-90 disabled:opacity-50"
+              >
+                <span aria-hidden className="material-symbols-outlined text-[16px]">done_all</span>
+                {confirmProposalsLabel(confirmable)}
+              </button>
+              <span className="max-w-[60ch] text-label text-[var(--on-surface-variant)]">
+                PromptMaster read each row and proposed the status it supports, with its reason. Confirming makes
+                them your decisions; change any row first if it reads wrong.
+              </span>
+            </div>
           )}
 
           {schema.decisionQuestion && !readOnly && (
@@ -431,6 +474,14 @@ function ReviewRow({ row, columns, statuses, schema, readOnly, onPatch }: Review
               placeholder="Not looked at"
               onChange={(value) => onPatch(row.id, 'status', value)}
             />
+          )}
+          {isProposed(row) && option && (
+            <span data-proposed className="mt-1 block text-label text-[var(--pm-primary)]">
+              Proposed by PromptMaster
+              {!needsReason && (row.reason ?? '').trim() ? (
+                <span className="block text-[var(--on-surface-variant)]">{row.reason}</span>
+              ) : null}
+            </span>
           )}
           {row.status_source === 'model' && option && option.decided !== false && (
             <span className="mt-1 block text-label text-[var(--on-surface-variant)]">Set by PromptMaster</span>

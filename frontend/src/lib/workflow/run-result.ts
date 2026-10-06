@@ -53,7 +53,7 @@ export function applyRunResult(
   if (!execution || n === null || n > items.length) return null;
   const was = items[n - 1];
   // The user's own decision outranks a run; so does a status with no recorded source (written before sources existed).
-  if (was.status && was.status_source !== 'model' && was.status_source !== 'sandbox') return null;
+  if (was.status && was.status_source !== 'model' && was.status_source !== 'proposed' && was.status_source !== 'sandbox') return null;
   const max = schema.fields.find((f) => f.key === execution.field)?.max;
   const row: StageItem = {
     ...was,
@@ -67,7 +67,7 @@ export function applyRunResult(
   // production a completed row still read "the calculation outcome is not
   // available" beside its own output.
   delete row.reason;
-  if (was.status_source === 'model') for (const key of execution.clears ?? []) delete row[key];
+  if (was.status_source === 'model' || was.status_source === 'proposed') for (const key of execution.clears ?? []) delete row[key];
   return { items: items.map((item, i) => (i === n - 1 ? row : item)), row };
 }
 
@@ -90,7 +90,7 @@ export function applyRunBlocked(
   const reason = blocked.reason.trim();
   if (!execution?.blocked || !reason || n === null || n > items.length) return null;
   const was = items[n - 1];
-  if (was.status && was.status_source !== 'model') return null;
+  if (was.status && was.status_source !== 'model' && was.status_source !== 'proposed') return null;
   const row: StageItem = {
     ...was,
     status: execution.blocked,

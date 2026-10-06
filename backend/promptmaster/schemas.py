@@ -496,12 +496,17 @@ class StageItemStatus(BaseModel):
     (`model_may_set`: a run that could not be executed because the data was
     never provided), and which one every generated row starts in
     (`model_default`: a work the model recalled is a candidate, not a
-    retrieved source).
+    retrieved source). A judgment the draft can already see in its own words —
+    "addressed but not ruled out" — it may *propose* (`model_may_propose`): the
+    row carries the proposal and its reason, and stays undecided until the user
+    confirms it (Sean, 3 Oct: "PromptMaster proposes a status → user confirms
+    or overrides → status becomes authoritative").
     """
     value: str
     label: str = ""
     requires_reason: bool = False
     model_may_set: bool = False
+    model_may_propose: bool = False
     model_default: bool = False
     #: What the status certifies, in one plain line; told to the model so the
     #: draft describes what was done in the same terms.

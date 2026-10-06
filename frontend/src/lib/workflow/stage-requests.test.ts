@@ -50,6 +50,15 @@ describe('the request says who may set which status (1 Oct, items 3, 12, 18)', (
     // The old value is not offered to the model at all.
     expect(statuses.reproduced).toBeUndefined();
   });
+  it('judgments the draft can see in its own words are proposed, never set (3 Oct)', () => {
+    const proposes = (stageId: string) => schemaFor(stageId).statuses!.filter((s) => s.model_may_propose).map((s) => s.value);
+    expect(proposes('alternatives')).toEqual(['ruled_out', 'addressed', 'left_open']);
+    expect(proposes('validation')).toEqual(['supported_by_prior', 'consistency_check']);
+    expect(proposes('final_review')).toEqual(['accepted', 'deferred']);
+    // What says something was carried out stays the user's or a run's.
+    expect(proposes('experiment')).toEqual([]);
+    expect(schemaFor('validation').statuses!.find((s) => s.value === 'independently_reproduced')!.model_may_propose).toBe(false);
+  });
   it('a recalled work starts as a candidate, and the model is never asked for a DOI', () => {
     const schema = schemaFor('literature');
     expect(schema.statuses!.find((s) => s.model_default)?.value).toBe('candidate');

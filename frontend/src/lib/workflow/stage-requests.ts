@@ -87,7 +87,7 @@ export function generationRequest(
           // keeps a model's status only where this says it may.
           statuses: (schema.statuses ?? []).filter((s) => !s.legacy).map((s) => ({
             value: s.value, label: s.label, requires_reason: Boolean(s.requiresReason),
-            model_may_set: Boolean(s.modelMaySet), model_default: Boolean(s.modelDefault),
+            model_may_set: Boolean(s.modelMaySet), model_may_propose: Boolean(s.modelMayPropose), model_default: Boolean(s.modelDefault),
             // What each status certifies, so the draft describes what was done in the same terms.
             ...(s.explain && !s.legacy ? { explain: s.explain } : {}),
           })),

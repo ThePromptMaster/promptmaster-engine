@@ -540,3 +540,75 @@ def test_later_stages_are_named_as_out_of_scope(basic_inputs, prose_stage, diges
     assert "LATER STAGES (out of scope here): Turnaround options, 12-month plan" in user
     _system, user = build_stage_prompt(basic_inputs, prose_stage, digest)
     assert "LATER STAGES" not in user
+
+
+# --- 3 Oct (Research run): the draft proposes the status its own text supports ---
+
+
+def _alternatives_schema() -> StageItemSchema:
+    return StageItemSchema(
+        item_label="alternative explanation",
+        fields=[_Field(key="explanation", label="The rival explanation"), _Field(key="how_addressed", label="What rules it out")],
+        statuses=[
+            _Status(value="ruled_out", label="Ruled out", model_may_propose=True),
+            _Status(value="addressed", label="Addressed", model_may_propose=True),
+            _Status(value="left_open", label="Left open", requires_reason=True, model_may_propose=True),
+        ],
+    )
+
+
+def test_the_prompt_asks_for_a_proposed_status_and_reason_on_every_row(basic_inputs, digest):
+    stage = StageDescriptor(id="alternatives", label="Alternatives", renderer="review", entry_prompt_hint="", artifact_kind="alternatives")
+    system, user = build_stage_prompt(basic_inputs, stage, digest, _alternatives_schema())
+    text = system + user
+    assert "for EVERY row, propose the one status its own text supports: 'ruled_out' (Ruled out); 'addressed' (Addressed); 'left_open' (Left open)" in text
+    assert "a proposal the user will confirm or change" in text
+    assert "never a stronger status than the text supports" in text
+    assert '"status": "(the status this row\'s text supports: ruled_out or addressed or left_open)"' in text
+    assert "Never set" not in text
+
+
+def test_validation_proposes_judgments_but_never_a_reproduction(basic_inputs, digest):
+    schema = StageItemSchema(
+        item_label="result",
+        fields=[_Field(key="result", label="The result")],
+        statuses=[
+            _Status(value="independently_reproduced", label="Independently reproduced"),
+            _Status(value="supported_by_prior", label="Supported by prior evidence", model_may_propose=True),
+            _Status(value="consistency_check", label="Consistency check only", model_may_propose=True),
+            _Status(value="not_attempted", label="Not attempted", requires_reason=True, model_may_set=True),
+        ],
+    )
+    stage = StageDescriptor(id="validation", label="Validation", renderer="review", entry_prompt_hint="", artifact_kind="validation_table")
+    system, user = build_stage_prompt(basic_inputs, stage, digest, schema)
+    text = system + user
+    assert "'not_attempted' (Not attempted); 'supported_by_prior' (Supported by prior evidence); 'consistency_check' (Consistency check only)" in text
+    assert "Never set 'independently_reproduced'" in text
+    items = _parse_items(
+        {"items": [
+            {"id": "v1", "result": "Margin fell 6 points", "status": "consistency_check", "reason": "Checked against earlier stages only."},
+            {"id": "v2", "result": "Scrap rose", "status": "independently_reproduced", "reason": "Recalculated."},
+            {"id": "v3", "result": "Mix shift", "status": "not_attempted", "reason": "No SKU data."},
+        ]},
+        schema,
+    )
+    rows = [i.model_dump() for i in items]
+    assert rows[0]["status"] == "consistency_check" and rows[0]["status_source"] == "proposed"
+    assert rows[0]["reason"] == "Checked against earlier stages only."
+    # Never the model's to claim, not even as a proposal.
+    assert "status" not in rows[1] and "status_source" not in rows[1]
+    # An outcome it may set still counts as set.
+    assert rows[2]["status"] == "not_attempted" and rows[2]["status_source"] == "model"
+
+
+def test_a_proposal_that_needs_a_reason_and_has_none_is_dropped():
+    items = _parse_items(
+        {"items": [
+            {"id": "a1", "explanation": "Raw-material inflation", "status": "left_open", "reason": ""},
+            {"id": "a2", "explanation": "Measurement artefact", "status": "Addressed", "reason": "Reconciled to the ledger."},
+        ]},
+        _alternatives_schema(),
+    )
+    rows = [i.model_dump() for i in items]
+    assert "status" not in rows[0]
+    assert rows[1]["status"] == "addressed" and rows[1]["status_source"] == "proposed"

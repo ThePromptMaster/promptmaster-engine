@@ -345,6 +345,8 @@ export interface StageContext {
   itemCounts: Record<string, number>;
   /** Per stage id: items still lacking a status value. */
   itemsMissingStatus: Record<string, number>;
+  /** Per stage id: rows whose proposed status can be confirmed as it stands (3 Oct). */
+  itemsProposed?: Record<string, number>;
   /** Per stage id, per status value: how many rows carry it. */
   itemStatusCounts?: Record<string, Record<string, number>>;
   /** Per stage id, per field key: rows that leave that field empty. */

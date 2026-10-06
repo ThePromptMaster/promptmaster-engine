@@ -102,7 +102,10 @@ describe('a reason the row already gives is not typed twice (2 Oct, item 1)', ()
     expect(reasonFromRow({ id: 'a', run: 'x', deviation: ' No source data were provided. ', observed: 'Nothing ran.' }, runs)).toBe('No source data were provided.');
     expect(reasonFromRow({ id: 'a', run: 'x', observed: 'Nothing ran.' }, runs)).toBe('Nothing ran.');
     expect(reasonFromRow({ id: 'a', run: 'x' }, runs)).toBe('');
-    expect(reasonFromRow({ id: 'a', notes: 'text' }, ITEM_SCHEMAS.validation_table)).toBe('');
+    // Since 3 Oct every check table offers its own words as the reason.
+    expect(reasonFromRow({ id: 'a', notes: 'text' }, ITEM_SCHEMAS.validation_table)).toBe('text');
+    expect(reasonFromRow({ id: 'a', attempt: 'Compared with earlier stages only.', notes: 'text' }, ITEM_SCHEMAS.validation_table)).toBe('Compared with earlier stages only.');
+    expect(reasonFromRow({ id: 'a', item: 'x' }, ITEM_SCHEMAS.critique_report)).toBe('');
   });
 });
 

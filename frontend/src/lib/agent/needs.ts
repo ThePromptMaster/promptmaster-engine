@@ -14,6 +14,8 @@ import type { ExecutionPolicy } from '@/types/agent';
 import type { StageDefinition, StageEvaluation, WorkflowState } from '@/lib/workflow/types';
 import type { StageFacts } from './facts';
 import type { InputsChange } from '@/lib/workflow/stage-inputs';
+import { confirmableProposals } from '@/lib/workflow/stage-artifact';
+import { confirmProposalsLabel } from '@/lib/workflow/stage-controls';
 
 type Need =
   | { kind: 'set_objective' }
@@ -30,7 +32,7 @@ type Need =
   /** Go's proposal to start another round of a looping workflow; the user starts it. */
   | { kind: 'next_round'; stageId: string; toStageId: string; reason: string }
   /** An outcome table's rows (claims, runs…) are all the user's to decide. */
-  | { kind: 'decide_rows'; stageId: string; count: number; itemLabel: string };
+  | { kind: 'decide_rows'; stageId: string; count: number; itemLabel: string; proposed?: number };
 
 /**
  * `onStage` is the stage the project was on when the run stopped. A request
@@ -230,8 +232,13 @@ export function needsUser(input: {
   // computation can settle a row, and stopping first would leave the data unused.
   const canRun = Boolean(facts.review?.outcome && facts.review.schema.execution && (input.runAttemptsLeft ?? 0) > 0);
   if (facts.review && facts.review.material.length > 0 && facts.review.routine.length === 0 && !canRun) {
+    const proposed = confirmableProposals(facts.review.material, facts.review.schema).length;
     return facts.review.outcome
-      ? { kind: 'decide_rows', stageId: stage.id, count: facts.review.material.length, itemLabel: facts.review.schema.itemLabel }
+      ? {
+          kind: 'decide_rows', stageId: stage.id, count: facts.review.material.length, itemLabel: facts.review.schema.itemLabel,
+          // Rows PromptMaster already proposed a status for: one click confirms them (3 Oct).
+          ...(proposed > 0 ? { proposed } : {}),
+        }
       : { kind: 'triage_findings', stageId: stage.id, count: facts.review.material.length };
   }
 
@@ -436,6 +443,13 @@ export function describeNeed(
         action: `Draft ${need.sections} sections anyway`,
       };
     case 'decide_rows':
+      if (need.proposed) {
+        const rest = need.count - need.proposed;
+        return {
+          message: `I proposed a status for ${need.proposed} ${need.proposed === 1 ? need.itemLabel : `${need.itemLabel}s`}, each with its reason, from what the row already says. They count once you confirm them: press "${confirmProposalsLabel(need.proposed)}" above the table, or change any that read wrong.${rest > 0 ? ` ${rest} more ${rest === 1 ? 'needs' : 'need'} a status from you.` : ''}`,
+          action: SHOW_TABLE,
+        };
+      }
       return {
         message: `${need.count} ${need.count === 1 ? need.itemLabel : `${need.itemLabel}s`} ${need.count === 1 ? 'is' : 'are'} waiting for your decision — only you can settle ${need.count === 1 ? 'it' : 'them'}. Set a status on each in the table below — that is how a check stage works.`,
         action: SHOW_TABLE,

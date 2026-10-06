@@ -19,7 +19,7 @@ import { approvedOutlineVersionId } from '@/lib/supabase/outline';
 import type { Artifact, ArtifactVersion, Project } from '@/types/project';
 import { draftingStageId } from './derived-outline';
 import type { StageArtifactBundle } from './digest';
-import { effectiveRenderer, isTriaged, itemSchemaFor, parseItems, rendererHoldsItems } from './stage-artifact';
+import { confirmableProposals, effectiveRenderer, isTriaged, itemSchemaFor, parseItems, rendererHoldsItems } from './stage-artifact';
 import type { StageContext, StageDefinition, WorkflowEvent, WorkflowTemplate } from './types';
 
 export interface BuildContextInput {
@@ -84,6 +84,7 @@ export function buildStageContext(input: BuildContextInput): StageContext {
 
   const itemCounts: Record<string, number> = {};
   const itemsMissingStatus: Record<string, number> = {};
+  const itemsProposed: Record<string, number> = {};
   const itemFieldGaps: Record<string, Record<string, number>> = {};
   const itemStatusCounts: Record<string, Record<string, number>> = {};
   const artifactNonEmpty: Record<string, boolean> = {};
@@ -124,6 +125,7 @@ export function buildStageContext(input: BuildContextInput): StageContext {
     const schema = itemSchemaFor(s);
     itemCounts[s.id] = items.length;
     itemsMissingStatus[s.id] = items.filter((i) => !isTriaged(i, schema)).length;
+    itemsProposed[s.id] = confirmableProposals(items, schema).length;
     itemStatusCounts[s.id] = {};
     for (const i of items) if (i.status) itemStatusCounts[s.id][i.status] = (itemStatusCounts[s.id][i.status] ?? 0) + 1;
     itemFieldGaps[s.id] = Object.fromEntries(
@@ -146,6 +148,7 @@ export function buildStageContext(input: BuildContextInput): StageContext {
     },
     itemCounts,
     itemsMissingStatus,
+    itemsProposed,
     itemFieldGaps,
     itemStatusCounts,
     artifactNonEmpty,
