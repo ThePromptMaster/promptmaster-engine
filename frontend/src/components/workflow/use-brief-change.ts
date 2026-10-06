@@ -37,6 +37,8 @@ export function useBriefChange({
   enabled: boolean;
 }) {
   const baseline = useRef<Record<BriefField, string> | null>(null);
+  /** When the brief was last edited away from the baseline. */
+  const changedAt = useRef<string | null>(null);
   const latest = useRef({ project, template, state, bundles, stageId, appendEvent });
   latest.current = { project, template, state, bundles, stageId, appendEvent };
   const values = BRIEF_FIELDS.map((f) => project[f] ?? '');
@@ -48,12 +50,16 @@ export function useBriefChange({
       return;
     }
     if (!enabled) return;
+    // The latest edit: a stage finished before it was finished on older text.
+    if (BRIEF_FIELDS.some((f) => (project[f] ?? '') !== baseline.current![f])) changedAt.current = new Date().toISOString();
     const timer = setTimeout(() => {
       const { project: p, template: t, state: s, bundles: b, stageId: at, appendEvent: append } = latest.current;
       const was = baseline.current!;
       const changed = BRIEF_FIELDS.filter((f) => (p[f] ?? '') !== was[f]);
       if (!changed.length) return;
       baseline.current = Object.fromEntries(BRIEF_FIELDS.map((f) => [f, p[f] ?? ''])) as Record<BriefField, string>;
+      const since = changedAt.current ?? new Date().toISOString();
+      changedAt.current = null;
       void (async () => {
         for (const field of changed) {
           const before = was[field];
@@ -62,7 +68,7 @@ export function useBriefChange({
             await append({ type: 'brief_changed', stage_id: at, payload: { field, kind: 'wording', presentation_only: true, affected: [] } });
             continue;
           }
-          const stages = finishedConclusions(t, s, b);
+          const stages = finishedConclusions(t, s, b, since);
           if (!stages.length) continue;
           try {
             const impact = await api.assessChange({ field, before, after, stages, model: p.model });

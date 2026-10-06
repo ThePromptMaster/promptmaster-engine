@@ -47,14 +47,22 @@ export interface StageConclusion {
   computed: boolean;
 }
 
-/** What each finished stage concluded: its stored summary and the figures it recorded. */
+/**
+ * What each finished stage concluded: its stored summary and the figures it
+ * recorded. Only stages finished before `changedAt`: one finished after the
+ * edit was finished with the new text, and has nothing to recheck.
+ */
 export function finishedConclusions(
   template: WorkflowTemplate,
   state: WorkflowState,
-  bundles: Record<string, StageArtifactBundle>
+  bundles: Record<string, StageArtifactBundle>,
+  changedAt?: string
 ): StageConclusion[] {
   return template.stages
-    .filter((s: StageDefinition) => isDone(state.stages[s.id]?.status))
+    .filter((s: StageDefinition) => {
+      const st = state.stages[s.id];
+      return isDone(st?.status) && (!changedAt || !st?.completed_at || st.completed_at <= changedAt);
+    })
     .map((s) => {
       const bundle = bundles[s.id];
       const figures = bundle?.artifact?.key_figures?.figures ?? [];
