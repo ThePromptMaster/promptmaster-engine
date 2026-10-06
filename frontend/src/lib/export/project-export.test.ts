@@ -332,7 +332,7 @@ describe('Carry forward goes out with the work (3 Oct, Research run)', () => {
     };
     return b;
   }
-  const rows = [
+  const rows: Record<string, string>[] = [
     { id: 'f1', item: 'Primary-cause attribution', where: 'Unverified', status: 'deferred', reason: 'No driver-level cost data.', status_source: 'user' },
     { id: 'f2', item: 'Measurement artefact', where: 'Reconciled', status: 'accepted' },
     // A proposal the user never confirmed is not their decision.
