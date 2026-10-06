@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 
 import { MarkdownOutput } from '@/components/shared/markdown-output';
 import { downloadBlob, downloadFile } from '@/lib/utils';
-import { exportFilename, toManuscriptMarkdown, type ExportBundle } from '@/lib/export/project-export';
+import { carriedForward, CARRIED_HEADING, exportFilename, toManuscriptMarkdown, type ExportBundle } from '@/lib/export/project-export';
 import { deliverableStage, type CompletionSummary } from '@/lib/workflow/engine';
 import { deliverableNouns } from '@/lib/workflow/labels';
 import type { Evaluation } from '@/types/project';
@@ -35,7 +35,9 @@ export function ProjectFinished({ bundle, completion, evaluation, onReopen, onEd
   const { deliverable: noun, unit } = deliverableNouns(template);
   const markdown = useMemo(() => toManuscriptMarkdown(bundle), [bundle]);
   const body = markdown.replace(/^# .*\n+/, '');
-  const chapters = inSections ? (body.match(/^## /gm) ?? []).length : 0;
+  const carried = useMemo(() => carriedForward(bundle), [bundle]);
+  // The carried-forward list closes the document; it is not a chapter.
+  const chapters = inSections ? (body.match(/^## /gm) ?? []).length - (carried.length ? 1 : 0) : 0;
   const words = body.split(/\s+/).filter(Boolean).length;
   const [reading, setReading] = useState(false);
   const [note, setNote] = useState<string | null>(null);
@@ -146,6 +148,22 @@ export function ProjectFinished({ bundle, completion, evaluation, onReopen, onEd
           Continue improving
         </button>
       </div>
+      {carried.length > 0 && (
+        <div data-carried-forward className="mt-5 rounded-xl bg-[var(--surface-container-low)] px-5 py-4">
+          <h3 className="text-title text-[var(--on-surface)]">{CARRIED_HEADING}</h3>
+          <p className="mt-1 text-label text-[var(--on-surface-variant)]">
+            What you carried forward on the final review. It goes out with the {noun}, at the end of every export.
+          </p>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-body text-[var(--on-surface)]">
+            {carried.map((c, i) => (
+              <li key={i}>
+                {c.item}
+                {c.reason && <span className="text-[var(--on-surface-variant)]"> — {c.reason}</span>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {note && (
         <p role="status" className="mt-2 text-label text-[var(--on-surface-variant)]">
           {note}

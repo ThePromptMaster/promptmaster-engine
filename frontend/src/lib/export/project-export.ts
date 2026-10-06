@@ -27,6 +27,7 @@
 import { manuscriptArtifactFor } from '@/lib/workflow/context';
 import { formatManuscript } from '@/lib/workflow/digest';
 import { deliverableStage } from '@/lib/workflow/engine';
+import { isProposed, parseItems, primaryArtifactKind, statusOption, itemSchemaFor } from '@/lib/workflow/stage-artifact';
 import type { StageDefinition, WorkflowEvent, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
 import type { Artifact, ArtifactVersion, Evaluation, Project } from '@/types/project';
 
@@ -78,6 +79,35 @@ function manuscriptOf(bundle: ExportBundle, stage: StageDefinition): string {
   return formatManuscript(own.long_form.outline, Number.POSITIVE_INFINITY);
 }
 
+/** The status a closing review gives an issue that stays open and goes out with the work. */
+const CARRIED = 'deferred';
+export const CARRIED_HEADING = 'Open issues carried forward';
+
+/**
+ * The open issues the user carried forward on the closing review (Sean, 3 Oct:
+ * "what does Carry forward actually do?"). Read from the head version of the
+ * stage whose artifact is the final evaluation — by kind, never by workflow —
+ * and only rows the user decided: a proposal they have not confirmed is not
+ * their decision yet.
+ */
+export function carriedForward(bundle: Pick<ExportBundle, 'template' | 'stages'>): { item: string; reason: string }[] {
+  const stage = bundle.template.stages.find((s) => primaryArtifactKind(s) === 'final_evaluation');
+  if (!stage) return [];
+  const schema = itemSchemaFor(stage);
+  if (!statusOption(schema, CARRIED)) return [];
+  const rows = parseItems(head(bundle.stages[stage.id]?.versions)?.content) ?? [];
+  return rows
+    .filter((r) => r.status === CARRIED && !isProposed(r) && (r.item ?? '').trim())
+    .map((r) => ({ item: (r.item ?? '').trim(), reason: (r.reason ?? '').trim() }));
+}
+
+/** The carried-forward issues as a closing section of the document. */
+function carriedSection(bundle: ExportBundle): string {
+  const open = carriedForward(bundle);
+  if (!open.length) return '';
+  return `\n## ${CARRIED_HEADING}\n\n${open.map((o) => `- ${o.item}${o.reason ? ` — ${o.reason}` : ''}`).join('\n')}\n`;
+}
+
 /**
  * The manuscript alone: title and chapters, for reading, copying and the
  * Word/PDF exports. Empty when nothing has been written.
@@ -97,7 +127,7 @@ export function toManuscriptMarkdown(bundle: ExportBundle): string {
   return `# ${project.title || 'Untitled project'}
 
 ${body.trim()}
-`;
+${carriedSection(bundle)}`;
 }
 
 /**
