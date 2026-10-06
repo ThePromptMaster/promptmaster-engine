@@ -508,8 +508,8 @@ gaps are.
 
 **Every write of stage work passes one commit check.** `appendStageVersion` runs
 `checkCommit` (`lib/workflow/commit-check.ts`) before anything is appended. It refuses a
-revision that is empty, text where the stage holds a table, a table with no rows, or a
-rewrite that lost most of the text (L-36). Code also checks that figures have a source
+revision that is empty, text where the stage holds a table, or a table with no rows
+(L-36). Code also checks that figures have a source
 (`lib/workflow/figure-support.ts`, L-37); a figure without one becomes a finding rather
 than a refusal.
 

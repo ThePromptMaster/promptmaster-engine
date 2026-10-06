@@ -11,18 +11,16 @@ import { parseItems } from './stage-artifact';
  * append, so a new path cannot ship without it.
  *
  * Pure: it sees the current head and the proposed content, nothing else.
+ *
+ * It judges shape, not length. A rule refusing rewrites that kept under 30%
+ * of the text was removed after its first production run (6 Oct): the check
+ * had asked for a 23,000-character overshoot to be cut to a positioning
+ * statement, and the cut was exactly what was wanted.
  */
 
 /** Operations the user performs by hand. They may empty a table on purpose. */
 const USER_OPERATIONS = new Set(['stage_edit', 'outline_edit', 'restore']);
 
-/** Operations that rewrite the current text rather than add to it. */
-const REWRITE_OPERATIONS = new Set(['applied_findings', 'applied_recommendations', 'refine']);
-
-/** A rewrite shorter than this share of the text it replaces lost the work. */
-const MIN_REWRITE_SHARE = 0.3;
-/** Below this length a short rewrite is plausible and not checked. */
-const SHRINK_CHECK_FROM = 400;
 
 export class RefusedRevision extends Error {
   constructor(message: string) {
@@ -61,13 +59,6 @@ export function checkCommit(input: {
     }
     if (afterItems.length === 0 && beforeItems.length > 0) {
       return 'The revised table came back with no rows, so the current version was kept';
-    }
-  }
-
-  if (!beforeItems && before && REWRITE_OPERATIONS.has(operation)) {
-    const was = before.trim().length;
-    if (was >= SHRINK_CHECK_FROM && after.trim().length < was * MIN_REWRITE_SHARE) {
-      return 'The revision lost most of the text it was revising, so the current version was kept';
     }
   }
 

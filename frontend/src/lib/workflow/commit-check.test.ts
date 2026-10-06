@@ -25,8 +25,8 @@ describe('checkCommit: what may become the current version', () => {
     expect(checkCommit({ before: TABLE, after: serializeItems([{ id: 'c', claim: 'Option C' }]), operation: 'applied_findings' })).toBeNull();
   });
 
-  it('refuses a rewrite that lost most of the text', () => {
-    expect(checkCommit({ before: PROSE, after: 'Short.', operation: 'applied_recommendations' })).toMatch(/lost most/);
+  it('lets a rewrite cut a draft down, when that is what the findings asked (6 Oct)', () => {
+    expect(checkCommit({ before: PROSE, after: 'Short.', operation: 'applied_findings' })).toBeNull();
   });
 
   it('lets a short first draft or an added section through', () => {

@@ -11,6 +11,13 @@
 
 /** Past this, a first message is treated as a brief. */
 export const BRIEF_FROM_CHARS = 1_500;
+/**
+ * …and past this, if it is laid out as one: a title, the ask, then facts.
+ * A 1,356-character board brief with nine bullet points stayed whole as the
+ * objective on the production pass (6 Oct).
+ */
+export const STRUCTURED_BRIEF_FROM_CHARS = 600;
+const STRUCTURED_PARAGRAPHS = 3;
 /** The objective drawn from a brief is at most this long. */
 export const DRAWN_OBJECTIVE_MAX = 1_200;
 /** Kept in step with MAX_CONTEXT_CHARS in backend/promptmaster/limits.py. */
@@ -23,9 +30,12 @@ export interface SplitAsk {
 
 export function splitAsk(text: string): SplitAsk {
   const ask = text.trim();
-  if (ask.length <= BRIEF_FROM_CHARS) return { objective: ask, context: '' };
-
   const paragraphs = ask.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  const isBrief =
+    ask.length > BRIEF_FROM_CHARS ||
+    (ask.length > STRUCTURED_BRIEF_FROM_CHARS && paragraphs.length >= STRUCTURED_PARAGRAPHS);
+  if (!isBrief) return { objective: ask, context: '' };
+
   // The first paragraph that reads as a sentence, not a title line.
   const opening = paragraphs.find((p) => p.length >= 80 || /[.?!]$/.test(p)) ?? paragraphs[0] ?? ask;
   let objective = opening;
