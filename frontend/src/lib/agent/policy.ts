@@ -209,8 +209,21 @@ export function allowedActions(
   // production, with the write-up no longer offered, it proposed "Objective
   // complete" instead of the next round (4 Oct). Ending it is the user's.
   if (!stage.transitions.loop_to) keys.push('declare_objective_complete');
+  // A round's stages stay on their task (production, 5 Oct): offered the
+  // reasoning moves, Go spent a whole window deriving and comparing on Next
+  // question instead of writing it, so the next round was never proposed.
+  // A stage still holding last round's draft is drafted, or the user asked;
+  // the stage that closes a round chooses the question, it does not reason.
+  if (staleRoundDraft) return keys.filter((k) => k === 'draft_stage' || k === 'request_user_decision');
+  if (stage.transitions.loop_to) return keys.filter((k) => !REASONING_MOVES.has(k));
   return keys;
 }
+
+/** The inquiry moves (derive, compare, look up…): offered where a stage investigates. */
+const REASONING_MOVES = new Set([
+  'derive', 'prove', 'simplify', 'limiting_case', 'try_contradiction', 'run_computation',
+  'falsify_hypothesis', 'compare_alternatives', 'update_assumptions', 'check_literature',
+]);
 
 export interface Preemption {
   status: Exclude<AgentRunStatus, 'running'>;
