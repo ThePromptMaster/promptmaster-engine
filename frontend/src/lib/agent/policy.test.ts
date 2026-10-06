@@ -7,7 +7,7 @@ import type { StageEvaluation } from '@/lib/workflow/types';
 import type { AgentStep } from '@/types/agent';
 import { deriveExecutionLabel } from './labels';
 import { ITEM_SCHEMAS } from '@/lib/workflow/stage-artifact';
-import { allowedActions, alternating, NO_TOOLS, polishSinceDirection, withoutOverride, withoutEndlessPolish, withoutSettledRuns, fitsBudget, noChange, noProgress, plannedBeforeLatestChange, preempt, shouldPause, stageMoveActor, stateFingerprint } from './policy';
+import { allowedActions, alternating, LIVE_TOOLS, NO_TOOLS, polishSinceDirection, withoutOverride, withoutEndlessPolish, withoutSettledRuns, fitsBudget, noChange, noProgress, plannedBeforeLatestChange, preempt, shouldPause, stageMoveActor, stateFingerprint } from './policy';
 
 function step(over: Partial<AgentStep>): AgentStep {
   return {
@@ -565,5 +565,30 @@ describe('each exploration round is drafted afresh (production pass, 4 Oct)', ()
 
   it('moves on once this round has its draft', () => {
     expect(allowedActions(EXPLORATION_V1, state, findings, true)).toContain('advance_stage');
+  });
+});
+
+describe('the stages of a round stay on their task (production pass, 5 Oct)', () => {
+  const ids = EXPLORATION_V1.stages.map((s) => s.id);
+  const events = ids.slice(0, ids.indexOf('next_question')).map((id, i) => ({
+    type: 'stage_completed' as const, stage_id: id, to_stage_id: ids[i + 1], actor: 'user' as const, created_at: `2026-10-05T00:00:0${i}Z`,
+  }));
+  const state = projectState(EXPLORATION_V1, events);
+  const next = getStage(EXPLORATION_V1, 'next_question')!;
+
+  it('a stage holding last round\'s draft is drafted, nothing else', () => {
+    expect(allowedActions(EXPLORATION_V1, state, next, false, LIVE_TOOLS)).toEqual(['draft_stage', 'request_user_decision']);
+  });
+
+  it('the stage that closes a round proposes the next one rather than reasoning further', () => {
+    const allowed = allowedActions(EXPLORATION_V1, state, next, true, LIVE_TOOLS);
+    expect(allowed).toContain('propose_next_round');
+    expect(allowed).not.toContain('derive');
+    expect(allowed).not.toContain('check_literature');
+  });
+
+  it('the other stages of a round may still reason', () => {
+    const findingsState = projectState(EXPLORATION_V1, events.slice(0, ids.indexOf('findings')));
+    expect(allowedActions(EXPLORATION_V1, findingsState, getStage(EXPLORATION_V1, 'findings')!, true, LIVE_TOOLS)).toContain('derive');
   });
 });
