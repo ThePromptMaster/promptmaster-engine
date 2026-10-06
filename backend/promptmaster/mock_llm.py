@@ -399,6 +399,13 @@ def _json_reply(system: str, prompt: str) -> dict:
     if agent._TRIAGE_INSTRUCTION[:60] in system:
         ids = re.findall(r"^- id=([^:]+):", prompt.split("FINDINGS TO DECIDE:", 1)[-1], re.M)
         return {"decisions": [{"id": i, "status": "accepted", "reason": "Mock: routine, accepted."} for i in ids]}
+    from promptmaster import criterion_check
+
+    if system.startswith(criterion_check._CHECK_INSTRUCTION[:60]):
+        # Met, unless the stage's text says "[[mock:criterion=unmet]]".
+        if "[[mock:criterion=unmet]]" in prompt:
+            return {"met": False, "reason": "Mock: the text does not say it."}
+        return {"met": True, "reason": "Mock: the text states it in its second paragraph."}
     if agent._NEXT_ACTION_INSTRUCTION[:60] in system:
         return _next_action(system, prompt)
     if _STAGE_EVAL_INSTRUCTION[:60] in system:

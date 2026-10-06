@@ -72,6 +72,16 @@ export interface ExitCriterion {
    * item a new user cannot decode is one they cannot satisfy.
    */
   hint?: string;
+  /**
+   * Manual criteria only: who may satisfy it (Sean, 5 Oct, "Delegated
+   * authority and routine approval gates").
+   * - 'delegable': a routine decision. Under the project's "Routine decisions:
+   *   handle them for me", Go may commit it once validation passes, and the
+   *   history says it was committed under that policy.
+   * - 'reserved': the user's preferences, judgment or authorization.
+   * Absent means reserved: the safe default is the user's.
+   */
+  authority?: 'delegable' | 'reserved';
 }
 
 export interface ArtifactSpec {
@@ -315,7 +325,13 @@ export type WorkflowEventType =
   | 'project_reopened'
   | 'template_upgraded'
   /** C5: a done stage opened for editing without moving the cursor. Closing it again is stage_marked_complete. */
-  | 'stage_reopened';
+  | 'stage_reopened'
+  /** A revision the commit check refused; moves no state (G1, 6 Oct). */
+  | 'revision_refused'
+  /** The user set "Routine decisions" (6 Oct); payload.routine_decisions. */
+  | 'routine_policy_changed'
+  /** Go committed a delegable approval under that policy; payload.criterion_id. */
+  | 'criterion_committed';
 
 export interface WorkflowEvent {
   type: WorkflowEventType;
@@ -371,6 +387,8 @@ export interface CriterionResult {
   label: string;
   satisfied: boolean;
   blocking: boolean;
+  /** An approval the template marks routine: Go may commit it under the routine-decision policy. */
+  authority?: 'delegable';
   /** Present when unmet: one line on what is missing. */
   detail?: string;
   /**

@@ -53,3 +53,25 @@ def test_endpoint_returns_the_design_and_refuses_an_unusable_one():
         assert client.post("/api/generate-workflow", json={"description": "a magazine feature"}).status_code == 422
     finally:
         app.dependency_overrides.pop(get_client, None)
+
+
+def test_each_approval_says_whether_it_is_routine_and_new_commitments_are_kept_apart():
+    """Sean, 5 Oct: "I approve these extracted claims and commitments" stopped
+    Autonomous. Checking what the source says is routine; accepting a new
+    commitment is the user's."""
+    _, user = build_workflow_prompt("contract review", "Summarise the supplier terms")
+    assert "approval_kind" in user and "routine" in user
+    assert "new commitments" in user
+
+    wf = parse_workflow({"name": "X", "stages": [
+        _stage("Brief"),
+        _stage("Extract terms", "list", approval="I confirm the extracted terms match the contract",
+               approval_kind="routine", decision="I accept the new commitments it proposes"),
+        _stage("Recommend", approval="I approve this recommendation", approval_kind="whatever"),
+        _stage("Final"),
+    ]})
+    extract, recommend = wf.stages[1], wf.stages[2]
+    assert extract.approval_kind == "routine"
+    assert extract.decision == "I accept the new commitments it proposes"
+    # Anything but an explicit "routine" stays the user's.
+    assert recommend.approval_kind == "decision"

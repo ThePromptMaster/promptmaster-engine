@@ -138,7 +138,12 @@ export function CustomWorkflowDesigner({
                   <button onClick={() => remove(i)} disabled={design.stages.length <= 2} aria-label={`Remove stage ${i + 1}`} className="material-symbols-outlined text-[18px] text-[var(--on-surface-variant)] disabled:opacity-30">close</button>
                 </div>
                 {s.purpose && <p className="ml-7 mt-1 text-label text-[var(--on-surface-variant)]">{s.purpose}</p>}
-                {s.approval && <p className="ml-7 mt-1 text-label text-[var(--on-surface-variant)]">You approve: “{s.approval}”</p>}
+                {s.approval && (
+                  <p className="ml-7 mt-1 text-label text-[var(--on-surface-variant)]">
+                    {s.approval_kind === 'routine' ? 'Checked, and routine: ' : 'You approve: '}“{s.approval}”
+                  </p>
+                )}
+                {s.decision && <p className="ml-7 mt-1 text-label text-[var(--on-surface-variant)]">You decide: “{s.decision}”</p>}
               </li>
             ))}
           </ol>

@@ -74,6 +74,12 @@ export interface Project {
   status: ProjectStatus;
   /** User-ticked exit criteria, keyed by criterion id. */
   manual_checks: Record<string, boolean>;
+  /**
+   * Who may decide a routine approval (5 Oct): 'handle' lets Go commit an
+   * approval the template marks delegable once it has checked it; 'ask' leaves
+   * every approval to the user. The database re-reads it on each commit.
+   */
+  routine_decisions?: RoutineDecisions;
   /** PM-21: the project's critique dials. */
   critique_intensity?: CritiqueIntensity;
   critique_tone?: CritiqueTone;
@@ -231,6 +237,8 @@ export interface ProjectInput {
  * timestamps: revision is owned by a trigger, and letting a caller set it
  * would defeat the concurrency guard it exists to provide.
  */
+export type RoutineDecisions = 'ask' | 'handle';
+
 export type ProjectPatch = Partial<
   Pick<
     Project,
@@ -254,6 +262,7 @@ export type ProjectPatch = Partial<
     | 'stage'
     | 'status'
     | 'manual_checks'
+    | 'routine_decisions'
     | 'critique_intensity'
     | 'critique_tone'
   >

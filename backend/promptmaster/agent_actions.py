@@ -108,6 +108,10 @@ AGENT_ACTIONS: list[AgentAction] = [
                 when="This stage closes a round of open-ended work and the question it ends on is worth "
                      "another round. Params: reason (one or two plain sentences: what the next round should "
                      "pursue, and why it is worth it). The user starts the round; it is their decision."),
+    AgentAction(key="commit_delegated", family="workflow", label="Commit a routine approval",
+                when="Only offered when the project's routine decisions are set to 'handle them for me' and an "
+                     "approval on this stage is a routine one. Checks the stage against that approval and, if it "
+                     "holds, commits it under the user's policy. Params: criterion_id."),
     AgentAction(key="advance_stage", family="workflow", label="Move to the next stage",
                 when="This stage's work is done and checked.", important=True),
     AgentAction(key="mark_blocked", family="workflow", label="Mark this stage stuck",
