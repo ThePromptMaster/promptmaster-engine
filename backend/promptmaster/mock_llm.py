@@ -622,6 +622,12 @@ class ScriptedClient(OpenRouterClient):
 
         usage = {"tokens_in": len(system + prompt) // 4, "tokens_out": len(content) // 4}
         finish_reason = "length" if "length" in markers else "stop"
+        # Metered like a real call (E1), so the browser tests see usage rows;
+        # the mock model has no price, so its cost is unknown, never zero.
+        from promptmaster.llm_client import _meter
+
+        _meter(model=str(payload.get("model") or MOCK_MODEL), tokens_in=usage["tokens_in"], tokens_out=usage["tokens_out"],
+               elapsed=0.01, finish_reason=finish_reason)
         return content, usage, finish_reason
 
     @classmethod

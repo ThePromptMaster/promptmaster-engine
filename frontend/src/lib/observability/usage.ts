@@ -39,6 +39,8 @@ export interface UsageEvent {
   costUsd: number | null;
   promptPriceUsd: number | null;
   completionPriceUsd: number | null;
+  /** 'retry' succeeded after a retryable failure; 'repair' is the JSON repair pass (E1). */
+  attempt: 'first' | 'retry' | 'repair';
 }
 
 function num(value: unknown): number {
@@ -78,6 +80,7 @@ export function parseUsageHeader(raw: string | null | undefined): UsageEvent[] {
       costUsd: optionalNum(e.c),
       promptPriceUsd: optionalNum(e.pp),
       completionPriceUsd: optionalNum(e.cp),
+      attempt: e.a === 'retry' || e.a === 'repair' ? e.a : 'first',
     });
   }
   return events;

@@ -37,6 +37,8 @@ import type {
   AdminUsageRow,
 } from '@/lib/admin/types';
 
+import { rollUpOperations, rollUpProjects, type UsageDetailRow } from '@/lib/admin/usage-rollups';
+
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
@@ -84,6 +86,7 @@ export async function GET(request: NextRequest) {
     ...errorRows.map((r) => r.user_id),
   ]);
   const projectIds = unique([
+    ...usageRows.map((r) => r.project_id),
     ...jobRows.map((r) => r.project_id),
     ...errorRows.map((r) => r.project_id),
   ]);
@@ -110,6 +113,8 @@ export async function GET(request: NextRequest) {
       errors: errorRows.length,
     },
     usageByUser,
+    usageByOperation: rollUpOperations(usageRows).slice(0, LIST_LIMIT),
+    usageByProject: rollUpProjects(usageRows, projectTitles).slice(0, LIST_LIMIT),
     failedJobs: jobRows.slice(0, LIST_LIMIT).map((row) => ({
       id: row.id,
       kind: row.kind,
@@ -149,7 +154,7 @@ export async function GET(request: NextRequest) {
 
 type Client = ReturnType<typeof createAdminClient>;
 
-interface UsageRow {
+interface UsageRow extends UsageDetailRow {
   user_id: string;
   tokens_in: number | null;
   tokens_out: number | null;
@@ -160,7 +165,7 @@ interface UsageRow {
 async function fetchUsage(supabase: Client, since: string, warnings: string[]) {
   const { data, error } = await supabase
     .from('model_usage')
-    .select('user_id, tokens_in, tokens_out, cost_usd, created_at')
+    .select('user_id, project_id, route, operation, attempt, elapsed_ms, tokens_in, tokens_out, cost_usd, created_at')
     .gte('created_at', since)
     .order('created_at', { ascending: false })
     .limit(ROLLUP_LIMIT);

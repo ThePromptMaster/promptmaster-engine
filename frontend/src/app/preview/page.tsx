@@ -1328,6 +1328,14 @@ const ADMIN_OVERVIEW: AdminOverview = {
     failedJobs: 3,
     errors: 27,
   },
+  usageByOperation: [
+    { operation: 'go:revise_stage', calls: 212, costUsd: 9.8121, unpricedCalls: 0, p50Ms: 18_400, p95Ms: 51_200, reworkShare: 0.04 },
+    { operation: '/api/generate-stage-artifact', calls: 340, costUsd: 14.1102, unpricedCalls: 2, p50Ms: 22_900, p95Ms: 58_300, reworkShare: 0.02 },
+    { operation: 'go:commit_delegated', calls: 41, costUsd: 0.3104, unpricedCalls: 0, p50Ms: 1_900, p95Ms: 3_400, reworkShare: 0 },
+  ],
+  usageByProject: [
+    { projectId: 'p-1', title: 'Margin decline memo', calls: 318, costUsd: 11.2049, unpricedCalls: 0, modelMs: 6_120_000, goCalls: 201, reworkCalls: 9 },
+  ],
   usageByUser: [
     {
       userId: 'u-1',
@@ -1491,6 +1499,8 @@ function AdminEdgeSlice() {
       errors: 0,
     },
     usageByUser: [],
+    usageByOperation: [],
+    usageByProject: [],
     failedJobs: [],
     recentErrors: [],
     errorTally: [],
