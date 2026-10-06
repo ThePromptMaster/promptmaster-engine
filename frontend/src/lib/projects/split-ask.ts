@@ -1,3 +1,5 @@
+import { INPUT_LIMITS } from './input-limits';
+
 /**
  * A long first message is a brief, not an objective (4 Oct, item 7).
  *
@@ -20,8 +22,8 @@ export const STRUCTURED_BRIEF_FROM_CHARS = 600;
 const STRUCTURED_PARAGRAPHS = 3;
 /** The objective drawn from a brief is at most this long. */
 export const DRAWN_OBJECTIVE_MAX = 1_200;
-/** Kept in step with MAX_CONTEXT_CHARS in backend/promptmaster/limits.py. */
-export const MAX_CONTEXT_CHARS = 60_000;
+/** Kept in step with MAX_CONTEXT_CHARS in backend/promptmaster/limits.py (input-limits.test.ts). */
+export const MAX_CONTEXT_CHARS = INPUT_LIMITS.context;
 
 export interface SplitAsk {
   objective: string;

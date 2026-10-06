@@ -30,7 +30,8 @@ import { useMemo } from 'react';
 import type { StageDefinition } from '@/lib/workflow/types';
 import type { Project, ProjectPatch } from '@/types/project';
 import { AutoGrowTextarea } from '@/components/shared/auto-grow-textarea';
-import { MAX_CONTEXT_CHARS } from '@/lib/projects/split-ask';
+import { LimitCounter } from '@/components/shared/limit-counter';
+import { INPUT_LIMITS, withinLimit } from '@/lib/projects/input-limits';
 
 /** The project columns a criterion is allowed to require, and how to label one. */
 const FIELDS = {
@@ -148,9 +149,10 @@ export function ProjectSetup({ project, stage, onPatch, readOnly }: Props) {
                 readOnly={readOnly}
                 rows={field.rows}
                 placeholder={field.placeholder}
-                onChange={(e) => onPatch({ [key]: key === 'context' ? e.target.value.slice(0, MAX_CONTEXT_CHARS) : e.target.value })}
+                onChange={(e) => onPatch({ [key]: withinLimit(key, e.target.value) })}
                 className="w-full rounded-lg bg-[var(--surface-container-low)] px-4 py-3 text-body leading-relaxed text-[var(--on-surface)] outline-none placeholder:text-[var(--on-surface-variant)] focus:ring-2 focus:ring-[var(--pm-primary)]/40 read-only:opacity-70"
               />
+              {!readOnly && <LimitCounter length={value.length} limit={INPUT_LIMITS[key]} />}
             </div>
           );
         })}
@@ -202,7 +204,7 @@ export function ProjectBrief({ project, onPatch, readOnly }: Omit<Props, 'stage'
                   readOnly={readOnly}
                   rows={project.context ? 8 : 2}
                   placeholder={field.placeholder}
-                  onChange={(e) => onPatch({ context: e.target.value.slice(0, MAX_CONTEXT_CHARS) })}
+                  onChange={(e) => onPatch({ context: withinLimit('context', e.target.value) })}
                   className="max-h-96 w-full resize-y overflow-y-auto rounded-lg bg-[var(--surface-container-low)] px-4 py-2.5 text-body leading-relaxed text-[var(--on-surface)] outline-none placeholder:text-[var(--on-surface-variant)] focus:ring-2 focus:ring-[var(--pm-primary)]/40 read-only:opacity-70"
                 />
               ) : (
@@ -212,10 +214,11 @@ export function ProjectBrief({ project, onPatch, readOnly }: Omit<Props, 'stage'
                 readOnly={readOnly}
                 rows={1}
                 placeholder={field.placeholder}
-                onChange={(e) => onPatch({ [key]: e.target.value })}
+                onChange={(e) => onPatch({ [key]: withinLimit(key, e.target.value) })}
                 className="w-full rounded-lg bg-[var(--surface-container-low)] px-4 py-2.5 text-body leading-relaxed text-[var(--on-surface)] outline-none placeholder:text-[var(--on-surface-variant)] focus:ring-2 focus:ring-[var(--pm-primary)]/40 read-only:opacity-70"
               />
               )}
+              {!readOnly && <LimitCounter length={(project[key] ?? '').length} limit={INPUT_LIMITS[key]} />}
             </div>
           );
         })}

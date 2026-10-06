@@ -31,16 +31,24 @@ from __future__ import annotations
 # Free text carried into prompts
 # ---------------------------------------------------------------------------
 
-#: The objective is one to a few paragraphs. 8k characters is a long brief.
-MAX_OBJECTIVE_CHARS = 8_000
-#: Constraints, format and audience are short qualifiers, not documents.
+#: The brief fields — objective, audience, constraints, output format — are
+#: the user's own words about their project, and on 5 Oct a 4,000-character cap
+#: on constraints was the thing a user hit. These are abuse ceilings, not
+#: product limits: a constraint list long enough to reach one is a document,
+#: and the user is told before saving rather than by a 422 on the next stage.
+#: (Before 6 Oct: objective 8k, the other three 4k.)
+MAX_OBJECTIVE_CHARS = 60_000
+MAX_FIELD_CHARS = 60_000
+#: Custom persona name and tone are labels, not documents.
 MAX_SHORT_TEXT_CHARS = 4_000
 #: A custom persona preamble is a system prompt, so it gets more room.
 MAX_PREAMBLE_CHARS = 8_000
-#: Project context is source material the user pasted (4 Oct: a board-level
-#: brief with the company's figures). It rides on every stage call, so it is
-#: bounded: about 15k tokens, a long brief, not a document library.
-MAX_CONTEXT_CHARS = 60_000
+#: Project context is source material — pasted, or the text of a PDF or Word
+#: brief attached on the start screen. It rides on every stage call (L-38), so
+#: it is still bounded: about 50k tokens, a long report, not a library.
+MAX_CONTEXT_CHARS = 200_000
+#: A one-off instruction — a revise request, a chat instruction, a stage hint.
+MAX_INSTRUCTION_CHARS = 20_000
 
 #: Session facts are pinned one-liners injected into *every* prompt, so their
 #: cost is multiplied by the length of the session. Bounded on both axes.

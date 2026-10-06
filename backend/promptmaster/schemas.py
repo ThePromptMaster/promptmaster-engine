@@ -7,6 +7,8 @@ from pydantic import BaseModel, Field, field_validator
 
 from .limits import (
     MAX_CONTEXT_CHARS,
+    MAX_FIELD_CHARS,
+    MAX_INSTRUCTION_CHARS,
     MAX_OBJECTIVE_CHARS,
     MAX_PREAMBLE_CHARS,
     MAX_SESSION_FACT_CHARS,
@@ -27,9 +29,9 @@ class PMInput(BaseModel):
     FastAPI before a handler runs — see `promptmaster/limits.py`.
     """
     objective: str = Field(..., max_length=MAX_OBJECTIVE_CHARS, description="What the user wants to accomplish")
-    audience: str = Field(default="General", max_length=MAX_SHORT_TEXT_CHARS, description="Target audience")
-    constraints: str = Field(default="", max_length=MAX_SHORT_TEXT_CHARS, description="Optional constraints")
-    output_format: str = Field(default="", max_length=MAX_SHORT_TEXT_CHARS, description="Desired output structure (e.g. bullet points, numbered list)")
+    audience: str = Field(default="General", max_length=MAX_FIELD_CHARS, description="Target audience")
+    constraints: str = Field(default="", max_length=MAX_FIELD_CHARS, description="Optional constraints")
+    output_format: str = Field(default="", max_length=MAX_FIELD_CHARS, description="Desired output structure (e.g. bullet points, numbered list)")
     # 4 Oct: the facts, figures and background behind the objective, kept apart
     # from it so the objective stays short. Material to use, not instructions.
     context: str = Field(default="", max_length=MAX_CONTEXT_CHARS, description="The project's source material")
@@ -333,7 +335,7 @@ class SectionRevisionBrief(BaseModel):
     brief ("apply the accepted findings and only those", "work at the line").
     """
     stage_label: str = Field(default="", max_length=200)
-    instruction: str = Field(default="", max_length=4_000)
+    instruction: str = Field(default="", max_length=MAX_INSTRUCTION_CHARS)
     notes: str = Field(default="", max_length=40_000)
     current_content: str = Field(..., max_length=400_000)
 

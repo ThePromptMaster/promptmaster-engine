@@ -18,7 +18,7 @@ router = APIRouter(prefix="/api", tags=["setup"])
 
 
 class GenerateSetupRequest(BaseModel):
-    objective: str
+    objective: str = Field(..., min_length=1, max_length=MAX_OBJECTIVE_CHARS)
     model: str = ""
     #: Answers from the "Guide me" path; empty on "I know what I want to do".
     answers: list[GuideAnswer] = Field(default=[], max_length=8)

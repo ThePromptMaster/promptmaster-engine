@@ -31,6 +31,7 @@ from promptmaster.limits import (
     MAX_CONTENT_CHARS,
     MAX_DOCUMENT_CHARS,
     MAX_GLOSSARY_TERMS,
+    MAX_INSTRUCTION_CHARS,
     MAX_ITERATION_HISTORY,
     MAX_MODEL_SLUG_CHARS,
     MAX_OUTLINE_SECTIONS,
@@ -124,7 +125,7 @@ class GenerateSectionProseRequest(BaseModel):
     revision: SectionRevisionBrief | None = None
     #: The long-form stage's own `entry_prompt_hint` — how this workflow wants
     #: a section written. It never reached the chapter prompt before 2026-10-03.
-    stage_hint: str = Field(default="", max_length=4_000)
+    stage_hint: str = Field(default="", max_length=MAX_INSTRUCTION_CHARS)
 
 
 class ExtractSectionRecordRequest(BaseModel):
