@@ -10,7 +10,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { exportFilename, toJson, toManuscriptMarkdown, toMarkdown, type ExportBundle } from './project-export';
+import { carriedForward, exportFilename, toJson, toManuscriptMarkdown, toMarkdown, type ExportBundle } from './project-export';
 import { BOOK_V1, projectState } from '@/lib/workflow';
 import type { WorkflowEvent } from '@/lib/workflow/types';
 import type { Artifact, ArtifactVersion, Evaluation, Project } from '@/types/project';
@@ -320,6 +320,34 @@ describe('Markdown export carries the manuscript (A2)', () => {
     expect(doc).toContain('Acacia leaves, mostly.');
     expect(doc).not.toContain('**Objective:**');
     expect(toManuscriptMarkdown(bundle())).toBe('');
+  });
+});
+
+describe('Carry forward goes out with the work (3 Oct, Research run)', () => {
+  function withFinalReview(rows: Record<string, string>[]): ExportBundle {
+    const b = bookWithChapters();
+    b.stages.final_review = {
+      artifact: null,
+      versions: [version('fr1', JSON.stringify({ kind: 'stage_items', items: rows }), 1)],
+    };
+    return b;
+  }
+  const rows: Record<string, string>[] = [
+    { id: 'f1', item: 'Primary-cause attribution', where: 'Unverified', status: 'deferred', reason: 'No driver-level cost data.', status_source: 'user' },
+    { id: 'f2', item: 'Measurement artefact', where: 'Reconciled', status: 'accepted' },
+    // A proposal the user never confirmed is not their decision.
+    { id: 'f3', item: 'Mix shift', where: 'Open', status: 'deferred', reason: 'No SKU data.', status_source: 'proposed' },
+  ];
+
+  it('lists only the issues the user carried forward, with their reasons', () => {
+    expect(carriedForward(withFinalReview(rows))).toEqual([{ item: 'Primary-cause attribution', reason: 'No driver-level cost data.' }]);
+  });
+
+  it('closes the exported document with them; nothing is added when none were carried', () => {
+    const doc = toManuscriptMarkdown(withFinalReview(rows));
+    expect(doc).toMatch(/Acacia leaves, mostly\.\n\n## Open issues carried forward\n\n- Primary-cause attribution — No driver-level cost data\.\n$/);
+    expect(doc).not.toContain('Mix shift');
+    expect(toManuscriptMarkdown(withFinalReview([rows[1]]))).not.toContain('carried forward');
   });
 });
 

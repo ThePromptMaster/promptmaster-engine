@@ -588,6 +588,22 @@ describe('ReviewRenderer', () => {
 // Research v1 stranded projects at Experiment (Sean's screenshot, Sep 10)
 // ---------------------------------------------------------------------------
 
+describe('Final review: open items are findings, not blockers (3 Oct, item 5)', () => {
+  it('says marking is optional, and what Carry forward does', async () => {
+    const user = userEvent.setup();
+    const items = serializeItems([
+      { id: 'f1', item: 'Primary-cause attribution unverified', where: 'No driver-level data' },
+      { id: 'f2', item: 'Mix shift unresolved', where: 'No SKU data' },
+    ]);
+    render(<ReviewRenderer {...props(getStage(RESEARCH_V1, 'final_review')!, { versions: [version(items)] })} />);
+    expect(screen.getByText('2 not yet marked — optional, does not block finishing')).toBeInTheDocument();
+    expect(screen.queryByText(/still to resolve/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Marking them is optional and does not block finishing/)).toBeInTheDocument();
+    await user.click(screen.getByText('What the statuses mean'));
+    expect(screen.getByText(/listed with the finished work — on the finished page and at the end of the exported document/)).toBeInTheDocument();
+  });
+});
+
 describe('PromptMaster proposes, the user confirms (3 Oct, Research run)', () => {
   const alternatives = () => serializeItems([
     { id: 'a1', explanation: 'Raw-material inflation', how_addressed: 'Partly addressed, not excluded', status: 'left_open', reason: 'Input prices rose, but not enough to explain the gap.', status_source: 'proposed' },

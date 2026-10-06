@@ -146,6 +146,10 @@ export function ReviewRenderer({
   const openRows = rows.filter((r) => !settledIds.has(r.id));
   const foldedRows = rows.filter((r) => settledIds.has(r.id));
   const outstanding = rows.length - triaged;
+  // Whether the stage requires a status on every row. Final review's open
+  // items do not: "10 still to resolve" beside "0 required" read as a
+  // contradiction (3 Oct). Decided by the stage's own criteria.
+  const statusRequired = stage.exit_criteria.some((c) => c.rule?.type === 'every_item_has_status');
 
   // PM-06: tell the workspace about unsaved edits, so "Save changes" can lead.
   const saveRef = useRef<() => Promise<void>>(async () => {});
@@ -272,7 +276,11 @@ export function ReviewRenderer({
                 outstanding === 0 ? 'text-[var(--pm-secondary)]' : 'text-[var(--on-surface-variant)]'
               }`}
             >
-              {outstanding === 0 ? 'all resolved' : `${outstanding} still to resolve`}
+              {outstanding === 0
+                ? 'all resolved'
+                : statusRequired
+                  ? `${outstanding} still to resolve`
+                  : `${outstanding} not yet marked — optional, does not block finishing`}
             </span>
             {proposed > 0 && (
               <span data-proposals className="text-label text-[var(--on-surface-variant)]">

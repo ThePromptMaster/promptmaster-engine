@@ -460,9 +460,15 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
       { key: 'where', label: 'Where it stands', max: 240 },
     ],
     statuses: [
-      { value: 'accepted', label: 'Settled', tone: 'done', modelMayPropose: true },
-      { value: 'deferred', label: 'Carry forward', tone: 'neutral', requiresReason: true, modelMayPropose: true },
+      { value: 'accepted', label: 'Settled', tone: 'done', modelMayPropose: true, explain: 'Resolved; nothing more is needed.' },
+      {
+        value: 'deferred', label: 'Carry forward', tone: 'neutral', requiresReason: true, modelMayPropose: true,
+        explain: 'Left unresolved, and listed with the finished work — on the finished page and at the end of the exported document — as an open issue and next step.',
+      },
     ],
+    // 3 Oct: "10 still to resolve" read as "do not finish yet". Open items
+    // are findings, and marking them does not block finishing.
+    decisionQuestion: 'For each open item: is it settled, or should it be carried forward as an open issue with the finished work? Marking them is optional and does not block finishing.',
     reasonFrom: ['where'],
   },
 };
