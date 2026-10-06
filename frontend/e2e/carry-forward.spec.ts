@@ -8,8 +8,8 @@ import { createProject, pressTransition, stageArtifact } from './helpers';
  * the ones carried forward go out with the finished work.
  */
 test('Final review: marking is optional, and what is carried forward is listed with the finished work', async ({ page }) => {
-  test.setTimeout(240_000);
-  await createProject(page, { workflow: 'Research', name: 'E2E carry forward', objective: 'Why gross margin fell' });
+  test.setTimeout(420_000);
+  await createProject(page, { workflow: 'Research', name: 'E2E carry forward', objective: 'Why gross margin fell [[mock:plan=generate_outline,draft_sections]]' });
   await expect(stageArtifact(page)).toContainText('Mock', { timeout: 30_000 });
   for (const heading of [
     'Literature context', 'Hypothesis or proposition', 'Method', 'Experiment or investigation', 'Analysis',
@@ -17,6 +17,22 @@ test('Final review: marking is optional, and what is carried forward is listed w
   ]) {
     await pressTransition(page);
     await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible({ timeout: 30_000 });
+    if (heading === 'Drafting') {
+      // As in research-end-to-end: Go builds the outline, the user approves it, Go drafts.
+      const panel = page.getByRole('region', { name: 'Go mode', exact: true });
+      await panel.getByRole('button', { name: 'Set up Go' }).click();
+      await panel.getByRole('radio', { name: /^Guided/ }).click();
+      await panel.getByRole('button', { name: /^Go$/ }).click();
+      const prompt = page.getByRole('region', { name: 'Go mode needs your approval' });
+      await expect(prompt).toContainText('Generate the outline', { timeout: 30_000 });
+      await prompt.getByRole('button', { name: 'Approve' }).click();
+      const card = page.getByRole('region', { name: 'Go mode needs you' });
+      await card.getByRole('button', { name: /pprove the outline/ }).click({ timeout: 30_000 });
+      await expect(prompt).toContainText('Draft the sections', { timeout: 30_000 });
+      await prompt.getByRole('button', { name: 'Approve' }).click();
+      await expect(page.getByText(/(\d+) of \1 sections written/)).toBeVisible({ timeout: 180_000 });
+      await panel.getByRole('button', { name: /^Stop/ }).click().catch(() => {});
+    }
   }
   const artifact = stageArtifact(page);
   await expect(artifact).toContainText('Mock item 1', { timeout: 30_000 });
