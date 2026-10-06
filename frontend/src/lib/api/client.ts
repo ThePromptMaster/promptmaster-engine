@@ -695,6 +695,15 @@ export const api = {
     return apiFetch('/api/agent/triage', { method: 'POST', body: JSON.stringify(req), signal });
   },
 
+  /** Which finished stages relied on what changed in the brief (5 Oct). Writes nothing. */
+  async assessChange(req: {
+    field: string; before: string; after: string;
+    stages: { stage_id: string; label: string; summary: string; figures: string[]; computed: boolean }[];
+    model?: string;
+  }): Promise<{ kind: 'fact' | 'intent' | 'wording'; affected: { stage_id: string; reason: string }[]; calculations_hold: boolean }> {
+    return apiFetch('/api/assess-change', { method: 'POST', body: JSON.stringify(req) });
+  },
+
   /** Read each found source's abstract and judge it against its row (5 Oct). Stores nothing. */
   async agentVerifySources(
     req: { inputs: PMInput; sources: { id: string; claim: string; link: string }[]; model?: string },
