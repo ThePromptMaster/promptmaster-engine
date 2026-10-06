@@ -16,7 +16,10 @@ export const SINGLE_OUTPUT_V1: WorkflowTemplate = {
   // (Sean, 3 Oct: Review held the audit itself, and Go found "a deliverable,
   // not a prompt"). Input states the objective, Review writes the prompt,
   // Output produces the deliverable from the reviewed prompt.
-  version: 3,
+  // v4 (2026-10-06): each approval says who may satisfy it — a routine one
+  // Go may commit under the project's "Routine decisions: handle them for me",
+  // a reserved one only the user (Sean, 5 Oct). Criterion ids are unchanged.
+  version: 4,
   name: 'Single output',
   description: 'One prompt, evaluated and refined.',
   outline_stage: 'none',
@@ -58,7 +61,7 @@ export const SINGLE_OUTPUT_V1: WorkflowTemplate = {
       entry_prompt_hint:
         'Write the prompt that will be sent to produce the deliverable the objective describes. Address it to the model that will do the work: the task, the audience, what the deliverable must contain and in what structure, the constraints, the format and length, and what to avoid. It is an instruction, not the deliverable: write none of the deliverable itself.',
       exit_criteria: [
-        { id: 'review.checked', label: 'I have read the prompt and it asks for what I want', check: 'manual' },
+        { id: 'review.checked', label: 'I have read the prompt and it asks for what I want', check: 'manual', authority: 'delegable' },
       ],
       expected_artifacts: [{ kind: 'prompt', cardinality: 'one', primary: true }],
       recommended_modes: [],
@@ -93,7 +96,7 @@ export const SINGLE_OUTPUT_V1: WorkflowTemplate = {
       entry_guidance:
         'Offered every time, worth taking only when the output drifted. Correct the instruction rather than the text where you can.',
       exit_criteria: [
-        { id: 'realign.applied', label: 'I am satisfied the correction was applied', check: 'manual' },
+        { id: 'realign.applied', label: 'I am satisfied the correction was applied', check: 'manual', authority: 'delegable' },
       ],
       expected_artifacts: [{ kind: 'output', cardinality: 'one', primary: true }],
       recommended_modes: [{ mode: 'clarity', reason: 'Drift usually starts in the instruction, not the output' }],
@@ -109,7 +112,7 @@ export const SINGLE_OUTPUT_V1: WorkflowTemplate = {
       renderer: 'review',
       entry_guidance: 'Confirm this is what you needed, then export it or carry the lessons into the next piece of work.',
       exit_criteria: [
-        { id: 'summary.accepted', label: 'I accept this output as finished', check: 'manual' },
+        { id: 'summary.accepted', label: 'I accept this output as finished', check: 'manual', authority: 'reserved' },
       ],
       expected_artifacts: [{ kind: 'output', cardinality: 'one', primary: true }],
       recommended_modes: [],

@@ -17,8 +17,13 @@ const GROUPS = ['planning', 'outlining', 'drafting', 'expansion', 'evaluation', 
 /**
  * `requireHints`: every stage must say what it produces. On for anything
  * generated; Single output predates hints and draws on the brief instead.
+ * `requireAuthority`: every approval says whether it is a routine decision or
+ * the user's alone (6 Oct). On for every template written from now on.
  */
-export function validateTemplate(template: WorkflowTemplate, { requireHints = true } = {}): string[] {
+export function validateTemplate(
+  template: WorkflowTemplate,
+  { requireHints = true, requireAuthority = true } = {}
+): string[] {
   const errors: string[] = [];
   const stages = template.stages ?? [];
   if (!stages.length) return ['The workflow has no stages.'];
@@ -48,6 +53,10 @@ export function validateTemplate(template: WorkflowTemplate, { requireHints = tr
     if (s.transitions.allow_skip && !s.skip_reasons.length) errors.push(`"${s.label}" can be skipped but gives no reason to.`);
     for (const c of s.exit_criteria) {
       if (c.check === 'auto' && !c.rule) errors.push(`"${s.label}": "${c.label}" is checked automatically but has no rule.`);
+      if (c.check === 'manual' && requireAuthority && c.authority !== 'delegable' && c.authority !== 'reserved') {
+        errors.push(`"${s.label}": "${c.label}" does not say whether it is a routine decision or the user's alone.`);
+      }
+      if (c.check === 'auto' && c.authority) errors.push(`"${s.label}": "${c.label}" is checked automatically, so nobody decides it.`);
     }
     for (const m of s.recommended_modes) {
       if (m.reason.length > 80) errors.push(`"${s.label}": a mode's reason is longer than 80 characters.`);

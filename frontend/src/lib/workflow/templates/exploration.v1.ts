@@ -18,7 +18,10 @@ import type { WorkflowTemplate } from '../types';
  */
 export const EXPLORATION_V1: WorkflowTemplate = {
   key: 'exploration',
-  version: 1,
+  // v2 (2026-10-06): each approval says who may satisfy it — a routine one
+  // Go may commit under the project's "Routine decisions: handle them for me",
+  // a reserved one only the user (Sean, 5 Oct). Criterion ids are unchanged.
+  version: 2,
   name: 'Exploration',
   description: 'Take an idea as far as it goes, round after round, testing it as you go.',
   outline_stage: 'none',
@@ -128,7 +131,7 @@ export const EXPLORATION_V1: WorkflowTemplate = {
         'Write up where the idea stands after every round: the question, what was established and how, what broke, what remains open, and the most promising next steps. Distinguish established results from speculation throughout. Claiming more certainty than the rounds earned is the failure to avoid.',
       exit_criteria: [
         { id: 'write_up.written', label: 'The write-up is written', check: 'auto', rule: { type: 'artifact_non_empty' }, blocking: true },
-        { id: 'write_up.approved', label: 'I approve this as where the idea stands', check: 'manual', blocking: true },
+        { id: 'write_up.approved', label: 'I approve this as where the idea stands', check: 'manual', authority: 'reserved', blocking: true },
       ],
       expected_artifacts: [{ kind: 'exploration_write_up', cardinality: 'one', primary: true }],
       recommended_modes: [{ mode: 'clarity', reason: 'Makes the result readable by someone new' }],

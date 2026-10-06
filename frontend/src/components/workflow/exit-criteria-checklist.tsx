@@ -21,6 +21,12 @@ interface Props {
    * whenever the stage has a box only the user can tick.
    */
   collapsible?: boolean;
+  /**
+   * Approvals Go committed under "Routine decisions: handle them for me", with
+   * what its check found (5 Oct). The history says committed under the policy,
+   * never approved by the user.
+   */
+  committedByPolicy?: Record<string, string>;
 }
 
 /**
@@ -36,7 +42,14 @@ interface Props {
  * required — the stage stays open until the required ones are done — or
  * optional.
  */
-export function ExitCriteriaChecklist({ criteria, manualIds = new Set(), onToggleManual, readOnly = false, collapsible = false }: Props) {
+export function ExitCriteriaChecklist({
+  criteria,
+  manualIds = new Set(),
+  onToggleManual,
+  readOnly = false,
+  collapsible = false,
+  committedByPolicy = {},
+}: Props) {
   // A box only the user can tick is never folded away, ticked or not.
   const needsYou = criteria.some((c) => c.manual ?? manualIds.has(c.id));
   const [open, setOpen] = useState<boolean | null>(null);
@@ -100,6 +113,14 @@ export function ExitCriteriaChecklist({ criteria, manualIds = new Set(), onToggl
                 PromptMaster can&apos;t check this one here — it&apos;s yours to confirm.
               </span>
             )}
+            {manual && c.authority === 'delegable' && !c.satisfied && (
+              <span className="ml-2 text-label uppercase tracking-wide text-[var(--on-surface-variant)]">routine</span>
+            )}
+            {c.satisfied && committedByPolicy[c.id] !== undefined && (
+              <span className="mt-0.5 block text-label leading-snug text-[var(--on-surface-variant)]">
+                Committed under your routine-decision policy, after checking: {committedByPolicy[c.id]}
+              </span>
+            )}
             {!c.satisfied && c.hint && (
               <span className="mt-0.5 block text-label leading-snug text-[var(--on-surface-variant)]">{c.hint}</span>
             )}
@@ -160,7 +181,15 @@ export function ExitCriteriaChecklist({ criteria, manualIds = new Set(), onToggl
 
       <div className="space-y-4">
         {checked.length > 0 && group('PromptMaster verified', 'checked for you as you work', checked, 'Checked by PromptMaster')}
-        {yours.length > 0 && group('You approve', 'only you can give these', yours, 'For you to decide')}
+        {yours.length > 0 &&
+          group(
+            'You approve',
+            yours.some((r) => r.c.authority === 'delegable')
+              ? 'yours to give; a routine one PromptMaster can check and commit for you, if you let it handle routine decisions'
+              : 'only you can give these',
+            yours,
+            'For you to decide'
+          )}
       </div>
       </div>
     </section>

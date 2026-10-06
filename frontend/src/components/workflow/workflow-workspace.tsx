@@ -88,7 +88,7 @@ import { setUsageProject } from '@/lib/supabase/model-usage';
 import type { NewEvaluation, NewVersion } from '@/lib/supabase/versions';
 import { EventRecordedError, useProjectStore, type StageBundle } from '@/stores/project-store';
 import { commitOutlineVersion, approvedOutlineVersionId, ensureOutlineArtifact } from '@/lib/supabase/outline';
-import type { Artifact, ArtifactVersion, Evaluation, Project, ProjectPatch } from '@/types/project';
+import type { Artifact, ArtifactVersion, Evaluation, Project, ProjectPatch, RoutineDecisions } from '@/types/project';
 
 interface Props {
   project: Project;
@@ -812,6 +812,32 @@ export function WorkflowWorkspace({
     [project, onPatchProject, template, state, stageId, stage, context, flushProject, stageBundles, appendEvent, appendStageVersion]
   );
 
+  // "Routine decisions" (5 Oct). Written through before the event, because the
+  // database re-reads the column on every commit Go makes under it.
+  const setRoutineDecisions = useCallback(
+    async (value: RoutineDecisions) => {
+      onPatchProject({ routine_decisions: value });
+      try {
+        await flushProject();
+        await appendEvent({ type: 'routine_policy_changed', stage_id: stageId, payload: { routine_decisions: value } });
+      } catch (e) {
+        setTransitionError(`Routine decisions could not be saved${e instanceof Error && e.message ? `: ${e.message}` : ''}.`);
+      }
+    },
+    [onPatchProject, flushProject, appendEvent, stageId]
+  );
+
+  // Approvals committed under the routine-decision policy on this stage, while
+  // still ticked: what the check found, for the checklist (5 Oct).
+  const committedByPolicy = useMemo(() => {
+    const out: Record<string, string> = {};
+    for (const e of events ?? []) {
+      const id = e.type === 'criterion_committed' && e.stage_id === stageId ? String(e.payload?.criterion_id ?? '') : '';
+      if (id && project.manual_checks?.[id]) out[id] = e.reason ?? '';
+    }
+    return out;
+  }, [events, stageId, project.manual_checks]);
+
   const saveContent = useCallback(
     async (content: string) => {
       if (!stage || !appendStageVersion) return;
@@ -968,6 +994,13 @@ export function WorkflowWorkspace({
     setStageSummary,
     setStageFigures,
     reloadEvents: reloadAfterAgent,
+    // A routine approval Go committed under the policy (5 Oct): the box is
+    // ticked from the latest checks, and saved before the next move reads it.
+    commitCriterion: async (_stageId: string, criterionId: string) => {
+      const latest = useProjectStore.getState().project?.manual_checks ?? project.manual_checks ?? {};
+      onPatchProject({ manual_checks: { ...latest, [criterionId]: true } });
+      await flushProject();
+    },
     events: events ?? [],
     loadEvents: () => listWorkflowEvents(project.id),
     onRefresh: onReload,
@@ -1566,7 +1599,15 @@ export function WorkflowWorkspace({
           />
 
           {isCurrent && appendStageVersion && project.status !== 'finalized' && (
-            <GoPanel go={go} stageLabel={stage.label} mode={project.mode} needsActions={goNeedsActions} needContext={goNeedContextOnPage} dockHost={goDockHost} />
+            <GoPanel
+              go={go}
+              stageLabel={stage.label}
+              mode={project.mode}
+              needsActions={goNeedsActions}
+              needContext={goNeedContextOnPage}
+              dockHost={goDockHost}
+              routine={{ value: project.routine_decisions ?? 'ask', onChange: (v) => void setRoutineDecisions(v) }}
+            />
           )}
           {isCurrent && project.status === 'finalized' && (
             <ProjectFinished
@@ -1756,6 +1797,7 @@ export function WorkflowWorkspace({
             <ExitCriteriaChecklist
               criteria={evaluation.criteria}
               manualIds={manualIds}
+              committedByPolicy={committedByPolicy}
               onToggleManual={(id, checked) => void handleToggleManual(id, checked)}
               readOnly={!isEditable}
               collapsible={foldStageExtras}

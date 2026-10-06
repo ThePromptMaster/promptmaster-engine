@@ -11,6 +11,8 @@ import { DecisionPrompt, QuestionPrompt } from './decision-prompt';
 import { GoControl } from './go-control';
 import { NeedsYouCard } from './needs-you-card';
 import { PolicySelector } from './policy-selector';
+import { RoutineDecisions } from './routine-decisions';
+import type { RoutineDecisions as RoutinePolicy } from '@/types/project';
 import { StepTimeline } from './step-timeline';
 import { TransparencyPanel } from './transparency-panel';
 
@@ -41,6 +43,7 @@ export function GoPanel({
   needsActions,
   needContext,
   dockHost = null,
+  routine,
 }: {
   go: ReturnType<typeof useGoLoop>;
   stageLabel: string;
@@ -55,6 +58,8 @@ export function GoPanel({
    * don't have to keep scrolling back and forth".
    */
   dockHost?: HTMLElement | null;
+  /** "Routine decisions": who may decide an approval Go can check (5 Oct). */
+  routine?: { value: RoutinePolicy; onChange: (v: RoutinePolicy) => void };
 }) {
   const [open, setOpen] = useState(false);
   const sectionRef = useRef<HTMLElement>(null);
@@ -209,6 +214,7 @@ export function GoPanel({
       {expanded && (
         <div className="mt-4 space-y-4">
           <PolicySelector value={go.policy} onChange={go.setPolicy} disabled={go.active || go.phase === 'watching'} />
+          {routine && <RoutineDecisions value={routine.value} onChange={routine.onChange} />}
           <div ref={controlsRef}>
             <GoControl {...controlProps} />
           </div>

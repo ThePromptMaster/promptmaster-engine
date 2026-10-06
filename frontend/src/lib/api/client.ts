@@ -695,6 +695,14 @@ export const api = {
     return apiFetch('/api/agent/triage', { method: 'POST', body: JSON.stringify(req), signal });
   },
 
+  /** Whether a stage's text satisfies a routine approval, before Go commits it (5 Oct). Commits nothing. */
+  async agentCheckCriterion(
+    req: { inputs: PMInput; stage_label: string; criterion: string; content: string; model?: string },
+    signal?: AbortSignal
+  ): Promise<{ met: boolean; reason: string; model_used: string }> {
+    return apiFetch('/api/agent/check-criterion', { method: 'POST', body: JSON.stringify(req), signal });
+  },
+
   async agentReason(
     req: { inputs: PMInput; state: AgentStateDigest; action_key: string; params: Record<string, unknown>; model?: string },
     signal?: AbortSignal

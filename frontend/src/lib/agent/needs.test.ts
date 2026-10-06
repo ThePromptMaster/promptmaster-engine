@@ -5,7 +5,8 @@ import { describe, expect, it } from 'vitest';
 import { BOOK_V1 } from '@/lib/workflow/templates/book.v1';
 import { initialState, projectState } from '@/lib/workflow/engine';
 import type { StageEvaluation, WorkflowEvent } from '@/lib/workflow/types';
-import { describeNeed, needIsDecidedOnStage, needStillHolds, needsUser, requiredWork, type NeedsUser } from './needs';
+import { delegableToCommit, describeNeed, needIsDecidedOnStage, needStillHolds, needsUser, requiredWork, type NeedsUser } from './needs';
+import { RESEARCH_V1 } from '@/lib/workflow/templates/research.v1';
 
 const stage = (id: string) => BOOK_V1.stages.find((s) => s.id === id)!;
 const evaluation = (id: string, unmet: StageEvaluation['unmet'] = []): StageEvaluation => ({ stageId: id, canAdvance: unmet.every((c) => !c.blocking), criteria: [], unmet });
@@ -377,5 +378,46 @@ describe('requiredWork in a looping workflow (production pass, 5 Oct)', () => {
   it('leaves the choice to the planner while the stage is not ready, or outside a loop', () => {
     expect(requiredWork({ stage: next, facts: {}, stageEvaluation: unmet, allowed: ['propose_next_round'], round: { staleDraft: false } })).toBeNull();
     expect(requiredWork({ stage: next, facts: {}, stageEvaluation: met, allowed: ['propose_next_round'] })).toBeNull();
+  });
+});
+
+describe('routine decisions (Sean, 5 Oct): delegated, validated, and the user asked only when it is theirs', () => {
+  const draft = { draft: { truncated: false, checked: true } } as Record<string, unknown> as never;
+  const differentiator = [{ id: 'pos.differentiator', label: 'I confirm the one-sentence differentiator is stated', satisfied: false, blocking: true, manual: true }];
+  const moves = ['evaluate_stage', 'revise_stage', 'advance_stage', 'commit_delegated'];
+  const args = (over: Record<string, unknown> = {}) => ({
+    ...base, stage: stage('positioning'), facts: draft, stageEvaluation: evaluation('positioning', differentiator), allowed: moves, ...over,
+  });
+
+  it('under "handle them for me", a routine approval is checked and committed — not asked', () => {
+    expect(requiredWork(args({ routine: 'handle' }))).toMatchObject({ key: 'commit_delegated', params: { criterion_id: 'pos.differentiator' } });
+    expect(needsUser(args({ routine: 'handle' }))).toBeNull();
+  });
+
+  it('under "Ask me", the same approval is the user\'s, and the card says why', () => {
+    expect(requiredWork(args({ routine: 'ask' }))).toBeNull();
+    const need = needsUser(args({ routine: 'ask' }));
+    expect(need).toMatchObject({ kind: 'tick_criterion', criterionId: 'pos.differentiator', authority: 'policy_ask' });
+    expect(describeNeed(need!, label).message).toContain('your routine decisions are set to "Ask me"');
+    expect(describeNeed(need!, label).message).toContain('Approving it lets me carry on from Positioning');
+  });
+
+  it('a failed check is repaired, not asked about: Go revises toward it', () => {
+    const tried = args({ routine: 'handle', commitTried: ['pos.differentiator'] });
+    expect(requiredWork(tried)).toBeNull();
+    expect(needsUser(tried)).toBeNull();
+    // With no revision left to try, it is the user's after all.
+    expect(needsUser({ ...tried, allowed: ['advance_stage'] })).toMatchObject({ kind: 'tick_criterion', criterionId: 'pos.differentiator' });
+  });
+
+  it('a reserved approval is never delegated, and the card says it is the user\'s alone', () => {
+    const research = RESEARCH_V1.stages.find((s) => s.id === 'method')!;
+    const plan = [{ id: 'meth.analysisplan', label: 'I approve this analysis plan for execution', satisfied: false, blocking: true, manual: true }];
+    const reserved = { ...base, state: initialState(RESEARCH_V1), stage: research, facts: draft, stageEvaluation: evaluation('method', plan), allowed: moves, routine: 'handle' as const };
+    expect(delegableToCommit(research, evaluation('method', plan), 'handle')).toBeNull();
+    expect(requiredWork(reserved)).toBeNull();
+    const need = needsUser(reserved);
+    expect(need).toMatchObject({ kind: 'tick_criterion', criterionId: 'meth.analysisplan', authority: 'reserved' });
+    expect(describeNeed(need!, (id) => id).message).toContain('This one is yours alone');
   });
 });
