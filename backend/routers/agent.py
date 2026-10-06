@@ -33,6 +33,7 @@ from promptmaster.agent import (
     triage_findings,
     write_code,
 )
+from promptmaster.verify_sources import MAX_VERIFY, SourceToVerify, SourceVerdict, verify_sources
 from promptmaster.criterion_check import CriterionCheck, check_criterion
 from promptmaster.agent_actions import ACTION_KEYS, AGENT_ACTIONS, REASONING_ACTIONS, AgentAction
 from promptmaster.errors import PRESERVED_NOTHING_WRITTEN
@@ -233,6 +234,29 @@ async def api_literature_search(req: LiteratureSearchRequest) -> LiteratureSearc
     stored. Nobody has read what is returned."""
     works, reached = await search_works(req.query, req.limit, mock=llm_mode() == "mock")
     return LiteratureSearchResponse(works=works, reached=reached)
+
+
+class VerifySourcesRequest(BaseModel):
+    inputs: PMInput
+    sources: list[SourceToVerify] = Field(min_length=1, max_length=MAX_VERIFY)
+    model: str = ""
+
+
+class VerifySourcesResponse(BaseModel):
+    verdicts: list[SourceVerdict]
+    model_used: str = ""
+
+
+@router.post("/verify-sources")
+async def api_verify_sources(req: VerifySourcesRequest, client: OpenRouterClient = Depends(get_client)) -> VerifySourcesResponse:
+    """Read each source's abstract in OpenAlex and judge whether it supports the
+    row's claim, with the sentence relied on (5 Oct). One GET per source and at
+    most one LLM call; nothing is stored."""
+    try:
+        verdicts = await verify_sources(client, req.model or None, req.inputs, req.sources, mock=llm_mode() == "mock")
+    except OpenRouterError as e:
+        raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
+    return VerifySourcesResponse(verdicts=verdicts, model_used=_model_used(req.model, client))
 
 
 class CheckCriterionRequest(BaseModel):

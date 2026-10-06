@@ -8,7 +8,7 @@
  * and a row the user has already verified is never downgraded.
  */
 
-import { newItemId, type StageItem, type StageItemSchema } from './stage-artifact';
+import { itemSchemaFor, newItemId, type StageItem, type StageItemSchema } from './stage-artifact';
 import type { StageDefinition } from './types';
 
 export interface WorkMatch {
@@ -150,4 +150,100 @@ export function enoughWorksFound(stage: StageDefinition, items: readonly StageIt
       r?.type === 'min_items_with_status' && r.statuses.includes(status));
   if (!rule) return false;
   return items.filter((i) => rule.statuses.includes(i.status ?? '')).length >= rule.n;
+}
+
+/** PromptMaster's reading of one source's abstract (POST /api/agent/verify-sources). */
+export interface SourceVerdict {
+  id: string;
+  verdict: 'supports' | 'partly' | 'does_not' | 'cannot_tell';
+  quote: string;
+  basis: 'abstract' | 'none';
+  note: string;
+}
+
+export interface VerifyResult {
+  items: StageItem[];
+  supported: number;
+  contradicted: number;
+  /** Read but not settled, or not readable at all: the user's. */
+  open: number;
+}
+
+/** The rows a found record can be read for: found by the lookup, with a link, and not decided by the user. */
+export function verifyQueries(items: readonly StageItem[], schema: StageItemSchema, max = 20): { id: string; claim: string; link: string }[] {
+  const lookup = schema.lookup;
+  const verify = lookup?.verify;
+  if (!lookup || !verify) return [];
+  return items
+    .filter((i) => i.status === lookup.status && (i[lookup.linkField] ?? '').trim())
+    .map((i) => ({ id: i.id, claim: (i[verify.claimField] || i[lookup.field] || '').trim(), link: (i[lookup.linkField] ?? '').trim() }))
+    .filter((q) => q.claim)
+    .slice(0, max);
+}
+
+/**
+ * Put what the abstract showed onto the rows (5 Oct). Pure.
+ *
+ * Supported → "AI verified"; contradicted → "AI checked — does not support",
+ * which still waits for the user; anything else keeps "Retrieved" / "Source
+ * found". Each reading is recorded on the row — what was read, when, and the
+ * sentence relied on — and a row the user decided is never touched.
+ */
+export function applyVerification(
+  items: readonly StageItem[],
+  verdicts: readonly SourceVerdict[],
+  schema: StageItemSchema,
+  today = new Date().toISOString().slice(0, 10)
+): VerifyResult {
+  const lookup = schema.lookup;
+  const verify = lookup?.verify;
+  if (!lookup || !verify) return { items: [...items], supported: 0, contradicted: 0, open: 0 };
+  const byId = new Map(verdicts.map((v) => [v.id, v]));
+  const max = schema.fields.find((f) => f.key === lookup.recordField)?.max ?? 500;
+  let supported = 0;
+  let contradicted = 0;
+  let open = 0;
+  const next = items.map((item) => {
+    const v = byId.get(item.id);
+    if (!v || item.status !== lookup.status || item.status_source === 'user') return item;
+    const what =
+      v.verdict === 'supports' ? 'supports this' : v.verdict === 'does_not' ? 'does not support this' : v.verdict === 'partly' ? 'supports only part of this' : null;
+    const note = what
+      ? `AI check of the abstract (${today}): ${what} — “${v.quote.slice(0, 180)}”`
+      : `AI check (${today}): ${v.note || 'not settled by the abstract'}`;
+    const record = [(item[lookup.recordField] ?? '').replace(/ · AI check[^]*$/, '').trim(), note].filter(Boolean).join(' · ').slice(0, max);
+    const row: StageItem = { ...item, [lookup.recordField]: record };
+    if (v.verdict === 'supports') {
+      row.status = verify.supports;
+      row.status_source = 'tool';
+      supported += 1;
+    } else if (v.verdict === 'does_not') {
+      row.status = verify.contradicts;
+      row.status_source = 'tool';
+      contradicted += 1;
+    } else open += 1;
+    return row;
+  });
+  return { items: next, supported, contradicted, open };
+}
+
+export function verifySummary(result: VerifyResult): string {
+  const parts: string[] = [];
+  if (result.supported) parts.push(`${result.supported} AI verified from the abstract.`);
+  if (result.contradicted) parts.push(`${result.contradicted} where the abstract says something else — yours to correct or check.`);
+  if (result.open) parts.push(`${result.open} the abstract does not settle, or could not be read — yours to check in full.`);
+  return parts.join(' ');
+}
+
+/**
+ * Whether a stage's rows name sources PromptMaster could still look up or
+ * read: a stage that verifies (5 Oct), with a row nobody decided that names a
+ * source and has not been read yet.
+ */
+export function sourcesToCheck(stage: StageDefinition, items: readonly StageItem[]): boolean {
+  const schema = itemSchemaFor(stage);
+  const lookup = schema.lookup;
+  if (!lookup?.verify) return false;
+  const open = items.filter((i) => i.status_source !== 'user' && i.status !== lookup.verify!.supports && i.status !== lookup.verify!.contradicts);
+  return lookupQueries(open, schema).length > 0;
 }

@@ -105,7 +105,7 @@ test('Go applying a check\'s findings to a list stage keeps it a list', async ({
   await expect(artifact).not.toContainText('No works yet');
   await expect(artifact.getByRole('listitem')).toHaveCount(3);
   await page.screenshot({ path: test.info().outputPath('01-list-survives-apply-findings.png'), fullPage: true });
-  const [head] = await serviceSelect('artifact_versions', `project_id=eq.${id}&source_operation=eq.applied_findings&select=content`);
+  const [head] = await serviceSelect('artifact_versions', `project_id=eq.${id}&source_operation=eq.agent_apply&select=content`);
   expect(JSON.parse(head.content).items).toHaveLength(3);
 });
 

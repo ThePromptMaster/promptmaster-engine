@@ -1,5 +1,7 @@
 'use client';
 
+import { sourcesToCheck } from '@/lib/workflow/lookup';
+
 /**
  * Go mode's loop, driven from the browser and persisted as it goes (B4,
  * PM-17, PM-18).
@@ -482,6 +484,14 @@ export function useGoLoop(opts: Options) {
             ? Math.max(0, facts.review.items.length - runsTried)
             : 0;
 
+        // On a review table whose rows name sources (Fact-check), they are
+        // looked up and read once per stage per run before the table is handed
+        // over (5 Oct). Elsewhere looking up stays the planner's choice.
+        const lookedUpHere = [...priorStepsRef.current, ...stepsRef.current].some(
+          (st) => st.action_key === 'check_literature' && st.stage_id === o.stage!.id
+        );
+        const lookupDue = !lookedUpHere && Boolean(facts.review) && sourcesToCheck(o.stage, facts.review?.items ?? []);
+
         // Routine approvals (5 Oct): the project's policy, read each move so a
         // change mid-run applies at once; and the ones whose check failed on
         // the current version, which are revised toward rather than re-checked.
@@ -496,7 +506,7 @@ export function useGoLoop(opts: Options) {
         const need = needsUser({
           state: o.state, stage: o.stage, facts, stageEvaluation, allowed, policy: current.policy,
           outlineStageId: outlineStageFor(o.template)?.id ?? null, largeJobAcknowledged: largeJobOkRef.current,
-          runAttemptsLeft, routine, commitTried,
+          runAttemptsLeft, lookupDue, routine, commitTried,
         });
         if (need) {
           await setRunStatus('awaiting_decision', describeNeed(need, stageLabelFor).message, need);
@@ -508,7 +518,7 @@ export function useGoLoop(opts: Options) {
         // approval the findings are applied and the work checked first.
         const loops = o.template.stages.some((s) => s.transitions.loop_to);
         const required = requiredWork({
-          stage: o.stage, facts, stageEvaluation, allowed, routine, commitTried,
+          stage: o.stage, facts, stageEvaluation, allowed, lookupDue, routine, commitTried,
           ...(loops ? { round: { staleDraft: stageDrafts(o.stage) && !hasDraft } } : {}),
         });
         const choice = required
