@@ -330,3 +330,33 @@ describe('requiredWork: the stage\'s own requirements come before optional moves
     expect(needsUser({ ...base, stage: stage('positioning'), facts: pending, stageEvaluation: evaluation('positioning', approval), allowed: research })).toBeNull();
   });
 });
+
+describe('requiredWork in a looping workflow (production pass, 5 Oct)', () => {
+  const next = { ...BOOK_V1.stages[0], id: 'next_question', label: 'Next question', transitions: { ...BOOK_V1.stages[0].transitions, loop_to: 'explore' } };
+  const met = { canAdvance: true, unmet: [], criteria: [] } as unknown as StageEvaluation;
+  const unmet = { canAdvance: false, unmet: [], criteria: [] } as unknown as StageEvaluation;
+
+  it('drafts a stage that still holds last round\'s draft, before anything else', () => {
+    const r = requiredWork({ stage: next, facts: {}, stageEvaluation: met, allowed: ['draft_stage', 'request_user_decision'], round: { staleDraft: true } });
+    expect(r?.key).toBe('draft_stage');
+  });
+
+  it('proposes the next round once the question is written and the stage is ready', () => {
+    const r = requiredWork({ stage: next, facts: {}, stageEvaluation: met, allowed: ['propose_next_round', 'revise_stage'], round: { staleDraft: false } });
+    expect(r?.key).toBe('propose_next_round');
+  });
+
+  it('a stage that does not close a round gets the same answer with or without `round`', () => {
+    const plain = BOOK_V1.stages[0];
+    for (const evaluation of [met, unmet]) {
+      const allowed = ['propose_next_round', 'evaluate_stage', 'continue_writing'];
+      expect(requiredWork({ stage: plain, facts: {}, stageEvaluation: evaluation, allowed, round: { staleDraft: false } }))
+        .toEqual(requiredWork({ stage: plain, facts: {}, stageEvaluation: evaluation, allowed }));
+    }
+  });
+
+  it('leaves the choice to the planner while the stage is not ready, or outside a loop', () => {
+    expect(requiredWork({ stage: next, facts: {}, stageEvaluation: unmet, allowed: ['propose_next_round'], round: { staleDraft: false } })).toBeNull();
+    expect(requiredWork({ stage: next, facts: {}, stageEvaluation: met, allowed: ['propose_next_round'] })).toBeNull();
+  });
+});

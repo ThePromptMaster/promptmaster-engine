@@ -33,6 +33,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '@/lib/api/client';
 import { actionFor, actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, USER_ANSWER_STEP } from '@/lib/agent/actions';
 import { contextWithFacts, readOutcomeProof, readStageFacts, type StageFacts } from '@/lib/agent/facts';
+import { stageDrafts } from '@/lib/workflow/stage-artifact';
 import { describeNeed, NEED_CLEARED, NEED_MOVED_ON, needStillHolds, needsUser, requiredWork, type NeedsUser } from '@/lib/agent/needs';
 import { assertHonestOutcome, verifyOutcome } from '@/lib/agent/outcome';
 import { outlineStageFor } from '@/lib/outline/actions';
@@ -479,7 +480,11 @@ export function useGoLoop(opts: Options) {
         // What the stage itself still requires comes before anything the
         // planner might prefer (4 Oct): a cut-off draft is finished, and at an
         // approval the findings are applied and the work checked first.
-        const required = requiredWork({ stage: o.stage, facts, stageEvaluation, allowed });
+        const loops = o.template.stages.some((s) => s.transitions.loop_to);
+        const required = requiredWork({
+          stage: o.stage, facts, stageEvaluation, allowed,
+          ...(loops ? { round: { staleDraft: stageDrafts(o.stage) && !hasDraft } } : {}),
+        });
         const choice = required
           ? {
               action_key: required.key, params: {}, rationale: required.rationale, expected_outcome: required.expected,
