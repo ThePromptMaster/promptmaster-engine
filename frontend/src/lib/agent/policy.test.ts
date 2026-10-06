@@ -548,3 +548,22 @@ describe('an exploration round ends in a proposed round, not the write-up (produ
     expect(allowedActions(EXPLORATION_V1, findingsState, getStage(EXPLORATION_V1, 'findings')!, true)).toContain('advance_stage');
   });
 });
+
+describe('each exploration round is drafted afresh (production pass, 4 Oct)', () => {
+  const ids = EXPLORATION_V1.stages.map((s) => s.id);
+  const events = ids.slice(0, ids.indexOf('findings')).map((id, i) => ({
+    type: 'stage_completed' as const, stage_id: id, to_stage_id: ids[i + 1], actor: 'user' as const, created_at: `2026-10-04T00:00:0${i}Z`,
+  }));
+  const state = projectState(EXPLORATION_V1, events);
+  const findings = getStage(EXPLORATION_V1, 'findings')!;
+
+  it('drafts a re-entered stage before moving on', () => {
+    const allowed = allowedActions(EXPLORATION_V1, state, findings, false);
+    expect(allowed).toContain('draft_stage');
+    expect(allowed).not.toContain('advance_stage');
+  });
+
+  it('moves on once this round has its draft', () => {
+    expect(allowedActions(EXPLORATION_V1, state, findings, true)).toContain('advance_stage');
+  });
+});
