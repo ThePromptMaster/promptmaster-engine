@@ -346,6 +346,15 @@ describe('requiredWork in a looping workflow (production pass, 5 Oct)', () => {
     expect(r?.key).toBe('propose_next_round');
   });
 
+  it('a stage that does not close a round gets the same answer with or without `round`', () => {
+    const plain = BOOK_V1.stages[0];
+    for (const evaluation of [met, unmet]) {
+      const allowed = ['propose_next_round', 'evaluate_stage', 'continue_writing'];
+      expect(requiredWork({ stage: plain, facts: {}, stageEvaluation: evaluation, allowed, round: { staleDraft: false } }))
+        .toEqual(requiredWork({ stage: plain, facts: {}, stageEvaluation: evaluation, allowed }));
+    }
+  });
+
   it('leaves the choice to the planner while the stage is not ready, or outside a loop', () => {
     expect(requiredWork({ stage: next, facts: {}, stageEvaluation: unmet, allowed: ['propose_next_round'], round: { staleDraft: false } })).toBeNull();
     expect(requiredWork({ stage: next, facts: {}, stageEvaluation: met, allowed: ['propose_next_round'] })).toBeNull();
