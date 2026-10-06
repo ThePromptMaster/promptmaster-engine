@@ -501,6 +501,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       const created = await ctx.appendStageVersion(ctx.stage.id, ctx.stage.label, {
         content,
         source_operation: revising ? 'agent_revise' : 'agent_draft',
+        base_content: head,
         instruction: instruction || ctx.step.rationale || ctx.stage.entry_prompt_hint || '',
         model: res.model_used || ctx.project.model,
         mode: ctx.project.mode,
@@ -643,7 +644,8 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
           ? { table: { stage: ctx.stage, request: (instruction: string) => generationRequest(ctx.project, ctx.template, ctx.state, ctx.bundles, ctx.stage, head.content, instruction) } }
           : {}),
       });
-      const created = await ctx.appendStageVersion(ctx.stage.id, ctx.stage.label, appliedFindingsVersion(rev, ctx.project));
+      // Go's own apply, told apart from the user's Apply button in the history.
+      const created = await ctx.appendStageVersion(ctx.stage.id, ctx.stage.label, { ...appliedFindingsVersion(rev, ctx.project), source_operation: 'agent_apply' });
       const versionId = (created as { id?: unknown } | null)?.id;
       return done(key, {
         status: 'succeeded', toolsUsed: ['model'],
@@ -672,6 +674,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       const created = await ctx.appendStageVersion(ctx.stage.id, ctx.stage.label, {
         content: serializeItems(items),
         source_operation: 'agent_triage',
+        base_content: ctx.bundles[ctx.stage.id]?.versions.at(-1)?.content ?? '',
         instruction: ctx.step.rationale || 'Go mode decided the routine findings.',
         model: res.model_used || ctx.project.model,
         mode: ctx.project.mode,
@@ -697,6 +700,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       const created = await ctx.appendStageVersion(ctx.stage.id, ctx.stage.label, {
         content: serializeItems(res.items),
         source_operation: 'agent_triage',
+        base_content: ctx.bundles[ctx.stage.id]?.versions.at(-1)?.content ?? '',
         instruction: ctx.step.rationale || 'Go mode proposed a status for each row from its own text.',
         model: res.model_used || ctx.project.model,
         mode: ctx.project.mode,

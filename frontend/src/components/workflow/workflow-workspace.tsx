@@ -66,6 +66,7 @@ import { defaultOutlineForm, deriveOutlineItems, draftingStageId, formOfItems, o
 import { OutlineStagePanel } from '@/components/outline/outline-stage-panel';
 import { ProjectBrief, ProjectSetup, stageWantsSetup } from './project-setup';
 import { ProjectData } from './project-data';
+import { RefusedRevisions, refusedSince } from './refused-revisions';
 import { draftBindings } from '@/lib/outline/long-form';
 import { approveOutline, loadOutline, materialiseOutlineInto, outlineStageFor } from '@/lib/outline/actions';
 import type { OutlineDocument } from '@/types/outline';
@@ -1641,6 +1642,7 @@ export function WorkflowWorkspace({
                 underneath a working editor. A derived outline sits on the
                 drafting stage, whose renderer still has work to do, so only the
                 explicit case suppresses it. */}
+            <RefusedRevisions refused={refusedSince(events ?? [], stage.id, headVersion)} head={headVersion} />
             {explicitOutlineHere ? null : !stageDrafts(stage) &&
               stage.renderer !== 'long_form' ? (
               <CheckpointPanel />

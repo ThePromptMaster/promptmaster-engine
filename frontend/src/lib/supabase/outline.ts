@@ -1,3 +1,4 @@
+import { RefusedRevision } from '@/lib/workflow/commit-check';
 import { createClient } from './client';
 import { appendVersion, createArtifact, listArtifacts } from './versions';
 import { appendWorkflowEvent } from './workflow';
@@ -83,6 +84,13 @@ export async function commitOutlineVersion(
   doc: OutlineDocument,
   options: CommitOutlineOptions = {}
 ): Promise<ArtifactVersion> {
+  // The outline's commit check (G1): a generated outline with no sections is
+  // refused before it can become the version drafting binds to. The user may
+  // still empty their own.
+  const operation = options.sourceOperation ?? 'outline_edit';
+  if (operation !== 'outline_edit' && doc.items.length === 0) {
+    throw new RefusedRevision('The outline came back with no sections, so the current version was kept');
+  }
   const created = await appendVersion(artifact, {
     content: serializeOutlineDocument({ ...doc, forked_from_version_id: doc.forked_from_version_id ?? null }),
     source_operation: options.sourceOperation ?? 'outline_edit',

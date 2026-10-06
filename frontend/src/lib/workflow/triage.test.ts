@@ -50,6 +50,11 @@ describe('which findings Go may decide (B3)', () => {
     expect(withReason.applied).toEqual(['b']);
     expect(withReason.items[1]).toMatchObject({ status: 'rejected', reason: 'The text does not say that.' });
   });
+
+  it("records Go's decision as Go's, not the user's (G1)", () => {
+    const { items } = applyTriage([row('a', 'minor')], [{ id: 'a', status: 'accepted' }], continuity);
+    expect(items[0]).toMatchObject({ status: 'accepted', status_source: 'model' });
+  });
 });
 
 describe('claim table provenance (C3)', () => {

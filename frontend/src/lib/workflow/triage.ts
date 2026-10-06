@@ -67,7 +67,9 @@ export function applyTriage(
     const reason = (d.reason ?? '').trim();
     if (option.requiresReason && !reason) return item;
     applied.push(item.id);
-    return { ...item, status: option.value, ...(reason ? { reason } : {}) };
+    // Go's decision, recorded as such: a status with no source reads as the
+    // user's, and Go's routine triage is not (G1, 6 Oct).
+    return { ...item, status: option.value, status_source: 'model', ...(reason ? { reason } : {}) };
   });
   return { items: next, applied };
 }

@@ -315,7 +315,9 @@ export type WorkflowEventType =
   | 'project_reopened'
   | 'template_upgraded'
   /** C5: a done stage opened for editing without moving the cursor. Closing it again is stage_marked_complete. */
-  | 'stage_reopened';
+  | 'stage_reopened'
+  /** A revision the commit check refused; moves no state (G1, 6 Oct). */
+  | 'revision_refused';
 
 export interface WorkflowEvent {
   type: WorkflowEventType;
