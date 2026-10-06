@@ -28,6 +28,7 @@
  * open. Closing it pauses the run, and reopening the project resumes it.
  */
 
+import { RefusedRevision } from '@/lib/workflow/commit-check';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { api } from '@/lib/api/client';
@@ -296,7 +297,11 @@ export function useGoLoop(opts: Options) {
         if (signal.aborted || (e as Error)?.name === 'AbortError') throw new Stopped();
         outcome = {
           status: 'failed', label: null, toolsUsed: [], changes: {},
-          output: e instanceof Error && e.message ? e.message : 'The step failed.',
+          // A refused revision tells the next plan what a retry must do; a
+          // second failure in a row stops the run (MAX_CONSECUTIVE_FAILURES).
+          output: e instanceof RefusedRevision
+            ? `${e.message}. A retry must start from the current version and keep every row the user decided.`
+            : e instanceof Error && e.message ? e.message : 'The step failed.',
         };
       }
       if (signal.aborted) throw new Stopped();

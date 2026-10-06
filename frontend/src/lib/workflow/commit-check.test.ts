@@ -44,3 +44,48 @@ describe('checkCommit: what may become the current version', () => {
     expect(checkCommit({ before: PROSE, after: '', operation: 'stage_edit' })).toBeNull();
   });
 });
+
+describe('checkCommit: what the user decided, and what moved underneath (6 Oct)', () => {
+  const DECIDED = serializeItems([
+    { id: 'a', claim: 'Option A: close the plant', status: 'ruled_out', reason: 'Union contract', status_source: 'user' },
+    { id: 'b', claim: 'Option B: reprice contracts' },
+  ]);
+
+  it('refuses an unreviewed revision that drops a row the user decided, and names it', () => {
+    const after = serializeItems([{ id: 'b', claim: 'Option B: reprice contracts' }]);
+    for (const operation of ['agent_revise', 'applied_findings', 'agent_triage']) {
+      expect(checkCommit({ before: DECIDED, after, operation })).toMatch(/dropped a row you had decided \("Option A: close the plant"\)/);
+    }
+  });
+
+  it('lets the user drop it themselves, or through a chat proposal they accepted', () => {
+    const after = serializeItems([{ id: 'b', claim: 'Option B: reprice contracts' }]);
+    for (const operation of ['stage_edit', 'chat_instruct', 'chat_rows']) {
+      expect(checkCommit({ before: DECIDED, after, operation })).toBeNull();
+    }
+  });
+
+  it('lets a revision drop rows nobody decided (the wanted cut, 6 Oct)', () => {
+    const after = serializeItems([{ id: 'a', claim: 'Option A', status: 'ruled_out', reason: 'Union contract', status_source: 'user' }]);
+    expect(checkCommit({ before: DECIDED, after, operation: 'agent_revise' })).toBeNull();
+  });
+
+  it('counts a decision carried onto a renumbered row as kept', () => {
+    const after = serializeItems([
+      { id: 'r1', claim: 'Close the plant', status: 'ruled_out', reason: 'Union contract', status_source: 'user' },
+    ]);
+    expect(checkCommit({ before: DECIDED, after, operation: 'agent_revise' })).toBeNull();
+  });
+
+  it('treats a status with no source as the user’s, and a model proposal as nobody’s', () => {
+    const legacy = serializeItems([{ id: 'a', claim: 'A', status: 'addressed' }, { id: 'b', claim: 'B', status: 'left_open', reason: 'r', status_source: 'proposed' }]);
+    expect(checkCommit({ before: legacy, after: serializeItems([{ id: 'b', claim: 'B' }]), operation: 'agent_revise' })).toMatch(/dropped/);
+    expect(checkCommit({ before: legacy, after: serializeItems([{ id: 'a', claim: 'A', status: 'addressed' }]), operation: 'agent_revise' })).toBeNull();
+  });
+
+  it('refuses a revision made from a version that is no longer current', () => {
+    expect(checkCommit({ before: PROSE, after: 'New text.', operation: 'applied_findings', base: 'An older draft.' })).toMatch(/changed while this revision was being made/);
+    expect(checkCommit({ before: PROSE, after: 'New text.', operation: 'applied_findings', base: PROSE })).toBeNull();
+    expect(checkCommit({ before: undefined, after: 'First.', operation: 'agent_draft', base: '' })).toBeNull();
+  });
+});
