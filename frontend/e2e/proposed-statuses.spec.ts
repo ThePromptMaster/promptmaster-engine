@@ -17,7 +17,7 @@ test('Alternatives arrives with proposed statuses; one click confirms them', asy
     'Literature context', 'Hypothesis or proposition', 'Method', 'Experiment or investigation', 'Analysis', 'Alternative explanations',
   ]) {
     await pressTransition(page);
-    await expect(page.getByRole('heading', { name: heading })).toBeVisible();
+    await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible();
     await expect(stageArtifact(page)).toContainText('Mock', { timeout: 30_000 });
   }
 
