@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from deps import get_client
 from promptmaster.errors import PRESERVED_NOTHING_WRITTEN
+from promptmaster.limits import MAX_OBJECTIVE_CHARS
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError
 from routers._errors import llm_http_error
 from promptmaster.schemas import GuideAnswer, GuideQuestion, SetupSuggestion
@@ -46,7 +47,7 @@ async def api_generate_setup(
 
 
 class GuideQuestionsRequest(BaseModel):
-    objective: str = Field(..., min_length=1, max_length=4_000)
+    objective: str = Field(..., min_length=1, max_length=MAX_OBJECTIVE_CHARS)
     model: str = ""
 
 
@@ -70,7 +71,7 @@ class GuideAnswered(BaseModel):
 
 
 class GuideNextRequest(BaseModel):
-    objective: str = Field(..., min_length=1, max_length=4_000)
+    objective: str = Field(..., min_length=1, max_length=MAX_OBJECTIVE_CHARS)
     answered: list[GuideAnswered] = Field(default_factory=list, max_length=12)
     model: str = ""
 
@@ -99,7 +100,7 @@ async def api_guide_next_question(
 class GenerateWorkflowRequest(BaseModel):
     #: What kind of work this is, in the user's words ("a magazine feature").
     description: str = Field(..., min_length=3, max_length=2_000)
-    objective: str = Field(default="", max_length=4_000)
+    objective: str = Field(default="", max_length=MAX_OBJECTIVE_CHARS)
     model: str = ""
 
 

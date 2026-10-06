@@ -14,6 +14,7 @@ from .conversation import _shared_system
 from .llm_client import OpenRouterClient
 from .schemas import AuditFinding, Iteration, PMInput
 from .session_context import format_session_history
+from .project_context import context_block
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,8 @@ def build_audit_findings_prompt(
         f"Audience: {inputs.audience}\n"
         f"Constraints: {inputs.constraints or '(none)'}\n"
         f"Output format: {inputs.output_format or '(none)'}\n\n"
-        f"Session history:\n{history}\n\n"
+        + (f"{context_block(inputs)}\n\n" if inputs.context.strip() else "")
+        + f"Session history:\n{history}\n\n"
         f"--- CURRENT OUTPUT TO AUDIT ---\n{current_output}\n--- END ---\n\n"
         "Identify the 3-7 most impactful findings. Return JSON in this shape:\n"
         "{\n"
@@ -131,7 +133,8 @@ def build_apply_audit_prompt(
         f"Audience: {inputs.audience}\n"
         f"Constraints: {inputs.constraints or '(none)'}\n"
         f"Output format: {inputs.output_format or '(none)'}\n\n"
-        f"PREVIOUS OUTPUT (revise this — do not repeat verbatim):\n"
+        + (f"{context_block(inputs)}\n\n" if inputs.context.strip() else "")
+        + f"PREVIOUS OUTPUT (revise this — do not repeat verbatim):\n"
         f"{source_iteration.output}\n\n"
         f"FINDINGS TO ADDRESS:\n{findings_block}\n\n"
         "Produce a revised version of the answer that addresses each finding "

@@ -466,6 +466,76 @@ stage is short of the works its own requirement asks for; after that, Check lite
 looks up what is listed. Relevance is the user's to judge (they remove rows that do not
 belong); filtering by the index's relevance score or by reading abstracts is not built.
 
+
+### L-36 · The commit check guards shape, not quality · `accepted`
+
+Since 2026-10-05 every new stage version passes `checkCommit` (`lib/workflow/commit-check.ts`)
+inside `appendStageVersion`. A model's revision is refused, and the current version kept,
+when it is:
+- empty;
+- text where the stage holds a table;
+- a table that lost every row.
+
+It does not judge whether a revision is *better*, and it does not refuse a table that lost
+some of its rows. It does not judge length either: a rule that refused rewrites keeping
+under 30% of the text was removed on 2026-10-06, the day it shipped. Findings that ask for
+a 23,000-character overshoot to be cut back to a statement are asking for exactly that. Hand edits and restores are exempt, so a user may empty a stage on purpose.
+
+### L-37 · "Figures must have a source" is a lexical check · `accepted`
+
+Since 2026-10-05 a stage check adds a finding for every percentage, amount of money,
+magnitude (m, bn, k) or decimal in the draft, ranges included, that does not appear in:
+- the project's objective, constraints or context;
+- its data files;
+- another stage's text.
+
+The check is unit-aware: a percentage needs a percentage, and money needs money. It is
+code, not a model. The trade-offs:
+- **Written another way:** a figure written differently in its source ($41.2m against
+  $41,200,000) is reported.
+- **Derived by calculation:** a figure derived by calculation is reported unless a sandbox
+  run recorded it in a stage.
+- **Plain counts:** plain counts ("three plants", "18 months") are not checked.
+- **Assumption labels:** a sentence that labels its figure as an assumption or as
+  illustrative passes; "scenario" does not.
+
+### L-38 · Project context is capped at 60,000 characters and rides on every call · `accepted`
+
+`projects.context` (2026-10-05) is the user's source material, kept apart from the
+objective. It is capped at 60,000 characters, about 15k tokens (`MAX_CONTEXT_CHARS`).
+- **Where it goes:** it is included in every prompt that produces or judges stage work,
+  so a long context costs tokens on each of those calls. Go's planner gets only a
+  4,000-character excerpt.
+- **Not retrieval:** there is no retrieval over it; it is sent whole.
+- **Over the cap:** material beyond 60,000 characters belongs in a data file. Today the
+  model sees only the first rows of a text file (L-B3), so very large sources are not yet
+  usable.
+
+### L-39 · No dependency graph: staleness is coarse · `open`
+
+When an earlier stage changes:
+- its figures stop being handed to later stages (`establishedFigures`);
+- a return marks later stages stale.
+
+PromptMaster does not record which claim rests on which evidence. So it cannot say which
+specific conclusions, rows or paragraphs a change invalidates, or repair only those. The
+design for it is an additive links table (from → to, kind = supports / derived_from /
+cites) over the existing ids (`docs/architecture.md` § Project state model). That is the
+main foundational piece of the governance direction discussed on 2026-10-04/05.
+
+### L-40 · At an approval, Go asks rather than reasons further · `accepted`
+
+Since 2026-10-05 the boundary is reached when:
+- everything still open on a stage is a box only the user ticks;
+- the draft is finished, its findings are applied and it has been checked.
+
+At that point Go asks for the tick at once. Reasoning moves (Compare alternatives,
+Derive, …) are not taken first, because they cannot satisfy an approval. A user who wants
+more reasoning before approving asks for it in the side chat, or answers Go's card with a
+direction. Two things still count as work Go may do first:
+- an optional automatic item that is still open (Literature's "three works verified");
+- a computation the project's data can run.
+
 ---
 
 ## Summary
@@ -507,6 +577,11 @@ belong); filtering by the index's relevance score or by reading abstracts is not
 | L-33 | Password reset works on any device; email delivery needs a custom SMTP provider | open |
 | L-34 | Research outline and manuscript share one artifact row | accepted |
 | L-35 | Literature topic search returns index matches, not judged relevance | accepted |
+| L-36 | The commit check guards shape (empty, prose-for-table, no rows), not quality or length | accepted |
+| L-37 | Figures must have a source: lexical, unit-aware; other spellings and derived figures are reported | accepted |
+| L-38 | Project context capped at 60k characters, sent whole on every stage call | accepted |
+| L-39 | No dependency graph; staleness is per stage, not per claim | open |
+| L-40 | At an approval Go asks rather than reasoning further | accepted |
 | L-B3 | Go code execution: Python only, fixed packages, no network | accepted |
 | L-B4 | Go runs while the tab is open; windows, not dollars | accepted |
 | L-C3 | Conflict detection misses paraphrase and cross-stage contradiction | accepted |

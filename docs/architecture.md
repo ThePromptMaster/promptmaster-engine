@@ -492,6 +492,49 @@ user — and the database fixes what each may record (`workflow_events_agent_aut
 
 Neither direction changes the record or the guarantees above; both add a way in.
 
+### Project state model (2026-10-05)
+
+On 4 Oct the client asked for the project's state to be held as four kinds of truth,
+each with its own rules for change: what the human wants, what the project knows, what
+has been authorised, and what has been done. This is where each lives today, and where the
+gaps are.
+
+| Kind | Held in | Who may change it |
+|---|---|---|
+| **Intent**: objective, constraints, audience, format, context, critique dials | `projects` | the user (patches with a `revision` guard) |
+| **Knowledge**: figures, evidence, results, literature | `artifacts.key_figures` (only values found verbatim), `sandbox_runs`, review rows with `status_source`, evidence-cited stage events | a model's rows are candidates until a lookup, a run or the user settles them |
+| **Authority**: decisions, approvals, overrides, authorisations | `decisions`, `recommendations`, manual criteria (`projects.manual_checks`), Go authorisations | the user; a model only *proposes* (DB-enforced, above) |
+| **Execution**: what ran and what it produced | `agent_runs`, `agent_steps`, `artifact_versions`, `workflow_events` | append-only; labels derived from what happened |
+
+**Every write of stage work passes one commit check.** `appendStageVersion` runs
+`checkCommit` (`lib/workflow/commit-check.ts`) before anything is appended. It refuses a
+revision that is empty, text where the stage holds a table, or a table with no rows
+(L-36). Code also checks that figures have a source
+(`lib/workflow/figure-support.ts`, L-37); a figure without one becomes a finding rather
+than a refusal.
+
+**Go is driven by the stage's own requirements first** (`requiredWork`,
+`lib/agent/needs.ts`):
+1. finish a cut-off draft;
+2. once only the user's approval is left, apply the open findings;
+3. check the result;
+4. ask for the approval.
+
+The planner chooses only among what remains. A repeated move counts as a loop only if it
+changed nothing (`noProgress`).
+
+**The gap is dependencies (L-39).** Nothing yet records that a claim rests on a figure, or
+a conclusion on a decision. So a change upstream marks whole stages stale rather than the
+specific claims that depended on it. The intended shape is additive:
+- a `links` table (`from_kind, from_id, to_kind, to_id, kind`), where `kind` is supports /
+  derived_from / cites;
+- written when a stage quotes an established figure, cites evidence or applies a decision;
+- walked by a pure function that returns what is no longer justified (epistemic) and what
+  must be redone (operational) — the same edges, read two ways.
+
+Stable ids already exist on versions, rows and figures, so this needs no change to what is
+stored today.
+
 ## Extension points
 
 These are the seams the system was built to be extended at. Working with them is

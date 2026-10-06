@@ -31,6 +31,7 @@ from .conversation import _shared_system
 from .llm_client import OpenRouterClient
 from .page_context import scrub_button_mentions
 from .schemas import PMInput, DataFileBrief, format_data_files
+from .project_context import context_block
 
 logger = logging.getLogger(__name__)
 
@@ -301,6 +302,8 @@ def _format_state(inputs: PMInput, state: AgentState) -> str:
     return "\n".join([
         f"OBJECTIVE (authoritative): {inputs.objective}",
         f"Audience: {inputs.audience or '(not set)'}",
+        f"Constraints: {inputs.constraints or '(none)'}",
+        *([context_block(inputs, limit=4_000)] if inputs.context.strip() else []),
         "",
         *workflow_line,
         f"CURRENT STAGE: {state.stage_label or state.stage_id}",

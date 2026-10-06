@@ -16,6 +16,7 @@ import {
   serializeItems,
   type StageItem,
 } from '@/lib/workflow/stage-artifact';
+import type { AuditFinding } from '@/types';
 import type { StageDefinition, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
 import type { NewEvaluation } from '@/lib/supabase/versions';
 import type { Project } from '@/types/project';
@@ -42,6 +43,7 @@ export function inputsFrom(project: Project): PMInput {
     audience: project.audience,
     constraints: project.constraints,
     output_format: project.output_format,
+    context: project.context ?? '',
     mode: project.mode,
     custom_name: project.custom_name,
     custom_preamble: project.custom_preamble,
@@ -164,7 +166,9 @@ export function evaluationRequest(
 export function evaluationRecord(
   response: EvaluateStageArtifactResponse,
   fallbackModel: string,
-  source: NewEvaluation['source'] = 'manual'
+  source: NewEvaluation['source'] = 'manual',
+  /** Findings code found (figures with no source, 4 Oct), recorded beside the model's. */
+  checked: AuditFinding[] = []
 ): NewEvaluation {
   const { evaluation } = response;
   return {
@@ -177,7 +181,7 @@ export function evaluationRecord(
     completeness_status: evaluation.completeness?.status ?? null,
     completeness_reason: evaluation.completeness?.reason ?? null,
     interpretation: evaluation.interpretation ?? null,
-    findings: evaluation.findings ?? [],
+    findings: [...(evaluation.findings ?? []), ...checked],
     further_pass_needed: evaluation.further_pass_needed ?? null,
     further_pass_reason: evaluation.further_pass_reason || null,
     evaluator_model: response.model_used || fallbackModel,

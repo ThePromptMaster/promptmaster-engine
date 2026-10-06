@@ -12,6 +12,7 @@ from .prompt_builder import build_prompt, resolve_mode_config
 from .schemas import ChatMessage, Iteration, PMInput
 from .self_model import PROMPTMASTER_SELF_MODEL
 from .session_context import format_session_history
+from .project_context import context_line
 
 
 _PROMPTMASTER_CONTEXT = (
@@ -106,6 +107,7 @@ def build_chat_reply_prompt(
         f"Original objective: {inputs.objective}\n"
         f"Audience: {inputs.audience}\n"
         f"Constraints: {inputs.constraints or '(none)'}\n"
+        f"{context_line(inputs)}"
         f"Output format: {inputs.output_format or '(none)'}\n\n"
         f"{_where(context)}"
         f"CURRENT VERSION (#{active_iteration.iteration_number}):\n"
@@ -144,6 +146,7 @@ def build_apply_to_answer_prompt(
         f"Original objective: {inputs.objective}\n"
         f"Audience: {inputs.audience}\n"
         f"Constraints: {inputs.constraints or '(none)'}\n"
+        f"{context_line(inputs)}"
         f"Output format: {inputs.output_format or '(none)'}\n\n"
         f"{_where(context)}"
         f"CURRENT VERSION (#{active_iteration.iteration_number}):\n"
@@ -185,6 +188,7 @@ def build_save_as_new_version_prompt(
         f"Original objective: {inputs.objective}\n"
         f"Audience: {inputs.audience}\n"
         f"Constraints: {inputs.constraints or '(none)'}\n"
+        f"{context_line(inputs)}"
         f"Output format: {inputs.output_format or '(none)'}\n\n"
         f"{_where(context)}"
         f"CURRENT VERSION (#{active_iteration.iteration_number}):\n"

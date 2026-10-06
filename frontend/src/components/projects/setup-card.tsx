@@ -5,6 +5,7 @@ import { WorkflowPicker } from '@/components/projects/workflow-picker';
 import { MODE_DISPLAY } from '@/lib/constants';
 import type { WorkflowTemplate } from '@/lib/workflow/types';
 import type { ModeType, SetupRationale } from '@/types';
+import { MAX_CONTEXT_CHARS } from '@/lib/projects/split-ask';
 
 export interface SetupDraft {
   title: string;
@@ -12,6 +13,8 @@ export interface SetupDraft {
   audience: string;
   constraints: string;
   output_format: string;
+  /** Source material behind the objective (4 Oct, item 7); may be long. */
+  context: string;
   mode: ModeType;
 }
 
@@ -108,6 +111,23 @@ export function SetupCard({
           className="mt-3 w-full bg-transparent text-body leading-relaxed text-[var(--on-surface-variant)] outline-none"
         />
       </div>
+      </section>
+
+      <section>
+        <label htmlFor="setup-context" className={label}>Project context</label>
+        <p className="mb-2 text-label text-[var(--on-surface-variant)]">
+          {draft.context.trim()
+            ? 'What you pasted is kept here in full, and every stage can quote it. The objective above is its opening — edit it to say what you want decided.'
+            : 'Optional. Facts, figures and background the work should draw on — paste them here rather than into the objective.'}
+        </p>
+        {/* Scrolls rather than grows: a pasted brief can run to pages. */}
+        <textarea id="setup-context" value={draft.context} rows={draft.context ? 10 : 3}
+          placeholder="E.g. revenue by plant, the last three years' margins, what the board has already ruled out."
+          onChange={(e) => onChange({ context: e.target.value.slice(0, MAX_CONTEXT_CHARS) })}
+          className={`${field} max-h-96 resize-y overflow-y-auto`} />
+        <p className="mt-1 text-right text-label text-[var(--outline)]">
+          {draft.context.length.toLocaleString()} / {MAX_CONTEXT_CHARS.toLocaleString()}
+        </p>
       </section>
 
       {rationale && (

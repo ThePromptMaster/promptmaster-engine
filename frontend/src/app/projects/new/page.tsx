@@ -15,6 +15,7 @@ import { appendWorkflowEvent, listTemplates } from '@/lib/supabase/workflow';
 import { createArtifact } from '@/lib/supabase/versions';
 import type { WorkflowTemplate } from '@/lib/workflow/types';
 import type { SetupRationale } from '@/types';
+import { splitAsk } from '@/lib/projects/split-ask';
 
 /**
  * PM-09 — the unified entry.
@@ -62,6 +63,7 @@ export default function NewProjectPage() {
     audience: 'General',
     constraints: '',
     output_format: '',
+    context: '',
     mode: 'architect',
   });
   const [working, setWorking] = useState<null | 'questions' | 'setup' | 'creating'>(null);
@@ -111,9 +113,11 @@ export default function NewProjectPage() {
       setRecommendedKey(suggestion.workflow);
       setWorkflowReason(suggestion.workflow_reason);
       setRationale(suggestion.rationale);
+      const ask = splitAsk(objective);
       setDraft({
         title: titleFrom(objective),
-        objective: objective.trim(),
+        objective: ask.objective,
+        context: ask.context,
         audience: suggestion.audience || 'General',
         constraints: suggestion.constraints,
         output_format: suggestion.output_format,
@@ -140,7 +144,7 @@ export default function NewProjectPage() {
     setRecommendedKey(null);
     setWorkflowReason('');
     setRationale(null);
-    setDraft((d) => ({ ...d, title: titleFrom(objective), objective: objective.trim() }));
+    setDraft((d) => ({ ...d, title: titleFrom(objective), ...splitAsk(objective) }));
     setStep('setup');
   }
 
@@ -156,6 +160,7 @@ export default function NewProjectPage() {
           objective: draft.objective.trim(),
           audience: draft.audience.trim() || 'General',
           constraints: draft.constraints.trim(),
+          context: draft.context.trim(),
           // A book's deliverable is prose. Left empty, every chapter prompt
           // read "Output format: (none)" and the mode's structural habits
           // filled the gap (2 Oct: "it really wants to make outlines").

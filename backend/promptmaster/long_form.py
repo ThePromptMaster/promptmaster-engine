@@ -23,6 +23,7 @@ from .schemas import (
     PMInput,
     SectionRecord,
 )
+from .project_context import context_line
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +41,7 @@ def build_detect_prompt(inputs: PMInput) -> tuple[str, str]:
         f"Objective: {inputs.objective}\n"
         f"Audience: {inputs.audience}\n"
         f"Constraints: {inputs.constraints or '(none)'}\n"
+        f"{context_line(inputs)}"
         f"Output format: {inputs.output_format or '(none)'}\n\n"
         "Return JSON with fields:\n"
         "- is_long_form: true if this needs multiple sections / pages; false for short asks\n"
@@ -90,6 +92,7 @@ def build_outline_prompt(inputs: PMInput, suggested_section_count: int) -> tuple
         f"Objective: {inputs.objective}\n"
         f"Audience: {inputs.audience}\n"
         f"Constraints: {inputs.constraints or '(none)'}\n"
+        f"{context_line(inputs)}"
         f"Output format: {inputs.output_format or '(none)'}\n"
         f"Target section count: {suggested_section_count} (use this as a guide; "
         "adjust if the objective genuinely needs more or fewer).\n\n"
@@ -296,6 +299,7 @@ def build_section_prompt(
         f"Original objective: {inputs.objective}\n"
         f"Audience: {inputs.audience}\n"
         f"Constraints: {inputs.constraints or '(none)'}\n"
+        f"{context_line(inputs)}"
         f"Output format: {inputs.output_format or '(none)'}\n\n"
         f"FULL OUTLINE:\n{outline_text}\n\n"
         f"PRIOR CONTEXT:\n{context_text}\n\n"
@@ -351,7 +355,8 @@ def build_section_revision_prompt(
     user = (
         f"Original objective: {inputs.objective}\n"
         f"Audience: {inputs.audience}\n"
-        f"Constraints: {inputs.constraints or '(none)'}\n\n"
+        f"Constraints: {inputs.constraints or '(none)'}\n"
+        f"{context_line(inputs)}\n"
         f"FULL OUTLINE:\n{_format_outline_for_prompt(outline, section_index)}\n\n"
         f"STAGE: {revision.stage_label or 'Revision'}\n"
         f"STAGE BRIEF: {revision.instruction or 'Revise this section.'}\n\n"
