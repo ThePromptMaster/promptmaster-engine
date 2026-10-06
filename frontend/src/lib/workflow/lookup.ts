@@ -209,7 +209,7 @@ export function applyVerification(
     const what =
       v.verdict === 'supports' ? 'supports this' : v.verdict === 'does_not' ? 'does not support this' : v.verdict === 'partly' ? 'supports only part of this' : null;
     const note = what
-      ? `AI check of the abstract (${today}): ${what} — “${v.quote.slice(0, 180)}”`
+      ? `AI check of the abstract (${today}): ${what} — “${clipAtWord(v.quote, 180)}”`
       : `AI check (${today}): ${v.note || 'not settled by the abstract'}`;
     const record = [(item[lookup.recordField] ?? '').replace(/ · AI check[^]*$/, '').trim(), note].filter(Boolean).join(' · ').slice(0, max);
     const row: StageItem = { ...item, [lookup.recordField]: record };
@@ -246,4 +246,12 @@ export function sourcesToCheck(stage: StageDefinition, items: readonly StageItem
   if (!lookup?.verify) return false;
   const open = items.filter((i) => i.status_source !== 'user' && i.status !== lookup.verify!.supports && i.status !== lookup.verify!.contradicts);
   return lookupQueries(open, schema).length > 0;
+}
+
+/** A quote shortened at a word boundary, marked when cut (6 Oct: "…author country o"). */
+export function clipAtWord(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max);
+  const end = cut.lastIndexOf(' ');
+  return `${(end > max * 0.6 ? cut.slice(0, end) : cut).replace(/[\s,;:]+$/, '')}…`;
 }

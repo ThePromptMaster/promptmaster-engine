@@ -74,7 +74,10 @@ export function useBriefChange({
             const impact = await api.assessChange({ field, before, after, stages, model: p.model });
             await append({
               type: 'brief_changed', stage_id: at,
-              payload: { field, kind: impact.kind, presentation_only: false, affected: impact.affected, calculations_hold: impact.calculations_hold },
+              payload: {
+                field, kind: impact.kind, presentation_only: false, affected: impact.affected,
+                calculations_hold: impact.calculations_hold, had_computed: stages.some((st) => st.computed),
+              },
             });
           } catch {
             // Not being able to judge it is no reason to reopen everything:
