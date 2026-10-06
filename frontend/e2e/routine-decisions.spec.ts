@@ -42,8 +42,11 @@ test('under "handle them for me", Go checks a routine approval and commits it, a
   expect(committed.agent_run_id).toBeTruthy();
   const [policy] = await serviceSelect('workflow_events', `project_id=eq.${id}&type=eq.routine_policy_changed&select=actor,payload`);
   expect(policy).toMatchObject({ actor: 'user', payload: { routine_decisions: 'handle' } });
+  // The event is written before the step is closed; wait for the step too.
+  await expect
+    .poll(async () => (await serviceSelect('agent_steps', `project_id=eq.${id}&action_key=eq.commit_delegated&select=status`))[0]?.status, { timeout: 15_000 })
+    .toBe('succeeded');
   const steps = await serviceSelect('agent_steps', `project_id=eq.${id}&action_key=eq.commit_delegated&select=status,output`);
-  expect(steps[0]).toMatchObject({ status: 'succeeded' });
   expect(steps[0].output).toContain('Committed under your routine-decision policy');
   // No request to tick it was ever raised.
   const runs = await serviceSelect('agent_runs', `project_id=eq.${id}&select=needs`);
