@@ -143,5 +143,6 @@ export function appliedFindingsVersion(rev: PendingRevision, project: Pick<Proje
         ? `Applied from ${rev.source}: ${rev.findings[0].summary.slice(0, 120)}`
         : `Applied ${rev.findings.length} points from ${rev.source}.`,
     finish_reason: rev.finishReason,
+    base_content: rev.before,
   };
 }

@@ -362,7 +362,9 @@ export function useRecommendations({
     async (
       chosen: PanelRecommendation[],
       response: { content: string; instruction: string; finish_reason: string },
-      precedence: string[] = []
+      precedence: string[] = [],
+      /** What the revision was made from; a stage that has moved on since refuses it. */
+      base?: string
     ) => {
       if (!stage || !appendStageVersion) return;
         await appendStageVersion(
@@ -382,6 +384,7 @@ export function useRecommendations({
                 ? `Applied: ${chosen[0].title}`
                 : `Applied ${chosen.length} recommendations together.`,
             finish_reason: response.finish_reason || null,
+            ...(base !== undefined ? { base_content: base } : {}),
           },
           undefined,
           // The new head retires the old head's pending fixes — except these,
@@ -468,7 +471,7 @@ export function useRecommendations({
         setPreviewing(null);
         return;
       }
-      await commitRevision(chosen, response, precedence);
+      await commitRevision(chosen, response, precedence, content);
       setPreviewing(null);
       setSelected([]);
       await reload();
@@ -503,7 +506,7 @@ export function useRecommendations({
     setBusy(true);
     setError(null);
     try {
-      await commitRevision(revision.chosen, revision.response, revision.precedence);
+      await commitRevision(revision.chosen, revision.response, revision.precedence, revision.before);
       setRevision(null);
       setSelected([]);
       await reload();

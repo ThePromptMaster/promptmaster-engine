@@ -585,8 +585,27 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     // A revision is a proposal until it passes the commit check: nothing
     // empty or wrong-shaped becomes the stage's current work (4 Oct, Options).
     const head = get().stages[stageId]?.versions.find((v) => v.id === current.current_version_id);
-    const refused = checkCommit({ before: head?.content, after: version.content, operation: version.source_operation });
-    if (refused) throw new RefusedRevision(refused);
+    const refused = checkCommit({
+      before: head?.content,
+      after: version.content,
+      operation: version.source_operation,
+      ...(version.base_content !== undefined ? { base: version.base_content } : {}),
+    });
+    if (refused) {
+      // The attempt stays in the history (5 Oct): what tried to save, and why
+      // not. Best effort — the refusal stands whether or not it is recorded.
+      const byGo = version.source_operation.startsWith('agent_');
+      void get()
+        .appendEvent({
+          type: 'revision_refused',
+          stage_id: stageId,
+          actor: byGo ? 'system' : 'user',
+          reason: refused,
+          payload: { operation: version.source_operation, base_version_id: head?.id ?? null },
+        })
+        .catch(() => undefined);
+      throw new RefusedRevision(refused);
+    }
 
     const created = await appendVersionRow(current, version);
 

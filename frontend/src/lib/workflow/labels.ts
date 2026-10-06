@@ -40,6 +40,7 @@ const OPERATION_LABEL: Record<string, string> = {
   long_form_complete: 'Full draft saved',
   agent_outline: 'Go mode outline',
   agent_triage: 'Go mode: routine findings decided',
+  agent_apply: 'Go mode: findings applied',
   manuscript_snapshot: 'Full draft before revision',
   finished_version: 'Finished version',
 };

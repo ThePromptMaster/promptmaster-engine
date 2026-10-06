@@ -64,6 +64,8 @@ export interface ChatProposal {
   after: string;
   /** The whole document as it would stand, ready to append. */
   nextContent: string;
+  /** The document the proposal was made on; accepting it after the stage moved on is refused. */
+  baseContent?: string;
   /** The message row the instruction was persisted as, to stamp on accept. */
   messageId: string | null;
   changeSummary: string;
@@ -310,6 +312,7 @@ export function useStageChat({
           before: describeScope(target),
           after,
           nextContent: spliceScope(content, target, after),
+          baseContent: content,
           messageId: saved.id,
           changeSummary:
             response.iteration.summary?.trim() ||
@@ -361,6 +364,7 @@ export function useStageChat({
         before: describeScope(target),
         after,
         nextContent: after,
+        baseContent: content,
         messageId: null,
         changeSummary: response.iteration.summary?.trim() || 'Revised from the side-chat discussion.',
         source: 'chat_save',
@@ -389,6 +393,7 @@ export function useStageChat({
       await appendStageVersion(stageId, stageLabel, {
         content: proposal.nextContent,
         source_operation: proposal.source ?? 'chat_instruct',
+        ...(proposal.baseContent !== undefined ? { base_content: proposal.baseContent } : {}),
         instruction: proposal.instruction,
         model: project.model,
         mode: project.mode,

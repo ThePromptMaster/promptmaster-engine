@@ -457,6 +457,15 @@ describe('transitions', () => {
 });
 
 describe('projectState', () => {
+  it('a refused revision is a record, not a move (G1)', () => {
+    const before = projectState(BOOK_V1, [event('stage_completed', 'objective', { to_stage_id: 'audience' })]);
+    const after = projectState(BOOK_V1, [
+      event('stage_completed', 'objective', { to_stage_id: 'audience' }),
+      event('revision_refused', 'audience', { actor: 'system', reason: 'The revised table came back with no rows' }),
+    ]);
+    expect(after).toEqual(before);
+  });
+
   it('advances the cursor on completion', () => {
     const state = projectState(BOOK_V1, [
       event('stage_completed', 'objective', { to_stage_id: 'audience' }),
