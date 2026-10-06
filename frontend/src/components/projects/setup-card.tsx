@@ -5,7 +5,8 @@ import { WorkflowPicker } from '@/components/projects/workflow-picker';
 import { MODE_DISPLAY } from '@/lib/constants';
 import type { WorkflowTemplate } from '@/lib/workflow/types';
 import type { ModeType, SetupRationale } from '@/types';
-import { MAX_CONTEXT_CHARS } from '@/lib/projects/split-ask';
+import { LimitCounter } from '@/components/shared/limit-counter';
+import { INPUT_LIMITS, withinLimit } from '@/lib/projects/input-limits';
 
 export interface SetupDraft {
   title: string;
@@ -105,11 +106,12 @@ export function SetupCard({
         />
         <AutoGrowTextarea
           value={draft.objective}
-          onChange={(e) => onChange({ objective: e.target.value })}
+          onChange={(e) => onChange({ objective: withinLimit('objective', e.target.value) })}
           rows={2}
           aria-label="Objective"
           className="mt-3 w-full bg-transparent text-body leading-relaxed text-[var(--on-surface-variant)] outline-none"
         />
+        <LimitCounter length={draft.objective.length} limit={INPUT_LIMITS.objective} />
       </div>
       </section>
 
@@ -123,10 +125,10 @@ export function SetupCard({
         {/* Scrolls rather than grows: a pasted brief can run to pages. */}
         <textarea id="setup-context" value={draft.context} rows={draft.context ? 10 : 3}
           placeholder="E.g. revenue by plant, the last three years' margins, what the board has already ruled out."
-          onChange={(e) => onChange({ context: e.target.value.slice(0, MAX_CONTEXT_CHARS) })}
+          onChange={(e) => onChange({ context: withinLimit('context', e.target.value) })}
           className={`${field} max-h-96 resize-y overflow-y-auto`} />
         <p className="mt-1 text-right text-label text-[var(--outline)]">
-          {draft.context.length.toLocaleString()} / {MAX_CONTEXT_CHARS.toLocaleString()}
+          {draft.context.length.toLocaleString()} / {INPUT_LIMITS.context.toLocaleString()}
         </p>
       </section>
 
@@ -142,21 +144,24 @@ export function SetupCard({
         <section>
           <label htmlFor="setup-audience" className={label}>Audience</label>
           <AutoGrowTextarea id="setup-audience" value={draft.audience} rows={2}
-            onChange={(e) => onChange({ audience: e.target.value })} className={field} />
+            onChange={(e) => onChange({ audience: withinLimit('audience', e.target.value) })} className={field} />
+          <LimitCounter length={draft.audience.length} limit={INPUT_LIMITS.audience} />
           {why(rationale?.audience)}
         </section>
         <section>
           <label htmlFor="setup-constraints" className={label}>Constraints</label>
           <AutoGrowTextarea id="setup-constraints" value={draft.constraints} rows={2}
             placeholder="What must it do, avoid, or stay inside?"
-            onChange={(e) => onChange({ constraints: e.target.value })} className={field} />
+            onChange={(e) => onChange({ constraints: withinLimit('constraints', e.target.value) })} className={field} />
+          <LimitCounter length={draft.constraints.length} limit={INPUT_LIMITS.constraints} />
           {why(rationale?.constraints)}
         </section>
         <section>
           <label htmlFor="setup-format" className={label}>Output format</label>
           <AutoGrowTextarea id="setup-format" value={draft.output_format} rows={2}
             placeholder="Length, structure, tone."
-            onChange={(e) => onChange({ output_format: e.target.value })} className={field} />
+            onChange={(e) => onChange({ output_format: withinLimit('output_format', e.target.value) })} className={field} />
+          <LimitCounter length={draft.output_format.length} limit={INPUT_LIMITS.output_format} />
           {why(rationale?.output_format)}
         </section>
       </div>

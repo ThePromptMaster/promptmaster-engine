@@ -35,10 +35,10 @@ _FRIENDLY: dict[str, str] = {
     "objective": "the objective",
     "context": "the project context",
     "description": "the description of the work",
-    "constraints": "the constraints",
+    "constraints": "the constraints text",
     "output_format": "the output format",
     "audience": "the audience",
-    "session_facts": "the session facts",
+    "session_facts": "the session facts list",
     "custom_preamble": "the custom persona instructions",
     "merged_content": "the document",
     "section_content": "the section",
@@ -47,6 +47,8 @@ _FRIENDLY: dict[str, str] = {
     "iteration_history": "the version history",
     "records": "the continuity records",
     "model": "the model",
+    "instruction": "the instruction",
+    "stage_hint": "the stage instruction",
 }
 
 

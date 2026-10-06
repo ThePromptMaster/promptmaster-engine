@@ -25,6 +25,8 @@ from fastapi.testclient import TestClient
 from deps import get_client
 from main import app
 from promptmaster.limits import (
+    MAX_FIELD_CHARS,
+    MAX_INSTRUCTION_CHARS,
     MAX_OBJECTIVE_CHARS,
     MAX_SECTION_COUNT,
     MAX_SESSION_FACT_CHARS,
@@ -143,6 +145,42 @@ def test_an_enormous_objective_is_refused(client):
     )
     assert res.status_code == 422
     assert "objective" in res.json()["detail"]["message"]
+
+
+def test_a_long_brief_is_accepted():
+    """5 Oct: a user hit the old 4,000-character cap on constraints.
+
+    The brief fields are the user's own words about the project; the caps are
+    abuse ceilings, far above a long, real constraint list.
+    """
+    from promptmaster.schemas import PMInput
+
+    long = "Keep every figure sourced. " * 1_000  # 27,000 characters
+    assert len(long) > 4_000 * 6
+    PMInput.model_validate(
+        inputs(objective=long, audience=long, constraints=long, output_format=long)
+    )
+    assert MAX_OBJECTIVE_CHARS >= 60_000 and MAX_FIELD_CHARS >= 60_000
+    assert MAX_INSTRUCTION_CHARS >= 20_000
+
+
+@pytest.mark.parametrize("field", ["audience", "constraints", "output_format"])
+def test_an_enormous_brief_field_is_refused_by_name(client, field):
+    res = client.post(
+        "/api/generate-outline",
+        json={
+            "inputs": inputs(**{field: "x" * (MAX_FIELD_CHARS + 1)}),
+            "suggested_section_count": 4,
+        },
+    )
+    assert res.status_code == 422
+    assert "60,000-character limit" in res.json()["detail"]["message"]
+
+
+def test_generate_setup_objective_is_bounded(client):
+    """It was the one setup route with no cap at all."""
+    res = client.post("/api/generate-setup", json={"objective": "x" * (MAX_OBJECTIVE_CHARS + 1)})
+    assert res.status_code == 422
 
 
 def test_too_many_session_facts_are_refused(client):

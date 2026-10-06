@@ -499,17 +499,22 @@ code, not a model. The trade-offs:
 - **Assumption labels:** a sentence that labels its figure as an assumption or as
   illustrative passes; "scenario" does not.
 
-### L-38 · Project context is capped at 60,000 characters and rides on every call · `accepted`
+### L-38 · Project context is capped at 200,000 characters and rides on every call · `accepted`
 
 `projects.context` (2026-10-05) is the user's source material, kept apart from the
-objective. It is capped at 60,000 characters, about 15k tokens (`MAX_CONTEXT_CHARS`).
+objective. It is capped at 200,000 characters, about 50k tokens (`MAX_CONTEXT_CHARS`;
+60,000 until 6 Oct, raised so the text of an attached PDF or Word brief fits).
 - **Where it goes:** it is included in every prompt that produces or judges stage work,
   so a long context costs tokens on each of those calls. Go's planner gets only a
   4,000-character excerpt.
 - **Not retrieval:** there is no retrieval over it; it is sent whole.
-- **Over the cap:** material beyond 60,000 characters belongs in a data file. Today the
+- **Over the cap:** material beyond 200,000 characters belongs in a data file. Today the
   model sees only the first rows of a text file (L-B3), so very large sources are not yet
   usable.
+- **The brief fields** (6 Oct): objective, audience, constraints and output format are
+  capped at 60,000 characters each, and instructions at 20,000 — abuse ceilings, not
+  product limits. Each field shows a counter from 80% of its cap and stops taking text at
+  the cap, so a saved field can no longer fail every later stage with a 422.
 
 ### L-39 · No dependency graph: staleness is coarse · `open`
 
@@ -579,7 +584,7 @@ direction. Two things still count as work Go may do first:
 | L-35 | Literature topic search returns index matches, not judged relevance | accepted |
 | L-36 | The commit check guards shape (empty, prose-for-table, no rows), not quality or length | accepted |
 | L-37 | Figures must have a source: lexical, unit-aware; other spellings and derived figures are reported | accepted |
-| L-38 | Project context capped at 60k characters, sent whole on every stage call | accepted |
+| L-38 | Project context capped at 200k characters, sent whole on every stage call | accepted |
 | L-39 | No dependency graph; staleness is per stage, not per claim | open |
 | L-40 | At an approval Go asks rather than reasoning further | accepted |
 | L-41 | Proposed statuses wait for the user; Carry forward is listed, not tracked | accepted |
@@ -603,7 +608,7 @@ is recorded as `blocked` / `tool_missing` (or `data_missing` for a missing input
 file) rather than attempted another way.
 
 **Data files (2026-10-01).** A user can attach CSV, TSV, JSON or text files to a
-project (`project_files` + the private `project-files` bucket; ≤5 MB each, 10 per
+project (`project_files` + the private `project-files` bucket; ≤5 MB each, 20 per
 project). The sandbox route copies them into `/data` for every run of that project
 (≤20 MB in total; files past that are left out, in upload order). Prompts are shown
 each file's name, columns, first rows and row count — computed in the browser at
@@ -612,6 +617,15 @@ CSV per sheet that holds anything (`lib/data/spreadsheet.ts`); the CSVs are what
 stored, previewed and run against, and the workbook itself is not kept. Values survive;
 formulas arrive as their last computed results, and formatting, charts, merged cells and
 the old `.xls` format do not arrive at all. What this does **not** do: query a database.
+
+**Documents (2026-10-06).** PDF, Word (.docx) and Markdown files can be attached too, on
+the start screen or on any stage (20 per project). Their text is read in the browser
+(`lib/data/extract-text.ts`, pdf.js and mammoth) and goes into the project context —
+on the start screen straight away, so the suggested setup and the Guide questions read
+it (their calls see the first 12,000 characters); on a stage when the user presses "Add
+its text to the project context". A scanned PDF has no text layer and is refused with
+that reason: there is no OCR. Tables, images and layout inside a document are not kept,
+only its words; the file itself is stored and copied into `/data` like any other.
 
 **A run that executed settles its row (2026-10-01).** When the planner names the row of
 the stage's table a computation carries out (`params.row`) and the code exits cleanly,

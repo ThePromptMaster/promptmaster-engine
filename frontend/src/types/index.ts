@@ -320,6 +320,8 @@ export interface GenerateSetupRequest {
   model?: string;
   /** Answers from the "Guide me" path. */
   answers?: GuideAnswer[];
+  /** What was attached on the start screen, as text. */
+  material?: string;
 }
 
 export interface GuideQuestionsResponse {

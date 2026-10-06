@@ -36,8 +36,8 @@ test('a CSV attached to the project is read by the code Go runs', async ({ page 
   await expect(data).toContainText('churn-workbook - Notes.csv');
   await expect(data).toContainText('Data and images · 3 files');
   // Something that is not data is refused, and says what is accepted.
-  await data.getByLabel('Attach data files').setInputFiles({ name: 'deck.pdf', mimeType: 'application/pdf', buffer: Buffer.from('x') });
-  await expect(data.getByRole('alert')).toContainText('not a spreadsheet (.xlsx), CSV, TSV, JSON, text or image');
+  await data.getByLabel('Attach data files').setInputFiles({ name: 'deck.pptx', mimeType: 'application/vnd.ms-powerpoint', buffer: Buffer.from('x') });
+  await expect(data.getByRole('alert')).toContainText('is not a PDF, Word (.docx), Markdown, text, spreadsheet (.xlsx), CSV, TSV, JSON or image');
   await page.screenshot({ path: test.info().outputPath('01-data-attached.png'), fullPage: true });
 
   const panel = page.getByRole('region', { name: 'Go mode', exact: true });

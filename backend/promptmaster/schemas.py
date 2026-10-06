@@ -7,6 +7,8 @@ from pydantic import BaseModel, Field, field_validator
 
 from .limits import (
     MAX_CONTEXT_CHARS,
+    MAX_FIELD_CHARS,
+    MAX_INSTRUCTION_CHARS,
     MAX_OBJECTIVE_CHARS,
     MAX_PREAMBLE_CHARS,
     MAX_SESSION_FACT_CHARS,
@@ -27,9 +29,9 @@ class PMInput(BaseModel):
     FastAPI before a handler runs — see `promptmaster/limits.py`.
     """
     objective: str = Field(..., max_length=MAX_OBJECTIVE_CHARS, description="What the user wants to accomplish")
-    audience: str = Field(default="General", max_length=MAX_SHORT_TEXT_CHARS, description="Target audience")
-    constraints: str = Field(default="", max_length=MAX_SHORT_TEXT_CHARS, description="Optional constraints")
-    output_format: str = Field(default="", max_length=MAX_SHORT_TEXT_CHARS, description="Desired output structure (e.g. bullet points, numbered list)")
+    audience: str = Field(default="General", max_length=MAX_FIELD_CHARS, description="Target audience")
+    constraints: str = Field(default="", max_length=MAX_FIELD_CHARS, description="Optional constraints")
+    output_format: str = Field(default="", max_length=MAX_FIELD_CHARS, description="Desired output structure (e.g. bullet points, numbered list)")
     # 4 Oct: the facts, figures and background behind the objective, kept apart
     # from it so the objective stays short. Material to use, not instructions.
     context: str = Field(default="", max_length=MAX_CONTEXT_CHARS, description="The project's source material")
@@ -333,7 +335,7 @@ class SectionRevisionBrief(BaseModel):
     brief ("apply the accepted findings and only those", "work at the line").
     """
     stage_label: str = Field(default="", max_length=200)
-    instruction: str = Field(default="", max_length=4_000)
+    instruction: str = Field(default="", max_length=MAX_INSTRUCTION_CHARS)
     notes: str = Field(default="", max_length=40_000)
     current_content: str = Field(..., max_length=400_000)
 
@@ -435,7 +437,8 @@ def format_data_files(files: list["DataFileBrief"]) -> str:
     if not files:
         return ""
     lines = []
-    for f in files[:10]:
+    # As many as a project may hold (MAX_FILES in lib/data/preview.ts).
+    for f in files[:20]:
         cols = ", ".join(f.columns[:60]) or "(no columns read)"
         lines.append(f"- /data/{f.name} — {f.rows} {'lines' if f.kind == 'text' else 'rows'}; columns: {cols}")
         for row in f.sample[:3]:
@@ -469,7 +472,7 @@ class StageDigest(BaseModel):
     prior_stages: list["StageDigestEntry"] = Field(default_factory=list)
     manuscript: str = Field(default="", max_length=200_000, description="Drafted chapters, bounded by the client.")
     #: The project's data files; empty when none is attached.
-    data_files: list[DataFileBrief] = Field(default_factory=list, max_length=10)
+    data_files: list[DataFileBrief] = Field(default_factory=list, max_length=20)
     #: Figures earlier stages established, each exactly as that stage wrote it.
     figures: list["EstablishedFigure"] = Field(default_factory=list, max_length=60)
     #: The stages after this one, by label. Their content is out of scope here.

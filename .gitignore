@@ -35,6 +35,9 @@ uv.lock
 .playwright-mcp/
 *.docx
 *.pdf
+# Test fixtures for reading attached briefs (lib/data/extract-text.test.ts).
+!frontend/src/lib/data/__fixtures__/*.docx
+!frontend/src/lib/data/__fixtures__/*.pdf
 
 # Vercel
 .vercel
