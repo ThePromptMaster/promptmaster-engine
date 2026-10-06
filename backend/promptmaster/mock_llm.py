@@ -399,6 +399,17 @@ def _json_reply(system: str, prompt: str) -> dict:
     if agent._TRIAGE_INSTRUCTION[:60] in system:
         ids = re.findall(r"^- id=([^:]+):", prompt.split("FINDINGS TO DECIDE:", 1)[-1], re.M)
         return {"decisions": [{"id": i, "status": "accepted", "reason": "Mock: routine, accepted."} for i in ids]}
+    from promptmaster import change_impact
+
+    if system.startswith(change_impact._IMPACT_INSTRUCTION[:60]):
+        # The stages whose summary mentions a word that changed; an invented id is added and must be dropped.
+        after = prompt.split("--- AFTER ---", 1)[-1].split("FINISHED STAGES:", 1)[0].lower()
+        before = prompt.split("--- BEFORE ---", 1)[-1].split("--- AFTER ---", 1)[0].lower()
+        changed = set(re.findall(r"[a-z]{4,}", before)) ^ set(re.findall(r"[a-z]{4,}", after))
+        stages = re.findall(r"^- id=(\S+) — [^:]*: (.*)$", prompt.split("FINISHED STAGES:", 1)[-1], re.M)
+        hit = [sid for sid, text in stages if changed & set(re.findall(r"[a-z]{4,}", text.lower()))]
+        return {"kind": "fact", "calculations_hold": True,
+                "affected": [{"stage_id": s, "reason": f"Mock: relied on {sorted(changed)[0]}."} for s in hit] + [{"stage_id": "invented", "reason": "x"}]}
     if agent._NEXT_ACTION_INSTRUCTION[:60] in system:
         return _next_action(system, prompt)
     if _STAGE_EVAL_INSTRUCTION[:60] in system:

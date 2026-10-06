@@ -340,7 +340,7 @@ export function projectState(
 
       // Legacy: every log written before PM-13 projects exactly as it did.
       case 'stage_completed':
-        set(event.stage_id, { status: 'complete', completed_at: event.created_at, left_open: false });
+        set(event.stage_id, { status: 'complete', completed_at: event.created_at, left_open: false, stale: undefined });
         if (event.to_stage_id) {
           set(event.to_stage_id, { status: 'in_progress', entered_at: event.created_at });
           state.current_stage_id = event.to_stage_id;
@@ -373,6 +373,7 @@ export function projectState(
           completed_at: event.created_at,
           left_open: false,
           blocked: undefined,
+          stale: undefined,
         });
         if (event.to_stage_id) {
           set(event.to_stage_id, { status: 'in_progress', entered_at: event.created_at });
@@ -440,6 +441,29 @@ export function projectState(
           state.current_stage_id = event.to_stage_id;
         }
         break;
+
+      // 5 Oct (Sean): a change to an authoritative input reopens what relied
+      // on it, and only that. Which stages relied on it was judged when the
+      // change was saved (lib/workflow/brief-change.ts) and is on the event.
+      case 'brief_changed': {
+        const affected = Array.isArray(event.payload?.affected) ? (event.payload.affected as { stage_id?: unknown; reason?: unknown }[]) : [];
+        for (const a of affected) {
+          const id = typeof a.stage_id === 'string' ? a.stage_id : '';
+          const was = state.stages[id]?.status;
+          if (!id || !isDone(was)) continue;
+          set(id, { status: 'stale', stale: { reason: typeof a.reason === 'string' ? a.reason : '', since: event.created_at, was: was! } });
+        }
+        break;
+      }
+
+      case 'brief_change_dismissed': {
+        const at = event.payload?.change_at;
+        for (const id of order) {
+          const s = state.stages[id];
+          if (s?.status === 'stale' && s.stale && s.stale.since === at) set(id, { status: s.stale.was, stale: undefined });
+        }
+        break;
+      }
 
       case 'stage_returned': {
         const target = event.to_stage_id ?? event.stage_id;

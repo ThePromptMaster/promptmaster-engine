@@ -38,6 +38,8 @@ const UNION: WorkflowEventType[] = [
   'project_reopened',
   'template_upgraded',
   'stage_reopened',
+  'brief_changed',
+  'brief_change_dismissed',
 ];
 
 function checkConstraintValues(): string[] {

@@ -66,6 +66,9 @@ import { defaultOutlineForm, deriveOutlineItems, draftingStageId, formOfItems, o
 import { OutlineStagePanel } from '@/components/outline/outline-stage-panel';
 import { ProjectBrief, ProjectSetup, stageWantsSetup } from './project-setup';
 import { ProjectData } from './project-data';
+import { BriefChangeNotice } from './brief-change-notice';
+import { useBriefChange } from './use-brief-change';
+import { openBriefChange } from '@/lib/workflow/brief-change';
 import { contextFromDocuments } from '@/lib/data/extract-text';
 import { INPUT_LIMITS } from '@/lib/projects/input-limits';
 import { draftBindings } from '@/lib/outline/long-form';
@@ -810,6 +813,13 @@ export function WorkflowWorkspace({
     },
     [project, onPatchProject, template, state, stageId, stage, context, flushProject, stageBundles, appendEvent, appendStageVersion]
   );
+
+  // A saved change to the brief reopens only what relied on it (5 Oct).
+  useBriefChange({
+    project, template, state, bundles: stageBundles, stageId, appendEvent,
+    enabled: project.status !== 'finalized' && events !== null,
+  });
+  const briefChange = useMemo(() => openBriefChange(events ?? [], state), [events, state]);
 
   const saveContent = useCallback(
     async (content: string) => {
@@ -1608,6 +1618,11 @@ export function WorkflowWorkspace({
             ) : (
               <ProjectBrief project={project} onPatch={onPatchProject} readOnly={!isEditable} />
             )}
+            <BriefChangeNotice
+              change={briefChange}
+              stageLabel={(id) => template.stages.find((s) => s.id === id)?.label ?? id}
+              onKeep={(changeAt) => void appendEvent({ type: 'brief_change_dismissed', stage_id: stageId, payload: { change_at: changeAt } })}
+            />
             <FiguresOnRecord template={template} state={state} bundles={stageBundles} />
             {/* On every stage: data is the project's, not a stage's. */}
             <ProjectData

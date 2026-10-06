@@ -6,6 +6,8 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
 from deps import get_client
+from promptmaster.change_impact import ChangeImpact, StageConclusion, assess_change
+from promptmaster.limits import MAX_CONTEXT_CHARS
 from promptmaster.conflicts import Conflict, ConflictSource, ConflictStage, find_conflicts
 from promptmaster.errors import PRESERVED_NOTHING_WRITTEN
 from promptmaster.limits import MAX_INSTRUCTION_CHARS
@@ -42,3 +44,21 @@ async def api_check_conflicts(
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
     return CheckConflictsResponse(conflicts=conflicts)
+
+
+class AssessChangeRequest(BaseModel):
+    field: str = Field(pattern="^(objective|audience|constraints|output_format|context)$")
+    before: str = Field(default="", max_length=MAX_CONTEXT_CHARS)
+    after: str = Field(default="", max_length=MAX_CONTEXT_CHARS)
+    stages: list[StageConclusion] = Field(default_factory=list, max_length=40)
+    model: str = ""
+
+
+@router.post("/assess-change")
+async def api_assess_change(req: AssessChangeRequest, client: OpenRouterClient = Depends(get_client)) -> ChangeImpact:
+    """Which finished stages relied on what changed in the brief (5 Oct). One
+    call; nothing is written — the client records the result as an event."""
+    try:
+        return await assess_change(client, req.model or None, req.field, req.before, req.after, req.stages)
+    except OpenRouterError as e:
+        raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)

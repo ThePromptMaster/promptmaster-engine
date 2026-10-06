@@ -262,6 +262,12 @@ export interface StageState {
   blocked?: { kind: BlockKind; reason: string; inputs?: unknown };
   /** The block that was last cleared, so a stage marked stuck again for the same thing can say so. */
   last_block?: { kind: BlockKind; inputs?: unknown };
+  /**
+   * Set when a change to the brief reopened this stage for a recheck (5 Oct):
+   * why it may no longer hold, which change did it, and what it was before —
+   * so "keep them as they are" can put it back.
+   */
+  stale?: { reason: string; since: string; was: StageStatus };
 }
 
 export interface WorkflowState {
@@ -315,7 +321,15 @@ export type WorkflowEventType =
   | 'project_reopened'
   | 'template_upgraded'
   /** C5: a done stage opened for editing without moving the cursor. Closing it again is stage_marked_complete. */
-  | 'stage_reopened';
+  | 'stage_reopened'
+  /**
+   * The brief changed (5 Oct). payload: field, kind ('fact' | 'intent' |
+   * 'wording'), presentation_only, affected [{stage_id, reason}]. Marks only
+   * the affected done stages for recheck.
+   */
+  | 'brief_changed'
+  /** The user kept the stages a brief change reopened; payload.change_at names it. */
+  | 'brief_change_dismissed';
 
 export interface WorkflowEvent {
   type: WorkflowEventType;

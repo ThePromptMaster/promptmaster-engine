@@ -171,7 +171,11 @@ export function StageRail({ template, state, nextSuggestedId, onSelect, approval
 
                     {status === 'stale' && (
                       <span
-                        title="Work here predates a change you made earlier"
+                        title={
+                          state.stages[stage.id]?.stale?.reason
+                            ? `Your brief changed, and this may no longer hold: ${state.stages[stage.id]!.stale!.reason}`
+                            : 'Work here predates a change you made earlier'
+                        }
                         className="shrink-0 text-label uppercase tracking-wide text-[var(--pm-tertiary)]"
                       >
                         recheck
