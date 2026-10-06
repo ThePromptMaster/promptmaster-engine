@@ -1,3 +1,4 @@
+import { ITEM_SCHEMAS } from '@/lib/workflow/stage-artifact';
 import { approvalsAskedFor } from './needs';
 import { describe, expect, it } from 'vitest';
 
@@ -149,6 +150,24 @@ describe('B3: the findings that change the work are the user\'s', () => {
 });
 
 describe('needsUser: an outcome table is the user\'s to decide (production pass, 2026-09-29)', () => {
+  it('names the one click when PromptMaster has proposed the statuses (3 Oct)', () => {
+    const schema = ITEM_SCHEMAS.alternatives;
+    const rows = [
+      { id: 'a', explanation: 'x', status: 'ruled_out', reason: 'Reconciled to the ledger.', status_source: 'proposed' },
+      { id: 'b', explanation: 'y', status: 'left_open', reason: 'Not tested.', status_source: 'proposed' },
+      { id: 'c', explanation: 'z' },
+    ];
+    const need = needsUser({
+      ...base, stage: stage('fact_check'), stageEvaluation: evaluation('fact_check'), allowed: ['revise_stage', 'evaluate_stage'],
+      facts: { review: { items: rows, schema, routine: [], material: rows, outcome: true } } as never,
+    });
+    expect(need).toMatchObject({ kind: 'decide_rows', count: 3, proposed: 2 });
+    expect(describeNeed(need!, label)).toEqual({
+      message: 'I proposed a status for 2 alternative explanations, each with its reason, from what the row already says. They count once you confirm them: press "Confirm the 2 proposals" above the table, or change any that read wrong. 1 more needs a status from you.',
+      action: 'Go to the table',
+    });
+  });
+
   it('stops for undecided claims instead of letting the planner revise the table', () => {
     const schema = { itemLabel: 'claim', fields: [], minItems: 1, maxItems: 20, statuses: [] };
     const rows = [{ id: 'a', claim: 'x', status: 'candidate_source' }, { id: 'b', claim: 'y', status: 'no_source' }];

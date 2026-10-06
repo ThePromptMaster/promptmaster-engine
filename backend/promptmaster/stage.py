@@ -107,7 +107,25 @@ def _format_item_schema(schema: StageItemSchema) -> str:
         )
         lines.extend(f"  · {s.label or s.value}: {s.explain}" for s in explained)
     settable = [s for s in schema.statuses if s.model_may_set]
-    if settable:
+    proposable = [s for s in schema.statuses if s.model_may_propose and not s.model_may_set]
+    others = ", ".join(
+        f"'{s.value}'" for s in schema.statuses if not s.model_may_set and not s.model_may_propose and not s.model_default
+    )
+    never = f" Never set {others}: those record what a person or a tool actually did." if others else ""
+    if proposable:
+        # The draft has already reached a judgment on each row — "addressed but
+        # not ruled out", "compared with earlier studies only" — and the user
+        # was left to translate it back into the dropdown (Sean, 3 Oct). It now
+        # proposes the status itself, with the reason; the user confirms it.
+        names = "; ".join(f"'{s.value}' ({s.label or s.value})" for s in [*settable, *proposable])
+        lines.append(
+            f"- status: for EVERY row, propose the one status its own text supports: {names}. "
+            "It is a proposal the user will confirm or change, so choose what the row actually says was done or found — "
+            "never a stronger status than the text supports. "
+            "- reason: one plain sentence saying why that status, in the row's own terms."
+            + never
+        )
+    elif settable:
         # What the draft already knows should not have to be typed in again by
         # the user (1 Oct, items 3 and 18) — but only the outcomes that are the
         # model's to state. The rest record what a person or a tool did.
@@ -115,11 +133,10 @@ def _format_item_schema(schema: StageItemSchema) -> str:
             f"'{s.value}' ({s.label or s.value})" + (" — give the reason in 'reason', one plain sentence" if s.requires_reason else "")
             for s in settable
         )
-        others = ", ".join(f"'{s.value}'" for s in schema.statuses if not s.model_may_set and not s.model_default)
         lines.append(
             f"- status: set it ONLY when the project already tells you the outcome. You may set: {names}. "
             "Otherwise leave 'status' out."
-            + (f" Never set {others}: those record what a person or a tool actually did." if others else "")
+            + never
         )
     return "\n".join(lines)
 
@@ -138,7 +155,11 @@ def _example_json(schema: StageItemSchema) -> str:
     if not fields:
         example["text"] = "..."
     settable = [s.value for s in schema.statuses if s.model_may_set]
-    if settable:
+    proposable = [s.value for s in schema.statuses if s.model_may_propose and s.value not in settable]
+    if proposable:
+        example["status"] = f"(the status this row's text supports: {' or '.join([*settable, *proposable])})"
+        example["reason"] = "(one sentence: why that status)"
+    elif settable:
         example["status"] = f"(only if already known: {' or '.join(settable)})"
         example["reason"] = "(when the status needs one)"
     return (
@@ -345,12 +366,14 @@ def _claim_provenance(row: dict) -> dict:
 def _model_status(row: dict, schema: StageItemSchema) -> dict:
     """The status a generated row is stored with, when the client said who may set what.
 
-    Kept only if it is one the model may set and it carries its reason where
-    one is required; then marked as the model's, so the screen can say
-    "set by PromptMaster — review or change". Anything else is dropped: a
-    model that writes "completed" on a run nobody ran is guessing, and the
-    row goes back to undecided. A row with no kept status starts in the
-    schema's default for generated rows, if it has one.
+    Kept only if it is one the model may set or propose, and it carries its
+    reason where one is required. A status the model may *set* is marked as
+    the model's ("set by PromptMaster — review or change") and counts; one it
+    may only *propose* is marked 'proposed' and stays undecided until the user
+    confirms it. Anything else is dropped: a model that writes "completed" on
+    a run nobody ran is guessing, and the row goes back to undecided. A row
+    with no kept status starts in the schema's default for generated rows, if
+    it has one.
     """
     by_value = {s.value: s for s in schema.statuses}
     status = row.get("status")
@@ -360,8 +383,8 @@ def _model_status(row: dict, schema: StageItemSchema) -> dict:
     row.pop("status", None)
     row.pop("reason", None)
     row.pop("status_source", None)
-    if chosen and chosen.model_may_set and (reason or not chosen.requires_reason):
-        out = {"status": chosen.value, "status_source": "model"}
+    if chosen and (chosen.model_may_set or chosen.model_may_propose) and (reason or not chosen.requires_reason):
+        out = {"status": chosen.value, "status_source": "model" if chosen.model_may_set else "proposed"}
         if reason:
             out["reason"] = reason
         return out

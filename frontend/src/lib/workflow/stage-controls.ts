@@ -36,6 +36,8 @@ export const PLACE_WORDS: Record<ControlPlace, string> = {
 export const ATTACH_DATA_LABEL = 'Attach a data file';
 export const ADD_IMAGES_LABEL = 'Add images';
 export const lookupLabel = (noun: string) => `Look up these ${noun}`;
+/** The one click that makes PromptMaster's proposed statuses the user's (3 Oct). */
+export const confirmProposalsLabel = (n: number) => (n === 1 ? 'Confirm the proposal' : `Confirm the ${n} proposals`);
 
 export interface MenuEntry {
   id: string;
@@ -88,6 +90,8 @@ export function stageControls(input: {
   lookupNoun?: string | null;
   /** The Data panel is on the page. */
   dataPanel?: boolean;
+  /** Rows whose proposed status can be confirmed as it stands. */
+  proposals?: number;
 }): StageControl[] {
   const controls: StageControl[] = [];
   if (input.primary && input.primary.kind !== 'none' && input.primary.label) {
@@ -98,6 +102,7 @@ export function stageControls(input: {
   }
   for (const t of transitionEntries(input)) controls.push({ id: t.id, label: t.label, place: 'more_menu' });
   for (const c of input.openApprovals ?? []) controls.push({ id: `tick-${c.id}`, label: c.label, place: 'checklist' });
+  if (input.proposals) controls.push({ id: 'confirm-proposals', label: confirmProposalsLabel(input.proposals), place: 'table' });
   if (input.lookupNoun) controls.push({ id: 'lookup', label: lookupLabel(input.lookupNoun), place: 'table' });
   if (input.dataPanel) controls.push({ id: 'attach-data', label: ATTACH_DATA_LABEL, place: 'data_panel' });
   // One label, one entry: the planner names a button by its words.

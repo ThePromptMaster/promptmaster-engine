@@ -67,6 +67,14 @@ export interface ReviewStatusOption {
    * Statuses without this are not the model's to claim.
    */
   modelMaySet?: true;
+  /**
+   * A judgment the draft can already see in its own words ("addressed but not
+   * ruled out", "compared with earlier studies only"). The model proposes it
+   * with a reason; the row stays undecided until the user confirms it (Sean,
+   * 3 Oct: "PromptMaster proposes a status → user confirms or overrides →
+   * status becomes authoritative").
+   */
+  modelMayPropose?: true;
   /** The state every generated row starts in. */
   modelDefault?: true;
   /** One line for the legend under the table. */
@@ -343,11 +351,12 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
     // Left open is an acceptable outcome. Left unmentioned is not, which is
     // why there is no status meaning "not considered".
     statuses: [
-      { value: 'ruled_out', label: 'Ruled out', tone: 'done', explain: 'The evidence shows this explanation does not hold.' },
-      { value: 'addressed', label: 'Addressed', tone: 'done', explain: 'It has been dealt with in the work, though not excluded outright.' },
-      { value: 'left_open', label: 'Left open', tone: 'neutral', requiresReason: true, explain: 'It could still be true. Say why it is being left.' },
+      { value: 'ruled_out', label: 'Ruled out', tone: 'done', modelMayPropose: true, explain: 'The evidence shows this explanation does not hold.' },
+      { value: 'addressed', label: 'Addressed', tone: 'done', modelMayPropose: true, explain: 'It has been dealt with in the work, though not excluded outright.' },
+      { value: 'left_open', label: 'Left open', tone: 'neutral', requiresReason: true, modelMayPropose: true, explain: 'It could still be true. Say why it is being left.' },
     ],
     decisionQuestion: 'For each rival explanation: has the evidence ruled it out, has the work dealt with it, or is it still open?',
+    reasonFrom: ['how_addressed'],
   },
 
   validation_table: {
@@ -374,11 +383,11 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
         explain: 'The result was recalculated or re-run from the data and came out the same. Only you can say this — PromptMaster never sets it.',
       },
       {
-        value: 'supported_by_prior', label: 'Supported by prior evidence', tone: 'done',
+        value: 'supported_by_prior', label: 'Supported by prior evidence', tone: 'done', modelMayPropose: true,
         explain: 'It agrees with earlier studies or records. Nothing was recalculated.',
       },
       {
-        value: 'consistency_check', label: 'Consistency check only', tone: 'neutral',
+        value: 'consistency_check', label: 'Consistency check only', tone: 'neutral', modelMayPropose: true,
         explain: 'It fits with the rest of this work. That is not an independent test.',
       },
       {
@@ -394,6 +403,7 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
         explain: 'Set before the kinds of validation were told apart. Choose which of the above it was.',
       },
     ],
+    reasonFrom: ['attempt', 'notes'],
   },
 
   continuity_findings: {
@@ -450,9 +460,10 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
       { key: 'where', label: 'Where it stands', max: 240 },
     ],
     statuses: [
-      { value: 'accepted', label: 'Settled', tone: 'done' },
-      { value: 'deferred', label: 'Carry forward', tone: 'neutral', requiresReason: true },
+      { value: 'accepted', label: 'Settled', tone: 'done', modelMayPropose: true },
+      { value: 'deferred', label: 'Carry forward', tone: 'neutral', requiresReason: true, modelMayPropose: true },
     ],
+    reasonFrom: ['where'],
   },
 };
 
@@ -556,12 +567,30 @@ export function statusOption(
   return schema.statuses?.find((s) => s.value === value);
 }
 
+/** The row carries a status PromptMaster proposed and the user has not yet confirmed. */
+export function isProposed(item: StageItem): boolean {
+  return item.status_source === 'proposed' && Boolean(item.status);
+}
+
+/** Rows whose proposed status can be confirmed as it stands (it is offered, and has its reason). */
+export function confirmableProposals(items: readonly StageItem[], schema: StageItemSchema): StageItem[] {
+  return items.filter((i) => isProposed(i) && isTriaged({ ...i, status_source: 'user' }, schema));
+}
+
+/** Confirm every proposal that can stand as it is: the status becomes the user's. */
+export function confirmProposals(items: readonly StageItem[], schema: StageItemSchema): StageItem[] {
+  const ok = new Set(confirmableProposals(items, schema).map((i) => i.id));
+  return items.map((i) => (ok.has(i.id) ? { ...i, status_source: 'user' } : i));
+}
+
 /**
  * A row is triaged when it has a status and, where that status demands one, a
  * reason. "Rejected because" is a decision; "rejected" on its own is a shrug,
  * and six months later nobody can tell them apart.
  */
 export function isTriaged(item: StageItem, schema: StageItemSchema): boolean {
+  // PromptMaster's proposal is not the user's decision until they confirm it.
+  if (isProposed(item)) return false;
   const option = statusOption(schema, item.status);
   if (!option) return false;
   if (option.decided === false) return false;
@@ -616,7 +645,8 @@ export function stageContentForChat(schema: StageItemSchema, content: string | n
         .map((f) => `${f.label}: ${f.value}`);
       const status = statusOption(schema, item.status)?.label;
       const reason = (item.reason ?? '').trim();
-      return `${i + 1}. ${fields.join(' — ')}${status ? ` [${status}${reason ? `: ${reason}` : ''}]` : ''}`;
+      const proposed = isProposed(item) ? 'proposed by PromptMaster, not yet confirmed: ' : '';
+      return `${i + 1}. ${fields.join(' — ')}${status ? ` [${proposed}${status}${reason ? `: ${reason}` : ''}]` : ''}`;
     })
     .join('\n');
 }

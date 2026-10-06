@@ -1243,6 +1243,7 @@ export function WorkflowWorkspace({
         openApprovals: evaluation.criteria.filter((c) => c.manual && !c.satisfied),
         lookupNoun: rendererHoldsItems(stage.renderer) && hasContent ? (itemSchemaFor(stage).lookup?.noun ?? null) : null,
         dataPanel: true,
+        proposals: context.itemsProposed?.[stage.id] ?? 0,
       })
     : null;
   // Read by the Go loop when it plans a move, never during render.

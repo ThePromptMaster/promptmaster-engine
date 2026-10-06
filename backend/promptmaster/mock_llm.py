@@ -100,11 +100,19 @@ def _stage_items(prompt: str) -> dict:
     # is not the model's to claim, the third says nothing — so a browser test
     # sees one row prefilled and two left for the user.
     may_set = re.search(r"only if already known: ([a-z_]+)", prompt)
+    # A status the draft may propose (3 Oct): the first two rows propose one,
+    # with a reason; the third says nothing, so a browser test sees two
+    # proposals to confirm and one row left for the user.
+    proposes = re.search(r"the status this row's text supports: ([a-z_ ]+)\)", prompt)
+    options = proposes.group(1).split(" or ") if proposes else []
     items = []
     for n in range(1, 4):
         item: dict[str, str] = {"id": f"i{n}"}
         for i, key in enumerate(keys):
-            if key in ("status", "reason") and may_set:
+            if key in ("status", "reason") and options:
+                if n <= 2:
+                    item[key] = options[min(n - 1, len(options) - 1)] if key == "status" else f"Mock: row {n} says so."
+            elif key in ("status", "reason") and may_set:
                 if n == 1:
                     item[key] = may_set.group(1) if key == "status" else "Mock: the data this needs was never provided."
                 elif n == 2 and key == "status":

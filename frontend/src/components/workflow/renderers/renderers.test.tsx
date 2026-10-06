@@ -588,6 +588,42 @@ describe('ReviewRenderer', () => {
 // Research v1 stranded projects at Experiment (Sean's screenshot, Sep 10)
 // ---------------------------------------------------------------------------
 
+describe('PromptMaster proposes, the user confirms (3 Oct, Research run)', () => {
+  const alternatives = () => serializeItems([
+    { id: 'a1', explanation: 'Raw-material inflation', how_addressed: 'Partly addressed, not excluded', status: 'left_open', reason: 'Input prices rose, but not enough to explain the gap.', status_source: 'proposed' },
+    { id: 'a2', explanation: 'Measurement artefact', how_addressed: 'Reconciled to the ledger', status: 'ruled_out', reason: 'The ledger and the margin report agree.', status_source: 'proposed' },
+    { id: 'a3', explanation: 'Mix shift', how_addressed: '' },
+  ]);
+
+  it('shows each proposal with its reason and confirms them in one click', async () => {
+    const user = userEvent.setup();
+    const onSaveItems = vi.fn(async () => {});
+    render(<ReviewRenderer {...props(getStage(RESEARCH_V1, 'alternatives')!, { versions: [version(alternatives())], onSaveItems })} />);
+    // Proposals are not decisions yet.
+    expect(screen.getByText('3 still to resolve')).toBeInTheDocument();
+    expect(screen.getByText(/2 proposed by PromptMaster — confirm or change/)).toBeInTheDocument();
+    expect(screen.getAllByText('Proposed by PromptMaster')).toHaveLength(2);
+    expect(screen.getByText('The ledger and the margin report agree.')).toBeInTheDocument();
+    expect(screen.getAllByRole('combobox')[0]).toHaveTextContent('Left open');
+
+    await user.click(screen.getByRole('button', { name: /Confirm the 2 proposals/ }));
+    const saved = (onSaveItems.mock.calls[0] as unknown as [StageItem[]])[0];
+    expect(saved.map((r) => r.status_source)).toEqual(['user', 'user', undefined]);
+    expect(saved[0].reason).toBe('Input prices rose, but not enough to explain the gap.');
+    expect(screen.getByText('1 still to resolve')).toBeInTheDocument();
+  });
+
+  it('a row the user changes is theirs, and no longer a proposal', async () => {
+    const user = userEvent.setup();
+    render(<ReviewRenderer {...props(getStage(RESEARCH_V1, 'alternatives')!, { versions: [version(alternatives())] })} />);
+    await user.click(screen.getAllByRole('combobox')[1]);
+    await user.click(screen.getByRole('option', { name: 'Addressed' }));
+    expect(screen.getAllByText('Proposed by PromptMaster')).toHaveLength(1);
+    expect(screen.getByRole('button', { name: /Confirm the proposal$/ })).toBeInTheDocument();
+    expect(screen.getByText('2 still to resolve')).toBeInTheDocument();
+  });
+});
+
 describe('a long check table folds what is already decided (3 Oct call)', () => {
   const findings = serializeItems(
     Array.from({ length: 9 }, (_, i) => ({

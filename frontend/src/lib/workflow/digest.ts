@@ -147,7 +147,8 @@ export function summariseStageContent(
         ([key, value]) => key !== 'id' && key !== 'status' && key !== 'reason' && (value ?? '').trim()
       );
       const text = first?.[1] ?? '';
-      const status = item.status ? ` [${item.status}]` : '';
+      // A proposal is not yet the user's decision; a later stage must not read it as one.
+      const status = item.status ? ` [${item.status_source === 'proposed' ? 'proposed: ' : ''}${item.status}]` : '';
       return `${truncate(text, 90)}${status}`;
     });
     const more = items.length > 8 ? ` (+${items.length - 8} more)` : '';
