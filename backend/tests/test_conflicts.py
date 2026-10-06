@@ -89,3 +89,36 @@ def test_the_check_is_told_the_stage_and_that_its_own_work_is_no_conflict(basic_
     assert "this stage's product differs from the final one" in user
     _, bare = build_conflict_prompt(basic_inputs, "Normalise the citations", [], [])
     assert "THE STAGE THIS INSTRUCTION IS FOR" not in bare
+
+
+def test_an_instruction_that_only_asks_for_the_stages_own_form_is_no_conflict():
+    """Sean, 2 Oct screenshot: Go turning Book's research notes into the
+    claim/source/confidence table the stage asks for was stopped as "a
+    different deliverable from the book". The check marks such a conflict
+    within_stage_work, and code drops it; a real conflict with the objective,
+    and any conflict with a decision, still stands."""
+    stub = AsyncMock()
+    stub.generate_json = AsyncMock(return_value=({"conflicts": [
+        {"kind": "objective", "with_text": "Write a book about lions", "explanation": "A table is a different deliverable from the book.", "within_stage_work": True},
+        {"kind": "objective", "with_text": "Write a book about lions", "explanation": "It turns the book into one about tigers.", "within_stage_work": False},
+        {"kind": "decision", "with_id": "d1", "with_text": "x", "explanation": "The user chose prose notes.", "within_stage_work": True},
+    ]}, {}))
+    body = {
+        "inputs": {**INPUTS.model_dump(), "objective": "Write a book about lions"},
+        "instruction": "Reformat the research notes into a table with exactly these columns: claim, source, confidence.",
+        "decisions": [{"id": "d1", "text": "Keep the research notes as prose."}],
+    }
+    app.dependency_overrides[get_client] = lambda: stub
+    try:
+        http = TestClient(app)
+        with_stage = http.post("/api/check-conflicts", json={
+            **body, "stage": {"label": "Research notes", "instruction": "Produce a table of the claims: claim, source, confidence."},
+        }).json()["conflicts"]
+        without_stage = http.post("/api/check-conflicts", json=body).json()["conflicts"]
+    finally:
+        app.dependency_overrides.pop(get_client, None)
+    assert [c["explanation"] for c in with_stage] == ["It turns the book into one about tigers.", "The user chose prose notes."]
+    # With no stage named there is nothing to compare against: every conflict stands.
+    assert len(without_stage) == 3
+    from promptmaster.conflicts import _STAGE_RULE
+    assert '"within_stage_work": true' in _STAGE_RULE
