@@ -704,6 +704,14 @@ export const api = {
     return apiFetch('/api/assess-change', { method: 'POST', body: JSON.stringify(req) });
   },
 
+  /** Read each found source's abstract and judge it against its row (5 Oct). Stores nothing. */
+  async agentVerifySources(
+    req: { inputs: PMInput; sources: { id: string; claim: string; link: string }[]; model?: string },
+    signal?: AbortSignal
+  ): Promise<{ verdicts: import('@/lib/workflow/lookup').SourceVerdict[]; model_used: string }> {
+    return apiFetch('/api/agent/verify-sources', { method: 'POST', body: JSON.stringify(req), signal });
+  },
+
   /** Whether a stage's text satisfies a routine approval, before Go commits it (5 Oct). Commits nothing. */
   async agentCheckCriterion(
     req: { inputs: PMInput; stage_label: string; criterion: string; content: string; model?: string },

@@ -460,7 +460,7 @@ describe('ReviewRenderer', () => {
 
     // Verified by me is a decision that stands on its own.
     await user.click(screen.getAllByRole('combobox')[0]);
-    await user.click(screen.getByRole('option', { name: 'Verified by me' }));
+    await user.click(screen.getByRole('option', { name: 'Human verified' }));
     expect(screen.queryByText(/still counts as unresolved/)).not.toBeInTheDocument();
 
     // Unverifiable is legitimate, but has to say why.

@@ -77,6 +77,12 @@ export interface ReviewStatusOption {
   modelMayPropose?: true;
   /** The state every generated row starts in. */
   modelDefault?: true;
+  /**
+   * Weaker statuses this one includes, for counting rules: a work PromptMaster
+   * read and found supporting the row was also retrieved (5 Oct). Counts only;
+   * the row carries one status.
+   */
+  implies?: readonly string[];
   /** One line for the legend under the table. */
   explain?: string;
   /**
@@ -129,6 +135,13 @@ export interface StageItemSchema {
     search?: true;
     /** Said of what was not found, when "misremembered" is not the likely reason. */
     notFoundNote?: string;
+    /**
+     * Once found, PromptMaster reads the source's abstract and judges whether
+     * it supports `claimField` (5 Oct: Go verifies what it legitimately can
+     * before asking). The two statuses it may set; anything it cannot settle
+     * keeps the lookup's status and is the user's.
+     */
+    verify?: { claimField: string; supports: string; contradicts: string };
   };
   /**
    * The rows are things to be carried out, and a sandbox run that executed
@@ -231,11 +244,24 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
         value: 'retrieved', label: 'Retrieved by PromptMaster', tone: 'done', settable: false,
         explain: 'A record with this title was found in OpenAlex, and its DOI and real title are on the row. Nobody has checked that it says what this row claims.',
       },
-      { value: 'verified', label: 'Verified by me', tone: 'done', explain: 'You found the work and checked it says this. Add its DOI or link.' },
+      // 5 Oct (Sean): what PromptMaster checked itself is told apart from what
+      // the user checked. It reads the abstract, never more, and says so.
+      {
+        value: 'ai_verified', label: 'AI verified — the abstract supports it', tone: 'done', settable: false, implies: ['retrieved'],
+        explain: 'PromptMaster read the work\'s abstract in OpenAlex and it states what this row says; the sentence it relied on is on the row. The full work was not read.',
+      },
+      {
+        value: 'ai_not_supported', label: 'AI checked — the abstract does not support it', tone: 'warn', settable: false, decided: false, implies: ['retrieved'],
+        explain: 'PromptMaster read the abstract and it says something else. Correct the row, or check the full work yourself.',
+      },
+      { value: 'verified', label: 'Human verified', tone: 'done', explain: 'You found the work and checked it says this yourself. Add its DOI or link.' },
     ],
     defaultStateNote:
       '{n} of {total} works were suggested from the model\'s knowledge. They have not been searched for, retrieved or verified — treat them as candidates.',
-    lookup: { field: 'work', linkField: 'link', recordField: 'record', status: 'retrieved', noun: 'works', search: true },
+    lookup: {
+      field: 'work', linkField: 'link', recordField: 'record', status: 'retrieved', noun: 'works', search: true,
+      verify: { claimField: 'finding', supports: 'ai_verified', contradicts: 'ai_not_supported' },
+    },
   },
 
   // Keyed 'hypotheses' because that is the artifact kind the Research template
@@ -278,8 +304,16 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
     // tool to set; none is connected, so nothing carries it today.
     statuses: [
       {
-        value: 'verified_by_promptmaster', label: 'Verified by PromptMaster', tone: 'done', settable: false,
-        explain: 'A tool read the source and confirmed the claim. The lookup only finds that a source exists — it does not read it — so no claim carries this today.',
+        value: 'verified_by_promptmaster', label: 'Verified by PromptMaster', tone: 'done', settable: false, legacy: true,
+        explain: 'Never set; replaced by "AI verified" (6 Oct).',
+      },
+      {
+        value: 'ai_verified', label: 'AI verified — the abstract supports it', tone: 'done', settable: false, implies: ['source_found'],
+        explain: 'PromptMaster read the source\'s abstract in OpenAlex and it states this claim; the sentence it relied on is on the row. The full source was not read.',
+      },
+      {
+        value: 'ai_not_supported', label: 'AI checked — the abstract does not support it', tone: 'warn', settable: false, decided: false, implies: ['source_found'],
+        explain: 'PromptMaster read the abstract and it says something else. Correct the claim, check the full source yourself, or remove it.',
       },
       {
         value: 'source_found', label: 'Source found by PromptMaster — check it says this', tone: 'neutral', decided: false, settable: false,
@@ -293,7 +327,7 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
         value: 'no_source', label: 'No source found', tone: 'neutral', decided: false,
         explain: 'PromptMaster could not name where to check this. Verify it yourself, mark it unverifiable, or remove it.',
       },
-      { value: 'verified', label: 'Verified by me', tone: 'done', explain: 'You checked the source yourself.' },
+      { value: 'verified', label: 'Human verified', tone: 'done', explain: 'You checked the source yourself.' },
       { value: 'unverifiable', label: 'Unverifiable', tone: 'neutral', requiresReason: true, explain: 'No source could settle it, and you say why. An acceptable answer.' },
       { value: 'removed', label: 'Remove', tone: 'warn', requiresReason: true, explain: 'The claim should not stand, and you say why.' },
     ],
@@ -302,6 +336,7 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
     // still counts as undecided.
     lookup: {
       field: 'source', linkField: 'link', recordField: 'record', status: 'source_found', noun: 'sources', skipStatus: 'no_source',
+      verify: { claimField: 'claim', supports: 'ai_verified', contradicts: 'ai_not_supported' },
       notFoundNote: 'The index holds published research; a guide, a website or the author\'s own data will not be in it, and a source can also be misremembered.',
     },
   },

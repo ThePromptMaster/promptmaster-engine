@@ -159,6 +159,11 @@ export function requiredWork(input: {
   routine?: RoutineDecisions;
   commitTried?: readonly string[];
   /**
+   * The stage's rows name sources Go has not yet looked up and read in this
+   * run (5 Oct: verify what it legitimately can before asking).
+   */
+  lookupDue?: boolean;
+  /**
    * A workflow that loops (Exploration): `staleDraft` when this stage still
    * holds last round's draft. Left to the planner, both moves below were
    * skipped on production (5 Oct) — it reasoned, or asked, instead of
@@ -189,6 +194,14 @@ export function requiredWork(input: {
       key: 'continue_writing',
       rationale: `The ${stage.label} draft was cut off before it finished; finishing it comes before anything else.`,
       expected: 'The draft continues from where it stopped, as a new version.',
+    };
+  }
+
+  if (input.lookupDue && can('check_literature')) {
+    return {
+      key: 'check_literature',
+      rationale: `${stage.label} names sources; looking them up and reading their abstracts comes before handing the rows to you.`,
+      expected: 'Each source found in OpenAlex and checked against its row where the abstract allows; the rest left for you.',
     };
   }
 
@@ -239,6 +252,8 @@ export function needsUser(input: {
   outlineStageId: string | null;
   /** The user already said "draft them anyway" for this many sections. */
   largeJobAcknowledged?: number | null;
+  /** Sources on the rows Go has not yet looked up and read in this run. */
+  lookupDue?: boolean;
   /** The project's "Routine decisions", and approvals whose check failed on the current version. */
   routine?: RoutineDecisions;
   commitTried?: readonly string[];
@@ -286,7 +301,8 @@ export function needsUser(input: {
   const canRun = Boolean(facts.review?.outcome && facts.review.schema.execution && (input.runAttemptsLeft ?? 0) > 0);
   // …or rows still waiting for a proposal Go can make first (3 Oct).
   const canPropose = allowed.includes('propose_statuses');
-  if (facts.review && facts.review.material.length > 0 && facts.review.routine.length === 0 && !canRun && !canPropose) {
+  const canLookUp = Boolean(input.lookupDue && allowed.includes('check_literature'));
+  if (facts.review && facts.review.material.length > 0 && facts.review.routine.length === 0 && !canRun && !canPropose && !canLookUp) {
     const proposed = confirmableProposals(facts.review.material, facts.review.schema).length;
     return facts.review.outcome
       ? {
