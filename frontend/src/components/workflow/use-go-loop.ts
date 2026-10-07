@@ -38,7 +38,7 @@ import { api } from '@/lib/api/client';
 import { actionFor, actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, USER_ANSWER_STEP } from '@/lib/agent/actions';
 import { contextWithFacts, readOutcomeProof, readStageFacts, type StageFacts } from '@/lib/agent/facts';
 import { stageDrafts } from '@/lib/workflow/stage-artifact';
-import { delegableToCommit, describeNeed, NEED_CLEARED, NEED_MOVED_ON, needStillHolds, needsUser, requiredWork, type NeedsUser } from '@/lib/agent/needs';
+import { delegableToCommit, policyConfirmable, staleRepair, describeNeed, NEED_CLEARED, NEED_MOVED_ON, needStillHolds, needsUser, requiredWork, type NeedsUser } from '@/lib/agent/needs';
 import { assertHonestOutcome, verifyOutcome } from '@/lib/agent/outcome';
 import { outlineStageFor } from '@/lib/outline/actions';
 import { listRecommendations, recordDecision } from '@/lib/supabase/recommendations';
@@ -501,9 +501,20 @@ export function useGoLoop(opts: Options) {
           .filter((s) => s.action_key === 'commit_delegated' && s.stage_id === o.stage!.id && s.status === 'failed' && (s.finished_at ?? s.started_at ?? '') >= headAt)
           .map((s) => String(s.params?.criterion_id ?? ''));
         if (delegableToCommit(o.stage, stageEvaluation, routine, commitTried)) allowed.push('commit_delegated');
+        // 6 Oct: proposals that stand are Go's to confirm under "handle them for me".
+        if (policyConfirmable(o.stage, facts, routine) > 0) allowed.push('confirm_proposals');
+
+        // 6 Oct: a stage a change reopened is repaired before anything else —
+        // on whichever stage it is — so Summary is not left recommending A.
+        // Once per stage per run: one that still cannot close is the user's.
+        const recheckTried = [...priorStepsRef.current, ...stepsRef.current]
+          .filter((s) => s.action_key === 'recheck_stage')
+          .map((s) => String(s.params?.stage_id ?? ''));
+        const repair = staleRepair(o.template, o.state, recheckTried);
+        if (repair) allowed.push('recheck_stage');
 
         // Before the planner is asked: is the next move the user's? (B4)
-        const need = needsUser({
+        const need = repair ? null : needsUser({
           state: o.state, stage: o.stage, facts, stageEvaluation, allowed, policy: current.policy,
           outlineStageId: outlineStageFor(o.template)?.id ?? null, largeJobAcknowledged: largeJobOkRef.current,
           runAttemptsLeft, lookupDue, routine, commitTried,
@@ -517,7 +528,7 @@ export function useGoLoop(opts: Options) {
         // planner might prefer (4 Oct): a cut-off draft is finished, and at an
         // approval the findings are applied and the work checked first.
         const loops = o.template.stages.some((s) => s.transitions.loop_to);
-        const required = requiredWork({
+        const required = repair ?? requiredWork({
           stage: o.stage, facts, stageEvaluation, allowed, lookupDue, routine, commitTried,
           ...(loops ? { round: { staleDraft: stageDrafts(o.stage) && !hasDraft } } : {}),
         });

@@ -19,7 +19,7 @@ import { appliedFindingsVersion, carryUserFields, findingsInstruction, reviseWit
 import { findInstructionConflicts } from '@/lib/workflow/conflict-trail';
 import { describeWith, type InstructionConflict } from '@/lib/workflow/instruction-conflicts';
 import { defaultOutlineForm, deriveOutlineItems } from '@/lib/workflow/derived-outline';
-import { itemSchemaFor, parseItems, proposableStatuses, rendererHoldsItems, serializeItems } from '@/lib/workflow/stage-artifact';
+import { confirmableProposals, itemSchemaFor, parseItems, proposableStatuses, rendererHoldsItems, serializeItems } from '@/lib/workflow/stage-artifact';
 import { enoughWorksFound, lookupQueries, recordLine, rowsFromSearch } from '@/lib/workflow/lookup';
 import { lookupAndVerify } from '@/lib/workflow/verify';
 import { figuresFromOutput, readStageFigures, withRunFigures, type StageFigures } from '@/lib/workflow/figures';
@@ -723,6 +723,101 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       });
     }
 
+    case 'recheck': {
+      // 6 Oct: a stage a change reopened is repaired, not left recommending
+      // what the change superseded. The project's current facts and brief
+      // ride on the request (inputsFrom); the instruction says what changed
+      // and what to keep.
+      if (!ctx.appendStageVersion) throw new Error('This view cannot save versions.');
+      const target = ctx.template.stages.find((s) => s.id === String(params.stage_id ?? ''));
+      const st = target ? ctx.state.stages[target.id] : undefined;
+      if (!target || st?.status !== 'stale') {
+        return done(key, { status: 'failed', output: 'That stage is not waiting for a recheck.', toolsUsed: [], changes: {} });
+      }
+      const headVersion = ctx.bundles[target.id]?.versions.at(-1);
+      const head = headVersion?.content ?? '';
+      const why = st.stale?.reason ?? 'something it relied on changed';
+      const instruction = recheckInstruction(target.label, why);
+      const res = await api.generateStageArtifact(
+        generationRequest(ctx.project, ctx.template, ctx.state, ctx.bundles, target, head, instruction),
+        ctx.signal
+      );
+      const generated = generationContent(target, res);
+      const before = rendererHoldsItems(target.renderer) ? parseItems(head) : null;
+      const after = before ? parseItems(generated) : null;
+      const content = before && after ? serializeItems(carryUserFields(before, after, itemSchemaFor(target))) : generated;
+      if (!content) {
+        return done(key, { status: 'failed', output: 'The model returned nothing usable.', toolsUsed: ['model'], changes: {} });
+      }
+      const created = await ctx.appendStageVersion(target.id, target.label, {
+        content,
+        source_operation: 'agent_revise',
+        base_content: head,
+        instruction,
+        model: res.model_used || ctx.project.model,
+        mode: ctx.project.mode,
+        change_summary: `Repaired after a change: ${why}`,
+        finish_reason: res.finish_reason || null,
+      });
+      const versionId = (created as { id?: unknown } | null)?.id;
+      // Closed again only when its own requirements hold; a reserved approval
+      // stays the user's, and the stage stays reopened until they give it.
+      const evaluation = evaluateStage(ctx.template, target.id, ctx.context);
+      const actor = stageMoveActor(ctx.run.policy, ctx.approvedByUser);
+      if (evaluation.canAdvance && typeof versionId === 'string') {
+        if (ctx.setStageSummary) {
+          const summary = summariseStageContent(target, content);
+          if (summary) await ctx.setStageSummary(target.id, summary).catch(() => undefined);
+        }
+        await appendWorkflowEvent(ctx.project.id, ctx.project.user_id, {
+          type: 'stage_marked_complete',
+          stage_id: target.id,
+          actor,
+          agent_run_id: actor === 'system' ? ctx.run.id : null,
+          reason: `Repaired after a change: ${why}`,
+          payload: {
+            evidence_version_id: versionId,
+            repaired_after: why,
+            ...(actor === 'user' && ctx.approvedByUser ? { via: 'go_approve' } : {}),
+          },
+        });
+        await ctx.afterStageEvent();
+      }
+      return done(key, {
+        status: 'succeeded', toolsUsed: ['model'],
+        changes: typeof versionId === 'string' ? { version_ids: [versionId] } : {},
+        output: evaluation.canAdvance
+          ? `Repaired ${target.label} (${why}) — saved as a new version and marked complete again; the earlier version is kept.`
+          : `Repaired ${target.label} (${why}) — saved as a new version; it stays reopened until: ${evaluation.unmet.filter((c) => c.blocking).map((c) => c.label).join('; ')}.`,
+      });
+    }
+
+    case 'confirm': {
+      // 6 Oct: under "handle them for me", proposals that stand as they are
+      // are confirmed by Go, and say so — not three row decisions for the user.
+      const r = ctx.facts?.review;
+      if (!r) return done(key, { status: 'failed', output: 'This stage has no rows to confirm.', toolsUsed: [], changes: {} });
+      if (!ctx.appendStageVersion) throw new Error('This view cannot save versions.');
+      const ok = new Set(confirmableProposals(r.items, r.schema).map((i) => i.id));
+      if (!ok.size) return done(key, { status: 'failed', output: 'No proposal can stand as it is; they are left for you.', toolsUsed: [], changes: {} });
+      const items = r.items.map((i) => (ok.has(i.id) ? { ...i, status_source: 'policy' } : i));
+      const created = await ctx.appendStageVersion(ctx.stage.id, ctx.stage.label, {
+        content: serializeItems(items),
+        source_operation: 'agent_triage',
+        base_content: ctx.bundles[ctx.stage.id]?.versions.at(-1)?.content ?? '',
+        instruction: 'Confirmed the proposed statuses under the routine-decision policy.',
+        model: ctx.project.model,
+        mode: ctx.project.mode,
+        change_summary: `Go mode confirmed ${ok.size} proposed status${ok.size === 1 ? '' : 'es'} under your routine-decision policy.`,
+      });
+      const versionId = (created as { id?: unknown } | null)?.id;
+      return done(key, {
+        status: 'succeeded', toolsUsed: [],
+        changes: typeof versionId === 'string' ? { version_ids: [versionId] } : {},
+        output: `Confirmed ${ok.size} proposed status${ok.size === 1 ? '' : 'es'} under your routine-decision policy. Each says so on its row; change any of them.`,
+      });
+    }
+
     case 'evaluate': {
       const version = ctx.bundles[ctx.stage.id]?.versions.at(-1);
       if (!version?.content.trim()) {
@@ -1025,4 +1120,19 @@ function deliverableText(ctx: Pick<PerformContext, 'bundles' | 'template'>, stag
       .join('\n\n');
   }
   return bundle?.versions.at(-1)?.content ?? '';
+}
+
+/**
+ * What a repair is told (6 Oct, Sean's acceptance criteria: "Valid figures
+ * and calculations remain intact. Superseded recommendations are repaired
+ * consistently"). The current facts and brief reach the model with the request.
+ */
+export function recheckInstruction(stageLabel: string, why: string): string {
+  return (
+    `RECHECK AFTER A CHANGE. ${stageLabel} was reopened because: ${why}. ` +
+    'Bring it into line with the project as it now stands — the brief, the accepted facts and requirements, and the earlier stages. ' +
+    'Keep every figure, calculation and finding that still holds, exactly as written. ' +
+    'Replace any conclusion or recommendation the change superseded, and re-test each option against the requirements as they are now: one that no longer qualifies is said to be excluded, and why. ' +
+    'Begin with one line, "What changed:", saying what was kept and what was replaced.'
+  );
 }
