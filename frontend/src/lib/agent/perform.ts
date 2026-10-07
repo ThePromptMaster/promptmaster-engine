@@ -31,7 +31,8 @@ import { proposeStatuses } from '@/lib/workflow/propose';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import { summariseStageContent } from '@/lib/workflow/digest';
 import { stageContentForSummary, stageEvidence } from '@/lib/workflow/evidence';
-import { describeOutstanding, evaluateStage, outstandingWork } from '@/lib/workflow/engine';
+import { deliverableStage, describeOutstanding, evaluateStage, outstandingWork } from '@/lib/workflow/engine';
+import { pausedLine } from '@/lib/workflow/objective';
 import { figureFindings, figureSources } from '@/lib/workflow/figure-support';
 import { asIteration } from '@/lib/workflow/legacy';
 import {
@@ -940,11 +941,51 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         });
       }
       // PM-25: the model's opinion is not enough — the deliverable has to exist.
+      // 7 Oct: nor is the deliverable existing. A research log that says the
+      // criterion is not met is a deliverable (email 13); whether the
+      // objective is met is judged, quoted, and recorded.
       if (ctx.deliverableDone) {
+        const holder = deliverableStage(ctx.template);
+        const content = holder ? deliverableText(ctx, holder.id) : '';
+        const assessment = await api.agentAssessObjective(
+          {
+            inputs: inputsFrom(ctx.project),
+            deliverable_label: holder?.label ?? 'the deliverable',
+            content: content || '(empty)',
+            steps: ctx.digest.recent_steps.map((s) => ({ action_key: s.action_key, execution_label: s.execution_label, output: s.output })),
+            model: ctx.project.model,
+          },
+          ctx.signal
+        );
+        const payload = {
+          outcome: assessment.outcome, reason: assessment.reason, basis_quote: assessment.basis_quote,
+          blockers: assessment.blockers, performed: assessment.performed, proposed_next: assessment.proposed_next,
+        };
+        await appendWorkflowEvent(ctx.project.id, ctx.project.user_id, {
+          type: 'objective_assessed',
+          stage_id: ctx.stage.id,
+          actor: 'system',
+          agent_run_id: ctx.run.id,
+          reason: assessment.reason,
+          payload,
+        });
+        await ctx.afterStageEvent();
+        if (assessment.outcome === 'met') {
+          return done(key, {
+            status: 'succeeded', toolsUsed: [], changes: {},
+            output: `The objective is met: "${assessment.basis_quote}". Nothing needs another pass.`,
+            stop: { status: 'completed', reason: 'Objective met.' },
+          });
+        }
+        // Not met: the cycle is finished, the objective is not. With a named
+        // blocker the run is blocked on it; otherwise it is the user's call.
+        const performed = assessment.performed.length ? ` Done: ${assessment.performed.join('; ')}.` : ' No computation or investigation was recorded as performed.';
+        const proposed = assessment.proposed_next.length ? ` Proposed, not done: ${assessment.proposed_next.join('; ')}.` : '';
+        const line = pausedLine(assessment);
         return done(key, {
           status: 'succeeded', toolsUsed: [], changes: {},
-          output: 'The objective is met and the deliverable is done. Nothing needs another pass.',
-          stop: { status: 'completed', reason: 'Objective met.' },
+          output: `${line} ${assessment.reason}${performed}${proposed}`,
+          stop: { status: assessment.blockers.length ? 'blocked' : 'awaiting_decision', reason: line },
         });
       }
       // What the planner usually means by it mid-project is "nothing more for
@@ -972,4 +1013,16 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
     default:
       return done(key, { status: 'failed', output: `Unknown action "${key}".`, toolsUsed: [], changes: {} });
   }
+}
+
+/** The deliverable as text, for the objective check: the manuscript for a long-form stage, else the head version. */
+function deliverableText(ctx: Pick<PerformContext, 'bundles' | 'template'>, stageId: string): string {
+  const bundle = ctx.bundles[stageId];
+  const stage = ctx.template.stages.find((s) => s.id === stageId);
+  if (stage?.renderer === 'long_form') {
+    return (bundle?.artifact?.long_form?.outline ?? [])
+      .map((sec) => `## ${sec.title}\n\n${sec.content ?? ''}`)
+      .join('\n\n');
+  }
+  return bundle?.versions.at(-1)?.content ?? '';
 }

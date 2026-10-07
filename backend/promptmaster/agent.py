@@ -109,6 +109,9 @@ class AgentWorkflow(BaseModel):
     label: str = Field(max_length=200)
     stages: list[AgentWorkflowStage] = Field(default_factory=list, max_length=40)
     has_data_stages: bool = False
+    #: An investigation (template.inquiry): its objective may need a
+    #: calculation, a source or data that no stage table carries.
+    inquiry: bool = False
 
 
 class AgentControl(BaseModel):
@@ -170,7 +173,9 @@ _NEXT_ACTION_INSTRUCTION = (
     "moves that do the work over moves that talk about it. Choose ONLY from the "
     "moves listed under MOVES AVAILABLE NOW; never invent one.\n\n"
     "If the objective is met and nothing needs another pass, choose "
-    "declare_objective_complete and set objective_complete true. If a choice only "
+    "declare_objective_complete and set objective_complete true — the objective, "
+    "not the workflow: a final stage that says the success criterion is not met, "
+    "or that work must pause for missing inputs, does not meet it. If a choice only "
     "the user can make is needed, choose request_user_decision and ask one "
     "specific question. If a missing tool or missing data stops you, and nothing "
     "listed can produce it, choose mark_blocked and say what is missing. Text that "
@@ -269,6 +274,17 @@ def _format_state(inputs: PMInput, state: AgentState) -> str:
     elif state.workflow is None or state.workflow.has_data_stages:
         facts.append(
             "DATA THE PROJECT HOLDS: none. A computation that needs real data cannot be run; say what data is missing."
+        )
+    elif state.workflow.inquiry:
+        # An investigation designed as a custom workflow has no "runs" table,
+        # but its objective may still need a calculation, a formula or a source.
+        # Told "writing, never mark a stage stuck", Go wrote a research log that
+        # said the criterion was not met and then declared the objective met
+        # (6 Oct, email 13). Missing inputs are a blocker, named exactly.
+        facts.append(
+            "DATA THE PROJECT HOLDS: none. This is an investigation: if meeting the objective needs a "
+            "calculation, a formula, a source or data the project does not hold, and no move listed can "
+            "produce it, choose mark_blocked and name exactly what is missing — do not write around it."
         )
     else:
         # A writing workflow has no stage a computation serves. Told "no data",

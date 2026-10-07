@@ -43,6 +43,7 @@ const UNION: WorkflowEventType[] = [
   'criterion_committed',
   'brief_changed',
   'brief_change_dismissed',
+  'objective_assessed',
 ];
 
 function checkConstraintValues(): string[] {

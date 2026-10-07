@@ -35,6 +35,7 @@ from promptmaster.agent import (
 )
 from promptmaster.verify_sources import MAX_VERIFY, SourceToVerify, SourceVerdict, verify_sources
 from promptmaster.criterion_check import CriterionCheck, check_criterion
+from promptmaster.objective_assessment import ObjectiveAssessment, RunStep, assess_objective
 from promptmaster.agent_actions import ACTION_KEYS, AGENT_ACTIONS, REASONING_ACTIONS, AgentAction
 from promptmaster.errors import PRESERVED_NOTHING_WRITTEN
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError
@@ -280,3 +281,29 @@ async def api_check_criterion(req: CheckCriterionRequest, client: OpenRouterClie
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
     return CheckCriterionResponse(**result.model_dump(), model_used=_model_used(req.model, client))
+
+
+class AssessObjectiveRequest(BaseModel):
+    inputs: PMInput
+    deliverable_label: str = Field(max_length=200)
+    content: str = Field(min_length=1, max_length=1_000_000)
+    steps: list[RunStep] = Field(default_factory=list, max_length=40)
+    success_criterion: str = Field(default="", max_length=4_000)
+    model: str = ""
+
+
+class AssessObjectiveResponse(ObjectiveAssessment):
+    model_used: str = ""
+
+
+@router.post("/assess-objective")
+async def api_assess_objective(req: AssessObjectiveRequest, client: OpenRouterClient = Depends(get_client)) -> AssessObjectiveResponse:
+    """Whether the objective is met by what the project holds, before Go may say
+    so (6 Oct, email 13). 1 LLM call; commits nothing."""
+    try:
+        result = await assess_objective(
+            client, req.model or None, req.inputs, req.deliverable_label, req.content, req.steps, req.success_criterion
+        )
+    except OpenRouterError as e:
+        raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
+    return AssessObjectiveResponse(**result.model_dump(), model_used=_model_used(req.model, client))

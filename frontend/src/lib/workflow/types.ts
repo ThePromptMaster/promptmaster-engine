@@ -345,7 +345,13 @@ export type WorkflowEventType =
    */
   | 'brief_changed'
   /** The user kept the stages a brief change reopened; payload.change_at names it. */
-  | 'brief_change_dismissed';
+  | 'brief_change_dismissed'
+  /**
+   * Whether the objective is met, judged before Go may say so (7 Oct).
+   * payload: outcome, reason, basis_quote, blockers, performed, proposed_next.
+   * Moves no state; `objective.ts` reads the latest.
+   */
+  | 'objective_assessed';
 
 export interface WorkflowEvent {
   type: WorkflowEventType;

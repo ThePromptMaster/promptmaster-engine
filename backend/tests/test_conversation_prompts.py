@@ -120,3 +120,24 @@ def test_save_as_new_version_system_instructs_fresh_generation(basic_inputs, bas
         iterations=[basic_iteration],
     )
     assert "fresh" in system.lower() or "new" in system.lower()
+
+
+def test_the_chat_is_given_go_s_run_record_and_may_not_infer_a_stop_reason():
+    """6 Oct, email 10: asked why Go stopped, the chat first said external
+    validation was required — an inference — and then that it could not see
+    the run. It is now given the run record, and told to answer from it."""
+    from promptmaster.page_context import ChatContext, GoRunTrace, GoStepTrace, format_chat_context
+
+    ctx = ChatContext(stage_label="Final", go_run=GoRunTrace(
+        status="blocked", policy="autonomous",
+        stop_reason="Paused — the objective is not met. Waiting for: the exact formulas.",
+        steps=[GoStepTrace(action="run_computation", status="failed", execution_label="blocked", block_kind="data_missing")],
+        objective="not met — the log says the criterion is not met.",
+    ))
+    text = format_chat_context(ctx)
+    assert "GO'S LATEST RUN: blocked (autonomous)" in text
+    assert "Recorded stop reason: Paused — the objective is not met" in text
+    assert "run_computation [failed; blocked, blocked: data_missing]" in text
+    assert "never offer an inference as the reason" in text
+    assert "Never say you updated, recorded or saved anything" in text
+    assert "GO: no run on this project yet." in format_chat_context(ChatContext(stage_label="Final"))

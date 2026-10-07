@@ -92,7 +92,7 @@ export interface AgentStateDigest {
    * "DATA THE PROJECT HOLDS: none" on a workflow with no stage that could
    * run anything (2 Oct, screenshot 8).
    */
-  workflow: { key: string; label: string; stages: { label: string; renderer: string }[]; has_data_stages: boolean };
+  workflow: { key: string; label: string; stages: { label: string; renderer: string }[]; has_data_stages: boolean; inquiry?: boolean };
   tools: AgentTools;
 }
 
@@ -121,6 +121,7 @@ export function describeWorkflow(template: WorkflowTemplate): AgentStateDigest['
     label: template.name,
     stages: template.stages.map((s) => ({ label: s.label, renderer: s.renderer })),
     has_data_stages: template.stages.some((s) => Boolean(itemSchemaFor(s).execution)),
+    inquiry: Boolean(template.inquiry),
   };
 }
 

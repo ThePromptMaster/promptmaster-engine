@@ -5,6 +5,7 @@ import { useState } from 'react';
 import type { EvaluationResult } from '@/types';
 
 import { describeOutstanding, type CompletionSummary } from '@/lib/workflow/engine';
+import type { ObjectiveAssessment } from '@/lib/workflow/objective';
 import type { BlockKind } from '@/lib/workflow/types';
 
 const BLOCK_KINDS: { kind: BlockKind; label: string; hint: string }[] = [
@@ -81,6 +82,65 @@ export function BlockedNotice({ kind, reason, onUnblock }: { kind: BlockKind; re
         Continue this stage
       </button>
     </div>
+  );
+}
+
+/**
+ * The objective is not met, though the workflow's stages may all be done
+ * (7 Oct; Sean, 6 Oct, email 13: "the project should remain blocked or
+ * paused, preserve the missing-input requirements, and resume when those
+ * inputs arrive"). What is missing, what was done, what is only proposed.
+ */
+export function ObjectivePausedNotice({
+  assessment,
+  onResume,
+  resumeDisabled = false,
+}: {
+  assessment: ObjectiveAssessment;
+  onResume?: () => void;
+  resumeDisabled?: boolean;
+}) {
+  return (
+    <section role="status" aria-label="Objective not met" className="rounded-xl bg-[var(--surface-container-high)] px-5 py-4">
+      <div className="flex flex-wrap items-start gap-3">
+        <span aria-hidden className="material-symbols-outlined text-[var(--pm-tertiary)]">pause_circle</span>
+        <div className="mr-auto min-w-0 flex-1">
+          <p className="text-title text-[var(--on-surface)]">
+            {assessment.blockers.length ? 'Paused — the objective is not met' : 'The objective is not met yet'}
+          </p>
+          <p className="mt-1 text-label text-[var(--on-surface-variant)]">{assessment.reason}</p>
+          {assessment.blockers.length > 0 && (
+            <>
+              <p className="mt-2 text-label font-semibold text-[var(--on-surface)]">Waiting for</p>
+              <ul className="list-disc pl-5 text-label text-[var(--on-surface-variant)]">
+                {assessment.blockers.map((b, i) => (
+                  <li key={i}>{b.need}</li>
+                ))}
+              </ul>
+            </>
+          )}
+          <p className="mt-2 text-label text-[var(--on-surface-variant)]">
+            <span className="font-semibold text-[var(--on-surface)]">Done: </span>
+            {assessment.performed.length ? assessment.performed.join('; ') : 'no computation or investigation was recorded as performed'}
+          </p>
+          {assessment.proposed_next.length > 0 && (
+            <p className="mt-1 text-label text-[var(--on-surface-variant)]">
+              <span className="font-semibold text-[var(--on-surface)]">Proposed, not done: </span>
+              {assessment.proposed_next.join('; ')}
+            </p>
+          )}
+        </div>
+        {onResume && (
+          <button
+            onClick={onResume}
+            disabled={resumeDisabled}
+            className="rounded-lg bg-[var(--surface-container-highest)] px-4 py-2 text-title text-[var(--on-surface)] disabled:opacity-40"
+          >
+            {assessment.blockers.length ? 'I have added it — resume Go' : 'Resume Go'}
+          </button>
+        )}
+      </div>
+    </section>
   );
 }
 
