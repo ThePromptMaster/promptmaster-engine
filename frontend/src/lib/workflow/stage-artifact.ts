@@ -184,6 +184,21 @@ const TRIAGE: ReviewStatusOption[] = [
   { value: 'rejected', label: 'Reject', tone: 'warn', requiresReason: true },
 ];
 
+/**
+ * The rows of a review stage with no schema of its own (Single Output's
+ * Summary): the same three statuses, but Accept and Defer may be proposed from
+ * what a row says (6 Oct: "Autonomous stopped at three row-status decisions
+ * instead of preparing the repairs"), so under "handle them for me" Go
+ * proposes and confirms them. A proposal counts only once confirmed; rejecting
+ * a point stays the user's. Triage tables with a severity (critique,
+ * continuity) keep TRIAGE: their major findings are the user's (B3).
+ */
+const REVIEW_ROWS: ReviewStatusOption[] = [
+  { value: 'accepted', label: 'Accept', tone: 'done', modelMayPropose: true },
+  { value: 'deferred', label: 'Defer', tone: 'neutral', requiresReason: true, modelMayPropose: true },
+  { value: 'rejected', label: 'Reject', tone: 'warn', requiresReason: true },
+];
+
 const GENERIC_ITEM: StageItemSchema = {
   itemLabel: 'item',
   fields: [{ key: 'text', label: 'Item', long: true, max: 600 }],
@@ -526,7 +541,7 @@ export function itemSchemaFor(stage: StageDefinition): StageItemSchema {
   const kind = primaryArtifactKind(stage);
   const found = kind ? ITEM_SCHEMAS[kind] : undefined;
   if (found) return found;
-  if (effectiveRenderer(stage) === 'review') return { ...GENERIC_ITEM, statuses: TRIAGE };
+  if (effectiveRenderer(stage) === 'review') return { ...GENERIC_ITEM, statuses: REVIEW_ROWS };
   return GENERIC_ITEM;
 }
 

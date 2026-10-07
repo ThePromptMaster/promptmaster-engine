@@ -16,6 +16,9 @@ import { deriveWorkflowRecommendations } from './recommend';
 import { figureFindings, figureSources } from './figure-support';
 import { evaluateStage } from './engine';
 import { SINGLE_OUTPUT_V1 as template } from './templates/single-output.v1';
+import { itemSchemaFor } from './stage-artifact';
+import { policyConfirmable, staleRepair } from '@/lib/agent/needs';
+import { recheckInstruction } from '@/lib/agent/perform';
 import type { StageContext, WorkflowState } from './types';
 
 const ctx = (over: Partial<StageContext> = {}): StageContext => ({
@@ -125,10 +128,36 @@ describe('An authorized requirement change updates the brief and affected artifa
   it.todo('Phase 3: a requirement or fact recorded in project_facts reopens only the stages that relied on it');
 });
 describe('Superseded recommendations are repaired consistently; valid figures remain', () => {
-  it.todo('Phase 4: Go repairs a stale stage (recheck_stage), keeps figures that still hold, and re-completes it');
+  it('a stage reopened by the change is Go\'s next move, earliest first, once per run', () => {
+    const state: WorkflowState = { ...afterChange, stages: { ...afterChange.stages, output: { status: 'stale', stale: { reason: 'the requirement changed', since: 'x', was: 'complete' } } } };
+    expect(staleRepair(template, state)).toMatchObject({ key: 'recheck_stage', params: { stage_id: 'output' } });
+    expect(staleRepair(template, state, ['output'])).toMatchObject({ params: { stage_id: 'summary' } });
+    expect(staleRepair(template, state, ['output', 'summary'])).toBeNull();
+  });
+  it('the repair is told to keep what holds and replace what the change superseded', () => {
+    const text = recheckInstruction('Output', 'relied on "highest contribution within capacity"');
+    expect(text).toContain('Keep every figure, calculation and finding that still holds, exactly as written');
+    expect(text).toContain('one that no longer qualifies is said to be excluded, and why');
+    expect(text).toContain('"What changed:"');
+  });
 });
 describe('Go handles routine repairs within delegated authority', () => {
-  it.todo('Phase 4: under "handle them for me", proposed row statuses are confirmed by Go (confirm_proposals)');
+  const summary = template.stages.find((s) => s.id === 'summary')!;
+  const schema = itemSchemaFor(summary);
+  const rows = [
+    { id: 'i1', text: 'B fits within 160 hours', status: 'accepted', status_source: 'proposed', reason: 'says so' },
+    { id: 'i2', text: 'C qualifies but contributes less', status: 'deferred', status_source: 'proposed', reason: 'kept as an option' },
+    { id: 'i3', text: 'Unclear' },
+  ];
+  const facts = { review: { items: rows, schema, routine: [], material: rows, outcome: true } } as never;
+  it('under "handle them for me", proposals that stand are Go\'s to confirm; under "ask me" they are not', () => {
+    expect(policyConfirmable(summary, facts, 'handle')).toBe(2);
+    expect(policyConfirmable(summary, facts, 'ask')).toBe(0);
+  });
+  it('not where the rows are a decision reserved to the user', () => {
+    const reserved = { ...summary, exit_criteria: [{ id: 'x', label: 'I accept each verdict', check: 'manual' as const, blocking: true, authority: 'reserved' as const }] };
+    expect(policyConfirmable(reserved, facts, 'handle')).toBe(0);
+  });
 });
 describe('Accepted evidence is recorded once with its source, and every check reads it', () => {
   it('a figure the user supplied as an accepted fact is supplied material for the figure check', () => {

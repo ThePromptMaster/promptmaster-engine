@@ -98,6 +98,14 @@ AGENT_ACTIONS: list[AgentAction] = [
                 when="A check table (alternatives, validation, final open items) has rows with no status. "
                      "Proposes the status each row's own text supports, with its reason; the user confirms.",
                 important=True),
+    AgentAction(key="recheck_stage", family="writing", label="Repair a reopened stage",
+                when="Only offered when a change to the brief or the accepted facts reopened a finished stage. "
+                     "Revises that stage so what the change superseded is replaced and what still holds is kept, "
+                     "then marks it complete again. Params: stage_id.",
+                important=True),
+    AgentAction(key="confirm_proposals", family="writing", label="Confirm the routine proposals",
+                when="Only offered when routine decisions are set to 'handle them for me' and rows carry proposed "
+                     "statuses that can stand as they are. Confirms them under the user's policy."),
     # --- workflow ---------------------------------------------------------------
     AgentAction(key="propose_skip", family="workflow", label="Suggest skipping this stage",
                 when="This stage may be skipped, and for THIS objective an expert would not do it next "

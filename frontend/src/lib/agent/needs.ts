@@ -11,7 +11,7 @@
 
 import { isLargeJob } from '@/components/workflow/large-job-warning';
 import type { ExecutionPolicy } from '@/types/agent';
-import type { ExitCriterion, StageDefinition, StageEvaluation, WorkflowState } from '@/lib/workflow/types';
+import type { ExitCriterion, StageDefinition, StageEvaluation, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
 import type { RoutineDecisions } from '@/types/project';
 import type { StageFacts } from './facts';
 import type { InputsChange } from '@/lib/workflow/stage-inputs';
@@ -118,6 +118,53 @@ export interface RequiredMove {
 }
 
 /**
+ * A finished stage a change reopened, to repair before anything else (6 Oct).
+ *
+ * Sean: "revising Output changed the recommendation to B, and Summary was
+ * correctly flagged for rechecking. But Summary still recommended A." A stage
+ * marked for a recheck is outstanding work (`outstandingWork`); this makes it
+ * Go's next move, earliest first, so a repair upstream is carried into the
+ * stages after it. Prose, list and review stages only — a manuscript or an
+ * outline is the user's editor. `tried`: stages this run already rechecked,
+ * so one that still cannot be closed is not repaired again in a loop.
+ */
+export function staleRepair(
+  template: WorkflowTemplate,
+  state: WorkflowState,
+  tried: readonly string[] = []
+): RequiredMove | null {
+  for (const stage of template.stages) {
+    const st = state.stages[stage.id];
+    if (st?.status !== 'stale' || tried.includes(stage.id)) continue;
+    if (!['prose', 'list', 'review'].includes(stage.renderer)) continue;
+    return {
+      key: 'recheck_stage',
+      rationale: `${stage.label} was reopened: ${st.stale?.reason ?? 'something it relied on changed'}. Repairing it keeps the project consistent.`,
+      expected: `A new version of ${stage.label} that keeps what still holds and replaces what the change superseded; then it is marked complete again.`,
+      params: { stage_id: stage.id },
+    };
+  }
+  return null;
+}
+
+/**
+ * Rows whose proposed status Go may confirm under "handle them for me" (6 Oct:
+ * "Autonomous stopped at three row-status decisions instead of preparing the
+ * repairs"). Not on a stage with an approval reserved to the user and blocking
+ * — Analysis's "I accept each verdict" — where the rows are that decision.
+ */
+export function policyConfirmable(
+  stage: StageDefinition,
+  facts: StageFacts,
+  routine: RoutineDecisions | undefined
+): number {
+  if (routine !== 'handle' || !facts.review) return 0;
+  const reserved = stage.exit_criteria.some((c) => c.check === 'manual' && c.blocking && c.authority !== 'delegable');
+  if (reserved) return 0;
+  return confirmableProposals(facts.review.items, facts.review.schema).length;
+}
+
+/**
  * The routine approval Go may commit on this stage now, or null (5 Oct).
  *
  * Only under "Routine decisions: handle them for me"; only a blocking box the
@@ -173,6 +220,14 @@ export function requiredWork(input: {
 }): RequiredMove | null {
   const { stage, facts, stageEvaluation, allowed, round } = input;
   const can = (k: string) => allowed.includes(k);
+
+  if (can('confirm_proposals')) {
+    return {
+      key: 'confirm_proposals',
+      rationale: `${stage.label}'s proposed statuses stand as they are, and your routine decisions are mine to handle.`,
+      expected: 'Each proposal confirmed, recorded as confirmed under your routine-decision policy.',
+    };
+  }
 
   if (round?.staleDraft && can('draft_stage')) {
     return {
@@ -300,7 +355,7 @@ export function needsUser(input: {
   // computation can settle a row, and stopping first would leave the data unused.
   const canRun = Boolean(facts.review?.outcome && facts.review.schema.execution && (input.runAttemptsLeft ?? 0) > 0);
   // …or rows still waiting for a proposal Go can make first (3 Oct).
-  const canPropose = allowed.includes('propose_statuses');
+  const canPropose = allowed.includes('propose_statuses') || allowed.includes('confirm_proposals');
   const canLookUp = Boolean(input.lookupDue && allowed.includes('check_literature'));
   if (facts.review && facts.review.material.length > 0 && facts.review.routine.length === 0 && !canRun && !canPropose && !canLookUp) {
     const proposed = confirmableProposals(facts.review.material, facts.review.schema).length;

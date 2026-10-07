@@ -23,6 +23,8 @@ export type Performer =
   | 'triage' // decide the routine findings of a review table (B3)
   | 'propose' // propose a status for each undecided row of a check table; the user confirms (3 Oct)
   | 'commit' // check a routine approval, then commit it under the routine-decision policy
+  | 'recheck' // repair a stage a change reopened, then mark it complete again (6 Oct)
+  | 'confirm' // confirm proposed row statuses under the routine-decision policy (6 Oct)
   | 'advance' // a stage event
   | 'skip' // proposes skipping the stage; the user decides
   | 'loop' // proposes the next round of a looping workflow; the user starts it
@@ -63,6 +65,10 @@ export const AGENT_ACTIONS: readonly AgentAction[] = [
   { key: 'triage_findings', family: 'writing', label: 'Decide the routine findings', performer: 'triage', important: true },
   // 3 Oct: what the draft already concluded reaches the status, as a proposal the user confirms.
   { key: 'propose_statuses', family: 'writing', label: 'Propose a status for each row', performer: 'propose', important: true },
+  // 6 Oct: a stage a change reopened is repaired, not left for the user to find.
+  { key: 'recheck_stage', family: 'writing', label: 'Repair a reopened stage', performer: 'recheck', important: true },
+  // 6 Oct: under "handle them for me", proposed row statuses are confirmed by Go.
+  { key: 'confirm_proposals', family: 'writing', label: 'Confirm the routine proposals', performer: 'confirm', important: false },
   // 1 Oct, item 11: the template guides the order; it does not imprison it.
   { key: 'propose_skip', family: 'workflow', label: 'Suggest skipping this stage', performer: 'skip', important: false },
   // 3 Oct call: work that goes on round after round; the user starts each one.

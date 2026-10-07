@@ -532,6 +532,9 @@ function ReviewRow({ row, columns, statuses, schema, readOnly, onPatch }: Review
           {row.status_source === 'model' && option && option.decided !== false && (
             <span className="mt-1 block text-label text-[var(--on-surface-variant)]">Set by PromptMaster</span>
           )}
+          {row.status_source === 'policy' && option && (
+            <span className="mt-1 block text-label text-[var(--on-surface-variant)]">Confirmed under your routine-decision policy</span>
+          )}
           {row.status_source === 'sandbox' && option && (
             <span className="mt-1 block text-label text-[var(--on-surface-variant)]">
               {row.status === schema.execution?.blocked ? 'Recorded by PromptMaster: the run could not be made' : 'Recorded from a sandbox run'}
