@@ -25,6 +25,28 @@ class PageButton(BaseModel):
     where: str = Field(default="", max_length=200)
 
 
+class GoStepTrace(BaseModel):
+    action: str = Field(max_length=120)
+    status: str = Field(default="", max_length=40)
+    #: Derived from what happened (labels.ts), never from a model.
+    execution_label: str | None = Field(default=None, max_length=40)
+    block_kind: str | None = Field(default=None, max_length=40)
+    output: str = Field(default="", max_length=400)
+
+
+class GoRunTrace(BaseModel):
+    """The latest Go run, as recorded (6 Oct, email 10: asked why it stopped,
+    the chat "said it could not inspect the autonomous execution trace", and
+    first offered an inference as the reason)."""
+
+    status: str = Field(max_length=40)
+    policy: str = Field(default="", max_length=40)
+    stop_reason: str = Field(default="", max_length=2_000)
+    steps: list[GoStepTrace] = Field(default_factory=list, max_length=12)
+    #: The latest objective assessment, in one line, if any.
+    objective: str = Field(default="", max_length=2_000)
+
+
 class ChatContext(BaseModel):
     """What the side chat may know about the project beyond the brief."""
 
@@ -41,6 +63,8 @@ class ChatContext(BaseModel):
     manuscript: str = Field(default="", max_length=200_000)
     #: None when the client did not say; [] when the page has none.
     buttons: list[PageButton] | None = Field(default=None, max_length=40)
+    #: The latest Go run on this project; None when there has been none.
+    go_run: GoRunTrace | None = None
 
 
 NEVER_PASTE_RULE = (
@@ -62,6 +86,37 @@ def format_buttons(buttons: list[PageButton] | None) -> str:
         "in quotes, and never a button that is not listed):\n"
         + "\n".join(f'- "{b.label}" — {b.where}' if b.where else f'- "{b.label}"' for b in buttons)
     )
+
+
+WHAT_CHAT_CAN_CHANGE = (
+    "WHAT YOU CAN AND CANNOT CHANGE: talking here changes nothing. A change to this stage happens "
+    "only when the user accepts an action offered under your answer, as a new version. You cannot "
+    "change the project brief, its context or its facts, another stage, or Go's run. Never say you "
+    "updated, recorded or saved anything; say what the user can press to do it."
+)
+
+
+def format_go_run(run: GoRunTrace | None) -> str:
+    """The run trace, with the rule that the chat may not invent a stop reason."""
+    if run is None:
+        return "GO: no run on this project yet."
+    lines = [f"GO'S LATEST RUN: {run.status}" + (f" ({run.policy})" if run.policy else "")]
+    if run.stop_reason.strip():
+        lines.append(f"Recorded stop reason: {run.stop_reason.strip()}")
+    if run.objective.strip():
+        lines.append(f"Objective check: {run.objective.strip()}")
+    if run.steps:
+        lines.append("Its last steps (execution labels are derived from what actually ran):")
+        for s in run.steps:
+            label = s.execution_label or "no execution"
+            extra = f", blocked: {s.block_kind}" if s.block_kind else ""
+            out = f" — {' '.join(s.output.split())[:160]}" if s.output.strip() else ""
+            lines.append(f"- {s.action} [{s.status}; {label}{extra}]{out}")
+    lines.append(
+        "When asked why Go stopped or what it did, answer from this record only. If the record does "
+        "not show it, say you cannot verify it from the run record — never offer an inference as the reason."
+    )
+    return "\n".join(lines)
 
 
 def format_chat_context(ctx: ChatContext | None) -> str:
@@ -91,6 +146,7 @@ def format_chat_context(ctx: ChatContext | None) -> str:
             ctx.manuscript.strip(),
             "--- END MANUSCRIPT ---",
         ]
+    lines += ["", format_go_run(ctx.go_run), "", WHAT_CHAT_CAN_CHANGE]
     lines += ["", format_buttons(ctx.buttons), "", NEVER_PASTE_RULE]
     return "\n".join(lines)
 

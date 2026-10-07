@@ -231,6 +231,14 @@ export interface ChatContext {
   manuscript: string;
   /** null when not known; [] when the page has none. */
   buttons: { label: string; where: string }[] | null;
+  /** The latest Go run as recorded; null when there has been none (7 Oct). */
+  go_run?: {
+    status: string;
+    policy: string;
+    stop_reason: string;
+    steps: { action: string; status: string; execution_label: string | null; block_kind: string | null; output: string }[];
+    objective: string;
+  } | null;
 }
 
 export interface ChatMessageRequest {

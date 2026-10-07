@@ -415,6 +415,20 @@ def _json_reply(system: str, prompt: str) -> dict:
         # Every item supported, quoting the scripted abstract's second sentence.
         ids = re.findall(r"^ITEM id=(\S+)", prompt, re.M)
         return {"verdicts": [{"id": i, "verdict": "supports", "quote": "This study shows the effect holds in every case examined."} for i in ids]}
+    from promptmaster import objective_assessment
+
+    if system.startswith(objective_assessment._ASSESS_INSTRUCTION[:60]):
+        # Not met when the deliverable says "[[mock:objective=unmet]]": a blocker
+        # and a proposal; otherwise met, quoting the deliverable's first line.
+        body = prompt.split("--- THE DELIVERABLE:", 1)[-1].split("---\n", 1)[-1]
+        first = next((ln.strip() for ln in body.splitlines() if ln.strip()), "")
+        if "[[mock:objective=unmet]]" in prompt:
+            return {"outcome": "not_met", "reason": "Mock: the log says the criterion is not met.",
+                    "basis_quote": first[:120],
+                    "blockers": [{"need": "the exact formulas and their parameterisation", "kind": "source_missing"}],
+                    "performed": ["S99"], "proposed_next": ["Compute the Hessian once the formulas are supplied."]}
+        return {"outcome": "met", "reason": "Mock: the deliverable states the answer.", "basis_quote": first[:120],
+                "blockers": [], "performed": [], "proposed_next": []}
     from promptmaster import criterion_check
 
     if system.startswith(criterion_check._CHECK_INSTRUCTION[:60]):

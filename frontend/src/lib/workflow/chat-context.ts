@@ -66,6 +66,9 @@ export function chatContentFor(
   return stageContentForChat(itemSchemaFor(stage), versionContent);
 }
 
+/** Go steps the chat is shown: enough to answer "why did it stop?". */
+const GO_STEPS_MAX = 12;
+
 export function buildChatContext(input: {
   template: WorkflowTemplate;
   state: WorkflowState;
@@ -74,8 +77,14 @@ export function buildChatContext(input: {
   bundles: Record<string, StageArtifactBundle>;
   /** The page's buttons; null for a stage the user is only browsing. */
   controls: StageControl[] | null;
+  /** The latest Go run and its steps, so the chat answers "why did it stop?" from the record. */
+  goRun?: {
+    run: { status: string; policy: string; stop_reason: string | null } | null;
+    steps: readonly { action_key: string; status: string; execution_label: string | null; block_kind?: string | null; output: string }[];
+    objective?: string;
+  };
 }): ChatContext {
-  const { template, state, project, stage, bundles, controls } = input;
+  const { template, state, project, stage, bundles, controls, goRun } = input;
   const digest = buildStageDigest(template, state, project, bundles, stage.id);
   // A chapter stage's own text already is the manuscript; sending it twice
   // would double the cost of every message.
@@ -92,6 +101,24 @@ export function buildChatContext(input: {
     manuscript,
     buttons: controls
       ? controls.slice(0, BUTTONS_MAX).map((c) => ({ label: c.label, where: PLACE_WORDS[c.place] }))
+      : null,
+    go_run: goRun?.run
+      ? {
+          status: goRun.run.status,
+          policy: goRun.run.policy,
+          stop_reason: (goRun.run.stop_reason ?? '').slice(0, 2_000),
+          steps: goRun.steps
+            .filter((s) => s.status !== 'running')
+            .slice(-GO_STEPS_MAX)
+            .map((s) => ({
+              action: s.action_key,
+              status: s.status,
+              execution_label: s.execution_label,
+              block_kind: s.block_kind ?? null,
+              output: s.output.slice(0, 400),
+            })),
+          objective: (goRun.objective ?? '').slice(0, 2_000),
+        }
       : null,
   };
 }

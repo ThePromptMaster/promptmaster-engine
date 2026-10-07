@@ -87,6 +87,16 @@ describe('Completion messages agree with unresolved work', () => {
   });
 });
 
+describe('A finished cycle with an unmet objective stays paused on its blocker (email 13)', () => {
+  it('a "not met" objective is outstanding, with what it waits for, even when every stage is done', () => {
+    const done: WorkflowState = { current_stage_id: 'summary', stages: { input: { status: 'complete' }, review: { status: 'complete' }, output: { status: 'complete' }, realign: { status: 'skipped' }, summary: { status: 'complete' } } };
+    const items = outstandingWork(template, done, ctx({ manualChecks: { 'summary.accepted': true } }), {
+      objectiveUnmet: { blockers: ['the exact formulas and their parameterisation'] },
+    });
+    expect(items.map(describeOutstanding)).toEqual(['The objective is not met — waiting for: the exact formulas and their parameterisation']);
+  });
+});
+
 describe('The project cannot report "Ready to move on" while an unresolved check remains', () => {
   it('an unresolved finding counts even when the template marks it non-blocking', () => {
     const state: WorkflowState = { current_stage_id: 'summary', stages: { ...afterChange.stages, summary: { status: 'in_progress' } } };

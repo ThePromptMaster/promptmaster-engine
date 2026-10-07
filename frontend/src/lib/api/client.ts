@@ -712,6 +712,24 @@ export const api = {
     return apiFetch('/api/agent/verify-sources', { method: 'POST', body: JSON.stringify(req), signal });
   },
 
+  /**
+   * Whether the objective is met by what the project holds, before Go may say
+   * so (6 Oct, email 13). Commits nothing.
+   */
+  async agentAssessObjective(
+    req: {
+      inputs: PMInput;
+      deliverable_label: string;
+      content: string;
+      steps: { action_key: string; execution_label: string | null; output: string }[];
+      success_criterion?: string;
+      model?: string;
+    },
+    signal?: AbortSignal
+  ): Promise<import('@/lib/workflow/objective').ObjectiveAssessment & { model_used: string }> {
+    return apiFetch('/api/agent/assess-objective', { method: 'POST', body: JSON.stringify(req), signal });
+  },
+
   /** Whether a stage's text satisfies a routine approval, before Go commits it (5 Oct). Commits nothing. */
   async agentCheckCriterion(
     req: { inputs: PMInput; stage_label: string; criterion: string; content: string; model?: string },

@@ -10,7 +10,7 @@ import { ConfirmOverwrite } from './renderers/stage-chrome';
 import { CheckpointPanel } from './checkpoint-panel';
 import { UpgradeBanner } from './upgrade-banner';
 import { templateDiff } from '@/lib/workflow/upgrade';
-import { BlockForm, BlockedNotice, CompletionDialog } from './stage-status-panels';
+import { BlockForm, BlockedNotice, CompletionDialog, ObjectivePausedNotice } from './stage-status-panels';
 import { StageToolResult } from './stage-tool-result';
 import { CRITIQUE_TOOLS, REWRITE_TOOLS, useStageTools } from './use-stage-tools';
 import { nextStageAction, type ReportedPanelStep } from '@/lib/workflow/next-action';
@@ -58,6 +58,7 @@ import {
   tickClosesStage,
 } from '@/lib/workflow/engine';
 import { buildStageDigest, formatManuscript, summariseStageContent } from '@/lib/workflow/digest';
+import { objectiveUnmet } from '@/lib/workflow/objective';
 import { buildChatContext, chatContentFor } from '@/lib/workflow/chat-context';
 import { starterQuestions } from '@/lib/workflow/chat-starters';
 import { keepFinishedVersion, stageContentForSummary, stageEvidence } from '@/lib/workflow/evidence';
@@ -375,7 +376,16 @@ export function WorkflowWorkspace({
   // What is still open anywhere in the project, and the part of it that is not
   // on this stage: "Ready to move on" says so too, rather than "nothing is
   // outstanding" beside a stage that needs a recheck (6 Oct).
-  const outstanding = useMemo(() => outstandingWork(template, state, context), [template, state, context]);
+  // The latest judgment of the objective (7 Oct): "not met" is outstanding
+  // work, and the banner says what it waits for.
+  const objectiveAssessment = useMemo(() => objectiveUnmet(events ?? []), [events]);
+  const outstanding = useMemo(
+    () =>
+      outstandingWork(template, state, context, {
+        objectiveUnmet: objectiveAssessment ? { blockers: objectiveAssessment.blockers.map((b) => b.need) } : null,
+      }),
+    [template, state, context, objectiveAssessment]
+  );
   const outstandingOther = useMemo(
     () => outstandingBeyondCriteria(outstanding, stageId).map(describeOutstanding),
     [outstanding, stageId]
@@ -1223,7 +1233,10 @@ export function WorkflowWorkspace({
     go.run && !go.run.ended_at && (go.run.status === 'awaiting_decision' || go.run.status === 'blocked')
       ? go.run.stop_reason || 'a decision from you'
       : null;
-  const completion = completionSummary(template, state, context, { goWaiting });
+  const completion = completionSummary(template, state, context, {
+    goWaiting,
+    objectiveUnmet: objectiveAssessment ? { blockers: objectiveAssessment.blockers.map((b) => b.need) } : null,
+  });
   // The deliverable's latest objective check, for the finished screen (C4).
   const deliverableHead = completion.deliverable ? bundles?.[completion.deliverable.id]?.versions.at(-1) : undefined;
   const deliverableEvaluation = deliverableHead ? evaluations?.[deliverableHead.id] : undefined;
@@ -1677,6 +1690,15 @@ export function WorkflowWorkspace({
             ) : (
               <ProjectBrief project={project} onPatch={onPatchProject} readOnly={!isEditable} />
             )}
+            {objectiveAssessment && project.status !== 'finalized' && (
+              <div className="mb-4">
+                <ObjectivePausedNotice
+                  assessment={objectiveAssessment}
+                  onResume={appendStageVersion ? () => void go.go() : undefined}
+                  resumeDisabled={go.active}
+                />
+              </div>
+            )}
             <BriefChangeNotice
               change={briefChange}
               stageLabel={(id) => template.stages.find((s) => s.id === id)?.label ?? id}
@@ -2041,7 +2063,18 @@ export function WorkflowWorkspace({
                   ''
               )}
               // Built when a message is sent, not on every render: it carries the chapters.
-              getChatContext={() => buildChatContext({ template, state, project, stage, bundles: stageBundles, controls: pageControls })}
+              getChatContext={() =>
+                buildChatContext({
+                  template, state, project, stage, bundles: stageBundles, controls: pageControls,
+                  goRun: {
+                    run: go.run ? { status: go.run.status, policy: go.run.policy, stop_reason: go.run.stop_reason ?? null } : null,
+                    steps: go.steps,
+                    objective: objectiveAssessment
+                      ? `${objectiveAssessment.outcome.replace('_', ' ')} — ${objectiveAssessment.reason}${objectiveAssessment.blockers.length ? ` Waiting for: ${objectiveAssessment.blockers.map((b) => b.need).join('; ')}.` : ''}`
+                      : '',
+                  },
+                })
+              }
               starters={isCurrent ? starterQuestions({
                 renderer: stage.renderer,
                 stageLabel: stage.short_label,
