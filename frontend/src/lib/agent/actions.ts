@@ -78,7 +78,7 @@ export const AGENT_ACTIONS: readonly AgentAction[] = [
   { key: 'advance_stage', family: 'workflow', label: 'Move to the next stage', performer: 'advance', important: true },
   { key: 'mark_blocked', family: 'workflow', label: 'Mark this stage stuck', performer: 'block', important: false },
   { key: 'request_user_decision', family: 'workflow', label: 'Ask the user', performer: 'ask', important: false },
-  { key: 'declare_objective_complete', family: 'workflow', label: 'Objective complete', performer: 'complete', important: true },
+  { key: 'declare_objective_complete', family: 'workflow', label: 'Check the objective is met', performer: 'complete', important: true },
 ];
 
 /** Not planner-selectable: the automatic second half of run_computation. */

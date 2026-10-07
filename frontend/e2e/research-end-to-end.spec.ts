@@ -58,7 +58,7 @@ test('Research, start to finish: prefilled runs, Go derives and drafts the repor
 
   // The run has done what it was for; the rest is the user's walk to the end.
   // (The scripted planner next proposes declaring the objective met; that is declined.)
-  await expect(prompt).toContainText('Objective complete', { timeout: 30_000 });
+  await expect(prompt).toContainText('Check the objective is met', { timeout: 30_000 });
   await prompt.getByRole('button', { name: 'Decline' }).click();
   await expect(prompt).toHaveCount(0);
 

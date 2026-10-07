@@ -5,6 +5,26 @@ import type { ProjectFile } from '@/types/project';
 const BUCKET = 'project-files';
 const COLUMNS = 'id, project_id, user_id, name, path, content_type, bytes, preview, created_at';
 
+/**
+ * A file name as a storage key can hold it. Supabase Storage refuses keys with
+ * characters outside a small ASCII set — accents, curly quotes, dashes — with
+ * "Invalid key", and on the start screen that cost the whole project (6 Oct,
+ * email 9: "Attachments aren't working"). The key only has to be unique and
+ * readable; the name the user sees stays on the row, exactly as they gave it.
+ */
+export function storageSafeName(name: string): string {
+  const dot = name.lastIndexOf('.');
+  const ext = dot > 0 ? name.slice(dot).toLowerCase().replace(/[^a-z0-9.]/g, '') : '';
+  const stem = (dot > 0 ? name.slice(0, dot) : name)
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Za-z0-9._-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^[-.]+|[-.]+$/g, '')
+    .slice(0, 80);
+  return `${stem || 'file'}${ext}`;
+}
+
 export async function listProjectFiles(projectId: string): Promise<ProjectFile[]> {
   const supabase = createClient();
   const { data, error } = await supabase
@@ -24,7 +44,7 @@ export async function attachProjectFile(
   preview: DataPreview
 ): Promise<ProjectFile> {
   const supabase = createClient();
-  const path = `${project.user_id}/${project.id}/${crypto.randomUUID()}-${file.name}`;
+  const path = `${project.user_id}/${project.id}/${crypto.randomUUID()}-${storageSafeName(file.name)}`;
   const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, file, { contentType: file.type || 'text/plain' });
   if (upErr) throw upErr;
   const { data, error } = await supabase
