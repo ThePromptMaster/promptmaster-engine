@@ -44,3 +44,9 @@ def test_endpoint_returns_reply_and_brief_and_saves_nothing():
         assert r.json()["reply"] == "Who is it for?" and r.json()["brief"]["objective"] == "o"
     finally:
         app.dependency_overrides.pop(get_client, None)
+
+
+def test_a_requirement_is_not_listed_again_as_a_fact():
+    out = parse_front_door({"reply": "ok", "brief": {"objective": "o", "requirements": ["One researcher must stay free"],
+                                                     "evidence": ["One researcher must stay free.", "B needs 120 hours and returns $45,000"]}}, TURNS)
+    assert out.brief.evidence == ["B needs 120 hours and returns $45,000"]

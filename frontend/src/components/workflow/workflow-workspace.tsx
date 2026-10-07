@@ -695,8 +695,9 @@ export function WorkflowWorkspace({
    * evaluation: acting on a stage you are only looking at is never what was
    * meant.
    */
+  const reloadRecommendations = useProjectStore((s) => s.reloadRecommendations);
   const tools = useStageTools({
-    project, stage: stage ?? null, headVersion, appendStageVersion,
+    project, stage: stage ?? null, headVersion, appendStageVersion, onRecorded: reloadRecommendations,
     // A long-form stage's text lives in its chapters, not in a version.
     fallbackContent: stage?.renderer === 'long_form' ? stageContentForSummary(template, stage, stageBundles) : '',
   });

@@ -54,5 +54,10 @@ test('a conversation builds a draft brief; only confirmed facts become the proje
     expect.arrayContaining([['requirement', 'chat'], ['fact', 'chat']])
   );
   expect(facts.map((f: { statement: string }) => f.statement)).not.toContain('Revenue grew 999% last year');
-  await expect(page.getByRole('region', { name: 'Facts and requirements' })).toContainText('One researcher must stay available');
+  const panel = page.getByRole('region', { name: 'Facts and requirements' });
+  await expect(panel).toContainText('One researcher must stay available');
+  // Labelled as the conversation it came from, and a requirement is not recorded twice.
+  await expect(panel).toContainText('from your conversation');
+  const statements = facts.map((f: { statement: string }) => f.statement.toLowerCase().replace(/[^a-z0-9$%]+/g, ' ').trim());
+  expect(new Set(statements).size).toBe(statements.length);
 });

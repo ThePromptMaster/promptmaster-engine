@@ -223,3 +223,26 @@ export async function appendWorkflowEvent(
   });
   if (error) throw error;
 }
+
+
+/**
+ * Projects whose latest objective check said the objective is not met (7 Oct,
+ * L-55): the projects list shows them as paused. One query for all of them;
+ * a later "met" clears it.
+ */
+export async function pausedProjectIds(projectIds: readonly string[]): Promise<Set<string>> {
+  if (!projectIds.length) return new Set();
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('workflow_events')
+    .select('project_id, payload, seq')
+    .eq('type', 'objective_assessed')
+    .in('project_id', projectIds as string[])
+    .order('seq', { ascending: true });
+  if (error) throw error;
+  const latest = new Map<string, string>();
+  for (const row of (data ?? []) as { project_id: string; payload: { outcome?: string } | null }[]) {
+    latest.set(row.project_id, row.payload?.outcome ?? '');
+  }
+  return new Set([...latest].filter(([, outcome]) => outcome && outcome !== 'met').map(([id]) => id));
+}
