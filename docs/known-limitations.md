@@ -1061,3 +1061,42 @@ extraction, criterion checks, change impact, source verification — would likel
 well on a smaller model at a fraction of the cost. Per-operation cost and time are now
 recorded (E1); routing should follow measurement on matched tasks, not precede it.
 
+
+### L-51 — Accepted facts are recorded by the user; Go does not extract them (2026-10-07)
+
+`project_facts` holds what the user accepted: typed into the facts panel, confirmed from
+the side chat, or confirmed at the end of the conversational start. Figures in an attached
+file reach prompts through the project context, not as individual facts, and Go does not
+propose facts from files or stages yet. The database already guards policy acceptance
+(a running run on a `handle` project, from a file or stage only), so adding that move does
+not need a schema change.
+
+### L-52 — A fact or requirement reopens whole stages, not the claims that used it (2026-10-07)
+
+Changing a fact runs the same change check as an edit of the brief: one call names the
+finished stages that relied on it. There is no per-claim dependency record, so a stage
+with one sentence that used the fact is reopened whole, and its repair revises the whole
+stage (keeping what holds). Per-claim dependencies are the next layer if this proves too
+coarse.
+
+### L-53 — Go's repair is a revision, judged by the model (2026-10-07)
+
+`recheck_stage` revises a reopened stage with the change and the current facts, told to
+keep every figure that still holds and to replace superseded conclusions. That instruction
+is followed by the model; nothing in code checks that a figure survived unchanged. The
+commit check still refuses an empty result, prose for a table, or a dropped user decision,
+and the earlier version is always kept.
+
+### L-54 — Ongoing workflows: rounds are bounded by the step budget, not by the objective (2026-10-07)
+
+Under Autonomous with routine decisions handled, Go starts each next round itself. It
+stops when the step budget (and any further windows the user authorised) runs out, when
+it marks a stage stuck, or when it asks. It does not yet run the objective check at the end
+of each round to stop on success; the user ends the rounds from the stage bar, or Go's
+completion check does when the last stage is reached.
+
+### L-55 — The projects list does not show "Paused" (2026-10-07)
+
+When Go's objective check finds the objective not met, the project shows "Paused — the
+objective is not met. Waiting for: …" and the stage bar and finish dialog list it. The
+projects list reads no events, so it still shows the project as in progress.

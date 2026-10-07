@@ -8,6 +8,8 @@ import { useAuth } from '@/hooks/use-auth';
 import { GuideInterview } from '@/components/projects/guide-interview';
 import { SetupCard, type SetupDraft } from '@/components/projects/setup-card';
 import { CustomWorkflowDesigner } from '@/components/projects/custom-workflow-designer';
+import { FrontDoor, type DraftBrief } from '@/components/projects/front-door';
+import { recordFacts, type NewFact } from '@/lib/supabase/facts';
 import { designFromTemplate } from '@/lib/workflow/custom';
 import { AutoGrowTextarea } from '@/components/shared/auto-grow-textarea';
 import { api } from '@/lib/api/client';
@@ -41,7 +43,7 @@ import { LimitCounter } from '@/components/shared/limit-counter';
  * Choosing the workflow yourself is still one click away on the first screen.
  */
 
-type Step = 'ask' | 'questions' | 'setup';
+type Step = 'ask' | 'questions' | 'talk' | 'setup';
 
 /** The output format a Book gets when setup suggested none. */
 export const BOOK_OUTPUT_FORMAT = 'A book manuscript in continuous prose, chapter by chapter';
@@ -62,6 +64,11 @@ export default function NewProjectPage() {
   const [step, setStep] = useState<Step>('ask');
   const [objective, setObjective] = useState('');
   const [templateId, setTemplateId] = useState<string | null>(null);
+  /**
+   * Facts and requirements the user gave in the front-door conversation and
+   * confirmed: recorded as the project's accepted facts when it is created.
+   */
+  const [initialFacts, setInitialFacts] = useState<NewFact[]>([]);
   /** A saved workflow being edited as a copy. */
   const [copying, setCopying] = useState<(WorkflowTemplate & { id: string }) | null>(null);
   const [recommendedKey, setRecommendedKey] = useState<string | null>(null);
@@ -120,25 +127,27 @@ export default function NewProjectPage() {
   }
   const hasObjective = objective.trim().length > 0;
 
-  async function recommend(given?: { question: string; answer: string }[]) {
+  async function recommend(given?: { question: string; answer: string }[], from?: { objective: string; material: string }) {
     setWorking('setup');
     setError(null);
+    const ask = from?.objective ?? objective;
+    const brought = [material, from?.material ?? ''].filter(Boolean).join('\n\n');
     try {
       const { suggestion } = await api.generateSetup({
-        objective: objective.trim(),
+        objective: ask.trim(),
         answers: given?.length ? given.slice(0, 8) : undefined,
-        ...(material ? { material } : {}),
+        ...(brought ? { material: brought } : {}),
       });
       const recommended = templateFor(suggestion.workflow) ?? templateFor('single_output');
       setTemplateId(recommended?.id ?? null);
       setRecommendedKey(suggestion.workflow);
       setWorkflowReason(suggestion.workflow_reason);
       setRationale(suggestion.rationale);
-      const ask = withDocuments(objective);
+      const split = withDocuments(ask);
       setDraft({
-        title: titleFrom(objective),
-        objective: ask.objective,
-        context: ask.context,
+        title: titleFrom(ask),
+        objective: split.objective,
+        context: split.context,
         audience: suggestion.audience || 'General',
         constraints: suggestion.constraints,
         output_format: suggestion.output_format,
@@ -152,6 +161,22 @@ export default function NewProjectPage() {
     } finally {
       setWorking(null);
     }
+  }
+
+  /** The front door confirmed: its brief becomes the setup, and its facts the initial record. */
+  function fromConversation(brief: DraftBrief, transcript: string) {
+    setObjective(brief.objective);
+    setInitialFacts([
+      ...brief.requirements.map((statement) => ({ statement, kind: 'requirement' as const, source_kind: 'chat' as const, source_ref: { via: 'front door' } })),
+      ...brief.evidence.map((statement) => ({ statement, kind: 'fact' as const, source_kind: 'chat' as const, source_ref: { via: 'front door' } })),
+    ]);
+    const lines = [
+      brief.audience && `Audience: ${brief.audience}`,
+      brief.deliverables.length && `Deliverables: ${brief.deliverables.join('; ')}`,
+      brief.stages.length && `Stages discussed: ${brief.stages.join(' › ')}`,
+      brief.approvals.length && `Approvals wanted: ${brief.approvals.join('; ')}`,
+    ].filter(Boolean);
+    void recommend(undefined, { objective: brief.objective, material: [lines.join('\n'), `The conversation:\n${transcript}`].filter(Boolean).join('\n\n') });
   }
 
   // The questions are asked one at a time, on their own screen (1 Oct, item 9).
@@ -246,6 +271,8 @@ export default function NewProjectPage() {
         return;
       }
 
+      // What the user confirmed in the front door is the project's initial record.
+      if (initialFacts.length) await recordFacts(project, initialFacts);
       router.push(`/projects/${project.id}`);
     } catch (e) {
       // Four writes, not one transaction: a failure part-way left a project
@@ -349,7 +376,17 @@ export default function NewProjectPage() {
             >
               <span className="block text-title">Guide me — ask me questions</span>
               <span className="mt-1 block text-label text-[var(--on-surface-variant)]">
-                A few quick questions first, then a setup
+                One question at a time, then a setup
+              </span>
+            </button>
+            <button
+              onClick={() => { setError(null); setStep('talk'); }}
+              disabled={!hasObjective || working !== null}
+              className="rounded-2xl bg-[var(--surface-container-high)] px-6 py-5 text-left text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-highest)] disabled:opacity-40 sm:col-span-2"
+            >
+              <span className="block text-title">Keep this as a conversation for now</span>
+              <span className="mt-1 block text-label text-[var(--on-surface-variant)]">
+                Talk it through; a draft brief builds up beside the chat, and nothing is created until you say so
               </span>
             </button>
           </div>
@@ -384,6 +421,17 @@ export default function NewProjectPage() {
             onDone={(given) => void recommend(given)}
             onBack={() => setStep('ask')}
           />
+        </>
+      )}
+
+      {step === 'talk' && (
+        <>
+          <h1 className="text-display text-[var(--on-surface)]">Talk it through</h1>
+          <p className="mt-3 mb-8 text-body text-[var(--on-surface-variant)]">
+            PromptMaster asks one useful question at a time and keeps a draft brief of what you say. When it is
+            right, you confirm what becomes the project&apos;s starting record.
+          </p>
+          <FrontDoor opening={objective} onReady={fromConversation} onBack={() => setStep('ask')} />
         </>
       )}
 
@@ -431,6 +479,17 @@ export default function NewProjectPage() {
               </>
             }
           />
+          {initialFacts.length > 0 && (
+            <section aria-label="Initial facts" className="mt-8 rounded-2xl bg-[var(--surface-container-low)] px-5 py-4">
+              <p className="text-title text-[var(--on-surface)]">These become the project&apos;s accepted facts</p>
+              <p className="mt-1 text-label text-[var(--on-surface-variant)]">From your conversation; every stage reads them. You can change or take out any of them later.</p>
+              <ul className="mt-2 list-disc pl-5 text-label text-[var(--on-surface)]">
+                {initialFacts.map((f) => (
+                  <li key={f.statement}>{f.kind === 'requirement' ? <span className="font-semibold">Requirement: </span> : null}{f.statement}</li>
+                ))}
+              </ul>
+            </section>
+          )}
           <div className="mt-10 flex items-center gap-3">
             <button
               onClick={() => void handleCreate()}

@@ -576,6 +576,14 @@ export const api = {
     return apiFetch('/api/generate-workflow', { method: 'POST', body: JSON.stringify(req) });
   },
 
+  /** One turn of the conversational front door: a reply and the draft brief (6 Oct, email 8). Saves nothing. */
+  async frontDoor(req: {
+    turns: { role: 'user' | 'assistant'; content: string }[];
+    brief: import('@/components/projects/front-door').DraftBrief;
+  }): Promise<{ reply: string; brief: import('@/components/projects/front-door').DraftBrief; ready: boolean }> {
+    return apiFetch('/api/front-door', { method: 'POST', body: JSON.stringify(req) });
+  },
+
   /** A targeted change to a designed workflow: only what the request names changes (6 Oct, email 11). Saves nothing. */
   async reviseWorkflow(req: { workflow: import('@/lib/workflow/custom').DesignedWorkflow; request: string }): Promise<{
     workflow: import('@/lib/workflow/custom').DesignedWorkflow;
