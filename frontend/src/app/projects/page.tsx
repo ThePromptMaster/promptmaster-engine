@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 
 import { useAuth } from '@/hooks/use-auth';
 import { listProjects, softDeleteProject } from '@/lib/supabase/projects';
+import { useProjectStore } from '@/stores/project-store';
 import type { ProjectSummary } from '@/types/project';
 import { GuestBanner } from '@/components/projects/guest-banner';
 import { DeletedProjects } from '@/components/projects/deleted-projects';
@@ -44,7 +45,15 @@ export default function ProjectsPage() {
   const [listFailed, setListFailed] = useState(false);
 
   const load = useCallback(() => {
-    listProjects()
+    // A project just left may still have a debounced edit on its way — the
+    // status Finish set, the stage it moved to. Leaving by a link does not wait
+    // for it, and the list read the old row (7 Oct): "Finished" showed under
+    // In progress. Send it first, then read.
+    useProjectStore
+      .getState()
+      .flush()
+      .catch(() => undefined)
+      .then(() => listProjects())
       .then(setProjects)
       .catch((e) => {
         setListFailed(true);
