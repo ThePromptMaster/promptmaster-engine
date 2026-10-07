@@ -8,7 +8,7 @@
  * `validateTemplate` is the check before it is saved.
  */
 
-import type { ExitCriterion, StageDefinition, StageGroup, WorkflowTemplate } from './types';
+import type { ExitCriterion, StageDefinition, StageGroup, WorkflowExecution, WorkflowTemplate } from './types';
 
 export type DesignedKind = 'write' | 'list' | 'check';
 
@@ -24,6 +24,8 @@ export interface DesignedStage {
   approval_kind?: 'routine' | 'decision';
   /** A separate, reserved sign-off on new commitments the stage proposes; '' for none. */
   decision?: string;
+  /** Ongoing work: this stage closes a round, and the next starts from the stage with this label. */
+  loop_back_to?: string;
 }
 
 export interface DesignedWorkflow {
@@ -31,6 +33,7 @@ export interface DesignedWorkflow {
   description: string;
   deliverable: string;
   inquiry: boolean;
+  execution?: WorkflowExecution;
   stages: DesignedStage[];
 }
 
@@ -85,7 +88,8 @@ export function templateFromDesign(design: DesignedWorkflow, suffix: string): Wo
     required: i === 0 || i === count - 1 ? true : s.required,
     renderer: RENDERER[s.kind],
     entry_guidance: s.purpose,
-    entry_prompt_hint: s.instruction,
+    // A stage added by hand with no instructions yet still says what to produce.
+    entry_prompt_hint: s.instruction.trim() || `Produce the ${s.label.trim().toLowerCase() || 'stage'}.`,
     exit_criteria: criteriaFor(s, ids[i], i === 0),
     expected_artifacts: [{
       kind: s.kind === 'list' ? LIST_KIND : s.kind === 'check' ? CHECK_KIND : `${ids[i]}_text`,
@@ -98,6 +102,9 @@ export function templateFromDesign(design: DesignedWorkflow, suffix: string): Wo
       default_next: ids[i + 1] ?? null,
       allow_skip: !(i === 0 || i === count - 1 || s.required),
       allow_return_to: ids.slice(0, i),
+      // Ongoing work (7 Oct): the stage that closes a round starts the next
+      // from an earlier stage. Only in an ongoing workflow, only backwards.
+      ...(loopTarget(design, i, ids) ? { loop_to: loopTarget(design, i, ids)! } : {}),
     },
   }));
   return {
@@ -108,6 +115,49 @@ export function templateFromDesign(design: DesignedWorkflow, suffix: string): Wo
     outline_stage: 'none',
     nouns: { deliverable: design.deliverable.trim() || 'piece', unit: 'part' },
     ...(design.inquiry ? { inquiry: true } : {}),
+    ...(design.execution ? { execution: { ...design.execution, success_criterion: design.execution.success_criterion.trim() } } : {}),
     stages,
+  };
+}
+
+function loopTarget(design: DesignedWorkflow, i: number, ids: readonly string[]): string | null {
+  if (design.execution?.kind !== 'ongoing') return null;
+  const target = design.stages[i].loop_back_to?.trim();
+  if (!target || i === 0 || i === design.stages.length - 1) return null;
+  const at = design.stages.findIndex((s) => s.label === target);
+  return at >= 0 && at < i ? ids[at] : null;
+}
+
+const KIND_OF: Record<string, DesignedKind> = { prose: 'write', list: 'list', review: 'check' };
+
+/**
+ * A saved workflow back as a design, to edit a copy of it (7 Oct; Sean, 6 Oct,
+ * email 11: "let users save and reuse their own templates"). Publishing the
+ * copy makes a new template; projects on the old one are unaffected.
+ */
+export function designFromTemplate(template: WorkflowTemplate): DesignedWorkflow {
+  const byId = new Map(template.stages.map((s) => [s.id, s.label]));
+  return {
+    name: template.name,
+    description: template.description,
+    deliverable: template.nouns?.deliverable ?? 'piece',
+    inquiry: Boolean(template.inquiry),
+    ...(template.execution ? { execution: template.execution } : {}),
+    stages: template.stages.map((s) => {
+      const approval = s.exit_criteria.find((c) => c.id.endsWith('.approved') && c.check === 'manual');
+      const decision = s.exit_criteria.find((c) => c.id.endsWith('.decision') && c.check === 'manual');
+      return {
+        label: s.label,
+        short_label: s.short_label,
+        kind: KIND_OF[s.renderer] ?? 'write',
+        purpose: s.entry_guidance ?? '',
+        instruction: s.entry_prompt_hint ?? '',
+        required: s.required,
+        approval: approval?.label ?? '',
+        approval_kind: approval?.authority === 'delegable' ? 'routine' : 'decision',
+        decision: decision?.label ?? '',
+        loop_back_to: s.transitions.loop_to ? (byId.get(s.transitions.loop_to) ?? '') : '',
+      };
+    }),
   };
 }

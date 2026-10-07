@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { GuideInterview } from '@/components/projects/guide-interview';
 import { SetupCard, type SetupDraft } from '@/components/projects/setup-card';
 import { CustomWorkflowDesigner } from '@/components/projects/custom-workflow-designer';
+import { designFromTemplate } from '@/lib/workflow/custom';
 import { AutoGrowTextarea } from '@/components/shared/auto-grow-textarea';
 import { api } from '@/lib/api/client';
 import { createProject, hardDeleteProject } from '@/lib/supabase/projects';
@@ -61,6 +62,8 @@ export default function NewProjectPage() {
   const [step, setStep] = useState<Step>('ask');
   const [objective, setObjective] = useState('');
   const [templateId, setTemplateId] = useState<string | null>(null);
+  /** A saved workflow being edited as a copy. */
+  const [copying, setCopying] = useState<(WorkflowTemplate & { id: string }) | null>(null);
   const [recommendedKey, setRecommendedKey] = useState<string | null>(null);
   const [workflowReason, setWorkflowReason] = useState('');
   const [rationale, setRationale] = useState<SetupRationale | null>(null);
@@ -369,14 +372,30 @@ export default function NewProjectPage() {
             rationale={rationale}
             onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))}
             designer={
-              <CustomWorkflowDesigner
-                objective={draft.objective}
-                ownerId={user?.id ?? null}
-                onPublished={(t) => {
-                  setTemplates((prior) => [...prior, t]);
-                  setTemplateId(t.id);
-                }}
-              />
+              <>
+                {/* A saved workflow of the user's own can be edited as a copy (6 Oct, email 11). */}
+                {selected?.key.startsWith('custom_') && copying?.id !== selected.id && (
+                  <button
+                    type="button"
+                    onClick={() => setCopying(selected)}
+                    className="mt-3 mr-4 inline-flex items-center gap-1.5 text-body text-[var(--pm-primary)] hover:underline"
+                  >
+                    <span aria-hidden className="material-symbols-outlined text-[18px]">edit</span>
+                    Edit a copy of {selected.name}
+                  </button>
+                )}
+                <CustomWorkflowDesigner
+                  key={copying?.id ?? 'new'}
+                  objective={draft.objective}
+                  ownerId={user?.id ?? null}
+                  initial={copying ? designFromTemplate(copying) : null}
+                  onPublished={(t) => {
+                    setTemplates((prior) => [...prior, t]);
+                    setTemplateId(t.id);
+                    setCopying(null);
+                  }}
+                />
+              </>
             }
           />
           <div className="mt-10 flex items-center gap-3">

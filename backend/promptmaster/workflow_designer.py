@@ -50,6 +50,21 @@ class DesignedStage(BaseModel):
     #: A separate, reserved sign-off for new commitments the stage proposes —
     #: a deadline, a budget, a promise not in the source — or "".
     decision: str = Field(default="", max_length=120)
+    #: Ongoing work (7 Oct): this stage closes a round and the next round
+    #: starts again from the stage with this label (an earlier one), or "".
+    loop_back_to: str = Field(default="", max_length=60)
+
+
+class Execution(BaseModel):
+    """Whether the work ends or goes on, and when it is done (Sean, 6 Oct,
+    emails 10-11: "preserve the execution objective when generating the
+    workflow … Reaching the final stage should not by itself mean the original
+    objective is satisfied")."""
+    kind: str = Field(default="finite", pattern="^(finite|ongoing)$")
+    #: What counts as the objective met, in the user's words where they gave it.
+    success_criterion: str = Field(default="", max_length=2_000)
+    #: When to stop short of it: a blocker, exhausted branches, a decision.
+    stop_conditions: list[str] = Field(default_factory=list, max_length=8)
 
 
 class DesignedWorkflow(BaseModel):
@@ -57,6 +72,7 @@ class DesignedWorkflow(BaseModel):
     description: str = Field(default="", max_length=240)
     deliverable: str = Field(default="piece", max_length=40)
     inquiry: bool = False
+    execution: Execution = Field(default_factory=Execution)
     stages: list[DesignedStage] = Field(default_factory=list, max_length=MAX_STAGES)
 
 
@@ -99,12 +115,26 @@ def build_workflow_prompt(description: str, objective: str) -> tuple[str, str]:
         "commitments it proposes\"). Otherwise \"\"\n\n"
         "Set inquiry true only when the work investigates or tests ideas (science, "
         "analysis, a thought experiment) rather than writes something.\n\n"
+        "EXECUTION — whether the work ends, and when it is done:\n"
+        "- kind \"finite\" when one pass produces the deliverable; \"ongoing\" when the "
+        "objective asks to keep going until something is reached (\"continue until a "
+        "supported result\", \"keep investigating\"), so a pass may end without it.\n"
+        "- success_criterion: what counts as the objective met. Where the objective states "
+        "one, copy it in the user's own words; never weaken or paraphrase it into a "
+        "finite task. Reaching the last stage is NOT the criterion.\n"
+        "- stop_conditions: when to stop short of it (a concrete blocker, exhausted "
+        "branches, missing information or capability, a decision only the user can make).\n"
+        "- For ongoing work, put a stage just before the last one that closes a round "
+        "(e.g. \"Next round\", kind write: what was learned and what to pursue next) and "
+        "set its loop_back_to to the label of the earlier stage a new round starts from. "
+        "Only that one stage loops; every other stage has loop_back_to \"\".\n\n"
         "Return JSON only:\n"
         '{"name": "...", "description": "one sentence", "deliverable": "noun for the '
         'finished thing, e.g. article", "inquiry": false, "stages": [{"label": "...", '
         '"short_label": "...", "kind": "write|list|check", "purpose": "...", '
         '"instruction": "...", "required": true, "approval": "", "approval_kind": "decision", '
-        '"decision": ""}]}'
+        '"decision": "", "loop_back_to": ""}], "execution": {"kind": "finite|ongoing", '
+        '"success_criterion": "...", "stop_conditions": ["..."]}}'
     )
     return _SYSTEM, user
 
@@ -137,6 +167,7 @@ def parse_workflow(result: object) -> DesignedWorkflow:
                 # Anything unclear is the user's: only an explicit "routine" is delegable.
                 approval_kind="routine" if str(raw.get("approval_kind") or "").strip().lower() == "routine" else "decision",
                 decision=_clip(raw.get("decision"), 120),
+                loop_back_to=_clip(raw.get("loop_back_to"), 60),
             )
         )
     stages = stages[:MAX_STAGES]
@@ -149,13 +180,42 @@ def parse_workflow(result: object) -> DesignedWorkflow:
         raise ValueError("The design had too few usable stages. Try describing the work in more detail.")
     stages[0].required = True
     stages[-1].required = True
+    execution = parse_execution(result.get("execution"))
     return DesignedWorkflow(
         name=_clip(result.get("name"), 60) or "Custom workflow",
         description=_clip(result.get("description"), 240),
         deliverable=_clip(result.get("deliverable"), 40) or "piece",
         inquiry=bool(result.get("inquiry")),
-        stages=stages,
+        execution=execution,
+        stages=fix_loops(stages, execution),
     )
+
+
+def parse_execution(raw: object) -> Execution:
+    if not isinstance(raw, dict):
+        return Execution()
+    kind = "ongoing" if str(raw.get("kind") or "").strip().lower() == "ongoing" else "finite"
+    stops = [_clip(s, 300) for s in (raw.get("stop_conditions") or []) if _clip(s, 300)][:8]
+    return Execution(kind=kind, success_criterion=str(raw.get("success_criterion") or "").strip()[:2_000], stop_conditions=stops)
+
+
+def fix_loops(stages: list[DesignedStage], execution: Execution) -> list[DesignedStage]:
+    """At most one stage loops, back to an earlier stage, never from the first
+    or the last; a finite workflow has none. What the engine cannot walk is
+    dropped here rather than saved (`validate.ts` checks the same)."""
+    labels = [s.label for s in stages]
+    seen = False
+    for i, s in enumerate(stages):
+        target = s.loop_back_to.strip()
+        ok = (
+            execution.kind == "ongoing" and not seen and target in labels[:i]
+            and 0 < i < len(stages) - 1
+        )
+        if not ok:
+            s.loop_back_to = ""
+        else:
+            seen = True
+    return stages
 
 
 async def design_workflow(

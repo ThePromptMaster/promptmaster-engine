@@ -12,6 +12,7 @@ from promptmaster.llm_client import OpenRouterClient, OpenRouterError
 from routers._errors import llm_http_error
 from promptmaster.schemas import GuideAnswer, GuideQuestion, SetupSuggestion
 from promptmaster.workflow_designer import DesignedWorkflow, design_workflow
+from promptmaster.workflow_revision import RevisedWorkflow, revise_workflow
 from promptmaster.setup_suggester import suggest_guide_questions, suggest_next_guide_question, suggest_setup
 
 router = APIRouter(prefix="/api", tags=["setup"])
@@ -129,3 +130,26 @@ async def api_generate_workflow(
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     return GenerateWorkflowResponse(workflow=workflow)
+
+
+class ReviseWorkflowRequest(BaseModel):
+    workflow: DesignedWorkflow
+    #: The change, in the user's words ("add a verification stage after Analysis").
+    request: str = Field(..., min_length=3, max_length=MAX_CHAT_MESSAGE_CHARS)
+    model: str = ""
+
+
+@router.post("/revise-workflow")
+async def api_revise_workflow(
+    req: ReviseWorkflowRequest,
+    client: OpenRouterClient = Depends(get_client),
+) -> RevisedWorkflow:
+    """A targeted change to a designed workflow: the stages it names change, the
+    rest stay as they were, and what the engine cannot do is said (6 Oct,
+    email 11). 1 LLM call; saves nothing."""
+    try:
+        return await revise_workflow(client, req.model or None, req.workflow, req.request)
+    except OpenRouterError as e:
+        raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))

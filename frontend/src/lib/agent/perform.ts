@@ -951,6 +951,26 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       const to = ctx.stage.transitions.loop_to;
       if (!to) return done(key, { status: 'failed', toolsUsed: [], changes: {}, output: 'This stage does not start another round.' });
       const reason = (typeof params.reason === 'string' && params.reason.trim()) || ctx.step.rationale || 'The question this round ended on is worth pursuing.';
+      // 7 Oct (Sean, 6 Oct, email 10: "continue justified investigation
+      // within available tools and delegated authority"): an authorized
+      // autonomous run whose routine decisions are Go's starts the round
+      // itself, along the template's own loop; the database checks all three.
+      if (ctx.run.policy === 'autonomous' && ctx.project.routine_decisions === 'handle') {
+        await appendWorkflowEvent(ctx.project.id, ctx.project.user_id, {
+          type: 'stage_returned',
+          stage_id: ctx.stage.id,
+          to_stage_id: to,
+          actor: 'system',
+          agent_run_id: ctx.run.id,
+          reason: `Next round: ${reason}`,
+          payload: { next_round: true, policy: 'routine_decisions' },
+        });
+        await ctx.afterStageEvent();
+        return done(key, {
+          status: 'succeeded', toolsUsed: [], changes: { event_types: ['stage_returned'] },
+          output: `Started the next round under your routine-decision policy: ${reason}`,
+        });
+      }
       const need: NeedsUser = { kind: 'next_round', stageId: ctx.stage.id, toStageId: to, reason };
       const message = `Suggested another round: ${reason}`;
       return done(key, {
@@ -1048,6 +1068,8 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
             deliverable_label: holder?.label ?? 'the deliverable',
             content: content || '(empty)',
             steps: ctx.digest.recent_steps.map((s) => ({ action_key: s.action_key, execution_label: s.execution_label, output: s.output })),
+            // The criterion the workflow was designed against, kept from the objective (7 Oct).
+            success_criterion: ctx.template.execution?.success_criterion ?? '',
             model: ctx.project.model,
           },
           ctx.signal
