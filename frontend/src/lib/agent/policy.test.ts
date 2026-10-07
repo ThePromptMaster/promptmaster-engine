@@ -102,6 +102,12 @@ describe('preempt — checked before any model call', () => {
       '"Compare alternatives" was chosen 3 times in a row on this stage without changing it. It needs your direction.'
     );
   });
+
+  it('three repairs of three reopened stages, each saving a version, are progress (production, 7 Oct)', () => {
+    const repair = (idx: number, stage: string) =>
+      step({ idx, action_key: 'recheck_stage', params: { stage_id: stage }, changes: { version_ids: [`v-${stage}`] } });
+    expect(noProgress([repair(0, 'input'), repair(1, 'review'), repair(2, 'output')])).toBe(false);
+  });
 });
 
 describe('shouldPause — the execution policy, not the model', () => {
