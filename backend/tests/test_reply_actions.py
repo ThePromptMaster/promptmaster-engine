@@ -86,6 +86,6 @@ def test_the_route_returns_parsed_actions():
     finally:
         app.dependency_overrides.pop(get_client, None)
     assert res.status_code == 200
-    assert res.json()["actions"] == [{"label": "Tighten the opening", "kind": "revise", "instruction": "Shorten it.", "updates": [], "rows": []}]
+    assert res.json()["actions"] == [{"label": "Tighten the opening", "kind": "revise", "instruction": "Shorten it.", "updates": [], "rows": [], "facts": []}]
     system = client.generate_json.call_args.kwargs["system"]
     assert "TURN AN ANSWER INTO ACTIONS" in system

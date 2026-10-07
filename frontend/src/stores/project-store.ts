@@ -2,6 +2,7 @@
 
 import { create } from 'zustand';
 import { listProjectFiles } from '@/lib/supabase/project-files';
+import { listProjectFacts } from '@/lib/supabase/facts';
 import type { StageFigures } from '@/lib/workflow/figures';
 
 import {
@@ -38,6 +39,7 @@ import {
   type ArtifactVersion,
   type Evaluation,
   type Project,
+  type ProjectFact,
   type ProjectFile,
   type ProjectPatch,
 } from '@/types/project';
@@ -115,6 +117,8 @@ interface ProjectState {
   tasks: ProjectTask[];
   /** Data files attached to the project; read by code the project runs. */
   files: ProjectFile[];
+  /** Accepted facts and requirements, current and retired (F1, 7 Oct). */
+  facts: ProjectFact[];
 
   /** Which version the UI is *displaying*. Never implies a restore. */
   activeVersionId: string | null;
@@ -264,6 +268,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
   recommendations: [],
   tasks: [],
   files: [],
+  facts: [],
   activeVersionId: null,
   loading: false,
   error: null,
@@ -293,12 +298,15 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       // down: the derived half of the panel still works. Events do not fail to
       // an empty log — that reads as a reset project (4 Oct). They stay null,
       // or keep the log already on hand on a background reload, and say so.
-      const [artifacts, loadedEvents, recommendations, tasks, files] = await Promise.all([
+      const [artifacts, loadedEvents, recommendations, tasks, files, facts] = await Promise.all([
         listArtifacts(id),
         listWorkflowEvents(id).catch(() => null),
         listRecommendations(id).catch(() => [] as Recommendation[]),
         listTasks(id).catch(() => [] as ProjectTask[]),
         listProjectFiles(id).catch(() => [] as ProjectFile[]),
+        // Not [] on a failed read: prompts built from no facts would read as
+        // the facts having been withdrawn. Keep what was last read.
+        listProjectFacts(id).catch(() => (get().projectId === id ? get().facts : [])),
       ]);
 
       // A Book project has thirteen artifacts, not one. Load them all and index
@@ -366,6 +374,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         recommendations,
         tasks,
         files,
+        facts,
         activeVersionId: head?.id ?? null,
         loading: false,
         // A reload that worked clears a refresh failure; a save failure keeps
@@ -393,6 +402,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       recommendations: [],
       tasks: [],
       files: [],
+      facts: [],
       activeVersionId: null,
       saveState: 'idle',
       conflict: null,

@@ -24,6 +24,7 @@
 import type { AuditFinding } from '@/types';
 import type { Project } from '@/types/project';
 import type { StageArtifactBundle } from './digest';
+import { currentFacts } from './facts';
 
 const NUM = String.raw`\d[\d,]*(?:\.\d+)?`;
 const CURRENCY = String.raw`[$€£]`;
@@ -106,11 +107,14 @@ export function unsupportedFigures(content: string, sources: readonly string[]):
 
 /** Everything a stage's figures may legitimately come from: the project, its data and the other stages. */
 export function figureSources(
-  project: Pick<Project, 'objective' | 'constraints' | 'audience' | 'output_format' | 'context' | 'data_files'>,
+  project: Pick<Project, 'objective' | 'constraints' | 'audience' | 'output_format' | 'context' | 'data_files' | 'facts'>,
   bundles: Record<string, StageArtifactBundle>,
   stageId: string
 ): string[] {
   const sources = [project.objective, project.constraints, project.audience, project.output_format, project.context ?? ''];
+  // An accepted fact is supplied material (6 Oct, email 4: figures the user
+  // gave were flagged "unsupported" by the final check).
+  for (const f of currentFacts(project.facts)) sources.push(f.statement);
   for (const f of project.data_files ?? []) sources.push(JSON.stringify(f.preview ?? {}));
   for (const [id, bundle] of Object.entries(bundles)) {
     if (id === stageId) continue;

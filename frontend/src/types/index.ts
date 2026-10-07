@@ -9,6 +9,8 @@ export interface PMInput {
   output_format: string;
   /** The user's source material — facts, figures, background — kept apart from the objective. */
   context?: string;
+  /** Accepted facts and requirements, current only, each with its source (F1, 7 Oct). */
+  facts?: { statement: string; subject: string; kind: 'fact' | 'requirement'; source: string }[];
   mode: ModeType;
   custom_name?: string;
   custom_preamble?: string;
@@ -468,10 +470,12 @@ export interface StageItemSchemaRequest {
 /** One thing to do about a side-chat answer (POST /api/suggest-actions). */
 export interface ReplyAction {
   label: string;
-  kind: 'revise' | 'row_updates' | 'add_rows';
+  kind: 'revise' | 'row_updates' | 'add_rows' | 'record_facts';
   instruction?: string;
   updates?: { id: string; status?: string; reason?: string; fields?: Record<string, string> }[];
   rows?: Record<string, string>[];
+  /** `record_facts`: facts the user supplied, recorded only on confirmation (F3, 7 Oct). */
+  facts?: { statement: string; subject?: string; kind?: 'fact' | 'requirement' }[];
 }
 
 export interface SuggestActionsRequest {

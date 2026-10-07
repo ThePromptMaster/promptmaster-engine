@@ -34,9 +34,36 @@ export interface ProjectFile {
   created_at: string;
 }
 
+/**
+ * One accepted fact or requirement (F1, 7 Oct). Recorded once, with where it
+ * came from; never edited — a change is a new row that supersedes it.
+ */
+export interface ProjectFact {
+  id: string;
+  project_id: string;
+  user_id: string;
+  statement: string;
+  subject: string | null;
+  kind: 'fact' | 'requirement';
+  source_kind: 'brief' | 'file' | 'chat' | 'user_edit' | 'stage';
+  source_ref: Record<string, unknown>;
+  accepted_by: 'user' | 'policy';
+  agent_run_id: string | null;
+  supersedes: string | null;
+  retired_at: string | null;
+  retired_reason: string | null;
+  created_at: string;
+}
+
 export interface Project {
   id: string;
   user_id: string;
+  /**
+   * Every fact the project has accepted, current and retired, oldest first.
+   * Not a column: joined on in the browser like `data_files`, so every prompt
+   * built from the project carries the same current facts.
+   */
+  facts?: ProjectFact[];
   /**
    * The project's data files. Not a column: joined on in the browser when
    * the project is opened, so everything that is handed the project — stage

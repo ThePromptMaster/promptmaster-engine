@@ -95,7 +95,7 @@ def build_assessment_prompt(
     user = (
         f"OBJECTIVE: {inputs.objective}\n"
         + (f"SUCCESS CRITERION, as set when the workflow was designed: {success_criterion}\n" if success_criterion.strip() else "")
-        + (f"{context_block(inputs, limit=4_000)}\n" if inputs.context.strip() else "")
+        + (f"{context_block(inputs, limit=4_000)}\n" if (inputs.context.strip() or inputs.facts) else "")
         + f"\nRUN RECORD (what the autonomous run actually did; execution labels are derived from what happened):\n{record}\n\n"
         f"--- THE DELIVERABLE: {deliverable_label} ---\n{_clip(content)}\n--- END ---\n\n"
         "Return JSON: {\n"

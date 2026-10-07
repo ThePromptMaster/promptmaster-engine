@@ -45,7 +45,7 @@ def build_check_prompt(inputs: PMInput, stage_label: str, criterion: str, conten
         text = text[:MAX_CHECK_CONTENT] + "\n[…the rest of the stage is not shown]"
     user = (
         f"PROJECT OBJECTIVE: {inputs.objective}\n"
-        + (f"{context_block(inputs, limit=2_000)}\n" if inputs.context.strip() else "")
+        + (f"{context_block(inputs, limit=2_000)}\n" if (inputs.context.strip() or inputs.facts) else "")
         + f"STAGE: {stage_label}\n"
         f"THE APPROVAL, as the user would state it: \"{criterion}\"\n\n"
         f"--- THE STAGE'S TEXT ---\n{text}\n--- END ---\n\n"

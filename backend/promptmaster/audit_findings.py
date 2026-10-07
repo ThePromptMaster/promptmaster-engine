@@ -47,7 +47,7 @@ def build_audit_findings_prompt(
         f"Audience: {inputs.audience}\n"
         f"Constraints: {inputs.constraints or '(none)'}\n"
         f"Output format: {inputs.output_format or '(none)'}\n\n"
-        + (f"{context_block(inputs)}\n\n" if inputs.context.strip() else "")
+        + (f"{context_block(inputs)}\n\n" if (inputs.context.strip() or inputs.facts) else "")
         + f"Session history:\n{history}\n\n"
         f"--- CURRENT OUTPUT TO AUDIT ---\n{current_output}\n--- END ---\n\n"
         "Identify the 3-7 most impactful findings. Return JSON in this shape:\n"
@@ -133,7 +133,7 @@ def build_apply_audit_prompt(
         f"Audience: {inputs.audience}\n"
         f"Constraints: {inputs.constraints or '(none)'}\n"
         f"Output format: {inputs.output_format or '(none)'}\n\n"
-        + (f"{context_block(inputs)}\n\n" if inputs.context.strip() else "")
+        + (f"{context_block(inputs)}\n\n" if (inputs.context.strip() or inputs.facts) else "")
         + f"PREVIOUS OUTPUT (revise this — do not repeat verbatim):\n"
         f"{source_iteration.output}\n\n"
         f"FINDINGS TO ADDRESS:\n{findings_block}\n\n"
