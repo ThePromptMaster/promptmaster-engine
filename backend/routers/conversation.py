@@ -16,6 +16,7 @@ from promptmaster.conversation import (
 )
 from promptmaster.engine import generate
 from promptmaster.errors import PRESERVED_NOTHING_WRITTEN
+from promptmaster.limits import MAX_CHAT_MESSAGE_CHARS
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError
 from routers._errors import llm_http_error
 from promptmaster.page_context import ChatContext, scrub_button_mentions
@@ -33,7 +34,9 @@ class ChatMessageRequest(BaseModel):
     inputs: PMInput
     active_iteration: Iteration
     chat_history: list[ChatMessage] = []
-    user_message: str
+    #: 6 Oct, email 12: no practical limit; bounded so a runaway paste is a
+    #: readable 422, not a failed request body.
+    user_message: str = Field(..., max_length=MAX_CHAT_MESSAGE_CHARS)
     iteration_history: list[Iteration] = []
     model: str = ""
     #: Where the user is (stage, workflow, outline, chapters, buttons). Optional,
@@ -77,7 +80,7 @@ class IterationFromConversationResponse(BaseModel):
 class SuggestActionsRequest(BaseModel):
     inputs: PMInput
     stage_label: str = ""
-    question: str = Field(default="", max_length=8_000)
+    question: str = Field(default="", max_length=MAX_CHAT_MESSAGE_CHARS)
     reply: str = Field(min_length=1, max_length=20_000)
     #: Set when the stage's work is a table; actions are then row changes.
     table: ActionTable | None = None

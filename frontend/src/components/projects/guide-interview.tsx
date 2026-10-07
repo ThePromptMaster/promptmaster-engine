@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { api } from '@/lib/api/client';
 import type { GuideQuestion } from '@/types';
+import { AutoGrowTextarea } from '@/components/shared/auto-grow-textarea';
+import { INPUT_LIMITS } from '@/lib/projects/input-limits';
 
 export interface GuideAnswered {
   question: GuideQuestion;
@@ -67,10 +69,12 @@ export function GuideInterview({
           setEnough(res.reason || 'That is enough to set this up.');
           onDone(answersForSetup(soFar));
         } else setCurrent(res.question);
-      } catch {
-        // Not being able to ask more is a reason to go on with what there is.
+      } catch (e) {
+        // Not being able to ask more is a reason to go on with what there is —
+        // but the reason is said: a refused answer is not "no more questions".
         setCurrent(null);
-        setEnough('I could not think of another question, so I will go on with what you have told me.');
+        const why = e instanceof Error && e.message ? ` (${e.message})` : '';
+        setEnough(`I could not get another question${why}, so I will go on with what you have told me.`);
         onDone(answersForSetup(soFar));
       } finally {
         setLoading(false);
@@ -192,11 +196,13 @@ export function GuideInterview({
           )}
 
           <div className="mt-3 flex gap-2">
-            <input
+            <AutoGrowTextarea
               value={typed}
-              onChange={(e) => setTyped(e.target.value)}
+              rows={1}
+              onChange={(e) => setTyped(e.target.value.slice(0, INPUT_LIMITS.message))}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') {
+                // Enter answers; Shift+Enter starts a new line in a long answer.
+                if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
                   addTyped();
                 }

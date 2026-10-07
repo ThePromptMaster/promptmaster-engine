@@ -17,6 +17,7 @@ import re
 
 from pydantic import BaseModel, Field
 
+from .limits import MAX_INSTRUCTION_CHARS
 from .llm_client import OpenRouterClient
 from .self_model import PROMPTMASTER_SELF_MODEL
 
@@ -35,8 +36,10 @@ class DesignedStage(BaseModel):
     label: str = Field(max_length=60)
     short_label: str = Field(max_length=24)
     kind: str
-    purpose: str = Field(default="", max_length=240)
-    instruction: str = Field(default="", max_length=1_200)
+    purpose: str = Field(default="", max_length=2_000)
+    #: The stage's working instruction; the user may now edit it before the
+    #: workflow is saved (6 Oct, email 11), so it has an instruction's room.
+    instruction: str = Field(default="", max_length=MAX_INSTRUCTION_CHARS)
     required: bool = True
     #: The user's sign-off in the first person, or "" for none.
     approval: str = Field(default="", max_length=120)

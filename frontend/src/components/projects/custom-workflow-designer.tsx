@@ -7,6 +7,9 @@ import { publishUserTemplate } from '@/lib/supabase/workflow';
 import { templateFromDesign, type DesignedKind, type DesignedWorkflow } from '@/lib/workflow/custom';
 import { validateTemplate } from '@/lib/workflow/validate';
 import type { WorkflowTemplate } from '@/lib/workflow/types';
+import { AutoGrowTextarea } from '@/components/shared/auto-grow-textarea';
+import { LimitCounter } from '@/components/shared/limit-counter';
+import { INPUT_LIMITS } from '@/lib/projects/input-limits';
 
 const KIND_WORDS: Record<DesignedKind, string> = { write: 'Writing', list: 'List', check: 'Check' };
 
@@ -98,14 +101,19 @@ export function CustomWorkflowDesigner({
         Say what kind of work this is. PromptMaster proposes the stages an expert would go through; change any of them,
         then save it as your own workflow to use again.
       </p>
-      <div className="mt-3 flex gap-2">
-        <input
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          aria-label="What kind of work is this?"
-          placeholder="e.g. a magazine feature, a grant proposal, a client pitch"
-          className={field}
-        />
+      <div className="mt-3 flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          {/* Multi-line: a description can be a whole workflow brief (6 Oct, email 12). */}
+          <AutoGrowTextarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value.slice(0, INPUT_LIMITS.message))}
+            rows={1}
+            aria-label="What kind of work is this?"
+            placeholder="e.g. a magazine feature, a grant proposal, a client pitch — or paste the whole workflow you have in mind"
+            className={`${field} resize-none`}
+          />
+          <LimitCounter length={description.length} limit={INPUT_LIMITS.message} />
+        </div>
         <button
           onClick={() => void propose()}
           disabled={description.trim().length < 3 || busy !== null}

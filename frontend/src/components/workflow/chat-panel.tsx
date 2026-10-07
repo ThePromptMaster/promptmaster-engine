@@ -47,6 +47,8 @@ import { documentSections, type ScopeKind } from './chat-scope';
 import type { StageChatMessage } from '@/lib/supabase/conversation';
 import type { NewVersion } from '@/lib/supabase/versions';
 import type { ArtifactVersion, Project } from '@/types/project';
+import { LimitCounter } from '@/components/shared/limit-counter';
+import { INPUT_LIMITS } from '@/lib/projects/input-limits';
 
 type Mode = 'discuss' | 'instruct';
 
@@ -551,7 +553,7 @@ export function ChatPanel({
           >
             <textarea
               value={draft}
-              onChange={(e) => setDraft(e.target.value)}
+              onChange={(e) => setDraft(e.target.value.slice(0, INPUT_LIMITS.message))}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                   e.preventDefault();
@@ -563,6 +565,7 @@ export function ChatPanel({
               placeholder={spec.placeholder}
               className="w-full resize-y bg-transparent text-body text-[var(--on-surface)] outline-none placeholder:text-[var(--on-surface-variant)]"
             />
+            <LimitCounter length={draft.length} limit={INPUT_LIMITS.message} />
             <div className="mt-1 flex items-center gap-2">
               <span className="text-label text-[var(--on-surface-variant)]">{spec.promise}</span>
               <button

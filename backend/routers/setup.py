@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 from deps import get_client
 from promptmaster.errors import PRESERVED_NOTHING_WRITTEN
-from promptmaster.limits import MAX_CONTEXT_CHARS, MAX_OBJECTIVE_CHARS
+from promptmaster.limits import MAX_CHAT_MESSAGE_CHARS, MAX_CONTEXT_CHARS, MAX_OBJECTIVE_CHARS
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError
 from routers._errors import llm_http_error
 from promptmaster.schemas import GuideAnswer, GuideQuestion, SetupSuggestion
@@ -72,8 +72,8 @@ async def api_guide_questions(
 
 
 class GuideAnswered(BaseModel):
-    question: str = Field(max_length=600)
-    answer: str = Field(default="", max_length=2_000)
+    question: str = Field(max_length=2_000)
+    answer: str = Field(default="", max_length=MAX_CHAT_MESSAGE_CHARS)
 
 
 class GuideNextRequest(BaseModel):
@@ -107,7 +107,7 @@ async def api_guide_next_question(
 
 class GenerateWorkflowRequest(BaseModel):
     #: What kind of work this is, in the user's words ("a magazine feature").
-    description: str = Field(..., min_length=3, max_length=2_000)
+    description: str = Field(..., min_length=3, max_length=MAX_CHAT_MESSAGE_CHARS)
     objective: str = Field(default="", max_length=MAX_OBJECTIVE_CHARS)
     model: str = ""
 
