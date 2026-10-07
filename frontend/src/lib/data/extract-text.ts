@@ -86,8 +86,14 @@ export async function extractText(name: string, data: ArrayBuffer): Promise<{ te
       };
     }
     return { text };
-  } catch {
-    return { error: `${name} could not be read. Save it again as PDF or Word (.docx), or paste its words instead.` };
+  } catch (e) {
+    // The reason is kept: a generic "could not be read" hid what actually
+    // failed, which made a broken reader look like a bad file.
+    const why = e instanceof Error && e.message ? ` (${e.message.slice(0, 160)})` : '';
+    if (typeof console !== 'undefined') console.warn('[extract-text]', name, e);
+    return {
+      error: `${name} could not be read${why}. Save it again as PDF or Word (.docx), or paste its words instead.`,
+    };
   }
 }
 

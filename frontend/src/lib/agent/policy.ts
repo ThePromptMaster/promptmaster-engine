@@ -284,7 +284,9 @@ export function preempt(input: {
 }
 
 /** Performers whose step saves a new version when it succeeds. */
-const SAVING = new Set(['draft', 'revise', 'continue', 'outline', 'apply', 'triage']);
+// A repair and a policy confirmation save versions too: three repairs of three
+// reopened stages are progress, not a loop (production, 7 Oct).
+const SAVING = new Set(['draft', 'revise', 'continue', 'outline', 'apply', 'triage', 'recheck', 'confirm']);
 
 /** The step saved something new to the project. */
 function savedSomething(s: AgentStep): boolean {
