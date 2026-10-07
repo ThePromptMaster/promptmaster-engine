@@ -1,6 +1,6 @@
 # Authoritative project state, consistent completion, and the workflow editor — assessment
 
-*7 October 2026. In reply to the thirteen emails of 6 October. The code is in PRs #151–#158
+*7 October 2026. In reply to the thirteen emails of 6 October. The code is in PRs #151–#160
 (the PR list below says which PR built each item). The limits that remain are in
 `docs/known-limitations.md`, L-51 to L-55.*
 
@@ -117,8 +117,7 @@ It counts these whatever the template marks as blocking. Every message reads it:
 
 The stopping condition in your two research runs follows from the code: Go's
 `declare_objective_complete` checked only that the final stage was non-empty. I diagnosed
-this from the code, not from the production logs of those runs. The production pass for
-this round re-runs both scenarios and reads their run records.
+this from the code, not from the production logs of those runs. Section 8 shows the same scenario run on production after the fix.
 
 ## 3. Your acceptance criteria
 
@@ -213,7 +212,23 @@ Now:
 - A file that fails after the project exists is reported, and the project is kept.
 - The side chat has its own *Attach* button.
 
-## 8. Hours
+## 8. Checked on production with the real model (7 October)
+
+Each phase was merged, deployed and then run on production before the next one.
+
+| Scenario | What PromptMaster did |
+|---|---|
+| Accented file name (email 9) | `Résumé – “final”.pdf` on the start screen created the project with the file; the same name as a Word file attached from the side chat, and its text went into the context |
+| 10,000-character workflow description (email 12) | Accepted; the designer returned six stages |
+| Regge Hessian, formulas not supplied (emails 10 and 13) | The Summary said the computation could not be done. Go asked for the missing inputs, then judged the objective: **"Paused — the objective is not met"**, waiting for the four named inputs. It listed *Done: draft_stage* and *Proposed, not done: supply the missing setup*. The side chat, asked why Go stopped, answered from the run record and said nothing was computed |
+| Candidate facts (email 4) | The side chat said nothing is recorded until confirmed and offered "Record these 2 facts". Both were recorded "from the side chat". Go drafted the recommendation with the exact figures; the objective check quoted them; nothing flagged them as unsupported |
+| A/B/C with the added requirement (email 1) | The requirement reopened Input, Review and Output, each with its reason, and the stage bar listed all three. Go repaired them in order. Output now begins "What changed: kept the original subject, figures … replaced the conclusion that Project A should be chosen", chooses **B**, excludes **A** for using all three researchers, and says **C qualifies**. Version 1 is kept |
+
+Two things the production runs found, fixed the same day:
+- **#159.** With Go waiting on a question, the stage bar still said "Ready to move on". It now lists "Go is waiting for you". The step that judges the objective was titled "Objective complete" even when it paused; it is now "Check the objective is met".
+- **#160.** After repairing three stages, Go stopped with "chosen 3 times in a row … without changing it". Each repair had saved a version, so it now counts as progress.
+
+## 9. Hours
 
 These are engineering estimates for this round, not timesheet figures.
 
