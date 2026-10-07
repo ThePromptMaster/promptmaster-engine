@@ -120,7 +120,7 @@ AGENT_ACTIONS: list[AgentAction] = [
                      "'tool_missing' (a tool or capability is not available), 'needs_decision' (only a choice by the user is missing)."),
     AgentAction(key="request_user_decision", family="workflow", label="Ask the user",
                 when="A real choice only the user can make is needed. Set decision_question."),
-    AgentAction(key="declare_objective_complete", family="workflow", label="Objective complete",
+    AgentAction(key="declare_objective_complete", family="workflow", label="Check the objective is met",
                 when="The objective is met and nothing needs another pass.", important=True),
 ]
 

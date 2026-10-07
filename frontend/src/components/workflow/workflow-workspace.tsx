@@ -2002,7 +2002,9 @@ export function WorkflowWorkspace({
                 onPrimary={runPrimary}
                 more={moreActions}
                 nextStageLabel={nextStage?.short_label ?? null}
-                elsewhere={outstandingOther}
+                // Go waiting for an answer is open work too (6 Oct, email 1:
+                // "nothing was outstanding while … Go was waiting for me").
+                elsewhere={goWaiting ? [...outstandingOther, `Go is waiting for you: ${goWaiting}`] : outstandingOther}
                 onSuggest={appendStageVersion && !go.active && !go.pendingStep ? () => void go.suggest() : undefined}
                 suggesting={go.active && go.run?.policy === 'guided'}
               />
