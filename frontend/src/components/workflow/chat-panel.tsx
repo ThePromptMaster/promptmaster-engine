@@ -29,7 +29,7 @@
  * boundary itself live in `use-stage-chat.ts`.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { MarkdownOutput } from '@/components/shared/markdown-output';
 import { useStageChat } from './use-stage-chat';
@@ -130,6 +130,8 @@ interface Props {
   getChatContext?: () => ChatContext;
   /** Questions offered before the user types, from the stage's state (3 Oct call). */
   starters?: string[];
+  /** A control beside the composer that attaches a file to the project. */
+  attach?: ReactNode;
 }
 
 /**
@@ -172,6 +174,7 @@ export function ChatPanel({
   isTable = false,
   getChatContext,
   starters = [],
+  attach,
 }: Props) {
   const [offerActions, setOfferActions] = useState(true);
   useEffect(() => setOfferActions(readOfferActions()), []);
@@ -564,6 +567,7 @@ export function ChatPanel({
               className="w-full resize-y bg-transparent text-body text-[var(--on-surface)] outline-none placeholder:text-[var(--on-surface-variant)]"
             />
             <div className="mt-1 flex items-center gap-2">
+              {attach}
               <span className="text-label text-[var(--on-surface-variant)]">{spec.promise}</span>
               <button
                 onClick={() => void send()}

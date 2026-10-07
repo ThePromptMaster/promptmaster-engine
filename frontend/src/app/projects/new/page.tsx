@@ -83,6 +83,7 @@ export default function NewProjectPage() {
   };
   const [working, setWorking] = useState<null | 'questions' | 'setup' | 'creating'>(null);
   const [error, setError] = useState<string | null>(null);
+  const [createdWithFailures, setCreatedWithFailures] = useState<{ id: string; failed: string[] } | null>(null);
   // Kept apart from `error`: every other action clears that, and a failed
   // workflow list then left "Start" disabled with nothing saying why (4 Oct).
   const [templatesError, setTemplatesError] = useState<string | null>(null);
@@ -165,7 +166,7 @@ export default function NewProjectPage() {
   }
 
   async function handleCreate() {
-    if (!user || !selected || working) return;
+    if (!user || !selected || working || createdWithFailures) return;
     setWorking('creating');
     setError(null);
     let createdId: string | null = null;
@@ -206,8 +207,18 @@ export default function NewProjectPage() {
         stage_id: selected.stages[0]?.id ?? '',
       });
 
-      // What was attached before the project existed.
-      for (const { file, preview } of startFiles) await attachProjectFile(project, file, preview);
+      // What was attached before the project existed. The project is made
+      // by now, so a file that will not store is reported, not a reason to
+      // take the project back out (6 Oct, email 9): its text is already in
+      // the context, and the file can be added again on the first stage.
+      const failed: string[] = [];
+      for (const { file, preview } of startFiles) {
+        try {
+          await attachProjectFile(project, file, preview);
+        } catch (e) {
+          failed.push(`${file.name} (${e instanceof Error && e.message ? e.message : 'not stored'})`);
+        }
+      }
       for (const { file, caption } of startImages) {
         let width = 0;
         let height = 0;
@@ -219,7 +230,16 @@ export default function NewProjectPage() {
         } catch {
           // Stored all the same; its size is just unknown.
         }
-        await attachProjectFile(project, file, imagePreview(file.name, caption, width, height));
+        try {
+          await attachProjectFile(project, file, imagePreview(file.name, caption, width, height));
+        } catch (e) {
+          failed.push(`${file.name} (${e instanceof Error && e.message ? e.message : 'not stored'})`);
+        }
+      }
+      if (failed.length) {
+        setCreatedWithFailures({ id: project.id, failed });
+        setWorking(null);
+        return;
       }
 
       router.push(`/projects/${project.id}`);
@@ -251,6 +271,19 @@ export default function NewProjectPage() {
       {error && (
         <div role="alert" className="mb-6 rounded-xl bg-[var(--error-container)] px-4 py-3 text-body text-[var(--on-error-container)]">
           {error}
+        </div>
+      )}
+
+      {createdWithFailures && (
+        <div role="alert" className="mb-6 rounded-xl bg-[var(--error-container)] px-4 py-3 text-body text-[var(--on-error-container)]">
+          <p>
+            The project was created, but {createdWithFailures.failed.length === 1 ? 'this file' : 'these files'} could
+            not be stored: {createdWithFailures.failed.join('; ')}. Any text in them is already in the project context;
+            add the file again on the first stage if you need it there.
+          </p>
+          <Link href={`/projects/${createdWithFailures.id}`} className="mt-2 inline-block font-medium underline">
+            Open the project
+          </Link>
         </div>
       )}
 
@@ -380,7 +413,7 @@ export default function NewProjectPage() {
           <div className="mt-10 flex items-center gap-3">
             <button
               onClick={() => void handleCreate()}
-              disabled={!selected || working !== null || !user || !draft.objective.trim()}
+              disabled={!selected || working !== null || !user || !draft.objective.trim() || createdWithFailures !== null}
               className="rounded-xl bg-[var(--pm-primary)] px-6 py-3 text-title text-[var(--on-primary)] transition-opacity hover:opacity-90 disabled:opacity-40"
             >
               {working === 'creating' ? 'Creating…' : `Start ${selected?.name ?? 'project'}`}

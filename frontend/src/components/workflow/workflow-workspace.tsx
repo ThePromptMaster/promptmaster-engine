@@ -72,6 +72,7 @@ import { BriefChangeNotice } from './brief-change-notice';
 import { useBriefChange } from './use-brief-change';
 import { openBriefChange } from '@/lib/workflow/brief-change';
 import { contextFromDocuments } from '@/lib/data/extract-text';
+import { ChatAttach } from './chat-attach';
 import { INPUT_LIMITS } from '@/lib/projects/input-limits';
 import { draftBindings } from '@/lib/outline/long-form';
 import { approveOutline, loadOutline, materialiseOutlineInto, outlineStageFor } from '@/lib/outline/actions';
@@ -1990,6 +1991,19 @@ export function WorkflowWorkspace({
               project={project}
               stageId={stage.id}
               stageLabel={stage.label}
+              attach={
+                project.status === 'finalized' ? undefined : (
+                  <ChatAttach
+                    project={project}
+                    existingNames={(project.data_files ?? []).map((f) => f.name)}
+                    onChanged={() => onReload?.()}
+                    onAddToContext={(documents) =>
+                      onPatchProject({ context: contextFromDocuments(project.context ?? '', documents, INPUT_LIMITS.context).context })
+                    }
+                    disabled={!isEditable}
+                  />
+                )
+              }
               content={chatContentFor(
                 template,
                 stage,
