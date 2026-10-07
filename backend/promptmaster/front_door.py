@@ -89,11 +89,15 @@ def parse_front_door(result: object, turns: list[Turn]) -> FrontDoorTurn:
         return FrontDoorTurn(reply="Sorry — could you say that again?", brief=DraftBrief())
     raw = result.get("brief") if isinstance(result.get("brief"), dict) else {}
     user_text = " ".join(t.content for t in turns if t.role == "user").lower().replace(",", "")
+    requirements = [r for r in _clean(raw.get("requirements")) if _said(r, user_text)]
+    norm = lambda t: re.sub(r"[^a-z0-9$%]+", " ", t.lower()).strip()  # noqa: E731
+    required = {norm(r) for r in requirements}
     brief = DraftBrief(
         objective=" ".join(str(raw.get("objective") or "").split())[:4_000],
         audience=" ".join(str(raw.get("audience") or "").split())[:1_000],
-        requirements=[r for r in _clean(raw.get("requirements")) if _said(r, user_text)],
-        evidence=[e for e in _clean(raw.get("evidence")) if _said(e, user_text)],
+        requirements=requirements,
+        # A requirement is not listed again as a fact the user gave.
+        evidence=[e for e in _clean(raw.get("evidence")) if _said(e, user_text) and norm(e) not in required],
         deliverables=_clean(raw.get("deliverables"), 300),
         stages=_clean(raw.get("stages"), 120),
         approvals=_clean(raw.get("approvals"), 200),

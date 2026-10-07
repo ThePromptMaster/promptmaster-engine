@@ -27,7 +27,12 @@ function day(iso: string): string {
 /** "from the side chat, 6 Oct" — the provenance chip. */
 export function factSource(f: Pick<ProjectFact, 'source_kind' | 'source_ref' | 'created_at' | 'accepted_by'>): string {
   const file = typeof f.source_ref?.name === 'string' ? ` ${f.source_ref.name}` : '';
-  const base = f.source_kind === 'file' && file ? `from${file}` : SOURCE_WORDS[f.source_kind];
+  const base =
+    f.source_kind === 'file' && file
+      ? `from${file}`
+      : f.source_kind === 'chat' && f.source_ref?.via === 'front door'
+        ? 'from your conversation'
+        : SOURCE_WORDS[f.source_kind];
   const by = f.accepted_by === 'policy' ? ', accepted under your routine-decision policy' : '';
   const when = day(f.created_at);
   return `${base}${when ? `, ${when}` : ''}${by}`;
