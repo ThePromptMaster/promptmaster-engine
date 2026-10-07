@@ -560,6 +560,26 @@ An approval says what was decided; the event says who decided it (`stage_marked_
 by the user, `via: go_approve` when given through Go, `criterion_committed` under the
 policy). Neither ever promotes the other: approving a stage changes no row.
 
+### Authoritative state, outstanding work and repair (2026-10-07)
+
+The client's 6 Oct emails ask where accepted facts live, how every stage reads the same
+current value, how a change invalidates and repairs dependent work, whether Go can do
+routine repairs, and how completion is kept from contradicting open work. Assessment:
+`docs/assessments/2026-10-07-authoritative-state.md`.
+
+| Concern | Where it lives |
+|---|---|
+| Accepted facts and requirements | `project_facts` (`20261024000000`): append-only; a change is a new row with `supersedes`, which the insert retires; `source_kind` / `source_ref` / `accepted_by` |
+| One read path | `PMInput.facts` (the current rows, sent by `inputsFrom`) → `project_context.facts_block`, carried by `context_block` into every prompt that has the context; `test_project_facts.py` holds it |
+| Facts from chat | `record_facts` reply action; figures must be in the user's own message (`reply_actions._from_user`); recorded only on *Record* |
+| A fact changed | the change check watches `facts` like a brief field (`use-brief-change.ts`); `brief_changed` keeps `before` / `after` |
+| What is still open | `outstandingWork()` in `engine.ts`: stale stages, open findings, unconfirmed proposals, unmet blocking criteria, stuck stages, Go waiting, an unmet objective — read by the stage bar, recommendations, the finish dialog and Go's completion |
+| Is the objective met | `/api/agent/assess-objective` before Go may say so; recorded as `objective_assessed` (`20261023000000`); "met" needs a verbatim quote, "performed" only recorded steps |
+| Repair | Go's `recheck_stage` (stale stages up to the current one, earliest first) and `confirm_proposals` (under `handle`, `status_source: 'policy'`) |
+| Ongoing work | `WorkflowTemplate.execution` (finite/ongoing, success criterion, stop conditions); a custom stage's `loop_to`; Go starts the next round under Autonomous + `handle` (`20261025000000`) |
+| Designing a workflow | `generate-workflow`, then `revise-workflow` for targeted changes (operations applied in code; unsupported requests said) |
+| Creating from a conversation | `/api/front-door` keeps a draft brief; its facts are recorded only after *Create project* |
+
 ## Extension points
 
 These are the seams the system was built to be extended at. Working with them is

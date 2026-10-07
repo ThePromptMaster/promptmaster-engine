@@ -59,10 +59,10 @@ It does verify identity. `backend/auth.py` checks the Supabase JWT and attaches 
 | `conversation.py` | `chat-message`, `apply-to-answer`, `save-as-new-version`, `suggest-actions` (a chat answer as at most four actions; prompt and parser in `promptmaster/reply_actions.py`). The chat is told where the user is — stage, workflow, outline, chapters, page buttons — via `context` (`lib/workflow/chat-context.ts` → `promptmaster/page_context.py`), so it never asks for anything to be pasted |
 | `continuation.py` | `continue-document` |
 | `long_form.py` | `detect-long-form`, `generate-outline`, `generate-section`, `finalize-long-form` |
-| `setup.py` | `generate-setup`, `guide-questions` (the batch; no longer used by the UI), `guide-next-question` ("Guide me" one question at a time: the next question given the answers so far, or that there is enough) |
+| `setup.py` | `generate-setup`, `guide-questions` (the batch; no longer used by the UI), `guide-next-question` ("Guide me" one question at a time: the next question given the answers so far, or that there is enough), `generate-workflow`, `revise-workflow` (a targeted change as operations applied in code; unsupported requests said), `front-door` (the conversational start: a reply and a draft brief; saves nothing) |
 | `audit.py` | `audit-findings`, `apply-audit` |
 | `conflicts.py` | `check-conflicts` — PM-24; the deterministic half lives in `lib/workflow/instruction-conflicts.ts` |
-| `agent.py` | `agent/actions`, `agent/next-action`, `agent/reason`, `agent/write-code`, `agent/interpret-result`, `agent/literature` (looks named works up in OpenAlex; no model call), `agent/literature-search` (searches OpenAlex by topic; no model call) — Go mode (PM-17/19); the loop itself runs in the browser |
+| `agent.py` | `agent/actions`, `agent/next-action`, `agent/reason`, `agent/write-code`, `agent/interpret-result`, `agent/literature` (looks named works up in OpenAlex; no model call), `agent/literature-search` (searches OpenAlex by topic; no model call), `agent/assess-objective` (is the objective met — judged before Go may say so; recorded as `objective_assessed`) — Go mode (PM-17/19); the loop itself runs in the browser |
 
 `routers/_pipeline.py` — `build_iteration_with_full_pipeline()` is **the** "produce a new Iteration" path, used by every iteration-creating endpoint. It fans out eval + suggestions + summary in parallel via `asyncio`, stamps the FR-10 provenance fields (`created_at`, `model_used`, `instruction`), and enforces `finish_reason == "length"` → `completeness = incomplete`, overriding whatever the evaluator LLM said. Pass `active_iteration=None` for a first iteration: there is nothing to summarise a change against, so the summary call is skipped. Never re-implement the fan-out — until 2026-09-02 `engine.py` had its own inlined copy twice, which made every new `Iteration` field a three-site change.
 
@@ -159,7 +159,9 @@ A separate LLM call scores three dimensions plus two optional fields (`Evaluatio
 
 ## Supabase Schema
 
-**Phase 2 (current):** `projects`, `artifacts`, `artifact_versions`, `evaluations`, `workflow_templates`, `workflow_events`, `project_stage_events`, `recommendations`, `decisions`, `project_tasks`, `jobs`, `model_usage`, `error_events`, `project_files`.
+**Phase 2 (current):** `projects`, `artifacts`, `artifact_versions`, `evaluations`, `workflow_templates`, `workflow_events`, `project_stage_events`, `recommendations`, `decisions`, `project_tasks`, `jobs`, `model_usage`, `error_events`, `project_files`, `project_facts`.
+
+`project_facts` is the accepted facts and requirements, **append-only** like `artifact_versions` (a change is a new row that supersedes the old; the trigger allows only retiring). Every request carries the current rows as `PMInput.facts`, and `project_context.context_block` puts them in every prompt — add facts to a prompt through that block, never by hand. What is still open anywhere is `outstandingWork()` in `engine.ts`; a readiness message that does not read it will contradict the others.
 
 `model_usage` and `error_events` (FR-18/FR-19) are **insert-and-select only** —
 no update or delete policy, because a user who could edit their own usage rows

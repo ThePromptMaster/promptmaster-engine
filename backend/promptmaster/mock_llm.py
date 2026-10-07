@@ -325,6 +325,23 @@ def _json_reply(system: str, prompt: str) -> dict:
 
     from promptmaster import conflicts
 
+    if system.startswith("You help someone work out a project before PromptMaster creates it"):
+        # The brief takes the user's first message as the objective and every
+        # sentence with a figure as evidence — plus one figure the user never
+        # gave, which must be dropped. Ready from the second user turn.
+        convo = prompt.split("THE CONVERSATION SO FAR:", 1)[-1].split("THE DRAFT BRIEF", 1)[0]
+        users = [ln[len("USER: "):] for ln in convo.splitlines() if ln.startswith("USER: ")]
+        said = " ".join(users)
+        sentences = [s.strip().rstrip(".") for s in re.split(r"(?<=[.;])\s+", said) if s.strip()]
+        evidence = [s for s in sentences if re.search(r"\d", s) or "must" in s.lower()]
+        return {
+            "reply": "Mock: who is this for?" if len(users) < 2 else "Mock: I have enough to set this up.",
+            "brief": {"objective": users[0][:200] if users else "", "audience": "Mock board" if len(users) > 1 else "",
+                      "requirements": [s for s in evidence if "must" in s.lower()],
+                      "evidence": [s for s in evidence if "must" not in s.lower()] + ["Revenue grew 999% last year"],
+                      "deliverables": ["Mock memo"], "stages": ["Brief", "Options", "Recommendation"], "approvals": ["I approve the recommendation"]},
+            "ready": len(users) >= 2,
+        }
     if "You change a workflow the user is designing" in system:
         # Adds "Verification" after stage 3; a request to repeat only part of a
         # round comes back as unsupported.

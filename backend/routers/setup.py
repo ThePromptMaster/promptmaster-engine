@@ -13,6 +13,7 @@ from routers._errors import llm_http_error
 from promptmaster.schemas import GuideAnswer, GuideQuestion, SetupSuggestion
 from promptmaster.workflow_designer import DesignedWorkflow, design_workflow
 from promptmaster.workflow_revision import RevisedWorkflow, revise_workflow
+from promptmaster.front_door import DraftBrief, FrontDoorTurn, Turn, front_door_turn
 from promptmaster.setup_suggester import suggest_guide_questions, suggest_next_guide_question, suggest_setup
 
 router = APIRouter(prefix="/api", tags=["setup"])
@@ -153,3 +154,19 @@ async def api_revise_workflow(
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
+
+
+class FrontDoorRequest(BaseModel):
+    turns: list[Turn] = Field(..., min_length=1, max_length=80)
+    brief: DraftBrief = Field(default_factory=DraftBrief)
+    model: str = ""
+
+
+@router.post("/front-door")
+async def api_front_door(req: FrontDoorRequest, client: OpenRouterClient = Depends(get_client)) -> FrontDoorTurn:
+    """One turn of talking a project into shape: a reply, and the draft brief as
+    it stands (6 Oct, email 8). 1 LLM call; saves nothing."""
+    try:
+        return await front_door_turn(client, req.model or None, req.turns, req.brief)
+    except OpenRouterError as e:
+        raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
