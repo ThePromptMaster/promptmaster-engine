@@ -69,3 +69,48 @@ test('a Word brief added on a later stage can go into the project context', asyn
   await page.locator('#setup-context').scrollIntoViewIfNeeded();
   await page.screenshot({ path: test.info().outputPath('04-docx-text-added-on-a-stage.png') });
 });
+
+/**
+ * P1a (6 Oct, email 9: "Attachments aren't working"). A file whose name has
+ * an accent, a dash and curly quotes was refused by Storage as "Invalid key",
+ * and on the start screen that took the whole project back out. The name the
+ * user gave is kept; only the storage key is made safe.
+ */
+test('a file with accents and curly quotes in its name attaches, at the start and from the chat', async ({ page }) => {
+  const fs = await import('node:fs/promises');
+  const pdf = await fs.readFile(path.join(FIXTURES, 'brief.pdf'));
+  const docx = await fs.readFile(path.join(FIXTURES, 'brief.docx'));
+  const pdfName = 'Résumé – “final”.pdf';
+  const docxName = 'Notes – “Café”.docx';
+
+  await page.goto('/projects/new');
+  await dismissBetaNotice(page);
+  await page.getByLabel('What do you want to do or figure out?').fill('Explain the margin decline to the board.');
+  await page.getByLabel('Attach files').setInputFiles([{ name: pdfName, mimeType: 'application/pdf', buffer: pdf }]);
+  await expect(page.getByRole('list', { name: 'Attached' })).toContainText(pdfName);
+  await page.getByRole('button', { name: /I know what I want to do/ }).click();
+  await page.getByRole('radio', { name: /^Single output/ }).click();
+  await page.getByLabel('Project name').fill('E2E accented attachments');
+  await page.getByRole('button', { name: /^Start / }).click();
+  await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}$/);
+  const id = page.url().split('/').at(-1)!;
+
+  let files = await serviceSelect('project_files', `project_id=eq.${id}&select=name,path`);
+  expect(files.map((f: { name: string }) => f.name)).toEqual([pdfName]);
+  expect(files[0].path).toMatch(/-Resume-final\.pdf$/);
+  await page.screenshot({ path: test.info().outputPath('05-accented-name-at-the-start.png') });
+
+  // The side chat has a paperclip, and it stores the file the same way.
+  await expect(page.getByText('Mock output').first()).toBeVisible();
+  const chat = page.getByRole('region', { name: 'Side chat' });
+  await chat
+    .getByLabel('Attach a file to the project')
+    .setInputFiles([{ name: docxName, mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', buffer: docx }]);
+  await expect(chat.getByRole('status')).toContainText(`Attached to the project: ${docxName}.`);
+  await chat.getByRole('button', { name: 'Add its text to the project context' }).click();
+  await expect(page.locator('#setup-context')).toHaveValue(/### From Notes – “Café”\.docx[\s\S]*Funding is secured/);
+  files = await serviceSelect('project_files', `project_id=eq.${id}&select=name&order=name`);
+  expect(files.map((f: { name: string }) => f.name)).toEqual([docxName, pdfName]);
+  await chat.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: test.info().outputPath('06-attached-from-the-chat.png') });
+});
