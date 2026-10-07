@@ -124,7 +124,7 @@ test('the planner is told what the user already decided, and an autonomous run c
   expect(decisions[0].metadata).toMatchObject({ auto_continue_windows: 1 });
   expect(decisions[1].metadata).toMatchObject({ continues_run_id: runs[0].id, auto: true });
   expect(decisions[1].rationale).toContain('on its own, as authorized in advance');
-  await expect(page.getByRole('region', { name: 'What Go mode is doing' })).toContainText(/Objective complete|Nothing — the objective is met/, { timeout: 30_000 });
+  await expect(page.getByRole('region', { name: 'What Go mode is doing' })).toContainText(/Check the objective is met|Nothing — the objective is met/, { timeout: 30_000 });
   await page.screenshot({ path: test.info().outputPath('02-second-window-ran-on-its-own.png'), fullPage: true });
 });
 

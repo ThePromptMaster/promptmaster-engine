@@ -41,3 +41,25 @@ test('design a workflow, edit a stage, start a project on it, and find it again'
   await expect(page.getByRole('radio', { name: /^Magazine feature.*Yours/ })).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('03-offered-again.png'), fullPage: true });
 });
+
+/**
+ * P1b (6 Oct, email 12): "We should be able to have unlimited amount of
+ * characters for workflow and other chat boxes if feasible." A workflow brief
+ * of 12,000 characters goes to the designer whole (the cap was 2,000).
+ */
+test('a long workflow description is sent whole', async ({ page }) => {
+  await page.goto('/projects/new');
+  await dismissBetaNotice(page);
+  await page.getByLabel('What do you want to do or figure out?').fill('Profile a chef for a food magazine');
+  await page.getByRole('button', { name: /I know what I want to do/ }).click();
+  await page.getByRole('button', { name: /Design a workflow for this work/ }).click();
+  const designer = page.getByRole('region', { name: 'Design a workflow' });
+  const long = `a magazine feature. ${'Each stage keeps the interview notes and the fact-check separate. '.repeat(200)}`.trim();
+  expect(long.length).toBeGreaterThan(12_000);
+  await designer.getByLabel('What kind of work is this?').fill(long);
+  const sent = page.waitForRequest((r) => r.url().endsWith('/api/generate-workflow'));
+  await designer.getByRole('button', { name: 'Design it' }).click();
+  expect(((await sent).postDataJSON() as { description: string }).description).toBe(long);
+  await expect(designer.getByRole('list', { name: 'Proposed stages' }).getByRole('listitem')).toHaveCount(5, { timeout: 30_000 });
+  await page.screenshot({ path: test.info().outputPath('04-long-description.png'), fullPage: true });
+});

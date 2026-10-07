@@ -29,7 +29,7 @@
  * boundary itself live in `use-stage-chat.ts`.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { MarkdownOutput } from '@/components/shared/markdown-output';
 import { useStageChat } from './use-stage-chat';
@@ -47,6 +47,8 @@ import { documentSections, type ScopeKind } from './chat-scope';
 import type { StageChatMessage } from '@/lib/supabase/conversation';
 import type { NewVersion } from '@/lib/supabase/versions';
 import type { ArtifactVersion, Project } from '@/types/project';
+import { LimitCounter } from '@/components/shared/limit-counter';
+import { INPUT_LIMITS } from '@/lib/projects/input-limits';
 
 type Mode = 'discuss' | 'instruct';
 
@@ -130,6 +132,8 @@ interface Props {
   getChatContext?: () => ChatContext;
   /** Questions offered before the user types, from the stage's state (3 Oct call). */
   starters?: string[];
+  /** A control beside the composer that attaches a file to the project. */
+  attach?: ReactNode;
 }
 
 /**
@@ -172,6 +176,7 @@ export function ChatPanel({
   isTable = false,
   getChatContext,
   starters = [],
+  attach,
 }: Props) {
   const [offerActions, setOfferActions] = useState(true);
   useEffect(() => setOfferActions(readOfferActions()), []);
@@ -551,7 +556,7 @@ export function ChatPanel({
           >
             <textarea
               value={draft}
-              onChange={(e) => setDraft(e.target.value)}
+              onChange={(e) => setDraft(e.target.value.slice(0, INPUT_LIMITS.message))}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                   e.preventDefault();
@@ -563,7 +568,9 @@ export function ChatPanel({
               placeholder={spec.placeholder}
               className="w-full resize-y bg-transparent text-body text-[var(--on-surface)] outline-none placeholder:text-[var(--on-surface-variant)]"
             />
+            <LimitCounter length={draft.length} limit={INPUT_LIMITS.message} />
             <div className="mt-1 flex items-center gap-2">
+              {attach}
               <span className="text-label text-[var(--on-surface-variant)]">{spec.promise}</span>
               <button
                 onClick={() => void send()}

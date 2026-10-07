@@ -102,7 +102,7 @@ test('Checkpoint: reasoning runs on its own, code waits for approval, then runs 
   await expect(interpret).toContainText('Result interpreted');
   await expect(interpret).toContainText('The run printed 2 + 2 = 4');
   // The plan is done: declaring the objective complete is important, so it waits.
-  await expect(prompt).toContainText('Objective complete');
+  await expect(prompt).toContainText('Check the objective is met');
   await page.screenshot({ path: test.info().outputPath('02-code-executed-and-interpreted.png'), fullPage: true });
 
   const run = await runOf(id);
@@ -220,7 +220,7 @@ test('The step budget ends the run', async ({ page }) => {
   // beside "14 / 25 steps this window").
   await goPanel(page).getByLabel('Step budget').selectOption('12');
   await card.getByRole('button', { name: 'Continue for 5 more steps' }).click();
-  await expect(page.getByRole('region', { name: 'What Go mode is doing' })).toContainText(/Objective complete|Nothing — the objective is met/, { timeout: 30_000 });
+  await expect(page.getByRole('region', { name: 'What Go mode is doing' })).toContainText(/Check the objective is met|Nothing — the objective is met/, { timeout: 30_000 });
   await expect(goPanel(page).getByLabel('Step budget')).toHaveValue('5');
   await expect(goPanel(page).getByLabel('Budget used')).toContainText('3 / 5 steps');
   const next = await runOf(id);

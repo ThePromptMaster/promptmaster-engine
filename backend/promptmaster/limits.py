@@ -49,6 +49,14 @@ MAX_PREAMBLE_CHARS = 8_000
 MAX_CONTEXT_CHARS = 200_000
 #: A one-off instruction — a revise request, a chat instruction, a stage hint.
 MAX_INSTRUCTION_CHARS = 20_000
+#: What someone types into the side chat, a "Guide me" answer, or the
+#: description of a workflow to design. 6 Oct, email 12: "We should be able to
+#: have unlimited amount of characters for workflow and other chat boxes if
+#: feasible." Unlimited is not, on an endpoint that pays per token; this is the
+#: same order as the project context — a long report pasted whole — so nobody
+#: typing will meet it. (Before 7 Oct: workflow description 2,000, guide
+#: answer 2,000, chat unbounded until the request body failed.)
+MAX_CHAT_MESSAGE_CHARS = 200_000
 
 #: Session facts are pinned one-liners injected into *every* prompt, so their
 #: cost is multiplied by the length of the session. Bounded on both axes.
