@@ -25,6 +25,7 @@ export type Performer =
   | 'commit' // check a routine approval, then commit it under the routine-decision policy
   | 'recheck' // repair a stage a change reopened, then mark it complete again (6 Oct)
   | 'confirm' // confirm proposed row statuses under the routine-decision policy (6 Oct)
+  | 'facts' // read the attached documents' facts and record them under the policy (7 Oct)
   | 'advance' // a stage event
   | 'skip' // proposes skipping the stage; the user decides
   | 'loop' // proposes the next round of a looping workflow; the user starts it
@@ -69,6 +70,8 @@ export const AGENT_ACTIONS: readonly AgentAction[] = [
   { key: 'recheck_stage', family: 'writing', label: 'Repair a reopened stage', performer: 'recheck', important: true },
   // 6 Oct: under "handle them for me", proposed row statuses are confirmed by Go.
   { key: 'confirm_proposals', family: 'writing', label: 'Confirm the routine proposals', performer: 'confirm', important: false },
+  // 7 Oct (L-51): the facts an attached document states, recorded under the policy, each quoted.
+  { key: 'extract_facts', family: 'writing', label: 'Record the facts in the attached documents', performer: 'facts', important: false },
   // 1 Oct, item 11: the template guides the order; it does not imprison it.
   { key: 'propose_skip', family: 'workflow', label: 'Suggest skipping this stage', performer: 'skip', important: false },
   // 3 Oct call: work that goes on round after round; the user starts each one.

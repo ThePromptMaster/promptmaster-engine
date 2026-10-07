@@ -64,6 +64,7 @@ import { dataFileBriefs, type StageArtifactBundle } from '@/lib/workflow/digest'
 import type { StageFigures } from '@/lib/workflow/figures';
 import type { StageControl } from '@/lib/workflow/stage-controls';
 import { evaluateStage, getStage } from '@/lib/workflow/engine';
+import { documentsAwaitingFacts } from '@/lib/workflow/facts';
 import { inputsFrom } from '@/lib/workflow/stage-requests';
 import type { StageContext, StageDefinition, StageEvaluation, WorkflowEvent, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
 import type { NewEvaluation, NewVersion } from '@/lib/supabase/versions';
@@ -503,6 +504,10 @@ export function useGoLoop(opts: Options) {
         if (delegableToCommit(o.stage, stageEvaluation, routine, commitTried)) allowed.push('commit_delegated');
         // 6 Oct: proposals that stand are Go's to confirm under "handle them for me".
         if (policyConfirmable(o.stage, facts, routine) > 0) allowed.push('confirm_proposals');
+        // 7 Oct (L-51): attached documents whose facts are not on record yet,
+        // read once per run under "handle them for me".
+        const factsTried = [...priorStepsRef.current, ...stepsRef.current].some((s) => s.action_key === 'extract_facts');
+        if (routine === 'handle' && !factsTried && documentsAwaitingFacts(o.project)) allowed.push('extract_facts');
 
         // 6 Oct: a stage a change reopened is repaired before anything else —
         // on whichever stage it is — so Summary is not left recommending A.

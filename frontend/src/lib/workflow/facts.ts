@@ -2,7 +2,7 @@
  * The current facts, and how they are named to a model and to the user (F1,
  * 7 Oct). Pure; the rows come from `lib/supabase/facts.ts`.
  */
-import type { ProjectFact } from '@/types/project';
+import type { Project, ProjectFact } from '@/types/project';
 
 /** Facts sent with a request: enough for every prompt, bounded. */
 export const MAX_FACTS_SENT = 200;
@@ -53,4 +53,28 @@ export function factsText(facts: readonly ProjectFact[] | undefined): string {
 /** Superseded and retired facts, newest first: the history. */
 export function retiredFacts(facts: readonly ProjectFact[] | undefined): ProjectFact[] {
   return (facts ?? []).filter((f) => f.retired_at).reverse();
+}
+
+/**
+ * The documents attached to the project, as their text in the project context
+ * ("### From <file>" sections, written when a PDF or Word file is attached).
+ */
+export function attachedDocuments(context: string | undefined): { name: string; text: string }[] {
+  const out: { name: string; text: string }[] = [];
+  const parts = (context ?? '').split(/^### From (.+)$/m);
+  for (let i = 1; i < parts.length; i += 2) {
+    const text = (parts[i + 1] ?? '').trim();
+    if (text) out.push({ name: parts[i].trim(), text });
+  }
+  return out;
+}
+
+/** Attached documents whose facts are not on record yet (L-51). */
+export function documentsAwaitingFacts(project: Pick<Project, 'context' | 'facts'>): boolean {
+  const recorded = new Set(
+    currentFacts(project.facts)
+      .filter((f) => f.source_kind === 'file' && typeof f.source_ref?.name === 'string')
+      .map((f) => f.source_ref.name as string)
+  );
+  return attachedDocuments(project.context).some((d) => !recorded.has(d.name));
 }

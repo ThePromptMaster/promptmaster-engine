@@ -33,6 +33,8 @@ import { summariseStageContent } from '@/lib/workflow/digest';
 import { stageContentForSummary, stageEvidence } from '@/lib/workflow/evidence';
 import { deliverableStage, describeOutstanding, evaluateStage, outstandingWork } from '@/lib/workflow/engine';
 import { pausedLine } from '@/lib/workflow/objective';
+import { attachedDocuments, currentFacts } from '@/lib/workflow/facts';
+import { recordPolicyFacts } from '@/lib/supabase/facts';
 import { figureFindings, figureSources } from '@/lib/workflow/figure-support';
 import { asIteration } from '@/lib/workflow/legacy';
 import {
@@ -792,6 +794,31 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       });
     }
 
+    case 'facts': {
+      // 7 Oct (L-51): what the attached documents state becomes accepted
+      // facts, each quoted from its file — under the routine-decision policy,
+      // which the database checks; nothing inferred, nothing computed.
+      const docs = attachedDocuments(ctx.project.context).filter(
+        (d) => !currentFacts(ctx.project.facts).some((f) => f.source_kind === 'file' && f.source_ref?.name === d.name)
+      );
+      if (!docs.length) return done(key, { status: 'failed', output: 'No attached document is waiting for its facts.', toolsUsed: [], changes: {} });
+      const res = await api.agentExtractFacts(
+        { inputs: inputsFrom(ctx.project), sources: docs.map((d) => ({ id: d.name, label: d.name, text: d.text })), model: ctx.project.model },
+        ctx.signal
+      );
+      const recorded = await recordPolicyFacts(
+        ctx.project, ctx.run.id,
+        res.facts.map((f) => ({ statement: f.statement, subject: f.subject, kind: f.kind, file: f.source_id, quote: f.quote }))
+      );
+      await ctx.refresh?.();
+      return done(key, {
+        status: 'succeeded', toolsUsed: ['model'], changes: {},
+        output: recorded.length
+          ? `Recorded ${recorded.length} fact${recorded.length === 1 ? '' : 's'} from ${docs.map((d) => d.name).join(', ')} under your routine-decision policy, each quoted from its file:\n${recorded.map((f) => `- ${f.statement}`).join('\n')}`
+          : `Read ${docs.map((d) => d.name).join(', ')}; it states no fact that is not already on record.`,
+      });
+    }
+
     case 'confirm': {
       // 6 Oct: under "handle them for me", proposals that stand as they are
       // are confirmed by Go, and say so — not three row decisions for the user.
@@ -956,6 +983,39 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // autonomous run whose routine decisions are Go's starts the round
       // itself, along the template's own loop; the database checks all three.
       if (ctx.run.policy === 'autonomous' && ctx.project.routine_decisions === 'handle') {
+        // 7 Oct (L-54): before another round, is the objective already met —
+        // or blocked on something no round can produce? Judged on this round's
+        // work, the same check as at the end, and recorded.
+        const roundText = roundContent(ctx, to);
+        const verdict = await judgeObjective(ctx, `the round that ended at ${ctx.stage.label}`, roundText);
+        if (verdict.outcome === 'met') {
+          const target = ctx.stage.transitions.default_next;
+          const head = ctx.bundles[ctx.stage.id]?.versions.at(-1);
+          if (target && head) {
+            await appendWorkflowEvent(ctx.project.id, ctx.project.user_id, {
+              type: 'stage_marked_complete',
+              stage_id: ctx.stage.id,
+              to_stage_id: target,
+              actor: 'system',
+              agent_run_id: ctx.run.id,
+              reason: `Objective met in this round: "${verdict.basis_quote}"`,
+              payload: { evidence_version_id: head.id, objective_met: true },
+            });
+            await ctx.afterStageEvent();
+          }
+          return done(key, {
+            status: 'succeeded', toolsUsed: ['model'], changes: { event_types: ['objective_assessed', 'stage_marked_complete'] },
+            output: `The objective is met in this round ("${verdict.basis_quote}"), so no further round: moving on to the write-up.`,
+          });
+        }
+        if (verdict.blockers.length) {
+          const line = pausedLine(verdict);
+          return done(key, {
+            status: 'succeeded', toolsUsed: ['model'], changes: { event_types: ['objective_assessed'] },
+            output: `${line} Another round cannot produce it, so none was started.`,
+            stop: { status: 'blocked', reason: line },
+          });
+        }
         await appendWorkflowEvent(ctx.project.id, ctx.project.user_id, {
           type: 'stage_returned',
           stage_id: ctx.stage.id,
@@ -1062,31 +1122,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       if (ctx.deliverableDone) {
         const holder = deliverableStage(ctx.template);
         const content = holder ? deliverableText(ctx, holder.id) : '';
-        const assessment = await api.agentAssessObjective(
-          {
-            inputs: inputsFrom(ctx.project),
-            deliverable_label: holder?.label ?? 'the deliverable',
-            content: content || '(empty)',
-            steps: ctx.digest.recent_steps.map((s) => ({ action_key: s.action_key, execution_label: s.execution_label, output: s.output })),
-            // The criterion the workflow was designed against, kept from the objective (7 Oct).
-            success_criterion: ctx.template.execution?.success_criterion ?? '',
-            model: ctx.project.model,
-          },
-          ctx.signal
-        );
-        const payload = {
-          outcome: assessment.outcome, reason: assessment.reason, basis_quote: assessment.basis_quote,
-          blockers: assessment.blockers, performed: assessment.performed, proposed_next: assessment.proposed_next,
-        };
-        await appendWorkflowEvent(ctx.project.id, ctx.project.user_id, {
-          type: 'objective_assessed',
-          stage_id: ctx.stage.id,
-          actor: 'system',
-          agent_run_id: ctx.run.id,
-          reason: assessment.reason,
-          payload,
-        });
-        await ctx.afterStageEvent();
+        const assessment = await judgeObjective(ctx, holder?.label ?? 'the deliverable', content);
         if (assessment.outcome === 'met') {
           return done(key, {
             status: 'succeeded', toolsUsed: [], changes: {},
@@ -1157,4 +1193,49 @@ export function recheckInstruction(stageLabel: string, why: string): string {
     'Replace any conclusion or recommendation the change superseded, and re-test each option against the requirements as they are now: one that no longer qualifies is said to be excluded, and why. ' +
     'Begin with one line, "What changed:", saying what was kept and what was replaced.'
   );
+}
+
+/**
+ * Judge whether the objective is met by the given text, record the judgment as
+ * `objective_assessed`, and return it (6–7 Oct). Used at the end of the work
+ * and at the end of each round of ongoing work.
+ */
+async function judgeObjective(ctx: PerformContext, label: string, content: string) {
+  const assessment = await api.agentAssessObjective(
+    {
+      inputs: inputsFrom(ctx.project),
+      deliverable_label: label,
+      content: content || '(empty)',
+      steps: ctx.digest.recent_steps.map((s) => ({ action_key: s.action_key, execution_label: s.execution_label, output: s.output })),
+      // The criterion the workflow was designed against, kept from the objective (7 Oct).
+      success_criterion: ctx.template.execution?.success_criterion ?? '',
+      model: ctx.project.model,
+    },
+    ctx.signal
+  );
+  const payload = {
+    outcome: assessment.outcome, reason: assessment.reason, basis_quote: assessment.basis_quote,
+    blockers: assessment.blockers, performed: assessment.performed, proposed_next: assessment.proposed_next,
+  };
+  await appendWorkflowEvent(ctx.project.id, ctx.project.user_id, {
+    type: 'objective_assessed',
+    stage_id: ctx.stage.id,
+    actor: 'system',
+    agent_run_id: ctx.run.id,
+    reason: assessment.reason,
+    payload,
+  });
+  await ctx.afterStageEvent();
+  return assessment;
+}
+
+/** This round's work as one text: every stage from where the round starts to the one that closes it. */
+function roundContent(ctx: Pick<PerformContext, 'bundles' | 'template' | 'stage'>, fromStageId: string): string {
+  const ids = ctx.template.stages.map((s) => s.id);
+  const start = ids.indexOf(fromStageId);
+  const end = ids.indexOf(ctx.stage.id);
+  return ctx.template.stages
+    .slice(Math.max(0, start), end + 1)
+    .map((s) => `## ${s.label}\n\n${deliverableText(ctx, s.id)}`)
+    .join('\n\n');
 }

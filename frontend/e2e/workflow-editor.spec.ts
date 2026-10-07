@@ -77,7 +77,7 @@ test('stages are edited and added directly, and a change asked in words touches 
 
 test('an ongoing workflow keeps its success criterion and loops; Go starts the next round under the policy', async ({ page }) => {
   test.setTimeout(240_000);
-  const designer = await openDesigner(page, 'Continue investigating the Regge Hessian until a supported result [[mock:plan=advance_stage,advance_stage,advance_stage]]');
+  const designer = await openDesigner(page, 'Continue investigating the Regge Hessian until a supported result [[mock:plan=advance_stage,advance_stage,advance_stage]] [[mock:objective=open]]');
   await designer.getByLabel('What kind of work is this?').fill('research [[mock:ongoing]]');
   await designer.getByRole('button', { name: 'Design it' }).click();
   await expect(designer.getByLabel('Finite or ongoing')).toHaveValue('ongoing', { timeout: 30_000 });
@@ -112,4 +112,45 @@ test('an ongoing workflow keeps its success criterion and loops; Go starts the n
   expect(round).toMatchObject({ actor: 'system', stage_id: 'next_round', to_stage_id: 'investigate', payload: { next_round: true } });
   expect(round.agent_run_id).toBeTruthy();
   await page.screenshot({ path: test.info().outputPath('04-go-started-the-next-round.png'), fullPage: true });
+});
+
+test('when a round meets the objective, Go does not start another: it moves on to the write-up (L-54)', async ({ page }) => {
+  test.setTimeout(240_000);
+  const designer = await openDesigner(page, 'Continue investigating the Regge Hessian until a supported result [[mock:plan=advance_stage,advance_stage,advance_stage]]');
+  await designer.getByLabel('What kind of work is this?').fill('research [[mock:ongoing]]');
+  await designer.getByRole('button', { name: 'Design it' }).click();
+  await expect(designer.getByLabel('Finite or ongoing')).toHaveValue('ongoing', { timeout: 30_000 });
+  await expect(designer.getByLabel('Done means')).toHaveValue('A supported result, or a concrete blocker');
+  await expect(designer).toContainText('Closes a round; the next starts from “Investigate”.');
+  await page.screenshot({ path: test.info().outputPath('03-ongoing-design.png'), fullPage: true });
+  const name = `Open research ${Date.now()}`;
+  await designer.getByLabel('Name', { exact: true }).fill(name);
+  await designer.getByRole('button', { name: 'Use this workflow' }).click();
+  await expect(page.getByRole('radio', { name: new RegExp(`^${name}`) })).toHaveAttribute('aria-checked', 'true', { timeout: 15_000 });
+  await page.getByLabel('Project name').fill('E2E ongoing research');
+  await page.getByRole('button', { name: /^Start / }).click();
+  await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}$/);
+  const id = page.url().split('/').at(-1)!;
+  await expect(page.getByText('Mock output').first()).toBeVisible({ timeout: 30_000 });
+
+  const panel = page.getByRole('region', { name: 'Go mode' });
+  await panel.getByRole('button', { name: 'Set up Go' }).click();
+  await panel.getByRole('radio', { name: /^Handle them for me/ }).click();
+  await expect.poll(async () => (await serviceSelect('projects', `id=eq.${id}&select=routine_decisions`))[0].routine_decisions).toBe('handle');
+  await panel.getByRole('radio', { name: /^Autonomous/ }).click();
+  await panel.getByLabel('Step budget').selectOption('12');
+  await panel.getByRole('button', { name: /^Go$/ }).click();
+  await page.getByRole('button', { name: 'Authorize and go' }).click();
+
+  // The round's work meets the objective: no new round; the round stage is
+  // closed and the project moves on to the write-up, with the judgment recorded.
+  await expect.poll(
+    async () => (await serviceSelect('workflow_events', `project_id=eq.${id}&type=eq.stage_marked_complete&stage_id=eq.next_round&select=to_stage_id,payload`)).length,
+    { timeout: 180_000 }
+  ).toBeGreaterThan(0);
+  const [closed] = await serviceSelect('workflow_events', `project_id=eq.${id}&type=eq.stage_marked_complete&stage_id=eq.next_round&select=actor,to_stage_id,payload`);
+  expect(closed).toMatchObject({ actor: 'system', to_stage_id: 'research_log', payload: { objective_met: true } });
+  expect(await serviceSelect('workflow_events', `project_id=eq.${id}&type=eq.stage_returned&select=id`)).toEqual([]);
+  const [judged] = await serviceSelect('workflow_events', `project_id=eq.${id}&type=eq.objective_assessed&select=payload&order=seq&limit=1`);
+  expect(judged.payload.outcome).toBe('met');
 });

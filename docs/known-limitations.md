@@ -1062,7 +1062,12 @@ well on a smaller model at a fraction of the cost. Per-operation cost and time a
 recorded (E1); routing should follow measurement on matched tasks, not precede it.
 
 
-### L-51 — Accepted facts are recorded by the user; Go does not extract them (2026-10-07)
+### L-51 — Accepted facts are recorded by the user; Go does not extract them (2026-10-07) — resolved 2026-10-07
+
+*Resolved:* under "handle them for me" Go reads attached documents whose facts are not on
+record (`extract_facts`, `/api/agent/extract-facts`) and records each stated fact, quoted
+from its file; a quote not in the file, or a figure not in the quote, is dropped in code.
+Pasted context (not a file) still needs the user to record facts.
 
 `project_facts` holds what the user accepted: typed into the facts panel, confirmed from
 the side chat, or confirmed at the end of the conversational start. Figures in an attached
@@ -1087,7 +1092,11 @@ is followed by the model; nothing in code checks that a figure survived unchange
 commit check still refuses an empty result, prose for a table, or a dropped user decision,
 and the earlier version is always kept.
 
-### L-54 — Ongoing workflows: rounds are bounded by the step budget, not by the objective (2026-10-07)
+### L-54 — Ongoing workflows: rounds are bounded by the step budget, not by the objective (2026-10-07) — resolved 2026-10-07
+
+*Resolved:* before starting another round Go judges the objective on the round's work. Met:
+it closes the round and moves on to the write-up. Not met with a named blocker: it pauses.
+Otherwise the next round starts; the step budget remains the outer bound.
 
 Under Autonomous with routine decisions handled, Go starts each next round itself. It
 stops when the step budget (and any further windows the user authorised) runs out, when

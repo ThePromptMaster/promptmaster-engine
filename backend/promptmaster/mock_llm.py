@@ -467,6 +467,18 @@ def _json_reply(system: str, prompt: str) -> dict:
         # Every item supported, quoting the scripted abstract's second sentence.
         ids = re.findall(r"^ITEM id=(\S+)", prompt, re.M)
         return {"verdicts": [{"id": i, "verdict": "supports", "quote": "This study shows the effect holds in every case examined."} for i in ids]}
+    from promptmaster import fact_extraction
+
+    if system.startswith(fact_extraction._INSTRUCTION[:60]):
+        # The first sentence with a figure in each source, as a fact quoting
+        # it; and one whose quote is not in the source, which must be dropped.
+        facts = []
+        for m in re.finditer(r"--- SOURCE id=(\S+): [^\n]*---\n(.*?)\n--- END ---", prompt, re.S):
+            sentence = next((s.strip() for s in re.split(r"(?<=[.])\s+", m.group(2)) if re.search(r"\d", s)), "")
+            if sentence:
+                facts.append({"statement": sentence.rstrip("."), "subject": "", "kind": "fact", "source_id": m.group(1), "quote": sentence})
+                facts.append({"statement": "Revenue grew 999%", "source_id": m.group(1), "quote": "Revenue grew 999% last year."})
+        return {"facts": facts}
     from promptmaster import objective_assessment
 
     if system.startswith(objective_assessment._ASSESS_INSTRUCTION[:60]):
@@ -474,6 +486,10 @@ def _json_reply(system: str, prompt: str) -> dict:
         # and a proposal; otherwise met, quoting the deliverable's first line.
         body = prompt.split("--- THE DELIVERABLE:", 1)[-1].split("---\n", 1)[-1]
         first = next((ln.strip() for ln in body.splitlines() if ln.strip()), "")
+        if "[[mock:objective=open]]" in prompt:
+            # Not met, and nothing missing: another round is worth it.
+            return {"outcome": "not_met", "reason": "Mock: not there yet.", "basis_quote": first[:120],
+                    "blockers": [], "performed": [], "proposed_next": ["Mock: another round."]}
         if "[[mock:objective=unmet]]" in prompt:
             return {"outcome": "not_met", "reason": "Mock: the log says the criterion is not met.",
                     "basis_quote": first[:120],

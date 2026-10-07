@@ -36,6 +36,7 @@ from promptmaster.agent import (
 from promptmaster.verify_sources import MAX_VERIFY, SourceToVerify, SourceVerdict, verify_sources
 from promptmaster.criterion_check import CriterionCheck, check_criterion
 from promptmaster.objective_assessment import ObjectiveAssessment, RunStep, assess_objective
+from promptmaster.fact_extraction import ExtractedFact, SourceDoc, extract_facts
 from promptmaster.agent_actions import ACTION_KEYS, AGENT_ACTIONS, REASONING_ACTIONS, AgentAction
 from promptmaster.errors import PRESERVED_NOTHING_WRITTEN
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError
@@ -307,3 +308,26 @@ async def api_assess_objective(req: AssessObjectiveRequest, client: OpenRouterCl
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
     return AssessObjectiveResponse(**result.model_dump(), model_used=_model_used(req.model, client))
+
+
+class ExtractFactsRequest(BaseModel):
+    inputs: PMInput
+    sources: list[SourceDoc] = Field(default_factory=list, max_length=20)
+    model: str = ""
+
+
+class ExtractFactsResponse(BaseModel):
+    facts: list[ExtractedFact]
+    model_used: str = ""
+
+
+@router.post("/extract-facts")
+async def api_extract_facts(req: ExtractFactsRequest, client: OpenRouterClient = Depends(get_client)) -> ExtractFactsResponse:
+    """The facts the attached documents state, each quoted from its source
+    (7 Oct, L-51). 1 LLM call; records nothing — the browser does, under the
+    routine-decision policy, and the database checks it."""
+    try:
+        facts = await extract_facts(client, req.model or None, req.inputs, req.sources)
+    except OpenRouterError as e:
+        raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
+    return ExtractFactsResponse(facts=facts, model_used=_model_used(req.model, client))

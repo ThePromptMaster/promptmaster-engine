@@ -106,6 +106,10 @@ AGENT_ACTIONS: list[AgentAction] = [
     AgentAction(key="confirm_proposals", family="writing", label="Confirm the routine proposals",
                 when="Only offered when routine decisions are set to 'handle them for me' and rows carry proposed "
                      "statuses that can stand as they are. Confirms them under the user's policy."),
+    AgentAction(key="extract_facts", family="writing", label="Record the facts in the attached documents",
+                when="Only offered when routine decisions are set to 'handle them for me' and the project has attached "
+                     "documents whose facts are not yet on record. Reads them and records each stated fact, quoted from "
+                     "its file, as an accepted fact."),
     # --- workflow ---------------------------------------------------------------
     AgentAction(key="propose_skip", family="workflow", label="Suggest skipping this stage",
                 when="This stage may be skipped, and for THIS objective an expert would not do it next "
