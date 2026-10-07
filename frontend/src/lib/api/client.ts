@@ -576,6 +576,16 @@ export const api = {
     return apiFetch('/api/generate-workflow', { method: 'POST', body: JSON.stringify(req) });
   },
 
+  /** A targeted change to a designed workflow: only what the request names changes (6 Oct, email 11). Saves nothing. */
+  async reviseWorkflow(req: { workflow: import('@/lib/workflow/custom').DesignedWorkflow; request: string }): Promise<{
+    workflow: import('@/lib/workflow/custom').DesignedWorkflow;
+    changes: string[];
+    unsupported: { request: string; reason: string }[];
+    note: string;
+  }> {
+    return apiFetch('/api/revise-workflow', { method: 'POST', body: JSON.stringify(req) });
+  },
+
   async generateSetup(req: GenerateSetupRequest): Promise<GenerateSetupResponse> {
     return apiFetch('/api/generate-setup', {
       method: 'POST',

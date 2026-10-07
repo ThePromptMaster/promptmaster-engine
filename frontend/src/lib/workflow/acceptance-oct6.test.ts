@@ -134,6 +134,10 @@ describe('Superseded recommendations are repaired consistently; valid figures re
     expect(staleRepair(template, state, ['output'])).toMatchObject({ params: { stage_id: 'summary' } });
     expect(staleRepair(template, state, ['output', 'summary'])).toBeNull();
   });
+  it('a stage after the one the project is on is redone in order, not repaired ahead of it', () => {
+    const back: WorkflowState = { ...afterChange, current_stage_id: 'review', stages: { ...afterChange.stages, review: { status: 'in_progress' }, output: { status: 'stale', stale: { reason: 'went back', since: 'x', was: 'complete' } } } };
+    expect(staleRepair(template, back)).toBeNull();
+  });
   it('the repair is told to keep what holds and replace what the change superseded', () => {
     const text = recheckInstruction('Output', 'relied on "highest contribution within capacity"');
     expect(text).toContain('Keep every figure, calculation and finding that still holds, exactly as written');

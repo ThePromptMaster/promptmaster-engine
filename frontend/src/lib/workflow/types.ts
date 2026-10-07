@@ -201,6 +201,12 @@ export interface DerivedOutlineSpec {
   };
 }
 
+export interface WorkflowExecution {
+  kind: 'finite' | 'ongoing';
+  success_criterion: string;
+  stop_conditions: string[];
+}
+
 export interface WorkflowTemplate {
   key: string;
   version: number;
@@ -232,6 +238,13 @@ export interface WorkflowTemplate {
    * user generates gets the same moves (3 Oct call).
    */
   inquiry?: boolean;
+  /**
+   * Whether the work ends after one pass or goes on, and what counts as done
+   * (7 Oct; Sean, 6 Oct: "Reaching the final stage should not by itself mean
+   * the original objective is satisfied"). Go's planner and its objective
+   * check read the success criterion; set by the workflow designer.
+   */
+  execution?: WorkflowExecution;
   stages: StageDefinition[];
 }
 

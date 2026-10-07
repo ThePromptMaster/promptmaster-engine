@@ -112,6 +112,17 @@ class AgentWorkflow(BaseModel):
     #: An investigation (template.inquiry): its objective may need a
     #: calculation, a source or data that no stage table carries.
     inquiry: bool = False
+    #: Finite or ongoing, and what counts as done (7 Oct).
+    execution: "WorkflowExecution | None" = None
+
+
+class WorkflowExecution(BaseModel):
+    kind: str = Field(default="finite", pattern="^(finite|ongoing)$")
+    success_criterion: str = Field(default="", max_length=2_000)
+    stop_conditions: list[str] = Field(default_factory=list, max_length=8)
+
+
+AgentWorkflow.model_rebuild()
 
 
 class AgentControl(BaseModel):
@@ -315,6 +326,16 @@ def _format_state(inputs: PMInput, state: AgentState) -> str:
         ]
         if state.workflow is not None and state.workflow.stages else []
     )
+    ex = state.workflow.execution if state.workflow is not None else None
+    if ex is not None and (ex.kind == "ongoing" or ex.success_criterion.strip()):
+        # 7 Oct: the objective's own criterion, kept when the workflow was
+        # designed; the last stage is not it (Sean, 6 Oct, email 10).
+        workflow_line.append(
+            f"EXECUTION: {'ongoing — rounds continue until the criterion is met or a stop condition holds' if ex.kind == 'ongoing' else 'finite'}."
+            + (f" Done means: {ex.success_criterion.strip()}." if ex.success_criterion.strip() else "")
+            + (f" Stop short of it when: {'; '.join(ex.stop_conditions)}." if ex.stop_conditions else "")
+            + " Reaching the last stage does not by itself meet the objective."
+        )
     return "\n".join([
         f"OBJECTIVE (authoritative): {inputs.objective}",
         f"Audience: {inputs.audience or '(not set)'}",

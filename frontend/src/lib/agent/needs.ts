@@ -127,13 +127,19 @@ export interface RequiredMove {
  * stages after it. Prose, list and review stages only — a manuscript or an
  * outline is the user's editor. `tried`: stages this run already rechecked,
  * so one that still cannot be closed is not repaired again in a loop.
+ *
+ * Only up to the stage the project is on: a stage after it will be worked
+ * again in order when the project gets there — going back a round marks the
+ * whole round stale, and repairing its Analysis before its Investigate was
+ * redone did the round backwards (7 Oct, E2E).
  */
 export function staleRepair(
   template: WorkflowTemplate,
   state: WorkflowState,
   tried: readonly string[] = []
 ): RequiredMove | null {
-  for (const stage of template.stages) {
+  const here = template.stages.findIndex((s) => s.id === state.current_stage_id);
+  for (const stage of here >= 0 ? template.stages.slice(0, here + 1) : template.stages) {
     const st = state.stages[stage.id];
     if (st?.status !== 'stale' || tried.includes(stage.id)) continue;
     if (!['prose', 'list', 'review'].includes(stage.renderer)) continue;

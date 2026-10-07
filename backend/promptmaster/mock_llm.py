@@ -325,6 +325,33 @@ def _json_reply(system: str, prompt: str) -> dict:
 
     from promptmaster import conflicts
 
+    if "You change a workflow the user is designing" in system:
+        # Adds "Verification" after stage 3; a request to repeat only part of a
+        # round comes back as unsupported.
+        asked = prompt.split("THE USER ASKS:", 1)[-1].lower()
+        ops = []
+        if "verif" in asked:
+            ops.append({"op": "add_stage", "after": 3, "stage": {
+                "label": "Verification", "short_label": "Verify", "kind": "check", "purpose": "Mock: check the analysis.",
+                "instruction": "Mock: list each claim of the analysis and whether it holds.", "required": True, "approval": ""}})
+        unsupported = [{"request": "Repeat only the analysis automatically", "reason": "Mock: a loop repeats a whole round."}] if "only the analysis" in asked else []
+        return {"operations": ops, "unsupported": unsupported, "note": ""}
+    if "You design workflows for PromptMaster" in system and "[[mock:ongoing]]" in prompt:
+        # An investigation that goes on until a supported result: a round closes
+        # on "Next round", which loops back to "Investigate".
+        return {
+            "name": "Open research", "description": "Mock: an investigation that continues until a result.",
+            "deliverable": "research log", "inquiry": True,
+            "execution": {"kind": "ongoing", "success_criterion": "A supported result, or a concrete blocker",
+                          "stop_conditions": ["a concrete blocker", "exhausted branches"]},
+            "stages": [
+                {"label": "Objective", "short_label": "Objective", "kind": "write", "purpose": "Mock.", "instruction": "Mock: state it.", "required": True, "approval": ""},
+                {"label": "Investigate", "short_label": "Investigate", "kind": "write", "purpose": "Mock.", "instruction": "Mock: investigate.", "required": True, "approval": ""},
+                {"label": "Analysis", "short_label": "Analysis", "kind": "write", "purpose": "Mock.", "instruction": "Mock: analyse.", "required": True, "approval": ""},
+                {"label": "Next round", "short_label": "Next round", "kind": "write", "purpose": "Mock.", "instruction": "Mock: what next.", "required": True, "approval": "", "loop_back_to": "Investigate"},
+                {"label": "Research log", "short_label": "Log", "kind": "write", "purpose": "Mock.", "instruction": "Mock: the log.", "required": True, "approval": ""},
+            ],
+        }
     if "You design workflows for PromptMaster" in system:
         # A scripted magazine-feature workflow: write, list, write, check, write.
         return {

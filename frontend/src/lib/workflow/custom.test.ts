@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { templateFromDesign, type DesignedWorkflow } from './custom';
+import { designFromTemplate, templateFromDesign, type DesignedWorkflow } from './custom';
 import { initialState, projectState } from './engine';
 import { validateTemplate } from './validate';
 import type { WorkflowEvent } from './types';
@@ -60,5 +60,41 @@ describe('a designed workflow becomes a template the engine can walk (3 Oct call
   it('keeps stage ids unique when two labels match', () => {
     const twice = templateFromDesign({ ...design, stages: [design.stages[0], { ...design.stages[3], label: 'Pitch and angle' }, design.stages[3]] }, 'x');
     expect(new Set(twice.stages.map((s) => s.id)).size).toBe(3);
+  });
+});
+
+describe('ongoing work and editing a copy (7 Oct)', () => {
+  const ongoing: DesignedWorkflow = {
+    name: 'Open research', description: '', deliverable: 'research log', inquiry: true,
+    execution: { kind: 'ongoing', success_criterion: 'A supported result', stop_conditions: ['a concrete blocker'] },
+    stages: [
+      { label: 'Objective', short_label: 'Objective', kind: 'write', purpose: 'p', instruction: 'i', required: true, approval: '' },
+      { label: 'Investigate', short_label: 'Investigate', kind: 'write', purpose: 'p', instruction: 'i', required: true, approval: '' },
+      { label: 'Next round', short_label: 'Next round', kind: 'write', purpose: 'p', instruction: 'i', required: true, approval: '', loop_back_to: 'Investigate' },
+      { label: 'Log', short_label: 'Log', kind: 'write', purpose: 'p', instruction: 'i', required: true, approval: 'I accept this log', approval_kind: 'decision' },
+    ],
+  };
+
+  it('an ongoing design loops from the stage that closes a round, and keeps its success criterion', () => {
+    const t = templateFromDesign(ongoing, 'abc');
+    expect(t.stages.find((s) => s.id === 'next_round')?.transitions.loop_to).toBe('investigate');
+    expect(t.execution).toEqual({ kind: 'ongoing', success_criterion: 'A supported result', stop_conditions: ['a concrete blocker'] });
+    expect(validateTemplate(t)).toEqual([]);
+  });
+
+  it('a finite design never loops, whatever a stage says', () => {
+    const t = templateFromDesign({ ...ongoing, execution: { kind: 'finite', success_criterion: '', stop_conditions: [] } }, 'abc');
+    expect(t.stages.some((s) => s.transitions.loop_to)).toBe(false);
+  });
+
+  it('a saved workflow comes back as the same design, to edit a copy', () => {
+    const back = designFromTemplate(templateFromDesign(ongoing, 'abc'));
+    expect(back.execution).toEqual(ongoing.execution);
+    expect(back.stages.map((s) => [s.label, s.kind, s.loop_back_to, s.approval, s.approval_kind])).toEqual([
+      ['Objective', 'write', '', '', 'decision'],
+      ['Investigate', 'write', '', '', 'decision'],
+      ['Next round', 'write', 'Investigate', '', 'decision'],
+      ['Log', 'write', '', 'I accept this log', 'decision'],
+    ]);
   });
 });
