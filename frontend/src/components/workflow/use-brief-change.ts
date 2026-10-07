@@ -5,6 +5,7 @@ import { useEffect, useRef } from 'react';
 import { api } from '@/lib/api/client';
 import { BRIEF_FIELDS, finishedConclusions, presentationOnly, type WatchedField } from '@/lib/workflow/brief-change';
 import { factsText } from '@/lib/workflow/facts';
+import { stagesUsingFacts, statementsOf } from '@/lib/workflow/fact-dependencies';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import type { NewWorkflowEvent } from '@/lib/supabase/workflow';
 import type { WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
@@ -86,6 +87,24 @@ export function useBriefChange({
             continue;
           }
           const stages = finishedConclusions(t, s, b, since);
+          // A fact changed or taken out (L-52): what used the old value is in
+          // the text. Only those stages reopen, each with the sentence; the
+          // change is recorded even when nothing is finished yet.
+          if (field === 'facts') {
+            const after = new Set(statementsOf(is.facts));
+            const removed = statementsOf(was.facts).filter((f) => !after.has(f));
+            if (removed.length) {
+              const affected = stagesUsingFacts(
+                removed,
+                stages.map((st) => ({ stage_id: st.stage_id, label: st.label, text: b[st.stage_id]?.versions.at(-1)?.content ?? '' }))
+              );
+              await append({
+                type: 'brief_changed', stage_id: at,
+                payload: { field, kind: 'fact', presentation_only: false, affected, method: 'fact_match', changed_facts: removed, ...texts },
+              });
+              continue;
+            }
+          }
           if (!stages.length) continue;
           try {
             const impact = await api.assessChange({ field, before, after, stages, model: p.model });

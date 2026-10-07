@@ -79,6 +79,11 @@ test('facts given in the chat are recorded on confirmation, read by every reques
   expect(after).toHaveLength(3);
   expect(after[1]).toMatchObject({ statement: 'Candidate B has managed 100 or more employees for 4 years', retired_reason: 'superseded' });
   expect(after[2]).toMatchObject({ source_kind: 'user_edit', supersedes: expect.any(String) });
+  // L-52: a changed fact is traced in the text — no model call. The finished
+  // Objective stage never stated "4 years", so nothing reopens.
+  await expect.poll(async () => (await serviceSelect('workflow_events', `project_id=eq.${id}&type=eq.brief_changed&select=payload&order=seq`)).length, { timeout: 20_000 }).toBe(2);
+  const changes = await serviceSelect('workflow_events', `project_id=eq.${id}&type=eq.brief_changed&select=payload&order=seq`);
+  expect(changes[1].payload).toMatchObject({ field: 'facts', method: 'fact_match', affected: [], changed_facts: ['Candidate B has managed 100 or more employees for 4 years'] });
   await panel.scrollIntoViewIfNeeded();
   await page.screenshot({ path: test.info().outputPath('02-facts-with-source-and-history.png') });
 });

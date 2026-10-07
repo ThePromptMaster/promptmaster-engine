@@ -249,7 +249,7 @@ These are engineering estimates for this round, not timesheet figures.
 | Work | Estimate |
 |---|---|
 | Go proposing facts from files and stages | 6 h |
-| Per-claim dependencies, so a fact reopens only the claims that used it | 20–30 h |
+| Editing only the affected sentence in place, instead of revising the stage around it | 8–12 h |
 | An objective check at the end of each round, so Go stops on success | 4 h |
 | "Paused" on the projects list | 2 h |
 | Challenge / Reframe / Self-audit as recorded findings | 4 h |

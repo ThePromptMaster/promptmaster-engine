@@ -1071,7 +1071,14 @@ propose facts from files or stages yet. The database already guards policy accep
 (a running run on a `handle` project, from a file or stage only), so adding that move does
 not need a schema change.
 
-### L-52 — A fact or requirement reopens whole stages, not the claims that used it (2026-10-07)
+### L-52 — A fact or requirement reopens whole stages, not the claims that used it (2026-10-07) — narrowed 2026-10-07
+
+*Narrowed:* when a fact is changed or taken out, the finished stages whose text states the
+old fact (its figures with its words, or most of its words) are found in the text and only
+those reopen, each with the sentence that used it; there is no model call, and Go's repair
+is told that sentence. What remains: a newly added fact still goes through the one-call
+judgment, and the repair revises the stage (keeping what holds) rather than editing the one
+sentence in place.
 
 Changing a fact runs the same change check as an edit of the brief: one call names the
 finished stages that relied on it. There is no per-claim dependency record, so a stage
