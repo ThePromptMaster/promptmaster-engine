@@ -248,3 +248,43 @@ def test_multiple_violations_are_all_reported(client):
     message = res.json()["detail"]["message"]
     assert "objective" in message
     assert "number of sections" in message
+
+
+# ---------------------------------------------------------------------------
+# 6 Oct, email 12: "unlimited amount of characters for workflow and other chat
+# boxes if feasible". Long text is accepted; only a runaway is refused.
+# ---------------------------------------------------------------------------
+
+
+def test_a_long_workflow_description_and_guide_answer_are_accepted():
+    from promptmaster.limits import MAX_CHAT_MESSAGE_CHARS
+
+    stub = AsyncMock()
+    stub.generate_json = AsyncMock(return_value=({"name": "X", "stages": [
+        {"label": s, "short_label": s, "kind": "write", "purpose": "p", "instruction": "i"} for s in ("A", "B", "C")
+    ]}, {}))
+    app.dependency_overrides[get_client] = lambda: stub
+    try:
+        c = TestClient(app)
+        long = "Stage notes. " * 4_000  # ~52k characters; 2,000 was the cap before 7 Oct
+        r = c.post("/api/generate-workflow", json={"description": long})
+        assert r.status_code == 200, r.text
+        assert long.strip() in stub.generate_json.call_args.kwargs["prompt"]
+
+        stub.generate_json = AsyncMock(return_value=({"enough": True, "reason": "ok"}, {}))
+        r = c.post("/api/guide-next-question", json={
+            "objective": "Hire a COO",
+            "answered": [{"question": "What matters most?", "answer": "x" * 10_000}],
+        })
+        assert r.status_code == 200, r.text
+    finally:
+        app.dependency_overrides.pop(get_client, None)
+    assert MAX_CHAT_MESSAGE_CHARS >= 200_000
+
+
+def test_a_runaway_workflow_description_is_a_readable_422(client):
+    from promptmaster.limits import MAX_CHAT_MESSAGE_CHARS
+
+    r = client.post("/api/generate-workflow", json={"description": "x" * (MAX_CHAT_MESSAGE_CHARS + 1)})
+    assert r.status_code == 422
+    assert "description" in r.text

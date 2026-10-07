@@ -16,6 +16,12 @@ export const INPUT_LIMITS = {
   context: 200_000,
   /** A revise request, chat instruction or stage hint. */
   instruction: 20_000,
+  /**
+   * What is typed into the side chat, a "Guide me" answer, or a workflow's
+   * description (6 Oct, email 12: "unlimited … if feasible"). Bounded only so a
+   * runaway paste is told, not failed.
+   */
+  message: 200_000,
 } as const;
 
 export type LimitedField = keyof typeof INPUT_LIMITS;

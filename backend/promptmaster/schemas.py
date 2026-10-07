@@ -6,6 +6,7 @@ from uuid import uuid4
 from pydantic import BaseModel, Field, field_validator
 
 from .limits import (
+    MAX_CHAT_MESSAGE_CHARS,
     MAX_CONTEXT_CHARS,
     MAX_FIELD_CHARS,
     MAX_INSTRUCTION_CHARS,
@@ -381,8 +382,8 @@ class SetupSuggestion(BaseModel):
 
 class GuideAnswer(BaseModel):
     """One answer from the 'Guide me' path, fed back into setup."""
-    question: str = Field(..., max_length=500)
-    answer: str = Field(default="", max_length=2_000)
+    question: str = Field(..., max_length=2_000)
+    answer: str = Field(default="", max_length=MAX_CHAT_MESSAGE_CHARS)
 
 
 class GuideQuestion(BaseModel):
