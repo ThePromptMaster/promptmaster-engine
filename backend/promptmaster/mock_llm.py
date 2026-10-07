@@ -359,6 +359,14 @@ def _json_reply(system: str, prompt: str) -> dict:
         # question gives none (an answer that only explained).
         if "[[mock:no-actions]]" in prompt:
             return {"actions": []}
+        if "[[mock:facts]]" in prompt:
+            # Each sentence of the question with a figure in it, as a fact; and
+            # one the user never wrote, which must be dropped.
+            asked = prompt.split("--- THE USER ASKED ---", 1)[-1].split("--- THE ANSWER", 1)[0]
+            sentences = [s.strip() for s in re.split(r"(?<=[.;])\s+", asked.replace("[[mock:facts]]", "")) if re.search(r"\d", s)]
+            facts = [{"statement": s.rstrip(".;"), "subject": "", "kind": "fact"} for s in sentences]
+            facts.append({"statement": "Candidate C managed 500 staff for 12 years", "kind": "fact"})
+            return {"actions": [{"label": f"Record these {len(sentences)} facts", "kind": "record_facts", "facts": facts}]}
         ids = re.findall(r"^- id=([^:]+):", prompt, re.M)
         if ids:
             status = re.search(r"^Statuses: ([a-z_]+) ", prompt, re.M)

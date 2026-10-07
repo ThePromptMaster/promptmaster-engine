@@ -47,7 +47,9 @@ async def api_check_conflicts(
 
 
 class AssessChangeRequest(BaseModel):
-    field: str = Field(pattern="^(objective|audience|constraints|output_format|context)$")
+    #: `facts`: the accepted facts as a list, before and after one was added,
+    #: changed or retired (F1, 7 Oct).
+    field: str = Field(pattern="^(objective|audience|constraints|output_format|context|facts)$")
     before: str = Field(default="", max_length=MAX_CONTEXT_CHARS)
     after: str = Field(default="", max_length=MAX_CONTEXT_CHARS)
     stages: list[StageConclusion] = Field(default_factory=list, max_length=40)

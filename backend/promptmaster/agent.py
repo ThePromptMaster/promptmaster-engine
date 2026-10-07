@@ -319,7 +319,7 @@ def _format_state(inputs: PMInput, state: AgentState) -> str:
         f"OBJECTIVE (authoritative): {inputs.objective}",
         f"Audience: {inputs.audience or '(not set)'}",
         f"Constraints: {inputs.constraints or '(none)'}",
-        *([context_block(inputs, limit=4_000)] if inputs.context.strip() else []),
+        *([context_block(inputs, limit=4_000)] if (inputs.context.strip() or inputs.facts) else []),
         "",
         *workflow_line,
         f"CURRENT STAGE: {state.stage_label or state.stage_id}",

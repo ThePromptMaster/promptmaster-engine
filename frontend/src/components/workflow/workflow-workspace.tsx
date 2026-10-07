@@ -59,6 +59,8 @@ import {
 } from '@/lib/workflow/engine';
 import { buildStageDigest, formatManuscript, summariseStageContent } from '@/lib/workflow/digest';
 import { objectiveUnmet } from '@/lib/workflow/objective';
+import { recordFacts } from '@/lib/supabase/facts';
+import { ProjectFacts } from './project-facts';
 import { buildChatContext, chatContentFor } from '@/lib/workflow/chat-context';
 import { starterQuestions } from '@/lib/workflow/chat-starters';
 import { keepFinishedVersion, stageContentForSummary, stageEvidence } from '@/lib/workflow/evidence';
@@ -753,6 +755,20 @@ export function WorkflowWorkspace({
     // `from` names where the action came from when it is not the side chat: a Challenge, a Reframe, a Self-audit.
     async (action: ReplyAction, from?: string) => {
       if (!stage || !appendStageVersion) return;
+      if (action.kind === 'record_facts') {
+        // The facts the user gave in the chat become the project's record,
+        // with where they came from (6 Oct, email 4). The change check then
+        // reopens what relied on the facts as they were.
+        await recordFacts(
+          project,
+          (action.facts ?? []).map((f) => ({
+            statement: f.statement, subject: f.subject || null, kind: f.kind ?? 'fact',
+            source_kind: 'chat' as const, source_ref: { stage_id: stage.id, via: from ?? 'side chat' },
+          }))
+        );
+        await onReload?.();
+        return;
+      }
       if (action.kind === 'revise') {
         // One finding, the ordinary apply path: previewed before it is saved.
         await applyFindings.apply(
@@ -772,7 +788,7 @@ export function WorkflowWorkspace({
         change_summary: `From ${from ?? 'the side chat'}: ${action.label} (${changes.length} row${changes.length === 1 ? '' : 's'}).`,
       });
     },
-    [stage, appendStageVersion, applyFindings, headItems, project.model, project.mode]
+    [stage, appendStageVersion, applyFindings, headItems, project, onReload]
   );
 
   const critiquePoints = useMemo(
@@ -1704,6 +1720,8 @@ export function WorkflowWorkspace({
               onKeep={(changeAt) => void appendEvent({ type: 'brief_change_dismissed', stage_id: stageId, payload: { change_at: changeAt } })}
             />
             <FiguresOnRecord template={template} state={state} bundles={stageBundles} />
+            {/* On every stage: the accepted facts are the project's record (F3, 7 Oct). */}
+            <ProjectFacts project={project} onChanged={() => onReload?.()} readOnly={!isEditable || project.status === 'finalized'} />
             {/* On every stage: data is the project's, not a stage's. */}
             <ProjectData
               project={project}

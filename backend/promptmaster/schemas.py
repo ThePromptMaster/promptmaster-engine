@@ -20,6 +20,17 @@ ModeType = Literal["architect", "critic", "clarity", "coach", "therapist", "cold
 ScoreLevel = Literal["Low", "Medium", "High"]
 
 
+class AcceptedFact(BaseModel):
+    """One accepted fact or requirement, as the project records it (F1, 7 Oct).
+    The browser sends the current ones with every request; the backend stores
+    nothing."""
+    statement: str = Field(..., min_length=1, max_length=2_000)
+    subject: str = Field(default="", max_length=200)
+    kind: Literal["fact", "requirement"] = "fact"
+    #: Where it came from, in words ("from the side chat, 6 Oct").
+    source: str = Field(default="", max_length=300)
+
+
 class PMInput(BaseModel):
     """User inputs for a PromptMaster session.
 
@@ -35,6 +46,11 @@ class PMInput(BaseModel):
     # 4 Oct: the facts, figures and background behind the objective, kept apart
     # from it so the objective stays short. Material to use, not instructions.
     context: str = Field(default="", max_length=MAX_CONTEXT_CHARS, description="The project's source material")
+    # 7 Oct (Sean, 6 Oct): the facts and requirements the project has accepted,
+    # each with its source. Every prompt that carries the context carries these
+    # first (`project_context.context_block`), so every stage, check and chat
+    # reads the same current evidence.
+    facts: list[AcceptedFact] = Field(default_factory=list, max_length=200)
     mode: ModeType = Field(..., description="Selected operational mode")
     # Custom mode fields (only used when mode == 'custom')
     custom_name: str = Field(default="", max_length=MAX_SHORT_TEXT_CHARS, description="Custom mode persona name")

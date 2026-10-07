@@ -14,13 +14,20 @@ import { summariseStageContent, type StageArtifactBundle } from './digest';
 
 export const BRIEF_FIELDS = ['objective', 'audience', 'constraints', 'output_format', 'context'] as const;
 export type BriefField = (typeof BRIEF_FIELDS)[number];
+/**
+ * What a change check watches: the brief's fields, and the accepted facts as
+ * one list (F3, 7 Oct) — a fact added, changed or retired reopens what relied
+ * on it exactly as an edit of the context does.
+ */
+export type WatchedField = BriefField | 'facts';
 
-export const BRIEF_FIELD_LABEL: Record<BriefField, string> = {
+export const BRIEF_FIELD_LABEL: Record<WatchedField, string> = {
   objective: 'objective',
   audience: 'audience',
   constraints: 'constraints',
   output_format: 'output format',
   context: 'project context',
+  facts: 'accepted facts',
 };
 
 /** The words, without case, punctuation, Markdown markup or spacing. */

@@ -1,6 +1,6 @@
 'use client';
 
-import { BRIEF_FIELD_LABEL, type BriefField } from '@/lib/workflow/brief-change';
+import { BRIEF_FIELD_LABEL, type WatchedField } from '@/lib/workflow/brief-change';
 import type { WorkflowEvent } from '@/lib/workflow/types';
 
 /**
@@ -19,7 +19,7 @@ export function BriefChangeNotice({
 }) {
   if (!change) return null;
   const { event, stageIds } = change;
-  const field = BRIEF_FIELD_LABEL[(event.payload?.field as BriefField) ?? 'objective'] ?? 'brief';
+  const field = BRIEF_FIELD_LABEL[(event.payload?.field as WatchedField) ?? 'objective'] ?? 'brief';
   const affected = (event.payload?.affected as { stage_id: string; reason: string }[] | undefined) ?? [];
   const names = stageIds.map(stageLabel);
   const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;

@@ -16,16 +16,19 @@ only on the user's click.
 
 from __future__ import annotations
 
+import re
 from typing import Literal
 
 from pydantic import BaseModel, Field
 
 from .conversation import _shared_system
 from .llm_client import OpenRouterClient
+from .project_context import facts_block
 from .schemas import PMInput
 
 MAX_ACTIONS = 4
 MAX_ROWS_PER_ACTION = 30
+MAX_FACTS_PER_ACTION = 12
 
 
 class TableField(BaseModel):
@@ -55,15 +58,24 @@ class RowUpdate(BaseModel):
     fields: dict[str, str] = Field(default_factory=dict)
 
 
+class FactToRecord(BaseModel):
+    statement: str = Field(max_length=2_000)
+    subject: str = Field(default="", max_length=200)
+    kind: Literal["fact", "requirement"] = "fact"
+
+
 class ReplyAction(BaseModel):
     label: str
-    kind: Literal["revise", "row_updates", "add_rows"]
+    kind: Literal["revise", "row_updates", "add_rows", "record_facts"]
     #: `revise`: what to change about the draft, as one instruction.
     instruction: str = ""
     #: `row_updates`: changes to existing rows.
     updates: list[RowUpdate] = Field(default_factory=list)
     #: `add_rows`: new rows, by field key.
     rows: list[dict[str, str]] = Field(default_factory=list)
+    #: `record_facts`: facts or requirements the USER supplied, to be recorded
+    #: as accepted project facts once the user confirms them (6 Oct, email 4).
+    facts: list[FactToRecord] = Field(default_factory=list)
 
 
 _REPLY_ACTIONS_INSTRUCTION = (
@@ -99,6 +111,16 @@ _TABLE_KINDS = (
     "Do not use kind \"revise\" for a table.\n"
 )
 
+_FACTS_KIND = (
+    "\nFACTS THE USER SUPPLIED: when THE USER'S message gives facts or requirements "
+    "for the project — figures, dates, durations, conditions, a changed rule — or asks "
+    "to update the project's facts, also offer kind \"record_facts\": \"facts\" is a "
+    "list of {\"statement\", \"subject\", \"kind\": \"fact\" | \"requirement\"}, one "
+    "per fact, each in the user's own words and figures. Only what the user wrote — "
+    "never what the answer inferred or suggested. Label it like \"Record these 3 facts\". "
+    "Nothing is recorded until the user confirms.\n"
+)
+
 _SHAPE = (
     "Return JSON only:\n"
     '{"actions": [{"label": "...", "kind": "revise", "instruction": "..."}, '
@@ -112,8 +134,11 @@ def build_reply_actions_prompt(
 ) -> tuple[str, str]:
     """Build (system, user). Pure."""
     kinds = _TABLE_KINDS if table else _PROSE_KINDS
-    system = _shared_system(inputs, [], f"{_REPLY_ACTIONS_INSTRUCTION}\n{kinds}\n{_SHAPE}")
+    system = _shared_system(inputs, [], f"{_REPLY_ACTIONS_INSTRUCTION}\n{kinds}{_FACTS_KIND}\n{_SHAPE}")
     parts = [f"STAGE: {stage_label or '(unnamed)'}", f"OBJECTIVE: {inputs.objective or '(none)'}", ""]
+    facts = facts_block(inputs)
+    if facts:
+        parts += [facts, ""]
     if table:
         parts.append(f"THE TABLE (one {table.item_label} per row):")
         parts.append("Columns: " + ", ".join(f"{f.key} ({f.label or f.key})" for f in table.fields))
@@ -144,7 +169,7 @@ def _clean_label(value: object) -> str:
     return label[:60]
 
 
-def parse_reply_actions(raw: object, table: ActionTable | None) -> list[ReplyAction]:
+def parse_reply_actions(raw: object, table: ActionTable | None, question: str = "") -> list[ReplyAction]:
     """Keep only actions that can be carried out as stated.
 
     A table action that names a row which is not there, or a status the table
@@ -167,7 +192,11 @@ def parse_reply_actions(raw: object, table: ActionTable | None) -> list[ReplyAct
         kind = item.get("kind")
         if not label:
             continue
-        if kind == "revise" and not table:
+        if kind == "record_facts":
+            facts = parse_record_facts(item, question)
+            if facts:
+                out.append(ReplyAction(label=label, kind="record_facts", facts=facts))
+        elif kind == "revise" and not table:
             instruction = str(item.get("instruction") or "").strip()
             if instruction:
                 out.append(ReplyAction(label=label, kind="revise", instruction=instruction[:1_500]))
@@ -203,10 +232,40 @@ def parse_reply_actions(raw: object, table: ActionTable | None) -> list[ReplyAct
     return out
 
 
+_NUMBER = re.compile(r"\d[\d,]*(?:\.\d+)?")
+_WORD = re.compile(r"[a-zA-Z]{4,}")
+
+
+def _from_user(statement: str, question: str) -> bool:
+    """A fact to record must be the user's: every figure in it appears in what
+    the user wrote, and, without figures, most of its words do. A model that
+    "records" a figure from its own answer is the stale-evidence problem in
+    another form."""
+    q = question.lower().replace(",", "")
+    numbers = [n.replace(",", "") for n in _NUMBER.findall(statement)]
+    if numbers:
+        return all(n in q for n in numbers)
+    words = [w.lower() for w in _WORD.findall(statement)]
+    return bool(words) and sum(w in q for w in words) >= max(1, (len(words) + 1) // 2)
+
+
+def parse_record_facts(item: dict, question: str) -> list[FactToRecord]:
+    facts: list[FactToRecord] = []
+    for f in (item.get("facts") or [])[:MAX_FACTS_PER_ACTION]:
+        if not isinstance(f, dict):
+            continue
+        statement = " ".join(str(f.get("statement") or "").split())[:2_000]
+        if not statement or not _from_user(statement, question):
+            continue
+        kind = "requirement" if f.get("kind") == "requirement" else "fact"
+        facts.append(FactToRecord(statement=statement, subject=" ".join(str(f.get("subject") or "").split())[:200], kind=kind))
+    return facts
+
+
 async def suggest_reply_actions(
     client: OpenRouterClient, model: str | None, inputs: PMInput, stage_label: str,
     question: str, reply: str, table: ActionTable | None,
 ) -> list[ReplyAction]:
     system, user = build_reply_actions_prompt(inputs, stage_label, question, reply, table)
     raw, _usage = await client.generate_json(prompt=user, system=system, temperature=0.2, max_tokens=1_500, model=model)
-    return parse_reply_actions(raw, table)
+    return parse_reply_actions(raw, table, question)

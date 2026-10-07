@@ -1,3 +1,4 @@
+import { factsForRequest } from './facts';
 /**
  * The requests a stage's draft and evaluation send, and what is stored from
  * their responses. Pure.
@@ -44,6 +45,7 @@ export function inputsFrom(project: Project): PMInput {
     constraints: project.constraints,
     output_format: project.output_format,
     context: project.context ?? '',
+    facts: factsForRequest(project.facts),
     mode: project.mode,
     custom_name: project.custom_name,
     custom_preamble: project.custom_preamble,

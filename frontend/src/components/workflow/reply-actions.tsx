@@ -76,6 +76,40 @@ export function ReplyActions({
     ) : null;
   }
 
+  if (confirming?.kind === 'record_facts') {
+    // Conversation never silently becomes project state (Sean, 6 Oct, email
+    // 8): what will be recorded is shown, and only "Record" writes it.
+    const facts = confirming.facts ?? [];
+    return (
+      <section aria-label="Record facts" className="rounded-xl bg-[var(--surface-container-low)] px-4 py-3">
+        <p className="text-title text-[var(--on-surface)]">These become accepted project facts</p>
+        <p className="mt-1 text-label text-[var(--on-surface-variant)]">
+          Every stage, check and chat reads them from now on. Finished work that relied on what changed is reopened for a recheck.
+        </p>
+        <ul className="mt-2 list-disc space-y-1 pl-5 text-label text-[var(--on-surface)]">
+          {facts.map((f, i) => (
+            <li key={i}>
+              {f.kind === 'requirement' ? <span className="font-semibold">Requirement: </span> : null}
+              {f.subject ? `${f.subject}: ` : ''}
+              {f.statement}
+            </li>
+          ))}
+        </ul>
+        {failed && (
+          <p role="alert" className="mt-2 text-label text-[var(--pm-error)]">{failed}</p>
+        )}
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button onClick={() => void run(confirming)} disabled={working || busy || !facts.length} className={primary}>
+            {working ? 'Recording…' : `Record ${facts.length === 1 ? 'this fact' : `these ${facts.length} facts`}`}
+          </button>
+          <button onClick={() => setConfirming(null)} disabled={working} className={quiet}>
+            Back
+          </button>
+        </div>
+      </section>
+    );
+  }
+
   if (confirming) {
     const changes = previewRows?.(confirming) ?? [];
     return (

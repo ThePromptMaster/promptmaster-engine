@@ -90,9 +90,11 @@ def format_buttons(buttons: list[PageButton] | None) -> str:
 
 WHAT_CHAT_CAN_CHANGE = (
     "WHAT YOU CAN AND CANNOT CHANGE: talking here changes nothing. A change to this stage happens "
-    "only when the user accepts an action offered under your answer, as a new version. You cannot "
-    "change the project brief, its context or its facts, another stage, or Go's run. Never say you "
-    "updated, recorded or saved anything; say what the user can press to do it."
+    "only when the user accepts an action offered under your answer, as a new version. Facts or "
+    "requirements the user gives you become the project's accepted facts only when the user confirms "
+    "the \"Record these facts\" action offered under your answer. You cannot change the project brief, "
+    "its context, another stage, or Go's run. Never say you updated, recorded or saved anything; say "
+    "what the user can press to do it."
 )
 
 

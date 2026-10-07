@@ -13,6 +13,7 @@ import { describe, expect, it } from 'vitest';
 
 import { completionSummary, describeOutstanding, initialState, outstandingBeyondCriteria, outstandingElsewhere, outstandingWork } from './engine';
 import { deriveWorkflowRecommendations } from './recommend';
+import { figureFindings, figureSources } from './figure-support';
 import { evaluateStage } from './engine';
 import { SINGLE_OUTPUT_V1 as template } from './templates/single-output.v1';
 import type { StageContext, WorkflowState } from './types';
@@ -130,5 +131,13 @@ describe('Go handles routine repairs within delegated authority', () => {
   it.todo('Phase 4: under "handle them for me", proposed row statuses are confirmed by Go (confirm_proposals)');
 });
 describe('Accepted evidence is recorded once with its source, and every check reads it', () => {
-  it.todo('Phase 3: the facts block appears in every stage, check and chat prompt');
+  it('a figure the user supplied as an accepted fact is supplied material for the figure check', () => {
+    const fact = { id: 'f', project_id: 'p', user_id: 'u', statement: 'Candidate A saved $4.5m in year one', subject: null, kind: 'fact' as const,
+      source_kind: 'chat' as const, source_ref: {}, accepted_by: 'user' as const, agent_run_id: null, supersedes: null, retired_at: null, retired_reason: null, created_at: '' };
+    const sources = figureSources({ objective: 'o', constraints: '', audience: '', output_format: '', context: '', data_files: [], facts: [fact] }, {}, 'summary');
+    expect(figureFindings('A is recommended: $4.5m saved in year one.', sources)).toEqual([]);
+  });
+  // The rest is held elsewhere: every prompt carries the same facts block
+  // (backend/tests/test_project_facts.py); the record, its source and its
+  // history, and the change check on it (e2e/facts.spec.ts).
 });
