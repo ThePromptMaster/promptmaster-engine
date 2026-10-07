@@ -52,6 +52,9 @@ import {
   type TransitionOption,
   completionSummary,
   deliverableStage,
+  describeOutstanding,
+  outstandingBeyondCriteria,
+  outstandingWork,
   tickClosesStage,
 } from '@/lib/workflow/engine';
 import { buildStageDigest, formatManuscript, summariseStageContent } from '@/lib/workflow/digest';
@@ -366,6 +369,15 @@ export function WorkflowWorkspace({
   const evaluation = useMemo(
     () => evaluateStage(template, stageId, context),
     [template, stageId, context]
+  );
+
+  // What is still open anywhere in the project, and the part of it that is not
+  // on this stage: "Ready to move on" says so too, rather than "nothing is
+  // outstanding" beside a stage that needs a recheck (6 Oct).
+  const outstanding = useMemo(() => outstandingWork(template, state, context), [template, state, context]);
+  const outstandingOther = useMemo(
+    () => outstandingBeyondCriteria(outstanding, stageId).map(describeOutstanding),
+    [outstanding, stageId]
   );
 
   // Open stages whose only required item left is the user's approval: said in
@@ -785,6 +797,7 @@ export function WorkflowWorkspace({
     },
     table: tableRevision,
     enabled: isCurrent && events !== null,
+    elsewhere: outstandingOther,
   });
 
   const handleToggleManual = useCallback(
@@ -1204,7 +1217,12 @@ export function WorkflowWorkspace({
   const deliverable = deliverableStage(template);
   const deliverableBundle = deliverable ? stageBundles[deliverable.id] : undefined;
   const deliverableSections = deliverableBundle?.artifact?.long_form?.outline ?? [];
-  const completion = completionSummary(template, state, context);
+  // Go waiting on the user is outstanding work as much as an open finding is.
+  const goWaiting =
+    go.run && !go.run.ended_at && (go.run.status === 'awaiting_decision' || go.run.status === 'blocked')
+      ? go.run.stop_reason || 'a decision from you'
+      : null;
+  const completion = completionSummary(template, state, context, { goWaiting });
   // The deliverable's latest objective check, for the finished screen (C4).
   const deliverableHead = completion.deliverable ? bundles?.[completion.deliverable.id]?.versions.at(-1) : undefined;
   const deliverableEvaluation = deliverableHead ? evaluations?.[deliverableHead.id] : undefined;
@@ -1903,10 +1921,17 @@ export function WorkflowWorkspace({
                 busy={busy}
                 check={objectiveCheck}
                 onCheck={() => void checkAgainstObjective()}
-                onConfirm={() => {
+                onConfirm={(reason) => {
                   const { option, note } = finishing;
                   setFinishing(null);
-                  void handleTransition(option, note);
+                  // Finishing past open work is a deviation, so its reason is
+                  // recorded on project_finalized with what was still open.
+                  const why = reason
+                    ? [note, `Finished with ${completion.outstanding.length} item(s) still open: ${completion.outstanding.map(describeOutstanding).join('; ')}. Reason: ${reason}`]
+                        .filter(Boolean)
+                        .join(' — ')
+                    : note;
+                  void handleTransition(option, why);
                 }}
                 onCancel={() => {
                   setFinishing(null);
@@ -1954,6 +1979,7 @@ export function WorkflowWorkspace({
                 onPrimary={runPrimary}
                 more={moreActions}
                 nextStageLabel={nextStage?.short_label ?? null}
+                elsewhere={outstandingOther}
                 onSuggest={appendStageVersion && !go.active && !go.pendingStep ? () => void go.suggest() : undefined}
                 suggesting={go.active && go.run?.policy === 'guided'}
               />

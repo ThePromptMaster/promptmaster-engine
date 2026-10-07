@@ -67,7 +67,10 @@ export async function pressTransition(page: Page) {
   // PM-14: Finish shows what is being finished before it finishes.
   const summary = page.getByRole('region', { name: 'Finish the project' });
   if (await summary.isVisible().catch(() => false)) {
-    await summary.getByRole('button', { name: /^(Finish project|Override and finish)$/ }).click();
+    // 6 Oct: finishing with work still open somewhere asks why.
+    const why = summary.getByLabel('Why finish with work still open');
+    if (await why.isVisible().catch(() => false)) await why.fill('Finishing for the test; the open items are known.');
+    await summary.getByRole('button', { name: /^(Finish project|Finish anyway|Override and finish)$/ }).click();
   }
 }
 

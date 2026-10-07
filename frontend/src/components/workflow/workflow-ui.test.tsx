@@ -308,6 +308,7 @@ describe('left-open stages are named where finishing happens (A3, Sean 28 Sep it
     leftOpenStages: [positioning],
     blocked: 0,
     notStarted: 0,
+    outstanding: [],
   };
 
   it('the Finish dialog names the stage and offers to go and close it', async () => {
@@ -504,6 +505,7 @@ describe('the finished screen puts the work at the centre (C4, Sean 28 Sep item 
   const project = { id: 'p1', title: 'Field guide', workflow: 'single_output', status: 'finalized' } as never;
   const summary = {
     deliverable: stage, deliverableDone: true, completed: 5, withArtifact: 5, skipped: 0, leftOpen: 0, leftOpenStages: [], blocked: 0, notStarted: 0,
+    outstanding: [],
   };
   const bundle = (content: string) => ({
     project, template, state: initialState(template), events: [], evaluations: {},

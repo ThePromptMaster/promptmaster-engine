@@ -66,6 +66,8 @@ interface Options {
   stageEvaluation: StageEvaluation;
   /** The stage is marked stuck: no "move on" suggestion while it is. */
   blocked?: boolean;
+  /** Work still open on other stages, in words (`describeOutstanding`). */
+  elsewhere?: string[];
   /** The version a correction would be applied to. */
   headVersion: ArtifactVersion | null;
   /** The stored evaluation for that version, when there is one. */
@@ -120,6 +122,7 @@ export function useRecommendations({
   stage,
   stageEvaluation,
   blocked = false,
+  elsewhere,
   headVersion,
   storedEvaluation,
   modelRecommendation,
@@ -218,8 +221,9 @@ export function useRecommendations({
       evaluation: stageEvaluation,
       dismissed,
       blocked,
+      elsewhere,
     });
-  }, [template, stage, stageEvaluation, dismissed, blocked]);
+  }, [template, stage, stageEvaluation, dismissed, blocked, elsewhere]);
 
   const panelRows: PanelRecommendation[] = useMemo(() => {
     const persisted = rows

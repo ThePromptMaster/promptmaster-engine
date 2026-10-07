@@ -474,6 +474,12 @@ export interface DeriveOptions {
    * stage is stuck, the stuck card is the one surface that says what to do.
    */
   blocked?: boolean;
+  /**
+   * Work still open on other stages, one line each. "Nothing on Summary is
+   * outstanding" while Output needed a recheck was true of Summary and false
+   * of the project (6 Oct), so the advance and finish rows say both.
+   */
+  elsewhere?: readonly string[];
 }
 
 /*
@@ -516,6 +522,7 @@ export function deriveWorkflowRecommendations({
   evaluation,
   dismissed,
   blocked = false,
+  elsewhere = [],
 }: DeriveOptions): ProposedRecommendation[] {
   const out: ProposedRecommendation[] = [];
   const setupCriterionIds = new Set<string>();
@@ -597,9 +604,16 @@ export function deriveWorkflowRecommendations({
           .map((c) => `"${c.label}"`)
           .join(', ')}) — optional, but worth a look.`
       : '';
-    const nothingBlocks = open.length
-      ? `Nothing on ${stage.label} blocks moving on.${openNote}`
-      : `Nothing on ${stage.label} is outstanding.`;
+    // Never "nothing is outstanding" while something is (6 Oct): with work
+    // still open, the row says the required items are done and names the rest.
+    const stillOpen = elsewhere.length
+      ? `${elsewhere.length === 1 ? 'One thing is' : `${elsewhere.length} things are`} still open: ${elsewhere.join('; ')}.`
+      : '';
+    const nothingBlocks = elsewhere.length
+      ? `${stage.label}'s required items are done.${openNote} ${stillOpen}`
+      : open.length
+        ? `Nothing on ${stage.label} blocks moving on.${openNote}`
+        : `Nothing on ${stage.label} is outstanding.`;
     const next = stage.transitions.default_next;
     if (next) {
       const target = getStage(template, next);
@@ -629,10 +643,14 @@ export function deriveWorkflowRecommendations({
       out.push({
         category: `finish:${stage.id}`,
         kind: 'stage_transition',
-        title: 'Finish',
-        summary: open.length
-          ? `${stage.label} is the last stage, and nothing on it blocks finishing.${openNote}`
-          : `${stage.label} is the last stage, and nothing on it is outstanding.`,
+        title: elsewhere.length
+          ? `Close the ${elsewhere.length === 1 ? 'open item' : `${elsewhere.length} open items`}, then finish`
+          : 'Finish',
+        summary: elsewhere.length
+          ? `${stage.label} is the last stage and its required items are done.${openNote} ${stillOpen}`
+          : open.length
+            ? `${stage.label} is the last stage, and nothing on it blocks finishing.${openNote}`
+            : `${stage.label} is the last stage, and nothing on it is outstanding.`,
         suggested_change: 'Mark the project finished.',
         instruction: '',
         rationale: {

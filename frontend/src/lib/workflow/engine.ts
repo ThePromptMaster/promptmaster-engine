@@ -586,6 +586,11 @@ export interface CompletionSummary {
   leftOpenStages: StageDefinition[];
   blocked: number;
   notStarted: number;
+  /**
+   * Everything still open in the project (`outstandingWork`). Finishing with
+   * any of it asks for a reason, which is recorded (6 Oct).
+   */
+  outstanding: OutstandingItem[];
 }
 
 /**
@@ -595,7 +600,8 @@ export interface CompletionSummary {
 export function completionSummary(
   template: WorkflowTemplate,
   state: WorkflowState,
-  ctx: Pick<StageContext, 'artifactNonEmpty' | 'sections'>
+  ctx: Pick<StageContext, 'artifactNonEmpty' | 'sections'> & Partial<StageContext>,
+  extras: OutstandingExtras = {}
 ): CompletionSummary {
   const stage = deliverableStage(template);
   const done = stage ? deliverableDone(stage, ctx) : false;
@@ -610,6 +616,7 @@ export function completionSummary(
     leftOpenStages: leftOpenStages(template, state),
     blocked: 0,
     notStarted: 0,
+    outstanding: outstandingWork(template, state, ctx, extras),
   };
   for (const s of template.stages) {
     const st = state.stages[s.id];
@@ -622,4 +629,118 @@ export function completionSummary(
     if (st?.left_open && status === 'in_progress') summary.leftOpen += 1;
   }
   return summary;
+}
+
+// --- outstanding work, project-wide (6 Oct) -------------------------------------
+
+/**
+ * One thing still open somewhere in the project.
+ *
+ * Sean, 6 Oct: "The UI simultaneously said nothing was outstanding while
+ * Summary needed rechecking and Go was waiting for me", and "the interface
+ * displayed 'Ready to move on' and allowed me to finish the project despite
+ * the unresolved finding." Every readiness message read the current stage's
+ * blocking criteria and nothing else. This list is what they read now — the
+ * transition bar, the recommendations, the finish dialog, and Go's
+ * "objective complete" — so they cannot disagree with one another.
+ *
+ * It counts open findings and unconfirmed proposals whatever the template's
+ * `blocking` flag says: a check stage's findings default to non-blocking, and
+ * a finding nobody has resolved is still unresolved work.
+ */
+export type OutstandingItem =
+  | { kind: 'stale_stage'; stageId: string; label: string; reason: string }
+  | { kind: 'open_findings'; stageId: string; label: string; count: number }
+  | { kind: 'unconfirmed_proposals'; stageId: string; label: string; count: number }
+  | { kind: 'unmet_blocking'; stageId: string; label: string; criteria: string[] }
+  | { kind: 'blocked_stage'; stageId: string; label: string; reason: string }
+  | { kind: 'go_waiting'; label: string; need: string }
+  | { kind: 'objective_unmet'; label: string; blockers: string[] };
+
+export interface OutstandingExtras {
+  /** Go stopped and is waiting on the user: what it needs, in one line. */
+  goWaiting?: string | null;
+  /** The latest objective assessment said the objective is not met. */
+  objectiveUnmet?: { blockers: string[] } | null;
+}
+
+export function outstandingWork(
+  template: WorkflowTemplate,
+  state: WorkflowState,
+  ctx: Partial<Pick<StageContext, 'findings' | 'itemsProposed'>> & Partial<StageContext>,
+  extras: OutstandingExtras = {}
+): OutstandingItem[] {
+  const out: OutstandingItem[] = [];
+  for (const stage of template.stages) {
+    const st = state.stages[stage.id];
+    const status = st?.status ?? 'not_started';
+    if (status === 'not_started' || status === 'skipped') continue;
+    const label = stage.short_label || stage.label;
+
+    if (status === 'stale') {
+      out.push({ kind: 'stale_stage', stageId: stage.id, label, reason: st?.stale?.reason ?? 'something before it changed' });
+    }
+    if (status === 'blocked') {
+      out.push({ kind: 'blocked_stage', stageId: stage.id, label, reason: st?.blocked?.reason ?? 'marked stuck' });
+    }
+
+    const proposed = ctx.itemsProposed?.[stage.id] ?? 0;
+    const findings = ctx.findings?.[stage.id];
+    if (findings) {
+      // Proposed rows are not triaged either; they are counted once, as proposals.
+      const open = Math.max(0, findings.total - findings.triaged - proposed);
+      if (open > 0) out.push({ kind: 'open_findings', stageId: stage.id, label, count: open });
+    }
+    if (proposed > 0) out.push({ kind: 'unconfirmed_proposals', stageId: stage.id, label, count: proposed });
+
+    // Required work still unticked: on the stage the project is on, and on any
+    // stage moved past with something left open.
+    const onIt = stage.id === state.current_stage_id && status !== 'stale';
+    if ((onIt || (status === 'in_progress' && st?.left_open)) && ctx.artifactNonEmpty && ctx.manualChecks) {
+      const unmet = evaluateStage(template, stage.id, ctx as StageContext).unmet.filter((c) => c.blocking);
+      if (unmet.length) out.push({ kind: 'unmet_blocking', stageId: stage.id, label, criteria: unmet.map((c) => c.label) });
+    }
+  }
+  if (extras.objectiveUnmet) {
+    out.push({ kind: 'objective_unmet', label: 'Objective', blockers: extras.objectiveUnmet.blockers });
+  }
+  if (extras.goWaiting) out.push({ kind: 'go_waiting', label: 'Go', need: extras.goWaiting });
+  return out;
+}
+
+/** One line per item, in the words every surface uses. */
+export function describeOutstanding(item: OutstandingItem): string {
+  switch (item.kind) {
+    case 'stale_stage':
+      return `${item.label} needs a recheck — ${item.reason}`;
+    case 'open_findings':
+      return `${item.label}: ${item.count} finding${item.count === 1 ? '' : 's'} not yet accepted or rejected`;
+    case 'unconfirmed_proposals':
+      return `${item.label}: ${item.count} proposed status${item.count === 1 ? '' : 'es'} not yet confirmed`;
+    case 'unmet_blocking':
+      return `${item.label}: ${item.criteria.join('; ')}`;
+    case 'blocked_stage':
+      return `${item.label} is stuck — ${item.reason}`;
+    case 'go_waiting':
+      return `Go is waiting for you: ${item.need}`;
+    case 'objective_unmet':
+      return item.blockers.length
+        ? `The objective is not met — waiting for: ${item.blockers.join('; ')}`
+        : 'The objective is not met';
+  }
+}
+
+/**
+ * What "Ready to move on" must also mention: everything open except the given
+ * stage's own unmet criteria, which its checklist and `canAdvance` already
+ * speak for. A finding left open on the stage itself is included — it is not
+ * one of the stage's criteria unless the template made it one.
+ */
+export function outstandingBeyondCriteria(items: readonly OutstandingItem[], stageId: string): OutstandingItem[] {
+  return items.filter((i) => !(i.kind === 'unmet_blocking' && i.stageId === stageId));
+}
+
+/** Items that are not on the given stage at all. */
+export function outstandingElsewhere(items: readonly OutstandingItem[], stageId: string): OutstandingItem[] {
+  return items.filter((i) => !('stageId' in i) || i.stageId !== stageId);
 }
