@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { createProject, pressTransition, transitionBar } from './helpers';
+import { createProject, pressTransition, serviceSelect, transitionBar } from './helpers';
 
 /**
  * A4 / PM-10, PM-11 — the original PromptMaster core, reconnected inside a
@@ -14,7 +14,7 @@ async function openMore(page: import('@playwright/test').Page) {
 }
 
 test('refine and critique a stage draft with the original core', async ({ page }) => {
-  await createProject(page, { workflow: 'Book', name: 'E2E core', objective: 'A book about giraffes' });
+  const id = await createProject(page, { workflow: 'Book', name: 'E2E core', objective: 'A book about giraffes' });
   await expect(page.getByText('Mock output').first()).toBeVisible();
 
   // A rewrite lands as a new version, labelled with what produced it.
@@ -33,6 +33,12 @@ test('refine and critique a stage draft with the original core', async ({ page }
   await expect(critique).toBeVisible();
   await expect(critique).toContainText('nothing has been changed');
   await expect(page.getByRole('button', { name: 'v3' })).toHaveCount(0);
+  // 7 Oct: the critique is recorded, not only shown — each point is a pending
+  // recommendation on this version, kept with the project.
+  await expect.poll(async () => (await serviceSelect('recommendations', `project_id=eq.${id}&category=like.critique:*&select=id`)).length, { timeout: 15_000 }).toBeGreaterThan(0);
+  const [rec] = await serviceSelect('recommendations', `project_id=eq.${id}&category=like.critique:*&select=status,kind,scope,version_id&limit=1`);
+  expect(rec).toMatchObject({ status: 'pending', kind: 'fix', scope: { stage_id: 'objective' } });
+  expect(rec.version_id).toBeTruthy();
   await critique.scrollIntoViewIfNeeded();
   await page.screenshot({ path: test.info().outputPath('02-challenge-commentary.png') });
 });

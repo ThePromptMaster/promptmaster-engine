@@ -166,9 +166,14 @@ export default function NewProjectPage() {
   /** The front door confirmed: its brief becomes the setup, and its facts the initial record. */
   function fromConversation(brief: DraftBrief, transcript: string) {
     setObjective(brief.objective);
+    // A point the brief lists as a requirement is not recorded again as a fact.
+    const norm = (t: string) => t.toLowerCase().replace(/[^a-z0-9$%]+/g, ' ').trim();
+    const required = new Set(brief.requirements.map(norm));
     setInitialFacts([
       ...brief.requirements.map((statement) => ({ statement, kind: 'requirement' as const, source_kind: 'chat' as const, source_ref: { via: 'front door' } })),
-      ...brief.evidence.map((statement) => ({ statement, kind: 'fact' as const, source_kind: 'chat' as const, source_ref: { via: 'front door' } })),
+      ...brief.evidence
+        .filter((statement) => !required.has(norm(statement)))
+        .map((statement) => ({ statement, kind: 'fact' as const, source_kind: 'chat' as const, source_ref: { via: 'front door' } })),
     ]);
     const lines = [
       brief.audience && `Audience: ${brief.audience}`,

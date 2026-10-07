@@ -1102,7 +1102,10 @@ it marks a stage stuck, or when it asks. It does not yet run the objective check
 of each round to stop on success; the user ends the rounds from the stage bar, or Go's
 completion check does when the last stage is reached.
 
-### L-55 — The projects list does not show "Paused" (2026-10-07)
+### L-55 — The projects list does not show "Paused" (2026-10-07) — resolved 2026-10-07
+
+*Resolved:* the list reads each active project's latest `objective_assessed` event and
+shows **Paused** when it is not "met".
 
 When Go's objective check finds the objective not met, the project shows "Paused — the
 objective is not met. Waiting for: …" and the stage bar and finish dialog list it. The

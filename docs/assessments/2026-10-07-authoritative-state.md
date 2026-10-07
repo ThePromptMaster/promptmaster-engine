@@ -158,13 +158,10 @@ structured state, with evidence proportional to consequence and an audit trail."
 | Design / edit / publish a workflow | — | `workflow_templates` (immutable once published) | template validation | the version row |
 | Create a project (including from a conversation) | — | project, initial facts | confirmation screen | `project_created`, fact rows |
 
-**Buttons that still only launch a prompt.**
-- *Challenge*, *Reframe* and *Self-audit* (under More) return commentary and write
-  nothing. Their result reaches state only through a reply action the user accepts.
-- *Ask* in the side chat writes nothing, by design. Its actions are the governed path.
-
-Making these first-class means recording them as findings on the stage. That is a small
-change and the next candidate.
+**Challenge, Reframe and Self-audit** now record their points. Each point becomes a pending
+recommendation on the current version, accepted or dismissed like any other, and kept with
+the project. *Ask* in the side chat still writes nothing, by design; its actions are the
+governed path.
 
 ## 5. Workflow customization (emails 11 and 12)
 
@@ -252,4 +249,3 @@ These are engineering estimates for this round, not timesheet figures.
 | Editing only the affected sentence in place, instead of revising the stage around it | 8–12 h |
 | An objective check at the end of each round, so Go stops on success | 4 h |
 | "Paused" on the projects list | 2 h |
-| Challenge / Reframe / Self-audit as recorded findings | 4 h |
