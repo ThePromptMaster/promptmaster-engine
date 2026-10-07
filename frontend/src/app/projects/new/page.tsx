@@ -22,6 +22,7 @@ import { contextFromDocuments } from '@/lib/data/extract-text';
 import { imagePreview } from '@/lib/data/preview';
 import { INPUT_LIMITS } from '@/lib/projects/input-limits';
 import { attachProjectFile } from '@/lib/supabase/project-files';
+import { LimitCounter } from '@/components/shared/limit-counter';
 
 /**
  * PM-09 — the unified entry.
@@ -319,6 +320,7 @@ export default function NewProjectPage() {
               placeholder="e.g. Write a short book about giraffes for curious ten-year-olds"
               className="w-full bg-transparent text-title leading-relaxed text-[var(--on-surface)] outline-none placeholder:text-[var(--outline)]"
             />
+            <LimitCounter length={objective.length} limit={INPUT_LIMITS.objective} />
             <StartAttachments
               files={startFiles}
               images={startImages}
