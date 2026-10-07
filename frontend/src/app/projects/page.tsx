@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 
 import { useAuth } from '@/hooks/use-auth';
 import { listProjects, softDeleteProject } from '@/lib/supabase/projects';
+import { pausedProjectIds } from '@/lib/supabase/workflow';
 import { useProjectStore } from '@/stores/project-store';
 import type { ProjectSummary } from '@/types/project';
 import { GuestBanner } from '@/components/projects/guest-banner';
@@ -43,6 +44,7 @@ export default function ProjectsPage() {
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
 
   const [listFailed, setListFailed] = useState(false);
+  const [paused, setPaused] = useState<Set<string>>(new Set());
 
   const load = useCallback(() => {
     // A project just left may still have a debounced edit on its way — the
@@ -54,7 +56,13 @@ export default function ProjectsPage() {
       .flush()
       .catch(() => undefined)
       .then(() => listProjects())
-      .then(setProjects)
+      .then((rows) => {
+        setProjects(rows);
+        // Paused on an unmet objective: said on the list, not only on the project.
+        pausedProjectIds(rows.filter((p) => p.status !== 'finalized').map((p) => p.id))
+          .then(setPaused)
+          .catch(() => undefined);
+      })
       .catch((e) => {
         setListFailed(true);
         setError(e instanceof Error ? e.message : 'Could not load projects.');
@@ -198,6 +206,11 @@ export default function ProjectsPage() {
                         <span className="rounded-md bg-[var(--surface-container-high)] px-2 py-1">
                           {WORKFLOW_LABEL[p.workflow] ?? p.workflow}
                         </span>
+                        {p.status !== 'finalized' && paused.has(p.id) && (
+                          <span className="rounded-md bg-[var(--surface-container-high)] px-2 py-1 font-semibold text-[var(--pm-tertiary)]" title="The objective is not met; waiting for missing inputs">
+                            Paused
+                          </span>
+                        )}
                         {p.status !== 'finalized' && p.stage && (
                           <span className="rounded-md bg-[var(--surface-container-high)] px-2 py-1">
                             {p.stage.replace(/_/g, ' ')}

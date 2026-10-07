@@ -11,6 +11,8 @@
  * replacing it — so nothing here can lose work.
  */
 
+import { insertRecommendation } from '@/lib/supabase/recommendations';
+import { pointsFromCommentary } from '@/lib/workflow/critique-points';
 import { useCallback, useRef, useState } from 'react';
 
 import { api } from '@/lib/api/client';
@@ -60,9 +62,47 @@ interface Options {
    */
   fallbackContent?: string;
   appendStageVersion?: (stageId: string, name: string, version: NewVersion) => Promise<unknown>;
+  /** Re-read the recommendations once a critique's points are recorded. */
+  onRecorded?: () => unknown;
 }
 
-export function useStageTools({ project, stage, headVersion, fallbackContent = '', appendStageVersion }: Options) {
+/** At most this many points of one critique become recommendations. */
+const MAX_RECORDED_POINTS = 6;
+
+async function recordCritique(
+  project: Project,
+  stage: StageDefinition,
+  headVersion: ArtifactVersion | null,
+  title: string,
+  kind: CritiqueKind,
+  text: string
+) {
+  const points = pointsFromCommentary(text).slice(0, MAX_RECORDED_POINTS);
+  const at = Date.now();
+  for (const [i, point] of points.entries()) {
+    await insertRecommendation(project.id, project.user_id, {
+      version_id: headVersion?.id ?? null,
+      kind: 'fix',
+      category: `critique:${kind}:${at}:${i}`,
+      title: point.text.slice(0, 120),
+      summary: point.detail?.slice(0, 600) || point.text,
+      suggested_change: point.text,
+      instruction: `Address this point from ${title}: ${point.text}${point.detail ? ` — ${point.detail}` : ''}`,
+      rationale: {
+        triggering_issue: `${title} raised it about ${stage.label}.`,
+        relevant_stage: stage.label,
+        expected_benefit: point.detail?.slice(0, 200) || 'The draft answers the point.',
+        scope: `${stage.label}'s current version.`,
+      },
+      scope: { kind: 'document', described_as: `${stage.label}'s current version.`, stage_id: stage.id },
+      tags: ['critique', kind],
+      severity: 'minor',
+      source_model: project.model,
+    });
+  }
+}
+
+export function useStageTools({ project, stage, headVersion, fallbackContent = '', appendStageVersion, onRecorded }: Options) {
   const [running, setRunning] = useState<ToolKind | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [commentary, setCommentary] = useState<Commentary | null>(null);
@@ -112,6 +152,12 @@ export function useStageTools({ project, stage, headVersion, fallbackContent = '
         const critique = CRITIQUE_TOOLS.find((t) => t.kind === kind);
         if (critique) {
           setCommentary({ kind: critique.kind, title: critique.title, text: output });
+          // Recorded, not only shown (Sean, 6 Oct: "if a button only launches a
+          // prompt, it is not implementing PromptMaster's core value"): each
+          // point becomes a pending recommendation on this version, accepted or
+          // dismissed like any other, and kept with the project.
+          await recordCritique(project, stage, headVersion, critique.title, critique.kind, output).catch(() => undefined);
+          await onRecorded?.();
           return;
         }
 
@@ -133,7 +179,7 @@ export function useStageTools({ project, stage, headVersion, fallbackContent = '
         setRunning(null);
       }
     },
-    [stage, headVersion, fallbackContent, project, appendStageVersion]
+    [stage, headVersion, fallbackContent, project, appendStageVersion, onRecorded]
   );
 
   return {

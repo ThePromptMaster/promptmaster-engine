@@ -64,4 +64,10 @@ test('a finished cycle with an unmet objective pauses on its blocker; chat answe
   expect(body.context?.go_run?.stop_reason).toContain('Waiting for: the exact formulas');
   expect(body.context?.go_run?.steps.map((s) => s.action)).toContain('declare_objective_complete');
   expect(body.context?.go_run?.objective).toMatch(/^not met/);
+
+  // 7 Oct (L-55): the projects list says so too.
+  await page.goto('/projects');
+  const row = page.getByRole('link', { name: /E2E objective not met/ }).first();
+  await expect(row).toContainText('Paused', { timeout: 15_000 });
+  await page.screenshot({ path: test.info().outputPath('02-paused-on-the-list.png') });
 });
