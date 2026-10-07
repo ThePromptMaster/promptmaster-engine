@@ -40,6 +40,13 @@ interface Props {
   /** PM-23: ask PromptMaster for the best next move (one Guided planner call). */
   onSuggest?: () => void;
   suggesting?: boolean;
+  /**
+   * Work still open beyond this stage's own criteria — other stages, and
+   * findings or proposals left on this one — one line each (`outstandingWork`).
+   * "Ready to move on" is about this stage; this keeps it from reading as
+   * "nothing is outstanding" for the project (6 Oct).
+   */
+  elsewhere?: readonly string[];
 }
 
 /**
@@ -63,6 +70,7 @@ export function StageTransitionBar({
   onPrimary,
   more = [],
   nextStageLabel = null,
+  elsewhere = [],
 }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [whyOpen, setWhyOpen] = useState(false);
@@ -165,9 +173,12 @@ export function StageTransitionBar({
     );
   }
 
+  const elsewhereNote = elsewhere.length
+    ? ` · ${elsewhere.length} still open: ${elsewhere.join('; ')}`
+    : '';
   const statusLine = evaluation.canAdvance
-    ? 'Ready to move on'
-    : `${evaluation.unmet.length} item${evaluation.unmet.length === 1 ? '' : 's'} outstanding`;
+    ? `Ready to move on${elsewhereNote}`
+    : `${evaluation.unmet.length} item${evaluation.unmet.length === 1 ? '' : 's'} outstanding${elsewhereNote}`;
 
   if (primary) {
     const primaryIsTransition = primary.kind === 'continue' || primary.kind === 'finish';
@@ -305,9 +316,7 @@ export function StageTransitionBar({
       className="flex flex-wrap items-center gap-2 rounded-xl bg-[var(--surface-container-low)] px-5 py-4"
     >
       <span className="mr-auto text-label text-[var(--on-surface-variant)]">
-        {evaluation.canAdvance
-          ? 'Ready to move on'
-          : `${evaluation.unmet.length} item${evaluation.unmet.length === 1 ? '' : 's'} outstanding`}
+        {statusLine}
       </span>
 
       {returns.length > 0 && (

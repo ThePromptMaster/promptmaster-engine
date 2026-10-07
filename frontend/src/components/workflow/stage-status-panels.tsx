@@ -4,7 +4,7 @@ import { useState } from 'react';
 
 import type { EvaluationResult } from '@/types';
 
-import type { CompletionSummary } from '@/lib/workflow/engine';
+import { describeOutstanding, type CompletionSummary } from '@/lib/workflow/engine';
 import type { BlockKind } from '@/lib/workflow/types';
 
 const BLOCK_KINDS: { kind: BlockKind; label: string; hint: string }[] = [
@@ -103,11 +103,18 @@ export function CompletionDialog({
   /** The deliverable scored against the objective, when the user asks (PM-14). */
   check?: { running: boolean; result: EvaluationResult | null; error: string | null };
   onCheck?: () => void;
-  onConfirm: () => void;
+  /** With a reason when work was still open; the reason is recorded. */
+  onConfirm: (reason?: string) => void;
   onCancel: () => void;
   /** Go and look at a stage that was left open, to close it before finishing. */
   onViewStage?: (stageId: string) => void;
 }) {
+  const [reason, setReason] = useState('');
+  // Left-open stages have their own line above; everything else still open is
+  // listed here, and finishing past it asks why (6 Oct: the project "allowed
+  // me to finish … despite the unresolved finding").
+  const open = (summary.outstanding ?? []).filter((i) => i.kind !== 'unmet_blocking' || !summary.leftOpenStages.some((s) => s.id === i.stageId));
+  const needsReason = open.length > 0;
   const rows: [string, number][] = [
     ['completed', summary.completed],
     ['skipped on purpose', summary.skipped],
@@ -157,6 +164,39 @@ export function CompletionDialog({
           Finishing now records the project as finished without it. You can reopen it at any time.
         </p>
       )}
+      {needsReason && (
+        <div role="group" aria-label="Still open" className="mt-3 rounded-lg bg-[var(--surface-container-low)] px-4 py-3">
+          <p className="text-label font-semibold text-[var(--on-surface)]">
+            Still open — {open.length === 1 ? 'one thing' : `${open.length} things`}:
+          </p>
+          <ul className="mt-1 list-disc pl-5 text-label text-[var(--on-surface-variant)]">
+            {open.map((item, i) => (
+              <li key={i}>
+                {describeOutstanding(item)}
+                {onViewStage && 'stageId' in item && (
+                  <button
+                    type="button"
+                    onClick={() => onViewStage(item.stageId)}
+                    className="ml-2 rounded px-1.5 py-0.5 font-semibold text-[var(--pm-primary)] hover:bg-[var(--surface-container-high)]"
+                  >
+                    Go to {item.label}
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+          <label className="mt-3 block text-label text-[var(--on-surface)]">
+            Why finish with this open? It is recorded with the project.
+            <textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              rows={2}
+              aria-label="Why finish with work still open"
+              className="mt-1 w-full rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2 text-body text-[var(--on-surface)] outline-none focus:ring-2 focus:ring-[var(--pm-primary)]/40"
+            />
+          </label>
+        </div>
+      )}
       {check && onCheck && summary.deliverableDone && (
         <div className="mt-4 rounded-lg bg-[var(--surface-container-low)] px-4 py-3">
           {check.result ? (
@@ -197,11 +237,11 @@ export function CompletionDialog({
       )}
       <div className="mt-4 flex gap-2">
         <button
-          onClick={onConfirm}
-          disabled={busy}
+          onClick={() => onConfirm(needsReason ? reason.trim() : undefined)}
+          disabled={busy || (needsReason && !reason.trim())}
           className="rounded-lg bg-[var(--pm-primary)] px-5 py-2 text-title text-[var(--on-primary)] disabled:opacity-50"
         >
-          {summary.deliverableDone ? 'Finish project' : 'Override and finish'}
+          {!summary.deliverableDone ? 'Override and finish' : needsReason ? 'Finish anyway' : 'Finish project'}
         </button>
         <button onClick={onCancel} className="rounded-lg px-4 py-2 text-title text-[var(--on-surface-variant)]">
           Not yet

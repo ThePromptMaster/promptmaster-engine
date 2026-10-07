@@ -85,8 +85,14 @@ test('finishing is about the deliverable, and a finished project can be reopened
   await expect(summary).toContainText('The deliverable (Output) is done.');
   await expect(summary).toContainText('skipped on purpose');
   await summary.scrollIntoViewIfNeeded();
+  // 6 Oct: the review's findings are unresolved, so they are listed and
+  // finishing past them asks why ("allowed me to finish … despite the
+  // unresolved finding").
+  await expect(summary.getByRole('group', { name: 'Still open' })).toContainText('Summary: 3 findings not yet accepted or rejected');
+  await expect(summary.getByRole('button', { name: 'Finish anyway' })).toBeDisabled();
+  await summary.getByLabel('Why finish with work still open').fill('The findings are style notes; the decision stands.');
   await page.screenshot({ path: test.info().outputPath('03-completion-summary.png') });
-  await summary.getByRole('button', { name: 'Finish project' }).click();
+  await summary.getByRole('button', { name: 'Finish anyway' }).click();
   await expect(page.getByText('This project is finished')).toBeVisible();
 
   await page.getByRole('button', { name: 'Reopen' }).click();

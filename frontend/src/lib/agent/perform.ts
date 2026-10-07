@@ -31,7 +31,7 @@ import { proposeStatuses } from '@/lib/workflow/propose';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import { summariseStageContent } from '@/lib/workflow/digest';
 import { stageContentForSummary, stageEvidence } from '@/lib/workflow/evidence';
-import { evaluateStage } from '@/lib/workflow/engine';
+import { describeOutstanding, evaluateStage, outstandingWork } from '@/lib/workflow/engine';
 import { figureFindings, figureSources } from '@/lib/workflow/figure-support';
 import { asIteration } from '@/lib/workflow/legacy';
 import {
@@ -924,6 +924,21 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
     }
 
     case 'complete': {
+      // 6 Oct: "Objective met" while Summary still needed a recheck and a
+      // finding was unresolved. Work open on any stage — other than this
+      // stage's own approval, handled below — means the objective is not done.
+      const open = outstandingWork(ctx.template, ctx.state, ctx.context).filter(
+        (i) => !(i.kind === 'unmet_blocking' && i.stageId === ctx.stage.id)
+      );
+      if (ctx.deliverableDone && open.length > 0) {
+        const list = open.map(describeOutstanding).join('; ');
+        const reason = `The deliverable is written, but the work is not finished: ${list}.`;
+        return done(key, {
+          status: 'succeeded', toolsUsed: [], changes: {},
+          output: `${reason} I will not call the objective met while any of it is open.`,
+          stop: { status: 'awaiting_decision', reason },
+        });
+      }
       // PM-25: the model's opinion is not enough — the deliverable has to exist.
       if (ctx.deliverableDone) {
         return done(key, {

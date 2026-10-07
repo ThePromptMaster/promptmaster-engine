@@ -296,7 +296,15 @@ describe('the single-output workflow walks its five stages in the workspace', ()
     // question, not whether every box is ticked.
     const summary = await screen.findByRole('region', { name: 'Finish the project' });
     expect(summary).toHaveTextContent(/The deliverable \(Output\) is done/);
-    await user.click(within(summary).getByRole('button', { name: 'Finish project' }));
+    // 6 Oct: the review's finding is still unresolved, so finishing names it
+    // and asks why — it is not "Finish project" over open work.
+    expect(within(summary).getByRole('group', { name: 'Still open' })).toHaveTextContent(
+      'Summary: 1 finding not yet accepted or rejected'
+    );
+    const finishAnyway = within(summary).getByRole('button', { name: 'Finish anyway' });
+    expect(finishAnyway).toBeDisabled();
+    await user.type(within(summary).getByLabelText('Why finish with work still open'), 'The finding is cosmetic.');
+    await user.click(finishAnyway);
 
     // PM-03: Finish used to record the stage and change nothing else, so the
     // button looked dead. Now the project says it is done, and can be reopened.
