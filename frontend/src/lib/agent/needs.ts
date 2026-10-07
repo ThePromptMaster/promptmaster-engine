@@ -227,6 +227,14 @@ export function requiredWork(input: {
   const { stage, facts, stageEvaluation, allowed, round } = input;
   const can = (k: string) => allowed.includes(k);
 
+  if (can('extract_facts')) {
+    return {
+      key: 'extract_facts',
+      rationale: 'The attached documents state facts that are not on record yet; recording them, each quoted from its file, means every stage and check reads the same evidence.',
+      expected: 'The documents\' facts recorded as accepted facts under your routine-decision policy, each citing its file.',
+    };
+  }
+
   if (can('confirm_proposals')) {
     return {
       key: 'confirm_proposals',

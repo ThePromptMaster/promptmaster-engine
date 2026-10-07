@@ -76,3 +76,28 @@ export async function retireFact(id: string, reason: string): Promise<void> {
     .eq('id', id);
   if (error) throw error;
 }
+
+/**
+ * Facts Go read out of attached documents and records under the routine-
+ * decision policy (L-51). The database accepts them only from a running run
+ * on a project whose routine decisions are Go's, and only citing a file.
+ */
+export async function recordPolicyFacts(
+  project: { id: string; user_id: string },
+  runId: string,
+  facts: readonly { statement: string; subject?: string; kind: ProjectFact['kind']; file: string; quote: string }[]
+): Promise<ProjectFact[]> {
+  if (!facts.length) return [];
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('project_facts')
+    .insert(
+      facts.map((f) => ({
+        project_id: project.id, user_id: project.user_id, statement: f.statement.trim(), subject: f.subject?.trim() || null,
+        kind: f.kind, source_kind: 'file', source_ref: { name: f.file, quote: f.quote }, accepted_by: 'policy', agent_run_id: runId,
+      }))
+    )
+    .select(COLUMNS);
+  if (error) throw error;
+  return (data ?? []) as unknown as ProjectFact[];
+}

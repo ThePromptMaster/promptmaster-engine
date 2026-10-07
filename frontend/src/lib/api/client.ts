@@ -748,6 +748,14 @@ export const api = {
     return apiFetch('/api/agent/assess-objective', { method: 'POST', body: JSON.stringify(req), signal });
   },
 
+  /** The facts attached documents state, each quoted from its source (7 Oct, L-51). Records nothing. */
+  async agentExtractFacts(
+    req: { inputs: PMInput; sources: { id: string; label: string; text: string }[]; model?: string },
+    signal?: AbortSignal
+  ): Promise<{ facts: { statement: string; subject: string; kind: 'fact' | 'requirement'; source_id: string; quote: string }[]; model_used: string }> {
+    return apiFetch('/api/agent/extract-facts', { method: 'POST', body: JSON.stringify(req), signal });
+  },
+
   /** Whether a stage's text satisfies a routine approval, before Go commits it (5 Oct). Commits nothing. */
   async agentCheckCriterion(
     req: { inputs: PMInput; stage_label: string; criterion: string; content: string; model?: string },
