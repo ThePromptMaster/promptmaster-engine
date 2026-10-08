@@ -44,6 +44,9 @@ import { outlineStageFor } from '@/lib/outline/actions';
 import { listRecommendations, recordDecision } from '@/lib/supabase/recommendations';
 import { projectMemory } from '@/lib/agent/memory';
 import { requestProjectCancel } from '@/lib/supabase/jobs';
+import { recordFacts } from '@/lib/supabase/facts';
+import { appendWorkflowEvent } from '@/lib/supabase/workflow';
+import { answerAsFact } from '@/lib/workflow/answers';
 import { authorizeRun } from '@/lib/agent/authorize';
 import { buildAgentState } from '@/lib/agent/digest';
 import { performStep, type PerformContext, type StepOutcome } from '@/lib/agent/perform';
@@ -511,7 +514,7 @@ export function useGoLoop(opts: Options) {
 
         // 6 Oct: a stage a change reopened is repaired before anything else —
         // on whichever stage it is — so Summary is not left recommending A.
-        // Once per stage per run: one that still cannot close is the user's.
+        // At most twice per stage (REPAIR_TRIES): one that still cannot close is the user's.
         const recheckTried = [...priorStepsRef.current, ...stepsRef.current]
           .filter((s) => s.action_key === 'recheck_stage')
           .map((s) => String(s.params?.stage_id ?? ''));
@@ -723,6 +726,29 @@ export function useGoLoop(opts: Options) {
   }, [policy, budget, pendingStepId, commitRun, loop, startRun, continueRun]);
 
   /**
+   * "Update affected work and resume" (D2): repairing every reopened stage
+   * takes several steps. A paused run with only a step or two left in its
+   * window spent them on the first repair and stopped (8 Oct, production), so
+   * a nearly spent window is closed and the next one opened instead.
+   */
+  const update = useCallback(async () => {
+    const live = runRef.current;
+    const left = live ? live.budget_steps - stepsRef.current.length : 0;
+    if (live && !live.ended_at && live.policy === policy && (live.status === 'blocked' || live.status === 'awaiting_decision') && left < 4 && !pendingStepId) {
+      try {
+        await updateAgentRun(live.id, { status: 'budget_exhausted', stop_reason: 'Window closed to update affected work.', needs: null });
+        commitRun({ ...live, status: 'budget_exhausted', needs: null });
+        await continueRun();
+        return;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Could not start updating the affected work.');
+        return;
+      }
+    }
+    await go();
+  }, [policy, pendingStepId, commitRun, continueRun, go]);
+
+  /**
    * PM-23: "next logical action; why it is recommended; ability to apply".
    * One Guided proposal — the planner's best move with its rationale, waiting
    * for one click. Nothing runs until the user says Do it.
@@ -838,6 +864,22 @@ export function useGoLoop(opts: Options) {
           rationale: '', expectedOutcome: '', needsDecision: false, decisionQuestion: null,
         });
         upsertStep(await finishAgentStep(step.id, { status: 'succeeded', label: null, output: text.trim() }));
+        // The answer is a decision of record, not only a line in this run
+        // (Sean, 7 Oct, emails 8 and 11): evaluation, the final review and the
+        // objective check read the project's facts, never the run's steps.
+        const asked = current.needs?.kind === 'answer_question' ? current.needs.question : current.stop_reason ?? '';
+        const fact = answerAsFact(asked, text, { run_id: current.id, step_id: step.id, stage_id: o.stage.id });
+        if (fact) await recordFacts(o.project, [fact]);
+        // A stage stuck on that decision is no longer stuck.
+        const st = o.state.stages[o.stage.id];
+        if (st?.status === 'blocked' && st.blocked?.kind === 'needs_decision') {
+          await appendWorkflowEvent(o.project.id, o.project.user_id, {
+            type: 'stage_unblocked', stage_id: o.stage.id, actor: 'user', reason: `Answered: ${text.trim().slice(0, 300)}`,
+          });
+        }
+        if (fact || st?.status === 'blocked') {
+          await Promise.all([o.onRefresh?.(), o.reloadEvents()]);
+        }
         await go();
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Could not record your answer.');
@@ -1060,7 +1102,7 @@ export function useGoLoop(opts: Options) {
     stageLabelFor,
     autoWindows, setAutoWindows, autoPending,
     policy, setPolicy, budget, setBudget, run, steps, phase, active, pendingStep, pendingStale, authorizing, error,
-    go, suggest, replan, stop, approve, decline, answer, confirmAuthorization,
+    go, update, suggest, replan, stop, approve, decline, answer, confirmAuthorization,
     cancelAuthorization: useCallback(() => setAuthorizing(null), []),
     dismissError: useCallback(() => setError(null), []),
   };

@@ -48,11 +48,25 @@ export function latestObjectiveAssessment(events: readonly WorkflowEvent[]): (Ob
  * a file, or a new version of any stage. Those make it "to be checked again",
  * not "met".
  */
-export function objectiveUnmet(events: readonly WorkflowEvent[]): ObjectiveAssessment | null {
+export function objectiveUnmet(
+  events: readonly WorkflowEvent[],
+  facts: readonly { created_at: string }[] = []
+): ObjectiveAssessment | null {
   const latest = latestObjectiveAssessment(events);
   if (!latest || latest.outcome === 'met') return null;
-  return latest;
+  // Until 8 Oct this returned the latest assessment whatever happened after
+  // it, so a project kept "waiting for" the launch date and the price after
+  // both had been answered (Sean, 7 Oct, email 11).
+  const at = Date.parse(latest.at);
+  if (Number.isNaN(at)) return latest;
+  const after = (iso: string | undefined) => Boolean(iso) && Date.parse(iso!) > at;
+  const changed =
+    events.some((e) => CHANGES_SINCE.has(e.type) && after(e.created_at)) || facts.some((f) => after(f.created_at));
+  return changed ? null : latest;
 }
+
+/** What makes an "objective not met" a thing to check again rather than a standing verdict. */
+const CHANGES_SINCE = new Set<WorkflowEvent['type']>(['brief_changed', 'stage_version_saved', 'stage_unblocked']);
 
 /** The pause, in words: "Paused — waiting for: the formulas; the data." */
 export function pausedLine(a: Pick<ObjectiveAssessment, 'blockers' | 'reason'>): string {

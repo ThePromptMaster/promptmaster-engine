@@ -12,10 +12,19 @@ export function BriefChangeNotice({
   change,
   stageLabel,
   onKeep,
+  onUpdate,
+  updating = false,
 }: {
   change: { event: WorkflowEvent; stageIds: string[] } | null;
   stageLabel: (id: string) => string;
   onKeep: (changeAt: string) => void;
+  /**
+   * "Update affected work and resume" (Sean, 7 Oct, TeamNotes): Go repairs
+   * every reopened stage in order, re-checks each, then carries on. Absent
+   * where Go cannot run.
+   */
+  onUpdate?: () => void;
+  updating?: boolean;
 }) {
   if (!change) return null;
   const { event, stageIds } = change;
@@ -27,15 +36,9 @@ export function BriefChangeNotice({
       <div role="status" aria-label="Brief change" className="mb-6 rounded-xl bg-[var(--surface-container-low)] px-5 py-3 text-body text-[var(--on-surface-variant)]">
         <p>
           <span aria-hidden className="material-symbols-outlined mr-1 align-[-4px] text-[18px] text-[var(--pm-tertiary)]">history</span>
-          {stageLabel(event.stage_id)} was revised{typeof n === 'number' ? ` (now v${n})` : ''}, so {list} {stageIds.length === 1 ? 'was' : 'were'} reopened
-          for a recheck: {stageIds.length === 1 ? 'it was' : 'they were'} built on the earlier version. Earlier versions stay in each stage&apos;s history.
+          {`${stageLabel(event.stage_id)} was revised${typeof n === 'number' ? ` (now v${n})` : ''}, so ${list} ${stageIds.length === 1 ? 'was' : 'were'} reopened for a recheck: ${stageIds.length === 1 ? 'it was' : 'they were'} built on the earlier version. Earlier versions stay in each stage's history.`}
         </p>
-        <button
-          onClick={() => onKeep(event.created_at)}
-          className="mt-2 rounded-lg bg-[var(--surface-container-high)] px-3 py-1.5 text-label text-[var(--on-surface)] hover:opacity-90"
-        >
-          Keep them as they are
-        </button>
+        <Actions onUpdate={onUpdate} updating={updating} onKeep={() => onKeep(event.created_at)} />
       </div>
     );
   }
@@ -61,9 +64,26 @@ export function BriefChangeNotice({
           </li>
         ))}
       </ul>
+      <Actions onUpdate={onUpdate} updating={updating} onKeep={() => onKeep(event.created_at)} />
+    </div>
+  );
+}
+
+function Actions({ onUpdate, updating, onKeep }: { onUpdate?: () => void; updating: boolean; onKeep: () => void }) {
+  return (
+    <div className="mt-2 flex flex-wrap gap-2">
+      {onUpdate && (
+        <button
+          onClick={onUpdate}
+          disabled={updating}
+          className="rounded-lg bg-[var(--pm-primary)] px-3 py-1.5 text-label text-[var(--on-primary)] hover:opacity-90 disabled:opacity-50"
+        >
+          {updating ? 'Updating affected work…' : 'Update affected work and resume'}
+        </button>
+      )}
       <button
-        onClick={() => onKeep(event.created_at)}
-        className="mt-2 rounded-lg bg-[var(--surface-container-high)] px-3 py-1.5 text-label text-[var(--on-surface)] hover:opacity-90"
+        onClick={onKeep}
+        className="rounded-lg bg-[var(--surface-container-high)] px-3 py-1.5 text-label text-[var(--on-surface)] hover:opacity-90"
       >
         Keep them as they are
       </button>
