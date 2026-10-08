@@ -1327,6 +1327,7 @@ const ADMIN_OVERVIEW: AdminOverview = {
     activeUsers: 4,
     failedJobs: 3,
     errors: 27,
+    feedback: 2,
   },
   usageByOperation: [
     { operation: 'go:revise_stage', calls: 212, costUsd: 9.8121, unpricedCalls: 0, p50Ms: 18_400, p95Ms: 51_200, reworkShare: 0.04 },
@@ -1463,6 +1464,28 @@ const ADMIN_OVERVIEW: AdminOverview = {
     { code: 'invalid_request', count: 3 },
     { code: 'insufficient_credits', count: 1 },
   ],
+  feedback: [
+    {
+      id: 'fb-1',
+      userEmail: 'analyst@example.com',
+      projectTitle: 'Tidal Energy Handbook',
+      useCase: 'Drafting the market chapter of a handbook from my own notes.',
+      value: 'The outline stage made me decide the argument before writing anything.',
+      blockage: 'I could not tell whether Go had read my uploaded spreadsheet.',
+      reuseLikelihood: 4,
+      createdAt: new Date(Date.now() - 2 * 3_600_000).toISOString(),
+    },
+    {
+      id: 'fb-2',
+      userEmail: 'auditor@example.com',
+      projectTitle: null,
+      useCase: 'Trying it out on a short memo.',
+      value: '',
+      blockage: '',
+      reuseLikelihood: null,
+      createdAt: new Date(Date.now() - 3 * 86_400_000).toISOString(),
+    },
+  ],
   warnings: [],
 };
 
@@ -1497,6 +1520,7 @@ function AdminEdgeSlice() {
       activeUsers: 0,
       failedJobs: 0,
       errors: 0,
+      feedback: 0,
     },
     usageByUser: [],
     usageByOperation: [],
@@ -1504,6 +1528,7 @@ function AdminEdgeSlice() {
     failedJobs: [],
     recentErrors: [],
     errorTally: [],
+    feedback: [],
     warnings: [],
   };
 
