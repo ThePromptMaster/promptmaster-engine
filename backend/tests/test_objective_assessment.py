@@ -87,3 +87,16 @@ def test_endpoint_returns_the_judgment_and_never_writes():
         assert "Hessian" in stub.generate_json.call_args.kwargs["prompt"]
     finally:
         app.dependency_overrides.pop(get_client, None)
+
+
+def test_a_failed_check_keeps_the_objective_from_being_met(basic_inputs):
+    """C2 (Sean, 6 Oct, sequence test): the final review's findings were
+    carried forward and Go still declared the objective met."""
+    from promptmaster.objective_assessment import build_assessment_prompt, parse_assessment
+
+    checks = ["Final review: carried forward — the induction proofs are missing from the report"]
+    _system, user = build_assessment_prompt(basic_inputs, "Report", "The proofs are complete.", [], "", checks)
+    assert "STILL UNMET" in user and "the induction proofs are missing from the report" in user
+    a = parse_assessment({"outcome": "met", "basis_quote": "The proofs are complete.", "reason": "ok"}, "The proofs are complete.", [], checks)
+    assert a.outcome == "partly"
+    assert a.reason.startswith("Still unmet:")

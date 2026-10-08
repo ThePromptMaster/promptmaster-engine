@@ -16,6 +16,7 @@ import type { RoutineDecisions } from '@/types/project';
 import type { StageFacts } from './facts';
 import type { InputsChange } from '@/lib/workflow/stage-inputs';
 import { confirmableProposals } from '@/lib/workflow/stage-artifact';
+import { rowsRequired } from '@/lib/workflow/engine';
 import { confirmProposalsLabel } from '@/lib/workflow/stage-controls';
 
 type Need =
@@ -382,7 +383,11 @@ export function needsUser(input: {
   // …or rows still waiting for a proposal Go can make first (3 Oct).
   const canPropose = allowed.includes('propose_statuses') || allowed.includes('confirm_proposals');
   const canLookUp = Boolean(input.lookupDue && allowed.includes('check_literature'));
-  if (facts.review && facts.review.material.length > 0 && facts.review.routine.length === 0 && !canRun && !canPropose && !canLookUp) {
+  // A table that says it does not block finishing never stops Go (C3, 8 Oct):
+  // its rows are left as they are, listed as optional. Under "Handle them for
+  // me" a required table's rows are Go's to propose and confirm first.
+  const optionalRows = Boolean(facts.review?.outcome) && !rowsRequired(stage);
+  if (facts.review && !optionalRows && facts.review.material.length > 0 && facts.review.routine.length === 0 && !canRun && !canPropose && !canLookUp) {
     const proposed = confirmableProposals(facts.review.material, facts.review.schema).length;
     return facts.review.outcome
       ? {

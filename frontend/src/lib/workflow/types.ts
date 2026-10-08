@@ -426,6 +426,14 @@ export interface StageContext {
    * blocking check on that stage.
    */
   measured?: Record<string, { id: string; label: string; satisfied: boolean; detail?: string }[]>;
+  /**
+   * Per review stage id: rows carried forward or deferred whose text says an
+   * objective requirement is unmet (`carriedForwardUnmet`, C2). Each is open
+   * work for "Objective met", whatever its row status.
+   */
+  carriedForward?: Record<string, string[]>;
+  /** Per review stage id: undecided or proposed rows that say a requirement is unmet (`openUnmet`). */
+  openUnmet?: Record<string, number>;
 }
 
 export interface CriterionResult {

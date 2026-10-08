@@ -19,7 +19,7 @@ import { approvedOutlineVersionId } from '@/lib/supabase/outline';
 import type { Artifact, ArtifactVersion, Project } from '@/types/project';
 import { draftingStageId } from './derived-outline';
 import type { StageArtifactBundle } from './digest';
-import { confirmableProposals, effectiveRenderer, isTriaged, itemSchemaFor, parseItems, rendererHoldsItems } from './stage-artifact';
+import { carriedForwardUnmet, confirmableProposals, openUnmet, effectiveRenderer, isTriaged, itemSchemaFor, parseItems, rendererHoldsItems } from './stage-artifact';
 import type { StageContext, StageDefinition, WorkflowEvent, WorkflowTemplate } from './types';
 import { deliverableStage } from './engine';
 import { currentFacts } from './facts';
@@ -93,6 +93,8 @@ export function buildStageContext(input: BuildContextInput): StageContext {
   const artifactNonEmpty: Record<string, boolean> = {};
   const sections: StageContext['sections'] = {};
   const findings: StageContext['findings'] = {};
+  const carriedForward: Record<string, string[]> = {};
+  const openUnmetRows: Record<string, number> = {};
 
   for (const s of template.stages) {
     const bundle = bundles[s.id];
@@ -146,6 +148,10 @@ export function buildStageContext(input: BuildContextInput): StageContext {
     // every review stage's count is available at once.
     if (effectiveRenderer(s) === 'review') {
       findings[s.id] = { total: items.length, triaged: items.length - itemsMissingStatus[s.id] };
+      const carried = carriedForwardUnmet(items, schema);
+      if (carried.length) carriedForward[s.id] = carried;
+      const unmet = openUnmet(items, schema);
+      if (unmet) openUnmetRows[s.id] = unmet;
     }
   }
 
@@ -172,6 +178,8 @@ export function buildStageContext(input: BuildContextInput): StageContext {
 
   return {
     measured,
+    carriedForward,
+    openUnmet: openUnmetRows,
     fields: {
       objective: project.objective,
       audience: project.audience,
