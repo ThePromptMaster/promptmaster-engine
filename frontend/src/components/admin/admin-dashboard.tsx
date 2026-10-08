@@ -89,6 +89,7 @@ export function AdminDashboard({ overview, onWindowChange, refreshing, onRefresh
         />
       </section>
 
+      <FeedbackPanel overview={overview} />
       <FailedJobsPanel overview={overview} />
       <UsagePanel overview={overview} />
       <OperationsPanel overview={overview} />
@@ -305,6 +306,82 @@ function Td({
 }
 
 // ---------------------------------------------------------------------------
+
+/**
+ * FR-22: what beta testers said, in the four questions' own words.
+ *
+ * Every submission, not the reporting window's: in a beta each one is read,
+ * and the window control above would otherwise hide last month's.
+ */
+export function FeedbackPanel({ overview }: { overview: AdminOverview }) {
+  const { feedback } = overview;
+  const total = overview.totals.feedback;
+  const shown =
+    total > feedback.length
+      ? ` The newest ${feedback.length.toLocaleString()} are listed.`
+      : '';
+
+  return (
+    <Panel
+      title="Beta feedback"
+      description={`What people said through "Tell us how it went" — ${total.toLocaleString()} ${
+        total === 1 ? 'submission' : 'submissions'
+      } in all, newest first, regardless of the period above.${shown}`}
+    >
+      {feedback.length === 0 ? (
+        <EmptyState icon="forum">No feedback yet.</EmptyState>
+      ) : (
+        <TableScroll>
+          <table className="w-full min-w-[60rem] border-collapse">
+            <thead>
+              <tr className="bg-[var(--surface-container)]">
+                <Th>What they were doing</Th>
+                <Th>What was valuable</Th>
+                <Th>Where they got stuck</Th>
+                <Th align="right">Use again</Th>
+                <Th>Who</Th>
+                <Th align="right">When</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {feedback.map((row) => (
+                <tr key={row.id} className="align-top odd:bg-[var(--surface-container-lowest)]">
+                  <Td>
+                    <span className="block max-w-[36ch] whitespace-pre-wrap">{row.useCase}</span>
+                  </Td>
+                  <Td muted={!row.value}>
+                    <span className="block max-w-[36ch] whitespace-pre-wrap">
+                      {row.value || '—'}
+                    </span>
+                  </Td>
+                  <Td muted={!row.blockage}>
+                    <span className="block max-w-[36ch] whitespace-pre-wrap">
+                      {row.blockage || '—'}
+                    </span>
+                  </Td>
+                  <Td align="right">
+                    {row.reuseLikelihood === null ? '—' : `${row.reuseLikelihood}/5`}
+                  </Td>
+                  <Td muted>
+                    <span className="block">{row.userEmail ?? 'Unknown account'}</span>
+                    {row.projectTitle && (
+                      <span className="mt-0.5 block text-label">{row.projectTitle}</span>
+                    )}
+                  </Td>
+                  <Td align="right" muted>
+                    <span title={new Date(row.createdAt).toLocaleString()}>
+                      {relativeTime(row.createdAt)}
+                    </span>
+                  </Td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TableScroll>
+      )}
+    </Panel>
+  );
+}
 
 function FailedJobsPanel({ overview }: { overview: AdminOverview }) {
   return (

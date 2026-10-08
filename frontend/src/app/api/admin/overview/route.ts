@@ -33,6 +33,7 @@ import type {
   AdminErrorRow,
   AdminErrorTally,
   AdminFailedJob,
+  AdminFeedbackRow,
   AdminOverview,
   AdminUsageRow,
 } from '@/lib/admin/types';
@@ -53,6 +54,8 @@ const LIST_LIMIT = 50;
  * fraction of the spend as if it were all of it.
  */
 const ROLLUP_LIMIT = 10_000;
+/** Feedback rows shown. The count above the list is exact regardless. */
+const FEEDBACK_LIMIT = 200;
 
 export async function GET(request: NextRequest) {
   // Authorise BEFORE touching the service-role key. See the module docstring.
@@ -73,10 +76,11 @@ export async function GET(request: NextRequest) {
   const since = new Date(Date.now() - windowDays * 86_400_000).toISOString();
   const warnings: string[] = [];
 
-  const [usageRows, jobRows, errorRows] = await Promise.all([
+  const [usageRows, jobRows, errorRows, feedback] = await Promise.all([
     fetchUsage(supabase, since, warnings),
     fetchFailedJobs(supabase, warnings),
     fetchErrors(supabase, since, warnings),
+    fetchFeedback(supabase, warnings),
   ]);
 
   // Resolve every id we are about to show, in two queries rather than N.
@@ -84,11 +88,13 @@ export async function GET(request: NextRequest) {
     ...usageRows.map((r) => r.user_id),
     ...jobRows.map((r) => r.user_id),
     ...errorRows.map((r) => r.user_id),
+    ...feedback.rows.map((r) => r.user_id),
   ]);
   const projectIds = unique([
     ...usageRows.map((r) => r.project_id),
     ...jobRows.map((r) => r.project_id),
     ...errorRows.map((r) => r.project_id),
+    ...feedback.rows.map((r) => r.project_id),
   ]);
 
   const [emails, projectTitles] = await Promise.all([
@@ -111,6 +117,7 @@ export async function GET(request: NextRequest) {
       activeUsers: usageByUser.length,
       failedJobs: jobRows.length,
       errors: errorRows.length,
+      feedback: feedback.total,
     },
     usageByUser,
     usageByOperation: rollUpOperations(usageRows).slice(0, LIST_LIMIT),
@@ -142,6 +149,16 @@ export async function GET(request: NextRequest) {
       createdAt: row.created_at,
     })) satisfies AdminErrorRow[],
     errorTally,
+    feedback: feedback.rows.map((row) => ({
+      id: row.id,
+      userEmail: emails.get(row.user_id) ?? null,
+      projectTitle: row.project_id ? (projectTitles.get(row.project_id) ?? null) : null,
+      useCase: row.use_case,
+      value: row.value ?? '',
+      blockage: row.blockage ?? '',
+      reuseLikelihood: row.reuse_likelihood,
+      createdAt: row.created_at,
+    })) satisfies AdminFeedbackRow[],
     warnings,
   };
 
@@ -245,6 +262,41 @@ async function fetchErrors(supabase: Client, since: string, warnings: string[]) 
     return [];
   }
   return (data ?? []) as ErrorRow[];
+}
+
+interface FeedbackRow {
+  id: string;
+  user_id: string;
+  project_id: string | null;
+  use_case: string;
+  value: string | null;
+  blockage: string | null;
+  reuse_likelihood: number | null;
+  created_at: string;
+}
+
+async function fetchFeedback(
+  supabase: Client,
+  warnings: string[]
+): Promise<{ rows: FeedbackRow[]; total: number }> {
+  // Not windowed, for the same reason as failed jobs: in a beta every response
+  // is read, and one that aged past the reporting window would otherwise
+  // vanish from the only place the product owner can see it.
+  const { data, error, count } = await supabase
+    .from('beta_feedback')
+    .select(
+      'id, user_id, project_id, use_case, value, blockage, reuse_likelihood, created_at',
+      { count: 'exact' }
+    )
+    .order('created_at', { ascending: false })
+    .limit(FEEDBACK_LIMIT);
+
+  if (error) {
+    warnings.push(`Feedback could not be read: ${error.message}`);
+    return { rows: [], total: 0 };
+  }
+  const rows = (data ?? []) as FeedbackRow[];
+  return { rows, total: count ?? rows.length };
 }
 
 // ---------------------------------------------------------------------------
