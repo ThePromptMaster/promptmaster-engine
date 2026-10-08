@@ -96,7 +96,7 @@ export function useBriefChange({
             if (removed.length) {
               const affected = stagesUsingFacts(
                 removed,
-                stages.map((st) => ({ stage_id: st.stage_id, label: st.label, text: b[st.stage_id]?.versions.at(-1)?.content ?? '' }))
+                finishedConclusions(t, s, b, since, true).map((st) => ({ stage_id: st.stage_id, label: st.label, text: b[st.stage_id]?.versions.at(-1)?.content ?? '' }))
               );
               await append({
                 type: 'brief_changed', stage_id: at,

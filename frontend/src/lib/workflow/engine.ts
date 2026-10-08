@@ -464,7 +464,8 @@ export function projectState(
         for (const a of affected) {
           const id = typeof a.stage_id === 'string' ? a.stage_id : '';
           const was = state.stages[id]?.status;
-          if (!id || !isDone(was)) continue;
+          // A draft in progress that used the old value is reopened too (8 Oct).
+          if (!id || !(isDone(was) || was === 'in_progress')) continue;
           set(id, { status: 'stale', stale: { reason: typeof a.reason === 'string' ? a.reason : '', since: event.created_at, was: was! } });
         }
         break;
@@ -480,9 +481,15 @@ export function projectState(
         const label = template.stages[cutoff]?.label ?? event.stage_id;
         const n = event.payload?.version_number;
         const reason = `${label} was changed${typeof n === 'number' ? ` (now v${n})` : ''} after this stage used it.`;
+        // Named on the event when it was saved: done stages after it, and
+        // drafts in progress after it (8 Oct). Older events: done stages.
+        const named = Array.isArray(event.payload?.affected) ? (event.payload.affected as unknown[]).filter((x): x is string => typeof x === 'string') : null;
         order.forEach((id, i) => {
           const was = state.stages[id]?.status;
-          if (i > cutoff && isDone(was)) set(id, { status: 'stale', stale: { reason, since: event.created_at, was: was! } });
+          if (i <= cutoff) return;
+          if (named ? named.includes(id) && (isDone(was) || was === 'in_progress') : isDone(was)) {
+            set(id, { status: 'stale', stale: { reason, since: event.created_at, was: was! } });
+          }
         });
         break;
       }
@@ -807,8 +814,20 @@ export function outstandingElsewhere(items: readonly OutstandingItem[], stageId:
  * version. A save on `stageId` reopens them (`stage_version_saved`); when
  * there are none the event is not worth writing.
  */
-export function laterDoneStages(template: WorkflowTemplate, state: WorkflowState, stageId: string): string[] {
+export function laterDoneStages(
+  template: WorkflowTemplate,
+  state: WorkflowState,
+  stageId: string,
+  /** Stages holding a saved draft: one in progress after this stage was built on it too. */
+  drafted: ReadonlySet<string> = new Set()
+): string[] {
   const index = template.stages.findIndex((s) => s.id === stageId);
   if (index < 0) return [];
-  return template.stages.slice(index + 1).filter((s) => isDone(state.stages[s.id]?.status)).map((s) => s.id);
+  return template.stages
+    .slice(index + 1)
+    .filter((s) => {
+      const status = state.stages[s.id]?.status;
+      return isDone(status) || (status === 'in_progress' && drafted.has(s.id));
+    })
+    .map((s) => s.id);
 }

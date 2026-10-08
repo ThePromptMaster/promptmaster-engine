@@ -665,14 +665,15 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     // caller that would then report the save as failed.
     const { template, events } = get();
     if (template && events) {
-      const later = laterDoneStages(template, projectState(template, events), stageId);
+      const drafted = new Set(Object.entries(get().stages).filter(([, b]) => b.versions.at(-1)?.content?.trim()).map(([id]) => id));
+      const later = laterDoneStages(template, projectState(template, events), stageId, drafted);
       if (later.length) {
         await get()
           .appendEvent({
             type: 'stage_version_saved',
             stage_id: stageId,
             actor: version.source_operation.startsWith('agent_') ? 'system' : 'user',
-            payload: { version_id: created.id, version_number: created.version_number, prior_version_id: head?.id ?? null },
+            payload: { version_id: created.id, version_number: created.version_number, prior_version_id: head?.id ?? null, affected: later },
           })
           .catch((err) => console.error('[H1b] could not record the save for recheck', err));
       }

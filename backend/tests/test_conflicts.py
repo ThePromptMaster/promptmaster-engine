@@ -134,3 +134,12 @@ def test_a_quoted_constraint_must_be_the_users_own_words():
     ]}
     kept = parse_conflicts(raw, DECISIONS, OTHERS, user_text="Explain the damped oscillator. Keep it under 300 words.")
     assert [c.with_text for c in kept] == ["Keep it under 300 words"]
+def test_the_check_sees_accepted_facts_as_the_users_decisions():
+    """8 Oct production pass (TaskBoard): an answer recorded as a fact was
+    unknown to the check, which said "no such decision exists"."""
+    from promptmaster.schemas import AcceptedFact
+
+    inputs = INPUTS.model_copy(update={"facts": [AcceptedFact(statement="Decided by the user: launch December 10, price $18.")]})
+    _system, user = build_conflict_prompt(inputs, "Draft it with December 10 and $18", DECISIONS, OTHERS)
+    assert "ACCEPTED PROJECT FACTS" in user
+    assert "- Decided by the user: launch December 10, price $18." in user

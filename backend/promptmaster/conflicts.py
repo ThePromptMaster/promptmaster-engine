@@ -98,6 +98,18 @@ def build_conflict_prompt(
         "",
         "DECISIONS THE USER ALREADY MADE:",
         listed(decisions),
+        # 8 Oct (production, TaskBoard): the user answered Go's "which date and
+        # price?" and the answer was recorded as an accepted fact; the check,
+        # shown no facts, said "no such decision exists" and asked again.
+        *(
+            [
+                "ACCEPTED PROJECT FACTS (each is a decision the user made or accepted; an "
+                "instruction that applies one of them carries out the user's decision and does "
+                "not conflict with an objective that asked for that decision to be made first):",
+                *[f"- {' '.join(f.statement.split())}" for f in inputs.facts if f.statement.strip()],
+            ]
+            if inputs.facts else []
+        ),
         "",
         "OTHER PENDING INSTRUCTIONS:",
         listed(others),

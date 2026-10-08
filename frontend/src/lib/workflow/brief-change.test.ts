@@ -84,3 +84,29 @@ describe('a saved revision of an earlier stage (H1b; Sean, 7 Oct, workshop)', ()
     expect(laterDoneStages(BOOK_V1, state, 'positioning')).toEqual([]);
   });
 });
+
+describe('the notice survives a later change that reopened nothing new (8 Oct, production)', () => {
+  it('shows the earlier change whose stages still wait', () => {
+    const first = ev('brief_changed', 'positioning', '2026-10-08T10:00:00Z', { payload: { affected: [{ stage_id: 'audience', reason: 'price changed' }] } });
+    const second = ev('brief_changed', 'positioning', '2026-10-08T10:01:00Z', { payload: { affected: [{ stage_id: 'audience', reason: 'again' }] } });
+    const state = projectState(BOOK_V1, [...done, first]);
+    // `second` names a stage that is already stale: nothing new reopened.
+    expect(openBriefChange([...done, first, second], state)?.event).toBe(first);
+  });
+});
+
+describe('a draft in progress is rechecked too (8 Oct, production)', () => {
+  it('a save names the later draft in progress, and it is reopened', () => {
+    const state0 = projectState(BOOK_V1, done);
+    expect(laterDoneStages(BOOK_V1, state0, 'objective', new Set(['positioning']))).toEqual(['audience', 'positioning']);
+    const saved = ev('stage_version_saved', 'objective', '2026-10-08T12:00:00Z', { payload: { version_number: 2, affected: ['audience', 'positioning'] } });
+    const state = projectState(BOOK_V1, [...done, saved]);
+    expect(state.stages.positioning).toMatchObject({ status: 'stale', stale: { was: 'in_progress' } });
+    expect(state.stages.audience.status).toBe('stale');
+  });
+
+  it('a fact change reopens a named draft in progress', () => {
+    const changed = ev('brief_changed', 'positioning', '2026-10-08T12:00:00Z', { payload: { affected: [{ stage_id: 'positioning', reason: 'It states $18' }] } });
+    expect(projectState(BOOK_V1, [...done, changed]).stages.positioning.status).toBe('stale');
+  });
+});

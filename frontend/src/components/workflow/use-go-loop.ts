@@ -732,6 +732,29 @@ export function useGoLoop(opts: Options) {
   }, [policy, budget, pendingStepId, commitRun, loop, startRun, continueRun]);
 
   /**
+   * "Update affected work and resume" (D2): repairing every reopened stage
+   * takes several steps. A paused run with only a step or two left in its
+   * window spent them on the first repair and stopped (8 Oct, production), so
+   * a nearly spent window is closed and the next one opened instead.
+   */
+  const update = useCallback(async () => {
+    const live = runRef.current;
+    const left = live ? live.budget_steps - stepsRef.current.length : 0;
+    if (live && !live.ended_at && live.policy === policy && (live.status === 'blocked' || live.status === 'awaiting_decision') && left < 4 && !pendingStepId) {
+      try {
+        await updateAgentRun(live.id, { status: 'budget_exhausted', stop_reason: 'Window closed to update affected work.', needs: null });
+        commitRun({ ...live, status: 'budget_exhausted', needs: null });
+        await continueRun();
+        return;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Could not start updating the affected work.');
+        return;
+      }
+    }
+    await go();
+  }, [policy, pendingStepId, commitRun, continueRun, go]);
+
+  /**
    * PM-23: "next logical action; why it is recommended; ability to apply".
    * One Guided proposal — the planner's best move with its rationale, waiting
    * for one click. Nothing runs until the user says Do it.
@@ -1085,7 +1108,7 @@ export function useGoLoop(opts: Options) {
     stageLabelFor,
     autoWindows, setAutoWindows, autoPending,
     policy, setPolicy, budget, setBudget, run, steps, phase, active, pendingStep, pendingStale, authorizing, error,
-    go, suggest, replan, stop, approve, decline, answer, confirmAuthorization,
+    go, update, suggest, replan, stop, approve, decline, answer, confirmAuthorization,
     cancelAuthorization: useCallback(() => setAuthorizing(null), []),
     dismissError: useCallback(() => setError(null), []),
   };
