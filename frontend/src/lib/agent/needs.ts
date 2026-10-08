@@ -128,20 +128,31 @@ export interface RequiredMove {
  * outline is the user's editor. `tried`: stages this run already rechecked,
  * so one that still cannot be closed is not repaired again in a loop.
  *
- * Only up to the stage the project is on: a stage after it will be worked
- * again in order when the project gets there — going back a round marks the
- * whole round stale, and repairing its Analysis before its Investigate was
- * redone did the round backwards (7 Oct, E2E).
+ * In a workflow that loops, only up to the stage the project is on: going
+ * back a round marks the whole round stale, and repairing its Analysis before
+ * its Investigate was redone did the round backwards (7 Oct, E2E). Otherwise
+ * every stale stage, through to the final bundle: a fact changed at
+ * Consistency left the finished announcement saying the old date (8 Oct,
+ * TeamNotes). A stage whose repair failed is tried once more, no more.
  */
+export const REPAIR_TRIES = 2;
+
 export function staleRepair(
   template: WorkflowTemplate,
   state: WorkflowState,
   tried: readonly string[] = []
 ): RequiredMove | null {
+  const loops = template.stages.some((s) => s.transitions.loop_to);
   const here = template.stages.findIndex((s) => s.id === state.current_stage_id);
-  for (const stage of here >= 0 ? template.stages.slice(0, here + 1) : template.stages) {
+  // Past the current stage only when the work up to it is settled — not while
+  // the user has gone back to redo it — and only what a change reopened (a
+  // stage reopened by going back carries no `stale` record).
+  const reworking = ['in_progress', 'not_started'].includes(state.stages[state.current_stage_id]?.status ?? 'not_started');
+  const ahead = !loops && !reworking;
+  for (const [index, stage] of template.stages.entries()) {
     const st = state.stages[stage.id];
-    if (st?.status !== 'stale' || tried.includes(stage.id)) continue;
+    if (here >= 0 && index > here && !(ahead && st?.stale)) continue;
+    if (st?.status !== 'stale' || tried.filter((id) => id === stage.id).length >= REPAIR_TRIES) continue;
     if (!['prose', 'list', 'review'].includes(stage.renderer)) continue;
     return {
       key: 'recheck_stage',

@@ -385,7 +385,7 @@ export function WorkflowWorkspace({
   // outstanding" beside a stage that needs a recheck (6 Oct).
   // The latest judgment of the objective (7 Oct): "not met" is outstanding
   // work, and the banner says what it waits for.
-  const objectiveAssessment = useMemo(() => objectiveUnmet(events ?? []), [events]);
+  const objectiveAssessment = useMemo(() => objectiveUnmet(events ?? [], project.facts ?? []), [events, project.facts]);
   const outstanding = useMemo(
     () =>
       outstandingWork(template, state, context, {
@@ -1725,6 +1725,8 @@ export function WorkflowWorkspace({
               change={briefChange}
               stageLabel={(id) => template.stages.find((s) => s.id === id)?.label ?? id}
               onKeep={(changeAt) => void appendEvent({ type: 'brief_change_dismissed', stage_id: stageId, payload: { change_at: changeAt } })}
+              onUpdate={appendStageVersion && project.status !== 'finalized' ? () => void go.update() : undefined}
+              updating={go.active}
             />
             <FiguresOnRecord template={template} state={state} bundles={stageBundles} />
             {/* On every stage: the accepted facts are the project's record (F3, 7 Oct). */}

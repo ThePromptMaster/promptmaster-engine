@@ -33,7 +33,8 @@ import { summariseStageContent } from '@/lib/workflow/digest';
 import { stageContentForSummary, stageEvidence } from '@/lib/workflow/evidence';
 import { deliverableStage, describeOutstanding, evaluateStage, outstandingWork } from '@/lib/workflow/engine';
 import { pausedLine } from '@/lib/workflow/objective';
-import { attachedDocuments, currentFacts } from '@/lib/workflow/facts';
+import { attachedDocuments, currentFacts, supersededFactValues } from '@/lib/workflow/facts';
+import { describeValue, leftoverValues, type SupersededValue } from '@/lib/workflow/fact-values';
 import { recordPolicyFacts } from '@/lib/supabase/facts';
 import { figureFindings, figureSources } from '@/lib/workflow/figure-support';
 import { asIteration } from '@/lib/workflow/legacy';
@@ -739,15 +740,30 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       const headVersion = ctx.bundles[target.id]?.versions.at(-1);
       const head = headVersion?.content ?? '';
       const why = st.stale?.reason ?? 'something it relied on changed';
-      const instruction = recheckInstruction(target.label, why);
-      const res = await api.generateStageArtifact(
-        generationRequest(ctx.project, ctx.template, ctx.state, ctx.bundles, target, head, instruction),
-        ctx.signal
-      );
-      const generated = generationContent(target, res);
+      const superseded = supersededFactValues(ctx.project.facts);
+      const instruction = recheckInstruction(target.label, why, superseded);
       const before = rendererHoldsItems(target.renderer) ? parseItems(head) : null;
-      const after = before ? parseItems(generated) : null;
-      const content = before && after ? serializeItems(carryUserFields(before, after, itemSchemaFor(target))) : generated;
+      const attempt = async (text: string) => {
+        const res = await api.generateStageArtifact(
+          generationRequest(ctx.project, ctx.template, ctx.state, ctx.bundles, target, head, text),
+          ctx.signal
+        );
+        const generated = generationContent(target, res);
+        const after = before ? parseItems(generated) : null;
+        const content = before && after ? serializeItems(carryUserFields(before, after, itemSchemaFor(target))) : generated;
+        return { res, content };
+      };
+      let { res, content } = await attempt(instruction);
+      // A repair that still states a value the user changed is not a repair
+      // (Sean, 7 Oct: "the final announcement still displayed November 12 and
+      // $12"). Checked in code; one more try names what was left behind.
+      let leftover = content ? leftoverValues(content, superseded) : [];
+      if (content && leftover.length) {
+        ({ res, content } = await attempt(
+          `${instruction} YOUR PREVIOUS ATTEMPT STILL STATED: ${leftover.map(describeValue).join(', ')}. Replace each with the current fact's value.`
+        ));
+        leftover = content ? leftoverValues(content, superseded) : [];
+      }
       if (!content) {
         return done(key, { status: 'failed', output: 'The model returned nothing usable.', toolsUsed: ['model'], changes: {} });
       }
@@ -766,6 +782,14 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // stays the user's, and the stage stays reopened until they give it.
       const evaluation = evaluateStage(ctx.template, target.id, ctx.context);
       const actor = stageMoveActor(ctx.run.policy, ctx.approvedByUser);
+      if (leftover.length) {
+        const named = leftover.map((v) => `${describeValue(v)} (now: "${v.now}")`).join('; ');
+        return done(key, {
+          status: 'failed', toolsUsed: ['model'],
+          changes: typeof versionId === 'string' ? { version_ids: [versionId] } : {},
+          output: `Couldn't finish repairing ${target.label}: the new version still states ${named}. It is saved, so you can see it, and the stage stays reopened; edit those values or ask Go to try again.`,
+        });
+      }
       if (evaluation.canAdvance && typeof versionId === 'string') {
         if (ctx.setStageSummary) {
           const summary = summariseStageContent(target, content);
@@ -1185,13 +1209,22 @@ function deliverableText(ctx: Pick<PerformContext, 'bundles' | 'template'>, stag
  * and calculations remain intact. Superseded recommendations are repaired
  * consistently"). The current facts and brief reach the model with the request.
  */
-export function recheckInstruction(stageLabel: string, why: string): string {
+export function recheckInstruction(stageLabel: string, why: string, superseded: readonly SupersededValue[] = []): string {
+  // The values the user's fact changes made untrue, each with what replaces
+  // it. Until 8 Oct the brief named the old sentence but not the new value,
+  // and "keep every figure that still holds" kept November 12 (TeamNotes).
+  const changes = [...new Map(superseded.map((v) => [`${v.kind}:${v.value}`, v])).values()];
+  const replace = changes.length
+    ? ' CHANGED FACTS — these values are no longer true; replace every occurrence, in every form it is written, with the current fact: ' +
+      changes.map((v) => `${describeValue(v)} (was: "${v.was}"; now: "${v.now}")`).join('; ') + '.'
+    : '';
   return (
     `RECHECK AFTER A CHANGE. ${stageLabel} was reopened because: ${why}. ` +
     'Bring it into line with the project as it now stands — the brief, the accepted facts and requirements, and the earlier stages. ' +
     'Keep every figure, calculation and finding that still holds, exactly as written. ' +
     'Replace any conclusion or recommendation the change superseded, and re-test each option against the requirements as they are now: one that no longer qualifies is said to be excluded, and why. ' +
-    'Begin with one line, "What changed:", saying what was kept and what was replaced.'
+    'Begin with one line, "What changed:", saying what was kept and what was replaced.' +
+    replace
   );
 }
 

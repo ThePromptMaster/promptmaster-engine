@@ -31,4 +31,10 @@ describe('which finished work used a fact (L-52)', () => {
   it('reads the statements back out of the facts text', () => {
     expect(statementsOf('- A has 7 years\n- Requirement: Keep one researcher free')).toEqual(['A has 7 years', 'Keep one researcher free']);
   });
+
+  it('finds a date or a price however the stage wrote it, without the year (8 Oct, TeamNotes)', () => {
+    expect(sentenceUsingFact('TeamNotes launches on Nov. 12th for every team.', 'Launch date: November 12, 2026')).toBe('TeamNotes launches on Nov. 12th for every team.');
+    expect(sentenceUsingFact('It costs $12.00 per seat each month.', 'Price: $12 per user per month')).toBe('It costs $12.00 per seat each month.');
+    expect(sentenceUsingFact('It launches on November 19.', 'Launch date: November 12, 2026')).toBeNull();
+  });
 });

@@ -22,7 +22,7 @@ describe('accepted facts (F1–F3, 7 Oct)', () => {
 
   it('a request carries each current fact with its source in words', () => {
     expect(factsForRequest([a, a2, req])).toEqual([
-      { statement: 'Candidate A has managed 100+ employees for 7 years', subject: '', kind: 'fact', source: 'edited, 6 Oct' },
+      { statement: 'Candidate A has managed 100+ employees for 7 years', subject: '', kind: 'fact', source: 'edited, 6 Oct', replaces: 'Candidate A: 6 years' },
       { statement: 'Keep one researcher free for client work', subject: '', kind: 'requirement', source: 'added to the brief, 6 Oct' },
     ]);
     expect(factSource(fact({ source_kind: 'file', source_ref: { name: 'candidates.pdf' } }))).toBe('from candidates.pdf, 6 Oct');
