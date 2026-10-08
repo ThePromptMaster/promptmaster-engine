@@ -63,11 +63,20 @@ export function finishedConclusions(
   template: WorkflowTemplate,
   state: WorkflowState,
   bundles: Record<string, StageArtifactBundle>,
-  changedAt?: string
+  changedAt?: string,
+  /**
+   * Include drafts in progress. A draft in progress was written against the
+   * old value too (8 Oct, production: Summary, not yet finished, kept "Use
+   * $18" after the price became $15, and Go confirmed the row). Used where the
+   * match is made in code — a changed fact's value found in the text — not for
+   * the model's judgment of which finished work relied on a change.
+   */
+  drafts = false
 ): StageConclusion[] {
   return template.stages
     .filter((s: StageDefinition) => {
       const st = state.stages[s.id];
+      if (drafts && st?.status === 'in_progress' && bundles[s.id]?.versions.at(-1)?.content?.trim()) return true;
       return isDone(st?.status) && (!changedAt || !st?.completed_at || st.completed_at <= changedAt);
     })
     .map((s) => {
@@ -105,7 +114,11 @@ export function openBriefChange(
     const stageIds = affected
       .map((a) => a.stage_id ?? '')
       .filter((id) => state.stages[id]?.status === 'stale' && state.stages[id]?.stale?.since === e.created_at);
-    return stageIds.length ? { event: e, stageIds } : null;
+    // A later change that reopened nothing new (its stages were already
+    // waiting) must not hide the earlier one that did: on production a fact
+    // changed then another taken out left no notice, and no "Update affected
+    // work and resume" (8 Oct).
+    if (stageIds.length) return { event: e, stageIds };
   }
   return null;
 }

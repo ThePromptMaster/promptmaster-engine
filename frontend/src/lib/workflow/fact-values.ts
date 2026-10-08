@@ -75,8 +75,11 @@ export interface SupersededValue {
  * date that did not move) is not superseded.
  */
 export function supersededValues(oldStatement: string, newStatement: string): SupersededValue[] {
-  const was = factValues(oldStatement);
-  const now = factValues(newStatement);
+  // A recorded answer carries the question it answered ("December 3 or
+  // December 10?"): only what was answered is the user's value (8 Oct,
+  // production: December 3 and $24 were treated as values to remove).
+  const was = factValues(answered(oldStatement));
+  const now = factValues(answered(newStatement));
   const out: SupersededValue[] = [];
   for (const kind of ['dates', 'money', 'numbers'] as const) {
     for (const value of was[kind]) {
@@ -86,6 +89,20 @@ export function supersededValues(oldStatement: string, newStatement: string): Su
   return out;
 }
 
+/** The part of a recorded answer that is the answer. */
+function answered(statement: string): string {
+  const at = statement.lastIndexOf('answered:');
+  return at >= 0 ? statement.slice(at + 'answered:'.length) : statement;
+}
+
+/**
+ * Words that attribute a value to a source or set it aside: "Source A says
+ * $18", "do not use $24", "previously November 12". Such a sentence reports
+ * the value; it does not state it as current (8 Oct, production: a reviewed
+ * prompt restating the two sources could never pass the leftover check).
+ */
+const ATTRIBUTED = /\b(sources?|exclud\w*|conflict\w*|supersed\w*|instead of|replac\w*|previous\w*|earlier|formerly|alternative\w*|no longer|rather than|do not use|don't use|not use|was (?:originally|initially))\b/i;
+
 /**
  * The superseded values `text` still states as current. A sentence that names
  * the old value beside the new one ("moved from November 12 to November 19")
@@ -94,6 +111,22 @@ export function supersededValues(oldStatement: string, newStatement: string): Su
  */
 export function leftoverValues(text: string, superseded: readonly SupersededValue[]): SupersededValue[] {
   if (!superseded.length) return [];
+  // A list under a line that sets values aside ("The following alternatives
+  // are excluded:") is that line's: each item reports a value, it does not
+  // state it (8 Oct, production: "- $18 per user per month price").
+  const lines = text.replace(/\\n/g, '\n').split('\n');
+  let underAttribution = false;
+  const kept = lines.filter((line) => {
+    const t = line.trim();
+    if (/:\s*$/.test(t)) {
+      underAttribution = ATTRIBUTED.test(t);
+      return !underAttribution;
+    }
+    if (underAttribution && (/^([-*+]|\d+[.)])\s/.test(t) || (t && t.length < 80 && !/[.!?]$/.test(t)))) return false;
+    if (t) underAttribution = false;
+    return true;
+  });
+  text = kept.join('\n');
   const pieces = text
     .replace(/\\n/g, '\n')
     .split(/(?<=[.!?;])\s+|\s*\n\s*|",\s*"/)
@@ -102,7 +135,7 @@ export function leftoverValues(text: string, superseded: readonly SupersededValu
   return superseded.filter((s) => {
     const now = factValues(s.now)[s.kind].filter((v) => v !== s.value);
     return pieces.some((p) => {
-      if (/^\W*what changed\b/i.test(p)) return false;
+      if (/^\W*what changed\b/i.test(p) || ATTRIBUTED.test(p)) return false;
       const found = factValues(p)[s.kind];
       return found.includes(s.value) && !now.some((v) => found.includes(v));
     });

@@ -122,3 +122,14 @@ def test_an_instruction_that_only_asks_for_the_stages_own_form_is_no_conflict():
     assert len(without_stage) == 3
     from promptmaster.conflicts import _STAGE_RULE
     assert '"within_stage_work": true' in _STAGE_RULE
+
+
+def test_the_check_sees_accepted_facts_as_the_users_decisions():
+    """8 Oct production pass (TaskBoard): an answer recorded as a fact was
+    unknown to the check, which said "no such decision exists"."""
+    from promptmaster.schemas import AcceptedFact
+
+    inputs = INPUTS.model_copy(update={"facts": [AcceptedFact(statement="Decided by the user: launch December 10, price $18.")]})
+    _system, user = build_conflict_prompt(inputs, "Draft it with December 10 and $18", DECISIONS, OTHERS)
+    assert "ACCEPTED PROJECT FACTS" in user
+    assert "- Decided by the user: launch December 10, price $18." in user
