@@ -56,6 +56,8 @@ const LIST_LIMIT = 50;
 const ROLLUP_LIMIT = 10_000;
 /** Feedback rows shown. The count above the list is exact regardless. */
 const FEEDBACK_LIMIT = 200;
+/** Project ids per title lookup; they travel in the URL. */
+const TITLE_BATCH = 100;
 
 export async function GET(request: NextRequest) {
   // Authorise BEFORE touching the service-role key. See the module docstring.
@@ -335,13 +337,21 @@ async function resolveProjectTitles(
   const ids = projectIds.filter((id): id is string => Boolean(id));
   if (ids.length === 0) return titles;
 
-  const { data, error } = await supabase.from('projects').select('id, title').in('id', ids);
-  if (error) {
-    warnings.push('Project titles could not be resolved, so rows are labelled by id.');
-    return titles;
-  }
-  for (const row of (data ?? []) as { id: string; title: string | null }[]) {
-    if (row.title) titles.set(row.id, row.title);
+  // In batches: the ids go in the query string, and a few hundred uuids in one
+  // `in.(…)` is past the URL limit (HTTP 414), which loses every title at once.
+  const unique = [...new Set(ids)];
+  for (let i = 0; i < unique.length; i += TITLE_BATCH) {
+    const { data, error } = await supabase
+      .from('projects')
+      .select('id, title')
+      .in('id', unique.slice(i, i + TITLE_BATCH));
+    if (error) {
+      warnings.push('Project titles could not be resolved, so rows are labelled by id.');
+      return titles;
+    }
+    for (const row of (data ?? []) as { id: string; title: string | null }[]) {
+      if (row.title) titles.set(row.id, row.title);
+    }
   }
   return titles;
 }
