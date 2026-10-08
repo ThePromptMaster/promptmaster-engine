@@ -49,3 +49,12 @@ describe('superseded values from a recorded answer (8 Oct, production)', () => {
     expect(leftoverValues('TaskBoard costs $18 per user per month.', s)).toHaveLength(1);
   });
 });
+
+describe('a list of excluded values (8 Oct, production)', () => {
+  it('items under a line that sets values aside are not leftovers', () => {
+    const s = supersededValues('Price: $18 per user per month', 'Price: $15 per user per month');
+    const prompt = 'Price: $15 per user per month\n\nThe following alternatives are excluded because they conflict with the accepted project facts:\n\n- December 3 launch date\n- $18 per user per month price\n- $24 per user per month price\n\nRequirements:\n- State the price.';
+    expect(leftoverValues(prompt, s)).toHaveLength(0);
+    expect(leftoverValues('Requirements:\n- Charge $18 per user per month.', s)).toHaveLength(1);
+  });
+});
