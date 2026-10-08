@@ -85,16 +85,15 @@ test('finishing is about the deliverable, and a finished project can be reopened
   await expect(summary).toContainText('The deliverable (Output) is done.');
   await expect(summary).toContainText('skipped on purpose');
   await summary.scrollIntoViewIfNeeded();
-  // 6 Oct: the review's findings are unresolved, so they are listed and
-  // finishing past them asks why ("allowed me to finish … despite the
-  // unresolved finding").
+  // 6 Oct: the review's findings are unresolved, so they are listed.
+  // 8 Oct (C3): Summary's rows are optional and none says anything is
+  // missing, so they are listed as optional and finishing needs no reason.
   // Two rows carry PromptMaster's proposal (not yet confirmed); one nothing settles.
-  await expect(summary.getByRole('group', { name: 'Still open' })).toContainText('Summary: 1 finding not yet accepted or rejected');
-  await expect(summary.getByRole('group', { name: 'Still open' })).toContainText('Summary: 2 proposed statuses not yet confirmed');
-  await expect(summary.getByRole('button', { name: 'Finish anyway' })).toBeDisabled();
-  await summary.getByLabel('Why finish with work still open').fill('The findings are style notes; the decision stands.');
+  const optional = summary.getByRole('group', { name: 'Optional, left as they are' });
+  await expect(optional).toContainText('Summary: 1 optional finding not yet accepted or rejected');
+  await expect(optional).toContainText('Summary: 2 optional proposed statuses not yet confirmed');
   await page.screenshot({ path: test.info().outputPath('03-completion-summary.png') });
-  await summary.getByRole('button', { name: 'Finish anyway' }).click();
+  await summary.getByRole('button', { name: 'Finish project' }).click();
   await expect(page.getByText('This project is finished')).toBeVisible();
 
   await page.getByRole('button', { name: 'Reopen' }).click();

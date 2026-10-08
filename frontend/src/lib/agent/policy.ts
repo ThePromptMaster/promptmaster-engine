@@ -277,7 +277,7 @@ export function preempt(input: {
     const last = finished.at(-1)!;
     return {
       status: 'blocked',
-      reason: `"${actionFor(last.action_key)?.label ?? last.action_key}" was chosen ${NO_PROGRESS_REPEATS} times in a row on this stage, and none of it was saved to the document, so the stage is unchanged. What each produced is in the run log. It needs your direction.`,
+      reason: `"${actionFor(last.action_key)?.label ?? last.action_key}" was chosen ${NO_PROGRESS_REPEATS} times in a row on this stage without changing it: none of it was saved to the document. What each produced is in the run log. It needs your direction.`,
     };
   }
   return null;
@@ -300,8 +300,9 @@ function savedSomething(s: AgentStep): boolean {
  * anything was last saved there, or null (C4, 8 Oct). Sean's sequence test:
  * Go saw that Results needed replacing, chose "Derive" three times, and the
  * correction never reached the document — a derivation is only text in the
- * run. Once one has run, the next move on the stage must save it: reasoning
- * is withheld (`withoutRepeatReasoning`), and the revision is handed this.
+ * run. The next revision of the stage is handed it, to put into the document
+ * in full; a run that keeps reasoning without saving is stopped by
+ * `noProgress`, saying nothing was saved.
  */
 export function unsavedDerivation(steps: readonly AgentStep[], stageId: string): { label: string; output: string } | null {
   for (let i = steps.length - 1; i >= 0; i -= 1) {
@@ -315,11 +316,6 @@ export function unsavedDerivation(steps: readonly AgentStep[], stageId: string):
   return null;
 }
 
-/** Reasoning moves are withheld on a stage while one's result is still unsaved there. */
-export function withoutRepeatReasoning(allowed: readonly string[], steps: readonly AgentStep[], stageId: string): string[] {
-  if (!unsavedDerivation(steps, stageId)) return [...allowed];
-  return allowed.filter((k) => actionFor(k)?.performer !== 'reason');
-}
 
 /**
  * The same move three times on one stage with nothing to show for it.

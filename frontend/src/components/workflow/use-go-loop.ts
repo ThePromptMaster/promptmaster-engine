@@ -50,7 +50,7 @@ import { answerAsFact } from '@/lib/workflow/answers';
 import { authorizeRun } from '@/lib/agent/authorize';
 import { buildAgentState } from '@/lib/agent/digest';
 import { performStep, type PerformContext, type StepOutcome } from '@/lib/agent/perform';
-import { allowedActions, stageHasCurrentDraft, LIVE_TOOLS, polishSinceDirection, unsavedDerivation, withoutRepeatReasoning, withoutEndlessPolish, withoutSettledRuns, withoutOverride, DEFAULT_BUDGET_STEPS, fitsBudget, noChange, plannedBeforeLatestChange, preempt, shouldPause, stateFingerprint, stepCost } from '@/lib/agent/policy';
+import { allowedActions, stageHasCurrentDraft, LIVE_TOOLS, polishSinceDirection, unsavedDerivation, withoutEndlessPolish, withoutSettledRuns, withoutOverride, DEFAULT_BUDGET_STEPS, fitsBudget, noChange, plannedBeforeLatestChange, preempt, shouldPause, stateFingerprint, stepCost } from '@/lib/agent/policy';
 import {
   createAgentRun,
   endAgentRun,
@@ -479,9 +479,6 @@ export function useGoLoop(opts: Options) {
           polishedHere,
           stageEvaluation.canAdvance
         ), facts.review);
-        // C4: a derivation not yet saved is saved next, not derived again.
-        const allSteps = [...priorStepsRef.current, ...stepsRef.current];
-        allowed.splice(0, allowed.length, ...withoutRepeatReasoning(allowed, allSteps, o.stage!.id));
 
         // Runs the data could carry out are tried before the table is handed
         // to the user: at most once per row, so a row no code can settle
