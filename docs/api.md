@@ -171,7 +171,8 @@ the same reason — it writes or reads with the service role, which the backend 
 holds: `POST /api/sandbox/run` (runs model-written code in a Vercel Sandbox with the
 project's data files at `/data`, and writes the `sandbox_runs` row that makes an
 execution label honest; the user's JWT, with the project, run and step re-checked
-against it) and `GET /api/admin/overview` (FR-18/FR-19; `ADMIN_USER_IDS`).
+against it) and `GET /api/admin/overview` (FR-18/FR-19; `ADMIN_USER_IDS`; also returns every
+`beta_feedback` submission for FR-22, unwindowed, as `feedback`).
 
 Authorisation accepts either credential:
 

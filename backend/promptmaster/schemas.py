@@ -30,6 +30,8 @@ class AcceptedFact(BaseModel):
     kind: Literal["fact", "requirement"] = "fact"
     #: Where it came from, in words ("from the side chat, 6 Oct").
     source: str = Field(default="", max_length=300)
+    #: The statement this one superseded, when it did: a value no longer true.
+    replaces: str = Field(default="", max_length=2_000)
 
 
 class PMInput(BaseModel):

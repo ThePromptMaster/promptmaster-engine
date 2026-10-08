@@ -73,7 +73,10 @@ test('a changed requirement reopens what relied on it, and Go repairs it under "
   // rather than handing over row decisions. Only the row its text does not
   // settle is left (the scripted proposer leaves one), and Go then will not
   // call the objective met while it is open — it says what is open instead.
-  expect(steps.map((s: { action_key: string }) => s.action_key)).toEqual(['recheck_stage', 'confirm_proposals', 'declare_objective_complete']);
+  // D6 (8 Oct): repairing Output reopens the Summary draft built on the old
+  // Output, so Go repairs that too before confirming its rows.
+  expect(steps.map((s: { action_key: string }) => s.action_key)).toEqual(['recheck_stage', 'recheck_stage', 'confirm_proposals', 'declare_objective_complete']);
+  expect(steps[1]).toMatchObject({ action_key: 'recheck_stage', params: { stage_id: 'summary' } });
   const [summaryArtifact] = await serviceSelect('artifacts', `project_id=eq.${id}&stage_id=eq.summary&select=id`);
   const [summaryHead] = await serviceSelect('artifact_versions', `artifact_id=eq.${summaryArtifact.id}&select=content&order=created_at.desc&limit=1`);
   const rows = JSON.parse(summaryHead.content).items as { status?: string; status_source?: string }[];

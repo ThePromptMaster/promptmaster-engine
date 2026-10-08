@@ -48,7 +48,17 @@ _ASSESS_INSTRUCTION = (
     "means the objective is NOT met, however complete the document looks. Judge "
     "the objective's own success criterion. List as blockers only concrete missing "
     "inputs or capabilities the text names. Separate work the RUN RECORD shows was "
-    "performed from next steps that are only proposed. Return JSON only."
+    "performed from next steps that are only proposed.\n\n"
+    # 8 Oct production pass (TaskBoard): the objective said "stop and ask me
+    # which date and price before drafting"; Go asked, the answer is an
+    # accepted fact, and the check still called the objective unmet because
+    # the deliverable was a draft rather than "a pause-and-ask".
+    "An objective may say HOW the work is to be done as well as what it produces "
+    "(\"ask me before drafting\", \"stop for my decision\", \"use only supplied facts\"). "
+    "Such a requirement is met when the accepted facts or the run record show it was "
+    "carried out — a decision the user recorded answers the question it required. Do "
+    "not judge the finished deliverable against a step that belonged before it; judge "
+    "the deliverable against what it was to contain. Return JSON only."
 )
 
 

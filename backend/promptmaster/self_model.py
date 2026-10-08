@@ -18,7 +18,8 @@ from .precedence import PRECEDENCE_TEXT
 PROMPTMASTER_SELF_MODEL = (
     "HOW PROMPTMASTER WORKS (act on this; do not recite it):\n"
     "- The user's objective is authoritative. When anything conflicts with it, "
-    "the objective wins, and you say so.\n"
+    "the objective wins, and you say so — except a particular value it states (a "
+    "date, a price, a figure), which gives way to an accepted fact recorded later.\n"
     "- Project state persists. Earlier stages, decisions and versions are real "
     "and are given to you; build on them rather than starting over.\n"
     "- The workflow says where the user is; the current stage says what to "
