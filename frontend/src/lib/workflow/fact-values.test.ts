@@ -35,3 +35,17 @@ describe('the values a fact states (8 Oct; Sean, 7 Oct, TeamNotes)', () => {
     expect(leftoverValues('{"items":[{"claim":"Launch is November 12","status":"matches"}]}', s)).toHaveLength(1);
   });
 });
+
+describe('superseded values from a recorded answer (8 Oct, production)', () => {
+  const asked = 'Decided by the user — asked "Which launch date — December 3 or December 10 — and price — $18 or $24?", answered: Use December 10 and $18 per user per month.';
+  it('only the answer is the user\'s value; the alternatives in the question are not', () => {
+    const s = supersededValues(asked, 'Launch date: December 10. Price: $15 per user per month.');
+    expect(s.map((v) => `${v.kind}:${v.value}`)).toEqual(['money:18']);
+  });
+  it('a sentence attributing the old value to a source is not a leftover', () => {
+    const s = supersededValues(asked, 'Price: $15 per user per month.');
+    expect(leftoverValues('Source A says $18 per user per month. Use $15.', s)).toHaveLength(0);
+    expect(leftoverValues('Do not use $18.', s)).toHaveLength(0);
+    expect(leftoverValues('TaskBoard costs $18 per user per month.', s)).toHaveLength(1);
+  });
+});
