@@ -18,9 +18,11 @@ export const DOCUMENT_ONLY_EXTENSIONS = ['.pdf', '.docx', '.md'] as const;
 /**
  * Photos and figures (3 Oct call: "attachments, pictures, photos"). They are
  * placed in the work, never shown to a model: a prompt gets each one's name,
- * caption and id, so it can say where it belongs.
+ * caption and id, so it can say where it belongs. iPhone photos (HEIC/HEIF)
+ * are converted to JPEG, and large ones scaled, before they are stored
+ * (`normalize-image.ts`, 8 Oct).
  */
-export const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp', '.gif'] as const;
+export const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp', '.gif', '.heic', '.heif'] as const;
 
 export function isImage(name: string): boolean {
   return (IMAGE_EXTENSIONS as readonly string[]).includes(extensionOf(name));
@@ -68,7 +70,7 @@ export function rejectReason(name: string, bytes: number, existing: readonly str
       ? `${name} is in the old Excel format. Save it as .xlsx or CSV first.`
       : ext === '.doc'
         ? `${name} is in the old Word format. Save it as .docx or PDF first.`
-        : `${name} is not a PDF, Word (.docx), Markdown, text, spreadsheet (.xlsx), CSV, TSV, JSON or image (PNG, JPEG, WebP, GIF) file.`;
+        : `${name} is not a PDF, Word (.docx), Markdown, text, spreadsheet (.xlsx), CSV, TSV, JSON or image (PNG, JPEG, WebP, GIF, HEIC) file.`;
   }
   if (bytes > MAX_FILE_BYTES) return `${name} is larger than ${MAX_FILE_BYTES / 1_000_000} MB.`;
   if (bytes === 0) return `${name} is empty.`;

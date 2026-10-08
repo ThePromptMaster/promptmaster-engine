@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 
 import { prepareFiles, type PreparedFile } from '@/lib/data/attachments';
+import { normalizeImage } from '@/lib/data/normalize-image';
 import { MAX_FILES, PICKABLE_EXTENSIONS, describePreview, imagePreview, isImage, rejectReason } from '@/lib/data/preview';
 
 /** An image waiting to be stored, with what the user says it shows. */
@@ -51,7 +52,16 @@ export function StartAttachments({
       const errors = [...prepared.errors];
       const taken = [...names, ...prepared.ready.map((p) => p.file.name)];
       const nextImages: StartImage[] = [];
-      for (const file of pictures) {
+      const notes = [...prepared.notes];
+      for (const picked of pictures) {
+        // iPhone photos: HEIC to JPEG, and a large one scaled to fit (U1).
+        const normal = await normalizeImage(picked);
+        if ('error' in normal) {
+          errors.push(normal.error);
+          continue;
+        }
+        const file = normal.file;
+        if (normal.note) notes.push(normal.note);
         const reason = rejectReason(file.name, file.size, taken);
         if (reason) errors.push(reason);
         else {
@@ -62,7 +72,7 @@ export function StartAttachments({
       if (prepared.ready.length) onFiles([...files, ...prepared.ready]);
       if (nextImages.length) onImages([...images, ...nextImages]);
       if (errors.length) setError(errors.join(' '));
-      if (prepared.notes.length) setNote(prepared.notes.join(' '));
+      if (notes.length) setNote(notes.join(' '));
     } finally {
       setBusy(false);
       if (input.current) input.current.value = '';
