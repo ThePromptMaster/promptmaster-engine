@@ -227,7 +227,9 @@ def build_stage_prompt(
         "THE ORIGINAL OBJECTIVE IS THE USER'S OWN WORDS AND GOVERNS. The earlier "
         "stages elaborate it; none of them changes what is being made, for whom, "
         "or about what. Where an earlier stage above and the original "
-        "objective disagree, the original objective wins.",
+        "objective disagree, the original objective wins. A particular value the "
+        "objective states — a date, a price, a figure — gives way to an accepted "
+        "fact that supersedes it: use the fact's value everywhere.",
         *(
             [
                 "This stage's statement sharpens the user's objective; it keeps the "

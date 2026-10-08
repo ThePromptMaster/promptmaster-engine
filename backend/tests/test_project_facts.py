@@ -78,3 +78,19 @@ def test_chat_offers_to_record_only_facts_the_user_wrote():
 def test_the_chat_action_prompt_offers_record_facts():
     system, _ = build_reply_actions_prompt(_inputs(), "Final", "q", "a", None)
     assert '"record_facts"' in system and "Only what the user wrote" in system
+
+
+def test_a_later_fact_outranks_a_value_in_the_objective(basic_inputs):
+    """8 Oct (TeamNotes): the objective still said November 12 and $12; the
+    facts said November 19 and $15, and the repairs kept the objective's."""
+    from promptmaster.precedence import PRECEDENCE_TEXT
+    from promptmaster.project_context import facts_block
+    from promptmaster.schemas import AcceptedFact
+
+    inputs = basic_inputs.model_copy(update={"facts": [
+        AcceptedFact(statement="Launch date: November 19, 2026", source="edited, 7 Oct", replaces="Launch date: November 12, 2026"),
+    ]})
+    block = facts_block(inputs)
+    assert 'Launch date: November 19, 2026 — edited, 7 Oct (replaces "Launch date: November 12, 2026", which is no longer true)' in block
+    assert "including a value written in the objective" in block
+    assert "gives way to an accepted fact that supersedes it" in PRECEDENCE_TEXT
