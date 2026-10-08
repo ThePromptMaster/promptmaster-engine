@@ -173,7 +173,11 @@ export function evaluateStage(
     return { stageId, criteria: [], canAdvance: true, unmet: [] };
   }
 
-  const criteria = stage.exit_criteria.map((c) => evaluateCriterion(c, stageId, ctx, stage.renderer));
+  const criteria = [
+    ...stage.exit_criteria.map((c) => evaluateCriterion(c, stageId, ctx, stage.renderer)),
+    // What the user asked for in numbers, counted on the saved text (C1, 8 Oct).
+    ...(ctx.measured?.[stageId] ?? []).map((m) => ({ ...m, blocking: true })),
+  ];
   const unmet = criteria.filter((c) => !c.satisfied);
   return {
     stageId,

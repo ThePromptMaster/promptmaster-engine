@@ -420,6 +420,12 @@ export interface StageContext {
   findings: Record<string, { total: number; triaged: number }>;
   /** Manual criteria the user has ticked, by criterion id. */
   manualChecks: Record<string, boolean>;
+  /**
+   * Per stage id: the measurable requirements (word ranges, question counts)
+   * measured on its saved text (`measurable.ts`, C1). Each is an automatic,
+   * blocking check on that stage.
+   */
+  measured?: Record<string, { id: string; label: string; satisfied: boolean; detail?: string }[]>;
 }
 
 export interface CriterionResult {

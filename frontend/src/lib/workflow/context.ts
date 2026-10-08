@@ -21,10 +21,13 @@ import { draftingStageId } from './derived-outline';
 import type { StageArtifactBundle } from './digest';
 import { confirmableProposals, effectiveRenderer, isTriaged, itemSchemaFor, parseItems, rendererHoldsItems } from './stage-artifact';
 import type { StageContext, StageDefinition, WorkflowEvent, WorkflowTemplate } from './types';
+import { deliverableStage } from './engine';
+import { currentFacts } from './facts';
+import { measure, parseRequirements, requirementsForStage, type Measurement } from './measurable';
 
 export interface BuildContextInput {
   template: WorkflowTemplate;
-  project: Pick<Project, 'objective' | 'audience' | 'constraints' | 'manual_checks'>;
+  project: Pick<Project, 'objective' | 'audience' | 'constraints' | 'manual_checks'> & Partial<Pick<Project, 'output_format' | 'facts'>>;
   /** Per stage id: that stage's artifact and its versions. */
   bundles: Record<string, StageArtifactBundle>;
   /**
@@ -146,7 +149,29 @@ export function buildStageContext(input: BuildContextInput): StageContext {
     }
   }
 
+  // C1 (8 Oct): word ranges, limits and question counts the user asked for,
+  // measured on the stages that produce what they describe.
+  const requirements = parseRequirements([
+    project.objective ?? '',
+    project.constraints ?? '',
+    project.output_format ?? '',
+    ...currentFacts(project.facts).filter((f) => f.kind === 'requirement').map((f) => f.statement),
+  ]);
+  const measured: Record<string, Measurement[]> = {};
+  if (requirements.length) {
+    const deliverableId = deliverableStage(template)?.id;
+    for (const s of template.stages) {
+      const content = bundles[s.id]?.versions.at(-1)?.content ?? '';
+      if (!content.trim()) continue;
+      const results = requirementsForStage(s, deliverableId, requirements)
+        .map(({ requirement, whole }) => measure(requirement, content, whole))
+        .filter((m): m is Measurement => m !== null);
+      if (results.length) measured[s.id] = results;
+    }
+  }
+
   return {
+    measured,
     fields: {
       objective: project.objective,
       audience: project.audience,
