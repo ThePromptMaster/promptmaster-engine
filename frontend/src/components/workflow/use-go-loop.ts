@@ -514,7 +514,7 @@ export function useGoLoop(opts: Options) {
 
         // 6 Oct: a stage a change reopened is repaired before anything else —
         // on whichever stage it is — so Summary is not left recommending A.
-        // Once per stage per run: one that still cannot close is the user's.
+        // At most twice per stage (REPAIR_TRIES): one that still cannot close is the user's.
         const recheckTried = [...priorStepsRef.current, ...stepsRef.current]
           .filter((s) => s.action_key === 'recheck_stage')
           .map((s) => String(s.params?.stage_id ?? ''));
@@ -724,6 +724,29 @@ export function useGoLoop(opts: Options) {
       setError(e instanceof Error ? e.message : 'Could not start Go mode.');
     }
   }, [policy, budget, pendingStepId, commitRun, loop, startRun, continueRun]);
+
+  /**
+   * "Update affected work and resume" (D2): repairing every reopened stage
+   * takes several steps. A paused run with only a step or two left in its
+   * window spent them on the first repair and stopped (8 Oct, production), so
+   * a nearly spent window is closed and the next one opened instead.
+   */
+  const update = useCallback(async () => {
+    const live = runRef.current;
+    const left = live ? live.budget_steps - stepsRef.current.length : 0;
+    if (live && !live.ended_at && live.policy === policy && (live.status === 'blocked' || live.status === 'awaiting_decision') && left < 4 && !pendingStepId) {
+      try {
+        await updateAgentRun(live.id, { status: 'budget_exhausted', stop_reason: 'Window closed to update affected work.', needs: null });
+        commitRun({ ...live, status: 'budget_exhausted', needs: null });
+        await continueRun();
+        return;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Could not start updating the affected work.');
+        return;
+      }
+    }
+    await go();
+  }, [policy, pendingStepId, commitRun, continueRun, go]);
 
   /**
    * PM-23: "next logical action; why it is recommended; ability to apply".
@@ -1079,7 +1102,7 @@ export function useGoLoop(opts: Options) {
     stageLabelFor,
     autoWindows, setAutoWindows, autoPending,
     policy, setPolicy, budget, setBudget, run, steps, phase, active, pendingStep, pendingStale, authorizing, error,
-    go, suggest, replan, stop, approve, decline, answer, confirmAuthorization,
+    go, update, suggest, replan, stop, approve, decline, answer, confirmAuthorization,
     cancelAuthorization: useCallback(() => setAuthorizing(null), []),
     dismissError: useCallback(() => setError(null), []),
   };

@@ -22,8 +22,11 @@ FACTS_HEADER = (
     "ACCEPTED PROJECT FACTS AND REQUIREMENTS — authoritative: the user accepted each one, "
     "and each says where it came from. Treat them as supplied evidence: use them, quote "
     "their figures exactly, and never call one unsupported or suggest removing it. Where "
-    "other text contradicts one, the fact stands and the other text is what is wrong. A "
-    "requirement binds every recommendation."
+    "other text contradicts one, the fact stands and the other text is what is wrong — "
+    "including a value written in the objective, the brief or an earlier stage: a fact "
+    "the user recorded later is their later word. Where a fact replaces an earlier one, "
+    "the earlier value is no longer true; replace it wherever it appears. A requirement "
+    "binds every recommendation."
 )
 
 
@@ -39,7 +42,8 @@ def facts_block(inputs: PMInput) -> str:
         label = "Requirement" if f.kind == "requirement" else "Fact"
         about = f" ({f.subject.strip()})" if f.subject.strip() else ""
         src = f" — {f.source.strip()}" if f.source.strip() else ""
-        lines.append(f"- {label}{about}: {' '.join(f.statement.split())}{src}")
+        replaces = f' (replaces "{" ".join(f.replaces.split())}", which is no longer true)' if f.replaces.strip() else ""
+        lines.append(f"- {label}{about}: {' '.join(f.statement.split())}{src}{replaces}")
     return f"{FACTS_HEADER}\n" + "\n".join(lines)
 
 

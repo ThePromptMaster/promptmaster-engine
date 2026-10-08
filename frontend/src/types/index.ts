@@ -10,7 +10,7 @@ export interface PMInput {
   /** The user's source material — facts, figures, background — kept apart from the objective. */
   context?: string;
   /** Accepted facts and requirements, current only, each with its source (F1, 7 Oct). */
-  facts?: { statement: string; subject: string; kind: 'fact' | 'requirement'; source: string }[];
+  facts?: { statement: string; subject: string; kind: 'fact' | 'requirement'; source: string; replaces?: string }[];
   mode: ModeType;
   custom_name?: string;
   custom_preamble?: string;

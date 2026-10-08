@@ -60,6 +60,22 @@ export interface AdminErrorRow {
   createdAt: string;
 }
 
+/**
+ * FR-22: one beta feedback submission, in the four questions' own terms.
+ * `value` and `blockage` are '' when the tester left them blank.
+ */
+export interface AdminFeedbackRow {
+  id: string;
+  userEmail: string | null;
+  projectTitle: string | null;
+  useCase: string;
+  value: string;
+  blockage: string;
+  /** 1–5, or null when the tester did not answer. */
+  reuseLikelihood: number | null;
+  createdAt: string;
+}
+
 /** How often each failure code occurred in the window — what to fix next. */
 export interface AdminErrorTally {
   code: string;
@@ -79,6 +95,8 @@ export interface AdminOverview {
     activeUsers: number;
     failedJobs: number;
     errors: number;
+    /** Every feedback submission, not just the window's. */
+    feedback: number;
   };
   usageByUser: AdminUsageRow[];
   /** E1: spend by Go move or route, with call times and the share that was rework. */
@@ -88,6 +106,8 @@ export interface AdminOverview {
   failedJobs: AdminFailedJob[];
   recentErrors: AdminErrorRow[];
   errorTally: AdminErrorTally[];
+  /** FR-22: beta feedback, newest first. Not windowed — see the route. */
+  feedback: AdminFeedbackRow[];
   /**
    * Set when a section could not be read — a missing table, a permissions
    * problem. Surfaced rather than swallowed: an admin page that silently shows

@@ -24,7 +24,7 @@ future change does not undo a guarantee without noticing.
 | `project_tasks` | Unresolved work items. |
 | `jobs` | The background queue. See [`jobs.md`](jobs.md). |
 | `section_records` | Per-section continuity records (summary, glossary, decisions, TODOs). |
-| `beta_feedback` | FR-22 feedback capture. |
+| `beta_feedback` | FR-22 feedback capture. Users see only their own rows; the product owner reads all of them on `/admin` (Beta feedback), through `/api/admin/overview`. |
 
 ### Stage statuses (PM-13) and project completion (PM-14)
 

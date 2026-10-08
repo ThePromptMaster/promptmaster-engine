@@ -1725,6 +1725,8 @@ export function WorkflowWorkspace({
               change={briefChange}
               stageLabel={(id) => template.stages.find((s) => s.id === id)?.label ?? id}
               onKeep={(changeAt) => void appendEvent({ type: 'brief_change_dismissed', stage_id: stageId, payload: { change_at: changeAt } })}
+              onUpdate={appendStageVersion && project.status !== 'finalized' ? () => void go.update() : undefined}
+              updating={go.active}
             />
             <FiguresOnRecord template={template} state={state} bundles={stageBundles} />
             {/* On every stage: the accepted facts are the project's record (F3, 7 Oct). */}

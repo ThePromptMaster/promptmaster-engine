@@ -3,6 +3,7 @@
  * 7 Oct). Pure; the rows come from `lib/supabase/facts.ts`.
  */
 import type { Project, ProjectFact } from '@/types/project';
+import { supersededValues, type SupersededValue } from './fact-values';
 
 /** Facts sent with a request: enough for every prompt, bounded. */
 export const MAX_FACTS_SENT = 200;
@@ -42,9 +43,28 @@ export function factSource(f: Pick<ProjectFact, 'source_kind' | 'source_ref' | '
 
 /** What a request carries: the current facts, each with its source in words. */
 export function factsForRequest(facts: readonly ProjectFact[] | undefined) {
+  const byId = new Map((facts ?? []).map((f) => [f.id, f]));
   return currentFacts(facts)
     .slice(-MAX_FACTS_SENT)
-    .map((f) => ({ statement: f.statement, subject: f.subject ?? '', kind: f.kind, source: factSource(f) }));
+    .map((f) => {
+      // The value it replaced rides with it, so every prompt is told what is
+      // no longer true rather than left to reconcile two dates (8 Oct).
+      const replaced = f.supersedes ? byId.get(f.supersedes)?.statement : undefined;
+      return { statement: f.statement, subject: f.subject ?? '', kind: f.kind, source: factSource(f), ...(replaced ? { replaces: replaced } : {}) };
+    });
+}
+
+/**
+ * The values the user's fact changes made untrue: for each current fact that
+ * superseded another, what the old one stated that the new one does not.
+ * A repair must not leave any of these in place (D2, 8 Oct).
+ */
+export function supersededFactValues(facts: readonly ProjectFact[] | undefined): SupersededValue[] {
+  const byId = new Map((facts ?? []).map((f) => [f.id, f]));
+  return currentFacts(facts).flatMap((f) => {
+    const old = f.supersedes ? byId.get(f.supersedes) : undefined;
+    return old ? supersededValues(old.statement, f.statement) : [];
+  });
 }
 
 /**
