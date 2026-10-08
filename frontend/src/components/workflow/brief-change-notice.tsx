@@ -36,8 +36,7 @@ export function BriefChangeNotice({
       <div role="status" aria-label="Brief change" className="mb-6 rounded-xl bg-[var(--surface-container-low)] px-5 py-3 text-body text-[var(--on-surface-variant)]">
         <p>
           <span aria-hidden className="material-symbols-outlined mr-1 align-[-4px] text-[18px] text-[var(--pm-tertiary)]">history</span>
-          {stageLabel(event.stage_id)} was revised{typeof n === 'number' ? ` (now v${n})` : ''}, so {list} {stageIds.length === 1 ? 'was' : 'were'} reopened
-          for a recheck: {stageIds.length === 1 ? 'it was' : 'they were'} built on the earlier version. Earlier versions stay in each stage&apos;s history.
+          {`${stageLabel(event.stage_id)} was revised${typeof n === 'number' ? ` (now v${n})` : ''}, so ${list} ${stageIds.length === 1 ? 'was' : 'were'} reopened for a recheck: ${stageIds.length === 1 ? 'it was' : 'they were'} built on the earlier version. Earlier versions stay in each stage's history.`}
         </p>
         <Actions onUpdate={onUpdate} updating={updating} onKeep={() => onKeep(event.created_at)} />
       </div>
