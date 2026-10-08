@@ -303,7 +303,9 @@ def _format_state(inputs: PMInput, state: AgentState) -> str:
         facts.append(
             f"DATA: this is a {state.workflow.label.lower()} workflow — writing, not computation. "
             "No stage of it needs a dataset, a run or a measurement; never ask the user for one "
-            "and never mark a stage stuck for the lack of one."
+            "and never mark a stage stuck for the lack of one. Code is different: where "
+            "run_computation is among the moves, the draft holds code the objective asks to "
+            "have checked — run it before saying the code is correct, and report what ran."
         )
     if state.controls is None:
         facts.append("BUTTONS ON THIS PAGE NOW: not known. Do not name any button.")

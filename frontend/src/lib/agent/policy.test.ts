@@ -609,3 +609,13 @@ describe('R1c: propose_statuses is offered while a check table has rows with nei
     expect(allowedActions(RESEARCH_V1, research, alternatives, true, undefined, facts([{ id: 'a', explanation: 'x', status: 'ruled_out', status_source: 'user' }]) as never)).not.toContain('propose_statuses');
   });
 });
+
+describe('code a deliverable asks to have checked runs in any workflow (M3; Sean, 7 Oct, email 3)', () => {
+  it('Single output offers "Run a computation" only when its draft holds code the objective asks to test', () => {
+    const output = getStage(SINGLE_OUTPUT_V1, 'output')!;
+    const state = initialState(SINGLE_OUTPUT_V1);
+    const code = { language: 'python' as const, code: 'print(1)' };
+    expect(allowedActions(SINGLE_OUTPUT_V1, state, output, true, LIVE_TOOLS, { code })).toContain('run_computation');
+    expect(allowedActions(SINGLE_OUTPUT_V1, state, output, true, LIVE_TOOLS, {})).not.toContain('run_computation');
+  });
+});

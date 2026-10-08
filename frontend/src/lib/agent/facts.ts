@@ -12,6 +12,7 @@
  * claim against it.
  */
 
+import { codeToCheck, type CodeToCheck } from './code-check';
 import { loadOutline, outlineStageFor } from '@/lib/outline/actions';
 import { countNamedSections, emptyDocument, parseOutlineDocument } from '@/lib/outline/model';
 import { jobBySection, pendingJobs, revisedCount, stoppedSections, type SectionTarget } from '@/lib/jobs/sections';
@@ -135,6 +136,8 @@ export interface StageFacts {
   evaluationFindings?: EvaluationFacts;
   draft?: DraftFacts;
   review?: ReviewFacts;
+  /** Python in this stage's draft that the objective asks to have checked (M3). */
+  code?: CodeToCheck;
 }
 
 export async function readStageFacts(input: {
@@ -238,6 +241,8 @@ export async function readStageFacts(input: {
   const head = bundles[stage.id]?.versions.at(-1);
   if (stageDrafts(stage) && !rendererHoldsItems(stage.renderer) && head?.content.trim()) {
     facts.draft = draftFacts(head, latestEvaluation);
+    const code = codeToCheck(head.content, `${input.project.objective}\n${input.project.constraints ?? ''}`);
+    if (code) facts.code = code;
   }
 
   return facts;

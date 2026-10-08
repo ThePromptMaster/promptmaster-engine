@@ -35,6 +35,7 @@ import { deliverableStage, describeOutstanding, evaluateStage, outstandingWork }
 import { pausedLine } from '@/lib/workflow/objective';
 import { attachedDocuments, currentFacts } from '@/lib/workflow/facts';
 import { recordPolicyFacts } from '@/lib/supabase/facts';
+import { checkGoal } from './code-check';
 import { figureFindings, figureSources } from '@/lib/workflow/figure-support';
 import { asIteration } from '@/lib/workflow/legacy';
 import {
@@ -370,7 +371,12 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
 
     case 'compute': {
       const kind = params.kind === 'simulation' ? 'simulation' : 'computation';
-      const goal = (typeof params.goal === 'string' ? params.goal : ctx.step.expected_outcome).slice(0, MAX_GOAL);
+      // M3: on a written stage whose code the objective asks to check, the
+      // run is that code, as written, against the named cases.
+      const checking = ctx.template.key !== 'research' && !ctx.template.inquiry && ctx.facts?.code;
+      const goal = checking
+        ? checkGoal(ctx.facts!.code!, inputs.objective)
+        : (typeof params.goal === 'string' ? params.goal : ctx.step.expected_outcome).slice(0, MAX_GOAL);
       const written = await api.agentWriteCode({ inputs, state: ctx.digest, goal, kind, model }, ctx.signal);
       let result;
       try {
