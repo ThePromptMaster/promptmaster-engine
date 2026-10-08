@@ -68,6 +68,10 @@ export function finishedConclusions(
   return template.stages
     .filter((s: StageDefinition) => {
       const st = state.stages[s.id];
+      // A draft in progress was written against the old value too (8 Oct,
+      // production: Summary, not yet finished, kept "Use $18" after the price
+      // became $15, and Go confirmed the row).
+      if (st?.status === 'in_progress' && bundles[s.id]?.versions.at(-1)?.content?.trim()) return true;
       return isDone(st?.status) && (!changedAt || !st?.completed_at || st.completed_at <= changedAt);
     })
     .map((s) => {
