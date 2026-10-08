@@ -519,7 +519,7 @@ def test_every_stage_is_told_the_original_objective_governs(basic_inputs, prose_
     ])
     _, user = build_stage_prompt(basic_inputs, prose_stage, digest)
     assert "THE ORIGINAL OBJECTIVE IS THE USER'S OWN WORDS AND GOVERNS." in user
-    assert "Where a summary above and the original objective disagree, the original objective wins." in user
+    assert "Where an earlier stage above and the original objective disagree, the original objective wins." in user
     assert user.index("Original objective: Write a book about lions") < user.index("GOVERNS")
     # Only the objective-stating stage is told it is sharpening.
     assert "keeps the deliverable and the subject exactly as the user named them" not in user

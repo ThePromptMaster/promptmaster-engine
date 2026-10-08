@@ -4,8 +4,9 @@
  * The backend is stateless, so the client assembles this. The rule that makes
  * it affordable is a size bound: **O(stages x constant), never O(project)**.
  * Sending the whole manuscript to generate a claim table would grow without
- * limit across thirteen stages and bury the instruction that matters, so each
- * completed upstream stage contributes at most a few hundred characters.
+ * limit across thirteen stages and bury the instruction that matters, so the
+ * earlier stages' saved documents share one budget (DOCUMENTS_MAX), and only
+ * a stage past it falls back to a few hundred characters of summary.
  *
  * The objective is carried in full — it is short, and every stage is judged
  * against it. The manuscript is the other exception: stages after drafting
@@ -23,16 +24,38 @@ import type { Artifact, ArtifactVersion, Project } from '@/types/project';
 import type { OutlineSection } from '@/types';
 import { manuscriptSourceFor } from './context';
 import type { StageDefinition, WorkflowState, WorkflowTemplate } from './types';
-import { parseItems, primaryArtifactKind, rendererHoldsItems } from './stage-artifact';
+import { itemSchemaFor, parseItems, primaryArtifactKind, rendererHoldsItems } from './stage-artifact';
 import { carriesForward, isDone } from './types';
 
-/** Per-stage budget. Twelve stages of this is a paragraph, not a book. */
+/** Per-stage budget for a summary, used only where no saved text is sent. */
 export const SUMMARY_MAX = 320;
+
+/**
+ * The earlier stages' saved documents, all together: roughly 30k tokens.
+ *
+ * Until 8 Oct each earlier stage reached later ones as a 320-character summary
+ * written when it was completed. A consistency check then called facts missing
+ * that the saved FAQ stated, a research report said its cycles were "not run"
+ * while Analysis held the proofs, and a final review judged Output v1 after the
+ * user had saved v2. The documents are the record; the budget is filled from
+ * the latest stage backwards, since that is the work the next stage builds on.
+ */
+export const DOCUMENTS_MAX = 120_000;
+/** Below this much room a document is not worth cutting; its summary goes instead. */
+const DOCUMENT_MIN_SHARE = 2_000;
 
 export interface StageDigestEntry {
   stage_id: string;
   label: string;
   summary: string;
+  /**
+   * The latest saved version, in full (rows as lines for a table stage), within
+   * DOCUMENTS_MAX across every stage. Empty when the stage has no saved text,
+   * holds the manuscript (sent separately) or fell outside the budget.
+   */
+  text?: string;
+  version?: number;
+  truncated?: boolean;
 }
 
 export interface StageDigest {
@@ -165,6 +188,36 @@ export function summariseStageContent(
   return truncate(content);
 }
 
+/**
+ * A stage's saved version as a later stage should read it: prose as written,
+ * a table as one line per row with every field and its status. '' for the
+ * manuscript, which travels on its own (`manuscript`).
+ */
+export function documentText(stage: StageDefinition, content: string | null | undefined): string {
+  if (!content?.trim() || stage.renderer === 'long_form') return '';
+  if (!rendererHoldsItems(stage.renderer)) return content.trim();
+  const items = parseItems(content);
+  if (!items) return content.trim();
+  const labels = new Map(itemSchemaFor(stage).fields.map((f) => [f.key, f.label || f.key]));
+  return items
+    .map((item, i) => {
+      const fields = Object.entries(item)
+        .filter(([key, value]) => !['id', 'status', 'reason', 'status_source', 'status_history'].includes(key) && typeof value === 'string' && value.trim())
+        .map(([key, value]) => `${labels.get(key) ?? key}: ${String(value).trim()}`);
+      const status = item.status
+        ? ` [status: ${item.status_source === 'proposed' ? 'proposed, not yet decided: ' : ''}${item.status}${item.reason ? ` — ${String(item.reason).trim()}` : ''}]`
+        : ' [status: undecided]';
+      return `${i + 1}. ${fields.join(' | ')}${status}`;
+    })
+    .join('\n');
+}
+
+function cutDocument(text: string, room: number): string {
+  const cut = text.slice(0, room);
+  const space = cut.lastIndexOf(' ');
+  return `${(space > room * 0.8 ? cut.slice(0, space) : cut).trimEnd()}\n[… the rest of this document is not shown …]`;
+}
+
 export interface StageArtifactBundle {
   artifact: Artifact | null;
   versions: ArtifactVersion[];
@@ -196,22 +249,54 @@ export function buildStageDigest(
   // question) is usually still open, and on production round two never saw
   // the question round one ended on (4 Oct).
   const loops = template.stages.some((s) => s.transitions.loop_to);
+  const texts: string[] = [];
   template.stages.forEach((stage, index) => {
     const st = state.stages[stage.id];
     const lastRound = loops && index > cutoff && Boolean(st) && st!.status !== 'not_started' && st!.status !== 'skipped';
     if (!lastRound && cutoff >= 0 && index >= cutoff) return;
-    if (!lastRound && !carriesForward(st)) return;
-    const leftOpen = !lastRound && !isDone(st?.status);
-
     const bundle = bundles[stage.id];
-    const stored = bundle?.artifact?.summary?.trim();
-    const head = bundle?.versions.at(-1)?.content;
-    const summary = stored ? truncate(stored) : summariseStageContent(stage, head);
-    if (!summary) return;
+    const headVersion = bundle?.versions.at(-1);
+    // A stage reopened for editing, or waiting for a recheck, still holds the
+    // latest saved work. Dropping it (as before 8 Oct) left a final review
+    // reading nothing of an Output the user had just revised; it is shown,
+    // labelled for what it is.
+    const pending = !lastRound && !carriesForward(st) && Boolean(headVersion?.content?.trim())
+      && (st?.status === 'in_progress' || st?.status === 'stale' || st?.status === 'blocked');
+    if (!lastRound && !carriesForward(st) && !pending) return;
+    const leftOpen = !lastRound && !pending && !isDone(st?.status);
 
-    const label = lastRound ? `${stage.label} (last round)` : leftOpen ? `${stage.label} (left open)` : stage.label;
-    prior_stages.push({ stage_id: stage.id, label, summary });
+    const stored = bundle?.artifact?.summary?.trim();
+    const head = headVersion?.content;
+    const summary = stored ? truncate(stored) : summariseStageContent(stage, head);
+    const text = documentText(stage, head);
+    if (!summary && !text) return;
+
+    const label = lastRound
+      ? `${stage.label} (last round)`
+      : st?.status === 'stale'
+        ? `${stage.label} (awaiting a recheck — may be out of date)`
+        : pending
+          ? `${stage.label} (being revised — latest saved, not yet signed off)`
+          : leftOpen ? `${stage.label} (left open)` : stage.label;
+    prior_stages.push({ stage_id: stage.id, label, summary, ...(headVersion?.version_number ? { version: headVersion.version_number } : {}) });
+    texts.push(text);
   });
+
+  // Fill the budget from the latest stage backwards.
+  let room = DOCUMENTS_MAX;
+  for (let i = prior_stages.length - 1; i >= 0; i -= 1) {
+    const text = texts[i];
+    if (!text) continue;
+    if (text.length <= room) {
+      prior_stages[i].text = text;
+      room -= text.length;
+    } else if (room >= DOCUMENT_MIN_SHARE) {
+      prior_stages[i].text = cutDocument(text, room);
+      prior_stages[i].truncated = true;
+      room = 0;
+    }
+    if (!prior_stages[i].text && !prior_stages[i].summary) prior_stages[i].summary = summariseStageContent(template.stages.find((s) => s.id === prior_stages[i].stage_id)!, text);
+  }
 
   // The stages after drafting that are not themselves long-form read the
   // chapters (`manuscriptSourceFor`, shared with Go's planner state).

@@ -53,6 +53,7 @@ from .schemas import (
     WhyThisWorks,
 )
 from .project_context import context_block
+from .saved_documents import format_prior_documents
 
 logger = logging.getLogger(__name__)
 
@@ -171,14 +172,7 @@ def _format_outline(approved_outline: list[OutlineSection] | None) -> str:
 
 
 def _format_prior_stages(digest: StageDigest) -> str:
-    if not digest.prior_stages:
-        return "(nothing completed before this stage)"
-    lines = []
-    for entry in digest.prior_stages:
-        label = entry.label or entry.stage_id
-        summary = entry.summary.strip() or "(no summary recorded)"
-        lines.append(f"- {label}: {summary}")
-    return "\n".join(lines)
+    return format_prior_documents(digest)
 
 
 def build_stage_evaluation_prompt(
@@ -228,6 +222,29 @@ def build_stage_evaluation_prompt(
         *([context_block(inputs), ""] if context_block(inputs) else []),
         f"WHAT THE EARLIER STAGES ESTABLISHED:\n{_format_prior_stages(digest)}",
         "",
+        *(
+            [
+                "THE INSTRUCTION THE USER REVIEWED, which this artifact was produced from:",
+                "--- BEGIN REVIEWED INSTRUCTION ---",
+                digest.reviewed_prompt.strip(),
+                "--- END REVIEWED INSTRUCTION ---",
+                "",
+            ]
+            if digest.reviewed_prompt.strip()
+            else []
+        ),
+        *(
+            [
+                "FIGURES ALREADY ESTABLISHED by earlier stages (the artifact should use these exact values):",
+                *[
+                    f"- [{f.stage}] {f.name}: {f.value}" + (f" ({f.context})" if f.context else "")
+                    for f in digest.figures
+                ],
+                "",
+            ]
+            if digest.figures
+            else []
+        ),
         *(
             [
                 "THE MANUSCRIPT THIS STAGE WAS PRODUCED FROM (judge the artifact against it):",

@@ -428,6 +428,10 @@ export interface StageDigestEntry {
   stage_id: string;
   label: string;
   summary: string;
+  /** The latest saved version in full, within the digest's budget (digest.ts). */
+  text?: string;
+  version?: number;
+  truncated?: boolean;
 }
 
 export interface StageDigestRequest {
