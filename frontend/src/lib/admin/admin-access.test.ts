@@ -23,6 +23,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const getUser = vi.hoisted(() => vi.fn());
 /** Records every `createClient` call so we can assert which key was used. */
 const createClientSpy = vi.hoisted(() => vi.fn());
+/** Rows a table returns; every other table is empty. */
+const tableRows = vi.hoisted(() => new Map<string, unknown[]>());
+/** Accounts `auth.admin.listUsers` knows about. */
+const authUsers = vi.hoisted(() => [] as { id: string; email: string }[]);
 
 vi.mock('@supabase/supabase-js', () => ({
   createClient: (url: string, key: string, opts?: unknown) => {
@@ -30,16 +34,16 @@ vi.mock('@supabase/supabase-js', () => ({
     return {
       auth: {
         getUser,
-        admin: { listUsers: async () => ({ data: { users: [] }, error: null }) },
+        admin: { listUsers: async () => ({ data: { users: authUsers }, error: null }) },
       },
-      from: () => makeQuery(),
+      from: (table: string) => makeQuery(tableRows.get(table) ?? []),
     };
   },
 }));
 
 /** A chainable PostgREST stub that always resolves to an empty result. */
-function makeQuery() {
-  const result = Promise.resolve({ data: [], error: null });
+function makeQuery(rows: unknown[]) {
+  const result = Promise.resolve({ data: rows, error: null, count: rows.length });
   const chain: Record<string, unknown> = {};
   for (const method of ['select', 'gte', 'in', 'order', 'limit', 'eq']) {
     chain[method] = () => chain;
@@ -60,6 +64,8 @@ beforeEach(() => {
   vi.resetModules();
   getUser.mockReset();
   createClientSpy.mockReset();
+  tableRows.clear();
+  authUsers.length = 0;
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://proj.supabase.co';
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = ANON_KEY;
   process.env.SUPABASE_SERVICE_ROLE_KEY = SERVICE_KEY;
@@ -102,6 +108,7 @@ describe('the admin route refuses everyone who is not an admin', () => {
     const body = await res.json();
     expect(body.error).toMatch(/administrator/i);
     expect(body.usageByUser).toBeUndefined();
+    expect(body.feedback).toBeUndefined();
   });
 
   it('never even constructs the service-role client for a non-admin', async () => {
@@ -180,6 +187,39 @@ describe('the admin route admits an admin', () => {
     expect(body.totals).toBeDefined();
     expect(Array.isArray(body.usageByUser)).toBe(true);
     expect(Array.isArray(body.failedJobs)).toBe(true);
+  });
+
+  it('returns every beta feedback submission, resolved to an email', async () => {
+    // FR-22: the admin page is the only place cross-user feedback can be read.
+    authUsers.push({ id: 'tester-1', email: 'tester@example.test' });
+    tableRows.set('beta_feedback', [
+      {
+        id: 'fb-1',
+        user_id: 'tester-1',
+        project_id: null,
+        use_case: 'Drafting a memo',
+        value: 'The outline',
+        blockage: null,
+        reuse_likelihood: 4,
+        created_at: '2026-10-09T10:00:00Z',
+      },
+    ]);
+    signedInAs(ADMIN_ID);
+    const body = await (await callRoute('valid-token')).json();
+
+    expect(body.totals.feedback).toBe(1);
+    expect(body.feedback).toEqual([
+      {
+        id: 'fb-1',
+        userEmail: 'tester@example.test',
+        projectTitle: null,
+        useCase: 'Drafting a memo',
+        value: 'The outline',
+        blockage: '',
+        reuseLikelihood: 4,
+        createdAt: '2026-10-09T10:00:00Z',
+      },
+    ]);
   });
 
   it('uses the service-role client once the check has passed', async () => {
