@@ -87,3 +87,12 @@ def test_endpoint_returns_the_judgment_and_never_writes():
         assert "Hessian" in stub.generate_json.call_args.kwargs["prompt"]
     finally:
         app.dependency_overrides.pop(get_client, None)
+
+
+def test_a_requirement_about_how_the_work_is_done_is_met_by_the_record(basic_inputs):
+    """8 Oct production pass (TaskBoard): "stop and ask me first" was asked and
+    answered; the check said the objective was not met because a draft exists."""
+    from promptmaster.objective_assessment import build_assessment_prompt
+
+    system, _user = build_assessment_prompt(basic_inputs, "Output", "TaskBoard launches December 10.", [])
+    assert "a decision the user recorded answers the question it required" in system
