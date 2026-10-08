@@ -18,8 +18,10 @@ from __future__ import annotations
 
 #: Highest first. Keys are mirrored in the frontend.
 PRECEDENCE: tuple[tuple[str, str], ...] = (
-    ("objective", "the user's objective, in their own words"),
-    ("decision", "decisions the user has made — approvals, choices, settled rows"),
+    ("objective", "the user's objective, in their own words — what is made, for whom and why. "
+     "A particular value in it (a date, a price, a figure) gives way to an accepted fact that "
+     "supersedes it: the fact is the user's later word"),
+    ("decision", "decisions the user has made — accepted facts, answers to questions, approvals, choices, settled rows"),
     ("instruction", "the user's latest explicit instruction"),
     ("stage", "the current stage's instruction: what to produce now"),
     ("constraint", "the project's constraints and output format"),

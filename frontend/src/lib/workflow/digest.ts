@@ -26,6 +26,8 @@ import { manuscriptSourceFor } from './context';
 import type { StageDefinition, WorkflowState, WorkflowTemplate } from './types';
 import { itemSchemaFor, parseItems, primaryArtifactKind, rendererHoldsItems } from './stage-artifact';
 import { carriesForward, isDone } from './types';
+import { supersededFactValues } from './facts';
+import { leftoverValues, type SupersededValue } from './fact-values';
 
 /** Per-stage budget for a summary, used only where no saved text is sent. */
 export const SUMMARY_MAX = 320;
@@ -235,7 +237,7 @@ export interface StageArtifactBundle {
 export function buildStageDigest(
   template: WorkflowTemplate,
   state: WorkflowState,
-  project: Pick<Project, 'objective' | 'audience' | 'data_files'>,
+  project: Pick<Project, 'objective' | 'audience' | 'data_files'> & Partial<Pick<Project, 'facts'>>,
   bundles: Record<string, StageArtifactBundle>,
   upToStageId: string
 ): StageDigest {
@@ -310,7 +312,9 @@ export function buildStageDigest(
     prior_stages,
     manuscript: formatManuscript(sections),
     data_files: dataFileBriefs(project),
-    figures: establishedFigures(template, state, bundles, upToStageId),
+    // A figure whose value the user has since changed is not "established":
+    // quoting it "exactly" carried November 12 into the repairs (8 Oct).
+    figures: withoutSuperseded(establishedFigures(template, state, bundles, upToStageId), supersededFactValues(project.facts)),
     later_stages: cutoff >= 0 ? template.stages.slice(cutoff + 1).map((s) => s.label.slice(0, 120)) : [],
     ...reviewedPrompt(template, state, bundles, cutoff),
   };
@@ -363,4 +367,9 @@ export function establishedFigures(
     for (const f of stored.figures) out.push({ stage: stage.label, name: f.name, value: f.value, context: f.context ?? '' });
   });
   return out.slice(0, 60);
+}
+
+function withoutSuperseded(figures: StageDigest['figures'], superseded: readonly SupersededValue[]): StageDigest['figures'] {
+  if (!superseded.length) return figures;
+  return figures.filter((f) => leftoverValues(f.value, superseded).length === 0);
 }

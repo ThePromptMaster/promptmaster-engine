@@ -19,6 +19,7 @@ import { SINGLE_OUTPUT_V1 as template } from './templates/single-output.v1';
 import { itemSchemaFor } from './stage-artifact';
 import { policyConfirmable, staleRepair } from '@/lib/agent/needs';
 import { recheckInstruction } from '@/lib/agent/perform';
+import { supersededValues } from './fact-values';
 import type { StageContext, WorkflowState } from './types';
 
 const ctx = (over: Partial<StageContext> = {}): StageContext => ({
@@ -128,11 +129,18 @@ describe('An authorized requirement change updates the brief and affected artifa
   it.todo('Phase 3: a requirement or fact recorded in project_facts reopens only the stages that relied on it');
 });
 describe('Superseded recommendations are repaired consistently; valid figures remain', () => {
-  it('a stage reopened by the change is Go\'s next move, earliest first, once per run', () => {
+  it('a stage reopened by the change is Go\'s next move, earliest first, at most twice per run', () => {
     const state: WorkflowState = { ...afterChange, stages: { ...afterChange.stages, output: { status: 'stale', stale: { reason: 'the requirement changed', since: 'x', was: 'complete' } } } };
     expect(staleRepair(template, state)).toMatchObject({ key: 'recheck_stage', params: { stage_id: 'output' } });
-    expect(staleRepair(template, state, ['output'])).toMatchObject({ params: { stage_id: 'summary' } });
-    expect(staleRepair(template, state, ['output', 'summary'])).toBeNull();
+    // A repair that failed is tried once more (D2, 8 Oct), then left to the user.
+    expect(staleRepair(template, state, ['output'])).toMatchObject({ params: { stage_id: 'output' } });
+    expect(staleRepair(template, state, ['output', 'output'])).toMatchObject({ params: { stage_id: 'summary' } });
+    expect(staleRepair(template, state, ['output', 'output', 'summary', 'summary'])).toBeNull();
+  });
+  it('a stage a change reopened after the current one is repaired too, through to the final bundle (8 Oct, TeamNotes)', () => {
+    const changed = { status: 'stale' as const, stale: { reason: 'the launch date changed', since: 'x', was: 'complete' as const } };
+    const atOutput: WorkflowState = { ...afterChange, current_stage_id: 'output', stages: { ...afterChange.stages, output: changed, summary: changed } };
+    expect(staleRepair(template, atOutput, ['output', 'output'])).toMatchObject({ params: { stage_id: 'summary' } });
   });
   it('a stage after the one the project is on is redone in order, not repaired ahead of it', () => {
     const back: WorkflowState = { ...afterChange, current_stage_id: 'review', stages: { ...afterChange.stages, review: { status: 'in_progress' }, output: { status: 'stale', stale: { reason: 'went back', since: 'x', was: 'complete' } } } };
@@ -143,6 +151,10 @@ describe('Superseded recommendations are repaired consistently; valid figures re
     expect(text).toContain('Keep every figure, calculation and finding that still holds, exactly as written');
     expect(text).toContain('one that no longer qualifies is said to be excluded, and why');
     expect(text).toContain('"What changed:"');
+    // D2 (8 Oct): a changed fact's old value is named, with what replaces it.
+    const withChange = recheckInstruction('Announcement', 'the launch date changed', supersededValues('Launch: November 12, 2026', 'Launch: November 19, 2026'));
+    expect(withChange).toContain('CHANGED FACTS');
+    expect(withChange).toContain('November 12 (was: "Launch: November 12, 2026"; now: "Launch: November 19, 2026")');
   });
 });
 describe('Go handles routine repairs within delegated authority', () => {

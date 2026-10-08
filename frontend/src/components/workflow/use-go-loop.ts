@@ -514,7 +514,7 @@ export function useGoLoop(opts: Options) {
 
         // 6 Oct: a stage a change reopened is repaired before anything else —
         // on whichever stage it is — so Summary is not left recommending A.
-        // Once per stage per run: one that still cannot close is the user's.
+        // At most twice per stage (REPAIR_TRIES): one that still cannot close is the user's.
         const recheckTried = [...priorStepsRef.current, ...stepsRef.current]
           .filter((s) => s.action_key === 'recheck_stage')
           .map((s) => String(s.params?.stage_id ?? ''));
