@@ -41,6 +41,7 @@ from .schemas import (
     StageItemSchema,
 )
 from .project_context import context_block
+from .saved_documents import format_prior_documents
 
 logger = logging.getLogger(__name__)
 
@@ -71,14 +72,7 @@ _LIST_INSTRUCTION = (
 
 def _format_digest(digest: StageDigest) -> str:
     """Render the upstream stages as a block the model can read in order."""
-    if not digest.prior_stages:
-        return "(nothing completed before this stage)"
-    lines = []
-    for entry in digest.prior_stages:
-        label = entry.label or entry.stage_id
-        summary = entry.summary.strip() or "(no summary recorded)"
-        lines.append(f"- {label}: {summary}")
-    return "\n".join(lines)
+    return format_prior_documents(digest)
 
 
 def _format_item_schema(schema: StageItemSchema) -> str:
@@ -232,8 +226,8 @@ def build_stage_prompt(
         # drifted into whatever the statement made of it (the client, 2 Oct).
         "THE ORIGINAL OBJECTIVE IS THE USER'S OWN WORDS AND GOVERNS. The earlier "
         "stages elaborate it; none of them changes what is being made, for whom, "
-        "or about what. Where a summary above and the original objective "
-        "disagree, the original objective wins.",
+        "or about what. Where an earlier stage above and the original "
+        "objective disagree, the original objective wins.",
         *(
             [
                 "This stage's statement sharpens the user's objective; it keeps the "

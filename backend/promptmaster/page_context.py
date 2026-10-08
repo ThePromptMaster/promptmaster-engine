@@ -15,7 +15,8 @@ import re
 
 from pydantic import BaseModel, Field
 
-from .schemas import StageDigestEntry
+from .saved_documents import format_prior_documents
+from .schemas import StageDigest, StageDigestEntry
 
 
 class PageButton(BaseModel):
@@ -137,7 +138,7 @@ def format_chat_context(ctx: ChatContext | None) -> str:
         lines.append(f"What this stage produces: {ctx.stage_instruction.strip()}")
     if ctx.prior_stages:
         lines.append("What the earlier stages established:")
-        lines += [f"- {e.label or e.stage_id}: {e.summary.strip() or '(no summary)'}" for e in ctx.prior_stages]
+        lines.append(format_prior_documents(StageDigest(prior_stages=ctx.prior_stages)))
     if ctx.outline.strip():
         lines += ["", "THE OUTLINE:", ctx.outline.strip()]
     if ctx.manuscript.strip():

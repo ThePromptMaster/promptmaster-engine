@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import { BOOK_V1, EXPLORATION_V1, RESEARCH_V1, SINGLE_OUTPUT_V1, projectState } from './index';
 import {
+  DOCUMENTS_MAX,
   MANUSCRIPT_MAX,
   SUMMARY_MAX,
   buildStageDigest,
+  documentText,
   formatManuscript,
   summariseStageContent,
   type StageArtifactBundle,
@@ -144,9 +146,10 @@ describe('buildStageDigest', () => {
     expect(digest.prior_stages[0].summary).not.toBe('');
   });
 
-  it('grows with the number of stages, not the length of the book', () => {
-    // The size bound the whole design rests on: twelve completed stages, each
-    // holding a chapter, still produce a digest measured in hundreds of bytes.
+  it('is bounded by the documents budget, not the length of the book', () => {
+    // Twelve completed stages, each holding a chapter: the latest stages are
+    // sent in full until DOCUMENTS_MAX, the cut one is marked, and the rest
+    // fall back to summaries.
     const chapter = 'word '.repeat(20000);
     const all: Record<string, StageArtifactBundle> = {};
     const completions: WorkflowEvent[] = [];
@@ -160,8 +163,57 @@ describe('buildStageDigest', () => {
     const digest = buildStageDigest(BOOK_V1, full, PROJECT, all, 'final_review');
     const size = JSON.stringify(digest).length;
     expect(digest.prior_stages).toHaveLength(BOOK_V1.stages.length - 1);
-    expect(size).toBeLessThan(BOOK_V1.stages.length * (SUMMARY_MAX + 200));
-    expect(size).toBeLessThan(chapter.length / 10);
+    expect(size).toBeLessThan(DOCUMENTS_MAX + BOOK_V1.stages.length * (SUMMARY_MAX + 300));
+    const sent = digest.prior_stages.filter((e) => e.text);
+    expect(sent.length).toBeGreaterThan(0);
+    expect(digest.prior_stages.some((e) => e.truncated)).toBe(true);
+    expect(digest.prior_stages[0].text ?? '').toBe('');
+    expect(digest.prior_stages[0].summary).not.toBe('');
+  });
+
+  it('sends each earlier stage\'s latest saved text in full, with its version', () => {
+    const v2: StageArtifactBundle = {
+      artifact: { id: 'a', summary: 'Stored when v1 completed.' } as Artifact,
+      versions: [
+        { id: 'v1', version_number: 1, content: 'The first answer.' } as ArtifactVersion,
+        { id: 'v2', version_number: 2, content: 'The revised answer, with every detail.' } as ArtifactVersion,
+      ],
+    };
+    const digest = buildStageDigest(BOOK_V1, state, PROJECT, { ...bundles, objective: v2 }, 'positioning');
+    expect(digest.prior_stages[0]).toMatchObject({ text: 'The revised answer, with every detail.', version: 2 });
+  });
+
+  it('renders a table as every row with every field and its status', () => {
+    const rows = serializeItems([
+      { id: 'i1', who: 'Engineering leads', prior_knowledge: 'x'.repeat(300) },
+      { id: 'i2', who: 'Compliance officers', prior_knowledge: 'Knows the audit rules', status: 'kept', status_source: 'proposed' },
+      ...Array.from({ length: 10 }, (_, n) => ({ id: `r${n}`, who: `Reader ${n}` })),
+    ]);
+    const text = documentText(BOOK_V1.stages[1], rows);
+    expect(text).toContain('x'.repeat(300));
+    expect(text).toContain('Knows the audit rules');
+    expect(text).toContain('proposed, not yet decided: kept');
+    expect(text).toContain('Reader 9');
+    expect(text.split('\n')).toHaveLength(12);
+  });
+
+  it('shows a stage reopened for editing, labelled, rather than dropping it', () => {
+    // 7 Oct workshop test: Output revised to v2 after being reopened; the final
+    // review never saw it.
+    const reopened = projectState(SINGLE_OUTPUT_V1, [
+      ev('stage_completed', 'input', 'review'),
+      ev('stage_completed', 'review', 'output'),
+      ev('stage_completed', 'output', 'realign'),
+      ev('stage_completed', 'realign', 'summary'),
+      ev('stage_reopened', 'output'),
+    ]);
+    expect(reopened.stages.output.status).toBe('in_progress');
+    const digest = buildStageDigest(SINGLE_OUTPUT_V1, reopened, PROJECT, {
+      output: { artifact: { id: 'o', summary: 'old' } as Artifact, versions: [{ id: 'o2', version_number: 2, content: 'Hands-on: 80 minutes. Finish 12:05. Feasible: no.' } as ArtifactVersion] },
+    }, 'summary');
+    const output = digest.prior_stages.find((e) => e.stage_id === 'output')!;
+    expect(output.label).toMatch(/being revised/);
+    expect(output.text).toContain('Feasible: no');
   });
 
   it('works on Research with no workflow-specific handling', () => {

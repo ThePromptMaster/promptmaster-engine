@@ -424,15 +424,19 @@ class GuideQuestion(BaseModel):
 
 
 class StageDigestEntry(BaseModel):
-    """One completed upstream stage, projected down to a few lines.
+    """One upstream stage: its summary and, since 8 Oct, its latest saved text.
 
-    Deliberately a summary rather than the artifact itself. A thirteen-stage
-    book would otherwise ship the whole manuscript in order to generate a claim
-    table — unbounded growth that also buries the instruction that matters.
+    The text is the document itself (rows rendered as lines for a table stage),
+    bounded by the client across all stages (digest.ts, DOCUMENTS_MAX). A check
+    that saw only a 320-character summary reported facts missing that the saved
+    FAQ stated; see saved_documents.py. The manuscript still travels separately.
     """
     stage_id: str = Field(..., description="The stage this came from.")
     label: str = Field(default="", description="Human label, used verbatim in the prompt.")
-    summary: str = Field(default="", description="A few lines. Not the artifact.")
+    summary: str = Field(default="", description="A few lines. Used when no text was sent.")
+    text: str = Field(default="", max_length=200_000, description="The latest saved version, in full unless truncated.")
+    version: int | None = Field(default=None, description="The saved version number the text is.")
+    truncated: bool = Field(default=False, description="The text was cut to fit the budget.")
 
 
 class DataFileBrief(BaseModel):
@@ -486,7 +490,7 @@ class StageDigest(BaseModel):
     """
     objective: str = Field(default="", description="Full text; never summarised.")
     audience: str = Field(default="")
-    prior_stages: list["StageDigestEntry"] = Field(default_factory=list)
+    prior_stages: list["StageDigestEntry"] = Field(default_factory=list, max_length=60)
     manuscript: str = Field(default="", max_length=200_000, description="Drafted chapters, bounded by the client.")
     #: The project's data files; empty when none is attached.
     data_files: list[DataFileBrief] = Field(default_factory=list, max_length=20)
