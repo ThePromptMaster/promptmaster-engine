@@ -84,3 +84,13 @@ describe('a saved revision of an earlier stage (H1b; Sean, 7 Oct, workshop)', ()
     expect(laterDoneStages(BOOK_V1, state, 'positioning')).toEqual([]);
   });
 });
+
+describe('the notice survives a later change that reopened nothing new (8 Oct, production)', () => {
+  it('shows the earlier change whose stages still wait', () => {
+    const first = ev('brief_changed', 'positioning', '2026-10-08T10:00:00Z', { payload: { affected: [{ stage_id: 'audience', reason: 'price changed' }] } });
+    const second = ev('brief_changed', 'positioning', '2026-10-08T10:01:00Z', { payload: { affected: [{ stage_id: 'audience', reason: 'again' }] } });
+    const state = projectState(BOOK_V1, [...done, first]);
+    // `second` names a stage that is already stale: nothing new reopened.
+    expect(openBriefChange([...done, first, second], state)?.event).toBe(first);
+  });
+});

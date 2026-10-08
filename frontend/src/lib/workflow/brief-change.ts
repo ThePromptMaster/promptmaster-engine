@@ -105,7 +105,11 @@ export function openBriefChange(
     const stageIds = affected
       .map((a) => a.stage_id ?? '')
       .filter((id) => state.stages[id]?.status === 'stale' && state.stages[id]?.stale?.since === e.created_at);
-    return stageIds.length ? { event: e, stageIds } : null;
+    // A later change that reopened nothing new (its stages were already
+    // waiting) must not hide the earlier one that did: on production a fact
+    // changed then another taken out left no notice, and no "Update affected
+    // work and resume" (8 Oct).
+    if (stageIds.length) return { event: e, stageIds };
   }
   return null;
 }
