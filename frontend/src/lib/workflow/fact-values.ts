@@ -101,7 +101,7 @@ function answered(statement: string): string {
  * the value; it does not state it as current (8 Oct, production: a reviewed
  * prompt restating the two sources could never pass the leftover check).
  */
-const ATTRIBUTED = /\b(sources?|conflict\w*|supersed\w*|instead of|replac\w*|previous\w*|earlier|formerly|alternative\w*|no longer|rather than|do not use|don't use|not use|was (?:originally|initially))\b/i;
+const ATTRIBUTED = /\b(sources?|exclud\w*|conflict\w*|supersed\w*|instead of|replac\w*|previous\w*|earlier|formerly|alternative\w*|no longer|rather than|do not use|don't use|not use|was (?:originally|initially))\b/i;
 
 /**
  * The superseded values `text` still states as current. A sentence that names
@@ -111,6 +111,22 @@ const ATTRIBUTED = /\b(sources?|conflict\w*|supersed\w*|instead of|replac\w*|pre
  */
 export function leftoverValues(text: string, superseded: readonly SupersededValue[]): SupersededValue[] {
   if (!superseded.length) return [];
+  // A list under a line that sets values aside ("The following alternatives
+  // are excluded:") is that line's: each item reports a value, it does not
+  // state it (8 Oct, production: "- $18 per user per month price").
+  const lines = text.replace(/\\n/g, '\n').split('\n');
+  let underAttribution = false;
+  const kept = lines.filter((line) => {
+    const t = line.trim();
+    if (/:\s*$/.test(t)) {
+      underAttribution = ATTRIBUTED.test(t);
+      return !underAttribution;
+    }
+    if (underAttribution && (/^([-*+]|\d+[.)])\s/.test(t) || (t && t.length < 80 && !/[.!?]$/.test(t)))) return false;
+    if (t) underAttribution = false;
+    return true;
+  });
+  text = kept.join('\n');
   const pieces = text
     .replace(/\\n/g, '\n')
     .split(/(?<=[.!?;])\s+|\s*\n\s*|",\s*"/)
