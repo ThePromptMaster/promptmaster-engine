@@ -44,6 +44,9 @@ import { outlineStageFor } from '@/lib/outline/actions';
 import { listRecommendations, recordDecision } from '@/lib/supabase/recommendations';
 import { projectMemory } from '@/lib/agent/memory';
 import { requestProjectCancel } from '@/lib/supabase/jobs';
+import { recordFacts } from '@/lib/supabase/facts';
+import { appendWorkflowEvent } from '@/lib/supabase/workflow';
+import { answerAsFact } from '@/lib/workflow/answers';
 import { authorizeRun } from '@/lib/agent/authorize';
 import { buildAgentState } from '@/lib/agent/digest';
 import { performStep, type PerformContext, type StepOutcome } from '@/lib/agent/perform';
@@ -838,6 +841,22 @@ export function useGoLoop(opts: Options) {
           rationale: '', expectedOutcome: '', needsDecision: false, decisionQuestion: null,
         });
         upsertStep(await finishAgentStep(step.id, { status: 'succeeded', label: null, output: text.trim() }));
+        // The answer is a decision of record, not only a line in this run
+        // (Sean, 7 Oct, emails 8 and 11): evaluation, the final review and the
+        // objective check read the project's facts, never the run's steps.
+        const asked = current.needs?.kind === 'answer_question' ? current.needs.question : current.stop_reason ?? '';
+        const fact = answerAsFact(asked, text, { run_id: current.id, step_id: step.id, stage_id: o.stage.id });
+        if (fact) await recordFacts(o.project, [fact]);
+        // A stage stuck on that decision is no longer stuck.
+        const st = o.state.stages[o.stage.id];
+        if (st?.status === 'blocked' && st.blocked?.kind === 'needs_decision') {
+          await appendWorkflowEvent(o.project.id, o.project.user_id, {
+            type: 'stage_unblocked', stage_id: o.stage.id, actor: 'user', reason: `Answered: ${text.trim().slice(0, 300)}`,
+          });
+        }
+        if (fact || st?.status === 'blocked') {
+          await Promise.all([o.onRefresh?.(), o.reloadEvents()]);
+        }
         await go();
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Could not record your answer.');
