@@ -7,7 +7,7 @@ import type { StageEvaluation } from '@/lib/workflow/types';
 import type { AgentStep } from '@/types/agent';
 import { deriveExecutionLabel } from './labels';
 import { ITEM_SCHEMAS, itemSchemaFor } from '@/lib/workflow/stage-artifact';
-import { allowedActions, alternating, unsavedDerivation, withoutRepeatReasoning, LIVE_TOOLS, NO_TOOLS, polishSinceDirection, withoutOverride, withoutEndlessPolish, withoutSettledRuns, fitsBudget, noChange, noProgress, plannedBeforeLatestChange, preempt, shouldPause, stageMoveActor, stateFingerprint } from './policy';
+import { allowedActions, alternating, unsavedDerivation, LIVE_TOOLS, NO_TOOLS, polishSinceDirection, withoutOverride, withoutEndlessPolish, withoutSettledRuns, fitsBudget, noChange, noProgress, plannedBeforeLatestChange, preempt, shouldPause, stageMoveActor, stateFingerprint } from './policy';
 
 function step(over: Partial<AgentStep>): AgentStep {
   return {
@@ -99,7 +99,7 @@ describe('preempt — checked before any model call', () => {
     expect(noProgress([saved[0], saved[1], revise(2, {})])).toBe(true);
     // A reasoning move never saves: three of it in a row still stop.
     expect(preempt({ ...base, steps: [0, 1, 2].map((idx) => step({ idx, action_key: 'compare_alternatives' })) })?.reason).toBe(
-      '"Compare alternatives" was chosen 3 times in a row on this stage, and none of it was saved to the document, so the stage is unchanged. What each produced is in the run log. It needs your direction.'
+      '"Compare alternatives" was chosen 3 times in a row on this stage without changing it: none of it was saved to the document. What each produced is in the run log. It needs your direction.'
     );
   });
 
@@ -610,15 +610,13 @@ describe('R1c: propose_statuses is offered while a check table has rows with nei
   });
 });
 
-describe('a derivation is saved, not repeated (C4; Sean, 6 Oct, sequence test)', () => {
+describe('a derivation reaches the document (C4; Sean, 6 Oct, sequence test)', () => {
   const derive = step({ action_key: 'derive', stage_id: 'analysis', status: 'succeeded', output: 'S_n = F_{n+2} - 1, proved by induction.' });
   const saved = step({ action_key: 'revise_stage', stage_id: 'analysis', status: 'succeeded', changes: { version_ids: ['v2'] } });
 
-  it('after a derivation, reasoning is withheld on the stage until something is saved', () => {
+  it('a derivation not yet saved is what the next revision applies', () => {
     expect(unsavedDerivation([derive], 'analysis')).toEqual({ label: 'Derive', output: 'S_n = F_{n+2} - 1, proved by induction.' });
-    expect(withoutRepeatReasoning(['derive', 'prove', 'revise_stage'], [derive], 'analysis')).toEqual(['revise_stage']);
     expect(unsavedDerivation([derive, saved], 'analysis')).toBeNull();
-    expect(withoutRepeatReasoning(['derive', 'revise_stage'], [derive, saved], 'analysis')).toEqual(['derive', 'revise_stage']);
     expect(unsavedDerivation([derive], 'results')).toBeNull();
   });
 });
