@@ -456,6 +456,23 @@ export function projectState(
         break;
       }
 
+      // 7 Oct (Sean, workshop test): Output was revised to v2, and the final
+      // review went on presenting v1 as current and feasible, even after a
+      // manual recheck. A save on an earlier stage reopens the work after it
+      // that is done, saying which change did it — as a brief change does.
+      case 'stage_version_saved': {
+        const cutoff = order.indexOf(event.stage_id);
+        if (cutoff < 0) break;
+        const label = template.stages[cutoff]?.label ?? event.stage_id;
+        const n = event.payload?.version_number;
+        const reason = `${label} was changed${typeof n === 'number' ? ` (now v${n})` : ''} after this stage used it.`;
+        order.forEach((id, i) => {
+          const was = state.stages[id]?.status;
+          if (i > cutoff && isDone(was)) set(id, { status: 'stale', stale: { reason, since: event.created_at, was: was! } });
+        });
+        break;
+      }
+
       case 'brief_change_dismissed': {
         const at = event.payload?.change_at;
         for (const id of order) {
@@ -743,4 +760,15 @@ export function outstandingBeyondCriteria(items: readonly OutstandingItem[], sta
 /** Items that are not on the given stage at all. */
 export function outstandingElsewhere(items: readonly OutstandingItem[], stageId: string): OutstandingItem[] {
   return items.filter((i) => !('stageId' in i) || i.stageId !== stageId);
+}
+
+/**
+ * The stages after `stageId` that are done, and so were built on its earlier
+ * version. A save on `stageId` reopens them (`stage_version_saved`); when
+ * there are none the event is not worth writing.
+ */
+export function laterDoneStages(template: WorkflowTemplate, state: WorkflowState, stageId: string): string[] {
+  const index = template.stages.findIndex((s) => s.id === stageId);
+  if (index < 0) return [];
+  return template.stages.slice(index + 1).filter((s) => isDone(state.stages[s.id]?.status)).map((s) => s.id);
 }

@@ -43,7 +43,9 @@ test('a done stage can be reopened, edited, closed again, and the stages after i
   await page.getByRole('button', { name: /back to Positioning/ }).click();
   await expect(page.getByRole('heading', { name: /Positioning/ })).toBeVisible();
   const log = await serviceSelect('workflow_events', `project_id=eq.${projectId}&stage_id=eq.objective&type=neq.project_created&select=type,actor,payload&order=seq`);
-  expect(log.map((e: { type: string }) => e.type)).toEqual(['stage_marked_complete', 'stage_reopened', 'stage_marked_complete']);
+  // H1b (8 Oct): saving v2 while Audience was done records the save that reopened it.
+  expect(log.map((e: { type: string }) => e.type)).toEqual(['stage_marked_complete', 'stage_reopened', 'stage_version_saved', 'stage_marked_complete']);
   expect(log[1].actor).toBe('user');
-  expect(log[2].payload.evidence_version_id).not.toBe(log[0].payload.evidence_version_id);
+  expect(log[2].payload.version_number).toBe(2);
+  expect(log[3].payload.evidence_version_id).not.toBe(log[0].payload.evidence_version_id);
 });

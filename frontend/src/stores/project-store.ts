@@ -32,7 +32,8 @@ import {
   listWorkflowEvents,
   type NewWorkflowEvent,
 } from '@/lib/supabase/workflow';
-import type { WorkflowEvent } from '@/lib/workflow/types';
+import type { WorkflowEvent, WorkflowTemplate } from '@/lib/workflow/types';
+import { laterDoneStages, projectState } from '@/lib/workflow/engine';
 import {
   ProjectConflictError,
   type Artifact,
@@ -106,6 +107,13 @@ interface ProjectState {
    * from "not read yet" and not generate against an empty log.
    */
   events: WorkflowEvent[] | null;
+  /**
+   * The template the open project is pinned to, set by the workspace. The
+   * store needs it for one thing: knowing which stages a save invalidates
+   * (`stage_version_saved`, H1b).
+   */
+  template: WorkflowTemplate | null;
+  setTemplate(template: WorkflowTemplate | null): void;
   /**
    * Set when the log could not be read and there is none on hand. `events`
    * then stays null rather than becoming `[]`: an empty log projects to "every
@@ -265,6 +273,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
   evaluations: {},
   events: null,
   eventsError: null,
+  template: null,
   recommendations: [],
   tasks: [],
   files: [],
@@ -432,6 +441,10 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     ]);
     if (retired.length) get().markSuperseded(retired);
     return events;
+  },
+
+  setTemplate(template) {
+    set({ template });
   },
 
   markSuperseded(ids) {
@@ -644,6 +657,26 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         evaluations: saved ? { ...s.evaluations, [created.id]: saved } : s.evaluations,
       };
     });
+
+    // H1b (Sean, 7 Oct, workshop): a revised Output left the final review
+    // presenting v1 as current. A save reopens the done work after this stage,
+    // which was built on the version just replaced. Best effort: the version
+    // is saved either way, and a failure here is logged, not thrown at a
+    // caller that would then report the save as failed.
+    const { template, events } = get();
+    if (template && events) {
+      const later = laterDoneStages(template, projectState(template, events), stageId);
+      if (later.length) {
+        await get()
+          .appendEvent({
+            type: 'stage_version_saved',
+            stage_id: stageId,
+            actor: version.source_operation.startsWith('agent_') ? 'system' : 'user',
+            payload: { version_id: created.id, version_number: created.version_number, prior_version_id: head?.id ?? null },
+          })
+          .catch((err) => console.error('[H1b] could not record the save for recheck', err));
+      }
+    }
 
     return created;
   },

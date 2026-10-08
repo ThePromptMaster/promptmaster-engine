@@ -574,6 +574,8 @@ routine repairs, and how completion is kept from contradicting open work. Assess
 | Facts from chat | `record_facts` reply action; figures must be in the user's own message (`reply_actions._from_user`); recorded only on *Record* |
 | A fact changed | the change check watches `facts` like a brief field (`use-brief-change.ts`); `brief_changed` keeps `before` / `after` |
 | What is still open | `outstandingWork()` in `engine.ts`: stale stages, open findings, unconfirmed proposals, unmet blocking criteria, stuck stages, Go waiting, an unmet objective — read by the stage bar, recommendations, the finish dialog and Go's completion |
+| What a later stage reads | each earlier stage's latest saved version in full (`digest.ts` `documentText`, budget `DOCUMENTS_MAX`), rendered by `saved_documents.py` for generation, checks and chat; a reopened or stale stage is shown, labelled |
+| A revision reopens later work | `stage_version_saved` (`20261026000000`), written by `appendStageVersion` when done stages follow; `projectState` marks them stale with the change named; the recheck notice reports it |
 | Is the objective met | `/api/agent/assess-objective` before Go may say so; recorded as `objective_assessed` (`20261023000000`); "met" needs a verbatim quote, "performed" only recorded steps |
 | Repair | Go's `recheck_stage` (stale stages up to the current one, earliest first) and `confirm_proposals` (under `handle`, `status_source: 'policy'`) |
 | Ongoing work | `WorkflowTemplate.execution` (finite/ongoing, success criterion, stop conditions); a custom stage's `loop_to`; Go starts the next round under Autonomous + `handle` (`20261025000000`) |
