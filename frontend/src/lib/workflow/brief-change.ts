@@ -91,6 +91,15 @@ export function openBriefChange(
 ): { event: WorkflowEvent; stageIds: string[] } | null {
   for (let i = events.length - 1; i >= 0; i -= 1) {
     const e = events[i];
+    // A saved revision of an earlier stage reopens what came after it the
+    // same way (H1b); the stages it reopened are the ones stale since it.
+    if (e.type === 'stage_version_saved') {
+      const stageIds = Object.entries(state.stages)
+        .filter(([, st]) => st.status === 'stale' && st.stale?.since === e.created_at)
+        .map(([id]) => id);
+      if (stageIds.length) return { event: e, stageIds };
+      continue;
+    }
     if (e.type !== 'brief_changed') continue;
     const affected = Array.isArray(e.payload?.affected) ? (e.payload!.affected as { stage_id?: string }[]) : [];
     const stageIds = affected

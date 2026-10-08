@@ -364,7 +364,14 @@ export type WorkflowEventType =
    * payload: outcome, reason, basis_quote, blockers, performed, proposed_next.
    * Moves no state; `objective.ts` reads the latest.
    */
-  | 'objective_assessed';
+  | 'objective_assessed'
+  /**
+   * A stage's saved work changed while later stages were done (8 Oct, H1b).
+   * payload: version_id, version_number, prior_version_id. Marks every later
+   * done stage for recheck, naming the change; written only when there is
+   * such work (`laterDoneStages`).
+   */
+  | 'stage_version_saved';
 
 export interface WorkflowEvent {
   type: WorkflowEventType;

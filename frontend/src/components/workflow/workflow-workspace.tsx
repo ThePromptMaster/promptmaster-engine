@@ -167,6 +167,11 @@ export function WorkflowWorkspace({
   // no surface can hold a copy the others have moved past.
   const events = useProjectStore((s) => s.events);
   const appendEvent = useProjectStore((s) => s.appendEvent);
+  // The store reads the template to know what a save reopens (H1b).
+  const setStoreTemplate = useProjectStore((s) => s.setTemplate);
+  useEffect(() => {
+    setStoreTemplate(template);
+  }, [setStoreTemplate, template]);
   const refreshEvents = useProjectStore((s) => s.refreshEvents);
   const flushProject = useProjectStore((s) => s.flush);
   const [viewingStageId, setViewingStageId] = useState<string | null>(null);
