@@ -42,3 +42,20 @@ describe('unsupportedFigures (4 Oct, item 11: invented recovery ranges)', () => 
     expect(figureFindings('Revenue was $412m.', [brief])).toEqual([]);
   });
 });
+
+describe('calculated figures and mathematics (8 Oct; Sean, portfolio and physics tests)', () => {
+  it('a total of supplied costs is supported, not "unsupported"', () => {
+    const brief = 'Costs: A $3,000, B $5,000, C $4,000, D $2,000, E $3,000. Benefits: A 6, B 7, C 5, D 4, E 7.';
+    expect(unsupportedFigures('B + D + E costs $10,000; A + B costs $8,000; B + C costs $9,000.', [brief])).toEqual([]);
+    expect(unsupportedFigures('A recovery of $41,500 is expected.', [brief])).toEqual(['$41,500']);
+  });
+
+  it('a ratio of supplied figures may be stated as a percentage', () => {
+    expect(unsupportedFigures('12 of 16 checks passed, 75% of them.', ['16 checks were run; 12 passed.'])).toEqual([]);
+  });
+
+  it('LaTeX is not money: $2$, $x_1 = 0.5$ and display maths are skipped', () => {
+    const text = 'The root is $2$, with $x_1 = 0.5$ and\n$$E = \\frac{1}{2} m v^2 = 4.5$$\nso the loss is $3.2m.';
+    expect(unsupportedFigures(text, [])).toEqual(['$3.2m']);
+  });
+});

@@ -88,16 +88,69 @@ function sentenceAround(text: string, at: number): string {
   return text.slice(start, end < 0 ? text.length : at + end);
 }
 
-/** The quantitative figures in `content` that none of `sources` contains. */
+/**
+ * Mathematics is not a figure. "$2$", "$x_1 = 0.5$" and display equations
+ * are LaTeX, and read as money they were flagged "unsupported" (8 Oct, physics
+ * review). A span counts as maths when it is $$…$$, \(…\), \[…\], or $…$
+ * holding a command, a sub/superscript, braces, an equals sign, or only a
+ * number or a variable. "$8,000 and $9,000" is two amounts, not a span.
+ */
+const MATH = /\$\$[\s\S]+?\$\$|\\\([\s\S]+?\\\)|\\\[[\s\S]+?\\\]|\$(?=\S)([^$\n]{1,300}?)(?<=\S)\$(?!\d)/g;
+export function withoutMath(text: string): string {
+  return text.replace(MATH, (span, inline: string | undefined) =>
+    inline === undefined || /[\\^_{}=]/.test(inline) || /^[\d.]+$|^[A-Za-z]$/.test(inline.trim()) ? ' '.repeat(span.length) : span
+  );
+}
+
+/** Numbers of each kind a figure may be calculated from, kept small enough to combine. */
+const COMBINE_MAX = 40;
+const round = (n: number) => norm(String(Math.round(n * 100) / 100));
+
+/**
+ * Figures calculated from supplied ones: a sum or difference of two or three
+ * of the same kind, a product of two, a ratio as a percentage (8 Oct; Sean's
+ * portfolio test: $8,000 and $9,000 were totals of the supplied costs, and
+ * the check told him to remove them or call them assumptions).
+ */
+export function derivedNumbers(known: ReadonlySet<string>): Set<string> {
+  const byKind = new Map<string, number[]>();
+  for (const key of known) {
+    const [n, kind] = key.split('|');
+    const v = Number(n);
+    if (!Number.isFinite(v)) continue;
+    const list = byKind.get(kind) ?? [];
+    if (list.length < COMBINE_MAX && !list.includes(v)) list.push(v);
+    byKind.set(kind, list);
+  }
+  const out = new Set<string>();
+  for (const [kind, vs] of byKind) {
+    for (let i = 0; i < vs.length; i += 1) {
+      for (let j = i + 1; j < vs.length; j += 1) {
+        out.add(`${round(vs[i] + vs[j])}|${kind}`);
+        out.add(`${round(Math.abs(vs[i] - vs[j]))}|${kind}`);
+        out.add(`${round(vs[i] * vs[j])}|${kind}`);
+        if (vs[j]) out.add(`${round((vs[i] / vs[j]) * 100)}|percent`);
+        if (vs[i]) out.add(`${round((vs[j] / vs[i]) * 100)}|percent`);
+        for (let k = j + 1; k < vs.length && vs.length <= 25; k += 1) out.add(`${round(vs[i] + vs[j] + vs[k])}|${kind}`);
+      }
+    }
+  }
+  return out;
+}
+
+/** The quantitative figures in `content` that none of `sources` contains, or is calculated from. */
 export function unsupportedFigures(content: string, sources: readonly string[]): string[] {
   const known = new Set<string>();
-  for (const s of sources) for (const n of numbersIn(s)) known.add(n);
+  for (const s of sources) for (const n of numbersIn(withoutMath(s))) known.add(n);
+  const derived = derivedNumbers(known);
   const out: string[] = [];
+  content = withoutMath(content);
   for (const f of figuresIn(content)) {
     if (!f.quantitative) continue;
     // A plain decimal (6.1) may be written as any kind in the source.
+    const has = (key: string) => known.has(key) || derived.has(key);
     const supported = (n: string) =>
-      known.has(`${n}|${f.kind}`) || (f.kind === 'plain' && (known.has(`${n}|percent`) || known.has(`${n}|money`)));
+      has(`${n}|${f.kind}`) || (f.kind === 'plain' && (has(`${n}|percent`) || has(`${n}|money`) || has(`${n}|plain`)));
     if (f.numbers.every(supported)) continue;
     if (ASSUMPTION.test(sentenceAround(content, f.at))) continue;
     if (!out.includes(f.text)) out.push(f.text);

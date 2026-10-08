@@ -53,7 +53,7 @@ def test_parse_drops_invented_targets_and_malformed_items():
 def test_route_is_protected_and_returns_parsed_conflicts():
     stub = AsyncMock()
     stub.generate_json = AsyncMock(return_value=({"conflicts": [
-        {"kind": "objective", "with_text": "the objective", "explanation": "It changes the audience."}]}, {}))
+        {"kind": "objective", "with_text": INPUTS.objective, "explanation": "It changes the audience."}]}, {}))
     app.dependency_overrides[get_client] = lambda: stub
     try:
         r = TestClient(app).post("/api/check-conflicts", json={
@@ -122,3 +122,15 @@ def test_an_instruction_that_only_asks_for_the_stages_own_form_is_no_conflict():
     assert len(without_stage) == 3
     from promptmaster.conflicts import _STAGE_RULE
     assert '"within_stage_work": true' in _STAGE_RULE
+
+
+def test_a_quoted_constraint_must_be_the_users_own_words():
+    """Sean, 6 Oct (physics): "an internal instruction conflict about JSON versus
+    a Markdown derivation" was shown to the user. The system's scaffolding is
+    not something the user's instruction can conflict with."""
+    raw = {"conflicts": [
+        {"kind": "constraint", "with_text": "Return JSON only, with shape items", "explanation": "Markdown vs JSON"},
+        {"kind": "constraint", "with_text": "Keep it under 300 words", "explanation": "asks for more"},
+    ]}
+    kept = parse_conflicts(raw, DECISIONS, OTHERS, user_text="Explain the damped oscillator. Keep it under 300 words.")
+    assert [c.with_text for c in kept] == ["Keep it under 300 words"]
