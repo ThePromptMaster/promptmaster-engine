@@ -385,7 +385,7 @@ export function WorkflowWorkspace({
   // outstanding" beside a stage that needs a recheck (6 Oct).
   // The latest judgment of the objective (7 Oct): "not met" is outstanding
   // work, and the banner says what it waits for.
-  const objectiveAssessment = useMemo(() => objectiveUnmet(events ?? []), [events]);
+  const objectiveAssessment = useMemo(() => objectiveUnmet(events ?? [], project.facts ?? []), [events, project.facts]);
   const outstanding = useMemo(
     () =>
       outstandingWork(template, state, context, {
