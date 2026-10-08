@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 import uuid
 
+from .notation import NOTATION_RULE
 from .continuity import generate_continuity_snapshot
 from .conversation import _prose_system, _shared_system
 from .llm_client import OpenRouterClient, OpenRouterDeadlineError
@@ -264,7 +265,7 @@ def _section_system(stage_hint: str) -> str:
     reached the chapter prompt: the request had no field for it.
     """
     hint = stage_hint.strip()
-    return _SECTION_INSTRUCTION + (f"\n\nTHIS STAGE:\n{hint}" if hint else "")
+    return _SECTION_INSTRUCTION + "\n\n" + NOTATION_RULE + (f"\n\nTHIS STAGE:\n{hint}" if hint else "")
 
 
 def build_section_prompt(

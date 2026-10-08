@@ -41,6 +41,7 @@ from .schemas import (
     StageItemSchema,
 )
 from .project_context import context_block
+from .notation import NOTATION_RULE
 from .saved_documents import format_prior_documents
 
 logger = logging.getLogger(__name__)
@@ -58,7 +59,7 @@ _PROSE_INSTRUCTION = (
     "mode prefers scaffolds, headings or structured breakdowns, that applies to "
     "how you think, not to the form of this artifact: the stage's instruction "
     "decides the form. Return Markdown prose, no code fences around the whole "
-    "answer."
+    "answer.\n\n" + NOTATION_RULE
 )
 
 _LIST_INSTRUCTION = (
