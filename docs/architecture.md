@@ -582,6 +582,23 @@ routine repairs, and how completion is kept from contradicting open work. Assess
 | Designing a workflow | `generate-workflow`, then `revise-workflow` for targeted changes (operations applied in code; unsupported requests said) |
 | Creating from a conversation | `/api/front-door` keeps a draft brief; its facts are recorded only after *Create project* |
 
+### Research under Go (2026-10-09)
+
+The client's 9 Oct email asks for Go to manage a research project from a bare goal:
+do the work it can, stop only when it must, go back when the analysis asks for more,
+and say what it did. Assessment: `docs/assessments/2026-10-09-research-go-and-branching.md`.
+
+| Concern | Where it lives |
+|---|---|
+| Runs Go can carry out | runs rows' `producible_by` (`stage-artifact.ts` `producibleBy`, `awaitsAttempt`); `policy.runAttemptsFor`; `needs.requiredWork` → `run_computation` per row; a failed or impossible run is recorded on its row (`perform.ts` `setAsideFrom`) and the run continues |
+| Stopping only when it must | `lib/agent/stop-audit.ts` (`auditStop`, `proposedDefault`); a question naming its own default is answered by it under `handle` and recorded as a policy fact (`recordRoutineDefault`, step `routine_default`); approval cards offer "Carry on with other work first" |
+| Going back | `return_to_stage` (both registries); offered by `policy.returnTargets` when the saved text asks for more (`asksForMoreWork`), under Autonomous + `handle`, at most `MAX_RETURNS`; the database checks it (`20261029000000`); the work is added to the earlier stage as a version, which reopens what was built on it |
+| Repetition | a repeat preemption carries `repeating`; the loop withdraws those moves once (`reconsiderNote`); saving an unsaved reasoning result is exempt from the polish cap |
+| Expert judgment | `/api/agent/expert-package` (`promptmaster/expert_review.py`): working quoted verbatim from the record, executed only where a sandbox run is on record; shown on the question card (`expertPackage`) |
+| Human-only work | `lib/workflow/human-requirements.ts`: rows naming it need a person; `failedChecks` holds the objective until the user's fact reports a result |
+| The account | `lib/agent/account.ts` → `RunAccountCard`: did / now (working, window, blocker, decision, complete) / set aside, from the steps |
+| Adapting the structure | optional stages skipped by Go under `handle` (`20261030000000`); Research v11's Final review may return to Analysis or Experiment |
+
 ## Extension points
 
 These are the seams the system was built to be extended at. Working with them is

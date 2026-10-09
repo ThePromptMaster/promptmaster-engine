@@ -33,7 +33,9 @@ export const POLICY_TERMS: Record<Exclude<ExecutionPolicy, 'guided'>, string[]> 
   autonomous: [
     'Go mode keeps choosing and performing moves until the work is done, it is genuinely stuck, or it needs a decision only you can make.',
     'It can move between stages, mark a stage complete when the requirements are met, and mark a stage stuck.',
-    'It cannot skip a stage, go back, or finish the project — those stay yours.',
+    // 9 Oct: under "Handle them for me" some of these became Go's (Q2, Q4, W3);
+    // the authorization records what the user agreed to, so it says so.
+    'It cannot finish the project. Skipping a stage and going back stay yours — except with routine decisions handed to it, when it may skip an optional stage, go back to do further work the analysis asks for, or start the next round, each with its reason recorded.',
   ],
 };
 
