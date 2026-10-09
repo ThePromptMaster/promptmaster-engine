@@ -51,7 +51,7 @@ import { authorizeRun } from '@/lib/agent/authorize';
 import { buildAgentState } from '@/lib/agent/digest';
 import { performStep, type PerformContext, type StepOutcome } from '@/lib/agent/perform';
 import { auditStop, describeAudit, touchesObjective } from '@/lib/agent/stop-audit';
-import { allowedActions, runAttemptsFor, stageHasCurrentDraft, LIVE_TOOLS, polishSinceDirection, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, withoutEndlessPolish, withoutSettledRuns, withoutOverride, DEFAULT_BUDGET_STEPS, fitsBudget, noChange, plannedBeforeLatestChange, preempt, shouldPause, stateFingerprint, stepCost } from '@/lib/agent/policy';
+import { allowedActions, reconsiderNote, returnTargets, runAttemptsFor, stageHasCurrentDraft, LIVE_TOOLS, polishSinceDirection, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, withoutEndlessPolish, withoutSettledRuns, withoutOverride, DEFAULT_BUDGET_STEPS, fitsBudget, noChange, plannedBeforeLatestChange, preempt, shouldPause, stateFingerprint, stepCost } from '@/lib/agent/policy';
 import {
   createAgentRun,
   endAgentRun,
@@ -221,6 +221,8 @@ export function useGoLoop(opts: Options) {
    * circles (2 Oct, screenshot 7), whatever the moves were called.
    */
   const fingerprintsRef = useRef<string[]>([]);
+  /** Q2b: the window has reconsidered once after going round in circles; `pending` moves are withdrawn for the next choice. */
+  const reconsiderRef = useRef<{ withdrawn: string[]; note: string; pending?: boolean } | null>(null);
   /** A move that counted against the window was performed since the last read. */
   const performedRef = useRef(false);
   const tabId = useRef<string>('');
@@ -411,6 +413,15 @@ export function useGoLoop(opts: Options) {
           budgetSteps: current.budget_steps,
           steps: stepsRef.current.slice(sinceRef.current).filter((s) => s.action_key !== AWAIT_SECTIONS_STEP),
         });
+        // Q2b: going round in circles is reconsidered once per window — the
+        // repeated moves are withdrawn and the planner is told why — before
+        // it stops for the user.
+        if (stop?.repeating && !reconsiderRef.current) {
+          reconsiderRef.current = { withdrawn: stop.repeating, note: reconsiderNote(stop.repeating), pending: true };
+          sinceRef.current = stepsRef.current.length;
+          fingerprintsRef.current = [];
+          continue;
+        }
         if (stop) {
           // Said as what the user can do about it (B4), not only why it stopped.
           const blocked = o.state.stages[o.stage.id]?.blocked;
@@ -513,6 +524,21 @@ export function useGoLoop(opts: Options) {
           .filter((s) => s.action_key === 'commit_delegated' && s.stage_id === o.stage!.id && s.status === 'failed' && (s.finished_at ?? s.started_at ?? '') >= headAt)
           .map((s) => String(s.params?.criterion_id ?? ''));
         if (delegableToCommit(o.stage, stageEvaluation, routine, commitTried)) allowed.push('commit_delegated');
+        // Q2 (9 Oct): back to the stage that does the further work the analysis asks for.
+        const goBackTo = returnTargets({
+          template: o.template, stage: o.stage, policy: current.policy, routine,
+          stageText: hasDraft ? (o.bundles[o.stage.id]?.versions.at(-1)?.content ?? '') : '',
+          steps: [...priorStepsRef.current, ...stepsRef.current],
+        });
+        if (goBackTo.length) allowed.push('return_to_stage');
+        // Q2b: after going round in circles, the repeated moves are off the table for the next choice.
+        const reconsider = reconsiderRef.current?.pending ? reconsiderRef.current : null;
+        if (reconsider) {
+          for (const k of reconsider.withdrawn) {
+            const at = allowed.indexOf(k);
+            if (at >= 0) allowed.splice(at, 1);
+          }
+        }
         // 6 Oct: proposals that stand are Go's to confirm under "handle them for me".
         if (policyConfirmable(o.stage, facts, routine) > 0) allowed.push('confirm_proposals');
         // 7 Oct (L-51): attached documents whose facts are not on record yet,
@@ -562,13 +588,15 @@ export function useGoLoop(opts: Options) {
                 state: buildAgentState({
                   template: o.template, state: o.state, stage: o.stage, bundles: o.bundles,
                   stageEvaluation, latestEvaluation: o.latestEvaluation, steps: [...priorStepsRef.current, ...stepsRef.current],
-                  context, approvedOutline: o.approvedOutline, facts, dataFiles: dataFileBriefs(o.project), tools: LIVE_TOOLS, memory, controls: o.getControls?.() ?? undefined,
+                  context, approvedOutline: o.approvedOutline, facts, dataFiles: dataFileBriefs(o.project), tools: LIVE_TOOLS, memory: reconsider ? [reconsider.note, ...memory].slice(0, 24) : memory, controls: o.getControls?.() ?? undefined,
+                  returnTargets: goBackTo,
                 }),
                 allowed_actions: allowed, policy: current.policy, model: o.project.model,
               },
               signal
             );
         if (signal.aborted) throw new Stopped();
+        if (reconsider) reconsiderRef.current = { ...reconsider, pending: false };
         // A reasoning move repeated while its last result is unsaved becomes
         // the save of that result (9 Oct, production: Derive ×3, nothing saved).
         const saving = required ? null : saveInsteadOfRepeating(choice, [...priorStepsRef.current, ...stepsRef.current], o.stage.id, allowed, hasDraft, stageEvaluation.canAdvance);
@@ -675,6 +703,7 @@ export function useGoLoop(opts: Options) {
       followRef.current = null;
       sinceRef.current = 0;
       fingerprintsRef.current = [];
+      reconsiderRef.current = null;
       performedRef.current = false;
       autoLeftRef.current = chosen === 'autonomous' ? autoWindows : 0;
       setAutoPending(autoLeftRef.current > 0);
@@ -723,6 +752,7 @@ export function useGoLoop(opts: Options) {
       followRef.current = null;
       sinceRef.current = 0;
       fingerprintsRef.current = [];
+      reconsiderRef.current = null;
       performedRef.current = false;
       void loop();
     } catch (e) {
@@ -743,6 +773,7 @@ export function useGoLoop(opts: Options) {
       if (live && !live.ended_at && live.policy === policy && (live.status === 'blocked' || live.status === 'awaiting_decision') && !pendingStepId) {
         sinceRef.current = stepsRef.current.length;
         fingerprintsRef.current = [];
+        reconsiderRef.current = null;
         performedRef.current = false;
         await updateAgentRun(live.id, { status: 'running', stop_reason: null, needs: null, lease_holder: tabId.current, heartbeat_at: new Date().toISOString() });
         commitRun({ ...live, status: 'running', stop_reason: null, needs: null });

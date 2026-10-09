@@ -132,6 +132,13 @@ class AgentControl(BaseModel):
     where: str = Field(default="", max_length=200)
 
 
+class AgentStageRef(BaseModel):
+    """A stage named by its id and its label."""
+
+    id: str = Field(max_length=100)
+    label: str = Field(default="", max_length=200)
+
+
 class AgentState(BaseModel):
     """What the planner may know. Assembled by the client from the project.
 
@@ -165,6 +172,8 @@ class AgentState(BaseModel):
     controls: list[AgentControl] | None = Field(default=None, max_length=40)
     #: The workflow and its stages. None from a client that predates it.
     workflow: AgentWorkflow | None = None
+    #: The earlier stages this stage may go back to (its template's allow_return_to), by label.
+    return_targets: list[AgentStageRef] = Field(default_factory=list, max_length=12)
 
 
 class NextAction(BaseModel):
@@ -312,6 +321,16 @@ def _format_state(inputs: PMInput, state: AgentState) -> str:
             "and never mark a stage stuck for the lack of one. Code is different: where "
             "run_computation is among the moves, the draft holds code the objective asks to "
             "have checked — run it before saying the code is correct, and report what ran."
+        )
+    if state.return_targets:
+        # Q2 (9 Oct): going back is a response to what the saved work found,
+        # chosen for the problem — not a fixed loop back to Experiment.
+        facts.append(
+            "GO BACK TO (stages this one may return to, for return_to_stage — by stage_id): "
+            + "; ".join(f"{t.id} ({t.label or t.id})" for t in state.return_targets)
+            + ". Choose by what the saved work asks for: more runs or cases → the experiment stage; a "
+            "different approach → the method stage; a missing source → the literature stage; another "
+            "explanation → the alternatives stage. Going back is one response among others, not a reflex."
         )
     if state.controls is None:
         facts.append("BUTTONS ON THIS PAGE NOW: not known. Do not name any button.")

@@ -608,6 +608,7 @@ direction. Two things still count as work Go may do first:
 | L-64 | An answer that contradicts the deliverable's wording reopens only what names the same values | resolved |
 | L-65 | An answer about what the record contains is taken as a fact, not checked against the record | resolved |
 | L-66 | Confirming proposed statuses on a finished table means reopening it, which reopens every later stage | resolved |
+| L-67 | Go goes back to an earlier stage only when the saved text says more work is needed, and at most three times | accepted |
 | L-B3 | Go code execution: Python only, fixed packages, no network | accepted |
 | L-B4 | Go runs while the tab is open; windows, not dollars | accepted |
 | L-C3 | Conflict detection misses paraphrase and cross-stage contradiction | accepted |
@@ -949,8 +950,12 @@ policy.
 Exploration (2026-10-03) works in rounds: Explore, Test, Findings, Next question, then
 the next round from Explore (`transitions.loop_to`).
 
-**Each round is started by the user.** The database records a return to an earlier
-stage only as the user's own decision, and a new round is such a return. So Go
+**Each round is started by the user** — except under Autonomous with routine decisions
+handed to Go, which may start it itself along the template's loop (2026-10-07,
+`20261025000000_agent_next_round.sql`), and may go back to an earlier stage the template
+allows when the saved analysis asks for more work (2026-10-09, L-67). Otherwise the
+database records a return to an earlier stage only as the user's own decision, and a new
+round is such a return. So Go
 *proposes* the next round (`propose_next_round`) and stops, and one click starts it.
 Within a round, an Autonomous run may continue for up to 20 windows ("Keep going",
 `20261014000000_agent_keep_going.sql`, up from 3) and still stops whenever it needs the
@@ -1272,3 +1277,26 @@ reopened, and a save whose only change is proposals confirmed (`onlyConfirmsProp
 same rows, text and statuses; `status_source` from *proposed* to the user's or the
 policy's) reopens nothing after it. Any other change still does (H1b).
 
+### L-67 — Go goes back to an earlier stage only when the saved text says more work is needed, and at most three times (2026-10-09)
+
+Sean, 9 Oct: "if Analysis identifies that further investigation is needed, Go should return
+to Experiment or investigation, perform the relevant work it can, save the results, and
+rerun the affected analysis and checks." `return_to_stage` does this under Autonomous with
+routine decisions handed to Go (the database checks the run, the policy, the template's
+`allow_return_to` and a recorded reason — `20261029000000_agent_return_to_stage.sql`). The
+work it names is added to the earlier stage as a new version, its new runs are carried out
+there (Q1a), and saving it reopens the stages built on the old version, which Go repairs
+from the new results when it gets back to them.
+
+Limits:
+- **It is offered only when the stage's saved text asks for more** (`asksForMoreWork`: an
+  inconclusive verdict, a run not made, further or additional runs, cases, data or sources).
+  An analysis that needs more but does not say so in those words is not followed up.
+- **Which stage to go back to is the planner's choice**, among those the template allows
+  (Analysis → Experiment or Method; Alternatives → Analysis or Experiment; Validation →
+  Analysis). Going back to Method reopens its analysis-plan approval, which stays the user's.
+- **At most three returns per run chain** (`MAX_RETURNS`), so an analysis that never stops
+  asking does not circle.
+- After a repeated move produces nothing new, Go reconsiders once — the repeated moves are
+  withdrawn and the planner is told to choose a different kind of move — and stops on the
+  second time (Q2b).

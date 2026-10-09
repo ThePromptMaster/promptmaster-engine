@@ -85,6 +85,8 @@ export interface AgentStateDigest {
    * told it may not name a button at all.
    */
   controls?: { label: string; where: string }[];
+  /** The earlier stages Go may go back to from here (Q2), when it may. */
+  return_targets?: { id: string; label: string }[];
   /**
    * Which workflow the project is on, and its stages in order. Without it
    * the planner spoke Research to a book — asking for "planned runs with
@@ -157,6 +159,8 @@ export function buildAgentState(input: {
   memory?: string[];
   /** The page's buttons (lib/workflow/stage-controls.ts). */
   controls?: readonly StageControl[];
+  /** Stages Go may go back to from this one, when return_to_stage is offered (Q2). */
+  returnTargets?: readonly { id: string; label: string }[];
 }): AgentStateDigest {
   const { template, state, stage, bundles, stageEvaluation, latestEvaluation, steps, context, approvedOutline = [], facts } = input;
   const pendingJobs = facts?.manuscript?.pendingJobs.length ?? input.pendingJobs ?? 0;
@@ -312,6 +316,7 @@ export function buildAgentState(input: {
     ...(input.memory?.length ? { memory: input.memory } : {}),
     ...(dataFiles.length ? { data_files: dataFiles } : {}),
     ...(input.controls ? { controls: input.controls.slice(0, CONTROLS_MAX).map((c) => ({ label: c.label, where: PLACE_WORDS[c.place] })) } : {}),
+    ...(input.returnTargets?.length ? { return_targets: input.returnTargets.map((t) => ({ id: t.id, label: t.label })) } : {}),
     workflow: describeWorkflow(template),
     tools,
   };

@@ -594,3 +594,24 @@ def test_propose_mode_asks_for_what_each_row_supports_and_always_a_reason(client
     assert r.status_code == 200, r.text
     assert r.json()["decisions"] == [{"id": "a1", "status": "addressed", "reason": "Partly addressed."}]
     assert "PROPOSE A STATUS" in stub.generate_json.call_args.kwargs["system"]
+
+
+def test_the_planner_is_told_where_it_may_go_back_and_to_choose_by_the_problem():
+    """Q2 (Sean, 9 Oct): returning to Experiment is one response, not a fixed loop."""
+    from promptmaster.agent import AgentStageRef
+    state = STATE.model_copy(update={"return_targets": [
+        AgentStageRef(id="experiment", label="Experiment or investigation"), AgentStageRef(id="method", label="Method"),
+    ]})
+    _, user = build_next_action_prompt(INPUTS, state, RESEARCH, "autonomous")
+    assert "GO BACK TO (stages this one may return to, for return_to_stage — by stage_id): experiment (Experiment or investigation); method (Method)" in user
+    assert "a different approach → the method stage" in user
+    assert "not a reflex" in user
+    _, none = build_next_action_prompt(INPUTS, STATE, RESEARCH, "autonomous")
+    assert "GO BACK TO" not in none
+
+
+def test_return_to_stage_says_what_it_needs():
+    from promptmaster.agent_actions import ACTIONS_BY_KEY
+    when = ACTIONS_BY_KEY["return_to_stage"].when
+    assert "Params: stage_id, reason" in when and "work (what is to be done there" in when
+    assert ACTIONS_BY_KEY["return_to_stage"].important

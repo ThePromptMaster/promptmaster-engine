@@ -7,7 +7,7 @@ import type { StageEvaluation } from '@/lib/workflow/types';
 import type { AgentStep } from '@/types/agent';
 import { deriveExecutionLabel } from './labels';
 import { ITEM_SCHEMAS, itemSchemaFor } from '@/lib/workflow/stage-artifact';
-import { allowedActions, runAttemptsFor, alternating, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, LIVE_TOOLS, NO_TOOLS, polishSinceDirection, withoutOverride, withoutEndlessPolish, withoutSettledRuns, fitsBudget, noChange, noProgress, plannedBeforeLatestChange, preempt, shouldPause, stageMoveActor, stateFingerprint } from './policy';
+import { allowedActions, asksForMoreWork, MAX_RETURNS, reconsiderNote, returnTargets, runAttemptsFor, alternating, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, LIVE_TOOLS, NO_TOOLS, polishSinceDirection, withoutOverride, withoutEndlessPolish, withoutSettledRuns, fitsBudget, noChange, noProgress, plannedBeforeLatestChange, preempt, shouldPause, stageMoveActor, stateFingerprint } from './policy';
 
 function step(over: Partial<AgentStep>): AgentStep {
   return {
@@ -699,5 +699,54 @@ describe('runAttemptsFor (Q1a, 9 Oct)', () => {
 
   it('the table stays open until the row is tried, so Go is not waved on', () => {
     expect(withoutSettledRuns(['run_computation'], { schema, items: [ours('a')] })).toEqual(['run_computation']);
+  });
+});
+
+describe('Q2: Go goes back when the analysis asks for more (Sean, 9 Oct)', () => {
+  const analysis = RESEARCH_V1.stages.find((s) => s.id === 'analysis')!;
+  const base = { template: RESEARCH_V1, stage: analysis, policy: 'autonomous' as const, routine: 'handle' as const, stageText: 'H2 is inconclusive: run 4 was not run.', steps: [] };
+
+  it('offers the stages the template lets this one return to', () => {
+    expect(returnTargets(base).map((t) => t.id)).toEqual(['experiment', 'method']);
+  });
+
+  it('only under Autonomous with routine decisions handed to Go, and when the saved work asks for more', () => {
+    expect(returnTargets({ ...base, policy: 'guided' })).toEqual([]);
+    expect(returnTargets({ ...base, routine: 'ask' })).toEqual([]);
+    expect(returnTargets({ ...base, stageText: '' })).toEqual([]);
+    expect(returnTargets({ ...base, stageText: 'H1 supported by runs 1–3; H2 not supported.' })).toEqual([]);
+  });
+
+  it('reads what asks for more work', () => {
+    expect(asksForMoreWork('The verdict on H2 is inconclusive.')).toBe(true);
+    expect(asksForMoreWork('Deciding it needs further runs at larger amplitude.')).toBe(true);
+    expect(asksForMoreWork('An additional sweep over damping would settle it.')).toBe(true);
+    expect(asksForMoreWork('Both hypotheses are supported by the runs.')).toBe(false);
+  });
+
+  it('at most MAX_RETURNS times in a run chain', () => {
+    const steps = Array.from({ length: MAX_RETURNS }, () => ({ action_key: 'return_to_stage', status: 'succeeded' }));
+    expect(returnTargets({ ...base, steps })).toEqual([]);
+    expect(returnTargets({ ...base, steps: steps.slice(1) }).length).toBeGreaterThan(0);
+  });
+
+  it('not in a writing workflow', () => {
+    const book = { ...base, template: BOOK_V1, stage: BOOK_V1.stages.find((s) => s.transitions.allow_return_to.length)! };
+    expect(returnTargets(book)).toEqual([]);
+  });
+});
+
+describe('Q2b: going round in circles is reconsidered once', () => {
+  const step = (action_key: string, idx: number) => ({ id: `s${idx}`, action_key, status: 'succeeded', stage_id: 'analysis', changes: {} }) as never;
+
+  it('a repeat stop names the moves that repeated, for the loop to withdraw', () => {
+    const state = projectState(RESEARCH_V1, []);
+    const stop = preempt({ state, objective: 'o', stepsUsed: 3, budgetSteps: 25, steps: [step('derive', 1), step('derive', 2), step('derive', 3)] });
+    expect(stop?.repeating).toEqual(['derive']);
+  });
+
+  it('the planner is told to choose a different kind of move', () => {
+    expect(reconsiderNote(['derive'])).toMatch(/^RECONSIDER: "Derive" was tried repeatedly here and produced no new evidence\. Do not try it again\./);
+    expect(reconsiderNote(['evaluate_stage', 'revise_stage'])).toContain('"Check this stage" and "Revise this stage" were');
   });
 });
