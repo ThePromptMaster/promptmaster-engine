@@ -106,6 +106,8 @@ interface Options {
   reloadEvents: () => Promise<void>;
   /** Tick an approval committed under the routine-decision policy, saved before it resolves. */
   commitCriterion?: (stageId: string, criterionId: string) => Promise<void>;
+  /** Untick approvals (Q2e): the reserved ones of a stage Go goes back to. */
+  reopenApprovals?: (criterionIds: string[]) => Promise<void>;
   /** The event log, for the facts a stage's own controls need (approvals). */
   events: readonly WorkflowEvent[];
   /**
@@ -298,7 +300,7 @@ export function useGoLoop(opts: Options) {
           ? { sandboxRunId: interpret.sandboxRunId, code: interpret.code, stdout: interpret.stdout, stderr: interpret.stderr, exitCode: interpret.exitCode }
           : undefined,
         appendStageVersion: o.appendStageVersion, recordStageEvaluation: o.recordStageEvaluation,
-        setStageSummary: o.setStageSummary, setStageFigures: o.setStageFigures, afterStageEvent: o.reloadEvents, commitCriterion: o.commitCriterion, signal,
+        setStageSummary: o.setStageSummary, setStageFigures: o.setStageFigures, afterStageEvent: o.reloadEvents, commitCriterion: o.commitCriterion, reopenApprovals: o.reopenApprovals, signal,
         facts, latestEvaluation: o.latestEvaluation, refresh: o.onRefresh, onProgress: setProgress,
         conflictAnswer: answerToConflict(stepsRef.current, o.stage.id),
         derived: unsavedDerivation([...priorStepsRef.current, ...stepsRef.current], o.stage.id) ?? undefined,

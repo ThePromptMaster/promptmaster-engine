@@ -62,8 +62,10 @@ test('from Analysis, Go goes back to Experiment with its reason, and adds the wo
   // The work named is on Experiment as a new version.
   await expect.poll(async () => (await serviceSelect('artifact_versions', `project_id=eq.${id}&select=id`)).length, { timeout: 60_000 })
     .toBeGreaterThan(before.length);
-  const [step] = await serviceSelect('agent_steps', `run_id=eq.${returned.agent_run_id}&action_key=eq.return_to_stage&select=status,output,changes`);
-  expect(step.status).toBe('succeeded');
+  // The new version lands before the step is closed: wait for the step.
+  const stepOf = async () => (await serviceSelect('agent_steps', `run_id=eq.${returned.agent_run_id}&action_key=eq.return_to_stage&select=status,output,changes`))[0];
+  await expect.poll(async () => (await stepOf())?.status, { timeout: 60_000 }).toBe('succeeded');
+  const step = await stepOf();
   expect(step.output).toContain('Went back to Experiment or investigation');
   await page.screenshot({ path: test.info().outputPath('01-go-went-back-to-experiment.png'), fullPage: true });
 });
