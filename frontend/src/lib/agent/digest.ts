@@ -97,6 +97,8 @@ export interface AgentStateDigest {
     execution?: { kind: 'finite' | 'ongoing'; success_criterion: string; stop_conditions: string[] };
   };
   tools: AgentTools;
+  /** The project's "Routine decisions" (Q1b): the planner makes routine choices itself under 'handle'. */
+  routine_decisions?: string;
 }
 
 function cap(text: string, max: number): string {
@@ -155,6 +157,8 @@ export function buildAgentState(input: {
   facts?: StageFacts;
   dataFiles?: DataFileBrief[];
   memory?: string[];
+  /** The project's "Routine decisions". */
+  routine?: string;
   /** The page's buttons (lib/workflow/stage-controls.ts). */
   controls?: readonly StageControl[];
 }): AgentStateDigest {
@@ -314,5 +318,6 @@ export function buildAgentState(input: {
     ...(input.controls ? { controls: input.controls.slice(0, CONTROLS_MAX).map((c) => ({ label: c.label, where: PLACE_WORDS[c.place] })) } : {}),
     workflow: describeWorkflow(template),
     tools,
+    ...(input.routine ? { routine_decisions: input.routine } : {}),
   };
 }

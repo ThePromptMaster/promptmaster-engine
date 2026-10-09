@@ -594,3 +594,12 @@ def test_propose_mode_asks_for_what_each_row_supports_and_always_a_reason(client
     assert r.status_code == 200, r.text
     assert r.json()["decisions"] == [{"id": "a1", "status": "addressed", "reason": "Partly addressed."}]
     assert "PROPOSE A STATUS" in stub.generate_json.call_args.kwargs["system"]
+
+
+def test_under_handle_the_planner_makes_routine_choices_itself():
+    """Q1b (production, 9 Oct): Go asked the user for a pendulum's L, g and amplitudes."""
+    _, handled = build_next_action_prompt(INPUTS, STATE.model_copy(update={"routine_decisions": "handle"}), RESEARCH, "autonomous")
+    assert "ROUTINE DECISIONS ARE YOURS" in handled
+    assert "parameter values, units, which cases and how many" in handled
+    _, asked = build_next_action_prompt(INPUTS, STATE, RESEARCH, "autonomous")
+    assert "ROUTINE DECISIONS ARE YOURS" not in asked

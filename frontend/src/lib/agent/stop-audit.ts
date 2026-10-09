@@ -52,11 +52,28 @@ export interface AuditResult {
   instead: { key: string; rationale: string; expected: string } | null;
 }
 
-/** Wording that marks a question about what the project is for, or about the user's own decisions. */
-const OBJECTIVE_WORDS = /\b(objective|goal|scope|requirement|relax|change (?:the|your) (?:plan|aim)|which (?:one|option) do you (?:want|prefer)|approve|your decision)\b/i;
+/**
+ * Wording that marks a question about what the project is for, or about the
+ * user's own decisions. "Approve this package" is not one: on production
+ * (9 Oct) a routine choice of a pendulum's length, g and amplitudes was asked
+ * of the user because it said "approve".
+ */
+const OBJECTIVE_WORDS = /\b(objective|goal|scope|requirements?|relax|change (?:the|your) (?:plan|aim)|which (?:one|option) do you (?:want|prefer)|approve (?:the|your) (?:objective|hypothes\w+|analysis plan|verdicts?)|your (?:own )?(?:decision|judgment))\b/i;
 
 export function touchesObjective(question: string): boolean {
   return OBJECTIVE_WORDS.test(question);
+}
+
+/**
+ * The default a question itself proposes ("If you want a default set, approve
+ * this single package: L = 1.00 m, g = 9.81 m/s^2, …"), or null. Under
+ * "handle them for me" a choice with a default the question already names is
+ * routine: Go takes it, records it as a fact the user can change, and goes on.
+ */
+export function proposedDefault(question: string): string | null {
+  const m = /\b(?:default|defaults|by default|I(?:'d| would) suggest|suggested values?)\b[^:]{0,80}:\s*([^\n]+)/i.exec(question);
+  const value = m?.[1]?.trim().replace(/[.\s]+$/, '') ?? '';
+  return value.length >= 3 ? value.slice(0, 600) : null;
 }
 
 export function auditStop(input: AuditInput): AuditResult {
