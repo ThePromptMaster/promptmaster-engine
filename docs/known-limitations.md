@@ -604,6 +604,7 @@ direction. Two things still count as work Go may do first:
 | L-60 | iPhone HEIC conversion depends on the browser or a converter loaded on demand | accepted |
 | L-61 | An unfinished setup keeps no attached files | accepted |
 | L-62 | No Jupyter notebook export | open |
+| L-63 | A measured requirement failed on a finished stage is reported, not repaired by Go | open |
 | L-B3 | Go code execution: Python only, fixed packages, no network | accepted |
 | L-B4 | Go runs while the tab is open; windows, not dollars | accepted |
 | L-C3 | Conflict detection misses paraphrase and cross-stage contradiction | accepted |
@@ -1179,4 +1180,13 @@ attached again.
 Proposed in the 8 Oct assessment, §4. Code a Go run executed has its output recorded in
 the run (and `sandbox_runs`), but no export collects prose, equations, code and outputs
 into one `.ipynb`.
+
+### L-63 — A measured requirement failed on a finished stage is reported, not repaired by Go (2026-10-09)
+
+A word range or question count is a blocking check on the stage that produces it, so a
+draft that misses it cannot be closed. A stage finished before the check existed (or
+closed by "Continue anyway") keeps its result: the objective check is given the failed
+measurement and will not call the objective met, and Go stops naming it ("the launch
+announcement does not meet the required 100–140 word length"). Go does not reopen the
+finished stage to repair it on its own; the user reopens it, or edits the text.
 
