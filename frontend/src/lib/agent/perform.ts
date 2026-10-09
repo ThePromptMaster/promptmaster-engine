@@ -1236,6 +1236,22 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // A proposal, never a skip: the stage is skipped only if the user
       // presses the card's button, and that event is theirs.
       const reason = (typeof params.reason === 'string' && params.reason.trim()) || ctx.step.rationale || 'It is not the best next move for this objective.';
+      // Q4 (Sean, 9 Oct: "Routine changes within the objective and delegated
+      // authority could proceed automatically"): an optional stage, under
+      // Autonomous with routine decisions handed to Go, is skipped by Go with
+      // its reason; the database checks the same. A required one stays a proposal.
+      if (!ctx.stage.required && ctx.run.policy === 'autonomous' && ctx.project.routine_decisions === 'handle') {
+        const to = ctx.stage.transitions.default_next ?? undefined;
+        await appendWorkflowEvent(ctx.project.id, ctx.project.user_id, {
+          type: 'stage_skipped', stage_id: ctx.stage.id, to_stage_id: to, actor: 'system', agent_run_id: ctx.run.id,
+          reason: reason.slice(0, 1_000), payload: { policy: 'routine_decisions' },
+        });
+        await ctx.afterStageEvent();
+        return done(key, {
+          status: 'succeeded', toolsUsed: [], changes: { event_types: ['stage_skipped'] },
+          output: `Skipped ${ctx.stage.label}, an optional stage, under your routine-decision policy: ${reason}`,
+        });
+      }
       const need: NeedsUser = { kind: 'skip_stage', stageId: ctx.stage.id, reason };
       const message = `Suggested skipping ${ctx.stage.label} for now: ${reason}`;
       return done(key, {

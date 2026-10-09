@@ -610,6 +610,7 @@ direction. Two things still count as work Go may do first:
 | L-66 | Confirming proposed statuses on a finished table means reopening it, which reopens every later stage | resolved |
 | L-67 | Go goes back to an earlier stage only when the saved text says more work is needed, and at most three times | accepted |
 | L-68 | Expert questions, human-only requirements and conditional results are recognised by wording | accepted |
+| L-69 | Go adapts a Research project by skipping optional stages and going back; it does not add stages | accepted |
 | L-B3 | Go code execution: Python only, fixed packages, no network | accepted |
 | L-B4 | Go runs while the tab is open; windows, not dollars | accepted |
 | L-C3 | Conflict detection misses paraphrase and cross-stage contradiction | accepted |
@@ -1327,3 +1328,25 @@ next, or exactly why it paused.
 - **The run account** (`lib/agent/account.ts`) is built from the step record alone: what
   ran, what was reasoned, what was written, repaired or revisited; whether the pause is a
   window, a blocker, a decision or completion; and what was set aside rather than asked.
+
+### L-69 — Go adapts a Research project by skipping optional stages and going back; it does not add stages (2026-10-09)
+
+Sean, 9 Oct: "A mathematical derivation, computational investigation, and literature review
+may require different structures. PromptMaster should choose an appropriate approach and
+adapt it as findings develop. Routine changes within the objective and delegated authority
+could proceed automatically."
+
+Under Autonomous with routine decisions handed to Go:
+- **An optional stage** (Validation, Mechanism, Generality) that does not serve the
+  objective is skipped by Go, with its reason on the record
+  (`20261030000000_agent_skip_optional_stage.sql`). A required stage is still only proposed
+  for skipping; the user decides.
+- **Research v11** lets Final review send the work back to Experiment or Analysis
+  (`return_to_stage`, L-67), so an investigation the review finds unfinished gets the
+  further work rather than a finish.
+- **Runs PromptMaster can carry out** are attempted whatever the approach (Q1a): a derivation
+  is recorded as derived, a computation as executed.
+
+Not done: Go does not add, remove or reorder stages of the template; a different structure
+is a workflow the user designs or edits (`generate-workflow`, the workflow editor). Projects
+pinned to Research v10 keep Final review's earlier return paths.
