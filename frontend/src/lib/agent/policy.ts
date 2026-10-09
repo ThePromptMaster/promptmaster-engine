@@ -114,7 +114,7 @@ export const MAX_RETURNS = 3;
  * inconclusive verdict, a run not made, further cases), and at most
  * MAX_RETURNS times in the run chain.
  */
-const MORE_WORK = /\b(?:inconclusive|undetermined|cannot (?:yet )?be (?:decided|determined|settled)|not (?:yet )?(?:run|tested|computed|carried out)|further (?:investigation|runs?|work|tests?|data|computations?|analysis|cases?)|(?:more|another|additional) (?:runs?|cases?|data|tests?|investigation|computations?|sweeps?|sources?)|insufficient (?:evidence|data))\b/i;
+const MORE_WORK = /\b(?:inconclusive|undetermined|missing (?:measurements?|values?|runs?|results?|data|cases?|computations?)|(?:measurement|value|run|result|computation)s? (?:is|are) missing|cannot (?:yet )?be (?:decided|determined|settled)|not (?:yet )?(?:run|tested|computed|measured|carried out)|further (?:investigation|runs?|work|tests?|data|computations?|analysis|cases?)|(?:more|another|additional) (?:runs?|cases?|data|tests?|investigation|computations?|sweeps?|sources?)|insufficient (?:evidence|data))\b/i;
 
 /** The saved work says something is still to be investigated, run or obtained. */
 export function asksForMoreWork(text: string): boolean {

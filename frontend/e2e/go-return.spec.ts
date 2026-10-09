@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { createProject, pressTransition, serviceSelect, stageArtifact } from './helpers';
+import { createProject, pressTransition, serviceInsert, serviceSelect, stageArtifact } from './helpers';
 
 /**
  * Q2 — Sean, 9 Oct: "if Analysis identifies that further investigation is
@@ -19,7 +19,7 @@ test('from Analysis, Go goes back to Experiment with its reason, and adds the wo
   test.setTimeout(300_000);
   const id = await createProject(page, {
     workflow: 'Research', name: 'E2E go return',
-    objective: 'Pendulum period against amplitude, inconclusive without further runs [[mock:plan=return_to_stage]]',
+    objective: 'Does a pendulum period depend on amplitude [[mock:plan=return_to_stage]]',
   });
 
   const analysis = page.locator('header').getByRole('heading', { name: 'Analysis', exact: true });
@@ -29,6 +29,14 @@ test('from Analysis, Go goes back to Experiment with its reason, and adds the wo
   }
   await expect(analysis).toBeVisible();
   await expect(stageArtifact(page)).toContainText('Mock', { timeout: 30_000 });
+  // The analysis says what it cannot yet decide, as a saved version.
+  const [art] = await serviceSelect('artifacts', `project_id=eq.${id}&stage_id=eq.analysis&select=id,user_id`);
+  await serviceInsert('artifact_versions', {
+    user_id: art.user_id, project_id: id, artifact_id: art.id, source_operation: 'stage_edit', instruction: '', model: '', mode: 'analyst',
+    content: '## Analysis\n\nH1 is supported by runs 1–3. H2 is inconclusive: the period at 75 degrees was not computed, so further runs are needed.',
+  });
+  await page.reload();
+  await expect(stageArtifact(page)).toContainText('inconclusive', { timeout: 30_000 });
   const before = await serviceSelect('artifact_versions', `project_id=eq.${id}&select=id,artifact_id`);
 
   const panel = goPanel(page);

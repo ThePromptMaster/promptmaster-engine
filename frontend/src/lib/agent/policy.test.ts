@@ -721,6 +721,7 @@ describe('Q2: Go goes back when the analysis asks for more (Sean, 9 Oct)', () =>
     expect(asksForMoreWork('The verdict on H2 is inconclusive.')).toBe(true);
     expect(asksForMoreWork('Deciding it needs further runs at larger amplitude.')).toBe(true);
     expect(asksForMoreWork('An additional sweep over damping would settle it.')).toBe(true);
+    expect(asksForMoreWork('Missing measurement: the record does not contain ΔT(75°).')).toBe(true);
     expect(asksForMoreWork('Both hypotheses are supported by the runs.')).toBe(false);
   });
 

@@ -255,18 +255,18 @@ test('A sandbox that is not available blocks the step honestly — never "execut
   expect(sandbox).toEqual({ status: 'unavailable', exit_code: null });
 });
 
-test('A run making no progress stops for direction, and Resume carries on', async ({ page }) => {
+test('A run going round in circles reconsiders once: the repeated moves are withdrawn and it moves on', async ({ page }) => {
   // Two moves taking turns without the stage moving on is a loop. (Repeating
-  // one reasoning move now saves its result instead — 9 Oct, below.)
+  // one reasoning move now saves its result instead — 9 Oct, below.) Since
+  // Q2b (Sean, 9 Oct: "recognize repeated attempts that aren't producing new
+  // evidence and reconsider its approach") the first loop in a window is not
+  // a stop: the two moves are withdrawn for the next choice.
   const id = await researchProject(page, 'E2E go no progress', 'Pendulum [[mock:plan=derive,prove,derive,prove,derive,prove,simplify]]');
   await choose(page, 'Autonomous');
   const transparency = page.getByRole('region', { name: 'What Go mode is doing' });
-  await expect(transparency).toContainText('have been taking turns on this stage without it moving on', { timeout: 60_000 });
-  await page.screenshot({ path: test.info().outputPath('01-no-progress-stop.png'), fullPage: true });
-
-  // Resuming is the user's direction to continue — it must not re-trip on the same steps.
-  await goPanel(page).getByRole('button', { name: 'Resume' }).click();
   await expect(transparency).toContainText('the deliverable is not', { timeout: 60_000 });
+  await expect(transparency).not.toContainText('have been taking turns on this stage without it moving on');
+  await page.screenshot({ path: test.info().outputPath('01-reconsidered.png'), fullPage: true });
   const recorded = await stepsOf((await runOf(id)).id);
   expect(recorded.map((s) => s.action_key)).toEqual(['derive', 'prove', 'derive', 'prove', 'derive', 'prove', 'simplify', 'declare_objective_complete']);
 });
