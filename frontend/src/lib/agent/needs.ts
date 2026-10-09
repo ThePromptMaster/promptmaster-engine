@@ -159,7 +159,7 @@ export function staleRepair(
       key: 'recheck_stage',
       rationale: `${stage.label} was reopened: ${st.stale?.reason ?? 'something it relied on changed'}. Repairing it keeps the project consistent.`,
       expected: `A new version of ${stage.label} that keeps what still holds and replaces what the change superseded; then it is marked complete again.`,
-      params: { stage_id: stage.id },
+      params: { stage_id: stage.id, ...(st.stale?.since ? { stale_since: st.stale.since } : {}) },
     };
   }
   return null;
