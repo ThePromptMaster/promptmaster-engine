@@ -363,12 +363,34 @@ def build_section_revision_prompt(
         f"STAGE BRIEF: {revision.instruction or 'Revise this section.'}\n\n"
         "FINDINGS THE USER ACCEPTED (they cover the whole manuscript — apply only the ones "
         f"that concern this section, and leave the rest alone):\n{notes}\n\n"
+        f"{_record_block(revision.record)}"
         f"THE CURRENT TEXT OF SECTION {section_index + 1}: {target.title}\n"
         f"--- BEGIN SECTION ---\n{revision.current_content}\n--- END SECTION ---\n\n"
         "Return the whole section as it should now read — prose only, no title, no notes "
         "on what you changed. If nothing here applies to this section, return it unchanged."
     )
     return system, user
+
+
+def _record_block(record: str) -> str:
+    """The saved work a section reports, as it stands now (C9, 9 Oct).
+
+    A section is drafted from its stages' work as it was when the outline was
+    approved. On the production replay of the sequence test the Experiment
+    record was later repaired to show both induction proofs worked by hand,
+    and Revision kept the section's "not run" because nothing told it
+    otherwise. Where the section and the record disagree, the record wins.
+    """
+    if not record.strip():
+        return ""
+    return (
+        "THE SAVED RECORD THIS SECTION REPORTS (latest saved versions — this is the record):\n"
+        f"--- BEGIN RECORD ---\n{record.strip()}\n--- END RECORD ---\n"
+        "Where the current text says something was not done, not run, missing, open or not on "
+        "record, and this record or an accepted project fact shows it was done, correct the "
+        "text to report it as the record does. Where the record says something was not done, "
+        "the text must not claim it was. Change nothing else.\n\n"
+    )
 
 
 async def generate_section_prose(

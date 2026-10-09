@@ -364,6 +364,40 @@ def test_section_prose_with_a_revision_brief_rewrites_the_existing_text(client_f
     assert "WRITE SECTION 1" not in prompt
 
 
+def test_a_revision_reads_the_latest_saved_record_and_it_wins(client_for_app):
+    """C9 (9 Oct, production replay): Experiment was repaired to show the induction
+    proofs worked by hand, and Revision kept Results' "not run" because the section
+    was only ever shown the outline's older copy. The current record is sent, and
+    the prompt says it wins where the section disagrees."""
+    api_client, mock_llm = client_for_app
+    captured = {}
+
+    async def _capture(**kwargs):
+        captured.update(kwargs)
+        return ("revised", {}, "stop")
+
+    mock_llm.generate_with_meta = _capture
+    body = {
+        "inputs": _basic_inputs_dict(),
+        "outline": [{"id": "results", "title": "Results", "abstract": "Experiment: induction step [status: not_run]"}],
+        "section_index": 0,
+        "revision": {
+            "stage_label": "Revision", "instruction": "apply", "notes": "",
+            "current_content": "The induction step was not run.",
+            "record": "Experiment or investigation: Cycle 3 induction step RECORD-MARKER [status: worked_by_hand]",
+        },
+    }
+    assert api_client.post("/api/generate-section-prose", json=body).status_code == 200
+    prompt = captured["prompt"]
+    assert "THE SAVED RECORD THIS SECTION REPORTS" in prompt and "RECORD-MARKER" in prompt
+    assert "this record or an accepted project fact shows it was done, correct the" in prompt
+    assert prompt.index("RECORD-MARKER") < prompt.index("THE CURRENT TEXT OF SECTION")
+
+    body["revision"]["record"] = ""
+    api_client.post("/api/generate-section-prose", json=body)
+    assert "THE SAVED RECORD THIS SECTION REPORTS" not in captured["prompt"]
+
+
 def test_section_prose_without_a_revision_is_still_a_first_draft(client_for_app):
     api_client, mock_llm = client_for_app
     captured = {}

@@ -22,7 +22,8 @@ import { RESEARCH_V1 } from './templates/research.v1';
 import { BOOK_V1 } from './templates/book.v1';
 import { SINGLE_OUTPUT_V1 } from './templates/single-output.v1';
 import { evaluateStage, projectState } from './engine';
-import { deriveOutlineItems, derivedOutlineDrift, draftingStageId, stageBrief } from './derived-outline';
+import { BRIEF_MAX, deriveOutlineItems, derivedOutlineDrift, draftingStageId, sectionRecords, stageBrief } from './derived-outline';
+import { revisionBrief } from './revision';
 import type { StageArtifactBundle } from './digest';
 import type { StageContext, WorkflowEvent } from './types';
 import { longFormFromOutline, longFormMatchesOutline, draftBindings } from '@/lib/outline/long-form';
@@ -562,6 +563,33 @@ describe('upstream changing after approval', () => {
     expect(drift.changed.map((i) => i.id).sort()).toEqual(['conclusion', 'discussion']);
     expect(drift.added).toEqual([]);
     expect(drift.removed).toEqual([]);
+  });
+
+  it('a revision is given the section\'s record as it stands now, not as approved (C9, 9 Oct)', () => {
+    const { state, bundles } = upstream();
+    const approved = deriveOutlineItems(RESEARCH_V1, state, bundles);
+    const repaired = {
+      ...bundles,
+      experiment: {
+        ...bundles.experiment,
+        versions: [...bundles.experiment.versions, { ...bundles.experiment.versions.at(-1)!, id: 'experiment-v2', content: 'Induction step worked by hand.' }],
+      },
+    };
+    expect(approved.find((i) => i.id === 'results')!.abstract).not.toContain('Induction step worked by hand.');
+    expect(sectionRecords(RESEARCH_V1, state, repaired).results).toContain('Experiment or investigation: Induction step worked by hand.');
+    const brief = revisionBrief(RESEARCH_V1, 'revision', repaired, state)!;
+    expect(brief.records?.results).toContain('Induction step worked by hand.');
+    // Without the state (callers that have none), the brief is as before.
+    expect(revisionBrief(RESEARCH_V1, 'revision', repaired)).not.toHaveProperty('records');
+  });
+
+  it('a long stage is cut only past BRIEF_MAX, and the cut is marked', () => {
+    const { state, bundles } = upstream();
+    const experiment = RESEARCH_V1.stages.find((s) => s.id === 'experiment')!;
+    const long = { ...bundles, experiment: { ...bundles.experiment, versions: [{ ...bundles.experiment.versions.at(-1)!, content: 'x'.repeat(9_000) }] } };
+    expect(stageBrief(experiment, state, long)).toBe('x'.repeat(9_000));
+    const longer = { ...bundles, experiment: { ...bundles.experiment, versions: [{ ...bundles.experiment.versions.at(-1)!, content: 'x'.repeat(BRIEF_MAX + 10) }] } };
+    expect(stageBrief(experiment, state, longer)).toMatch(/is not shown here …\]$/);
   });
 
   it('sees a section appear when a stage is completed later', () => {
