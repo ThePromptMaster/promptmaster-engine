@@ -8,7 +8,7 @@ import type { StageEvaluation } from '@/lib/workflow/types';
 import type { AgentStep } from '@/types/agent';
 import { deriveExecutionLabel } from './labels';
 import { ITEM_SCHEMAS, itemSchemaFor } from '@/lib/workflow/stage-artifact';
-import { allowedActions, asksForMoreWork, MAX_RETURNS, reconsiderNote, returnTargets, runAttemptsFor, alternating, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, LIVE_TOOLS, NO_TOOLS, polishSinceDirection, withoutOverride, withoutEndlessPolish, withoutSettledRuns, fitsBudget, noChange, noProgress, plannedBeforeLatestChange, preempt, shouldPause, stageMoveActor, stateFingerprint } from './policy';
+import { POLISH_MAX, allowedActions, asksForMoreWork, MAX_RETURNS, reconsiderNote, returnTargets, runAttemptsFor, alternating, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, LIVE_TOOLS, NO_TOOLS, polishSinceDirection, withoutOverride, withoutEndlessPolish, withoutSettledRuns, fitsBudget, noChange, noProgress, plannedBeforeLatestChange, preempt, shouldPause, stageMoveActor, stateFingerprint } from './policy';
 
 function step(over: Partial<AgentStep>): AgentStep {
   return {
@@ -764,5 +764,17 @@ describe('checkVerdict: a planning stage is not held to the deliverable (product
 
   it('a deliverable still is', () => {
     expect(checkVerdict(ctx('evaluation'))).toMatch(/incomplete \(no computed examples\)/);
+  });
+});
+
+describe('withoutEndlessPolish: saving a reasoning result is not polish (production, 9 Oct)', () => {
+  const allowed = ['derive', 'evaluate_stage', 'revise_stage', 'apply_findings', 'advance_stage'];
+
+  it('a capped stage keeps Revise when a derivation is waiting to be saved', () => {
+    expect(withoutEndlessPolish(allowed, POLISH_MAX, false, true)).toEqual(['derive', 'revise_stage', 'advance_stage']);
+  });
+
+  it('and loses it otherwise, as before', () => {
+    expect(withoutEndlessPolish(allowed, POLISH_MAX, false)).toEqual(['derive', 'advance_stage']);
   });
 });
