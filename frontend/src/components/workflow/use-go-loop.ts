@@ -35,7 +35,7 @@ import { RefusedRevision } from '@/lib/workflow/commit-check';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { api, type AnswerContradiction } from '@/lib/api/client';
-import { actionFor, actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, USER_ANSWER_STEP } from '@/lib/agent/actions';
+import { actionFor, actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, ROUTINE_DEFAULT_STEP, USER_ANSWER_STEP } from '@/lib/agent/actions';
 import { contextWithFacts, readOutcomeProof, readStageFacts, type StageFacts } from '@/lib/agent/facts';
 import { stageDrafts } from '@/lib/workflow/stage-artifact';
 import { delegableToCommit, policyConfirmable, repairTries, staleRepair, describeNeed, NEED_CLEARED, NEED_MOVED_ON, needStillHolds, needsUser, requiredWork, type NeedsUser } from '@/lib/agent/needs';
@@ -50,7 +50,8 @@ import { answerAsFact, answerDocuments, measuredDocument } from '@/lib/workflow/
 import { authorizeRun } from '@/lib/agent/authorize';
 import { buildAgentState } from '@/lib/agent/digest';
 import { performStep, type PerformContext, type StepOutcome } from '@/lib/agent/perform';
-import { auditStop, describeAudit, touchesObjective } from '@/lib/agent/stop-audit';
+import { auditStop, describeAudit, proposedDefault, touchesObjective } from '@/lib/agent/stop-audit';
+import { recordRoutineDefault } from '@/lib/supabase/facts';
 import { allowedActions, reconsiderNote, returnTargets, runAttemptsFor, stageHasCurrentDraft, LIVE_TOOLS, polishSinceDirection, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, withoutEndlessPolish, withoutSettledRuns, withoutOverride, DEFAULT_BUDGET_STEPS, fitsBudget, noChange, plannedBeforeLatestChange, preempt, shouldPause, stateFingerprint, stepCost } from '@/lib/agent/policy';
 import {
   createAgentRun,
@@ -289,7 +290,7 @@ export function useGoLoop(opts: Options) {
           template: o.template, state: o.state, stage: o.stage, bundles: o.bundles,
           stageEvaluation: evaluateStage(o.template, o.stage.id, context), latestEvaluation: o.latestEvaluation,
           steps: [...priorStepsRef.current, ...stepsRef.current],
-          context, approvedOutline: o.approvedOutline, facts, dataFiles: dataFileBriefs(o.project), tools: LIVE_TOOLS, memory, controls: o.getControls?.() ?? undefined,
+          context, approvedOutline: o.approvedOutline, facts, dataFiles: dataFileBriefs(o.project), tools: LIVE_TOOLS, routine: o.project.routine_decisions ?? undefined, memory, controls: o.getControls?.() ?? undefined,
         }),
         approvedByUser, deliverableDone: o.deliverableDone,
         interpret: interpret
@@ -588,7 +589,7 @@ export function useGoLoop(opts: Options) {
                 state: buildAgentState({
                   template: o.template, state: o.state, stage: o.stage, bundles: o.bundles,
                   stageEvaluation, latestEvaluation: o.latestEvaluation, steps: [...priorStepsRef.current, ...stepsRef.current],
-                  context, approvedOutline: o.approvedOutline, facts, dataFiles: dataFileBriefs(o.project), tools: LIVE_TOOLS, memory: reconsider ? [reconsider.note, ...memory].slice(0, 24) : memory, controls: o.getControls?.() ?? undefined,
+                  context, approvedOutline: o.approvedOutline, facts, dataFiles: dataFileBriefs(o.project), tools: LIVE_TOOLS, routine: o.project.routine_decisions ?? undefined, memory: reconsider ? [reconsider.note, ...memory].slice(0, 24) : memory, controls: o.getControls?.() ?? undefined,
                   returnTargets: goBackTo,
                 }),
                 allowed_actions: allowed, policy: current.policy, model: o.project.model,
@@ -608,6 +609,35 @@ export function useGoLoop(opts: Options) {
         if (!required && actionFor(choice.action_key)?.performer === 'ask') {
           const nextId = nextSuggestedStage(o.template, o.state);
           const question = choice.decision_question || choice.rationale || '';
+          // A choice whose default the question itself names is routine under
+          // "handle them for me": taken, recorded as a fact the user can
+          // change, and the work goes on — once per stage per window.
+          const fallback = proposedDefault(question);
+          if (
+            fallback && current.policy === 'autonomous' && routine === 'handle' && !touchesObjective(question) &&
+            !stepsRef.current.some((s) => s.stage_id === o.stage!.id && s.action_key === ROUTINE_DEFAULT_STEP)
+          ) {
+            const statement = `Routine default taken by Go under your routine-decision policy (yours to change): ${fallback}`;
+            const step = await startAgentStep({
+              runId: current.id, userId: o.project.user_id, projectId: o.project.id, idx: stepsRef.current.length,
+              stageId: o.stage.id, mode: o.project.mode, actionKey: ROUTINE_DEFAULT_STEP, params: { question: question.slice(0, 1000) },
+              rationale: `Instead of asking "${question.slice(0, 200)}", taking the default it names: routine decisions are mine to handle.`,
+              expectedOutcome: 'The default on record as a fact every later stage uses.', needsDecision: false, decisionQuestion: null,
+            });
+            upsertStep(step);
+            let output: string;
+            try {
+              await recordRoutineDefault(o.project, current.id, { statement, stageId: o.stage.id, question });
+              output = `${statement}. Change it in Facts and requirements if you want something else; the stages that use it will be reopened.`;
+            } catch (e) {
+              output = `Could not record the default (${(e as Error).message}); asking instead.`;
+            }
+            upsertStep(await finishAgentStep(step.id, { status: output.startsWith('Could not') ? 'failed' : 'succeeded', label: null, output }));
+            if (!output.startsWith('Could not')) {
+              await o.onRefresh?.();
+              continue;
+            }
+          }
           const { audit, instead } = auditStop({
             question, stageLabel: o.stage.label, nextStageLabel: nextId ? stageLabelFor(nextId) : null,
             allowed, canAdvance: stageEvaluation.canAdvance, policy: current.policy, routine,

@@ -174,6 +174,8 @@ class AgentState(BaseModel):
     workflow: AgentWorkflow | None = None
     #: The earlier stages this stage may go back to (its template's allow_return_to), by label.
     return_targets: list[AgentStageRef] = Field(default_factory=list, max_length=12)
+    #: The project's "Routine decisions": 'handle' when they are Go's to make.
+    routine_decisions: str = Field(default="", max_length=20)
 
 
 class NextAction(BaseModel):
@@ -331,6 +333,16 @@ def _format_state(inputs: PMInput, state: AgentState) -> str:
             + ". Choose by what the saved work asks for: more runs or cases → the experiment stage; a "
             "different approach → the method stage; a missing source → the literature stage; another "
             "explanation → the alternatives stage. Going back is one response among others, not a reflex."
+        )
+    if state.routine_decisions == "handle":
+        # Q1b (9 Oct, production): Go asked the user to choose a pendulum's
+        # length, g and amplitudes, proposing a default in the same question.
+        facts.append(
+            "ROUTINE DECISIONS ARE YOURS (the user chose 'handle them for me'). A choice with a sensible, "
+            "conventional default — parameter values, units, which cases and how many, a step size, a "
+            "tolerance — is routine: do not ask it. Make the choice, say it is an assumption the user can "
+            "change, and carry on with the move that uses it. Ask only about the objective, an accepted "
+            "requirement, an approval reserved to the user, or a choice with no defensible default."
         )
     if state.controls is None:
         facts.append("BUTTONS ON THIS PAGE NOW: not known. Do not name any button.")
