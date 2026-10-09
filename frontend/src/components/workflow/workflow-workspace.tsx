@@ -1807,6 +1807,7 @@ export function WorkflowWorkspace({
                 onSwitchModel={(model) => onPatchProject({ model })}
                 currentModel={project.model}
                 readOnly={!isEditable}
+                canConfirmWhenReadOnly={isDone(viewedState?.status) && project.status !== 'finalized'}
                 evaluation={
                   evaluations?.[
                     activeVersionId ?? stageVersions.at(-1)?.id ?? ''

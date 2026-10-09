@@ -75,6 +75,7 @@ export function ReviewRenderer({
   evaluating,
   evaluationError,
   readOnly,
+  canConfirmWhenReadOnly,
 }: StageRendererProps) {
   const active = useMemo(
     () => versions.find((v) => v.id === activeVersionId) ?? versions.at(-1) ?? null,
@@ -347,7 +348,7 @@ export function ReviewRenderer({
             </p>
           )}
 
-          {confirmable > 0 && !readOnly && onSaveItems && (
+          {confirmable > 0 && (!readOnly || (canConfirmWhenReadOnly && active?.id === versions.at(-1)?.id)) && onSaveItems && (
             <div className="mb-3 flex flex-wrap items-center gap-3">
               <button
                 data-confirm-proposals
