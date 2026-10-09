@@ -18,7 +18,7 @@ import { evaluateStage } from './engine';
 import { SINGLE_OUTPUT_V1 as template } from './templates/single-output.v1';
 import { itemSchemaFor } from './stage-artifact';
 import { policyConfirmable, repairTries, staleRepair } from '@/lib/agent/needs';
-import { recheckInstruction, withoutRevisionNotes } from '@/lib/agent/perform';
+import { recheckInstruction, withFreshMeasurements, withoutRevisionNotes } from '@/lib/agent/perform';
 import { supersededValues } from './fact-values';
 import type { StageContext, WorkflowState } from './types';
 
@@ -240,5 +240,19 @@ describe('a measured repair has tries of its own (9 Oct, production: TaskBoard)'
     const stale: WorkflowState = { ...finished, stages: { ...finished.stages, output: { status: 'stale', stale: { reason: 'r', since: 't2', was: 'complete' } } } };
     const tries = [step('a', { stage_id: 'output', stale_since: 't1' }), step('b', { stage_id: 'output', stale_since: 't2' }), step('c', { stage_id: 'output' })];
     expect(repairTries(tries, stale, new Set(['c']))).toEqual(['output', 'output']);
+  });
+});
+
+describe('a repair is closed on the count of what it saved (L-63, 9 Oct)', () => {
+  const measured = { id: 'measured.r1', label: 'Announcement: 100–140 words', satisfied: false, blocking: true } as never;
+  const approval = { id: 'output.ok', label: 'I approve', satisfied: false, blocking: true } as never;
+  const evaluation = { stageId: 'output', criteria: [], canAdvance: false, unmet: [measured] };
+  it('a measurement the new text meets no longer holds the stage open', () => {
+    expect(withFreshMeasurements(evaluation, true, [])).toMatchObject({ canAdvance: true, unmet: [] });
+    expect(withFreshMeasurements(evaluation, true, ['Announcement: 100–140 words — measured 99 words']).canAdvance).toBe(false);
+    expect(withFreshMeasurements(evaluation, false, [])).toBe(evaluation);
+  });
+  it('anything else unmet still holds it', () => {
+    expect(withFreshMeasurements({ ...evaluation, unmet: [measured, approval] }, true, []).canAdvance).toBe(false);
   });
 });
