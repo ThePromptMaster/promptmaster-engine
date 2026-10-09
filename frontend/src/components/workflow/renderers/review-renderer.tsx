@@ -41,6 +41,7 @@ import type { StageRendererProps } from './types';
 const FOLD_AFTER = 6;
 import { confirmProposalsLabel, lookupLabel } from '@/lib/workflow/stage-controls';
 import { PROPOSE_LABEL, proposeTargets } from '@/lib/workflow/proposals';
+import { rowsRequired } from '@/lib/workflow/engine';
 
 const TONE_CLASS: Record<string, string> = {
   done: 'text-[var(--pm-secondary)]',
@@ -149,7 +150,7 @@ export function ReviewRenderer({
   // Whether the stage requires a status on every row. Final review's open
   // items do not: "10 still to resolve" beside "0 required" read as a
   // contradiction (3 Oct). Decided by the stage's own criteria.
-  const statusRequired = stage.exit_criteria.some((c) => c.rule?.type === 'every_item_has_status');
+  const statusRequired = rowsRequired(stage);
 
   // PM-06: tell the workspace about unsaved edits, so "Save changes" can lead.
   const saveRef = useRef<() => Promise<void>>(async () => {});

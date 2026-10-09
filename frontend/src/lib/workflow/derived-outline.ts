@@ -19,7 +19,7 @@
  * approval event, the job queue and FR-05 resumption without a second path.
  */
 
-import { summariseStageContent } from './digest';
+import { documentText, summariseStageContent } from './digest';
 import type { StageArtifactBundle } from './digest';
 import type {
   DerivedSectionSpec,
@@ -67,10 +67,19 @@ export function stageBrief(
 ): string {
   if (!carriesForward(state.stages[stage.id])) return '';
   const bundle = bundles[stage.id];
+  // 8 Oct (A2): the section is drafted from the stage's saved work, not a
+  // 320-character summary of it. A research report's Results said all three
+  // cycles were "not run" while Analysis held both induction proofs and the
+  // sum checks (Sean, 6 Oct). Bounded per stage; a cut is marked.
+  const text = documentText(stage, bundle?.versions.at(-1)?.content ?? '');
+  if (text) return text.length > BRIEF_MAX ? `${text.slice(0, BRIEF_MAX).trimEnd()}\n[… the rest of ${stage.label} is not shown here …]` : text;
   const stored = bundle?.artifact?.summary?.trim();
   if (stored) return stored;
   return summariseStageContent(stage, bundle?.versions.at(-1)?.content ?? '');
 }
+
+/** Per source stage, in a section's brief: enough for a proof and its checks. */
+export const BRIEF_MAX = 4_000;
 
 /**
  * Fold a spec section and its stages into the section as it will appear.

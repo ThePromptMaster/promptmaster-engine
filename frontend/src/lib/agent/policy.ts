@@ -277,7 +277,7 @@ export function preempt(input: {
     const last = finished.at(-1)!;
     return {
       status: 'blocked',
-      reason: `"${actionFor(last.action_key)?.label ?? last.action_key}" was chosen ${NO_PROGRESS_REPEATS} times in a row on this stage without changing it. It needs your direction.`,
+      reason: `"${actionFor(last.action_key)?.label ?? last.action_key}" was chosen ${NO_PROGRESS_REPEATS} times in a row on this stage without changing it: none of it was saved to the document. What each produced is in the run log. It needs your direction.`,
     };
   }
   return null;
@@ -294,6 +294,28 @@ function savedSomething(s: AgentStep): boolean {
   const ids = (s.changes as { version_ids?: unknown } | null)?.version_ids;
   return Array.isArray(ids) && ids.length > 0;
 }
+
+/**
+ * The work a reasoning move (Derive, Prove, …) produced on this stage since
+ * anything was last saved there, or null (C4, 8 Oct). Sean's sequence test:
+ * Go saw that Results needed replacing, chose "Derive" three times, and the
+ * correction never reached the document — a derivation is only text in the
+ * run. The next revision of the stage is handed it, to put into the document
+ * in full; a run that keeps reasoning without saving is stopped by
+ * `noProgress`, saying nothing was saved.
+ */
+export function unsavedDerivation(steps: readonly AgentStep[], stageId: string): { label: string; output: string } | null {
+  for (let i = steps.length - 1; i >= 0; i -= 1) {
+    const s = steps[i];
+    if (s.stage_id !== stageId) continue;
+    if (savedSomething(s)) return null;
+    if (s.status === 'succeeded' && actionFor(s.action_key)?.performer === 'reason' && (s.output ?? '').trim()) {
+      return { label: actionFor(s.action_key)?.label ?? s.action_key, output: s.output.trim() };
+    }
+  }
+  return null;
+}
+
 
 /**
  * The same move three times on one stage with nothing to show for it.

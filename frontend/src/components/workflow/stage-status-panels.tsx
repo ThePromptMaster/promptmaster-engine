@@ -4,7 +4,7 @@ import { useState } from 'react';
 
 import type { EvaluationResult } from '@/types';
 
-import { describeOutstanding, type CompletionSummary } from '@/lib/workflow/engine';
+import { blocksCompletion, describeOutstanding, type CompletionSummary } from '@/lib/workflow/engine';
 import type { ObjectiveAssessment } from '@/lib/workflow/objective';
 import type { BlockKind } from '@/lib/workflow/types';
 
@@ -174,7 +174,8 @@ export function CompletionDialog({
   // listed here, and finishing past it asks why (6 Oct: the project "allowed
   // me to finish … despite the unresolved finding").
   const open = (summary.outstanding ?? []).filter((i) => i.kind !== 'unmet_blocking' || !summary.leftOpenStages.some((s) => s.id === i.stageId));
-  const needsReason = open.length > 0;
+  // Optional rows are listed, and finishing past them needs no reason (C3).
+  const needsReason = open.some(blocksCompletion);
   const rows: [string, number][] = [
     ['completed', summary.completed],
     ['skipped on purpose', summary.skipped],
@@ -223,6 +224,17 @@ export function CompletionDialog({
         <p className="mt-2 text-label text-[var(--on-surface-variant)]">
           Finishing now records the project as finished without it. You can reopen it at any time.
         </p>
+      )}
+      {!needsReason && open.length > 0 && (
+        // Optional rows only: named, and finishing needs no reason (C3, 8 Oct).
+        <div role="group" aria-label="Optional, left as they are" className="mt-3 rounded-lg bg-[var(--surface-container-low)] px-4 py-3">
+          <p className="text-label font-semibold text-[var(--on-surface)]">Optional, left as they are:</p>
+          <ul className="mt-1 list-disc pl-5 text-label text-[var(--on-surface-variant)]">
+            {open.map((item, i) => (
+              <li key={i}>{describeOutstanding(item)}</li>
+            ))}
+          </ul>
+        </div>
       )}
       {needsReason && (
         <div role="group" aria-label="Still open" className="mt-3 rounded-lg bg-[var(--surface-container-low)] px-4 py-3">
