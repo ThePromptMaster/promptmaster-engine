@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { api } from '@/lib/api/client';
 import { AutoGrowTextarea } from '@/components/shared/auto-grow-textarea';
@@ -18,7 +18,7 @@ export interface DraftBrief {
 
 export const EMPTY_BRIEF: DraftBrief = { objective: '', audience: '', requirements: [], evidence: [], deliverables: [], stages: [], approvals: [] };
 
-type Turn = { role: 'user' | 'assistant'; content: string };
+export type Turn = { role: 'user' | 'assistant'; content: string };
 
 /**
  * "Keep this as a conversation for now" (Sean, 6 Oct, email 8). The user talks;
@@ -31,15 +31,24 @@ export function FrontDoor({
   opening,
   onReady,
   onBack,
+  initialState = null,
+  onStateChange,
 }: {
   opening: string;
   onReady: (brief: DraftBrief, transcript: string) => void;
   onBack: () => void;
+  /** A conversation kept from an earlier visit (U2). */
+  initialState?: { turns: Turn[]; brief: DraftBrief; ready: boolean } | null;
+  /** Told of every change, so the page can keep the setup between visits. */
+  onStateChange?: (state: { turns: Turn[]; brief: DraftBrief; ready: boolean }) => void;
 }) {
-  const [turns, setTurns] = useState<Turn[]>([]);
-  const [brief, setBrief] = useState<DraftBrief>(EMPTY_BRIEF);
-  const [ready, setReady] = useState(false);
-  const [draft, setDraft] = useState(opening);
+  const [turns, setTurns] = useState<Turn[]>(initialState?.turns ?? []);
+  const [brief, setBrief] = useState<DraftBrief>(initialState?.brief ?? EMPTY_BRIEF);
+  const [ready, setReady] = useState(initialState?.ready ?? false);
+  useEffect(() => {
+    onStateChange?.({ turns, brief, ready });
+  }, [turns, brief, ready, onStateChange]);
+  const [draft, setDraft] = useState(initialState?.turns.length ? '' : opening);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);

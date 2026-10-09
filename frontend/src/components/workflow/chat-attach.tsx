@@ -3,7 +3,8 @@
 import { useRef, useState } from 'react';
 
 import { documentsOf, prepareFiles } from '@/lib/data/attachments';
-import { PICKABLE_EXTENSIONS, isImage } from '@/lib/data/preview';
+import { normalizeImage } from '@/lib/data/normalize-image';
+import { PICKABLE_EXTENSIONS, imagePreview, isImage, rejectReason } from '@/lib/data/preview';
 import { attachProjectFile } from '@/lib/supabase/project-files';
 import type { Project } from '@/types/project';
 
@@ -53,14 +54,41 @@ export function ChatAttach({
           failed.push(`${p.file.name} could not be stored${e instanceof Error && e.message ? ` (${e.message})` : ''}.`);
         }
       }
-      if (images.length) failed.push(`Images need a caption: add ${images.length === 1 ? 'it' : 'them'} with "Add images" on the page.`);
+      // Photos from the chat are stored too (U1, 8 Oct: Sean attached from his
+      // iPhone and could not tell whether it had worked). Each gets the caption
+      // its name suggests, which can be changed under the project's images.
+      const added: string[] = [];
+      for (const picked of images) {
+        const normal = await normalizeImage(picked);
+        if ('error' in normal) {
+          failed.push(normal.error);
+          continue;
+        }
+        const reason = rejectReason(normal.file.name, normal.file.size, [...existingNames, ...stored, ...added]);
+        if (reason) {
+          failed.push(reason);
+          continue;
+        }
+        try {
+          const bitmap = await createImageBitmap(normal.file).catch(() => null);
+          await attachProjectFile(project, normal.file, imagePreview(normal.file.name, '', bitmap?.width ?? 0, bitmap?.height ?? 0));
+          bitmap?.close();
+          added.push(normal.file.name);
+          if (normal.note) prepared.notes.push(normal.note);
+        } catch (e) {
+          failed.push(`${normal.file.name} could not be stored${e instanceof Error && e.message ? ` (${e.message})` : ''}.`);
+        }
+      }
+      if (added.length) {
+        prepared.notes.push(`Added as ${added.length === 1 ? 'an image' : 'images'}: ${added.join(', ')}. Change ${added.length === 1 ? 'its caption' : 'their captions'} under the project's images.`);
+      }
       setReadable(documentsOf(prepared.ready.filter((p) => stored.includes(p.file.name))));
       setMessage(
         [stored.length ? `Attached to the project: ${stored.join(', ')}.` : '', ...prepared.notes, ...failed]
           .filter(Boolean)
           .join(' ')
       );
-      if (stored.length) await onChanged();
+      if (stored.length || added.length) await onChanged();
     } finally {
       setBusy(false);
       if (input.current) input.current.value = '';

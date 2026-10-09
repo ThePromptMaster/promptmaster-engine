@@ -24,13 +24,15 @@ def test_the_prompt_offers_only_existing_page_kinds_and_names_the_work():
     assert "HOW PROMPTMASTER WORKS" in system
 
 
-def test_unknown_kinds_are_dropped_and_check_stages_cannot_open_or_close():
+def test_unknown_kinds_are_dropped_a_check_cannot_open_and_a_closing_check_gets_finalise():
     wf = parse_workflow({"name": "X", "stages": [
         _stage("Audit", "check"), _stage("Brief"), _stage("Bogus", "video"), _stage("Draft"),
         _stage("Review", "check"), _stage("Final", required=False), _stage("Late check", "check"),
     ]})
-    assert [s.label for s in wf.stages] == ["Brief", "Draft", "Review", "Final"]
-    assert wf.stages[-1].required is True
+    # 9 Oct (Sean's email 14): a final verification was silently dropped; it
+    # is kept, followed by the stage that produces the finished work.
+    assert [s.label for s in wf.stages] == ["Brief", "Draft", "Review", "Final", "Late check", "Finalise"]
+    assert wf.stages[-1].required is True and wf.stages[-1].kind == "write"
 
 
 def test_too_few_stages_is_refused():

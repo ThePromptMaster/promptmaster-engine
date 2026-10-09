@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 
 import { IMAGE_EXTENSIONS, MAX_FILE_BYTES, MAX_FILES, PICKABLE_EXTENSIONS, describePreview, imagePreview, rejectReason } from '@/lib/data/preview';
 import { prepareFiles } from '@/lib/data/attachments';
+import { normalizeImage } from '@/lib/data/normalize-image';
 import { useProjectImageUrls } from '@/components/shared/project-images';
 import { attachProjectFile, removeProjectFile } from '@/lib/supabase/project-files';
 import { ADD_IMAGES_LABEL, ATTACH_DATA_LABEL } from '@/lib/workflow/stage-controls';
@@ -65,18 +66,37 @@ export function ProjectData({
     }
   };
 
-  const pickImages = (picked: FileList | null) => {
+  const pickImages = async (picked: FileList | null) => {
     if (!picked?.length) return;
     setError(null);
-    const names = [...files.map((f) => f.name), ...pending.map((p) => p.file.name)];
-    const next: { file: File; caption: string }[] = [];
-    for (const file of Array.from(picked)) {
-      const reason = rejectReason(file.name, file.size, [...names, ...next.map((p) => p.file.name)]);
-      if (reason) setError(reason);
-      else next.push({ file, caption: imagePreview(file.name, '').caption ?? '' });
-    }
-    setPending((prior) => [...prior, ...next]);
+    setNote(null);
+    const chosen = Array.from(picked);
     if (imageInput.current) imageInput.current.value = '';
+    setBusy(true);
+    try {
+      const names = [...files.map((f) => f.name), ...pending.map((p) => p.file.name)];
+      const next: { file: File; caption: string }[] = [];
+      const errors: string[] = [];
+      const notes: string[] = [];
+      for (const original of chosen) {
+        // iPhone photos: HEIC to JPEG, and a large one scaled to fit (U1).
+        const normal = await normalizeImage(original);
+        if ('error' in normal) {
+          errors.push(normal.error);
+          continue;
+        }
+        if (normal.note) notes.push(normal.note);
+        const file = normal.file;
+        const reason = rejectReason(file.name, file.size, [...names, ...next.map((p) => p.file.name)]);
+        if (reason) errors.push(reason);
+        else next.push({ file, caption: imagePreview(file.name, '').caption ?? '' });
+      }
+      if (errors.length) setError(errors.join(' '));
+      if (notes.length) setNote(notes.join(' '));
+      setPending((prior) => [...prior, ...next]);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const attachImages = async () => {

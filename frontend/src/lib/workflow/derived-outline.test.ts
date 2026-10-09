@@ -544,12 +544,13 @@ describe('upstream changing after approval', () => {
 
     expect(derivedOutlineDrift(approved, approved).stale).toBe(false);
 
-    // The analysis stage is revised after approval.
+    // The analysis stage is revised after approval: a new saved version (8 Oct:
+    // the brief reads the saved work, not the summary stored at completion).
     const revised = {
       ...bundles,
       analysis: {
         ...bundles.analysis,
-        artifact: { ...bundles.analysis.artifact!, summary: 'Not supported after all.' },
+        versions: [...bundles.analysis.versions, { ...bundles.analysis.versions.at(-1)!, id: 'analysis-v2', content: 'Not supported after all.' }],
       },
     };
     const drift = derivedOutlineDrift(

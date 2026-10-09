@@ -93,7 +93,10 @@ def build_workflow_prompt(description: str, objective: str) -> tuple[str, str]:
         f"Design {MIN_STAGES} to {MAX_STAGES - 2} stages for this kind of work.\n"
         "The first stage states the objective and what success looks like. The last "
         "stage produces the finished deliverable, ready to use. Put a check stage after "
-        "the work it checks, never first. Every stage's kind is one of:\n"
+        "the work it checks, never first — after EVERY stage whose output it checks: a final "
+        "verification of several deliverables comes after the last of them, never between "
+        "them (Sean, 7 Oct: verification was placed before the invitation it had to verify). "
+        "Every stage's kind is one of:\n"
         f"{kinds}\n\n"
         "For each stage write:\n"
         "- label: a plain name (≤40 chars), and short_label (≤20 chars) for the side rail\n"
@@ -171,11 +174,12 @@ def parse_workflow(result: object) -> DesignedWorkflow:
             )
         )
     stages = stages[:MAX_STAGES]
-    # The ends are fixed: a check stage cannot open or close the work.
+    # A check cannot open the work. One that closes it — a final verification
+    # — is kept, with a stage after it that produces the finished work (9 Oct:
+    # Sean's verification of four deliverables was silently dropped here).
     while stages and stages[0].kind == "check":
         stages.pop(0)
-    while stages and stages[-1].kind == "check":
-        stages.pop()
+    stages = with_closing_stage(stages)
     if len(stages) < MIN_STAGES:
         raise ValueError("The design had too few usable stages. Try describing the work in more detail.")
     stages[0].required = True
@@ -224,3 +228,34 @@ async def design_workflow(
     system, user = build_workflow_prompt(description, objective)
     result, _usage = await client.generate_json(prompt=user, system=system, temperature=0.4, max_tokens=3_000, model=model)
     return parse_workflow(result)
+
+
+FINALISE_LABEL = "Finalise"
+
+
+def finalise_stage(after: str) -> DesignedStage:
+    """The stage that follows a closing check: the finished work, with the
+    corrections the check's accepted findings call for."""
+    return DesignedStage(
+        label=FINALISE_LABEL,
+        short_label=FINALISE_LABEL,
+        kind="write",
+        purpose=f"Produce the finished deliverables, with every correction {after} accepted applied.",
+        instruction=(
+            f"Assemble the finished deliverables from the earlier stages, applying every finding {after} accepted. "
+            "Change nothing else; where a finding was rejected, keep the work as it was."
+        ),
+        required=True,
+        approval="I approve the finished deliverables.",
+        approval_kind="decision",
+    )
+
+
+def with_closing_stage(stages: list[DesignedStage]) -> list[DesignedStage]:
+    """A workflow ends on the finished work. When a check would end it, a
+    Finalise stage is added after the check instead of dropping it."""
+    if stages and stages[-1].kind == "check":
+        if len(stages) >= MAX_STAGES:
+            stages = stages[: MAX_STAGES - 1]
+        return [*stages, finalise_stage(f"“{stages[-1].label}”")]
+    return stages

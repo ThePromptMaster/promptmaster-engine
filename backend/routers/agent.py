@@ -124,7 +124,8 @@ async def api_reason(req: ReasonRequest, client: OpenRouterClient = Depends(get_
 class WriteCodeRequest(BaseModel):
     inputs: PMInput
     state: AgentState
-    goal: str = Field(default="", max_length=2_000)
+    #: Up to 40k: a check of a deliverable's code carries the code (M3).
+    goal: str = Field(default="", max_length=40_000)
     kind: Literal["computation", "simulation"] = "computation"
     model: str = ""
 
@@ -290,6 +291,9 @@ class AssessObjectiveRequest(BaseModel):
     content: str = Field(min_length=1, max_length=1_000_000)
     steps: list[RunStep] = Field(default_factory=list, max_length=40)
     success_criterion: str = Field(default="", max_length=4_000)
+    #: What the project's own checks hold as still unmet (C2): measured
+    #: requirements that fail, and review rows carried forward unresolved.
+    failed_checks: list[str] = Field(default_factory=list, max_length=30)
     model: str = ""
 
 
@@ -303,7 +307,8 @@ async def api_assess_objective(req: AssessObjectiveRequest, client: OpenRouterCl
     so (6 Oct, email 13). 1 LLM call; commits nothing."""
     try:
         result = await assess_objective(
-            client, req.model or None, req.inputs, req.deliverable_label, req.content, req.steps, req.success_criterion
+            client, req.model or None, req.inputs, req.deliverable_label, req.content, req.steps, req.success_criterion,
+            [" ".join(c.split())[:300] for c in req.failed_checks if c.strip()],
         )
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)

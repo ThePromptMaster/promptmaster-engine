@@ -7,7 +7,7 @@ import type { StageEvaluation } from '@/lib/workflow/types';
 import type { AgentStep } from '@/types/agent';
 import { deriveExecutionLabel } from './labels';
 import { ITEM_SCHEMAS, itemSchemaFor } from '@/lib/workflow/stage-artifact';
-import { allowedActions, alternating, LIVE_TOOLS, NO_TOOLS, polishSinceDirection, withoutOverride, withoutEndlessPolish, withoutSettledRuns, fitsBudget, noChange, noProgress, plannedBeforeLatestChange, preempt, shouldPause, stageMoveActor, stateFingerprint } from './policy';
+import { allowedActions, alternating, unsavedDerivation, LIVE_TOOLS, NO_TOOLS, polishSinceDirection, withoutOverride, withoutEndlessPolish, withoutSettledRuns, fitsBudget, noChange, noProgress, plannedBeforeLatestChange, preempt, shouldPause, stageMoveActor, stateFingerprint } from './policy';
 
 function step(over: Partial<AgentStep>): AgentStep {
   return {
@@ -99,7 +99,7 @@ describe('preempt — checked before any model call', () => {
     expect(noProgress([saved[0], saved[1], revise(2, {})])).toBe(true);
     // A reasoning move never saves: three of it in a row still stop.
     expect(preempt({ ...base, steps: [0, 1, 2].map((idx) => step({ idx, action_key: 'compare_alternatives' })) })?.reason).toBe(
-      '"Compare alternatives" was chosen 3 times in a row on this stage without changing it. It needs your direction.'
+      '"Compare alternatives" was chosen 3 times in a row on this stage without changing it: none of it was saved to the document. What each produced is in the run log. It needs your direction.'
     );
   });
 
@@ -607,5 +607,26 @@ describe('R1c: propose_statuses is offered while a check table has rows with nei
     expect(allowedActions(RESEARCH_V1, research, alternatives, true, undefined, facts([{ id: 'a', explanation: 'x' }]) as never)).toContain('propose_statuses');
     expect(allowedActions(RESEARCH_V1, research, alternatives, true, undefined, facts([{ id: 'a', explanation: 'x', status: 'ruled_out', status_source: 'proposed' }]) as never)).not.toContain('propose_statuses');
     expect(allowedActions(RESEARCH_V1, research, alternatives, true, undefined, facts([{ id: 'a', explanation: 'x', status: 'ruled_out', status_source: 'user' }]) as never)).not.toContain('propose_statuses');
+  });
+});
+
+describe('code a deliverable asks to have checked runs in any workflow (M3; Sean, 7 Oct, email 3)', () => {
+  it('Single output offers "Run a computation" only when its draft holds code the objective asks to test', () => {
+    const output = getStage(SINGLE_OUTPUT_V1, 'output')!;
+    const state = initialState(SINGLE_OUTPUT_V1);
+    const code = { language: 'python' as const, code: 'print(1)' };
+    expect(allowedActions(SINGLE_OUTPUT_V1, state, output, true, LIVE_TOOLS, { code })).toContain('run_computation');
+    expect(allowedActions(SINGLE_OUTPUT_V1, state, output, true, LIVE_TOOLS, {})).not.toContain('run_computation');
+  });
+});
+
+describe('a derivation reaches the document (C4; Sean, 6 Oct, sequence test)', () => {
+  const derive = step({ action_key: 'derive', stage_id: 'analysis', status: 'succeeded', output: 'S_n = F_{n+2} - 1, proved by induction.' });
+  const saved = step({ action_key: 'revise_stage', stage_id: 'analysis', status: 'succeeded', changes: { version_ids: ['v2'] } });
+
+  it('a derivation not yet saved is what the next revision applies', () => {
+    expect(unsavedDerivation([derive], 'analysis')).toEqual({ label: 'Derive', output: 'S_n = F_{n+2} - 1, proved by induction.' });
+    expect(unsavedDerivation([derive, saved], 'analysis')).toBeNull();
+    expect(unsavedDerivation([derive], 'results')).toBeNull();
   });
 });

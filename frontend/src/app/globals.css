@@ -265,3 +265,16 @@
   direction: ltr;
   vertical-align: middle;
 }
+
+/* Code highlighting (M1, 8 Oct): token colours from the theme, so light and
+   dark both read; the code's text and indentation are never changed. */
+.hljs-keyword, .hljs-built_in, .hljs-selector-tag, .hljs-type, .hljs-literal { color: var(--pm-primary); }
+.hljs-string, .hljs-regexp, .hljs-template-string, .hljs-attr { color: var(--pm-success); }
+.hljs-number, .hljs-symbol, .hljs-variable.constant_ { color: var(--pm-tertiary); }
+.hljs-comment, .hljs-quote { color: var(--on-surface-variant); font-style: italic; }
+.hljs-title, .hljs-title.function_, .hljs-function .hljs-title, .hljs-section { color: var(--pm-secondary); }
+.hljs-meta, .hljs-doctag, .hljs-params { color: var(--on-surface-variant); }
+.hljs-deletion { color: var(--pm-error); }
+
+/* A long derivation scrolls inside its own line rather than the page. */
+.pm-math-display .katex-display { overflow-x: auto; overflow-y: hidden; padding: 0.25rem 0; }

@@ -19,6 +19,8 @@ question, and then misses the real one.
 
 from __future__ import annotations
 
+import re
+
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -127,8 +129,28 @@ def build_conflict_prompt(
     return system, user
 
 
+def _words(text: str) -> list[str]:
+    return re.findall(r"[a-z0-9]+", text.lower())
+
+
+def _from_user(with_text: str, user_text: str) -> bool:
+    """Whether a quoted objective or constraint is the user's own words.
+
+    Sean's physics review (6 Oct) showed "an internal instruction conflict
+    about JSON versus a Markdown derivation": the check had quoted the
+    system's own format scaffolding as a constraint. Only text the user wrote
+    can be in conflict with them; most of the quote's words must be there.
+    """
+    quote = [w for w in _words(with_text) if len(w) > 2]
+    if not quote:
+        return False
+    have = set(_words(user_text))
+    return sum(w in have for w in quote) / len(quote) >= 0.8
+
+
 def parse_conflicts(
-    raw: object, decisions: list[ConflictSource], others: list[ConflictSource], stage_given: bool = False
+    raw: object, decisions: list[ConflictSource], others: list[ConflictSource], stage_given: bool = False,
+    user_text: str | None = None,
 ) -> list[Conflict]:
     """Keep only well-formed conflicts that point at something that was actually listed.
 
@@ -166,6 +188,8 @@ def parse_conflicts(
             with_text = str(item.get("with_text") or "").strip()
             if not with_text:
                 continue
+            if user_text is not None and not _from_user(with_text, user_text):
+                continue
         out.append(Conflict(kind=kind, with_id=with_id, with_text=with_text[:2_000], explanation=explanation[:500]))
     return out
 
@@ -176,4 +200,5 @@ async def find_conflicts(
 ) -> list[Conflict]:
     system, user = build_conflict_prompt(inputs, instruction, decisions, others, stage)
     raw, _usage = await client.generate_json(prompt=user, system=system, temperature=0.0, max_tokens=700, model=model)
-    return parse_conflicts(raw, decisions, others, stage_given=stage is not None and bool(stage.label.strip()))
+    user_text = " ".join([inputs.objective, inputs.constraints, inputs.output_format, inputs.audience])
+    return parse_conflicts(raw, decisions, others, stage_given=stage is not None and bool(stage.label.strip()), user_text=user_text)
