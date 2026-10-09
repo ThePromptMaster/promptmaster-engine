@@ -50,8 +50,8 @@ describe('calculated figures and mathematics (8 Oct; Sean, portfolio and physics
     expect(unsupportedFigures('A recovery of $41,500 is expected.', [brief])).toEqual(['$41,500']);
   });
 
-  it('a ratio of supplied figures may be stated as a percentage', () => {
-    expect(unsupportedFigures('12 of 16 checks passed, 75% of them.', ['16 checks were run; 12 passed.'])).toEqual([]);
+  it('a percentage is never "calculated" from other figures: invented ranges stay reported', () => {
+    expect(unsupportedFigures('Recovery could reach 15–25%.', ['Plant 1 margin 20.4%; Plant 2 margin 35.4%; Plant 3 margin 45.4%.'])).toEqual(['15–25%']);
   });
 
   it('LaTeX is not money: $2$, $x_1 = 0.5$ and display maths are skipped', () => {

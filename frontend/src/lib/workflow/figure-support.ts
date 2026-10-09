@@ -108,7 +108,7 @@ const round = (n: number) => norm(String(Math.round(n * 100) / 100));
 
 /**
  * Figures calculated from supplied ones: a sum or difference of two or three
- * of the same kind, a product of two, a ratio as a percentage (8 Oct; Sean's
+ * amounts or counts of the same kind, or a product of two (8 Oct; Sean's
  * portfolio test: $8,000 and $9,000 were totals of the supplied costs, and
  * the check told him to remove them or call them assumptions).
  */
@@ -124,13 +124,15 @@ export function derivedNumbers(known: ReadonlySet<string>): Set<string> {
   }
   const out = new Set<string>();
   for (const [kind, vs] of byKind) {
+    // Not percentages: differences and ratios of margins can reach almost any
+    // figure, and an invented recovery range (15–25%) is exactly what this
+    // check exists to catch (4 Oct).
+    if (kind === 'percent') continue;
     for (let i = 0; i < vs.length; i += 1) {
       for (let j = i + 1; j < vs.length; j += 1) {
         out.add(`${round(vs[i] + vs[j])}|${kind}`);
         out.add(`${round(Math.abs(vs[i] - vs[j]))}|${kind}`);
         out.add(`${round(vs[i] * vs[j])}|${kind}`);
-        if (vs[j]) out.add(`${round((vs[i] / vs[j]) * 100)}|percent`);
-        if (vs[i]) out.add(`${round((vs[j] / vs[i]) * 100)}|percent`);
         for (let k = j + 1; k < vs.length && vs.length <= 25; k += 1) out.add(`${round(vs[i] + vs[j] + vs[k])}|${kind}`);
       }
     }
