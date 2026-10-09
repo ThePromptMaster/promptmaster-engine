@@ -376,6 +376,14 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
         value: 'not_run', label: 'Not run', tone: 'warn', requiresReason: true, modelMaySet: true,
         explain: 'It was not carried out. Say why — for example, the data it needed was not provided.',
       },
+      // 8 Oct (Sean's sequence test): three proof-and-check cycles were done
+      // in full by derivation, and the report called every one "not run"
+      // because only code counted. A derivation or hand calculation from what
+      // the objective supplies is carried out; the working is the evidence.
+      {
+        value: 'worked_by_hand', label: 'Worked by hand', tone: 'done', modelMaySet: true,
+        explain: 'Carried out by derivation or hand calculation from what the project supplies — no code or data needed. Put the working, or where it is, in "What actually happened".',
+      },
     ],
     decisionQuestion: 'For each planned run: was it carried out, and what happened? A run that was not done needs a reason, not silence.',
     // …but a run that really executed in the sandbox is.

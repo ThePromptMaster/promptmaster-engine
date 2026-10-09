@@ -392,7 +392,10 @@ def _json_reply(system: str, prompt: str) -> dict:
         # anything else is the usual answer: no conflict.
         instruction = prompt.split("--- THE NEW INSTRUCTION ---", 1)[-1]
         if "[[mock:conflict]]" in instruction:
-            return {"conflicts": [{"kind": "objective", "with_id": "", "with_text": "the project objective",
+            # Quotes the objective as listed: a conflict must quote the user's
+            # own words to be kept (A1, conflicts.parse_conflicts).
+            objective = next((l[len("OBJECTIVE: "):] for l in prompt.splitlines() if l.startswith("OBJECTIVE: ")), "")
+            return {"conflicts": [{"kind": "objective", "with_id": "", "with_text": objective[:300] or "the project objective",
                                    "explanation": "Mock: this instruction pulls the work away from the objective."}]}
         return {"conflicts": []}
     from promptmaster import reply_actions
