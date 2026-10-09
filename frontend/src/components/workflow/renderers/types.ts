@@ -154,6 +154,12 @@ export interface StageRendererProps {
    */
   readOnly: boolean;
 
+  /**
+   * A finished table whose proposed statuses the user may still confirm
+   * without reopening it (L-66): confirming changes no row's text or status.
+   */
+  canConfirmWhenReadOnly?: boolean;
+
   /** Present only for `long_form` stages. */
   longForm?: LongFormContext;
 }

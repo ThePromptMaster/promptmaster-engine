@@ -773,7 +773,7 @@ export function describeOutstanding(item: OutstandingItem): string {
     case 'open_findings':
       return `${item.label}: ${item.count}${item.optional ? ' optional' : ''} finding${item.count === 1 ? '' : 's'} not yet accepted or rejected`;
     case 'unconfirmed_proposals':
-      return `${item.label}: ${item.count}${item.optional ? ' optional' : ''} proposed status${item.count === 1 ? '' : 'es'} not yet confirmed`;
+      return `${item.label}: ${item.count}${item.optional ? ' optional' : ''} proposed status${item.count === 1 ? '' : 'es'} not yet confirmed${item.optional ? '' : ' (confirm them on that stage; it stays finished)'}`;
     case 'carried_forward':
       return `${item.label}: carried forward, still unmet — ${item.rows.slice(0, 3).map((r) => `"${r}"`).join('; ')}${item.rows.length > 3 ? ` and ${item.rows.length - 3} more` : ''}`;
     case 'unmet_blocking':
