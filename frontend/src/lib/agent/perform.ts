@@ -49,7 +49,7 @@ import {
   generationRequest,
   inputsFrom,
 } from '@/lib/workflow/stage-requests';
-import type { StageContext, StageDefinition, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
+import type { StageContext, StageDefinition, StageEvaluation, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
 import type { NewEvaluation, NewVersion } from '@/lib/supabase/versions';
 import type { AgentRun, AgentStep, BlockKind, ExecutionLabel } from '@/types/agent';
 import type { OutlineSection } from '@/types';
@@ -771,7 +771,10 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       const headVersion = ctx.bundles[target.id]?.versions.at(-1);
       const head = headVersion?.content ?? '';
       const before = rendererHoldsItems(target.renderer) ? parseItems(head) : null;
-      const measuredLine = measuredRepair
+      // Every repair of a stage whose measurement fails is told the count, not
+      // only a measured repair: on production two repairs of a reopened Output
+      // were not, and left the announcement at 99 words of 100–140 (9 Oct).
+      const measuredLine = measuredFails.length
         ? ` MEASURED IN CODE AND NOT MET: ${measuredFails.join('; ')}. Revise so each is met — the count is made in code, so count exactly — and keep everything else as written.`
         : '';
       const instruction = recheckInstruction(target.label, why, superseded, before ? 'table' : 'prose') + measuredLine;
@@ -797,7 +800,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         leftover = content ? leftoverValues(content, superseded) : [];
       }
       // A measured repair is measured again, in code; one more try names the count.
-      let stillUnmet = measuredRepair && content ? unmetMeasurementsOf(ctx, target, content) : [];
+      let stillUnmet = measuredFails.length && content ? unmetMeasurementsOf(ctx, target, content) : [];
       if (content && stillUnmet.length) {
         ({ res, content } = await attempt(`${instruction} YOUR PREVIOUS ATTEMPT MEASURED: ${stillUnmet.join('; ')}. Fix exactly that.`));
         stillUnmet = content ? unmetMeasurementsOf(ctx, target, content) : [];
@@ -818,7 +821,9 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       const versionId = (created as { id?: unknown } | null)?.id;
       // Closed again only when its own requirements hold; a reserved approval
       // stays the user's, and the stage stays reopened until they give it.
-      const evaluation = evaluateStage(ctx.template, target.id, ctx.context);
+      // The context was read before this save, so its measurements are of the
+      // old text: they are taken from the new one (L-63).
+      const evaluation = withFreshMeasurements(evaluateStage(ctx.template, target.id, ctx.context), measuredFails.length > 0, stillUnmet);
       const actor = stageMoveActor(ctx.run.policy, ctx.approvedByUser);
       if (leftover.length) {
         const named = leftover.map((v) => `${describeValue(v)} (now: "${v.now}")`).join('; ');
@@ -1268,6 +1273,17 @@ function deliverableText(ctx: Pick<PerformContext, 'bundles' | 'template'>, stag
       .join('\n\n');
   }
   return bundle?.versions.at(-1)?.content ?? '';
+}
+
+/**
+ * A stage's evaluation with its measured criteria judged on the text just
+ * saved rather than the text the context was read from (L-63). Only the
+ * measured criteria change; every other requirement stands as evaluated.
+ */
+export function withFreshMeasurements(evaluation: StageEvaluation, measured: boolean, stillUnmet: readonly string[]): StageEvaluation {
+  if (!measured) return evaluation;
+  const unmet = stillUnmet.length ? evaluation.unmet : evaluation.unmet.filter((c) => !c.id.startsWith('measured.'));
+  return { ...evaluation, unmet, canAdvance: !unmet.some((c) => c.blocking) };
 }
 
 /** A stage's measured requirements that fail, as "Label — measured detail" (L-63). */
