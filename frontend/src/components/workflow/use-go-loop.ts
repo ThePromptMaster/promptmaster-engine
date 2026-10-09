@@ -38,7 +38,7 @@ import { api, type AnswerContradiction } from '@/lib/api/client';
 import { actionFor, actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, USER_ANSWER_STEP } from '@/lib/agent/actions';
 import { contextWithFacts, readOutcomeProof, readStageFacts, type StageFacts } from '@/lib/agent/facts';
 import { stageDrafts } from '@/lib/workflow/stage-artifact';
-import { delegableToCommit, policyConfirmable, staleRepair, describeNeed, NEED_CLEARED, NEED_MOVED_ON, needStillHolds, needsUser, requiredWork, type NeedsUser } from '@/lib/agent/needs';
+import { delegableToCommit, policyConfirmable, repairTries, staleRepair, describeNeed, NEED_CLEARED, NEED_MOVED_ON, needStillHolds, needsUser, requiredWork, type NeedsUser } from '@/lib/agent/needs';
 import { assertHonestOutcome, verifyOutcome } from '@/lib/agent/outcome';
 import { outlineStageFor } from '@/lib/outline/actions';
 import { listRecommendations, recordDecision } from '@/lib/supabase/recommendations';
@@ -525,15 +525,7 @@ export function useGoLoop(opts: Options) {
         // twice before could never be repaired again (8 Oct, production).
         // Each repair step records the reopening it was for (`stale_since`),
         // so no clock is compared.
-        const thisRun = new Set(stepsRef.current.map((s) => s.id));
-        const recheckTried = [...priorStepsRef.current, ...stepsRef.current]
-          .filter((s) => s.action_key === 'recheck_stage')
-          .filter((s) => {
-            const since = o.state.stages[String(s.params?.stage_id ?? '')]?.stale?.since;
-            // Unmarked (a step the planner chose): counted within this run.
-            return !since || s.params?.stale_since === since || (!s.params?.stale_since && thisRun.has(s.id));
-          })
-          .map((s) => String(s.params?.stage_id ?? ''));
+        const recheckTried = repairTries([...priorStepsRef.current, ...stepsRef.current], o.state, new Set(stepsRef.current.map((s) => s.id)));
         const repair = staleRepair(o.template, o.state, recheckTried, context.measured ?? {});
         if (repair) allowed.push('recheck_stage');
 
