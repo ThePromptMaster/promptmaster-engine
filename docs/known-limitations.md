@@ -598,7 +598,7 @@ direction. Two things still count as work Go may do first:
 | L-49 | Routine decisions: only blocking approvals in current templates are delegated | accepted |
 | L-50 | One model for every call; no routing by task | open |
 | L-56 | Measurable requirements: only word ranges/limits and question counts are read | accepted |
-| L-57 | Figure support accepts any sum, difference, product or ratio of supplied figures | accepted |
+| L-57 | Figure support accepts sums, differences and products of supplied amounts and counts | accepted |
 | L-58 | A "missing" finding is disproved only when it quotes what it looked for | accepted |
 | L-59 | Carried-forward and unmet findings are recognised by their wording | accepted |
 | L-60 | iPhone HEIC conversion depends on the browser or a converter loaded on demand | accepted |
@@ -1137,13 +1137,15 @@ conservative: a sentence it does not recognise measures nothing rather than bloc
 requirement is measured under a heading that names it, on a stage about it, or on the
 whole deliverable when only one thing is asked for.
 
-### L-57 — Figure support accepts any sum, difference, product or ratio of supplied figures (2026-10-08)
+### L-57 — Figure support accepts sums, differences and products of supplied amounts and counts (2026-10-08)
 
-So that totals of supplied costs are not "unsupported" (Sean's portfolio test), a figure
-equal to a sum, difference or product of two supplied figures of the same kind, a sum of
-three, or a ratio stated as a percentage, counts as supported. An invented figure that
-happens to equal such a combination passes too. Up to 40 numbers of each kind are
-combined.
+So that totals of supplied costs are not "unsupported" (Sean's portfolio test), an amount
+or count equal to a sum or difference of two supplied figures of the same kind, a sum of
+three, or a product of two counts as supported. An invented figure that happens to equal
+such a combination passes too. Percentages are never derived: differences and ratios of
+margins could reach almost any figure, including the invented ranges this check exists
+to catch, so a percentage must be supplied or labelled an assumption. Up to 40 numbers of
+each kind are combined.
 
 ### L-58 — A "missing" finding is disproved only when it quotes what it looked for (2026-10-08)
 
