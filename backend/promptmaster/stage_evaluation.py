@@ -220,7 +220,10 @@ def build_stage_evaluation_prompt(
         f"4. APPROVED OUTLINE:\n{_format_outline(approved_outline)}",
         f"5. CURRENT STAGE: {stage_label} — see the stage instruction above.",
         "",
-        f"Requested output format: {inputs.output_format or '(none)'}",
+        # 9 Oct (production): Method was judged "incomplete" for holding no
+        # computed examples or comparison table — the final report's format.
+        f"Requested output format (of the final deliverable — not a requirement of an earlier "
+        f"stage such as a plan or a method): {inputs.output_format or '(none)'}",
         "",
         *([context_block(inputs), ""] if context_block(inputs) else []),
         f"WHAT THE EARLIER STAGES ESTABLISHED:\n{_format_prior_stages(digest)}",
@@ -264,7 +267,8 @@ def build_stage_evaluation_prompt(
         "--- END STAGE ARTIFACT ---",
         "",
         "Score alignment, drift and clarity as Low/Medium/High with one sentence "
-        "each; judge completeness; give 3-4 plain-English interpretation bullets; "
+        "each; judge completeness — against what THIS stage was asked to produce, never against the "
+        "final deliverable's format or the results later stages will produce; give 3-4 plain-English interpretation bullets; "
         "list the concrete findings; and return one corrective recommendation if a "
         "threshold was crossed, otherwise null.",
         "",

@@ -88,6 +88,8 @@ export const AGENT_ACTIONS: readonly AgentAction[] = [
 export const INTERPRET_STEP = 'interpret_result';
 /** Not planner-selectable: the user's reply to a question the run asked. */
 export const USER_ANSWER_STEP = 'user_answer';
+/** Not planner-selectable: a default the planner's own question proposed, taken under "handle them for me" (Q1b). */
+export const ROUTINE_DEFAULT_STEP = 'routine_default';
 /** Not planner-selectable: waiting for section jobs already queued (after a reload, or ones the user started). */
 export const AWAIT_SECTIONS_STEP = 'await_sections';
 
@@ -101,5 +103,6 @@ export function actionLabel(key: string): string {
   if (key === INTERPRET_STEP) return 'Interpret the result';
   if (key === USER_ANSWER_STEP) return 'Your answer';
   if (key === AWAIT_SECTIONS_STEP) return 'Wait for the sections being written';
+  if (key === ROUTINE_DEFAULT_STEP) return 'Take the routine default';
   return BY_KEY.get(key)?.label ?? key.replace(/_/g, ' ');
 }

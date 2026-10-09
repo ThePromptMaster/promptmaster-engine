@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { auditStop, describeAudit, touchesObjective, type AuditInput } from './stop-audit';
+import { auditStop, describeAudit, proposedDefault, touchesObjective, type AuditInput } from './stop-audit';
 
 const base: AuditInput = {
   question: 'Should the sweep also cover damping ratios above 1?',
@@ -36,5 +36,20 @@ describe('auditStop (Q1b; Sean, 9 Oct: "Before interrupting the user, Go should 
     expect(touchesObjective('Should we relax the noon deadline?')).toBe(true);
     expect(touchesObjective('Do you approve the analysis plan?')).toBe(true);
     expect(touchesObjective('Which integrator step size is enough?')).toBe(false);
+  });
+});
+
+describe('Q1b (production, 9 Oct): a routine choice with a named default is not the user\'s', () => {
+  const asked = 'Please choose the exact inputs to pre-register for the computations: one pendulum length L with units, one gravity value g with units, and the amplitude set with units. If you want a default set, approve this single package: L = 1.00 m, g = 9.81 m/s^2, amplitudes = 5°, 15°, 30°, 45°, 60°, 75°.';
+
+  it('"approve this package" is not a question about the objective', () => {
+    expect(touchesObjective(asked)).toBe(false);
+    expect(touchesObjective('Do you approve the analysis plan?')).toBe(true);
+    expect(touchesObjective('This is your own judgment to make.')).toBe(true);
+  });
+
+  it('reads the default the question proposes', () => {
+    expect(proposedDefault(asked)).toBe('L = 1.00 m, g = 9.81 m/s^2, amplitudes = 5°, 15°, 30°, 45°, 60°, 75°');
+    expect(proposedDefault('Which integrator should be used?')).toBeNull();
   });
 });
