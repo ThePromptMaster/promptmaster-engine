@@ -99,6 +99,8 @@ export interface AgentStateDigest {
     execution?: { kind: 'finite' | 'ongoing'; success_criterion: string; stop_conditions: string[] };
   };
   tools: AgentTools;
+  /** The project's "Routine decisions" (Q1b): the planner makes routine choices itself under 'handle'. */
+  routine_decisions?: string;
 }
 
 function cap(text: string, max: number): string {
@@ -157,6 +159,8 @@ export function buildAgentState(input: {
   facts?: StageFacts;
   dataFiles?: DataFileBrief[];
   memory?: string[];
+  /** The project's "Routine decisions". */
+  routine?: string;
   /** The page's buttons (lib/workflow/stage-controls.ts). */
   controls?: readonly StageControl[];
   /** Stages Go may go back to from this one, when return_to_stage is offered (Q2). */
@@ -319,5 +323,6 @@ export function buildAgentState(input: {
     ...(input.returnTargets?.length ? { return_targets: input.returnTargets.map((t) => ({ id: t.id, label: t.label })) } : {}),
     workflow: describeWorkflow(template),
     tools,
+    ...(input.routine ? { routine_decisions: input.routine } : {}),
   };
 }

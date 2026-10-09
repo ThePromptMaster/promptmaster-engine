@@ -1565,7 +1565,10 @@ export function checkVerdict(ctx: Pick<PerformContext, 'latestEvaluation' | 'bun
   const head = ctx.bundles[ctx.stage.id]?.versions.at(-1);
   if (!e || !head || e.version_id !== head.id) return null;
   const said: string[] = [];
-  if ((e.completeness_status ?? '').toLowerCase() === 'incomplete') said.push(`it is incomplete${e.completeness_reason ? ` (${e.completeness_reason.trim().replace(/\.$/, '')})` : ''}`);
+  // A planning stage (a question, a method) is not held to the deliverable's
+  // completeness: on production (9 Oct) Method was refused for holding no
+  // computed examples — the report's format, which no method contains.
+  if ((e.completeness_status ?? '').toLowerCase() === 'incomplete' && ctx.stage.group !== 'planning') said.push(`it is incomplete${e.completeness_reason ? ` (${e.completeness_reason.trim().replace(/\.$/, '')})` : ''}`);
   if (e.needs_realignment) said.push('it needs realigning to the objective');
   return said.length ? said.join(', and ') : null;
 }

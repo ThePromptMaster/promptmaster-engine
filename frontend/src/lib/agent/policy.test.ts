@@ -1,3 +1,4 @@
+import { checkVerdict } from './perform';
 import { describe, expect, it } from 'vitest';
 
 import { EXPLORATION_V1, RESEARCH_V1, SINGLE_OUTPUT_V1, getStage, projectState } from '@/lib/workflow';
@@ -749,5 +750,19 @@ describe('Q2b: going round in circles is reconsidered once', () => {
   it('the planner is told to choose a different kind of move', () => {
     expect(reconsiderNote(['derive'])).toMatch(/^RECONSIDER: "Derive" was tried repeatedly here and produced no new evidence\. Do not try it again\./);
     expect(reconsiderNote(['evaluate_stage', 'revise_stage'])).toContain('"Check this stage" and "Revise this stage" were');
+  });
+});
+
+describe('checkVerdict: a planning stage is not held to the deliverable (production, 9 Oct)', () => {
+  const head = { id: 'v2' };
+  const evaluation = { version_id: 'v2', completeness_status: 'incomplete', completeness_reason: 'no computed examples', needs_realignment: false };
+  const ctx = (group: string) => ({ latestEvaluation: evaluation as never, bundles: { s: { versions: [head] } } as never, stage: { id: 's', group } as never });
+
+  it('a method is not refused for lacking the report\'s results', () => {
+    expect(checkVerdict(ctx('planning'))).toBeNull();
+  });
+
+  it('a deliverable still is', () => {
+    expect(checkVerdict(ctx('evaluation'))).toMatch(/incomplete \(no computed examples\)/);
   });
 });

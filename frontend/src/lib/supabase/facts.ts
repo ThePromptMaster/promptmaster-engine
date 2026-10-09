@@ -101,3 +101,29 @@ export async function recordPolicyFacts(
   if (error) throw error;
   return (data ?? []) as unknown as ProjectFact[];
 }
+
+/**
+ * A routine default Go took instead of asking (Q1b, 9 Oct: Go asked the user
+ * to choose a pendulum's length, g and amplitudes while proposing a default
+ * itself). Recorded as an accepted fact under the routine-decision policy,
+ * citing the stage and the question it answers, so every later prompt uses
+ * it and the user can change it in Facts.
+ */
+export async function recordRoutineDefault(
+  project: { id: string; user_id: string },
+  runId: string,
+  taken: { statement: string; stageId: string; question: string }
+): Promise<ProjectFact> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('project_facts')
+    .insert({
+      project_id: project.id, user_id: project.user_id, statement: taken.statement.trim().slice(0, 1_000), subject: 'Routine default',
+      kind: 'fact', source_kind: 'stage', source_ref: { stage_id: taken.stageId, question: taken.question.slice(0, 1_000), routine_default: true },
+      accepted_by: 'policy', agent_run_id: runId,
+    })
+    .select(COLUMNS)
+    .single();
+  if (error) throw error;
+  return data as unknown as ProjectFact;
+}

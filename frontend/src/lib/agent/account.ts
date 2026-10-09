@@ -11,10 +11,7 @@
  */
 
 import type { AgentRun, AgentStep } from '@/types/agent';
-import { actionFor, actionLabel } from './actions';
-
-/** The step Go records when it takes a routine default instead of asking (Q1b). */
-const ROUTINE_DEFAULT_STEP = 'routine_default';
+import { actionFor, actionLabel, ROUTINE_DEFAULT_STEP } from './actions';
 
 export type PauseKind = 'working' | 'window' | 'blocker' | 'decision' | 'complete' | 'stopped';
 

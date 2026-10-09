@@ -615,3 +615,12 @@ def test_return_to_stage_says_what_it_needs():
     when = ACTIONS_BY_KEY["return_to_stage"].when
     assert "Params: stage_id, reason" in when and "work (what is to be done there" in when
     assert ACTIONS_BY_KEY["return_to_stage"].important
+
+
+def test_under_handle_the_planner_makes_routine_choices_itself():
+    """Q1b (production, 9 Oct): Go asked the user for a pendulum's L, g and amplitudes."""
+    _, handled = build_next_action_prompt(INPUTS, STATE.model_copy(update={"routine_decisions": "handle"}), RESEARCH, "autonomous")
+    assert "ROUTINE DECISIONS ARE YOURS" in handled
+    assert "parameter values, units, which cases and how many" in handled
+    _, asked = build_next_action_prompt(INPUTS, STATE, RESEARCH, "autonomous")
+    assert "ROUTINE DECISIONS ARE YOURS" not in asked
