@@ -7,6 +7,7 @@ Reuses promptmaster.continuity for snapshot regeneration.
 from __future__ import annotations
 
 import logging
+import re
 import uuid
 
 from .notation import NOTATION_RULE
@@ -309,7 +310,7 @@ def build_section_prompt(
         f"WRITE SECTION {section_index + 1}: {target.title}\n"
         f"This section covers: {target.abstract}\n\n"
         "Write only the prose for this section. Do not include the section title or "
-        "number; just the body content. Stay focused on what this section's abstract says.\n\n"
+        "number, or any line about which instruction you followed or set aside; just the body content. Stay focused on what this section's abstract says.\n\n"
         # The same finding was made again in Results, Validation, Discussion,
         # Threats and Conclusion (the client's 1 Oct feedback, item 31).
         "SAY EACH THING ONCE. The outline and the prior context show what earlier "
@@ -367,7 +368,7 @@ def build_section_revision_prompt(
         f"THE CURRENT TEXT OF SECTION {section_index + 1}: {target.title}\n"
         f"--- BEGIN SECTION ---\n{revision.current_content}\n--- END SECTION ---\n\n"
         "Return the whole section as it should now read — prose only, no title, no notes "
-        "on what you changed. If nothing here applies to this section, return it unchanged."
+        "on what you changed or which instruction you followed or set aside. If nothing here applies to this section, return it unchanged."
     )
     return system, user
 
@@ -438,7 +439,23 @@ async def generate_section_prose(
         model=model,
         deadline=deadline,
     )
-    return GenerateSectionProseResponse(content=content, finish_reason=finish_reason)
+    return GenerateSectionProseResponse(content=strip_process_note(content), finish_reason=finish_reason)
+
+
+#: "I followed the saved record …; I set aside …" — the precedence rule's reply line.
+_PROCESS_NOTE = re.compile(r"^\s*(?:I\s+)?followed\b[^\n]*\bset aside\b[^\n]*(?:\n|$)", re.IGNORECASE)
+
+
+def strip_process_note(content: str) -> str:
+    """A section opening with the line the precedence rule asks for *in a reply*.
+
+    The rule says "in the work itself, just follow it", and on the production
+    replay of 9 Oct every chapter of a research report still began "I followed
+    the saved record …; I set aside …". It is a note to the user, not the
+    report's prose, so a leading one is removed.
+    """
+    stripped = _PROCESS_NOTE.sub("", content, count=1)
+    return stripped.lstrip("\n") if stripped != content else content
 
 
 _RECORD_SYSTEM = (

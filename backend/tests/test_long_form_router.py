@@ -428,3 +428,28 @@ def test_section_prose_carries_the_stage_hint_into_the_prompt(client_for_app):
     system = call.kwargs.get("system") or call.args[1]
     assert "THIS STAGE:\nStay inside that abstract." in system
     assert "You do not write final prose" not in system
+
+
+def test_a_leading_process_note_is_not_kept_in_a_section(client_for_app):
+    """9 Oct, production replay: every chapter began "I followed the saved record …;
+    I set aside …" — the precedence rule's line for a reply, not for the work."""
+    api_client, mock_llm = client_for_app
+
+    async def _note(**kwargs):
+        return ("I followed the saved record over the earlier draft; I set aside the old wording.\n\nThe first run was carried out by hand.", {}, "stop")
+
+    mock_llm.generate_with_meta = _note
+    r = api_client.post("/api/generate-section-prose", json={
+        "inputs": _basic_inputs_dict(),
+        "outline": [{"id": "s1", "title": "Results", "abstract": "a"}],
+        "section_index": 0,
+    })
+    assert r.json()["content"] == "The first run was carried out by hand."
+
+
+def test_strip_process_note_leaves_ordinary_prose_alone():
+    from promptmaster.long_form import strip_process_note
+    text = "Followers of the method set aside nothing.\nThe proof holds."
+    assert strip_process_note("The proof holds. I followed the method and set aside nothing.") == "The proof holds. I followed the method and set aside nothing."
+    assert strip_process_note("Followed the original objective and saved record; set aside unrequested improvement.\nBody.") == "Body."
+    assert strip_process_note(text) == text
