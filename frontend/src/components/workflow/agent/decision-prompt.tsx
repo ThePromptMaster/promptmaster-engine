@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { actionLabel } from '@/lib/agent/actions';
 import type { AgentStep } from '@/types/agent';
+import type { AnswerContradiction } from '@/lib/api/client';
 
 /** The run is waiting on the user: approve this move, or decline it. */
 export function DecisionPrompt({
@@ -60,17 +61,34 @@ export function DecisionPrompt({
 export function QuestionPrompt({
   question,
   onAnswer,
+  checkAnswer,
   approvals = [],
   onTick,
 }: {
   question: string;
-  onAnswer: (text: string) => void;
+  /** With the contradiction the user chose to record the answer over (L-65). */
+  onAnswer: (text: string, contradicted?: AnswerContradiction) => void;
+  /** Reads the answer against the saved record first; null when nothing contradicts it. */
+  checkAnswer?: (text: string) => Promise<AnswerContradiction | null>;
   /** Approvals the question asks for, offered as the tick itself (4 Oct). */
   approvals?: { id: string; label: string }[];
   onTick?: (approval: { id: string; label: string }) => Promise<void>;
 }) {
   const [text, setText] = useState('');
+  const [checking, setChecking] = useState(false);
+  const [contradiction, setContradiction] = useState<AnswerContradiction | null>(null);
   const [ticking, setTicking] = useState<string | null>(null);
+  async function submit() {
+    if (!checkAnswer) return onAnswer(text);
+    setChecking(true);
+    try {
+      const found = await checkAnswer(text);
+      if (found) setContradiction(found);
+      else onAnswer(text);
+    } finally {
+      setChecking(false);
+    }
+  }
   const [tickError, setTickError] = useState<string | null>(null);
   return (
     <section aria-label="Go mode asks you" className="rounded-xl bg-[var(--surface-container-highest)] px-5 py-4">
@@ -102,9 +120,41 @@ export function QuestionPrompt({
           {tickError && <span role="alert" className="text-label text-[var(--pm-error)]">{tickError}</span>}
         </div>
       )}
+      {contradiction && (
+        <div role="alert" aria-label="Your answer and the record disagree" className="mt-3 rounded-lg bg-[var(--surface-container-lowest)] px-4 py-3">
+          <p className="text-label uppercase tracking-wide text-[var(--on-surface-variant)]">Your answer and the record disagree</p>
+          {contradiction.claim && <p className="mt-1 text-body text-[var(--on-surface)]">Your answer says: {contradiction.claim}</p>}
+          <p className="mt-1 text-body text-[var(--on-surface)]">
+            {contradiction.document}{contradiction.version ? ` (v${contradiction.version})` : ''} says: <q>{contradiction.quote}</q>
+          </p>
+          {contradiction.explanation && <p className="mt-1 text-label text-[var(--on-surface-variant)]">{contradiction.explanation}</p>}
+          <p className="mt-2 text-label text-[var(--on-surface-variant)]">
+            Your answer becomes a fact every stage follows. If the record is wrong, record it anyway; otherwise change your answer.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => onAnswer(text, contradiction)}
+              className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label text-[var(--on-primary)]"
+            >
+              Record my answer anyway
+            </button>
+            <button
+              type="button"
+              onClick={() => setContradiction(null)}
+              className="rounded-lg bg-[var(--surface-container-high)] px-4 py-2 text-label text-[var(--on-surface)]"
+            >
+              Edit my answer
+            </button>
+          </div>
+        </div>
+      )}
       <textarea
         value={text}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(e) => {
+          setText(e.target.value);
+          setContradiction(null);
+        }}
         rows={2}
         aria-label="Your answer"
         placeholder="Your answer…"
@@ -112,11 +162,11 @@ export function QuestionPrompt({
       />
       <div className="mt-2 flex flex-wrap items-center gap-3">
         <button
-          onClick={() => onAnswer(text)}
-          disabled={!text.trim()}
+          onClick={() => void submit()}
+          disabled={!text.trim() || checking || contradiction !== null}
           className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-title text-[var(--on-primary)] disabled:opacity-40"
         >
-          Answer and continue
+          {checking ? 'Checking against the record…' : 'Answer and continue'}
         </button>
         <span className="text-label text-[var(--on-surface-variant)]">
           Or change the project yourself — tick a requirement, edit the draft — and press Resume.

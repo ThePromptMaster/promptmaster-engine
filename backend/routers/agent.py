@@ -35,6 +35,7 @@ from promptmaster.agent import (
 )
 from promptmaster.verify_sources import MAX_VERIFY, SourceToVerify, SourceVerdict, verify_sources
 from promptmaster.criterion_check import CriterionCheck, check_criterion
+from promptmaster.answer_check import CheckAnswerRequest, CheckAnswerResponse, check_answer
 from promptmaster.objective_assessment import ObjectiveAssessment, RunStep, assess_objective
 from promptmaster.fact_extraction import ExtractedFact, SourceDoc, extract_facts
 from promptmaster.agent_actions import ACTION_KEYS, AGENT_ACTIONS, REASONING_ACTIONS, AgentAction
@@ -313,6 +314,14 @@ async def api_assess_objective(req: AssessObjectiveRequest, client: OpenRouterCl
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
     return AssessObjectiveResponse(**result.model_dump(), model_used=_model_used(req.model, client))
+
+
+@router.post("/check-answer")
+async def api_check_answer(req: CheckAnswerRequest, client: OpenRouterClient = Depends(get_client)) -> CheckAnswerResponse:
+    """Is a claim the answer makes about the saved record borne out by it (L-65)?
+    1 small LLM call; commits nothing. A failed check reports no contradiction,
+    so it never stands between the user and their answer."""
+    return await check_answer(client, req)
 
 
 class ExtractFactsRequest(BaseModel):
