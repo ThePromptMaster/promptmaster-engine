@@ -66,7 +66,9 @@ import {
 import { dataFileBriefs, type StageArtifactBundle } from '@/lib/workflow/digest';
 import type { StageFigures } from '@/lib/workflow/figures';
 import type { StageControl } from '@/lib/workflow/stage-controls';
-import { evaluateStage, getStage } from '@/lib/workflow/engine';
+import { deliverableStage, evaluateStage, getStage } from '@/lib/workflow/engine';
+import { objectiveUnmet } from '@/lib/workflow/objective';
+import { isDone } from '@/lib/workflow/types';
 import { documentsAwaitingFacts } from '@/lib/workflow/facts';
 import { inputsFrom } from '@/lib/workflow/stage-requests';
 import type { StageContext, StageDefinition, StageEvaluation, WorkflowEvent, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
@@ -532,7 +534,7 @@ export function useGoLoop(opts: Options) {
             return !since || s.params?.stale_since === since || (!s.params?.stale_since && thisRun.has(s.id));
           })
           .map((s) => String(s.params?.stage_id ?? ''));
-        const repair = staleRepair(o.template, o.state, recheckTried);
+        const repair = staleRepair(o.template, o.state, recheckTried, context.measured ?? {});
         if (repair) allowed.push('recheck_stage');
 
         // Before the planner is asked: is the next move the user's? (B4)
@@ -898,7 +900,24 @@ export function useGoLoop(opts: Options) {
             type: 'stage_unblocked', stage_id: o.stage.id, actor: 'user', reason: `Answered: ${text.trim().slice(0, 300)}`,
           });
         }
-        if (fact || st?.status === 'blocked') {
+        // L-64 (9 Oct): an answer to "the objective is not met" corrects the
+        // deliverable that was judged, so it is reopened with the answer as the
+        // reason, and Go's repair revises it. Matching the answer to the text
+        // it corrects is not possible in code; the judged stage is known.
+        const judged = deliverableStage(o.template);
+        const unmet = objectiveUnmet(o.events);
+        const judgedStatus = judged ? o.state.stages[judged.id]?.status : undefined;
+        if (judged && unmet && /objective is not met/i.test(current.stop_reason ?? '') && (isDone(judgedStatus) || judgedStatus === 'in_progress')) {
+          await appendWorkflowEvent(o.project.id, o.project.user_id, {
+            type: 'brief_changed', stage_id: judged.id, actor: 'user',
+            reason: 'Your answer to the objective check',
+            payload: {
+              field: 'facts', kind: 'answer',
+              affected: [{ stage_id: judged.id, reason: `your answer to "${asked.slice(0, 240)}" was: ${text.trim().slice(0, 600)}` }],
+            },
+          });
+        }
+        if (fact || st?.status === 'blocked' || unmet) {
           await Promise.all([o.onRefresh?.(), o.reloadEvents()]);
         }
         await go();

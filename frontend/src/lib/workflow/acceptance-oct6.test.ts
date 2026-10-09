@@ -169,7 +169,7 @@ describe('Superseded recommendations are repaired consistently; valid figures re
     expect(withChange).toContain('November 12 (was: "Launch: November 12, 2026"; now: "Launch: November 19, 2026")');
   });
   it('a table repair is told to put no note in the table, and a note row is dropped (9 Oct, production replay)', () => {
-    const text = recheckInstruction('Experiment', 'an answer changed it', [], true);
+    const text = recheckInstruction('Experiment', 'an answer changed it', [], 'table');
     expect(text).toContain('This is a table: put no note in it.');
     expect(text).not.toContain('"What changed:"');
     const rows = [
@@ -208,4 +208,22 @@ describe('Accepted evidence is recorded once with its source, and every check re
   // The rest is held elsewhere: every prompt carries the same facts block
   // (backend/tests/test_project_facts.py); the record, its source and its
   // history, and the change check on it (e2e/facts.spec.ts).
+});
+
+describe('L-63/L-64 (9 Oct): finished work that fails a measurement, and reopened manuscripts, are repaired', () => {
+  const done: WorkflowState = { current_stage_id: 'summary', stages: { ...afterChange.stages, summary: { status: 'in_progress' } } };
+  it('a finished stage failing a measured requirement is Go\'s next repair, and stays finished', () => {
+    const measured = { output: [{ label: 'Announcement: 100–140 words', satisfied: false, detail: '74 words' }] };
+    const move = staleRepair(template, done, [], measured);
+    expect(move).toMatchObject({ key: 'recheck_stage', params: { stage_id: 'output', measured: true } });
+    expect(move!.rationale).toContain('Announcement: 100–140 words — measured 74 words');
+    // Met, or tried twice: nothing more.
+    expect(staleRepair(template, done, [], { output: [{ label: 'x', satisfied: true }] })).toBeNull();
+    expect(staleRepair(template, done, ['output', 'output'], measured)).toBeNull();
+  });
+  it('a repaired manuscript section is told to return only its prose', () => {
+    const text = recheckInstruction('Drafting', 'your answer to the objective check', [], 'section');
+    expect(text).toContain('This is one section of the manuscript: return only its prose');
+    expect(text).not.toContain('"What changed:"');
+  });
 });

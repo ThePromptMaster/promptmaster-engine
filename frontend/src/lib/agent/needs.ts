@@ -12,6 +12,7 @@
 import { isLargeJob } from '@/components/workflow/large-job-warning';
 import type { ExecutionPolicy } from '@/types/agent';
 import type { ExitCriterion, StageDefinition, StageEvaluation, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
+import { isDone } from '@/lib/workflow/types';
 import type { RoutineDecisions } from '@/types/project';
 import type { StageFacts } from './facts';
 import type { InputsChange } from '@/lib/workflow/stage-inputs';
@@ -141,7 +142,9 @@ export const REPAIR_TRIES = 2;
 export function staleRepair(
   template: WorkflowTemplate,
   state: WorkflowState,
-  tried: readonly string[] = []
+  tried: readonly string[] = [],
+  /** Measured requirements per stage (C1): a finished stage failing one is repaired too (L-63). */
+  measured: Readonly<Record<string, readonly { satisfied: boolean; label: string; detail?: string }[]>> = {}
 ): RequiredMove | null {
   const loops = template.stages.some((s) => s.transitions.loop_to);
   const here = template.stages.findIndex((s) => s.id === state.current_stage_id);
@@ -153,8 +156,22 @@ export function staleRepair(
   for (const [index, stage] of template.stages.entries()) {
     const st = state.stages[stage.id];
     if (here >= 0 && index > here && !(ahead && st?.stale)) continue;
-    if (st?.status !== 'stale' || tried.filter((id) => id === stage.id).length >= REPAIR_TRIES) continue;
-    if (!['prose', 'list', 'review'].includes(stage.renderer)) continue;
+    if (tried.filter((id) => id === stage.id).length >= REPAIR_TRIES) continue;
+    // L-63 (9 Oct): "Announcement: 100–140 words — 74 words" on a finished
+    // stage was reported and left; it is repaired, and the stage stays finished.
+    const failing = isDone(st?.status) && stage.renderer === 'prose' ? (measured[stage.id] ?? []).filter((m) => !m.satisfied) : [];
+    if (failing.length && (here < 0 || index <= here || ahead)) {
+      const list = failing.map((m) => `${m.label} — measured ${m.detail ?? 'not met'}`).join('; ');
+      return {
+        key: 'recheck_stage',
+        rationale: `${stage.label} is finished, but a requirement measured in code is not met: ${list}. Repairing it keeps the deliverable within what was asked.`,
+        expected: `A new version of ${stage.label} that meets ${failing.map((m) => m.label).join('; ')}, measured again in code.`,
+        params: { stage_id: stage.id, measured: true },
+      };
+    }
+    if (st?.status !== 'stale') continue;
+    // L-64 (9 Oct): a reopened manuscript is repaired by revising its sections.
+    if (!['prose', 'list', 'review', 'long_form'].includes(stage.renderer)) continue;
     return {
       key: 'recheck_stage',
       rationale: `${stage.label} was reopened: ${st.stale?.reason ?? 'something it relied on changed'}. Repairing it keeps the project consistent.`,
