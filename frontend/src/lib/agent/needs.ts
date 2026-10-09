@@ -10,7 +10,7 @@
  */
 
 import { isLargeJob } from '@/components/workflow/large-job-warning';
-import type { ExecutionPolicy } from '@/types/agent';
+import type { AgentStep, ExecutionPolicy } from '@/types/agent';
 import type { ExitCriterion, StageDefinition, StageEvaluation, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
 import { isDone } from '@/lib/workflow/types';
 import type { RoutineDecisions } from '@/types/project';
@@ -138,6 +138,28 @@ export interface RequiredMove {
  * TeamNotes). A stage whose repair failed is tried once more, no more.
  */
 export const REPAIR_TRIES = 2;
+
+/**
+ * The repairs already tried, one stage id per try, for `staleRepair`.
+ *
+ * A reopened stage counts the tries for its current reopening (each repair
+ * step records it as `stale_since`), so a later change reopens it afresh
+ * (8 Oct, production). A measured repair of a finished stage (L-63) counts
+ * only measured repairs: on production, TaskBoard's Output had been repaired
+ * three times after fact changes, and those used up the measured repair's
+ * tries before it was ever made (9 Oct).
+ */
+export function repairTries(steps: readonly AgentStep[], state: WorkflowState, thisRun: ReadonlySet<string>): string[] {
+  return steps
+    .filter((s) => s.action_key === 'recheck_stage')
+    .filter((s) => {
+      const since = state.stages[String(s.params?.stage_id ?? '')]?.stale?.since;
+      if (!since) return Boolean(s.params?.measured);
+      // Unmarked (a step the planner chose): counted within this run.
+      return s.params?.stale_since === since || (!s.params?.stale_since && thisRun.has(s.id));
+    })
+    .map((s) => String(s.params?.stage_id ?? ''));
+}
 
 export function staleRepair(
   template: WorkflowTemplate,

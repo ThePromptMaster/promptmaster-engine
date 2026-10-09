@@ -17,7 +17,7 @@ import { figureFindings, figureSources } from './figure-support';
 import { evaluateStage } from './engine';
 import { SINGLE_OUTPUT_V1 as template } from './templates/single-output.v1';
 import { itemSchemaFor } from './stage-artifact';
-import { policyConfirmable, staleRepair } from '@/lib/agent/needs';
+import { policyConfirmable, repairTries, staleRepair } from '@/lib/agent/needs';
 import { recheckInstruction, withoutRevisionNotes } from '@/lib/agent/perform';
 import { supersededValues } from './fact-values';
 import type { StageContext, WorkflowState } from './types';
@@ -225,5 +225,20 @@ describe('L-63/L-64 (9 Oct): finished work that fails a measurement, and reopene
     const text = recheckInstruction('Drafting', 'your answer to the objective check', [], 'section');
     expect(text).toContain('This is one section of the manuscript: return only its prose');
     expect(text).not.toContain('"What changed:"');
+  });
+});
+
+describe('a measured repair has tries of its own (9 Oct, production: TaskBoard)', () => {
+  const step = (id: string, params: Record<string, unknown>) => ({ id, action_key: 'recheck_stage', params }) as never;
+  const finished: WorkflowState = { current_stage_id: 'summary', stages: { ...afterChange.stages, summary: { status: 'in_progress' } } };
+  it('earlier repairs after fact changes do not use up the measured repair', () => {
+    const earlier = [step('a', { stage_id: 'output', stale_since: 't1' }), step('b', { stage_id: 'output', stale_since: 't2' }), step('c', { stage_id: 'output' })];
+    expect(repairTries(earlier, finished, new Set())).toEqual([]);
+    expect(repairTries([...earlier, step('d', { stage_id: 'output', measured: true })], finished, new Set())).toEqual(['output']);
+  });
+  it('a reopened stage still counts the tries for its current reopening', () => {
+    const stale: WorkflowState = { ...finished, stages: { ...finished.stages, output: { status: 'stale', stale: { reason: 'r', since: 't2', was: 'complete' } } } };
+    const tries = [step('a', { stage_id: 'output', stale_since: 't1' }), step('b', { stage_id: 'output', stale_since: 't2' }), step('c', { stage_id: 'output' })];
+    expect(repairTries(tries, stale, new Set(['c']))).toEqual(['output', 'output']);
   });
 });

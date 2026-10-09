@@ -71,3 +71,19 @@ export function answerDocuments(
   }
   return out;
 }
+
+/**
+ * What the project's own code measured, as one more document for the answer
+ * check (L-65). A count is not a sentence any document says, so "the
+ * announcement already has 120 words" could not be contradicted by a quote;
+ * on production it went through, while the saved announcement measured 99.
+ */
+export function measuredDocument(
+  template: WorkflowTemplate,
+  measured: Readonly<Record<string, readonly { label: string; satisfied: boolean; detail?: string }[]>>
+): { label: string; version: null; text: string }[] {
+  const lines = template.stages.flatMap((s) =>
+    (measured[s.id] ?? []).map((m) => `${s.label}: ${m.label} — measured ${m.detail ?? 'met'}`)
+  );
+  return lines.length ? [{ label: 'Measured in code', version: null, text: lines.join('\n') }] : [];
+}

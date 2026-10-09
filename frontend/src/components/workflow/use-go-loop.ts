@@ -38,7 +38,7 @@ import { api, type AnswerContradiction } from '@/lib/api/client';
 import { actionFor, actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, USER_ANSWER_STEP } from '@/lib/agent/actions';
 import { contextWithFacts, readOutcomeProof, readStageFacts, type StageFacts } from '@/lib/agent/facts';
 import { stageDrafts } from '@/lib/workflow/stage-artifact';
-import { delegableToCommit, policyConfirmable, staleRepair, describeNeed, NEED_CLEARED, NEED_MOVED_ON, needStillHolds, needsUser, requiredWork, type NeedsUser } from '@/lib/agent/needs';
+import { delegableToCommit, policyConfirmable, repairTries, staleRepair, describeNeed, NEED_CLEARED, NEED_MOVED_ON, needStillHolds, needsUser, requiredWork, type NeedsUser } from '@/lib/agent/needs';
 import { assertHonestOutcome, verifyOutcome } from '@/lib/agent/outcome';
 import { outlineStageFor } from '@/lib/outline/actions';
 import { listRecommendations, recordDecision } from '@/lib/supabase/recommendations';
@@ -46,7 +46,7 @@ import { projectMemory } from '@/lib/agent/memory';
 import { requestProjectCancel } from '@/lib/supabase/jobs';
 import { recordFacts } from '@/lib/supabase/facts';
 import { appendWorkflowEvent } from '@/lib/supabase/workflow';
-import { answerAsFact, answerDocuments } from '@/lib/workflow/answers';
+import { answerAsFact, answerDocuments, measuredDocument } from '@/lib/workflow/answers';
 import { authorizeRun } from '@/lib/agent/authorize';
 import { buildAgentState } from '@/lib/agent/digest';
 import { performStep, type PerformContext, type StepOutcome } from '@/lib/agent/perform';
@@ -525,15 +525,7 @@ export function useGoLoop(opts: Options) {
         // twice before could never be repaired again (8 Oct, production).
         // Each repair step records the reopening it was for (`stale_since`),
         // so no clock is compared.
-        const thisRun = new Set(stepsRef.current.map((s) => s.id));
-        const recheckTried = [...priorStepsRef.current, ...stepsRef.current]
-          .filter((s) => s.action_key === 'recheck_stage')
-          .filter((s) => {
-            const since = o.state.stages[String(s.params?.stage_id ?? '')]?.stale?.since;
-            // Unmarked (a step the planner chose): counted within this run.
-            return !since || s.params?.stale_since === since || (!s.params?.stale_since && thisRun.has(s.id));
-          })
-          .map((s) => String(s.params?.stage_id ?? ''));
+        const recheckTried = repairTries([...priorStepsRef.current, ...stepsRef.current], o.state, new Set(stepsRef.current.map((s) => s.id)));
         const repair = staleRepair(o.template, o.state, recheckTried, context.measured ?? {});
         if (repair) allowed.push('recheck_stage');
 
@@ -885,7 +877,8 @@ export function useGoLoop(opts: Options) {
     const asked = current.needs?.kind === 'answer_question' ? current.needs.question : current.stop_reason ?? '';
     try {
       const res = await api.agentCheckAnswer({
-        question: asked, answer: text.trim(), documents: answerDocuments(o.template, o.bundles), model: o.project.model,
+        question: asked, answer: text.trim(), model: o.project.model,
+        documents: [...answerDocuments(o.template, o.bundles), ...measuredDocument(o.template, o.context.measured ?? {})],
       });
       return res.contradicts && res.quote ? res : null;
     } catch {
