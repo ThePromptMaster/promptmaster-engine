@@ -749,15 +749,15 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       const head = headVersion?.content ?? '';
       const why = st.stale?.reason ?? 'something it relied on changed';
       const superseded = supersededFactValues(ctx.project.facts);
-      const instruction = recheckInstruction(target.label, why, superseded);
       const before = rendererHoldsItems(target.renderer) ? parseItems(head) : null;
+      const instruction = recheckInstruction(target.label, why, superseded, Boolean(before));
       const attempt = async (text: string) => {
         const res = await api.generateStageArtifact(
           generationRequest(ctx.project, ctx.template, ctx.state, ctx.bundles, target, head, text),
           ctx.signal
         );
         const generated = generationContent(target, res);
-        const after = before ? parseItems(generated) : null;
+        const after = before ? withoutRevisionNotes(parseItems(generated)) : null;
         const content = before && after ? serializeItems(carryUserFields(before, after, itemSchemaFor(target))) : generated;
         return { res, content };
       };
@@ -1226,12 +1226,18 @@ function deliverableText(ctx: Pick<PerformContext, 'bundles' | 'template'>, stag
   return bundle?.versions.at(-1)?.content ?? '';
 }
 
+/** Rows that are a revision note ("What changed: …") rather than one of the stage's items. */
+export function withoutRevisionNotes<T extends Record<string, unknown>>(items: T[] | null): T[] | null {
+  if (!items) return items;
+  return items.filter((item) => !Object.values(item).some((v) => typeof v === 'string' && /^\s*\**\s*What changed\s*:/i.test(v)));
+}
+
 /**
  * What a repair is told (6 Oct, Sean's acceptance criteria: "Valid figures
  * and calculations remain intact. Superseded recommendations are repaired
  * consistently"). The current facts and brief reach the model with the request.
  */
-export function recheckInstruction(stageLabel: string, why: string, superseded: readonly SupersededValue[] = []): string {
+export function recheckInstruction(stageLabel: string, why: string, superseded: readonly SupersededValue[] = [], table = false): string {
   // The values the user's fact changes made untrue, each with what replaces
   // it. Until 8 Oct the brief named the old sentence but not the new value,
   // and "keep every figure that still holds" kept November 12 (TeamNotes).
@@ -1245,7 +1251,11 @@ export function recheckInstruction(stageLabel: string, why: string, superseded: 
     'Bring it into line with the project as it now stands — the brief, the accepted facts and requirements, and the earlier stages. ' +
     'Keep every figure, calculation and finding that still holds, exactly as written. ' +
     'Replace any conclusion or recommendation the change superseded, and re-test each option against the requirements as they are now: one that no longer qualifies is said to be excluded, and why. ' +
-    'Begin with one line, "What changed:", saying what was kept and what was replaced.' +
+    // A table has no place for a note: on a production replay (9 Oct) the line
+    // became the Experiment table's first "run", marked worked by hand.
+    (table
+      ? 'This is a table: put no note in it. Every row stays one of the stage\'s own items; say what changed only in the rows it concerns.'
+      : 'Begin with one line, "What changed:", saying what was kept and what was replaced.') +
     replace
   );
 }

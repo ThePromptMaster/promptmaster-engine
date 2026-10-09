@@ -18,7 +18,7 @@ import { evaluateStage } from './engine';
 import { SINGLE_OUTPUT_V1 as template } from './templates/single-output.v1';
 import { itemSchemaFor } from './stage-artifact';
 import { policyConfirmable, staleRepair } from '@/lib/agent/needs';
-import { recheckInstruction } from '@/lib/agent/perform';
+import { recheckInstruction, withoutRevisionNotes } from '@/lib/agent/perform';
 import { supersededValues } from './fact-values';
 import type { StageContext, WorkflowState } from './types';
 
@@ -167,6 +167,17 @@ describe('Superseded recommendations are repaired consistently; valid figures re
     const withChange = recheckInstruction('Announcement', 'the launch date changed', supersededValues('Launch: November 12, 2026', 'Launch: November 19, 2026'));
     expect(withChange).toContain('CHANGED FACTS');
     expect(withChange).toContain('November 12 (was: "Launch: November 12, 2026"; now: "Launch: November 19, 2026")');
+  });
+  it('a table repair is told to put no note in the table, and a note row is dropped (9 Oct, production replay)', () => {
+    const text = recheckInstruction('Experiment', 'an answer changed it', [], true);
+    expect(text).toContain('This is a table: put no note in it.');
+    expect(text).not.toContain('"What changed:"');
+    const rows = [
+      { id: 'i1', run: 'What changed: kept the Cycle 1 counterexample; replaced the not-run entries.', status: 'worked_by_hand' },
+      { id: 'i2', run: 'Cycle 1: test a_n = 2^n - 1 at n = 2', observed: 'a_2 = 1, 2^2 - 1 = 3', status: 'worked_by_hand' },
+    ];
+    expect(withoutRevisionNotes(rows)!.map((r) => r.id)).toEqual(['i2']);
+    expect(withoutRevisionNotes(null)).toBeNull();
   });
 });
 describe('Go handles routine repairs within delegated authority', () => {
