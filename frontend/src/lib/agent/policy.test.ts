@@ -7,7 +7,7 @@ import type { StageEvaluation } from '@/lib/workflow/types';
 import type { AgentStep } from '@/types/agent';
 import { deriveExecutionLabel } from './labels';
 import { ITEM_SCHEMAS, itemSchemaFor } from '@/lib/workflow/stage-artifact';
-import { allowedActions, alternating, unsavedDerivation, LIVE_TOOLS, NO_TOOLS, polishSinceDirection, withoutOverride, withoutEndlessPolish, withoutSettledRuns, fitsBudget, noChange, noProgress, plannedBeforeLatestChange, preempt, shouldPause, stageMoveActor, stateFingerprint } from './policy';
+import { allowedActions, alternating, unsavedDerivation, saveInsteadOfRepeating, LIVE_TOOLS, NO_TOOLS, polishSinceDirection, withoutOverride, withoutEndlessPolish, withoutSettledRuns, fitsBudget, noChange, noProgress, plannedBeforeLatestChange, preempt, shouldPause, stageMoveActor, stateFingerprint } from './policy';
 
 function step(over: Partial<AgentStep>): AgentStep {
   return {
@@ -625,8 +625,23 @@ describe('a derivation reaches the document (C4; Sean, 6 Oct, sequence test)', (
   const saved = step({ action_key: 'revise_stage', stage_id: 'analysis', status: 'succeeded', changes: { version_ids: ['v2'] } });
 
   it('a derivation not yet saved is what the next revision applies', () => {
-    expect(unsavedDerivation([derive], 'analysis')).toEqual({ label: 'Derive', output: 'S_n = F_{n+2} - 1, proved by induction.' });
+    expect(unsavedDerivation([derive], 'analysis')).toEqual({ label: 'Derive', output: 'S_n = F_{n+2} - 1, proved by induction.', action_key: 'derive' });
     expect(unsavedDerivation([derive, saved], 'analysis')).toBeNull();
     expect(unsavedDerivation([derive], 'results')).toBeNull();
   });
 });
+
+describe('a repeated derivation is saved, not repeated (9 Oct, production replay)', () => {
+  const derive = step({ action_key: 'derive', stage_id: 'analysis', status: 'succeeded', output: 'Binet: a_n = (phi^n - psi^n)/sqrt(5), proved by induction.' });
+  it('the same reasoning move again, with its result unsaved, becomes the save', () => {
+    const saving = saveInsteadOfRepeating({ action_key: 'derive' }, [derive], 'analysis', ['derive', 'revise_stage'], true);
+    expect(saving).toMatchObject({ action_key: 'revise_stage' });
+    expect(saving!.params.instruction).toContain('Put the result of the "Derive" step into this stage');
+  });
+  it('a different reasoning move, no draft, or nothing unsaved: the choice stands', () => {
+    expect(saveInsteadOfRepeating({ action_key: 'prove' }, [derive], 'analysis', ['prove', 'revise_stage'], true)).toBeNull();
+    expect(saveInsteadOfRepeating({ action_key: 'derive' }, [derive], 'analysis', ['derive', 'revise_stage'], false)).toBeNull();
+    expect(saveInsteadOfRepeating({ action_key: 'derive' }, [], 'analysis', ['derive', 'revise_stage'], true)).toBeNull();
+  });
+});
+
