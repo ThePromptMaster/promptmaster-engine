@@ -124,7 +124,8 @@ async def api_reason(req: ReasonRequest, client: OpenRouterClient = Depends(get_
 class WriteCodeRequest(BaseModel):
     inputs: PMInput
     state: AgentState
-    goal: str = Field(default="", max_length=2_000)
+    #: Up to 40k: a check of a deliverable's code carries the code (M3).
+    goal: str = Field(default="", max_length=40_000)
     kind: Literal["computation", "simulation"] = "computation"
     model: str = ""
 

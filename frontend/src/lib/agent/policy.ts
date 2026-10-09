@@ -159,6 +159,10 @@ export function allowedActions(
     // be able to walk into "no search tool is connected" and stop there
     // (Sean, 28 Sep, Research note).
     if (tools.literature) keys.push('check_literature');
+  } else if (facts.code) {
+    // M3 (8 Oct): code the objective asks to have checked is run, in any
+    // workflow; until then only research could run code (email 3).
+    keys.push('run_computation');
   } else if (tools.literature && itemSchemaFor(stage).lookup && facts.review?.items.length) {
     // 5 Oct: on any stage whose rows name sources (Book's Fact-check), Go looks
     // them up and reads their abstracts before handing the table to the user.

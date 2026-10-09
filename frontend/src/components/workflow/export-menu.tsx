@@ -58,6 +58,14 @@ export function ExportMenu({ bundle }: { bundle: ExportBundle }) {
     setOpen(false);
   }
 
+  // M2 (8 Oct): the work as LaTeX, its mathematics as written and its code verbatim.
+  async function exportLatex() {
+    const { markdownToLatex } = await import('@/lib/export/latex-export');
+    const title = bundle.project.title || 'Untitled project';
+    downloadFile(markdownToLatex(manuscript || toMarkdown(bundle), title), exportFilename(bundle.project, 'md').replace(/\.md$/, '.tex'), 'application/x-tex;charset=utf-8');
+    setOpen(false);
+  }
+
   function exportJson() {
     downloadFile(
       toJson(bundle),
@@ -94,6 +102,16 @@ export function ExportMenu({ bundle }: { bundle: ExportBundle }) {
             <span className="block text-body text-[var(--on-surface)]">Markdown document</span>
             <span className="mt-0.5 block text-label text-[var(--on-surface-variant)]">
               Every stage you reached, in order, ready to paste.
+            </span>
+          </button>
+          <button
+            role="menuitem"
+            onClick={() => void exportLatex()}
+            className="block w-full px-4 py-3 text-left transition-colors hover:bg-[var(--surface-container-low)]"
+          >
+            <span className="block text-body text-[var(--on-surface)]">LaTeX (.tex)</span>
+            <span className="mt-0.5 block text-label text-[var(--on-surface-variant)]">
+              {manuscript ? `The ${noun}` : 'Every stage you reached'}, equations as written and code verbatim.
             </span>
           </button>
           {manuscript && (

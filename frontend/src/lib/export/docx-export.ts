@@ -6,12 +6,23 @@
  * pressed — the backend stays a stateless LLM proxy and the project page does
  * not carry a document library it uses once. The Markdown the app already
  * assembles (`toManuscriptMarkdown`) is the source; the mapping is the plain
- * one — headings, paragraphs, bullets — and anything richer (tables, code)
- * arrives as text. Fidelity beyond that is a known limitation, not a promise.
+ * one — headings, paragraphs, bullets — with code and displayed equations
+ * kept verbatim in a fixed-width font (M2, 8 Oct); tables arrive as text.
+ * Fidelity beyond that is a known limitation, not a promise.
  */
+
+import { normalizeMath } from '@/lib/markdown/math';
 
 export type DocBlock =
   | { kind: 'title' | 'h1' | 'h2' | 'h3' | 'paragraph' | 'bullet'; text: string }
+  /**
+   * A fenced block of code, every line exactly as written (M2, 8 Oct): it
+   * used to be joined into one paragraph with "# comment" lines read as
+   * headings and "_" and "*" stripped, which changed what the code meant.
+   */
+  | { kind: 'code'; text: string; language: string }
+  /** A displayed equation, as its LaTeX. */
+  | { kind: 'math'; text: string }
   /** An image placed on its own line as `![caption](project-file:<id>)`. */
   | { kind: 'image'; id: string; text: string };
 
@@ -35,7 +46,36 @@ export function markdownToBlocks(markdown: string): DocBlock[] {
     if (paragraph.length) blocks.push({ kind: 'paragraph', text: inline(paragraph.join(' ')) });
     paragraph = [];
   };
-  for (const raw of markdown.replace(/\r\n?/g, '\n').split('\n')) {
+  // Code and displayed maths are kept whole and verbatim; everything else
+  // is read line by line as before.
+  let fence: { marker: string; language: string; lines: string[] } | null = null;
+  let math: string[] | null = null;
+  for (const raw of normalizeMath(markdown.replace(/\r\n?/g, '\n')).split('\n')) {
+    if (fence) {
+      if (raw.trim().startsWith(fence.marker)) {
+        blocks.push({ kind: 'code', text: fence.lines.join('\n'), language: fence.language });
+        fence = null;
+      } else fence.lines.push(raw);
+      continue;
+    }
+    const opens = /^\s*(```|~~~)\s*([\w+#.-]*)/.exec(raw);
+    if (opens) {
+      flush();
+      fence = { marker: opens[1], language: opens[2] ?? '', lines: [] };
+      continue;
+    }
+    if (math) {
+      if (raw.trim() === '$$') {
+        blocks.push({ kind: 'math', text: math.join('\n') });
+        math = null;
+      } else math.push(raw);
+      continue;
+    }
+    if (raw.trim() === '$$') {
+      flush();
+      math = [];
+      continue;
+    }
     const line = raw.trimEnd();
     const image = IMAGE_LINE.exec(line.trim());
     if (image) {
@@ -69,18 +109,29 @@ export function markdownToBlocks(markdown: string): DocBlock[] {
     paragraph.push(line.trim());
   }
   flush();
+  // An unclosed fence or equation is still kept, not lost.
+  if (fence) blocks.push({ kind: 'code', text: fence.lines.join('\n'), language: fence.language });
+  if (math) blocks.push({ kind: 'math', text: math.join('\n') });
   return blocks;
 }
 
-/** Strip the inline Markdown a reader would not want to see literally. */
+/**
+ * Strip the inline Markdown a reader would not want to see literally. Inline
+ * code and inline maths are set aside first and put back exactly: "a_i b_j"
+ * and "__init__" lost their underscores to the emphasis rules (M2, 8 Oct).
+ */
 function inline(text: string): string {
+  const kept: string[] = [];
+  const keep = (s: string) => `\u0000${kept.push(s) - 1}\u0000`;
   return text
+    .replace(/`([^`]+)`/g, (_m, code: string) => keep(code))
+    .replace(/\$\$([^$]+)\$\$/g, (_m, tex: string) => keep(`\\(${tex}\\)`))
     .replace(/\*\*(.+?)\*\*/g, '$1')
     .replace(/__(.+?)__/g, '$1')
     .replace(/(^|[^*])\*([^*]+)\*/g, '$1$2')
     .replace(/(^|[^_])_([^_]+)_/g, '$1$2')
-    .replace(/`([^`]+)`/g, '$1')
     .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/\u0000(\d+)\u0000/g, (_m, i: string) => kept[Number(i)])
     .trim();
 }
 
@@ -124,6 +175,15 @@ export async function manuscriptToDocx(
         return new Paragraph({ text: b.text, heading: HeadingLevel.HEADING_3 });
       case 'bullet':
         return new Paragraph({ children: [new TextRun(b.text)], bullet: { level: 0 } });
+      case 'code':
+      case 'math':
+        // One run per line, in a fixed-width font, so indentation and every
+        // character survive; the LaTeX of an equation is kept to be reused.
+        return new Paragraph({
+          children: b.text.split('\n').map((line, i) => new TextRun({ text: line, font: 'Consolas', size: 19, ...(i > 0 ? { break: 1 } : {}) })),
+          spacing: { before: 120, after: 200 },
+          ...(b.kind === 'math' ? { alignment: docx.AlignmentType.CENTER } : {}),
+        });
       default:
         return new Paragraph({ children: [new TextRun(b.text)], spacing: { after: 200 } });
     }
