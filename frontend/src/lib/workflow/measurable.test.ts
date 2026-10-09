@@ -62,4 +62,11 @@ describe('requirements PromptMaster can measure (C1; Sean, 7 Oct)', () => {
     expect(requirementsForStage(stage('review'), 'output', reqs)).toHaveLength(0);
     expect(requirementsForStage(stage('summary'), 'output', reqs)).toHaveLength(0);
   });
+
+  it('a range in brackets belongs to the deliverable just before it (9 Oct, production)', () => {
+    expect(parseRequirements(['Write a launch announcement (100-140 words) and a five-question support FAQ with answers'])).toEqual([
+      expect.objectContaining({ kind: 'words', subject: 'announcement', min: 100, max: 140 }),
+      expect.objectContaining({ kind: 'questions', subject: 'faq', min: 5 }),
+    ]);
+  });
 });
