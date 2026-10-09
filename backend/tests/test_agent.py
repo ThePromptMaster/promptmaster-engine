@@ -553,7 +553,7 @@ def test_the_planner_is_told_the_order_is_a_default_and_can_suggest_a_skip():
     assert "The workflow's order is a sensible default, not a rule" in system
     assert "do not work through a stage only because it comes next" in system
     assert "- propose_skip: Suggest skipping this stage." in user
-    assert "The user decides; nothing is skipped unless they agree." in user
+    assert "The user decides; nothing is skipped unless they agree — except an optional stage under Autonomous" in user
 
 
 def test_the_planner_is_given_what_the_user_already_decided():
