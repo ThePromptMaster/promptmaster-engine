@@ -50,6 +50,7 @@ import { answerAsFact, answerDocuments, measuredDocument } from '@/lib/workflow/
 import { authorizeRun } from '@/lib/agent/authorize';
 import { buildAgentState } from '@/lib/agent/digest';
 import { performStep, type PerformContext, type StepOutcome } from '@/lib/agent/perform';
+import { needsExpert, packageMarkdown, recordDocuments } from '@/lib/agent/expert';
 import { auditStop, describeAudit, touchesObjective } from '@/lib/agent/stop-audit';
 import { allowedActions, reconsiderNote, returnTargets, runAttemptsFor, stageHasCurrentDraft, LIVE_TOOLS, polishSinceDirection, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, withoutEndlessPolish, withoutSettledRuns, withoutOverride, DEFAULT_BUDGET_STEPS, fitsBudget, noChange, plannedBeforeLatestChange, preempt, shouldPause, stateFingerprint, stepCost } from '@/lib/agent/policy';
 import {
@@ -621,6 +622,15 @@ export function useGoLoop(opts: Options) {
             });
           } else {
             choice.params = { ...(choice.params ?? {}), stop_audit: describeAudit(audit) };
+            // Q3a: a question only an expert can answer is asked with the package an expert needs.
+            if (needsExpert(question)) {
+              setPhase('thinking');
+              const pkg = await api.agentExpertPackage({
+                inputs: inputsFrom(o.project), issue: question.slice(0, 2_000), stage_label: o.stage.label,
+                documents: recordDocuments(o.template, o.state, o.bundles), model: o.project.model,
+              }, signal).catch(() => null);
+              if (pkg) choice.params = { ...choice.params, expert_package: packageMarkdown(pkg, o.project.title) };
+            }
           }
         }
         if (!fitsBudget(choice.action_key, current.steps_used, current.budget_steps)) {

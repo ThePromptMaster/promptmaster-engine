@@ -58,7 +58,12 @@ _ASSESS_INSTRUCTION = (
     "Such a requirement is met when the accepted facts or the run record show it was "
     "carried out — a decision the user recorded answers the question it required. Do "
     "not judge the finished deliverable against a step that belonged before it; judge "
-    "the deliverable against what it was to contain. Return JSON only."
+    "the deliverable against what it was to contain. "
+    # Q3a/Q3b (9 Oct): conditional results and AI passes do not stand in.
+    "A result the deliverable labels as resting on an unverified assumption ('assumed, not "
+    "verified', 'conditional on') does not meet the objective; nor does an AI pass where the "
+    "objective requires people (independent human coders, participants, a laboratory "
+    "measurement). Return JSON only."
 )
 
 

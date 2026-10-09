@@ -34,7 +34,7 @@ type Need =
        */
       authority?: 'reserved' | 'policy_ask';
     }
-  | { kind: 'answer_question'; question: string }
+  | { kind: 'answer_question'; question: string; /** Q3a: the expert review package, as markdown. */ expertPackage?: string }
   | { kind: 'wait_for_jobs'; stageId: string; pending: number; complete: number; total: number }
   | { kind: 'continue_budget'; budgetSteps: number }
   | { kind: 'large_job'; stageId: string; sections: number }

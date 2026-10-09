@@ -609,6 +609,7 @@ direction. Two things still count as work Go may do first:
 | L-65 | An answer about what the record contains is taken as a fact, not checked against the record | resolved |
 | L-66 | Confirming proposed statuses on a finished table means reopening it, which reopens every later stage | resolved |
 | L-67 | Go goes back to an earlier stage only when the saved text says more work is needed, and at most three times | accepted |
+| L-68 | Expert questions, human-only requirements and conditional results are recognised by wording | accepted |
 | L-B3 | Go code execution: Python only, fixed packages, no network | accepted |
 | L-B4 | Go runs while the tab is open; windows, not dollars | accepted |
 | L-C3 | Conflict detection misses paraphrase and cross-stage contradiction | accepted |
@@ -1300,3 +1301,29 @@ Limits:
 - After a repeated move produces nothing new, Go reconsiders once — the repeated moves are
   withdrawn and the planner is told to choose a different kind of move — and stops on the
   second time (Q2b).
+
+### L-68 — Expert questions, human-only requirements and conditional results are recognised by wording (2026-10-09)
+
+Sean, 9 Oct: "When expert review is necessary, PromptMaster should prepare a concise
+package…"; "if a method genuinely requires independent human coders, the system should not
+silently substitute two AI passes"; and a short account of what Go did, what it is doing
+next, or exactly why it paused.
+
+- **The expert review package** (`/api/agent/expert-package`, `promptmaster/expert_review.py`)
+  is prepared when Go's question asks for an expert's or specialist's judgment, by its
+  wording (`needsExpert`). It quotes only working that is in the saved record (other quotes
+  are dropped in code), and calls a piece of working *executed* only when it comes from a
+  document that records a sandbox run. It is shown with the question, with Copy and
+  Download, and kept in the step's record. It is not a separate saved document.
+- **Human-only work** (`lib/workflow/human-requirements.ts`) is recognised by a fixed list of
+  phrases: independent or human coders, raters, annotators or judges; inter-rater
+  reliability; participants; an expert panel; laboratory or field measurements. A run row
+  that names one needs a person, whatever the draft said. The objective check treats each
+  requirement as unmet until a fact the user accepted reports its result. Wording outside
+  the list is not caught.
+- **Conditional results** are an instruction, not a check. The planner may go on with a
+  labelled assumption ("Assumed, not verified: …"), and the objective check is told such
+  results do not meet the objective.
+- **The run account** (`lib/agent/account.ts`) is built from the step record alone: what
+  ran, what was reasoned, what was written, repaired or revisited; whether the pause is a
+  window, a blocker, a decision or completion; and what was set aside rather than asked.
