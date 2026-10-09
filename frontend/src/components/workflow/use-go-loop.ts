@@ -46,7 +46,7 @@ import { projectMemory } from '@/lib/agent/memory';
 import { requestProjectCancel } from '@/lib/supabase/jobs';
 import { recordFacts } from '@/lib/supabase/facts';
 import { appendWorkflowEvent } from '@/lib/supabase/workflow';
-import { answerAsFact, answerDocuments } from '@/lib/workflow/answers';
+import { answerAsFact, answerDocuments, measuredDocument } from '@/lib/workflow/answers';
 import { authorizeRun } from '@/lib/agent/authorize';
 import { buildAgentState } from '@/lib/agent/digest';
 import { performStep, type PerformContext, type StepOutcome } from '@/lib/agent/perform';
@@ -877,7 +877,8 @@ export function useGoLoop(opts: Options) {
     const asked = current.needs?.kind === 'answer_question' ? current.needs.question : current.stop_reason ?? '';
     try {
       const res = await api.agentCheckAnswer({
-        question: asked, answer: text.trim(), documents: answerDocuments(o.template, o.bundles), model: o.project.model,
+        question: asked, answer: text.trim(), model: o.project.model,
+        documents: [...answerDocuments(o.template, o.bundles), ...measuredDocument(o.template, o.context.measured ?? {})],
       });
       return res.contradicts && res.quote ? res : null;
     } catch {

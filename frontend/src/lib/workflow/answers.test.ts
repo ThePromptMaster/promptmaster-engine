@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { answerAsFact, answerDocuments, questionOf } from './answers';
+import { answerAsFact, answerDocuments, measuredDocument, questionOf } from './answers';
 import { SINGLE_OUTPUT_V1 } from './templates/single-output.v1';
 import { factSource } from './facts';
 
@@ -50,5 +50,15 @@ describe('an answer is read against the saved record (L-65, 9 Oct)', () => {
   it('a fact recorded over a contradiction keeps the quote it overrode', () => {
     const fact = answerAsFact('Is n = 5 checked?', 'Yes, in the Experiment record.', { ...ref, contradicted: { document: 'Experiment', quote: 'n = 5 not run' } })!;
     expect(fact.source_ref).toMatchObject({ contradicted: { document: 'Experiment', quote: 'n = 5 not run' } });
+  });
+});
+
+describe('what code measured is a document an answer is read against (L-65, 9 Oct)', () => {
+  it('one line per measurement, quotable', () => {
+    const doc = measuredDocument(SINGLE_OUTPUT_V1, { output: [{ label: 'Announcement: 100–140 words', satisfied: false, detail: '99 words' }] });
+    expect(doc).toHaveLength(1);
+    expect(doc[0].label).toBe('Measured in code');
+    expect(doc[0].text).toMatch(/: Announcement: 100–140 words — measured 99 words$/);
+    expect(measuredDocument(SINGLE_OUTPUT_V1, {})).toEqual([]);
   });
 });
