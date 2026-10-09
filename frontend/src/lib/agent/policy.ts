@@ -349,7 +349,9 @@ export function preempt(input: {
     return { status: 'budget_exhausted', reason: `Used all ${budgetSteps} steps of this run's budget.` };
   }
   const finished = steps.filter((s) => s.status !== 'running' && s.status !== 'awaiting_decision');
-  const tail = finished.slice(-MAX_CONSECUTIVE_FAILURES);
+  // A failure recorded where it applies (a run that timed out, on its row) is
+  // set aside, not a reason to stop: the next row is different work.
+  const tail = finished.filter((s) => !(s.status === 'failed' && s.changes?.set_aside)).slice(-MAX_CONSECUTIVE_FAILURES);
   if (tail.length === MAX_CONSECUTIVE_FAILURES && tail.every((s) => s.status === 'failed')) {
     return { status: 'failed', reason: `The last ${MAX_CONSECUTIVE_FAILURES} steps failed. Stopping rather than retrying blind.` };
   }

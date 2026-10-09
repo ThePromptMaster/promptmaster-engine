@@ -540,6 +540,12 @@ _WRITE_CODE_INSTRUCTION = (
     "are available; nothing else, and no network access. Print every result the "
     "reader needs on its own line as `label: value`, so each can be recorded. "
     "Save any plot to /out/<name>.png. "
+    # 9 Oct (production replay): a sweep of 61 long integrations hit the
+    # sandbox's limit twice, and nothing was recorded.
+    "TIME: the script must finish within 30 seconds on 2 CPUs. Size the computation to fit — "
+    "vectorise, use fewer points, a coarser grid or a shorter integration — and print one line "
+    "`reduced: <what was reduced and why>` whenever you cut the scope, so the record says so. "
+    "Prefer a smaller computation that finishes over a complete one that does not. "
     "DATA: the project's files, if any, are listed in the state below with their "
     "paths under /data, their columns and a few sample rows. Read them with "
     "pandas, or the csv or json modules. Use only files that "
