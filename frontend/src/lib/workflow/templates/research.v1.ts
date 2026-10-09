@@ -62,7 +62,10 @@ export const RESEARCH_V1: WorkflowTemplate = {
   // v10 (2026-10-09): each planned run says who can carry it out, and a run
   // PromptMaster can carry out from what the project states is left for it to
   // run rather than marked "not run" for want of data (Sean, 9 Oct, Q1a).
-  version: 10,
+  // v11 (2026-10-09): Final review may send the work back to Experiment or
+  // Analysis when it finds the investigation unfinished, so Go can do the
+  // further work rather than finish (Sean, 9 Oct, Q4).
+  version: 11,
   name: 'Research',
   description: 'Question through validated write-up, with the analysis plan fixed before the data.',
   outline_stage: 'derived',
@@ -479,7 +482,7 @@ export const RESEARCH_V1: WorkflowTemplate = {
       expected_artifacts: [{ kind: 'final_evaluation', cardinality: 'one', primary: true }],
       recommended_modes: [],
       skip_reasons: [],
-      transitions: { default_next: null, allow_skip: false, allow_return_to: ['revision', 'alternatives'] },
+      transitions: { default_next: null, allow_skip: false, allow_return_to: ['revision', 'alternatives', 'analysis', 'experiment'] },
     },
   ],
 };

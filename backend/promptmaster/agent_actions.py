@@ -115,7 +115,8 @@ AGENT_ACTIONS: list[AgentAction] = [
                 when="This stage may be skipped, and for THIS objective an expert would not do it next "
                      "(for example: external literature before any internal data has been looked at). "
                      "Params: reason (one or two plain sentences: why not now, and what to do instead). "
-                     "The user decides; nothing is skipped unless they agree."),
+                     "The user decides; nothing is skipped unless they agree — except an optional stage under "
+                     "Autonomous with routine decisions handled by you, which is skipped at once with your reason."),
     AgentAction(key="propose_next_round", family="workflow", label="Suggest the next round",
                 when="This stage closes a round of open-ended work and the question it ends on is worth "
                      "another round. Params: reason (one or two plain sentences: what the next round should "
