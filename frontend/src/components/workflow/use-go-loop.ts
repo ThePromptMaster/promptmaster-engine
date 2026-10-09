@@ -50,7 +50,7 @@ import { answerAsFact } from '@/lib/workflow/answers';
 import { authorizeRun } from '@/lib/agent/authorize';
 import { buildAgentState } from '@/lib/agent/digest';
 import { performStep, type PerformContext, type StepOutcome } from '@/lib/agent/perform';
-import { allowedActions, stageHasCurrentDraft, LIVE_TOOLS, polishSinceDirection, unsavedDerivation, saveInsteadOfRepeating, withoutEndlessPolish, withoutSettledRuns, withoutOverride, DEFAULT_BUDGET_STEPS, fitsBudget, noChange, plannedBeforeLatestChange, preempt, shouldPause, stateFingerprint, stepCost } from '@/lib/agent/policy';
+import { allowedActions, stageHasCurrentDraft, LIVE_TOOLS, polishSinceDirection, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, withoutEndlessPolish, withoutSettledRuns, withoutOverride, DEFAULT_BUDGET_STEPS, fitsBudget, noChange, plannedBeforeLatestChange, preempt, shouldPause, stateFingerprint, stepCost } from '@/lib/agent/policy';
 import {
   createAgentRun,
   endAgentRun,
@@ -576,6 +576,9 @@ export function useGoLoop(opts: Options) {
         // the save of that result (9 Oct, production: Derive ×3, nothing saved).
         const saving = required ? null : saveInsteadOfRepeating(choice, [...priorStepsRef.current, ...stepsRef.current], o.stage.id, allowed, hasDraft, stageEvaluation.canAdvance);
         if (saving) Object.assign(choice, saving, { needs_user_decision: false, decision_question: null });
+        // Nor is an unchanged deliverable judged again (9 Oct, production).
+        const moving = required ? null : moveOnInsteadOfRejudging(choice, [...priorStepsRef.current, ...stepsRef.current], o.stage.id, allowed, stageEvaluation.canAdvance);
+        if (moving) Object.assign(choice, moving, { needs_user_decision: false, decision_question: null });
         if (!fitsBudget(choice.action_key, current.steps_used, current.budget_steps)) {
           await setRunStatus(
             'budget_exhausted',
