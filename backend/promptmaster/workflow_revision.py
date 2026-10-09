@@ -17,7 +17,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from .llm_client import OpenRouterClient
-from .workflow_designer import KINDS, MAX_STAGES, MIN_STAGES, DesignedStage, DesignedWorkflow, Execution, _clip, fix_loops, parse_execution
+from .workflow_designer import FINALISE_LABEL, KINDS, MAX_STAGES, MIN_STAGES, DesignedStage, DesignedWorkflow, Execution, _clip, fix_loops, parse_execution, with_closing_stage
 
 #: What the engine can and cannot walk, told to the model so it can say which.
 CAPABILITIES = (
@@ -29,7 +29,8 @@ CAPABILITIES = (
     "\"routine\" if it only certifies something checkable against the material, otherwise "
     "\"decision\"), and a separate reserved decision for new commitments.\n"
     "- A check stage comes after ALL the work it checks — a new verification stage goes after the "
-    "last stage it verifies, not between them; the first and last stages are not checks.\n"
+    "last stage it verifies, not between them; the first stage is not a check, and a check that "
+    "would be last is followed by a Finalise stage that produces the finished work.\n"
     "- Repair after a failed check is not a branch to design: Go applies a check's findings to the "
     "stage they are about, saves a new version and runs the check again, and a change to an earlier "
     "stage reopens the later ones for repair. When asked for that, say so in \"note\"; it is not "
@@ -204,9 +205,15 @@ def apply_operations(design: DesignedWorkflow, result: object) -> RevisedWorkflo
             execution = parse_execution(op["execution"])
             changes.append(f"Execution set to {execution.kind}")
 
-    # The ends stay walkable: no check stage first or last; first and last required.
-    if stages and (stages[0].kind == "check" or stages[-1].kind == "check"):
-        raise ValueError("That change would put a check stage first or last; a check comes after the work it checks.")
+    # The ends stay walkable: no check stage first; a check that would close
+    # the work gets a Finalise stage after it (9 Oct: "add a final verification"
+    # was refused outright).
+    if stages and stages[0].kind == "check":
+        raise ValueError("That change would put a check stage first; a check comes after the work it checks.")
+    if stages and stages[-1].kind == "check":
+        closing = stages[-1].label
+        stages = with_closing_stage(stages)
+        changes.append(f"Added “{FINALISE_LABEL}” after “{closing}”: the last stage produces the finished work, with the check's accepted corrections applied")
     if len(stages) < MIN_STAGES:
         raise ValueError(f"A workflow needs at least {MIN_STAGES} stages.")
     stages[0] = stages[0] if stages[0].required else stages[0].model_copy(update={"required": True})

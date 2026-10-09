@@ -51,9 +51,15 @@ def test_what_the_engine_cannot_do_is_said_not_approximated():
     assert "A repeating round" in reasons
 
 
-def test_a_check_stage_cannot_be_put_last():
+def test_a_check_stage_put_last_is_followed_by_finalise():
+    # 9 Oct: a closing check is kept; the last stage still produces the finished work.
+    revised = apply_operations(DESIGN, {"operations": [{"op": "add_stage", "after": 4, "stage": {"label": "Audit", "kind": "check", "instruction": "x"}}]})
+    assert [s.label for s in revised.workflow.stages][-2:] == ["Audit", "Finalise"]
+
+
+def test_a_check_stage_cannot_be_put_first():
     with pytest.raises(ValueError):
-        apply_operations(DESIGN, {"operations": [{"op": "add_stage", "after": 4, "stage": {"label": "Audit", "kind": "check", "instruction": "x"}}]})
+        apply_operations(DESIGN, {"operations": [{"op": "add_stage", "after": 0, "stage": {"label": "Audit", "kind": "check", "instruction": "x"}}]})
 
 
 def test_the_prompt_lists_what_a_workflow_can_and_cannot_do():
@@ -116,3 +122,18 @@ def test_a_verification_goes_after_everything_it_verifies_and_repair_is_not_a_br
     assert "after EVERY stage whose output it checks" in user
     assert "goes after the last stage it verifies" in CAPABILITIES
     assert "Repair after a failed check is not a branch to design" in CAPABILITIES
+
+
+def test_a_final_verification_is_kept_with_a_finalise_stage_after_it():
+    """9 Oct production pass (Sean's email 14): the designer dropped a closing
+    verification, and "add a final verification stage" was refused."""
+    from promptmaster.workflow_designer import DesignedStage, DesignedWorkflow
+    from promptmaster.workflow_revision import apply_operations
+
+    stage = lambda label, kind="write": DesignedStage(label=label, short_label=label, kind=kind)  # noqa: E731
+    design = DesignedWorkflow(name="Workshop", stages=[stage("Brief"), stage("Schedule"), stage("Budget"), stage("Invitation"), stage("Briefing")])
+    revised = apply_operations(design, {"operations": [{"op": "add_stage", "after": 5, "stage": {"label": "Final verification", "kind": "check", "instruction": "Check all four."}}]})
+    labels = [s.label for s in revised.workflow.stages]
+    assert labels[-2:] == ["Final verification", "Finalise"]
+    assert revised.workflow.stages[-1].kind == "write"
+    assert any("Added “Finalise” after “Final verification”" in c for c in revised.changes)
