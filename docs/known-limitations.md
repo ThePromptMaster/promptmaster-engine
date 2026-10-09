@@ -605,6 +605,9 @@ direction. Two things still count as work Go may do first:
 | L-61 | An unfinished setup keeps no attached files | accepted |
 | L-62 | No Jupyter notebook export | open |
 | L-63 | A measured requirement failed on a finished stage is reported, not repaired by Go | open |
+| L-64 | An answer that contradicts the deliverable's wording reopens only what names the same values | open |
+| L-65 | An answer about what the record contains is taken as a fact, not checked against the record | open |
+| L-66 | Confirming proposed statuses on a finished table means reopening it, which reopens every later stage | open |
 | L-B3 | Go code execution: Python only, fixed packages, no network | accepted |
 | L-B4 | Go runs while the tab is open; windows, not dollars | accepted |
 | L-C3 | Conflict detection misses paraphrase and cross-stage contradiction | accepted |
@@ -1189,4 +1192,41 @@ closed by "Continue anyway") keeps its result: the objective check is given the 
 measurement and will not call the objective met, and Go stops naming it ("the launch
 announcement does not meet the required 100–140 word length"). Go does not reopen the
 finished stage to repair it on its own; the user reopens it, or edits the text.
+
+### L-64 — An answer that contradicts the deliverable's wording reopens only what names the same values (2026-10-09)
+
+An answer to Go is recorded as an accepted fact, and every later prompt reads it. A
+stage is reopened by it only when the stage's text holds a value the answer changes
+(a date, a price, a figure), matched in code. An answer that corrects a *claim* — on
+the sequence-proof replay, "the n = 5 check was done in the planned investigation; there
+is no provenance issue" — reopens nothing, so a report sentence saying the opposite
+stays until a later stage revises it. Go no longer re-judges the unchanged report (C8,
+#185); it moves on to Revision, where the facts reach the revision prompt. The user
+can also regenerate the section.
+
+### L-65 — An answer about what the record contains is taken as a fact, not checked against the record (2026-10-09)
+
+An answer to Go becomes an accepted fact, and accepted facts outrank what the stages
+say (D1/D2, by design: the user decides values and settles conflicts). That includes
+an answer that is really a claim about the record. On the sequence-proof replay the
+answer said "the Experiment run record contains S_5 = 12"; Experiment v1 had marked
+that check *not run* (it was done in Analysis). Go accepted the answer, and the repair
+of Experiment then marked the run *worked by hand*, citing the fact. The mathematics
+was right and the working exists in the project — the run schema allows "the working,
+or where it is" — but the record's account of *where* it was done followed the answer,
+not the history. Proposed: an answer that names a stage's content is checked against
+that stage's saved versions, and a disagreement is put to the user before it is
+recorded.
+
+### L-66 — Confirming proposed statuses on a finished table means reopening it, which reopens every later stage (2026-10-09)
+
+The rows of an outcome table (runs, alternatives, validation) are the user's to decide.
+Go proposes a status for each, and the objective check counts unconfirmed proposals as
+open work. On the sequence-proof replay the project reached Final review with 6 proposals
+on Alternatives and 9 on Validation, both already finished. Confirming them is an edit
+to a finished stage: it must be reopened, and its new version reopens every later stage
+for a recheck (H1b). A long-form stage with no document of its own, such as Revision, is
+then rechecked by revising its sections again. Proposed: confirming a proposal, which
+does not change the row's text, is recorded as a decision and does not count as a new
+version of the stage.
 

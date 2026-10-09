@@ -2,7 +2,7 @@
 
 *8–9 October 2026. In reply to the fourteen emails of 6–7 October. The code is in PRs
 #164–#182; the table in §1 says which PR addressed each finding. Remaining limits are in
-`docs/known-limitations.md`, L-56 to L-63. §7 records each test replayed on production.*
+`docs/known-limitations.md`, L-56 to L-65. §7 records each test replayed on production.*
 
 The short version:
 - **Most of the generated work was right.** In your tests, the physics, the proofs, the
@@ -178,10 +178,11 @@ All of these ran on promptmaster-engine.vercel.app with the real model. Go was s
 | Physics and Python (2, 3, 9, 10) | Damped oscillator in Single output. 94 equations rendered (59 display, each with Copy LaTeX) and no raw LaTeX. Two Python blocks with language labels and Copy/Download. Go **ran** the tests ("Code executed"), and the output reports PASS for each. The Export menu has LaTeX (.tex). |
 | iPhone photos (12, 13) | A HEIC was converted to JPEG and stored. A 20.2 MB photo was reduced to 4.4 MB and stored. |
 | Setup draft (14) | "Your setup is saved as a draft — you can sign out and continue later." After a reload, "You have an unfinished setup from 9 Oct, 03:39…" restored the text. The workshop design now ends schedule → budget → invitation → briefing → final verification → Finalise. |
-| Sequence proof (1) | In progress; result below. |
+| Sequence proof (1) | Research, Autonomous with routine decisions handled. **The final report states all three cycles from the saved record**: the counterexample at n = 2 (a₂ = 1, against 2² − 1 = 3); Binet's formula proved by induction from both base cases; the partial-sum identity Sₙ = aₙ₊₂ − 1 proved by induction; and the explicit checks S₁ = 1, S₃ = 4, S₅ = 12 = a₇ − 1. Go never declared "Objective met" while the report said otherwise. Getting there took six fixes, each found on this replay: a repeated Derive on Analysis is saved into the document instead of repeated (#183); a repeated Derive on a finished table moves on (#184); an unchanged report judged "not met" is not judged again, and the work moves on to Revision (#185); a section revision reads the latest saved record, not the outline's copy taken at approval, and that copy is no longer cut at 4,000 characters (#186); a table repair no longer saves its "What changed" note as a row (#187); chapters no longer open with the "I followed … I set aside …" line meant for a reply (#188). Still open on this project: 15 proposed statuses on the finished Alternatives and Validation tables, which are the user's to confirm, and confirming them means reopening those stages (L-66). Also: my own answer to Go wrongly said the n = 5 check was in the Experiment record (it was done in Analysis), and Go took it as authoritative (L-65). |
 
 ## 8. Hours
 
 - Phases 1–6 (eleven PRs): about 2.5 days.
+- Fixes found on the production replays (#173–#177, #180–#188): about 1 day.
 - Production replays of all nine tests and this assessment: about 0.5 day.
 - Estimates for what remains are in §3 and §4.
