@@ -603,11 +603,11 @@ direction. Two things still count as work Go may do first:
 | L-59 | Carried-forward and unmet findings are recognised by their wording | accepted |
 | L-60 | iPhone HEIC conversion depends on the browser or a converter loaded on demand | accepted |
 | L-61 | An unfinished setup keeps no attached files | accepted |
-| L-62 | No Jupyter notebook export | open |
+| L-62 | No Jupyter notebook export | resolved |
 | L-63 | A measured requirement failed on a finished stage is reported, not repaired by Go | open |
 | L-64 | An answer that contradicts the deliverable's wording reopens only what names the same values | open |
 | L-65 | An answer about what the record contains is taken as a fact, not checked against the record | resolved |
-| L-66 | Confirming proposed statuses on a finished table means reopening it, which reopens every later stage | open |
+| L-66 | Confirming proposed statuses on a finished table means reopening it, which reopens every later stage | resolved |
 | L-B3 | Go code execution: Python only, fixed packages, no network | accepted |
 | L-B4 | Go runs while the tab is open; windows, not dollars | accepted |
 | L-C3 | Conflict detection misses paraphrase and cross-stage contradiction | accepted |
@@ -1184,6 +1184,11 @@ Proposed in the 8 Oct assessment, §4. Code a Go run executed has its output rec
 the run (and `sandbox_runs`), but no export collects prose, equations, code and outputs
 into one `.ipynb`.
 
+**Resolved 2026-10-09:** Export → "Jupyter notebook (.ipynb)" (`lib/export/notebook-export.ts`).
+Each fenced Python block is a code cell, byte for byte; prose and equations are Markdown
+cells, with mathematics in the `$…$` / `$$…$$` form Jupyter renders. Outputs are not
+included — a notebook claims a result only once it has been run.
+
 ### L-63 — A measured requirement failed on a finished stage is reported, not repaired by Go (2026-10-09)
 
 A word range or question count is a blocking check on the stage that produces it, so a
@@ -1236,4 +1241,9 @@ for a recheck (H1b). A long-form stage with no document of its own, such as Revi
 then rechecked by revising its sections again. Proposed: confirming a proposal, which
 does not change the row's text, is recorded as a decision and does not count as a new
 version of the stage.
+
+**Resolved 2026-10-09:** a finished table shows "Confirm" for its proposals without being
+reopened, and a save whose only change is proposals confirmed (`onlyConfirmsProposals`:
+same rows, text and statuses; `status_source` from *proposed* to the user's or the
+policy's) reopens nothing after it. Any other change still does (H1b).
 

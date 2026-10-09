@@ -641,6 +641,28 @@ export function confirmableProposals(items: readonly StageItem[], schema: StageI
   return items.filter((i) => isProposed(i) && isTriaged({ ...i, status_source: 'user' }, schema));
 }
 
+/**
+ * The new rows differ from the old only in proposals confirmed — the same
+ * rows, the same text, the same statuses, with `status_source` moved from
+ * "proposed" to the user's or the policy's (L-66, 9 Oct). Nothing a later
+ * stage read has changed, so a save like this reopens nothing after it.
+ */
+export function onlyConfirmsProposals(before: string | null | undefined, after: string | null | undefined): boolean {
+  const a = parseItems(before);
+  const b = parseItems(after);
+  if (!a || !b || a.length !== b.length || a.length === 0) return false;
+  let confirmed = 0;
+  for (let i = 0; i < a.length; i += 1) {
+    const { status_source: was, ...restA } = a[i];
+    const { status_source: now, ...restB } = b[i];
+    if (JSON.stringify(restA) !== JSON.stringify(restB)) return false;
+    if (was === now) continue;
+    if (was !== 'proposed' || (now !== 'user' && now !== 'policy')) return false;
+    confirmed += 1;
+  }
+  return confirmed > 0;
+}
+
 /** Confirm every proposal that can stand as it is: the status becomes the user's. */
 export function confirmProposals(items: readonly StageItem[], schema: StageItemSchema): StageItem[] {
   const ok = new Set(confirmableProposals(items, schema).map((i) => i.id));
