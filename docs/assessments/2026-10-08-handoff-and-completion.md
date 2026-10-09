@@ -1,8 +1,8 @@
 # Saved-work handoff, fact changes, and honest completion — assessment
 
-*8 October 2026. In reply to the fourteen emails of 6–7 October. The code is in PRs
-#164–#172; the table in §1 says which PR addressed each finding. Remaining limits are in
-`docs/known-limitations.md`, L-56 to L-62.*
+*8–9 October 2026. In reply to the fourteen emails of 6–7 October. The code is in PRs
+#164–#182; the table in §1 says which PR addressed each finding. Remaining limits are in
+`docs/known-limitations.md`, L-56 to L-63. §7 records each test replayed on production.*
 
 The short version:
 - **Most of the generated work was right.** In your tests, the physics, the proofs, the
@@ -50,7 +50,7 @@ The short version:
 | TaskBoard (8) | Your Dec 10 / $18 answer: evaluation and Summary still said "unresolved"; 95 words passed as 105; FAQ unanswered; Output complete while its check said incomplete | An answer was a run step, not a project fact. No word count | The answer is recorded as a fact (#166); word and question counts (#168); Go does not advance past a failed check (#168) |
 | ClearDesk (11) | Summary "waiting for" decisions already given | As TaskBoard, plus a stale "not met" verdict that nothing cleared | #166: answers become facts, and a verdict older than a later answer is treated as to be checked again |
 | iPhone photos (12, 13) | Photos could not be added | HEIC was not accepted, there was a 5 MB cap, and the side chat refused images | HEIC converted to JPEG; large photos scaled; the side chat takes photos (#170) |
-| Workshop setup (14) | Setup lost on sign-out; verification placed too early | Setup lived only in the page | Drafts are saved and offered back; verification goes after everything it verifies (#171) |
+| Workshop setup (14) | Setup lost on sign-out; verification omitted, then refused | Setup lived only in the page. The designer silently dropped a closing check, and a revision that put one last was refused | Drafts are saved and offered back (#171, #181). A closing verification is kept, after all four deliverables, followed by a Finalise stage that applies its corrections (#182) |
 
 ## 2. Code execution (email 3)
 
@@ -164,7 +164,23 @@ Built in #172:
 | Routine decisions follow the delegation settings; necessary human decisions explained | Built (#168: optional rows; a second proposal pass under "Handle them for me") |
 | This test finishes with three cycles, both full proofs and sum checks of 0, 1, 5 and 14 | To be replayed on production with the real model; the result will be added here |
 
-## 6. Hours
+## 7. Tests replayed on production (9 October)
+
+All of these ran on promptmaster-engine.vercel.app with the real model. Go was set to Autonomous with "Handle them for me" unless noted.
+
+| Test | What happened |
+|---|---|
+| Workshop (4) | Output was revised to an 80-minute exercise (v2). Realign and Summary were reopened ("Output was revised (now v2)…"). Go rebuilt Summary from v2: "12:05, Feasible: no". It then paused for your decision on which requirement to relax, instead of offering Finish. |
+| TaskBoard (8) | Go stopped before drafting and asked for the date and price. Your answer became a recorded fact ("your answer to Go"). The draft and Summary treated it as settled. The production pass found three more problems (the conflict check ignored the fact; the objective check read "ask me first" as unmet; a stale notice could hide the update button), all fixed (#173, #174). |
+| TaskBoard price change (6.5) | The price was changed $15 → $16 in Facts. Every stage was reopened, including the in-progress Summary. "Update affected work and resume" left the output saying $16 six times, with no $15 or $18 left, and Summary agreeing. Fixed along the way: #175 (a fresh step window; lists of excluded values), #176 (drafts in progress), #177 (repair tries counted per reopening). |
+| TaskBoard word count (8) | The checklist now reads "Announcement: 100–140 words — 74 words", required, and "FAQ: exactly 5 questions, each answered" ✓. Go would not say the objective was met: "…the launch announcement does not meet the required 100–140 word length". (The word range had first been attached to the FAQ; fixed in #180.) |
+| Portfolio (5) | B + D + E, $10,000, 18 points. No total was flagged "unsupported". Summary counted the 26 combinations against the saved table's 26 rows. It caught a real error ("A + C + D", $9,000, marked over budget). Answering "fix it" reopened Output; the row was repaired; then "Objective met" was declared with a correct quote. |
+| Physics and Python (2, 3, 9, 10) | Damped oscillator in Single output. 94 equations rendered (59 display, each with Copy LaTeX) and no raw LaTeX. Two Python blocks with language labels and Copy/Download. Go **ran** the tests ("Code executed"), and the output reports PASS for each. The Export menu has LaTeX (.tex). |
+| iPhone photos (12, 13) | A HEIC was converted to JPEG and stored. A 20.2 MB photo was reduced to 4.4 MB and stored. |
+| Setup draft (14) | "Your setup is saved as a draft — you can sign out and continue later." After a reload, "You have an unfinished setup from 9 Oct, 03:39…" restored the text. The workshop design now ends schedule → budget → invitation → briefing → final verification → Finalise. |
+| Sequence proof (1) | In progress; result below. |
+
+## 8. Hours
 
 - Phases 1–6 (eleven PRs): about 2.5 days.
 - Production replays of all nine tests and this assessment: about 0.5 day.
