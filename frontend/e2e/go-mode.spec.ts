@@ -256,7 +256,8 @@ test('A sandbox that is not available blocks the step honestly — never "execut
 });
 
 test('A run making no progress stops for direction, and Resume carries on', async ({ page }) => {
-  const id = await researchProject(page, 'E2E go no progress', 'Pendulum [[mock:plan=derive,derive,derive,prove]]');
+  // A check saves nothing: three in a row is a run going round in circles.
+  const id = await researchProject(page, 'E2E go no progress', 'Pendulum [[mock:plan=evaluate_stage,evaluate_stage,evaluate_stage,prove]]');
   await choose(page, 'Autonomous');
   const transparency = page.getByRole('region', { name: 'What Go mode is doing' });
   await expect(transparency).toContainText('was chosen 3 times in a row on this stage without changing it');
@@ -264,12 +265,26 @@ test('A run making no progress stops for direction, and Resume carries on', asyn
 
   // Resuming is the user's direction to continue — it must not re-trip on the same three steps.
   await goPanel(page).getByRole('button', { name: 'Resume' }).click();
-  // The three identical derives are one row with a count; Prove is the next row (2 Oct, screenshot 7).
+  // The three identical checks are one row with a count; Prove is the next row (2 Oct, screenshot 7).
   await expect(steps(page).nth(0)).toContainText('×3');
   await expect(steps(page).nth(1)).toContainText('Prove');
   await expect(transparency).toContainText('the deliverable is not');
   const recorded = await stepsOf((await runOf(id)).id);
-  expect(recorded.map((s) => s.action_key)).toEqual(['derive', 'derive', 'derive', 'prove', 'declare_objective_complete']);
+  expect(recorded.map((s) => s.action_key)).toEqual(['evaluate_stage', 'evaluate_stage', 'evaluate_stage', 'prove', 'declare_objective_complete']);
+});
+
+test('A derivation chosen again while its result is unsaved is saved into the document instead (9 Oct)', async ({ page }) => {
+  // Sean's sequence test, replayed on production: "Derive" three times on
+  // Analysis, and nothing reached the report.
+  const id = await researchProject(page, 'E2E go derive saved', 'Pendulum [[mock:plan=derive,derive,prove]]');
+  await choose(page, 'Autonomous');
+  const transparency = page.getByRole('region', { name: 'What Go mode is doing' });
+  await expect(transparency).toContainText('the deliverable is not', { timeout: 60_000 });
+  await expect(transparency).not.toContainText('was chosen 3 times in a row');
+  const recorded = await stepsOf((await runOf(id)).id);
+  expect(recorded.slice(0, 2).map((s) => s.action_key)).toEqual(['derive', 'revise_stage']);
+  expect(recorded[1].status).toBe('succeeded');
+  await page.screenshot({ path: test.info().outputPath('02-derivation-saved.png'), fullPage: true });
 });
 
 test('A question the run asks can be answered in place, and the answer is on the record', async ({ page }) => {

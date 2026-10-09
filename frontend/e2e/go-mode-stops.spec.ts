@@ -320,7 +320,9 @@ test('a stuck stage says whether anything changed; a retry is called a retry; ne
 test('repeated identical steps fold into one row, and the run stops rather than repeat a fourth time', async ({ page }) => {
   await createProject(page, {
     workflow: 'Research', name: 'E2E go repeats',
-    objective: 'Pendulum [[mock:plan=derive,derive,derive,derive]]',
+    // A check saves nothing, so three in a row is going round in circles. (A
+    // repeated derivation is now saved instead: go-mode.spec.ts, 9 Oct.)
+    objective: 'Pendulum [[mock:plan=evaluate_stage,evaluate_stage,evaluate_stage,evaluate_stage]]',
   });
   await expect(stageArtifact(page)).toContainText('Mock', { timeout: 30_000 });
   const panel = goPanel(page);
