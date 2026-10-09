@@ -219,7 +219,12 @@ export function GoPanel({
           <div ref={controlsRef}>
             <GoControl {...controlProps} />
           </div>
-          {need && <NeedsYouCard key={`${need.kind}:${go.run?.id}`} need={need} stageLabel={go.stageLabelFor} onAction={act} context={needContext} />}
+          {need && (
+            <NeedsYouCard
+              key={`${need.kind}:${go.run?.id}`} need={need} stageLabel={go.stageLabelFor} onAction={act} context={needContext}
+              onCarryOn={need.kind === 'tick_criterion' && canResume ? () => void go.go() : undefined}
+            />
+          )}
           {go.phase === 'watching' && (
             <p role="status" className="text-body text-[var(--on-surface-variant)]">
               This run is being driven from another tab. It will continue here if that tab closes.

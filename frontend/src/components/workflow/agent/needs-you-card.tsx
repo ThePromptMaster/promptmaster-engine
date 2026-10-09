@@ -14,8 +14,16 @@ export function NeedsYouCard({
   stageLabel,
   onAction,
   context,
+  onCarryOn,
 }: {
   need: NeedsUser;
+  /**
+   * Q2c (9 Oct, production): an approval Go stopped for may not be the only
+   * thing left. "Carry on with other work first" resumes the run; Go checks
+   * again whether anything can proceed without the approval, and asks again
+   * — at no cost — only if nothing can.
+   */
+  onCarryOn?: () => void;
   stageLabel: (stageId: string) => string;
   /** Clear the need and resume. Rejects with a message the card shows. A stuck stage says which of its options was chosen. */
   onAction: (option?: StuckOption) => Promise<void>;
@@ -71,6 +79,15 @@ export function NeedsYouCard({
                 ? 'Decide each one there. I will notice when they are settled; then press Resume.'
                 : 'Or do it yourself on the stage. I will notice, and Resume will appear here.'}
           </span>
+          {onCarryOn && (
+            <button
+              onClick={onCarryOn}
+              disabled={busy}
+              className="rounded-lg bg-[var(--surface-container-low)] px-4 py-2 text-title text-[var(--on-surface)] disabled:opacity-50"
+            >
+              Carry on with other work first
+            </button>
+          )}
         </div>
       ) : (
         <p className="mt-2 text-label text-[var(--on-surface-variant)]">Then press Resume.</p>
