@@ -23,3 +23,15 @@ describe('work only people can do (Q3b; Sean, 9 Oct)', () => {
     expect(unmetHumanRequirements({ ...project, facts: [fact('Independent human coders completed the coding; kappa 0.81.')] })).toEqual([]);
   });
 });
+
+describe('computing is never a missing tool (production replay, 9 Oct)', () => {
+  it('"Needs a tool — numerical integration" is PromptMaster\'s to run', () => {
+    expect(producibleBy({ id: 'r', run: 'Sweep A', producible_by: 'Needs a tool — numerical integration of 61 trajectories is required' }, ITEM_SCHEMAS.runs)).toBe('promptmaster');
+    expect(producibleBy({ id: 'r', run: 'Compute the Lyapunov exponent', producible_by: 'Needs a tool — a Lyapunov exponent computation' }, ITEM_SCHEMAS.runs)).toBe('promptmaster');
+  });
+
+  it('an instrument, a laboratory or missing software stays a missing tool', () => {
+    expect(producibleBy({ id: 'r', run: 'Measure a real pendulum', producible_by: 'Needs a tool — a laboratory pendulum and sensor' }, ITEM_SCHEMAS.runs)).toBe('needs_tool');
+    expect(producibleBy({ id: 'r', run: 'Run the MATLAB model', producible_by: 'Needs a tool — a MATLAB licence to run the simulation' }, ITEM_SCHEMAS.runs)).toBe('needs_tool');
+  });
+});
