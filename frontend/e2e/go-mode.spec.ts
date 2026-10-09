@@ -256,21 +256,19 @@ test('A sandbox that is not available blocks the step honestly — never "execut
 });
 
 test('A run making no progress stops for direction, and Resume carries on', async ({ page }) => {
-  // A check saves nothing: three in a row is a run going round in circles.
-  const id = await researchProject(page, 'E2E go no progress', 'Pendulum [[mock:plan=evaluate_stage,evaluate_stage,evaluate_stage,prove]]');
+  // Two moves taking turns without the stage moving on is a loop. (Repeating
+  // one reasoning move now saves its result instead — 9 Oct, below.)
+  const id = await researchProject(page, 'E2E go no progress', 'Pendulum [[mock:plan=derive,prove,derive,prove,derive,prove,simplify]]');
   await choose(page, 'Autonomous');
   const transparency = page.getByRole('region', { name: 'What Go mode is doing' });
-  await expect(transparency).toContainText('was chosen 3 times in a row on this stage without changing it');
+  await expect(transparency).toContainText('have been taking turns on this stage without it moving on', { timeout: 60_000 });
   await page.screenshot({ path: test.info().outputPath('01-no-progress-stop.png'), fullPage: true });
 
-  // Resuming is the user's direction to continue — it must not re-trip on the same three steps.
+  // Resuming is the user's direction to continue — it must not re-trip on the same steps.
   await goPanel(page).getByRole('button', { name: 'Resume' }).click();
-  // The three identical checks are one row with a count; Prove is the next row (2 Oct, screenshot 7).
-  await expect(steps(page).nth(0)).toContainText('×3');
-  await expect(steps(page).nth(1)).toContainText('Prove');
-  await expect(transparency).toContainText('the deliverable is not');
+  await expect(transparency).toContainText('the deliverable is not', { timeout: 60_000 });
   const recorded = await stepsOf((await runOf(id)).id);
-  expect(recorded.map((s) => s.action_key)).toEqual(['evaluate_stage', 'evaluate_stage', 'evaluate_stage', 'prove', 'declare_objective_complete']);
+  expect(recorded.map((s) => s.action_key)).toEqual(['derive', 'prove', 'derive', 'prove', 'derive', 'prove', 'simplify', 'declare_objective_complete']);
 });
 
 test('A derivation chosen again while its result is unsaved is saved into the document instead (9 Oct)', async ({ page }) => {

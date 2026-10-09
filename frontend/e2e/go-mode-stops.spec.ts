@@ -313,16 +313,14 @@ test('a stuck stage says whether anything changed; a retry is called a retry; ne
  */
 /**
  * 2 Oct, screenshot 7 — the execution log showed the same move repeated down
- * the screen before "Could not continue". Identical consecutive steps are now
- * one row with a count, and the run stops on its own when it goes round in
- * circles.
+ * the screen. Identical consecutive steps are one row with a count
+ * (step-timeline.test.tsx). 9 Oct: the same reasoning move chosen again while
+ * its result is unsaved is saved into the document instead of repeated.
  */
-test('repeated identical steps fold into one row, and the run stops rather than repeat a fourth time', async ({ page }) => {
+test('a reasoning move chosen again is saved, not repeated a fourth time', async ({ page }) => {
   await createProject(page, {
     workflow: 'Research', name: 'E2E go repeats',
-    // A check saves nothing, so three in a row is going round in circles. (A
-    // repeated derivation is now saved instead: go-mode.spec.ts, 9 Oct.)
-    objective: 'Pendulum [[mock:plan=evaluate_stage,evaluate_stage,evaluate_stage,evaluate_stage]]',
+    objective: 'Pendulum [[mock:plan=derive,derive,derive,derive]]',
   });
   await expect(stageArtifact(page)).toContainText('Mock', { timeout: 30_000 });
   const panel = goPanel(page);
@@ -332,12 +330,11 @@ test('repeated identical steps fold into one row, and the run stops rather than 
   await page.getByRole('button', { name: 'Authorize and go' }).click();
 
   const transparency = page.getByRole('region', { name: 'What Go mode is doing' });
-  await expect(transparency).toContainText('was chosen 3 times in a row on this stage without changing it', { timeout: 60_000 });
+  await expect(transparency).toContainText('the deliverable is not', { timeout: 60_000 });
+  await expect(transparency).not.toContainText('was chosen 3 times in a row');
   const steps = page.getByRole('list', { name: 'Go mode steps' });
-  await expect(steps.locator('[data-repeats="3"]')).toHaveCount(1);
-  await expect(steps.locator('[data-repeats="3"]')).toContainText('×3');
-  await expect(steps.getByRole('listitem')).toHaveCount(1);
-  await page.screenshot({ path: test.info().outputPath('01-repeated-steps-fold-into-one-row.png'), fullPage: true });
+  await expect(steps).toContainText('Revise this stage');
+  await page.screenshot({ path: test.info().outputPath('01-repeated-derive-saved.png'), fullPage: true });
 });
 
 test('the Go buttons stay in view while the page is scrolled, and point back when Go needs the user', async ({ page }) => {
