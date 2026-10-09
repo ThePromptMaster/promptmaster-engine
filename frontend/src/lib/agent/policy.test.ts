@@ -7,7 +7,7 @@ import type { StageEvaluation } from '@/lib/workflow/types';
 import type { AgentStep } from '@/types/agent';
 import { deriveExecutionLabel } from './labels';
 import { ITEM_SCHEMAS, itemSchemaFor } from '@/lib/workflow/stage-artifact';
-import { allowedActions, alternating, unsavedDerivation, LIVE_TOOLS, NO_TOOLS, polishSinceDirection, withoutOverride, withoutEndlessPolish, withoutSettledRuns, fitsBudget, noChange, noProgress, plannedBeforeLatestChange, preempt, shouldPause, stageMoveActor, stateFingerprint } from './policy';
+import { allowedActions, alternating, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, LIVE_TOOLS, NO_TOOLS, polishSinceDirection, withoutOverride, withoutEndlessPolish, withoutSettledRuns, fitsBudget, noChange, noProgress, plannedBeforeLatestChange, preempt, shouldPause, stageMoveActor, stateFingerprint } from './policy';
 
 function step(over: Partial<AgentStep>): AgentStep {
   return {
@@ -625,8 +625,50 @@ describe('a derivation reaches the document (C4; Sean, 6 Oct, sequence test)', (
   const saved = step({ action_key: 'revise_stage', stage_id: 'analysis', status: 'succeeded', changes: { version_ids: ['v2'] } });
 
   it('a derivation not yet saved is what the next revision applies', () => {
-    expect(unsavedDerivation([derive], 'analysis')).toEqual({ label: 'Derive', output: 'S_n = F_{n+2} - 1, proved by induction.' });
+    expect(unsavedDerivation([derive], 'analysis')).toEqual({ label: 'Derive', output: 'S_n = F_{n+2} - 1, proved by induction.', action_key: 'derive' });
     expect(unsavedDerivation([derive, saved], 'analysis')).toBeNull();
     expect(unsavedDerivation([derive], 'results')).toBeNull();
+  });
+});
+
+describe('a repeated derivation is saved, not repeated (9 Oct, production replay)', () => {
+  const derive = step({ action_key: 'derive', stage_id: 'analysis', status: 'succeeded', output: 'Binet: a_n = (phi^n - psi^n)/sqrt(5), proved by induction.' });
+  it('the same reasoning move again, with its result unsaved, becomes the save', () => {
+    const saving = saveInsteadOfRepeating({ action_key: 'derive' }, [derive], 'analysis', ['derive', 'revise_stage'], true);
+    expect(saving).toMatchObject({ action_key: 'revise_stage' });
+    expect(saving!.params.instruction).toContain('Put the result of the "Derive" step into this stage');
+  });
+  it('a different reasoning move, no draft, or nothing unsaved: the choice stands', () => {
+    expect(saveInsteadOfRepeating({ action_key: 'prove' }, [derive], 'analysis', ['prove', 'revise_stage'], true)).toBeNull();
+    expect(saveInsteadOfRepeating({ action_key: 'derive' }, [derive], 'analysis', ['derive', 'revise_stage'], false)).toBeNull();
+    expect(saveInsteadOfRepeating({ action_key: 'derive' }, [], 'analysis', ['derive', 'revise_stage'], true)).toBeNull();
+  });
+});
+
+describe('a repeated derivation on a finished table moves on (9 Oct, production replay)', () => {
+  const derive = step({ action_key: 'derive', stage_id: 'experiment', status: 'succeeded', output: 'S_5 = 12 = a_7 - 1.' });
+  it('no revision possible, stage ready: the repeat becomes moving on', () => {
+    expect(saveInsteadOfRepeating({ action_key: 'derive' }, [derive], 'experiment', ['derive', 'advance_stage'], true, true)).toMatchObject({ action_key: 'advance_stage' });
+  });
+  it('not ready, or not offered: the choice stands', () => {
+    expect(saveInsteadOfRepeating({ action_key: 'derive' }, [derive], 'experiment', ['derive', 'advance_stage'], true, false)).toBeNull();
+    expect(saveInsteadOfRepeating({ action_key: 'derive' }, [derive], 'experiment', ['derive'], true, true)).toBeNull();
+  });
+});
+
+describe('an unchanged deliverable is not judged again (9 Oct, production replay)', () => {
+  const judged = step({ action_key: 'declare_objective_complete', stage_id: 'drafting', status: 'succeeded', output: 'The objective is not met yet: the report leaves the n = 5 check open.' });
+  const allowed = ['declare_objective_complete', 'advance_stage'];
+  it('judged not met, nothing saved since, stage ready: moves on to the stages that revise it', () => {
+    expect(moveOnInsteadOfRejudging({ action_key: 'declare_objective_complete' }, [judged], 'drafting', allowed, true)).toMatchObject({ action_key: 'advance_stage' });
+  });
+  it('something saved since, a "met" verdict, not ready, or another move: the choice stands', () => {
+    const saved = step({ action_key: 'revise_stage', stage_id: 'drafting', status: 'succeeded', changes: { version_ids: ['v2'] } });
+    const met = step({ ...judged, output: 'The objective is met: "S_5 = 12".' });
+    expect(moveOnInsteadOfRejudging({ action_key: 'declare_objective_complete' }, [judged, saved], 'drafting', allowed, true)).toBeNull();
+    expect(moveOnInsteadOfRejudging({ action_key: 'declare_objective_complete' }, [met], 'drafting', allowed, true)).toBeNull();
+    expect(moveOnInsteadOfRejudging({ action_key: 'declare_objective_complete' }, [judged], 'drafting', allowed, false)).toBeNull();
+    expect(moveOnInsteadOfRejudging({ action_key: 'derive' }, [judged], 'drafting', allowed, true)).toBeNull();
+    expect(moveOnInsteadOfRejudging({ action_key: 'declare_objective_complete' }, [], 'drafting', allowed, true)).toBeNull();
   });
 });

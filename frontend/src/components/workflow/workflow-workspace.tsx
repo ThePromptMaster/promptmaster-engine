@@ -1399,7 +1399,7 @@ export function WorkflowWorkspace({
           state: manuscript?.long_form ?? null,
           approvedOutlineVersionId: approvedOutlineVersionId(events ?? []),
           onRefresh: () => onReload?.(),
-          revise: revisionBrief(template, stage.id, stageBundles),
+          revise: revisionBrief(template, stage.id, stageBundles, state),
           stageHint: stage.entry_prompt_hint,
           onPanelStep: reportPanelStep,
           // Snapshots go on the artifact that holds the manuscript — Drafting's,

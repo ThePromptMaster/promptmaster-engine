@@ -308,18 +308,91 @@ function savedSomething(s: AgentStep): boolean {
  * in full; a run that keeps reasoning without saving is stopped by
  * `noProgress`, saying nothing was saved.
  */
-export function unsavedDerivation(steps: readonly AgentStep[], stageId: string): { label: string; output: string } | null {
+export function unsavedDerivation(steps: readonly AgentStep[], stageId: string): { label: string; output: string; action_key: string } | null {
   for (let i = steps.length - 1; i >= 0; i -= 1) {
     const s = steps[i];
     if (s.stage_id !== stageId) continue;
     if (savedSomething(s)) return null;
     if (s.status === 'succeeded' && actionFor(s.action_key)?.performer === 'reason' && (s.output ?? '').trim()) {
-      return { label: actionFor(s.action_key)?.label ?? s.action_key, output: s.output.trim() };
+      return { label: actionFor(s.action_key)?.label ?? s.action_key, output: s.output.trim(), action_key: s.action_key };
     }
   }
   return null;
 }
 
+/**
+ * The planner chose a reasoning move whose last result on this stage is not
+ * saved yet: repeating it would change nothing, so the result is saved into
+ * the document instead (9 Oct, production replay of Sean's sequence test:
+ * "Derive" three times on Analysis, nothing reached the report). Different
+ * reasoning moves in a row (derive, prove, simplify) are left alone. Null
+ * when the choice stands.
+ */
+export function saveInsteadOfRepeating(
+  choice: { action_key: string },
+  steps: readonly AgentStep[],
+  stageId: string,
+  allowed: readonly string[],
+  hasDraft: boolean,
+  /** The stage's own requirements are met: it can move on. */
+  canAdvance = false
+): { action_key: 'revise_stage' | 'advance_stage'; params: Record<string, unknown>; rationale: string; expected_outcome: string } | null {
+  const unsaved = unsavedDerivation(steps, stageId);
+  if (!unsaved || unsaved.action_key !== choice.action_key) return null;
+  // A table stage (Experiment's runs) cannot take a revision; when its own
+  // work is done, the repeat is moved on from rather than repeated (9 Oct,
+  // production replay: Derive ×6 on a finished Experiment table).
+  if (!(hasDraft && allowed.includes('revise_stage'))) {
+    if (!canAdvance || !allowed.includes('advance_stage')) return null;
+    return {
+      action_key: 'advance_stage',
+      params: {},
+      rationale: `"${unsaved.label}" already produced its result, and this stage's own work is done; repeating it would change nothing here, so the work moves on to the next stage, where that reasoning belongs.`,
+      expected_outcome: 'This stage marked complete, and the next one started.',
+    };
+  }
+  return {
+    action_key: 'revise_stage',
+    params: {
+      instruction: `Put the result of the "${unsaved.label}" step into this stage's document in full — every step, equation and check — replacing what it corrects. Keep everything else.`,
+    },
+    rationale: `"${unsaved.label}" already produced its result on this stage and it is not saved yet; repeating it would change nothing, so the result is saved into the document instead.`,
+    expected_outcome: `A new version of this stage that holds the "${unsaved.label}" result.`,
+  };
+}
+
+
+/**
+ * The planner chose to check the objective again on a stage where the last
+ * check said "not met" and nothing has been saved since: the same text would
+ * get the same verdict. When the stage's own work is done, the work moves on
+ * to the stages after it — Revision and Final review are where the report is
+ * revised — instead (9 Oct, production replay of the sequence test: judged
+ * not met at Drafting, answered, then judged again on the unchanged report).
+ * Null when the choice stands.
+ */
+export function moveOnInsteadOfRejudging(
+  choice: { action_key: string },
+  steps: readonly AgentStep[],
+  stageId: string,
+  allowed: readonly string[],
+  canAdvance: boolean
+): { action_key: 'advance_stage'; params: Record<string, unknown>; rationale: string; expected_outcome: string } | null {
+  if (choice.action_key !== 'declare_objective_complete' || !canAdvance || !allowed.includes('advance_stage')) return null;
+  for (let i = steps.length - 1; i >= 0; i -= 1) {
+    const s = steps[i];
+    if (savedSomething(s)) return null;
+    if (s.stage_id !== stageId || s.action_key !== 'declare_objective_complete' || s.status !== 'succeeded') continue;
+    if (!/^(Paused — the objective is not met|The objective is not met)/.test((s.output ?? '').trim())) return null;
+    return {
+      action_key: 'advance_stage',
+      params: {},
+      rationale: 'The objective was judged not met on this stage and nothing has been saved since, so judging it again would say the same. This stage\'s own work is done; the stages after it revise the work, so it moves on to them.',
+      expected_outcome: 'This stage marked complete, and the next one started.',
+    };
+  }
+  return null;
+}
 
 /**
  * The same move three times on one stage with nothing to show for it.

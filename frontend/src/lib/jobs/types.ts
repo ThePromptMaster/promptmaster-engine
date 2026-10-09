@@ -75,6 +75,8 @@ export interface SectionRevisePayload {
   stage_label: string;
   instruction: string;
   notes: string;
+  /** The saved work this section reports, as it stood when queued (C9). */
+  record?: string;
 }
 
 /** What the backend is sent for a rewrite: the brief plus the section's current text. */

@@ -101,6 +101,18 @@ describe('enqueueing (B2a) — the same calls the buttons make', () => {
     ]);
   });
 
+  it('a revision carries each section\'s current record when the brief has one (C9)', async () => {
+    enqueueSectionJob.mockClear();
+    await enqueueRevisionJobs({
+      project, artifactId: 'art', stageId: 'revision', outline: [section('a', 'complete'), section('b', 'complete')], approvedOutlineVersionId: 'ov',
+      brief: { stageLabel: 'Revision', instruction: 'Tighten it.', findings: [], sources: [], records: { a: 'Experiment: induction step [status: worked_by_hand]' } },
+      saveSnapshot: async () => undefined,
+    });
+    const revises = enqueueSectionJob.mock.calls.map((c) => (c[0] as { revise?: { record?: string } }).revise);
+    expect(revises[0]?.record).toBe('Experiment: induction step [status: worked_by_hand]');
+    expect(revises[1]).not.toHaveProperty('record');
+  });
+
   it('drafts only the sections named when asked', async () => {
     enqueueSectionJob.mockClear();
     const queued = await enqueueDraftJobs({

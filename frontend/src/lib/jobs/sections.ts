@@ -173,7 +173,7 @@ export async function enqueueRevisionJobs(args: RevisionJobsArgs): Promise<strin
       sectionIndex: index,
       // A new revision means a new idempotency key: an explicit request, not a no-op.
       revision: (section.revision ?? 0) + 1,
-      revise,
+      revise: brief.records?.[section.id] ? { ...revise, record: brief.records[section.id] } : revise,
     });
     queued.push(section.id);
   }

@@ -14,7 +14,8 @@
 
 import type { StageArtifactBundle } from './digest';
 import { effectiveRenderer, itemSchemaFor, parseItems } from './stage-artifact';
-import type { StageDefinition, WorkflowTemplate } from './types';
+import type { StageDefinition, WorkflowState, WorkflowTemplate } from './types';
+import { sectionRecords } from './derived-outline';
 
 export interface RevisionFinding {
   source: string;
@@ -28,6 +29,8 @@ export interface RevisionBrief {
   findings: RevisionFinding[];
   /** The review stages the findings were read from, for the UI to name. */
   sources: string[];
+  /** Per section id: the saved work the section reports, as it stands now (C9). */
+  records?: Record<string, string>;
 }
 
 /** Rows a review stage asks to be acted on: accepted findings, and claims marked for removal. */
@@ -59,7 +62,9 @@ function actionable(stage: StageDefinition, content: string | undefined): Revisi
 export function revisionBrief(
   template: WorkflowTemplate,
   stageId: string,
-  bundles: Record<string, StageArtifactBundle>
+  bundles: Record<string, StageArtifactBundle>,
+  /** With the state, a derived outline's sections carry their current record. */
+  state?: WorkflowState
 ): RevisionBrief | null {
   const index = template.stages.findIndex((s) => s.id === stageId);
   const stage = template.stages[index];
@@ -83,6 +88,7 @@ export function revisionBrief(
     instruction: stage.entry_prompt_hint ?? '',
     findings: reviews.flatMap((s) => actionable(s, bundles[s.id]?.versions.at(-1)?.content)),
     sources: reviews.map((s) => s.label),
+    ...(state && template.outline_stage === 'derived' ? { records: sectionRecords(template, state, bundles) } : {}),
   };
 }
 
