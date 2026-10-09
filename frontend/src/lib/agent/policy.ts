@@ -363,6 +363,38 @@ export function saveInsteadOfRepeating(
 
 
 /**
+ * The planner chose to check the objective again on a stage where the last
+ * check said "not met" and nothing has been saved since: the same text would
+ * get the same verdict. When the stage's own work is done, the work moves on
+ * to the stages after it — Revision and Final review are where the report is
+ * revised — instead (9 Oct, production replay of the sequence test: judged
+ * not met at Drafting, answered, then judged again on the unchanged report).
+ * Null when the choice stands.
+ */
+export function moveOnInsteadOfRejudging(
+  choice: { action_key: string },
+  steps: readonly AgentStep[],
+  stageId: string,
+  allowed: readonly string[],
+  canAdvance: boolean
+): { action_key: 'advance_stage'; params: Record<string, unknown>; rationale: string; expected_outcome: string } | null {
+  if (choice.action_key !== 'declare_objective_complete' || !canAdvance || !allowed.includes('advance_stage')) return null;
+  for (let i = steps.length - 1; i >= 0; i -= 1) {
+    const s = steps[i];
+    if (savedSomething(s)) return null;
+    if (s.stage_id !== stageId || s.action_key !== 'declare_objective_complete' || s.status !== 'succeeded') continue;
+    if (!/^(Paused — the objective is not met|The objective is not met)/.test((s.output ?? '').trim())) return null;
+    return {
+      action_key: 'advance_stage',
+      params: {},
+      rationale: 'The objective was judged not met on this stage and nothing has been saved since, so judging it again would say the same. This stage\'s own work is done; the stages after it revise the work, so it moves on to them.',
+      expected_outcome: 'This stage marked complete, and the next one started.',
+    };
+  }
+  return null;
+}
+
+/**
  * The same move three times on one stage with nothing to show for it.
  *
  * A repeated name alone is not a loop (Sean, 4 Oct): three "Revise this
