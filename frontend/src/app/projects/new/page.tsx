@@ -383,7 +383,7 @@ export default function NewProjectPage() {
               Continue where I left off
             </button>
             <button onClick={discardKept} className="rounded-lg px-4 py-2 text-label text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-highest)]">
-              Start fresh
+              Discard the draft
             </button>
           </div>
         </div>
