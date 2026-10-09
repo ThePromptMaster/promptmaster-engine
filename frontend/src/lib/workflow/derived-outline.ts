@@ -78,8 +78,12 @@ export function stageBrief(
   return summariseStageContent(stage, bundle?.versions.at(-1)?.content ?? '');
 }
 
-/** Per source stage, in a section's brief: enough for a proof and its checks. */
-export const BRIEF_MAX = 4_000;
+/**
+ * Per source stage, in a section's brief: enough for a proof and its checks.
+ * 4,000 cut a nine-run Experiment table at its seventh row, so Results never
+ * saw Cycle 3 (9 Oct, production replay of the sequence test).
+ */
+export const BRIEF_MAX = 12_000;
 
 /**
  * Fold a spec section and its stages into the section as it will appear.
@@ -122,6 +126,31 @@ export function sectionAbstract(section: DerivedSection): string {
   if (section.empty) return section.guidance;
   const briefs = section.sources.map((s) => `${s.label}: ${s.brief}`).join('\n');
   return `${section.guidance}\n\n${briefs}`;
+}
+
+/**
+ * Per section id, the saved work it reports as that work stands now (C9, 9 Oct).
+ *
+ * An approved outline keeps the briefs it was approved with — re-deriving it
+ * behind the user's back is what `derivedOutlineDrift` exists to prevent. But
+ * a revision of a section must not be bound to them: on the production replay
+ * of the sequence test, Experiment was repaired to show both induction proofs
+ * "worked by hand", and Revision still rewrote Results from the outline's copy
+ * saying they were "not run". A revision is given this as well.
+ */
+export function sectionRecords(
+  template: WorkflowTemplate,
+  state: WorkflowState,
+  bundles: Record<string, StageArtifactBundle>
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const form of ['full', 'compact'] as const) {
+    for (const section of deriveSections(template, state, bundles, { form, keepEmptyOptional: true })) {
+      if (section.empty || out[section.id]) continue;
+      out[section.id] = section.sources.map((s) => `${s.label}: ${s.brief}`).join('\n\n');
+    }
+  }
+  return out;
 }
 
 /** One way the write-up can be laid out. */

@@ -357,6 +357,9 @@ class SectionRevisionBrief(BaseModel):
     instruction: str = Field(default="", max_length=MAX_INSTRUCTION_CHARS)
     notes: str = Field(default="", max_length=40_000)
     current_content: str = Field(..., max_length=400_000)
+    #: The saved work this section reports, as it stands now (C9, 9 Oct). The
+    #: section was drafted from an earlier copy; where they disagree, this wins.
+    record: str = Field(default="", max_length=200_000)
 
 
 class GenerateSectionProseResponse(BaseModel):

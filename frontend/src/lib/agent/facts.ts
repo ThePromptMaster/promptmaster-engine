@@ -189,7 +189,7 @@ export async function readStageFacts(input: {
         pendingJobs: pendingJobs(own),
         stopped: stoppedSections(outline, own),
         approvedOutlineVersionId: approvedOutlineVersionId(events),
-        brief: revisionBrief(template, stage.id, bundles),
+        brief: revisionBrief(template, stage.id, bundles, projectState(template, events)),
         revisedInStage: revisedCount(outline, own, stage.id),
       };
       void jobBySection; // re-exported helper used by callers; keeps the import honest
