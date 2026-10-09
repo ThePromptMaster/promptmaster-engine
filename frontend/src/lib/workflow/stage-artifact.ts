@@ -160,6 +160,13 @@ export interface StageItemSchema {
     blocked?: string;
     /** Fields the draft filled in about a run it could not make; emptied when a run settles the row, because they are no longer true. */
     clears?: string[];
+    /**
+     * The field in which the draft says who can carry the row out (Q1a, Sean
+     * 9 Oct: "A missing output alone shouldn't automatically become a request
+     * for the user to produce it"). A row PromptMaster can produce that the
+     * draft marked not run is work for Go, not a settled row.
+     */
+    producibleField?: string;
   };
 }
 
@@ -364,6 +371,13 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
       { key: 'run', label: 'What was to be done', long: true, max: 400 },
       { key: 'observed', label: 'What actually happened', long: true, max: 400 },
       { key: 'deviation', label: 'Deviation from the plan', long: true, max: 400 },
+      {
+        key: 'producible_by', label: 'Who can carry it out', max: 160,
+        hint:
+          'Start with exactly one of: "PromptMaster" — a calculation, simulation, derivation, comparison or aggregation that code or working can do from what the project states, with no dataset; ' +
+          '"Needs data" — it needs measurements or records the project does not hold; "Needs a person" — it needs people (participants, independent human coders, an expert panel); ' +
+          '"Needs a tool" — it needs an instrument, a laboratory or software that is not available. Then a dash and the reason in a few words.',
+      },
     ],
     // A run that was not done is fine; a run that vanishes between the method
     // and the results is not — so "not run" costs a sentence.
@@ -380,14 +394,16 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
       // in full by derivation, and the report called every one "not run"
       // because only code counted. A derivation or hand calculation from what
       // the objective supplies is carried out; the working is the evidence.
+      // 9 Oct (Q1a): "by hand" read as a person's work when the model did the
+      // derivation. It says what it is: derived, and not executed as code.
       {
-        value: 'worked_by_hand', label: 'Worked by hand', tone: 'done', modelMaySet: true,
-        explain: 'Carried out by derivation or hand calculation from what the project supplies — no code or data needed. Put the working, or where it is, in "What actually happened".',
+        value: 'worked_by_hand', label: 'Derived (not executed)', tone: 'done', modelMaySet: true,
+        explain: 'Carried out by derivation or calculation written out from what the project supplies — not executed as code, and no data needed. Put the working, or where it is, in "What actually happened".',
       },
     ],
     decisionQuestion: 'For each planned run: was it carried out, and what happened? A run that was not done needs a reason, not silence.',
     // …but a run that really executed in the sandbox is.
-    execution: { status: 'completed', field: 'observed', blocked: 'not_run', clears: ['deviation'] },
+    execution: { status: 'completed', field: 'observed', blocked: 'not_run', clears: ['deviation'], producibleField: 'producible_by' },
     reasonFrom: ['deviation', 'observed'],
   },
 
@@ -708,9 +724,35 @@ function rowText(item: StageItem): string {
     .join(' — ');
 }
 
+export type Producer = 'promptmaster' | 'needs_data' | 'needs_human' | 'needs_tool';
+
+/** Who the draft said can carry the row out; null when it did not say, or the table has no such field. */
+export function producibleBy(item: StageItem, schema: StageItemSchema): Producer | null {
+  const field = schema.execution?.producibleField;
+  const text = field ? (item[field] ?? '').trim().toLowerCase() : '';
+  if (!text) return null;
+  if (/^promptmaster\b/.test(text)) return 'promptmaster';
+  if (/^needs (a )?(person|people|human)/.test(text)) return 'needs_human';
+  if (/^needs (a )?tool/.test(text)) return 'needs_tool';
+  if (/^needs (some )?data/.test(text)) return 'needs_data';
+  return null;
+}
+
+/**
+ * A row PromptMaster can carry out that only the draft has called "not run":
+ * Go tries it before the table counts as settled. A run that was tried, or a
+ * status the user set, settles it as before.
+ */
+export function awaitsAttempt(item: StageItem, schema: StageItemSchema): boolean {
+  const execution = schema.execution;
+  if (!execution?.producibleField || producibleBy(item, schema) !== 'promptmaster') return false;
+  return !item.status || (item.status === execution.blocked && item.status_source === 'model');
+}
+
 export function isTriaged(item: StageItem, schema: StageItemSchema): boolean {
   // PromptMaster's proposal is not the user's decision until they confirm it.
   if (isProposed(item)) return false;
+  if (awaitsAttempt(item, schema)) return false;
   const option = statusOption(schema, item.status);
   if (!option) return false;
   if (option.decided === false) return false;

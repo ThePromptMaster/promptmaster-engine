@@ -36,11 +36,40 @@ export interface NormalizedImage {
   note: string;
 }
 
+/**
+ * The image, decoded. iPad Safari can refuse `createImageBitmap` on a full
+ * 48-megapixel photo (U5, 9 Oct: Sean's photos from an iPad); an `<img>`
+ * element decodes what the browser can show, and is drawn into a bitmap of
+ * the size that is kept, so the full-size pixels are never held twice.
+ */
 async function decode(file: Blob): Promise<ImageBitmap | null> {
   try {
     return await createImageBitmap(file);
   } catch {
+    return decodeThroughElement(file);
+  }
+}
+
+export async function decodeThroughElement(file: Blob): Promise<ImageBitmap | null> {
+  if (typeof document === 'undefined' || typeof URL.createObjectURL !== 'function') return null;
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    img.decoding = 'async';
+    img.src = url;
+    await img.decode();
+    const { width, height } = fitWithin(img.naturalWidth, img.naturalHeight);
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.drawImage(img, 0, 0, width, height);
+    return await createImageBitmap(canvas);
+  } catch {
     return null;
+  } finally {
+    URL.revokeObjectURL(url);
   }
 }
 

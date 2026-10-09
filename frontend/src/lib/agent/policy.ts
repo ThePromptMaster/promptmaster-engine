@@ -15,7 +15,7 @@
  *     comes from the registry, not from the response.
  */
 
-import { isTriaged, itemSchemaFor, stageDrafts, type StageItem, type StageItemSchema } from '@/lib/workflow/stage-artifact';
+import { awaitsAttempt, isTriaged, itemSchemaFor, stageDrafts, type StageItem, type StageItemSchema } from '@/lib/workflow/stage-artifact';
 import { nextSuggestedStage } from '@/lib/workflow/engine';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import type { StageDefinition, StageEvaluation, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
@@ -68,6 +68,25 @@ export function withoutSettledRuns(
   if (!review?.schema.execution) return [...allowed];
   const open = review.items.filter((i) => !isTriaged(i, review.schema)).length;
   return open > 0 ? [...allowed] : allowed.filter((k) => k !== 'run_computation');
+}
+
+/**
+ * How many more computations a run may try against this table. With data,
+ * one per row; without it, one per row PromptMaster can carry out from what
+ * the project states and the draft left not run (Q1a, 9 Oct: Sean's research
+ * test stopped on "Not run" rows no one had tried). Tries already made count
+ * against either.
+ */
+export function runAttemptsFor(
+  review: { items: StageItem[]; schema: StageItemSchema } | undefined,
+  allowed: readonly string[],
+  hasData: boolean,
+  tried: number
+): number {
+  if (!review?.schema.execution || !allowed.includes('run_computation')) return 0;
+  // Never more tries than rows, however the tries landed.
+  const left = Math.max(0, review.items.length - tried);
+  return hasData ? left : Math.min(left, review.items.filter((i) => awaitsAttempt(i, review.schema)).length);
 }
 
 /** Moves that polish a stage rather than move the work on. */

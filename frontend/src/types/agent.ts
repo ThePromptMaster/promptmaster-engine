@@ -80,7 +80,7 @@ export interface AgentStep {
   execution_label: ExecutionLabel | null;
   block_kind: BlockKind | null;
   tools_used: string[];
-  changes: { version_ids?: string[]; event_types?: string[]; sandbox_run_id?: string; sections_written?: string[]; jobs?: string[]; items_triaged?: string[]; items_run?: string[]; figures_recorded?: number };
+  changes: { version_ids?: string[]; event_types?: string[]; sandbox_run_id?: string; sections_written?: string[]; jobs?: string[]; items_triaged?: string[]; items_run?: string[]; figures_recorded?: number; set_aside?: string };
   output: string;
   cost_usd: number | null;
   started_at: string;

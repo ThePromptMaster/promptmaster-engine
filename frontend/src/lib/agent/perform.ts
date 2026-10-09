@@ -120,6 +120,11 @@ export interface StepOutcome {
   needs?: NeedsUser;
   /** The step changed nothing and repeated a stop already made: it is not counted against the window. */
   free?: boolean;
+  /**
+   * A blocked step whose blocker is recorded where it applies (a run's row):
+   * the item is set aside and the run continues with other work (Q1b).
+   */
+  setAside?: string;
 }
 
 const MAX_OUTPUT = 6_000;
@@ -250,6 +255,22 @@ async function recordRun(
     // The run itself is on record; what could not be added is simply not claimed.
   }
   return { changes, notes };
+}
+
+/** The last line of what the code wrote to stderr: the error itself, for a row's reason. */
+export function lastErrorLine(stderr: string): string {
+  const lines = stderr.split('\n').map((l) => l.trim()).filter(Boolean);
+  return (lines.at(-1) ?? 'it exited with an error').slice(0, 240);
+}
+
+/**
+ * A blocked run recorded on its own row blocks that row, not the run: the
+ * loop goes on to other work (Q1b; Sean, 9 Oct: "identify the exact
+ * limitation and assess whether other useful work can proceed").
+ */
+function setAsideFrom(recorded: { changes: AgentStep['changes'] }, row: unknown, why: string): Pick<StepOutcome, 'setAside'> {
+  const ids = (recorded.changes as { version_ids?: unknown } | null)?.version_ids;
+  return Array.isArray(ids) && ids.length ? { setAside: `Row ${String(row)}: ${why}` } : {};
 }
 
 /**
@@ -400,12 +421,16 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         );
       } catch (e) {
         const status = (e as { status?: number }).status;
-        // A cap or allowance is a missing resource, not a broken step.
+        // A cap or allowance is a missing resource, not a broken step. The
+        // row it was for says so, and the rest of the work goes on (Q1b).
         if (status === 429) {
+          const why = `the code sandbox is not available (${(e as Error).message.replace(/[.\s]+$/, '')})`;
+          const recorded = await recordBlockedRun(ctx, params.row, { runId: null, reason: why });
           return done(key, {
             status: 'blocked', blockKind: 'tool_missing', toolsUsed: ['model'],
-            output: `${(e as Error).message}\n\nThe code was written but not run:\n\n\`\`\`python\n${written.code}\n\`\`\``,
-            changes: {},
+            output: [`${(e as Error).message}\n\nThe code was written but not run:\n\n\`\`\`python\n${written.code}\n\`\`\``, ...recorded.notes].join('\n\n'),
+            changes: recorded.changes,
+            ...setAsideFrom(recorded, params.row, why),
           });
         }
         throw e;
@@ -427,10 +452,19 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       ].filter(Boolean).join('\n\n');
       // A run that executed cleanly is execution truth, recorded without a
       // model: on the row it carried out, and as the figures it printed.
+      // A run that could not be made, or that ran and failed, is recorded on
+      // its row with the real reason (Q1a): the row is settled honestly as
+      // not run, and is not tried again.
+      const failedWith = ran && run.exit_code !== 0 ? lastErrorLine(run.stderr) : null;
+      const blockedWhy =
+        classification.blockKind === 'data_missing' ? classification.missing ?? classification.summary
+        : classification.blockKind === 'tool_missing' ? classification.summary.replace(/^Code could not be run: /, '').replace(/[.\s]+$/, '')
+        : failedWith ? `the code ran but failed — ${failedWith}`
+        : null;
       const recorded = ran && classification.stepStatus === 'succeeded' && run.exit_code === 0
         ? await recordRun(ctx, params.row, { id: run.id, stdout: run.stdout })
-        : classification.blockKind === 'data_missing'
-          ? await recordBlockedRun(ctx, params.row, { runId: run.id, reason: classification.missing ?? classification.summary })
+        : blockedWhy
+          ? await recordBlockedRun(ctx, params.row, { runId: run.id, reason: blockedWhy })
           : { changes: {}, notes: [] };
       return done(key, {
         status: classification.stepStatus,
@@ -439,6 +473,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         toolsUsed: ['model', 'sandbox'],
         changes: { sandbox_run_id: run.id, ...recorded.changes },
         sandboxLabel: classification.executionLabel,
+        ...(classification.stepStatus === 'blocked' && blockedWhy ? setAsideFrom(recorded, params.row, blockedWhy) : {}),
         followUp: ran && classification.stepStatus === 'succeeded'
           ? { sandboxRunId: run.id, code: written.code, stdout: run.stdout, stderr: run.stderr, exitCode: run.exit_code }
           : undefined,
@@ -1183,9 +1218,11 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       );
       const pointer = named ? `\n\nThe button is "${named.label}", ${named.where}.` : '';
       const question = `${ctx.step.decision_question || 'Which way should this go?'}${pointer}`;
+      // What Go checked before interrupting (Q1b): on the record, under the question.
+      const audit = typeof params.stop_audit === 'string' ? `\n\n${params.stop_audit}` : '';
       return done(key, {
         status: 'succeeded', toolsUsed: [], changes: {},
-        output: question,
+        output: `${question}${audit}`,
         stop: { status: 'awaiting_decision', reason: question },
         needs: { kind: 'answer_question', question },
       });

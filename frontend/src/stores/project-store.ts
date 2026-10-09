@@ -727,6 +727,26 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         },
       },
     }));
+
+    // H1c (9 Oct): a restore changes the stage as much as a save does, so the
+    // done work after it — built on the version replaced — is reopened the
+    // same way (H1b). Restoring the version that is already current changes nothing.
+    const head = bundle.versions.at(-1);
+    const { template, events } = get();
+    if (template && events && head && head.content !== target.content) {
+      const drafted = new Set(Object.entries(get().stages).filter(([, b]) => b.versions.at(-1)?.content?.trim()).map(([id]) => id));
+      const later = laterDoneStages(template, projectState(template, events), stageId, drafted);
+      if (later.length) {
+        await get()
+          .appendEvent({
+            type: 'stage_version_saved',
+            stage_id: stageId,
+            actor: 'user',
+            payload: { version_id: created.id, version_number: created.version_number, prior_version_id: head.id, affected: later, restored_from_version_id: target.id },
+          })
+          .catch((err) => console.error('[H1c] could not record the restore for recheck', err));
+      }
+    }
   },
 
   async setStageSummary(stageId, summary) {

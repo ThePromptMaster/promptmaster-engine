@@ -654,7 +654,14 @@ version. It is the planner's word that the code *was* that run — nothing check
 against the row's description — which is why the row says where its status came from and
 stays the user's to change; a row the user decided is never overwritten. With data
 attached, Go tries a computation at most once per row before handing an undecided run
-table to the user; without data it stops for the user as before. A snapshot built before
+table to the user. **Without data (2026-10-09, Q1a)** each row says who can carry it out
+(`producible_by`: PromptMaster, or what it needs that the project lacks — data, a
+person, a tool). A row PromptMaster can carry out from what the project states is not
+settled by the draft calling it "not run": Go runs it, once, and the row records the
+output, or the exact reason it could not run (no sandbox, missing data, or the error the
+code ended with). That classification is the model's, written in the draft; a row it
+misjudges as needing data is still left to the user. A row blocked this way is set aside
+and the run goes on with other work (`setAside`), rather than ending. A snapshot built before
 pandas was added lacks it: rebuild with `scripts/sandbox-snapshot.mts` and update
 `SANDBOX_SNAPSHOT_ID`.
 **A run that could not be made settles its row too (2026-10-02).** When the code needs a

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useProjectStore } from './project-store';
+import { BOOK_V1 } from '@/lib/workflow/templates/book.v1';
 import { ProjectConflictError, type Project } from '@/types/project';
 
 const getProject = vi.hoisted(() => vi.fn());
@@ -571,5 +572,38 @@ describe('leaving a stage retires the proposals raised on it (A5, SN-01)', () =>
     expect(supersedePending).toHaveBeenCalledWith('p1', { stageId: 'output', except: ['r-apply'] });
     const byId = Object.fromEntries(useProjectStore.getState().recommendations.map((r) => [r.id, r.status]));
     expect(byId).toEqual({ 'r-old': 'superseded', 'r-apply': 'pending' });
+  });
+});
+
+describe('restoreStageVersion (H1c, 9 Oct)', () => {
+  const done = [
+    { type: 'stage_marked_complete', stage_id: 'objective', to_stage_id: 'audience', actor: 'user', created_at: '2026-10-06T10:00:00Z', payload: { evidence_version_id: 'v1' } },
+    { type: 'stage_marked_complete', stage_id: 'audience', to_stage_id: 'positioning', actor: 'user', created_at: '2026-10-06T10:01:00Z', payload: { evidence_version_id: 'x' } },
+  ];
+  const V2 = { ...V1, id: 'v2', version_number: 2, content: 'second' };
+
+  async function restoring(target: string) {
+    await loadFixture();
+    useProjectStore.setState({
+      template: BOOK_V1 as never,
+      events: done as never,
+      stages: { objective: { artifact: { ...ARTIFACT, stage_id: 'objective', current_version_id: 'v2', version_count: 2 } as never, versions: [V1 as never, V2 as never] } },
+    });
+    restoreVersionRow.mockResolvedValue({ ...V1, id: 'v3', version_number: 3, restored_from_version_id: target });
+    listWorkflowEvents.mockResolvedValue(done);
+    await useProjectStore.getState().restoreStageVersion('objective', target);
+  }
+
+  it('reopens the done work after the stage, as a save does', async () => {
+    await restoring('v1');
+    expect(appendWorkflowEvent).toHaveBeenCalledWith('p1', 'u1', expect.objectContaining({
+      type: 'stage_version_saved', stage_id: 'objective',
+      payload: expect.objectContaining({ version_id: 'v3', prior_version_id: 'v2', affected: ['audience'], restored_from_version_id: 'v1' }),
+    }));
+  });
+
+  it('restoring the version already current reopens nothing', async () => {
+    await restoring('v2');
+    expect(appendWorkflowEvent).not.toHaveBeenCalled();
   });
 });
