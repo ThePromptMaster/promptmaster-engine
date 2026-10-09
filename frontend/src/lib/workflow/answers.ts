@@ -11,6 +11,8 @@
  * accepted fact, which every prompt reads (`project_context.context_block`).
  */
 import type { NewFact } from '@/lib/supabase/facts';
+import { documentText, type StageArtifactBundle } from './digest';
+import type { WorkflowTemplate } from './types';
 
 const QUESTION_MAX = 600;
 const STATEMENT_MAX = 2_000;
@@ -29,7 +31,7 @@ export function questionOf(question: string): string {
 export function answerAsFact(
   question: string,
   answer: string,
-  ref: { run_id: string; step_id?: string; stage_id: string }
+  ref: { run_id: string; step_id?: string; stage_id: string; contradicted?: { document: string; quote: string } }
 ): NewFact | null {
   const text = answer.replace(/\s+/g, ' ').trim();
   if (!text || /^(ok(ay)?|yes|no|go( on| ahead)?|continue|proceed|sure|fine|thanks?( you)?)[.!]*$/i.test(text)) return null;
@@ -44,4 +46,28 @@ export function answerAsFact(
     source_kind: 'user_edit',
     source_ref: { via: 'go answer', question: asked, ...ref },
   };
+}
+
+/** Per stage, at most this much of its latest saved text goes to the answer check (L-65). */
+const ANSWER_DOC_MAX = 20_000;
+const ANSWER_DOCS_MAX = 120_000;
+
+/**
+ * The saved documents an answer is read against (L-65): every stage's latest
+ * saved version, as text, in workflow order, within a budget.
+ */
+export function answerDocuments(
+  template: WorkflowTemplate,
+  bundles: Record<string, StageArtifactBundle>
+): { label: string; version: number | null; text: string }[] {
+  const out: { label: string; version: number | null; text: string }[] = [];
+  let used = 0;
+  for (const stage of template.stages) {
+    const head = bundles[stage.id]?.versions.at(-1);
+    const text = documentText(stage, head?.content ?? '').slice(0, ANSWER_DOC_MAX);
+    if (!text.trim() || used + text.length > ANSWER_DOCS_MAX) continue;
+    used += text.length;
+    out.push({ label: stage.label, version: head?.version_number ?? null, text });
+  }
+  return out;
 }

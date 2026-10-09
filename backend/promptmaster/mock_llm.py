@@ -482,6 +482,17 @@ def _json_reply(system: str, prompt: str) -> dict:
                 facts.append({"statement": sentence.rstrip("."), "subject": "", "kind": "fact", "source_id": m.group(1), "quote": sentence})
                 facts.append({"statement": "Revenue grew 999%", "source_id": m.group(1), "quote": "Revenue grew 999% last year."})
         return {"facts": facts}
+    from promptmaster import answer_check
+
+    if system.startswith(answer_check._INSTRUCTION[:60]):
+        # A contradiction only when the answer says "[[mock:answer=contradicts]]",
+        # quoting the first line of the first document; otherwise none.
+        if "[[mock:answer=contradicts]]" in prompt:
+            m = re.search(r"--- DOCUMENT: ([^\n(]+?)(?: \(v\d+\))? ---\n([^\n]+)", prompt)
+            if m:
+                return {"contradicts": True, "document": m.group(1).strip(), "quote": m.group(2).strip(),
+                        "claim": "Mock: the answer says otherwise.", "explanation": "Mock: the document says this."}
+        return {"contradicts": False}
     from promptmaster import objective_assessment
 
     if system.startswith(objective_assessment._ASSESS_INSTRUCTION[:60]):

@@ -734,6 +734,14 @@ export const api = {
    * Whether the objective is met by what the project holds, before Go may say
    * so (6 Oct, email 13). Commits nothing.
    */
+  /** L-65: is a claim the answer makes about the saved record borne out by it? Fails open. */
+  async agentCheckAnswer(
+    req: { question: string; answer: string; documents: { label: string; version?: number | null; text: string }[]; model?: string },
+    signal?: AbortSignal
+  ): Promise<AnswerContradiction & { contradicts: boolean }> {
+    return apiFetch('/api/agent/check-answer', { method: 'POST', body: JSON.stringify(req), signal });
+  },
+
   async agentAssessObjective(
     req: {
       inputs: PMInput;
@@ -840,3 +848,12 @@ export const api = {
 };
 
 export type { ChatMessage };
+
+/** What a saved document says that an answer contradicts (L-65), with its verbatim quote. */
+export interface AnswerContradiction {
+  document: string;
+  version?: number | null;
+  quote: string;
+  claim: string;
+  explanation: string;
+}

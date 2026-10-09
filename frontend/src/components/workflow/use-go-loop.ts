@@ -34,7 +34,7 @@ import { setUsageOperation, takeStepCost } from '@/lib/supabase/model-usage';
 import { RefusedRevision } from '@/lib/workflow/commit-check';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { api } from '@/lib/api/client';
+import { api, type AnswerContradiction } from '@/lib/api/client';
 import { actionFor, actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, USER_ANSWER_STEP } from '@/lib/agent/actions';
 import { contextWithFacts, readOutcomeProof, readStageFacts, type StageFacts } from '@/lib/agent/facts';
 import { stageDrafts } from '@/lib/workflow/stage-artifact';
@@ -46,7 +46,7 @@ import { projectMemory } from '@/lib/agent/memory';
 import { requestProjectCancel } from '@/lib/supabase/jobs';
 import { recordFacts } from '@/lib/supabase/facts';
 import { appendWorkflowEvent } from '@/lib/supabase/workflow';
-import { answerAsFact } from '@/lib/workflow/answers';
+import { answerAsFact, answerDocuments } from '@/lib/workflow/answers';
 import { authorizeRun } from '@/lib/agent/authorize';
 import { buildAgentState } from '@/lib/agent/digest';
 import { performStep, type PerformContext, type StepOutcome } from '@/lib/agent/perform';
@@ -873,8 +873,26 @@ export function useGoLoop(opts: Options) {
    * Answer the question the run stopped on. Recorded as a step of its own, so
    * the planner reads it in the history and the trail shows who decided what.
    */
+  // L-65 (9 Oct): an answer's claims about the saved record are read against
+  // it before it becomes a fact. A contradiction with a verbatim quote is put
+  // to the user; anything else — including a failed check — lets it through.
+  const checkAnswer = useCallback(async (text: string): Promise<AnswerContradiction | null> => {
+    const current = runRef.current;
+    const o = latest.current;
+    if (!current || !text.trim()) return null;
+    const asked = current.needs?.kind === 'answer_question' ? current.needs.question : current.stop_reason ?? '';
+    try {
+      const res = await api.agentCheckAnswer({
+        question: asked, answer: text.trim(), documents: answerDocuments(o.template, o.bundles), model: o.project.model,
+      });
+      return res.contradicts && res.quote ? res : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
   const answer = useCallback(
-    async (text: string) => {
+    async (text: string, contradicted?: AnswerContradiction) => {
       const current = runRef.current;
       const o = latest.current;
       if (!current || !o.stage || !text.trim()) return;
@@ -889,7 +907,11 @@ export function useGoLoop(opts: Options) {
         // (Sean, 7 Oct, emails 8 and 11): evaluation, the final review and the
         // objective check read the project's facts, never the run's steps.
         const asked = current.needs?.kind === 'answer_question' ? current.needs.question : current.stop_reason ?? '';
-        const fact = answerAsFact(asked, text, { run_id: current.id, step_id: step.id, stage_id: o.stage.id });
+        const fact = answerAsFact(asked, text, {
+          run_id: current.id, step_id: step.id, stage_id: o.stage.id,
+          // Recorded knowing the record says otherwise: kept with the fact.
+          ...(contradicted ? { contradicted: { document: contradicted.document, quote: contradicted.quote } } : {}),
+        });
         if (fact) await recordFacts(o.project, [fact]);
         // A stage stuck on that decision is no longer stuck.
         const st = o.state.stages[o.stage.id];
@@ -1123,7 +1145,7 @@ export function useGoLoop(opts: Options) {
     stageLabelFor,
     autoWindows, setAutoWindows, autoPending,
     policy, setPolicy, budget, setBudget, run, steps, phase, active, pendingStep, pendingStale, authorizing, error,
-    go, update, suggest, replan, stop, approve, decline, answer, confirmAuthorization,
+    go, update, suggest, replan, stop, approve, decline, answer, checkAnswer, confirmAuthorization,
     cancelAuthorization: useCallback(() => setAuthorizing(null), []),
     dismissError: useCallback(() => setError(null), []),
   };
