@@ -1202,6 +1202,10 @@ finished stage to repair it on its own; the user reopens it, or edits the text.
 next repair (`staleRepair`, `params.measured`). The repair names the count, is measured
 again in code before it saves (one more try if it still fails), and the stage stays
 finished; its new version reopens the stages that read it (H1b).
+Follow-ups (#193, #194): a measured repair counts only measured repairs as its tries, and
+every repair of a stage whose measurement fails is told the count, re-measured before it
+saves, and closed on the new count. Production, TaskBoard: 99 → 111 words of 100–140, then
+"Objective met".
 
 ### L-64 — An answer that contradicts the deliverable's wording reopens only what names the same values (2026-10-09)
 
@@ -1240,6 +1244,9 @@ every stage's latest saved text. A contradiction is shown only with a quote that
 verbatim in the document it names: "Your answer and the record disagree", with *Record my
 answer anyway* or *Edit my answer*. An answer recorded anyway keeps the quote it overrode
 on the fact (`source_ref.contradicted`). A failed check lets the answer through.
+A count is not a sentence any document says, so what the project's code measured is sent
+too, as a "Measured in code" document (#193). Production: "the Output already has a 120-word
+announcement" was shown against "Announcement: 100–140 words — measured 99 words".
 
 ### L-66 — Confirming proposed statuses on a finished table means reopening it, which reopens every later stage (2026-10-09)
 
