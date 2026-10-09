@@ -66,6 +66,14 @@ export function ExportMenu({ bundle }: { bundle: ExportBundle }) {
     setOpen(false);
   }
 
+  // L-62 (9 Oct): the work as a notebook — Python blocks as cells that run.
+  async function exportNotebook() {
+    const { markdownToNotebook } = await import('@/lib/export/notebook-export');
+    const title = bundle.project.title || 'Untitled project';
+    downloadFile(markdownToNotebook(manuscript || toMarkdown(bundle), title), exportFilename(bundle.project, 'md').replace(/\.md$/, '.ipynb'), 'application/x-ipynb+json;charset=utf-8');
+    setOpen(false);
+  }
+
   function exportJson() {
     downloadFile(
       toJson(bundle),
@@ -112,6 +120,16 @@ export function ExportMenu({ bundle }: { bundle: ExportBundle }) {
             <span className="block text-body text-[var(--on-surface)]">LaTeX (.tex)</span>
             <span className="mt-0.5 block text-label text-[var(--on-surface-variant)]">
               {manuscript ? `The ${noun}` : 'Every stage you reached'}, equations as written and code verbatim.
+            </span>
+          </button>
+          <button
+            role="menuitem"
+            onClick={() => void exportNotebook()}
+            className="block w-full px-4 py-3 text-left transition-colors hover:bg-[var(--surface-container-low)]"
+          >
+            <span className="block text-body text-[var(--on-surface)]">Jupyter notebook (.ipynb)</span>
+            <span className="mt-0.5 block text-label text-[var(--on-surface-variant)]">
+              Python blocks as cells you can run; prose and equations as Markdown.
             </span>
           </button>
           {manuscript && (
