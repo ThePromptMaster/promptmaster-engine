@@ -59,7 +59,10 @@ export const RESEARCH_V1: WorkflowTemplate = {
   // Go may commit under the project's "Routine decisions: handle them for me",
   // a reserved one only the user (Sean, 5 Oct). Criterion ids are unchanged.
   // v9 (2026-10-06): the Literature hint names AI verified and Human verified.
-  version: 9,
+  // v10 (2026-10-09): each planned run says who can carry it out, and a run
+  // PromptMaster can carry out from what the project states is left for it to
+  // run rather than marked "not run" for want of data (Sean, 9 Oct, Q1a).
+  version: 10,
   name: 'Research',
   description: 'Question through validated write-up, with the analysis plan fixed before the data.',
   outline_stage: 'derived',
@@ -317,7 +320,7 @@ export const RESEARCH_V1: WorkflowTemplate = {
       entry_guidance:
         'Record each planned run and what actually happened, including deviations. A run that was not done needs a reason, not silence.',
       entry_prompt_hint:
-        'Produce one row per planned run, taken from the method\'s procedure rather than invented here. \'run\' names what was to be done and under what conditions; \'observed\' records what actually happened, with the numbers where there are numbers; \'deviation\' records anything that differed from the plan, however small. Every row needs a status, and a run that was not done needs a reason. Do not write a result you do not have — mark the row not run and say why. A run that quietly disappears between the method and the results is the commonest way a study stops being reproducible, and it is invisible to every later stage.',
+        'Produce one row per planned run, taken from the method\'s procedure rather than invented here. \'run\' names what was to be done and under what conditions; \'observed\' records what actually happened, with the numbers where there are numbers; \'deviation\' records anything that differed from the plan, however small. \'producible_by\' says who can carry the run out — PromptMaster (a calculation, simulation, derivation, comparison or aggregation from what the project states, with no dataset), or what it needs that the project does not have: data, people, or a tool. A run PromptMaster can carry out is not "not run" for want of a dataset: if you derive it here, mark it worked by hand and put the working in \'observed\'; otherwise leave its status out, and PromptMaster runs it. A run that needs what the project does not have is marked not run, with that reason. Do not write a result you do not have. A run that quietly disappears between the method and the results is the commonest way a study stops being reproducible, and it is invisible to every later stage.',
       exit_criteria: [
         { id: 'exp.results', label: 'Every planned run has a result or a reason', check: 'auto', rule: { type: 'every_item_has_status' }, blocking: true, hint: 'Give each run a status in the table above — Completed, Deviated or Not run (the last two need a reason) — then save.' },
       ],

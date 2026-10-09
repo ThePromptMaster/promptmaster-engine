@@ -476,7 +476,10 @@ def test_the_planner_is_told_what_data_exists_and_when_there_is_none():
     assert "e.g. A1 | Mid-Market | 1" in with_data
     _, without = build_next_action_prompt(INPUTS, STATE, RESEARCH, "guided")
     assert "DATA THE PROJECT HOLDS: none" in without
-    assert "say what data is missing" in without
+    assert "say\n" not in without  # one sentence, not a fragment
+    assert "exactly what data is missing" in without
+    # Q1a (9 Oct): no dataset is not "nothing can be computed".
+    assert "needs no dataset: run_computation can carry it out" in without
 
 
 def _book_workflow():

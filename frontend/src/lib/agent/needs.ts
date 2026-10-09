@@ -16,7 +16,7 @@ import { isDone } from '@/lib/workflow/types';
 import type { RoutineDecisions } from '@/types/project';
 import type { StageFacts } from './facts';
 import type { InputsChange } from '@/lib/workflow/stage-inputs';
-import { confirmableProposals } from '@/lib/workflow/stage-artifact';
+import { awaitsAttempt, confirmableProposals } from '@/lib/workflow/stage-artifact';
 import { rowsRequired } from '@/lib/workflow/engine';
 import { confirmProposalsLabel } from '@/lib/workflow/stage-controls';
 
@@ -111,6 +111,19 @@ const REASONING_MOVES = new Set([
   'derive', 'prove', 'simplify', 'limiting_case', 'try_contradiction', 'run_computation',
   'falsify_hypothesis', 'compare_alternatives', 'check_literature', 'update_assumptions',
 ]);
+
+/** The first row awaiting an attempt, as the planner would name it (1-based), with what it is to compute. */
+export function nextRunToAttempt(facts: StageFacts): { row: number; goal: string; why: string } | null {
+  const review = facts.review;
+  if (!review?.schema.execution) return null;
+  const i = review.items.findIndex((item) => awaitsAttempt(item, review.schema));
+  if (i < 0) return null;
+  const item = review.items[i];
+  const field = review.schema.execution.producibleField ?? '';
+  const why = (item[field] ?? '').replace(/^promptmaster\s*[—–:-]*\s*/i, '').trim() || 'no dataset is needed';
+  const goal = (item[review.schema.fields[0]?.key ?? ''] ?? '').trim().slice(0, 1500) || `Row ${i + 1}`;
+  return { row: i + 1, goal, why: why.slice(0, 160) };
+}
 
 export interface RequiredMove {
   key: string;
@@ -274,6 +287,8 @@ export function requiredWork(input: {
    * drafting, and never proposed the next round.
    */
   round?: { staleDraft: boolean };
+  /** Computations the run may still try against this table (`runAttemptsFor`). */
+  runAttemptsLeft?: number;
 }): RequiredMove | null {
   const { stage, facts, stageEvaluation, allowed, round } = input;
   const can = (k: string) => allowed.includes(k);
@@ -322,6 +337,18 @@ export function requiredWork(input: {
       key: 'check_literature',
       rationale: `${stage.label} names sources; looking them up and reading their abstracts comes before handing the rows to you.`,
       expected: 'Each source found in OpenAlex and checked against its row where the abstract allows; the rest left for you.',
+    };
+  }
+
+  // A row PromptMaster can carry out from what the project states is
+  // carried out, not handed to the user as "not run" (Q1a; Sean, 9 Oct).
+  const attempt = (input.runAttemptsLeft ?? 0) > 0 && can('run_computation') ? nextRunToAttempt(facts) : null;
+  if (attempt) {
+    return {
+      key: 'run_computation',
+      rationale: `Row ${attempt.row} of ${stage.label} is work PromptMaster can carry out from what the project states (${attempt.why}); running it rather than leaving it "not run".`,
+      expected: 'The computation run in the sandbox and its output recorded on the row, or the exact reason it could not run.',
+      params: { row: attempt.row, goal: attempt.goal },
     };
   }
 

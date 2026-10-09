@@ -7,7 +7,7 @@ import type { StageEvaluation } from '@/lib/workflow/types';
 import type { AgentStep } from '@/types/agent';
 import { deriveExecutionLabel } from './labels';
 import { ITEM_SCHEMAS, itemSchemaFor } from '@/lib/workflow/stage-artifact';
-import { allowedActions, alternating, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, LIVE_TOOLS, NO_TOOLS, polishSinceDirection, withoutOverride, withoutEndlessPolish, withoutSettledRuns, fitsBudget, noChange, noProgress, plannedBeforeLatestChange, preempt, shouldPause, stageMoveActor, stateFingerprint } from './policy';
+import { allowedActions, runAttemptsFor, alternating, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, LIVE_TOOLS, NO_TOOLS, polishSinceDirection, withoutOverride, withoutEndlessPolish, withoutSettledRuns, fitsBudget, noChange, noProgress, plannedBeforeLatestChange, preempt, shouldPause, stageMoveActor, stateFingerprint } from './policy';
 
 function step(over: Partial<AgentStep>): AgentStep {
   return {
@@ -670,5 +670,34 @@ describe('an unchanged deliverable is not judged again (9 Oct, production replay
     expect(moveOnInsteadOfRejudging({ action_key: 'declare_objective_complete' }, [judged], 'drafting', allowed, false)).toBeNull();
     expect(moveOnInsteadOfRejudging({ action_key: 'derive' }, [judged], 'drafting', allowed, true)).toBeNull();
     expect(moveOnInsteadOfRejudging({ action_key: 'declare_objective_complete' }, [], 'drafting', allowed, true)).toBeNull();
+  });
+});
+
+describe('runAttemptsFor (Q1a, 9 Oct)', () => {
+  const schema = ITEM_SCHEMAS.runs;
+  const ours = (id: string, extra = {}) => ({ id, run: 'Compute it', producible_by: 'PromptMaster — from the stated equation', status: 'not_run', status_source: 'model', reason: 'No data.', ...extra });
+  const theirs = (id: string) => ({ id, run: 'Survey people', producible_by: 'Needs a person — participants', status: 'not_run', status_source: 'model', reason: 'No participants.' });
+
+  it('with no data, only the rows PromptMaster can carry out are tried', () => {
+    const review = { schema, items: [ours('a'), theirs('b'), ours('c')] };
+    expect(runAttemptsFor(review, ['run_computation'], false, 0)).toBe(2);
+  });
+
+  it('with data, every row is tried once, as before', () => {
+    expect(runAttemptsFor({ schema, items: [theirs('a'), theirs('b')] }, ['run_computation'], true, 1)).toBe(1);
+  });
+
+  it('a row a run has settled, or the user decided, is not tried again', () => {
+    const review = { schema, items: [ours('a', { status: 'not_run', status_source: 'sandbox' }), ours('b', { status_source: 'user' })] };
+    expect(runAttemptsFor(review, ['run_computation'], false, 1)).toBe(0);
+  });
+
+  it('never more tries than rows, and none when a computation is not allowed', () => {
+    expect(runAttemptsFor({ schema, items: [ours('a')] }, ['run_computation'], false, 1)).toBe(0);
+    expect(runAttemptsFor({ schema, items: [ours('a')] }, [], false, 0)).toBe(0);
+  });
+
+  it('the table stays open until the row is tried, so Go is not waved on', () => {
+    expect(withoutSettledRuns(['run_computation'], { schema, items: [ours('a')] })).toEqual(['run_computation']);
   });
 });

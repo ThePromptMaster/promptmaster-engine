@@ -26,6 +26,7 @@ import { CustomSelect } from '@/components/shared/custom-select';
 import { ReasonField } from '@/components/shared/reason-field';
 import { reasonFromRow } from '@/lib/workflow/run-result';
 import {
+  awaitsAttempt,
   confirmableProposals,
   confirmProposals,
   isProposed,
@@ -531,7 +532,12 @@ function ReviewRow({ row, columns, statuses, schema, readOnly, onPatch }: Review
               ) : null}
             </span>
           )}
-          {row.status_source === 'model' && option && option.decided !== false && (
+          {awaitsAttempt(row, schema) ? (
+            // Q1a (9 Oct): work PromptMaster can do is not left as "not run".
+            <span data-awaits-run className="mt-1 block text-label text-[var(--pm-primary)]">
+              PromptMaster can carry this out — Go runs it before this row is yours to settle. Choose a status to settle it now.
+            </span>
+          ) : row.status_source === 'model' && option && option.decided !== false && (
             <span className="mt-1 block text-label text-[var(--on-surface-variant)]">Set by PromptMaster</span>
           )}
           {row.status_source === 'policy' && option && (

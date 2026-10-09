@@ -50,7 +50,8 @@ import { answerAsFact, answerDocuments, measuredDocument } from '@/lib/workflow/
 import { authorizeRun } from '@/lib/agent/authorize';
 import { buildAgentState } from '@/lib/agent/digest';
 import { performStep, type PerformContext, type StepOutcome } from '@/lib/agent/perform';
-import { allowedActions, stageHasCurrentDraft, LIVE_TOOLS, polishSinceDirection, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, withoutEndlessPolish, withoutSettledRuns, withoutOverride, DEFAULT_BUDGET_STEPS, fitsBudget, noChange, plannedBeforeLatestChange, preempt, shouldPause, stateFingerprint, stepCost } from '@/lib/agent/policy';
+import { auditStop, describeAudit, touchesObjective } from '@/lib/agent/stop-audit';
+import { allowedActions, runAttemptsFor, stageHasCurrentDraft, LIVE_TOOLS, polishSinceDirection, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, withoutEndlessPolish, withoutSettledRuns, withoutOverride, DEFAULT_BUDGET_STEPS, fitsBudget, noChange, plannedBeforeLatestChange, preempt, shouldPause, stateFingerprint, stepCost } from '@/lib/agent/policy';
 import {
   createAgentRun,
   endAgentRun,
@@ -66,7 +67,7 @@ import {
 import { dataFileBriefs, type StageArtifactBundle } from '@/lib/workflow/digest';
 import type { StageFigures } from '@/lib/workflow/figures';
 import type { StageControl } from '@/lib/workflow/stage-controls';
-import { deliverableStage, evaluateStage, getStage } from '@/lib/workflow/engine';
+import { deliverableStage, evaluateStage, getStage, nextSuggestedStage } from '@/lib/workflow/engine';
 import { objectiveUnmet } from '@/lib/workflow/objective';
 import { isDone } from '@/lib/workflow/types';
 import { documentsAwaitingFacts } from '@/lib/workflow/facts';
@@ -337,7 +338,7 @@ export function useGoLoop(opts: Options) {
       setUsageOperation(null);
       const finished = await finishAgentStep(step.id, {
         status: outcome.status, label: outcome.label, output: outcome.output, blockKind: outcome.blockKind ?? null,
-        toolsUsed: outcome.toolsUsed, changes: outcome.changes, params: outcome.params,
+        toolsUsed: outcome.toolsUsed, changes: outcome.setAside ? { ...outcome.changes, set_aside: outcome.setAside } : outcome.changes, params: outcome.params,
         costUsd: takeStepCost(step.id),
       });
       upsertStep(finished);
@@ -365,7 +366,9 @@ export function useGoLoop(opts: Options) {
         await setRunStatus(outcome.stop.status, outcome.stop.reason, outcome.needs ?? null);
         return 'stop';
       }
-      if (outcome.status === 'blocked') {
+      // A blocker recorded on its own item sets that item aside; the run goes
+      // on with whatever else can proceed, and stops only when nothing can (Q1b).
+      if (outcome.status === 'blocked' && !outcome.setAside) {
         await setRunStatus('blocked', outcome.output.split('\n')[0]);
         return 'stop';
       }
@@ -484,14 +487,14 @@ export function useGoLoop(opts: Options) {
 
         // Runs the data could carry out are tried before the table is handed
         // to the user: at most once per row, so a row no code can settle
-        // still ends with the user.
+        // still ends with the user. Without data, the rows PromptMaster can
+        // carry out from what the project states are tried (Q1a, 9 Oct).
         const runsTried = [...priorStepsRef.current, ...stepsRef.current].filter(
           (s) => s.action_key === 'run_computation' && s.stage_id === o.stage!.id
         ).length;
-        const runAttemptsLeft =
-          facts.review?.schema.execution && allowed.includes('run_computation') && dataFileBriefs(o.project).length
-            ? Math.max(0, facts.review.items.length - runsTried)
-            : 0;
+        // A sandbox that is not available now is not tried again for the next row in this window.
+        const sandboxDown = stepsRef.current.some((s) => s.action_key === 'run_computation' && s.block_kind === 'tool_missing');
+        const runAttemptsLeft = sandboxDown ? 0 : runAttemptsFor(facts.review, allowed, dataFileBriefs(o.project).length > 0, runsTried);
 
         // On a review table whose rows name sources (Fact-check), they are
         // looked up and read once per stage per run before the table is handed
@@ -545,7 +548,7 @@ export function useGoLoop(opts: Options) {
         // approval the findings are applied and the work checked first.
         const loops = o.template.stages.some((s) => s.transitions.loop_to);
         const required = repair ?? requiredWork({
-          stage: o.stage, facts, stageEvaluation, allowed, lookupDue, routine, commitTried,
+          stage: o.stage, facts, stageEvaluation, allowed, lookupDue, routine, commitTried, runAttemptsLeft,
           ...(loops ? { round: { staleDraft: stageDrafts(o.stage) && !hasDraft } } : {}),
         });
         const choice = required
@@ -573,6 +576,25 @@ export function useGoLoop(opts: Options) {
         // Nor is an unchanged deliverable judged again (9 Oct, production).
         const moving = required ? null : moveOnInsteadOfRejudging(choice, [...priorStepsRef.current, ...stepsRef.current], o.stage.id, allowed, stageEvaluation.canAdvance);
         if (moving) Object.assign(choice, moving, { needs_user_decision: false, decision_question: null });
+        // Before a question interrupts the user: does it hold the work up? (Q1b)
+        if (!required && actionFor(choice.action_key)?.performer === 'ask') {
+          const nextId = nextSuggestedStage(o.template, o.state);
+          const question = choice.decision_question || choice.rationale || '';
+          const { audit, instead } = auditStop({
+            question, stageLabel: o.stage.label, nextStageLabel: nextId ? stageLabelFor(nextId) : null,
+            allowed, canAdvance: stageEvaluation.canAdvance, policy: current.policy, routine,
+            setAsideBefore: stepsRef.current.some((s) => s.stage_id === o.stage!.id && typeof s.params?.set_aside_question === 'string'),
+            touchesObjective: touchesObjective(question),
+          });
+          if (instead) {
+            Object.assign(choice, {
+              action_key: instead.key, rationale: instead.rationale, expected_outcome: instead.expected,
+              params: { set_aside_question: question.slice(0, 1000) }, needs_user_decision: false, decision_question: null,
+            });
+          } else {
+            choice.params = { ...(choice.params ?? {}), stop_audit: describeAudit(audit) };
+          }
+        }
         if (!fitsBudget(choice.action_key, current.steps_used, current.budget_steps)) {
           await setRunStatus(
             'budget_exhausted',

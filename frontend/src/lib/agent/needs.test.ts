@@ -431,3 +431,24 @@ describe('routine decisions (Sean, 5 Oct): delegated, validated, and the user as
     expect(describeNeed(need!, (id) => id).message).toContain('This one is yours alone');
   });
 });
+
+describe('Q1a (Sean, 9 Oct): a "not run" row PromptMaster can carry out is work for Go, not the user', () => {
+  const schema = ITEM_SCHEMAS.runs;
+  const rows = [
+    { id: 'a', run: 'Period at 10, 30, 60 and 90 degrees by numerical integration', producible_by: 'PromptMaster — the equation is stated', status: 'not_run', status_source: 'model', reason: 'No data attached.' },
+    { id: 'b', run: 'Measure a real pendulum', producible_by: 'Needs data — laboratory timings', status: 'not_run', status_source: 'model', reason: 'No timings provided.' },
+  ];
+  const facts = { review: { items: rows, schema, routine: [], material: [rows[0]], outcome: true } } as never;
+
+  it('the row a computation can settle is the next move, named with what it is to compute', () => {
+    const move = requiredWork({ stage: RESEARCH_V1.stages.find((s) => s.id === 'experiment')!, facts, stageEvaluation: evaluation('experiment'), allowed: ['run_computation'], runAttemptsLeft: 1 });
+    expect(move).toMatchObject({ key: 'run_computation', params: { row: 1, goal: rows[0].run } });
+    expect(move?.rationale).toContain('the equation is stated');
+  });
+
+  it('with no attempts left, or no computation allowed, nothing is forced', () => {
+    const experiment = RESEARCH_V1.stages.find((s) => s.id === 'experiment')!;
+    expect(requiredWork({ stage: experiment, facts, stageEvaluation: evaluation('experiment'), allowed: ['run_computation'], runAttemptsLeft: 0 })).toBeNull();
+    expect(requiredWork({ stage: experiment, facts, stageEvaluation: evaluation('experiment'), allowed: [], runAttemptsLeft: 1 })).toBeNull();
+  });
+});

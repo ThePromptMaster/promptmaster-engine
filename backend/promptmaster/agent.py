@@ -283,8 +283,14 @@ def _format_state(inputs: PMInput, state: AgentState) -> str:
             "DATA THE PROJECT HOLDS (readable by code you run, at these paths — you have not seen the contents):\n" + data
         )
     elif state.workflow is None or state.workflow.has_data_stages:
+        # 9 Oct (Q1a): "none" read as "nothing can be computed", and a research
+        # run left every calculation "not run". A computation from equations,
+        # definitions or values the project states needs no dataset.
         facts.append(
-            "DATA THE PROJECT HOLDS: none. A computation that needs real data cannot be run; say what data is missing."
+            "DATA THE PROJECT HOLDS: none. A computation from equations, definitions or values the project "
+            "states needs no dataset: run_computation can carry it out, with the code computing or simulating "
+            "its own inputs. Only a computation that needs measured or recorded data cannot be run; then say "
+            "exactly what data is missing."
         )
     elif state.workflow.inquiry:
         # An investigation designed as a custom workflow has no "runs" table,
