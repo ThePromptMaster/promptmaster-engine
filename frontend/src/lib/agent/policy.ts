@@ -176,10 +176,18 @@ export function polishSinceDirection(
 export function withoutEndlessPolish(
   allowed: readonly string[],
   polishedHere: number,
-  canAdvance: boolean
+  canAdvance: boolean,
+  /**
+   * A reasoning result on this stage is not saved yet. Saving it is new work,
+   * not polish: on production (9 Oct) the cap had taken "Revise" away on
+   * Analysis, the stage could not advance before the user's approval, and Go
+   * chose "Derive" again and again with nothing reaching the document.
+   */
+  unsavedReasoning = false
 ): string[] {
   const capped = polishedHere >= POLISH_MAX || (canAdvance && polishedHere >= POLISH_WHEN_READY);
-  return capped ? allowed.filter((k) => !(POLISH_MOVES as readonly string[]).includes(k)) : [...allowed];
+  if (!capped) return [...allowed];
+  return allowed.filter((k) => !(POLISH_MOVES as readonly string[]).includes(k) || (unsavedReasoning && k === 'revise_stage'));
 }
 
 /** Which tools a run can actually call. */

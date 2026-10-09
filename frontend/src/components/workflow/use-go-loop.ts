@@ -495,7 +495,8 @@ export function useGoLoop(opts: Options) {
             // Asked once: if the user stayed, the stage is to be done.
           ).filter((k) => (k !== 'propose_skip' || !proposedSkipHere) && (k !== 'propose_statuses' || !proposedStatusesHere)),
           polishedHere,
-          stageEvaluation.canAdvance
+          stageEvaluation.canAdvance,
+          Boolean(unsavedDerivation([...priorStepsRef.current, ...stepsRef.current], o.stage.id))
         ), facts.review);
 
         // Runs the data could carry out are tried before the table is handed
