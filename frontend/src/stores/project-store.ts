@@ -34,6 +34,7 @@ import {
 } from '@/lib/supabase/workflow';
 import type { WorkflowEvent, WorkflowTemplate } from '@/lib/workflow/types';
 import { laterDoneStages, projectState } from '@/lib/workflow/engine';
+import { onlyConfirmsProposals } from '@/lib/workflow/stage-artifact';
 import {
   ProjectConflictError,
   type Artifact,
@@ -666,7 +667,12 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     const { template, events } = get();
     if (template && events) {
       const drafted = new Set(Object.entries(get().stages).filter(([, b]) => b.versions.at(-1)?.content?.trim()).map(([id]) => id));
-      const later = laterDoneStages(template, projectState(template, events), stageId, drafted);
+      // Confirming proposals changes no row a later stage read (L-66): on the
+      // sequence-proof replay, confirming 15 statuses on two finished tables
+      // would have reopened every stage after them.
+      const later = onlyConfirmsProposals(head?.content, version.content)
+        ? []
+        : laterDoneStages(template, projectState(template, events), stageId, drafted);
       if (later.length) {
         await get()
           .appendEvent({
