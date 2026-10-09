@@ -10,15 +10,18 @@
 
 import { api } from '@/lib/api/client';
 import { awaitSectionJobs, type WaitResult } from '@/lib/jobs/await';
-import { enqueueDraftJobs, enqueueRevisionJobs } from '@/lib/jobs/sections';
+import { enqueueDraftJobs, enqueueRevisionJobs, writtenSections } from '@/lib/jobs/sections';
 import { generateOutlineDraft } from '@/lib/outline/actions';
 import { countNamedSections, parseOutlineDocument } from '@/lib/outline/model';
-import { commitOutlineVersion } from '@/lib/supabase/outline';
-import { appendWorkflowEvent } from '@/lib/supabase/workflow';
+import { approvedOutlineVersionId, commitOutlineVersion } from '@/lib/supabase/outline';
+import { appendWorkflowEvent, listWorkflowEvents } from '@/lib/supabase/workflow';
+import { getArtifact } from '@/lib/supabase/versions';
+import { manuscriptArtifactFor, measureStageContent } from '@/lib/workflow/context';
+import { isDone } from '@/lib/workflow/types';
 import { appliedFindingsVersion, carryUserFields, findingsInstruction, reviseWithFindings } from '@/lib/workflow/apply-findings';
 import { findInstructionConflicts } from '@/lib/workflow/conflict-trail';
 import { describeWith, type InstructionConflict } from '@/lib/workflow/instruction-conflicts';
-import { defaultOutlineForm, deriveOutlineItems } from '@/lib/workflow/derived-outline';
+import { defaultOutlineForm, deriveOutlineItems, sectionRecords } from '@/lib/workflow/derived-outline';
 import { confirmableProposals, itemSchemaFor, parseItems, proposableStatuses, rendererHoldsItems, serializeItems } from '@/lib/workflow/stage-artifact';
 import { enoughWorksFound, lookupQueries, recordLine, rowsFromSearch } from '@/lib/workflow/lookup';
 import { lookupAndVerify } from '@/lib/workflow/verify';
@@ -136,12 +139,20 @@ function done(actionKey: string, partial: Omit<StepOutcome, 'label'> & { sandbox
 }
 
 /** Wait for the sections a step queued, and say what happened to each. */
-async function waitForSections(ctx: PerformContext, key: string, ids: string[], verb: string): Promise<StepOutcome> {
-  const m = ctx.facts?.manuscript;
+async function waitForSections(
+  ctx: PerformContext,
+  key: string,
+  ids: string[],
+  verb: string,
+  /** Another stage's manuscript (a repair, L-64); the current stage's otherwise. */
+  manuscript?: { artifactId: string; outline: readonly OutlineSection[] }
+): Promise<StepOutcome> {
+  const current = ctx.facts?.manuscript;
+  const m = manuscript ?? (current ? { artifactId: current.artifact.id, outline: current.outline } : null);
   if (!m) return done(key, { status: 'failed', output: 'This stage has no manuscript.', toolsUsed: [], changes: {} });
   const title = (id: string) => m.outline.find((s) => s.id === id)?.title || id;
   const r: WaitResult = await awaitSectionJobs({
-    projectId: ctx.project.id, artifactId: m.artifact.id, sectionIds: ids, signal: ctx.signal,
+    projectId: ctx.project.id, artifactId: m.artifactId, sectionIds: ids, signal: ctx.signal,
     onProgress: (s) => ctx.onProgress?.(`${s.complete} of ${s.total} sections written`),
   });
   ctx.refresh?.();
@@ -742,15 +753,28 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       if (!ctx.appendStageVersion) throw new Error('This view cannot save versions.');
       const target = ctx.template.stages.find((s) => s.id === String(params.stage_id ?? ''));
       const st = target ? ctx.state.stages[target.id] : undefined;
-      if (!target || st?.status !== 'stale') {
+      // L-63 (9 Oct): a finished stage whose measured requirement fails
+      // ("Announcement: 100–140 words — 74 words") is repaired as well, not
+      // only reported. It stays finished; the new version reopens what read it.
+      const measuredFails = target ? unmetMeasurements(ctx, target.id) : [];
+      const measuredRepair = Boolean(params.measured) && isDone(st?.status) && measuredFails.length > 0;
+      if (!target || (st?.status !== 'stale' && !measuredRepair)) {
         return done(key, { status: 'failed', output: 'That stage is not waiting for a recheck.', toolsUsed: [], changes: {} });
       }
+      const superseded = supersededFactValues(ctx.project.facts);
+      const why = measuredRepair
+        ? `measured in code and not met: ${measuredFails.join('; ')}`
+        : st?.stale?.reason ?? 'something it relied on changed';
+      // L-64 (9 Oct): a manuscript is repaired by revising its sections with
+      // the reason, each against its current saved record (C9).
+      if (target.renderer === 'long_form') return recheckManuscript(ctx, key, target, why, superseded);
       const headVersion = ctx.bundles[target.id]?.versions.at(-1);
       const head = headVersion?.content ?? '';
-      const why = st.stale?.reason ?? 'something it relied on changed';
-      const superseded = supersededFactValues(ctx.project.facts);
       const before = rendererHoldsItems(target.renderer) ? parseItems(head) : null;
-      const instruction = recheckInstruction(target.label, why, superseded, Boolean(before));
+      const measuredLine = measuredRepair
+        ? ` MEASURED IN CODE AND NOT MET: ${measuredFails.join('; ')}. Revise so each is met — the count is made in code, so count exactly — and keep everything else as written.`
+        : '';
+      const instruction = recheckInstruction(target.label, why, superseded, before ? 'table' : 'prose') + measuredLine;
       const attempt = async (text: string) => {
         const res = await api.generateStageArtifact(
           generationRequest(ctx.project, ctx.template, ctx.state, ctx.bundles, target, head, text),
@@ -771,6 +795,12 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
           `${instruction} YOUR PREVIOUS ATTEMPT STILL STATED: ${leftover.map(describeValue).join(', ')}. Replace each with the current fact's value.`
         ));
         leftover = content ? leftoverValues(content, superseded) : [];
+      }
+      // A measured repair is measured again, in code; one more try names the count.
+      let stillUnmet = measuredRepair && content ? unmetMeasurementsOf(ctx, target, content) : [];
+      if (content && stillUnmet.length) {
+        ({ res, content } = await attempt(`${instruction} YOUR PREVIOUS ATTEMPT MEASURED: ${stillUnmet.join('; ')}. Fix exactly that.`));
+        stillUnmet = content ? unmetMeasurementsOf(ctx, target, content) : [];
       }
       if (!content) {
         return done(key, { status: 'failed', output: 'The model returned nothing usable.', toolsUsed: ['model'], changes: {} });
@@ -797,6 +827,20 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
           changes: typeof versionId === 'string' ? { version_ids: [versionId] } : {},
           output: `Couldn't finish repairing ${target.label}: the new version still states ${named}. It is saved, so you can see it, and the stage stays reopened; edit those values or ask Go to try again.`,
         });
+      }
+      // A measured repair of a finished stage: it stays finished, and is
+      // judged by the count made in code on what was saved.
+      if (measuredRepair) {
+        const changes = typeof versionId === 'string' ? { version_ids: [versionId] } : {};
+        return stillUnmet.length
+          ? done(key, {
+              status: 'failed', toolsUsed: ['model'], changes,
+              output: `Couldn't meet the measured requirement on ${target.label}: the new version measures ${stillUnmet.join('; ')}. It is saved, so you can see it; edit it, or ask Go to try again.`,
+            })
+          : done(key, {
+              status: 'succeeded', toolsUsed: ['model'], changes,
+              output: `Repaired ${target.label} so that ${measuredFails.map((f) => f.split(' — ')[0]).join('; ')} now holds, measured in code — saved as a new version; the earlier one is kept, and the stages that read it are reopened for a recheck.`,
+            });
       }
       if (evaluation.canAdvance && typeof versionId === 'string') {
         if (ctx.setStageSummary) {
@@ -1226,6 +1270,81 @@ function deliverableText(ctx: Pick<PerformContext, 'bundles' | 'template'>, stag
   return bundle?.versions.at(-1)?.content ?? '';
 }
 
+/** A stage's measured requirements that fail, as "Label — measured detail" (L-63). */
+function unmetMeasurements(ctx: Pick<PerformContext, 'context'>, stageId: string): string[] {
+  return (ctx.context.measured?.[stageId] ?? []).filter((m) => !m.satisfied).map((m) => `${m.label} — measured ${m.detail ?? 'not met'}`);
+}
+
+/** The same requirements measured on new text, before it is saved. */
+function unmetMeasurementsOf(ctx: Pick<PerformContext, 'project' | 'template'>, stage: StageDefinition, content: string): string[] {
+  return measureStageContent(ctx.project, ctx.template, stage, content)
+    .filter((m) => !m.satisfied)
+    .map((m) => `${m.label} — measured ${m.detail ?? 'not met'}`);
+}
+
+/**
+ * Repair a reopened manuscript stage (Drafting, Revision): every written
+ * section is revised with the reason it was reopened, each against its
+ * current saved record (C9), then the stage is closed again when its own
+ * requirements hold (L-64, 9 Oct). Until now a manuscript was "the user's
+ * editor" and a reopened one stayed reopened.
+ */
+async function recheckManuscript(
+  ctx: PerformContext,
+  key: string,
+  target: StageDefinition,
+  why: string,
+  superseded: readonly SupersededValue[]
+): Promise<StepOutcome> {
+  const holder = manuscriptArtifactFor(ctx.template, target, ctx.bundles);
+  const fresh = holder ? await getArtifact(holder.id) : null;
+  const outline = fresh?.long_form?.outline ?? [];
+  if (!fresh || !writtenSections(outline).length) {
+    return done(key, { status: 'failed', output: `${target.label} has no written sections to repair.`, toolsUsed: [], changes: {} });
+  }
+  if (!ctx.appendStageVersion) throw new Error('This view cannot save versions.');
+  const append = ctx.appendStageVersion;
+  const holderStageId = fresh.stage_id ?? target.id;
+  const holderLabel = ctx.template.stages.find((s) => s.id === holderStageId)?.label ?? target.label;
+  const events = await listWorkflowEvents(ctx.project.id);
+  const ids = await enqueueRevisionJobs({
+    project: ctx.project, artifactId: fresh.id, stageId: target.id, outline,
+    approvedOutlineVersionId: approvedOutlineVersionId(events),
+    brief: {
+      stageLabel: target.label,
+      instruction: recheckInstruction(target.label, why, superseded, 'section'),
+      findings: [{ source: 'Why it was reopened', text: why }],
+      sources: [],
+      ...(ctx.template.outline_stage === 'derived' ? { records: sectionRecords(ctx.template, ctx.state, ctx.bundles) } : {}),
+    },
+    stageHint: target.entry_prompt_hint,
+    saveSnapshot: (v) => append(holderStageId, holderLabel, v),
+  });
+  const wrote = await waitForSections(ctx, key, ids, 'Repaired', { artifactId: fresh.id, outline });
+  if (wrote.status !== 'succeeded') return wrote;
+  await ctx.refresh?.();
+  const evaluation = evaluateStage(ctx.template, target.id, ctx.context);
+  const actor = stageMoveActor(ctx.run.policy, ctx.approvedByUser);
+  const evidence = evaluation.canAdvance
+    ? await stageEvidence({ template: ctx.template, stage: target, bundles: ctx.bundles, project: ctx.project, appendStageVersion: ctx.appendStageVersion })
+    : undefined;
+  if (evaluation.canAdvance && (evidence || actor === 'user')) {
+    await appendWorkflowEvent(ctx.project.id, ctx.project.user_id, {
+      type: 'stage_marked_complete',
+      stage_id: target.id,
+      actor,
+      agent_run_id: actor === 'system' ? ctx.run.id : null,
+      reason: `Repaired after a change: ${why}`,
+      payload: { ...(evidence ? { evidence_version_id: evidence } : {}), repaired_after: why, ...(actor === 'user' && ctx.approvedByUser ? { via: 'go_approve' } : {}) },
+    });
+    await ctx.afterStageEvent();
+  }
+  return done(key, {
+    ...wrote,
+    output: `${wrote.output} ${target.label} was repaired (${why})${evaluation.canAdvance && (evidence || actor === 'user') ? ' and marked complete again' : '; it stays reopened until its own requirements hold'}.`,
+  });
+}
+
 /** Rows that are a revision note ("What changed: …") rather than one of the stage's items. */
 export function withoutRevisionNotes<T extends Record<string, unknown>>(items: T[] | null): T[] | null {
   if (!items) return items;
@@ -1237,7 +1356,13 @@ export function withoutRevisionNotes<T extends Record<string, unknown>>(items: T
  * and calculations remain intact. Superseded recommendations are repaired
  * consistently"). The current facts and brief reach the model with the request.
  */
-export function recheckInstruction(stageLabel: string, why: string, superseded: readonly SupersededValue[] = [], table = false): string {
+export function recheckInstruction(
+  stageLabel: string,
+  why: string,
+  superseded: readonly SupersededValue[] = [],
+  /** What is being repaired: a document, a table of rows, or one section of a manuscript. */
+  form: 'prose' | 'table' | 'section' = 'prose'
+): string {
   // The values the user's fact changes made untrue, each with what replaces
   // it. Until 8 Oct the brief named the old sentence but not the new value,
   // and "keep every figure that still holds" kept November 12 (TeamNotes).
@@ -1253,9 +1378,11 @@ export function recheckInstruction(stageLabel: string, why: string, superseded: 
     'Replace any conclusion or recommendation the change superseded, and re-test each option against the requirements as they are now: one that no longer qualifies is said to be excluded, and why. ' +
     // A table has no place for a note: on a production replay (9 Oct) the line
     // became the Experiment table's first "run", marked worked by hand.
-    (table
+    (form === 'table'
       ? 'This is a table: put no note in it. Every row stays one of the stage\'s own items; say what changed only in the rows it concerns.'
-      : 'Begin with one line, "What changed:", saying what was kept and what was replaced.') +
+      : form === 'section'
+        ? 'This is one section of the manuscript: return only its prose, with no note on what changed. If the reason does not concern this section, return it unchanged.'
+        : 'Begin with one line, "What changed:", saying what was kept and what was replaced.') +
     replace
   );
 }

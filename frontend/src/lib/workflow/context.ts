@@ -157,23 +157,10 @@ export function buildStageContext(input: BuildContextInput): StageContext {
 
   // C1 (8 Oct): word ranges, limits and question counts the user asked for,
   // measured on the stages that produce what they describe.
-  const requirements = parseRequirements([
-    project.objective ?? '',
-    project.constraints ?? '',
-    project.output_format ?? '',
-    ...currentFacts(project.facts).filter((f) => f.kind === 'requirement').map((f) => f.statement),
-  ]);
   const measured: Record<string, Measurement[]> = {};
-  if (requirements.length) {
-    const deliverableId = deliverableStage(template)?.id;
-    for (const s of template.stages) {
-      const content = bundles[s.id]?.versions.at(-1)?.content ?? '';
-      if (!content.trim()) continue;
-      const results = requirementsForStage(s, deliverableId, requirements)
-        .map(({ requirement, whole }) => measure(requirement, content, whole))
-        .filter((m): m is Measurement => m !== null);
-      if (results.length) measured[s.id] = results;
-    }
+  for (const s of template.stages) {
+    const results = measureStageContent(project, template, s, bundles[s.id]?.versions.at(-1)?.content ?? '');
+    if (results.length) measured[s.id] = results;
   }
 
   return {
@@ -197,4 +184,27 @@ export function buildStageContext(input: BuildContextInput): StageContext {
     findings,
     manualChecks: project.manual_checks ?? {},
   };
+}
+
+/**
+ * The measurable requirements a stage answers for, measured on `content`
+ * (C1). Used for the saved head, and by a repair before it saves (L-63).
+ */
+export function measureStageContent(
+  project: Pick<Project, 'objective' | 'constraints'> & Partial<Pick<Project, 'output_format' | 'facts'>>,
+  template: WorkflowTemplate,
+  stage: StageDefinition,
+  content: string
+): Measurement[] {
+  if (!content.trim()) return [];
+  const requirements = parseRequirements([
+    project.objective ?? '',
+    project.constraints ?? '',
+    project.output_format ?? '',
+    ...currentFacts(project.facts).filter((f) => f.kind === 'requirement').map((f) => f.statement),
+  ]);
+  if (!requirements.length) return [];
+  return requirementsForStage(stage, deliverableStage(template)?.id, requirements)
+    .map(({ requirement, whole }) => measure(requirement, content, whole))
+    .filter((m): m is Measurement => m !== null);
 }
