@@ -457,8 +457,13 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // its row with the real reason (Q1a): the row is settled honestly as
       // not run, and is not tried again.
       const failedWith = ran && run.exit_code !== 0 ? lastErrorLine(run.stderr) : null;
+      // A run that hit the sandbox's time limit is recorded on its row too,
+      // and the run goes on to the next row instead of retrying this one
+      // (9 Oct, production replay: two timeouts on row 1 ended the run).
+      const timedOut = run.timed_out || run.status === 'timeout';
       const blockedWhy =
-        classification.blockKind === 'data_missing' ? classification.missing ?? classification.summary
+        timedOut ? 'the computation did not finish within the code sandbox\'s 30-second limit; a smaller sweep or a shorter integration would fit'
+        : classification.blockKind === 'data_missing' ? classification.missing ?? classification.summary
         : classification.blockKind === 'tool_missing' ? classification.summary.replace(/^Code could not be run: /, '').replace(/[.\s]+$/, '')
         : failedWith ? `the code ran but failed — ${failedWith}`
         : null;
@@ -474,7 +479,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         toolsUsed: ['model', 'sandbox'],
         changes: { sandbox_run_id: run.id, ...recorded.changes },
         sandboxLabel: classification.executionLabel,
-        ...(classification.stepStatus === 'blocked' && blockedWhy ? setAsideFrom(recorded, params.row, blockedWhy) : {}),
+        ...((classification.stepStatus === 'blocked' || timedOut) && blockedWhy ? setAsideFrom(recorded, params.row, blockedWhy) : {}),
         followUp: ran && classification.stepStatus === 'succeeded'
           ? { sandboxRunId: run.id, code: written.code, stdout: run.stdout, stderr: run.stderr, exitCode: run.exit_code }
           : undefined,

@@ -778,3 +778,17 @@ describe('withoutEndlessPolish: saving a reasoning result is not polish (product
     expect(withoutEndlessPolish(allowed, POLISH_MAX, false)).toEqual(['derive', 'advance_stage']);
   });
 });
+
+describe('preempt: a failure recorded on its row is set aside, not a stop (production replay, 9 Oct)', () => {
+  const failed = (set_aside?: string) => ({ action_key: 'run_computation', status: 'failed', stage_id: 'experiment', changes: set_aside ? { set_aside } : {} }) as never;
+
+  it('two timed-out rows recorded on the table do not stop the run', () => {
+    const state = projectState(RESEARCH_V1, []);
+    expect(preempt({ state, objective: 'o', stepsUsed: 4, budgetSteps: 25, steps: [failed('Row 1: timed out'), failed('Row 2: timed out')] })).toBeNull();
+  });
+
+  it('two plain failures still do', () => {
+    const state = projectState(RESEARCH_V1, []);
+    expect(preempt({ state, objective: 'o', stepsUsed: 4, budgetSteps: 25, steps: [failed(), failed()] })?.status).toBe('failed');
+  });
+});

@@ -624,3 +624,10 @@ def test_under_handle_the_planner_makes_routine_choices_itself():
     assert "parameter values, units, which cases and how many" in handled
     _, asked = build_next_action_prompt(INPUTS, STATE, RESEARCH, "autonomous")
     assert "ROUTINE DECISIONS ARE YOURS" not in asked
+
+
+def test_the_code_is_sized_to_the_sandbox_time_limit():
+    """9 Oct (production replay): a 61-trajectory sweep timed out twice and nothing was recorded."""
+    from promptmaster.agent import _WRITE_CODE_INSTRUCTION
+    assert "must finish within 30 seconds" in _WRITE_CODE_INSTRUCTION
+    assert "`reduced: <what was reduced and why>`" in _WRITE_CODE_INSTRUCTION
