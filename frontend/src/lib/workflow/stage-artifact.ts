@@ -375,9 +375,10 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
       {
         key: 'producible_by', label: 'Who can carry it out', max: 160,
         hint:
-          'Start with exactly one of: "PromptMaster" — a calculation, simulation, derivation, comparison or aggregation that code or working can do from what the project states, with no dataset; ' +
+          'Start with exactly one of: "PromptMaster" — a calculation, simulation, numerical integration, derivation, fit, statistic, comparison or aggregation that code or working can do from what the project states, with no dataset ' +
+          '(PromptMaster runs Python with numpy, scipy, sympy, pandas and matplotlib itself, so computing is never a missing tool); ' +
           '"Needs data" — it needs measurements or records the project does not hold; "Needs a person" — it needs people (participants, independent human coders, an expert panel); ' +
-          '"Needs a tool" — it needs an instrument, a laboratory or software that is not available. Then a dash and the reason in a few words.',
+          '"Needs a tool" — it needs a physical instrument, a laboratory, or software or network access the sandbox does not have. Then a dash and the reason in a few words.',
       },
     ],
     // A run that was not done is fine; a run that vanishes between the method
@@ -727,6 +728,9 @@ function rowText(item: StageItem): string {
 
 export type Producer = 'promptmaster' | 'needs_data' | 'needs_human' | 'needs_tool';
 
+const COMPUTATION = /\b(?:numerical(?:ly)?|integrat\w*|simulat\w*|comput\w*|calculat\w*|solv\w*|code|python|script|ode|lyapunov|fft|fit(?:ting)?|statistic\w*|monte carlo|sweep)\b/;
+const INSTRUMENT = /\b(?:instrument\w*|laborator\w*|lab|apparatus|sensor|oscilloscope|camera|telescope|microscope|hardware|internet|network|web access|api key|licen[cs]e\w*|matlab|mathematica|gpu)\b/;
+
 /** Who the draft said can carry the row out; null when it did not say, or the table has no such field. */
 export function producibleBy(item: StageItem, schema: StageItemSchema): Producer | null {
   const field = schema.execution?.producibleField;
@@ -737,7 +741,10 @@ export function producibleBy(item: StageItem, schema: StageItemSchema): Producer
   if (needsPeople(schema.fields.map((f) => item[f.key] ?? '').join(' '))) return 'needs_human';
   if (/^promptmaster\b/.test(text)) return 'promptmaster';
   if (/^needs (a )?(person|people|human)/.test(text)) return 'needs_human';
-  if (/^needs (a )?tool/.test(text)) return 'needs_tool';
+  // 9 Oct (production replay): "Needs a tool — numerical integration of 61
+  // trajectories" left a whole Experiment unrun. Computing is the sandbox's
+  // job; a tool the reason names only as computation is PromptMaster's.
+  if (/^needs (a )?tool/.test(text)) return COMPUTATION.test(text) && !INSTRUMENT.test(text) ? 'promptmaster' : 'needs_tool';
   if (/^needs (some )?data/.test(text)) return 'needs_data';
   return null;
 }
