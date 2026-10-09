@@ -333,10 +333,24 @@ export function saveInsteadOfRepeating(
   steps: readonly AgentStep[],
   stageId: string,
   allowed: readonly string[],
-  hasDraft: boolean
-): { action_key: 'revise_stage'; params: { instruction: string }; rationale: string; expected_outcome: string } | null {
+  hasDraft: boolean,
+  /** The stage's own requirements are met: it can move on. */
+  canAdvance = false
+): { action_key: 'revise_stage' | 'advance_stage'; params: Record<string, unknown>; rationale: string; expected_outcome: string } | null {
   const unsaved = unsavedDerivation(steps, stageId);
-  if (!unsaved || unsaved.action_key !== choice.action_key || !hasDraft || !allowed.includes('revise_stage')) return null;
+  if (!unsaved || unsaved.action_key !== choice.action_key) return null;
+  // A table stage (Experiment's runs) cannot take a revision; when its own
+  // work is done, the repeat is moved on from rather than repeated (9 Oct,
+  // production replay: Derive ×6 on a finished Experiment table).
+  if (!(hasDraft && allowed.includes('revise_stage'))) {
+    if (!canAdvance || !allowed.includes('advance_stage')) return null;
+    return {
+      action_key: 'advance_stage',
+      params: {},
+      rationale: `"${unsaved.label}" already produced its result, and this stage's own work is done; repeating it would change nothing here, so the work moves on to the next stage, where that reasoning belongs.`,
+      expected_outcome: 'This stage marked complete, and the next one started.',
+    };
+  }
   return {
     action_key: 'revise_stage',
     params: {

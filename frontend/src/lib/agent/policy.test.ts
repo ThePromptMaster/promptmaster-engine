@@ -645,3 +645,14 @@ describe('a repeated derivation is saved, not repeated (9 Oct, production replay
   });
 });
 
+describe('a repeated derivation on a finished table moves on (9 Oct, production replay)', () => {
+  const derive = step({ action_key: 'derive', stage_id: 'experiment', status: 'succeeded', output: 'S_5 = 12 = a_7 - 1.' });
+  it('no revision possible, stage ready: the repeat becomes moving on', () => {
+    expect(saveInsteadOfRepeating({ action_key: 'derive' }, [derive], 'experiment', ['derive', 'advance_stage'], true, true)).toMatchObject({ action_key: 'advance_stage' });
+  });
+  it('not ready, or not offered: the choice stands', () => {
+    expect(saveInsteadOfRepeating({ action_key: 'derive' }, [derive], 'experiment', ['derive', 'advance_stage'], true, false)).toBeNull();
+    expect(saveInsteadOfRepeating({ action_key: 'derive' }, [derive], 'experiment', ['derive'], true, true)).toBeNull();
+  });
+});
+

@@ -574,7 +574,7 @@ export function useGoLoop(opts: Options) {
         if (signal.aborted) throw new Stopped();
         // A reasoning move repeated while its last result is unsaved becomes
         // the save of that result (9 Oct, production: Derive ×3, nothing saved).
-        const saving = required ? null : saveInsteadOfRepeating(choice, [...priorStepsRef.current, ...stepsRef.current], o.stage.id, allowed, hasDraft);
+        const saving = required ? null : saveInsteadOfRepeating(choice, [...priorStepsRef.current, ...stepsRef.current], o.stage.id, allowed, hasDraft, stageEvaluation.canAdvance);
         if (saving) Object.assign(choice, saving, { needs_user_decision: false, decision_question: null });
         if (!fitsBudget(choice.action_key, current.steps_used, current.budget_steps)) {
           await setRunStatus(
