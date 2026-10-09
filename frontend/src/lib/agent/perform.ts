@@ -1166,6 +1166,71 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       });
     }
 
+    case 'return': {
+      // Q2 (Sean, 9 Oct): "if Analysis identifies that further investigation
+      // is needed, Go should return to Experiment … perform the relevant work
+      // it can, save the results, and rerun the affected analysis and checks."
+      // The return is recorded with its reason (the database checks the run,
+      // the policy and that the template allows it); the work it names is
+      // added to that stage as a new version at once, so the stage's own
+      // moves (a run per new row, a check) take it from there, and saving it
+      // reopens what was built on the old version (H1b).
+      const targetId = typeof params.stage_id === 'string' ? params.stage_id.trim() : '';
+      const target = ctx.template.stages.find((s) => s.id === targetId);
+      const allowedTargets = ctx.stage.transitions.allow_return_to ?? [];
+      if (!target || !allowedTargets.includes(target.id)) {
+        const names = allowedTargets.map((id) => ctx.template.stages.find((s) => s.id === id)?.label ?? id).join(', ');
+        return done(key, { status: 'failed', toolsUsed: [], changes: {}, output: `${ctx.stage.label} can go back only to: ${names || 'no earlier stage'}.` });
+      }
+      const reason = (typeof params.reason === 'string' && params.reason.trim()) || ctx.step.rationale || '';
+      const work = typeof params.work === 'string' ? params.work.trim().slice(0, 2_000) : '';
+      if (!reason || !work) {
+        return done(key, { status: 'failed', toolsUsed: [], changes: {}, output: 'Going back needs both what in the saved work asks for it, and what is to be done there.' });
+      }
+      await appendWorkflowEvent(ctx.project.id, ctx.project.user_id, {
+        type: 'stage_returned',
+        stage_id: ctx.stage.id,
+        to_stage_id: target.id,
+        actor: 'system',
+        agent_run_id: ctx.run.id,
+        reason: `Back to ${target.label}: ${reason}`.slice(0, 1_000),
+        payload: { agent_return: true, return_reason: reason.slice(0, 1_000), work, policy: 'routine_decisions' },
+      });
+      await ctx.afterStageEvent();
+      const changes: AgentStep['changes'] = { event_types: ['stage_returned'] };
+      const lines = [`Went back to ${target.label}: ${reason}`, `To be done there: ${work}`];
+      const head = ctx.bundles[target.id]?.versions.at(-1)?.content ?? '';
+      if (ctx.appendStageVersion && head.trim() && target.renderer !== 'long_form' && target.renderer !== 'outline') {
+        const instruction = rendererHoldsItems(target.renderer)
+          ? `Further investigation asked for by ${ctx.stage.label}: ${work}\nAdd a row for each piece of this work that is not already in the table. Keep every existing row, its text and its status exactly as they are.`
+          : `Further investigation asked for by ${ctx.stage.label}: ${work}\nRevise to take this in. Keep everything that still holds exactly as it is.`;
+        try {
+          const res = await api.generateStageArtifact(generationRequest(ctx.project, ctx.template, ctx.state, ctx.bundles, target, head, instruction), ctx.signal);
+          const generated = generationContent(target, res);
+          const before = rendererHoldsItems(target.renderer) ? parseItems(head) : null;
+          const after = before ? parseItems(generated) : null;
+          const content = before && after ? serializeItems(carryUserFields(before, after, itemSchemaFor(target))) : generated;
+          if (content) {
+            const created = await ctx.appendStageVersion(target.id, target.label, {
+              content, source_operation: 'agent_revise', base_content: head, instruction,
+              model: res.model_used || ctx.project.model, mode: ctx.project.mode,
+              change_summary: `Go mode: further work asked for by ${ctx.stage.label} — ${work}`.slice(0, 300),
+              finish_reason: res.finish_reason || null,
+            });
+            const id = (created as { id?: unknown } | null)?.id;
+            if (typeof id === 'string') {
+              changes.version_ids = [id];
+              lines.push(`Added it to ${target.label} as a new version; it is carried out there next, and the stages after it are rechecked from the new results.`);
+            }
+          }
+        } catch (e) {
+          if ((e as Error)?.name === 'AbortError') throw e;
+          lines.push(`The work could not be added to ${target.label} yet (${(e as Error).message || 'the draft failed'}); it is the next thing to do there.`);
+        }
+      }
+      return done(key, { status: 'succeeded', toolsUsed: changes.version_ids ? ['model'] : [], changes, output: lines.join('\n\n') });
+    }
+
     case 'skip': {
       // A proposal, never a skip: the stage is skipped only if the user
       // presses the card's button, and that event is theirs.

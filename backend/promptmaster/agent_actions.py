@@ -120,6 +120,15 @@ AGENT_ACTIONS: list[AgentAction] = [
                 when="This stage closes a round of open-ended work and the question it ends on is worth "
                      "another round. Params: reason (one or two plain sentences: what the next round should "
                      "pursue, and why it is worth it). The user starts the round; it is their decision."),
+    AgentAction(key="return_to_stage", family="workflow", label="Go back to an earlier stage",
+                when="Only offered under Autonomous with routine decisions handed to Go. The saved work on this "
+                     "stage says more investigation is needed that belongs to an earlier stage — a run that was not "
+                     "made, a further sweep or case, a source to obtain, a method that must change, another "
+                     "explanation to examine. Go back to the stage that does that work (one listed under GO BACK TO), "
+                     "do it, and the stages after it are rechecked from the new results. Params: stage_id, reason "
+                     "(one plain sentence: what in the saved work asks for it), work (what is to be done there, "
+                     "specifically: the runs, cases, source or change).",
+                important=True),
     AgentAction(key="commit_delegated", family="workflow", label="Commit a routine approval",
                 when="Only offered when the project's routine decisions are set to 'handle them for me' and an "
                      "approval on this stage is a routine one. Checks the stage against that approval and, if it "

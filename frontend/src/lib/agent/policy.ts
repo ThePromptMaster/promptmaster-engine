@@ -20,6 +20,7 @@ import { nextSuggestedStage } from '@/lib/workflow/engine';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import type { StageDefinition, StageEvaluation, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
 import type { AgentRunStatus, AgentStep, ExecutionPolicy } from '@/types/agent';
+import type { RoutineDecisions } from '@/types/project';
 import { actionFor, INTERPRET_STEP, USER_ANSWER_STEP } from './actions';
 import type { StageFacts } from './facts';
 import { proposeTargets } from '@/lib/workflow/proposals';
@@ -87,6 +88,57 @@ export function runAttemptsFor(
   // Never more tries than rows, however the tries landed.
   const left = Math.max(0, review.items.length - tried);
   return hasData ? left : Math.min(left, review.items.filter((i) => awaitsAttempt(i, review.schema)).length);
+}
+
+/**
+ * What the planner is told when the run reconsiders (Q2b; Sean, 9 Oct: "The
+ * system should also recognize repeated attempts that aren't producing new
+ * evidence and reconsider its approach"). The repeated moves are withdrawn
+ * for the next choice.
+ */
+export function reconsiderNote(repeating: readonly string[]): string {
+  const names = repeating.map((k) => `"${actionFor(k)?.label ?? STEP_WORDS[k] ?? k}"`).join(' and ');
+  return `RECONSIDER: ${names} ${repeating.length > 1 ? 'were' : 'was'} tried repeatedly here and produced no new evidence. ` +
+    'Do not try it again. Choose a different kind of move: go back to the stage that can produce what is missing, look a source up, ' +
+    'run a computation, record what is established and move on, or — only if none of these can help — ask one specific question.';
+}
+
+/** Go-made returns per run chain: enough to follow up what an analysis found, not to circle. */
+export const MAX_RETURNS = 3;
+
+/**
+ * The earlier stages Go may go back to from this one (Q2, 9 Oct), or none.
+ * Only in an investigation (Research, or a template that says it inquires),
+ * only under Autonomous with routine decisions handed to Go — the database
+ * checks the same — only when the saved work here asks for more (an
+ * inconclusive verdict, a run not made, further cases), and at most
+ * MAX_RETURNS times in the run chain.
+ */
+const MORE_WORK = /\b(?:inconclusive|undetermined|missing (?:measurements?|values?|runs?|results?|data|cases?|computations?)|(?:measurement|value|run|result|computation)s? (?:is|are) missing|cannot (?:yet )?be (?:decided|determined|settled)|not (?:yet )?(?:run|tested|computed|measured|carried out)|further (?:investigation|runs?|work|tests?|data|computations?|analysis|cases?)|(?:more|another|additional) (?:runs?|cases?|data|tests?|investigation|computations?|sweeps?|sources?)|insufficient (?:evidence|data))\b/i;
+
+/** The saved work says something is still to be investigated, run or obtained. */
+export function asksForMoreWork(text: string): boolean {
+  return MORE_WORK.test(text);
+}
+
+export function returnTargets(input: {
+  template: WorkflowTemplate;
+  stage: StageDefinition;
+  policy: ExecutionPolicy;
+  routine: RoutineDecisions;
+  /** The stage's saved text: a return is offered only when it asks for more work. */
+  stageText: string;
+  steps: readonly { action_key: string; status: string }[];
+}): { id: string; label: string }[] {
+  const { template, stage } = input;
+  if (template.key !== 'research' && !template.inquiry) return [];
+  if (input.policy !== 'autonomous' || input.routine !== 'handle' || !asksForMoreWork(input.stageText)) return [];
+  const made = input.steps.filter((s) => s.action_key === 'return_to_stage' && s.status === 'succeeded').length;
+  if (made >= MAX_RETURNS) return [];
+  return (stage.transitions.allow_return_to ?? [])
+    .map((id) => template.stages.find((s) => s.id === id))
+    .filter((s): s is StageDefinition => Boolean(s))
+    .map((s) => ({ id: s.id, label: s.label }));
 }
 
 /** Moves that polish a stage rather than move the work on. */
@@ -259,6 +311,11 @@ const REASONING_MOVES = new Set([
 export interface Preemption {
   status: Exclude<AgentRunStatus, 'running'>;
   reason: string;
+  /**
+   * The run is going round in circles (Q2b): the moves named were tried and
+   * produced nothing new. The loop reconsiders once before it stops.
+   */
+  repeating?: string[];
 }
 
 export function preempt(input: {
@@ -294,6 +351,7 @@ export function preempt(input: {
     return {
       status: 'blocked',
       reason: `"${name(pair[0])}" and "${name(pair[1])}" have been taking turns on this stage without it moving on. It needs your direction.`,
+      repeating: [pair[0], pair[1]],
     };
   }
   if (noProgress(finished)) {
@@ -301,6 +359,7 @@ export function preempt(input: {
     return {
       status: 'blocked',
       reason: `"${actionFor(last.action_key)?.label ?? last.action_key}" was chosen ${NO_PROGRESS_REPEATS} times in a row on this stage without changing it: none of it was saved to the document. What each produced is in the run log. It needs your direction.`,
+      repeating: [last.action_key],
     };
   }
   return null;

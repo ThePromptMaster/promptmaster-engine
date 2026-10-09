@@ -29,6 +29,7 @@ export type Performer =
   | 'advance' // a stage event
   | 'skip' // proposes skipping the stage; the user decides
   | 'loop' // proposes the next round of a looping workflow; the user starts it
+  | 'return' // goes back to an earlier stage the analysis says needs more work (Q2, 9 Oct)
   | 'block' // stage_blocked
   | 'ask' // stop for the user
   | 'complete'; // end the run, if the objective really is met
@@ -76,6 +77,8 @@ export const AGENT_ACTIONS: readonly AgentAction[] = [
   { key: 'propose_skip', family: 'workflow', label: 'Suggest skipping this stage', performer: 'skip', important: false },
   // 3 Oct call: work that goes on round after round; the user starts each one.
   { key: 'propose_next_round', family: 'workflow', label: 'Suggest the next round', performer: 'loop', important: false },
+  // 9 Oct (Q2): back to the stage that does the further work the analysis asks for.
+  { key: 'return_to_stage', family: 'workflow', label: 'Go back to an earlier stage', performer: 'return', important: true },
   // 5 Oct: a routine approval Go may commit under "Routine decisions: handle them for me", once checked.
   { key: 'commit_delegated', family: 'workflow', label: 'Commit a routine approval', performer: 'commit', important: false },
   { key: 'advance_stage', family: 'workflow', label: 'Move to the next stage', performer: 'advance', important: true },

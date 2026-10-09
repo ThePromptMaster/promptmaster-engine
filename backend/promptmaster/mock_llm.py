@@ -262,7 +262,7 @@ def _next_action(system: str, prompt: str) -> dict:
             choice = key
             break
     else:
-        workflow = {"advance_stage", "mark_blocked", "request_user_decision", "declare_objective_complete"}
+        workflow = {"advance_stage", "mark_blocked", "request_user_decision", "declare_objective_complete", "return_to_stage"}
         choice = next((k for k in allowed if k not in done and k not in workflow), None)
     if choice is None:
         choice = "declare_objective_complete"
@@ -286,6 +286,14 @@ def _next_action(system: str, prompt: str) -> dict:
             params = {"control": "Generate the outline/results artifact"}
         elif "[[mock:control=listed]]" in prompt and listed:
             params = {"control": listed.group(1)}
+    elif choice == "return_to_stage":
+        # Planned only ("[[mock:plan=…,return_to_stage]]"): back to the first stage listed under GO BACK TO.
+        target = re.search(r"GO BACK TO \([^)]*\): ([a-z_]+) \(", prompt)
+        params = {
+            "stage_id": target.group(1) if target else "experiment",
+            "reason": "Mock: the analysis cannot decide H2 without a fourth run.",
+            "work": "Mock: run 4 — the same computation at twice the amplitude.",
+        }
     elif choice == "mark_blocked":
         params = {"reason": "Mock: missing data", "block_kind": "data_missing"}
     elif choice == "propose_skip":

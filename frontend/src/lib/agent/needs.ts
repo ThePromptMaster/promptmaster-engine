@@ -473,6 +473,8 @@ export function needsUser(input: {
     allowed.some((k) => STAGE_WORK_MOVES.has(k)) ||
     // Computations the project's data can still carry out are work, not reasoning.
     (allowed.includes('run_computation') && (input.runAttemptsLeft ?? 0) > 0) ||
+    // So is going back for the further work the saved analysis asks for (Q2).
+    allowed.includes('return_to_stage') ||
     // An optional automatic item still open is something a lookup or a run may settle.
     (!onlyApprovalLeft(stageEvaluation) && allowed.some((k) => REASONING_MOVES.has(k))) ||
     requiredWork({ stage, facts, stageEvaluation, allowed, routine: input.routine, commitTried: input.commitTried }) !== null;
