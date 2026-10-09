@@ -597,6 +597,17 @@ direction. Two things still count as work Go may do first:
 | L-48 | PromptMaster takes no external actions, so operational recovery is not built | accepted |
 | L-49 | Routine decisions: only blocking approvals in current templates are delegated | accepted |
 | L-50 | One model for every call; no routing by task | open |
+| L-56 | Measurable requirements: only word ranges/limits and question counts are read | accepted |
+| L-57 | Figure support accepts sums, differences and products of supplied amounts and counts | accepted |
+| L-58 | A "missing" finding is disproved only when it quotes what it looked for | accepted |
+| L-59 | Carried-forward and unmet findings are recognised by their wording | accepted |
+| L-60 | iPhone HEIC conversion depends on the browser or a converter loaded on demand | accepted |
+| L-61 | An unfinished setup keeps no attached files | accepted |
+| L-62 | No Jupyter notebook export | open |
+| L-63 | A measured requirement failed on a finished stage is reported, not repaired by Go | open |
+| L-64 | An answer that contradicts the deliverable's wording reopens only what names the same values | open |
+| L-65 | An answer about what the record contains is taken as a fact, not checked against the record | open |
+| L-66 | Confirming proposed statuses on a finished table means reopening it, which reopens every later stage | open |
 | L-B3 | Go code execution: Python only, fixed packages, no network | accepted |
 | L-B4 | Go runs while the tab is open; windows, not dollars | accepted |
 | L-C3 | Conflict detection misses paraphrase and cross-stage contradiction | accepted |
@@ -1119,3 +1130,103 @@ shows **Paused** when it is not "met".
 When Go's objective check finds the objective not met, the project shows "Paused — the
 objective is not met. Waiting for: …" and the stage bar and finish dialog list it. The
 projects list reads no events, so it still shows the project as in progress.
+
+### L-56 — Measurable requirements: only word ranges/limits and question counts are read (2026-10-08)
+
+`lib/workflow/measurable.ts` recognises "120–180 words", "under / at most / at least N words",
+"exactly N words", and "exactly five (FAQ) questions" / "a five-question FAQ", and it
+counts answers under each question. Other measurable demands (character limits, a number
+of bullet points, reading level) are still judged by the stage check. It is deliberately
+conservative: a sentence it does not recognise measures nothing rather than blocking. A
+requirement is measured under a heading that names it, on a stage about it, or on the
+whole deliverable when only one thing is asked for.
+
+### L-57 — Figure support accepts sums, differences and products of supplied amounts and counts (2026-10-08)
+
+So that totals of supplied costs are not "unsupported" (Sean's portfolio test), an amount
+or count equal to a sum or difference of two supplied figures of the same kind, a sum of
+three, or a product of two counts as supported. An invented figure that happens to equal
+such a combination passes too. Percentages are never derived: differences and ratios of
+margins could reach almost any figure, including the invented ranges this check exists
+to catch, so a percentage must be supplied or labelled an assumption. Up to 40 numbers of
+each kind are combined.
+
+### L-58 — A "missing" finding is disproved only when it quotes what it looked for (2026-10-08)
+
+Checks are told to put the words they looked for in quotes. A claim that something is
+missing is dropped in code when those words are in the saved text. A claim with no
+quotes cannot be checked either way and is kept, and so are paraphrases ("does not say
+it runs in a browser").
+
+### L-59 — Carried-forward and unmet findings are recognised by their wording (2026-10-08)
+
+A deferred or carried-forward row blocks "Objective met" when it is `major`, or when its
+text says something is missing, not run, unmet, incomplete or contradicted. The same test
+decides whether an undecided row on an optional table still blocks. A row that describes
+an unmet requirement in other words is treated as optional.
+
+### L-60 — iPhone HEIC conversion depends on the browser or a converter loaded on demand (2026-10-08)
+
+Safari decodes HEIC itself. Elsewhere `heic2any` is loaded when a HEIC file is picked.
+A file neither can decode gets a message asking for a JPEG copy. Photos over 5 MB or
+4096 px are re-encoded as JPEG at decreasing quality until they fit; transparency and
+metadata are not kept.
+
+### L-61 — An unfinished setup keeps no attached files (2026-10-08)
+
+`setup_drafts` keeps the ask, the setup card, the front-door conversation and the
+workflow being designed. It keeps no files: the return banner names them so they can be
+attached again.
+
+### L-62 — No Jupyter notebook export (2026-10-08)
+
+Proposed in the 8 Oct assessment, §4. Code a Go run executed has its output recorded in
+the run (and `sandbox_runs`), but no export collects prose, equations, code and outputs
+into one `.ipynb`.
+
+### L-63 — A measured requirement failed on a finished stage is reported, not repaired by Go (2026-10-09)
+
+A word range or question count is a blocking check on the stage that produces it, so a
+draft that misses it cannot be closed. A stage finished before the check existed (or
+closed by "Continue anyway") keeps its result: the objective check is given the failed
+measurement and will not call the objective met, and Go stops naming it ("the launch
+announcement does not meet the required 100–140 word length"). Go does not reopen the
+finished stage to repair it on its own; the user reopens it, or edits the text.
+
+### L-64 — An answer that contradicts the deliverable's wording reopens only what names the same values (2026-10-09)
+
+An answer to Go is recorded as an accepted fact, and every later prompt reads it. A
+stage is reopened by it only when the stage's text holds a value the answer changes
+(a date, a price, a figure), matched in code. An answer that corrects a *claim* — on
+the sequence-proof replay, "the n = 5 check was done in the planned investigation; there
+is no provenance issue" — reopens nothing, so a report sentence saying the opposite
+stays until a later stage revises it. Go no longer re-judges the unchanged report (C8,
+#185); it moves on to Revision, where the facts reach the revision prompt. The user
+can also regenerate the section.
+
+### L-65 — An answer about what the record contains is taken as a fact, not checked against the record (2026-10-09)
+
+An answer to Go becomes an accepted fact, and accepted facts outrank what the stages
+say (D1/D2, by design: the user decides values and settles conflicts). That includes
+an answer that is really a claim about the record. On the sequence-proof replay the
+answer said "the Experiment run record contains S_5 = 12"; Experiment v1 had marked
+that check *not run* (it was done in Analysis). Go accepted the answer, and the repair
+of Experiment then marked the run *worked by hand*, citing the fact. The mathematics
+was right and the working exists in the project — the run schema allows "the working,
+or where it is" — but the record's account of *where* it was done followed the answer,
+not the history. Proposed: an answer that names a stage's content is checked against
+that stage's saved versions, and a disagreement is put to the user before it is
+recorded.
+
+### L-66 — Confirming proposed statuses on a finished table means reopening it, which reopens every later stage (2026-10-09)
+
+The rows of an outcome table (runs, alternatives, validation) are the user's to decide.
+Go proposes a status for each, and the objective check counts unconfirmed proposals as
+open work. On the sequence-proof replay the project reached Final review with 6 proposals
+on Alternatives and 9 on Validation, both already finished. Confirming them is an edit
+to a finished stage: it must be reopened, and its new version reopens every later stage
+for a recheck (H1b). A long-form stage with no document of its own, such as Revision, is
+then rechecked by revising its sections again. Proposed: confirming a proposal, which
+does not change the row's text, is recorded as a decision and does not count as a new
+version of the stage.
+
