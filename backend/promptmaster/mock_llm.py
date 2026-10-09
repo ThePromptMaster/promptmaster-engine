@@ -310,7 +310,8 @@ def _next_action(system: str, prompt: str) -> dict:
         "expected_outcome": f"Mock: the result of {choice}.",
         "needs_user_decision": choice == "request_user_decision",
         "decision_question": (
-            "Mock: which way should this go?"
+            ("Mock: this needs an expert's judgment on whether the hinge-area weighting is right."
+             if "[[mock:ask=expert]]" in system + prompt else "Mock: which way should this go?")
             # The client's 3 Oct example: a button named in the words, not in params.
             + (" Press Generate Outline to start." if "[[mock:control=invented]]" in prompt else "")
             # 4 Oct production: Go asks for an approval by quoting the requirement.
@@ -501,7 +502,21 @@ def _json_reply(system: str, prompt: str) -> dict:
                 return {"contradicts": True, "document": m.group(1).strip(), "quote": m.group(2).strip(),
                         "claim": "Mock: the answer says otherwise.", "explanation": "Mock: the document says this."}
         return {"contradicts": False}
-    from promptmaster import objective_assessment
+    from promptmaster import expert_review, objective_assessment
+
+    if system.startswith(expert_review._INSTRUCTION[:60]):
+        issue = re.search(r"THE ISSUE THAT NEEDS AN EXPERT: (.+)", prompt)
+        saved = re.search(r"--- SAVED: [^\n]*---\n(.+)", prompt)
+        return {
+            "question": f"Mock: {issue.group(1).strip() if issue else 'the issue'}",
+            "assumptions": [{"text": "Mock: the model is the one the method states.", "status": "accepted"}],
+            "working": [{"quote": saved.group(1).strip()[:80] if saved else "", "label": "derived"}],
+            "evidence": ["Mock: the runs on record."],
+            "checks": ["Mock: the limiting case was checked."],
+            "unresolved": "Mock: which treatment is correct.",
+            "judgment_requested": "Mock: is the treatment in the saved working correct?",
+            "depends_on_it": ["Mock: the analysis verdict."],
+        }
 
     if system.startswith(objective_assessment._ASSESS_INSTRUCTION[:60]):
         # Not met when the deliverable says "[[mock:objective=unmet]]": a blocker

@@ -774,6 +774,20 @@ export const api = {
     return apiFetch('/api/agent/check-criterion', { method: 'POST', body: JSON.stringify(req), signal });
   },
 
+  /** Q3a: the package for an expert's judgment, from the saved record. 1 LLM call; commits nothing. */
+  async agentExpertPackage(
+    req: {
+      inputs: PMInput;
+      issue: string;
+      stage_label: string;
+      documents: { label: string; text: string; executed: boolean }[];
+      model?: string;
+    },
+    signal?: AbortSignal
+  ): Promise<import('@/lib/agent/expert').ExpertPackage & { model_used: string }> {
+    return apiFetch('/api/agent/expert-package', { method: 'POST', body: JSON.stringify(req), signal });
+  },
+
   async agentReason(
     req: { inputs: PMInput; state: AgentStateDigest; action_key: string; params: Record<string, unknown>; model?: string },
     signal?: AbortSignal

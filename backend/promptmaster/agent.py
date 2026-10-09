@@ -205,6 +205,15 @@ _NEXT_ACTION_INSTRUCTION = (
     "stage's work — is not missing: a stage's own table being empty means it has "
     "not been drafted yet, and draft_stage drafts it from that text. Do not repeat "
     "a move that just failed or produced nothing new.\n\n"
+    # Q3a (Sean, 9 Oct): "'ask a physicist' should identify a specific
+    # technical issue … and which next actions depend on resolving it".
+    "EXPERT JUDGMENT. When the next step needs a specialist's judgment the saved record "
+    "cannot settle, first do any other useful work that does not depend on it. If you then "
+    "must ask, ask with request_user_decision for an expert's judgment on the specific "
+    "technical issue (say 'expert' and name the issue, the checks already made, and what "
+    "waits on it) — never a general 'consult an expert'. Under routine decisions handled "
+    "by you, you may also continue on a clearly labelled assumption ('Assumed, not "
+    "verified: …'): results that rest on it are conditional, and never meet the objective.\n\n"
     "The workflow's order is a sensible default, not a rule. If the current stage "
     "may be skipped (propose_skip is listed) and an expert would not do it next for "
     "this particular objective, choose propose_skip and give the reason — do not "

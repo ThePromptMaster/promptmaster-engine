@@ -14,6 +14,7 @@
  */
 
 import type { StageDefinition, StageRenderer } from './types';
+import { needsPeople } from './human-requirements';
 
 /** One row. Fields beyond id/status/reason are declared by the item schema. */
 export interface StageItem {
@@ -731,6 +732,9 @@ export function producibleBy(item: StageItem, schema: StageItemSchema): Producer
   const field = schema.execution?.producibleField;
   const text = field ? (item[field] ?? '').trim().toLowerCase() : '';
   if (!text) return null;
+  // Q3b: a run that names work only people can do needs them, whatever the
+  // draft says — no AI pass stands in for independent human coders.
+  if (needsPeople(schema.fields.map((f) => item[f.key] ?? '').join(' '))) return 'needs_human';
   if (/^promptmaster\b/.test(text)) return 'promptmaster';
   if (/^needs (a )?(person|people|human)/.test(text)) return 'needs_human';
   if (/^needs (a )?tool/.test(text)) return 'needs_tool';

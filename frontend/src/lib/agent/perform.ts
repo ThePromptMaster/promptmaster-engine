@@ -40,6 +40,7 @@ import { attachedDocuments, currentFacts, supersededFactValues } from '@/lib/wor
 import { describeValue, leftoverValues, type SupersededValue } from '@/lib/workflow/fact-values';
 import { recordPolicyFacts } from '@/lib/supabase/facts';
 import { checkGoal } from './code-check';
+import { unmetHumanRequirements } from '@/lib/workflow/human-requirements';
 import { figureFindings, figureSources } from '@/lib/workflow/figure-support';
 import { asIteration } from '@/lib/workflow/legacy';
 import {
@@ -1285,11 +1286,13 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       const question = `${ctx.step.decision_question || 'Which way should this go?'}${pointer}`;
       // What Go checked before interrupting (Q1b): on the record, under the question.
       const audit = typeof params.stop_audit === 'string' ? `\n\n${params.stop_audit}` : '';
+      // Q3a: a question for an expert carries the package for them, on the record.
+      const expertPackage = typeof params.expert_package === 'string' && params.expert_package.trim() ? params.expert_package : '';
       return done(key, {
-        status: 'succeeded', toolsUsed: [], changes: {},
-        output: `${question}${audit}`,
+        status: 'succeeded', toolsUsed: expertPackage ? ['model'] : [], changes: {},
+        output: `${question}${audit}${expertPackage ? `\n\nPrepared for an expert's review:\n\n${expertPackage}` : ''}`,
         stop: { status: 'awaiting_decision', reason: question },
-        needs: { kind: 'answer_question', question },
+        needs: { kind: 'answer_question', question, ...(expertPackage ? { expertPackage } : {}) },
       });
     }
 
@@ -1584,7 +1587,7 @@ export function withDerivation(instruction: string, derived?: { label: string; o
  * (C2): measured requirements that fail, and review rows carried forward that
  * say a requirement is unmet. The check may not call the objective met over them.
  */
-export function failedChecks(ctx: Pick<PerformContext, 'context' | 'template'>): string[] {
+export function failedChecks(ctx: Pick<PerformContext, 'context' | 'template'> & { project?: Pick<Project, 'objective' | 'constraints' | 'facts'> }): string[] {
   const label = (id: string) => ctx.template.stages.find((s) => s.id === id)?.label ?? id;
   const measured = Object.entries(ctx.context.measured ?? {}).flatMap(([id, ms]) =>
     ms.filter((m) => !m.satisfied).map((m) => `${label(id)}: ${m.label} — measured ${m.detail ?? 'not met'}`)
@@ -1592,5 +1595,7 @@ export function failedChecks(ctx: Pick<PerformContext, 'context' | 'template'>):
   const carried = Object.entries(ctx.context.carriedForward ?? {}).flatMap(([id, rows]) =>
     rows.map((r) => `${label(id)}: carried forward unresolved — ${r}`)
   );
-  return [...measured, ...carried].slice(0, 30);
+  // Q3b: work only people can do is not done until a human result is on record.
+  const people = ctx.project ? unmetHumanRequirements(ctx.project).map((r) => `Needs people: "${r}" — no human result is on record, and no AI pass stands in for it`) : [];
+  return [...measured, ...carried, ...people].slice(0, 30);
 }
