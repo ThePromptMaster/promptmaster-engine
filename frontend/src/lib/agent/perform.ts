@@ -101,6 +101,8 @@ export interface PerformContext {
   afterStageEvent: () => Promise<void>;
   /** Tick an approval the routine-decision policy committed; the event is written first, by the performer. */
   commitCriterion?: (stageId: string, criterionId: string) => Promise<void>;
+  /** Untick approvals: the reserved ones of a stage Go goes back to (Q2e). */
+  reopenApprovals?: (criterionIds: string[]) => Promise<void>;
   signal: AbortSignal;
 }
 
@@ -256,6 +258,16 @@ async function recordRun(
     // The run itself is on record; what could not be added is simply not claimed.
   }
   return { changes, notes };
+}
+
+/** The reserved approvals ticked on a stage Go goes back to: the user approved the version being changed. */
+export function reservedApprovalsToReopen(
+  stage: StageDefinition,
+  manualChecks: Readonly<Record<string, boolean>> | undefined
+): { id: string; label: string }[] {
+  return stage.exit_criteria
+    .filter((c) => c.check === 'manual' && c.authority === 'reserved' && manualChecks?.[c.id])
+    .map((c) => ({ id: c.id, label: c.label }));
 }
 
 /** The last line of what the code wrote to stderr: the error itself, for a row's reason. */
@@ -1205,6 +1217,13 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       await ctx.afterStageEvent();
       const changes: AgentStep['changes'] = { event_types: ['stage_returned'] };
       const lines = [`Went back to ${target.label}: ${reason}`, `To be done there: ${work}`];
+      // Q2e: what the user approved on that stage was the version Go is about
+      // to change. Their reserved approvals there are cleared and asked again.
+      const approvals = reservedApprovalsToReopen(target, ctx.context.manualChecks);
+      if (approvals.length && ctx.reopenApprovals) {
+        await ctx.reopenApprovals(approvals.map((c) => c.id));
+        lines.push(`Your approval on ${target.label} (${approvals.map((c) => `"${c.label}"`).join(', ')}) is asked again, because the work there is changing.`);
+      }
       const head = ctx.bundles[target.id]?.versions.at(-1)?.content ?? '';
       if (ctx.appendStageVersion && head.trim() && target.renderer !== 'long_form' && target.renderer !== 'outline') {
         const instruction = rendererHoldsItems(target.renderer)

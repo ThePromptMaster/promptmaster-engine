@@ -1,4 +1,4 @@
-import { checkVerdict } from './perform';
+import { checkVerdict, reservedApprovalsToReopen } from './perform';
 import { describe, expect, it } from 'vitest';
 
 import { EXPLORATION_V1, RESEARCH_V1, SINGLE_OUTPUT_V1, getStage, projectState } from '@/lib/workflow';
@@ -790,5 +790,18 @@ describe('preempt: a failure recorded on its row is set aside, not a stop (produ
   it('two plain failures still do', () => {
     const state = projectState(RESEARCH_V1, []);
     expect(preempt({ state, objective: 'o', stepsUsed: 4, budgetSteps: 25, steps: [failed(), failed()] })?.status).toBe('failed');
+  });
+});
+
+describe('reservedApprovalsToReopen: going back asks the user again (Q2e, production replay 9 Oct)', () => {
+  const method = RESEARCH_V1.stages.find((s) => s.id === 'method')!;
+
+  it('the approval the user gave on the stage Go goes back to is asked again', () => {
+    expect(reservedApprovalsToReopen(method, { 'meth.analysisplan': true })).toEqual([{ id: 'meth.analysisplan', label: 'I approve this analysis plan for execution' }]);
+  });
+
+  it('nothing to reopen when nothing was approved there', () => {
+    expect(reservedApprovalsToReopen(method, {})).toEqual([]);
+    expect(reservedApprovalsToReopen(RESEARCH_V1.stages.find((s) => s.id === 'experiment')!, { 'meth.analysisplan': true })).toEqual([]);
   });
 });

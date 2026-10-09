@@ -1055,6 +1055,16 @@ export function WorkflowWorkspace({
       onPatchProject({ manual_checks: { ...latest, [criterionId]: true } });
       await flushProject();
     },
+    // Q2e (9 Oct, production replay): Go went back and rewrote Method while
+    // "I approve this analysis plan" stayed ticked from the plan it replaced.
+    // Going back clears the reserved approvals of the stage it goes back to.
+    reopenApprovals: async (criterionIds: string[]) => {
+      const latest = useProjectStore.getState().project?.manual_checks ?? project.manual_checks ?? {};
+      const cleared = Object.fromEntries(Object.entries(latest).filter(([id]) => !criterionIds.includes(id)));
+      if (Object.keys(cleared).length === Object.keys(latest).length) return;
+      onPatchProject({ manual_checks: cleared });
+      await flushProject();
+    },
     events: events ?? [],
     loadEvents: () => listWorkflowEvents(project.id),
     onRefresh: onReload,
