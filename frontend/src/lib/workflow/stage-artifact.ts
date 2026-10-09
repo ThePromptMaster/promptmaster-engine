@@ -644,6 +644,40 @@ export function confirmProposals(items: readonly StageItem[], schema: StageItemS
  * reason. "Rejected because" is a decision; "rejected" on its own is a shrug,
  * and six months later nobody can tell them apart.
  */
+/** Wording that says a requirement is not met: missing, not run, contradicted, incomplete. */
+const UNMET =
+  /\b(missing|omit(?:s|ted)?|absent|not (?:included|present|shown|preserved|run|met|proved|proven|answered|reflected|reached|carried|recorded|verified|done)|incomplete|contradict\w*|inconsisten\w*|unresolved|unmet|lacks?|does not (?:contain|include|meet|satisfy|state|show|reflect|match))\b/i;
+
+/**
+ * Rows deferred or carried forward that say an objective requirement is
+ * unmet: a major finding, or one worded as something missing or contradicted
+ * (C2, 8 Oct). The sequence test's final review found the proofs missing from
+ * the report; the rows were carried forward, and Go declared the objective
+ * met. A carried-forward note about polish is not one of these.
+ */
+export function carriedForwardUnmet(items: readonly StageItem[], schema: StageItemSchema): string[] {
+  return items
+    .filter((i) => i.status === 'deferred' && isTriaged(i, schema))
+    .filter((i) => i.severity === 'major' || UNMET.test(rowText(i)))
+    .map((i) => rowText(i).slice(0, 160));
+}
+
+/**
+ * Rows not yet decided (or only proposed) that say a requirement is unmet. On
+ * a table labelled optional these still hold up "Objective met": the label
+ * says the rows need no decision, not that a missing proof does not matter.
+ */
+export function openUnmet(items: readonly StageItem[], schema: StageItemSchema): number {
+  return items.filter((i) => (!isTriaged(i, schema) || i.status_source === 'proposed') && (i.severity === 'major' || UNMET.test(rowText(i)))).length;
+}
+
+function rowText(item: StageItem): string {
+  return Object.entries(item)
+    .filter(([key, value]) => !['id', 'status', 'reason', 'status_source', 'status_history', 'severity'].includes(key) && typeof value === 'string' && value.trim())
+    .map(([, value]) => String(value).trim())
+    .join(' — ');
+}
+
 export function isTriaged(item: StageItem, schema: StageItemSchema): boolean {
   // PromptMaster's proposal is not the user's decision until they confirm it.
   if (isProposed(item)) return false;

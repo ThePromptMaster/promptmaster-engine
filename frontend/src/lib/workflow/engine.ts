@@ -28,6 +28,16 @@ export function getStage(
 
 // --- exit criteria ----------------------------------------------------------
 
+/**
+ * Whether a table's rows each need a decision before the stage is done. The
+ * table's own "optional — does not block finishing" label reads this, and so
+ * do Go and the outstanding-work list: until 8 Oct Go stopped for decisions on
+ * rows its own page called optional (Sean, emails 2, 4, 6.6, 8).
+ */
+export function rowsRequired(stage: Pick<StageDefinition, 'exit_criteria'>): boolean {
+  return stage.exit_criteria.some((c) => c.rule?.type === 'every_item_has_status' || c.rule?.type === 'all_findings_triaged');
+}
+
 /** Renderers whose artifact is a list of items that count rules can count. */
 const COUNTABLE_RENDERERS = new Set(['list', 'review', 'outline']);
 
@@ -173,7 +183,11 @@ export function evaluateStage(
     return { stageId, criteria: [], canAdvance: true, unmet: [] };
   }
 
-  const criteria = stage.exit_criteria.map((c) => evaluateCriterion(c, stageId, ctx, stage.renderer));
+  const criteria = [
+    ...stage.exit_criteria.map((c) => evaluateCriterion(c, stageId, ctx, stage.renderer)),
+    // What the user asked for in numbers, counted on the saved text (C1, 8 Oct).
+    ...(ctx.measured?.[stageId] ?? []).map((m) => ({ ...m, blocking: true })),
+  ];
   const unmet = criteria.filter((c) => !c.satisfied);
   return {
     stageId,
@@ -674,8 +688,14 @@ export function completionSummary(
  */
 export type OutstandingItem =
   | { kind: 'stale_stage'; stageId: string; label: string; reason: string }
-  | { kind: 'open_findings'; stageId: string; label: string; count: number }
-  | { kind: 'unconfirmed_proposals'; stageId: string; label: string; count: number }
+  | { kind: 'open_findings'; stageId: string; label: string; count: number; optional?: boolean }
+  | { kind: 'unconfirmed_proposals'; stageId: string; label: string; count: number; optional?: boolean }
+  /**
+   * Rows carried forward or deferred that say an objective requirement is
+   * unmet (C2, 8 Oct): settled as rows, not as work. "Carrying an issue
+   * forward should not turn an unmet requirement into 'Objective met'."
+   */
+  | { kind: 'carried_forward'; stageId: string; label: string; rows: string[] }
   | { kind: 'unmet_blocking'; stageId: string; label: string; criteria: string[] }
   | { kind: 'blocked_stage'; stageId: string; label: string; reason: string }
   | { kind: 'go_waiting'; label: string; need: string }
@@ -710,12 +730,25 @@ export function outstandingWork(
 
     const proposed = ctx.itemsProposed?.[stage.id] ?? 0;
     const findings = ctx.findings?.[stage.id];
+    // A table that says it does not block finishing is listed, as optional,
+    // and does not hold anything up (`blocksCompletion`).
+    // Rows that say a requirement is unmet hold it up wherever they are (C2).
+    const optionalTable = !rowsRequired(stage);
+    const unmetRows = optionalTable ? Math.min(ctx.openUnmet?.[stage.id] ?? 0, (findings ? findings.total - findings.triaged : 0) + proposed) : 0;
+    if (unmetRows > 0) out.push({ kind: 'open_findings', stageId: stage.id, label, count: unmetRows });
+    let rest = unmetRows;
+    const optional = optionalTable ? { optional: true } : {};
     if (findings) {
       // Proposed rows are not triaged either; they are counted once, as proposals.
-      const open = Math.max(0, findings.total - findings.triaged - proposed);
-      if (open > 0) out.push({ kind: 'open_findings', stageId: stage.id, label, count: open });
+      const all = Math.max(0, findings.total - findings.triaged - proposed);
+      const open = Math.max(0, all - rest);
+      rest = Math.max(0, rest - all);
+      if (open > 0) out.push({ kind: 'open_findings', stageId: stage.id, label, count: open, ...optional });
     }
-    if (proposed > 0) out.push({ kind: 'unconfirmed_proposals', stageId: stage.id, label, count: proposed });
+    const proposals = Math.max(0, proposed - rest);
+    if (proposals > 0) out.push({ kind: 'unconfirmed_proposals', stageId: stage.id, label, count: proposals, ...optional });
+    const carried = ctx.carriedForward?.[stage.id] ?? [];
+    if (carried.length) out.push({ kind: 'carried_forward', stageId: stage.id, label, rows: carried });
 
     // Required work still unticked: on the stage the project is on, and on any
     // stage moved past with something left open.
@@ -738,9 +771,11 @@ export function describeOutstanding(item: OutstandingItem): string {
     case 'stale_stage':
       return `${item.label} needs a recheck — ${item.reason}`;
     case 'open_findings':
-      return `${item.label}: ${item.count} finding${item.count === 1 ? '' : 's'} not yet accepted or rejected`;
+      return `${item.label}: ${item.count}${item.optional ? ' optional' : ''} finding${item.count === 1 ? '' : 's'} not yet accepted or rejected`;
     case 'unconfirmed_proposals':
-      return `${item.label}: ${item.count} proposed status${item.count === 1 ? '' : 'es'} not yet confirmed`;
+      return `${item.label}: ${item.count}${item.optional ? ' optional' : ''} proposed status${item.count === 1 ? '' : 'es'} not yet confirmed`;
+    case 'carried_forward':
+      return `${item.label}: carried forward, still unmet — ${item.rows.slice(0, 3).map((r) => `"${r}"`).join('; ')}${item.rows.length > 3 ? ` and ${item.rows.length - 3} more` : ''}`;
     case 'unmet_blocking':
       return `${item.label}: ${item.criteria.join('; ')}`;
     case 'blocked_stage':
@@ -752,6 +787,11 @@ export function describeOutstanding(item: OutstandingItem): string {
         ? `The objective is not met — waiting for: ${item.blockers.join('; ')}`
         : 'The objective is not met';
   }
+}
+
+/** Whether an outstanding item holds up "Objective met" and plain "Finish project". Optional rows do not. */
+export function blocksCompletion(item: OutstandingItem): boolean {
+  return !('optional' in item && item.optional);
 }
 
 /**

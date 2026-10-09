@@ -11,7 +11,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { completionSummary, describeOutstanding, initialState, outstandingBeyondCriteria, outstandingElsewhere, outstandingWork } from './engine';
+import { blocksCompletion, completionSummary, describeOutstanding, initialState, outstandingBeyondCriteria, outstandingElsewhere, outstandingWork } from './engine';
 import { deriveWorkflowRecommendations } from './recommend';
 import { figureFindings, figureSources } from './figure-support';
 import { evaluateStage } from './engine';
@@ -83,7 +83,7 @@ describe('Completion messages agree with unresolved work', () => {
     const rows = deriveWorkflowRecommendations({ template, stage: template.stages.at(-1)!, evaluation: evaluateStage(template, 'summary', c), elsewhere: open });
     const finish = rows.find((r) => r.category.startsWith('finish:'))!;
     expect(finish.summary).not.toMatch(/nothing on it/);
-    expect(finish.summary).toContain('Summary: 3 findings not yet accepted or rejected');
+    expect(finish.summary).toContain('Summary: 3 optional findings not yet accepted or rejected');
   });
 
   it('Go waiting for the user is outstanding work', () => {
@@ -110,13 +110,25 @@ describe('The project cannot report "Ready to move on" while an unresolved check
     expect(evaluateStage(template, 'summary', c).canAdvance).toBe(true);
     // …but the finding is outstanding, and finishing is no longer plain "Finish project".
     const summary = completionSummary(template, state, c);
-    expect(summary.outstanding.map(describeOutstanding)).toEqual(['Summary: 1 finding not yet accepted or rejected']);
+    expect(summary.outstanding.map(describeOutstanding)).toEqual(['Summary: 1 optional finding not yet accepted or rejected']);
   });
 
   it('proposed statuses are counted once, as proposals, not again as open findings', () => {
     const state: WorkflowState = { current_stage_id: 'summary', stages: { summary: { status: 'in_progress' } } };
     const items = outstandingWork(template, state, ctx({ findings: { summary: { total: 3, triaged: 0 } }, itemsProposed: { summary: 3 }, manualChecks: { 'summary.accepted': true } }));
-    expect(items.map(describeOutstanding)).toEqual(['Summary: 3 proposed statuses not yet confirmed']);
+    expect(items.map(describeOutstanding)).toEqual(['Summary: 3 optional proposed statuses not yet confirmed']);
+  });
+
+  it('optional rows are listed but hold nothing up; a row saying a requirement is unmet does (C2/C3, 8 Oct)', () => {
+    const state: WorkflowState = { current_stage_id: 'summary', stages: { ...afterChange.stages, summary: { status: 'in_progress' } } };
+    const optional = outstandingWork(template, state, ctx({ findings: { summary: { total: 3, triaged: 0 } }, manualChecks: { 'summary.accepted': true } }));
+    expect(optional.every((i) => !blocksCompletion(i))).toBe(true);
+    const unmet = outstandingWork(template, state, ctx({ findings: { summary: { total: 3, triaged: 0 } }, openUnmet: { summary: 1 }, manualChecks: { 'summary.accepted': true } }));
+    expect(unmet.map(describeOutstanding)).toEqual(['Summary: 1 finding not yet accepted or rejected', 'Summary: 2 optional findings not yet accepted or rejected']);
+    expect(unmet.filter(blocksCompletion)).toHaveLength(1);
+    const carried = outstandingWork(template, state, ctx({ carriedForward: { summary: ['Proofs missing from the report'] }, manualChecks: { 'summary.accepted': true } }));
+    expect(carried.map(describeOutstanding)).toEqual(['Summary: carried forward, still unmet — "Proofs missing from the report"']);
+    expect(carried.filter(blocksCompletion)).toHaveLength(1);
   });
 
   it('a clean project has nothing outstanding', () => {

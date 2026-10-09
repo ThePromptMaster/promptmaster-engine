@@ -19,12 +19,15 @@ import { approvedOutlineVersionId } from '@/lib/supabase/outline';
 import type { Artifact, ArtifactVersion, Project } from '@/types/project';
 import { draftingStageId } from './derived-outline';
 import type { StageArtifactBundle } from './digest';
-import { confirmableProposals, effectiveRenderer, isTriaged, itemSchemaFor, parseItems, rendererHoldsItems } from './stage-artifact';
+import { carriedForwardUnmet, confirmableProposals, openUnmet, effectiveRenderer, isTriaged, itemSchemaFor, parseItems, rendererHoldsItems } from './stage-artifact';
 import type { StageContext, StageDefinition, WorkflowEvent, WorkflowTemplate } from './types';
+import { deliverableStage } from './engine';
+import { currentFacts } from './facts';
+import { measure, parseRequirements, requirementsForStage, type Measurement } from './measurable';
 
 export interface BuildContextInput {
   template: WorkflowTemplate;
-  project: Pick<Project, 'objective' | 'audience' | 'constraints' | 'manual_checks'>;
+  project: Pick<Project, 'objective' | 'audience' | 'constraints' | 'manual_checks'> & Partial<Pick<Project, 'output_format' | 'facts'>>;
   /** Per stage id: that stage's artifact and its versions. */
   bundles: Record<string, StageArtifactBundle>;
   /**
@@ -90,6 +93,8 @@ export function buildStageContext(input: BuildContextInput): StageContext {
   const artifactNonEmpty: Record<string, boolean> = {};
   const sections: StageContext['sections'] = {};
   const findings: StageContext['findings'] = {};
+  const carriedForward: Record<string, string[]> = {};
+  const openUnmetRows: Record<string, number> = {};
 
   for (const s of template.stages) {
     const bundle = bundles[s.id];
@@ -143,10 +148,38 @@ export function buildStageContext(input: BuildContextInput): StageContext {
     // every review stage's count is available at once.
     if (effectiveRenderer(s) === 'review') {
       findings[s.id] = { total: items.length, triaged: items.length - itemsMissingStatus[s.id] };
+      const carried = carriedForwardUnmet(items, schema);
+      if (carried.length) carriedForward[s.id] = carried;
+      const unmet = openUnmet(items, schema);
+      if (unmet) openUnmetRows[s.id] = unmet;
+    }
+  }
+
+  // C1 (8 Oct): word ranges, limits and question counts the user asked for,
+  // measured on the stages that produce what they describe.
+  const requirements = parseRequirements([
+    project.objective ?? '',
+    project.constraints ?? '',
+    project.output_format ?? '',
+    ...currentFacts(project.facts).filter((f) => f.kind === 'requirement').map((f) => f.statement),
+  ]);
+  const measured: Record<string, Measurement[]> = {};
+  if (requirements.length) {
+    const deliverableId = deliverableStage(template)?.id;
+    for (const s of template.stages) {
+      const content = bundles[s.id]?.versions.at(-1)?.content ?? '';
+      if (!content.trim()) continue;
+      const results = requirementsForStage(s, deliverableId, requirements)
+        .map(({ requirement, whole }) => measure(requirement, content, whole))
+        .filter((m): m is Measurement => m !== null);
+      if (results.length) measured[s.id] = results;
     }
   }
 
   return {
+    measured,
+    carriedForward,
+    openUnmet: openUnmetRows,
     fields: {
       objective: project.objective,
       audience: project.audience,

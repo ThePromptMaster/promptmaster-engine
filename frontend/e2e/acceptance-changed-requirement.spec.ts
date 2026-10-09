@@ -81,8 +81,10 @@ test('a changed requirement reopens what relied on it, and Go repairs it under "
   const [summaryHead] = await serviceSelect('artifact_versions', `artifact_id=eq.${summaryArtifact.id}&select=content&order=created_at.desc&limit=1`);
   const rows = JSON.parse(summaryHead.content).items as { status?: string; status_source?: string }[];
   expect(rows.map((r) => r.status_source ?? null)).toEqual(['policy', 'policy', null]);
-  expect(run.status).toBe('awaiting_decision');
-  expect(run.stop_reason).toBe('The deliverable is written, but the work is not finished: Summary: 1 finding not yet accepted or rejected.');
+  // C3 (8 Oct): Summary's table says its rows are optional, and the row left
+  // undecided says nothing is missing, so it no longer holds the objective up.
+  expect(run.status).toBe('completed');
+  expect(run.stop_reason).toBe('Objective met.');
   await expect(page.getByText('Confirmed under your routine-decision policy').first()).toBeVisible({ timeout: 30_000 });
 
   // A new version, the old one kept; the stage is closed again, citing it.
@@ -91,7 +93,7 @@ test('a changed requirement reopens what relied on it, and Go repairs it under "
   expect(repaired).toMatchObject({ actor: 'system', payload: { repaired_after: expect.any(String), evidence_version_id: expect.any(String) } });
   await expect(page.getByRole('navigation').getByText('recheck', { exact: true })).toHaveCount(0, { timeout: 30_000 });
 
-  // The stage bar agrees with Go: one thing is still open.
-  await expect(page.getByRole('group', { name: 'Stage actions' })).toContainText('Summary: 1 finding not yet accepted or rejected');
+  // The stage bar still lists the optional row, as optional.
+  await expect(page.getByRole('group', { name: 'Stage actions' })).toContainText('Summary: 1 optional finding not yet accepted or rejected');
   await page.screenshot({ path: test.info().outputPath('02-repaired-by-go.png'), fullPage: true });
 });
