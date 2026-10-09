@@ -301,6 +301,31 @@ test('A question the run asks can be answered in place, and the answer is on the
 });
 
 /**
+ * L-65 (9 Oct): on the sequence-proof replay an answer said "the Experiment
+ * record contains S_5 = 12" when Experiment had marked that check not run, and
+ * it became a fact every stage followed. An answer is now read against the
+ * saved record first; a contradiction is shown, with its quote, and the user
+ * decides.
+ */
+test('an answer the saved record contradicts is shown first, and recorded only when the user says so', async ({ page }) => {
+  const id = await researchProject(page, 'E2E go answer checked', 'Pendulum [[mock:plan=request_user_decision,prove]]');
+  await choose(page, 'Autonomous');
+  const ask = page.getByRole('region', { name: 'Go mode asks you' });
+  await expect(ask).toContainText('Mock: which way should this go?');
+  await ask.getByLabel('Your answer').fill('The record already settles it. [[mock:answer=contradicts]]');
+  await ask.getByRole('button', { name: 'Answer and continue' }).click();
+  const disagree = ask.getByRole('alert', { name: 'Your answer and the record disagree' });
+  await expect(disagree).toContainText('says:');
+  await page.screenshot({ path: test.info().outputPath('01-answer-contradicts-record.png'), fullPage: true });
+  expect((await stepsOf((await runOf(id)).id)).map((s) => s.action_key)).toEqual(['request_user_decision']);
+
+  await disagree.getByRole('button', { name: 'Record my answer anyway' }).click();
+  await expect(steps(page).nth(1)).toContainText('Your answer');
+  const facts = await serviceSelect('project_facts', `project_id=eq.${id}&select=statement,source_ref`);
+  expect(facts.some((f: { source_ref?: { contradicted?: unknown } }) => f.source_ref?.contradicted)).toBe(true);
+});
+
+/**
  * 4 Oct, production — Go asked for the Literature approval in its own words,
  * quoting the requirement, and the card offered only a text box ("it asks me
  * to tick something and there is no tick"). The quoted requirement is now the

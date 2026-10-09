@@ -253,7 +253,8 @@ export function GoPanel({
             <QuestionPrompt
               key={go.run.stop_reason}
               question={go.run.stop_reason}
-              onAnswer={(t) => void go.answer(t)}
+              onAnswer={(t, contradicted) => void go.answer(t, contradicted)}
+              checkAnswer={go.checkAnswer}
               approvals={approvalsAskedFor(go.run.stop_reason, needContext?.openApprovals)}
               onTick={
                 needsActions

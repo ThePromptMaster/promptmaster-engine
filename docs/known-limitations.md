@@ -606,7 +606,7 @@ direction. Two things still count as work Go may do first:
 | L-62 | No Jupyter notebook export | open |
 | L-63 | A measured requirement failed on a finished stage is reported, not repaired by Go | open |
 | L-64 | An answer that contradicts the deliverable's wording reopens only what names the same values | open |
-| L-65 | An answer about what the record contains is taken as a fact, not checked against the record | open |
+| L-65 | An answer about what the record contains is taken as a fact, not checked against the record | resolved |
 | L-66 | Confirming proposed statuses on a finished table means reopening it, which reopens every later stage | open |
 | L-B3 | Go code execution: Python only, fixed packages, no network | accepted |
 | L-B4 | Go runs while the tab is open; windows, not dollars | accepted |
@@ -1217,6 +1217,13 @@ or where it is" — but the record's account of *where* it was done followed the
 not the history. Proposed: an answer that names a stage's content is checked against
 that stage's saved versions, and a disagreement is put to the user before it is
 recorded.
+
+**Resolved 2026-10-09:** before an answer to Go is recorded, `POST /api/agent/check-answer`
+reads its statements about the saved record (not its decisions or new values) against
+every stage's latest saved text. A contradiction is shown only with a quote that is
+verbatim in the document it names: "Your answer and the record disagree", with *Record my
+answer anyway* or *Edit my answer*. An answer recorded anyway keeps the quote it overrode
+on the fact (`source_ref.contradicted`). A failed check lets the answer through.
 
 ### L-66 — Confirming proposed statuses on a finished table means reopening it, which reopens every later stage (2026-10-09)
 
