@@ -57,12 +57,19 @@ const SUBJECTS = [
 const SUBJECT_RE = new RegExp(`\\b(${SUBJECTS.join('|')}|frequently asked questions)s?\\b`, 'i');
 
 function subjectNear(text: string, start: number, end: number): string {
-  // "a 120–180-word announcement": after it. "the announcement must be 100–140 words": before it.
-  const after = text.slice(end, end + 40).match(SUBJECT_RE);
-  if (after) return canonical(after[1]);
-  const before = text.slice(Math.max(0, start - 60), start);
-  const all = [...before.matchAll(new RegExp(SUBJECT_RE.source, 'gi'))];
-  return all.length ? canonical(all.at(-1)![1]) : '';
+  // "a 120–180-word announcement": after it. "the announcement must be
+  // 100–140 words", "a launch announcement (100-140 words) and a … FAQ":
+  // before it. Whichever is nearer — on production the second form was read
+  // as the FAQ's (9 Oct).
+  const afterText = text.slice(end, end + 40);
+  const after = afterText.match(SUBJECT_RE);
+  const beforeText = text.slice(Math.max(0, start - 60), start);
+  const all = [...beforeText.matchAll(new RegExp(SUBJECT_RE.source, 'gi'))];
+  const before = all.at(-1);
+  const afterGap = after ? after.index! : Infinity;
+  const beforeGap = before ? beforeText.length - (before.index! + before[0].length) : Infinity;
+  if (afterGap === Infinity && beforeGap === Infinity) return '';
+  return canonical(afterGap <= beforeGap ? after![1] : before![1]);
 }
 
 const canonical = (s: string) => (/frequently asked questions/i.test(s) ? 'faq' : s.toLowerCase());
