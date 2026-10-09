@@ -664,7 +664,12 @@ settled by the draft calling it "not run": Go runs it, once, and the row records
 output, or the exact reason it could not run (no sandbox, missing data, or the error the
 code ended with). That classification is the model's, written in the draft; a row it
 misjudges as needing data is still left to the user. A row blocked this way is set aside
-and the run goes on with other work (`setAside`), rather than ending. A snapshot built before
+and the run goes on with other work (`setAside`), rather than ending. A reason "needs a
+tool" that names only computation (integration, simulation, a fit) is read as
+PromptMaster's (#203). **Each run has 30 seconds** (`COMMAND_TIMEOUT_MS`): the code-writer
+is told so and prints `reduced: …` when it narrows a sweep to fit; a run that still times
+out is recorded on its row as not run, with that reason, and the next row is tried (#204).
+A computation that cannot be made to fit in 30 seconds is not run at all. A snapshot built before
 pandas was added lacks it: rebuild with `scripts/sandbox-snapshot.mts` and update
 `SANDBOX_SNAPSHOT_ID`.
 **A run that could not be made settles its row too (2026-10-02).** When the code needs a
