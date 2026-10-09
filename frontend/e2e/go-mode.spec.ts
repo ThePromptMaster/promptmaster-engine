@@ -381,3 +381,22 @@ test('a draft longer than the planner excerpt still gets a next move', async ({ 
   await expect(page.getByRole('button', { name: /Viewing a later stage — back to/ })).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('02-later-stage-banner.png') });
 });
+
+test('A question for an expert comes with the package an expert needs (Q3a, 9 Oct)', async ({ page }) => {
+  // Sean: "When expert review is necessary, PromptMaster should prepare a
+  // concise package containing the question, assumptions, derivation or
+  // computation, evidence, unresolved issue, and specific judgment requested."
+  const id = await researchProject(page, 'E2E go expert', 'Regge calculus continuum limit [[mock:plan=request_user_decision]] [[mock:ask=expert]]');
+  await choose(page, 'Autonomous');
+  const ask = page.getByRole('region', { name: 'Go mode asks you' });
+  await expect(ask).toContainText("needs an expert's judgment", { timeout: 60_000 });
+  const pkg = ask.getByRole('group', { name: 'Expert review package' });
+  await expect(pkg).toContainText('# Expert review: E2E go expert');
+  await expect(pkg).toContainText('## The judgment requested');
+  await expect(pkg.getByRole('button', { name: 'Download (.md)' })).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath('01-expert-package.png'), fullPage: true });
+  // Kept on the record with the question.
+  const [first] = await serviceSelect('agent_steps', `run_id=eq.${(await runOf(id)).id}&select=action_key,output&order=idx&limit=1`);
+  expect(first.action_key).toBe('request_user_decision');
+  expect(first.output).toContain("Prepared for an expert's review");
+});

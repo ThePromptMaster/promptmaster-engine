@@ -14,6 +14,7 @@ import { PolicySelector } from './policy-selector';
 import { RoutineDecisions } from './routine-decisions';
 import type { RoutineDecisions as RoutinePolicy } from '@/types/project';
 import { StepTimeline } from './step-timeline';
+import { RunAccountCard } from './run-account';
 import { TransparencyPanel } from './transparency-panel';
 
 /**
@@ -253,6 +254,7 @@ export function GoPanel({
             <QuestionPrompt
               key={go.run.stop_reason}
               question={go.run.stop_reason}
+              expertPackage={go.run.needs?.kind === 'answer_question' ? go.run.needs.expertPackage : undefined}
               onAnswer={(t, contradicted) => void go.answer(t, contradicted)}
               checkAnswer={go.checkAnswer}
               approvals={approvalsAskedFor(go.run.stop_reason, needContext?.openApprovals)}
@@ -266,6 +268,7 @@ export function GoPanel({
               }
             />
           )}
+          <RunAccountCard run={go.run} steps={go.steps} stageLabel={go.stageLabelFor} />
           {(go.run || go.steps.length > 0) && (
             <TransparencyPanel
               run={go.run}

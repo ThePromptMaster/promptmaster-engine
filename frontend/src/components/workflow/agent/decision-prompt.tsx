@@ -64,8 +64,11 @@ export function QuestionPrompt({
   checkAnswer,
   approvals = [],
   onTick,
+  expertPackage,
 }: {
   question: string;
+  /** Q3a: the package prepared for an expert's review, as markdown. */
+  expertPackage?: string;
   /** With the contradiction the user chose to record the answer over (L-65). */
   onAnswer: (text: string, contradicted?: AnswerContradiction) => void;
   /** Reads the answer against the saved record first; null when nothing contradicts it. */
@@ -94,6 +97,7 @@ export function QuestionPrompt({
     <section aria-label="Go mode asks you" className="rounded-xl bg-[var(--surface-container-highest)] px-5 py-4">
       <p className="text-label uppercase tracking-wide text-[var(--on-surface-variant)]">Go mode asks</p>
       <p className="mt-1 text-body text-[var(--on-surface)]">{question}</p>
+      {expertPackage && <ExpertPackageCard markdown={expertPackage} />}
       {onTick && approvals.length > 0 && (
         <div className="mt-3 flex flex-col items-start gap-2">
           {approvals.map((a) => (
@@ -173,5 +177,49 @@ export function QuestionPrompt({
         </span>
       </div>
     </section>
+  );
+}
+
+/**
+ * Q3a (Sean, 9 Oct): "PromptMaster should prepare a concise package containing
+ * the question, assumptions, derivation or computation, evidence, unresolved
+ * issue, and specific judgment requested." Shown with the question, to copy
+ * or download and send to whoever can judge it.
+ */
+function ExpertPackageCard({ markdown }: { markdown: string }) {
+  const [copied, setCopied] = useState(false);
+  const download = () => {
+    const url = URL.createObjectURL(new Blob([markdown], { type: 'text/markdown' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'expert-review.md';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+  return (
+    <details aria-label="Expert review package" className="mt-3 rounded-lg bg-[var(--surface-container-lowest)] px-4 py-3" open>
+      <summary className="cursor-pointer text-label uppercase tracking-wide text-[var(--on-surface-variant)]">
+        Prepared for an expert&apos;s review
+      </summary>
+      <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap text-body text-[var(--on-surface)]">{markdown}</pre>
+      <div className="mt-2 flex gap-2">
+        <button
+          type="button"
+          onClick={() => void navigator.clipboard?.writeText(markdown).then(() => setCopied(true))}
+          className="flex items-center gap-1 rounded-lg bg-[var(--surface-container-high)] px-3 py-1.5 text-label text-[var(--on-surface)]"
+        >
+          <span aria-hidden className="material-symbols-outlined text-[18px]">content_copy</span>
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+        <button
+          type="button"
+          onClick={download}
+          className="flex items-center gap-1 rounded-lg bg-[var(--surface-container-high)] px-3 py-1.5 text-label text-[var(--on-surface)]"
+        >
+          <span aria-hidden className="material-symbols-outlined text-[18px]">download</span>
+          Download (.md)
+        </button>
+      </div>
+    </details>
   );
 }

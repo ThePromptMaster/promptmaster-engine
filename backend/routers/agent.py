@@ -37,6 +37,7 @@ from promptmaster.verify_sources import MAX_VERIFY, SourceToVerify, SourceVerdic
 from promptmaster.criterion_check import CriterionCheck, check_criterion
 from promptmaster.answer_check import CheckAnswerRequest, CheckAnswerResponse, check_answer
 from promptmaster.objective_assessment import ObjectiveAssessment, RunStep, assess_objective
+from promptmaster.expert_review import ExpertPackage, RecordDocument, prepare_expert_package
 from promptmaster.fact_extraction import ExtractedFact, SourceDoc, extract_facts
 from promptmaster.agent_actions import ACTION_KEYS, AGENT_ACTIONS, REASONING_ACTIONS, AgentAction
 from promptmaster.errors import PRESERVED_NOTHING_WRITTEN
@@ -314,6 +315,30 @@ async def api_assess_objective(req: AssessObjectiveRequest, client: OpenRouterCl
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
     return AssessObjectiveResponse(**result.model_dump(), model_used=_model_used(req.model, client))
+
+
+class ExpertPackageRequest(BaseModel):
+    inputs: PMInput
+    issue: str = Field(min_length=1, max_length=2_000)
+    stage_label: str = Field(default="", max_length=200)
+    documents: list[RecordDocument] = Field(default_factory=list, max_length=30)
+    model: str = ""
+
+
+class ExpertPackageResponse(ExpertPackage):
+    model_used: str = ""
+
+
+@router.post("/expert-package")
+async def api_expert_package(req: ExpertPackageRequest, client: OpenRouterClient = Depends(get_client)) -> ExpertPackageResponse:
+    """The package for an expert's judgment (Q3a; Sean, 9 Oct): question, assumptions,
+    the saved working, evidence, what is unresolved and the judgment requested.
+    1 LLM call; commits nothing — the client saves it."""
+    try:
+        result = await prepare_expert_package(client, req.model or None, req.inputs, req.issue, req.stage_label, req.documents)
+    except OpenRouterError as e:
+        raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
+    return ExpertPackageResponse(**result.model_dump(), model_used=_model_used(req.model, client))
 
 
 @router.post("/check-answer")
