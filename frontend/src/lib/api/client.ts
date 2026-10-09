@@ -741,6 +741,8 @@ export const api = {
       content: string;
       steps: { action_key: string; execution_label: string | null; output: string }[];
       success_criterion?: string;
+      /** What the project's own checks hold as still unmet (C2). */
+      failed_checks?: string[];
       model?: string;
     },
     signal?: AbortSignal

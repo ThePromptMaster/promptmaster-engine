@@ -103,3 +103,16 @@ def test_the_planner_is_told_the_execution_objective():
     assert "EXECUTION: ongoing" in text
     assert "Done means: a supported result." in text
     assert "Reaching the last stage does not by itself meet the objective." in text
+
+
+def test_a_verification_goes_after_everything_it_verifies_and_repair_is_not_a_branch():
+    """Sean, 7 Oct (email 14): a requested verification was placed before the
+    invitation it had to verify, and the designer said it could not branch into
+    repairs and rerun checks — which Go does."""
+    from promptmaster.workflow_designer import build_workflow_prompt
+    from promptmaster.workflow_revision import CAPABILITIES
+
+    _system, user = build_workflow_prompt("A workshop with five deliverables", "")
+    assert "after EVERY stage whose output it checks" in user
+    assert "goes after the last stage it verifies" in CAPABILITIES
+    assert "Repair after a failed check is not a branch to design" in CAPABILITIES

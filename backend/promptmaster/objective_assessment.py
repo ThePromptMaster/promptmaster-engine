@@ -95,7 +95,12 @@ def _clip(text: str) -> str:
 
 
 def build_assessment_prompt(
-    inputs: PMInput, deliverable_label: str, content: str, steps: list[RunStep], success_criterion: str = ""
+    inputs: PMInput,
+    deliverable_label: str,
+    content: str,
+    steps: list[RunStep],
+    success_criterion: str = "",
+    failed_checks: list[str] | None = None,
 ) -> tuple[str, str]:
     record = "\n".join(
         f"- S{i + 1}: {s.action_key} — {s.execution_label or 'no execution label'}"
@@ -108,6 +113,15 @@ def build_assessment_prompt(
         + (f"{context_block(inputs, limit=4_000)}\n" if (inputs.context.strip() or inputs.facts) else "")
         + f"\nRUN RECORD (what the autonomous run actually did; execution labels are derived from what happened):\n{record}\n\n"
         f"--- THE DELIVERABLE: {deliverable_label} ---\n{_clip(content)}\n--- END ---\n\n"
+        + (
+            # C2 (8 Oct): what the project's own checks found still wrong. A
+            # finding carried forward is still a finding (Sean, sequence test).
+            "STILL UNMET, as the project's own checks recorded (measured in code, or carried forward "
+            "unresolved by a review). Each one means the objective is NOT met unless the deliverable "
+            "above plainly shows it is fixed:\n" + "\n".join(f"- {c}" for c in failed_checks) + "\n\n"
+            if failed_checks else ""
+        )
+        + 
         "Return JSON: {\n"
         '  "outcome": "met" | "not_met" | "partly",\n'
         '  "reason": "one sentence",\n'
@@ -125,7 +139,9 @@ def _norm(text: str) -> str:
     return " ".join(re.sub(r"[*_`#>]", "", text).split()).lower()
 
 
-def parse_assessment(result: object, content: str, steps: list[RunStep]) -> ObjectiveAssessment:
+def parse_assessment(
+    result: object, content: str, steps: list[RunStep], failed_checks: list[str] | None = None
+) -> ObjectiveAssessment:
     if not isinstance(result, dict):
         return ObjectiveAssessment(outcome="partly", reason="The check did not come back in a usable form.")
     outcome = result.get("outcome") if result.get("outcome") in ("met", "not_met", "partly") else "partly"
@@ -137,6 +153,11 @@ def parse_assessment(result: object, content: str, steps: list[RunStep]) -> Obje
     # quote is only "partly".
     if outcome == "met" and not quoted:
         outcome = "partly"
+    # A check the project measured or recorded as unmet is not overruled by
+    # the model's reading (C2, 8 Oct).
+    if outcome == "met" and failed_checks:
+        outcome = "partly"
+        result = {**result, "reason": f"Still unmet: {'; '.join(failed_checks[:3])}"}
 
     blockers: list[Blocker] = []
     for b in result.get("blockers") or []:
@@ -189,7 +210,8 @@ async def assess_objective(
     content: str,
     steps: list[RunStep],
     success_criterion: str = "",
+    failed_checks: list[str] | None = None,
 ) -> ObjectiveAssessment:
-    system, user = build_assessment_prompt(inputs, deliverable_label, content, steps, success_criterion)
+    system, user = build_assessment_prompt(inputs, deliverable_label, content, steps, success_criterion, failed_checks)
     result, _usage = await client.generate_json(prompt=user, system=system, temperature=0, max_tokens=900, model=model)
-    return parse_assessment(result, content, steps)
+    return parse_assessment(result, content, steps, failed_checks)

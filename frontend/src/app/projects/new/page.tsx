@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -26,6 +26,8 @@ import { imagePreview } from '@/lib/data/preview';
 import { INPUT_LIMITS } from '@/lib/projects/input-limits';
 import { attachProjectFile } from '@/lib/supabase/project-files';
 import { LimitCounter } from '@/components/shared/limit-counter';
+import { clearSetupDraft, loadSetupDraft, saveSetupDraft } from '@/lib/supabase/setup-drafts';
+import { describeDraft, worthKeeping, type DesignerState, type FrontDoorState, type SetupDraftState } from '@/lib/projects/setup-draft';
 
 /**
  * PM-09 — the unified entry.
@@ -100,6 +102,16 @@ export default function NewProjectPage() {
   const [templatesError, setTemplatesError] = useState<string | null>(null);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
 
+  // U2 (Sean, 7 Oct, email 14): the setup is kept as the user works, and
+  // offered back when they return — signing out no longer loses it.
+  const [frontDoorState, setFrontDoorState] = useState<FrontDoorState | null>(null);
+  const [designerState, setDesignerState] = useState<DesignerState | null>(null);
+  /** Remounts the front door and designer with what was restored. */
+  const [restoredAt, setRestoredAt] = useState(0);
+  const [kept, setKept] = useState<{ data: SetupDraftState; updated_at: string } | null>(null);
+  const [draftSaved, setDraftSaved] = useState<'saved' | 'saving' | 'failed' | null>(null);
+  const draftChecked = useRef(false);
+
   const loadTemplates = useCallback(() => {
     setLoadingTemplates(true);
     setTemplatesError(null);
@@ -112,6 +124,59 @@ export default function NewProjectPage() {
   useEffect(() => {
     loadTemplates();
   }, [loadTemplates]);
+
+  // An unfinished setup from an earlier visit: offered, never applied unasked.
+  useEffect(() => {
+    if (!user || draftChecked.current) return;
+    draftChecked.current = true;
+    loadSetupDraft(user.id)
+      .then((found) => {
+        if (found && worthKeeping(found.data)) setKept(found);
+      })
+      .catch(() => undefined);
+  }, [user]);
+
+  const snapshot: SetupDraftState = {
+    v: 1, step, objective, draft, templateId, recommendedKey, workflowReason, rationale, initialFacts,
+    frontDoor: frontDoorState, designer: designerState,
+    attachedNames: [...startFiles.map((f) => f.file.name), ...startImages.map((i) => i.file.name)],
+  };
+  const snapshotKey = JSON.stringify(snapshot);
+  useEffect(() => {
+    // Not while an earlier setup is still on offer: saving now would replace it.
+    if (!user || kept || !draftChecked.current || working === 'creating') return;
+    const state = JSON.parse(snapshotKey) as SetupDraftState;
+    if (!worthKeeping(state)) return;
+    setDraftSaved('saving');
+    const timer = setTimeout(() => {
+      saveSetupDraft(user.id, state)
+        .then(() => setDraftSaved('saved'))
+        .catch(() => setDraftSaved('failed'));
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [snapshotKey, user, kept, working]);
+
+  function restoreKept() {
+    if (!kept) return;
+    const k = kept.data;
+    setStep(k.step);
+    setObjective(k.objective);
+    if (k.draft) setDraft(k.draft);
+    setTemplateId(k.templateId ?? null);
+    setRecommendedKey(k.recommendedKey ?? null);
+    setWorkflowReason(k.workflowReason ?? '');
+    setRationale(k.rationale ?? null);
+    setInitialFacts(k.initialFacts ?? []);
+    setFrontDoorState(k.frontDoor ?? null);
+    setDesignerState(k.designer ?? null);
+    setRestoredAt(Date.now());
+    setKept(null);
+  }
+
+  function discardKept() {
+    if (user) void clearSetupDraft(user.id).catch(() => undefined);
+    setKept(null);
+  }
 
   const templateFor = (key: string) => templates.find((t) => t.key === key) ?? null;
   const selected = templates.find((t) => t.id === templateId) ?? null;
@@ -278,6 +343,7 @@ export default function NewProjectPage() {
 
       // What the user confirmed in the front door is the project's initial record.
       if (initialFacts.length) await recordFacts(project, initialFacts);
+      await clearSetupDraft(user.id).catch(() => undefined);
       router.push(`/projects/${project.id}`);
     } catch (e) {
       // Four writes, not one transaction: a failure part-way left a project
@@ -303,6 +369,38 @@ export default function NewProjectPage() {
         <span className="material-symbols-outlined text-[18px]">arrow_back</span>
         Projects
       </Link>
+
+      {kept && (
+        <div role="region" aria-label="Unfinished setup" className="mb-6 rounded-xl bg-[var(--surface-container-high)] px-5 py-4 text-body text-[var(--on-surface)]">
+          <p>{describeDraft(kept.data, kept.updated_at)}</p>
+          {(kept.data.attachedNames?.length ?? 0) > 0 && (
+            <p className="mt-1 text-label text-[var(--on-surface-variant)]">
+              Files are not kept in a draft — attach {kept.data.attachedNames!.length === 1 ? 'it' : 'them'} again: {kept.data.attachedNames!.join(', ')}.
+            </p>
+          )}
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button onClick={restoreKept} className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label font-semibold text-[var(--on-primary)]">
+              Continue where I left off
+            </button>
+            <button onClick={discardKept} className="rounded-lg px-4 py-2 text-label text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-highest)]">
+              Discard the draft
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!kept && draftSaved && (
+        <p role="status" aria-label="Setup draft" className="mb-4 text-label text-[var(--on-surface-variant)]">
+          <span aria-hidden className="material-symbols-outlined mr-1 align-[-3px] text-[16px]">
+            {draftSaved === 'failed' ? 'cloud_off' : 'cloud_done'}
+          </span>
+          {draftSaved === 'saving'
+            ? 'Saving your setup…'
+            : draftSaved === 'saved'
+              ? 'Your setup is saved as a draft — you can sign out and continue later. Nothing is created until you press Start.'
+              : 'Your setup could not be saved as a draft; it is kept on this page until you leave.'}
+        </p>
+      )}
 
       {error && (
         <div role="alert" className="mb-6 rounded-xl bg-[var(--error-container)] px-4 py-3 text-body text-[var(--on-error-container)]">
@@ -436,7 +534,14 @@ export default function NewProjectPage() {
             PromptMaster asks one useful question at a time and keeps a draft brief of what you say. When it is
             right, you confirm what becomes the project&apos;s starting record.
           </p>
-          <FrontDoor opening={objective} onReady={fromConversation} onBack={() => setStep('ask')} />
+          <FrontDoor
+            key={`fd-${restoredAt}`}
+            opening={objective}
+            onReady={fromConversation}
+            onBack={() => setStep('ask')}
+            initialState={frontDoorState}
+            onStateChange={setFrontDoorState}
+          />
         </>
       )}
 
@@ -471,7 +576,9 @@ export default function NewProjectPage() {
                   </button>
                 )}
                 <CustomWorkflowDesigner
-                  key={copying?.id ?? 'new'}
+                  key={`${copying?.id ?? 'new'}-${restoredAt}`}
+                  initialState={copying ? null : designerState}
+                  onStateChange={copying ? undefined : setDesignerState}
                   objective={draft.objective}
                   ownerId={user?.id ?? null}
                   initial={copying ? designFromTemplate(copying) : null}

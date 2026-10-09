@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { api } from '@/lib/api/client';
 import { publishUserTemplate } from '@/lib/supabase/workflow';
@@ -42,6 +42,8 @@ export function CustomWorkflowDesigner({
   onPublished,
   initial = null,
   startOpen = false,
+  initialState = null,
+  onStateChange,
 }: {
   objective: string;
   ownerId: string | null;
@@ -49,10 +51,17 @@ export function CustomWorkflowDesigner({
   /** A saved workflow to edit a copy of; publishing makes a new one. */
   initial?: DesignedWorkflow | null;
   startOpen?: boolean;
+  /** A design kept from an earlier visit, unpublished (U2). */
+  initialState?: { open: boolean; description: string; design: DesignedWorkflow | null } | null;
+  /** Told of every change, so the page can keep the design between visits. */
+  onStateChange?: (state: { open: boolean; description: string; design: DesignedWorkflow | null }) => void;
 }) {
-  const [open, setOpen] = useState(startOpen || Boolean(initial));
-  const [description, setDescription] = useState('');
-  const [design, setDesign] = useState<DesignedWorkflow | null>(initial);
+  const [open, setOpen] = useState(initialState?.open ?? (startOpen || Boolean(initial)));
+  const [description, setDescription] = useState(initialState?.description ?? '');
+  const [design, setDesign] = useState<DesignedWorkflow | null>(initialState?.design ?? initial);
+  useEffect(() => {
+    onStateChange?.({ open, description, design });
+  }, [open, description, design, onStateChange]);
   const [editing, setEditing] = useState<number | null>(null);
   const [request, setRequest] = useState('');
   const [revision, setRevision] = useState<{ changes: string[]; unsupported: { request: string; reason: string }[]; note: string } | null>(null);

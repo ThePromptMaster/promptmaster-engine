@@ -31,7 +31,7 @@ import { proposeStatuses } from '@/lib/workflow/propose';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import { summariseStageContent } from '@/lib/workflow/digest';
 import { stageContentForSummary, stageEvidence } from '@/lib/workflow/evidence';
-import { deliverableStage, describeOutstanding, evaluateStage, outstandingWork } from '@/lib/workflow/engine';
+import { blocksCompletion, deliverableStage, describeOutstanding, evaluateStage, outstandingWork } from '@/lib/workflow/engine';
 import { pausedLine } from '@/lib/workflow/objective';
 import { attachedDocuments, currentFacts, supersededFactValues } from '@/lib/workflow/facts';
 import { describeValue, leftoverValues, type SupersededValue } from '@/lib/workflow/fact-values';
@@ -83,6 +83,8 @@ export interface PerformContext {
    * ahead, carrying the answer, instead of asking again.
    */
   conflictAnswer?: string;
+  /** A Derive/Prove result on this stage not yet saved (C4): a revision applies it. */
+  derived?: { label: string; output: string };
   /** Re-read the project after a write that the store did not make itself. */
   refresh?: () => unknown;
   /** Live progress for a long step ("2 of 5 sections written"). */
@@ -502,7 +504,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // The instruction used to reach only the version's metadata, never the
       // model: "revise" was "regenerate with the old draft as context" (B0).
       const res = await api.generateStageArtifact(
-        generationRequest(ctx.project, ctx.template, ctx.state, ctx.bundles, ctx.stage, revising ? head : '', revising ? withAnswer(instruction, ctx.conflictAnswer) : ''),
+        generationRequest(ctx.project, ctx.template, ctx.state, ctx.bundles, ctx.stage, revising ? head : '', revising ? withDerivation(withAnswer(instruction, ctx.conflictAnswer), ctx.derived) : ''),
         ctx.signal
       );
       const generated = generationContent(ctx.stage, res);
@@ -946,6 +948,17 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
     case 'advance': {
       const target = ctx.stage.transitions.default_next;
       const evaluation = evaluateStage(ctx.template, ctx.stage.id, ctx.context);
+      // Sean, 7 Oct (TaskBoard): Output was marked complete while its own
+      // check said "incomplete" and "needs realignment", and Realign was then
+      // skipped. A run does not close a draft its latest check failed; it
+      // revises first. The user's own Approve still can.
+      const verdict = checkVerdict(ctx);
+      if (verdict && stageMoveActor(ctx.run.policy, ctx.approvedByUser) === 'system') {
+        return done(key, {
+          status: 'failed', toolsUsed: [], changes: {},
+          output: `Not moving on: the latest check of ${ctx.stage.label} says ${verdict}. It needs a revision first.`,
+        });
+      }
       // The same evidence the transition bar records (A2): the head version,
       // or a snapshot of a finished manuscript saved now. Drafting used to
       // have neither, so Go always left it open.
@@ -1133,8 +1146,11 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // 6 Oct: "Objective met" while Summary still needed a recheck and a
       // finding was unresolved. Work open on any stage — other than this
       // stage's own approval, handled below — means the objective is not done.
+      // Optional rows (a table that says it does not block finishing) do not
+      // hold it up (C3, 8 Oct); a row carried forward that says a requirement
+      // is unmet does (C2).
       const open = outstandingWork(ctx.template, ctx.state, ctx.context).filter(
-        (i) => !(i.kind === 'unmet_blocking' && i.stageId === ctx.stage.id)
+        (i) => !(i.kind === 'unmet_blocking' && i.stageId === ctx.stage.id) && blocksCompletion(i)
       );
       if (ctx.deliverableDone && open.length > 0) {
         const list = open.map(describeOutstanding).join('; ');
@@ -1248,6 +1264,7 @@ async function judgeObjective(ctx: PerformContext, label: string, content: strin
       steps: ctx.digest.recent_steps.map((s) => ({ action_key: s.action_key, execution_label: s.execution_label, output: s.output })),
       // The criterion the workflow was designed against, kept from the objective (7 Oct).
       success_criterion: ctx.template.execution?.success_criterion ?? '',
+      failed_checks: failedChecks(ctx),
       model: ctx.project.model,
     },
     ctx.signal
@@ -1277,4 +1294,45 @@ function roundContent(ctx: Pick<PerformContext, 'bundles' | 'template' | 'stage'
     .slice(Math.max(0, start), end + 1)
     .map((s) => `## ${s.label}\n\n${deliverableText(ctx, s.id)}`)
     .join('\n\n');
+}
+
+/**
+ * What the latest check of the current draft says is wrong with it, in words,
+ * or null: "incomplete" or "it needs realigning to the objective". Only a
+ * check of the head version counts — one about an earlier draft says nothing
+ * about this one.
+ */
+export function checkVerdict(ctx: Pick<PerformContext, 'latestEvaluation' | 'bundles' | 'stage'>): string | null {
+  const e = ctx.latestEvaluation;
+  const head = ctx.bundles[ctx.stage.id]?.versions.at(-1);
+  if (!e || !head || e.version_id !== head.id) return null;
+  const said: string[] = [];
+  if ((e.completeness_status ?? '').toLowerCase() === 'incomplete') said.push(`it is incomplete${e.completeness_reason ? ` (${e.completeness_reason.trim().replace(/\.$/, '')})` : ''}`);
+  if (e.needs_realignment) said.push('it needs realigning to the objective');
+  return said.length ? said.join(', and ') : null;
+}
+
+/**
+ * A revision that follows a derivation carries it, so the worked result
+ * reaches the saved document (C4, 8 Oct) instead of staying in the run.
+ */
+export function withDerivation(instruction: string, derived?: { label: string; output: string }): string {
+  if (!derived) return instruction;
+  return `${instruction}\n\nAPPLY THIS WORK TO THE DOCUMENT. The "${derived.label}" step produced the result below; put it into this stage's text in full where it belongs — every step, equation and check — replacing what it corrects. Do not summarise it.\n--- BEGIN ${derived.label.toUpperCase()} RESULT ---\n${derived.output.slice(0, 20_000)}\n--- END ${derived.label.toUpperCase()} RESULT ---`.trim();
+}
+
+/**
+ * What the project's own checks hold as still unmet, for the objective check
+ * (C2): measured requirements that fail, and review rows carried forward that
+ * say a requirement is unmet. The check may not call the objective met over them.
+ */
+export function failedChecks(ctx: Pick<PerformContext, 'context' | 'template'>): string[] {
+  const label = (id: string) => ctx.template.stages.find((s) => s.id === id)?.label ?? id;
+  const measured = Object.entries(ctx.context.measured ?? {}).flatMap(([id, ms]) =>
+    ms.filter((m) => !m.satisfied).map((m) => `${label(id)}: ${m.label} — measured ${m.detail ?? 'not met'}`)
+  );
+  const carried = Object.entries(ctx.context.carriedForward ?? {}).flatMap(([id, rows]) =>
+    rows.map((r) => `${label(id)}: carried forward unresolved — ${r}`)
+  );
+  return [...measured, ...carried].slice(0, 30);
 }

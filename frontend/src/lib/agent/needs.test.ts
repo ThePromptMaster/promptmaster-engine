@@ -169,6 +169,16 @@ describe('needsUser: an outcome table is the user\'s to decide (production pass,
     });
   });
 
+  it('never stops for rows on a table that says they are optional (C3; Sean, 7 Oct)', () => {
+    const schema = { itemLabel: 'item', fields: [], minItems: 1, maxItems: 20, statuses: [] };
+    const rows = [{ id: 'a', text: 'x' }, { id: 'b', text: 'y' }];
+    const optional = { ...stage('fact_check'), exit_criteria: [] };
+    expect(needsUser({
+      ...base, stage: optional, stageEvaluation: evaluation('fact_check'), allowed: ['revise_stage', 'evaluate_stage'],
+      facts: { review: { items: rows, schema, routine: [], material: rows, outcome: true } } as never,
+    })?.kind).not.toBe('decide_rows');
+  });
+
   it('stops for undecided claims instead of letting the planner revise the table', () => {
     const schema = { itemLabel: 'claim', fields: [], minItems: 1, maxItems: 20, statuses: [] };
     const rows = [{ id: 'a', claim: 'x', status: 'candidate_source' }, { id: 'b', claim: 'y', status: 'no_source' }];

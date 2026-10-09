@@ -43,6 +43,7 @@ from .schemas import (
 from .project_context import context_block
 from .notation import NOTATION_RULE
 from .saved_documents import format_prior_documents
+from .saved_text_checks import VERIFY_RULE, disproved_missing
 
 logger = logging.getLogger(__name__)
 
@@ -208,6 +209,8 @@ def build_stage_prompt(
         instruction_parts.append(_PROMPT_KIND_RULE)
     if hint:
         instruction_parts.append(f"THIS STAGE — {stage.label or stage.id}:\n{hint}")
+    if stage.renderer == "review":
+        instruction_parts.append(VERIFY_RULE)
     if schema_block:
         instruction_parts.append(schema_block)
         instruction_parts.append('Return JSON only, with shape: { "items": [ ... ] }.')
@@ -292,7 +295,10 @@ def build_stage_prompt(
             "do not state any result from them unless it is given to you elsewhere.\n" + data
         ) if data else (
             "DATA THE PROJECT HOLDS: none. No dataset or file has been attached. Do "
-            "not write as though any data had been examined."
+            "not write as though any data had been examined. A calculation from "
+            "definitions or values the objective or the earlier stages supply needs "
+            "no dataset: do it by hand and show the working (8 Oct: a validation "
+            "stage refused to recompute a recurrence it had been given in full)."
         ),
     ]
 
@@ -507,10 +513,16 @@ async def generate_stage_artifact(
         except Exception as e:
             logger.warning(f"Stage artifact JSON call failed for {stage.id}: {e}")
             return GenerateStageArtifactResponse(items=[], finish_reason="error")
-        return GenerateStageArtifactResponse(
-            items=_parse_items(result, item_schema),
-            finish_reason="stop",
-        )
+        items = _parse_items(result, item_schema)
+        if stage.renderer == "review":
+            # A check row saying something is missing, when the saved documents
+            # hold the words it quotes, is wrong (A1, 8 Oct: TeamNotes).
+            saved = "\n".join([digest.manuscript, *(e.text or e.summary for e in digest.prior_stages)])
+            items = [
+                i for i in items
+                if not disproved_missing(" ".join(str(v) for k, v in i.model_dump().items() if k not in ("id", "status", "reason")), saved)
+            ]
+        return GenerateStageArtifactResponse(items=items, finish_reason="stop")
 
     content, _usage, finish_reason = await client.generate_with_meta(
         prompt=user,

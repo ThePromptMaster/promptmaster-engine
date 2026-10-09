@@ -54,6 +54,7 @@ from .schemas import (
 )
 from .project_context import context_block
 from .saved_documents import format_prior_documents
+from .saved_text_checks import VERIFY_RULE, disproved_missing
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +111,9 @@ _STAGE_EVAL_INSTRUCTION = (
     "more passes would only churn it, set needed to false and say so plainly — "
     "do not recommend another pass out of habit.\n\n"
     "You are fair. You do not inflate scores and you do not manufacture "
-    "problems. Return ONLY valid JSON, no other text."
+    "problems.\n\n"
+    + VERIFY_RULE
+    + " Return ONLY valid JSON, no other text."
 )
 
 
@@ -337,7 +340,7 @@ def _dimension(raw: object, fallback: str) -> DimensionScore:
     return DimensionScore(score="Medium", explanation=fallback)
 
 
-def parse_stage_evaluation(result: dict) -> StageEvaluationResponse:
+def parse_stage_evaluation(result: dict, saved_text: str = "") -> StageEvaluationResponse:
     """Turn one raw JSON response into the typed result. Pure.
 
     Separated from the call for the same reason the prompt builder is: the
@@ -366,7 +369,11 @@ def parse_stage_evaluation(result: dict) -> StageEvaluationResponse:
         clarity=_dimension(result.get("clarity"), "Unable to evaluate"),
         completeness=completeness,
         interpretation=interpretation,
-        findings=_parse_findings(result.get("findings")),
+        findings=[
+            f for f in _parse_findings(result.get("findings"))
+            # A "missing" finding whose quoted words the saved text holds is wrong (A1).
+            if not disproved_missing(f"{f.summary} {f.suggested_change or ''}", saved_text)
+        ],
     )
 
     evaluation.further_pass_needed, evaluation.further_pass_reason = _further_pass(
@@ -470,7 +477,9 @@ async def evaluate_stage_artifact(
         logger.warning(f"Stage evaluation for {stage.id} returned a non-object")
         return _failed("malformed response")
 
-    parsed = parse_stage_evaluation(result)
+    # What the check could see: the draft and the saved documents before it.
+    saved = "\n".join([content, digest.manuscript, *(e.text or e.summary for e in digest.prior_stages)])
+    parsed = parse_stage_evaluation(result, saved)
     # The intensity's cap is a promise to the user; a model that raises more
     # has its extras dropped rather than shown.
     parsed.evaluation.findings = parsed.evaluation.findings[: MAX_FINDINGS[intensity_of(inputs.critique_intensity)]]
