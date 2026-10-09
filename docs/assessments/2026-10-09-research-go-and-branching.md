@@ -54,8 +54,8 @@ What it does not do yet:
 
 ## 2. Your six acceptance tests, replayed on production
 
-Two projects, both started from a bare goal with no attachments, under Research,
-Autonomous, and "Handle them for me". I approved only the reserved approvals, as you
+Three projects, each started from a bare goal with no attachments, under Research,
+Autonomous, and "Handle them for me" ("Ask me" for the expert test, so the question was put to me rather than set aside). I approved only the reserved approvals, as you
 would. Each production finding was fixed and deployed the same day.
 
 | Test | Result on production | Found and fixed on the way |
@@ -64,7 +64,7 @@ would. Each production finding was fixed and deployed the same day.
 | 2. A missing output the system can produce: do it, save it, check it, continue | **Pass.** First pendulum: "3 recorded from code that ran in the sandbox", with no data attached. Analysis quoted the computed periods, e.g. T(30°) = 2.0410 s for L = 1 m, which is correct. Second pendulum: after the fixes, each row was run in turn. | The draft called numerical integration "needs a tool" (#203). A long sweep hit the sandbox's 30-second limit, was not recorded, and was retried (#204: the code is sized to the limit; a timeout is recorded on its row and the next row is tried). |
 | 3. Analysis needs more: back to Experiment, update analysis and checks | **Pass.** Analysis found a run missing ("At least one specific drive amplitude … is missing"). Go went back to Experiment, added the run, and carried on. Earlier in the same project, Go judged the runs too large for the sandbox and went back to Method to change the plan. That is the "choose the right response, not a fixed loop" behaviour you asked for. The three-return cap held. | Going back to Method left your approval of the old analysis plan ticked (#205: a return now asks for that approval again). On the first pendulum, Go reasoned about the result but did not save it, because the polish cap had removed "Revise" (#202). |
 | 4. Unavailable source or tool: say exactly what, continue independent work | **Pass.** Each row that could not run is listed in the account with its reason: "Row 2: the computation did not finish within the code sandbox's 30-second limit; a smaller sweep or a shorter integration would fit". The run went on to the next row instead of stopping. | — |
-| 5. Expert judgment: explain the dependency, prepare a review package | **Built and tested in the browser suite; not reached by the real model in these runs.** The package endpoint, the card, Copy and Download are tested end to end with the scripted model. The production runs were stopped before Go reached the semiclassical question. | — |
+| 5. Expert judgment: explain the dependency, prepare a review package | **Pass** (10 October). *"Does Regge calculus … reproduce the Einstein-Hilbert action …? The hinge-area weighting is a technical judgment for an expert physicist."* Go asked for an expert's judgment on that specific issue, naming the checks already made and what waits on the answer. The question came with the package: the question, the assumptions (accepted or assumed), the working, what is unresolved, the judgment requested and what depends on it. Copy and Download (.md) were there. | — |
 | 6. Pause at a resource limit and resume without repeating | **Pass.** "Paused at the end of this window — a resource limit, not a problem. Everything is saved; Continue picks up from here and does not repeat finished work." Continue resumed at Hypothesis with no step repeated. | An approval card offered only "Approve" when Go could have done other work first (#200: "Carry on with other work first"). |
 
 **What limits heavy computation now is the sandbox's 30 seconds per run.** A sweep of 61
