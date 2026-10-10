@@ -91,3 +91,13 @@ def test_stage_prompts_say_every_figure_needs_a_source(basic_inputs, stage):
     _s, user = build_stage_prompt(basic_inputs, stage, StageDigest(objective=basic_inputs.objective))
     assert "FIGURES: every percentage, amount or other quantity" in user
     assert '"Assumption: …"' in user
+
+
+def test_missing_material_is_never_the_whole_conclusion(basic_inputs, stage):
+    """10 Oct: a memo with no attachment answered "no data was provided" instead of recommending."""
+    _s, user = build_stage_prompt(basic_inputs, stage, StageDigest(objective=basic_inputs.objective))
+    assert "DO THE JOB THE OBJECTIVE NAMES even where material is missing" in user
+    assert "a recommendation recommends" in user
+    assert "never the whole conclusion" in user
+    # The figure rule still stands beside it: an estimate is labelled, not stated as fact.
+    assert user.index("FIGURES: every percentage") < user.index("DO THE JOB")
