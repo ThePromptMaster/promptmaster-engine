@@ -879,6 +879,19 @@ export function useGoLoop(opts: Options) {
     }
   }, [pendingStepId, startRun]);
 
+  /**
+   * "Let Go run this" (Harold, via Sean, 9 Oct: a new user should give it a
+   * goal and see work happen, not configure a run). Autonomous, straight to the
+   * authorization — which stays, because it is the record of what was
+   * delegated. Reserved approvals still stop the run.
+   */
+  const handsOff = useCallback(() => {
+    if (runRef.current && !runRef.current.ended_at) return;
+    setError(null);
+    setPolicy('autonomous');
+    setAuthorizing('autonomous');
+  }, []);
+
   const confirmAuthorization = useCallback(async () => {
     const chosen = authorizing;
     const o = latest.current;
@@ -1255,6 +1268,7 @@ export function useGoLoop(opts: Options) {
     policy, setPolicy, budget, setBudget, run, steps, phase, active, pendingStep, pendingStale, authorizing, error,
     go, update, suggest, replan, stop, approve, decline, answer, checkAnswer, confirmAuthorization,
     cancelAuthorization: useCallback(() => setAuthorizing(null), []),
+    handsOff,
     dismissError: useCallback(() => setError(null), []),
   };
 }
