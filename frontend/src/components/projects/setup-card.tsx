@@ -31,6 +31,12 @@ interface Props {
   onChange: (patch: Partial<SetupDraft>) => void;
   /** Shown under the workflow picker: designing one of your own. */
   designer?: React.ReactNode;
+  /**
+   * The Start button, placed under the recommendation when there is one: a
+   * first-time user can start from the top without reading a form (Harold, via
+   * Sean, 9 Oct: "keep the question tree simple and easy").
+   */
+  start?: React.ReactNode;
 }
 
 const SELECTABLE_MODES = (Object.keys(MODE_DISPLAY) as ModeType[]).filter((m) => m !== 'custom');
@@ -50,6 +56,7 @@ export function SetupCard({
   rationale,
   onChange,
   designer,
+  start,
 }: Props) {
   const field =
     'w-full rounded-lg bg-[var(--surface-container-low)] px-4 py-3 text-body leading-relaxed text-[var(--on-surface)] outline-none placeholder:text-[var(--on-surface-variant)]/70 focus:ring-2 focus:ring-[var(--pm-primary)]/40';
@@ -70,6 +77,14 @@ export function SetupCard({
             {' — '}
             {workflowReason}
           </p>
+        )}
+        {start && (
+          <div className="mb-6">
+            {start}
+            <p className="mt-2 text-label text-[var(--on-surface-variant)]">
+              Or adjust anything below first — all of it is optional, and stays editable in the project.
+            </p>
+          </div>
         )}
         <WorkflowPicker templates={templates} selectedId={templateId} onSelect={onSelectTemplate} />
         {designer}
