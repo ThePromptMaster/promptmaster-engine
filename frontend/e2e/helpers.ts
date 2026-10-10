@@ -50,13 +50,24 @@ export function transitionBar(page: Page) {
  */
 export async function pressTransition(page: Page) {
   const bar = transitionBar(page);
-  const direct = bar.getByRole('button', { name: /^(Continue to|Finish|Override and)/ });
-  if (await direct.count()) {
-    await direct.click();
-  } else {
-    await bar.getByRole('button', { name: /^More/ }).click();
-    await page.getByRole('menuitem', { name: /^(Continue to|Finish|Override and)/ }).click();
-  }
+  const name = /^(Continue to|Finish|Override and)/;
+  const direct = bar.getByRole('button', { name });
+  // While a stage drafts, moving on is under More; when the draft lands on a
+  // stage that only frames the work, it becomes the primary and leaves More
+  // (10 Oct). Whichever is there when we look is the one pressed.
+  await expect(async () => {
+    if (await direct.count()) {
+      await direct.click({ timeout: 2_000 });
+      return;
+    }
+    await bar.getByRole('button', { name: /^More/ }).click({ timeout: 2_000 });
+    const item = page.getByRole('menuitem', { name });
+    if (!(await item.count())) {
+      await page.keyboard.press('Escape');
+      throw new Error('Moving on is neither the primary nor under More yet');
+    }
+    await item.click({ timeout: 2_000 });
+  }).toPass({ timeout: 30_000 });
   const reason = page.getByLabel('Reason for the override');
   if (await reason.isVisible().catch(() => false)) {
     await reason.fill('Moving on for now; will come back to it.');
@@ -72,6 +83,23 @@ export async function pressTransition(page: Page) {
     if (await why.isVisible().catch(() => false)) await why.fill('Finishing for the test; the open items are known.');
     await summary.getByRole('button', { name: /^(Finish project|Finish anyway|Override and finish)$/ }).click();
   }
+}
+
+/**
+ * Run the stage check. It is the primary button on a stage that produces the
+ * work; on one that only frames it (an objective statement, a question, a
+ * prompt) with its required items met, moving on leads and the check is under
+ * More (10 Oct).
+ */
+export async function checkStage(page: Page) {
+  const bar = transitionBar(page);
+  const direct = bar.getByRole('button', { name: 'Check this stage' });
+  if (await direct.count()) {
+    await direct.click();
+    return;
+  }
+  await bar.getByRole('button', { name: /^More/ }).click();
+  await page.getByRole('menuitem', { name: /^Check this stage/ }).click();
 }
 
 /** Skip the current stage with a reason. */

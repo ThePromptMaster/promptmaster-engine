@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { createProject, serviceSelect, transitionBar } from './helpers';
+import { checkStage, createProject, serviceSelect, transitionBar } from './helpers';
 
 /**
  * C2 — PM-22: after a critique, the easy actions Sean listed — Apply
@@ -18,7 +18,7 @@ const OBJECTIVE = 'A book about giraffes [[mock:findings=3]]';
 async function checked(page: Page, name: string) {
   const id = await createProject(page, { workflow: 'Book', name, objective: OBJECTIVE });
   await expect(page.getByText('Mock output').first()).toBeVisible();
-  await transitionBar(page).getByRole('button', { name: 'Check this stage' }).click();
+  await checkStage(page);
   const panel = page.getByRole('region', { name: 'Act on this check' });
   await expect(panel.getByRole('listitem')).toHaveCount(3);
   return { id, panel };
