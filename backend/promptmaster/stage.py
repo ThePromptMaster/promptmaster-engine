@@ -30,7 +30,7 @@ import logging
 import uuid
 
 from .conversation import _shared_system
-from .llm_client import OpenRouterClient
+from .llm_client import OpenRouterClient, OpenRouterDeadlineError, OpenRouterError
 from .schemas import (
     format_data_files,
     GenerateStageArtifactResponse,
@@ -522,6 +522,14 @@ async def generate_stage_artifact(
             )
         except Exception as e:
             logger.warning(f"Stage artifact JSON call failed for {stage.id}: {e}")
+            # The provider refused the call (out of credits, rate limited, down)
+            # or it timed out: that is not an empty table, and saying "the draft
+            # came back empty" sent Go into two blind retries (10 Oct, prod).
+            # Raised, the router classifies it like every other stage error.
+            if isinstance(e, OpenRouterDeadlineError) or (
+                isinstance(e, OpenRouterError) and (e.status_code is not None or e.provider_code)
+            ):
+                raise
             return GenerateStageArtifactResponse(items=[], finish_reason="error")
         items = _parse_items(result, item_schema)
         if stage.renderer == "review":
