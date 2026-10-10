@@ -368,6 +368,19 @@ export default function NewProjectPage() {
   const busyLabel =
     working === 'questions' ? 'Thinking of questions…' : working === 'setup' ? 'Working out a setup…' : null;
 
+  // With a recommendation the user can start from the top; choosing the
+  // workflow yourself still ends the form with Start (Harold, via Sean, 9 Oct).
+  const startAtTop = Boolean(recommendedKey) && selected?.key === recommendedKey;
+  const startButton = (
+    <button
+      onClick={() => void handleCreate()}
+      disabled={!selected || working !== null || !user || !draft.objective.trim() || createdWithFailures !== null}
+      className="rounded-xl bg-[var(--pm-primary)] px-6 py-3 text-title text-[var(--on-primary)] transition-opacity hover:opacity-90 disabled:opacity-40"
+    >
+      {working === 'creating' ? 'Creating…' : `Start ${selected?.name ?? 'project'}`}
+    </button>
+  );
+
   return (
     <main className="mx-auto max-w-[860px] px-6 py-14">
       <Link
@@ -558,10 +571,11 @@ export default function NewProjectPage() {
           <h1 className="text-display text-[var(--on-surface)]">Your setup</h1>
           <p className="mt-3 mb-8 text-body text-[var(--on-surface-variant)]">
             {recommendedKey
-              ? 'Recommended from what you told us. Change anything before you start — all of it stays editable later.'
+              ? 'Recommended from what you told us. Start now, or change anything first — all of it stays editable later.'
               : 'Pick a workflow and fill in what you know. All of it stays editable later.'}
           </p>
           <SetupCard
+            start={startAtTop ? startButton : undefined}
             templates={templates}
             templateId={templateId}
             onSelectTemplate={setTemplateId}
@@ -611,13 +625,7 @@ export default function NewProjectPage() {
             </section>
           )}
           <div className="mt-10 flex items-center gap-3">
-            <button
-              onClick={() => void handleCreate()}
-              disabled={!selected || working !== null || !user || !draft.objective.trim() || createdWithFailures !== null}
-              className="rounded-xl bg-[var(--pm-primary)] px-6 py-3 text-title text-[var(--on-primary)] transition-opacity hover:opacity-90 disabled:opacity-40"
-            >
-              {working === 'creating' ? 'Creating…' : `Start ${selected?.name ?? 'project'}`}
-            </button>
+            {!startAtTop && startButton}
             <button
               onClick={() => setStep('ask')}
               className="px-3 py-3 text-body text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
