@@ -139,3 +139,30 @@ def test_model_used_is_the_one_the_call_ran_on(client_with):
     )
     assert defaulted.json()["model_used"] == "provider/default-model"
     assert chosen.json()["model_used"] == "provider/picked"
+
+
+REVIEW_STAGE = {
+    "inputs": INPUTS,
+    "stage": {"id": "summary", "label": "Final review", "renderer": "review"},
+    "digest": DIGEST,
+    "item_schema": {"item_label": "finding", "fields": [{"key": "finding", "label": "Finding"}]},
+}
+
+
+def test_a_review_stage_out_of_credits_says_so(client_with):
+    """10 Oct, prod: a 402 on Final review read as "the draft came back empty"."""
+    stub = AsyncMock()
+    stub.generate_json = AsyncMock(side_effect=OpenRouterError(
+        "HTTP 402: would exceed your available credits", status_code=402, provider_code=None,
+    ))
+    r = client_with(stub).post("/api/generate-stage-artifact", json=REVIEW_STAGE)
+    assert r.status_code == 502
+    assert r.json()["detail"]["code"] == "insufficient_credits"
+
+
+def test_an_unparseable_table_is_still_an_empty_editable_stage(client_with):
+    stub = AsyncMock()
+    stub.generate_json = AsyncMock(side_effect=ValueError("could not parse JSON after repair"))
+    r = client_with(stub).post("/api/generate-stage-artifact", json=REVIEW_STAGE)
+    assert r.status_code == 200
+    assert r.json()["items"] == [] and r.json()["finish_reason"] == "error"
