@@ -24,8 +24,9 @@ test('PM-23: the next step says why, and PromptMaster can suggest a move you tak
   const bar = transitionBar(page);
   await bar.getByRole('button', { name: 'Why this?' }).click();
   const why = bar.getByRole('list', { name: 'Why this is the next step' });
-  await expect(why).toContainText('The current version has not been checked.');
+  // The objective statement frames the work: moving on leads, and says the check is under More (10 Oct).
   await expect(why).toContainText('Every required item on this stage is met.');
+  await expect(why).toContainText('This stage has not been checked; you can still check it from More.');
   await page.screenshot({ path: test.info().outputPath('01-why-this.png') });
 
   await bar.getByRole('button', { name: /^More/ }).click();
