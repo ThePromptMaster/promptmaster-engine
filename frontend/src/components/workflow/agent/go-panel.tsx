@@ -206,9 +206,22 @@ export function GoPanel({
           </p>
         </div>
         {!expanded && (
-          <button onClick={() => setOpen(true)} className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-title text-[var(--on-primary)]">
-            Set up Go
-          </button>
+          <>
+            <button onClick={() => setOpen(true)} className="rounded-lg bg-[var(--surface-container-highest)] px-4 py-2 text-title text-[var(--on-surface)]">
+              Set up Go
+            </button>
+            {/* One click to delegate: Autonomous, routine decisions handled, then the authorization to confirm. */}
+            <button
+              onClick={() => {
+                routine?.onChange('handle');
+                setOpen(true);
+                go.handsOff();
+              }}
+              className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-title text-[var(--on-primary)]"
+            >
+              Let Go run this
+            </button>
+          </>
         )}
       </div>
 
