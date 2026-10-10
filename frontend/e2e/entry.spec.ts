@@ -112,3 +112,47 @@ test('choosing the workflow yourself is still one click away', async ({ page }) 
   await page.getByRole('button', { name: 'Start Single output' }).click();
   await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}$/);
 });
+
+/**
+ * Harold, via Sean (9 Oct): who is it for, and why this rather than a chat?
+ * The landing page said "Five phases" and "8 Modes" — the retired product.
+ */
+test('the landing page says who PromptMaster is for and what a chat does not do', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: /Work you can\s*stand behind/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'For people who answer for their work.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'What a chat does not do.' })).toBeVisible();
+  await expect(page.getByText('Five phases. One aligned output.')).toHaveCount(0);
+  await expect(page.getByText('8 Modes')).toHaveCount(0);
+  await page.screenshot({ path: test.info().outputPath('landing.png'), fullPage: true });
+});
+
+/** "Can't really answer any questions until they get the ball rolling": an example goal fills the box, and nothing more. */
+test('an example goal opens a new project with the goal in the box', async ({ page }) => {
+  const goal = 'Write a one-page memo recommending whether our 12-person team should move from Slack to Microsoft Teams. Budget is $8,000 a year.';
+  await page.goto(`/projects/new?goal=${encodeURIComponent(goal)}`);
+  await dismissBetaNotice(page);
+  await expect(page.getByLabel('What do you want to do or figure out?')).toHaveValue(goal);
+  // Still the user's choice how to start.
+  await expect(page.getByRole('heading', { name: 'What do you want to do or figure out?' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /I know what I want to do/ })).toBeEnabled();
+  await page.screenshot({ path: test.info().outputPath('example-goal-prefilled.png') });
+});
+
+test('an empty project list explains a project and offers example goals', async ({ page }) => {
+  // A first-time user: the list comes back empty.
+  await page.route('**/rest/v1/projects?*', async (route) => {
+    if (route.request().method() === 'GET' && route.request().url().includes('deleted_at=is.null')) {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+    }
+    return route.fallback();
+  });
+  await page.goto('/projects');
+  await dismissBetaNotice(page);
+  await expect(page.getByText('Nothing here yet')).toBeVisible();
+  await expect(page.getByText(/A project takes one goal to a finished deliverable/)).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath('empty-projects-examples.png'), fullPage: true });
+  await page.getByRole('link', { name: /A recommendation memo/ }).click();
+  await expect(page).toHaveURL(/\/projects\/new\?goal=/);
+  await expect(page.getByLabel('What do you want to do or figure out?')).toHaveValue(/Slack to Microsoft Teams/);
+});

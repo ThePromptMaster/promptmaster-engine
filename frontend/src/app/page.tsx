@@ -7,23 +7,28 @@ import { Spotlight } from '@/components/ui/spotlight';
 import { ContainerScroll } from '@/components/ui/container-scroll-animation';
 import { Card } from '@/components/ui/card';
 
-const MODES = [
-  { icon: 'architecture', name: 'Architect', desc: 'Structure, systems, and frameworks' },
-  { icon: 'rate_review', name: 'Critic', desc: 'Finding weak points and contradictions' },
-  { icon: 'lightbulb', name: 'Clarity', desc: 'Translating complexity into understanding' },
-  { icon: 'sports', name: 'Coach', desc: 'Motivation and reframing obstacles' },
-  { icon: 'psychology', name: 'Therapist', desc: 'Empathetic exploration and insight' },
-  { icon: 'ac_unit', name: 'Cold Critic', desc: 'Brutal honesty, zero praise' },
-  { icon: 'analytics', name: 'Analyst', desc: 'Data-driven, evidence-based reasoning' },
-  { icon: 'tune', name: 'Custom', desc: 'Your own mode — define the persona' },
+/**
+ * What the product is for, in the words a first-time visitor asks in (Harold,
+ * via Sean, 9 Oct: who is it for, and why this rather than another AI tool?).
+ * Every line here is something the code does today; the assessment
+ * docs/assessments/2026-10-10-first-tester-path.md says where each one lives.
+ */
+const STEPS = [
+  { step: '01', name: 'Say what you need', desc: 'One sentence is enough. PromptMaster suggests how to set the work up; nothing to fill in first.', icon: 'edit_note' },
+  { step: '02', name: 'It picks the workflow', desc: 'A memo, a report, a research study, a book — each has stages suited to it, and you can change any of them.', icon: 'account_tree' },
+  { step: '03', name: 'Go does the stages', desc: 'Drafts, checks and repairs each stage against your objective, and tells you in three lines what it did.', icon: 'rocket_launch' },
+  { step: '04', name: 'You approve what is yours', desc: 'Routine decisions it can take for you; the ones that matter stop for you. Then export to Word or PDF.', icon: 'verified_user' },
 ];
 
-const PHASES = [
-  { step: '01', name: 'Define', desc: 'Choose a mode, set your objective, audience, and constraints.', icon: 'edit_note' },
-  { step: '02', name: 'Review', desc: 'See the optimized prompt with invisible scaffolding built in.', icon: 'visibility' },
-  { step: '03', name: 'Execute', desc: 'Generate output with a separate, independent AI evaluation.', icon: 'electric_bolt' },
-  { step: '04', name: 'Evaluate', desc: 'See alignment, clarity, and drift scores with actionable suggestions.', icon: 'assessment' },
-  { step: '05', name: 'Refine', desc: 'Iterate, realign, or finalize — every cycle improves the output.', icon: 'auto_fix_high' },
+const AUDIENCE = ['Analysts', 'Auditors', 'Lawyers', 'Strategists', 'Researchers', 'Consultants'];
+
+const VERSUS_CHAT = [
+  { icon: 'rule', title: 'Checked against your objective', desc: 'A separate pass scores the work for alignment, clarity, drift and completeness, and suggests the fixes. One click realigns drifted work.' },
+  { icon: 'fact_check', title: 'Your facts stay facts', desc: 'Figures and requirements you accept go into every stage. Change one and only the work that used it is reopened and repaired.' },
+  { icon: 'history', title: 'Nothing is overwritten', desc: 'Every version is kept. Figures in the text are checked against your material, and estimates are labelled as estimates.' },
+  { icon: 'rocket_launch', title: 'It does the stages, not just the reply', desc: 'Go moves the work forward stage by stage, runs calculations where they are needed, and says plainly what was run and what was only written.' },
+  { icon: 'gavel', title: 'Your decisions stay yours', desc: 'Approvals are rules checked in code, not a model’s opinion. What only you can sign off on always waits for you.' },
+  { icon: 'description', title: 'A record you can defend', desc: 'Every stage, check and decision is on record — and when an expert has to decide, it prepares the package for them.' },
 ];
 
 /** Load Spline when visible, UNLOAD when scrolled away to free GPU for scroll animations */
@@ -109,14 +114,15 @@ export default function LandingPage() {
         <div className="relative z-10 max-w-7xl mx-auto px-6 pt-32 pb-20 flex flex-col lg:flex-row items-center min-h-screen">
           <div className="flex-1 space-y-8 text-center lg:text-left">
             <h1 className="text-5xl md:text-7xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-b from-white via-white to-white/40 leading-[1.1]">
-              Stop prompting.
+              Work you can
               <br />
-              Start thinking.
+              stand behind.
             </h1>
 
             <p className="text-lg md:text-xl text-white/50 max-w-xl leading-relaxed">
-              Get clearer, more precise results by structuring how you interact
-              with AI — using modes, evaluation, and iterative refinement.
+              Give PromptMaster a goal. It takes the work through the stages a
+              careful professional would — drafting, checking, repairing — and
+              hands you a finished deliverable with the record of how it got there.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
@@ -125,7 +131,7 @@ export default function LandingPage() {
                 className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-[var(--pm-primary)] text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all"
               >
                 <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
-                Start Building
+                Start a project
               </Link>
               <a
                 href="#how-it-works"
@@ -160,7 +166,7 @@ export default function LandingPage() {
         >
           <Image
             src="/app-screenshot.png"
-            alt="PromptMaster session interface"
+            alt="A PromptMaster project: the stages on the left, the deliverable in the middle"
             height={720}
             width={1400}
             className="mx-auto rounded-2xl object-cover h-full object-left-top"
@@ -178,17 +184,16 @@ export default function LandingPage() {
               How It Works
             </p>
             <h2 className="text-4xl md:text-5xl font-semibold text-white tracking-tight">
-              Five phases. One aligned output.
+              From a goal to a finished deliverable.
             </h2>
             <p className="text-sm text-white/40 max-w-2xl mx-auto leading-relaxed">
-              PromptMaster structures every AI interaction into a repeatable loop:
-              define, review, execute, evaluate, and refine — until the output
-              matches your intent.
+              No prompt engineering, no blank form. Say what you need, and the
+              structure is set up for you.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            {PHASES.map((phase) => (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {STEPS.map((phase) => (
               <div key={phase.step}>
                 <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6 h-full space-y-4">
                   <div className="flex items-center gap-3">
@@ -212,38 +217,29 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ===== MODES ===== */}
+      {/* ===== WHO IT IS FOR ===== */}
       <section className="py-32 section-offscreen">
         <div className="max-w-6xl mx-auto px-6">
           <div className="text-center mb-20 space-y-4">
             <p className="text-sm font-bold uppercase tracking-[0.2em] text-blue-400">
-              8 Modes
+              Who it is for
             </p>
             <h2 className="text-4xl md:text-5xl font-semibold text-white tracking-tight">
-              Choose how the AI thinks.
+              For people who answer for their work.
             </h2>
             <p className="text-sm text-white/40 max-w-2xl mx-auto leading-relaxed">
-              Each mode locks the AI into a specific persona with tailored tone,
-              structure, and invisible scaffolding — so the output matches the
-              task, not a generic response.
+              If you need a quick answer, a chat is faster. PromptMaster is for the
+              memo, report or study you will have to defend afterwards.
             </p>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {MODES.map((mode) => (
+          <div className="flex flex-wrap justify-center gap-3">
+            {AUDIENCE.map((who) => (
               <Card
-                key={mode.name}
-                className="p-6 bg-white/[0.03] border-white/[0.06] cursor-default"
+                key={who}
+                className="px-6 py-3 bg-white/[0.03] border-white/[0.06] cursor-default"
               >
-                <span className="material-symbols-outlined text-blue-400 text-[28px] mb-4 block">
-                  {mode.icon}
-                </span>
-                <h3 className="text-sm font-bold text-white mb-1">
-                  {mode.name}
-                </h3>
-                <p className="text-xs text-white/40 leading-relaxed">
-                  {mode.desc}
-                </p>
+                <span className="text-sm font-semibold text-white">{who}</span>
               </Card>
             ))}
           </div>
@@ -253,12 +249,16 @@ export default function LandingPage() {
       {/* ===== KEY DIFFERENTIATORS ===== */}
       <section className="py-32 section-offscreen">
         <div className="max-w-6xl mx-auto px-6">
+          <div className="text-center mb-20 space-y-4">
+            <p className="text-sm font-bold uppercase tracking-[0.2em] text-blue-400">
+              Why not just a chat
+            </p>
+            <h2 className="text-4xl md:text-5xl font-semibold text-white tracking-tight">
+              What a chat does not do.
+            </h2>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {[
-              { icon: 'verified', title: 'Independent Evaluation', desc: 'A separate AI call scores every output on alignment, clarity, and drift — the AI never grades itself.' },
-              { icon: 'target', title: 'Drift Detection', desc: 'Every output is checked for scope deviation. When drift is detected, the system triggers a corrective realignment.' },
-              { icon: 'auto_fix_high', title: 'Iterative Refinement', desc: 'Each cycle improves on the last. Actionable suggestions tell you exactly what to change and which action to take next.' },
-            ].map((item) => (
+            {VERSUS_CHAT.map((item) => (
               <div key={item.icon} className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-8 space-y-4">
                 <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center">
                   <span className="material-symbols-outlined text-blue-400">{item.icon}</span>
@@ -276,18 +276,18 @@ export default function LandingPage() {
         <Spotlight className="-top-40 right-0 md:right-60 md:-top-20" fill="#2563eb" />
         <div className="relative z-10 max-w-3xl mx-auto px-6 text-center space-y-8">
           <h2 className="text-4xl md:text-5xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-b from-white to-white/60">
-            Ready to think with AI?
+            What do you need to get done?
           </h2>
           <p className="text-lg text-white/50 max-w-xl mx-auto">
-            Define your request. Let the system structure it. Evaluate the
-            result. Refine until it&apos;s right.
+            Say it in a sentence. You will have a first draft in a couple of
+            minutes, and you decide how far Go takes it.
           </p>
           <Link
             href="/projects"
             className="inline-flex items-center justify-center gap-2 px-10 py-4 bg-[var(--pm-primary)] text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all"
           >
             <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
-            Start Your First Session
+            Start your first project
           </Link>
         </div>
       </section>
@@ -300,7 +300,7 @@ export default function LandingPage() {
             <span className="text-sm text-white/40">PromptMaster</span>
           </div>
           <p className="text-xs text-white/30">
-            A structured system for thinking with AI
+            From a goal to work you can stand behind
           </p>
         </div>
       </footer>

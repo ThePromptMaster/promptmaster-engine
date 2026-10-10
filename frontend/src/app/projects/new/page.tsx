@@ -24,6 +24,7 @@ import { documentsOf, materialFrom, type PreparedFile } from '@/lib/data/attachm
 import { contextFromDocuments } from '@/lib/data/extract-text';
 import { imagePreview } from '@/lib/data/preview';
 import { INPUT_LIMITS } from '@/lib/projects/input-limits';
+import { goalFromSearch } from '@/lib/projects/example-goals';
 import { attachProjectFile } from '@/lib/supabase/project-files';
 import { LimitCounter } from '@/components/shared/limit-counter';
 import { clearSetupDraft, loadSetupDraft, saveSetupDraft } from '@/lib/supabase/setup-drafts';
@@ -124,6 +125,13 @@ export default function NewProjectPage() {
   useEffect(() => {
     loadTemplates();
   }, [loadTemplates]);
+
+  // An example goal from the empty project list arrives in the URL; it fills the
+  // box and nothing more — the user still chooses how to start.
+  useEffect(() => {
+    const goal = goalFromSearch(window.location.search, INPUT_LIMITS.objective);
+    if (goal) setObjective((current) => current || goal);
+  }, []);
 
   // An unfinished setup from an earlier visit: offered, never applied unasked.
   useEffect(() => {

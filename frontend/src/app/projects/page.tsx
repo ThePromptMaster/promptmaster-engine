@@ -11,6 +11,7 @@ import { useProjectStore } from '@/stores/project-store';
 import type { ProjectSummary } from '@/types/project';
 import { GuestBanner } from '@/components/projects/guest-banner';
 import { DeletedProjects } from '@/components/projects/deleted-projects';
+import { EXAMPLE_GOALS, newProjectHref } from '@/lib/projects/example-goals';
 
 const WORKFLOW_ICON: Record<string, string> = {
   book: 'menu_book',
@@ -157,10 +158,26 @@ export default function ProjectsPage() {
             workspaces
           </span>
           <p className="mt-3 text-headline text-[var(--on-surface)]">Nothing here yet</p>
-          <p className="mx-auto mt-2 max-w-[420px] text-body text-[var(--on-surface-variant)]">
-            Start a project and it will be waiting when you come back — with its versions,
-            evaluations and everything you skipped along the way.
+          <p className="mx-auto mt-2 max-w-[460px] text-body text-[var(--on-surface-variant)]">
+            A project takes one goal to a finished deliverable — drafted, checked against what
+            you asked for, and kept with every version. Say what you need in a sentence, or
+            start from one of these:
           </p>
+          <ul className="mx-auto mt-5 flex max-w-[560px] flex-col gap-2 text-left">
+            {EXAMPLE_GOALS.map((example) => (
+              <li key={example.label}>
+                <Link
+                  href={newProjectHref(example.goal)}
+                  className="block rounded-xl bg-[var(--surface-container-lowest)] px-4 py-3 transition-colors hover:bg-[var(--surface-container-high)]"
+                >
+                  <span className="block text-label uppercase tracking-wider text-[var(--on-surface-variant)]">
+                    {example.label}
+                  </span>
+                  <span className="mt-1 block text-body text-[var(--on-surface)]">{example.goal}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
           <Link
             href="/projects/new"
             className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[var(--pm-primary)] px-5 py-3 text-title text-[var(--on-primary)]"
