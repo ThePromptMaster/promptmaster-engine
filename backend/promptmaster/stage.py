@@ -253,6 +253,16 @@ def build_stage_prompt(
         "quoted as written there. Where none supports a number, do not supply one: say what is "
         "missing, or, if a working figure is genuinely needed, label it plainly as "
         "\"Assumption: …\". Calling a number a scenario or a range does not give it a source.",
+        # 10 Oct: a one-line goal and no attachment — "a memo recommending
+        # whether to move from Slack to Teams" — came back as "no data was
+        # provided, so stay": the rule above, read as "decline". A first-time
+        # user has supplied nothing yet, and a chat would have answered.
+        "DO THE JOB THE OBJECTIVE NAMES even where material is missing: a recommendation "
+        "recommends, an analysis concludes, a plan plans. Work from general knowledge, said "
+        "to be general knowledge. Where a number would decide the question (a price, a cost, "
+        "a size, a time), give a working estimate labelled \"Assumption: …\" rather than "
+        "leaving it out. Reach the conclusion these support, and say briefly what would "
+        "change it. Missing material is something to name, never the whole conclusion.",
     ]
     # A Diagnosis draft spent much of itself on Turnaround Options and the
     # 12-month plan — two stages later — and a later check had to flag it
