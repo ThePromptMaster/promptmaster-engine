@@ -1355,3 +1355,21 @@ Under Autonomous with routine decisions handed to Go:
 Not done: Go does not add, remove or reorder stages of the template; a different structure
 is a workflow the user designs or edits (`generate-workflow`, the workflow editor). Projects
 pinned to Research v10 keep Final review's earlier return paths.
+
+### L-70 — With no material supplied, a deliverable labels its assumptions but rarely estimates a price (2026-10-10)
+
+The first-tester replay (`docs/assessments/2026-10-10-first-tester-path.md` §6) asked for a
+recommendation memo with no attachment. Since #208 the memo recommends instead of
+concluding "no data was provided". It works from general knowledge stated as such, labels
+its assumptions, and names the facts that would change the verdict. It still gives no working
+figure for a price the decision turns on, even though the stage prompt asks for one labelled
+"Assumption: …". The rule against presenting an unsourced number as fact is deliberately
+kept, and the model reads the two together conservatively. A user who wants the figure can
+add it as a fact, or ask the side chat for an estimate and apply it.
+
+### L-71 — The first deliverable starts about one and a half screens down the stage (2026-10-10)
+
+Above a stage's draft sit the guidance, the mode card, the Go panel, the project setup, the
+facts and the data panel, each added on request. A first-time tester scrolls to find the work.
+No panel was moved or collapsed in this round. Doing so is a layout decision for the next
+round, not a fix.
