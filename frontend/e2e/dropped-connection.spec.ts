@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { createProject, serviceSelect, transitionBar } from './helpers';
+import { checkStage, createProject, serviceSelect } from './helpers';
 
 /**
  * L1d (4 Oct, "Load failed"): Apply the findings failed with Safari's "Load
@@ -12,7 +12,7 @@ import { createProject, serviceSelect, transitionBar } from './helpers';
 async function checked(page: Page, name: string) {
   const id = await createProject(page, { workflow: 'Book', name, objective: 'A book about giraffes [[mock:findings=3]]' });
   await expect(page.getByText('Mock output').first()).toBeVisible();
-  await transitionBar(page).getByRole('button', { name: 'Check this stage' }).click();
+  await checkStage(page);
   const panel = page.getByRole('region', { name: 'Act on this check' });
   await expect(panel.getByRole('listitem')).toHaveCount(3);
   return { id, panel };

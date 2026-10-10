@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { dismissBetaNotice, pressTransition, serviceSelect, transitionBar } from './helpers';
+import { checkStage, dismissBetaNotice, pressTransition, serviceSelect } from './helpers';
 
 /**
  * N3 (4 Oct, items 7 and 11).
@@ -61,7 +61,7 @@ test('a figure with no source in the project is reported by the stage check', as
   await page.getByRole('button', { name: 'Save as new version' }).click();
   await expect(page.getByRole('button', { name: 'v2' })).toBeVisible();
 
-  await transitionBar(page).getByRole('button', { name: 'Check this stage' }).click();
+  await checkStage(page);
   const panel = page.getByRole('region', { name: 'Act on this check' });
   await expect(panel).toContainText('A figure has no source in the project: 15–25%.');
   await expect(panel).not.toContainText('$7.5m');

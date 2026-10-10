@@ -13,12 +13,14 @@ test('each stage offers one next step, in words a new user can read', async ({ p
   await expect(page.getByText('Mock output').first()).toBeVisible();
 
   const bar = transitionBar(page);
-  // PM-06: one primary button; everything else behind More.
-  await expect(bar.getByRole('button', { name: 'Check this stage' })).toBeVisible();
+  // PM-06: one primary button; everything else behind More. The objective
+  // statement only frames the work, so with its required items met moving on
+  // leads and the check waits under More (10 Oct).
+  await expect(bar.getByRole('button', { name: 'Continue to Audience' })).toBeVisible();
   // More + the primary; "Why this?" is a disclosure beside the reason, not an action (PM-23).
   await expect(bar.getByRole('button')).toHaveCount(3);
   await expect(bar.getByRole('button', { name: 'Why this?' })).toHaveAttribute('aria-expanded', 'false');
-  await expect(bar).toContainText('One AI check scores it against your objective');
+  await expect(bar).toContainText('Everything this stage needs is done.');
 
   // PM-07: plain labels.
   await expect(page.getByText('AI draft').first()).toBeVisible();
@@ -30,16 +32,14 @@ test('each stage offers one next step, in words a new user can read', async ({ p
   await page.getByRole('heading', { name: 'To finish this stage' }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: test.info().outputPath('01-one-primary-action.png') });
 
-  // More holds the rest.
+  // More holds the rest, the check among it.
   await bar.getByRole('button', { name: /^More/ }).click();
   await expect(page.getByRole('menuitem', { name: 'Regenerate this stage' })).toBeVisible();
-  await expect(page.getByRole('menuitem', { name: /^Continue to Audience/ })).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: /^Check this stage/ })).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('02-more-menu.png') });
-  await page.keyboard.press('Escape');
-  await bar.getByRole('button', { name: /^More/ }).click(); // close
 
-  // Check -> the next step is to move on, and it says nothing needs another pass (PM-25).
-  await bar.getByRole('button', { name: 'Check this stage' }).click();
+  // Check -> moving on still leads, and it says nothing needs another pass (PM-25).
+  await page.getByRole('menuitem', { name: /^Check this stage/ }).click();
   await expect(bar.getByRole('button', { name: 'Continue to Audience' })).toBeVisible();
   await expect(bar).toContainText('No further AI pass needed');
   await bar.scrollIntoViewIfNeeded();

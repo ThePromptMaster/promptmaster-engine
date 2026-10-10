@@ -16,7 +16,9 @@
  *                     editor, drafting, revision) names its step, and that is
  *                     the primary — not "Continue anyway" beside it
  *   nothing yet    -> draft it
- *   not checked    -> check it (one model call, and it is the loop's point)
+ *   not checked    -> check it (one model call, and it is the loop's point) —
+ *                     except on a stage that only frames the work, whose
+ *                     required items are met: there, move on (see FRAMING_KINDS)
  *   fixes offered  -> apply them
  *   otherwise      -> move on, and say so plainly when nothing needs another
  *                     pass (PM-25).
@@ -51,6 +53,16 @@ export interface ReportedPanelStep extends PanelStep {
 
 export type PanelStepReporter = (stageId: string, step: ReportedPanelStep | null) => void;
 
+/**
+ * Artifact kinds that frame the work rather than being it: the objective
+ * statement, the research question, the prompt. On 10 Oct a first-time user on
+ * Single output met "Check this stage" — one more AI call — as the main button
+ * on Input and again on Review, with every required item already met and
+ * "move on" under a menu. On these stages the check is offered in More and
+ * moving on leads; on every other stage the check still comes first.
+ */
+export const FRAMING_KINDS: ReadonlySet<string> = new Set(['objective_statement', 'research_question', 'prompt']);
+
 export interface NextActionInput {
   /** The project is finished; nothing is suggested. */
   finished: boolean;
@@ -73,6 +85,8 @@ export interface NextActionInput {
   truncated?: boolean;
   /** The artifact can be scored by the stage evaluator. */
   evaluable: boolean;
+  /** The stage frames the work (its artifact kind is in FRAMING_KINDS). */
+  framing?: boolean;
   /** The head version has been evaluated. */
   evaluated: boolean;
   /** That evaluation needs nothing: aligned, clear, on topic, no findings. */
@@ -189,7 +203,7 @@ function chooseAction(input: NextActionInput): StageAction {
     };
   }
 
-  if (input.evaluable && input.hasContent && !input.evaluated) {
+  if (input.evaluable && input.hasContent && !input.evaluated && !(input.framing && input.canAdvance)) {
     return {
       kind: 'evaluate',
       label: 'Check this stage',

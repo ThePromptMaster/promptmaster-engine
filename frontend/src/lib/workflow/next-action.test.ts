@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { nextStageAction, type NextActionInput } from './next-action';
+import { FRAMING_KINDS, nextStageAction, type NextActionInput } from './next-action';
 
 const base: NextActionInput = {
   finished: false,
@@ -120,5 +120,24 @@ describe('PM-23: why the next step is the next step', () => {
 
   it('gives no reasons when there is nothing to do', () => {
     expect(nextStageAction({ ...base, finished: true }).because).toBeUndefined();
+  });
+
+  it('on a stage that only frames the work, moving on leads once its required items are met (10 Oct)', () => {
+    // Single output's Input and Review: "Check this stage" was the main button
+    // with every required item met, and moving on was under a menu.
+    const framing = { framing: true, evaluated: false };
+    expect(nextStageAction({ ...base, ...framing })).toMatchObject({ kind: 'continue', label: 'Continue to Audience' });
+    expect(nextStageAction({ ...base, ...framing }).because).toContain('This stage has not been checked; you can still check it from More.');
+    // A required item still open: the check is still the useful next step.
+    expect(kind({ ...framing, canAdvance: false })).toBe('evaluate');
+    // Drafting, saving and finishing a cut-off draft still come first.
+    expect(kind({ ...framing, hasContent: false })).toBe('draft');
+    expect(kind({ ...framing, dirty: true })).toBe('save');
+    expect(kind({ ...framing, truncated: true })).toBe('continue_writing');
+    // A check the user did run is still acted on.
+    expect(kind({ framing: true, evaluated: true, evaluationClean: false, applyableFixes: 2 })).toBe('apply_fixes');
+    // The deliverable is not a framing stage: there the check still leads.
+    expect(kind({ evaluated: false })).toBe('evaluate');
+    expect([...FRAMING_KINDS].sort()).toEqual(['objective_statement', 'prompt', 'research_question']);
   });
 });

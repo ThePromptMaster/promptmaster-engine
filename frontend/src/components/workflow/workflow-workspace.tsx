@@ -13,7 +13,7 @@ import { templateDiff } from '@/lib/workflow/upgrade';
 import { BlockForm, BlockedNotice, CompletionDialog, ObjectivePausedNotice } from './stage-status-panels';
 import { StageToolResult } from './stage-tool-result';
 import { CRITIQUE_TOOLS, REWRITE_TOOLS, useStageTools } from './use-stage-tools';
-import { nextStageAction, type ReportedPanelStep } from '@/lib/workflow/next-action';
+import { FRAMING_KINDS, nextStageAction, type ReportedPanelStep } from '@/lib/workflow/next-action';
 import { stageControls, type StageControl } from '@/lib/workflow/stage-controls';
 import { inputsChanged, stageInputs } from '@/lib/workflow/stage-inputs';
 import { isApplyable } from '@/lib/workflow/recommend';
@@ -1196,6 +1196,7 @@ export function WorkflowWorkspace({
     hasContent,
     truncated,
     evaluable: draftable && Boolean(stageEvaluation.evaluate),
+    framing: FRAMING_KINDS.has(stage.expected_artifacts[0]?.kind ?? ''),
     evaluated: Boolean(headEvaluation),
     evaluationClean: Boolean(
       headEvaluation &&

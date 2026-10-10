@@ -74,6 +74,23 @@ export async function pressTransition(page: Page) {
   }
 }
 
+/**
+ * Run the stage check. It is the primary button on a stage that produces the
+ * work; on one that only frames it (an objective statement, a question, a
+ * prompt) with its required items met, moving on leads and the check is under
+ * More (10 Oct).
+ */
+export async function checkStage(page: Page) {
+  const bar = transitionBar(page);
+  const direct = bar.getByRole('button', { name: 'Check this stage' });
+  if (await direct.count()) {
+    await direct.click();
+    return;
+  }
+  await bar.getByRole('button', { name: /^More/ }).click();
+  await page.getByRole('menuitem', { name: /^Check this stage/ }).click();
+}
+
 /** Skip the current stage with a reason. */
 export async function skipStage(page: Page, reason: string) {
   await transitionBar(page).getByRole('button', { name: /^More/ }).click();

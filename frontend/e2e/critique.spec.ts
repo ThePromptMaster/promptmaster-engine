@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { createProject, serviceSelect, transitionBar } from './helpers';
+import { checkStage, createProject, serviceSelect, transitionBar } from './helpers';
 
 /**
  * C1 — PM-21 (critique intensity and tone are separate, user-chosen dials) and
@@ -33,7 +33,7 @@ test('the critique dials are separate, remembered, and reach the evaluator', asy
   await expect(page.getByRole('region', { name: 'How to critique' }).getByRole('radio', { name: 'Rigorous' })).toHaveAttribute('aria-checked', 'true');
 
   // …and they reach the evaluator's prompt.
-  await transitionBar(page).getByRole('button', { name: 'Check this stage' }).click();
+  await checkStage(page);
   await expect(page.getByText('(intensity rigorous, tone gentle)').first()).toBeVisible();
 
   // PM-25: it is clean, and it says so, in words, where the next step is.
@@ -50,7 +50,7 @@ test('the critique dials are separate, remembered, and reach the evaluator', asy
 test('an artifact with findings is not declared done', async ({ page }) => {
   const id = await createProject(page, { workflow: 'Book', name: 'E2E needs a pass', objective: 'A book about giraffes [[mock:findings=3]]' });
   await expect(page.getByText('Mock output').first()).toBeVisible();
-  await transitionBar(page).getByRole('button', { name: 'Check this stage' }).click();
+  await checkStage(page);
 
   const evaluation = page.getByRole('region', { name: 'Stage evaluation' });
   await expect(evaluation).toContainText('Another pass would help: Mock: the findings are worth one more pass.');
