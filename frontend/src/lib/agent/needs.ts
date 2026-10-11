@@ -44,7 +44,25 @@ type Need =
   /** Go's proposal to start another round of a looping workflow; the user starts it. */
   | { kind: 'next_round'; stageId: string; toStageId: string; reason: string }
   /** An outcome table's rows (claims, runs…) are all the user's to decide. */
-  | { kind: 'decide_rows'; stageId: string; count: number; itemLabel: string; proposed?: number };
+  | { kind: 'decide_rows'; stageId: string; count: number; itemLabel: string; proposed?: number }
+  /**
+   * The objective check stopped the run (11 Oct, survey brief: "The objective
+   * is not met yet" with nothing named, then "Your decision is needed" with no
+   * decision). Every such stop says what it found and what each button does.
+   *  - `unmet`: the requirements found unmet, by name;
+   *  - `no_evidence`: called met, but no passage of the deliverable showed it;
+   *  - `stages_left`: met, with the workflow still holding stages;
+   *  - `work_open`: the deliverable is written, other work is still open.
+   */
+  | {
+      kind: 'objective_check';
+      stageId: string;
+      finding: 'unmet' | 'no_evidence' | 'stages_left' | 'work_open';
+      /** The unmet requirements, the open work, or the stages left — as the record names them. */
+      items: string[];
+      /** The stage Go moves to next, for `stages_left`. */
+      next?: string;
+    };
 
 /**
  * `onStage` is the stage the project was on when the run stopped. A request
@@ -179,7 +197,14 @@ export function staleRepair(
   state: WorkflowState,
   tried: readonly string[] = [],
   /** Measured requirements per stage (C1): a finished stage failing one is repaired too (L-63). */
-  measured: Readonly<Record<string, readonly { satisfied: boolean; label: string; detail?: string }[]>> = {}
+  measured: Readonly<Record<string, readonly { satisfied: boolean; label: string; detail?: string }[]>> = {},
+  /**
+   * Stages with a saved version. A stage still in progress that has one and
+   * fails a measured requirement is repaired as well (11 Oct, survey brief:
+   * "If length is the issue, I'd expect Go to shorten the brief … save it,
+   * and recheck automatically").
+   */
+  drafted: ReadonlySet<string> = new Set()
 ): RequiredMove | null {
   const loops = template.stages.some((s) => s.transitions.loop_to);
   const here = template.stages.findIndex((s) => s.id === state.current_stage_id);
@@ -194,12 +219,13 @@ export function staleRepair(
     if (tried.filter((id) => id === stage.id).length >= REPAIR_TRIES) continue;
     // L-63 (9 Oct): "Announcement: 100–140 words — 74 words" on a finished
     // stage was reported and left; it is repaired, and the stage stays finished.
-    const failing = isDone(st?.status) && stage.renderer === 'prose' ? (measured[stage.id] ?? []).filter((m) => !m.satisfied) : [];
+    const open = st?.status === 'in_progress' && drafted.has(stage.id);
+    const failing = (isDone(st?.status) || open) && stage.renderer === 'prose' ? (measured[stage.id] ?? []).filter((m) => !m.satisfied) : [];
     if (failing.length && (here < 0 || index <= here || ahead)) {
       const list = failing.map((m) => `${m.label} — measured ${m.detail ?? 'not met'}`).join('; ');
       return {
         key: 'recheck_stage',
-        rationale: `${stage.label} is finished, but a requirement measured in code is not met: ${list}. Repairing it keeps the deliverable within what was asked.`,
+        rationale: `${stage.label} ${open ? 'is drafted' : 'is finished'}, but a requirement measured in code is not met: ${list}. This is routine: I revise it to meet ${failing.length === 1 ? 'it' : 'them'}, keep everything else it says, save it and measure again.`,
         expected: `A new version of ${stage.label} that meets ${failing.map((m) => m.label).join('; ')}, measured again in code.`,
         params: { stage_id: stage.id, measured: true },
       };
@@ -521,6 +547,7 @@ export function needStillHolds(
     case 'answer_question':
     case 'skip_stage':
     case 'next_round':
+    case 'objective_check':
       return true;
     case 'unblock_stage':
       return input.state.stages[need.stageId]?.status === 'blocked';
@@ -543,7 +570,7 @@ export function needStillHolds(
  * lifts the block and leaves the user on the stage — what the More menu's
  * "Continue this stage" does — without Go resuming.
  */
-export type StuckOption = 'resume' | 'add_data' | 'skip' | 'retry' | 'clear';
+export type StuckOption = 'resume' | 'add_data' | 'skip' | 'retry' | 'clear' | 'fix' | 'stop';
 
 /** At most this many ways forward on a stuck card (2 Oct screenshots: five was too many). */
 export const STUCK_OPTIONS_MAX = 3;
@@ -699,6 +726,8 @@ export function describeNeed(
         message: `${need.count} ${need.count === 1 ? need.itemLabel : `${need.itemLabel}s`} ${need.count === 1 ? 'is' : 'are'} waiting for your decision — only you can settle ${need.count === 1 ? 'it' : 'them'}. Set a status on each in the table below — that is how a check stage works.`,
         action: SHOW_TABLE,
       };
+    case 'objective_check':
+      return describeObjectiveCheck(need, stageLabel);
     case 'triage_findings':
       return {
         // Why these were not handled under "Handle them for me" (Sean, 10 Oct,
@@ -707,5 +736,57 @@ export function describeNeed(
         message: `${need.count} finding${need.count === 1 ? '' : 's'} would change what the work says, so ${need.count === 1 ? 'it is' : 'they are'} yours to decide. "Routine decisions: handle them for me" covers minor and moderate findings only; ${need.count === 1 ? 'this one is' : 'these are'} major or unrated. Accept, reject or defer each in the table below.`,
         action: SHOW_TABLE,
       };
+  }
+}
+
+/** The objective check's stop, with what it found and what each button does (11 Oct). */
+function describeObjectiveCheck(
+  need: Extract<NeedsUser, { kind: 'objective_check' }>,
+  stageLabel: (id: string) => string
+): { message: string; action: string; options: { id: StuckOption; label: string }[] } {
+  const stage = stageLabel(need.stageId);
+  const list = need.items.map((i) => i.replace(/[.\s]+$/, '')).join('; ');
+  switch (need.finding) {
+    case 'unmet': {
+      const options = [
+        { id: 'fix' as const, label: `Have Go fix ${stage} and check again` },
+        { id: 'stop' as const, label: 'I will fix it myself' },
+      ];
+      return {
+        message: `The objective is not met yet — not met: ${list || 'see the check in the record below'}. I can revise ${stage} to fix ${need.items.length === 1 ? 'it' : 'them'}, keeping everything else the brief asks for, save it as a new version and check again.`,
+        action: options[0].label, options,
+      };
+    }
+    case 'no_evidence': {
+      const options = [
+        { id: 'resume' as const, label: 'Carry on' },
+        { id: 'stop' as const, label: 'Stop here' },
+      ];
+      return {
+        message: `The check found nothing unmet in ${stage}, but it could not point to a passage that shows the objective is met, even when asked twice, so I have not recorded it as met. Nothing needs fixing that I know of. Carry on to what the workflow still holds — accepting the output is yours there — or stop here.`,
+        action: options[0].label, options,
+      };
+    }
+    case 'stages_left': {
+      const next = need.next ?? need.items[0] ?? 'the next stage';
+      const options = [
+        { id: 'resume' as const, label: `Carry on to ${next}` },
+        { id: 'stop' as const, label: 'Stop here' },
+      ];
+      return {
+        message: `The objective is met on ${stage}, but the workflow is not finished: ${list}. Carrying on takes me to ${next}.`,
+        action: options[0].label, options,
+      };
+    }
+    case 'work_open': {
+      const options = [
+        { id: 'resume' as const, label: 'Carry on with the open work' },
+        { id: 'stop' as const, label: 'Stop here' },
+      ];
+      return {
+        message: `${stage} is written, but the work is not finished: ${list}. I will not call the objective met while any of it is open.`,
+        action: options[0].label, options,
+      };
+    }
   }
 }

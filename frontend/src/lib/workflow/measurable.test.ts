@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { countQuestions, countWords, measure, parseRequirements, requirementsForStage, sectionFor } from './measurable';
+import { countQuestions, countSections, countWords, measure, parseRequirements, requirementsForStage, sectionFor } from './measurable';
 import { SINGLE_OUTPUT_V1 } from './templates/single-output.v1';
 import type { StageDefinition } from './types';
 
@@ -43,8 +43,8 @@ describe('requirements PromptMaster can measure (C1; Sean, 7 Oct)', () => {
   it('TaskBoard: 95 words against 100–140, five questions without answers', () => {
     const [w, q] = parseRequirements(['a 100–140-word announcement and a five-question support FAQ']);
     const text = `## Announcement\n${words(95)}\n\n## FAQ\n1. When?\n2. How much?\n3. Who?\n4. Where?\n5. Trial?\n`;
-    expect(measure(w, text)).toEqual({ id: 'measured.words:announcement', label: 'Announcement: 100–140 words', satisfied: false, detail: '95 words' });
-    expect(measure(q, text)).toEqual({ id: 'measured.questions:faq', label: 'FAQ: exactly 5 questions, each answered', satisfied: false, detail: '5 without an answer' });
+    expect(measure(w, text)).toEqual({ id: 'measured.words:announcement', label: 'Announcement: 100–140 words', satisfied: false, detail: '95 words', value: '95 words' });
+    expect(measure(q, text)).toEqual({ id: 'measured.questions:faq', label: 'FAQ: exactly 5 questions, each answered', satisfied: false, detail: '5 without an answer', value: '5 questions, 0 answered' });
   });
 
   it('TeamNotes: the announcement stage is measured whole; a heading is not needed', () => {
@@ -68,5 +68,42 @@ describe('requirements PromptMaster can measure (C1; Sean, 7 Oct)', () => {
       expect.objectContaining({ kind: 'words', subject: 'announcement', min: 100, max: 140 }),
       expect.objectContaining({ kind: 'questions', subject: 'faq', min: 5 }),
     ]);
+  });
+});
+
+describe('11 Oct, survey kickoff brief: 200 words, exactly four sections, labelled assumptions', () => {
+  const brief = [
+    '# Customer survey kickoff brief',
+    '## Purpose',
+    'Learn why customers renew and why some leave.',
+    '## Roles',
+    '- Survey lead: owns the questions.',
+    '## Timeline',
+    'Two weeks in the field, one week of analysis.',
+    '## Assumptions',
+    '- Assumption: the survey runs online.',
+    'Assumption: responses are anonymous.',
+  ].join('\n');
+
+  it('reads "exactly four sections" and counts the sections under a title', () => {
+    const reqs = parseRequirements(['A customer survey kickoff brief under 200 words, with exactly four sections, generic roles.']);
+    expect(reqs.map((r) => [r.kind, r.subject, r.min, r.max])).toEqual([
+      ['words', '', undefined, 200],
+      ['sections', '', 4, 4],
+    ]);
+    expect(countSections(brief)).toBe(4);
+    expect(countSections('## A\ntext\n## B\ntext')).toBe(2);
+    expect(parseRequirements(['Summarise the four sections below.'])).toEqual([]);
+  });
+
+  it('counts labelled assumptions as words of the brief', () => {
+    // 8 + 5 + 9 + 5 + 4 = 31 words of text; the headings are not counted.
+    expect(countWords(brief)).toBe(31);
+  });
+
+  it('records the count whether or not the requirement is met', () => {
+    const [words, sections] = parseRequirements(['under 200 words, with exactly four sections']);
+    expect(measure(words, brief, true)).toMatchObject({ satisfied: true, value: '31 words' });
+    expect(measure(sections, brief, true)).toMatchObject({ satisfied: true, value: '4 sections' });
   });
 });

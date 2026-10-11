@@ -452,3 +452,25 @@ describe('Q1a (Sean, 9 Oct): a "not run" row PromptMaster can carry out is work 
     expect(requiredWork({ stage: experiment, facts, stageEvaluation: evaluation('experiment'), allowed: [], runAttemptsLeft: 1 })).toBeNull();
   });
 });
+
+describe('the objective check\'s stop (11 Oct, survey brief)', () => {
+  const label = (id: string) => (id === 'output' ? 'Output' : id);
+  it('names what is unmet and offers to fix it', () => {
+    const d = describeNeed({ kind: 'objective_check', stageId: 'output', finding: 'unmet', items: ['Exactly four sections — It has two.'] }, label);
+    expect(d.message).toContain('not met: Exactly four sections — It has two.');
+    expect(d.options?.map((o) => o.id)).toEqual(['fix', 'stop']);
+  });
+  it('a check that only lacked a quote does not say anything failed', () => {
+    const d = describeNeed({ kind: 'objective_check', stageId: 'output', finding: 'no_evidence', items: [] }, label);
+    expect(d.message).toContain('found nothing unmet');
+    expect(d.message).not.toMatch(/satisf/);
+    expect(d.options?.[0]).toEqual({ id: 'resume', label: 'Carry on' });
+  });
+  it('met with stages left says where carrying on goes', () => {
+    const d = describeNeed({ kind: 'objective_check', stageId: 'output', finding: 'stages_left', items: ['Summary', 'Realign (optional)'], next: 'Summary' }, label);
+    expect(d.options?.[0].label).toBe('Carry on to Summary');
+  });
+  it('holds until the run moves on', () => {
+    expect(needStillHolds({ kind: 'objective_check', stageId: 'output', finding: 'unmet', items: [] }, { currentStageId: 'output' } as never)).toBe(true);
+  });
+});

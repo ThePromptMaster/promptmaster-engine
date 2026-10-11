@@ -296,6 +296,8 @@ class AssessObjectiveRequest(BaseModel):
     #: What the project's own checks hold as still unmet (C2): measured
     #: requirements that fail, and review rows carried forward unresolved.
     failed_checks: list[str] = Field(default_factory=list, max_length=30)
+    #: Requirements code measured and found met, with the count (11 Oct).
+    measured: list[str] = Field(default_factory=list, max_length=30)
     model: str = ""
 
 
@@ -311,6 +313,7 @@ async def api_assess_objective(req: AssessObjectiveRequest, client: OpenRouterCl
         result = await assess_objective(
             client, req.model or None, req.inputs, req.deliverable_label, req.content, req.steps, req.success_criterion,
             [" ".join(c.split())[:300] for c in req.failed_checks if c.strip()],
+            [" ".join(m.split())[:300] for m in req.measured if m.strip()],
         )
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)

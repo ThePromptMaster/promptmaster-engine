@@ -20,7 +20,7 @@
 import { primaryArtifactKind } from './stage-artifact';
 import type { StageDefinition } from './types';
 
-export type MeasureKind = 'words' | 'questions';
+export type MeasureKind = 'words' | 'questions' | 'sections';
 
 export interface MeasurableRequirement {
   id: string;
@@ -40,6 +40,8 @@ export interface Measurement {
   label: string;
   satisfied: boolean;
   detail?: string;
+  /** What was counted, met or not: "187 words" (11 Oct: the check is told the count, not only failures). */
+  value?: string;
 }
 
 const NUMBER_WORDS: Record<string, number> = {
@@ -97,6 +99,14 @@ export function parseRequirements(texts: readonly string[]): MeasurableRequireme
         add({ kind: 'words', subject: subjectNear(t, m.index!, m.index! + m[0].length), source: m[0].trim(), ...r });
       }
     }
+    // "exactly four sections", "with four sections" (11 Oct, survey brief).
+    // Only after a word that makes it a requirement: "the four sections
+    // below" measures nothing.
+    for (const m of t.matchAll(new RegExp(`\\b(?:exactly|with|in|into|has|have|of)\\s+(?:exactly\\s+)?${NUM}\\s+(?:main\\s+|top-level\\s+)?sections?\\b`, 'gi'))) {
+      const n = num(m[1]);
+      if (!n || n > 30) continue;
+      add({ kind: 'sections', subject: '', min: n, max: n, source: m[0].trim() });
+    }
     // "exactly five FAQ questions", "a five-question support FAQ", "5 FAQ questions".
     const questionPatterns = [
       new RegExp(`\\bexactly\\s+${NUM}\\s+(?:(?:faq|support|customer)\\s+)*questions?\\b`, 'gi'),
@@ -138,8 +148,13 @@ function lines(text: string): Line[] {
 
 const plain = (s: string) => s.replace(/[*_`#>|]/g, ' ').replace(QUESTION_PREFIX, '').trim();
 const isQuestion = (l: Line) => plain(l.text).endsWith('?');
-/** Lines a count leaves out: notes about the text rather than the text. */
-const NOTE = /^\W*(what changed|revision notes?|change notes?|notes?|word count|words?\s*:|\(\d+\s+words?\)|verification|assumptions?)\b/i;
+/**
+ * Lines a count leaves out: notes about the text rather than the text.
+ * Assumptions are not among them (11 Oct, survey brief): a brief asked to
+ * label its assumptions holds them as part of what it says, so "Assumption:
+ * the survey runs online" counts — as it does when anyone counts the brief.
+ */
+const NOTE = /^\W*(what changed|revision notes?|change notes?|notes?|word count|words?\s*:|\(\d+\s+words?\)|verification)\b/i;
 
 /** The part of `text` that is about `subject`: under a heading naming it, or all of it. */
 export function sectionFor(text: string, subject: string): string | null {
@@ -169,6 +184,27 @@ export function countWords(text: string): number {
     .split(/\s+/)
     .filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
 }
+
+/**
+ * The sections of a text: its headings at the top level of its structure. A
+ * lone title above them (one heading at the shallowest level, the rest
+ * deeper) is not a section.
+ */
+export function countSections(text: string): number {
+  const heads = lines(text).filter((l) => l.level > 0 && l.level <= 7 && !isQuestion(l) && !NOTE.test(l.text));
+  if (!heads.length) return 0;
+  const top = Math.min(...heads.map((h) => h.level));
+  const atTop = heads.filter((h) => h.level === top);
+  if (atTop.length === 1 && heads.length > 1) {
+    const rest = heads.filter((h) => h.level > top);
+    const next = Math.min(...rest.map((h) => h.level));
+    return rest.filter((h) => h.level === next).length;
+  }
+  return atTop.length;
+}
+
+/** How a count is made, said wherever a count is shown or asked for (11 Oct). */
+export const COUNTING_RULE = 'words of the text itself, not counting headings or a word-count note; labelled assumptions count';
 
 /** The questions in a text and how many have an answer under them. */
 export function countQuestions(text: string): { total: number; answered: number } {
@@ -208,7 +244,13 @@ export function measure(r: MeasurableRequirement, text: string, whole = false): 
   if (r.kind === 'words') {
     const n = countWords(section);
     const ok = (r.min === undefined || n >= r.min) && (r.max === undefined || n <= r.max);
-    return { id: `measured.${r.id}`, label: `${name}: ${rangeText(r)} words`, satisfied: ok, ...(ok ? {} : { detail: `${n} words` }) };
+    return { id: `measured.${r.id}`, label: `${name}: ${rangeText(r)} words`, satisfied: ok, value: `${n} words`, ...(ok ? {} : { detail: `${n} words` }) };
+  }
+  if (r.kind === 'sections') {
+    const n = countSections(section);
+    const ok = (r.min === undefined || n >= r.min) && (r.max === undefined || n <= r.max);
+    const value = `${n} section${n === 1 ? '' : 's'}`;
+    return { id: `measured.${r.id}`, label: `${name}: ${rangeText(r)} sections`, satisfied: ok, value, ...(ok ? {} : { detail: value }) };
   }
   const { total, answered } = countQuestions(section);
   const countOk = (r.min === undefined || total >= r.min) && (r.max === undefined || total <= r.max);
@@ -221,6 +263,7 @@ export function measure(r: MeasurableRequirement, text: string, whole = false): 
     id: `measured.${r.id}`,
     label: `${name}: ${rangeText(r)} questions${r.answered ? ', each answered' : ''}`,
     satisfied: problems.length === 0,
+    value: `${total} question${total === 1 ? '' : 's'}, ${answered} answered`,
     ...(problems.length ? { detail: problems.join('; ') } : {}),
   };
 }

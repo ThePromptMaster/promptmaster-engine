@@ -151,6 +151,13 @@ export function GoPanel({
       case 'large_job':
         await go.acknowledgeLargeJob(need.sections);
         return;
+      case 'objective_check':
+        // What each button does is on it (11 Oct): fix and check again, carry
+        // on to what the workflow still holds, or stop here.
+        if (option === 'fix') return go.fixObjective(need.items);
+        if (option === 'stop') return go.stop();
+        await go.go();
+        return;
       case 'decide_rows':
       case 'triage_findings':
         // The rows are the user's to decide one by one; the button only takes them there.

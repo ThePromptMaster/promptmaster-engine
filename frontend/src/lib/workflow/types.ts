@@ -425,7 +425,7 @@ export interface StageContext {
    * measured on its saved text (`measurable.ts`, C1). Each is an automatic,
    * blocking check on that stage.
    */
-  measured?: Record<string, { id: string; label: string; satisfied: boolean; detail?: string }[]>;
+  measured?: Record<string, { id: string; label: string; satisfied: boolean; detail?: string; value?: string }[]>;
   /**
    * Per review stage id: rows carried forward or deferred whose text says an
    * objective requirement is unmet (`carriedForwardUnmet`, C2). Each is open
