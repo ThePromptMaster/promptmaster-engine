@@ -55,7 +55,7 @@ test('a revision that changes accepted facts updates them with it; a restore off
 
   // The record now says what the document says; the old facts are history.
   await expect
-    .poll(async () => (await serviceSelect('project_facts', `project_id=eq.${id}&retired_at=is.null&select=statement&order=created_at`)).map((r) => r.statement), { timeout: 15_000 })
+    .poll(async () => (await serviceSelect('project_facts', `project_id=eq.${id}&retired_at=is.null&select=statement&order=created_at`)).map((r: { statement: string }) => r.statement), { timeout: 15_000 })
     .toEqual(['The lunch is on Wednesday at 1:00 p.m.', 'The invitation is under 70 words.']);
   const updated = await serviceSelect('project_facts', `project_id=eq.${id}&retired_at=is.null&select=source_kind,source_ref,supersedes`);
   expect(updated[0]).toMatchObject({ source_kind: 'user_edit', source_ref: { via: 'revision' }, supersedes: expect.any(String) });
