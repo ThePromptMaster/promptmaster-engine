@@ -137,3 +137,12 @@ describe('11 Oct, production (lunch invitation): an accepted requirement fact go
     expect(other.map((r) => [r.kind, r.subject, r.max])).toEqual([['words', '', 120], ['questions', 'faq', 5]]);
   });
 });
+
+describe('11 Oct, survey brief: the ways a word limit is written', () => {
+  it.each([
+    ['capped at 200 words'], ['limited to 200 words'], ['a limit of 200 words'], ['no longer than 200 words'],
+    ['200 words max'], ['200 words or fewer'], ['a 200-word limit'], ['within 200 words'], ['maximum 200 words'],
+  ])('reads "%s" as at most 200', (text) => {
+    expect(parseRequirements([`A kickoff brief, ${text}.`]).map((r) => [r.kind, r.max])).toEqual([['words', 200]]);
+  });
+});

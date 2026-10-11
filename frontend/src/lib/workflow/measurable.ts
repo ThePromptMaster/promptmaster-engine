@@ -89,7 +89,11 @@ export function parseRequirements(texts: readonly string[]): MeasurableRequireme
     const patterns: [RegExp, (m: RegExpMatchArray) => Partial<MeasurableRequirement>][] = [
       [new RegExp(`${NUM}\\s*(?:–|—|-|to)\\s*${NUM}[\\s-]*words?\\b`, 'gi'), (m) => ({ min: num(m[1]), max: num(m[2]) })],
       [new RegExp(`\\bexactly\\s+${NUM}[\\s-]*words?\\b`, 'gi'), (m) => ({ min: num(m[1]), max: num(m[1]) })],
-      [new RegExp(`\\b(?:under|fewer than|less than|at most|no more than|maximum of|a maximum of|up to|not (?:to )?exceed(?:ing)?)\\s+${NUM}[\\s-]*words?\\b`, 'gi'), (m) => ({ max: num(m[1]) })],
+      // 11 Oct (survey brief): "capped at 200 words" was not read, so the limit
+      // was never measured and the model's eye count stood unchallenged.
+      [new RegExp(`\\b(?:under|fewer than|less than|at most|no more than|not more than|no longer than|maximum of|a maximum of|max(?:imum)?|up to|below|within|capped at|a cap of|limited to|a limit of|not (?:to )?exceed(?:ing)?)\\s+${NUM}[\\s-]*words?\\b`, 'gi'), (m) => ({ max: num(m[1]) })],
+      // "200 words max", "200 words or fewer", "a 200-word limit".
+      [new RegExp(`\\b${NUM}[\\s-]*words?\\s+(?:max(?:imum)?|or (?:less|fewer)|at most|limit|cap)\\b`, 'gi'), (m) => ({ max: num(m[1]) })],
       [new RegExp(`\\b(?:at least|a minimum of|minimum of|no fewer than|no less than)\\s+${NUM}[\\s-]*words?\\b`, 'gi'), (m) => ({ min: num(m[1]) })],
     ];
     for (const [re, read] of patterns) {
