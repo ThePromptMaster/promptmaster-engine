@@ -1398,3 +1398,30 @@ Under "Routine decisions: handle them for me", Go decides minor and moderate rev
 and records each decision. Major or unrated findings change what the work says and stay the
 user's, by design (`lib/workflow/triage.ts`). Since #219 the stop says so. Severity is the
 model's rating, so a finding rated major that a user would call routine still stops.
+
+### L-75 — Only some requirements are measured in code, and only in the phrasings it recognises (2026-10-11)
+
+Code measures word limits and ranges, an exact number of questions (each answered), and,
+since #222, an exact number of sections. The objective check is given those counts and may
+not overrule them. A limit is read only in the phrasings `measurable.ts` knows. #224 added
+"capped at", "limited to", "200 words max" and "a 200-word limit", after the survey-brief
+test showed "capped at 200 words" was never measured. A phrasing it does not know measures
+nothing rather than guessing, so the model's reading stands for it.
+
+- **Sections** are the headings at the top level of the text, not counting a lone title.
+  A brief that uses bold lines or numbered paragraphs instead of headings is counted by
+  those bold lines, or not at all.
+- **Labelled assumptions count as words.** Headings and a trailing "Word count:" or
+  "Notes:" line do not.
+- **"Generic roles" and "no invented company details"** cannot be measured. The model
+  assesses them, and when it cannot quote a passage that shows one is met, the record says
+  "Not verified".
+
+### L-76 — A Single output run under "Handle them for me" can need a second window (2026-10-11)
+
+On the production retest (`docs/assessments/2026-10-11-objective-pause-and-length.md`), Go
+took the survey brief from Input to a finished Summary with no question. It used all 12
+steps of the default window to do it: two checks, the objective check, moves and drafts.
+It then needed one "Continue for 12 more steps" to finish Summary. The pause says that it
+is a resource limit, not a problem. The window was not raised in this round. A larger
+default is a cost decision.
