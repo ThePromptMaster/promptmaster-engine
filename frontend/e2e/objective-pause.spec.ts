@@ -109,3 +109,31 @@ test('a brief over its word limit is shortened, saved and checked again by Go, w
   await card.scrollIntoViewIfNeeded();
   await page.screenshot({ path: test.info().outputPath('04-shortened-and-met.png') });
 });
+
+test('under "Handle them for me" a met objective carries on through the stages that are left, without asking', async ({ page }) => {
+  test.setTimeout(180_000);
+  const id = await createProject(page, {
+    workflow: 'Single output',
+    name: 'E2E brief handled to the end',
+    objective: 'A survey kickoff brief under 30 words [[mock:plan=declare_objective_complete]]',
+  });
+  await pressTransition(page);
+  await pressTransition(page);
+  await expect(page.getByText('Mock output').first()).toBeVisible({ timeout: 30_000 });
+  const panel = goPanel(page);
+  await panel.getByRole('button', { name: 'Let Go run this' }).click();
+  await page.getByRole('button', { name: 'Authorize and go' }).click();
+
+  // 11 Oct, production retest: it stopped twice to ask whether to carry on.
+  await expect.poll(async () => {
+    const [run] = await serviceSelect('agent_runs', `project_id=eq.${id}&select=status&order=created_at.desc&limit=1`);
+    return run?.status;
+  }, { timeout: 120_000 }).toBe('completed');
+  const runs = await serviceSelect('agent_runs', `project_id=eq.${id}&select=id,status,needs`);
+  expect(runs.every((r: { needs: { kind?: string } | null }) => r.needs?.kind !== 'objective_check')).toBe(true);
+  const steps = await serviceSelect('agent_steps', `run_id=in.(${runs.map((r: { id: string }) => r.id).join(',')})&select=action_key,output&order=idx.asc`);
+  expect(steps.some((s: { output: string }) => /Carrying on under your routine-decision policy/.test(s.output ?? ''))).toBe(true);
+  await expect(page.getByRole('region', { name: 'What Go has done' })).toContainText('Finished: the objective is verified as met.', { timeout: 30_000 });
+  await page.getByRole('region', { name: 'What Go has done' }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: test.info().outputPath('05-handled-to-the-end.png') });
+});

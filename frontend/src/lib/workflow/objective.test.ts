@@ -36,3 +36,21 @@ describe('the objective as judged (7 Oct)', () => {
     expect(objectiveUnmet([waiting, saved])).toBeNull();
   });
 });
+
+describe('stillMet (11 Oct: four checks of an unchanged Output v2)', () => {
+  const basis = { stage_id: 'output', stage_label: 'Output', version_id: 'v2', version_number: 2, measured: [], assessed: [], not_checked: [] };
+  const met = { type: 'objective_assessed', created_at: '2026-10-11T10:00:00Z', payload: { outcome: 'met', reason: 'ok', basis_quote: 'q', blockers: [], performed: [], proposed_next: [], basis } } as never;
+  it('keeps a met verdict on the same version with nothing changed', async () => {
+    const { stillMet } = await import('./objective');
+    expect(stillMet([met], [], { stageId: 'output', versionId: 'v2' })?.basis.version_id).toBe('v2');
+  });
+  it('not on another version, after a save of the deliverable, a brief change or a new fact', async () => {
+    const { stillMet } = await import('./objective');
+    expect(stillMet([met], [], { stageId: 'output', versionId: 'v3' })).toBeNull();
+    const saved = { type: 'stage_version_saved', stage_id: 'output', created_at: '2026-10-11T10:05:00Z' } as never;
+    expect(stillMet([met, saved], [], { stageId: 'output', versionId: 'v2' })).toBeNull();
+    const elsewhere = { type: 'stage_version_saved', stage_id: 'summary', created_at: '2026-10-11T10:05:00Z' } as never;
+    expect(stillMet([met, elsewhere], [], { stageId: 'output', versionId: 'v2' })).not.toBeNull();
+    expect(stillMet([met], [{ created_at: '2026-10-11T10:06:00Z' }], { stageId: 'output', versionId: 'v2' })).toBeNull();
+  });
+});

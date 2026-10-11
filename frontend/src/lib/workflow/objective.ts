@@ -118,3 +118,29 @@ export function pausedLine(a: Pick<ObjectiveAssessment, 'blockers' | 'reason'>):
       ? `The objective is not met yet. ${a.reason}`
       : `The objective is not met yet: ${a.reason}`;
 }
+
+/**
+ * The latest check said "met" on this exact version of the deliverable, and
+ * nothing that could change that has happened since: no new version of the
+ * deliverable, no change to the brief, no new fact. Judging it again would
+ * repeat a model call for the same answer (11 Oct: four checks of an
+ * unchanged Output v2 while Go carried on to the end).
+ */
+export function stillMet(
+  events: readonly WorkflowEvent[],
+  facts: readonly { created_at: string }[],
+  deliverable: { stageId: string; versionId: string | null }
+): (ObjectiveAssessment & { at: string; basis: ObjectiveBasis }) | null {
+  const latest = latestObjectiveAssessment(events);
+  if (!latest || latest.outcome !== 'met' || !deliverable.versionId) return null;
+  const assessed = [...events].reverse().find((e) => e.type === 'objective_assessed');
+  const basis = (assessed?.payload as { basis?: ObjectiveBasis } | undefined)?.basis;
+  if (basis?.version_id !== deliverable.versionId) return null;
+  const at = Date.parse(latest.at);
+  if (Number.isNaN(at)) return null;
+  const after = (iso: string | undefined) => Boolean(iso) && Date.parse(iso!) > at;
+  const changed = events.some(
+    (e) => after(e.created_at) && (e.type === 'brief_changed' || (e.type === 'stage_version_saved' && e.stage_id === deliverable.stageId))
+  );
+  return changed || facts.some((f) => after(f.created_at)) || !basis ? null : { ...latest, basis };
+}

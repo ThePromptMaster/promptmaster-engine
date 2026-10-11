@@ -36,7 +36,7 @@ import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import { summariseStageContent } from '@/lib/workflow/digest';
 import { stageContentForSummary, stageEvidence } from '@/lib/workflow/evidence';
 import { blocksCompletion, deliverableStage, describeOutstanding, evaluateStage, outstandingWork, remainingStages } from '@/lib/workflow/engine';
-import { describeBasis, pausedLine, type ObjectiveAssessment, type ObjectiveBasis } from '@/lib/workflow/objective';
+import { describeBasis, pausedLine, stillMet, type ObjectiveAssessment, type ObjectiveBasis } from '@/lib/workflow/objective';
 import { attachedDocuments, currentFacts, supersededFactValues } from '@/lib/workflow/facts';
 import { ManuscriptMissing, withFreshManuscript } from '@/lib/workflow/fresh-manuscript';
 import { describeValue, leftoverValues, type SupersededValue } from '@/lib/workflow/fact-values';
@@ -1431,12 +1431,22 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       if (ctx.deliverableDone) {
         const holder = deliverableStage(ctx.template);
         const content = holder ? deliverableText(ctx, holder.id) : '';
-        const { assessment, basis } = await judgeObjective(ctx, holder ?? null, content);
+        // Met on this version already, and nothing changed since: the verdict
+        // stands, without another model call (11 Oct).
+        const head = holder ? ctx.bundles[holder.id]?.versions.at(-1) : undefined;
+        const kept = holder && head
+          ? stillMet(await listWorkflowEvents(ctx.project.id), ctx.project.facts ?? [], { stageId: holder.id, versionId: head.id })
+          : null;
+        const { assessment, basis } = kept
+          ? { assessment: kept, basis: kept.basis }
+          : await judgeObjective(ctx, holder ?? null, content);
         // The check ran and was recorded: the record says so (10 Oct, email 3:
         // "'Analyzed or performed' and 'Tools' show dashes").
-        const judged = { toolsUsed: ['model'], changes: { event_types: ['objective_assessed'] } };
+        const judged = kept
+          ? { toolsUsed: [] as string[], changes: {} }
+          : { toolsUsed: ['model'], changes: { event_types: ['objective_assessed'] } };
         if (assessment.outcome === 'met') {
-          const checked = describeBasis(basis);
+          const checked = `${describeBasis(basis)}${kept ? ' (The check already made on this version; nothing has changed since, so it was not repeated.)' : ''}`;
           // Met is not finished (Sean, 10 Oct, email 2: "Finished: the objective is
           // verified as met" beside "2 done · 3 to go"). What the workflow still
           // holds is said, and the run waits for it rather than calling it done.
@@ -1455,6 +1465,18 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
             const reason = onlyApproval
               ? `The objective is met on ${basis.stage_label}${basis.version_number ? ` v${basis.version_number}` : ''}, but the workflow is not finished — your approval is left: "${mine[0].label}".`
               : `The objective is met on ${basis.stage_label}${basis.version_number ? ` v${basis.version_number}` : ''}, but the workflow is not finished — ${still}.`;
+            // 11 Oct, production retest (survey brief): under "Handle them for me"
+            // the run stopped twice to ask whether to carry on to stages with
+            // nothing unmet. Finishing a stage that can be finished and moving
+            // on is routine there; it is said, and the run goes on (the next
+            // declare becomes the move, moveOnInsteadOfRejudging).
+            const routine = ctx.run.policy === 'autonomous' && ctx.project.routine_decisions === 'handle';
+            if (routine && !onlyApproval && evaluateStage(ctx.template, ctx.stage.id, ctx.context).canAdvance) {
+              return done(key, {
+                ...judged, status: 'succeeded',
+                output: `${reason} Carrying on under your routine-decision policy. Evidence: "${assessment.basis_quote}". ${checked}${deferredNote(ctx)}`,
+              });
+            }
             return done(key, {
               ...judged, status: 'succeeded',
               output: `${reason} Evidence: "${assessment.basis_quote}". ${checked}${deferredNote(ctx)}`,
@@ -1462,9 +1484,11 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
               needs: onlyApproval
                 ? { kind: 'tick_criterion' as const, stageId: ctx.stage.id, criterionId: mine[0].id, label: mine[0].label, ...(mine[0].hint ? { hint: mine[0].hint } : {}) }
                 : {
-                    kind: 'objective_check' as const, stageId: holder?.id ?? ctx.stage.id, finding: 'stages_left' as const,
+                    // The card is about the stage the run is on: "Finish Summary", never "Carry on to Summary" on Summary.
+                    kind: 'objective_check' as const, stageId: ctx.stage.id, finding: 'stages_left' as const,
                     items: [...left.required, ...left.optional.map((o) => `${o} (optional)`)],
                     next: left.required[0] ?? left.optional[0],
+                    metOn: basis.stage_label,
                   },
             });
           }

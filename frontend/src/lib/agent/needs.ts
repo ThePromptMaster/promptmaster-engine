@@ -62,6 +62,8 @@ type Need =
       items: string[];
       /** The stage Go moves to next, for `stages_left`. */
       next?: string;
+      /** The stage the objective was met on, for `stages_left` when it is not the one the run is on. */
+      metOn?: string;
     };
 
 /**
@@ -775,7 +777,7 @@ function describeObjectiveCheck(
         { id: 'stop' as const, label: 'Stop here' },
       ];
       return {
-        message: `The objective is met on ${stage}, but the workflow is not finished: ${list}. ${next === stage ? `Carrying on marks ${stage} complete and moves to what is left.` : `Carrying on takes me to ${next}.`}`,
+        message: `The objective is met on ${need.metOn ?? stage}, but the workflow is not finished: ${list}. ${next === stage ? `Carrying on marks ${stage} complete and moves to what is left.` : `Carrying on takes me to ${next}.`}`,
         action: options[0].label, options,
       };
     }
