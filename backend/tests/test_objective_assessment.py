@@ -107,3 +107,46 @@ def test_a_requirement_about_how_the_work_is_done_is_met_by_the_record(basic_inp
 
     system, _user = build_assessment_prompt(basic_inputs, "Output", "TaskBoard launches December 10.", [])
     assert "a decision the user recorded answers the question it required" in system
+
+
+def test_a_heading_is_not_evidence_the_objective_is_met():
+    """Sean, 10 Oct, email 8: the completion message quoted "## 1. Pre-arrival preparation"."""
+    plan = "## 1. Pre-arrival preparation\n\nSend the laptop request a week before day one so access works on arrival."
+    a = parse_assessment({"outcome": "met", "basis_quote": "## 1. Pre-arrival preparation"}, plan, [])
+    assert a.outcome == "partly" and a.basis_quote == ""
+    a = parse_assessment({"outcome": "met", "basis_quote": "1. Pre-arrival preparation"}, plan, [])
+    assert a.outcome == "partly"
+
+
+def test_each_requirement_has_a_verdict_and_a_met_one_has_a_sentence():
+    """Sean, 10 Oct, emails 3, 6.5 and 8: what was checked, and how, is on the record."""
+    plan = "Send the laptop request a week before day one so access works on arrival."
+    a = parse_assessment({
+        "outcome": "met", "basis_quote": plan,
+        "criteria": [
+            {"requirement": "Covers pre-arrival", "verdict": "met", "basis": plan},
+            {"requirement": "Fits on one page", "verdict": "not_checked", "basis": "Page length is not visible in the text."},
+            {"requirement": "Six sections", "verdict": "met", "basis": "There are six sections."},
+            {"requirement": "", "verdict": "met"},
+        ],
+    }, plan, [])
+    assert [(c.requirement, c.verdict) for c in a.criteria] == [
+        ("Covers pre-arrival", "met"), ("Fits on one page", "not_checked"), ("Six sections", "not_checked"),
+    ]
+    assert a.outcome == "met"
+
+
+def test_a_requirement_found_unmet_keeps_the_objective_from_being_met():
+    plan = "Send the laptop request a week before day one so access works on arrival."
+    a = parse_assessment({
+        "outcome": "met", "basis_quote": plan,
+        "criteria": [{"requirement": "Labels its assumptions", "verdict": "not_met", "basis": "No assumption is labelled."}],
+    }, plan, [])
+    assert a.outcome == "partly"
+
+
+def test_the_prompt_asks_for_each_requirement_and_says_what_cannot_be_checked():
+    _system, user = build_assessment_prompt(_inputs(), "Output", "text", [])
+    assert '"criteria"' in user
+    assert "how many pages it prints to" in user
+    assert "A heading is not a basis." in user

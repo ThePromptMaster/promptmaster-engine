@@ -1676,6 +1676,7 @@ export function WorkflowWorkspace({
               go={go}
               stageLabel={stage.label}
               mode={project.mode}
+              stageMode={stage?.recommended_modes?.[0]?.mode}
               needsActions={goNeedsActions}
               needContext={goNeedContextOnPage}
               dockHost={goDockHost}

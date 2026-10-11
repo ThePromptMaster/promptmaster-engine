@@ -554,6 +554,22 @@ export function progressSummary(template: WorkflowTemplate, state: WorkflowState
   };
 }
 
+/**
+ * The stages not yet done, skipped or left open, by name: the required ones,
+ * and the optional ones that can be skipped. What "the workflow is not
+ * finished" means, from the same statuses the sidebar counts.
+ */
+export function remainingStages(template: WorkflowTemplate, state: WorkflowState): { required: string[]; optional: string[] } {
+  const required: string[] = [];
+  const optional: string[] = [];
+  for (const s of template.stages) {
+    const st = state.stages[s.id];
+    if (isDone(st?.status) || st?.status === 'skipped' || (st?.status === 'in_progress' && st.left_open)) continue;
+    (s.required === false ? optional : required).push(s.short_label ?? s.label);
+  }
+  return { required, optional };
+}
+
 /** Stages moved past with requirements still open, in workflow order. */
 export function leftOpenStages(template: WorkflowTemplate, state: WorkflowState): StageDefinition[] {
   return template.stages.filter((s) => {

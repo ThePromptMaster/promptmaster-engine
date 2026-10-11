@@ -41,6 +41,7 @@ export function GoPanel({
   go,
   stageLabel,
   mode,
+  stageMode,
   needsActions,
   needContext,
   dockHost = null,
@@ -49,6 +50,8 @@ export function GoPanel({
   go: ReturnType<typeof useGoLoop>;
   stageLabel: string;
   mode: string;
+  /** The mode the current stage recommends. */
+  stageMode?: string;
   needsActions?: NeedsActions;
   /** What is true of the project now, for a request whose wording depends on it. */
   needContext?: NeedContext;
@@ -294,6 +297,7 @@ export function GoPanel({
               next={next}
               stageLabel={stageLabel}
               mode={mode}
+              stageMode={stageMode}
               thinking={go.phase === 'thinking'}
             />
           )}

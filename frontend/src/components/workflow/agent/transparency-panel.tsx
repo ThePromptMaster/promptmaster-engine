@@ -8,6 +8,7 @@ import type { ModeType } from '@/types';
 import { ExecutionBadge } from './execution-badge';
 
 const EVENT_PHRASE: Record<string, string> = {
+  objective_assessed: 'an objective check recorded',
   stage_marked_complete: 'a stage marked complete',
   stage_advanced: 'the project moved on, leaving the stage open',
   stage_blocked: 'a stage marked stuck',
@@ -16,25 +17,41 @@ const EVENT_PHRASE: Record<string, string> = {
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
-/** What the step changed in the project, in the user's words (C2, PM-12). */
-function changed(step: AgentStep): string {
-  const parts: string[] = [];
+/**
+ * What the step changed, in the user's words (C2, PM-12), with the document
+ * and the workflow apart (Sean, 10 Oct, email 6.8: "the record said nothing
+ * changed in the project … although the interface changed to a finished
+ * state"). Either can be empty.
+ */
+function changes(step: AgentStep, run: AgentRun | null): { document: string[]; workflow: string[] } {
+  const document: string[] = [];
+  const workflow: string[] = [];
   const c = step.changes ?? {};
-  if (c.event_types?.length) parts.push(c.event_types.map((t) => EVENT_PHRASE[t] ?? t.replace(/_/g, ' ')).join(', '));
-  if (c.sandbox_run_id) parts.push('a recorded code run');
+  if (c.event_types?.length) workflow.push(...c.event_types.map((t) => EVENT_PHRASE[t] ?? t.replace(/_/g, ' ')));
+  if (c.sandbox_run_id) document.push('a recorded code run');
   if (c.sections_written?.length) {
-    parts.push(step.action_key === 'revise_sections' ? `${plural(c.sections_written.length, 'section')} revised` : `${plural(c.sections_written.length, 'section')} drafted`);
+    document.push(step.action_key === 'revise_sections' ? `${plural(c.sections_written.length, 'section')} revised` : `${plural(c.sections_written.length, 'section')} drafted`);
   }
-  if (c.items_triaged?.length) parts.push(`${plural(c.items_triaged.length, 'routine finding')} decided`);
+  if (c.items_triaged?.length) workflow.push(`${plural(c.items_triaged.length, 'routine finding')} decided`);
   if (c.version_ids?.length) {
-    if (step.action_key === 'evaluate_stage') parts.push('an evaluation of the current version');
-    else if (step.action_key === 'generate_outline') parts.push('the outline, saved as a version');
-    else if (step.action_key === 'apply_findings') parts.push('a new version with the findings applied');
-    else if (step.action_key === 'draft_stage' || step.action_key === 'revise_stage') parts.push('a new version of this draft');
-    else if (!c.sections_written?.length && !c.items_triaged?.length) parts.push(plural(c.version_ids.length, 'new version'));
+    if (step.action_key === 'evaluate_stage') workflow.push('an evaluation of the current version');
+    else if (step.action_key === 'generate_outline') document.push('the outline, saved as a version');
+    else if (step.action_key === 'apply_findings') document.push('a new version with the findings applied');
+    else if (step.action_key === 'draft_stage' || step.action_key === 'revise_stage') document.push('a new version of this draft');
+    else if (!c.sections_written?.length && !c.items_triaged?.length) document.push(plural(c.version_ids.length, 'new version'));
   } else if ((step.action_key === 'draft_stage' || step.action_key === 'revise_stage') && step.status === 'succeeded') {
-    parts.push('a new version of this draft');
+    document.push('a new version of this draft');
   }
+  // The step that ended the run changed the run's state, whatever else it did.
+  if (run && run.status !== 'running' && run.steps_used > 0 && step.status === 'succeeded' && step.action_key === 'declare_objective_complete') {
+    workflow.push(run.status === 'completed' ? 'Go run finished' : 'Go run paused for you');
+  }
+  return { document, workflow };
+}
+
+function changed(step: AgentStep, run: AgentRun | null): string {
+  const { document, workflow } = changes(step, run);
+  const parts = [...document, ...workflow];
   return parts.length ? parts.join('; ') : 'Nothing in the project — this step only produced the text below.';
 }
 
@@ -53,7 +70,7 @@ function narrative(run: AgentRun | null, step: AgentStep | null, next: string, t
     case 'awaiting_decision':
       return `Proposed: ${label}. Waiting for your approval.`;
     case 'succeeded': {
-      const what = changed(step);
+      const what = changed(step, run);
       const tail = what.startsWith('Nothing in the project') ? 'No change to the project.' : `Changed: ${what}.`;
       return `${label} — done. ${tail}${run.status === 'awaiting_decision' ? ' Waiting for you.' : run.status === 'running' ? ` Next: ${next}.` : ''}`;
     }
@@ -79,6 +96,7 @@ export function TransparencyPanel({
   next,
   stageLabel,
   mode,
+  stageMode,
   thinking,
 }: {
   run: AgentRun | null;
@@ -86,13 +104,24 @@ export function TransparencyPanel({
   next: string;
   stageLabel: string;
   mode: string;
+  /** The mode the stage recommends, when it differs from the project's (10 Oct, email 3). */
+  stageMode?: string;
   thinking: boolean;
 }) {
+  const modeName = (m: string) => MODE_DISPLAY[m as ModeType]?.display_name ?? m;
+  const changedNow = step && step.status !== 'running' ? changes(step, run) : null;
   // What was used, in the user's words rather than the record's.
   const TOOL_NAME: Record<string, string> = { sandbox: 'code sandbox', model: 'AI model', jobs: 'background writing queue', search: 'literature search (OpenAlex)' };
   const rows: [string, React.ReactNode][] = [
     ['Stage', stageLabel],
-    ['Mode', MODE_DISPLAY[mode as ModeType]?.display_name ?? mode ?? '—'],
+    // The project's mode is what every step uses; the stage only recommends one (Sean, 10 Oct:
+    // "The execution record lists Clarity, while the stage displays Critic").
+    [
+      'Project mode',
+      mode
+        ? `${modeName(mode)}${stageMode && stageMode !== mode ? ` · this stage suggests ${modeName(stageMode)}; Go uses the project's mode` : ''}`
+        : '—',
+    ],
     ['Action', thinking ? 'Choosing the next move…' : step ? actionLabel(step.action_key) : '—'],
     [
       'Analyzed or performed',
@@ -106,7 +135,8 @@ export function TransparencyPanel({
     ],
     ['Tools', step?.tools_used?.length ? step.tools_used.map((t) => TOOL_NAME[t] ?? t).join(', ') : '—'],
     ['Status', run ? `${RUN_STATUS[run.status]}${step ? ` · step ${STEP_STATUS[step.status].toLowerCase()}` : ''}` : 'Not started'],
-    ['What changed', step && step.status !== 'running' ? changed(step) : '—'],
+    ['Document changes', changedNow ? (changedNow.document.join('; ') || 'None — the document is as it was') : '—'],
+    ['Workflow changes', changedNow ? (changedNow.workflow.join('; ') || 'None') : '—'],
     ['Next', next],
   ];
   return (
