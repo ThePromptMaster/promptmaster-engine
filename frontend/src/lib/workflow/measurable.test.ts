@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { countQuestions, countWords, measure, parseRequirements, requirementsForStage, sectionFor } from './measurable';
+import { countQuestions, countSections, countWords, measure, parseRequirements, requirementsForStage, sectionFor } from './measurable';
 import { SINGLE_OUTPUT_V1 } from './templates/single-output.v1';
 import type { StageDefinition } from './types';
 
@@ -43,8 +43,8 @@ describe('requirements PromptMaster can measure (C1; Sean, 7 Oct)', () => {
   it('TaskBoard: 95 words against 100–140, five questions without answers', () => {
     const [w, q] = parseRequirements(['a 100–140-word announcement and a five-question support FAQ']);
     const text = `## Announcement\n${words(95)}\n\n## FAQ\n1. When?\n2. How much?\n3. Who?\n4. Where?\n5. Trial?\n`;
-    expect(measure(w, text)).toEqual({ id: 'measured.words:announcement', label: 'Announcement: 100–140 words', satisfied: false, detail: '95 words' });
-    expect(measure(q, text)).toEqual({ id: 'measured.questions:faq', label: 'FAQ: exactly 5 questions, each answered', satisfied: false, detail: '5 without an answer' });
+    expect(measure(w, text)).toEqual({ id: 'measured.words:announcement', label: 'Announcement: 100–140 words', satisfied: false, detail: '95 words', value: '95 words' });
+    expect(measure(q, text)).toEqual({ id: 'measured.questions:faq', label: 'FAQ: exactly 5 questions, each answered', satisfied: false, detail: '5 without an answer', value: '5 questions, 0 answered' });
   });
 
   it('TeamNotes: the announcement stage is measured whole; a heading is not needed', () => {
@@ -68,5 +68,72 @@ describe('requirements PromptMaster can measure (C1; Sean, 7 Oct)', () => {
       expect.objectContaining({ kind: 'words', subject: 'announcement', min: 100, max: 140 }),
       expect.objectContaining({ kind: 'questions', subject: 'faq', min: 5 }),
     ]);
+  });
+});
+
+describe('11 Oct, survey kickoff brief: 200 words, exactly four sections, labelled assumptions', () => {
+  const brief = [
+    '# Customer survey kickoff brief',
+    '## Purpose',
+    'Learn why customers renew and why some leave.',
+    '## Roles',
+    '- Survey lead: owns the questions.',
+    '## Timeline',
+    'Two weeks in the field, one week of analysis.',
+    '## Assumptions',
+    '- Assumption: the survey runs online.',
+    'Assumption: responses are anonymous.',
+  ].join('\n');
+
+  it('reads "exactly four sections" and counts the sections under a title', () => {
+    const reqs = parseRequirements(['A customer survey kickoff brief under 200 words, with exactly four sections, generic roles.']);
+    expect(reqs.map((r) => [r.kind, r.subject, r.min, r.max])).toEqual([
+      ['words', '', undefined, 200],
+      ['sections', '', 4, 4],
+    ]);
+    expect(countSections(brief)).toBe(4);
+    expect(countSections('## A\ntext\n## B\ntext')).toBe(2);
+    expect(parseRequirements(['Summarise the four sections below.'])).toEqual([]);
+  });
+
+  it('counts labelled assumptions as words of the brief', () => {
+    // 8 + 5 + 9 + 5 + 4 = 31 words of text; the headings are not counted.
+    expect(countWords(brief)).toBe(31);
+  });
+
+  it('records the count whether or not the requirement is met', () => {
+    const [words, sections] = parseRequirements(['under 200 words, with exactly four sections']);
+    expect(measure(words, brief, true)).toMatchObject({ satisfied: true, value: '31 words' });
+    expect(measure(sections, brief, true)).toMatchObject({ satisfied: true, value: '4 sections' });
+  });
+});
+
+describe('11 Oct, production (lunch invitation): an accepted requirement fact governs the brief\'s figure', () => {
+  const words = (n: number) => Array.from({ length: n }, (_, i) => `w${i}`).join(' ');
+  // As on production: the limit is a sentence away from what it limits, so it reads as the whole deliverable's.
+  const OBJECTIVE = 'Write a lunch invitation for the whole team, for Wednesday at the usual place, menu attached. Keep it under 120 words.';
+  const project = (facts: string[]) => ({
+    objective: OBJECTIVE,
+    constraints: '',
+    facts: facts.map((statement, i) => ({ id: `f${i}`, statement, kind: 'requirement', retired_at: null }) as never),
+  });
+  const output = SINGLE_OUTPUT_V1.stages.find((s) => s.id === 'output')!;
+
+  it('the fact\'s 70 words is measured, not the objective\'s 120', async () => {
+    const { measureStageContent } = await import('./context');
+    const ms = measureStageContent(project(['Requirement: The invitation is under 70 words.']), SINGLE_OUTPUT_V1, output, words(49));
+    expect(ms).toEqual([expect.objectContaining({ label: 'The deliverable: at most 70 words', satisfied: true, value: '49 words' })]);
+    const over = measureStageContent(project(['Requirement: The invitation is under 70 words.']), SINGLE_OUTPUT_V1, output, words(90));
+    expect(over).toEqual([expect.objectContaining({ satisfied: false, detail: '90 words' })]);
+  });
+
+  it('a fact about the same subject replaces it; one about something else is added', async () => {
+    const { governingRequirements } = await import('./context');
+    expect(parseRequirements([OBJECTIVE]).map((r) => r.subject)).toEqual(['']);
+    const near = 'Write a lunch invitation under 120 words.';
+    const same = governingRequirements(near, parseRequirements([near]), [parseRequirements(['The invitation is under 70 words.'])]);
+    expect(same.map((r) => [r.subject, r.max])).toEqual([['invitation', 70]]);
+    const other = governingRequirements(OBJECTIVE, parseRequirements([OBJECTIVE]), [parseRequirements(['The FAQ has exactly 5 questions.'])]);
+    expect(other.map((r) => [r.kind, r.subject, r.max])).toEqual([['words', '', 120], ['questions', 'faq', 5]]);
   });
 });

@@ -102,6 +102,15 @@ export function actionFor(key: string): AgentAction | undefined {
   return BY_KEY.get(key);
 }
 
+/**
+ * A step's title. A repair of a measured requirement is not a repair "after a
+ * change" (11 Oct: shortening an over-limit brief read as "Repair a reopened stage").
+ */
+export function stepLabel(step: { action_key: string; params?: Record<string, unknown> | null }): string {
+  if (step.action_key === 'recheck_stage' && step.params?.measured) return 'Fix a measured requirement';
+  return actionLabel(step.action_key);
+}
+
 export function actionLabel(key: string): string {
   if (key === INTERPRET_STEP) return 'Interpret the result';
   if (key === USER_ANSWER_STEP) return 'Your answer';

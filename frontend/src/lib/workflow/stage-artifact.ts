@@ -711,6 +711,19 @@ export function carriedForwardUnmet(items: readonly StageItem[], schema: StageIt
 }
 
 /**
+ * Rows deferred that do not hold "Objective met" up, with the reason given
+ * for deferring each: the finish message lists them and says why they do
+ * not block (Sean, 10 Oct, 6.6: deferred rows must be named, not silently
+ * counted as resolved).
+ */
+export function deferredNotBlocking(items: readonly StageItem[], schema: StageItemSchema): { row: string; reason: string }[] {
+  return items
+    .filter((i) => i.status === 'deferred' && isTriaged(i, schema))
+    .filter((i) => !(i.severity === 'major' || UNMET.test(rowText(i))))
+    .map((i) => ({ row: rowText(i).slice(0, 160), reason: (i.reason ?? '').trim().slice(0, 200) }));
+}
+
+/**
  * Rows not yet decided (or only proposed) that say a requirement is unmet. On
  * a table labelled optional these still hold up "Objective met": the label
  * says the rows need no decision, not that a missing proof does not matter.

@@ -28,6 +28,10 @@ export interface ObjectiveAssessment {
   proposed_next: string[];
   /** Each requirement the check considered (10 Oct, email 6.5); absent on older records. */
   criteria?: CriterionResult[];
+  /** What was found unmet, by name (11 Oct); absent on older records. */
+  unmet?: string[];
+  /** The model's own sentence when code overruled its "met" — kept, never shown as the reason. */
+  model_note?: string;
 }
 
 /**
@@ -73,6 +77,7 @@ export function latestObjectiveAssessment(events: readonly WorkflowEvent[]): (Ob
       performed: Array.isArray(p.performed) ? p.performed : [],
       proposed_next: Array.isArray(p.proposed_next) ? p.proposed_next : [],
       ...(Array.isArray(p.criteria) ? { criteria: p.criteria } : {}),
+      ...(Array.isArray(p.unmet) ? { unmet: p.unmet } : {}),
       at: e.created_at ?? '',
     };
   }
@@ -109,5 +114,7 @@ const CHANGES_SINCE = new Set<WorkflowEvent['type']>(['brief_changed', 'stage_ve
 export function pausedLine(a: Pick<ObjectiveAssessment, 'blockers' | 'reason'>): string {
   return a.blockers.length
     ? `Paused — the objective is not met. Waiting for: ${a.blockers.map((b) => b.need).join('; ')}.`
-    : `The objective is not met yet: ${a.reason}`;
+    : /^Not met: /.test(a.reason)
+      ? `The objective is not met yet. ${a.reason}`
+      : `The objective is not met yet: ${a.reason}`;
 }

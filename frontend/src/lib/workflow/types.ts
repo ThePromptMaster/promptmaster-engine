@@ -425,13 +425,15 @@ export interface StageContext {
    * measured on its saved text (`measurable.ts`, C1). Each is an automatic,
    * blocking check on that stage.
    */
-  measured?: Record<string, { id: string; label: string; satisfied: boolean; detail?: string }[]>;
+  measured?: Record<string, { id: string; label: string; satisfied: boolean; detail?: string; value?: string }[]>;
   /**
    * Per review stage id: rows carried forward or deferred whose text says an
    * objective requirement is unmet (`carriedForwardUnmet`, C2). Each is open
    * work for "Objective met", whatever its row status.
    */
   carriedForward?: Record<string, string[]>;
+  /** Per review stage id: deferred rows that do not block, with why each was deferred (`deferredNotBlocking`). */
+  deferred?: Record<string, { row: string; reason: string }[]>;
   /** Per review stage id: undecided or proposed rows that say a requirement is unmet (`openUnmet`). */
   openUnmet?: Record<string, number>;
 }

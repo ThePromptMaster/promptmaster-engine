@@ -12,6 +12,7 @@
 
 import type { AgentRun, AgentStep } from '@/types/agent';
 import { actionFor, actionLabel, ROUTINE_DEFAULT_STEP } from './actions';
+import { describeNeed, type NeedsUser } from './needs';
 
 export type PauseKind = 'working' | 'window' | 'blocker' | 'decision' | 'complete' | 'stopped';
 
@@ -39,7 +40,9 @@ export function runAccount(run: AgentRun | null, steps: readonly AgentStep[], st
   const executed = ok.filter((s) => s.execution_label === 'code_executed' || s.execution_label === 'simulation_run').length;
   const derived = ok.filter((s) => actionFor(s.action_key)?.performer === 'reason').length;
   const lookups = ok.filter((s) => s.action_key === 'check_literature').length;
-  const repaired = new Set(ok.filter((s) => s.action_key === 'recheck_stage').map((s) => String(s.params?.stage_id ?? s.stage_id ?? '')));
+  const repaired = new Set(ok.filter((s) => s.action_key === 'recheck_stage' && !s.params?.measured).map((s) => String(s.params?.stage_id ?? s.stage_id ?? '')));
+  // 11 Oct: shortening a brief to its limit is not "a repair after a change".
+  const fitted = new Set(ok.filter((s) => s.action_key === 'recheck_stage' && s.params?.measured).map((s) => String(s.params?.stage_id ?? s.stage_id ?? '')));
   const written = new Set(
     ok.filter((s) => ['draft_stage', 'revise_stage', 'apply_findings', 'draft_sections', 'revise_sections'].includes(s.action_key) && s.stage_id).map((s) => s.stage_id!)
   );
@@ -50,6 +53,7 @@ export function runAccount(run: AgentRun | null, steps: readonly AgentStep[], st
     lookups ? `searched the literature ${n(lookups, 'time')}` : '',
     written.size ? `wrote or revised ${[...written].map(stageLabel).join(', ')}` : '',
     repaired.size ? `repaired ${[...repaired].filter(Boolean).map(stageLabel).join(', ')} after a change` : '',
+    fitted.size ? `revised ${[...fitted].filter(Boolean).map(stageLabel).join(', ')} to meet a requirement measured in code` : '',
     returns.length ? `went back ${n(returns.length, 'time')} for further work (${returns.map((s) => stageLabel(String(s.params?.stage_id ?? ''))).join(', ')})` : '',
   ].filter(Boolean);
   const did = parts.length ? `${parts.join('; ')}.`.replace(/^./, (c) => c.toUpperCase()) : '';
@@ -75,12 +79,30 @@ export function runAccount(run: AgentRun | null, steps: readonly AgentStep[], st
       }
       return { did, kind: 'blocker', now: `Can't continue: ${firstSentence(reason) || 'something it needs is missing.'}`, setAside };
     case 'awaiting_decision':
-      return { did, kind: 'decision', now: `Your decision is needed: ${firstSentence(reason) || 'see below.'}`, setAside };
+      // The decision itself, not the stop's statement (11 Oct: "Your decision
+      // is needed" over a sentence that asked nothing).
+      return { did, kind: 'decision', now: `Your decision is needed: ${decisionAsked(run.needs ?? null, reason, stageLabel)}`, setAside };
     case 'completed':
-      return { did, kind: 'complete', now: /objective (?:is )?met/i.test(reason) ? 'Finished: the objective is verified as met.' : `Finished: ${firstSentence(reason) || 'nothing left to do.'}`, setAside };
+      // What was deferred is said with the finish, not counted as resolved (10 Oct, 6.6).
+      return {
+        did, kind: 'complete', setAside,
+        now: /objective (?:is )?met/i.test(reason)
+          ? `Finished: the objective is verified as met.${reason.match(/ Deferred, not blocking[\s\S]*$/)?.[0] ?? ''}`
+          : `Finished: ${firstSentence(reason) || 'nothing left to do.'}`,
+      };
     case 'failed':
       return { did, kind: 'blocker', now: `Stopped on an error: ${firstSentence(reason) || 'see the record below.'}`, setAside };
     default:
       return { did, kind: 'stopped', now: 'Stopped by you. Everything done so far is saved.', setAside };
   }
+}
+
+/** What the user is asked to decide, in one line: the request's own buttons when it has them. */
+function decisionAsked(need: NeedsUser | null, reason: string, stageLabel: (id: string) => string): string {
+  if (need && need.kind !== 'answer_question') {
+    const d = describeNeed(need, stageLabel);
+    const choices = d.options?.map((o) => o.label) ?? (d.action ? [d.action] : []);
+    if (choices.length) return `${choices.map((c) => `“${c}”`).join(' or ')}. ${firstSentence(d.message)}`;
+  }
+  return firstSentence(reason) || 'see below.';
 }

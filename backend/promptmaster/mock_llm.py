@@ -528,6 +528,15 @@ def _json_reply(system: str, prompt: str) -> dict:
             # Not met, and nothing missing: another round is worth it.
             return {"outcome": "not_met", "reason": "Mock: not there yet.", "basis_quote": first[:120],
                     "blockers": [], "performed": [], "proposed_next": ["Mock: another round."]}
+        if "[[mock:objective=noquote]]" in prompt:
+            # 11 Oct (survey brief): "met", quoting a heading — twice.
+            return {"outcome": "met", "reason": "Mock: the brief satisfies all of the requirements.",
+                    "basis_quote": "## Purpose", "blockers": [], "performed": [], "proposed_next": []}
+        if "[[mock:objective=criterion]]" in prompt and "recheck_stage" not in prompt:
+            # A named requirement unmet, until a repair is on the run record.
+            return {"outcome": "met", "reason": "Mock: the brief satisfies all of the requirements.",
+                    "basis_quote": first[:120], "blockers": [], "performed": [], "proposed_next": [],
+                    "criteria": [{"requirement": "Exactly four sections", "verdict": "not_met", "basis": "It has two."}]}
         if "[[mock:objective=unmet]]" in prompt:
             return {"outcome": "not_met", "reason": "Mock: the log says the criterion is not met.",
                     "basis_quote": first[:120],
@@ -673,6 +682,9 @@ def _prose_reply(system: str, prompt: str) -> str:
         first = notes.group(1).splitlines()[0].strip() if notes else "(no findings)"
         return f"## Mock revision\n\nRevised by the mock model, applying: {first[:160]}"
     objective = _objective(prompt) if "Objective:" in prompt else "the task"
+    if "MEASURED IN CODE AND NOT MET" in prompt:
+        # A repair of a measured requirement (11 Oct): short enough for any limit the E2E sets.
+        return "## Mock output\n\nShortened by the mock to meet the measured limit."
     if _WRITING_NOW in prompt:
         # A chapter. Say what the prompt carried, so a browser test can see
         # that the stage's own hint reached it and that the mode came as a

@@ -321,8 +321,11 @@ test('an answer the saved record contradicts is shown first, and recorded only w
 
   await disagree.getByRole('button', { name: 'Record my answer anyway' }).click();
   await expect(steps(page).nth(1)).toContainText('Your answer');
-  const facts = await serviceSelect('project_facts', `project_id=eq.${id}&select=statement,source_ref`);
-  expect(facts.some((f: { source_ref?: { contradicted?: unknown } }) => f.source_ref?.contradicted)).toBe(true);
+  // The step shows before the fact's row is written: wait for it rather than read once.
+  await expect.poll(async () => {
+    const facts = await serviceSelect('project_facts', `project_id=eq.${id}&select=statement,source_ref`);
+    return facts.some((f: { source_ref?: { contradicted?: unknown } }) => f.source_ref?.contradicted);
+  }).toBe(true);
 });
 
 /**
