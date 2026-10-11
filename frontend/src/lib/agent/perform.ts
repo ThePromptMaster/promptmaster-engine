@@ -38,6 +38,7 @@ import { blocksCompletion, deliverableStage, describeOutstanding, evaluateStage,
 import { pausedLine } from '@/lib/workflow/objective';
 import { attachedDocuments, currentFacts, supersededFactValues } from '@/lib/workflow/facts';
 import { describeValue, leftoverValues, type SupersededValue } from '@/lib/workflow/fact-values';
+import { revertsUserVersion, USER_CHOSEN_OPERATIONS } from '@/lib/workflow/fact-reconcile';
 import { recordPolicyFacts } from '@/lib/supabase/facts';
 import { checkGoal } from './code-check';
 import { unmetHumanRequirements } from '@/lib/workflow/human-requirements';
@@ -581,6 +582,26 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       if (!content) {
         return done(key, { status: 'failed', output: 'The model returned nothing usable.', toolsUsed: ['model'], changes: {} });
       }
+      // The user's own latest version outranks an older fact it changed: a
+      // revision that would put the fact's value back is not saved, and the
+      // user is asked which is right (10 Oct, Sean: Go turned the Wednesday
+      // invitation back into Thursday and called it verified).
+      const headVersion = ctx.bundles[ctx.stage.id]?.versions.at(-1);
+      if (revising && headVersion && USER_CHOSEN_OPERATIONS.has(headVersion.source_operation) && !ctx.conflictAnswer) {
+        const reverted = revertsUserVersion({ facts: ctx.project.facts, userText: head, generated: content, userChosenAt: headVersion.created_at });
+        if (reverted.length) {
+          const values = reverted.map((r) => `${r.was} (yours) → ${r.now} (the accepted facts)`).join('; ');
+          const question =
+            `Your latest version of ${ctx.stage.label} (v${headVersion.version_number}) differs from the accepted facts: ${values}. ` +
+            `I have not changed it. Which is right? If your version is, update the facts in Facts and requirements; if the facts are, say so and I will revise it.`;
+          return done(key, {
+            status: 'blocked', blockKind: 'needs_decision', toolsUsed: ['model'], changes: {},
+            output: question, params: { ...params, conflict_question: true },
+            stop: { status: 'awaiting_decision', reason: question },
+            needs: { kind: 'answer_question', question },
+          });
+        }
+      }
       const created = await ctx.appendStageVersion(ctx.stage.id, ctx.stage.label, {
         content,
         source_operation: revising ? 'agent_revise' : 'agent_draft',
@@ -860,6 +881,20 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       }
       if (!content) {
         return done(key, { status: 'failed', output: 'The model returned nothing usable.', toolsUsed: ['model'], changes: {} });
+      }
+      // A repair does not undo the user's own latest version either (10 Oct).
+      if (headVersion && USER_CHOSEN_OPERATIONS.has(headVersion.source_operation)) {
+        const reverted = revertsUserVersion({ facts: ctx.project.facts, userText: head, generated: content, userChosenAt: headVersion.created_at });
+        if (reverted.length) {
+          const values = reverted.map((r) => `${r.was} (yours) → ${r.now} (the accepted facts)`).join('; ');
+          const question =
+            `Your latest version of ${target.label} (v${headVersion.version_number}) differs from the accepted facts: ${values}. ` +
+            `I have not changed it. Which is right? If your version is, update the facts in Facts and requirements; if the facts are, say so and I will revise it.`;
+          return done(key, {
+            status: 'blocked', blockKind: 'needs_decision', toolsUsed: ['model'], changes: {},
+            output: question, stop: { status: 'awaiting_decision', reason: question }, needs: { kind: 'answer_question', question },
+          });
+        }
       }
       const created = await ctx.appendStageVersion(target.id, target.label, {
         content,

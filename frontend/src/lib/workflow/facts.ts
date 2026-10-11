@@ -35,7 +35,9 @@ export function factSource(f: Pick<ProjectFact, 'source_kind' | 'source_ref' | '
         ? 'from your conversation'
         : f.source_ref?.via === 'go answer'
           ? 'your answer to Go'
-          : SOURCE_WORDS[f.source_kind];
+          : f.source_ref?.via === 'revision'
+            ? 'updated with your revision'
+            : SOURCE_WORDS[f.source_kind];
   const by = f.accepted_by === 'policy' ? ', accepted under your routine-decision policy' : '';
   const when = day(f.created_at);
   return `${base}${when ? `, ${when}` : ''}${by}`;

@@ -75,6 +75,8 @@ import { ProjectData } from './project-data';
 import { lookupAndVerify } from '@/lib/workflow/verify';
 import { RefusedRevisions, refusedSince } from './refused-revisions';
 import { BriefChangeNotice } from './brief-change-notice';
+import { FactReconcileNotice } from './fact-change-list';
+import { factChangesFromRevision, type FactChange } from '@/lib/workflow/fact-reconcile';
 import { useBriefChange } from './use-brief-change';
 import { openBriefChange } from '@/lib/workflow/brief-change';
 import { contextFromDocuments } from '@/lib/data/extract-text';
@@ -893,9 +895,22 @@ export function WorkflowWorkspace({
   });
   const briefChange = useMemo(() => openBriefChange(events ?? [], state), [events, state]);
 
+  // A version the user saved themselves that states values the facts do not
+  // (10 Oct, Sean: restoring the Wednesday draft left the facts on Thursday).
+  const [factReconcile, setFactReconcile] = useState<{ stageId: string; how: string; changes: FactChange[] } | null>(null);
+  const offerFactUpdates = useCallback(
+    (how: string, before: string, after: string) => {
+      if (!stage) return;
+      const changes = factChangesFromRevision({ facts: project.facts, instruction: '', before, after });
+      setFactReconcile(changes.length ? { stageId: stage.id, how, changes } : null);
+    },
+    [stage, project.facts]
+  );
+
   const saveContent = useCallback(
     async (content: string) => {
       if (!stage || !appendStageVersion) return;
+      const before = headVersion?.content ?? '';
       await appendStageVersion(stage.id, stage.label, {
         content,
         source_operation: 'stage_edit',
@@ -903,8 +918,9 @@ export function WorkflowWorkspace({
         mode: project.mode,
         change_summary: 'Edited by hand.',
       });
+      offerFactUpdates('Your edit', before, content);
     },
-    [stage, appendStageVersion, project.model, project.mode]
+    [stage, appendStageVersion, project.model, project.mode, headVersion?.content, offerFactUpdates]
   );
 
   const saveItems = useCallback(
@@ -940,10 +956,13 @@ export function WorkflowWorkspace({
   const restore = useCallback(
     async (versionId: string) => {
       if (!stage || !restoreStageVersion) return;
+      const before = headVersion?.content ?? '';
+      const restored = stageVersionList.find((v) => v.id === versionId);
       await restoreStageVersion(stage.id, versionId);
       setActiveVersionId(null);
+      if (restored) offerFactUpdates(`The version you restored (v${restored.version_number})`, before, restored.content);
     },
-    [stage, restoreStageVersion]
+    [stage, restoreStageVersion, headVersion?.content, stageVersionList, offerFactUpdates]
   );
 
   /**
@@ -1739,6 +1758,16 @@ export function WorkflowWorkspace({
               onUpdate={appendStageVersion && project.status !== 'finalized' ? () => void go.update() : undefined}
               updating={go.active}
             />
+            {factReconcile && factReconcile.stageId === stage.id && (
+              <FactReconcileNotice
+                project={project}
+                stageLabel={stage.label}
+                how={factReconcile.how}
+                changes={factReconcile.changes}
+                onChanged={() => onReload?.()}
+                onDone={() => setFactReconcile(null)}
+              />
+            )}
             <FiguresOnRecord template={template} state={state} bundles={stageBundles} />
             {/* On every stage: the accepted facts are the project's record (F3, 7 Oct). */}
             <ProjectFacts project={project} onChanged={() => onReload?.()} readOnly={!isEditable || project.status === 'finalized'} />
@@ -2079,6 +2108,7 @@ export function WorkflowWorkspace({
               project={project}
               stageId={stage.id}
               stageLabel={stage.label}
+              onFactsChanged={() => onReload?.()}
               attach={
                 project.status === 'finalized' ? undefined : (
                   <ChatAttach

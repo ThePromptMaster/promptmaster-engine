@@ -52,14 +52,16 @@ export async function recordFacts(project: { id: string; user_id: string }, fact
 export async function supersedeFact(
   project: { id: string; user_id: string },
   old: Pick<ProjectFact, 'id' | 'kind' | 'subject'>,
-  statement: string
+  statement: string,
+  /** Where the change came from, beside the fact it replaces: a revision names its stage and instruction. */
+  from?: Record<string, unknown>
 ): Promise<ProjectFact> {
   const supabase = createClient();
   const { data, error } = await supabase
     .from('project_facts')
     .insert({
       project_id: project.id, user_id: project.user_id, statement: statement.trim(), subject: old.subject,
-      kind: old.kind, source_kind: 'user_edit', source_ref: { supersedes: old.id }, supersedes: old.id,
+      kind: old.kind, source_kind: 'user_edit', source_ref: { ...(from ?? {}), supersedes: old.id }, supersedes: old.id,
     })
     .select(COLUMNS)
     .single();
