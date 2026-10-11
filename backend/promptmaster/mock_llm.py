@@ -649,6 +649,14 @@ def _prose_reply(system: str, prompt: str) -> str:
             "2. **Weak reasoning** — Mock: the main claim is asserted, never shown.\n"
             "3. **Missing perspectives** — Mock: the strongest counter-argument is ignored.\n"
         )
+    if conversation._APPLY_INSTRUCTION[:60] in system:
+        # "[[mock:say=…]]" in the instruction is the revision's text, so a
+        # browser test can script what "Change it" returns (10 Oct: a revision
+        # that changes an accepted fact).
+        # The latest instruction's: the thread repeats the earlier ones.
+        said = re.findall(r"\[\[mock:say=(.+?)\]\]", prompt)
+        if said:
+            return said[-1].strip()
     if audit_findings._APPLY_AUDIT_INSTRUCTION[:60] in system:
         # Apply fixes: keep the previous text and add one line per finding, so
         # a diff shows exactly what was applied (C2's review and preview).

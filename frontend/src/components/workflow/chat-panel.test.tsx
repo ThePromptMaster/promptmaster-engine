@@ -26,6 +26,11 @@ const applyToAnswer = vi.fn();
 const saveAsNewVersion = vi.fn();
 const checkConflicts = vi.fn<(...args: unknown[]) => Promise<{ conflicts: unknown[] }>>(async () => ({ conflicts: [] }));
 const recordConflictChoice = vi.fn<(...args: unknown[]) => Promise<void>>(async () => {});
+const supersedeFact = vi.fn<(...args: unknown[]) => Promise<unknown>>(async () => ({}));
+
+vi.mock('@/lib/supabase/facts', () => ({
+  supersedeFact: (...args: unknown[]) => supersedeFact(...args),
+}));
 
 // PM-24's decision trail is Supabase; here it is the empty trail plus a spy.
 // The check itself (findInstructionConflicts) is the real one; only where it
@@ -352,5 +357,57 @@ describe('PM-24: an instruction that conflicts asks which should control', () =>
     panel();
     await instruct('Tighten this.', /whole document/i);
     await waitFor(() => expect(applyToAnswer).toHaveBeenCalledTimes(1));
+  });
+});
+
+// --- a revision that changes an accepted fact (10 Oct, Sean: lunch invitation) ---
+
+describe('a revision that changes an accepted fact', () => {
+  const INVITE = 'Join me for lunch on Thursday at 12:30. Bring your own lunch.';
+  const facts = [
+    { id: 'f1', statement: 'Lunch is Thursday at 12:30.', subject: null, kind: 'fact', source_kind: 'chat', source_ref: {}, retired_at: null, supersedes: null, created_at: '2026-10-10T00:00:00Z' },
+    { id: 'f2', statement: 'Under 120 words.', subject: null, kind: 'requirement', source_kind: 'chat', source_ref: {}, retired_at: null, supersedes: null, created_at: '2026-10-10T00:00:00Z' },
+  ];
+  const project = { ...PROJECT, facts } as unknown as Project;
+
+  beforeEach(() => {
+    applyToAnswer.mockResolvedValue({
+      iteration: { output: 'Join me for lunch on Wednesday at 1:00 p.m. Bring your own lunch.', summary: 'Moved the lunch.' },
+      suggestions: [],
+    });
+  });
+
+  it('offers to update the facts with the revision, and updates the ticked ones on apply', async () => {
+    const onFactsChanged = vi.fn();
+    const { appendStageVersion } = panel({ project, content: INVITE, headVersion: { ...HEAD, content: INVITE } as ArtifactVersion, onFactsChanged });
+    await instruct('Make it Wednesday at 1:00 p.m., under 70 words.', /whole document/i);
+
+    const card = await screen.findByLabelText('Proposed revision');
+    expect(card).toHaveTextContent('This changes 2 accepted facts');
+    expect(card).toHaveTextContent('Lunch is Wednesday at 1:00 p.m.');
+    expect(card).toHaveTextContent('Under 70 words.');
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /apply and update 2 facts/i }));
+
+    await waitFor(() => expect(appendStageVersion).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(supersedeFact).toHaveBeenCalledTimes(2));
+    expect(supersedeFact.mock.calls[0]![2]).toBe('Lunch is Wednesday at 1:00 p.m.');
+    expect(supersedeFact.mock.calls[1]![2]).toBe('Under 70 words.');
+    expect(onFactsChanged).toHaveBeenCalled();
+  });
+
+  it('a fact left unticked is kept, with a warning that Go may change the draft back', async () => {
+    panel({ project, content: INVITE, headVersion: { ...HEAD, content: INVITE } as ArtifactVersion });
+    await instruct('Make it Wednesday at 1:00 p.m., under 70 words.', /whole document/i);
+    await screen.findByLabelText('Proposed revision');
+
+    const user = userEvent.setup();
+    await user.click(screen.getAllByRole('checkbox')[1]!);
+    expect(screen.getByLabelText('Proposed revision')).toHaveTextContent(/may change the draft back/);
+    await user.click(screen.getByRole('button', { name: /apply and update the fact/i }));
+
+    await waitFor(() => expect(supersedeFact).toHaveBeenCalledTimes(1));
+    expect(supersedeFact.mock.calls[0]![2]).toBe('Lunch is Wednesday at 1:00 p.m.');
   });
 });

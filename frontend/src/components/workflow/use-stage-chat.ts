@@ -52,6 +52,8 @@ import {
 } from './chat-scope';
 import type { NewVersion } from '@/lib/supabase/versions';
 import type { ArtifactVersion, Project } from '@/types/project';
+import { factChangesFromRevision, type FactChange } from '@/lib/workflow/fact-reconcile';
+import { supersedeFact } from '@/lib/supabase/facts';
 import type { ChatContext, ChatMessage } from '@/types';
 
 /** A revision the user has been shown but has not yet accepted. */
@@ -73,6 +75,12 @@ export interface ChatProposal {
   changeSummary: string;
   /** How the version is recorded when accepted; defaults to 'chat_instruct'. */
   source?: string;
+  /**
+   * Accepted facts whose values the revision replaces (10 Oct, Sean: the draft
+   * said Wednesday while the facts still said Thursday, and Go changed it back).
+   * Offered with the revision; the ones the user keeps ticked are updated on accept.
+   */
+  factChanges?: FactChange[];
 }
 
 /** What was applied last, so it can be undone without hunting for it. */
@@ -99,6 +107,8 @@ interface Options {
   restoreStageVersion?: (stageId: string, versionId: string) => Promise<void>;
   /** Where the user is: stage, workflow, outline, chapters, buttons (3 Oct call). */
   getChatContext?: () => ChatContext;
+  /** After facts were updated with a revision, so the project reloads them. */
+  onFactsChanged?: () => Promise<unknown> | void;
 }
 
 /**
@@ -135,6 +145,7 @@ export function useStageChat({
   appendStageVersion,
   restoreStageVersion,
   getChatContext,
+  onFactsChanged,
 }: Options) {
   const [messages, setMessages] = useState<StageChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -316,6 +327,12 @@ export function useStageChat({
           nextContent: spliceScope(content, target, after),
           baseContent: content,
           messageId: saved.id,
+          factChanges: factChangesFromRevision({
+            facts: project.facts,
+            instruction: text,
+            before: content,
+            after: spliceScope(content, target, after),
+          }),
           changeSummary:
             response.iteration.summary?.trim() ||
             `Revised ${scopeNoun(kind)} from the side chat: ${text}`,
@@ -385,7 +402,7 @@ export function useStageChat({
    * version this replaces stays exactly where it was, which is what
    * "recoverable new version" means in FR-08.
    */
-  const accept = useCallback(async () => {
+  const accept = useCallback(async (updateFactIds?: readonly string[]) => {
     if (!proposal || !appendStageVersion || busy) return;
     setBusy(true);
     setError(null);
@@ -402,9 +419,27 @@ export function useStageChat({
         change_summary: proposal.changeSummary,
       });
 
+      // The facts the user kept ticked take the revision's values, in the
+      // same step, so no later prompt is told the old ones outrank it.
+      const chosen = (proposal.factChanges ?? []).filter((c) => !updateFactIds || updateFactIds.includes(c.fact.id));
+      let factsUpdated = 0;
+      for (const c of chosen) {
+        try {
+          await supersedeFact(project, c.fact, c.proposed, { via: 'revision', stage_id: stageId, instruction: proposal.instruction.slice(0, 500) });
+          factsUpdated += 1;
+        } catch {
+          // The version is saved; a fact that could not be changed is said below.
+        }
+      }
+      if (chosen.length) await onFactsChanged?.();
+      if (factsUpdated < chosen.length && live.current) {
+        setError(`The revision was saved, but ${chosen.length - factsUpdated} of the facts could not be updated. Change them in Facts and requirements, or Go will treat the old values as current.`);
+      }
+
       await persist(
         'assistant',
-        `Applied to ${proposal.target.label.toLowerCase()}. The previous version is kept and can be restored.`,
+        `Applied to ${proposal.target.label.toLowerCase()}. The previous version is kept and can be restored.` +
+          (factsUpdated ? ` Updated ${factsUpdated === 1 ? 'one fact' : `${factsUpdated} facts`} to match.` : ''),
         'instruct',
         proposal.target.label
       );
@@ -431,7 +466,7 @@ export function useStageChat({
     } finally {
       if (live.current) setBusy(false);
     }
-  }, [proposal, appendStageVersion, busy, headVersion?.id, stageId, stageLabel, project, persist]);
+  }, [proposal, appendStageVersion, busy, headVersion?.id, stageId, stageLabel, project, persist, onFactsChanged]);
 
   /**
    * Discard the proposal.
