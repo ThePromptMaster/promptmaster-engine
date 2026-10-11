@@ -8,7 +8,7 @@ import type { StageEvaluation } from '@/lib/workflow/types';
 import type { AgentStep } from '@/types/agent';
 import { deriveExecutionLabel } from './labels';
 import { ITEM_SCHEMAS, itemSchemaFor } from '@/lib/workflow/stage-artifact';
-import { POLISH_MAX, allowedActions, asksForMoreWork, MAX_RETURNS, reconsiderNote, returnTargets, runAttemptsFor, alternating, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, LIVE_TOOLS, NO_TOOLS, polishSinceDirection, withoutOverride, withoutEndlessPolish, withoutSettledRuns, fitsBudget, noChange, noProgress, plannedBeforeLatestChange, preempt, shouldPause, stageMoveActor, stateFingerprint } from './policy';
+import { POLISH_MAX, allowedActions, asksForMoreWork, MAX_RETURNS, reconsiderNote, returnTargets, runAttemptsFor, alternating, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, LIVE_TOOLS, NO_TOOLS, polishSinceDirection, withoutOverride, withoutEndlessPolish, withoutSettledRuns, fitsBudget, noChange, noProgress, plannedBeforeLatestChange, preempt, shouldPause, stageMoveActor, stateFingerprint, repairedTooOften, REPAIRS_PER_STAGE_PER_RUN } from './policy';
 
 function step(over: Partial<AgentStep>): AgentStep {
   return {
@@ -100,7 +100,7 @@ describe('preempt — checked before any model call', () => {
     expect(noProgress([saved[0], saved[1], revise(2, {})])).toBe(true);
     // A reasoning move never saves: three of it in a row still stop.
     expect(preempt({ ...base, steps: [0, 1, 2].map((idx) => step({ idx, action_key: 'compare_alternatives' })) })?.reason).toBe(
-      '"Compare alternatives" was chosen 3 times in a row on this stage without changing it: none of it was saved to the document. What each produced is in the run log. It needs your direction.'
+      'Going round in circles: "Compare alternatives" was chosen 3 times in a row on this stage without changing it: none of it was saved to the document. What each produced is in the run log. It needs your direction.'
     );
   });
 
@@ -453,7 +453,7 @@ describe('a run going round in circles stops (2 Oct, screenshot 7)', () => {
     expect(alternating(circle)).toEqual(['evaluate_stage', 'apply_findings']);
     expect(noProgress(circle)).toBe(true);
     expect(preempt({ ...base, steps: circle })?.reason).toBe(
-      '"Check this stage" and "Apply the findings" have been taking turns on this stage without it moving on. It needs your direction.'
+      'Going round in circles: "Check this stage" and "Apply the findings" have been taking turns on this stage without it moving on. It needs your direction.'
     );
     // A check, a revision and a second check is ordinary work, not a loop.
     expect(alternating([check(0), apply(1), check(2), apply(3)])).toBeNull();
@@ -803,5 +803,18 @@ describe('reservedApprovalsToReopen: going back asks the user again (Q2e, produc
   it('nothing to reopen when nothing was approved there', () => {
     expect(reservedApprovalsToReopen(method, {})).toEqual([]);
     expect(reservedApprovalsToReopen(RESEARCH_V1.stages.find((s) => s.id === 'experiment')!, { 'meth.analysisplan': true })).toEqual([]);
+  });
+});
+
+describe('a repair cascade stops (Sean, 10 Oct, email 7.6)', () => {
+  const repair = (n: number, stageId: string): AgentStep =>
+    ({ id: `r${n}`, step_index: n, action_key: 'recheck_stage', stage_id: 'critique', params: { stage_id: stageId }, status: 'succeeded', changes: { version_ids: [`v${n}`] }, output: 'Repaired.' }) as unknown as AgentStep;
+  it('one stage repaired more than the cap in a run is going round in circles', () => {
+    const steps = [1, 2, 3, 4].map((n) => repair(n, 'fact_check'));
+    expect(repairedTooOften(steps.slice(0, REPAIRS_PER_STAGE_PER_RUN))).toBeNull();
+    expect(repairedTooOften(steps)).toEqual({ stage: 'fact_check', times: 4 });
+  });
+  it('repairs of different stages are a cascade working through, not a loop', () => {
+    expect(repairedTooOften(['a', 'b', 'c', 'd', 'e'].map((s, i) => repair(i, s)))).toBeNull();
   });
 });

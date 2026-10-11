@@ -360,18 +360,46 @@ export function preempt(input: {
     const name = (k: string) => actionFor(k)?.label ?? STEP_WORDS[k] ?? k;
     return {
       status: 'blocked',
-      reason: `"${name(pair[0])}" and "${name(pair[1])}" have been taking turns on this stage without it moving on. It needs your direction.`,
+      reason: `Going round in circles: "${name(pair[0])}" and "${name(pair[1])}" have been taking turns on this stage without it moving on. It needs your direction.`,
       repeating: [pair[0], pair[1]],
+    };
+  }
+  const repaired = repairedTooOften(finished);
+  if (repaired) {
+    return {
+      status: 'blocked',
+      reason: `Going round in circles: ${repaired.stage} was repaired ${repaired.times} times in this run, and each new version reopened work again. Each repair is saved as its own version; look at the latest before Go goes on. It needs your direction.`,
+      repeating: ['recheck_stage'],
     };
   }
   if (noProgress(finished)) {
     const last = finished.at(-1)!;
     return {
       status: 'blocked',
-      reason: `"${actionFor(last.action_key)?.label ?? last.action_key}" was chosen ${NO_PROGRESS_REPEATS} times in a row on this stage without changing it: none of it was saved to the document. What each produced is in the run log. It needs your direction.`,
+      reason: `Going round in circles: "${actionFor(last.action_key)?.label ?? last.action_key}" was chosen ${NO_PROGRESS_REPEATS} times in a row on this stage without changing it: none of it was saved to the document. What each produced is in the run log. It needs your direction.`,
       repeating: [last.action_key],
     };
   }
+  return null;
+}
+
+/**
+ * Repairs of one stage in a run before Go stops and asks (Sean, 10 Oct,
+ * email 7.6: "Resume should not repeat an ineffective repair indefinitely").
+ * Each repair saves a version and reopens what read the old one, so a
+ * cascade looks like progress to `noProgress`; this bounds it per stage.
+ */
+export const REPAIRS_PER_STAGE_PER_RUN = 3;
+
+/** The stage repaired more than the cap allows in this run, or null. */
+export function repairedTooOften(finished: readonly AgentStep[]): { stage: string; times: number } | null {
+  const counts = new Map<string, number>();
+  for (const s of finished) {
+    if (actionFor(s.action_key)?.performer !== 'recheck') continue;
+    const stage = String((s.params as { stage_id?: unknown } | null)?.stage_id ?? s.stage_id ?? '');
+    counts.set(stage, (counts.get(stage) ?? 0) + 1);
+  }
+  for (const [stage, times] of counts) if (times > REPAIRS_PER_STAGE_PER_RUN) return { stage, times };
   return null;
 }
 

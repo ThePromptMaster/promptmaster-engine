@@ -37,6 +37,7 @@ import { stageContentForSummary, stageEvidence } from '@/lib/workflow/evidence';
 import { blocksCompletion, deliverableStage, describeOutstanding, evaluateStage, outstandingWork } from '@/lib/workflow/engine';
 import { pausedLine } from '@/lib/workflow/objective';
 import { attachedDocuments, currentFacts, supersededFactValues } from '@/lib/workflow/facts';
+import { ManuscriptMissing, withFreshManuscript } from '@/lib/workflow/fresh-manuscript';
 import { describeValue, leftoverValues, type SupersededValue } from '@/lib/workflow/fact-values';
 import { revertsUserVersion, USER_CHOSEN_OPERATIONS } from '@/lib/workflow/fact-reconcile';
 import { recordPolicyFacts } from '@/lib/supabase/facts';
@@ -197,6 +198,26 @@ async function waitForSections(
  * made, Go stops and asks which takes priority instead of quietly rewriting
  * the work (1 Oct, item 33).
  */
+/** The bundles with the chapters re-read for a stage that reads them; null when none has text. */
+async function readManuscript(ctx: PerformContext, target: StageDefinition): Promise<Record<string, StageArtifactBundle> | null> {
+  try {
+    return await withFreshManuscript(ctx.template, target, ctx.bundles);
+  } catch (e) {
+    if (e instanceof ManuscriptMissing) return null;
+    throw e;
+  }
+}
+
+/** A stage that reads the chapters is not written without them, and says so. */
+function manuscriptMissing(key: string, target: StageDefinition): StepOutcome {
+  const source = 'the drafting stage';
+  const reason = `${target.label} reads the manuscript, and no chapter in ${source} has saved text yet. Nothing was written, so nothing claims to have reviewed a draft it was not given.`;
+  return done(key, {
+    status: 'blocked', blockKind: 'data_missing', toolsUsed: [], changes: {},
+    output: reason, stop: { status: 'blocked', reason },
+  });
+}
+
 function askWhichTakesPriority(key: string, params: Record<string, unknown>, instruction: string, conflicts: InstructionConflict[]): StepOutcome {
   const c = conflicts[0];
   const question =
@@ -568,8 +589,11 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       }
       // The instruction used to reach only the version's metadata, never the
       // model: "revise" was "regenerate with the old draft as context" (B0).
+      // The chapters as saved, not the page's copy of them (10 Oct, email 6.2).
+      const fresh = await readManuscript(ctx, ctx.stage);
+      if (!fresh) return manuscriptMissing(key, ctx.stage);
       const res = await api.generateStageArtifact(
-        generationRequest(ctx.project, ctx.template, ctx.state, ctx.bundles, ctx.stage, revising ? head : '', revising ? withDerivation(withAnswer(instruction, ctx.conflictAnswer), ctx.derived) : ''),
+        generationRequest(ctx.project, ctx.template, ctx.state, fresh, ctx.stage, revising ? head : '', revising ? withDerivation(withAnswer(instruction, ctx.conflictAnswer), ctx.derived) : ''),
         ctx.signal
       );
       const generated = generationContent(ctx.stage, res);
@@ -852,9 +876,11 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         ? ` MEASURED IN CODE AND NOT MET: ${measuredFails.join('; ')}. Revise so each is met — the count is made in code, so count exactly — and keep everything else as written.`
         : '';
       const instruction = recheckInstruction(target.label, why, superseded, before ? 'table' : 'prose') + measuredLine;
+      const fresh = await readManuscript(ctx, target);
+      if (!fresh) return manuscriptMissing(key, target);
       const attempt = async (text: string) => {
         const res = await api.generateStageArtifact(
-          generationRequest(ctx.project, ctx.template, ctx.state, ctx.bundles, target, head, text),
+          generationRequest(ctx.project, ctx.template, ctx.state, fresh, target, head, text),
           ctx.signal
         );
         const generated = generationContent(target, res);
@@ -1265,7 +1291,8 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
           ? `Further investigation asked for by ${ctx.stage.label}: ${work}\nAdd a row for each piece of this work that is not already in the table. Keep every existing row, its text and its status exactly as they are.`
           : `Further investigation asked for by ${ctx.stage.label}: ${work}\nRevise to take this in. Keep everything that still holds exactly as it is.`;
         try {
-          const res = await api.generateStageArtifact(generationRequest(ctx.project, ctx.template, ctx.state, ctx.bundles, target, head, instruction), ctx.signal);
+          const fresh = await withFreshManuscript(ctx.template, target, ctx.bundles).catch(() => ctx.bundles);
+          const res = await api.generateStageArtifact(generationRequest(ctx.project, ctx.template, ctx.state, fresh, target, head, instruction), ctx.signal);
           const generated = generationContent(target, res);
           const before = rendererHoldsItems(target.renderer) ? parseItems(head) : null;
           const after = before ? parseItems(generated) : null;

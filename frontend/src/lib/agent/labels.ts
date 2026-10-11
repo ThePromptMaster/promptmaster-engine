@@ -6,7 +6,7 @@
  * run, result interpreted, blocked" are different claims. The mapping:
  *
  *   reasoning moves (derive, prove, …), evaluation   → discussed
- *   drafting / revising a stage artifact             → designed (written, nothing run)
+ *   drafting / revising / repairing a stage artifact → designed (written, nothing run)
  *   run_computation                                  → from the sandbox's own record
  *                                                      (lib/sandbox/outcome.ts)
  *   interpret_result                                 → result_interpreted, only with a run to cite
@@ -39,6 +39,8 @@ export function deriveExecutionLabel(
     case 'outline':
     case 'sections':
     case 'apply':
+    // A repair rewrites the stage (10 Oct, email 7.5); it is checked by `verifyOutcome`.
+    case 'recheck':
       return 'designed';
     case 'compute':
       // Never more than the sandbox recorded; without a record, only code was written.
