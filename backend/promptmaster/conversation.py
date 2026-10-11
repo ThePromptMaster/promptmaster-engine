@@ -123,12 +123,27 @@ def build_chat_reply_prompt(
 # 2. Apply to answer — patch the active iteration's output
 # --------------------------------------------------------------------------
 
+# Sean, 10 Oct (emails 4–5): "Change it" to Wednesday at 1:00 p.m. came back
+# still saying Thursday at 12:30 — the facts and the objective said Thursday,
+# and every prompt is told an accepted fact outranks other text. The user's
+# instruction is later than both; PromptMaster offers to update the record
+# with the revision (lib/workflow/fact-reconcile.ts), so the revision follows it.
+_INSTRUCTION_IS_LATER = (
+    " THE USER'S INSTRUCTION IN THE CHAT IS THEIR LATEST WORD. Where it changes a "
+    "particular value — a day, a time, a date, an amount, a length limit — that the "
+    "objective, the constraints or an accepted fact states, write the instruction's "
+    "value. Do not keep the old value against it: PromptMaster asks the user, with "
+    "this revision, whether to update the record to match."
+)
+
+
 _APPLY_INSTRUCTION = (
     "APPLY MODE: The user has had a chat about a specific answer and now wants "
     "you to revise that answer to incorporate the discussed insights, while "
     "preserving alignment with the original objective and constraints. Produce "
     "a complete updated version of the answer — full text, ready to read. Keep "
     "the structure and length appropriate to the objective."
+    + _INSTRUCTION_IS_LATER
 )
 
 
@@ -171,6 +186,7 @@ _SAVE_AS_NEW_INSTRUCTION = (
     "the chat settled as instructions. Start from the current version, change "
     "what the chat asked for, and keep the rest. Output only the full text of "
     "the new version, ready to read."
+    + _INSTRUCTION_IS_LATER
 )
 
 
