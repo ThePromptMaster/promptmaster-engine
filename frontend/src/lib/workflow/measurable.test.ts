@@ -107,3 +107,33 @@ describe('11 Oct, survey kickoff brief: 200 words, exactly four sections, labell
     expect(measure(sections, brief, true)).toMatchObject({ satisfied: true, value: '4 sections' });
   });
 });
+
+describe('11 Oct, production (lunch invitation): an accepted requirement fact governs the brief\'s figure', () => {
+  const words = (n: number) => Array.from({ length: n }, (_, i) => `w${i}`).join(' ');
+  // As on production: the limit is a sentence away from what it limits, so it reads as the whole deliverable's.
+  const OBJECTIVE = 'Write a lunch invitation for the whole team, for Wednesday at the usual place, menu attached. Keep it under 120 words.';
+  const project = (facts: string[]) => ({
+    objective: OBJECTIVE,
+    constraints: '',
+    facts: facts.map((statement, i) => ({ id: `f${i}`, statement, kind: 'requirement', retired_at: null }) as never),
+  });
+  const output = SINGLE_OUTPUT_V1.stages.find((s) => s.id === 'output')!;
+
+  it('the fact\'s 70 words is measured, not the objective\'s 120', async () => {
+    const { measureStageContent } = await import('./context');
+    const ms = measureStageContent(project(['Requirement: The invitation is under 70 words.']), SINGLE_OUTPUT_V1, output, words(49));
+    expect(ms).toEqual([expect.objectContaining({ label: 'The deliverable: at most 70 words', satisfied: true, value: '49 words' })]);
+    const over = measureStageContent(project(['Requirement: The invitation is under 70 words.']), SINGLE_OUTPUT_V1, output, words(90));
+    expect(over).toEqual([expect.objectContaining({ satisfied: false, detail: '90 words' })]);
+  });
+
+  it('a fact about the same subject replaces it; one about something else is added', async () => {
+    const { governingRequirements } = await import('./context');
+    expect(parseRequirements([OBJECTIVE]).map((r) => r.subject)).toEqual(['']);
+    const near = 'Write a lunch invitation under 120 words.';
+    const same = governingRequirements(near, parseRequirements([near]), [parseRequirements(['The invitation is under 70 words.'])]);
+    expect(same.map((r) => [r.subject, r.max])).toEqual([['invitation', 70]]);
+    const other = governingRequirements(OBJECTIVE, parseRequirements([OBJECTIVE]), [parseRequirements(['The FAQ has exactly 5 questions.'])]);
+    expect(other.map((r) => [r.kind, r.subject, r.max])).toEqual([['words', '', 120], ['questions', 'faq', 5]]);
+  });
+});

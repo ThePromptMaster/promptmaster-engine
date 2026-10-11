@@ -23,7 +23,7 @@ import { carriedForwardUnmet, deferredNotBlocking, confirmableProposals, openUnm
 import type { StageContext, StageDefinition, WorkflowEvent, WorkflowTemplate } from './types';
 import { deliverableStage } from './engine';
 import { currentFacts } from './facts';
-import { measure, parseRequirements, requirementsForStage, type Measurement } from './measurable';
+import { measure, parseRequirements, requirementsForStage, type MeasurableRequirement, type Measurement } from './measurable';
 
 export interface BuildContextInput {
   template: WorkflowTemplate;
@@ -191,6 +191,35 @@ export function buildStageContext(input: BuildContextInput): StageContext {
 }
 
 /**
+ * The requirements that govern: an accepted requirement fact replaces the
+ * brief's figure of the same kind (11 Oct, production: the lunch invitation's
+ * fact said "under 70 words", the objective still said "under 120", and the
+ * 120 was what was measured). It replaces one about the same thing, or one
+ * about the whole deliverable when the objective names the fact's subject as
+ * what it asks for ("a lunch invitation … under 120 words"); then it measures
+ * the whole deliverable, as the figure it replaces did. Facts are in the order
+ * they were accepted, so a later one governs.
+ */
+export function governingRequirements(
+  objective: string,
+  brief: readonly MeasurableRequirement[],
+  facts: readonly (readonly MeasurableRequirement[])[]
+): MeasurableRequirement[] {
+  let out = [...brief];
+  for (const fromFact of facts) {
+    for (const f of fromFact) {
+      const names = (subject: string) => Boolean(subject) && new RegExp(`\\b${subject}s?\\b`, 'i').test(objective);
+      const same = out.findIndex((r) => r.kind === f.kind && r.subject === f.subject);
+      const whole = out.findIndex((r) => r.kind === f.kind && r.subject === '' && names(f.subject));
+      if (same >= 0) out[same] = f;
+      else if (whole >= 0) out[whole] = { ...f, id: out[whole].id, subject: '' };
+      else out = [...out, f];
+    }
+  }
+  return out;
+}
+
+/**
  * The measurable requirements a stage answers for, measured on `content`
  * (C1). Used for the saved head, and by a repair before it saves (L-63).
  */
@@ -201,12 +230,11 @@ export function measureStageContent(
   content: string
 ): Measurement[] {
   if (!content.trim()) return [];
-  const requirements = parseRequirements([
+  const requirements = governingRequirements(
     project.objective ?? '',
-    project.constraints ?? '',
-    project.output_format ?? '',
-    ...currentFacts(project.facts).filter((f) => f.kind === 'requirement').map((f) => f.statement),
-  ]);
+    parseRequirements([project.objective ?? '', project.constraints ?? '', project.output_format ?? '']),
+    currentFacts(project.facts).filter((f) => f.kind === 'requirement').map((f) => parseRequirements([f.statement]))
+  );
   if (!requirements.length) return [];
   return requirementsForStage(stage, deliverableStage(template)?.id, requirements)
     .map(({ requirement, whole }) => measure(requirement, content, whole))

@@ -267,3 +267,19 @@ def test_a_model_not_met_with_nothing_named_is_the_thing_unmet():
     a = parse_assessment({"outcome": "not_met", "reason": "The roles name real people."}, BRIEF, [])
     assert a.unmet == ["The roles name real people"]
     assert a.reason == "Not met: The roles name real people."
+
+
+def test_lunch_invitation_49_words_is_not_over_the_accepted_70():
+    """11 Oct, production (lunch invitation): Output v4 is 49 words; the check
+    paused with "it exceeds the accepted under-70-word limit"."""
+    invite = "Join us for lunch on Wednesday at 1:00 p.m. in the garden room."
+    measured = ["Invitation: at most 70 words — 49 words"]
+    a = parse_assessment({
+        "outcome": "not_met", "reason": "It exceeds the accepted under-70-word limit.",
+        "basis_quote": invite,
+        "criteria": [{"requirement": "The invitation is under 70 words", "verdict": "not_met", "basis": "Too long."}],
+    }, invite, [], [], measured)
+    assert a.outcome == "met"
+    assert a.criteria[0].basis == "Measured in code: Invitation: at most 70 words — 49 words"
+    b = parse_assessment({"outcome": "not_met", "reason": "It exceeds the accepted under-70-word limit."}, invite, [], [], measured)
+    assert b.unmet == [] and "could not point to a passage" in b.reason
