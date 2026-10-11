@@ -68,6 +68,11 @@ export function runAccount(run: AgentRun | null, steps: readonly AgentStep[], st
     case 'budget_exhausted':
       return { did, kind: 'window', now: 'Paused at the end of this window — a resource limit, not a problem. Everything is saved; Continue picks up from here and does not repeat finished work.', setAside };
     case 'blocked':
+      // A loop stop is not a missing tool or missing data (Sean, 10 Oct, email 7.6:
+      // "distinguish a step-budget pause from a technical block and from project completion").
+      if (/^Going round in circles: /.test(reason)) {
+        return { did, kind: 'blocker', now: `Stopped to avoid repeating itself: ${firstSentence(reason.replace(/^Going round in circles: /, ''))} Nothing is lost; tell Go what to do differently, or do it yourself.`, setAside };
+      }
       return { did, kind: 'blocker', now: `Can't continue: ${firstSentence(reason) || 'something it needs is missing.'}`, setAside };
     case 'awaiting_decision':
       return { did, kind: 'decision', now: `Your decision is needed: ${firstSentence(reason) || 'see below.'}`, setAside };

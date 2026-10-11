@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { collapseSteps } from './labels';
+import { collapseSteps, deriveExecutionLabel } from './labels';
 
 const row = (action_key: string, status = 'succeeded', output = '', execution_label: string | null = null) =>
   ({ action_key, status, output, execution_label }) as Parameters<typeof collapseSteps>[0][number];
@@ -27,5 +27,11 @@ describe('collapseSteps: a repeated step is one row with a count (2 Oct, screens
     expect(rows).toHaveLength(1);
     expect((rows[0].step as { id?: string }).id).toBe('last');
     expect(rows[0].repeats).toBe(2);
+  });
+});
+
+describe('a repair has a label (Sean, 10 Oct, email 7.5)', () => {
+  it('is a draft written, nothing run', () => {
+    expect(deriveExecutionLabel('recheck_stage', { blocked: false })).toBe('designed');
   });
 });

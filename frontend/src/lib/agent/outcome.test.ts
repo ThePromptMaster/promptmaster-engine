@@ -87,3 +87,18 @@ describe('"succeeded" is read back from the project (1 Oct, item 4)', () => {
     expect(verifyOutcome('draft_stage', failed, {})).toBe(failed);
   });
 });
+
+describe('a repair is held to what it saved (Sean, 10 Oct, email 7.5)', () => {
+  it('a repair that reports success with nothing saved is recorded as failed', () => {
+    expect(assertHonestOutcome('recheck_stage', ok({})).status).toBe('failed');
+    expect(assertHonestOutcome('recheck_stage', ok({ version_ids: ['v9'] })).status).toBe('succeeded');
+  });
+  it('the version a repair names must be in the project', () => {
+    expect(verifyOutcome('recheck_stage', ok({ version_ids: ['v9'] }), { versions: [{ id: 'v9', found: false, empty: false }] }).status).toBe('failed');
+    expect(verifyOutcome('recheck_stage', ok({ version_ids: ['v9'] }), { versions: [{ id: 'v9', found: true, empty: false }] }).status).toBe('succeeded');
+  });
+  it('chapters a repair says it rewrote must hold text', () => {
+    expect(verifyOutcome('recheck_stage', ok({ sections_written: ['s1'] }), { sectionsWithContent: [] }).status).toBe('failed');
+    expect(verifyOutcome('recheck_stage', ok({ sections_written: ['s1'] }), { sectionsWithContent: ['s1'] }).status).toBe('succeeded');
+  });
+});

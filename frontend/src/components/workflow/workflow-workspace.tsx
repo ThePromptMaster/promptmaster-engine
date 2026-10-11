@@ -140,7 +140,8 @@ interface Props {
    */
   ensureStageArtifact?: (stageId: string, name: string) => Promise<Artifact>;
   /** Reload project state after the server changed it behind our back. */
-  onReload?: () => void;
+  /** Reloads the project; the promise settles when the page holds the saved state, so a caller can await it. */
+  onReload?: () => Promise<void> | void;
 }
 
 /** Per-viewer convenience only: whether this person last left the side chat open. */
@@ -1070,7 +1071,12 @@ export function WorkflowWorkspace({
     onRefresh: onReload,
     getControls: () => controlsRef.current,
   });
-  useEffect(() => setGoDriving(go.active || go.phase === 'awaiting'), [go.active, go.phase]);
+  // A paused run holds the next move too: the page drafting Realign while Go
+  // proposed skipping it, or Summary while Go waited for approval to draft it,
+  // made versions no Go step accounted for (Sean, 10 Oct, email 6.7). The stage
+  // can still be drafted by hand from its menu.
+  const goPaused = go.run?.status === 'awaiting_decision' || go.run?.status === 'blocked' || go.run?.status === 'budget_exhausted';
+  useEffect(() => setGoDriving(go.active || go.phase === 'awaiting' || goPaused), [go.active, go.phase, goPaused]);
 
   // What Go can ask the user for, done from its card with one click (B4):
   // the same writes the stage's own controls make.
