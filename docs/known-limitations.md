@@ -1373,3 +1373,28 @@ Above a stage's draft sit the guidance, the mode card, the Go panel, the project
 facts and the data panel, each added on request. A first-time tester scrolls to find the work.
 No panel was moved or collapsed in this round. Doing so is a layout decision for the next
 round, not a fix.
+
+### L-72 — A revision updates the facts it changes only where the change is a value (2026-10-11)
+
+Since #216, Change it, a restore and a hand edit offer to update each accepted fact whose
+value they replace. The values are matched in code: dates, weekdays, times of day, amounts of
+money and length limits ("under 70 words", "one page"). A change of meaning that carries no
+such value is not matched. For example, an onboarding plan moved from "in-office" to "fully
+remote" leaves a fact saying "the team is in-office" as it was. Go then treats that fact as
+authoritative. Go's guard against undoing the user's version (#216) also works on values only.
+The user can change such a fact in Facts and requirements. Proposed: a model check of the
+revision against the facts, shown for confirmation like the value matches.
+
+### L-73 — "One page" is reported as not verified, not measured (2026-10-11)
+
+How many pages a deliverable prints to depends on fonts, margins and paper size, which the text
+alone does not settle. Since #218 the objective check lists such a requirement as *not
+verified* in its record and in the finish message, rather than claiming it. Measuring it would
+need a page renderer (about two days; not built).
+
+### L-74 — The routine-decision setting covers minor and moderate findings only (2026-10-11)
+
+Under "Routine decisions: handle them for me", Go decides minor and moderate review findings
+and records each decision. Major or unrated findings change what the work says and stay the
+user's, by design (`lib/workflow/triage.ts`). Since #219 the stop says so. Severity is the
+model's rating, so a finding rated major that a user would call routine still stops.
