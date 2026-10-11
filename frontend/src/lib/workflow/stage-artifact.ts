@@ -406,7 +406,9 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
     decisionQuestion: 'For each planned run: was it carried out, and what happened? A run that was not done needs a reason, not silence.',
     // …but a run that really executed in the sandbox is.
     execution: { status: 'completed', field: 'observed', blocked: 'not_run', clears: ['deviation'], producibleField: 'producible_by' },
-    reasonFrom: ['deviation', 'observed'],
+    // The planned row often already says why it cannot run ("Needs data — …");
+    // marking it Not run asked for that again (Sean, 10 Oct, email 6.9).
+    reasonFrom: ['deviation', 'observed', 'producible_by'],
   },
 
   alternatives: {
@@ -845,4 +847,20 @@ export function stageDrafts(stage: StageDefinition): boolean {
 /** Which renderers store their artifact as items rather than as prose. */
 export function rendererHoldsItems(renderer: StageRenderer): boolean {
   return renderer === 'list' || renderer === 'review';
+}
+
+const SAYS_NOT_REPRODUCED = /\b(?:not|never)\s+(?:been\s+)?(?:independently\s+)?(?:reproduced|replicated|re-?run|recalculated|re-?computed)\b|\bcould\s+not\s+(?:be\s+)?(?:reproduc|replicat)\w*|\bwithout\s+(?:reproducing|re-?running|recalculating)\b/i;
+
+/**
+ * The row's own words contradict its status: "Reproduced" on a row that says
+ * it was not reproduced (Sean, 10 Oct, email 6.9). Pure; the row is flagged,
+ * not changed — the status is the user's.
+ */
+export function statusContradictsRow(item: StageItem): string | null {
+  if (item.status !== 'independently_reproduced' && item.status !== 'reproduced') return null;
+  const said = Object.entries(item)
+    .filter(([k, v]) => k !== 'status' && k !== 'status_source' && typeof v === 'string')
+    .map(([, v]) => v as string)
+    .find((v) => SAYS_NOT_REPRODUCED.test(v));
+  return said ? 'This row says it was not reproduced, but its status says it was. Check which is right.' : null;
 }

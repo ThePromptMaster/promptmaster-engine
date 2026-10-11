@@ -187,8 +187,19 @@ export function GoPanel({
   const dock =
     expanded && dockHost && !controlsInView
       ? createPortal(
-          <section aria-label="Go buttons" className="rounded-xl bg-[var(--surface-container)] px-4 py-2 shadow-[0_8px_24px_rgba(0,0,0,0.12)]">
-            <div className="flex flex-wrap items-center gap-3">
+          <section aria-label="Go buttons" className="max-lg:pointer-events-none max-lg:flex max-lg:justify-end lg:rounded-xl lg:bg-[var(--surface-container)] lg:px-4 lg:py-2 lg:shadow-[0_8px_24px_rgba(0,0,0,0.12)]">
+            {/* On a phone or an iPad the pinned copy is one small button, not a
+                bar over the text (Sean, 10 Oct, emails 6.11 and 8). */}
+            <button
+              onClick={() => sectionRef.current?.scrollIntoView({ block: 'start' })}
+              className={`pointer-events-auto flex items-center gap-1 rounded-full px-3 py-1.5 text-label shadow-[0_4px_12px_rgba(0,0,0,0.15)] lg:hidden ${
+                waiting ? 'bg-[var(--pm-tertiary)] text-white' : 'bg-[var(--surface-container-highest)] text-[var(--on-surface)]'
+              }`}
+            >
+              <span aria-hidden className="material-symbols-outlined text-[16px]">{go.active ? 'progress_activity' : 'play_arrow'}</span>
+              {waiting ? 'Go needs you' : go.active ? 'Go is working' : 'Go'}
+            </button>
+            <div className="hidden flex-wrap items-center gap-3 lg:flex">
               <div className="min-w-0 flex-1">
                 <GoControl {...controlProps} compact />
               </div>

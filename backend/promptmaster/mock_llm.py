@@ -349,7 +349,9 @@ def _json_reply(system: str, prompt: str) -> dict:
                       "requirements": [s for s in evidence if "must" in s.lower()],
                       "evidence": [s for s in evidence if "must" not in s.lower()] + ["Revenue grew 999% last year"],
                       "deliverables": ["Mock memo"], "stages": ["Brief", "Options", "Recommendation"], "approvals": ["I approve the recommendation"]},
-            "ready": len(users) >= 2,
+            "enough": len(users) >= 2,
+            # "[[mock:draft]]" asks for a piece of writing: it comes back apart from the reply.
+            **({"draft": "Hi team — lunch is on Wednesday at 1:00 p.m. Bring your own; coming is optional."} if "[[mock:draft]]" in said else {}),
         }
     if "You change a workflow the user is designing" in system:
         # Adds "Verification" after stage 3; a request to repeat only part of a

@@ -86,3 +86,18 @@ def test_chat_reply_is_checked_when_the_buttons_are_known():
 
 def test_chat_reply_is_untouched_when_the_buttons_are_not_known():
     assert _chat(None) == "Press Generate Outline to continue."
+
+
+def test_a_quoted_button_after_a_is_checked_too():
+    """Sean, 10 Oct, email 6.9: "use a 'Generate outline/results artifact' button"."""
+    out = scrub_button_mentions("To continue, use a 'Generate outline/results artifact' button.", BUTTONS)
+    assert "there is no button for this on this page" in out
+
+
+def test_a_reason_or_instruction_in_the_params_is_checked_too():
+    choice = parse_next_action(
+        {"action_key": "mark_blocked", "params": {"reason": "Press Generate Results Artifact first."}, "rationale": "r"},
+        ["mark_blocked"],
+        [AgentControl(label="Draft this stage", where="in the stage bar")],
+    )
+    assert "there is no button for this on this page" in choice.params["reason"]

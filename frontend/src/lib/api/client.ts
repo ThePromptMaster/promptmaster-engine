@@ -580,7 +580,7 @@ export const api = {
   async frontDoor(req: {
     turns: { role: 'user' | 'assistant'; content: string }[];
     brief: import('@/components/projects/front-door').DraftBrief;
-  }): Promise<{ reply: string; brief: import('@/components/projects/front-door').DraftBrief; ready: boolean }> {
+  }): Promise<{ reply: string; draft?: string; brief: import('@/components/projects/front-door').DraftBrief; ready: boolean }> {
     return apiFetch('/api/front-door', { method: 'POST', body: JSON.stringify(req) });
   },
 

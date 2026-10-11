@@ -418,7 +418,7 @@ export default function NewProjectPage() {
           {draftSaved === 'saving'
             ? 'Saving your setup…'
             : draftSaved === 'saved'
-              ? 'Your setup is saved as a draft — you can sign out and continue later. Nothing is created until you press Start.'
+              ? 'Your setup is kept as a draft, conversation included — you can sign out and come back. No project exists until you press Start.'
               : 'Your setup could not be saved as a draft; it is kept on this page until you leave.'}
         </p>
       )}
@@ -510,7 +510,7 @@ export default function NewProjectPage() {
             >
               <span className="block text-title">Keep this as a conversation for now</span>
               <span className="mt-1 block text-label text-[var(--on-surface-variant)]">
-                Talk it through; a draft brief builds up beside the chat, and nothing is created until you say so
+                Talk it through; a draft brief builds up beside the chat. No project exists until you press Start
               </span>
             </button>
           </div>

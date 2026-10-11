@@ -33,6 +33,7 @@ import {
   isTriaged,
   parseItems,
   statusOption,
+  statusContradictsRow,
   type StageItem,
 } from '@/lib/workflow/stage-artifact';
 import { ConfirmOverwrite, EmptyStage, GenerationBar, VersionBar } from './stage-chrome';
@@ -392,14 +393,17 @@ export function ReviewRenderer({
           {/* The table scrolls inside its own container: at five columns it is
               wider than the 820px content well on a laptop, and a horizontally
               scrolling page is worse than a horizontally scrolling table. */}
+          {/* Below md each row is a card — the finding, then its status and
+              reason under it — so nothing scrolls sideways on a phone or an iPad
+              in portrait (Sean, 10 Oct, emails 6.11 and 8). */}
           <div data-stage-table tabIndex={-1} className="scroll-mt-24 overflow-x-auto rounded-xl bg-[var(--surface-container-lowest)] outline-none">
-            <table className="w-full min-w-[720px] border-collapse">
+            <table className="w-full border-collapse max-md:block md:min-w-[720px]">
               <caption className="sr-only">
                 {stage.label}: one row per {schema.itemLabel}, each with a status and, where the
                 status requires it, a reason.
               </caption>
               <thead>
-                <tr className="bg-[var(--surface-container-low)]">
+                <tr className="bg-[var(--surface-container-low)] max-md:hidden">
                   {columns.map((c) => (
                     <th
                       key={c.key}
@@ -417,7 +421,7 @@ export function ReviewRenderer({
                   </th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="max-md:block">
                 {openRows.map((row) => (
                   <ReviewRow
                     key={row.id}
@@ -430,8 +434,8 @@ export function ReviewRenderer({
                   />
                 ))}
                 {foldedRows.length > 0 && (
-                  <tr>
-                    <td colSpan={columns.length + 1} className="px-4 py-2">
+                  <tr className="max-md:block">
+                    <td colSpan={columns.length + 1} className="px-4 py-2 max-md:block">
                       <button
                         type="button"
                         aria-expanded={showSettled}
@@ -510,16 +514,17 @@ function ReviewRow({ row, columns, statuses, schema, readOnly, onPatch }: Review
 
   return (
     <>
-      <tr className="align-top" {...(isTriaged(row, schema) ? {} : { 'data-undecided': '' })}>
+      <tr className="align-top max-md:block max-md:border-b max-md:border-[var(--surface-container-high)] max-md:py-2" {...(isTriaged(row, schema) ? {} : { 'data-undecided': '' })}>
         {columns.map((c) => (
           <td
             key={c.key}
-            className="px-4 py-3 text-body leading-relaxed text-[var(--on-surface)]"
+            data-label={c.label}
+            className="px-4 py-3 text-body leading-relaxed text-[var(--on-surface)] max-md:block max-md:py-1 max-md:before:block max-md:before:text-label max-md:before:uppercase max-md:before:tracking-wider max-md:before:text-[var(--on-surface-variant)] max-md:before:content-[attr(data-label)]"
           >
             {row[c.key] || <span className="text-[var(--on-surface-variant)]">—</span>}
           </td>
         ))}
-        <td className="px-4 py-3">
+        <td data-label="Status" className="px-4 py-3 max-md:block max-md:py-1 max-md:before:block max-md:before:text-label max-md:before:uppercase max-md:before:tracking-wider max-md:before:text-[var(--on-surface-variant)] max-md:before:content-[attr(data-label)]">
           {readOnly ? (
             <span className={`text-body ${TONE_CLASS[option?.tone ?? 'neutral']}`}>
               {option?.label ?? 'Not looked at'}
@@ -556,6 +561,11 @@ function ReviewRow({ row, columns, statuses, schema, readOnly, onPatch }: Review
               {row.status === schema.execution?.blocked ? 'Recorded by PromptMaster: the run could not be made' : 'Recorded from a sandbox run'}
             </span>
           )}
+          {statusContradictsRow(row) && (
+            <p role="status" data-contradiction className="mt-1 text-label text-[var(--pm-tertiary)]">
+              {statusContradictsRow(row)}
+            </p>
+          )}
         </td>
       </tr>
 
@@ -566,8 +576,8 @@ function ReviewRow({ row, columns, statuses, schema, readOnly, onPatch }: Review
           the identical control for the identical reason — dismissing a
           recommendation is dismissing a finding. It was extracted from here. */}
       {needsReason && (
-        <tr>
-          <td colSpan={columns.length + 1} className="px-4 pb-4">
+        <tr className="max-md:block">
+          <td colSpan={columns.length + 1} className="px-4 pb-4 max-md:block">
             <ReasonField
               id={`${row.id}-reason`}
               label={`Why ${option?.label.toLowerCase()}?`}
