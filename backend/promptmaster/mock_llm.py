@@ -653,9 +653,10 @@ def _prose_reply(system: str, prompt: str) -> str:
         # "[[mock:say=…]]" in the instruction is the revision's text, so a
         # browser test can script what "Change it" returns (10 Oct: a revision
         # that changes an accepted fact).
-        said = re.search(r"\[\[mock:say=(.+?)\]\]", prompt)
+        # The latest instruction's: the thread repeats the earlier ones.
+        said = re.findall(r"\[\[mock:say=(.+?)\]\]", prompt)
         if said:
-            return said.group(1).strip()
+            return said[-1].strip()
     if audit_findings._APPLY_AUDIT_INSTRUCTION[:60] in system:
         # Apply fixes: keep the previous text and add one line per finding, so
         # a diff shows exactly what was applied (C2's review and preview).
