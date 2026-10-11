@@ -40,7 +40,9 @@ export function runAccount(run: AgentRun | null, steps: readonly AgentStep[], st
   const executed = ok.filter((s) => s.execution_label === 'code_executed' || s.execution_label === 'simulation_run').length;
   const derived = ok.filter((s) => actionFor(s.action_key)?.performer === 'reason').length;
   const lookups = ok.filter((s) => s.action_key === 'check_literature').length;
-  const repaired = new Set(ok.filter((s) => s.action_key === 'recheck_stage').map((s) => String(s.params?.stage_id ?? s.stage_id ?? '')));
+  const repaired = new Set(ok.filter((s) => s.action_key === 'recheck_stage' && !s.params?.measured).map((s) => String(s.params?.stage_id ?? s.stage_id ?? '')));
+  // 11 Oct: shortening a brief to its limit is not "a repair after a change".
+  const fitted = new Set(ok.filter((s) => s.action_key === 'recheck_stage' && s.params?.measured).map((s) => String(s.params?.stage_id ?? s.stage_id ?? '')));
   const written = new Set(
     ok.filter((s) => ['draft_stage', 'revise_stage', 'apply_findings', 'draft_sections', 'revise_sections'].includes(s.action_key) && s.stage_id).map((s) => s.stage_id!)
   );
@@ -51,6 +53,7 @@ export function runAccount(run: AgentRun | null, steps: readonly AgentStep[], st
     lookups ? `searched the literature ${n(lookups, 'time')}` : '',
     written.size ? `wrote or revised ${[...written].map(stageLabel).join(', ')}` : '',
     repaired.size ? `repaired ${[...repaired].filter(Boolean).map(stageLabel).join(', ')} after a change` : '',
+    fitted.size ? `revised ${[...fitted].filter(Boolean).map(stageLabel).join(', ')} to meet a requirement measured in code` : '',
     returns.length ? `went back ${n(returns.length, 'time')} for further work (${returns.map((s) => stageLabel(String(s.params?.stage_id ?? ''))).join(', ')})` : '',
   ].filter(Boolean);
   const did = parts.length ? `${parts.join('; ')}.`.replace(/^./, (c) => c.toUpperCase()) : '';

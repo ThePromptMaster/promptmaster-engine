@@ -96,7 +96,9 @@ test('a brief over its word limit is shortened, saved and checked again by Go, w
   // Shortened as routine work: a repair step that says what it measured.
   const card = page.getByRole('region', { name: 'Go mode needs you' });
   await expect(card).toContainText('The objective is met on', { timeout: 60_000 });
-  await expect(card.getByRole('button', { name: /^Carry on to / })).toBeVisible();
+  await expect(card.getByRole('button', { name: /^Finish .+ and carry on$/ })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'What Go has done' })).toContainText(/revised Output to meet a requirement measured in code/i);
+  await expect(page.getByText('Fix a measured requirement')).toBeVisible();
   await expect(card).not.toContainText('not met');
   const steps = await serviceSelect('agent_steps', `run_id=in.(${(await serviceSelect('agent_runs', `project_id=eq.${id}&select=id`)).map((r: { id: string }) => r.id).join(',')})&select=action_key,status,output,params&order=idx.asc`);
   const repair = steps.find((s: { action_key: string }) => s.action_key === 'recheck_stage');

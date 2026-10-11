@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 
 import { MarkdownOutput } from '@/components/shared/markdown-output';
-import { actionLabel } from '@/lib/agent/actions';
+import { stepLabel } from '@/lib/agent/actions';
 import { collapseSteps, STEP_STATUS_TEXT } from '@/lib/agent/labels';
 import { createClient } from '@/lib/supabase/client';
 import { getSandboxRun } from '@/lib/supabase/agent';
@@ -76,7 +76,7 @@ export function StepTimeline({ steps }: { steps: AgentStep[] }) {
                 {STATUS_ICON[s.status]}
               </span>
               <span className="text-label text-[var(--on-surface-variant)]">{s.idx + 1}.</span>
-              <span className="text-title text-[var(--on-surface)]">{actionLabel(s.action_key)}</span>
+              <span className="text-title text-[var(--on-surface)]">{stepLabel(s)}</span>
               {repeats > 1 && <span className="text-label text-[var(--on-surface-variant)]">×{repeats}</span>}
               <ExecutionBadge label={s.execution_label} />
               <span className="ml-auto text-label text-[var(--on-surface-variant)]">{STEP_STATUS_TEXT[s.status]}</span>

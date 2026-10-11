@@ -769,12 +769,13 @@ function describeObjectiveCheck(
     }
     case 'stages_left': {
       const next = need.next ?? need.items[0] ?? 'the next stage';
+      // Still on the stage the objective was met on: finishing it is the next move.
       const options = [
-        { id: 'resume' as const, label: `Carry on to ${next}` },
+        { id: 'resume' as const, label: next === stage ? `Finish ${stage} and carry on` : `Carry on to ${next}` },
         { id: 'stop' as const, label: 'Stop here' },
       ];
       return {
-        message: `The objective is met on ${stage}, but the workflow is not finished: ${list}. Carrying on takes me to ${next}.`,
+        message: `The objective is met on ${stage}, but the workflow is not finished: ${list}. ${next === stage ? `Carrying on marks ${stage} complete and moves to what is left.` : `Carrying on takes me to ${next}.`}`,
         action: options[0].label, options,
       };
     }

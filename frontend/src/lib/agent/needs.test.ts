@@ -474,3 +474,8 @@ describe('the objective check\'s stop (11 Oct, survey brief)', () => {
     expect(needStillHolds({ kind: 'objective_check', stageId: 'output', finding: 'unmet', items: [] }, { currentStageId: 'output' } as never)).toBe(true);
   });
 });
+
+it('met while still on the stage: the button finishes it, not "carry on to" it', () => {
+  const d = describeNeed({ kind: 'objective_check', stageId: 'output', finding: 'stages_left', items: ['Output', 'Summary'], next: 'Output' }, (id) => (id === 'output' ? 'Output' : id));
+  expect(d.options?.[0].label).toBe('Finish Output and carry on');
+});
