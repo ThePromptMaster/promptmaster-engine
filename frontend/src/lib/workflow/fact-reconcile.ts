@@ -23,7 +23,8 @@ import { currentFacts } from './facts';
 const RECONCILED: readonly (keyof FactValues)[] = ['dates', 'money', 'weekdays', 'times', 'limits'];
 
 export interface FactValueChange {
-  kind: keyof FactValues;
+  /** A value matched in code, or 'meaning': a change the model found and quoted (L-72). */
+  kind: keyof FactValues | 'meaning';
   was: string;
   now: string;
 }
@@ -101,7 +102,40 @@ export function factChangesFromRevision(input: {
 
 /** "Thursday → Wednesday; 12:30 p.m. → 1:00 p.m." */
 export function describeFactChange(c: FactChange): string {
-  return c.changes.map((v) => `${v.was} → ${v.now}`).join('; ');
+  return c.changes.map((v) => (v.kind === 'meaning' ? v.now : `${v.was} → ${v.now}`)).join('; ');
+}
+
+/**
+ * The facts a revision contradicts in meaning, not by a value (L-72, 11 Oct:
+ * in-office to fully remote). One small AI call for the facts the value
+ * matcher did not already offer; each is kept only with a quote from the new
+ * text. A failed check adds nothing.
+ */
+export async function withMeaningChanges(
+  valueChanges: FactChange[],
+  input: { facts: readonly ProjectFact[] | undefined; instruction: string; before: string; after: string; model?: string },
+  check: (req: { instruction: string; before: string; after: string; facts: { id: string; statement: string }[]; model?: string }) => Promise<{ changes: { fact_id: string; proposed: string; quote: string; why: string }[] }>
+): Promise<FactChange[]> {
+  const offered = new Set(valueChanges.map((c) => c.fact.id));
+  const rest = currentFacts(input.facts).filter((f) => !offered.has(f.id));
+  if (!rest.length || !input.after.trim() || input.before.trim() === input.after.trim()) return valueChanges;
+  try {
+    const res = await check({
+      instruction: input.instruction.trim() || 'The user changed the text to the revised text themselves; every difference is theirs.',
+      before: input.before, after: input.after, model: input.model,
+      facts: rest.map((f) => ({ id: f.id, statement: f.statement })),
+    });
+    const byId = new Map(rest.map((f) => [f.id, f]));
+    const meaning = res.changes.flatMap((m): FactChange[] => {
+      const fact = byId.get(m.fact_id);
+      return fact
+        ? [{ fact: { id: fact.id, statement: fact.statement, subject: fact.subject, kind: fact.kind }, changes: [{ kind: 'meaning', was: fact.statement, now: m.why ? `${m.why} — “${m.quote}”` : `“${m.quote}”` }], proposed: m.proposed }]
+        : [];
+    });
+    return [...valueChanges, ...meaning];
+  } catch {
+    return valueChanges;
+  }
 }
 
 /**

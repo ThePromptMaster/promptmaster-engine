@@ -61,7 +61,12 @@ _PROSE_INSTRUCTION = (
     "mode prefers scaffolds, headings or structured breakdowns, that applies to "
     "how you think, not to the form of this artifact: the stage's instruction "
     "decides the form. Return Markdown prose, no code fences around the whole "
-    "answer.\n\n" + NOTATION_RULE
+    "answer. "
+    # Sean, 10 Oct (email 6.11): a workshop brief for a novice planner ran to
+    # 18,818 characters and repeated its questions and safeguards.
+    "Say each point once: do not repeat a question, a safeguard, a list or a "
+    "recommendation already given elsewhere in the artifact — refer back to it "
+    "instead. Cover everything the stage asks for at the length its reader can use.\n\n" + NOTATION_RULE
 )
 
 _LIST_INSTRUCTION = (

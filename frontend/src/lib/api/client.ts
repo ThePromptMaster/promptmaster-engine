@@ -576,6 +576,17 @@ export const api = {
     return apiFetch('/api/generate-workflow', { method: 'POST', body: JSON.stringify(req) });
   },
 
+  /** Accepted facts a revision contradicts in meaning, each rewritten to agree (L-72). Records nothing. */
+  async revisionFacts(req: {
+    instruction: string;
+    before: string;
+    after: string;
+    facts: { id: string; statement: string }[];
+    model?: string;
+  }): Promise<{ changes: { fact_id: string; proposed: string; quote: string; why: string }[] }> {
+    return apiFetch('/api/revision-facts', { method: 'POST', body: JSON.stringify(req) });
+  },
+
   /** One turn of the conversational front door: a reply and the draft brief (6 Oct, email 8). Saves nothing. */
   async frontDoor(req: {
     turns: { role: 'user' | 'assistant'; content: string }[];

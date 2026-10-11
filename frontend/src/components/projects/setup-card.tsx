@@ -8,6 +8,10 @@ import type { ModeType, SetupRationale } from '@/types';
 import { LimitCounter } from '@/components/shared/limit-counter';
 import { INPUT_LIMITS, withinLimit } from '@/lib/projects/input-limits';
 
+
+/** Added to the output format by "Keep it concise". */
+const CONCISE = 'Concise: the shortest version that covers every requirement, each point said once.';
+
 export interface SetupDraft {
   title: string;
   objective: string;
@@ -184,6 +188,17 @@ export function SetupCard({
             placeholder="Length, structure, tone."
             onChange={(e) => onChange({ output_format: withinLimit('output_format', e.target.value) })} className={field} />
           <LimitCounter length={draft.output_format.length} limit={INPUT_LIMITS.output_format} />
+          {/* For a reader new to the task (Sean, 10 Oct: an 18,818-character workshop brief). */}
+          {!draft.output_format.includes(CONCISE) && (
+            <button
+              type="button"
+              onClick={() => onChange({ output_format: withinLimit('output_format', [draft.output_format.trim(), CONCISE].filter(Boolean).join(' ')) })}
+              className="mt-1 inline-flex items-center gap-1 rounded-full bg-[var(--surface-container-high)] px-3 py-1 text-label text-[var(--on-surface)]"
+            >
+              <span aria-hidden className="material-symbols-outlined text-[16px]">compress</span>
+              Keep it concise
+            </button>
+          )}
           {why(rationale?.output_format)}
         </section>
       </div>

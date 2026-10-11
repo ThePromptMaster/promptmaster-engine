@@ -76,7 +76,7 @@ import { lookupAndVerify } from '@/lib/workflow/verify';
 import { RefusedRevisions, refusedSince } from './refused-revisions';
 import { BriefChangeNotice } from './brief-change-notice';
 import { FactReconcileNotice } from './fact-change-list';
-import { factChangesFromRevision, type FactChange } from '@/lib/workflow/fact-reconcile';
+import { factChangesFromRevision, withMeaningChanges, type FactChange } from '@/lib/workflow/fact-reconcile';
 import { useBriefChange } from './use-brief-change';
 import { openBriefChange } from '@/lib/workflow/brief-change';
 import { contextFromDocuments } from '@/lib/data/extract-text';
@@ -904,8 +904,13 @@ export function WorkflowWorkspace({
       if (!stage) return;
       const changes = factChangesFromRevision({ facts: project.facts, instruction: '', before, after });
       setFactReconcile(changes.length ? { stageId: stage.id, how, changes } : null);
+      // A change of meaning is found by a small AI check and added when it comes back (L-72).
+      const stageId = stage.id;
+      void withMeaningChanges(changes, { facts: project.facts, instruction: '', before, after, model: project.model }, (req) => api.revisionFacts(req)).then(
+        (all) => all.length > changes.length && setFactReconcile({ stageId, how, changes: all })
+      );
     },
-    [stage, project.facts]
+    [stage, project.facts, project.model]
   );
 
   const saveContent = useCallback(

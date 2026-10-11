@@ -667,3 +667,11 @@ def test_a_review_tells_general_advice_from_an_invented_specific(basic_inputs, d
     system, _user = build_stage_prompt(basic_inputs, stage, digest)
     assert "A general recommendation the objective asks for" in system
     assert "a company name, a person, a policy, a figure, a date, a tool or product by name" in system
+
+
+def test_a_stage_says_each_point_once(basic_inputs, digest):
+    """Sean, 10 Oct (email 6.11): an 18,818-character brief repeated its questions and safeguards."""
+    from promptmaster.schemas import StageDescriptor
+    stage = StageDescriptor(id="output", label="Output", renderer="prose", entry_prompt_hint="", artifact_kind="output")
+    system, _user = build_stage_prompt(basic_inputs, stage, digest)
+    assert "Say each point once" in system

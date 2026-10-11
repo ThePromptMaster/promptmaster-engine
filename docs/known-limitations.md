@@ -1385,12 +1385,24 @@ authoritative. Go's guard against undoing the user's version (#216) also works o
 The user can change such a fact in Facts and requirements. Proposed: a model check of the
 revision against the facts, shown for confirmation like the value matches.
 
+**Resolved 2026-10-11:** a revision, a restore or a hand edit also asks one small AI check
+(`POST /api/revision-facts`) about the facts the value matcher did not offer. A fact the
+user's change contradicts in meaning is offered rewritten to agree, with a quote copied word
+for word from the new text; a fact without such a quote is not offered. A failed check offers
+nothing. On the real model the onboarding case ("make the employee fully remote") offered only
+"The team is five people, working fully remote" (2 of 2), and a tone-only revision offered nothing.
+
 ### L-73 — "One page" is reported as not verified, not measured (2026-10-11)
 
 How many pages a deliverable prints to depends on fonts, margins and paper size, which the text
 alone does not settle. Since #218 the objective check lists such a requirement as *not
 verified* in its record and in the finish message, rather than claiming it. Measuring it would
 need a page renderer (about two days; not built).
+
+**Resolved 2026-10-11:** "one page", "a one-page plan", "no more than two pages" are
+measured requirements. Pages are estimated from the word count at 550 words a page, and both
+the checklist and the objective record say so: "about 0.5 pages (300 words; estimated at 550
+words a page)". A printed page still depends on fonts and margins, so an estimate is what it is.
 
 ### L-74 — The routine-decision setting covers minor and moderate findings only (2026-10-11)
 

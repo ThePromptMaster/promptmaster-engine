@@ -52,7 +52,7 @@ import {
 } from './chat-scope';
 import type { NewVersion } from '@/lib/supabase/versions';
 import type { ArtifactVersion, Project } from '@/types/project';
-import { factChangesFromRevision, type FactChange } from '@/lib/workflow/fact-reconcile';
+import { factChangesFromRevision, withMeaningChanges, type FactChange } from '@/lib/workflow/fact-reconcile';
 import { supersedeFact } from '@/lib/supabase/facts';
 import type { ChatContext, ChatMessage } from '@/types';
 
@@ -165,8 +165,18 @@ export function useStageChat({
     };
   }, []);
 
+  // The thread on screen. A reply that comes back after the user moved to
+  // another project or stage is saved to its own thread and not shown here.
+  const thread = useRef(`${project.id}:${stageId}`);
+  thread.current = `${project.id}:${stageId}`;
+
   useEffect(() => {
     let current = true;
+    // Another project's or stage's thread is never shown, nor sent as history,
+    // while this one loads (Sean, 10 Oct, email 6.9: the churn project's chat
+    // answered about tariffs — the thread of another project's stage with the
+    // same id, still on screen when the page moved between projects).
+    setMessages([]);
     setLoading(true);
     setProposal(null);
     setApplied(null);
@@ -196,6 +206,7 @@ export function useStageChat({
       mode: 'discuss' | 'instruct',
       scope?: string
     ): Promise<StageChatMessage> => {
+      const own = `${project.id}:${stageId}`;
       const saved = await saveStageChatMessage({
         project_id: project.id,
         stage_id: stageId,
@@ -206,7 +217,7 @@ export function useStageChat({
         mode,
         scope: scope ?? null,
       });
-      if (live.current) setMessages((prior) => [...prior, saved]);
+      if (live.current && thread.current === own) setMessages((prior) => [...prior, saved]);
       return saved;
     },
     [project.id, stageId, headVersion?.id, versionNumber]
@@ -222,7 +233,7 @@ export function useStageChat({
   const discuss = useCallback(
     async (text: string) => {
       const message = text.trim();
-      if (!message || busy) return;
+      if (!message || busy || loading) return;
       setBusy(true);
       setError(null);
 
@@ -248,7 +259,7 @@ export function useStageChat({
         if (live.current) setBusy(false);
       }
     },
-    [busy, messages, persist, project, content, versionNumber, getChatContext]
+    [busy, loading, messages, persist, project, content, versionNumber, getChatContext]
   );
 
   /**
@@ -266,7 +277,7 @@ export function useStageChat({
       options: { selection?: string; sectionId?: string; precedence?: string[] } = {}
     ) => {
       const text = instruction.trim();
-      if (!text || busy) return;
+      if (!text || busy || loading) return;
 
       const target = resolveScope(content, kind, options);
       if (!target) {
@@ -327,12 +338,11 @@ export function useStageChat({
           nextContent: spliceScope(content, target, after),
           baseContent: content,
           messageId: saved.id,
-          factChanges: factChangesFromRevision({
-            facts: project.facts,
-            instruction: text,
-            before: content,
-            after: spliceScope(content, target, after),
-          }),
+          factChanges: await withMeaningChanges(
+            factChangesFromRevision({ facts: project.facts, instruction: text, before: content, after: spliceScope(content, target, after) }),
+            { facts: project.facts, instruction: text, before: content, after: spliceScope(content, target, after), model: project.model },
+            (req) => api.revisionFacts(req)
+          ),
           changeSummary:
             response.iteration.summary?.trim() ||
             `Revised ${scopeNoun(kind)} from the side chat: ${text}`,
@@ -345,7 +355,7 @@ export function useStageChat({
         if (live.current) setBusy(false);
       }
     },
-    [busy, content, messages, persist, project, versionNumber]
+    [busy, loading, content, messages, persist, project, versionNumber]
   );
 
   /**

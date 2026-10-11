@@ -42,9 +42,14 @@ The short version:
   when it opens. It did so even while a Go run was paused, so Realign and Summary got
   v1 drafts while Go was proposing to skip one and waiting for approval on the other.
   Those versions are recorded ("AI draft"), but no Go step accounts for them.
-- **6.9, unrelated tariff content in the churn chat.** Nothing in the code explains it.
-  Chat is scoped by project and stage, and no prompt contains tariff text. We need to
-  read that project's chat rows to say more (§5).
+- **6.9, unrelated tariff content in the churn chat.** The churn project's saved chat
+  is clean. The tariff thread belongs to another of Sean's projects (1 Oct), on a stage
+  with the same id (`final_review`). Moving between projects kept the page mounted, so
+  that thread stayed on screen until the new one loaded. A reply still in flight was also
+  added to whichever thread was showing, and a question asked in that moment went out
+  with the other project's thread as its history. Fixed in #227: the thread is cleared on
+  every project or stage change, a late reply joins only its own thread, nothing is sent
+  while a thread loads, and each project gets a fresh workspace.
 
 ## 2. Each example, as Sean asked
 
@@ -129,15 +134,12 @@ The short version:
 5. **Front door.** Ask for an email: it arrives in its own Draft block with Copy.
 6. **iPad.** The Go button no longer covers text. Review rows read as cards.
 
-## 6. Not built, with estimates
+## 6. Built after the first round (#227)
 
-- **The workshop brief's length (18,818 characters).** A concise style for novice
-  planners, offered in setup. Estimate: half a day. Proposed, not built: it changes
-  what a deliverable looks like, which is Sean's call.
-- **Measuring rendered page length.** "One page" depends on fonts and paper size,
-  which the text alone does not fix. We disclose it as not verified (F3) rather than
-  build a page renderer. Building one: about two days.
-- **The tariff content in the churn chat.** We need the project's chat rows to
-  explain it. About an hour once we have them.
-- **Listing deferred findings in the finish message, with why they do not block:**
-  shipped in #222, with the parallel fix to the same completion code.
+- **The tariff thread in the churn chat:** explained and fixed (§1).
+- **A change of meaning** (in-office to fully remote) is offered for fact update with the
+  revision, quoted from the new text (L-72, resolved).
+- **"One page"** is measured as an estimate (550 words a page) and said to be one (L-73,
+  resolved).
+- **Shorter briefs:** every stage now says each point once, and setup has a "Keep it
+  concise" choice for a reader new to the task.

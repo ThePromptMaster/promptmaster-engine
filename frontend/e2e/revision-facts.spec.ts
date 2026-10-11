@@ -65,3 +65,24 @@ test('a revision that changes accepted facts updates them with it; a restore off
   await facts.scrollIntoViewIfNeeded();
   await page.screenshot({ path: test.info().outputPath('02-facts-match-the-revision.png') });
 });
+
+/** L-72 (11 Oct): a change of meaning — in-office to fully remote — is offered too, quoted from the revision. */
+test('a revision that changes a fact in meaning offers it, with the words that changed it', async ({ page }) => {
+  test.setTimeout(120_000);
+  const id = await createProject(page, { workflow: 'Single output', name: 'E2E revision meaning', objective: 'A one-page onboarding plan for a new employee' });
+  await expect(page.getByText('Mock output').first()).toBeVisible();
+  const [project] = await serviceSelect('projects', `id=eq.${id}&select=user_id`);
+  await serviceInsert('project_facts', { project_id: id, user_id: project.user_id, statement: 'The team works in-office.', kind: 'fact', source_kind: 'brief' });
+  await page.reload();
+
+  const chat = await changeIt(page, '[[mock:say=Day one happens on video. The team works fully remote.]] [[mock:remote]] Make the employee fully remote.');
+  const card = chat.getByLabel('Proposed revision');
+  await expect(card).toContainText('This changes an accepted fact', { timeout: 30_000 });
+  await expect(card).toContainText('The team works fully remote.');
+  await expect(card).toContainText('was “The team works in-office.”');
+  await page.screenshot({ path: test.info().outputPath('03-meaning-change-offered.png') });
+  await card.getByRole('button', { name: 'Apply and update the fact' }).click();
+  await expect
+    .poll(async () => (await serviceSelect('project_facts', `project_id=eq.${id}&retired_at=is.null&select=statement`)).map((r: { statement: string }) => r.statement), { timeout: 15_000 })
+    .toEqual(['The team works fully remote.']);
+});
