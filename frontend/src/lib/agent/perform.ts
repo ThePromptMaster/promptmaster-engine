@@ -1377,11 +1377,22 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
               left.required.length ? `still to do: ${left.required.join(', ')}` : '',
               left.optional.length ? `optional, can be skipped: ${left.optional.join(', ')}` : '',
             ].filter(Boolean).join('; ');
-            const reason = `The objective is met on ${basis.stage_label}${basis.version_number ? ` v${basis.version_number}` : ''}, but the workflow is not finished — ${still}.`;
+            // What is left may be only the user's own approval on this stage
+            // ("I accept this output as finished"): then that is what is asked for.
+            const mine = evaluateStage(ctx.template, ctx.stage.id, ctx.context).unmet.filter((c) => c.blocking);
+            const onlyApproval =
+              left.required.length === 1 && left.required[0] === (ctx.stage.short_label ?? ctx.stage.label) && !left.optional.length &&
+              mine.length > 0 && mine.every((c) => c.manual);
+            const reason = onlyApproval
+              ? `The objective is met on ${basis.stage_label}${basis.version_number ? ` v${basis.version_number}` : ''}, but the workflow is not finished — your approval is left: "${mine[0].label}".`
+              : `The objective is met on ${basis.stage_label}${basis.version_number ? ` v${basis.version_number}` : ''}, but the workflow is not finished — ${still}.`;
             return done(key, {
               ...judged, status: 'succeeded',
               output: `${reason} Evidence: "${assessment.basis_quote}". ${checked}`,
               stop: { status: 'awaiting_decision', reason },
+              ...(onlyApproval
+                ? { needs: { kind: 'tick_criterion' as const, stageId: ctx.stage.id, criterionId: mine[0].id, label: mine[0].label, ...(mine[0].hint ? { hint: mine[0].hint } : {}) } }
+                : {}),
             });
           }
           return done(key, {
@@ -1593,7 +1604,7 @@ async function judgeObjective(ctx: PerformContext, holder: StageDefinition | nul
   const criteria = assessment.criteria ?? [];
   const basis: ObjectiveBasis = {
     stage_id: holder?.id ?? '',
-    stage_label: label,
+    stage_label: labelOverride ?? holder?.short_label ?? label,
     version_id: head?.id ?? null,
     version_number: head?.version_number ?? null,
     measured: holder ? (ctx.context.measured?.[holder.id] ?? []).filter((m) => m.satisfied).map((m) => `${m.label}${m.detail ? ` — ${m.detail}` : ''}`) : [],
