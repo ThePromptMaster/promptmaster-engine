@@ -428,7 +428,7 @@ export function ChatPanel({
         {chat.loading ? (
           <p className="text-label text-[var(--on-surface-variant)]">Loading the thread…</p>
         ) : chat.messages.length === 0 ? (
-          <EmptyThread mode={mode} />
+          <EmptyThread mode={mode} hasContent={content.trim().length > 0} />
         ) : (
           <ol className="space-y-4">
             {chat.messages.map((message) => (
@@ -565,7 +565,7 @@ export function ChatPanel({
               }}
               rows={3}
               aria-label={mode === 'discuss' ? 'Ask a question' : 'Give a revision instruction'}
-              placeholder={spec.placeholder}
+              placeholder={mode === 'discuss' && !content.trim() ? 'Ask about this stage — nothing you write here changes anything.' : spec.placeholder}
               className="w-full resize-y bg-transparent text-body text-[var(--on-surface)] outline-none placeholder:text-[var(--on-surface-variant)]"
             />
             <LimitCounter length={draft.length} limit={INPUT_LIMITS.message} />
@@ -657,11 +657,14 @@ function ModeSwitch({
   );
 }
 
-function EmptyThread({ mode }: { mode: Mode }) {
+function EmptyThread({ mode, hasContent }: { mode: Mode; hasContent: boolean }) {
   return (
     <p className="text-body text-[var(--on-surface-variant)]">
       {mode === 'discuss'
-        ? 'Ask anything about this draft — what it assumes, what it leaves out, whether it suits the audience. Nothing here edits it.'
+        ? hasContent
+          ? 'Ask anything about this draft — what it assumes, what it leaves out, whether it suits the audience. Nothing here edits it.'
+          // No draft yet (Sean, 10 Oct, email 6.11: "this draft" before one existed).
+          : 'Ask anything about this stage — what it is for, what it needs from you, what to put in it. There is no draft here yet.'
         : 'Describe a change and choose what it should apply to. You will see the exact passage before anything is written.'}
     </p>
   );

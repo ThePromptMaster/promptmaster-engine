@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { api } from '@/lib/api/client';
 import { AutoGrowTextarea } from '@/components/shared/auto-grow-textarea';
 import { INPUT_LIMITS } from '@/lib/projects/input-limits';
+import { MarkdownOutput } from '@/components/shared/markdown-output';
 
 export interface DraftBrief {
   objective: string;
@@ -18,7 +19,8 @@ export interface DraftBrief {
 
 export const EMPTY_BRIEF: DraftBrief = { objective: '', audience: '', requirements: [], evidence: [], deliverables: [], stages: [], approvals: [] };
 
-export type Turn = { role: 'user' | 'assistant'; content: string };
+/** A turn; an assistant turn may carry a piece of writing to use as it stands (10 Oct, email 1). */
+export type Turn = { role: 'user' | 'assistant'; content: string; draft?: string };
 
 /**
  * "Keep this as a conversation for now" (Sean, 6 Oct, email 8). The user talks;
@@ -62,8 +64,10 @@ export function FrontDoor({
     setBusy(true);
     setError(null);
     try {
-      const res = await api.frontDoor({ turns: next, brief });
-      setTurns([...next, { role: 'assistant', content: res.reply }]);
+      // The model reads back its own drafts with the conversation.
+      const sent = next.map((t) => ({ role: t.role, content: t.draft ? `${t.content}\n\nDRAFT YOU WROTE:\n${t.draft}` : t.content }));
+      const res = await api.frontDoor({ turns: sent, brief });
+      setTurns([...next, { role: 'assistant', content: res.reply, ...(res.draft?.trim() ? { draft: res.draft.trim() } : {}) }]);
       setBrief(res.brief);
       setReady(res.ready);
     } catch (e) {
@@ -90,17 +94,24 @@ export function FrontDoor({
         <div className="space-y-3">
           {turns.length === 0 && (
             <p className="text-body text-[var(--on-surface-variant)]">
-              Say what you have in mind. Nothing is created until you say so.
+              Say what you have in mind. The conversation is kept as a draft you can come back to; no project
+              exists until you press Start.
             </p>
           )}
-          {turns.map((t, i) => (
-            <p
-              key={i}
-              className={`rounded-xl px-4 py-2 text-body ${t.role === 'user' ? 'ml-8 bg-[var(--surface-container-high)] text-[var(--on-surface)]' : 'mr-8 bg-[var(--surface-container-low)] text-[var(--on-surface)]'}`}
-            >
-              {t.content}
-            </p>
-          ))}
+          {turns.map((t, i) =>
+            t.role === 'user' ? (
+              <p key={i} className="ml-8 whitespace-pre-wrap rounded-xl bg-[var(--surface-container-high)] px-4 py-2 text-body text-[var(--on-surface)]">
+                {t.content}
+              </p>
+            ) : (
+              <div key={i} className="mr-8 space-y-2">
+                <div className="rounded-xl bg-[var(--surface-container-low)] px-4 py-2 text-body text-[var(--on-surface)]">
+                  <MarkdownOutput content={t.content} />
+                </div>
+                {t.draft && <DraftBlock text={t.draft} />}
+              </div>
+            )
+          )}
           {busy && <p role="status" className="text-label text-[var(--on-surface-variant)]">Thinking…</p>}
         </div>
         <div className="mt-4 flex items-end gap-2">
@@ -126,7 +137,8 @@ export function FrontDoor({
       </section>
 
       <aside aria-label="Draft brief" className="h-fit rounded-2xl bg-[var(--surface-container-low)] px-5 py-4">
-        <p className="text-label uppercase tracking-wider text-[var(--on-surface-variant)]">Draft brief — not saved</p>
+        <p className="text-label uppercase tracking-wider text-[var(--on-surface-variant)]">Draft brief — not a project yet</p>
+        <p className="mt-1 text-label text-[var(--on-surface-variant)]">Kept with your setup draft. It becomes the project&apos;s record only when you press Start.</p>
         {brief.objective ? (
           <p className="mt-2 text-body text-[var(--on-surface)]">{brief.objective}</p>
         ) : (
@@ -152,10 +164,12 @@ export function FrontDoor({
             <p className="text-label text-[var(--on-surface)]">
               I&apos;m ready to create this project. These facts, requirements and decisions will become its initial authoritative state.
             </p>
-            <p className="mt-1 text-label text-[var(--on-surface-variant)]">Next you choose the workflow and can still change everything.</p>
+            <p className="mt-1 text-label text-[var(--on-surface-variant)]">
+              Next you choose the workflow and can still change everything. Pressing Start there creates the project.
+            </p>
             <div className="mt-2 flex gap-2">
               <button onClick={() => onReady(brief, transcript)} className="rounded-lg bg-[var(--pm-primary)] px-3 py-1.5 text-label text-[var(--on-primary)]">
-                Create project
+                Use this brief
               </button>
               <button onClick={() => setConfirming(false)} className="rounded-lg px-3 py-1.5 text-label text-[var(--on-surface-variant)]">
                 Keep talking
@@ -165,5 +179,28 @@ export function FrontDoor({
         )}
       </aside>
     </div>
+  );
+}
+
+/** A piece of writing to use as it stands, apart from the explanation, with a copy button. */
+function DraftBlock({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <section aria-label="Draft" className="rounded-xl bg-[var(--surface-container-lowest)] px-4 py-3 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-label uppercase tracking-wider text-[var(--on-surface-variant)]">Draft</p>
+        <button
+          type="button"
+          onClick={() => void navigator.clipboard?.writeText(text).then(() => setCopied(true)).catch(() => undefined)}
+          className="flex items-center gap-1 rounded-lg bg-[var(--surface-container-high)] px-3 py-1 text-label text-[var(--on-surface)]"
+        >
+          <span aria-hidden className="material-symbols-outlined text-[16px]">content_copy</span>
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+      </div>
+      <div className="mt-2 text-body text-[var(--on-surface)]">
+        <MarkdownOutput content={text} />
+      </div>
+    </section>
   );
 }

@@ -29,7 +29,13 @@ _SYSTEM = (
     "the work is clear — the stages an expert would go through and the points they must approve. "
     "Never put in the brief anything the user did not say or plainly agree to; leave a field "
     "empty instead. When the objective, the deliverable and the main requirements are known, set "
-    "ready true and say so in one sentence. Nothing is saved until the user confirms.\n\n"
+    "\"enough\" to true and tell the user, in plain words, that you have enough to set the project "
+    "up. Never name a field or a flag in your reply. No project exists until the user presses "
+    "Start on the next screen; the conversation is kept as a draft meanwhile.\n\n"
+    # Sean, 10 Oct (email 1): an email draft arrived mixed into the explanation.
+    "When the user asks for a piece of writing they could use as it stands — an email, a message, "
+    "a paragraph — put that text alone in \"draft\", ready to copy, and use \"reply\" only to say "
+    "in a sentence or two what it is and what you assumed. Otherwise leave \"draft\" empty.\n\n"
     + PROMPTMASTER_SELF_MODEL
 )
 
@@ -51,6 +57,8 @@ class DraftBrief(BaseModel):
 
 class FrontDoorTurn(BaseModel):
     reply: str = Field(max_length=8_000)
+    #: A piece of writing the user can use as it stands, apart from the reply (10 Oct, email 1).
+    draft: str = Field(default="", max_length=20_000)
     brief: DraftBrief
     ready: bool = False
 
@@ -61,7 +69,7 @@ def build_front_door_prompt(turns: list[Turn], brief: DraftBrief) -> tuple[str, 
         f"THE CONVERSATION SO FAR:\n{convo}\n\n"
         f"THE DRAFT BRIEF SO FAR (update it; keep what still holds):\n{brief.model_dump_json()}\n\n"
         'Return JSON only: {"reply": "your next message", "brief": {"objective": "", "audience": "", '
-        '"requirements": [], "evidence": [], "deliverables": [], "stages": [], "approvals": []}, "ready": false}'
+        '"requirements": [], "evidence": [], "deliverables": [], "stages": [], "approvals": []}, "draft": "", "enough": false}'
     )
     return _SYSTEM, user
 
@@ -103,10 +111,21 @@ def parse_front_door(result: object, turns: list[Turn]) -> FrontDoorTurn:
         approvals=_clean(raw.get("approvals"), 200),
     )
     return FrontDoorTurn(
-        reply=str(result.get("reply") or "").strip()[:8_000] or "Tell me more about what you want to get done.",
+        reply=_plain(str(result.get("reply") or "").strip())[:8_000] or "Tell me more about what you want to get done.",
+        draft=str(result.get("draft") or "").strip()[:20_000],
         brief=brief,
-        ready=bool(result.get("ready")) and bool(brief.objective),
+        ready=bool(result.get("enough", result.get("ready"))) and bool(brief.objective),
     )
+
+
+# "Ready is true" (Sean, 10 Oct, email 1): a sentence that names the flag is the
+# model talking about its own output, not to the user.
+_FLAG_TALK = re.compile(r"[^.!?\n]*\b(?:ready|enough)\b\s*(?:is|=|:|to)\s*(?:true|false)\b[^.!?\n]*[.!?]?", re.I)
+
+
+def _plain(reply: str) -> str:
+    cleaned = _FLAG_TALK.sub("", reply)
+    return re.sub(r"[ \t]{2,}", " ", cleaned).strip() or reply
 
 
 async def front_door_turn(client: OpenRouterClient, model: str | None, turns: list[Turn], brief: DraftBrief) -> FrontDoorTurn:

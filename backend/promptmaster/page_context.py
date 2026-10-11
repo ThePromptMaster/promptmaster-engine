@@ -167,12 +167,13 @@ _QUOTES = "\"'“”‘’"
 _VERBS = r"(?i:press|click(?:\s+on)?|tap|hit|select|use)"
 # "press 'X'" / "click “X” button"
 _QUOTED = re.compile(
-    rf"\b({_VERBS})\s+(?:the\s+)?[{_QUOTES}]([^{_QUOTES}\n]{{2,60}})[{_QUOTES}](\s+button)?",
+    # "use a 'Generate outline/results artifact' button" (Sean, 10 Oct, email 6.9).
+    rf"\b({_VERBS})\s+(?:the\s+|an?\s+)?[{_QUOTES}]([^{_QUOTES}\n]{{2,60}})[{_QUOTES}](\s+button)?",
     re.IGNORECASE,
 )
 # "Press Generate Outline" — a run of capitalised words after the verb.
 _TITLED = re.compile(
-    rf"\b({_VERBS})\s+(?:the\s+)?((?:[A-Z][\w'/-]*)(?:\s+(?:the\s+|a\s+|to\s+|and\s+)?[A-Z][\w'/-]*){{0,5}})(\s+button)?",
+    rf"\b({_VERBS})\s+(?:the\s+|an?\s+)?((?:[A-Z][\w'/-]*)(?:\s+(?:the\s+|a\s+|to\s+|and\s+)?[A-Z][\w'/-]*){{0,5}})(\s+button)?",
 )
 _ARTICLES = re.compile(r"\b(the|a|an|this|your)\b", re.IGNORECASE)
 

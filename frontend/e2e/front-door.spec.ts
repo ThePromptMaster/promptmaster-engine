@@ -30,7 +30,7 @@ test('a conversation builds a draft brief; only confirmed facts become the proje
   await expect(brief).toContainText('One researcher must stay available for client work');
   // A figure the user never gave is not in the brief.
   await expect(brief).not.toContainText('999%');
-  await expect(brief).toContainText('Draft brief — not saved');
+  await expect(brief).toContainText('Draft brief — not a project yet');
   await page.screenshot({ path: test.info().outputPath('01-draft-brief.png'), fullPage: true });
 
   await brief.getByRole('button', { name: 'Ready to create' }).click();
@@ -38,7 +38,7 @@ test('a conversation builds a draft brief; only confirmed facts become the proje
     "I'm ready to create this project. These facts, requirements and decisions will become its initial authoritative state."
   );
   await page.screenshot({ path: test.info().outputPath('02-confirm.png'), fullPage: true });
-  await brief.getByRole('button', { name: 'Create project' }).click();
+  await brief.getByRole('button', { name: 'Use this brief' }).click();
 
   await expect(page.getByRole('heading', { name: 'Your setup' })).toBeVisible({ timeout: 30_000 });
   const initial = page.getByRole('region', { name: 'Initial facts' });
@@ -60,4 +60,19 @@ test('a conversation builds a draft brief; only confirmed facts become the proje
   await expect(panel).toContainText('from your conversation');
   const statements = facts.map((f: { statement: string }) => f.statement.toLowerCase().replace(/[^a-z0-9$%]+/g, ' ').trim());
   expect(new Set(statements).size).toBe(statements.length);
+});
+
+/** Sean, 10 Oct, email 1: the draft apart from the explanation, easy to copy; no "Ready is true". */
+test('a piece of writing the conversation produces comes in its own block, ready to copy', async ({ page }) => {
+  await page.goto('/projects/new');
+  await dismissBetaNotice(page);
+  await page.getByLabel('What do you want to do or figure out?').fill('A short lunch invitation for my team [[mock:draft]]');
+  await page.getByRole('button', { name: /Keep this as a conversation for now/ }).click();
+  const convo = page.getByRole('region', { name: 'Conversation' });
+  await convo.getByRole('button', { name: 'Send' }).click();
+  const draft = convo.getByRole('region', { name: 'Draft' });
+  await expect(draft).toContainText('Hi team — lunch is on Wednesday at 1:00 p.m.', { timeout: 30_000 });
+  await expect(draft.getByRole('button', { name: 'Copy' })).toBeVisible();
+  await expect(convo).not.toContainText(/ready is true/i);
+  await page.screenshot({ path: test.info().outputPath('03-draft-apart.png'), fullPage: true });
 });

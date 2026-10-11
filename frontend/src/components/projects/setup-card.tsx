@@ -169,6 +169,13 @@ export function SetupCard({
             placeholder="What must it do, avoid, or stay inside?"
             onChange={(e) => onChange({ constraints: withinLimit('constraints', e.target.value) })} className={field} />
           <LimitCounter length={draft.constraints.length} limit={INPUT_LIMITS.constraints} />
+          {/* A suggestion is not a requirement until the user keeps it (Sean, 10 Oct, email 6.11). */}
+          {rationale?.constraints && draft.constraints.trim() && (
+            <p data-suggested className="mt-1 text-label text-[var(--pm-tertiary)]">
+              Suggested by PromptMaster, not something you said. Keep it, edit it, or clear it — what is here when you
+              press Start becomes a requirement every stage follows.
+            </p>
+          )}
           {why(rationale?.constraints)}
         </section>
         <section>

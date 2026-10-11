@@ -471,6 +471,13 @@ def parse_next_action(result: object, allowed: list[str], controls: list[AgentCo
     def shown(text: object) -> str:
         return scrub_button_mentions(str(text or "").strip(), controls, also=_GO_BUTTONS)
 
+    # A reason or an instruction reaches the user as well (a block's reason, a
+    # skip's, a revision's), and named a button the page lacked (Sean, 10 Oct,
+    # email 6.9: "Generate outline/results artifact").
+    for field in ("reason", "instruction", "question"):
+        if isinstance(params.get(field), str):
+            params[field] = shown(params[field])
+
     return NextAction(
         action_key=key,
         params=params,
