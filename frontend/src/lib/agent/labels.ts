@@ -6,12 +6,13 @@
  * run, result interpreted, blocked" are different claims. The mapping:
  *
  *   reasoning moves (derive, prove, …), evaluation   → discussed
- *   drafting / revising a stage artifact             → designed (written, nothing run)
+ *   drafting / revising / repairing a stage artifact → designed (written, nothing run)
  *   run_computation                                  → from the sandbox's own record
  *                                                      (lib/sandbox/outcome.ts)
  *   interpret_result                                 → result_interpreted, only with a run to cite
  *   anything that stopped on a missing tool/data     → blocked
- *   pure workflow moves (advance, ask, complete)     → no label — they are not work on the artifact
+ *   the objective check (complete)                   → discussed: the model assessed the saved text
+ *   pure workflow moves (advance, ask)               → no label — they are not work on the artifact
  *
  * The database re-checks the two that could be lied about (code_executed /
  * simulation_run need a sandbox run for the step; result_interpreted must cite
@@ -32,6 +33,9 @@ export function deriveExecutionLabel(
     case 'reason':
     case 'evaluate':
     case 'triage':
+    // Checking the objective is an assessment of the saved text (10 Oct, email 3:
+    // "'Analyzed or performed' and 'Tools' show dashes").
+    case 'complete':
       return 'discussed';
     case 'draft':
     case 'revise':
@@ -39,6 +43,8 @@ export function deriveExecutionLabel(
     case 'outline':
     case 'sections':
     case 'apply':
+    // A repair rewrites the stage (10 Oct, email 7.5); it is checked by `verifyOutcome`.
+    case 'recheck':
       return 'designed';
     case 'compute':
       // Never more than the sandbox recorded; without a record, only code was written.

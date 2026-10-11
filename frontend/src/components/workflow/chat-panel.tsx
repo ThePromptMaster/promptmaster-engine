@@ -47,6 +47,8 @@ import { documentSections, type ScopeKind } from './chat-scope';
 import type { StageChatMessage } from '@/lib/supabase/conversation';
 import type { NewVersion } from '@/lib/supabase/versions';
 import type { ArtifactVersion, Project } from '@/types/project';
+import type { FactChange } from '@/lib/workflow/fact-reconcile';
+import { FactChangeList, toggled } from './fact-change-list';
 import { LimitCounter } from '@/components/shared/limit-counter';
 import { INPUT_LIMITS } from '@/lib/projects/input-limits';
 
@@ -134,6 +136,8 @@ interface Props {
   starters?: string[];
   /** A control beside the composer that attaches a file to the project. */
   attach?: ReactNode;
+  /** After a revision updated accepted facts, so the project reloads them. */
+  onFactsChanged?: () => Promise<unknown> | void;
 }
 
 /**
@@ -177,6 +181,7 @@ export function ChatPanel({
   getChatContext,
   starters = [],
   attach,
+  onFactsChanged,
 }: Props) {
   const [offerActions, setOfferActions] = useState(true);
   useEffect(() => setOfferActions(readOfferActions()), []);
@@ -189,6 +194,7 @@ export function ChatPanel({
     appendStageVersion,
     restoreStageVersion,
     getChatContext,
+    onFactsChanged,
   });
 
   const [requestedMode, setMode] = useState<Mode>(initialMode);
@@ -478,12 +484,14 @@ export function ChatPanel({
         )}
         {chat.proposal && (
           <ProposalCard
+            key={chat.proposal.messageId ?? chat.proposal.after}
             scopeLabel={chat.proposal.target.label}
             before={chat.proposal.before}
             after={chat.proposal.after}
             canApply={chat.canApply}
             busy={chat.busy}
-            onAccept={() => void chat.accept()}
+            factChanges={chat.proposal.factChanges}
+            onAccept={(factIds) => void chat.accept(factIds)}
             onDiscard={chat.discard}
           />
         )}
@@ -818,6 +826,7 @@ export function ProposalCard({
   after,
   canApply,
   busy,
+  factChanges = [],
   onAccept,
   onDiscard,
 }: {
@@ -826,9 +835,13 @@ export function ProposalCard({
   after: string;
   canApply: boolean;
   busy: boolean;
-  onAccept: () => void;
+  /** Accepted facts the revision changes; each ticked one is updated with it. */
+  factChanges?: FactChange[];
+  onAccept: (updateFactIds: string[]) => void;
   onDiscard: () => void;
 }) {
+  const [kept, setKept] = useState<ReadonlySet<string>>(() => new Set());
+  const updating = factChanges.filter((c) => !kept.has(c.fact.id)).map((c) => c.fact.id);
   return (
     <section
       aria-label="Proposed revision"
@@ -853,17 +866,26 @@ export function ProposalCard({
         </div>
       </div>
 
+      {factChanges.length > 0 && (
+        <div className="mt-3 rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2" aria-label="Facts this changes">
+          <p className="text-label text-[var(--on-surface)]">
+            This changes {factChanges.length === 1 ? 'an accepted fact' : `${factChanges.length} accepted facts`}. Update {factChanges.length === 1 ? 'it' : 'them'} too?
+          </p>
+          <FactChangeList changes={factChanges} kept={kept} onToggle={(id, on) => setKept((prev) => toggled(prev, id, on))} />
+        </div>
+      )}
+
       <p className="mt-3 text-label text-[var(--on-surface-variant)]">
         Applying appends a new version. The one you are reading is kept and can be restored.
       </p>
 
       <div className="mt-2 flex items-center gap-2">
         <button
-          onClick={onAccept}
+          onClick={() => onAccept(updating)}
           disabled={!canApply || busy}
           className="rounded-lg bg-[var(--pm-primary)] px-4 py-1.5 text-label text-[var(--on-primary)] disabled:opacity-40"
         >
-          Apply as new version
+          {updating.length ? `Apply and update ${updating.length === 1 ? 'the fact' : `${updating.length} facts`}` : 'Apply as new version'}
         </button>
         <button
           onClick={onDiscard}

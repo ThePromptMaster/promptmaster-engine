@@ -17,6 +17,7 @@ import { approvedOutlineVersionId, commitOutlineVersion } from '@/lib/supabase/o
 import { appendWorkflowEvent, listWorkflowEvents } from '@/lib/supabase/workflow';
 import { getArtifact } from '@/lib/supabase/versions';
 import { manuscriptArtifactFor, measureStageContent } from '@/lib/workflow/context';
+import { COUNTING_RULE } from '@/lib/workflow/measurable';
 import { isDone } from '@/lib/workflow/types';
 import { appliedFindingsVersion, carryUserFields, findingsInstruction, reviseWithFindings } from '@/lib/workflow/apply-findings';
 import { findInstructionConflicts } from '@/lib/workflow/conflict-trail';
@@ -34,10 +35,12 @@ import { proposeStatuses } from '@/lib/workflow/propose';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import { summariseStageContent } from '@/lib/workflow/digest';
 import { stageContentForSummary, stageEvidence } from '@/lib/workflow/evidence';
-import { blocksCompletion, deliverableStage, describeOutstanding, evaluateStage, outstandingWork } from '@/lib/workflow/engine';
-import { pausedLine } from '@/lib/workflow/objective';
+import { blocksCompletion, deliverableStage, describeOutstanding, evaluateStage, outstandingWork, remainingStages } from '@/lib/workflow/engine';
+import { describeBasis, pausedLine, type ObjectiveAssessment, type ObjectiveBasis } from '@/lib/workflow/objective';
 import { attachedDocuments, currentFacts, supersededFactValues } from '@/lib/workflow/facts';
+import { ManuscriptMissing, withFreshManuscript } from '@/lib/workflow/fresh-manuscript';
 import { describeValue, leftoverValues, type SupersededValue } from '@/lib/workflow/fact-values';
+import { revertsUserVersion, USER_CHOSEN_OPERATIONS } from '@/lib/workflow/fact-reconcile';
 import { recordPolicyFacts } from '@/lib/supabase/facts';
 import { checkGoal } from './code-check';
 import { unmetHumanRequirements } from '@/lib/workflow/human-requirements';
@@ -196,6 +199,26 @@ async function waitForSections(
  * made, Go stops and asks which takes priority instead of quietly rewriting
  * the work (1 Oct, item 33).
  */
+/** The bundles with the chapters re-read for a stage that reads them; null when none has text. */
+async function readManuscript(ctx: PerformContext, target: StageDefinition): Promise<Record<string, StageArtifactBundle> | null> {
+  try {
+    return await withFreshManuscript(ctx.template, target, ctx.bundles);
+  } catch (e) {
+    if (e instanceof ManuscriptMissing) return null;
+    throw e;
+  }
+}
+
+/** A stage that reads the chapters is not written without them, and says so. */
+function manuscriptMissing(key: string, target: StageDefinition): StepOutcome {
+  const source = 'the drafting stage';
+  const reason = `${target.label} reads the manuscript, and no chapter in ${source} has saved text yet. Nothing was written, so nothing claims to have reviewed a draft it was not given.`;
+  return done(key, {
+    status: 'blocked', blockKind: 'data_missing', toolsUsed: [], changes: {},
+    output: reason, stop: { status: 'blocked', reason },
+  });
+}
+
 function askWhichTakesPriority(key: string, params: Record<string, unknown>, instruction: string, conflicts: InstructionConflict[]): StepOutcome {
   const c = conflicts[0];
   const question =
@@ -567,8 +590,11 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       }
       // The instruction used to reach only the version's metadata, never the
       // model: "revise" was "regenerate with the old draft as context" (B0).
+      // The chapters as saved, not the page's copy of them (10 Oct, email 6.2).
+      const fresh = await readManuscript(ctx, ctx.stage);
+      if (!fresh) return manuscriptMissing(key, ctx.stage);
       const res = await api.generateStageArtifact(
-        generationRequest(ctx.project, ctx.template, ctx.state, ctx.bundles, ctx.stage, revising ? head : '', revising ? withDerivation(withAnswer(instruction, ctx.conflictAnswer), ctx.derived) : ''),
+        generationRequest(ctx.project, ctx.template, ctx.state, fresh, ctx.stage, revising ? head : '', revising ? withDerivation(withAnswer(instruction, ctx.conflictAnswer), ctx.derived) : ''),
         ctx.signal
       );
       const generated = generationContent(ctx.stage, res);
@@ -580,6 +606,26 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       const content = before && after ? serializeItems(carryUserFields(before, after, itemSchemaFor(ctx.stage))) : generated;
       if (!content) {
         return done(key, { status: 'failed', output: 'The model returned nothing usable.', toolsUsed: ['model'], changes: {} });
+      }
+      // The user's own latest version outranks an older fact it changed: a
+      // revision that would put the fact's value back is not saved, and the
+      // user is asked which is right (10 Oct, Sean: Go turned the Wednesday
+      // invitation back into Thursday and called it verified).
+      const headVersion = ctx.bundles[ctx.stage.id]?.versions.at(-1);
+      if (revising && headVersion && USER_CHOSEN_OPERATIONS.has(headVersion.source_operation) && !ctx.conflictAnswer) {
+        const reverted = revertsUserVersion({ facts: ctx.project.facts, userText: head, generated: content, userChosenAt: headVersion.created_at });
+        if (reverted.length) {
+          const values = reverted.map((r) => `${r.was} (yours) → ${r.now} (the accepted facts)`).join('; ');
+          const question =
+            `Your latest version of ${ctx.stage.label} (v${headVersion.version_number}) differs from the accepted facts: ${values}. ` +
+            `I have not changed it. Which is right? If your version is, update the facts in Facts and requirements; if the facts are, say so and I will revise it.`;
+          return done(key, {
+            status: 'blocked', blockKind: 'needs_decision', toolsUsed: ['model'], changes: {},
+            output: question, params: { ...params, conflict_question: true },
+            stop: { status: 'awaiting_decision', reason: question },
+            needs: { kind: 'answer_question', question },
+          });
+        }
       }
       const created = await ctx.appendStageVersion(ctx.stage.id, ctx.stage.label, {
         content,
@@ -810,7 +856,10 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // ("Announcement: 100–140 words — 74 words") is repaired as well, not
       // only reported. It stays finished; the new version reopens what read it.
       const measuredFails = target ? unmetMeasurements(ctx, target.id) : [];
-      const measuredRepair = Boolean(params.measured) && isDone(st?.status) && measuredFails.length > 0;
+      // 11 Oct: a drafted stage still in progress too — shortening a brief
+      // that is over its limit is routine, not the user's decision.
+      const drafted = (ctx.bundles[target?.id ?? '']?.versions.length ?? 0) > 0;
+      const measuredRepair = Boolean(params.measured) && (isDone(st?.status) || (st?.status === 'in_progress' && drafted)) && measuredFails.length > 0;
       if (!target || (st?.status !== 'stale' && !measuredRepair)) {
         return done(key, { status: 'failed', output: 'That stage is not waiting for a recheck.', toolsUsed: [], changes: {} });
       }
@@ -828,12 +877,14 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // only a measured repair: on production two repairs of a reopened Output
       // were not, and left the announcement at 99 words of 100–140 (9 Oct).
       const measuredLine = measuredFails.length
-        ? ` MEASURED IN CODE AND NOT MET: ${measuredFails.join('; ')}. Revise so each is met — the count is made in code, so count exactly — and keep everything else as written.`
+        ? ` MEASURED IN CODE AND NOT MET: ${measuredFails.join('; ')}. Revise so each is met — the count is made in code (${COUNTING_RULE}), so count exactly and leave a margin — and keep everything else the brief asks for: every required section, label and fact. Add nothing new.`
         : '';
       const instruction = recheckInstruction(target.label, why, superseded, before ? 'table' : 'prose') + measuredLine;
+      const fresh = await readManuscript(ctx, target);
+      if (!fresh) return manuscriptMissing(key, target);
       const attempt = async (text: string) => {
         const res = await api.generateStageArtifact(
-          generationRequest(ctx.project, ctx.template, ctx.state, ctx.bundles, target, head, text),
+          generationRequest(ctx.project, ctx.template, ctx.state, fresh, target, head, text),
           ctx.signal
         );
         const generated = generationContent(target, res);
@@ -860,6 +911,20 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       }
       if (!content) {
         return done(key, { status: 'failed', output: 'The model returned nothing usable.', toolsUsed: ['model'], changes: {} });
+      }
+      // A repair does not undo the user's own latest version either (10 Oct).
+      if (headVersion && USER_CHOSEN_OPERATIONS.has(headVersion.source_operation)) {
+        const reverted = revertsUserVersion({ facts: ctx.project.facts, userText: head, generated: content, userChosenAt: headVersion.created_at });
+        if (reverted.length) {
+          const values = reverted.map((r) => `${r.was} (yours) → ${r.now} (the accepted facts)`).join('; ');
+          const question =
+            `Your latest version of ${target.label} (v${headVersion.version_number}) differs from the accepted facts: ${values}. ` +
+            `I have not changed it. Which is right? If your version is, update the facts in Facts and requirements; if the facts are, say so and I will revise it.`;
+          return done(key, {
+            status: 'blocked', blockKind: 'needs_decision', toolsUsed: ['model'], changes: {},
+            output: question, stop: { status: 'awaiting_decision', reason: question }, needs: { kind: 'answer_question', question },
+          });
+        }
       }
       const created = await ctx.appendStageVersion(target.id, target.label, {
         content,
@@ -897,7 +962,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
             })
           : done(key, {
               status: 'succeeded', toolsUsed: ['model'], changes,
-              output: `Repaired ${target.label} so that ${measuredFails.map((f) => f.split(' — ')[0]).join('; ')} now holds, measured in code — saved as a new version; the earlier one is kept, and the stages that read it are reopened for a recheck.`,
+              output: `Repaired ${target.label} so that ${measuredValues(ctx, target, content).join('; ')} — measured in code on the saved text (${COUNTING_RULE}). Saved as a new version; the earlier one is kept${isDone(st?.status) ? ', and the stages that read it are reopened for a recheck' : ''}.`,
             });
       }
       if (evaluation.canAdvance && typeof versionId === 'string') {
@@ -1112,7 +1177,9 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       return done(key, {
         status: 'succeeded', toolsUsed: [], changes: { event_types: [type] },
         output: type === 'stage_marked_complete'
-          ? `Marked ${ctx.stage.label} complete and moved on.`
+          ? ctx.stage.transitions.default_next
+            ? `Marked ${ctx.stage.label} complete and moved on.`
+            : `Marked ${ctx.stage.label} complete. It is the last stage; nothing follows it.`
           : `Moved on from ${ctx.stage.label}, leaving it open: ${evaluation.unmet.map((c) => c.label).join('; ') || 'requirements not met'}.`,
       });
     }
@@ -1132,7 +1199,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         // or blocked on something no round can produce? Judged on this round's
         // work, the same check as at the end, and recorded.
         const roundText = roundContent(ctx, to);
-        const verdict = await judgeObjective(ctx, `the round that ended at ${ctx.stage.label}`, roundText);
+        const { assessment: verdict } = await judgeObjective(ctx, ctx.stage, roundText, `the round that ended at ${ctx.stage.label}`);
         if (verdict.outcome === 'met') {
           const target = ctx.stage.transitions.default_next;
           const head = ctx.bundles[ctx.stage.id]?.versions.at(-1);
@@ -1230,7 +1297,8 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
           ? `Further investigation asked for by ${ctx.stage.label}: ${work}\nAdd a row for each piece of this work that is not already in the table. Keep every existing row, its text and its status exactly as they are.`
           : `Further investigation asked for by ${ctx.stage.label}: ${work}\nRevise to take this in. Keep everything that still holds exactly as it is.`;
         try {
-          const res = await api.generateStageArtifact(generationRequest(ctx.project, ctx.template, ctx.state, ctx.bundles, target, head, instruction), ctx.signal);
+          const fresh = await withFreshManuscript(ctx.template, target, ctx.bundles).catch(() => ctx.bundles);
+          const res = await api.generateStageArtifact(generationRequest(ctx.project, ctx.template, ctx.state, fresh, target, head, instruction), ctx.signal);
           const generated = generationContent(target, res);
           const before = rendererHoldsItems(target.renderer) ? parseItems(head) : null;
           const after = before ? parseItems(generated) : null;
@@ -1353,6 +1421,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
           status: 'succeeded', toolsUsed: [], changes: {},
           output: `${reason} I will not call the objective met while any of it is open.`,
           stop: { status: 'awaiting_decision', reason },
+          needs: { kind: 'objective_check', stageId: ctx.stage.id, finding: 'work_open', items: open.map(describeOutstanding) },
         });
       }
       // PM-25: the model's opinion is not enough — the deliverable has to exist.
@@ -1362,12 +1431,47 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       if (ctx.deliverableDone) {
         const holder = deliverableStage(ctx.template);
         const content = holder ? deliverableText(ctx, holder.id) : '';
-        const assessment = await judgeObjective(ctx, holder?.label ?? 'the deliverable', content);
+        const { assessment, basis } = await judgeObjective(ctx, holder ?? null, content);
+        // The check ran and was recorded: the record says so (10 Oct, email 3:
+        // "'Analyzed or performed' and 'Tools' show dashes").
+        const judged = { toolsUsed: ['model'], changes: { event_types: ['objective_assessed'] } };
         if (assessment.outcome === 'met') {
+          const checked = describeBasis(basis);
+          // Met is not finished (Sean, 10 Oct, email 2: "Finished: the objective is
+          // verified as met" beside "2 done · 3 to go"). What the workflow still
+          // holds is said, and the run waits for it rather than calling it done.
+          const left = remainingStages(ctx.template, ctx.state);
+          if (left.required.length || left.optional.length) {
+            const still = [
+              left.required.length ? `still to do: ${left.required.join(', ')}` : '',
+              left.optional.length ? `optional, can be skipped: ${left.optional.join(', ')}` : '',
+            ].filter(Boolean).join('; ');
+            // What is left may be only the user's own approval on this stage
+            // ("I accept this output as finished"): then that is what is asked for.
+            const mine = evaluateStage(ctx.template, ctx.stage.id, ctx.context).unmet.filter((c) => c.blocking);
+            const onlyApproval =
+              left.required.length === 1 && left.required[0] === (ctx.stage.short_label ?? ctx.stage.label) && !left.optional.length &&
+              mine.length > 0 && mine.every((c) => c.manual);
+            const reason = onlyApproval
+              ? `The objective is met on ${basis.stage_label}${basis.version_number ? ` v${basis.version_number}` : ''}, but the workflow is not finished — your approval is left: "${mine[0].label}".`
+              : `The objective is met on ${basis.stage_label}${basis.version_number ? ` v${basis.version_number}` : ''}, but the workflow is not finished — ${still}.`;
+            return done(key, {
+              ...judged, status: 'succeeded',
+              output: `${reason} Evidence: "${assessment.basis_quote}". ${checked}${deferredNote(ctx)}`,
+              stop: { status: 'awaiting_decision', reason },
+              needs: onlyApproval
+                ? { kind: 'tick_criterion' as const, stageId: ctx.stage.id, criterionId: mine[0].id, label: mine[0].label, ...(mine[0].hint ? { hint: mine[0].hint } : {}) }
+                : {
+                    kind: 'objective_check' as const, stageId: holder?.id ?? ctx.stage.id, finding: 'stages_left' as const,
+                    items: [...left.required, ...left.optional.map((o) => `${o} (optional)`)],
+                    next: left.required[0] ?? left.optional[0],
+                  },
+            });
+          }
           return done(key, {
-            status: 'succeeded', toolsUsed: [], changes: {},
-            output: `The objective is met: "${assessment.basis_quote}". Nothing needs another pass.`,
-            stop: { status: 'completed', reason: 'Objective met.' },
+            ...judged, status: 'succeeded',
+            output: `The objective is met on ${basis.stage_label}${basis.version_number ? ` v${basis.version_number}` : ''}: "${assessment.basis_quote}". ${checked}${deferredNote(ctx)}`,
+            stop: { status: 'completed', reason: `Objective met.${deferredNote(ctx)}` },
           });
         }
         // Not met: the cycle is finished, the objective is not. With a named
@@ -1375,10 +1479,20 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         const performed = assessment.performed.length ? ` Done: ${assessment.performed.join('; ')}.` : ' No computation or investigation was recorded as performed.';
         const proposed = assessment.proposed_next.length ? ` Proposed, not done: ${assessment.proposed_next.join('; ')}.` : '';
         const line = pausedLine(assessment);
+        const blocked = assessment.blockers.length > 0;
+        // What was found unmet, by name, and what each button does (11 Oct,
+        // survey brief: a pause that named nothing and asked nothing).
+        const failed = unmetItems(assessment);
         return done(key, {
-          status: 'succeeded', toolsUsed: [], changes: {},
-          output: `${line} ${assessment.reason}${performed}${proposed}`,
-          stop: { status: assessment.blockers.length ? 'blocked' : 'awaiting_decision', reason: line },
+          ...judged, status: 'succeeded',
+          output: `${line}${performed}${proposed} ${describeBasis(basis)}${assessment.model_note ? ` The check's own words: "${assessment.model_note}"` : ''}`,
+          stop: { status: blocked ? 'blocked' : 'awaiting_decision', reason: line },
+          ...(blocked ? {} : {
+            needs: {
+              kind: 'objective_check' as const, stageId: holder?.id ?? ctx.stage.id,
+              finding: failed.length ? 'unmet' as const : 'no_evidence' as const, items: failed,
+            },
+          }),
         });
       }
       // What the planner usually means by it mid-project is "nothing more for
@@ -1396,16 +1510,40 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
           needs: { kind: 'tick_criterion', stageId: ctx.stage.id, criterionId: c.id, label: c.label, ...(c.hint ? { hint: c.hint } : {}) },
         });
       }
-      return done(key, {
-            status: 'succeeded', toolsUsed: [], changes: {},
-            output: 'The model judged the objective met, but the deliverable is not done yet, so the run stops here for you to decide.',
-            stop: { status: 'awaiting_decision', reason: 'The model thinks the work is done, but the deliverable is not. Your call.' },
-          });
+      {
+        const holder = deliverableStage(ctx.template);
+        const where = holder ? holder.short_label ?? holder.label : 'The deliverable';
+        return done(key, {
+          status: 'succeeded', toolsUsed: [], changes: {},
+          output: `The model judged the objective met, but the deliverable is not done yet: ${where} is not written, so there is nothing to check.`,
+          stop: { status: 'awaiting_decision', reason: `The model thinks the work is done, but the deliverable is not: ${where} is not written yet.` },
+          needs: { kind: 'objective_check', stageId: holder?.id ?? ctx.stage.id, finding: 'work_open', items: [`${where} is not written yet`] },
+        });
+      }
     }
 
     default:
       return done(key, { status: 'failed', output: `Unknown action "${key}".`, toolsUsed: [], changes: {} });
   }
+}
+
+/**
+ * The deferred rows that do not hold the finish up, by stage, with why each
+ * was deferred and why it does not block (peer item, 10 Oct email 6.6).
+ */
+export function deferredNote(ctx: Pick<PerformContext, 'context' | 'template'>): string {
+  const label = (id: string) => ctx.template.stages.find((s) => s.id === id)?.label ?? id;
+  const rows = Object.entries(ctx.context.deferred ?? {}).flatMap(([id, rs]) =>
+    rs.map((r) => `${label(id)}: "${r.row}"${r.reason ? ` — deferred because ${r.reason.replace(/[.\s]+$/, '')}` : ''}`)
+  );
+  if (!rows.length) return '';
+  return ` Deferred, not blocking (none says a requirement is unmet): ${rows.slice(0, 8).join('; ')}${rows.length > 8 ? `; and ${rows.length - 8} more` : ''}.`;
+}
+
+/** What the objective check found unmet, by name: measured and carried-forward checks first, then the criteria. */
+export function unmetItems(a: Pick<ObjectiveAssessment, 'unmet' | 'criteria'>): string[] {
+  if (a.unmet?.length) return a.unmet;
+  return (a.criteria ?? []).filter((c) => c.verdict === 'not_met').map((c) => (c.basis ? `${c.requirement} — ${c.basis}` : c.requirement));
 }
 
 /** The deliverable as text, for the objective check: the manuscript for a long-form stage, else the head version. */
@@ -1434,6 +1572,11 @@ export function withFreshMeasurements(evaluation: StageEvaluation, measured: boo
 /** A stage's measured requirements that fail, as "Label — measured detail" (L-63). */
 function unmetMeasurements(ctx: Pick<PerformContext, 'context'>, stageId: string): string[] {
   return (ctx.context.measured?.[stageId] ?? []).filter((m) => !m.satisfied).map((m) => `${m.label} — measured ${m.detail ?? 'not met'}`);
+}
+
+/** Each of a stage's measured requirements on new text, with its count: "Output: at most 200 words — 187 words". */
+function measuredValues(ctx: Pick<PerformContext, 'project' | 'template'>, stage: StageDefinition, content: string): string[] {
+  return measureStageContent(ctx.project, ctx.template, stage, content).map((m) => `${m.label} — ${m.value ?? (m.satisfied ? 'met' : m.detail ?? 'not met')}`);
 }
 
 /** The same requirements measured on new text, before it is saved. */
@@ -1553,7 +1696,13 @@ export function recheckInstruction(
  * `objective_assessed`, and return it (6–7 Oct). Used at the end of the work
  * and at the end of each round of ongoing work.
  */
-async function judgeObjective(ctx: PerformContext, label: string, content: string) {
+async function judgeObjective(ctx: PerformContext, holder: StageDefinition | null, content: string, labelOverride?: string) {
+  const label = labelOverride ?? holder?.label ?? 'the deliverable';
+  // What code counted and found met, with the count: the check may not count
+  // again (11 Oct, survey brief: "the saved deliverable exceeds 200 words").
+  const measured = holder
+    ? (ctx.context.measured?.[holder.id] ?? []).filter((m) => m.satisfied).map((m) => `${m.label} — ${m.value ?? 'met'}`)
+    : [];
   const assessment = await api.agentAssessObjective(
     {
       inputs: inputsFrom(ctx.project),
@@ -1563,13 +1712,29 @@ async function judgeObjective(ctx: PerformContext, label: string, content: strin
       // The criterion the workflow was designed against, kept from the objective (7 Oct).
       success_criterion: ctx.template.execution?.success_criterion ?? '',
       failed_checks: failedChecks(ctx),
+      measured,
       model: ctx.project.model,
     },
     ctx.signal
   );
+  // What the verdict rests on, recorded with it (10 Oct, emails 3, 5, 8).
+  const head = holder ? ctx.bundles[holder.id]?.versions.at(-1) : undefined;
+  const criteria = assessment.criteria ?? [];
+  const basis: ObjectiveBasis = {
+    stage_id: holder?.id ?? '',
+    stage_label: labelOverride ?? holder?.short_label ?? label,
+    version_id: head?.id ?? null,
+    version_number: head?.version_number ?? null,
+    measured,
+    assessed: criteria.filter((c) => c.verdict !== 'not_checked'),
+    not_checked: criteria.filter((c) => c.verdict === 'not_checked').map((c) => c.requirement),
+  };
   const payload = {
     outcome: assessment.outcome, reason: assessment.reason, basis_quote: assessment.basis_quote,
     blockers: assessment.blockers, performed: assessment.performed, proposed_next: assessment.proposed_next,
+    criteria, basis,
+    ...(assessment.unmet?.length ? { unmet: assessment.unmet } : {}),
+    ...(assessment.model_note ? { model_note: assessment.model_note } : {}),
   };
   await appendWorkflowEvent(ctx.project.id, ctx.project.user_id, {
     type: 'objective_assessed',
@@ -1580,7 +1745,7 @@ async function judgeObjective(ctx: PerformContext, label: string, content: strin
     payload,
   });
   await ctx.afterStageEvent();
-  return assessment;
+  return { assessment, basis };
 }
 
 /** This round's work as one text: every stage from where the round starts to the one that closes it. */

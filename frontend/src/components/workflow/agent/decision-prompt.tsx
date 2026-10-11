@@ -3,6 +3,7 @@
 import { useState } from 'react';
 
 import { actionLabel } from '@/lib/agent/actions';
+import { MarkdownOutput } from '@/components/shared/markdown-output';
 import type { AgentStep } from '@/types/agent';
 import type { AnswerContradiction } from '@/lib/api/client';
 
@@ -10,6 +11,8 @@ import type { AnswerContradiction } from '@/lib/api/client';
 export function DecisionPrompt({
   step,
   stale = false,
+  label,
+  effect,
   onApprove,
   onReplan,
   onDecline,
@@ -17,6 +20,10 @@ export function DecisionPrompt({
   step: AgentStep;
   /** Proposed before the stage last changed: its reasons may no longer hold. */
   stale?: boolean;
+  /** The step's name on its stage (`stepActionLabel`). */
+  label?: string;
+  /** What approving it does, from the code (`whatApprovalDoes`). */
+  effect?: string | null;
   onApprove: () => void;
   onReplan?: () => void;
   onDecline: () => void;
@@ -24,11 +31,12 @@ export function DecisionPrompt({
   return (
     <section aria-label="Go mode needs your approval" className="rounded-xl bg-[var(--surface-container-highest)] px-5 py-4">
       <p className="text-label uppercase tracking-wide text-[var(--on-surface-variant)]">Next move — needs your approval</p>
-      <p className="mt-1 text-title text-[var(--on-surface)]">{actionLabel(step.action_key)}</p>
+      <p className="mt-1 text-title text-[var(--on-surface)]">{label ?? actionLabel(step.action_key)}</p>
+      {effect && <p data-effect className="mt-1 text-body text-[var(--on-surface)]">What it does: {effect}</p>}
       {step.decision_question && <p className="mt-1 text-body text-[var(--on-surface)]">{step.decision_question}</p>}
       {step.rationale && <p className="mt-1 text-body text-[var(--on-surface-variant)]">Why: {step.rationale}</p>}
       {step.expected_outcome && (
-        <p className="mt-1 text-label text-[var(--on-surface-variant)]">Expected: {step.expected_outcome}</p>
+        <p className="mt-1 text-label text-[var(--on-surface-variant)]">Go expects: {step.expected_outcome}</p>
       )}
       {stale && (
         <p role="status" className="mt-2 text-label text-[var(--pm-tertiary)]">
@@ -197,11 +205,15 @@ function ExpertPackageCard({ markdown }: { markdown: string }) {
     URL.revokeObjectURL(url);
   };
   return (
-    <details aria-label="Expert review package" className="mt-3 rounded-lg bg-[var(--surface-container-lowest)] px-4 py-3" open>
-      <summary className="cursor-pointer text-label uppercase tracking-wide text-[var(--on-surface-variant)]">
-        Prepared for an expert&apos;s review
+    // Closed and rendered (Sean, 10 Oct, email 7.3: raw "## Question" and
+    // "## Assumptions" in the main view). The copy and download keep the markdown.
+    <details aria-label="Expert review package" className="mt-3 rounded-lg bg-[var(--surface-container-lowest)] px-4 py-3">
+      <summary className="cursor-pointer text-label text-[var(--on-surface-variant)]">
+        A summary of this question for a specialist, to copy or send — show
       </summary>
-      <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap text-body text-[var(--on-surface)]">{markdown}</pre>
+      <div className="mt-2 max-h-80 overflow-auto">
+        <MarkdownOutput content={markdown} />
+      </div>
       <div className="mt-2 flex gap-2">
         <button
           type="button"

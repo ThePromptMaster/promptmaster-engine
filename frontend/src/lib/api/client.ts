@@ -751,6 +751,8 @@ export const api = {
       success_criterion?: string;
       /** What the project's own checks hold as still unmet (C2). */
       failed_checks?: string[];
+      /** Requirements code measured and found met, with the count (11 Oct). */
+      measured?: string[];
       model?: string;
     },
     signal?: AbortSignal

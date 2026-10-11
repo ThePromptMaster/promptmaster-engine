@@ -256,3 +256,17 @@ describe('a repair is closed on the count of what it saved (L-63, 9 Oct)', () =>
     expect(withFreshMeasurements({ ...evaluation, unmet: [measured, approval] }, true, []).canAdvance).toBe(false);
   });
 });
+
+describe('11 Oct, survey brief: shortening a brief over its limit is routine', () => {
+  const over = { output: [{ satisfied: false, label: 'The deliverable: at most 200 words', detail: '214 words' }] };
+  const atOutput: WorkflowState = { ...afterChange, current_stage_id: 'output', stages: { ...afterChange.stages, output: { status: 'in_progress' } } };
+  it('a drafted stage still in progress that fails a measured requirement is repaired, not left for the user', () => {
+    const r = staleRepair(template, atOutput, [], over, new Set(['output']));
+    expect(r).toMatchObject({ key: 'recheck_stage', params: { stage_id: 'output', measured: true } });
+    expect(r?.rationale).toContain('This is routine');
+  });
+  it('not before there is a draft, and at most twice', () => {
+    expect(staleRepair(template, atOutput, [], over, new Set())).toBeNull();
+    expect(staleRepair(template, atOutput, ['output', 'output'], over, new Set(['output']))).toBeNull();
+  });
+});

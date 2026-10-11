@@ -10,6 +10,8 @@ import type { AgentStep } from '@/types/agent';
 export function NextMoveCard({
   step,
   stale = false,
+  label,
+  effect,
   onDo,
   onReplan,
   onDismiss,
@@ -17,6 +19,10 @@ export function NextMoveCard({
   step: AgentStep;
   /** Suggested before the stage last changed: its reasons may no longer hold. */
   stale?: boolean;
+  /** The step's name on its stage (`stepActionLabel`). */
+  label?: string;
+  /** What doing it does, from the code (`whatApprovalDoes`). */
+  effect?: string | null;
   onDo: () => void;
   onReplan?: () => void;
   onDismiss: () => void;
@@ -27,10 +33,11 @@ export function NextMoveCard({
         <span aria-hidden className="material-symbols-outlined text-[16px]">lightbulb</span>
         PromptMaster suggests
       </p>
-      <p className="mt-1 text-title text-[var(--on-surface)]">{actionLabel(step.action_key)}</p>
+      <p className="mt-1 text-title text-[var(--on-surface)]">{label ?? actionLabel(step.action_key)}</p>
+      {effect && <p data-effect className="mt-1 text-body text-[var(--on-surface)]">What it does: {effect}</p>}
       {step.decision_question && <p className="mt-1 text-body text-[var(--on-surface)]">{step.decision_question}</p>}
       {step.rationale && <p className="mt-1 text-body text-[var(--on-surface)]">Why: {step.rationale}</p>}
-      {step.expected_outcome && <p className="mt-0.5 text-label text-[var(--on-surface-variant)]">You get: {step.expected_outcome}</p>}
+      {step.expected_outcome && <p className="mt-0.5 text-label text-[var(--on-surface-variant)]">Go expects: {step.expected_outcome}</p>}
       {stale && (
         <p role="status" className="mt-2 text-label text-[var(--pm-tertiary)]">
           Suggested before your latest change to this stage, so this reasoning may no longer hold.

@@ -35,12 +35,13 @@ import { RefusedRevision } from '@/lib/workflow/commit-check';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { api, type AnswerContradiction } from '@/lib/api/client';
-import { actionFor, actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, ROUTINE_DEFAULT_STEP, USER_ANSWER_STEP } from '@/lib/agent/actions';
+import { actionFor, actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, ROUTINE_DEFAULT_STEP, stepActionLabel, USER_ANSWER_STEP, whatApprovalDoes } from '@/lib/agent/actions';
 import { contextWithFacts, readOutcomeProof, readStageFacts, type StageFacts } from '@/lib/agent/facts';
 import { stageDrafts } from '@/lib/workflow/stage-artifact';
 import { delegableToCommit, policyConfirmable, repairTries, staleRepair, describeNeed, NEED_CLEARED, NEED_MOVED_ON, needStillHolds, needsUser, requiredWork, type NeedsUser } from '@/lib/agent/needs';
 import { assertHonestOutcome, verifyOutcome } from '@/lib/agent/outcome';
 import { outlineStageFor } from '@/lib/outline/actions';
+import { effectiveRenderer } from '@/lib/workflow/stage-artifact';
 import { listRecommendations, recordDecision } from '@/lib/supabase/recommendations';
 import { projectMemory } from '@/lib/agent/memory';
 import { requestProjectCancel } from '@/lib/supabase/jobs';
@@ -263,6 +264,16 @@ export function useGoLoop(opts: Options) {
     [commitRun]
   );
   const stageLabelFor = useCallback((id: string) => getStage(latest.current.template, id)?.short_label ?? id, []);
+  // A step's name and what approving it does, on its own stage (10 Oct, email 6.3).
+  const stepLabel = useCallback(
+    (s: Pick<AgentStep, 'action_key' | 'stage_id'>) => stepActionLabel(s.action_key, s.stage_id ? getStage(latest.current.template, s.stage_id) : null),
+    []
+  );
+  const stepEffect = useCallback((s: Pick<AgentStep, 'action_key' | 'stage_id'>) => {
+    const stage = s.stage_id ? getStage(latest.current.template, s.stage_id) : null;
+    const next = stage?.transitions.default_next ? getStage(latest.current.template, stage.transitions.default_next)?.label ?? null : null;
+    return whatApprovalDoes(s.action_key, stage, next);
+  }, []);
 
   // --- performing one step ------------------------------------------------------
 
@@ -560,7 +571,8 @@ export function useGoLoop(opts: Options) {
         // Each repair step records the reopening it was for (`stale_since`),
         // so no clock is compared.
         const recheckTried = repairTries([...priorStepsRef.current, ...stepsRef.current], o.state, new Set(stepsRef.current.map((s) => s.id)));
-        const repair = staleRepair(o.template, o.state, recheckTried, context.measured ?? {});
+        const drafted = new Set(Object.entries(o.bundles).filter(([, b]) => (b?.versions.length ?? 0) > 0).map(([id]) => id));
+        const repair = staleRepair(o.template, o.state, recheckTried, context.measured ?? {}, drafted);
         if (repair) allowed.push('recheck_stage');
 
         // Before the planner is asked: is the next move the user's? (B4)
@@ -656,7 +668,10 @@ export function useGoLoop(opts: Options) {
           } else {
             choice.params = { ...(choice.params ?? {}), stop_audit: describeAudit(audit) };
             // Q3a: a question only an expert can answer is asked with the package an expert needs.
-            if (needsExpert(question)) {
+            // Not on a check stage: its findings are decided in its table, not
+            // sent to a specialist (Sean, 10 Oct, email 7.2: eight Critique
+            // findings arrived as one long expert-review question).
+            if (needsExpert(question) && effectiveRenderer(o.stage) !== 'review') {
               setPhase('thinking');
               const pkg = await api.agentExpertPackage({
                 inputs: inputsFrom(o.project), issue: question.slice(0, 2_000), stage_label: o.stage.label,
@@ -995,6 +1010,47 @@ export function useGoLoop(opts: Options) {
     }
   }, []);
 
+  /**
+   * Reopen the deliverable the objective check judged, with why, so Go's
+   * repair revises it (L-64). Returns the unmet assessment, or null when
+   * there is none to act on.
+   */
+  const reopenJudged = useCallback(async (title: string, why: string) => {
+    const o = latest.current;
+    const judged = deliverableStage(o.template);
+    const unmet = objectiveUnmet(o.events);
+    const judgedStatus = judged ? o.state.stages[judged.id]?.status : undefined;
+    if (judged && unmet && (isDone(judgedStatus) || judgedStatus === 'in_progress')) {
+      await appendWorkflowEvent(o.project.id, o.project.user_id, {
+        type: 'brief_changed', stage_id: judged.id, actor: 'user', reason: title,
+        payload: { field: 'facts', kind: 'answer', affected: [{ stage_id: judged.id, reason: why }] },
+      });
+    }
+    return unmet;
+  }, []);
+
+  /**
+   * "Have Go fix it" on the objective check's card (11 Oct): the deliverable
+   * is reopened with what was found unmet as the reason, and Go repairs it,
+   * saves a new version and checks again — no answer to type.
+   */
+  const fixObjective = useCallback(
+    async (items: readonly string[]) => {
+      const o = latest.current;
+      try {
+        const unmet = await reopenJudged(
+          'Fix what the objective check found unmet',
+          `the objective check found these unmet — fix each, keep everything else the brief asks for: ${items.join('; ').slice(0, 800)}`
+        );
+        if (unmet) await Promise.all([o.onRefresh?.(), o.reloadEvents()]);
+        await go();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Could not reopen the deliverable.');
+      }
+    },
+    [go, reopenJudged]
+  );
+
   const answer = useCallback(
     async (text: string, contradicted?: AnswerContradiction) => {
       const current = runRef.current;
@@ -1028,19 +1084,9 @@ export function useGoLoop(opts: Options) {
         // deliverable that was judged, so it is reopened with the answer as the
         // reason, and Go's repair revises it. Matching the answer to the text
         // it corrects is not possible in code; the judged stage is known.
-        const judged = deliverableStage(o.template);
-        const unmet = objectiveUnmet(o.events);
-        const judgedStatus = judged ? o.state.stages[judged.id]?.status : undefined;
-        if (judged && unmet && /objective is not met/i.test(current.stop_reason ?? '') && (isDone(judgedStatus) || judgedStatus === 'in_progress')) {
-          await appendWorkflowEvent(o.project.id, o.project.user_id, {
-            type: 'brief_changed', stage_id: judged.id, actor: 'user',
-            reason: 'Your answer to the objective check',
-            payload: {
-              field: 'facts', kind: 'answer',
-              affected: [{ stage_id: judged.id, reason: `your answer to "${asked.slice(0, 240)}" was: ${text.trim().slice(0, 600)}` }],
-            },
-          });
-        }
+        const unmet = /objective is not met/i.test(current.stop_reason ?? '')
+          ? await reopenJudged('Your answer to the objective check', `your answer to "${asked.slice(0, 240)}" was: ${text.trim().slice(0, 600)}`)
+          : objectiveUnmet(o.events);
         if (fact || st?.status === 'blocked' || unmet) {
           await Promise.all([o.onRefresh?.(), o.reloadEvents()]);
         }
@@ -1049,7 +1095,7 @@ export function useGoLoop(opts: Options) {
         setError(e instanceof Error ? e.message : 'Could not record your answer.');
       }
     },
-    [go, upsertStep]
+    [go, upsertStep, reopenJudged]
   );
 
   const stop = useCallback(async () => {
@@ -1264,9 +1310,11 @@ export function useGoLoop(opts: Options) {
     continueRun,
     acknowledgeLargeJob,
     stageLabelFor,
+    stepLabel,
+    stepEffect,
     autoWindows, setAutoWindows, autoPending,
     policy, setPolicy, budget, setBudget, run, steps, phase, active, pendingStep, pendingStale, authorizing, error,
-    go, update, suggest, replan, stop, approve, decline, answer, checkAnswer, confirmAuthorization,
+    go, update, suggest, replan, stop, approve, decline, answer, fixObjective, checkAnswer, confirmAuthorization,
     cancelAuthorization: useCallback(() => setAuthorizing(null), []),
     handsOff,
     dismissError: useCallback(() => setError(null), []),

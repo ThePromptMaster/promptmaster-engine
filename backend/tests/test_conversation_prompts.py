@@ -141,3 +141,15 @@ def test_the_chat_is_given_go_s_run_record_and_may_not_infer_a_stop_reason():
     assert "never offer an inference as the reason" in text
     assert "Never say you updated, recorded or saved anything" in text
     assert "GO: no run on this project yet." in format_chat_context(ChatContext(stage_label="Final"))
+
+
+def test_a_change_the_user_asks_for_is_later_than_an_older_fact(basic_inputs, basic_iteration):
+    """Sean, 10 Oct (emails 4–5): Change it to Wednesday at 1:00 p.m. came back
+    still saying Thursday at 12:30, the value the facts and the objective held."""
+    from promptmaster.conversation import build_apply_to_answer_prompt
+    from promptmaster.project_context import FACTS_HEADER
+
+    system, _user = build_apply_to_answer_prompt(basic_inputs, basic_iteration, [], [])
+    assert "THE USER'S INSTRUCTION IN THE CHAT IS THEIR LATEST WORD" in system
+    assert "write the instruction's value" in system
+    assert "a change the user is asking for right now, in their own words in the side chat" in FACTS_HEADER

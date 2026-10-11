@@ -301,7 +301,7 @@ export async function readOutcomeProof(input: {
     return proof;
   }
   if (versionIds.length) proof.versions = await checkVersions(versionIds);
-  if (performer === 'sections' && facts.manuscript) {
+  if ((performer === 'sections' || (performer === 'recheck' && outcome.changes.sections_written?.length)) && facts.manuscript) {
     const fresh = await getArtifact(facts.manuscript.artifact.id);
     proof.sectionsWithContent = (fresh?.long_form?.outline ?? []).filter((s) => (s.content ?? '').trim()).map((s) => s.id);
   }

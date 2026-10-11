@@ -361,7 +361,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         setStageSummary={setStageSummary}
         setStageFigures={setStageFigures}
         ensureStageArtifact={ensureStageArtifact}
-        onReload={() => void loadProject(id, { background: true })}
+        onReload={() => loadProject(id, { background: true })}
       />
       </>
       )}

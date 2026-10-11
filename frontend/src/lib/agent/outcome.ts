@@ -19,7 +19,10 @@ import type { StepOutcome } from './perform';
 import { actionFor } from './actions';
 
 /** Performers whose success is a change to the project, not a piece of text. */
-const MUTATING = new Set(['draft', 'revise', 'continue', 'outline', 'sections', 'apply', 'triage', 'commit']);
+// A repair (`recheck`) is one too (Sean, 10 Oct, email 7.5: "A repair action that
+// promises a saved revision should not be marked successful merely because text
+// was generated").
+const MUTATING = new Set(['draft', 'revise', 'continue', 'outline', 'sections', 'apply', 'triage', 'commit', 'recheck']);
 
 export function changedSomething(changes: StepOutcome['changes'] | undefined): boolean {
   if (!changes) return false;
@@ -65,7 +68,9 @@ export function verifyOutcome(actionKey: string, outcome: StepOutcome, proof: Ou
   const performer = actionFor(actionKey)?.performer;
   if (!performer) return outcome;
 
-  if (SAVES_VERSION.has(performer)) {
+  // A repair saves a version, or rewrites chapters; whichever it names must be there.
+  const savesVersion = SAVES_VERSION.has(performer) || (performer === 'recheck' && Boolean(outcome.changes.version_ids?.length));
+  if (savesVersion) {
     const versions = proof.versions ?? [];
     if (!versions.length || versions.some((v) => !v.found)) return missing(outcome, 'the version this step says it saved was not found in the project.');
     if (versions.some((v) => v.empty)) return missing(outcome, 'the version this step saved is empty.');
@@ -73,7 +78,7 @@ export function verifyOutcome(actionKey: string, outcome: StepOutcome, proof: Ou
   if (performer === 'evaluate' && !proof.evaluated) {
     return missing(outcome, 'no check was found in the project for this draft.');
   }
-  if (performer === 'sections') {
+  if (performer === 'sections' || (performer === 'recheck' && outcome.changes.sections_written?.length && proof.sectionsWithContent)) {
     const have = new Set(proof.sectionsWithContent ?? []);
     const absent = (outcome.changes.sections_written ?? []).filter((id) => !have.has(id));
     if (absent.length) {

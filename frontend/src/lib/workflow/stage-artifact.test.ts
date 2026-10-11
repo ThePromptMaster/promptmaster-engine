@@ -32,3 +32,18 @@ describe('a status the row contradicts (Sean, 10 Oct, email 6.9)', () => {
     expect(reasonFromRow({ id: 'r', run: 'Cohort comparison', producible_by: 'Needs data — account-level churn records' }, ITEM_SCHEMAS.runs)).toBe('Needs data — account-level churn records');
   });
 });
+
+describe('deferred rows that do not block are named with their reason (10 Oct, email 6.6)', () => {
+  it('lists a deferred polish row, not one that says a requirement is unmet', async () => {
+    const { deferredNotBlocking, itemSchemaFor } = await import('./stage-artifact');
+    const { SINGLE_OUTPUT_V1 } = await import('./templates/single-output.v1');
+    const schema = itemSchemaFor(SINGLE_OUTPUT_V1.stages.find((s) => s.id === 'summary')!);
+    const key = schema.fields[0].key;
+    const rows = [
+      { id: 'a', [key]: 'Tighten the closing line', status: 'deferred', reason: 'Style only; after launch.' },
+      { id: 'b', [key]: 'The pricing section is missing', status: 'deferred', reason: 'Later.' },
+      { id: 'c', [key]: 'Fine as is', status: 'accepted', reason: 'ok' },
+    ];
+    expect(deferredNotBlocking(rows as never, schema)).toEqual([{ row: 'Tighten the closing line', reason: 'Style only; after launch.' }]);
+  });
+});

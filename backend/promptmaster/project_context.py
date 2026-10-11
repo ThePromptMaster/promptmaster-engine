@@ -26,7 +26,9 @@ FACTS_HEADER = (
     "including a value written in the objective, the brief or an earlier stage: a fact "
     "the user recorded later is their later word. Where a fact replaces an earlier one, "
     "the earlier value is no longer true; replace it wherever it appears. A requirement "
-    "binds every recommendation."
+    "binds every recommendation. One thing is later than any fact: a change the user is "
+    "asking for right now, in their own words in the side chat — follow it, and "
+    "PromptMaster offers to update the fact with it."
 )
 
 

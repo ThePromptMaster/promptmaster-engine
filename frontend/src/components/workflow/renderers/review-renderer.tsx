@@ -194,6 +194,7 @@ export function ReviewRenderer({
   // (3 Oct). They count only once the user confirms them — one click for all
   // of them, or by changing any one.
   const proposed = rows.filter(isProposed).length;
+  const deferred = rows.filter((r) => r.status === 'deferred' && !isProposed(r)).length;
   const confirmable = confirmableProposals(rows, schema).length;
   async function confirmAll() {
     if (!onSaveItems || saving) return;
@@ -281,7 +282,11 @@ export function ReviewRenderer({
               }`}
             >
               {outstanding === 0
-                ? 'all resolved'
+                ? deferred > 0
+                  // Deferred is decided, not resolved (Sean, 10 Oct, email 8:
+                  // "'All resolved' includes deferred concerns").
+                  ? `all decided · ${deferred} deferred, still open in the work`
+                  : 'all decided'
                 : statusRequired
                   ? `${outstanding} still to resolve`
                   : `${outstanding} not yet marked — optional, does not block finishing`}
@@ -378,7 +383,10 @@ export function ReviewRenderer({
           {!readOnly && outstanding > 0 && (
             <p data-check-stage-note className="mb-3 max-w-[70ch] text-label text-[var(--on-surface-variant)]">
               This is a check stage: PromptMaster lists what it found, and you decide on each row with its
-              status. Nothing in your work changes here — later stages act on what you decide.
+              status. Nothing in your work changes here
+              {stage.transitions.default_next
+                ? ' — later stages act on what you decide.'
+                : '. This is the last stage: what you decide is recorded with the finished work.'}
             </p>
           )}
 

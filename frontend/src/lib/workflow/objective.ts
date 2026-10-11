@@ -13,6 +13,12 @@ import type { WorkflowEvent } from './types';
 
 export type BlockerKind = 'data_missing' | 'tool_missing' | 'source_missing' | 'needs_decision';
 
+export interface CriterionResult {
+  requirement: string;
+  verdict: 'met' | 'not_met' | 'not_checked';
+  basis: string;
+}
+
 export interface ObjectiveAssessment {
   outcome: 'met' | 'not_met' | 'partly';
   reason: string;
@@ -20,6 +26,40 @@ export interface ObjectiveAssessment {
   blockers: { need: string; kind: BlockerKind }[];
   performed: string[];
   proposed_next: string[];
+  /** Each requirement the check considered (10 Oct, email 6.5); absent on older records. */
+  criteria?: CriterionResult[];
+  /** What was found unmet, by name (11 Oct); absent on older records. */
+  unmet?: string[];
+  /** The model's own sentence when code overruled its "met" — kept, never shown as the reason. */
+  model_note?: string;
+}
+
+/**
+ * What a check of the objective rested on, as recorded with it (Sean, 10 Oct,
+ * emails 3, 5, 8): which saved version was read, each requirement with how it
+ * was checked — measured in code, or assessed by the model — and what was not
+ * checked at all.
+ */
+export interface ObjectiveBasis {
+  stage_id: string;
+  stage_label: string;
+  version_id: string | null;
+  version_number: number | null;
+  measured: string[];
+  assessed: CriterionResult[];
+  not_checked: string[];
+}
+
+/** "Checked Output v3: 2 measured in code, 4 assessed by the model; not verified: fits on one page." */
+export function describeBasis(b: ObjectiveBasis): string {
+  const where = `${b.stage_label}${b.version_number ? ` v${b.version_number}` : ''}`;
+  const met = b.assessed.filter((c) => c.verdict === 'met').length;
+  const parts = [
+    b.measured.length ? `${b.measured.length} measured in code (${b.measured.join('; ')})` : '',
+    met ? `${met} assessed by the AI model against the text` : '',
+  ].filter(Boolean);
+  const unchecked = b.not_checked.length ? ` Not verified: ${b.not_checked.join('; ')}.` : '';
+  return `Checked ${where}${parts.length ? `: ${parts.join(', ')}` : ''}.${unchecked}`;
 }
 
 /** The latest assessment in the log, if any. */
@@ -36,6 +76,8 @@ export function latestObjectiveAssessment(events: readonly WorkflowEvent[]): (Ob
       blockers: Array.isArray(p.blockers) ? p.blockers : [],
       performed: Array.isArray(p.performed) ? p.performed : [],
       proposed_next: Array.isArray(p.proposed_next) ? p.proposed_next : [],
+      ...(Array.isArray(p.criteria) ? { criteria: p.criteria } : {}),
+      ...(Array.isArray(p.unmet) ? { unmet: p.unmet } : {}),
       at: e.created_at ?? '',
     };
   }
@@ -72,5 +114,7 @@ const CHANGES_SINCE = new Set<WorkflowEvent['type']>(['brief_changed', 'stage_ve
 export function pausedLine(a: Pick<ObjectiveAssessment, 'blockers' | 'reason'>): string {
   return a.blockers.length
     ? `Paused — the objective is not met. Waiting for: ${a.blockers.map((b) => b.need).join('; ')}.`
-    : `The objective is not met yet: ${a.reason}`;
+    : /^Not met: /.test(a.reason)
+      ? `The objective is not met yet. ${a.reason}`
+      : `The objective is not met yet: ${a.reason}`;
 }

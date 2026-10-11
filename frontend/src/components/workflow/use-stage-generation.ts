@@ -35,6 +35,8 @@ import {
 } from '@/lib/errors/recovery';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import { stageDrafts } from '@/lib/workflow/stage-artifact';
+import { ManuscriptMissing, withFreshManuscript } from '@/lib/workflow/fresh-manuscript';
+import { manuscriptSourceFor } from '@/lib/workflow/context';
 import { generationContent, generationRequest } from '@/lib/workflow/stage-requests';
 import type { StageDefinition, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
 import type { NewVersion } from '@/lib/supabase/versions';
@@ -106,7 +108,7 @@ export function useStageGeneration({
   }, [currentStageId, cancel]);
 
   const generate = useCallback(
-    async (target: StageDefinition, options?: { force?: boolean }) => {
+    async (target: StageDefinition, options?: { force?: boolean; auto?: boolean }) => {
       const { project: p, template: t, state: s, bundles: b, appendStageVersion: append } =
         latest.current;
 
@@ -130,8 +132,10 @@ export function useStageGeneration({
       };
 
       try {
+        // The chapters as saved, not this page's copy (10 Oct, email 6.2).
+        const fresh = manuscriptSourceFor(t, target) ? await withFreshManuscript(t, target, b) : b;
         const response = await api.generateStageArtifact(
-          generationRequest(p, t, s, b, target, options?.force ? head : ''),
+          generationRequest(p, t, s, fresh, target, options?.force ? head : ''),
           controller.signal
         );
 
@@ -159,11 +163,16 @@ export function useStageGeneration({
           instruction: target.entry_prompt_hint ?? '',
           model: response.model_used || p.model,
           mode: p.mode,
-          change_summary: options?.force ? 'Regenerated draft.' : null,
+          // Where a version came from is on the version (10 Oct, email 6.7).
+          change_summary: options?.force ? 'Regenerated draft.' : options?.auto ? 'Drafted automatically when the stage opened.' : 'Drafted from the stage menu.',
           finish_reason: response.finish_reason || null,
         });
       } catch (err) {
         if (controller.signal.aborted || (err as Error)?.name === 'AbortError') return;
+        if (err instanceof ManuscriptMissing) {
+          setFailure({ stageId: target.id, failure: localFailure('Nothing to read yet', err.message, preserved) });
+          return;
+        }
         // Everything goes through stageFailure, including a fetch that never
         // reached the server: it is the only path that guarantees the message
         // says what survived.
@@ -193,7 +202,7 @@ export function useStageGeneration({
       return;
     }
 
-    void generate(stage);
+    void generate(stage, { auto: true });
   }, [enabled, stage, bundles, generate]);
 
   const regenerate = useCallback(

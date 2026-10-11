@@ -142,7 +142,7 @@ describe('B3: the findings that change the work are the user\'s', () => {
   it('with only material rows left, the user is asked, with no button — the table is the control', () => {
     const need = needsUser({ ...base, stage: stage('continuity'), facts: review(0, 2), stageEvaluation: evaluation('continuity'), allowed: ['advance_stage'] });
     expect(need).toEqual({ kind: 'triage_findings', stageId: 'continuity', count: 2 });
-    expect(describeNeed(need!, label)).toEqual({ message: '2 findings would change the work, so they need your decision. Accept or reject each in the table below — that is how a check stage works.', action: 'Go to the table' });
+    expect(describeNeed(need!, label)).toEqual({ message: '2 findings would change what the work says, so they are yours to decide. "Routine decisions: handle them for me" covers minor and moderate findings only; these are major or unrated. Accept, reject or defer each in the table below.', action: 'Go to the table' });
   });
 
   it('a fully decided table needs nothing', () => {
@@ -451,4 +451,31 @@ describe('Q1a (Sean, 9 Oct): a "not run" row PromptMaster can carry out is work 
     expect(requiredWork({ stage: experiment, facts, stageEvaluation: evaluation('experiment'), allowed: ['run_computation'], runAttemptsLeft: 0 })).toBeNull();
     expect(requiredWork({ stage: experiment, facts, stageEvaluation: evaluation('experiment'), allowed: [], runAttemptsLeft: 1 })).toBeNull();
   });
+});
+
+describe('the objective check\'s stop (11 Oct, survey brief)', () => {
+  const label = (id: string) => (id === 'output' ? 'Output' : id);
+  it('names what is unmet and offers to fix it', () => {
+    const d = describeNeed({ kind: 'objective_check', stageId: 'output', finding: 'unmet', items: ['Exactly four sections — It has two.'] }, label);
+    expect(d.message).toContain('not met: Exactly four sections — It has two.');
+    expect(d.options?.map((o) => o.id)).toEqual(['fix', 'stop']);
+  });
+  it('a check that only lacked a quote does not say anything failed', () => {
+    const d = describeNeed({ kind: 'objective_check', stageId: 'output', finding: 'no_evidence', items: [] }, label);
+    expect(d.message).toContain('found nothing unmet');
+    expect(d.message).not.toMatch(/satisf/);
+    expect(d.options?.[0]).toEqual({ id: 'resume', label: 'Carry on' });
+  });
+  it('met with stages left says where carrying on goes', () => {
+    const d = describeNeed({ kind: 'objective_check', stageId: 'output', finding: 'stages_left', items: ['Summary', 'Realign (optional)'], next: 'Summary' }, label);
+    expect(d.options?.[0].label).toBe('Carry on to Summary');
+  });
+  it('holds until the run moves on', () => {
+    expect(needStillHolds({ kind: 'objective_check', stageId: 'output', finding: 'unmet', items: [] }, { currentStageId: 'output' } as never)).toBe(true);
+  });
+});
+
+it('met while still on the stage: the button finishes it, not "carry on to" it', () => {
+  const d = describeNeed({ kind: 'objective_check', stageId: 'output', finding: 'stages_left', items: ['Output', 'Summary'], next: 'Output' }, (id) => (id === 'output' ? 'Output' : id));
+  expect(d.options?.[0].label).toBe('Finish Output and carry on');
 });

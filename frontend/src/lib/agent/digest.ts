@@ -22,7 +22,7 @@ import { countNamedSections, parseOutlineDocument } from '@/lib/outline/model';
 import { manuscriptArtifactFor, manuscriptSourceFor } from '@/lib/workflow/context';
 import { formatManuscript, type DataFileBrief, type StageArtifactBundle } from '@/lib/workflow/digest';
 import { nextSuggestedStage } from '@/lib/workflow/engine';
-import { effectiveRenderer, isTriaged, itemSchemaFor, parseItems } from '@/lib/workflow/stage-artifact';
+import { effectiveRenderer, isTriaged, itemSchemaFor, parseItems, isProposed } from '@/lib/workflow/stage-artifact';
 import type { StageContext, StageDefinition, StageEvaluation, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
 import type { OutlineSection } from '@/types';
 import type { AgentStep } from '@/types/agent';
@@ -245,7 +245,11 @@ export function buildAgentState(input: {
     // Rows as "[status] finding" lines: what a reviewer needs, at a fraction
     // of the JSON document's size. Numbered where a computation can carry a
     // row out, so the planner can say which one it is running.
-    excerpt = items.map((i, n) => `${schema.execution ? `${n + 1}. ` : ''}[${i.status || 'undecided'}] ${firstField(i)}`).join('\n');
+    // A proposal is marked as one: "[accepted]" on a row the user never
+    // confirmed let the planner write "accepted review findings" (Sean, 10 Oct, email 6.4).
+    excerpt = items
+      .map((i, n) => `${schema.execution ? `${n + 1}. ` : ''}[${isProposed(i) ? `proposed, not confirmed: ${i.status}` : i.status || 'undecided'}] ${firstField(i)}`)
+      .join('\n');
     if (schema.execution && items.length && dataFiles.length) {
       excerpt +=
         `\n\nA row that is not "${schema.execution.status}" can be carried out with run_computation when the project's data allows it: ` +

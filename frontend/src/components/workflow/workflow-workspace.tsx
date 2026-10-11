@@ -75,6 +75,8 @@ import { ProjectData } from './project-data';
 import { lookupAndVerify } from '@/lib/workflow/verify';
 import { RefusedRevisions, refusedSince } from './refused-revisions';
 import { BriefChangeNotice } from './brief-change-notice';
+import { FactReconcileNotice } from './fact-change-list';
+import { factChangesFromRevision, type FactChange } from '@/lib/workflow/fact-reconcile';
 import { useBriefChange } from './use-brief-change';
 import { openBriefChange } from '@/lib/workflow/brief-change';
 import { contextFromDocuments } from '@/lib/data/extract-text';
@@ -140,7 +142,8 @@ interface Props {
    */
   ensureStageArtifact?: (stageId: string, name: string) => Promise<Artifact>;
   /** Reload project state after the server changed it behind our back. */
-  onReload?: () => void;
+  /** Reloads the project; the promise settles when the page holds the saved state, so a caller can await it. */
+  onReload?: () => Promise<void> | void;
 }
 
 /** Per-viewer convenience only: whether this person last left the side chat open. */
@@ -893,9 +896,22 @@ export function WorkflowWorkspace({
   });
   const briefChange = useMemo(() => openBriefChange(events ?? [], state), [events, state]);
 
+  // A version the user saved themselves that states values the facts do not
+  // (10 Oct, Sean: restoring the Wednesday draft left the facts on Thursday).
+  const [factReconcile, setFactReconcile] = useState<{ stageId: string; how: string; changes: FactChange[] } | null>(null);
+  const offerFactUpdates = useCallback(
+    (how: string, before: string, after: string) => {
+      if (!stage) return;
+      const changes = factChangesFromRevision({ facts: project.facts, instruction: '', before, after });
+      setFactReconcile(changes.length ? { stageId: stage.id, how, changes } : null);
+    },
+    [stage, project.facts]
+  );
+
   const saveContent = useCallback(
     async (content: string) => {
       if (!stage || !appendStageVersion) return;
+      const before = headVersion?.content ?? '';
       await appendStageVersion(stage.id, stage.label, {
         content,
         source_operation: 'stage_edit',
@@ -903,8 +919,9 @@ export function WorkflowWorkspace({
         mode: project.mode,
         change_summary: 'Edited by hand.',
       });
+      offerFactUpdates('Your edit', before, content);
     },
-    [stage, appendStageVersion, project.model, project.mode]
+    [stage, appendStageVersion, project.model, project.mode, headVersion?.content, offerFactUpdates]
   );
 
   const saveItems = useCallback(
@@ -940,10 +957,13 @@ export function WorkflowWorkspace({
   const restore = useCallback(
     async (versionId: string) => {
       if (!stage || !restoreStageVersion) return;
+      const before = headVersion?.content ?? '';
+      const restored = stageVersionList.find((v) => v.id === versionId);
       await restoreStageVersion(stage.id, versionId);
       setActiveVersionId(null);
+      if (restored) offerFactUpdates(`The version you restored (v${restored.version_number})`, before, restored.content);
     },
-    [stage, restoreStageVersion]
+    [stage, restoreStageVersion, headVersion?.content, stageVersionList, offerFactUpdates]
   );
 
   /**
@@ -1070,7 +1090,12 @@ export function WorkflowWorkspace({
     onRefresh: onReload,
     getControls: () => controlsRef.current,
   });
-  useEffect(() => setGoDriving(go.active || go.phase === 'awaiting'), [go.active, go.phase]);
+  // A paused run holds the next move too: the page drafting Realign while Go
+  // proposed skipping it, or Summary while Go waited for approval to draft it,
+  // made versions no Go step accounted for (Sean, 10 Oct, email 6.7). The stage
+  // can still be drafted by hand from its menu.
+  const goPaused = go.run?.status === 'awaiting_decision' || go.run?.status === 'blocked' || go.run?.status === 'budget_exhausted';
+  useEffect(() => setGoDriving(go.active || go.phase === 'awaiting' || goPaused), [go.active, go.phase, goPaused]);
 
   // What Go can ask the user for, done from its card with one click (B4):
   // the same writes the stage's own controls make.
@@ -1676,6 +1701,7 @@ export function WorkflowWorkspace({
               go={go}
               stageLabel={stage.label}
               mode={project.mode}
+              stageMode={stage?.recommended_modes?.[0]?.mode}
               needsActions={goNeedsActions}
               needContext={goNeedContextOnPage}
               dockHost={goDockHost}
@@ -1739,6 +1765,16 @@ export function WorkflowWorkspace({
               onUpdate={appendStageVersion && project.status !== 'finalized' ? () => void go.update() : undefined}
               updating={go.active}
             />
+            {factReconcile && factReconcile.stageId === stage.id && (
+              <FactReconcileNotice
+                project={project}
+                stageLabel={stage.label}
+                how={factReconcile.how}
+                changes={factReconcile.changes}
+                onChanged={() => onReload?.()}
+                onDone={() => setFactReconcile(null)}
+              />
+            )}
             <FiguresOnRecord template={template} state={state} bundles={stageBundles} />
             {/* On every stage: the accepted facts are the project's record (F3, 7 Oct). */}
             <ProjectFacts project={project} onChanged={() => onReload?.()} readOnly={!isEditable || project.status === 'finalized'} />
@@ -2019,6 +2055,8 @@ export function WorkflowWorkspace({
               <NextMoveCard
                 step={go.pendingStep}
                 stale={go.pendingStale}
+                label={go.stepLabel(go.pendingStep)}
+                effect={go.stepEffect(go.pendingStep)}
                 onDo={() => void go.approve()}
                 onReplan={() => void go.replan()}
                 onDismiss={() => void go.decline()}
@@ -2079,6 +2117,7 @@ export function WorkflowWorkspace({
               project={project}
               stageId={stage.id}
               stageLabel={stage.label}
+              onFactsChanged={() => onReload?.()}
               attach={
                 project.status === 'finalized' ? undefined : (
                   <ChatAttach

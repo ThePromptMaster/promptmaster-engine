@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import { actionLabel } from '@/lib/agent/actions';
 import { approvalsAskedFor, describeNeed, isClearedNote, needIsDecidedOnStage, type NeedContext, type StuckOption } from '@/lib/agent/needs';
 import type { useGoLoop } from '../use-go-loop';
 import { AuthorizationDialog } from './authorization-dialog';
@@ -41,6 +40,7 @@ export function GoPanel({
   go,
   stageLabel,
   mode,
+  stageMode,
   needsActions,
   needContext,
   dockHost = null,
@@ -49,6 +49,8 @@ export function GoPanel({
   go: ReturnType<typeof useGoLoop>;
   stageLabel: string;
   mode: string;
+  /** The mode the current stage recommends. */
+  stageMode?: string;
   needsActions?: NeedsActions;
   /** What is true of the project now, for a request whose wording depends on it. */
   needContext?: NeedContext;
@@ -76,13 +78,6 @@ export function GoPanel({
   const live = go.run && !go.run.ended_at;
   const expanded = open || Boolean(live) || go.steps.length > 0 || Boolean(go.authorizing);
   const current = go.steps.at(-1) ?? null;
-  const next = go.pendingStep
-    ? `${actionLabel(go.pendingStep.action_key)} — waiting for your approval`
-    : go.phase === 'thinking' || go.phase === 'performing'
-      ? 'Chosen after this step finishes'
-      : go.run?.status === 'completed'
-        ? 'Nothing — the objective is met'
-        : 'Press Go to choose the next move';
   const askingUser = Boolean(live && go.run!.status === 'awaiting_decision' && !go.pendingStep && !go.active);
   const canResume = Boolean(live && (go.run!.status === 'blocked' || go.run!.status === 'awaiting_decision') && !go.pendingStep);
   // The "I need you to…" card (B4): shown for a stop the user can clear, live
@@ -97,6 +92,16 @@ export function GoPanel({
   const canContinue = Boolean(
     go.run && go.run.status === 'budget_exhausted' && go.run.policy === go.policy && go.run.budget_steps === go.budget
   );
+  // The button's own word (Sean, 10 Oct, email 6.3: the record said "press Go"
+  // while the button read "Resume").
+  const button = canResume ? 'Resume' : canContinue ? 'Continue' : 'Go';
+  const next = go.pendingStep
+    ? `${go.stepLabel(go.pendingStep)} — waiting for your approval`
+    : go.phase === 'thinking' || go.phase === 'performing'
+      ? 'Chosen after this step finishes'
+      : go.run?.status === 'completed'
+        ? 'Nothing — the objective is met'
+        : `Press ${button} to choose the next move`;
   const act = async (option?: StuckOption) => {
     if (!need) return;
     switch (need.kind) {
@@ -145,6 +150,13 @@ export function GoPanel({
         return;
       case 'large_job':
         await go.acknowledgeLargeJob(need.sections);
+        return;
+      case 'objective_check':
+        // What each button does is on it (11 Oct): fix and check again, carry
+        // on to what the workflow still holds, or stop here.
+        if (option === 'fix') return go.fixObjective(need.items);
+        if (option === 'stop') return go.stop();
+        await go.go();
         return;
       case 'decide_rows':
       case 'triage_findings':
@@ -274,6 +286,8 @@ export function GoPanel({
             <DecisionPrompt
               step={go.pendingStep}
               stale={go.pendingStale}
+              label={go.stepLabel(go.pendingStep)}
+              effect={go.stepEffect(go.pendingStep)}
               onApprove={() => void go.approve()}
               onReplan={() => void go.replan()}
               onDecline={() => void go.decline()}
@@ -305,6 +319,7 @@ export function GoPanel({
               next={next}
               stageLabel={stageLabel}
               mode={mode}
+              stageMode={stageMode}
               thinking={go.phase === 'thinking'}
             />
           )}

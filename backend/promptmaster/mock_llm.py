@@ -524,11 +524,21 @@ def _json_reply(system: str, prompt: str) -> dict:
         # Not met when the deliverable says "[[mock:objective=unmet]]": a blocker
         # and a proposal; otherwise met, quoting the deliverable's first line.
         body = prompt.split("--- THE DELIVERABLE:", 1)[-1].split("---\n", 1)[-1]
-        first = next((ln.strip() for ln in body.splitlines() if ln.strip()), "")
+        # A sentence, not a heading: a heading is not evidence (10 Oct, email 8).
+        first = next((ln.strip() for ln in body.splitlines() if ln.strip() and not ln.lstrip().startswith("#")), "")
         if "[[mock:objective=open]]" in prompt:
             # Not met, and nothing missing: another round is worth it.
             return {"outcome": "not_met", "reason": "Mock: not there yet.", "basis_quote": first[:120],
                     "blockers": [], "performed": [], "proposed_next": ["Mock: another round."]}
+        if "[[mock:objective=noquote]]" in prompt:
+            # 11 Oct (survey brief): "met", quoting a heading — twice.
+            return {"outcome": "met", "reason": "Mock: the brief satisfies all of the requirements.",
+                    "basis_quote": "## Purpose", "blockers": [], "performed": [], "proposed_next": []}
+        if "[[mock:objective=criterion]]" in prompt and "recheck_stage" not in prompt:
+            # A named requirement unmet, until a repair is on the run record.
+            return {"outcome": "met", "reason": "Mock: the brief satisfies all of the requirements.",
+                    "basis_quote": first[:120], "blockers": [], "performed": [], "proposed_next": [],
+                    "criteria": [{"requirement": "Exactly four sections", "verdict": "not_met", "basis": "It has two."}]}
         if "[[mock:objective=unmet]]" in prompt:
             return {"outcome": "not_met", "reason": "Mock: the log says the criterion is not met.",
                     "basis_quote": first[:120],
@@ -651,6 +661,14 @@ def _prose_reply(system: str, prompt: str) -> str:
             "2. **Weak reasoning** — Mock: the main claim is asserted, never shown.\n"
             "3. **Missing perspectives** — Mock: the strongest counter-argument is ignored.\n"
         )
+    if conversation._APPLY_INSTRUCTION[:60] in system:
+        # "[[mock:say=…]]" in the instruction is the revision's text, so a
+        # browser test can script what "Change it" returns (10 Oct: a revision
+        # that changes an accepted fact).
+        # The latest instruction's: the thread repeats the earlier ones.
+        said = re.findall(r"\[\[mock:say=(.+?)\]\]", prompt)
+        if said:
+            return said[-1].strip()
     if audit_findings._APPLY_AUDIT_INSTRUCTION[:60] in system:
         # Apply fixes: keep the previous text and add one line per finding, so
         # a diff shows exactly what was applied (C2's review and preview).
@@ -666,6 +684,9 @@ def _prose_reply(system: str, prompt: str) -> str:
         first = notes.group(1).splitlines()[0].strip() if notes else "(no findings)"
         return f"## Mock revision\n\nRevised by the mock model, applying: {first[:160]}"
     objective = _objective(prompt) if "Objective:" in prompt else "the task"
+    if "MEASURED IN CODE AND NOT MET" in prompt:
+        # A repair of a measured requirement (11 Oct): short enough for any limit the E2E sets.
+        return "## Mock output\n\nShortened by the mock to meet the measured limit."
     if _WRITING_NOW in prompt:
         # A chapter. Say what the prompt carried, so a browser test can see
         # that the stage's own hint reached it and that the mode came as a

@@ -99,7 +99,10 @@ def test_a_failed_check_keeps_the_objective_from_being_met(basic_inputs):
     assert "STILL UNMET" in user and "the induction proofs are missing from the report" in user
     a = parse_assessment({"outcome": "met", "basis_quote": "The proofs are complete.", "reason": "ok"}, "The proofs are complete.", [], checks)
     assert a.outcome == "partly"
-    assert a.reason.startswith("Still unmet:")
+    assert a.reason.startswith("Not met: Final review: carried forward")
+    assert a.model_note == "ok"
+
+
 def test_a_requirement_about_how_the_work_is_done_is_met_by_the_record(basic_inputs):
     """8 Oct production pass (TaskBoard): "stop and ask me first" was asked and
     answered; the check said the objective was not met because a draft exists."""
@@ -107,3 +110,176 @@ def test_a_requirement_about_how_the_work_is_done_is_met_by_the_record(basic_inp
 
     system, _user = build_assessment_prompt(basic_inputs, "Output", "TaskBoard launches December 10.", [])
     assert "a decision the user recorded answers the question it required" in system
+
+
+def test_a_heading_is_not_evidence_the_objective_is_met():
+    """Sean, 10 Oct, email 8: the completion message quoted "## 1. Pre-arrival preparation"."""
+    plan = "## 1. Pre-arrival preparation\n\nSend the laptop request a week before day one so access works on arrival."
+    a = parse_assessment({"outcome": "met", "basis_quote": "## 1. Pre-arrival preparation"}, plan, [])
+    assert a.outcome == "partly" and a.basis_quote == ""
+    a = parse_assessment({"outcome": "met", "basis_quote": "1. Pre-arrival preparation"}, plan, [])
+    assert a.outcome == "partly"
+
+
+def test_each_requirement_has_a_verdict_and_a_met_one_has_a_sentence():
+    """Sean, 10 Oct, emails 3, 6.5 and 8: what was checked, and how, is on the record."""
+    plan = "Send the laptop request a week before day one so access works on arrival."
+    a = parse_assessment({
+        "outcome": "met", "basis_quote": plan,
+        "criteria": [
+            {"requirement": "Covers pre-arrival", "verdict": "met", "basis": plan},
+            {"requirement": "Fits on one page", "verdict": "not_checked", "basis": "Page length is not visible in the text."},
+            {"requirement": "Six sections", "verdict": "met", "basis": "There are six sections."},
+            {"requirement": "", "verdict": "met"},
+        ],
+    }, plan, [])
+    assert [(c.requirement, c.verdict) for c in a.criteria] == [
+        ("Covers pre-arrival", "met"), ("Fits on one page", "not_checked"), ("Six sections", "not_checked"),
+    ]
+    assert a.outcome == "met"
+
+
+def test_a_requirement_found_unmet_keeps_the_objective_from_being_met():
+    plan = "Send the laptop request a week before day one so access works on arrival."
+    a = parse_assessment({
+        "outcome": "met", "basis_quote": plan,
+        "criteria": [{"requirement": "Labels its assumptions", "verdict": "not_met", "basis": "No assumption is labelled."}],
+    }, plan, [])
+    assert a.outcome == "partly"
+    assert a.reason == "Not met: Labels its assumptions — No assumption is labelled."
+
+
+BRIEF = (
+    "## Purpose\n\nThe survey will tell us why customers renew.\n\n"
+    "## Assumptions\n\nAssumption: the survey runs online for two weeks."
+)
+
+
+def test_a_met_without_evidence_does_not_read_as_praise_under_not_met():
+    """11 Oct, survey brief: "The objective is not met yet", followed by the model
+    saying the brief satisfied the requirements, and nothing named as failed."""
+    a = parse_assessment({
+        "outcome": "met", "reason": "The brief satisfies all of the requirements.", "basis_quote": "## Purpose",
+    }, BRIEF, [])
+    assert a.outcome == "partly"
+    assert "could not point to a passage" in a.reason
+    assert "satisfies" not in a.reason
+    assert a.model_note == "The brief satisfies all of the requirements."
+
+
+def test_a_model_not_met_with_named_criteria_names_them_first():
+    a = parse_assessment({
+        "outcome": "not_met", "reason": "Mostly fine.",
+        "criteria": [
+            {"requirement": "Exactly four sections", "verdict": "not_met", "basis": "It has two."},
+            {"requirement": "Generic roles", "verdict": "not_checked", "basis": ""},
+        ],
+    }, BRIEF, [], ["Output: at most 200 words — measured 214 words"])
+    assert a.reason == "Not met: Output: at most 200 words — measured 214 words; Exactly four sections — It has two."
+
+
+def test_a_met_without_evidence_is_asked_once_more_before_it_can_pause_a_run():
+    stub = AsyncMock()
+    stub.generate_json = AsyncMock(side_effect=[
+        ({"outcome": "met", "reason": "Fine.", "basis_quote": "## Purpose"}, {}),
+        ({"outcome": "met", "reason": "Fine.", "basis_quote": "The survey will tell us why customers renew."}, {}),
+    ])
+    app.dependency_overrides[get_client] = lambda: stub
+    try:
+        r = TestClient(app).post("/api/agent/assess-objective", json={
+            "inputs": _inputs().model_dump(), "deliverable_label": "Output", "content": BRIEF, "steps": [],
+        })
+        assert r.status_code == 200, r.text
+        assert r.json()["outcome"] == "met"
+        assert stub.generate_json.call_count == 2
+        assert "YOUR PREVIOUS ANSWER said \"met\"" in stub.generate_json.call_args_list[1].kwargs["prompt"]
+    finally:
+        app.dependency_overrides.pop(get_client, None)
+
+
+def test_a_not_met_for_a_real_failure_is_not_asked_again():
+    stub = AsyncMock()
+    stub.generate_json = AsyncMock(return_value=({"outcome": "not_met", "reason": "Too long."}, {}))
+    app.dependency_overrides[get_client] = lambda: stub
+    try:
+        TestClient(app).post("/api/agent/assess-objective", json={
+            "inputs": _inputs().model_dump(), "deliverable_label": "Output", "content": BRIEF, "steps": [],
+        })
+        assert stub.generate_json.call_count == 1
+    finally:
+        app.dependency_overrides.pop(get_client, None)
+
+
+def test_the_prompt_asks_for_each_requirement_and_says_what_cannot_be_checked():
+    _system, user = build_assessment_prompt(_inputs(), "Output", "text", [])
+    assert '"criteria"' in user
+    assert "how many pages it prints to" in user
+    assert "A heading is not a basis." in user
+
+
+MEASURED = ["The deliverable: at most 200 words — 187 words", "The deliverable: exactly 4 sections — 4 sections"]
+
+
+def test_the_prompt_gives_the_counts_code_made_as_authoritative():
+    _system, user = build_assessment_prompt(_inputs(), "Output", BRIEF, [], "", None, MEASURED)
+    assert "MEASURED IN CODE AND MET" in user and "do not mark these requirements not met" in user
+    assert "- The deliverable: at most 200 words — 187 words" in user
+    assert "labelled assumptions count" in user
+
+
+def test_a_length_the_model_miscounted_is_overruled_by_the_count_code_made():
+    """11 Oct, survey brief: "it stopped again, this time saying the saved
+    deliverable exceeds 200 words." Code counted it."""
+    a = parse_assessment({
+        "outcome": "not_met", "reason": "The brief exceeds 200 words.",
+        "basis_quote": "The survey will tell us why customers renew.",
+        "criteria": [
+            {"requirement": "Capped at 200 words", "verdict": "not_met", "basis": "About 230 words."},
+            {"requirement": "Exactly four sections", "verdict": "not_checked", "basis": ""},
+            {"requirement": "Generic roles", "verdict": "met", "basis": "The survey will tell us why customers renew."},
+        ],
+    }, BRIEF, [], [], MEASURED)
+    assert a.outcome == "met"
+    assert [c.verdict for c in a.criteria] == ["met", "met", "met"]
+    assert a.criteria[0].basis == "Measured in code: The deliverable: at most 200 words — 187 words"
+    assert "Overruled by the count made in code" in a.model_note
+
+
+def test_a_miscount_stated_only_in_the_reason_is_overruled_too():
+    a = parse_assessment({"outcome": "not_met", "reason": "The saved deliverable exceeds 200 words."}, BRIEF, [], [], MEASURED)
+    assert a.outcome == "partly"  # nothing quoted: not recorded as met, and not as a failure
+    assert a.unmet == [] and "could not point to a passage" in a.reason
+
+
+def test_a_real_failure_beside_a_miscount_still_fails():
+    a = parse_assessment({
+        "outcome": "not_met", "reason": "Too long and invents a company.",
+        "criteria": [
+            {"requirement": "Under 200 words", "verdict": "not_met", "basis": ""},
+            {"requirement": "No invented company details", "verdict": "not_met", "basis": "Names Acme Corp."},
+        ],
+    }, BRIEF, [], [], MEASURED)
+    assert a.outcome == "not_met"
+    assert a.unmet == ["No invented company details — Names Acme Corp"]
+
+
+def test_a_model_not_met_with_nothing_named_is_the_thing_unmet():
+    a = parse_assessment({"outcome": "not_met", "reason": "The roles name real people."}, BRIEF, [])
+    assert a.unmet == ["The roles name real people"]
+    assert a.reason == "Not met: The roles name real people."
+
+
+def test_lunch_invitation_49_words_is_not_over_the_accepted_70():
+    """11 Oct, production (lunch invitation): Output v4 is 49 words; the check
+    paused with "it exceeds the accepted under-70-word limit"."""
+    invite = "Join us for lunch on Wednesday at 1:00 p.m. in the garden room."
+    measured = ["Invitation: at most 70 words — 49 words"]
+    a = parse_assessment({
+        "outcome": "not_met", "reason": "It exceeds the accepted under-70-word limit.",
+        "basis_quote": invite,
+        "criteria": [{"requirement": "The invitation is under 70 words", "verdict": "not_met", "basis": "Too long."}],
+    }, invite, [], [], measured)
+    assert a.outcome == "met"
+    assert a.criteria[0].basis == "Measured in code: Invitation: at most 70 words — 49 words"
+    b = parse_assessment({"outcome": "not_met", "reason": "It exceeds the accepted under-70-word limit."}, invite, [], [], measured)
+    assert b.unmet == [] and "could not point to a passage" in b.reason
