@@ -39,6 +39,8 @@ MAX_ITEMS = 12
 
 BlockerKind = Literal["data_missing", "tool_missing", "source_missing", "needs_decision"]
 Outcome = Literal["met", "not_met", "partly"]
+Verdict = Literal["met", "not_met", "not_checked"]
+MAX_CRITERIA = 12
 
 _ASSESS_INSTRUCTION = (
     "You decide whether a PromptMaster project's OBJECTIVE is met, from what the "
@@ -72,6 +74,17 @@ class Blocker(BaseModel):
     kind: BlockerKind = "data_missing"
 
 
+class CriterionResult(BaseModel):
+    """One requirement the check considered, with its verdict and basis (Sean,
+    10 Oct, email 6.5: "The final verification should identify the saved
+    artifact it assessed, the criteria considered, the results, and any
+    remaining qualifications")."""
+    requirement: str = Field(max_length=300)
+    verdict: Verdict = "not_checked"
+    #: Verbatim from the deliverable when "met"; else "" or why it could not be checked.
+    basis: str = Field(default="", max_length=400)
+
+
 class ObjectiveAssessment(BaseModel):
     outcome: Outcome
     #: One sentence: why.
@@ -83,6 +96,8 @@ class ObjectiveAssessment(BaseModel):
     performed: list[str] = Field(default_factory=list, max_length=MAX_ITEMS)
     #: Next investigations or steps named but not done.
     proposed_next: list[str] = Field(default_factory=list, max_length=MAX_ITEMS)
+    #: Each requirement considered: the objective's parts, accepted requirements, constraints.
+    criteria: list[CriterionResult] = Field(default_factory=list, max_length=MAX_CRITERIA)
 
 
 class RunStep(BaseModel):
@@ -133,8 +148,16 @@ def build_assessment_prompt(
         '  "basis_quote": "a short passage copied exactly from the deliverable that shows the outcome",\n'
         '  "blockers": [{"need": "exactly what is missing", "kind": "data_missing|tool_missing|source_missing|needs_decision"}],\n'
         '  "performed": ["S1", "S3"],\n'
-        '  "proposed_next": ["each next step or investigation the text names but the record does not show done"]\n'
+        '  "proposed_next": ["each next step or investigation the text names but the record does not show done"],\n'
+        '  "criteria": [{"requirement": "one thing the objective, an accepted requirement or a constraint asks for", '
+        '"verdict": "met" | "not_met" | "not_checked", "basis": "for met: a sentence copied exactly from the deliverable that shows it; '
+        'otherwise why"}]\n'
         "}\n"
+        # 10 Oct (Sean, emails 3 and 8): a heading is not evidence; a length you
+        # cannot see (pages when printed) is not checked, and saying so is honest.
+        "List each requirement separately in \"criteria\" — every part of the objective, every accepted "
+        "requirement and constraint — at most 12. Mark one \"not_checked\" when the text alone cannot show it "
+        "(how many pages it prints to, how it looks, anything outside the text). A heading is not a basis.\n"
         '"performed" lists ONLY step ids from the RUN RECORD whose execution label shows work was done.'
     )
     return _ASSESS_INSTRUCTION, user
@@ -144,6 +167,20 @@ def _norm(text: str) -> str:
     return " ".join(re.sub(r"[*_`#>]", "", text).split()).lower()
 
 
+def _is_evidence(quote: str, content: str) -> bool:
+    """A passage copied from the deliverable that says something, not one of its
+    headings (Sean, 10 Oct, email 8: the completion message quoted
+    "## 1. Pre-arrival preparation" as the evidence the objective was met)."""
+    if not quote or _norm(quote) not in _norm(content):
+        return False
+    if quote.lstrip().startswith("#"):
+        return False
+    for line in content.splitlines():
+        if line.lstrip().startswith("#") and _norm(line) == _norm(quote):
+            return False
+    return True
+
+
 def parse_assessment(
     result: object, content: str, steps: list[RunStep], failed_checks: list[str] | None = None
 ) -> ObjectiveAssessment:
@@ -151,7 +188,7 @@ def parse_assessment(
         return ObjectiveAssessment(outcome="partly", reason="The check did not come back in a usable form.")
     outcome = result.get("outcome") if result.get("outcome") in ("met", "not_met", "partly") else "partly"
     quote = " ".join(str(result.get("basis_quote") or "").split())[:400]
-    quoted = bool(quote) and _norm(quote) in _norm(content)
+    quoted = _is_evidence(quote, content)
     if not quoted:
         quote = ""
     # "Met" needs the deliverable to show it; a claim without a verbatim
@@ -197,8 +234,26 @@ def parse_assessment(
         if text and text not in proposed:
             proposed.append(text)
 
+    criteria: list[CriterionResult] = []
+    for c in result.get("criteria") or []:
+        if not isinstance(c, dict):
+            continue
+        requirement = " ".join(str(c.get("requirement") or "").split())[:300]
+        if not requirement:
+            continue
+        verdict = c.get("verdict") if c.get("verdict") in ("met", "not_met", "not_checked") else "not_checked"
+        basis = " ".join(str(c.get("basis") or "").split())[:400]
+        # "Met" needs a sentence the deliverable says; without one it was not shown.
+        if verdict == "met" and not _is_evidence(basis, content):
+            verdict, basis = "not_checked", "No passage in the deliverable shows it."
+        criteria.append(CriterionResult(requirement=requirement, verdict=verdict, basis=basis))
+    # A requirement the check found unmet is a reason the objective is not met.
+    if outcome == "met" and any(c.verdict == "not_met" for c in criteria):
+        outcome = "partly"
+
     return ObjectiveAssessment(
         outcome=outcome,
+        criteria=criteria[:MAX_CRITERIA],
         reason=" ".join(str(result.get("reason") or "").split())[:600] or "No reason was given.",
         basis_quote=quote,
         blockers=blockers[:MAX_BLOCKERS],
@@ -218,5 +273,5 @@ async def assess_objective(
     failed_checks: list[str] | None = None,
 ) -> ObjectiveAssessment:
     system, user = build_assessment_prompt(inputs, deliverable_label, content, steps, success_criterion, failed_checks)
-    result, _usage = await client.generate_json(prompt=user, system=system, temperature=0, max_tokens=900, model=model)
+    result, _usage = await client.generate_json(prompt=user, system=system, temperature=0, max_tokens=1_600, model=model)
     return parse_assessment(result, content, steps, failed_checks)

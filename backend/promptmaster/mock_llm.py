@@ -522,7 +522,8 @@ def _json_reply(system: str, prompt: str) -> dict:
         # Not met when the deliverable says "[[mock:objective=unmet]]": a blocker
         # and a proposal; otherwise met, quoting the deliverable's first line.
         body = prompt.split("--- THE DELIVERABLE:", 1)[-1].split("---\n", 1)[-1]
-        first = next((ln.strip() for ln in body.splitlines() if ln.strip()), "")
+        # A sentence, not a heading: a heading is not evidence (10 Oct, email 8).
+        first = next((ln.strip() for ln in body.splitlines() if ln.strip() and not ln.lstrip().startswith("#")), "")
         if "[[mock:objective=open]]" in prompt:
             # Not met, and nothing missing: another round is worth it.
             return {"outcome": "not_met", "reason": "Mock: not there yet.", "basis_quote": first[:120],

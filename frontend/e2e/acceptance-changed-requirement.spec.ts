@@ -83,6 +83,8 @@ test('a changed requirement reopens what relied on it, and Go repairs it under "
   expect(rows.map((r) => r.status_source ?? null)).toEqual(['policy', 'policy', null]);
   // C3 (8 Oct): Summary's table says its rows are optional, and the row left
   // undecided says nothing is missing, so it no longer holds the objective up.
+  // Every stage is done here (the repair closed Summary again, and its
+  // acceptance does not block), so met is also finished.
   expect(run.status).toBe('completed');
   expect(run.stop_reason).toBe('Objective met.');
   await expect(page.getByText('Confirmed under your routine-decision policy').first()).toBeVisible({ timeout: 30_000 });

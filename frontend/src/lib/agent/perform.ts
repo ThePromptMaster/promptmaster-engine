@@ -34,8 +34,8 @@ import { proposeStatuses } from '@/lib/workflow/propose';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import { summariseStageContent } from '@/lib/workflow/digest';
 import { stageContentForSummary, stageEvidence } from '@/lib/workflow/evidence';
-import { blocksCompletion, deliverableStage, describeOutstanding, evaluateStage, outstandingWork } from '@/lib/workflow/engine';
-import { pausedLine } from '@/lib/workflow/objective';
+import { blocksCompletion, deliverableStage, describeOutstanding, evaluateStage, outstandingWork, remainingStages } from '@/lib/workflow/engine';
+import { describeBasis, pausedLine, type ObjectiveBasis } from '@/lib/workflow/objective';
 import { attachedDocuments, currentFacts, supersededFactValues } from '@/lib/workflow/facts';
 import { ManuscriptMissing, withFreshManuscript } from '@/lib/workflow/fresh-manuscript';
 import { describeValue, leftoverValues, type SupersededValue } from '@/lib/workflow/fact-values';
@@ -1193,7 +1193,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         // or blocked on something no round can produce? Judged on this round's
         // work, the same check as at the end, and recorded.
         const roundText = roundContent(ctx, to);
-        const verdict = await judgeObjective(ctx, `the round that ended at ${ctx.stage.label}`, roundText);
+        const { assessment: verdict } = await judgeObjective(ctx, ctx.stage, roundText, `the round that ended at ${ctx.stage.label}`);
         if (verdict.outcome === 'met') {
           const target = ctx.stage.transitions.default_next;
           const head = ctx.bundles[ctx.stage.id]?.versions.at(-1);
@@ -1424,11 +1424,42 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       if (ctx.deliverableDone) {
         const holder = deliverableStage(ctx.template);
         const content = holder ? deliverableText(ctx, holder.id) : '';
-        const assessment = await judgeObjective(ctx, holder?.label ?? 'the deliverable', content);
+        const { assessment, basis } = await judgeObjective(ctx, holder ?? null, content);
+        // The check ran and was recorded: the record says so (10 Oct, email 3:
+        // "'Analyzed or performed' and 'Tools' show dashes").
+        const judged = { toolsUsed: ['model'], changes: { event_types: ['objective_assessed'] } };
         if (assessment.outcome === 'met') {
+          const checked = describeBasis(basis);
+          // Met is not finished (Sean, 10 Oct, email 2: "Finished: the objective is
+          // verified as met" beside "2 done · 3 to go"). What the workflow still
+          // holds is said, and the run waits for it rather than calling it done.
+          const left = remainingStages(ctx.template, ctx.state);
+          if (left.required.length || left.optional.length) {
+            const still = [
+              left.required.length ? `still to do: ${left.required.join(', ')}` : '',
+              left.optional.length ? `optional, can be skipped: ${left.optional.join(', ')}` : '',
+            ].filter(Boolean).join('; ');
+            // What is left may be only the user's own approval on this stage
+            // ("I accept this output as finished"): then that is what is asked for.
+            const mine = evaluateStage(ctx.template, ctx.stage.id, ctx.context).unmet.filter((c) => c.blocking);
+            const onlyApproval =
+              left.required.length === 1 && left.required[0] === (ctx.stage.short_label ?? ctx.stage.label) && !left.optional.length &&
+              mine.length > 0 && mine.every((c) => c.manual);
+            const reason = onlyApproval
+              ? `The objective is met on ${basis.stage_label}${basis.version_number ? ` v${basis.version_number}` : ''}, but the workflow is not finished — your approval is left: "${mine[0].label}".`
+              : `The objective is met on ${basis.stage_label}${basis.version_number ? ` v${basis.version_number}` : ''}, but the workflow is not finished — ${still}.`;
+            return done(key, {
+              ...judged, status: 'succeeded',
+              output: `${reason} Evidence: "${assessment.basis_quote}". ${checked}`,
+              stop: { status: 'awaiting_decision', reason },
+              ...(onlyApproval
+                ? { needs: { kind: 'tick_criterion' as const, stageId: ctx.stage.id, criterionId: mine[0].id, label: mine[0].label, ...(mine[0].hint ? { hint: mine[0].hint } : {}) } }
+                : {}),
+            });
+          }
           return done(key, {
-            status: 'succeeded', toolsUsed: [], changes: {},
-            output: `The objective is met: "${assessment.basis_quote}". Nothing needs another pass.`,
+            ...judged, status: 'succeeded',
+            output: `The objective is met on ${basis.stage_label}${basis.version_number ? ` v${basis.version_number}` : ''}: "${assessment.basis_quote}". ${checked}`,
             stop: { status: 'completed', reason: 'Objective met.' },
           });
         }
@@ -1438,8 +1469,8 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         const proposed = assessment.proposed_next.length ? ` Proposed, not done: ${assessment.proposed_next.join('; ')}.` : '';
         const line = pausedLine(assessment);
         return done(key, {
-          status: 'succeeded', toolsUsed: [], changes: {},
-          output: `${line} ${assessment.reason}${performed}${proposed}`,
+          ...judged, status: 'succeeded',
+          output: `${line} ${assessment.reason}${performed}${proposed} ${describeBasis(basis)}`,
           stop: { status: assessment.blockers.length ? 'blocked' : 'awaiting_decision', reason: line },
         });
       }
@@ -1615,7 +1646,8 @@ export function recheckInstruction(
  * `objective_assessed`, and return it (6–7 Oct). Used at the end of the work
  * and at the end of each round of ongoing work.
  */
-async function judgeObjective(ctx: PerformContext, label: string, content: string) {
+async function judgeObjective(ctx: PerformContext, holder: StageDefinition | null, content: string, labelOverride?: string) {
+  const label = labelOverride ?? holder?.label ?? 'the deliverable';
   const assessment = await api.agentAssessObjective(
     {
       inputs: inputsFrom(ctx.project),
@@ -1629,9 +1661,22 @@ async function judgeObjective(ctx: PerformContext, label: string, content: strin
     },
     ctx.signal
   );
+  // What the verdict rests on, recorded with it (10 Oct, emails 3, 5, 8).
+  const head = holder ? ctx.bundles[holder.id]?.versions.at(-1) : undefined;
+  const criteria = assessment.criteria ?? [];
+  const basis: ObjectiveBasis = {
+    stage_id: holder?.id ?? '',
+    stage_label: labelOverride ?? holder?.short_label ?? label,
+    version_id: head?.id ?? null,
+    version_number: head?.version_number ?? null,
+    measured: holder ? (ctx.context.measured?.[holder.id] ?? []).filter((m) => m.satisfied).map((m) => `${m.label}${m.detail ? ` — ${m.detail}` : ''}`) : [],
+    assessed: criteria.filter((c) => c.verdict !== 'not_checked'),
+    not_checked: criteria.filter((c) => c.verdict === 'not_checked').map((c) => c.requirement),
+  };
   const payload = {
     outcome: assessment.outcome, reason: assessment.reason, basis_quote: assessment.basis_quote,
     blockers: assessment.blockers, performed: assessment.performed, proposed_next: assessment.proposed_next,
+    criteria, basis,
   };
   await appendWorkflowEvent(ctx.project.id, ctx.project.user_id, {
     type: 'objective_assessed',
@@ -1642,7 +1687,7 @@ async function judgeObjective(ctx: PerformContext, label: string, content: strin
     payload,
   });
   await ctx.afterStageEvent();
-  return assessment;
+  return { assessment, basis };
 }
 
 /** This round's work as one text: every stage from where the round starts to the one that closes it. */

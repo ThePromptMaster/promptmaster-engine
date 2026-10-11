@@ -499,7 +499,9 @@ export function moveOnInsteadOfRejudging(
     const s = steps[i];
     if (savedSomething(s)) return null;
     if (s.stage_id !== stageId || s.action_key !== 'declare_objective_complete' || s.status !== 'succeeded') continue;
-    if (!/^(Paused — the objective is not met|The objective is not met)/.test((s.output ?? '').trim())) return null;
+    // Met, with the workflow still holding stages (10 Oct, email 2): judging it
+    // again says the same; the workflow moves on to what is left.
+    if (!/^(Paused — the objective is not met|The objective is not met|The objective is met on .+ but the workflow is not finished)/.test((s.output ?? '').trim())) return null;
     return {
       action_key: 'advance_stage',
       params: {},
