@@ -432,6 +432,8 @@ export interface StageContext {
    * work for "Objective met", whatever its row status.
    */
   carriedForward?: Record<string, string[]>;
+  /** Per review stage id: deferred rows that do not block, with why each was deferred (`deferredNotBlocking`). */
+  deferred?: Record<string, { row: string; reason: string }[]>;
   /** Per review stage id: undecided or proposed rows that say a requirement is unmet (`openUnmet`). */
   openUnmet?: Record<string, number>;
 }

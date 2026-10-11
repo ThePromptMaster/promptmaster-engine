@@ -1457,7 +1457,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
               : `The objective is met on ${basis.stage_label}${basis.version_number ? ` v${basis.version_number}` : ''}, but the workflow is not finished — ${still}.`;
             return done(key, {
               ...judged, status: 'succeeded',
-              output: `${reason} Evidence: "${assessment.basis_quote}". ${checked}`,
+              output: `${reason} Evidence: "${assessment.basis_quote}". ${checked}${deferredNote(ctx)}`,
               stop: { status: 'awaiting_decision', reason },
               needs: onlyApproval
                 ? { kind: 'tick_criterion' as const, stageId: ctx.stage.id, criterionId: mine[0].id, label: mine[0].label, ...(mine[0].hint ? { hint: mine[0].hint } : {}) }
@@ -1470,8 +1470,8 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
           }
           return done(key, {
             ...judged, status: 'succeeded',
-            output: `The objective is met on ${basis.stage_label}${basis.version_number ? ` v${basis.version_number}` : ''}: "${assessment.basis_quote}". ${checked}`,
-            stop: { status: 'completed', reason: 'Objective met.' },
+            output: `The objective is met on ${basis.stage_label}${basis.version_number ? ` v${basis.version_number}` : ''}: "${assessment.basis_quote}". ${checked}${deferredNote(ctx)}`,
+            stop: { status: 'completed', reason: `Objective met.${deferredNote(ctx)}` },
           });
         }
         // Not met: the cycle is finished, the objective is not. With a named
@@ -1525,6 +1525,19 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
     default:
       return done(key, { status: 'failed', output: `Unknown action "${key}".`, toolsUsed: [], changes: {} });
   }
+}
+
+/**
+ * The deferred rows that do not hold the finish up, by stage, with why each
+ * was deferred and why it does not block (peer item, 10 Oct email 6.6).
+ */
+export function deferredNote(ctx: Pick<PerformContext, 'context' | 'template'>): string {
+  const label = (id: string) => ctx.template.stages.find((s) => s.id === id)?.label ?? id;
+  const rows = Object.entries(ctx.context.deferred ?? {}).flatMap(([id, rs]) =>
+    rs.map((r) => `${label(id)}: "${r.row}"${r.reason ? ` — deferred because ${r.reason.replace(/[.\s]+$/, '')}` : ''}`)
+  );
+  if (!rows.length) return '';
+  return ` Deferred, not blocking (none says a requirement is unmet): ${rows.slice(0, 8).join('; ')}${rows.length > 8 ? `; and ${rows.length - 8} more` : ''}.`;
 }
 
 /** What the objective check found unmet, by name: measured and carried-forward checks first, then the criteria. */

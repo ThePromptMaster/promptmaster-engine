@@ -83,7 +83,13 @@ export function runAccount(run: AgentRun | null, steps: readonly AgentStep[], st
       // is needed" over a sentence that asked nothing).
       return { did, kind: 'decision', now: `Your decision is needed: ${decisionAsked(run.needs ?? null, reason, stageLabel)}`, setAside };
     case 'completed':
-      return { did, kind: 'complete', now: /objective (?:is )?met/i.test(reason) ? 'Finished: the objective is verified as met.' : `Finished: ${firstSentence(reason) || 'nothing left to do.'}`, setAside };
+      // What was deferred is said with the finish, not counted as resolved (10 Oct, 6.6).
+      return {
+        did, kind: 'complete', setAside,
+        now: /objective (?:is )?met/i.test(reason)
+          ? `Finished: the objective is verified as met.${reason.match(/ Deferred, not blocking[\s\S]*$/)?.[0] ?? ''}`
+          : `Finished: ${firstSentence(reason) || 'nothing left to do.'}`,
+      };
     case 'failed':
       return { did, kind: 'blocker', now: `Stopped on an error: ${firstSentence(reason) || 'see the record below.'}`, setAside };
     default:

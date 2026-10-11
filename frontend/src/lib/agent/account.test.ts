@@ -54,3 +54,8 @@ describe('11 Oct, survey brief: "Your decision is needed" names the decision', (
     expect(now).toContain('not met: Output: at most 200 words — measured 214 words');
   });
 });
+
+it('a finish names what was deferred and why it does not block', () => {
+  const r = { status: 'completed', stop_reason: 'Objective met. Deferred, not blocking (none says a requirement is unmet): Summary: "Tighten the closing line" — deferred because style only.' } as never;
+  expect(runAccount(r, [], (id) => id)!.now).toBe('Finished: the objective is verified as met. Deferred, not blocking (none says a requirement is unmet): Summary: "Tighten the closing line" — deferred because style only.');
+});
