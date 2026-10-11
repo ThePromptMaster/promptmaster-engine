@@ -109,3 +109,50 @@ export function actionLabel(key: string): string {
   if (key === ROUTINE_DEFAULT_STEP) return 'Take the routine default';
   return BY_KEY.get(key)?.label ?? key.replace(/_/g, ' ');
 }
+
+/** What a step's stage is, as far as naming the step needs: its label and whether anything follows it. */
+export interface StepStage {
+  label: string;
+  transitions: { default_next: string | null };
+}
+
+/**
+ * The step's name on its own stage: "Move to the next stage" on the last one
+ * named a stage that does not exist (Sean, 10 Oct, email 6.3).
+ */
+export function stepActionLabel(key: string, stage?: StepStage | null): string {
+  if (key === 'advance_stage' && stage && !stage.transitions.default_next) return 'Mark the last stage complete';
+  return actionLabel(key);
+}
+
+/**
+ * What approving the step does, said by the code that does it rather than by
+ * the planner (Sean, 10 Oct, email 6.3: the title said "Move to the next
+ * stage", the explanation said it would check the final review, and approving
+ * it marked Summary complete). Null for moves whose effect is their name.
+ */
+export function whatApprovalDoes(key: string, stage?: StepStage | null, nextLabel?: string | null): string | null {
+  const here = stage?.label ?? 'this stage';
+  switch (key) {
+    case 'advance_stage':
+      return stage && !stage.transitions.default_next
+        ? `Marks ${here} complete. It is the last stage, so nothing follows it.`
+        : `Marks ${here} complete and moves the project on${nextLabel ? ` to ${nextLabel}` : ''}. No document changes.`;
+    case 'declare_objective_complete':
+      return 'Runs one AI check of the objective against the saved deliverable and records the result. No document changes.';
+    case 'evaluate_stage':
+      return `Runs one AI check of ${here} and records it. No document changes.`;
+    case 'draft_stage':
+      return `Writes ${here} with the AI model and saves it as a new version.`;
+    case 'revise_stage':
+      return `Revises ${here} with the AI model and saves it as a new version; the current one is kept.`;
+    case 'apply_findings':
+      return `Applies the findings to ${here} as a new version; the current one is kept.`;
+    case 'recheck_stage':
+      return 'Repairs the reopened stage as a new version and checks it again; the current one is kept.';
+    case 'skip_stage':
+      return `Skips ${here}. Nothing is written there.`;
+    default:
+      return null;
+  }
+}

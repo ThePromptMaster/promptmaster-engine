@@ -270,9 +270,15 @@ export function ProseRenderer({
             )}
           </div>
 
+          {/* A note about the version, not part of it (Sean, 10 Oct, email 8: the
+              plan seemed to begin "Applied from the stage check…"). */}
           {active?.change_summary && !editing && (
-            <p className="mb-5 text-body italic text-[var(--on-surface-variant)]">
-              {active.change_summary}
+            <p data-version-note className="mb-5 flex items-start gap-1.5 rounded-lg bg-[var(--surface-container-low)] px-3 py-2 text-label text-[var(--on-surface-variant)]">
+              <span aria-hidden className="material-symbols-outlined text-[16px]">history</span>
+              <span>
+                <span className="sr-only">About this version: </span>
+                {active.change_summary}
+              </span>
             </p>
           )}
 

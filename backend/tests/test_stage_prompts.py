@@ -634,3 +634,36 @@ def test_the_deliverable_is_produced_from_the_reviewed_prompt(basic_inputs, dige
     assert "--- BEGIN PROMPT ---\nWrite an internal audit memo on vendor payments" in user
     _, without = build_stage_prompt(basic_inputs, stage, digest)
     assert "THE REVIEWED PROMPT" not in without
+
+
+def test_a_proposal_reason_does_not_announce_the_decision_as_made():
+    """Sean, 10 Oct, email 6.4: eight unconfirmed rows "already began with
+    'Accepted' or 'Deferred'"."""
+    schema = StageItemSchema(
+        item_label="finding",
+        fields=[_Field(key="finding", label="Finding")],
+        statuses=[
+            _Status(value="accepted", label="Accept", model_may_propose=True),
+            _Status(value="deferred", label="Defer", requires_reason=True, model_may_propose=True),
+        ],
+    )
+    items = _parse_items(
+        {"items": [
+            {"id": "r1", "finding": "Unsupported benefit claim", "status": "deferred", "reason": "Deferred — not blocking; revisit after the pilot."},
+            {"id": "r2", "finding": "Agenda is modular", "status": "accepted", "reason": "**Accepted:** the brief asks for it."},
+            {"id": "r3", "finding": "Tone", "status": "accepted", "reason": "Acceptance criteria are met."},
+        ]},
+        schema,
+    )
+    rows = [i.model_dump() for i in items]
+    assert [r["reason"] for r in rows] == ["Not blocking; revisit after the pilot.", "The brief asks for it.", "Acceptance criteria are met."]
+    assert all(r["status_source"] == "proposed" for r in rows)
+
+
+def test_a_review_tells_general_advice_from_an_invented_specific(basic_inputs, digest):
+    """Sean, 10 Oct, email 8: a general onboarding plan's "basic workspace
+    supplies and access" was flagged as not supplied."""
+    stage = StageDescriptor(id="summary", label="Final review", renderer="review", entry_prompt_hint="", artifact_kind="review")
+    system, _user = build_stage_prompt(basic_inputs, stage, digest)
+    assert "A general recommendation the objective asks for" in system
+    assert "a company name, a person, a policy, a figure, a date, a tool or product by name" in system

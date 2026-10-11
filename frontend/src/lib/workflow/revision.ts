@@ -13,7 +13,7 @@
  */
 
 import type { StageArtifactBundle } from './digest';
-import { effectiveRenderer, itemSchemaFor, parseItems } from './stage-artifact';
+import { effectiveRenderer, isProposed, itemSchemaFor, parseItems } from './stage-artifact';
 import type { StageDefinition, WorkflowState, WorkflowTemplate } from './types';
 import { sectionRecords } from './derived-outline';
 
@@ -45,7 +45,9 @@ function actionable(stage: StageDefinition, content: string | undefined): Revisi
     // Triage: only what the user accepted. A rejected finding is a decision
     // not to change the text, and applying it anyway would overrule them.
     // Outcome tables (a claim marked "Remove"): the warn outcome is the edit.
-    const act = status === 'accepted' || (!isTriage && tone.get(status) === 'warn');
+    // Only what was decided: a status PromptMaster proposed and nobody
+    // confirmed is not an instruction to change the text (10 Oct, email 6.4).
+    const act = !isProposed(item) && (status === 'accepted' || (!isTriage && tone.get(status) === 'warn'));
     if (!act) return [];
     const parts = schema.fields
       .map((f) => (item[f.key] ?? '').trim())

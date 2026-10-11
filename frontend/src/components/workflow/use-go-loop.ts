@@ -35,12 +35,13 @@ import { RefusedRevision } from '@/lib/workflow/commit-check';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { api, type AnswerContradiction } from '@/lib/api/client';
-import { actionFor, actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, ROUTINE_DEFAULT_STEP, USER_ANSWER_STEP } from '@/lib/agent/actions';
+import { actionFor, actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, ROUTINE_DEFAULT_STEP, stepActionLabel, USER_ANSWER_STEP, whatApprovalDoes } from '@/lib/agent/actions';
 import { contextWithFacts, readOutcomeProof, readStageFacts, type StageFacts } from '@/lib/agent/facts';
 import { stageDrafts } from '@/lib/workflow/stage-artifact';
 import { delegableToCommit, policyConfirmable, repairTries, staleRepair, describeNeed, NEED_CLEARED, NEED_MOVED_ON, needStillHolds, needsUser, requiredWork, type NeedsUser } from '@/lib/agent/needs';
 import { assertHonestOutcome, verifyOutcome } from '@/lib/agent/outcome';
 import { outlineStageFor } from '@/lib/outline/actions';
+import { effectiveRenderer } from '@/lib/workflow/stage-artifact';
 import { listRecommendations, recordDecision } from '@/lib/supabase/recommendations';
 import { projectMemory } from '@/lib/agent/memory';
 import { requestProjectCancel } from '@/lib/supabase/jobs';
@@ -263,6 +264,16 @@ export function useGoLoop(opts: Options) {
     [commitRun]
   );
   const stageLabelFor = useCallback((id: string) => getStage(latest.current.template, id)?.short_label ?? id, []);
+  // A step's name and what approving it does, on its own stage (10 Oct, email 6.3).
+  const stepLabel = useCallback(
+    (s: Pick<AgentStep, 'action_key' | 'stage_id'>) => stepActionLabel(s.action_key, s.stage_id ? getStage(latest.current.template, s.stage_id) : null),
+    []
+  );
+  const stepEffect = useCallback((s: Pick<AgentStep, 'action_key' | 'stage_id'>) => {
+    const stage = s.stage_id ? getStage(latest.current.template, s.stage_id) : null;
+    const next = stage?.transitions.default_next ? getStage(latest.current.template, stage.transitions.default_next)?.label ?? null : null;
+    return whatApprovalDoes(s.action_key, stage, next);
+  }, []);
 
   // --- performing one step ------------------------------------------------------
 
@@ -656,7 +667,10 @@ export function useGoLoop(opts: Options) {
           } else {
             choice.params = { ...(choice.params ?? {}), stop_audit: describeAudit(audit) };
             // Q3a: a question only an expert can answer is asked with the package an expert needs.
-            if (needsExpert(question)) {
+            // Not on a check stage: its findings are decided in its table, not
+            // sent to a specialist (Sean, 10 Oct, email 7.2: eight Critique
+            // findings arrived as one long expert-review question).
+            if (needsExpert(question) && effectiveRenderer(o.stage) !== 'review') {
               setPhase('thinking');
               const pkg = await api.agentExpertPackage({
                 inputs: inputsFrom(o.project), issue: question.slice(0, 2_000), stage_label: o.stage.label,
@@ -1264,6 +1278,8 @@ export function useGoLoop(opts: Options) {
     continueRun,
     acknowledgeLargeJob,
     stageLabelFor,
+    stepLabel,
+    stepEffect,
     autoWindows, setAutoWindows, autoPending,
     policy, setPolicy, budget, setBudget, run, steps, phase, active, pendingStep, pendingStale, authorizing, error,
     go, update, suggest, replan, stop, approve, decline, answer, checkAnswer, confirmAuthorization,

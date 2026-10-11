@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import uuid
 
 from .conversation import _shared_system
@@ -401,6 +402,18 @@ def _claim_provenance(row: dict) -> dict:
     return out
 
 
+_DECISION_WORD = re.compile(
+    r"^\s*\**\s*(?:accepted|accept|deferred|defer|rejected|reject|declined|decline|carried forward|carry forward)\b[\s*:—–.,-]*",
+    re.I,
+)
+
+
+def _without_decision_word(reason: str) -> str:
+    """'Accepted — the brief covers it' → 'The brief covers it'."""
+    rest = _DECISION_WORD.sub("", reason, count=1).strip()
+    return (rest[:1].upper() + rest[1:]) if rest else reason
+
+
 def _model_status(row: dict, schema: StageItemSchema) -> dict:
     """The status a generated row is stored with, when the client said who may set what.
 
@@ -422,6 +435,11 @@ def _model_status(row: dict, schema: StageItemSchema) -> dict:
     row.pop("reason", None)
     row.pop("status_source", None)
     if chosen and (chosen.model_may_set or chosen.model_may_propose) and (reason or not chosen.requires_reason):
+        if not chosen.model_may_set:
+            # A proposal's reason does not announce the decision as made (Sean,
+            # 10 Oct, email 6.4: unconfirmed rows "already began with 'Accepted'
+            # or 'Deferred'").
+            reason = _without_decision_word(reason)
         out = {"status": chosen.value, "status_source": "model" if chosen.model_may_set else "proposed"}
         if reason:
             out["reason"] = reason

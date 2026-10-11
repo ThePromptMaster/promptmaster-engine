@@ -74,7 +74,7 @@ test('Propose statuses fills the row the draft left open; confirming settles the
   await page.screenshot({ path: test.info().outputPath('03-propose-on-request.png'), fullPage: true });
 
   await artifact.getByRole('button', { name: 'Confirm the 3 proposals' }).click();
-  await expect(artifact).toContainText('all resolved');
+  await expect(artifact).toContainText('all decided');
   await page.getByRole('button', { name: /To finish this stage/ }).click();
   await expect(criterion(page, 'Each addressed or left open')).not.toContainText('unresolved');
   await page.screenshot({ path: test.info().outputPath('04-all-confirmed.png'), fullPage: true });
