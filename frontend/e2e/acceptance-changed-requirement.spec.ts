@@ -86,7 +86,8 @@ test('a changed requirement reopens what relied on it, and Go repairs it under "
   // Every stage is done here (the repair closed Summary again, and its
   // acceptance does not block), so met is also finished.
   expect(run.status).toBe('completed');
-  expect(run.stop_reason).toBe('Objective met.');
+  // The finish names what was deferred and why it does not block (10 Oct, 6.6).
+  expect(run.stop_reason).toMatch(/^Objective met\. Deferred, not blocking \(none says a requirement is unmet\): Final review: "[^"]+" — deferred because /);
   await expect(page.getByText('Confirmed under your routine-decision policy').first()).toBeVisible({ timeout: 30_000 });
 
   // A new version, the old one kept; the stage is closed again, citing it.
