@@ -19,8 +19,9 @@ The short version:
 - **"Verified as met" was not "finished".** The check stopped Go without finishing
   the workflow, and its record named neither the version it read nor how each
   requirement was checked.
-- **All fixes are in and tested.** Five PRs, #216–#220 (§3). Sean's retests are in §4.
-  Two items are proposed with estimates rather than built (§5).
+- **All fixes are in and tested.** PRs #216–#220 and #223 (§3), each checked on
+  production (§4). Sean's retests are in §5. Two items are proposed with estimates
+  rather than built (§6).
 
 ---
 
@@ -81,13 +82,30 @@ The short version:
 
 | PR | Phase | What it does |
 |---|---|---|
+| #223 | F1c | Found on the production pass of #216. Change it to Wednesday came back still saying Thursday, because the prompt told the model a fact outranks everything. The apply prompts now treat the user's instruction as their latest word for a value. On the real model, main kept Thursday and the fix wrote Wednesday (2 of 2). |
 | #216 | F1 | Change it, a restore and a hand edit offer to update the facts they change (dates, weekdays, times, amounts, length limits — matched in code). Go's revise and repair refuse to save a revision that puts a stale fact's value back over the user's own latest version, and ask which is right. |
 | #217 | F2 | The chapters are read fresh before a stage after Drafting is generated. Repairs are verified and labelled, and a repeated repair stops as a loop. No auto-draft while Go is paused. |
 | #218 | F3 | Met with stages left is "not finished", with what is left. The objective record names the version, each requirement's verdict, how it was checked and what was not verified. A heading is not evidence. |
 | #219 | F4 | Proposals stay proposals. Each step says what approving it does. The wording follows the stage. Critique stops explain the routine-decision limit. |
 | #220 | F5 | The front door draft gets its own block with plain wording. Research routing is fixed. The layout works on a phone and an iPad. |
 
-## 4. Retests we recommend (Sean's own sequences)
+## 4. What production showed (11 October, real model)
+
+- **Lunch invitation** (a fresh project, facts Thursday at 12:30 and under 120 words):
+  - Change it to Wednesday at 1:00 p.m., under 70 words. The revision said Wednesday, and the card offered both fact updates. After Apply, both facts read "updated with your revision".
+  - Go repaired the stages the change had reopened and kept Wednesday (49 words).
+  - Its record read "Checked Output v4: 1 measured in code, 4 assessed by the AI model", with document and workflow changes listed apart.
+  - **Gap found:** the limit measured in code was still the objective's 120 words, not the updated 70. The model, unchecked by a measurement, claimed the text exceeded 70. Both were fixed the same day in #222 (an accepted requirement replaces the brief's figure; a measured count outranks the model's reading) and #224 ("capped at 200 words" is read as a limit).
+- **A hand edit** to Wednesday on another project brought up "Your edit … says something different from an accepted fact", and Update the fact superseded it.
+- **Book, push-ups vs jumping jacks, under "Let Go run this":**
+  - Drafting ran through the job queue. Continuity then quoted Chapter 3's text, not "no draft text".
+  - Go decided 6 routine findings and left 1 major one, saying why "Handle them for me" did not cover it.
+  - Revision saved Drafting v2. "Repair a reopened stage" was labelled *Draft written*, saved, and closed Continuity again.
+  - Critique quoted the revised chapters.
+  - The step-budget pause read as a resource limit, not a block.
+- **Version note:** "Applied 2 points from the stage check." now shows as an "About this version" chip, not as the deliverable's first line.
+
+## 5. Retests we recommend (Sean's own sequences)
 
 1. **Lunch invitation.** Change it to Wednesday at 1:00 p.m., under 70 words.
    - The card offers both fact updates. Apply.
@@ -111,7 +129,7 @@ The short version:
 5. **Front door.** Ask for an email: it arrives in its own Draft block with Copy.
 6. **iPad.** The Go button no longer covers text. Review rows read as cards.
 
-## 5. Not built, with estimates
+## 6. Not built, with estimates
 
 - **The workshop brief's length (18,818 characters).** A concise style for novice
   planners, offered in setup. Estimate: half a day. Proposed, not built: it changes
@@ -121,6 +139,5 @@ The short version:
   build a page renderer. Building one: about two days.
 - **The tariff content in the churn chat.** We need the project's chat rows to
   explain it. About an hour once we have them.
-- **Listing deferred findings in the finish message, with why they do not block.**
-  This goes with a parallel fix to the same completion code (a stopped run that names
-  no failed criterion). It ships in that work, so the two are not edited at once.
+- **Listing deferred findings in the finish message, with why they do not block:**
+  shipped in #222, with the parallel fix to the same completion code.
