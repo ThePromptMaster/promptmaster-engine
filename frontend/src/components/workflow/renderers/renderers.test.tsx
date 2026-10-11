@@ -538,7 +538,7 @@ describe('ReviewRenderer', () => {
       { id: 'r2', run: 'Count accounts', status: 'completed', status_source: 'sandbox', observed: 'Ran in the sandbox.' },
     ]);
     render(<ReviewRenderer {...props(stage, { versions: [version(runs)] })} />);
-    expect(screen.getByText('all resolved')).toBeInTheDocument();
+    expect(screen.getByText('all decided')).toBeInTheDocument();
     expect(screen.getByText(/1 could not be run — PromptMaster recorded why/)).toBeInTheDocument();
     expect(screen.getByText(/1 recorded from code that ran in the sandbox/)).toBeInTheDocument();
     expect(screen.getByText('Recorded by PromptMaster: the run could not be made')).toBeInTheDocument();
@@ -561,7 +561,7 @@ describe('ReviewRenderer', () => {
     const offered = screen.getAllByRole('option').map((o) => o.textContent);
     expect(offered).toEqual(['Independently reproduced', 'Supported by prior evidence', 'Consistency check only', 'Not reproduced', 'Not attempted']);
     await user.click(screen.getByRole('option', { name: 'Supported by prior evidence' }));
-    expect(screen.getByText('all resolved')).toBeInTheDocument();
+    expect(screen.getByText('all decided')).toBeInTheDocument();
 
     const legend = screen.getByLabelText('What the statuses mean');
     expect(within(legend).getByText('It agrees with earlier studies or records. Nothing was recalculated.')).toBeInTheDocument();

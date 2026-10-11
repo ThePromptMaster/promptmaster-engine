@@ -701,7 +701,10 @@ export function describeNeed(
       };
     case 'triage_findings':
       return {
-        message: `${need.count} finding${need.count === 1 ? '' : 's'} would change the work, so ${need.count === 1 ? 'it needs' : 'they need'} your decision. Accept or reject each in the table below — that is how a check stage works.`,
+        // Why these were not handled under "Handle them for me" (Sean, 10 Oct,
+        // email 7.1): the setting covers minor and moderate findings; these are
+        // major, or have no severity, and change what the work says.
+        message: `${need.count} finding${need.count === 1 ? '' : 's'} would change what the work says, so ${need.count === 1 ? 'it is' : 'they are'} yours to decide. "Routine decisions: handle them for me" covers minor and moderate findings only; ${need.count === 1 ? 'this one is' : 'these are'} major or unrated. Accept, reject or defer each in the table below.`,
         action: SHOW_TABLE,
       };
   }

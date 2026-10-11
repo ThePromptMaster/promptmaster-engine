@@ -1112,7 +1112,9 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       return done(key, {
         status: 'succeeded', toolsUsed: [], changes: { event_types: [type] },
         output: type === 'stage_marked_complete'
-          ? `Marked ${ctx.stage.label} complete and moved on.`
+          ? ctx.stage.transitions.default_next
+            ? `Marked ${ctx.stage.label} complete and moved on.`
+            : `Marked ${ctx.stage.label} complete. It is the last stage; nothing follows it.`
           : `Moved on from ${ctx.stage.label}, leaving it open: ${evaluation.unmet.map((c) => c.label).join('; ') || 'requirements not met'}.`,
       });
     }

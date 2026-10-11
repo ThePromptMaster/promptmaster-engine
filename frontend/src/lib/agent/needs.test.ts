@@ -142,7 +142,7 @@ describe('B3: the findings that change the work are the user\'s', () => {
   it('with only material rows left, the user is asked, with no button — the table is the control', () => {
     const need = needsUser({ ...base, stage: stage('continuity'), facts: review(0, 2), stageEvaluation: evaluation('continuity'), allowed: ['advance_stage'] });
     expect(need).toEqual({ kind: 'triage_findings', stageId: 'continuity', count: 2 });
-    expect(describeNeed(need!, label)).toEqual({ message: '2 findings would change the work, so they need your decision. Accept or reject each in the table below — that is how a check stage works.', action: 'Go to the table' });
+    expect(describeNeed(need!, label)).toEqual({ message: '2 findings would change what the work says, so they are yours to decide. "Routine decisions: handle them for me" covers minor and moderate findings only; these are major or unrated. Accept, reject or defer each in the table below.', action: 'Go to the table' });
   });
 
   it('a fully decided table needs nothing', () => {

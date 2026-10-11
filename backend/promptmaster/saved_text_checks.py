@@ -25,7 +25,13 @@ VERIFY_RULE = (
     "double quotes. Before you claim a count or full coverage (\"all 26 combinations\", "
     "\"only feasible options\"), count the items in the saved text and give that count. "
     "Where the brief limits the work to supplied facts, flag any claim or benefit wording "
-    "that no supplied fact supports (\"helps keep everyone aligned\", \"makes it easy\")."
+    "that no supplied fact supports (\"helps keep everyone aligned\", \"makes it easy\"). "
+    # Sean, 10 Oct (email 8): a general onboarding plan was faulted for "basic
+    # workspace supplies and access" because nobody had supplied them.
+    "A general recommendation the objective asks for (\"set up their laptop and accounts "
+    "before day one\") is not an invented fact and is not a finding. What may not be "
+    "invented is a specific the user did not give: a company name, a person, a policy, a "
+    "figure, a date, a tool or product by name."
 )
 
 _MISSING = re.compile(

@@ -568,7 +568,9 @@ export function deriveWorkflowRecommendations({
       out.push({
         category: `workflow:${stage.id}:${blocker.id}`,
         kind: 'workflow',
-        title: blocker.label,
+        // "BLOCKING — An output exists" read as a claim that it does (Sean,
+        // 10 Oct, email 6.10): the title says it is still to come.
+        title: `Not yet: ${blocker.label.charAt(0).toLowerCase()}${blocker.label.slice(1)}`,
         // Verbatim, not paraphrased. `engine.ts` already wrote the honest
         // string and there should be exactly one of it.
         summary: blocker.detail

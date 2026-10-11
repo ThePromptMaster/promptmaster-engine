@@ -391,8 +391,11 @@ test('A question for an expert comes with the package an expert needs (Q3a, 9 Oc
   const ask = page.getByRole('region', { name: 'Go mode asks you' });
   await expect(ask).toContainText("needs an expert's judgment", { timeout: 60_000 });
   const pkg = ask.getByRole('group', { name: 'Expert review package' });
-  await expect(pkg).toContainText('# Expert review: E2E go expert');
-  await expect(pkg).toContainText('## The judgment requested');
+  // Closed, and rendered rather than raw markdown (10 Oct, email 7.3).
+  await pkg.getByText(/A summary of this question for a specialist/).click();
+  await expect(pkg.getByRole('heading', { name: 'Expert review: E2E go expert' })).toBeVisible();
+  await expect(pkg.getByRole('heading', { name: 'The judgment requested' })).toBeVisible();
+  await expect(pkg).not.toContainText('## The judgment requested');
   await expect(pkg.getByRole('button', { name: 'Download (.md)' })).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('01-expert-package.png'), fullPage: true });
   // Kept on the record with the question.

@@ -2019,6 +2019,8 @@ export function WorkflowWorkspace({
               <NextMoveCard
                 step={go.pendingStep}
                 stale={go.pendingStale}
+                label={go.stepLabel(go.pendingStep)}
+                effect={go.stepEffect(go.pendingStep)}
                 onDo={() => void go.approve()}
                 onReplan={() => void go.replan()}
                 onDismiss={() => void go.decline()}
