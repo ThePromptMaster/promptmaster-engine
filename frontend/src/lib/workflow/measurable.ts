@@ -20,7 +20,7 @@
 import { primaryArtifactKind } from './stage-artifact';
 import type { StageDefinition } from './types';
 
-export type MeasureKind = 'words' | 'questions' | 'sections';
+export type MeasureKind = 'words' | 'questions' | 'sections' | 'pages';
 
 export interface MeasurableRequirement {
   id: string;
@@ -101,6 +101,21 @@ export function parseRequirements(texts: readonly string[]): MeasurableRequireme
         const r = read(m);
         if ((r.min ?? 0) > 20_000 || (r.max ?? 0) > 20_000) continue;
         add({ kind: 'words', subject: subjectNear(t, m.index!, m.index! + m[0].length), source: m[0].trim(), ...r });
+      }
+    }
+    // "a one-page plan", "fits on one page", "no more than two pages" (L-73,
+    // 11 Oct: Sean's onboarding plan was declared finished with its one-page
+    // requirement never checked). Pages are estimated from the word count.
+    const pagePatterns: [RegExp, (m: RegExpMatchArray) => number][] = [
+      [/\b(one|single)[\s-]page\b/gi, () => 1],
+      [new RegExp(`\\b(?:fits? on|on|within|under|at most|no more than|not more than|no longer than|maximum of|max(?:imum)?|up to)\\s+(?:a\\s+)?${NUM}\\s+pages?\\b`, 'gi'), (m) => num(m[1])],
+      [new RegExp(`\\b${NUM}[\\s-]+pages?\\s+(?:max(?:imum)?|or (?:less|fewer)|at most|limit)\\b`, 'gi'), (m) => num(m[1])],
+    ];
+    for (const [re, read] of pagePatterns) {
+      for (const m of t.matchAll(re)) {
+        const n = read(m);
+        if (!n || n > 50) continue;
+        add({ kind: 'pages', subject: subjectNear(t, m.index!, m.index! + m[0].length), max: n, source: m[0].trim() });
       }
     }
     // "exactly four sections", "with four sections" (11 Oct, survey brief).
@@ -207,6 +222,13 @@ export function countSections(text: string): number {
   return atTop.length;
 }
 
+/**
+ * Words a printed page holds, for estimating pages: single-spaced, 11–12 pt,
+ * with headings and short lists. Generous on purpose — an estimate that blocks
+ * finishing should not do so on a page that would fit.
+ */
+export const WORDS_PER_PAGE = 550;
+
 /** How a count is made, said wherever a count is shown or asked for (11 Oct). */
 export const COUNTING_RULE = 'words of the text itself, not counting headings or a word-count note; labelled assumptions count';
 
@@ -249,6 +271,15 @@ export function measure(r: MeasurableRequirement, text: string, whole = false): 
     const n = countWords(section);
     const ok = (r.min === undefined || n >= r.min) && (r.max === undefined || n <= r.max);
     return { id: `measured.${r.id}`, label: `${name}: ${rangeText(r)} words`, satisfied: ok, value: `${n} words`, ...(ok ? {} : { detail: `${n} words` }) };
+  }
+  if (r.kind === 'pages') {
+    // An estimate, said as one: a printed page depends on fonts and margins,
+    // which the text does not fix (L-73).
+    const n = countWords(section);
+    const pages = Math.max(0.1, Math.round((n / WORDS_PER_PAGE) * 10) / 10);
+    const ok = r.max === undefined || n <= r.max * WORDS_PER_PAGE;
+    const value = `about ${pages} page${pages === 1 ? '' : 's'} (${n} words; estimated at ${WORDS_PER_PAGE} words a page)`;
+    return { id: `measured.${r.id}`, label: `${name}: ${rangeText(r)} page${r.max === 1 ? '' : 's'} (estimated)`, satisfied: ok, value, ...(ok ? {} : { detail: value }) };
   }
   if (r.kind === 'sections') {
     const n = countSections(section);

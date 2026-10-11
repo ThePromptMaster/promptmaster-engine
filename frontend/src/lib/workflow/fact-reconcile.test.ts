@@ -1,8 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { ProjectFact } from '@/types/project';
 import { factValues } from './fact-values';
-import { describeFactChange, factChangesFromRevision, revertsUserVersion } from './fact-reconcile';
+import { describeFactChange, factChangesFromRevision, revertsUserVersion, withMeaningChanges } from './fact-reconcile';
 
 const fact = (id: string, statement: string, kind: ProjectFact['kind'] = 'fact'): ProjectFact =>
   ({ id, statement, subject: null, kind, source_kind: 'chat', source_ref: {}, retired_at: null, supersedes: null, created_at: '2026-10-10T00:00:00Z' }) as unknown as ProjectFact;
@@ -83,5 +83,28 @@ describe('a revision that would undo the user\'s own version', () => {
   });
   it('a value no fact states is not a reversal', () => {
     expect(revertsUserVersion({ facts: [], userText: AFTER, generated: BEFORE })).toEqual([]);
+  });
+});
+
+describe('a change of meaning, not a value (L-72, 11 Oct: in-office to fully remote)', () => {
+  const facts = [fact('o', 'The team is five people, initially in-office.'), fact('a', 'The lunch is on Thursday at 12:30.')];
+  const before = 'Day one happens at the office on Thursday at 12:30.';
+  const after = 'Day one happens on video on Wednesday at 1:00 p.m. The team works fully remote.';
+  it('asks only about the facts the value matcher did not offer, and adds what comes back', async () => {
+    const values = factChangesFromRevision({ facts, instruction: 'Make it remote, Wednesday at 1:00 p.m.', before, after });
+    const check = vi.fn(async (req: { facts: { id: string }[] }) => {
+      expect(req.facts.map((f) => f.id)).toEqual(['o']);
+      return { changes: [{ fact_id: 'o', proposed: 'The team is five people, fully remote.', quote: 'The team works fully remote.', why: 'now remote' }] };
+    });
+    const all = await withMeaningChanges(values, { facts, instruction: 'Make it remote, Wednesday at 1:00 p.m.', before, after }, check);
+    expect(all.map((c) => [c.fact.id, c.proposed])).toEqual([
+      ['a', 'The lunch is on Wednesday at 1:00 p.m.'],
+      ['o', 'The team is five people, fully remote.'],
+    ]);
+    expect(describeFactChange(all[1])).toBe('now remote — “The team works fully remote.”');
+  });
+  it('a failed check leaves the value changes as they were', async () => {
+    const values = factChangesFromRevision({ facts, instruction: 'x', before, after });
+    expect(await withMeaningChanges(values, { facts, instruction: 'x', before, after }, async () => { throw new Error('down'); })).toEqual(values);
   });
 });

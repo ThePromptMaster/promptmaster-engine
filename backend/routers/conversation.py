@@ -23,6 +23,7 @@ from promptmaster.page_context import ChatContext, scrub_button_mentions
 from promptmaster.schemas import ChatMessage, Iteration, PMInput
 from promptmaster.session_context import _label_trigger
 from promptmaster.reply_actions import ActionTable, ReplyAction, suggest_reply_actions
+from promptmaster.revision_facts import RevisionFactsRequest, RevisionFactsResponse, revision_facts
 from routers._pipeline import build_iteration_with_full_pipeline
 
 router = APIRouter(prefix="/api", tags=["conversation"])
@@ -234,3 +235,11 @@ async def api_suggest_actions(
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
     return SuggestActionsResponse(actions=actions)
+
+
+@router.post("/revision-facts")
+async def api_revision_facts(req: RevisionFactsRequest, client: OpenRouterClient = Depends(get_client)) -> RevisionFactsResponse:
+    """The accepted facts a revision contradicts in meaning, each rewritten to
+    agree, for the user to tick with the revision (L-72). 1 small LLM call;
+    commits nothing. A failed check reports nothing."""
+    return await revision_facts(client, req)

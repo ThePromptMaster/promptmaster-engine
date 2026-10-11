@@ -57,8 +57,9 @@ vi.mock('@/lib/api/client', () => ({
 
 // The thread persists to conversation_messages; that round trip is not what
 // these tests are about, so it is stubbed to an in-memory echo.
+const loadStageChat = vi.fn<(projectId: string, stageId: string) => Promise<unknown[]>>(async () => []);
 vi.mock('@/lib/supabase/conversation', () => ({
-  loadStageChat: vi.fn(async () => []),
+  loadStageChat: (projectId: string, stageId: string) => loadStageChat(projectId, stageId),
   saveStageChatMessage: vi.fn(async (msg: Record<string, unknown>) => ({
     ...msg,
     id: `m${Math.random()}`,
@@ -409,5 +410,35 @@ describe('a revision that changes an accepted fact', () => {
 
     await waitFor(() => expect(supersedeFact).toHaveBeenCalledTimes(1));
     expect(supersedeFact.mock.calls[0]![2]).toBe('Lunch is Wednesday at 1:00 p.m.');
+  });
+});
+
+// --- one project's thread never shows in another (Sean, 10 Oct, email 6.9) ---
+
+describe('the side chat belongs to its project', () => {
+  it('moving to another project with the same stage id clears the thread while the new one loads', async () => {
+    loadStageChat.mockImplementation(async (projectId: string) =>
+      projectId === 'p1'
+        ? [{ id: 'm1', role: 'assistant', content: 'Tariffs are mostly bad for the overall economy.', mode: 'discuss', iteration_number: 1, created_at: '2026-10-01T00:00:00Z' }]
+        : new Promise(() => {})
+    );
+    const props = { stageId: 'final_review', stageLabel: 'Final review', content: CONTENT, headVersion: HEAD };
+    const view = render(<ChatPanel project={PROJECT} {...props} />);
+    expect(await screen.findByText(/Tariffs are mostly bad/)).toBeInTheDocument();
+    view.rerender(<ChatPanel project={{ ...PROJECT, id: 'p2' } as Project} {...props} />);
+    await waitFor(() => expect(screen.queryByText(/Tariffs are mostly bad/)).not.toBeInTheDocument());
+  });
+
+  it('a reply that comes back after moving to another project is not shown there', async () => {
+    loadStageChat.mockImplementation(async () => []);
+    let answer: (v: unknown) => void = () => undefined;
+    chatMessage.mockImplementation(() => new Promise((r) => { answer = r; }));
+    const props = { stageId: 'final_review', stageLabel: 'Final review', content: CONTENT, headVersion: HEAD };
+    const view = render(<ChatPanel project={PROJECT} {...props} />);
+    await ask('Are tariffs good for the economy?');
+    view.rerender(<ChatPanel project={{ ...PROJECT, id: 'p2' } as Project} {...props} />);
+    answer({ assistant_message: { content: 'Tariffs are mostly bad for the overall economy.' } });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByText(/Tariffs are mostly bad/)).not.toBeInTheDocument();
   });
 });

@@ -520,6 +520,18 @@ def _json_reply(system: str, prompt: str) -> dict:
             "depends_on_it": ["Mock: the analysis verdict."],
         }
 
+    from promptmaster import revision_facts as _revision_facts
+
+    if system.startswith(_revision_facts._INSTRUCTION[:60]):
+        # "[[mock:remote]]" in the instruction: a fact saying the team is in the
+        # office is contradicted by a revised text that makes it remote.
+        if "[[mock:remote]]" in prompt:
+            fact = re.search(r"^- \[([^\]]+)\] (.*in-office.*|.*in the office.*)$", prompt, re.M | re.I)
+            after = prompt.split("THE REVISED TEXT:\n", 1)[-1].split("\n\nACCEPTED FACTS", 1)[0]
+            line = next((ln.strip() for ln in after.splitlines() if "remote" in ln.lower()), "")
+            if fact and line:
+                return {"changes": [{"fact_id": fact.group(1), "proposed": "The team works fully remote.", "quote": line[:200], "why": "Mock: now remote."}]}
+        return {"changes": []}
     if system.startswith(objective_assessment._ASSESS_INSTRUCTION[:60]):
         # Not met when the deliverable says "[[mock:objective=unmet]]": a blocker
         # and a proposal; otherwise met, quoting the deliverable's first line.

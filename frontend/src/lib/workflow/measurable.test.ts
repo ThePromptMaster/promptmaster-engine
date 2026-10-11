@@ -146,3 +146,22 @@ describe('11 Oct, survey brief: the ways a word limit is written', () => {
     expect(parseRequirements([`A kickoff brief, ${text}.`]).map((r) => [r.kind, r.max])).toEqual([['words', 200]]);
   });
 });
+
+describe('"one page" is estimated in code (L-73, 11 Oct: onboarding plan)', () => {
+  it('reads one-page and page limits', async () => {
+    const { parseRequirements } = await import('./measurable');
+    expect(parseRequirements(['A one-page onboarding plan with six sections.']).filter((r) => r.kind === 'pages').map((r) => r.max)).toEqual([1]);
+    expect(parseRequirements(['Keep it to no more than two pages.']).filter((r) => r.kind === 'pages').map((r) => r.max)).toEqual([2]);
+    expect(parseRequirements(['The four pages below explain it.']).filter((r) => r.kind === 'pages')).toEqual([]);
+  });
+  it('measures the estimate and says it is one', async () => {
+    const { measure, parseRequirements, WORDS_PER_PAGE } = await import('./measurable');
+    const [r] = parseRequirements(['A one-page plan.']).filter((x) => x.kind === 'pages');
+    const short = measure(r, Array(300).fill('word').join(' '), true)!;
+    expect(short).toMatchObject({ satisfied: true, label: 'The deliverable: at most 1 page (estimated)' });
+    expect(short.value).toBe(`about 0.5 pages (300 words; estimated at ${WORDS_PER_PAGE} words a page)`);
+    const long = measure(r, Array(900).fill('word').join(' '), true)!;
+    expect(long.satisfied).toBe(false);
+    expect(long.detail).toMatch(/^about 1.6 pages/);
+  });
+});

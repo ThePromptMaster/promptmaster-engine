@@ -348,6 +348,9 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           The workspace used to take a `children` pane for that one template; it
           does not any more, which is what retired /session. */}
       <WorkflowWorkspace
+        // A fresh workspace per project: nothing one project's page holds
+        // (its chat thread, a proposal, a pending notice) carries into another.
+        key={project.id}
         project={project}
         artifact={artifact}
         versions={versions}
