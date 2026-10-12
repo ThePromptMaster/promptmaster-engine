@@ -99,6 +99,7 @@ import { getLatestTemplate } from '@/lib/supabase/workflow';
 import { setUsageProject } from '@/lib/supabase/model-usage';
 import type { NewEvaluation, NewVersion } from '@/lib/supabase/versions';
 import { EventRecordedError, useProjectStore, type StageBundle } from '@/stores/project-store';
+import { withAppliedInstructions } from '@/lib/workflow/applied-instructions';
 import { commitOutlineVersion, approvedOutlineVersionId, ensureOutlineArtifact } from '@/lib/supabase/outline';
 import type { Artifact, ArtifactVersion, Evaluation, Project, ProjectPatch, RoutineDecisions } from '@/types/project';
 
@@ -150,7 +151,7 @@ interface Props {
 const CHAT_OPEN_KEY = 'pm.sideChatOpen';
 
 export function WorkflowWorkspace({
-  project,
+  project: projectProp,
   artifact,
   versions,
   template,
@@ -165,6 +166,9 @@ export function WorkflowWorkspace({
   ensureStageArtifact,
   onReload,
 }: Props) {
+  // Every request built from the project carries the instructions the user
+  // applied, beside its facts (12 Oct, Atlas and Meridian).
+  const project = useMemo(() => withAppliedInstructions(projectProp, template, bundles), [projectProp, template, bundles]);
   // The event log lives in the project store, with the artifacts it is read
   // alongside; writing goes through `appendEvent`, which re-reads the log, so
   // no surface can hold a copy the others have moved past.

@@ -46,6 +46,9 @@ export function inputsFrom(project: Project): PMInput {
     output_format: project.output_format,
     context: project.context ?? '',
     facts: factsForRequest(project.facts),
+    ...(project.applied_instructions?.length
+      ? { user_instructions: project.applied_instructions.map(({ stage, version, instruction }) => ({ stage, version, instruction })) }
+      : {}),
     mode: project.mode,
     custom_name: project.custom_name,
     custom_preamble: project.custom_preamble,

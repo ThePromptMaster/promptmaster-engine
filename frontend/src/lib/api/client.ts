@@ -576,14 +576,20 @@ export const api = {
     return apiFetch('/api/generate-workflow', { method: 'POST', body: JSON.stringify(req) });
   },
 
-  /** Accepted facts a revision contradicts in meaning, each rewritten to agree (L-72). Records nothing. */
+  /**
+   * Accepted facts a revision contradicts in meaning, each rewritten to agree
+   * (L-72), and the standing changes its instruction states (12 Oct). Records nothing.
+   */
   async revisionFacts(req: {
     instruction: string;
     before: string;
     after: string;
     facts: { id: string; statement: string }[];
     model?: string;
-  }): Promise<{ changes: { fact_id: string; proposed: string; quote: string; why: string }[] }> {
+  }): Promise<{
+    changes: { fact_id: string; proposed: string; quote: string; why: string }[];
+    additions?: { statement: string; kind: 'fact' | 'requirement'; quote: string }[];
+  }> {
     return apiFetch('/api/revision-facts', { method: 'POST', body: JSON.stringify(req) });
   },
 

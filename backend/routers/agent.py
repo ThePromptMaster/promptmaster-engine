@@ -305,6 +305,13 @@ class AssessObjectiveResponse(ObjectiveAssessment):
     model_used: str = ""
 
 
+def _line(text: str, limit: int = 600) -> str:
+    """A check as one line, cut with a visible "…" — a silent cut read as a
+    requirement truncated (12 Oct, Northstar)."""
+    one = " ".join(text.split())
+    return one if len(one) <= limit else one[: limit - 1].rstrip() + "…"
+
+
 @router.post("/assess-objective")
 async def api_assess_objective(req: AssessObjectiveRequest, client: OpenRouterClient = Depends(get_client)) -> AssessObjectiveResponse:
     """Whether the objective is met by what the project holds, before Go may say
@@ -312,8 +319,8 @@ async def api_assess_objective(req: AssessObjectiveRequest, client: OpenRouterCl
     try:
         result = await assess_objective(
             client, req.model or None, req.inputs, req.deliverable_label, req.content, req.steps, req.success_criterion,
-            [" ".join(c.split())[:300] for c in req.failed_checks if c.strip()],
-            [" ".join(m.split())[:300] for m in req.measured if m.strip()],
+            [_line(c) for c in req.failed_checks if c.strip()],
+            [_line(m) for m in req.measured if m.strip()],
         )
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)

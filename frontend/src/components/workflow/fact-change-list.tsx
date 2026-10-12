@@ -8,8 +8,8 @@
 
 import { useState } from 'react';
 
-import { supersedeFact } from '@/lib/supabase/facts';
-import { describeFactChange, type FactChange } from '@/lib/workflow/fact-reconcile';
+import { recordFacts, supersedeFact } from '@/lib/supabase/facts';
+import { describeFactChange, isNewFact, type FactChange } from '@/lib/workflow/fact-reconcile';
 import type { Project } from '@/types/project';
 
 export function FactChangeList({
@@ -32,7 +32,9 @@ export function FactChangeList({
               <span>
                 <span className="block">{c.proposed}</span>
                 <span className="block text-[var(--on-surface-variant)]">
-                  {describeFactChange(c)} · was &ldquo;{c.fact.statement}&rdquo;
+                  {isNewFact(c)
+                    ? `New ${c.fact.kind === 'requirement' ? 'requirement' : 'fact'} ${describeFactChange(c)}`
+                    : <>{describeFactChange(c)} · was &ldquo;{c.fact.statement}&rdquo;</>}
                 </span>
               </span>
             </label>
@@ -41,7 +43,7 @@ export function FactChangeList({
       </ul>
       {kept.size > 0 && (
         <p className="mt-2 text-label text-[var(--on-surface-variant)]">
-          A fact left unticked keeps its old value. Go treats accepted facts as authoritative, so it may change the draft back to match.
+          A fact left unticked keeps its old value, and a new one unticked is not recorded. Go treats accepted facts as authoritative, so it may change the draft back to match.
         </p>
       )}
     </>
@@ -83,7 +85,10 @@ export function FactReconcileNotice({
     setBusy(true);
     setError(null);
     try {
-      for (const c of updating) await supersedeFact(project, c.fact, c.proposed, { via: 'revision', stage: stageLabel, how });
+      for (const c of updating) {
+        if (isNewFact(c)) await recordFacts(project, [{ statement: c.proposed, kind: c.fact.kind, source_kind: 'user_edit', source_ref: { via: 'revision', stage: stageLabel, how } }]);
+        else await supersedeFact(project, c.fact, c.proposed, { via: 'revision', stage: stageLabel, how });
+      }
       await onChanged?.();
       onDone('updated');
     } catch {

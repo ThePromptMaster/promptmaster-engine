@@ -49,6 +49,52 @@ def facts_block(inputs: PMInput) -> str:
     return f"{FACTS_HEADER}\n" + "\n".join(lines)
 
 
+INSTRUCTIONS_HEADER = (
+    "INSTRUCTIONS THE USER APPLIED SINCE THE BRIEF — their own words, oldest first, each with the "
+    "version it made. Each is the user's later word: where one changes the brief, the objective's "
+    "particulars, the permitted sources or evidence, or a reviewed prompt, the instruction wins, and work "
+    "that follows it is correct, not unsupported. Evidence or sources an instruction supplies are supplied "
+    "evidence. Something an instruction removed stays removed, and something it resolved stays resolved. "
+    "Only an accepted fact recorded after it, or what the user asks right now, is later still."
+)
+
+
+def instructions_block(inputs: PMInput) -> str:
+    """The instructions the user applied, or "" when there are none. Never cut:
+    the client bounds them (`applied-instructions.ts`)."""
+    said = [i for i in (inputs.user_instructions or []) if i.instruction.strip()]
+    if not said:
+        return ""
+    lines = [
+        f"- {i.stage.strip() or 'A stage'}{f' v{i.version}' if i.version else ''}: {' '.join(i.instruction.split())}"
+        for i in said
+    ]
+    return f"{INSTRUCTIONS_HEADER}\n" + "\n".join(lines)
+
+
+#: The most context a check is sent. The checks took 4,000 characters until
+#: 12 Oct, which cut a long brief's requirements in half (Northstar).
+CHECK_CONTEXT_MAX = 40_000
+
+CONTEXT_SHORTENED = (
+    "[The project context continues beyond this point; only this step's copy was shortened, for length. "
+    "Nothing is missing from the project: never report a requirement as missing, cut off or truncated "
+    "because of this note.]"
+)
+
+
+def brief_lines(inputs: PMInput) -> str:
+    """The brief's own requirements beside the objective — audience,
+    constraints, format — or "". A check given only the objective could not see
+    a requirement written in them."""
+    rows = [
+        ("Audience", inputs.audience),
+        ("Constraints", inputs.constraints),
+        ("Output format", inputs.output_format),
+    ]
+    return "\n".join(f"{k}: {' '.join(v.split())}" for k, v in rows if v.strip() and v.strip().lower() != "general")
+
+
 def context_block(inputs: PMInput, limit: int | None = None) -> str:
     """The accepted facts and the context as delimited blocks, or "" when there
     are neither.
@@ -58,11 +104,17 @@ def context_block(inputs: PMInput, limit: int | None = None) -> str:
     dropped. The facts are never cut.
     """
     facts = facts_block(inputs)
+    said = instructions_block(inputs)
     text = (inputs.context or "").strip()
     if limit is not None and len(text) > limit:
-        text = text[:limit].rstrip() + "\n[…the rest of the project context is not shown in this step]"
+        # At a line, and said plainly: "[…not shown]" read to the objective
+        # check as a requirement cut off, and it paused on "project context
+        # incomplete" while the brief was intact (12 Oct, Northstar).
+        cut = text[:limit]
+        cut = cut[: cut.rfind("\n")] if cut.rfind("\n") > limit // 2 else cut
+        text = cut.rstrip() + f"\n{CONTEXT_SHORTENED}"
     context = f"{_HEADER}\n<<<\n{text}\n>>>" if text else ""
-    return "\n\n".join(b for b in (facts, context) if b)
+    return "\n\n".join(b for b in (facts, said, context) if b)
 
 
 def context_line(inputs: PMInput) -> str:

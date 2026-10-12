@@ -65,6 +65,12 @@ export interface Project {
    */
   facts?: ProjectFact[];
   /**
+   * The instructions the user applied with "Change it", oldest first. Not a
+   * column: derived from the stage versions in the workspace, so every request
+   * carries the user's later word (12 Oct; `lib/workflow/applied-instructions.ts`).
+   */
+  applied_instructions?: import('@/lib/workflow/applied-instructions').AppliedInstruction[];
+  /**
    * The project's data files. Not a column: joined on in the browser when
    * the project is opened, so everything that is handed the project — stage
    * generation, the Go planner, the code writer — knows what data exists.

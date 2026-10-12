@@ -47,7 +47,7 @@ import { documentSections, type ScopeKind } from './chat-scope';
 import type { StageChatMessage } from '@/lib/supabase/conversation';
 import type { NewVersion } from '@/lib/supabase/versions';
 import type { ArtifactVersion, Project } from '@/types/project';
-import type { FactChange } from '@/lib/workflow/fact-reconcile';
+import { isNewFact, type FactChange } from '@/lib/workflow/fact-reconcile';
 import { FactChangeList, toggled } from './fact-change-list';
 import { LimitCounter } from '@/components/shared/limit-counter';
 import { INPUT_LIMITS } from '@/lib/projects/input-limits';
@@ -869,7 +869,7 @@ export function ProposalCard({
       {factChanges.length > 0 && (
         <div className="mt-3 rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2" aria-label="Facts this changes">
           <p className="text-label text-[var(--on-surface)]">
-            This changes {factChanges.length === 1 ? 'an accepted fact' : `${factChanges.length} accepted facts`}. Update {factChanges.length === 1 ? 'it' : 'them'} too?
+            {factChangesHeading(factChanges)}
           </p>
           <FactChangeList changes={factChanges} kept={kept} onToggle={(id, on) => setKept((prev) => toggled(prev, id, on))} />
         </div>
@@ -885,7 +885,9 @@ export function ProposalCard({
           disabled={!canApply || busy}
           className="rounded-lg bg-[var(--pm-primary)] px-4 py-1.5 text-label text-[var(--on-primary)] disabled:opacity-40"
         >
-          {updating.length ? `Apply and update ${updating.length === 1 ? 'the fact' : `${updating.length} facts`}` : 'Apply as new version'}
+          {updating.length
+            ? `Apply and ${factChanges.some((c) => updating.includes(c.fact.id) && !isNewFact(c)) ? 'update' : 'record'} ${updating.length === 1 ? 'the fact' : `${updating.length} facts`}`
+            : 'Apply as new version'}
         </button>
         <button
           onClick={onDiscard}
@@ -942,4 +944,15 @@ export function AppliedNotice({
       </div>
     </section>
   );
+}
+
+/** "This changes an accepted fact", "This states 2 new facts", or both. */
+function factChangesHeading(changes: readonly FactChange[]): string {
+  const added = changes.filter(isNewFact).length;
+  const changed = changes.length - added;
+  const parts = [
+    changed ? `changes ${changed === 1 ? 'an accepted fact' : `${changed} accepted facts`}` : '',
+    added ? `states ${added === 1 ? 'something later work must respect' : `${added} things later work must respect`}` : '',
+  ].filter(Boolean);
+  return `This ${parts.join(' and ')}. Record ${changes.length === 1 ? 'it' : 'them'} so every later stage and check uses ${changes.length === 1 ? 'it' : 'them'}?`;
 }

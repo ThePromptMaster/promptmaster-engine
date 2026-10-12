@@ -59,11 +59,12 @@ def test_apply_carries_it(with_context):
 
 
 def test_the_planner_gets_a_bounded_excerpt_and_the_constraints(with_context):
-    long = with_context.model_copy(update={"context": FACT + " " + "x" * 10_000})
+    long = with_context.model_copy(update={"context": FACT + " " + "x" * 30_000})
     _s, user = build_next_action_prompt(long, AgentState(stage_id="diagnosis"), ["evaluate_stage"], "guided")
-    assert FACT in user and "the rest of the project context is not shown" in user
+    assert FACT in user and "only this step's copy was shortened" in user
+    assert "never report a requirement as missing, cut off or truncated" in user
     assert "Constraints: Two-week timeline" in user
-    assert user.count("x") < 6_000
+    assert 10_000 < user.count("x") < 14_000
 
 
 def test_the_context_is_capped(basic_inputs):
@@ -101,3 +102,22 @@ def test_missing_material_is_never_the_whole_conclusion(basic_inputs, stage):
     assert "never the whole conclusion" in user
     # The figure rule still stands beside it: an estimate is labelled, not stated as fact.
     assert user.index("FIGURES: every percentage") < user.index("DO THE JOB")
+
+
+def test_the_objective_check_reads_the_whole_brief_and_the_applied_instructions(with_context):
+    """12 Oct (Northstar): the check was cut at 4,000 characters and paused on a
+    requirement "truncated"; it never saw constraints or format at all."""
+    from promptmaster.objective_assessment import build_assessment_prompt
+    from promptmaster.schemas import UserInstruction
+    req = "H1 must distinguish the completed approval from the four outstanding clearances."
+    long = with_context.model_copy(update={
+        "context": "x" * 9_000 + "\n" + req,
+        "output_format": "Five sections, H1 to H5",
+        "user_instructions": [UserInstruction(stage="Output", version=3, instruction="Use November 2, not October 26.")],
+    })
+    _s, user = build_assessment_prompt(long, "Output", "text", [])
+    assert req in user and "not shown" not in user
+    assert "Output format: Five sections, H1 to H5" in user
+    assert "Constraints: Two-week timeline" in user
+    assert "INSTRUCTIONS THE USER APPLIED SINCE THE BRIEF" in user
+    assert "- Output v3: Use November 2, not October 26." in user

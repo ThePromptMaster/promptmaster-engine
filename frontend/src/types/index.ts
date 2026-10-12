@@ -11,6 +11,8 @@ export interface PMInput {
   context?: string;
   /** Accepted facts and requirements, current only, each with its source (F1, 7 Oct). */
   facts?: { statement: string; subject: string; kind: 'fact' | 'requirement'; source: string; replaces?: string }[];
+  /** Instructions the user applied with "Change it", oldest first (12 Oct): their later word. */
+  user_instructions?: { stage: string; version: number; instruction: string }[];
   mode: ModeType;
   custom_name?: string;
   custom_preamble?: string;
