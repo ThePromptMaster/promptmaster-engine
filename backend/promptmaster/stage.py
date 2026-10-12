@@ -66,7 +66,15 @@ _PROSE_INSTRUCTION = (
     # 18,818 characters and repeated its questions and safeguards.
     "Say each point once: do not repeat a question, a safeguard, a list or a "
     "recommendation already given elsewhere in the artifact — refer back to it "
-    "instead. Cover everything the stage asks for at the length its reader can use.\n\n" + NOTATION_RULE
+    "instead. Cover everything the stage asks for at the length its reader can use. "
+    # 12 Oct (Colette, via Sean): a two-minute speech "for an eleven year old"
+    # on "If I had one wish" read "like I was five" and offered several wishes.
+    "Write in the voice the audience and the brief call for. When the piece is "
+    "to be spoken or written by a person of a stated age, write as a capable "
+    "person of that age would — natural, confident and specific — never "
+    "simplified or childish. When the user has given the topic or the choice, "
+    "write one finished piece on exactly that; do not offer alternatives or "
+    "several versions unless they ask for options.\n\n" + NOTATION_RULE
 )
 
 _LIST_INSTRUCTION = (

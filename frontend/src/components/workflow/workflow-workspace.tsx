@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StageHeader } from './stage-header';
 import { StageRail } from './stage-rail';
 import { ExitCriteriaChecklist } from './exit-criteria-checklist';
-import { StageTransitionBar, type MoreAction } from './stage-transition-bar';
+import { MORE_GROUPS, StageTransitionBar, type MoreAction } from './stage-transition-bar';
 import { ConfirmOverwrite } from './renderers/stage-chrome';
 import { CheckpointPanel } from './checkpoint-panel';
 import { UpgradeBanner } from './upgrade-banner';
@@ -1346,33 +1346,35 @@ export function WorkflowWorkspace({
 
   const moreActions: MoreAction[] = [
     ...(canMarkComplete
-      ? [{ id: 'mark-complete', label: 'Mark this stage complete', icon: 'task_alt', onSelect: () => void markComplete() }]
+      ? [{ id: 'mark-complete', label: 'Mark this stage complete', icon: 'task_alt', group: MORE_GROUPS.stage, hint: 'Records it as done; you can reopen it later.', onSelect: () => void markComplete() }]
       : []),
     isBlocked
-      ? { id: 'unblock', label: 'Continue this stage', icon: 'lock_open', onSelect: () => void setBlocked(null) }
-      : { id: 'block', label: 'Mark as stuck…', icon: 'block', onSelect: () => setBlocking(true) },
+      ? { id: 'unblock', label: 'Continue this stage', icon: 'lock_open', group: MORE_GROUPS.stage, hint: 'Clears the stuck mark.', onSelect: () => void setBlocked(null) }
+      : { id: 'block', label: 'Mark as stuck…', icon: 'block', group: MORE_GROUPS.stage, hint: 'Say what is in the way; Go stops here.', onSelect: () => setBlocking(true) },
     ...(draftable && hasContent
-      ? [{ id: 'regenerate', label: 'Regenerate this stage', icon: 'refresh', onSelect: () => setConfirmingRegenerate(true) }]
+      ? [{ id: 'regenerate', label: 'Regenerate this stage', icon: 'refresh', group: MORE_GROUPS.stage, hint: 'Writes a fresh draft as a new version; this one is kept.', onSelect: () => setConfirmingRegenerate(true) }]
       : []),
     ...(draftable && !hasContent && primaryAction.kind !== 'draft'
-      ? [{ id: 'draft', label: 'Draft this stage', icon: 'auto_awesome', onSelect: () => generation.generate() }]
+      ? [{ id: 'draft', label: 'Draft this stage', icon: 'auto_awesome', group: MORE_GROUPS.stage, hint: 'Writes the first draft.', onSelect: () => generation.generate() }]
       : []),
     ...(toolsAvailable
       ? [
           ...(truncated && primaryAction.kind !== 'continue_writing'
-            ? [{ id: 'continue', label: 'Continue writing', icon: 'play_arrow', onSelect: () => void tools.run('continue') }]
+            ? [{ id: 'continue', label: 'Continue writing', icon: 'play_arrow', group: MORE_GROUPS.stage, hint: 'Finishes a draft that was cut off.', onSelect: () => void tools.run('continue') }]
             : []),
-          ...REWRITE_TOOLS.map((t) => ({ id: t.kind, label: t.label, icon: t.icon, onSelect: () => void tools.run(t.kind) })),
-          ...CRITIQUE_TOOLS.map((t) => ({ id: t.kind, label: t.label, icon: t.icon, onSelect: () => void tools.run(t.kind) })),
+          ...REWRITE_TOOLS.map((t) => ({ id: t.kind, label: t.label, icon: t.icon, group: MORE_GROUPS.rewrite, onSelect: () => void tools.run(t.kind) })),
+          ...CRITIQUE_TOOLS.map((t) => ({ id: t.kind, label: t.label, icon: t.icon, group: MORE_GROUPS.critique, onSelect: () => void tools.run(t.kind) })),
         ]
       : critiqueOnly
-        ? CRITIQUE_TOOLS.map((t) => ({ id: t.kind, label: t.label, icon: t.icon, onSelect: () => void tools.run(t.kind) }))
+        ? CRITIQUE_TOOLS.map((t) => ({ id: t.kind, label: t.label, icon: t.icon, group: MORE_GROUPS.critique, onSelect: () => void tools.run(t.kind) }))
         : []),
     ...(draftable && hasContent && Boolean(stageEvaluation.evaluate) && primaryAction.kind !== 'evaluate'
       ? [{
           id: 'evaluate',
           label: headEvaluation ? 'Check this stage again · one AI check' : 'Check this stage · one AI check',
           icon: 'rule',
+          group: MORE_GROUPS.stage,
+          hint: 'Scores this version against the objective; changes nothing.',
           onSelect: () => stageEvaluation.evaluate?.(),
         }]
       : []),

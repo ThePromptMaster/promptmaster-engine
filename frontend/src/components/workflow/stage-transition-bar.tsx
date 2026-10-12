@@ -14,6 +14,28 @@ export interface MoreAction {
   icon: string;
   onSelect: () => void;
   disabled?: boolean;
+  /**
+   * The heading it sits under, and one line on what it does (12 Oct; Colette
+   * and Sean: many buttons, and no way to tell which to use or what it does).
+   */
+  group?: string;
+  hint?: string;
+}
+
+/** Group headings, in menu order. Entries with no group go first. */
+export const MORE_GROUPS = {
+  stage: 'This stage',
+  rewrite: 'Rewrite — saves a new version, keeps this one',
+  critique: 'Get a second opinion — changes nothing',
+  move: 'Move between stages',
+} as const;
+
+const GROUP_ORDER: readonly string[] = Object.values(MORE_GROUPS);
+
+/** Entries in group order, each group's own order kept, so a heading appears once. */
+export function byGroup(items: readonly MoreAction[]): MoreAction[] {
+  const rank = (a: MoreAction) => (a.group ? GROUP_ORDER.indexOf(a.group) : -1);
+  return items.map((a, i) => ({ a, i })).sort((x, y) => rank(x.a) - rank(y.a) || x.i - y.i).map(({ a }) => a);
 }
 
 interface Props {
@@ -188,11 +210,12 @@ export function StageTransitionBar({
       ...(onSuggest
         ? [{ id: 'suggest', label: suggesting ? 'Thinking…' : 'Suggest a move', icon: 'lightbulb', onSelect: onSuggest, disabled: suggesting }]
         : []),
-      ...more,
+      ...byGroup(more),
       // The transitions come from the same function Go's list of this page's
       // buttons is built from (lib/workflow/stage-controls.ts).
       ...transitionEntries({ primary, options, nextStageLabel }).map((entry) => ({
         ...entry,
+        group: MORE_GROUPS.move,
         onSelect: () => {
           const option = entry.id === 'advance' ? advance : entry.id === 'skip' ? skip : returns.find((o) => `return-${o.toStageId}` === entry.id);
           if (option) start(option);
@@ -254,24 +277,37 @@ export function StageTransitionBar({
               {menuOpen && (
                 <div
                   role="menu"
-                  className="absolute bottom-full right-0 z-10 mb-1 min-w-[240px] rounded-lg bg-[var(--surface-container-highest)] py-1 shadow-lg"
+                  className="absolute bottom-full right-0 z-10 mb-1 max-h-[70vh] min-w-[240px] max-w-[min(360px,calc(100vw-2rem))] overflow-y-auto rounded-lg bg-[var(--surface-container-highest)] py-1 shadow-lg"
                 >
-                  {menu.map((item) => (
-                    <button
-                      key={item.id}
-                      role="menuitem"
-                      disabled={item.disabled || busy}
-                      onClick={() => {
-                        setMenuOpen(false);
-                        item.onSelect();
-                      }}
-                      className="flex w-full items-center gap-2 px-4 py-2 text-left text-body text-[var(--on-surface)] hover:bg-[var(--surface-container-high)] disabled:opacity-40"
-                    >
-                      <span aria-hidden className="material-symbols-outlined text-[18px] text-[var(--on-surface-variant)]">
-                        {item.icon}
-                      </span>
-                      {item.label}
-                    </button>
+                  {menu.map((item, i) => (
+                    <div key={item.id}>
+                      {item.group && item.group !== menu[i - 1]?.group && (
+                        <p role="presentation" className="px-4 pb-1 pt-2 text-label uppercase tracking-wide text-[var(--on-surface-variant)]">
+                          {item.group}
+                        </p>
+                      )}
+                      <button
+                        role="menuitem"
+                        // The label is the name; the hint describes it, so a
+                        // reader (and Go's list of this page's buttons) names it the same.
+                        aria-label={item.label}
+                        aria-describedby={item.hint ? `more-hint-${item.id}` : undefined}
+                        disabled={item.disabled || busy}
+                        onClick={() => {
+                          setMenuOpen(false);
+                          item.onSelect();
+                        }}
+                        className="flex w-full items-start gap-2 px-4 py-2 text-left text-body text-[var(--on-surface)] hover:bg-[var(--surface-container-high)] disabled:opacity-40"
+                      >
+                        <span aria-hidden className="material-symbols-outlined mt-0.5 text-[18px] text-[var(--on-surface-variant)]">
+                          {item.icon}
+                        </span>
+                        <span>
+                          {item.label}
+                          {item.hint && <span id={`more-hint-${item.id}`} className="block text-label text-[var(--on-surface-variant)]">{item.hint}</span>}
+                        </span>
+                      </button>
+                    </div>
                   ))}
                   {returns.length > 0 && (
                     <p className="px-4 py-2 text-label leading-snug text-[var(--on-surface-variant)]">

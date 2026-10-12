@@ -225,12 +225,13 @@ export function GoPanel({
         <div className="mr-auto">
           <h2 className="text-title text-[var(--on-surface)]">Go mode</h2>
           <p className="text-label text-[var(--on-surface-variant)]">
-            Chooses the best next move for this stage and does it — and says whether it analyzed something or actually ran it.
+            Does the next steps for you, one at a time, and tells you what it did. It asks you only when a decision is yours.
           </p>
         </div>
         {!expanded && (
           <>
-            <button onClick={() => setOpen(true)} className="rounded-lg bg-[var(--surface-container-highest)] px-4 py-2 text-title text-[var(--on-surface)]">
+            {/* One clear action; the settings stay one click away (12 Oct, Colette: too many buttons). */}
+            <button onClick={() => setOpen(true)} className="rounded-lg px-2 py-2 text-label text-[var(--on-surface-variant)] underline-offset-2 hover:text-[var(--on-surface)] hover:underline">
               Set up Go
             </button>
             {/* One click to delegate: Autonomous, routine decisions handled, then the authorization to confirm. */}

@@ -10,7 +10,8 @@ const STATUS_LABEL: Partial<Record<StageStatus, string>> = {
   completed_with_artifact: 'Complete',
   blocked: 'Stuck',
   skipped: 'Skipped',
-  stale: 'Needs another look',
+  // 12 Oct (Sean): one name for one state, everywhere — rail, header, notice.
+  stale: 'Awaiting recheck',
 };
 
 interface Props {

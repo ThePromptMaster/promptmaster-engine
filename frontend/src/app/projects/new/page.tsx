@@ -200,7 +200,7 @@ export default function NewProjectPage() {
   }
   const hasObjective = objective.trim().length > 0;
 
-  async function recommend(given?: { question: string; answer: string }[], from?: { objective: string; material: string }) {
+  async function recommend(given?: { question: string; answer: string }[], from?: { objective: string; material: string; audience?: string }) {
     setWorking('setup');
     setError(null);
     const ask = from?.objective ?? objective;
@@ -221,7 +221,9 @@ export default function NewProjectPage() {
         title: titleFrom(ask),
         objective: split.objective,
         context: split.context,
-        audience: suggestion.audience || 'General',
+        // The audience the user stated in the conversation is theirs; a preset
+        // the suggester picked ("Student" for an eleven-year-old) is not (12 Oct, Colette).
+        audience: from?.audience?.trim() || suggestion.audience || 'General',
         constraints: suggestion.constraints,
         output_format: suggestion.output_format,
         mode: suggestion.mode,
@@ -254,7 +256,7 @@ export default function NewProjectPage() {
       brief.stages.length && `Stages discussed: ${brief.stages.join(' › ')}`,
       brief.approvals.length && `Approvals wanted: ${brief.approvals.join('; ')}`,
     ].filter(Boolean);
-    void recommend(undefined, { objective: brief.objective, material: [lines.join('\n'), `The conversation:\n${transcript}`].filter(Boolean).join('\n\n') });
+    void recommend(undefined, { objective: brief.objective, audience: brief.audience, material: [lines.join('\n'), `The conversation:\n${transcript}`].filter(Boolean).join('\n\n') });
   }
 
   // The questions are asked one at a time, on their own screen (1 Oct, item 9).

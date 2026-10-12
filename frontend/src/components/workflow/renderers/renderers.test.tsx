@@ -746,7 +746,7 @@ describe('version history', () => {
     render(<ProseRenderer {...props(bookStage('objective'), { versions, activeVersionId: 'v4' })} />);
     const history = screen.getByRole('group', { name: 'Version history' });
     expect(within(history).getByRole('button', { name: /^v4 · current/ })).toHaveAttribute('aria-pressed', 'true');
-    expect(within(history).getByRole('button', { name: /^v2 · saved/ })).toBeInTheDocument();
+    expect(within(history).getByRole('button', { name: /^v2 · earlier, kept/ })).toBeInTheDocument();
     expect(within(history).queryByRole('button', { name: /^v1/ })).not.toBeInTheDocument();
     expect(within(history).queryByRole('button', { name: /^v3/ })).not.toBeInTheDocument();
     await user.click(within(history).getByRole('button', { name: 'Full history (4)' }));

@@ -208,7 +208,7 @@ describe('StageRail', () => {
       ev('stage_returned', 'positioning', { to_stage_id: 'objective' }),
     ]);
     render(<StageRail template={BOOK_V1} state={state} nextSuggestedId={null} onSelect={vi.fn()} />);
-    expect(screen.getByText('recheck')).toBeInTheDocument();
+    expect(screen.getByText('awaiting recheck')).toBeInTheDocument();
   });
 
   it('a stage left open is not drawn as the stage you are on (1 Oct, item 1)', () => {

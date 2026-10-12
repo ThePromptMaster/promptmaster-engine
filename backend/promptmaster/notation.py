@@ -15,7 +15,8 @@ NOTATION_RULE = (
     "through LaTeX — \\frac, \\sqrt, \\sum, subscripts, superscripts, Greek letters, "
     "matrices with \\begin{pmatrix} — never plain-text or Unicode approximations, and never "
     "a comma where an equals sign belongs. Write a dollar amount as plain text ($8,000), "
-    "never inside maths. Put code in a fenced block that names its language (```python), "
+    "never inside maths, and so are a duration, a count or a measurement in prose (2 minutes, "
+    "5 to 10 ideas, 40 people): LaTeX is only for mathematics. Put code in a fenced block that names its language (```python), "
     "complete, with its indentation exact; say plainly whether it was run or is only "
     "proposed, and never present output that was not produced by running it."
 )
