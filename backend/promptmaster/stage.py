@@ -190,6 +190,10 @@ _PROMPT_KIND_RULE = (
 )
 
 
+#: The ceiling on one prose stage draft (4,096 until 12 Oct).
+STAGE_PROSE_MAX_TOKENS = 12_000
+
+
 def build_stage_prompt(
     inputs: PMInput,
     stage: StageDescriptor,
@@ -594,7 +598,10 @@ async def generate_stage_artifact(
         prompt=user,
         system=system,
         temperature=0.7,
-        max_tokens=4096,
+        # 12 Oct (Sean, Diligence): a complete question pack runs past 4,096
+        # tokens; v4 stopped halfway through Q11. What is billed is what is
+        # written, so the higher ceiling costs nothing on a short draft.
+        max_tokens=STAGE_PROSE_MAX_TOKENS,
         model=model,
     )
     return GenerateStageArtifactResponse(content=content, finish_reason=finish_reason)

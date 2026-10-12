@@ -604,10 +604,12 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // found work went back to "Suggested" (4 Oct, production).
       const before = revising && rendererHoldsItems(ctx.stage.renderer) ? parseItems(head) : null;
       const after = before ? parseItems(generated) : null;
-      const content = before && after ? serializeItems(carryUserFields(before, after, itemSchemaFor(ctx.stage))) : generated;
-      if (!content) {
+      const joined = before && after ? serializeItems(carryUserFields(before, after, itemSchemaFor(ctx.stage))) : generated;
+      if (!joined) {
         return done(key, { status: 'failed', output: 'The model returned nothing usable.', toolsUsed: ['model'], changes: {} });
       }
+      const whole = await finishCutDraft(ctx, inputs, model, ctx.stage, joined, res.finish_reason);
+      const content = whole.content;
       // The user's own latest version outranks an older fact it changed: a
       // revision that would put the fact's value back is not saved, and the
       // user is asked which is right (10 Oct, Sean: Go turned the Wednesday
@@ -649,9 +651,16 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         model: res.model_used || ctx.project.model,
         mode: ctx.project.mode,
         change_summary: revising ? `Go mode: ${instruction || 'revised'}` : 'Go mode draft.',
-        finish_reason: res.finish_reason || null,
+        finish_reason: whole.finishReason,
       });
       const versionId = (created as { id?: unknown } | null)?.id;
+      if (whole.cut) {
+        return done(key, {
+          status: 'failed', toolsUsed: ['model'],
+          changes: typeof versionId === 'string' ? { version_ids: [versionId] } : {},
+          output: cutOffMessage(ctx.stage.label, content),
+        });
+      }
       return done(key, {
         status: 'succeeded', toolsUsed: ['model'],
         // What changed, so the record can be checked against the project (SN-25).
@@ -918,7 +927,8 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         leftover = content ? leftoverValues(content, superseded) : [];
       }
       // A measured repair is measured again, in code; one more try names the count.
-      let stillUnmet = measuredFails.length && content ? unmetMeasurementsOf(ctx, target, content) : [];
+      // Every repair is measured on its new text, not only a measured one (12 Oct, Diligence).
+      let stillUnmet = content ? unmetMeasurementsOf(ctx, target, content) : [];
       if (content && stillUnmet.length) {
         ({ res, content } = await attempt(`${instruction} YOUR PREVIOUS ATTEMPT MEASURED: ${stillUnmet.join('; ')}. Fix exactly that.`));
         stillUnmet = content ? unmetMeasurementsOf(ctx, target, content) : [];
@@ -926,6 +936,12 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       if (!content) {
         return done(key, { status: 'failed', output: 'The model returned nothing usable.', toolsUsed: ['model'], changes: {} });
       }
+      // A repair the model cut off is continued before it is saved, and is
+      // never marked complete while it is still cut (12 Oct, Diligence: v4
+      // stopped halfway through Q11 and the stage read as done).
+      const whole = await finishCutDraft(ctx, inputs, model, target, content, res.finish_reason);
+      content = whole.content;
+      if (whole.continued) stillUnmet = unmetMeasurementsOf(ctx, target, content);
       // A repair does not undo the user's own latest version either (10 Oct),
       // nor bring back what they removed, nor rename an ID (12 Oct, Meridian).
       if (headVersion && !ctx.conflictAnswer) {
@@ -951,6 +967,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
           });
         }
       }
+      if (!before) content = honestChangeNote(content, measuredValues(ctx, target, content));
       const created = await ctx.appendStageVersion(target.id, target.label, {
         content,
         source_operation: 'agent_revise',
@@ -959,14 +976,21 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         model: res.model_used || ctx.project.model,
         mode: ctx.project.mode,
         change_summary: `Repaired after a change: ${why}`,
-        finish_reason: res.finish_reason || null,
+        finish_reason: whole.finishReason,
       });
       const versionId = (created as { id?: unknown } | null)?.id;
+      if (whole.cut) {
+        return done(key, {
+          status: 'failed', toolsUsed: ['model'],
+          changes: typeof versionId === 'string' ? { version_ids: [versionId] } : {},
+          output: `${cutOffMessage(target.label, content)} ${target.label} stays reopened.`,
+        });
+      }
       // Closed again only when its own requirements hold; a reserved approval
       // stays the user's, and the stage stays reopened until they give it.
       // The context was read before this save, so its measurements are of the
       // old text: they are taken from the new one (L-63).
-      const evaluation = withFreshMeasurements(evaluateStage(ctx.template, target.id, ctx.context), measuredFails.length > 0, stillUnmet);
+      const evaluation = withFreshMeasurements(evaluateStage(ctx.template, target.id, ctx.context), measureStageContent(ctx.project, ctx.template, target, content).length > 0, stillUnmet);
       const actor = stageMoveActor(ctx.run.policy, ctx.approvedByUser);
       if (leftover.length) {
         const named = leftover.map((v) => `${describeValue(v)} (now: "${v.now}")`).join('; ');
@@ -1614,7 +1638,11 @@ function deliverableText(ctx: Pick<PerformContext, 'bundles' | 'template'>, stag
  */
 export function withFreshMeasurements(evaluation: StageEvaluation, measured: boolean, stillUnmet: readonly string[]): StageEvaluation {
   if (!measured) return evaluation;
-  const unmet = stillUnmet.length ? evaluation.unmet : evaluation.unmet.filter((c) => !c.id.startsWith('measured.'));
+  // The new text's measurements replace the old text's, failing ones included:
+  // a repair that broke a limit the old text met is not complete (12 Oct, Diligence).
+  const others = evaluation.unmet.filter((c) => !c.id.startsWith('measured.'));
+  const fresh = stillUnmet.map((line, i) => ({ id: `measured.fresh.${i}`, label: line, satisfied: false, blocking: true, detail: line }));
+  const unmet = [...others, ...fresh];
   return { ...evaluation, unmet, canAdvance: !unmet.some((c) => c.blocking) };
 }
 
@@ -1741,6 +1769,72 @@ export function recheckInstruction(
         : 'Begin with one line, "What changed:", saying what was kept and what was replaced.') +
     replace
   );
+}
+
+/** A clause in a change note that claims a check: "a verified 240 words", "now within the limit". */
+const CLAIM = /\b(verif(?:y|ied|ication)|within (?:the )?(?:\d+[- ]word )?limit|under (?:the )?limit|word count|\d+ words)\b/i;
+
+/**
+ * The model's "What changed:" line, without the checks it claims to have made,
+ * and with the counts code made on the saved text (12 Oct; Sean, Diligence: a
+ * repair said "verified sub-250-word summary" over a summary still too long).
+ */
+export function honestChangeNote(content: string, measured: readonly string[]): string {
+  const m = /^(\s*\**What changed:?\**:?\s*)([^\n]*)/i.exec(content);
+  if (!m) return content;
+  const clauses = m[2].split(/(?<=[.;])\s+/).map((c) => c.trim()).filter(Boolean);
+  const kept = clauses.filter((c) => !CLAIM.test(c));
+  if (kept.length === clauses.length && !measured.length) return content;
+  const said = kept.join(' ').replace(/;$/, '.').trim();
+  const counted = measured.length ? `Measured in code: ${measured.join('; ')}.` : '';
+  const line = [said && /[.!?]$/.test(said) ? said : said ? `${said}.` : '', counted].filter(Boolean).join(' ');
+  return `${m[1].replace(/\s+$/, ' ')}${line}${content.slice(m[0].length)}`;
+}
+
+/** How many times a cut-off draft is continued before it is saved as cut off. */
+const CONTINUE_TRIES = 2;
+
+/**
+ * A prose draft the model cut off at its token limit, continued from where it
+ * stopped, up to `CONTINUE_TRIES` times (12 Oct; Sean, Diligence). Before
+ * this, the draft was saved as current and its stage marked complete, ending
+ * halfway through Q11. A table is not continued: its rows are JSON.
+ */
+async function finishCutDraft(
+  ctx: PerformContext,
+  inputs: ReturnType<typeof inputsFrom>,
+  model: string | undefined,
+  stage: StageDefinition,
+  content: string,
+  finishReason: string | null | undefined
+): Promise<{ content: string; cut: boolean; continued: boolean; finishReason: string | null }> {
+  if (finishReason !== 'length' || rendererHoldsItems(stage.renderer)) {
+    return { content, cut: false, continued: false, finishReason: finishReason || null };
+  }
+  let text = content;
+  let cut = true;
+  for (let i = 0; i < CONTINUE_TRIES && cut; i += 1) {
+    try {
+      const { iteration } = await api.continueDocument(
+        { inputs, incomplete_iteration: asIteration(text, 1, ctx.project.mode), iteration_number: 2, model },
+        ctx.signal
+      );
+      if (!iteration.output?.trim() || iteration.output.trim().length <= text.trim().length) break;
+      text = iteration.output;
+      cut = iteration.evaluation?.completeness?.status === 'incomplete';
+    } catch (e) {
+      if ((e as Error)?.name === 'AbortError') throw e;
+      break;
+    }
+  }
+  return { content: text, cut, continued: text !== content, finishReason: cut ? 'length' : 'stop' };
+}
+
+/** Where a saved draft stops, so "cut off" names the place. */
+function cutOffMessage(label: string, content: string): string {
+  const last = content.trim().split('\n').map((l) => l.trim()).filter(Boolean).at(-1) ?? '';
+  const at = last ? ` It stops at: “${last.length > 80 ? `${last.slice(0, 80)}…` : last}”.` : '';
+  return `The new version of ${label} was cut off by the model's length limit and could not be completed.${at} It is saved so you can see it, but it is not marked complete; use "Continue writing", or ask Go to try again.`;
 }
 
 /**

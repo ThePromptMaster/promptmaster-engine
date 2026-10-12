@@ -92,6 +92,12 @@ export function parseRequirements(texts: readonly string[]): MeasurableRequireme
       // 11 Oct (survey brief): "capped at 200 words" was not read, so the limit
       // was never measured and the model's eye count stood unchallenged.
       [new RegExp(`\\b(?:under|fewer than|less than|at most|no more than|not more than|no longer than|maximum of|a maximum of|max(?:imum)?|up to|below|within|capped at|a cap of|limited to|a limit of|not (?:to )?exceed(?:ing)?)\\s+${NUM}[\\s-]*words?\\b`, 'gi'), (m) => ({ max: num(m[1]) })],
+      // 12 Oct (Sean, Diligence): "a 250-word executive summary", "≤ 250
+      // words" and "keep it to 250 words" were not read, so the model's eye
+      // count stood and an overlength summary passed.
+      [new RegExp(`(?:≤|<=|<)\\s*${NUM}[\\s-]*words?\\b`, 'gi'), (m) => ({ max: num(m[1]) })],
+      [new RegExp(`\\bkeep (?:it|this|them|the [a-z ]{1,30}?) (?:to|under|within|below)\\s+${NUM}[\\s-]*words?\\b`, 'gi'), (m) => ({ max: num(m[1]) })],
+      [new RegExp(`\\b${NUM}-words?\\s+(?:(?:executive|short|brief|one-paragraph|opening|closing)\\s+)?(?=(?:${SUBJECTS.join('|')}|frequently asked questions)\\b)`, 'gi'), (m) => ({ max: num(m[1]) })],
       // "200 words max", "200 words or fewer", "a 200-word limit".
       [new RegExp(`\\b${NUM}[\\s-]*words?\\s+(?:max(?:imum)?|or (?:less|fewer)|at most|limit|cap)\\b`, 'gi'), (m) => ({ max: num(m[1]) })],
       [new RegExp(`\\b(?:at least|a minimum of|minimum of|no fewer than|no less than)\\s+${NUM}[\\s-]*words?\\b`, 'gi'), (m) => ({ min: num(m[1]) })],
@@ -100,7 +106,9 @@ export function parseRequirements(texts: readonly string[]): MeasurableRequireme
       for (const m of t.matchAll(re)) {
         const r = read(m);
         if ((r.min ?? 0) > 20_000 || (r.max ?? 0) > 20_000) continue;
-        add({ kind: 'words', subject: subjectNear(t, m.index!, m.index! + m[0].length), source: m[0].trim(), ...r });
+        // "Keep the summary to 250 words" names its subject inside the match.
+        const inside = m[0].match(SUBJECT_RE);
+        add({ kind: 'words', subject: inside ? canonical(inside[1]) : subjectNear(t, m.index!, m.index! + m[0].length), source: m[0].trim(), ...r });
       }
     }
     // "a one-page plan", "fits on one page", "no more than two pages" (L-73,
@@ -175,7 +183,28 @@ const isQuestion = (l: Line) => plain(l.text).endsWith('?');
  */
 const NOTE = /^\W*(what changed|revision notes?|change notes?|notes?|word count|words?\s*:|\(\d+\s+words?\)|verification)\b/i;
 
-/** The part of `text` that is about `subject`: under a heading naming it, or all of it. */
+/**
+ * A part of a document that sits beside other parts — "a summary of at most
+ * 100 words, followed by a five-row table and three questions" — rather than
+ * being the whole of it.
+ */
+const PART_SUBJECTS: ReadonlySet<string> = new Set(['summary', 'abstract', 'overview', 'introduction']);
+
+/** Lines that are never part of a summary's prose: a table row, a numbered or labelled question. */
+const isTableLine = (l: Line) => l.level === 0 && /^\|.*\|$/.test(l.text);
+const isListedQuestion = (l: Line) => l.level === 0 && /^(?:\d+[.)]|q\s*\d+[.:)]?|question\s*\d+[.:)]?)\s+/i.test(l.text) && isQuestion(l);
+
+/**
+ * The part of `text` that is about `subject`: under a heading naming it, or
+ * null when no heading does.
+ *
+ * 12 Oct (Sean, Cedar): an 80-word summary measured 212, because a bold
+ * "Table" label and the questions under "## Summary" did not end it. The
+ * section now ends at the next heading at its level or above, at a bold or
+ * "Label:" line under a markdown heading, at a heading naming another part,
+ * at a table, or at a numbered question. A document's title that names the
+ * subject ("# Cedar Summary", with the parts below it) is not the section.
+ */
 export function sectionFor(text: string, subject: string): string | null {
   const all = lines(text);
   if (!subject) return text;
@@ -183,15 +212,61 @@ export function sectionFor(text: string, subject: string): string | null {
     const t = l.text.toLowerCase();
     return subject === 'faq' ? /\bfaq\b|frequently asked questions/.test(t) : t.includes(subject);
   };
-  const start = all.findIndex((l) => l.level > 0 && !isQuestion(l) && named(l));
-  if (start < 0) return null;
+  const heads = all.map((l, i) => ({ l, i })).filter(({ l }) => l.level > 0 && !isQuestion(l));
+  const isTitle = (i: number) => {
+    const first = heads[0];
+    if (!first || first.i !== i || first.l.level > 6) return false;
+    const rest = heads.slice(1);
+    return rest.length > 0 && rest.every(({ l }) => l.level > first.l.level);
+  };
+  const found = heads.find(({ l, i }) => named(l) && !isTitle(i));
+  if (!found) return null;
+  const start = found.i;
   const level = all[start].level;
   const out: string[] = [];
   for (const l of all.slice(start + 1)) {
-    if (l.level > 0 && !isQuestion(l) && (l.level <= level || SUBJECT_RE.test(l.text) || NOTE.test(l.text))) break;
+    if (isTableLine(l) || (subject !== 'faq' && isListedQuestion(l))) break;
+    if (l.level > 0 && !isQuestion(l)) {
+      const ends = l.level <= level || (level <= 6 && l.level >= 7) || SUBJECT_RE.test(l.text) || NOTE.test(l.text) || !named(l) && PART_SUBJECTS.has(subject) && /\b(table|questions?|appendix|actions?|risks?|recommendations?|findings?|sources?)\b/i.test(l.text);
+      if (ends) break;
+    }
     out.push(l.level > 0 ? `# ${l.text}` : l.text);
   }
   return out.join('\n');
+}
+
+/**
+ * The opening prose of a text: everything before its first heading below a
+ * title, its first table or its first numbered question. Where a part such as
+ * the summary has no heading of its own, this is where it is.
+ */
+export function openingProse(text: string): string {
+  const all = lines(text);
+  const out: string[] = [];
+  let seenProse = false;
+  for (const l of all) {
+    if (isTableLine(l) || isListedQuestion(l)) break;
+    if (l.level > 0 && !isQuestion(l)) {
+      if (seenProse) break;
+      continue; // a title, or the document's first heading
+    }
+    if (l.text) seenProse = true;
+    out.push(l.text);
+  }
+  return out.join('\n');
+}
+
+/** Whether a text has parts besides its opening: a heading after prose, a table, or numbered questions. */
+function hasOtherParts(text: string): boolean {
+  return openingProse(text).trim().length < text.trim().length - 40;
+}
+
+/** "from “first words” to “last words”": which text a count was made of. */
+export function quoteSpan(text: string): string {
+  const words = lines(text).filter((l) => l.level === 0 && !NOTE.test(l.text)).map((l) => plain(l.text)).join(' ').split(/\s+/).filter(Boolean);
+  if (!words.length) return '';
+  if (words.length <= 12) return `“${words.join(' ')}”`;
+  return `from “${words.slice(0, 5).join(' ')}” to “${words.slice(-5).join(' ')}”`;
 }
 
 /** Words of prose, by whitespace, leaving out headings and notes about the text. */
@@ -264,13 +339,20 @@ function rangeText(r: MeasurableRequirement): string {
  * with no heading naming it the whole text is what is measured.
  */
 export function measure(r: MeasurableRequirement, text: string, whole = false): Measurement | null {
-  const section = sectionFor(text, r.subject) ?? (whole ? text : null);
+  const headed = sectionFor(text, r.subject);
+  // A part with no heading of its own is the opening prose, never the whole
+  // document with its tables and questions (12 Oct, Cedar: 80 words read as 212).
+  const opening = headed === null && whole && PART_SUBJECTS.has(r.subject) && hasOtherParts(text) ? openingProse(text) : null;
+  const section = headed ?? opening ?? (whole ? text : null);
   if (section === null) return null;
   const name = subjectLabel(r.subject);
   if (r.kind === 'words') {
     const n = countWords(section);
     const ok = (r.min === undefined || n >= r.min) && (r.max === undefined || n <= r.max);
-    return { id: `measured.${r.id}`, label: `${name}: ${rangeText(r)} words`, satisfied: ok, value: `${n} words`, ...(ok ? {} : { detail: `${n} words` }) };
+    // The count says which text it was made of, so a wrong section shows (12 Oct).
+    const span = r.subject && section !== text ? quoteSpan(section) : '';
+    const value = `${n} words${span ? `, counted ${span}` : ''}`;
+    return { id: `measured.${r.id}`, label: `${name}: ${rangeText(r)} words`, satisfied: ok, value, ...(ok ? {} : { detail: `${n} words` }) };
   }
   if (r.kind === 'pages') {
     // An estimate, said as one: a printed page depends on fonts and margins,

@@ -18,7 +18,7 @@ import { evaluateStage } from './engine';
 import { SINGLE_OUTPUT_V1 as template } from './templates/single-output.v1';
 import { itemSchemaFor } from './stage-artifact';
 import { policyConfirmable, repairTries, staleRepair } from '@/lib/agent/needs';
-import { recheckInstruction, withFreshMeasurements, withoutRevisionNotes } from '@/lib/agent/perform';
+import { honestChangeNote, recheckInstruction, withFreshMeasurements, withoutRevisionNotes } from '@/lib/agent/perform';
 import { supersededValues } from './fact-values';
 import type { StageContext, WorkflowState } from './types';
 
@@ -254,6 +254,25 @@ describe('a repair is closed on the count of what it saved (L-63, 9 Oct)', () =>
   });
   it('anything else unmet still holds it', () => {
     expect(withFreshMeasurements({ ...evaluation, unmet: [measured, approval] }, true, []).canAdvance).toBe(false);
+  });
+  it('a repair that breaks a limit the old text met is not complete (12 Oct, Diligence)', () => {
+    const passing = { stageId: 'output', criteria: [], canAdvance: true, unmet: [] };
+    const fresh = withFreshMeasurements(passing, true, ['Summary: at most 250 words — measured 281 words']);
+    expect(fresh.canAdvance).toBe(false);
+    expect(fresh.unmet[0].label).toContain('281 words');
+  });
+});
+
+describe('a change note cannot claim a check code did not make (12 Oct, Diligence)', () => {
+  it('drops the model’s verification claims and states the count made in code', () => {
+    const text = 'What changed: shortened the summary to a verified 240 words; fixed vacancy notation.\n\n## Executive summary\nBody.';
+    expect(honestChangeNote(text, ['Summary: at most 250 words — 281 words'])).toBe(
+      'What changed: fixed vacancy notation. Measured in code: Summary: at most 250 words — 281 words.\n\n## Executive summary\nBody.'
+    );
+  });
+  it('leaves a note with no claims alone', () => {
+    const text = 'What changed: fixed vacancy notation.\n\nBody.';
+    expect(honestChangeNote(text, [])).toBe(text);
   });
 });
 
