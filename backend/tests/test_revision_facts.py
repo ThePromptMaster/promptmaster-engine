@@ -43,6 +43,45 @@ def test_the_endpoint_reports_nothing_when_the_check_fails():
     app.dependency_overrides[get_client] = lambda: stub
     try:
         r = TestClient(app).post("/api/revision-facts", json=REQ.model_dump())
-        assert r.status_code == 200 and r.json() == {"changes": []}
+        assert r.status_code == 200 and r.json() == {"changes": [], "additions": []}
+    finally:
+        app.dependency_overrides.pop(get_client, None)
+
+
+ATLAS = RevisionFactsRequest(
+    instruction="Use the new sources S6 and S7. The permitted evidence is now S1–S7. Make the tone warmer.",
+    before="Training: eight of ten complete (S4).",
+    after="Training: nine of ten complete (S6).",
+    facts=[RevisionFact(id="f1", statement="Use only sources S1–S5.")],
+)
+
+
+def test_the_prompt_asks_for_standing_changes_the_instruction_states():
+    system, _user = build_prompt(ATLAS)
+    assert "STANDING change the INSTRUCTION itself states" in system
+    assert "permitted evidence" in system
+    assert "A one-off wording or style request is not a standing change" in system
+
+
+def test_an_addition_is_kept_only_with_a_quote_from_the_instruction():
+    out = parse({"changes": [], "additions": [
+        {"statement": "Permitted evidence is S1–S7.", "kind": "requirement", "quote": "The permitted evidence is now S1–S7."},
+        {"statement": "Training is nine of ten.", "kind": "fact", "quote": "nine of ten complete"},  # quoted from the text, not the instruction
+        {"statement": "Use only sources S1–S5.", "kind": "requirement", "quote": "Use the new sources S6 and S7."},  # already a fact
+        {"statement": "Permitted evidence is S1–S7.", "kind": "requirement", "quote": "Use the new sources S6 and S7."},  # duplicate
+    ]}, ATLAS)
+    assert [(a.statement, a.kind) for a in out.additions] == [("Permitted evidence is S1–S7.", "requirement")]
+
+
+def test_the_check_runs_when_the_project_has_no_facts_yet():
+    stub = AsyncMock()
+    stub.generate_json = AsyncMock(return_value=({"changes": [], "additions": [
+        {"statement": "Supplier was removed with Elena's approval on 9 November.", "kind": "fact", "quote": "Elena approved removing Supplier"}]}, None))
+    app.dependency_overrides[get_client] = lambda: stub
+    try:
+        req = RevisionFactsRequest(instruction="Elena approved removing Supplier; drop its row.", before="a", after="b")
+        r = TestClient(app).post("/api/revision-facts", json=req.model_dump())
+        assert r.status_code == 200
+        assert r.json()["additions"][0]["statement"].startswith("Supplier was removed")
     finally:
         app.dependency_overrides.pop(get_client, None)

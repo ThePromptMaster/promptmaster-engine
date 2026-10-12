@@ -33,6 +33,10 @@ from .page_context import scrub_button_mentions
 from .schemas import PMInput, DataFileBrief, format_data_files
 from .project_context import context_block
 
+#: Go's planner runs every step, so it reads the context bounded; 4,000 until
+#: 12 Oct cut a long brief's requirements in half (Northstar).
+PLANNER_CONTEXT_MAX = 12_000
+
 logger = logging.getLogger(__name__)
 
 POLICY_TEXT = {
@@ -388,7 +392,7 @@ def _format_state(inputs: PMInput, state: AgentState) -> str:
         f"OBJECTIVE (authoritative): {inputs.objective}",
         f"Audience: {inputs.audience or '(not set)'}",
         f"Constraints: {inputs.constraints or '(none)'}",
-        *([context_block(inputs, limit=4_000)] if (inputs.context.strip() or inputs.facts) else []),
+        *([context_block(inputs, limit=PLANNER_CONTEXT_MAX)] if context_block(inputs) else []),
         "",
         *workflow_line,
         f"CURRENT STAGE: {state.stage_label or state.stage_id}",

@@ -28,7 +28,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from .llm_client import OpenRouterClient
-from .project_context import context_block
+from .project_context import CHECK_CONTEXT_MAX, brief_lines, context_block
 from .schemas import PMInput
 
 #: The deliverable text a check reads; the verdict and blockers of a long
@@ -137,7 +137,8 @@ def build_assessment_prompt(
     user = (
         f"OBJECTIVE: {inputs.objective}\n"
         + (f"SUCCESS CRITERION, as set when the workflow was designed: {success_criterion}\n" if success_criterion.strip() else "")
-        + (f"{context_block(inputs, limit=4_000)}\n" if (inputs.context.strip() or inputs.facts) else "")
+        + (f"{brief}\n" if (brief := brief_lines(inputs)) else "")
+        + (f"{context_block(inputs, limit=CHECK_CONTEXT_MAX)}\n" if context_block(inputs) else "")
         + f"\nRUN RECORD (what the autonomous run actually did; execution labels are derived from what happened):\n{record}\n\n"
         f"--- THE DELIVERABLE: {deliverable_label} ---\n{_clip(content)}\n--- END ---\n\n"
         + (

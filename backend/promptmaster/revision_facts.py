@@ -13,6 +13,13 @@ says something the fact no longer allows, and the user's instruction asked
 for that change. Each comes back with the fact rewritten to agree. Nothing is
 recorded here; the user ticks or unticks each one with the revision. A failed
 check reports nothing, so it never stands between the user and the revision.
+
+12 Oct (Sean, Atlas and Meridian): an instruction can also *add* to the
+project's state — "you may now use S1–S7", "Elena approved removing Supplier".
+Saved only on the version, it reached no later prompt, so the review held the
+revised report to S1–S5 and Go asked to restore the removed rows. The same
+call now reports each standing change the instruction states, quoted from the
+instruction itself, for the user to record as a fact or requirement.
 """
 
 from __future__ import annotations
@@ -25,6 +32,7 @@ from .llm_client import OpenRouterClient
 
 MAX_FACTS = 60
 MAX_CHANGES = 8
+MAX_ADDITIONS = 6
 
 
 class RevisionFact(BaseModel):
@@ -47,8 +55,15 @@ class FactMeaningChange(BaseModel):
     why: str = ""
 
 
+class NewStandingFact(BaseModel):
+    statement: str
+    kind: str = "fact"  # "fact" | "requirement"
+    quote: str
+
+
 class RevisionFactsResponse(BaseModel):
     changes: list[FactMeaningChange] = Field(default_factory=list)
+    additions: list[NewStandingFact] = Field(default_factory=list)
 
 
 _INSTRUCTION = (
@@ -61,7 +76,15 @@ _INSTRUCTION = (
     "For each fact you report: its id exactly as given; the fact rewritten so it agrees with the revision, "
     "changing as little as possible; a quote copied verbatim from the revised text that shows the change "
     "(one sentence or less); and a few words on what changed.\n"
-    "Return JSON: {\"changes\": [{\"fact_id\": string, \"proposed\": string, \"quote\": string, \"why\": string}]}"
+    "SEPARATELY, report each STANDING change the INSTRUCTION itself states that later work must respect and "
+    "that no accepted fact already says: a change to the permitted evidence or sources (\"use S1–S7\"), "
+    "an approved removal or addition and who approved it, a new or moved date, a figure, or a rule to "
+    "preserve something. Write each as one short self-contained statement, mark it \"requirement\" when it "
+    "binds what the work may say or must keep and \"fact\" otherwise, and quote the instruction verbatim "
+    "(one sentence or less). A one-off wording or style request is not a standing change. When in doubt, "
+    "report nothing.\n"
+    "Return JSON: {\"changes\": [{\"fact_id\": string, \"proposed\": string, \"quote\": string, \"why\": string}], "
+    "\"additions\": [{\"statement\": string, \"kind\": \"fact\" | \"requirement\", \"quote\": string}]}"
 )
 
 
@@ -75,15 +98,43 @@ def build_prompt(req: RevisionFactsRequest) -> tuple[str, str]:
         f"THE USER'S INSTRUCTION:\n{req.instruction.strip()}\n\n"
         f"THE TEXT BEFORE:\n{req.before.strip() or '(none)'}\n\n"
         f"THE REVISED TEXT:\n{req.after.strip()}\n\n"
-        f"ACCEPTED FACTS:\n{facts}"
+        f"ACCEPTED FACTS:\n{facts or '(none)'}"
     )
     return _INSTRUCTION, prompt
 
 
 def parse(raw: object, req: RevisionFactsRequest) -> RevisionFactsResponse:
-    """Kept only for a fact that was listed, with a quote verbatim in the revised text."""
-    if not isinstance(raw, dict) or not isinstance(raw.get("changes"), list):
+    """A change is kept only for a fact that was listed, with a quote verbatim in
+    the revised text; an addition only with a quote verbatim in the instruction."""
+    if not isinstance(raw, dict):
         return RevisionFactsResponse()
+    return RevisionFactsResponse(changes=_changes(raw, req), additions=_additions(raw, req))
+
+
+def _additions(raw: dict, req: RevisionFactsRequest) -> list[NewStandingFact]:
+    items = raw.get("additions")
+    if not isinstance(items, list):
+        return []
+    instruction = _norm(req.instruction)
+    known = {_norm(f.statement) for f in req.facts}
+    out: list[NewStandingFact] = []
+    for item in items[:MAX_ADDITIONS]:
+        if not isinstance(item, dict):
+            continue
+        statement = " ".join(str(item.get("statement") or "").split())[:2_000]
+        quote = " ".join(str(item.get("quote") or "").split()).strip('"“”')[:600]
+        kind = "requirement" if str(item.get("kind") or "").strip().lower() == "requirement" else "fact"
+        if len(statement) < 4 or len(quote) < 4 or _norm(quote) not in instruction:
+            continue
+        if _norm(statement) in known or any(_norm(a.statement) == _norm(statement) for a in out):
+            continue
+        out.append(NewStandingFact(statement=statement, kind=kind, quote=quote))
+    return out
+
+
+def _changes(raw: dict, req: RevisionFactsRequest) -> list[FactMeaningChange]:
+    if not isinstance(raw.get("changes"), list):
+        return []
     by_id = {f.id: f for f in req.facts}
     after = _norm(req.after)
     out: list[FactMeaningChange] = []
@@ -98,15 +149,15 @@ def parse(raw: object, req: RevisionFactsRequest) -> RevisionFactsResponse:
         if _norm(proposed) == _norm(fact.statement) or any(c.fact_id == fact.id for c in out):
             continue
         out.append(FactMeaningChange(fact_id=fact.id, proposed=proposed, quote=quote, why=" ".join(str(item.get("why") or "").split())[:300]))
-    return RevisionFactsResponse(changes=out)
+    return out
 
 
 async def revision_facts(client: OpenRouterClient, req: RevisionFactsRequest) -> RevisionFactsResponse:
-    if not req.facts or not req.after.strip():
+    if not req.after.strip():
         return RevisionFactsResponse()
     system, prompt = build_prompt(req)
     try:
-        raw, _usage = await client.generate_json(prompt=prompt, system=system, temperature=0, max_tokens=800, model=req.model or None)
+        raw, _usage = await client.generate_json(prompt=prompt, system=system, temperature=0, max_tokens=1_200, model=req.model or None)
     except Exception:  # noqa: BLE001 — a failed check never blocks the revision
         return RevisionFactsResponse()
     return parse(raw, req)

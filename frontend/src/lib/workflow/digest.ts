@@ -276,7 +276,7 @@ export function buildStageDigest(
     const label = lastRound
       ? `${stage.label} (last round)`
       : st?.status === 'stale'
-        ? `${stage.label} (awaiting a recheck — may be out of date)`
+        ? `${stage.label} (awaiting a recheck — may be out of date; where it differs from a later stage or an instruction the user applied, it is the one that is wrong)`
         : pending
           ? `${stage.label} (being revised — latest saved, not yet signed off)`
           : leftOpen ? `${stage.label} (left open)` : stage.label;
@@ -284,9 +284,13 @@ export function buildStageDigest(
     texts.push(text);
   });
 
-  // Fill the budget from the latest stage backwards.
+  // Fill the budget from the latest stage backwards, the current documents
+  // first: a copy awaiting a recheck may hold the old state, and took the room
+  // before the revised Output did (12 Oct, Meridian).
   let room = DOCUMENTS_MAX;
-  for (let i = prior_stages.length - 1; i >= 0; i -= 1) {
+  const stale = (i: number) => prior_stages[i].label.includes('(awaiting a recheck');
+  const order = prior_stages.map((_, i) => i).reverse();
+  for (const i of [...order.filter((i) => !stale(i)), ...order.filter(stale)]) {
     const text = texts[i];
     if (!text) continue;
     if (text.length <= room) {

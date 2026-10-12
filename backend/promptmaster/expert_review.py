@@ -24,7 +24,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from .llm_client import OpenRouterClient
-from .project_context import context_block
+from .project_context import CHECK_CONTEXT_MAX, context_block
 from .schemas import PMInput
 
 MAX_RECORD = 60_000
@@ -91,7 +91,7 @@ def build_package_prompt(inputs: PMInput, issue: str, stage_label: str, document
     ) or "(nothing saved yet)"
     user = (
         f"OBJECTIVE: {inputs.objective}\n"
-        + (f"{context_block(inputs, limit=4_000)}\n" if (inputs.context.strip() or inputs.facts) else "")
+        + (f"{context_block(inputs, limit=CHECK_CONTEXT_MAX)}\n" if context_block(inputs) else "")
         + f"\nWHERE THE WORK STOPPED: {stage_label}\n"
         f"THE ISSUE THAT NEEDS AN EXPERT: {issue}\n\n"
         f"THE SAVED RECORD:\n{record}\n\n"

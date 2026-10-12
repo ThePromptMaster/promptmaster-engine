@@ -26,6 +26,13 @@ VERIFY_RULE = (
     "\"only feasible options\"), count the items in the saved text and give that count. "
     "Where the brief limits the work to supplied facts, flag any claim or benefit wording "
     "that no supplied fact supports (\"helps keep everyone aligned\", \"makes it easy\"). "
+    # 12 Oct (Sean, Atlas): the user widened the evidence to S1–S7 with "Change
+    # it"; the review held the report to the brief's S1–S5 and called the new
+    # sources unsupported.
+    "Supplied facts include the accepted facts and whatever an instruction the user applied "
+    "supplies or permits: when an instruction widened the sources or evidence, work that uses "
+    "them is supported, and a value or date it changed is the current one, not a conflict. "
+    "Something an instruction removed or resolved is not a finding for being gone. "
     # Sean, 10 Oct (email 8): a general onboarding plan was faulted for "basic
     # workspace supplies and access" because nobody had supplied them.
     "A general recommendation the objective asks for (\"set up their laptop and accounts "

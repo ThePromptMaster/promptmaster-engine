@@ -531,6 +531,11 @@ def _json_reply(system: str, prompt: str) -> dict:
             line = next((ln.strip() for ln in after.splitlines() if "remote" in ln.lower()), "")
             if fact and line:
                 return {"changes": [{"fact_id": fact.group(1), "proposed": "The team works fully remote.", "quote": line[:200], "why": "Mock: now remote."}]}
+        # "[[mock:addition]]": the instruction's first line is a standing change (12 Oct, Atlas).
+        if "[[mock:addition]]" in prompt:
+            said = prompt.split("THE USER'S INSTRUCTION:\n", 1)[-1].split("\n", 1)[0].replace("[[mock:addition]]", "").strip()
+            if said:
+                return {"changes": [], "additions": [{"statement": said, "kind": "requirement", "quote": said[:200]}]}
         return {"changes": []}
     if system.startswith(objective_assessment._ASSESS_INSTRUCTION[:60]):
         # Not met when the deliverable says "[[mock:objective=unmet]]": a blocker

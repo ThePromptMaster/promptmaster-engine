@@ -709,7 +709,10 @@ export function carriedForwardUnmet(items: readonly StageItem[], schema: StageIt
   return items
     .filter((i) => i.status === 'deferred' && isTriaged(i, schema))
     .filter((i) => i.severity === 'major' || UNMET.test(rowText(i)))
-    .map((i) => rowText(i).slice(0, 160));
+    .map((i) => {
+      const text = rowText(i);
+      return text.length > 600 ? `${text.slice(0, 599).trimEnd()}…` : text;
+    });
 }
 
 /**

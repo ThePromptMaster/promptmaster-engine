@@ -23,8 +23,12 @@ import { currentFacts } from './facts';
 const RECONCILED: readonly (keyof FactValues)[] = ['dates', 'money', 'weekdays', 'times', 'limits'];
 
 export interface FactValueChange {
-  /** A value matched in code, or 'meaning': a change the model found and quoted (L-72). */
-  kind: keyof FactValues | 'meaning';
+  /**
+   * A value matched in code; 'meaning': a change the model found and quoted
+   * (L-72); 'new': a standing change the instruction states, to record as a
+   * new fact (12 Oct).
+   */
+  kind: keyof FactValues | 'meaning' | 'new';
   was: string;
   now: string;
 }
@@ -102,7 +106,14 @@ export function factChangesFromRevision(input: {
 
 /** "Thursday → Wednesday; 12:30 p.m. → 1:00 p.m." */
 export function describeFactChange(c: FactChange): string {
-  return c.changes.map((v) => (v.kind === 'meaning' ? v.now : `${v.was} → ${v.now}`)).join('; ');
+  return c.changes.map((v) => (v.kind === 'meaning' || v.kind === 'new' ? v.now : `${v.was} → ${v.now}`)).join('; ');
+}
+
+/** The id a standing change carries until it is recorded: it is not a fact yet. */
+const NEW_PREFIX = 'new:';
+
+export function isNewFact(c: FactChange): boolean {
+  return c.fact.id.startsWith(NEW_PREFIX);
 }
 
 /**
@@ -114,14 +125,21 @@ export function describeFactChange(c: FactChange): string {
 export async function withMeaningChanges(
   valueChanges: FactChange[],
   input: { facts: readonly ProjectFact[] | undefined; instruction: string; before: string; after: string; model?: string },
-  check: (req: { instruction: string; before: string; after: string; facts: { id: string; statement: string }[]; model?: string }) => Promise<{ changes: { fact_id: string; proposed: string; quote: string; why: string }[] }>
+  check: (req: { instruction: string; before: string; after: string; facts: { id: string; statement: string }[]; model?: string }) => Promise<{
+    changes: { fact_id: string; proposed: string; quote: string; why: string }[];
+    additions?: { statement: string; kind: 'fact' | 'requirement'; quote: string }[];
+  }>
 ): Promise<FactChange[]> {
   const offered = new Set(valueChanges.map((c) => c.fact.id));
   const rest = currentFacts(input.facts).filter((f) => !offered.has(f.id));
-  if (!rest.length || !input.after.trim() || input.before.trim() === input.after.trim()) return valueChanges;
+  // A standing change can come only from the user's own instruction (12 Oct,
+  // Atlas: "the permitted evidence is now S1–S7"), so with none there is
+  // nothing to add, and with no facts left there is nothing to contradict.
+  const said = input.instruction.trim();
+  if ((!rest.length && !said) || !input.after.trim() || input.before.trim() === input.after.trim()) return valueChanges;
   try {
     const res = await check({
-      instruction: input.instruction.trim() || 'The user changed the text to the revised text themselves; every difference is theirs.',
+      instruction: said || 'The user changed the text to the revised text themselves; every difference is theirs.',
       before: input.before, after: input.after, model: input.model,
       facts: rest.map((f) => ({ id: f.id, statement: f.statement })),
     });
@@ -132,7 +150,14 @@ export async function withMeaningChanges(
         ? [{ fact: { id: fact.id, statement: fact.statement, subject: fact.subject, kind: fact.kind }, changes: [{ kind: 'meaning', was: fact.statement, now: m.why ? `${m.why} — “${m.quote}”` : `“${m.quote}”` }], proposed: m.proposed }]
         : [];
     });
-    return [...valueChanges, ...meaning];
+    const added = said
+      ? (res.additions ?? []).map((a, i): FactChange => ({
+          fact: { id: `${NEW_PREFIX}${i}`, statement: '', subject: null, kind: a.kind === 'requirement' ? 'requirement' : 'fact' },
+          changes: [{ kind: 'new', was: '', now: `from your instruction — “${a.quote}”` }],
+          proposed: a.statement,
+        }))
+      : [];
+    return [...valueChanges, ...meaning, ...added];
   } catch {
     return valueChanges;
   }

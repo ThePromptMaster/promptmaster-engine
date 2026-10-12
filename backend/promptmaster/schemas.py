@@ -34,6 +34,13 @@ class AcceptedFact(BaseModel):
     replaces: str = Field(default="", max_length=2_000)
 
 
+class UserInstruction(BaseModel):
+    """An instruction the user applied to a stage, as the version it made records it."""
+    stage: str = Field(default="", max_length=200)
+    version: int = 0
+    instruction: str = Field(..., min_length=1, max_length=1_600)
+
+
 class PMInput(BaseModel):
     """User inputs for a PromptMaster session.
 
@@ -54,6 +61,10 @@ class PMInput(BaseModel):
     # first (`project_context.context_block`), so every stage, check and chat
     # reads the same current evidence.
     facts: list[AcceptedFact] = Field(default_factory=list, max_length=200)
+    # 12 Oct (Sean, Atlas and Meridian): the instructions the user applied with
+    # "Change it", oldest first. Saved only on their versions, they reached no
+    # later prompt, so a review held the work to the brief they had changed.
+    user_instructions: list[UserInstruction] = Field(default_factory=list, max_length=20)
     mode: ModeType = Field(..., description="Selected operational mode")
     # Custom mode fields (only used when mode == 'custom')
     custom_name: str = Field(default="", max_length=MAX_SHORT_TEXT_CHARS, description="Custom mode persona name")

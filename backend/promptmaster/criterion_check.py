@@ -16,7 +16,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from .llm_client import OpenRouterClient
-from .project_context import context_block
+from .project_context import CHECK_CONTEXT_MAX, context_block
 from .schemas import PMInput
 
 #: The stage text a check reads. A routine approval is about what the stage
@@ -45,7 +45,7 @@ def build_check_prompt(inputs: PMInput, stage_label: str, criterion: str, conten
         text = text[:MAX_CHECK_CONTENT] + "\n[…the rest of the stage is not shown]"
     user = (
         f"PROJECT OBJECTIVE: {inputs.objective}\n"
-        + (f"{context_block(inputs, limit=2_000)}\n" if (inputs.context.strip() or inputs.facts) else "")
+        + (f"{context_block(inputs, limit=CHECK_CONTEXT_MAX)}\n" if context_block(inputs) else "")
         + f"STAGE: {stage_label}\n"
         f"THE APPROVAL, as the user would state it: \"{criterion}\"\n\n"
         f"--- THE STAGE'S TEXT ---\n{text}\n--- END ---\n\n"

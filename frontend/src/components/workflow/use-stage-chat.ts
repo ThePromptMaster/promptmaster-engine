@@ -52,8 +52,8 @@ import {
 } from './chat-scope';
 import type { NewVersion } from '@/lib/supabase/versions';
 import type { ArtifactVersion, Project } from '@/types/project';
-import { factChangesFromRevision, withMeaningChanges, type FactChange } from '@/lib/workflow/fact-reconcile';
-import { supersedeFact } from '@/lib/supabase/facts';
+import { factChangesFromRevision, isNewFact, withMeaningChanges, type FactChange } from '@/lib/workflow/fact-reconcile';
+import { recordFacts, supersedeFact } from '@/lib/supabase/facts';
 import type { ChatContext, ChatMessage } from '@/types';
 
 /** A revision the user has been shown but has not yet accepted. */
@@ -435,7 +435,9 @@ export function useStageChat({
       let factsUpdated = 0;
       for (const c of chosen) {
         try {
-          await supersedeFact(project, c.fact, c.proposed, { via: 'revision', stage_id: stageId, instruction: proposal.instruction.slice(0, 500) });
+          const from = { via: 'revision', stage_id: stageId, instruction: proposal.instruction.slice(0, 500) };
+          if (isNewFact(c)) await recordFacts(project, [{ statement: c.proposed, kind: c.fact.kind, source_kind: 'user_edit', source_ref: from }]);
+          else await supersedeFact(project, c.fact, c.proposed, from);
           factsUpdated += 1;
         } catch {
           // The version is saved; a fact that could not be changed is said below.
@@ -449,7 +451,7 @@ export function useStageChat({
       await persist(
         'assistant',
         `Applied to ${proposal.target.label.toLowerCase()}. The previous version is kept and can be restored.` +
-          (factsUpdated ? ` Updated ${factsUpdated === 1 ? 'one fact' : `${factsUpdated} facts`} to match.` : ''),
+          (factsUpdated ? ` Recorded ${factsUpdated === 1 ? 'one fact' : `${factsUpdated} facts`} with it.` : ''),
         'instruct',
         proposal.target.label
       );

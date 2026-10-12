@@ -1437,3 +1437,24 @@ steps of the default window to do it: two checks, the objective check, moves and
 It then needed one "Continue for 12 more steps" to finish Summary. The pause says that it
 is a resource limit, not a problem. The window was not raised in this round. A larger
 default is a cost decision.
+
+### L-77 — Applied instructions and the IDs a revision keeps (2026-10-12)
+
+Since 12 Oct, an instruction the user applies with "Change it" goes into every
+later prompt and check, under accepted facts and above the reviewed prompt and the
+brief (`lib/workflow/applied-instructions.ts`, `project_context.instructions_block`).
+Only the latest 12 go out, each up to 1,500 characters. Standing changes such as
+"the permitted evidence is now S1–S7" are offered as new facts in the same step. They
+are found by a small model call and kept only when quoted from the instruction, so
+one the model misses is still carried as the instruction itself.
+
+Go does not save a revision that brings back an ID the user's own change removed,
+or that rewrites an ID in another form (D3 → D3-P). It asks instead
+(`lib/workflow/id-changes.ts`). An ID is matched by its shape: one to three capital
+letters and up to three digits, with an optional suffix. An item with no visible ID
+is not protected this way; the prompt rule "keep the record" is all that covers it.
+
+The objective check, the criterion check and the expert review now read the
+project context up to 40,000 characters. Go's planner reads 12,000, because it runs
+on every step. A longer context is cut at a line, with a note saying the cut is not
+a missing requirement.

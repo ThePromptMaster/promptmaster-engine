@@ -41,6 +41,7 @@ import { attachedDocuments, currentFacts, supersededFactValues } from '@/lib/wor
 import { ManuscriptMissing, withFreshManuscript } from '@/lib/workflow/fresh-manuscript';
 import { describeValue, leftoverValues, type SupersededValue } from '@/lib/workflow/fact-values';
 import { revertsUserVersion, USER_CHOSEN_OPERATIONS } from '@/lib/workflow/fact-reconcile';
+import { hasIdChanges, idChangeQuestion, idChanges, removedByUser } from '@/lib/workflow/id-changes';
 import { recordPolicyFacts } from '@/lib/supabase/facts';
 import { checkGoal } from './code-check';
 import { unmetHumanRequirements } from '@/lib/workflow/human-requirements';
@@ -612,6 +613,19 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // user is asked which is right (10 Oct, Sean: Go turned the Wednesday
       // invitation back into Thursday and called it verified).
       const headVersion = ctx.bundles[ctx.stage.id]?.versions.at(-1);
+      // Nor one that brings back what the user removed, or renames an ID (12 Oct, Meridian).
+      if (revising && headVersion && !ctx.conflictAnswer) {
+        const ids = idChanges({ head, generated: content, removed: removedByUser(ctx.bundles[ctx.stage.id]?.versions ?? []) });
+        if (hasIdChanges(ids)) {
+          const question = idChangeQuestion(ctx.stage.label, headVersion.version_number, ids);
+          return done(key, {
+            status: 'blocked', blockKind: 'needs_decision', toolsUsed: ['model'], changes: {},
+            output: question, params: { ...params, conflict_question: true },
+            stop: { status: 'awaiting_decision', reason: question },
+            needs: { kind: 'answer_question', question },
+          });
+        }
+      }
       if (revising && headVersion && USER_CHOSEN_OPERATIONS.has(headVersion.source_operation) && !ctx.conflictAnswer) {
         const reverted = revertsUserVersion({ facts: ctx.project.facts, userText: head, generated: content, userChosenAt: headVersion.created_at });
         if (reverted.length) {
@@ -912,7 +926,18 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       if (!content) {
         return done(key, { status: 'failed', output: 'The model returned nothing usable.', toolsUsed: ['model'], changes: {} });
       }
-      // A repair does not undo the user's own latest version either (10 Oct).
+      // A repair does not undo the user's own latest version either (10 Oct),
+      // nor bring back what they removed, nor rename an ID (12 Oct, Meridian).
+      if (headVersion && !ctx.conflictAnswer) {
+        const ids = idChanges({ head, generated: content, removed: removedByUser(ctx.bundles[target.id]?.versions ?? []) });
+        if (hasIdChanges(ids)) {
+          const question = idChangeQuestion(target.label, headVersion.version_number, ids);
+          return done(key, {
+            status: 'blocked', blockKind: 'needs_decision', toolsUsed: ['model'], changes: {},
+            output: question, stop: { status: 'awaiting_decision', reason: question }, needs: { kind: 'answer_question', question },
+          });
+        }
+      }
       if (headVersion && USER_CHOSEN_OPERATIONS.has(headVersion.source_operation)) {
         const reverted = revertsUserVersion({ facts: ctx.project.facts, userText: head, generated: content, userChosenAt: headVersion.created_at });
         if (reverted.length) {
@@ -1701,7 +1726,10 @@ export function recheckInstruction(
     : '';
   return (
     `RECHECK AFTER A CHANGE. ${stageLabel} was reopened because: ${why}. ` +
-    'Bring it into line with the project as it now stands — the brief, the accepted facts and requirements, and the earlier stages. ' +
+    // 12 Oct (Meridian): "into line with the brief" read as "back to the
+    // brief", and Go proposed restoring the rows the user had removed.
+    'Bring it into line with the project as it now stands — the accepted facts and requirements, the instructions the user applied since the brief, the earlier stages, and the brief — the later word winning. ' +
+    'Never undo what an instruction the user applied changed, removed or resolved, and keep every item\'s ID and meaning. ' +
     'Keep every figure, calculation and finding that still holds, exactly as written. ' +
     'Replace any conclusion or recommendation the change superseded, and re-test each option against the requirements as they are now: one that no longer qualifies is said to be excluded, and why. ' +
     // A table has no place for a note: on a production replay (9 Oct) the line

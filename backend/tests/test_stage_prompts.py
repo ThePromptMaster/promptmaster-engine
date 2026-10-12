@@ -675,3 +675,36 @@ def test_a_stage_says_each_point_once(basic_inputs, digest):
     stage = StageDescriptor(id="output", label="Output", renderer="prose", entry_prompt_hint="", artifact_kind="output")
     system, _user = build_stage_prompt(basic_inputs, stage, digest)
     assert "Say each point once" in system
+
+
+# --- 12 Oct (Sean, Atlas and Meridian): one current state ---------------------
+
+
+def test_a_revision_keeps_the_record_and_is_not_told_to_start_again(basic_inputs, prose_stage):
+    _s, user = build_stage_prompt(basic_inputs, prose_stage, StageDigest(objective="o"),
+                                  existing_content="R-002: vacancies — resolved", instruction="Add the onboarding update.")
+    assert "do not repeat it verbatim" not in user
+    assert "revise it; do not start again" in user
+    assert "Every ID (R-002, D3, Q11) keeps its exact form and its meaning" in user
+    assert "stays resolved, closed or removed" in user
+
+
+def test_a_regeneration_without_an_instruction_still_asks_for_a_better_draft(basic_inputs, prose_stage):
+    _s, user = build_stage_prompt(basic_inputs, prose_stage, StageDigest(objective="o"), existing_content="old")
+    assert "produce a better one; do not repeat it verbatim" in user
+
+
+def test_every_stage_reads_the_applied_instructions_above_the_reviewed_prompt(basic_inputs, prose_stage):
+    from promptmaster.schemas import UserInstruction
+    inputs = basic_inputs.model_copy(update={"user_instructions": [UserInstruction(stage="Output", version=4, instruction="The permitted evidence is now S1–S7.")]})
+    _s, user = build_stage_prompt(inputs, prose_stage, StageDigest(objective="o", reviewed_prompt="Use only S1–S5."))
+    assert "- Output v4: The permitted evidence is now S1–S7." in user
+    assert "Evidence or sources an instruction supplies are supplied evidence" in user
+    assert "WHICH WORD IS LATEST" in user
+    assert "an instruction the user applied since, changes it: that later word wins" in user
+    assert user.index("INSTRUCTIONS THE USER APPLIED") < user.index("THE REVIEWED PROMPT")
+
+
+def test_the_review_rule_counts_evidence_an_instruction_supplied():
+    from promptmaster.saved_text_checks import VERIFY_RULE
+    assert "when an instruction widened the sources or evidence, work that uses them is supported" in VERIFY_RULE

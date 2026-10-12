@@ -240,6 +240,13 @@ def build_stage_prompt(
         "objective disagree, the original objective wins. A particular value the "
         "objective states — a date, a price, a figure — gives way to an accepted "
         "fact that supersedes it: use the fact's value everywhere.",
+        # 12 Oct (Sean, Atlas and Meridian): one order for every stage and
+        # check, so the revision and the review read the same current state.
+        "WHICH WORD IS LATEST, from latest to earliest: what the user asks right now; "
+        "the accepted facts and requirements; the instructions the user applied since "
+        "the brief; the reviewed prompt; the brief and the original objective's "
+        "particulars. A later one overrides an earlier one on what it addresses, and "
+        "nothing else.",
         *(
             [
                 "This stage's statement sharpens the user's objective; it keeps the "
@@ -323,7 +330,9 @@ def build_stage_prompt(
             "",
             "THE REVIEWED PROMPT — the instruction the user reviewed for this deliverable. "
             "Produce what it asks for, as it asks for it. The original objective still "
-            "governs; where a summary above and this prompt differ, follow the prompt:",
+            "governs; where a summary above and this prompt differ, follow the prompt — "
+            "except where an accepted fact, or an instruction the user applied since, "
+            "changes it: that later word wins (a date moved, a source added, a row removed):",
             "--- BEGIN PROMPT ---",
             digest.reviewed_prompt.strip(),
             "--- END PROMPT ---",
@@ -339,7 +348,23 @@ def build_stage_prompt(
             "--- END MANUSCRIPT ---",
         ]
 
-    if existing_content.strip():
+    if existing_content.strip() and instruction.strip():
+        # A revision, not a fresh attempt. "Produce a better one; do not repeat
+        # it verbatim" beside "keep everything it does not ask you to change"
+        # let the model rewrite the register: R-002 became a different risk and
+        # proposal D3 became D3-P (12 Oct, Sean, Meridian).
+        parts += [
+            "",
+            "THE CURRENT DRAFT OF THIS STAGE — revise it; do not start again:",
+            existing_content.strip(),
+            "",
+            "KEEP THE RECORD: every line, row and item the instruction does not concern stays as it is. "
+            "Every ID (R-002, D3, Q11) keeps its exact form and its meaning; never reuse an ID for "
+            "something else. An item that is resolved, closed or removed stays resolved, closed or "
+            "removed, marked as such; a new item gets a new ID. Restore nothing the current draft "
+            "removed unless the instruction asks for it.",
+        ]
+    elif existing_content.strip():
         # Regeneration with something already on the page. Saying so keeps the
         # model from reproducing the draft it was asked to improve on.
         parts += [
