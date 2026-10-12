@@ -1519,6 +1519,8 @@ lighter Single output mode with fewer stages and controls is not built.
 The prompts now ask for the voice the audience calls for. A speaker of a stated age is
 written as a capable person of that age, never childishly, and a topic the user gives
 gets one finished piece rather than options. The front door's stated audience is kept
-over the setup suggester's preset. A speech, talk, letter, poem or short story is
+over the setup suggester's preset, and since 12 Oct the suggester itself keeps an audience the
+user states in their own words ("an eleven-year-old giving a pageant speech") instead of
+mapping it to a preset. A speech, talk, letter, poem or short story is
 recommended as Single output. A user can still pick Book for one by hand, and on 11 Oct
 a two-minute speech ran as a Book whose first stage listed topic ideas.

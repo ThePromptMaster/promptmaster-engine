@@ -187,3 +187,11 @@ async def test_an_exploration_recommendation_is_kept_and_valid():
     }, {}))
     suggestion = await suggest_setup(client=client, model=None, objective="Is spacetime emergent?")
     assert suggestion.workflow == "exploration"
+
+
+def test_a_stated_audience_is_kept_in_the_users_words():
+    """12 Oct (Colette): an eleven-year-old's pageant speech was set up for "Student"."""
+    from promptmaster import setup_suggester
+    prompts = " ".join(v for v in vars(setup_suggester).values() if isinstance(v, str))
+    assert "when the user says who the work is for or who delivers it, keep their words" in prompts
+    assert "Only when they say nothing about it, pick the closest of" in prompts

@@ -39,9 +39,13 @@ SETUP_SUGGESTER_SYSTEM = (
     "- cold_critic: Brutally objective audit, no encouragement\n"
     "- analyst: Evidence-based, data-aware reasoning\n"
     "- custom: Reserved for user-defined modes — do NOT recommend custom\n\n"
-    "Available audiences (suggest the closest match or a short free-text "
-    "tailored to the objective):\n"
-    "General, Technical, Executive, Academic, Student.\n\n"
+    # 12 Oct (Colette): "a speech for an eleven year old for a pageant" became
+    # "Student", and the drafts lost who was speaking and who was listening.
+    "Audience: when the user says who the work is for or who delivers it, keep "
+    "their words, briefly — e.g. \"An eleven-year-old giving a pageant speech; "
+    "the judges and audience\", \"Five-person team\". Only when they say nothing "
+    "about it, pick the closest of: General, Technical, Executive, Academic, "
+    "Student.\n\n"
     "Constraints: a short paragraph of the scope limits, focus areas or deadlines "
     "the user stated, or that follow directly from what they said. Do not add "
     "limits of your own (Sean, 10 Oct: \"avoid specialized training materials\" "
