@@ -21,7 +21,7 @@ import { draftingStageId } from './derived-outline';
 import type { StageArtifactBundle } from './digest';
 import { carriedForwardUnmet, deferredNotBlocking, confirmableProposals, openUnmet, effectiveRenderer, isTriaged, itemSchemaFor, parseItems, rendererHoldsItems } from './stage-artifact';
 import type { StageContext, StageDefinition, WorkflowEvent, WorkflowTemplate } from './types';
-import { deliverableStage } from './engine';
+import { deliverableStage, rowsRequired } from './engine';
 import { currentFacts } from './facts';
 import { measure, parseRequirements, requirementsForStage, type MeasurableRequirement, type Measurement } from './measurable';
 
@@ -149,9 +149,10 @@ export function buildStageContext(input: BuildContextInput): StageContext {
     // every review stage's count is available at once.
     if (effectiveRenderer(s) === 'review') {
       findings[s.id] = { total: items.length, triaged: items.length - itemsMissingStatus[s.id] };
-      const carried = carriedForwardUnmet(items, schema);
+      const optional = !rowsRequired(s);
+      const carried = carriedForwardUnmet(items, schema, optional);
       if (carried.length) carriedForward[s.id] = carried;
-      const later = deferredNotBlocking(items, schema);
+      const later = deferredNotBlocking(items, schema, optional);
       if (later.length) deferred[s.id] = later;
       const unmet = openUnmet(items, schema);
       if (unmet) openUnmetRows[s.id] = unmet;

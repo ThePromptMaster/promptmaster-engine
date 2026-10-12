@@ -47,6 +47,7 @@ import {
   evaluateStage,
   getStage,
   nextSuggestedStage,
+  progressCaptionText,
   progressSummary,
   projectState,
   type TransitionOption,
@@ -429,18 +430,7 @@ export function WorkflowWorkspace({
   const progress = useMemo(() => progressSummary(template, state), [template, state]);
   // "12 done · 1 left open · 0 to go" rather than "12 done · 1 to go" on a
   // finished project: a stage moved past is named for what it is.
-  const progressCaption = useMemo(() => {
-    const finished = state.project_status === 'finalized';
-    return [
-      finished ? 'Finished' : null,
-      `${progress.complete} done`,
-      progress.skipped > 0 ? `${progress.skipped} skipped` : null,
-      progress.leftOpen > 0 ? `${progress.leftOpen} left open` : null,
-      progress.remaining > 0 || !finished ? `${progress.remaining} to go` : null,
-    ]
-      .filter(Boolean)
-      .join(' · ');
-  }, [progress, state.project_status]);
+
   // 0-based position of the stage on screen. Read twice — by the stage header
   // and by the narrow-viewport bar — so it is derived once.
   const stageIndex = template.stages.findIndex((s) => s.id === stage?.id);
@@ -1304,6 +1294,8 @@ export function WorkflowWorkspace({
     goWaiting,
     objectiveUnmet: objectiveAssessment ? { blockers: objectiveAssessment.blockers.map((b) => b.need) } : null,
   });
+  // The sidebar counts what Go stops on, not only stage statuses (12 Oct).
+  const progressCaption = progressCaptionText(progress, state.project_status === 'finalized', completion.outstanding);
   // The deliverable's latest objective check, for the finished screen (C4).
   const deliverableHead = completion.deliverable ? bundles?.[completion.deliverable.id]?.versions.at(-1) : undefined;
   const deliverableEvaluation = deliverableHead ? evaluations?.[deliverableHead.id] : undefined;

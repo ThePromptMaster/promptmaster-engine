@@ -572,7 +572,12 @@ export function useGoLoop(opts: Options) {
         // so no clock is compared.
         const recheckTried = repairTries([...priorStepsRef.current, ...stepsRef.current], o.state, new Set(stepsRef.current.map((s) => s.id)));
         const drafted = new Set(Object.entries(o.bundles).filter(([, b]) => (b?.versions.length ?? 0) > 0).map(([id]) => id));
-        const repair = staleRepair(o.template, o.state, recheckTried, context.measured ?? {}, drafted);
+        const holder = deliverableStage(o.template);
+        const carriedRows = Object.values(context.carriedForward ?? {}).flat();
+        const carried = current.policy === 'autonomous' && routine === 'handle' && holder && carriedRows.length
+          ? { deliverableId: holder.id, rows: carriedRows }
+          : null;
+        const repair = staleRepair(o.template, o.state, recheckTried, context.measured ?? {}, drafted, carried);
         if (repair) allowed.push('recheck_stage');
 
         // Before the planner is asked: is the next move the user's? (B4)

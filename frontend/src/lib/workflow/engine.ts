@@ -555,6 +555,32 @@ export function progressSummary(template: WorkflowTemplate, state: WorkflowState
 }
 
 /**
+ * The sidebar's line: stages by status, then what is still open beyond them —
+ * the same outstanding work Go stops on (12 Oct; Sean: "4 done · 1 skipped ·
+ * 0 to go" beside a Go waiting on corrections, three times in one day).
+ */
+export function progressCaptionText(
+  progress: ReturnType<typeof progressSummary>,
+  finished: boolean,
+  outstanding: readonly OutstandingItem[] = []
+): string {
+  const waiting = outstanding.some((o) => o.kind === 'go_waiting');
+  // A stale stage is already counted "to go"; the rest is open on top of the stages.
+  const open = outstanding.filter((o) => blocksCompletion(o) && o.kind !== 'stale_stage' && o.kind !== 'go_waiting').length;
+  return [
+    finished ? 'Finished' : null,
+    `${progress.complete} done`,
+    progress.skipped > 0 ? `${progress.skipped} skipped` : null,
+    progress.leftOpen > 0 ? `${progress.leftOpen} left open` : null,
+    progress.remaining > 0 || !finished ? `${progress.remaining} to go` : null,
+    open > 0 ? `${open} still open` : null,
+    waiting ? 'Go is waiting for you' : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
+/**
  * The stages not yet done, skipped or left open, by name: the required ones,
  * and the optional ones that can be skipped. What "the workflow is not
  * finished" means, from the same statuses the sidebar counts.
@@ -772,6 +798,14 @@ export function outstandingWork(
     if ((onIt || (status === 'in_progress' && st?.left_open)) && ctx.artifactNonEmpty && ctx.manualChecks) {
       const unmet = evaluateStage(template, stage.id, ctx as StageContext).unmet.filter((c) => c.blocking);
       if (unmet.length) out.push({ kind: 'unmet_blocking', stageId: stage.id, label, criteria: unmet.map((c) => c.label) });
+    } else if (isDone(status)) {
+      // A finished stage whose saved text fails a measured requirement is not
+      // finished work: the sidebar said "0 to go" while Go waited on it
+      // (12 Oct; Sean, Diligence and Cedar).
+      const failing = (ctx.measured?.[stage.id] ?? []).filter((m) => !m.satisfied);
+      if (failing.length) {
+        out.push({ kind: 'unmet_blocking', stageId: stage.id, label, criteria: failing.map((m) => `${m.label} — measured ${m.detail ?? 'not met'}`) });
+      }
     }
   }
   if (extras.objectiveUnmet) {
