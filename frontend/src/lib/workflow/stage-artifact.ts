@@ -705,10 +705,12 @@ const UNMET =
  * the report; the rows were carried forward, and Go declared the objective
  * met. A carried-forward note about polish is not one of these.
  */
-export function carriedForwardUnmet(items: readonly StageItem[], schema: StageItemSchema): string[] {
+export function carriedForwardUnmet(items: readonly StageItem[], schema: StageItemSchema, optional = false): string[] {
   return items
     .filter((i) => i.status === 'deferred' && isTriaged(i, schema))
-    .filter((i) => i.severity === 'major' || UNMET.test(rowText(i)))
+    // On a table whose rows do not block finishing (Final review's open items:
+    // "marking them does not block finishing"), only a major finding does (12 Oct).
+    .filter((i) => (optional ? i.severity === 'major' : deferralBlocks(i)))
     .map((i) => {
       const text = rowText(i);
       return text.length > 600 ? `${text.slice(0, 599).trimEnd()}…` : text;
@@ -721,11 +723,25 @@ export function carriedForwardUnmet(items: readonly StageItem[], schema: StageIt
  * not block (Sean, 10 Oct, 6.6: deferred rows must be named, not silently
  * counted as resolved).
  */
-export function deferredNotBlocking(items: readonly StageItem[], schema: StageItemSchema): { row: string; reason: string }[] {
+export function deferredNotBlocking(items: readonly StageItem[], schema: StageItemSchema, optional = false): { row: string; reason: string }[] {
   return items
     .filter((i) => i.status === 'deferred' && isTriaged(i, schema))
-    .filter((i) => !(i.severity === 'major' || UNMET.test(rowText(i))))
+    .filter((i) => !(optional ? i.severity === 'major' : deferralBlocks(i)))
     .map((i) => ({ row: rowText(i).slice(0, 160), reason: (i.reason ?? '').trim().slice(0, 200) }));
+}
+
+/**
+ * Whether a deferred row still says the objective is unmet. A major finding
+ * does, and so does one worded as something missing or contradicted — unless
+ * it was a minor or moderate finding deferred under the user's routine-decision
+ * policy: that is a decision the user delegated, and it is recorded, not
+ * re-asked (12 Oct; Sean: a wording finding marked "Defer — confirmed under
+ * your routine-decision policy" still stopped Go).
+ */
+function deferralBlocks(i: StageItem): boolean {
+  if (i.severity === 'major') return true;
+  const routine = i.status_source === 'policy' && (i.severity === 'minor' || i.severity === 'moderate');
+  return !routine && UNMET.test(rowText(i));
 }
 
 /**

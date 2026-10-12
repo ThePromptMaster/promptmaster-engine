@@ -883,13 +883,18 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // that is over its limit is routine, not the user's decision.
       const drafted = (ctx.bundles[target?.id ?? '']?.versions.length ?? 0) > 0;
       const measuredRepair = Boolean(params.measured) && (isDone(st?.status) || (st?.status === 'in_progress' && drafted)) && measuredFails.length > 0;
-      if (!target || (st?.status !== 'stale' && !measuredRepair)) {
+      // 12 Oct: findings a review carried forward as still unmet, under "handle them for me".
+      const carriedRows = Array.isArray(params.carried) ? params.carried.filter((r): r is string => typeof r === 'string' && r.trim().length > 0) : [];
+      const carriedRepair = !measuredRepair && carriedRows.length > 0 && isDone(st?.status) && drafted;
+      if (!target || (st?.status !== 'stale' && !measuredRepair && !carriedRepair)) {
         return done(key, { status: 'failed', output: 'That stage is not waiting for a recheck.', toolsUsed: [], changes: {} });
       }
       const superseded = supersededFactValues(ctx.project.facts);
       const why = measuredRepair
         ? `measured in code and not met: ${measuredFails.join('; ')}`
-        : st?.stale?.reason ?? 'something it relied on changed';
+        : carriedRepair
+          ? `a review carried forward, as still unmet: ${carriedRows.map((r) => `"${r}"`).join('; ')}`
+          : st?.stale?.reason ?? 'something it relied on changed';
       // L-64 (9 Oct): a manuscript is repaired by revising its sections with
       // the reason, each against its current saved record (C9).
       if (target.renderer === 'long_form') return recheckManuscript(ctx, key, target, why, superseded);
@@ -1520,6 +1525,15 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
             // on is routine there; it is said, and the run goes on (the next
             // declare becomes the move, moveOnInsteadOfRejudging).
             const routine = ctx.run.policy === 'autonomous' && ctx.project.routine_decisions === 'handle';
+            // 12 Oct (Sean, Atlas): the approval left was one the template marks
+            // routine, and the run still stopped for it. Under "handle them for
+            // me" it is committed next (commit_delegated), checked first.
+            if (routine && onlyApproval && mine.every((c) => c.authority === 'delegable')) {
+              return done(key, {
+                ...judged, status: 'succeeded',
+                output: `${reason} It is a routine approval, so I check it and commit it under your routine-decision policy next. Evidence: "${assessment.basis_quote}". ${checked}${deferredNote(ctx)}`,
+              });
+            }
             if (routine && !onlyApproval && evaluateStage(ctx.template, ctx.stage.id, ctx.context).canAdvance) {
               return done(key, {
                 ...judged, status: 'succeeded',

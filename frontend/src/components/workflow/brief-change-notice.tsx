@@ -57,6 +57,9 @@ export function BriefChangeNotice({
         {holds ? 'Calculations still hold; what was judged against the old priority is reopened. ' : ''}
         Everything else stands.
       </p>
+      {partialUpdate(affected.map((a) => a.stage_id), stageIds, stageLabel) && (
+        <p className="mt-1 text-label text-[var(--on-surface)]">{partialUpdate(affected.map((a) => a.stage_id), stageIds, stageLabel)}</p>
+      )}
       <ul className="mt-1 list-disc pl-6 text-label">
         {affected.filter((a) => stageIds.includes(a.stage_id)).map((a) => (
           <li key={a.stage_id}>
@@ -89,4 +92,17 @@ function Actions({ onUpdate, updating, onKeep }: { onUpdate?: () => void; updati
       </button>
     </div>
   );
+}
+
+/**
+ * When some of the reopened stages are updated and some are not: which, so
+ * the notice never reads as all or nothing (12 Oct; Sean: "If only some
+ * document updates succeed, identify what remains unfinished").
+ */
+export function partialUpdate(affected: readonly string[], waiting: readonly string[], stageLabel: (id: string) => string): string | null {
+  const all = [...new Set(affected)];
+  const done = all.filter((id) => !waiting.includes(id));
+  if (!done.length || !waiting.length) return null;
+  const names = (ids: readonly string[]) => ids.map(stageLabel).join(', ');
+  return `${done.length} of ${all.length} updated (${names(done)}). Still awaiting a recheck: ${names(waiting)}.`;
 }

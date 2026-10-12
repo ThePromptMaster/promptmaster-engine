@@ -1478,3 +1478,25 @@ A prose draft the model cut off is continued up to twice before it is saved. If 
 still cut off, it is saved so the user can see it, but it is not marked complete and
 Go says where it stops. A prose stage may now write up to 12,000 tokens (4,096 before).
 A table stage is not continued.
+
+### L-79 — When Go finishes on its own, and what the sidebar counts (2026-10-12)
+
+The sidebar line now adds what Go stops on to the stage counts: "4 done · 1 skipped ·
+0 to go · 1 still open · Go is waiting for you". A finished stage whose saved text
+fails a measured requirement counts as still open.
+
+A deferred review row holds up "objective met" when it is major. It also does when it
+reads as something missing or contradicted, unless Go deferred it as a minor or
+moderate finding under "Routine decisions: handle them for me". On a table whose rows
+do not block finishing, such as Final review's open items, only a major row does.
+Severity is the model's rating (L-74).
+
+Under Autonomous with "Handle them for me", Go revises the finished deliverable to
+address carried-forward findings, up to twice, and rechecks the review against it. A
+routine approval left on the last stage is checked and committed instead of asked
+for. A reserved approval, such as "I accept this output as finished", stays the
+user's.
+
+After "Update affected work", the notice names the stages updated and those still
+awaiting a recheck. It does this only for a change to the brief, which records which
+stages it affected. A revision of an earlier stage lists what is still waiting.

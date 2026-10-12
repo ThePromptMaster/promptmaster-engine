@@ -187,7 +187,7 @@ export function repairTries(steps: readonly AgentStep[], state: WorkflowState, t
     .filter((s) => s.action_key === 'recheck_stage')
     .filter((s) => {
       const since = state.stages[String(s.params?.stage_id ?? '')]?.stale?.since;
-      if (!since) return Boolean(s.params?.measured);
+      if (!since) return Boolean(s.params?.measured) || Array.isArray(s.params?.carried);
       // Unmarked (a step the planner chose): counted within this run.
       return s.params?.stale_since === since || (!s.params?.stale_since && thisRun.has(s.id));
     })
@@ -206,7 +206,14 @@ export function staleRepair(
    * "If length is the issue, I'd expect Go to shorten the brief … save it,
    * and recheck automatically").
    */
-  drafted: ReadonlySet<string> = new Set()
+  drafted: ReadonlySet<string> = new Set(),
+  /**
+   * Under "handle them for me": review findings carried forward as still
+   * unmet, and the finished deliverable they are about. Revised and rechecked
+   * rather than waited on (12 Oct; Sean: "If it needs correcting, I'd expect
+   * Go to revise and recheck automatically under these settings").
+   */
+  carried: { deliverableId: string; rows: readonly string[] } | null = null
 ): RequiredMove | null {
   const loops = template.stages.some((s) => s.transitions.loop_to);
   const here = template.stages.findIndex((s) => s.id === state.current_stage_id);
@@ -232,7 +239,18 @@ export function staleRepair(
         params: { stage_id: stage.id, measured: true },
       };
     }
-    if (st?.status !== 'stale') continue;
+    if (st?.status !== 'stale') {
+      if (carried?.rows.length && stage.id === carried.deliverableId && isDone(st?.status) && stage.renderer === 'prose') {
+        const rows = carried.rows.slice(0, 8);
+        return {
+          key: 'recheck_stage',
+          rationale: `A review carried forward ${rows.length === 1 ? 'a finding' : `${rows.length} findings`} saying ${stage.label} is still not right: ${rows.map((r) => `"${r.slice(0, 160)}"`).join('; ')}. Under your routine-decision policy I revise ${stage.label} to address ${rows.length === 1 ? 'it' : 'them'}, keep everything else, save it and recheck.`,
+          expected: `A new version of ${stage.label} that addresses the carried-forward findings; the review is then rechecked against it.`,
+          params: { stage_id: stage.id, carried: rows },
+        };
+      }
+      continue;
+    }
     // L-64 (9 Oct): a reopened manuscript is repaired by revising its sections.
     if (!['prose', 'list', 'review', 'long_form'].includes(stage.renderer)) continue;
     return {
