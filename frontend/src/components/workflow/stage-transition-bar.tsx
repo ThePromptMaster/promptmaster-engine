@@ -288,6 +288,10 @@ export function StageTransitionBar({
                       )}
                       <button
                         role="menuitem"
+                        // The label is the name; the hint describes it, so a
+                        // reader (and Go's list of this page's buttons) names it the same.
+                        aria-label={item.label}
+                        aria-describedby={item.hint ? `more-hint-${item.id}` : undefined}
                         disabled={item.disabled || busy}
                         onClick={() => {
                           setMenuOpen(false);
@@ -300,7 +304,7 @@ export function StageTransitionBar({
                         </span>
                         <span>
                           {item.label}
-                          {item.hint && <span className="block text-label text-[var(--on-surface-variant)]">{item.hint}</span>}
+                          {item.hint && <span id={`more-hint-${item.id}`} className="block text-label text-[var(--on-surface-variant)]">{item.hint}</span>}
                         </span>
                       </button>
                     </div>
