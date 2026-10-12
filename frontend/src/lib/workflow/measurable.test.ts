@@ -43,7 +43,7 @@ describe('requirements PromptMaster can measure (C1; Sean, 7 Oct)', () => {
   it('TaskBoard: 95 words against 100–140, five questions without answers', () => {
     const [w, q] = parseRequirements(['a 100–140-word announcement and a five-question support FAQ']);
     const text = `## Announcement\n${words(95)}\n\n## FAQ\n1. When?\n2. How much?\n3. Who?\n4. Where?\n5. Trial?\n`;
-    expect(measure(w, text)).toEqual({ id: 'measured.words:announcement', label: 'Announcement: 100–140 words', satisfied: false, detail: '95 words', value: '95 words' });
+    expect(measure(w, text)).toEqual({ id: 'measured.words:announcement', label: 'Announcement: 100–140 words', satisfied: false, detail: '95 words', value: '95 words, counted from “word0 word1 word2 word3 word4” to “word90 word91 word92 word93 word94”' });
     expect(measure(q, text)).toEqual({ id: 'measured.questions:faq', label: 'FAQ: exactly 5 questions, each answered', satisfied: false, detail: '5 without an answer', value: '5 questions, 0 answered' });
   });
 
@@ -163,5 +163,60 @@ describe('"one page" is estimated in code (L-73, 11 Oct: onboarding plan)', () =
     const long = measure(r, Array(900).fill('word').join(' '), true)!;
     expect(long.satisfied).toBe(false);
     expect(long.detail).toMatch(/^about 1.6 pages/);
+  });
+});
+
+// --- 12 Oct (Sean, Cedar and Diligence): the summary, not the document --------
+
+describe('a summary beside other parts', () => {
+  const SUMMARY = Array.from({ length: 80 }, (_, i) => `w${i}`).join(' ');
+  const TABLE = '| Item | Owner |\n|---|---|\n' + Array.from({ length: 5 }, (_, i) => `| row ${i} has several words here | owner ${i} |`).join('\n');
+  const QUESTIONS = '1. What should the team decide about the vendor before Friday?\n2. Who owns the budget line for the new tooling next quarter?\n3. When does the pilot end and who signs it off?';
+  const req = parseRequirements(['A summary of at most 100 words, followed by a five-row table and three questions.'])[0];
+
+  it('reads the limit as the summary’s', () => {
+    expect(req).toMatchObject({ kind: 'words', subject: 'summary', max: 100 });
+  });
+
+  it('measures only the summary under its heading, ending at a bold label, a table or questions', () => {
+    for (const text of [
+      `## Summary\n${SUMMARY}\n\n**Five-row table**\n${TABLE}\n\n**Questions**\n${QUESTIONS}`,
+      `## Summary\n${SUMMARY}\n\n${TABLE}\n\n${QUESTIONS}`,
+      `## Summary\n${SUMMARY}\n\n### Table\n${TABLE}\n\n### Questions\n${QUESTIONS}`,
+      `# Cedar Summary\n\n## Summary\n${SUMMARY}\n\n## Table\n${TABLE}`,
+    ]) {
+      const m = measure(req, text, true)!;
+      expect(m.value).toMatch(/^80 words, counted from “w0 w1 w2 w3 w4” to “w75 w76 w77 w78 w79”$/);
+      expect(m.satisfied).toBe(true);
+    }
+  });
+
+  it('with no summary heading, measures the opening prose rather than the whole document', () => {
+    const m = measure(req, `# Project Cedar status\n\n${SUMMARY}\n\n${TABLE}\n\n${QUESTIONS}`, true)!;
+    expect(m.value!.startsWith('80 words')).toBe(true);
+  });
+
+  it('a title naming the summary is not the section', () => {
+    const m = measure(req, `# Cedar Summary\n\n${SUMMARY}\n\n## Table\n${TABLE}\n\n## Questions\n${QUESTIONS}`, true)!;
+    expect(m.value!.startsWith('80 words')).toBe(true);
+  });
+});
+
+describe('the Diligence phrasings', () => {
+  it.each([
+    ['A 250-word executive summary, then the full question pack.', 250],
+    ['Executive summary ≤ 250 words.', 250],
+    ['Keep the executive summary to 250 words.', 250],
+    ['Keep it to 250 words in the summary.', 250],
+  ])('%s', (text, max) => {
+    expect(parseRequirements([text]).find((r) => r.kind === 'words')).toMatchObject({ subject: 'summary', max });
+  });
+
+  it('measures an overlength executive summary as over', () => {
+    const req = parseRequirements(['A 250-word executive summary.'])[0];
+    const long = Array.from({ length: 280 }, () => 'word').join(' ');
+    const m = measure(req, `## Executive summary\n${long}\n\n## Q1. Ownership\nAnswer text here.`, true)!;
+    expect(m.satisfied).toBe(false);
+    expect(m.value!.startsWith('280 words')).toBe(true);
   });
 });

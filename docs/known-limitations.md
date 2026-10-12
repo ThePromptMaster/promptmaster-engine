@@ -1458,3 +1458,23 @@ The objective check, the criterion check and the expert review now read the
 project context up to 40,000 characters. Go's planner reads 12,000, because it runs
 on every step. A longer context is cut at a line, with a note saying the cut is not
 a missing requirement.
+
+### L-78 — How a named part is found and measured; cut-off drafts (2026-10-12)
+
+A limit on a part, such as "a summary of at most 100 words", is measured on that
+part. It is found under a heading that names it. The part ends at the next heading at
+its level or above, at a bold or "Label:" line, at a heading naming another part, at a
+table, or at a numbered question. A title that names the subject is not the part. With
+no heading, the part is the opening prose before the first heading, table or question.
+The record quotes the first and last words it counted, so a wrong boundary can be
+seen. A summary that uses a bold-only line as a sub-heading inside itself is cut short
+at that line.
+
+"A 250-word executive summary", "≤ 250 words" and "keep it to 250 words" are now
+read as limits. A count made in code overrules the model only for the part it
+measured.
+
+A prose draft the model cut off is continued up to twice before it is saved. If it is
+still cut off, it is saved so the user can see it, but it is not marked complete and
+Go says where it stops. A prose stage may now write up to 12,000 tokens (4,096 before).
+A table stage is not continued.

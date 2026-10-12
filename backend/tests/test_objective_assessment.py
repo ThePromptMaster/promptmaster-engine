@@ -283,3 +283,16 @@ def test_lunch_invitation_49_words_is_not_over_the_accepted_70():
     assert a.criteria[0].basis == "Measured in code: Invitation: at most 70 words — 49 words"
     b = parse_assessment({"outcome": "not_met", "reason": "It exceeds the accepted under-70-word limit."}, invite, [], [], measured)
     assert b.unmet == [] and "could not point to a passage" in b.reason
+
+
+def test_a_count_of_another_part_does_not_overrule_the_summary_verdict():
+    """12 Oct (Sean, Diligence): the summary was over 250 words; a count of the
+    whole pack's opening at 250 must not turn "not met" into "met"."""
+    text = "Executive summary. The target operates three plants."
+    measured = ["Report: at most 250 words — 180 words"]
+    a = parse_assessment({
+        "outcome": "not_met", "reason": "The executive summary is over 250 words.", "basis_quote": "The target operates three plants.",
+        "criteria": [{"requirement": "The executive summary is at most 250 words", "verdict": "not_met", "basis": "About 280 words."}],
+    }, text, [], [], measured)
+    assert a.outcome != "met"
+    assert a.criteria[0].verdict == "not_met"

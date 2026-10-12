@@ -211,13 +211,26 @@ def _numbers(text: str) -> set[int]:
     return found
 
 
+#: The parts a requirement can name; mirrors `SUBJECTS` in `measurable.ts`.
+_PARTS = (
+    "announcement", "faq", "summary", "email", "letter", "memo", "abstract", "post", "report",
+    "description", "bio", "introduction", "overview", "invitation", "briefing", "press release", "statement", "answer",
+)
+
+
 def _measured_for(requirement: str, measured: list[str]) -> str | None:
     """The measurement in code a requirement is about: same kind (words,
-    sections, questions) and the same number."""
+    sections, questions), the same number, and the same part. 12 Oct (Sean,
+    Diligence): a count of something else at the same limit overruled the
+    model's "the summary is over 250 words"."""
     req = requirement.lower()
     nums = _numbers(req)
     for m in measured:
         label = m.split(" — ")[0].lower()
+        subject = label.split(":", 1)[0].strip() if ":" in label else ""
+        named = {p for p in _PARTS if re.search(rf"\b{p}", req)}
+        if named and subject not in named and subject != "the deliverable":
+            continue
         if any(k in req and k in label for k in _KINDS) and nums & _numbers(label):
             return m
     return None
