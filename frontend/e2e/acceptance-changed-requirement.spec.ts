@@ -47,7 +47,7 @@ test('a changed requirement reopens what relied on it, and Go repairs it under "
 
   // The finished work that relied on the old rule is reopened, and every
   // readiness message says so.
-  await expect(page.getByRole('navigation').getByText('recheck', { exact: true })).toHaveCount(1, { timeout: 30_000 });
+  await expect(page.getByRole('navigation').getByText('awaiting recheck', { exact: true })).toHaveCount(1, { timeout: 30_000 });
   await expect(page.getByRole('group', { name: 'Stage actions' })).toContainText('needs a recheck');
   await page.screenshot({ path: test.info().outputPath('01-requirement-reopens-output.png') });
 
@@ -94,7 +94,7 @@ test('a changed requirement reopens what relied on it, and Go repairs it under "
   expect(await outputVersions()).toBe(before + 1);
   const [repaired] = await serviceSelect('workflow_events', `project_id=eq.${id}&type=eq.stage_marked_complete&stage_id=eq.output&select=actor,payload&order=seq.desc&limit=1`);
   expect(repaired).toMatchObject({ actor: 'system', payload: { repaired_after: expect.any(String), evidence_version_id: expect.any(String) } });
-  await expect(page.getByRole('navigation').getByText('recheck', { exact: true })).toHaveCount(0, { timeout: 30_000 });
+  await expect(page.getByRole('navigation').getByText('awaiting recheck', { exact: true })).toHaveCount(0, { timeout: 30_000 });
 
   // The stage bar still lists the optional row, as optional.
   await expect(page.getByRole('group', { name: 'Stage actions' })).toContainText('Summary: 1 optional finding not yet accepted or rejected');

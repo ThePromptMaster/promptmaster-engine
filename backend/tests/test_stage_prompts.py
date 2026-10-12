@@ -708,3 +708,23 @@ def test_every_stage_reads_the_applied_instructions_above_the_reviewed_prompt(ba
 def test_the_review_rule_counts_evidence_an_instruction_supplied():
     from promptmaster.saved_text_checks import VERIFY_RULE
     assert "when an instruction widened the sources or evidence, work that uses them is supported" in VERIFY_RULE
+
+
+def test_the_draft_writes_one_piece_in_the_stated_voice(basic_inputs, prose_stage):
+    """12 Oct (Colette): a speech for an eleven-year-old read "like I was five" and offered several wishes."""
+    system, _user = build_stage_prompt(basic_inputs, prose_stage, StageDigest(objective="o"))
+    assert "write as a capable person of that age would" in system
+    assert "never simplified or childish" in system
+    assert "write one finished piece on exactly that; do not offer alternatives" in system
+
+
+def test_a_duration_in_prose_is_not_mathematics():
+    """12 Oct (Colette): "2m long" came back as \\(2m\\) and "5-10" as \\(5\\)-\\(10\\)."""
+    from promptmaster.notation import NOTATION_RULE
+    assert "a duration, a count or a measurement in prose (2 minutes" in NOTATION_RULE
+
+
+def test_a_speech_is_a_single_output():
+    from promptmaster import setup_suggester
+    import inspect
+    assert "a speech, a talk, a letter" in inspect.getsource(setup_suggester)

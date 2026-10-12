@@ -1500,3 +1500,25 @@ user's.
 After "Update affected work", the notice names the stages updated and those still
 awaiting a recheck. It does this only for a change to the brief, which records which
 stages it affected. A revision of an earlier stage lists what is still waiting.
+
+### L-80 — Status words, the More menu, and voice (2026-10-12)
+
+One word per state:
+- **Proposed — not saved yet** for a chat proposal.
+- **vN · current** for the version in use, with "· saved by Go" when Go made it.
+- **vN · earlier** for any other version, with "kept" when the user chose it.
+- **Awaiting recheck** in the rail and the stage header.
+
+"Saved by Go" does not yet say whether a later check passed on that version.
+
+The More menu groups its entries under "This stage", "Rewrite — saves a new version,
+keeps this one", "Get a second opinion — changes nothing" and "Move between stages",
+and the stage entries carry one line on what they do. No action was removed, and a
+lighter Single output mode with fewer stages and controls is not built.
+
+The prompts now ask for the voice the audience calls for. A speaker of a stated age is
+written as a capable person of that age, never childishly, and a topic the user gives
+gets one finished piece rather than options. The front door's stated audience is kept
+over the setup suggester's preset. A speech, talk, letter, poem or short story is
+recommended as Single output. A user can still pick Book for one by hand, and on 11 Oct
+a two-minute speech ran as a Book whose first stage listed topic ideas.

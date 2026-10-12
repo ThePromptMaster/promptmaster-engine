@@ -66,7 +66,7 @@ export function VersionBar({
                 : 'bg-[var(--surface-container-low)] text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)]'
             }`}
           >
-            {v.id === headId ? `v${v.version_number} · current` : isSaved(v.source_operation) ? `v${v.version_number} · saved` : `v${v.version_number}`}
+            {versionPillLabel(v, v.id === headId)}
             {v.restored_from_version_id && (
               <span aria-label=" (restored)" title="Restored"> ↩</span>
             )}
@@ -314,3 +314,18 @@ export function ConfirmOverwrite({ label, onConfirm, onCancel }: ConfirmOverwrit
     </div>
   );
 }
+
+/**
+ * One word per state (12 Oct; Sean: "clearly distinguish proposed changes,
+ * saved current versions, historical versions, and work awaiting recheck"):
+ * the version in use is "current", one Go saved says so, and every other is
+ * "earlier" — a version kept by choice is marked as kept, not as "saved",
+ * because every version is saved.
+ */
+export function versionPillLabel(v: Pick<ArtifactVersion, 'version_number' | 'source_operation'>, isHead: boolean): string {
+  const n = `v${v.version_number}`;
+  if (isHead) return GO_MADE.has(v.source_operation) ? `${n} · current · saved by Go` : `${n} · current`;
+  return isSaved(v.source_operation) ? `${n} · earlier, kept` : `${n} · earlier`;
+}
+
+const GO_MADE: ReadonlySet<string> = new Set(['agent_draft', 'agent_revise', 'agent_apply', 'agent_triage', 'agent_outline']);

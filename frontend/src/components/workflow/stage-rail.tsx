@@ -178,7 +178,7 @@ export function StageRail({ template, state, nextSuggestedId, onSelect, approval
                         }
                         className="shrink-0 text-label uppercase tracking-wide text-[var(--pm-tertiary)]"
                       >
-                        recheck
+                        awaiting recheck
                       </span>
                     )}
                   </button>

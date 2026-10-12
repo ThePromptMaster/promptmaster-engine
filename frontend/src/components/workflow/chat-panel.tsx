@@ -848,7 +848,7 @@ export function ProposalCard({
       className="mt-4 rounded-xl bg-[var(--surface-container-high)] px-4 py-3"
     >
       <p className="text-label uppercase tracking-wider text-[var(--on-surface-variant)]">
-        Would change
+        Proposed — not saved yet
       </p>
       <p className="mt-0.5 text-body text-[var(--on-surface)]">{scopeLabel}</p>
 

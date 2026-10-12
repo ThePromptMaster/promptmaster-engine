@@ -25,7 +25,7 @@ test('a factual change reopens only what relied on it; a punctuation fix reopens
   const notice = page.getByRole('status', { name: 'Brief change' });
   await expect(notice).toContainText('Changing the project context reopened Objective', { timeout: 30_000 });
   await expect(notice).toContainText("relied on 'pending'");
-  await expect(page.getByRole('navigation').getByText('recheck', { exact: true })).toHaveCount(1);
+  await expect(page.getByRole('navigation').getByText('awaiting recheck', { exact: true })).toHaveCount(1);
   const [changed] = await serviceSelect('workflow_events', `project_id=eq.${id}&type=eq.brief_changed&select=actor,payload`);
   expect(changed).toMatchObject({ actor: 'user', payload: { field: 'context', kind: 'fact', presentation_only: false } });
   // The invented stage id the mock adds was dropped.
@@ -39,7 +39,7 @@ test('a factual change reopens only what relied on it; a punctuation fix reopens
   // Kept as it was: the stage is finished again.
   await notice.getByRole('button', { name: 'Keep them as they are' }).click();
   await expect(notice).toHaveCount(0);
-  await expect(page.getByRole('navigation').getByText('recheck', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('navigation').getByText('awaiting recheck', { exact: true })).toHaveCount(0);
 
   // Punctuation only: recorded, nothing reopened, no model call.
   const calls: string[] = [];
@@ -50,6 +50,6 @@ test('a factual change reopens only what relied on it; a punctuation fix reopens
   expect(all[1].payload).toMatchObject({ kind: 'wording', presentation_only: true, affected: [] });
   expect(calls).toEqual([]);
   await expect(notice).toHaveCount(0);
-  await expect(page.getByRole('navigation').getByText('recheck', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('navigation').getByText('awaiting recheck', { exact: true })).toHaveCount(0);
   await page.screenshot({ path: test.info().outputPath('02-punctuation-reopens-nothing.png') });
 });
