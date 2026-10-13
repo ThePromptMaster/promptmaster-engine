@@ -289,7 +289,7 @@ export function staleRepair(
         const rows = carried.rows.slice(0, 8);
         return {
           key: 'recheck_stage',
-          rationale: `A review carried forward ${rows.length === 1 ? 'a finding' : `${rows.length} findings`} saying ${stage.label} is still not right: ${rows.map((r) => `"${r.slice(0, 160)}"`).join('; ')}. Under your routine-decision policy I revise ${stage.label} to address ${rows.length === 1 ? 'it' : 'them'}, keep everything else, save it and recheck.`,
+          rationale: `A review carried forward ${rows.length === 1 ? 'a finding' : `${rows.length} findings`} saying ${stage.label} is still not right: ${rows.map((r) => `"${r.length > 160 ? `${r.slice(0, 157).trimEnd()}…` : r}"`).join('; ')}. Under your routine-decision policy I revise ${stage.label} to address ${rows.length === 1 ? 'it' : 'them'}, keep everything else, save it and recheck.`,
           expected: `A new version of ${stage.label} that addresses the carried-forward findings; the review is then rechecked against it.`,
           params: { stage_id: stage.id, carried: rows },
         };

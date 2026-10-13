@@ -50,7 +50,9 @@ _ASSESS_INSTRUCTION = (
     "means the objective is NOT met, however complete the document looks. Judge "
     "the objective's own success criterion. List as blockers only concrete missing "
     "inputs or capabilities the text names. Separate work the RUN RECORD shows was "
-    "performed from next steps that are only proposed.\n\n"
+    "performed from next steps that are only proposed. A finished report, plan or "
+    "status pack meets an objective to produce it, even while the project it "
+    "describes still has open work; that open work is not a reason it is unmet.\n\n"
     # 8 Oct production pass (TaskBoard): the objective said "stop and ask me
     # which date and price before drafting"; Go asked, the answer is an
     # accepted fact, and the check still called the objective unmet because

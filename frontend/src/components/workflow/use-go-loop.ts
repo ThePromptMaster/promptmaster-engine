@@ -54,7 +54,7 @@ import { performStep, type PerformContext, type StepOutcome } from '@/lib/agent/
 import { needsExpert, packageMarkdown, recordDocuments } from '@/lib/agent/expert';
 import { auditStop, describeAudit, proposedDefault, touchesObjective } from '@/lib/agent/stop-audit';
 import { recordRoutineDefault } from '@/lib/supabase/facts';
-import { allowedActions, reconsiderNote, returnTargets, runAttemptsFor, stageHasCurrentDraft, LIVE_TOOLS, polishSinceDirection, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, withoutEndlessPolish, withoutSettledRuns, withoutOverride, DEFAULT_BUDGET_STEPS, fitsBudget, noChange, plannedBeforeLatestChange, preempt, shouldPause, stateFingerprint, stepCost } from '@/lib/agent/policy';
+import { allowedActions, answeredReturn, reconsiderNote, returnTargets, runAttemptsFor, stageHasCurrentDraft, LIVE_TOOLS, polishSinceDirection, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, withoutEndlessPolish, withoutSettledRuns, withoutOverride, DEFAULT_BUDGET_STEPS, fitsBudget, noChange, plannedBeforeLatestChange, preempt, shouldPause, stateFingerprint, stepCost } from '@/lib/agent/policy';
 import {
   autoWindowsLeft,
   createAgentRun,
@@ -557,7 +557,9 @@ export function useGoLoop(opts: Options) {
           stageText: hasDraft ? (o.bundles[o.stage.id]?.versions.at(-1)?.content ?? '') : '',
           steps: [...priorStepsRef.current, ...stepsRef.current],
         });
-        if (goBackTo.length) allowed.push('return_to_stage');
+        // An answer that names going back is the user's return; Go carries it out (13 Oct).
+        const userReturn = answeredReturn(o.template, o.stage, [...priorStepsRef.current, ...stepsRef.current]);
+        if (goBackTo.length || userReturn) allowed.push('return_to_stage');
         // Q2b: after going round in circles, the repeated moves are off the table for the next choice.
         const reconsider = reconsiderRef.current?.pending ? reconsiderRef.current : null;
         if (reconsider) {
@@ -621,7 +623,14 @@ export function useGoLoop(opts: Options) {
         // planner might prefer (4 Oct): a cut-off draft is finished, and at an
         // approval the findings are applied and the work checked first.
         const loops = o.template.stages.some((s) => s.transitions.loop_to);
-        const required = repair ?? requiredWork({
+        const required = repair ?? (userReturn
+          ? {
+              key: 'return_to_stage',
+              rationale: `You chose: "${userReturn.answer.slice(0, 200)}". Going back to ${userReturn.label} to do it.`,
+              expected: `The work is back on ${userReturn.label}; the stages after it are rechecked once it changes.`,
+              params: { stage_id: userReturn.id, reason: `You chose: ${userReturn.answer}`.slice(0, 1_000), work: userReturn.answer.slice(0, 2_000), by_user: true },
+            }
+          : null) ?? requiredWork({
           stage: o.stage, facts, stageEvaluation, allowed, lookupDue, routine, commitTried, runAttemptsLeft,
           ...(loops ? { round: { staleDraft: stageDrafts(o.stage) && !hasDraft } } : {}),
         });

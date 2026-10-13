@@ -42,7 +42,11 @@ class CriterionCheck(BaseModel):
 def build_check_prompt(inputs: PMInput, stage_label: str, criterion: str, content: str) -> tuple[str, str]:
     text = content.strip()
     if len(text) > MAX_CHECK_CONTENT:
-        text = text[:MAX_CHECK_CONTENT] + "\n[…the rest of the stage is not shown]"
+        # Said so it is not read as a gap in the work (12 Oct, Northstar; 13 Oct).
+        text = text[:MAX_CHECK_CONTENT] + (
+            "\n[The rest of the stage is not shown here, for length. It exists; never "
+            "report anything as missing, cut off or truncated because of this note.]"
+        )
     user = (
         f"PROJECT OBJECTIVE: {inputs.objective}\n"
         + (f"{context_block(inputs, limit=CHECK_CONTEXT_MAX)}\n" if context_block(inputs) else "")

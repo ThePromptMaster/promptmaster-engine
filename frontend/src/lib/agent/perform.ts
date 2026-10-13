@@ -1367,14 +1367,18 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       if (!reason || !work) {
         return done(key, { status: 'failed', toolsUsed: [], changes: {}, output: 'Going back needs both what in the saved work asks for it, and what is to be done there.' });
       }
+      // The user's own return, chosen in their answer, is recorded as theirs (13 Oct).
+      const byUser = params.by_user === true;
       await appendWorkflowEvent(ctx.project.id, ctx.project.user_id, {
         type: 'stage_returned',
         stage_id: ctx.stage.id,
         to_stage_id: target.id,
-        actor: 'system',
-        agent_run_id: ctx.run.id,
+        actor: byUser ? 'user' : 'system',
+        agent_run_id: byUser ? null : ctx.run.id,
         reason: `Back to ${target.label}: ${reason}`.slice(0, 1_000),
-        payload: { agent_return: true, return_reason: reason.slice(0, 1_000), work, policy: 'routine_decisions' },
+        payload: byUser
+          ? { via: 'go_answer', return_reason: reason.slice(0, 1_000), work }
+          : { agent_return: true, return_reason: reason.slice(0, 1_000), work, policy: 'routine_decisions' },
       });
       await ctx.afterStageEvent();
       const changes: AgentStep['changes'] = { event_types: ['stage_returned'] };
