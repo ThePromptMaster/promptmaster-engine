@@ -24,7 +24,9 @@ test('a done stage can be reopened, edited, closed again, and the stages after i
   const artifact = page.getByRole('region', { name: /Objective.*work/ });
   await expect(artifact.getByRole('button', { name: 'Edit' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Reopen to edit' }).click();
-  await expect(page.getByText(/Reopened — edit it here, then mark it complete/)).toBeVisible();
+  await expect(page.getByText(/Reopened — change it here/)).toBeVisible();
+  // 13 Oct (Sean, email 1): the way back to Go is on the reopened stage itself.
+  await expect(page.getByRole('button', { name: 'Apply my changes and let Go continue' })).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('01-reopened.png') });
 
   // Edit it: a new version, the stage's new evidence.
@@ -35,7 +37,7 @@ test('a done stage can be reopened, edited, closed again, and the stages after i
 
   // Close it again. Audience, built on the old objective, is flagged.
   await page.getByRole('button', { name: 'Mark this stage complete' }).click();
-  await expect(page.getByText(/Reopened — edit it here/)).toHaveCount(0);
+  await expect(page.getByText(/Reopened — change it here/)).toHaveCount(0);
   await expect(rail.getByRole('button', { name: /Audience/ })).toContainText('recheck');
   await page.screenshot({ path: test.info().outputPath('02-closed-again-audience-recheck.png') });
 
