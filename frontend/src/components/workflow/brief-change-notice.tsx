@@ -42,6 +42,18 @@ export function BriefChangeNotice({
       </div>
     );
   }
+  // 13 Oct (Sean, email 1): a stage the user reopened, changed and handed to Go.
+  if (event.payload?.kind === 'reopened') {
+    return (
+      <div role="status" aria-label="Brief change" className="mb-6 rounded-xl bg-[var(--surface-container-low)] px-5 py-3 text-body text-[var(--on-surface-variant)]">
+        <p>
+          <span aria-hidden className="material-symbols-outlined mr-1 align-[-4px] text-[18px] text-[var(--pm-tertiary)]">history</span>
+          {`You reopened ${stageLabel(event.stage_id)} and asked Go to finish it with your changes. Go finishes it, then rechecks the stages after it. Earlier versions stay in its history.`}
+        </p>
+        <Actions onUpdate={onUpdate} updating={updating} onKeep={() => onKeep(event.created_at)} />
+      </div>
+    );
+  }
   const field = BRIEF_FIELD_LABEL[(event.payload?.field as WatchedField) ?? 'objective'] ?? 'brief';
   const affected = (event.payload?.affected as { stage_id: string; reason: string }[] | undefined) ?? [];
   const names = stageIds.map(stageLabel);

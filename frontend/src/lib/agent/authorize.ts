@@ -35,7 +35,11 @@ export const POLICY_TERMS: Record<Exclude<ExecutionPolicy, 'guided'>, string[]> 
     'It can move between stages, mark a stage complete when the requirements are met, and mark a stage stuck.',
     // 9 Oct: under "Handle them for me" some of these became Go's (Q2, Q4, W3);
     // the authorization records what the user agreed to, so it says so.
-    'It cannot finish the project. Skipping a stage and going back stay yours — except with routine decisions handed to it, when it may skip an optional stage, go back to do further work the analysis asks for, or start the next round, each with its reason recorded.',
+    // 13 Oct (Sean, 12.12): "works until done" beside "cannot finish the
+    // project" read as a contradiction. Done means every stage and the
+    // objective check; closing the project is a separate, final click.
+    'It can complete every stage and check the objective. Finishing the project — the final "Finish project" — is always your click.',
+    'Skipping a stage and going back stay yours — except with routine decisions handed to it, when it may skip an optional stage, go back to do further work the analysis asks for, or start the next round, each with its reason recorded.',
   ],
 };
 

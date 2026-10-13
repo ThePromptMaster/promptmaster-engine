@@ -37,9 +37,10 @@ export function AuthorizationDialog({
         {POLICY_TERMS[policy].map((t) => (
           <li key={t}>{t}</li>
         ))}
+        {/* What happens at the end of a window follows the choice below (13 Oct,
+            Sean: "every window needs my click" sat above a dropdown authorising them). */}
         <li>
-          In windows of {budget} steps. When a window is used up, Go stops and offers another; each further window is your
-          click, and is recorded. You can press Stop at any time.
+          {windowsLine(policy, budget, autoWindows)} You can press Stop at any time.
         </li>
       </ul>
       {policy === 'autonomous' && onAutoWindows && (
@@ -79,4 +80,13 @@ export function AuthorizationDialog({
       </div>
     </section>
   );
+}
+
+/** What happens when a window of steps is used up, as the choice below sets it. */
+export function windowsLine(policy: Exclude<ExecutionPolicy, 'guided'>, budget: number, autoWindows: number): string {
+  if (policy !== 'autonomous' || autoWindows <= 0) {
+    return `It works in windows of ${budget} steps. When one is used up, Go stops and offers another; each further window is your click, and is recorded.`;
+  }
+  const n = autoWindows >= KEEP_GOING_WINDOWS ? `up to ${KEEP_GOING_WINDOWS}` : String(autoWindows);
+  return `It works in windows of ${budget} steps, and you are authorising ${n} more window${autoWindows === 1 ? '' : 's'} now: when one is used up it starts the next without asking, each recorded. After that, a further window is your click.`;
 }
