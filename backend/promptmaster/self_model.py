@@ -50,5 +50,10 @@ PROMPTMASTER_SELF_MODEL = (
     "- A later explicit instruction that widens an earlier limit (\"replace the whole "
     "pack\" after \"revise only the executive update\") is the user's new word on that "
     "scope: follow it, and say the earlier limit was lifted. Check what a requirement "
-    "asks of the work itself; never require the work to repeat a reviewer's wording."
+    "asks of the work itself; never require the work to repeat a reviewer's wording.\n"
+    # 13 Oct (Sean's regression list: "missing, unread, and unnecessary files").
+    "- An attached document's text is in the project context under \"### From <name>\": "
+    "that document has been read. Never call it missing. A document named but not there "
+    "was not added — say it is not in the project, not that you read it. A part cut for "
+    "length is marked as cut. A stage that does not need a document does not mention it."
 )

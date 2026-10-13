@@ -181,6 +181,26 @@ export function ReviewRenderer({
       return next;
     }));
   }
+
+  /**
+   * "Use this reason for the other rows marked the same" (13 Oct; Sean's
+   * regression list, "repeated reasons"): one reason, many rows — by the
+   * user's click, never filled in on rows they have not looked at.
+   */
+  function applyReasonToSame(fromId: string) {
+    setRows((prev) => {
+      const from = prev.find((r) => r.id === fromId);
+      const reason = (from?.reason ?? '').trim();
+      if (!from || !reason) return prev;
+      return prev.map((r) =>
+        r.id !== fromId && r.status === from.status && !(r.reason ?? '').trim()
+          ? { ...r, reason, reason_source: 'same', status_source: 'user' }
+          : r
+      );
+    });
+  }
+  const missingReasonFor = (status: string | undefined, exceptId: string) =>
+    status ? rows.filter((r) => r.id !== exceptId && r.status === status && !(r.reason ?? '').trim()).length : 0;
   // Rows whose status the draft itself set, because it already knew the
   // outcome (1 Oct, items 3 and 18). They count as resolved; the user can
   // still change any of them.
@@ -432,6 +452,8 @@ export function ReviewRenderer({
                     schema={schema}
                     readOnly={readOnly}
                     onPatch={patch}
+                    sameMissing={missingReasonFor(row.status, row.id)}
+                    onApplyReasonToSame={() => applyReasonToSame(row.id)}
                   />
                 ))}
                 {foldedRows.length > 0 && (
@@ -463,6 +485,8 @@ export function ReviewRenderer({
                       schema={schema}
                       readOnly={readOnly}
                       onPatch={patch}
+                      sameMissing={missingReasonFor(row.status, row.id)}
+                      onApplyReasonToSame={() => applyReasonToSame(row.id)}
                     />
                   ))}
               </tbody>
@@ -506,9 +530,12 @@ interface ReviewRowProps {
   schema: StageRendererProps['schema'];
   readOnly: boolean;
   onPatch: (id: string, key: string, value: string) => void;
+  /** Other rows with this row's status and no reason yet. */
+  sameMissing?: number;
+  onApplyReasonToSame?: () => void;
 }
 
-function ReviewRow({ row, columns, statuses, schema, readOnly, onPatch }: ReviewRowProps) {
+function ReviewRow({ row, columns, statuses, schema, readOnly, onPatch, sameMissing = 0, onApplyReasonToSame }: ReviewRowProps) {
   const option = statusOption(schema, row.status);
   const needsReason = Boolean(option?.requiresReason);
   const reasonMissing = needsReason && !(row.reason ?? '').trim();
@@ -599,9 +626,24 @@ function ReviewRow({ row, columns, statuses, schema, readOnly, onPatch }: Review
                 Filled in from what this row already says — edit it if that is not the reason.
               </span>
             )}
+            {row.reason_source === 'same' && !reasonMissing && (
+              <span className="mt-1 block text-label text-[var(--on-surface-variant)]">
+                The reason you gave for another row marked {option?.label.toLowerCase()} — edit it if this one differs.
+              </span>
+            )}
+            {!readOnly && !reasonMissing && sameMissing > 0 && onApplyReasonToSame && (
+              <button
+                type="button"
+                onClick={onApplyReasonToSame}
+                className="mt-1 block text-label text-[var(--pm-primary)] hover:underline"
+              >
+                Use this reason for the {sameMissing} other row{sameMissing === 1 ? '' : 's'} marked {option?.label.toLowerCase()} without one
+              </button>
+            )}
           </td>
         </tr>
       )}
     </>
   );
 }
+

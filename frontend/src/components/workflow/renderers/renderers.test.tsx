@@ -817,3 +817,26 @@ describe('an empty prose stage', () => {
     expect(screen.queryByRole('button', { name: /Write it yourself/ })).not.toBeInTheDocument();
   });
 });
+
+describe('one reason for several rows (13 Oct; Sean, "repeated reasons")', () => {
+  it('offers the reason given on one row to the other rows with the same status, by a click', async () => {
+    const user = userEvent.setup();
+    const stage = getStage(RESEARCH_V1, 'experiment')!;
+    const runs = serializeItems([
+      { id: 'r1', run: 'Compare churn by cohort' },
+      { id: 'r2', run: 'Interview five customers' },
+      { id: 'r3', run: 'Survey the panel' },
+    ]);
+    render(<ReviewRenderer {...props(stage, { versions: [version(runs)] })} />);
+    for (const i of [0, 1, 2]) {
+      await user.click(screen.getAllByRole('combobox')[i]);
+      await user.click(screen.getByRole('option', { name: 'Not run' }));
+    }
+    // Nothing is filled in on rows the user has not looked at.
+    expect(screen.getAllByText(/still counts as unresolved/)).toHaveLength(3);
+    await user.type(screen.getByLabelText(/Why not run\?/, { selector: '#r1-reason' }), 'No source data were provided.');
+    await user.click(screen.getByRole('button', { name: 'Use this reason for the 2 other rows marked not run without one' }));
+    expect(screen.getByLabelText(/Why not run\?/, { selector: '#r3-reason' })).toHaveValue('No source data were provided.');
+    expect(screen.queryByText(/still counts as unresolved/)).not.toBeInTheDocument();
+  });
+});
