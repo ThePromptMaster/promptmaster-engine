@@ -654,3 +654,28 @@ def test_the_planner_is_told_to_offer_choices():
 
     assert "decision_choices" in _NEXT_ACTION_INSTRUCTION
     assert "2 to 4 short answers" in _NEXT_ACTION_INSTRUCTION
+
+
+def test_every_prompt_carries_the_regression_rules():
+    """13 Oct (Sean's regression list): storage, owners, removed scope, pack vs project, later scope."""
+    from promptmaster.self_model import PROMPTMASTER_SELF_MODEL as m
+
+    assert "Never write that saving, storage or files are not supported" in m
+    assert "Proposed owner: <name>" in m
+    assert "Something the user removed from scope stays in the record as removed" in m
+    assert "A finished status report, plan or pack does not finish the project" in m
+    assert "say the earlier limit was lifted" in m
+
+
+def test_the_objective_check_keeps_a_finished_pack_apart_from_open_project_work():
+    from promptmaster.objective_assessment import _ASSESS_INSTRUCTION
+
+    assert "even while the project it describes still has open work" in _ASSESS_INSTRUCTION
+
+
+def test_a_shortened_stage_is_not_read_as_missing_work():
+    from promptmaster.criterion_check import MAX_CHECK_CONTENT, build_check_prompt
+    from promptmaster.schemas import PMInput
+
+    _, user = build_check_prompt(PMInput(objective="x", audience="y", mode="architect"), "Output", "c", "w " * MAX_CHECK_CONTENT)
+    assert "never report anything as missing, cut off or truncated because of this note" in user

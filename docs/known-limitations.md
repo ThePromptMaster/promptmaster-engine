@@ -1612,3 +1612,21 @@ never replaced. This needs the `projects.stage_modes` column (migration
 
 Material findings that "Handle them for me" leaves undecided now say so on their row.
 Choosing Accept, Defer or Reject for each is still the user's, one row at a time.
+### L-84 — Rules for the earlier regression list, held by prompt rather than by code (2026-10-13)
+
+Sean's 12 Oct regression list was swept against the code. Five of its items are now rules
+every prompt carries (`self_model.py`):
+- PromptMaster saves every version, so generated text never claims storage is
+  unsupported.
+- A person is an owner only when the material names them; otherwise "Proposed
+  owner" or "Owner: to confirm".
+- Scope the user removed stays in the record but is not listed as open work.
+- A finished report or pack does not finish the project.
+- A later instruction that widens an earlier limit is followed, and the lifted limit
+  is said.
+
+The objective check says the same about a finished pack. A shortened criterion check no
+longer reads its own cut as missing work. These are model instructions: a model can
+still break them, and no code check stops it. The ID check in code catches IDs that are
+removed and come back, and IDs that are renamed. It does not catch an ID kept but
+reused for something else; only the prompt rule covers that.
