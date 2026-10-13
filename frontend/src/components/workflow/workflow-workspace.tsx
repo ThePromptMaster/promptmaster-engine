@@ -91,7 +91,7 @@ import { previewRowAction } from '@/lib/workflow/row-actions';
 import { readStageFigures, type StageFigures } from '@/lib/workflow/figures';
 import { FiguresOnRecord } from './figures-on-record';
 import type { ReplyAction } from '@/types';
-import { buildStageContext } from '@/lib/workflow/context';
+import { buildStageContext, measureStageContent } from '@/lib/workflow/context';
 import { proposeSummary, proposeTargets } from '@/lib/workflow/proposals';
 import { proposeStatuses } from '@/lib/workflow/propose';
 import type { StageContext, WorkflowTemplate, BlockKind } from '@/lib/workflow/types';
@@ -1095,6 +1095,38 @@ export function WorkflowWorkspace({
     onRefresh: onReload,
     getControls: () => controlsRef.current,
   });
+
+  /**
+   * 13 Oct (Sean, email 1): "return to a stage, supply changes, and run Go
+   * again". The reopened stage is closed on its new version when its
+   * requirements hold — which reopens the work after it for a recheck — or
+   * handed to Go to finish with the user's changes kept; then Go carries on
+   * from where the project is, rechecking what the change affected first.
+   */
+  const continueFromReopened = useCallback(async () => {
+    if (!stage || !reopenedHere) return;
+    setTransitionError(null);
+    try {
+      if (evaluation.canAdvance) {
+        await markComplete();
+      } else {
+        const unmet = evaluation.unmet.filter((c) => c.blocking).map((c) => c.label).join('; ');
+        await appendEvent({
+          type: 'brief_changed',
+          stage_id: stage.id,
+          reason: `Reopened and handed to Go to finish`,
+          payload: {
+            kind: 'reopened',
+            affected: [{ stage_id: stage.id, reason: `You reopened ${stage.label} and changed it. Finish it keeping every change you made${unmet ? `, so that: ${unmet}` : ''}.` }],
+          },
+        });
+      }
+      setViewingStageId(null);
+      await go.go();
+    } catch (e) {
+      setTransitionError(`That didn't go through${e instanceof Error && e.message ? `: ${e.message}` : ''}. Nothing was changed.`);
+    }
+  }, [stage, reopenedHere, evaluation, markComplete, appendEvent, go]);
   // A paused run holds the next move too: the page drafting Realign while Go
   // proposed skipping it, or Summary while Go waited for approval to draft it,
   // made versions no Go step accounted for (Sean, 10 Oct, email 6.7). The stage
@@ -1643,7 +1675,7 @@ export function WorkflowWorkspace({
                   marked for a recheck if what it was built on changed. */}
               {reopenedHere && (
                 <span className="text-label text-[var(--on-surface-variant)]">
-                  Reopened — edit it here, then mark it complete. Later stages are flagged for a recheck if this changes.
+                  Reopened — change it here (edit it, or use the side chat), then let Go continue: it keeps this version as the new one, rechecks the stages after it, and carries on. Or mark it complete yourself.
                 </span>
               )}
               {canReopen && (
@@ -1653,6 +1685,16 @@ export function WorkflowWorkspace({
                 >
                   <span className="material-symbols-outlined text-[16px]">edit</span>
                   Reopen to edit
+                </button>
+              )}
+              {reopenedHere && appendStageVersion && project.status !== 'finalized' && (
+                <button
+                  onClick={() => void continueFromReopened()}
+                  disabled={go.active}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--pm-primary)] px-3 py-1.5 text-label font-semibold text-[var(--on-primary)] hover:opacity-90 disabled:opacity-50"
+                >
+                  <span className="material-symbols-outlined text-[16px]">play_arrow</span>
+                  Apply my changes and let Go continue
                 </button>
               )}
               {canMarkComplete && !isCurrent && (
@@ -2133,6 +2175,10 @@ export function WorkflowWorkspace({
               stageId={stage.id}
               stageLabel={stage.label}
               onFactsChanged={() => onReload?.()}
+              // 13 Oct (Sean, email 6): the revision's saved text is checked
+              // against what can be measured, and the result shown with it.
+              checkRevision={(text) => measureStageContent(project, template, stage, text).map((m) => ({ label: `${m.label} — ${m.value ?? (m.satisfied ? 'met' : 'not met')}`, ok: m.satisfied }))}
+              autoApply={project.routine_decisions === 'handle'}
               attach={
                 project.status === 'finalized' ? undefined : (
                   <ChatAttach

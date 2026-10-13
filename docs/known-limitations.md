@@ -1556,3 +1556,21 @@ it at the top.
 
 The planner can offer 2–4 one-click answers with a question. Whether it does is a
 model judgement, and an open question still has only the text box.
+
+### L-82 — Continuing from a reopened stage; delegated chat revisions (2026-10-13)
+
+A reopened earlier stage offers "Apply my changes and let Go continue". If the stage's
+requirements hold, it is completed on its new version, which reopens the work after it
+for a recheck, and Go starts from where the project is. If they do not hold, Go is
+asked to finish the stage while keeping the user's changes. That is a model revision of
+the user's version, and the earlier versions stay in its history. The Go panel itself
+still appears only on the project's current stage.
+
+With "Routine decisions: handle them for me", a "Change it" proposal in the side chat
+that changes no accepted fact is applied without a click. The notice says so and keeps
+"Restore the previous version". A proposal that changes a fact still waits, because
+recording a fact is the user's decision. The check after applying measures what can be
+measured (lengths, sections, questions) on the saved text. It does not re-run a model
+evaluation.
+
+Pre-authorised further windows are read back from the record after a reload.

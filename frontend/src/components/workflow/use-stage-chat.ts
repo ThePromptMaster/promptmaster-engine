@@ -88,6 +88,12 @@ export interface AppliedRevision {
   scope: string;
   /** The version to restore to. Held from *before* the append. */
   previousVersionId: string | null;
+  /** What changed, in one line (13 Oct, Sean: "a short explanation"). */
+  summary?: string;
+  /** What was checked on the saved text, each as one line (13 Oct). */
+  checks?: { label: string; ok: boolean }[];
+  /** Applied under "Routine decisions: handle them for me", without a click. */
+  auto?: boolean;
 }
 
 interface Options {
@@ -109,6 +115,15 @@ interface Options {
   getChatContext?: () => ChatContext;
   /** After facts were updated with a revision, so the project reloads them. */
   onFactsChanged?: () => Promise<unknown> | void;
+  /** The requirements checked on a revision's saved text, each met or not (13 Oct). */
+  checkRevision?: (content: string) => { label: string; ok: boolean }[];
+  /**
+   * Routine revisions are the user's delegated decision (13 Oct, Sean: "If
+   * I've authorized routine revisions, it should apply them within that
+   * authority and report what changed"). A proposal that changes no fact is
+   * then applied at once; one that does still waits for the click.
+   */
+  autoApply?: boolean;
 }
 
 /**
@@ -146,6 +161,8 @@ export function useStageChat({
   restoreStageVersion,
   getChatContext,
   onFactsChanged,
+  checkRevision,
+  autoApply = false,
 }: Options) {
   const [messages, setMessages] = useState<StageChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -412,6 +429,9 @@ export function useStageChat({
    * version this replaces stays exactly where it was, which is what
    * "recoverable new version" means in FR-08.
    */
+  /** The proposal applied without a click under delegated routine decisions. */
+  const autoRef = useRef<ChatProposal | null>(null);
+
   const accept = useCallback(async (updateFactIds?: readonly string[]) => {
     if (!proposal || !appendStageVersion || busy) return;
     setBusy(true);
@@ -466,7 +486,13 @@ export function useStageChat({
       }
 
       if (live.current) {
-        setApplied({ scope: proposal.target.label, previousVersionId });
+        setApplied({
+          scope: proposal.target.label,
+          previousVersionId,
+          summary: proposal.changeSummary,
+          checks: checkRevision?.(proposal.nextContent) ?? [],
+          auto: autoRef.current === proposal,
+        });
         setProposal(null);
       }
     } catch (e) {
@@ -478,7 +504,25 @@ export function useStageChat({
     } finally {
       if (live.current) setBusy(false);
     }
-  }, [proposal, appendStageVersion, busy, headVersion?.id, stageId, stageLabel, project, persist, onFactsChanged]);
+  }, [proposal, appendStageVersion, busy, headVersion?.id, stageId, stageLabel, project, persist, onFactsChanged, checkRevision]);
+
+  // Under delegated routine decisions, a proposal that changes no accepted
+  // fact is applied as soon as it is drafted, once (13 Oct). The previous
+  // version stays one click away on the notice.
+  useEffect(() => {
+    if (!autoApply || !proposal || busy || autoRef.current === proposal) return;
+    if (proposal.factChanges?.length || !appendStageVersion) return;
+    autoRef.current = proposal;
+    void accept();
+  }, [autoApply, proposal, busy, appendStageVersion, accept]);
+
+  /** "Adjust": the instruction back in the box, the proposal set aside, nothing saved. */
+  const adjust = useCallback((): string => {
+    const text = proposal?.instruction ?? '';
+    setProposal(null);
+    setError(null);
+    return text;
+  }, [proposal]);
 
   /**
    * Discard the proposal.
@@ -518,6 +562,7 @@ export function useStageChat({
     propose,
     saveDiscussion,
     accept,
+    adjust,
     discard,
     undo,
     dismissApplied,

@@ -138,6 +138,10 @@ interface Props {
   attach?: ReactNode;
   /** After a revision updated accepted facts, so the project reloads them. */
   onFactsChanged?: () => Promise<unknown> | void;
+  /** The requirements checked on a revision's saved text (13 Oct). */
+  checkRevision?: (content: string) => { label: string; ok: boolean }[];
+  /** Routine revisions are applied without a click (delegated routine decisions). */
+  autoApply?: boolean;
 }
 
 /**
@@ -182,6 +186,8 @@ export function ChatPanel({
   starters = [],
   attach,
   onFactsChanged,
+  checkRevision,
+  autoApply,
 }: Props) {
   const [offerActions, setOfferActions] = useState(true);
   useEffect(() => setOfferActions(readOfferActions()), []);
@@ -195,6 +201,8 @@ export function ChatPanel({
     restoreStageVersion,
     getChatContext,
     onFactsChanged,
+    checkRevision,
+    autoApply,
   });
 
   const [requestedMode, setMode] = useState<Mode>(initialMode);
@@ -491,7 +499,12 @@ export function ChatPanel({
             canApply={chat.canApply}
             busy={chat.busy}
             factChanges={chat.proposal.factChanges}
+            summary={chat.proposal.changeSummary}
             onAccept={(factIds) => void chat.accept(factIds)}
+            onAdjust={() => {
+              setDraft(chat.adjust());
+              setMode('instruct');
+            }}
             onDiscard={chat.discard}
           />
         )}
@@ -499,6 +512,9 @@ export function ChatPanel({
         {chat.applied && (
           <AppliedNotice
             scope={chat.applied.scope}
+            summary={chat.applied.summary}
+            checks={chat.applied.checks}
+            auto={chat.applied.auto}
             canUndo={chat.canUndo && Boolean(chat.applied.previousVersionId)}
             busy={chat.busy}
             onUndo={() => void chat.undo()}
@@ -827,10 +843,16 @@ export function ProposalCard({
   canApply,
   busy,
   factChanges = [],
+  summary,
   onAccept,
+  onAdjust,
   onDiscard,
 }: {
   scopeLabel: string;
+  /** What the revision changes, in one line (13 Oct). */
+  summary?: string;
+  /** Back to the instruction, to change what was asked (13 Oct, Sean: "Apply and Adjust buttons"). */
+  onAdjust?: () => void;
   before: string;
   after: string;
   canApply: boolean;
@@ -851,6 +873,12 @@ export function ProposalCard({
         Proposed — not saved yet
       </p>
       <p className="mt-0.5 text-body text-[var(--on-surface)]">{scopeLabel}</p>
+      {summary && (
+        <p aria-label="What changed" className="mt-1 text-label text-[var(--on-surface)]">
+          <span className="text-[var(--on-surface-variant)]">What changed: </span>
+          {summary}
+        </p>
+      )}
 
       <div className="mt-3">
         <p className="text-label text-[var(--on-surface-variant)]">Now</p>
@@ -896,6 +924,15 @@ export function ProposalCard({
         >
           Discard
         </button>
+        {onAdjust && (
+          <button
+            onClick={onAdjust}
+            disabled={busy}
+            className="rounded-lg px-3 py-1.5 text-label text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-highest)] hover:text-[var(--on-surface)]"
+          >
+            Adjust
+          </button>
+        )}
       </div>
     </section>
   );
@@ -903,12 +940,18 @@ export function ProposalCard({
 
 export function AppliedNotice({
   scope,
+  summary,
+  checks = [],
+  auto = false,
   canUndo,
   busy,
   onUndo,
   onDismiss,
 }: {
   scope: string;
+  summary?: string;
+  checks?: { label: string; ok: boolean }[];
+  auto?: boolean;
   canUndo: boolean;
   busy: boolean;
   onUndo: () => void;
@@ -920,8 +963,19 @@ export function AppliedNotice({
       className="mt-4 rounded-xl bg-[var(--success-container)] px-4 py-3"
     >
       <p className="text-body text-[var(--on-success-container)]">
-        Applied to {scope.toLowerCase()}.
+        Applied to {scope.toLowerCase()}{auto ? ' under your routine-decision authority' : ''}.
       </p>
+      {summary && <p className="mt-0.5 text-label text-[var(--on-success-container)]">What changed: {summary}</p>}
+      {checks.length > 0 && (
+        <ul aria-label="Checked on the saved text" className="mt-1 space-y-0.5 text-label text-[var(--on-success-container)]">
+          {checks.map((c) => (
+            <li key={c.label}>
+              <span aria-hidden className="material-symbols-outlined mr-1 align-[-3px] text-[14px]">{c.ok ? 'check' : 'close'}</span>
+              {c.label}
+            </li>
+          ))}
+        </ul>
+      )}
       <p className="mt-0.5 text-label text-[var(--on-success-container)]">
         The previous version is still in this stage&rsquo;s history.
       </p>

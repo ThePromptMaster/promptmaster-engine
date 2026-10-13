@@ -56,6 +56,7 @@ import { auditStop, describeAudit, proposedDefault, touchesObjective } from '@/l
 import { recordRoutineDefault } from '@/lib/supabase/facts';
 import { allowedActions, reconsiderNote, returnTargets, runAttemptsFor, stageHasCurrentDraft, LIVE_TOOLS, polishSinceDirection, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, withoutEndlessPolish, withoutSettledRuns, withoutOverride, DEFAULT_BUDGET_STEPS, fitsBudget, noChange, plannedBeforeLatestChange, preempt, shouldPause, stateFingerprint, stepCost } from '@/lib/agent/policy';
 import {
+  autoWindowsLeft,
   createAgentRun,
   endAgentRun,
   finishAgentStep,
@@ -1165,6 +1166,8 @@ export function useGoLoop(opts: Options) {
   const adopt = useCallback(
     async (found: AgentRun) => {
       const list = await listAgentSteps(found.id).catch(() => []);
+      autoLeftRef.current = await autoWindowsLeft(found).catch(() => 0);
+      setAutoPending(autoLeftRef.current > 0);
       setPolicy(found.policy);
       // The selector shows the window this run was given, not the default:
       // after a reload it read "12 steps" beside "3 / 25" (1 Oct, item 21).
@@ -1223,6 +1226,9 @@ export function useGoLoop(opts: Options) {
       // not vanish because the run finished.
       const last = await getLatestAgentRun(opts.project.id);
       if (!last) return;
+      // Windows authorised in advance outlast a reload (13 Oct).
+      autoLeftRef.current = await autoWindowsLeft(last).catch(() => 0);
+      setAutoPending(autoLeftRef.current > 0);
       setPolicy(last.policy);
       setBudget(last.budget_steps);
       commitRun(last);

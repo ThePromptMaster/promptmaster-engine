@@ -191,3 +191,23 @@ export async function getLatestAgentRun(projectId: string): Promise<AgentRun | n
   if (error) throw error;
   return (data as AgentRun | null) ?? null;
 }
+
+/**
+ * The further windows an authorization still allows without asking (13 Oct):
+ * the number authorised, less the windows already started on their own. Read
+ * from the record, so a reload does not forget what the user authorised.
+ */
+export async function autoWindowsLeft(run: Pick<AgentRun, 'authorization_id' | 'policy'>): Promise<number> {
+  if (run.policy !== 'autonomous' || !run.authorization_id) return 0;
+  const supabase = createClient();
+  const { data: rec, error } = await supabase.from('recommendations').select('scope').eq('id', run.authorization_id).maybeSingle();
+  if (error || !rec) return 0;
+  const allowed = Number((rec.scope as { auto_continue_windows?: unknown } | null)?.auto_continue_windows ?? 0);
+  if (!Number.isFinite(allowed) || allowed <= 0) return 0;
+  const { count } = await supabase
+    .from('agent_runs')
+    .select('id', { count: 'exact', head: true })
+    .eq('authorization_id', run.authorization_id)
+    .eq('auto_continued', true);
+  return Math.max(0, allowed - (count ?? 0));
+}
