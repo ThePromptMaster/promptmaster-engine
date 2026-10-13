@@ -34,11 +34,22 @@ type Need =
        */
       authority?: 'reserved' | 'policy_ask';
     }
-  | { kind: 'answer_question'; question: string; /** Q3a: the expert review package, as markdown. */ expertPackage?: string }
+  | {
+      kind: 'answer_question'; question: string; /** Q3a: the expert review package, as markdown. */ expertPackage?: string;
+      /** Answers the user can click (13 Oct); the text box stays for anything else. */
+      choices?: string[];
+    }
   | { kind: 'wait_for_jobs'; stageId: string; pending: number; complete: number; total: number }
   | { kind: 'continue_budget'; budgetSteps: number }
   | { kind: 'large_job'; stageId: string; sections: number }
   | { kind: 'triage_findings'; stageId: string; count: number }
+  /**
+   * A repair that did not settle (13 Oct, Sean: "The recovery should identify
+   * the unresolved requirement, explain why the repair didn't resolve it, and
+   * offer an actionable next step"). `why`: what reopened it and is still
+   * unresolved; `last`: what the last attempt did, in the record's words.
+   */
+  | { kind: 'repair_stuck'; stageId: string; why: string; last: string; tries: number; saved: number }
   /** Go thinks this stage is not the best next move; skipping it is the user's call. */
   | { kind: 'skip_stage'; stageId: string; reason: string }
   /** Go's proposal to start another round of a looping workflow; the user starts it. */
@@ -192,6 +203,40 @@ export function repairTries(steps: readonly AgentStep[], state: WorkflowState, t
       return s.params?.stale_since === since || (!s.params?.stale_since && thisRun.has(s.id));
     })
     .map((s) => String(s.params?.stage_id ?? ''));
+}
+
+/**
+ * A reopened stage whose repairs are used up and which is still reopened, or
+ * null (13 Oct, Sean's screenplay: Continuity stayed "awaiting recheck" after
+ * its two repairs, and nothing said so until the objective check, three
+ * stages later). It is the user's next decision, said as one.
+ */
+export function exhaustedRepair(template: WorkflowTemplate, state: WorkflowState, tried: readonly string[]): string | null {
+  for (const stage of template.stages) {
+    if (state.stages[stage.id]?.status !== 'stale') continue;
+    if (tried.filter((id) => id === stage.id).length >= REPAIR_TRIES) return stage.id;
+  }
+  return null;
+}
+
+/** The `repair_stuck` need for a stage, from the repair steps recorded for it. */
+export function repairStuckNeed(state: WorkflowState, stageId: string, steps: readonly AgentStep[], fallbackWhy = ''): Extract<NeedsUser, { kind: 'repair_stuck' }> {
+  const repairs = steps.filter((s) => s.action_key === 'recheck_stage' && String(s.params?.stage_id ?? s.stage_id) === stageId);
+  const recent = repairs.slice(-Math.max(REPAIR_TRIES, 3));
+  const saved = recent.filter((s) => {
+    if (s.status !== 'succeeded') return false;
+    const c = (s.changes ?? {}) as { version_ids?: unknown; sections_written?: unknown };
+    return (Array.isArray(c.version_ids) && c.version_ids.length > 0) || (Array.isArray(c.sections_written) && c.sections_written.length > 0);
+  }).length;
+  const last = recent.at(-1);
+  return {
+    kind: 'repair_stuck',
+    stageId,
+    why: state.stages[stageId]?.stale?.reason || fallbackWhy || 'something it relied on changed',
+    last: last?.output ?? '',
+    tries: recent.length,
+    saved,
+  };
 }
 
 export function staleRepair(
@@ -590,7 +635,7 @@ export function needStillHolds(
  * lifts the block and leaves the user on the stage — what the More menu's
  * "Continue this stage" does — without Go resuming.
  */
-export type StuckOption = 'resume' | 'add_data' | 'skip' | 'retry' | 'clear' | 'fix' | 'stop';
+export type StuckOption = 'resume' | 'add_data' | 'skip' | 'retry' | 'clear' | 'fix' | 'stop' | 'keep' | 'open';
 
 /** At most this many ways forward on a stuck card (2 Oct screenshots: five was too many). */
 export const STUCK_OPTIONS_MAX = 3;
@@ -748,6 +793,8 @@ export function describeNeed(
       };
     case 'objective_check':
       return describeObjectiveCheck(need, stageLabel);
+    case 'repair_stuck':
+      return describeRepairStuck(need, stageLabel(need.stageId));
     case 'triage_findings':
       return {
         // Why these were not handled under "Handle them for me" (Sean, 10 Oct,
@@ -757,6 +804,39 @@ export function describeNeed(
         action: SHOW_TABLE,
       };
   }
+}
+
+/**
+ * A repair that did not settle, said as what is still wrong, why the attempts
+ * did not fix it, and three ways on (13 Oct): try once more from the current
+ * version, keep the stage as it is, or open it and change it by hand.
+ */
+function describeRepairStuck(
+  need: Extract<NeedsUser, { kind: 'repair_stuck' }>,
+  stage: string
+): { message: string; action: string; options: { id: StuckOption; label: string }[] } {
+  const why = need.why.replace(/[.\s]+$/, '');
+  const last = need.last.replace(/\s+/g, ' ').trim().replace(/[.\s]+$/, '');
+  const attempts = `${need.tries} repair${need.tries === 1 ? '' : 's'} of ${stage}`;
+  const saved = need.saved === 0
+    ? 'none of them was saved'
+    : need.saved === need.tries
+      ? `each was saved as a new version (the earlier ones are kept)`
+      : `${need.saved} ${need.saved === 1 ? 'was' : 'were'} saved as a new version, the rest were not`;
+  const options = [
+    { id: 'retry' as const, label: `Try once more from the current version` },
+    { id: 'keep' as const, label: `Keep ${stage} as it is now` },
+    { id: 'open' as const, label: `Open ${stage}` },
+  ];
+  return {
+    message:
+      `I stopped repairing ${stage}: ${attempts} did not settle it, and ${saved}. ` +
+      `What is still unresolved: ${why}. ` +
+      (last ? `The last attempt: ${last.length > 400 ? `${last.slice(0, 400)}…` : last}. ` : '') +
+      `Choose how to go on: try once more (it starts from the current version and keeps every decided row), keep ${stage} as it is now and carry on, or open it and change it yourself.`,
+    action: options[0].label,
+    options,
+  };
 }
 
 /** The objective check's stop, with what it found and what each button does (11 Oct). */

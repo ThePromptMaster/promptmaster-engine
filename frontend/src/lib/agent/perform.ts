@@ -29,7 +29,8 @@ import { lookupAndVerify } from '@/lib/workflow/verify';
 import { figuresFromOutput, readStageFigures, withRunFigures, type StageFigures } from '@/lib/workflow/figures';
 import { applyRunBlocked, applyRunResult } from '@/lib/workflow/run-result';
 import { inputsChanged, stageInputs } from '@/lib/workflow/stage-inputs';
-import { applyTriage } from '@/lib/workflow/triage';
+import { applyTriage, isTriageTable, splitUntriaged } from '@/lib/workflow/triage';
+import { restoreDecided } from '@/lib/workflow/commit-check';
 import { proposeTargets } from '@/lib/workflow/proposals';
 import { proposeStatuses } from '@/lib/workflow/propose';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
@@ -97,7 +98,7 @@ export interface PerformContext {
   refresh?: () => unknown;
   /** Live progress for a long step ("2 of 5 sections written"). */
   onProgress?: (text: string) => void;
-  appendStageVersion?: (stageId: string, name: string, version: NewVersion) => Promise<unknown>;
+  appendStageVersion?: (stageId: string, name: string, version: NewVersion, evaluation?: undefined, options?: { keepRecommendations?: readonly string[]; writtenFor?: string }) => Promise<unknown>;
   recordStageEvaluation?: (stageId: string, versionId: string, evaluation: NewEvaluation) => Promise<Evaluation>;
   setStageSummary?: (stageId: string, summary: string) => Promise<void>;
   setStageFigures?: (stageId: string, figures: StageFigures) => Promise<void>;
@@ -144,9 +145,13 @@ function clip(text: string): string {
 
 function done(actionKey: string, partial: Omit<StepOutcome, 'label'> & { sandboxLabel?: ExecutionLabel | null; interpretedRunId?: string | null }): StepOutcome {
   const { sandboxLabel, interpretedRunId, ...rest } = partial;
+  // A failed step that saved nothing wrote no draft (13 Oct, Sean: "Draft
+  // written" sat beside "the current version was kept").
+  const c = (rest.changes ?? {}) as { version_ids?: unknown; sections_written?: unknown };
+  const savedAny = (Array.isArray(c.version_ids) && c.version_ids.length > 0) || (Array.isArray(c.sections_written) && c.sections_written.length > 0);
   return {
     ...rest,
-    label: deriveExecutionLabel(actionKey, { blocked: rest.status === 'blocked', sandboxLabel, interpretedRunId }),
+    label: rest.status === 'failed' && !savedAny && !sandboxLabel ? null : deriveExecutionLabel(actionKey, { blocked: rest.status === 'blocked', sandboxLabel, interpretedRunId }),
   };
 }
 
@@ -765,7 +770,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       const ids = await enqueueRevisionJobs({
         project: ctx.project, artifactId: m.artifact.id, stageId: ctx.stage.id, outline: m.outline,
         approvedOutlineVersionId: m.approvedOutlineVersionId, brief: m.brief, stageHint: ctx.stage.entry_prompt_hint,
-        saveSnapshot: (v) => append(m.holderStageId, holderLabel, v),
+        saveSnapshot: (v) => append(m.holderStageId, holderLabel, v, undefined, { writtenFor: ctx.stage.id }),
       });
       if (!ids.length) return done(key, { status: 'failed', output: 'No written section to revise.', toolsUsed: [], changes: {} });
       return waitForSections(ctx, key, ids, 'Revised');
@@ -907,7 +912,11 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       const measuredLine = measuredFails.length
         ? ` MEASURED IN CODE AND NOT MET: ${measuredFails.join('; ')}. Revise so each is met — the count is made in code (${COUNTING_RULE}), so count exactly and leave a margin — and keep everything else the brief asks for: every required section, label and fact. Add nothing new.`
         : '';
-      const instruction = recheckInstruction(target.label, why, superseded, before ? 'table' : 'prose') + measuredLine;
+      // The rows already decided are named, to be returned as they are (13 Oct).
+      const decidedLine = before?.some((r) => r.status)
+        ? ` DECIDED ROWS — return each of these exactly as it is, with its id, text, status and reason: ${before.filter((r) => r.status).map((r) => r.id).join(', ')}. Add a row only for a new problem; never drop or renumber one.`
+        : '';
+      const instruction = recheckInstruction(target.label, why, superseded, before ? 'table' : 'prose') + measuredLine + decidedLine;
       const fresh = await readManuscript(ctx, target);
       if (!fresh) return manuscriptMissing(key, target);
       const attempt = async (text: string) => {
@@ -917,7 +926,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         );
         const generated = generationContent(target, res);
         const after = before ? withoutRevisionNotes(parseItems(generated)) : null;
-        const content = before && after ? serializeItems(carryUserFields(before, after, itemSchemaFor(target))) : generated;
+        const content = before && after ? serializeItems(restoreDecided(before, carryUserFields(before, after, itemSchemaFor(target)))) : generated;
         return { res, content };
       };
       let { res, content } = await attempt(instruction);
@@ -972,7 +981,37 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
           });
         }
       }
-      if (!before) content = honestChangeNote(content, measuredValues(ctx, target, content));
+      // Under "handle them for me", the routine findings a recheck raised are
+      // decided with it, as Go decides them on the stage it stands on (13 Oct,
+      // screenplay: four new Continuity findings sat "not looked at" until
+      // the objective check, three stages on, said the work was not finished).
+      const tableSchema = itemSchemaFor(target);
+      const triaged: string[] = [];
+      if (before && isTriageTable(tableSchema) && ctx.run.policy === 'autonomous' && ctx.project.routine_decisions === 'handle') {
+        const rows = parseItems(content) ?? [];
+        const { routine } = splitUntriaged(rows, tableSchema);
+        if (routine.length) {
+          const t = await api.agentTriage(
+            {
+              inputs, state: ctx.digest,
+              items: routine.map((i) => Object.fromEntries(Object.entries(i).filter(([k, v]) => k !== 'status' && k !== 'reason' && typeof v === 'string')) as Record<string, string>),
+              statuses: proposableStatuses(tableSchema).map((s) => ({ value: s.value, label: s.label, requires_reason: Boolean(s.requiresReason) })),
+              model,
+            },
+            ctx.signal
+          ).catch(() => null);
+          if (t) {
+            const r = applyTriage(rows, t.decisions.filter((d) => routine.some((i) => i.id === d.id)), tableSchema);
+            content = serializeItems(r.items);
+            triaged.push(...r.applied);
+          }
+        }
+      }
+      // The note is the version's record, not part of the document (13 Oct,
+      // Sean's PINE pack: "Measured in code: … 159 words" saved at the top of
+      // the pack was read back as a 159-word draft competing with the 98-word one).
+      const note = before ? { note: null, body: content } : splitChangeNote(honestChangeNote(content, measuredValues(ctx, target, content)));
+      content = note.body;
       const created = await ctx.appendStageVersion(target.id, target.label, {
         content,
         source_operation: 'agent_revise',
@@ -980,7 +1019,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         instruction,
         model: res.model_used || ctx.project.model,
         mode: ctx.project.mode,
-        change_summary: `Repaired after a change: ${why}`,
+        change_summary: `Repaired after a change: ${why}${note.note ? ` — ${note.note}` : ''}`.slice(0, 1000),
         finish_reason: whole.finishReason,
       });
       const versionId = (created as { id?: unknown } | null)?.id;
@@ -1041,9 +1080,9 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       return done(key, {
         status: 'succeeded', toolsUsed: ['model'],
         changes: typeof versionId === 'string' ? { version_ids: [versionId] } : {},
-        output: evaluation.canAdvance
+        output: (triaged.length ? `Decided ${triaged.length} routine finding${triaged.length === 1 ? '' : 's'} it raised, under your routine-decision policy. ` : '') + (evaluation.canAdvance
           ? `Repaired ${target.label} (${why}) — saved as a new version and marked complete again; the earlier version is kept.`
-          : `Repaired ${target.label} (${why}) — saved as a new version; it stays reopened until: ${evaluation.unmet.filter((c) => c.blocking).map((c) => c.label).join('; ')}.`,
+          : `Repaired ${target.label} (${why}) — saved as a new version; it stays reopened until: ${evaluation.unmet.filter((c) => c.blocking).map((c) => c.label).join('; ')}.`),
       });
     }
 
@@ -1450,11 +1489,12 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       const audit = typeof params.stop_audit === 'string' ? `\n\n${params.stop_audit}` : '';
       // Q3a: a question for an expert carries the package for them, on the record.
       const expertPackage = typeof params.expert_package === 'string' && params.expert_package.trim() ? params.expert_package : '';
+      const choices = Array.isArray(params.choices) ? params.choices.filter((c): c is string => typeof c === 'string' && c.trim().length > 0).slice(0, 4) : [];
       return done(key, {
         status: 'succeeded', toolsUsed: expertPackage ? ['model'] : [], changes: {},
         output: `${question}${audit}${expertPackage ? `\n\nPrepared for an expert's review:\n\n${expertPackage}` : ''}`,
         stop: { status: 'awaiting_decision', reason: question },
-        needs: { kind: 'answer_question', question, ...(expertPackage ? { expertPackage } : {}) },
+        needs: { kind: 'answer_question', question, ...(expertPackage ? { expertPackage } : {}), ...(choices.length >= 2 ? { choices } : {}) },
       });
     }
 
@@ -1713,7 +1753,7 @@ async function recheckManuscript(
       ...(ctx.template.outline_stage === 'derived' ? { records: sectionRecords(ctx.template, ctx.state, ctx.bundles) } : {}),
     },
     stageHint: target.entry_prompt_hint,
-    saveSnapshot: (v) => append(holderStageId, holderLabel, v),
+    saveSnapshot: (v) => append(holderStageId, holderLabel, v, undefined, { writtenFor: target.id }),
   });
   const wrote = await waitForSections(ctx, key, ids, 'Repaired', { artifactId: fresh.id, outline });
   if (wrote.status !== 'succeeded') return wrote;
@@ -1803,6 +1843,18 @@ export function honestChangeNote(content: string, measured: readonly string[]): 
   const counted = measured.length ? `Measured in code: ${measured.join('; ')}.` : '';
   const line = [said && /[.!?]$/.test(said) ? said : said ? `${said}.` : '', counted].filter(Boolean).join(' ');
   return `${m[1].replace(/\s+$/, ' ')}${line}${content.slice(m[0].length)}`;
+}
+
+/**
+ * A leading "What changed: …" line taken off the document: the line, and the
+ * text without it. The repair is asked for the line so its record can say what
+ * it did; the document itself carries no note about itself.
+ */
+export function splitChangeNote(content: string): { note: string | null; body: string } {
+  const m = /^\s*\**What changed:?\**:?\s*([^\n]*)\n*/i.exec(content);
+  if (!m) return { note: null, body: content };
+  const note = m[1].replace(/\*+$/, '').trim();
+  return { note: note || null, body: content.slice(m[0].length).replace(/^\s+/, '') };
 }
 
 /** How many times a cut-off draft is continued before it is saved as cut off. */

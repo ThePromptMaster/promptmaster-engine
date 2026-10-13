@@ -37,3 +37,14 @@ describe('an answer that contradicts the record is put to the user first (L-65, 
     await waitFor(() => expect(onAnswer).toHaveBeenCalledWith('December 10'));
   });
 });
+
+describe('a question that is a choice (13 Oct, PINE)', () => {
+  it('offers each answer as a button, and the text box for anything else', async () => {
+    const { QuestionPrompt: Q } = await import('./decision-prompt');
+    const onAnswer = vi.fn();
+    render(<Q question="Which version should govern?" choices={['Use the 98-word version', 'Keep the visible version']} onAnswer={onAnswer} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Use the 98-word version' }));
+    expect(onAnswer).toHaveBeenCalledWith('Use the 98-word version');
+    expect(screen.getByPlaceholderText('Or say something else…')).toBeTruthy();
+  });
+});

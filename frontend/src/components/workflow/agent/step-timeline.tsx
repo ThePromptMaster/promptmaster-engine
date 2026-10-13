@@ -57,7 +57,7 @@ function SandboxFiles({ runId }: { runId: string }) {
   );
 }
 
-export function StepTimeline({ steps }: { steps: AgentStep[] }) {
+export function StepTimeline({ steps, stageName }: { steps: AgentStep[]; stageName?: (id: string) => string }) {
   if (!steps.length) return null;
   // Repeated identical steps are one row with a count (2 Oct, screenshot 7).
   const rows = collapseSteps(steps);
@@ -76,7 +76,11 @@ export function StepTimeline({ steps }: { steps: AgentStep[] }) {
                 {STATUS_ICON[s.status]}
               </span>
               <span className="text-label text-[var(--on-surface-variant)]">{s.idx + 1}.</span>
-              <span className="text-title text-[var(--on-surface)]">{stepLabel(s)}</span>
+              <span className="text-title text-[var(--on-surface)]">
+                {stepLabel(s)}
+                {/* A repair says which stage it repaired (13 Oct). */}
+                {stageName && typeof s.params?.stage_id === 'string' && s.params.stage_id !== s.stage_id ? ` — ${stageName(s.params.stage_id)}` : ''}
+              </span>
               {repeats > 1 && <span className="text-label text-[var(--on-surface-variant)]">×{repeats}</span>}
               <ExecutionBadge label={s.execution_label} />
               <span className="ml-auto text-label text-[var(--on-surface-variant)]">{STEP_STATUS_TEXT[s.status]}</span>

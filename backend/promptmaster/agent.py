@@ -189,6 +189,9 @@ class NextAction(BaseModel):
     expected_outcome: str = ""
     needs_user_decision: bool = False
     decision_question: str | None = None
+    #: The answers the user can pick with one click (13 Oct, Sean: a choice
+    #: between two versions was asked as free text). 2–4, each a full answer.
+    decision_choices: list[str] = Field(default_factory=list, max_length=4)
     objective_complete: bool = False
 
 
@@ -243,6 +246,11 @@ _NEXT_ACTION_INSTRUCTION = (
     "\"allowed actions\", \"model call\", \"renderer\" or an action key; "
     "never describe your own menu of moves. Say what you will do, or what you "
     "need from them, and why.\n\n"
+    "When you ask (decision_question), ask ONE question about the work, and "
+    "when the answer is a choice between options, list them in decision_choices: "
+    "2 to 4 short answers the user can click, each one a complete answer in "
+    "their voice (\"Use the 98-word version\", \"Keep the visible version\"). "
+    "Leave it empty for an open question.\n\n"
     "Return JSON only, in exactly this shape:\n"
     "{\n"
     '  "action_key": "one of the allowed keys",\n'
@@ -251,6 +259,7 @@ _NEXT_ACTION_INSTRUCTION = (
     '  "expected_outcome": "one sentence: what it should produce",\n'
     '  "needs_user_decision": false,\n'
     '  "decision_question": null,\n'
+    '  "decision_choices": [],\n'
     '  "objective_complete": false\n'
     "}"
 )
@@ -489,8 +498,21 @@ def parse_next_action(result: object, allowed: list[str], controls: list[AgentCo
         expected_outcome=shown(result.get("expected_outcome")),
         needs_user_decision=bool(result.get("needs_user_decision")) or key == "request_user_decision",
         decision_question=shown(question) if question else None,
+        decision_choices=_choices(result.get("decision_choices"), shown) if question else [],
         objective_complete=bool(result.get("objective_complete")) or key == "declare_objective_complete",
     )
+
+
+def _choices(raw: object, shown) -> list[str]:
+    """2–4 distinct, short answers; anything else is no choices (an open question)."""
+    if not isinstance(raw, list):
+        return []
+    out: list[str] = []
+    for item in raw:
+        text = " ".join(shown(item).split())[:120] if isinstance(item, str) else ""
+        if text and text.lower() not in {o.lower() for o in out}:
+            out.append(text)
+    return out[:4] if len(out) >= 2 else []
 
 
 def _ask(question: str) -> NextAction:

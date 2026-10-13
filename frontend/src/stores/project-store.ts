@@ -33,7 +33,7 @@ import {
   type NewWorkflowEvent,
 } from '@/lib/supabase/workflow';
 import type { WorkflowEvent, WorkflowTemplate } from '@/lib/workflow/types';
-import { laterDoneStages, projectState } from '@/lib/workflow/engine';
+import { laterDoneStages, laterOf, projectState } from '@/lib/workflow/engine';
 import { onlyConfirmsProposals } from '@/lib/workflow/stage-artifact';
 import {
   ProjectConflictError,
@@ -179,7 +179,17 @@ interface ProjectState {
      * they are accepted *after* the version lands and a superseded row can
      * no longer be accepted.
      */
-    options?: { keepRecommendations?: readonly string[] }
+    options?: {
+      keepRecommendations?: readonly string[];
+      /**
+       * The later stage this save is made for: Revision or Editing saving the
+       * manuscript it is about to rewrite. The stages between the two gave
+       * that stage its findings; applying them does not reopen them (13 Oct,
+       * Sean's screenplay: Revision's rewrite reopened Continuity, whose
+       * recheck reopened Revision, and Drafting reached v7 in one run).
+       */
+      writtenFor?: string;
+    }
   ) => Promise<ArtifactVersion>;
   restoreStageVersion: (stageId: string, versionId: string) => Promise<void>;
 
@@ -670,10 +680,14 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       // Confirming proposals changes no row a later stage read (L-66): on the
       // sequence-proof replay, confirming 15 statuses on two finished tables
       // would have reopened every stage after them.
+      const state = projectState(template, events);
       const later = onlyConfirmsProposals(head?.content, version.content)
         ? []
-        : laterDoneStages(template, projectState(template, events), stageId, drafted);
-      if (later.length) {
+        : laterDoneStages(template, state, laterOf(template, stageId, options?.writtenFor), drafted);
+      // A reopened draft in progress is answered by this version (13 Oct); the
+      // event is what says so, even when nothing after it is affected.
+      const answersReopen = state.stages[stageId]?.status === 'stale' && state.stages[stageId]?.stale?.was === 'in_progress';
+      if (later.length || answersReopen) {
         await get()
           .appendEvent({
             type: 'stage_version_saved',

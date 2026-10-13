@@ -1524,3 +1524,35 @@ user states in their own words ("an eleven-year-old giving a pageant speech") in
 mapping it to a preset. A speech, talk, letter, poem or short story is
 recommended as Single output. A user can still pick Book for one by hand, and on 11 Oct
 a two-minute speech ran as a Book whose first stage listed topic ideas.
+
+### L-81 — The repair loop: what a repair reopens, and when Go stops repairing (2026-10-13)
+
+When Revision or Editing saves a copy of the manuscript before rewriting it, only the
+finished stages *after* that stage are reopened. The stages between Drafting and it,
+such as Continuity, gave it its findings and are not reopened by applying them. Until
+13 Oct they were: Continuity's recheck reopened Revision, Revision's rewrite reopened
+Continuity, and Drafting reached v7 in one run. The trade-off is that Continuity does
+not re-read the revised manuscript on its own. A user who wants a fresh continuity
+pass reopens Continuity, and a later edit to Drafting by hand still reopens it.
+
+Every reopening records why and when, including completing a stage again on new
+evidence and going back to an earlier stage. A stage's repairs are therefore always
+counted, and after two that did not settle it Go stops with the stage, what is still
+unresolved, what the last attempt did, and three buttons:
+- "Try once more" allows one more repair. It is held in the open tab only, so it is
+  lost on reload.
+- "Keep it as it is now" dismisses that stage's recheck and no other.
+- "Open it" shows the stage.
+
+The same stop follows a loop of repairs. A repair of a findings table is told which
+rows are decided, and a decided row it leaves out is put back exactly as it was
+instead of the whole repair being refused. Under Autonomous with "Handle them for me",
+the routine findings a repair raises are decided with it. Major or unrated ones are
+still the user's (L-74).
+
+Go's "What changed" note on a repaired document goes to the version's change summary
+and is no longer saved inside the document. Versions saved before 13 Oct still carry
+it at the top.
+
+The planner can offer 2–4 one-click answers with a question. Whether it does is a
+model judgement, and an open question still has only the text box.

@@ -38,7 +38,7 @@ import { api, type AnswerContradiction } from '@/lib/api/client';
 import { actionFor, actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, ROUTINE_DEFAULT_STEP, stepActionLabel, USER_ANSWER_STEP, whatApprovalDoes } from '@/lib/agent/actions';
 import { contextWithFacts, readOutcomeProof, readStageFacts, type StageFacts } from '@/lib/agent/facts';
 import { stageDrafts } from '@/lib/workflow/stage-artifact';
-import { delegableToCommit, policyConfirmable, repairTries, staleRepair, describeNeed, NEED_CLEARED, NEED_MOVED_ON, needStillHolds, needsUser, requiredWork, type NeedsUser } from '@/lib/agent/needs';
+import { delegableToCommit, exhaustedRepair, policyConfirmable, repairStuckNeed, repairTries, staleRepair, describeNeed, NEED_CLEARED, NEED_MOVED_ON, needStillHolds, needsUser, requiredWork, type NeedsUser } from '@/lib/agent/needs';
 import { assertHonestOutcome, verifyOutcome } from '@/lib/agent/outcome';
 import { outlineStageFor } from '@/lib/outline/actions';
 import { effectiveRenderer } from '@/lib/workflow/stage-artifact';
@@ -228,6 +228,8 @@ export function useGoLoop(opts: Options) {
   const fingerprintsRef = useRef<string[]>([]);
   /** Q2b: the window has reconsidered once after going round in circles; `pending` moves are withdrawn for the next choice. */
   const reconsiderRef = useRef<{ withdrawn: string[]; note: string; pending?: boolean } | null>(null);
+  /** Stages the user asked Go to try once more ("Try once more"): one more repair each, beyond `REPAIR_TRIES`. */
+  const extraTriesRef = useRef<Map<string, number>>(new Map());
   /** A move that counted against the window was performed since the last read. */
   const performedRef = useRef(false);
   const tabId = useRef<string>('');
@@ -440,12 +442,19 @@ export function useGoLoop(opts: Options) {
         if (stop) {
           // Said as what the user can do about it (B4), not only why it stopped.
           const blocked = o.state.stages[o.stage.id]?.blocked;
+          // A loop of repairs is said as what is unresolved and why, with
+          // ways on (13 Oct, Sean: not "give it different direction").
+          const lastRepair = stop.repeating?.includes('recheck_stage')
+            ? [...stepsRef.current].reverse().find((s) => s.action_key === 'recheck_stage')
+            : undefined;
+          const repairTarget = lastRepair ? String(lastRepair.params?.stage_id ?? lastRepair.stage_id) : '';
           const need: NeedsUser | null =
-            stop.status === 'budget_exhausted' ? { kind: 'continue_budget', budgetSteps: current.budget_steps }
+            lastRepair ? repairStuckNeed(o.state, repairTarget, [...priorStepsRef.current, ...stepsRef.current])
+            : stop.status === 'budget_exhausted' ? { kind: 'continue_budget', budgetSteps: current.budget_steps }
             : stop.status === 'blocked' && blocked ? { kind: 'unblock_stage', stageId: o.stage.id, reason: blocked.reason, blockKind: blocked.kind }
             : stop.status === 'awaiting_decision' && !o.project.objective.trim() ? { kind: 'set_objective' }
             : null;
-          await setRunStatus(stop.status, stop.reason, need);
+          await setRunStatus(stop.status, need?.kind === 'repair_stuck' ? describeNeed(need, stageLabelFor).message : stop.reason, need);
           break;
         }
 
@@ -570,15 +579,30 @@ export function useGoLoop(opts: Options) {
         // twice before could never be repaired again (8 Oct, production).
         // Each repair step records the reopening it was for (`stale_since`),
         // so no clock is compared.
-        const recheckTried = repairTries([...priorStepsRef.current, ...stepsRef.current], o.state, new Set(stepsRef.current.map((s) => s.id)));
+        const recheckTried = withExtraTries(
+          repairTries([...priorStepsRef.current, ...stepsRef.current], o.state, new Set(stepsRef.current.map((s) => s.id))),
+          extraTriesRef.current
+        );
         const drafted = new Set(Object.entries(o.bundles).filter(([, b]) => (b?.versions.length ?? 0) > 0).map(([id]) => id));
         const holder = deliverableStage(o.template);
         const carriedRows = Object.values(context.carriedForward ?? {}).flat();
         const carried = current.policy === 'autonomous' && routine === 'handle' && holder && carriedRows.length
           ? { deliverableId: holder.id, rows: carriedRows }
           : null;
-        const repair = staleRepair(o.template, o.state, recheckTried, context.measured ?? {}, drafted, carried);
+        // After a loop of repairs was withdrawn, the next choice is the
+        // planner's, not the same repair forced again (13 Oct).
+        const repair = reconsider?.withdrawn.includes('recheck_stage')
+          ? null
+          : staleRepair(o.template, o.state, recheckTried, context.measured ?? {}, drafted, carried);
         if (repair) allowed.push('recheck_stage');
+        // A reopened stage whose repairs are used up is the user's next
+        // decision, said with what is unresolved (13 Oct, screenplay).
+        const exhausted = repair ? null : exhaustedRepair(o.template, o.state, recheckTried);
+        if (exhausted) {
+          const stuck = repairStuckNeed(o.state, exhausted, [...priorStepsRef.current, ...stepsRef.current]);
+          await setRunStatus('awaiting_decision', describeNeed(stuck, stageLabelFor).message, stuck);
+          break;
+        }
 
         // Before the planner is asked: is the next move the user's? (B4)
         const need = repair ? null : needsUser({
@@ -697,7 +721,8 @@ export function useGoLoop(opts: Options) {
 
         const step = await startAgentStep({
           runId: current.id, userId: o.project.user_id, projectId: o.project.id, idx: stepsRef.current.length,
-          stageId: o.stage.id, mode: o.project.mode, actionKey: choice.action_key, params: choice.params ?? {},
+          stageId: o.stage.id, mode: o.project.mode, actionKey: choice.action_key,
+          params: { ...(choice.params ?? {}), ...('decision_choices' in choice && choice.decision_choices?.length ? { choices: choice.decision_choices } : {}) },
           rationale: choice.rationale, expectedOutcome: choice.expected_outcome,
           needsDecision: choice.needs_user_decision, decisionQuestion: choice.decision_question,
         });
@@ -1039,6 +1064,15 @@ export function useGoLoop(opts: Options) {
    * is reopened with what was found unmet as the reason, and Go repairs it,
    * saves a new version and checks again — no answer to type.
    */
+  /** "Try once more" on a repair that did not settle: one more try for that stage, then Go carries on (13 Oct). */
+  const retryRepair = useCallback(
+    async (stageId: string) => {
+      extraTriesRef.current.set(stageId, (extraTriesRef.current.get(stageId) ?? 0) + 1);
+      await go();
+    },
+    [go]
+  );
+
   const fixObjective = useCallback(
     async (items: readonly string[]) => {
       const o = latest.current;
@@ -1319,9 +1353,22 @@ export function useGoLoop(opts: Options) {
     stepEffect,
     autoWindows, setAutoWindows, autoPending,
     policy, setPolicy, budget, setBudget, run, steps, phase, active, pendingStep, pendingStale, authorizing, error,
-    go, update, suggest, replan, stop, approve, decline, answer, fixObjective, checkAnswer, confirmAuthorization,
+    go, update, suggest, replan, stop, approve, decline, answer, fixObjective, retryRepair, checkAnswer, confirmAuthorization,
     cancelAuthorization: useCallback(() => setAuthorizing(null), []),
     handsOff,
     dismissError: useCallback(() => setError(null), []),
   };
+}
+
+/** The repairs tried, less one per extra try the user granted for a stage. */
+export function withExtraTries(tried: readonly string[], extra: ReadonlyMap<string, number>): string[] {
+  const left = new Map(extra);
+  return tried.filter((id) => {
+    const n = left.get(id) ?? 0;
+    if (n > 0) {
+      left.set(id, n - 1);
+      return false;
+    }
+    return true;
+  });
 }

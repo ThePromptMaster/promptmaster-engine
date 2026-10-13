@@ -31,7 +31,7 @@ test('Final review: marking is optional, and what is carried forward is listed w
       await expect(prompt).toContainText('Draft the sections', { timeout: 30_000 });
       await prompt.getByRole('button', { name: 'Approve' }).click();
       await expect(page.getByText(/(\d+) of \1 sections written/)).toBeVisible({ timeout: 180_000 });
-      await panel.getByRole('button', { name: /^Stop/ }).click().catch(() => {});
+      await panel.getByRole('button', { name: /^Stop/ }).click({ timeout: 5_000 }).catch(() => {}); // only there while Go is thinking
     }
   }
   const artifact = stageArtifact(page);

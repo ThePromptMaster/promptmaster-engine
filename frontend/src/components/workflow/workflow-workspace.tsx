@@ -117,7 +117,9 @@ interface Props {
   appendStageVersion?: (
     stageId: string,
     name: string,
-    version: NewVersion
+    version: NewVersion,
+    evaluation?: undefined,
+    options?: { keepRecommendations?: readonly string[]; writtenFor?: string }
   ) => Promise<unknown>;
   /**
    * Attach an evaluation to a stage version that already exists (FR-11).
@@ -440,6 +442,10 @@ export function WorkflowWorkspace({
     [stage, stageBundles]
   );
   const headVersion = useMemo(() => stageVersionList.at(-1) ?? null, [stageVersionList]);
+  // A new version on this stage is what the page shows next, not an older
+  // pill left selected (13 Oct, Sean's PINE pack: Go read the new 98-word
+  // version while the page still showed the 159-word one).
+  useEffect(() => setActiveVersionId(null), [headVersion?.id]);
   const shownEvaluation = evaluations?.[activeVersionId ?? headVersion?.id ?? ''];
 
   // A stage's unsaved edits belong to that stage.
@@ -1122,6 +1128,12 @@ export function WorkflowWorkspace({
       },
       unblock: () => setBlocked(null),
       tick: (criterionId: string) => handleToggleManual(criterionId, true),
+      keepStage: async (keepId: string) => {
+        const since = state.stages[keepId]?.stale?.since;
+        if (!since) return;
+        await appendEvent({ type: 'brief_change_dismissed', stage_id: keepId, reason: 'Kept as it is after repairs did not settle it.', payload: { change_at: since, stage_ids: [keepId] } });
+      },
+      openStage: (openId: string) => setViewingStageId(openId === state.current_stage_id ? null : openId),
       // The user's skip, with Go's reason as the recorded one.
       skip: async (reason: string) => {
         const option = transitions.find((t) => t.kind === 'skip');
@@ -1150,7 +1162,7 @@ export function WorkflowWorkspace({
         panel.scrollIntoView({ block: 'center' });
       },
     }),
-    [project.id, project.user_id, project.model, project.mode, materialiseOutline, refreshEvents, setBlocked, handleToggleManual, onReload, transitions, handleTransition]
+    [project.id, project.user_id, project.model, project.mode, materialiseOutline, refreshEvents, setBlocked, handleToggleManual, onReload, transitions, handleTransition, state, appendEvent]
   );
 
   // For Go's card on a stuck stage: has anything changed since it was marked
@@ -1446,7 +1458,7 @@ export function WorkflowWorkspace({
           appendManuscriptVersion:
             appendStageVersion && manuscript?.stage_id
               ? (version: NewVersion) =>
-                  appendStageVersion(manuscript.stage_id!, getStage(template, manuscript.stage_id!)?.label ?? stage.label, version)
+                  appendStageVersion(manuscript.stage_id!, getStage(template, manuscript.stage_id!)?.label ?? stage.label, version, undefined, { writtenFor: stage.id })
               : undefined,
           emptyHint:
             template.outline_stage === 'explicit'
