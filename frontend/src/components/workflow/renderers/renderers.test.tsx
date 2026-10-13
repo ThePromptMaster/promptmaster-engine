@@ -239,7 +239,7 @@ describe('exit criteria are satisfiable', () => {
     );
     const criterion = partial.criteria.find((c) => c.id === 'fc.status')!;
     expect(criterion.satisfied).toBe(false);
-    expect(criterion.detail).toBe('1 still unresolved');
+    expect(criterion.detail).toMatch(/^1 still unresolved — each needs a decision/);
 
     // "Removed" on its own is a shrug; "removed because" is a decision.
     expect(isTriaged({ ...removedWithoutReason, reason: 'Could not source it.' }, schema)).toBe(true);

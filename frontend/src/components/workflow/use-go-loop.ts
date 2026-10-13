@@ -75,6 +75,7 @@ import { deliverableStage, evaluateStage, getStage, nextSuggestedStage } from '@
 import { objectiveUnmet } from '@/lib/workflow/objective';
 import { isDone } from '@/lib/workflow/types';
 import { documentsAwaitingFacts } from '@/lib/workflow/facts';
+import { modeForStage } from '@/lib/workflow/stage-mode';
 import { inputsFrom } from '@/lib/workflow/stage-requests';
 import type { StageContext, StageDefinition, StageEvaluation, WorkflowEvent, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
 import type { NewEvaluation, NewVersion } from '@/lib/supabase/versions';
@@ -416,7 +417,7 @@ export function useGoLoop(opts: Options) {
         if (followRef.current) {
           const step = await startAgentStep({
             runId: current.id, userId: o.project.user_id, projectId: o.project.id, idx: stepsRef.current.length,
-            stageId: o.stage.id, mode: o.project.mode, actionKey: INTERPRET_STEP,
+            stageId: o.stage.id, mode: modeForStage(o.project, o.stage), actionKey: INTERPRET_STEP,
             params: { sandbox_run_id: followRef.current.sandboxRunId },
             rationale: 'Code ran; reading what it actually printed.', expectedOutcome: 'What the output shows.',
             needsDecision: false, decisionQuestion: null,
@@ -474,7 +475,7 @@ export function useGoLoop(opts: Options) {
         if (facts.manuscript?.pendingJobs.length) {
           const step = await startAgentStep({
             runId: current.id, userId: o.project.user_id, projectId: o.project.id, idx: stepsRef.current.length,
-            stageId: o.stage.id, mode: o.project.mode, actionKey: AWAIT_SECTIONS_STEP, params: {},
+            stageId: o.stage.id, mode: modeForStage(o.project, o.stage), actionKey: AWAIT_SECTIONS_STEP, params: {},
             rationale: `${facts.manuscript.pendingJobs.length} section(s) are being written; waiting for them.`,
             expectedOutcome: 'The sections land in the manuscript.', needsDecision: false, decisionQuestion: null,
           });
@@ -666,7 +667,7 @@ export function useGoLoop(opts: Options) {
             const statement = `Routine default taken by Go under your routine-decision policy (yours to change): ${fallback}`;
             const step = await startAgentStep({
               runId: current.id, userId: o.project.user_id, projectId: o.project.id, idx: stepsRef.current.length,
-              stageId: o.stage.id, mode: o.project.mode, actionKey: ROUTINE_DEFAULT_STEP, params: { question: question.slice(0, 1000) },
+              stageId: o.stage.id, mode: modeForStage(o.project, o.stage), actionKey: ROUTINE_DEFAULT_STEP, params: { question: question.slice(0, 1000) },
               rationale: `Instead of asking "${question.slice(0, 200)}", taking the default it names: routine decisions are mine to handle.`,
               expectedOutcome: 'The default on record as a fact every later stage uses.', needsDecision: false, decisionQuestion: null,
             });
@@ -722,7 +723,7 @@ export function useGoLoop(opts: Options) {
 
         const step = await startAgentStep({
           runId: current.id, userId: o.project.user_id, projectId: o.project.id, idx: stepsRef.current.length,
-          stageId: o.stage.id, mode: o.project.mode, actionKey: choice.action_key,
+          stageId: o.stage.id, mode: modeForStage(o.project, o.stage), actionKey: choice.action_key,
           params: { ...(choice.params ?? {}), ...('decision_choices' in choice && choice.decision_choices?.length ? { choices: choice.decision_choices } : {}) },
           rationale: choice.rationale, expectedOutcome: choice.expected_outcome,
           needsDecision: choice.needs_user_decision, decisionQuestion: choice.decision_question,
@@ -1099,7 +1100,7 @@ export function useGoLoop(opts: Options) {
       try {
         const step = await startAgentStep({
           runId: current.id, userId: o.project.user_id, projectId: o.project.id, idx: stepsRef.current.length,
-          stageId: o.stage.id, mode: o.project.mode, actionKey: USER_ANSWER_STEP, params: {},
+          stageId: o.stage.id, mode: modeForStage(o.project, o.stage), actionKey: USER_ANSWER_STEP, params: {},
           rationale: '', expectedOutcome: '', needsDecision: false, decisionQuestion: null,
         });
         upsertStep(await finishAgentStep(step.id, { status: 'succeeded', label: null, output: text.trim() }));

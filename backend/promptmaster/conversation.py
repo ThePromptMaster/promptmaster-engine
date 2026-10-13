@@ -13,6 +13,7 @@ from .schemas import ChatMessage, Iteration, PMInput
 from .self_model import PROMPTMASTER_SELF_MODEL
 from .session_context import format_session_history
 from .project_context import context_line
+from .work_form import form_block
 
 
 _PROMPTMASTER_CONTEXT = (
@@ -43,10 +44,12 @@ def _shared_system(inputs: PMInput, iterations: list[Iteration], extra: str) -> 
     """Build the shared system prompt: PromptMaster context + mode + history + extra."""
     base = build_prompt(inputs)
     history = format_session_history(iterations)
+    form = form_block(inputs)
     return (
         f"{_PROMPTMASTER_CONTEXT}\n\n"
         f"{base.system_prompt}\n\n"
-        f"Session history:\n{history}\n\n"
+        + (f"{form}\n\n" if form else "")
+        + f"Session history:\n{history}\n\n"
         f"{extra}"
     )
 
@@ -66,9 +69,11 @@ def _prose_system(inputs: PMInput, extra: str) -> str:
     voice = [f"MODE: {mode['display_name']}.", f"TONE GUIDANCE: {mode['tone']}"]
     if inputs.mode == "custom":
         voice.insert(1, mode["system_preamble"])
+    form = form_block(inputs)
     return (
         f"{_PROMPTMASTER_CONTEXT}\n\n"
         + "\n".join(voice)
+        + (f"\n\n{form}" if form else "")
         + "\n\nThe mode shapes voice and emphasis only. What you write here is finished "
         "prose for a reader, so a mode's structural habits — scaffolds, headings, "
         "numbered sub-plans, tables in place of narrative — do not apply.\n\n"

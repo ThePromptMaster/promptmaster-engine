@@ -1,5 +1,7 @@
 'use client';
 
+import { MODE_DISPLAY } from '@/lib/constants';
+import type { ModeType } from '@/types';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -49,6 +51,7 @@ export function GoPanel({
   needContext,
   dockHost = null,
   routine,
+  stageModes,
 }: {
   go: ReturnType<typeof useGoLoop>;
   stageLabel: string;
@@ -65,6 +68,8 @@ export function GoPanel({
    * don't have to keep scrolling back and forth".
    */
   dockHost?: HTMLElement | null;
+  /** 13 Oct: each stage in its own recommended mode, or the project's mode everywhere. */
+  stageModes?: { value: 'stage' | 'project'; onChange: (v: 'stage' | 'project') => void };
   /** "Routine decisions": who may decide an approval Go can check (5 Oct). */
   routine?: { value: RoutinePolicy; onChange: (v: RoutinePolicy) => void };
 }) {
@@ -270,6 +275,16 @@ export function GoPanel({
         <div className="mt-4 space-y-4">
           <PolicySelector value={go.policy} onChange={go.setPolicy} disabled={go.active || go.phase === 'watching'} />
           {routine && <RoutineDecisions value={routine.value} onChange={routine.onChange} />}
+          {stageModes && stageMode && stageMode !== mode && mode !== 'custom' && (
+            <label className="flex items-center gap-2 text-label text-[var(--on-surface-variant)]">
+              <input
+                type="checkbox"
+                checked={stageModes.value === 'project'}
+                onChange={(e) => stageModes.onChange(e.target.checked ? 'project' : 'stage')}
+              />
+              Use my mode ({MODE_DISPLAY[mode as ModeType]?.display_name ?? mode}) on every stage, instead of each stage&apos;s own
+            </label>
+          )}
           <div ref={controlsRef}>
             <GoControl {...controlProps} />
           </div>
@@ -339,6 +354,7 @@ export function GoPanel({
               stageLabel={stageLabel}
               mode={mode}
               stageMode={stageMode}
+              stageModes={stageModes?.value}
               thinking={go.phase === 'thinking'}
               stageName={go.stageLabelFor}
             />

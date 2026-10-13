@@ -767,7 +767,7 @@ describe('every_item_has_status needs a drafted table (production pass, 2026-10-
   });
   it('a drafted table with no undecided rows — or no rows at all — is', () => {
     expect(rule(ctx(true, 0)).satisfied).toBe(true);
-    expect(rule(ctx(true, 2))).toMatchObject({ satisfied: false, detail: '2 still unresolved' });
+    expect(rule(ctx(true, 2))).toMatchObject({ satisfied: false, detail: expect.stringMatching(/^2 still unresolved — each needs a decision/) });
   });
 });
 

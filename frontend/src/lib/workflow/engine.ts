@@ -120,7 +120,7 @@ function evaluateCriterion(
       return {
         ...base,
         satisfied: drafted && missing === 0,
-        detail: !drafted ? 'nothing drafted yet' : missing === 0 ? undefined : `${missing} still unresolved`,
+        detail: !drafted ? 'nothing drafted yet' : missing === 0 ? undefined : `${missing} still unresolved — each needs a decision`,
       };
     }
 

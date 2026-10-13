@@ -30,6 +30,7 @@ import logging
 import re
 import uuid
 
+from .work_form import FICTION_CLAIMS_RULE, form_of
 from .conversation import _shared_system
 from .llm_client import OpenRouterClient, OpenRouterDeadlineError, OpenRouterError
 from .schemas import (
@@ -229,6 +230,11 @@ def build_stage_prompt(
         instruction_parts.append(f"THIS STAGE — {stage.label or stage.id}:\n{hint}")
     if stage.renderer == "review":
         instruction_parts.append(VERIFY_RULE)
+    # 13 Oct (Sean's screenplay): a fact-check of fiction sorts invented story
+    # material from claims about the world before it writes a row.
+    form = form_of(inputs)
+    if form and form.fiction and stage.artifact_kind == "claim_table":
+        instruction_parts.append(FICTION_CLAIMS_RULE)
     if schema_block:
         instruction_parts.append(schema_block)
         instruction_parts.append('Return JSON only, with shape: { "items": [ ... ] }.')
@@ -353,8 +359,9 @@ def build_stage_prompt(
     if digest.manuscript.strip():
         parts += [
             "",
-            "THE MANUSCRIPT AS DRAFTED — the actual chapters. Work from this text, not "
-            "from the summaries above, and point to the chapter and passage you mean:",
+            f"THE {(form.key if form else 'manuscript').upper()} AS DRAFTED — the actual {form.unit + 's' if form else 'chapters'}. "
+            "Work from this text, not from the summaries above, and point to the "
+            f"{form.unit if form else 'chapter'} and passage you mean:",
             "--- BEGIN MANUSCRIPT ---",
             digest.manuscript.strip(),
             "--- END MANUSCRIPT ---",
@@ -419,7 +426,8 @@ def build_stage_prompt(
 
 
 _NO_SOURCE = {"", "none", "none found", "no source", "no source found", "n/a", "na", "unknown", "-", "—"}
-_CLAIM_DECISIONS = {"unverifiable", "removed"}
+#: "fiction": invented story material, decided as such (13 Oct).
+_CLAIM_DECISIONS = {"unverifiable", "removed", "fiction"}
 
 
 def _claim_provenance(row: dict) -> dict:

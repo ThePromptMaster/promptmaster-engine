@@ -347,10 +347,16 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
         explain: 'PromptMaster named where this could be checked. It has not checked it; you decide.',
       },
       {
-        value: 'no_source', label: 'No source found', tone: 'neutral', decided: false,
-        explain: 'PromptMaster could not name where to check this. Verify it yourself, mark it unverifiable, or remove it.',
+        value: 'no_source', label: 'No source found yet — your decision', tone: 'neutral', decided: false,
+        // 13 Oct (Sean, 12.9): "No source found" read as a status already given.
+        explain: 'A search result, not a decision: PromptMaster could not name where to check this. Choose Human verified, Unverifiable, Fiction or Remove.',
       },
       { value: 'verified', label: 'Human verified', tone: 'done', explain: 'You checked the source yourself.' },
+      // 13 Oct (Sean, 12.9): invented story material is not an external claim.
+      {
+        value: 'fiction', label: 'Fiction — not an external claim', tone: 'neutral',
+        explain: 'Invented for the story: a character, scene, document or event the work makes up. No outside source could confirm it, and none is needed.',
+      },
       { value: 'unverifiable', label: 'Unverifiable', tone: 'neutral', requiresReason: true, explain: 'No source could settle it, and you say why. An acceptable answer.' },
       { value: 'removed', label: 'Remove', tone: 'warn', requiresReason: true, explain: 'The claim should not stand, and you say why.' },
     ],
@@ -360,7 +366,7 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
     lookup: {
       field: 'source', linkField: 'link', recordField: 'record', status: 'source_found', noun: 'sources', skipStatus: 'no_source',
       verify: { claimField: 'claim', supports: 'ai_verified', contradicts: 'ai_not_supported' },
-      notFoundNote: 'The index holds published research; a guide, a website or the author\'s own data will not be in it, and a source can also be misremembered.',
+      notFoundNote: 'The index holds published research; a guide, a website or the author\'s own data will not be in it, and a source can also be misremembered. A detail of a historical setting is rarely settled by a research abstract: check it against a source you trust and mark it Human verified.',
     },
   },
 

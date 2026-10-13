@@ -1,5 +1,6 @@
 'use client';
 
+import { formOf } from '@/lib/workflow/work-form';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -290,7 +291,8 @@ export default function NewProjectPage() {
           // A book's deliverable is prose. Left empty, every chapter prompt
           // read "Output format: (none)" and the mode's structural habits
           // filled the gap (2 Oct: "it really wants to make outlines").
-          output_format: draft.output_format.trim() || (selected.key === 'book' ? BOOK_OUTPUT_FORMAT : ''),
+          // Not when the objective names another form (13 Oct): a screenplay is not a book manuscript.
+          output_format: draft.output_format.trim() || (selected.key === 'book' && !formOf({ objective: draft.objective, constraints: draft.constraints }) ? BOOK_OUTPUT_FORMAT : ''),
           mode: draft.mode,
           workflow: selected.key,
         },
