@@ -1643,5 +1643,8 @@ item's words would pass.
 The stage bar says "This stage is done · N still open elsewhere: …" instead of "Ready to
 move on" whenever other work is open.
 
-On New project, words typed into the goal box before the page became interactive are
-kept. They used to be wiped when the page finished loading.
+On New project, the "unfinished setup" banner arrives after the page loads. It used to
+push the goal box about 100px down, so a click aimed at the box landed on the banner and
+the typing went nowhere. On the first step the banner now sits below the start buttons,
+where it moves nothing. Text typed before the page becomes interactive is also read back
+from the box.
