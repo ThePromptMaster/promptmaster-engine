@@ -39,6 +39,8 @@ export function lookupQueries(items: readonly StageItem[], schema: StageItemSche
   if (!lookup) return [];
   return items
     .filter((i) => !lookup.skipStatus || i.status !== lookup.skipStatus)
+    // Fiction is settled as the work's own material; there is no source to find (13 Oct).
+    .filter((i) => i.status !== 'fiction')
     .map((i) => ({ id: i.id, work: (i[lookup.field] ?? '').trim() }))
     .filter((w) => w.work && !NAMES_NOTHING.test(w.work))
     .slice(0, max);

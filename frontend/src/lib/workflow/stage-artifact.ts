@@ -313,6 +313,14 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
     maxItems: 20,
     fields: [
       { key: 'claim', label: 'Claim', long: true, max: 400 },
+      // 13 Oct (production pass on a screenplay): told in words to leave
+      // invented story material out, the model listed it as claims anyway.
+      // Each row now says what kind of claim it is, and an invented one is
+      // settled as fiction in code.
+      {
+        key: 'kind', label: 'Kind', max: 40, options: ['real world', 'historical setting', 'invented'],
+        hint: "One of: 'real world' (a date, institution or real person), 'historical setting' (what a period, place or institution was like), or 'invented' (the work's own character, scene, document or event).",
+      },
       { key: 'source', label: 'Source', max: 240 },
       { key: 'where', label: 'Where it appears', max: 160 },
       { key: 'record', label: 'Record found', hint: 'Filled in when the source is looked up — the title, authors and year the index holds', max: 500, userOnly: true },
@@ -360,6 +368,7 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
       { value: 'unverifiable', label: 'Unverifiable', tone: 'neutral', requiresReason: true, explain: 'No source could settle it, and you say why. An acceptable answer.' },
       { value: 'removed', label: 'Remove', tone: 'warn', requiresReason: true, explain: 'The claim should not stand, and you say why.' },
     ],
+    // Invented material is not looked up: there is nothing to find (13 Oct).
     // The source a claim names can be searched for like any work. Finding it
     // is not verifying the claim: the row moves to "source found", which
     // still counts as undecided.

@@ -51,3 +51,16 @@ describe('the stage’s own mode (12.7)', () => {
     expect(modeForStage({ mode: 'architect' }, { recommended_modes: [] })).toBe('architect');
   });
 });
+
+describe('invented claims are not looked up (13 Oct, production pass)', () => {
+  it('skips a fiction row, and the claim table asks each row its kind', async () => {
+    const { lookupQueries } = await import('./lookup');
+    const schema = itemSchemaFor(BOOK_V1.stages.find((s) => s.id === 'fact_check')!);
+    expect(schema.fields.find((f) => f.key === 'kind')?.options).toEqual(['real world', 'historical setting', 'invented']);
+    const rows = [
+      { id: 'c1', claim: 'Citizen Renard’s memorandum', kind: 'invented', source: 'Archives nationales', status: 'fiction' },
+      { id: 'c2', claim: 'The Committee met in the Tuileries', kind: 'real world', source: 'Palmer, Twelve Who Ruled', status: 'candidate_source' },
+    ];
+    expect(lookupQueries(rows, schema).map((q) => q.id)).toEqual(['c2']);
+  });
+});

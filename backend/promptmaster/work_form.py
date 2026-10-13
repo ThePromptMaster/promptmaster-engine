@@ -93,6 +93,9 @@ FICTION_CLAIMS_RULE = (
     "3. Historical setting and plausibility — what a period, place or institution was like "
     "(curfews, uniforms, how a tribunal sat). These ARE claims: give each a row.\n"
     "4. Claims about real dates, institutions and real people. These ARE claims: give each a row.\n"
+    "Set every row's 'kind': 'real world' for 4, 'historical setting' for 3, 'invented' for "
+    "the work's own material. A row about something the work made up is 'invented', however "
+    "official it sounds — a made-up memorandum, decree, register or search is invented.\n"
     "A passage the draft leaves undecided — alternatives such as \"If he sees… / If he does not see "
     "her…\" — is a drafting problem, not a claim: leave it out (the critique covers it)."
 )

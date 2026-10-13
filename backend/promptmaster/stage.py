@@ -439,6 +439,14 @@ def _claim_provenance(row: dict) -> dict:
     when it is not; the reason goes with it, since it argued for a status the
     row no longer has.
     """
+    # 13 Oct: the row's own kind settles invented story material as fiction,
+    # in code — the model listed it as claims despite being told not to.
+    kind = row.get("kind")
+    if isinstance(kind, str) and kind.strip().lower() in ("invented", "fiction", "fictional"):
+        row["kind"] = "invented"
+        if not (isinstance(row.get("reason"), str) and row["reason"].strip()):
+            row["reason"] = "Invented for the story — not an external claim."
+        return {"status": "fiction"}
     status = row.get("status")
     normalised = status.strip().lower() if isinstance(status, str) else ""
     if normalised == "remove":

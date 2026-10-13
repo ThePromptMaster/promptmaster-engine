@@ -54,3 +54,17 @@ def test_a_fiction_fact_check_sorts_story_from_world():
 def test_fiction_is_a_decision_the_extraction_may_make():
     assert _claim_provenance({"status": "fiction", "source": "none found", "reason": "Invented"}) == {"status": "fiction"}
     assert _claim_provenance({"status": "verified", "source": "none"}) == {"status": "no_source"}
+
+
+def test_an_invented_row_is_settled_as_fiction_in_code():
+    """13 Oct production pass: told to leave invented material out, the model listed it anyway."""
+    row = {"claim": "Citizen Renard's memorandum is sent upstairs", "kind": "Invented", "status": "candidate_source", "source": "Archives nationales"}
+    assert _claim_provenance(row) == {"status": "fiction"}
+    assert row["kind"] == "invented" and row["reason"].startswith("Invented for the story")
+    real = {"claim": "The Committee of Public Safety was created in April 1793", "kind": "real world", "source": "none"}
+    assert _claim_provenance(real) == {"status": "no_source"}
+
+
+def test_the_fiction_rule_asks_for_a_kind_on_every_row():
+    assert "Set every row's 'kind'" in FICTION_CLAIMS_RULE
+    assert "a made-up memorandum, decree, register or search is invented" in FICTION_CLAIMS_RULE

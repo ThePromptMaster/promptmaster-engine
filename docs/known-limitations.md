@@ -1598,7 +1598,7 @@ kinds:
 4. Claims about real dates, institutions and people.
 
 Setting and real-world claims are checked, and an unresolved alternative in the draft
-is left to Critique. The sorting is a model judgement. A row it gets wrong can be set
+is left to Critique. Each claim row also carries a kind: real world, historical setting or invented. A row the model marks as invented is set to Fiction in code and never looked up. This was added because, on the first production run, the model listed invented memoranda and searches as claims despite the prompt telling it not to. The sorting is still a model judgement. A row it gets wrong can be set
 by hand, and "Fiction" settles a row without a reason. "No source found yet" is a
 search result and still needs a decision. The OpenAlex lookup reads research
 abstracts and rarely settles a historical-setting detail, and the table now says so.
