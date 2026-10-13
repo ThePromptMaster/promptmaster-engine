@@ -32,7 +32,7 @@ export function ProjectFinished({ bundle, completion, evaluation, onReopen, onEd
   const { project, template } = bundle;
   const stage = deliverableStage(template);
   const inSections = stage?.renderer === 'long_form';
-  const { deliverable: noun, unit } = deliverableNouns(template);
+  const { deliverable: noun, unit } = deliverableNouns(template, project);
   const markdown = useMemo(() => toManuscriptMarkdown(bundle), [bundle]);
   const body = markdown.replace(/^# .*\n+/, '');
   const carried = useMemo(() => carriedForward(bundle), [bundle]);
