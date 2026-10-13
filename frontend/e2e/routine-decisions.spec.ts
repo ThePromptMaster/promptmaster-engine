@@ -52,7 +52,7 @@ test('under "handle them for me", Go checks a routine approval and commits it, a
   const runs = await serviceSelect('agent_runs', `project_id=eq.${id}&select=needs`);
   expect(runs.filter((r: { needs: { criterionId?: string } | null }) => r.needs?.criterionId === 'pos.differentiator')).toEqual([]);
 
-  await panel.getByRole('button', { name: /^Stop/ }).click().catch(() => undefined);
+  await panel.getByRole('button', { name: /^Stop/ }).click({ timeout: 5_000 }).catch(() => undefined);
   await page.getByRole('navigation').getByRole('button', { name: /Positioning/ }).click().catch(() => undefined);
   await expect(page.getByText('Committed under your routine-decision policy, after checking:')).toBeVisible({ timeout: 30_000 });
   await page.getByText('Committed under your routine-decision policy, after checking:').scrollIntoViewIfNeeded();
