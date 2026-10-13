@@ -71,7 +71,9 @@ export async function pressTransition(page: Page) {
   const reason = page.getByLabel('Reason for the override');
   if (await reason.isVisible().catch(() => false)) {
     await reason.fill('Moving on for now; will come back to it.');
-    await page.getByRole('button', { name: 'Override and continue' }).click();
+    // The stage can settle while the note is open (a draft landing turns an
+    // override into a plain move on), so whichever button is there is pressed.
+    await page.getByRole('button', { name: /^(Override and continue|Move on)$/ }).first().click();
   }
   const moveOn = page.getByRole('button', { name: 'Move on' });
   if (await moveOn.isVisible().catch(() => false)) await moveOn.click();

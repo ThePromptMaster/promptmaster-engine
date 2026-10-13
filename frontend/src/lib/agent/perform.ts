@@ -30,6 +30,7 @@ import { figuresFromOutput, readStageFigures, withRunFigures, type StageFigures 
 import { applyRunBlocked, applyRunResult } from '@/lib/workflow/run-result';
 import { inputsChanged, stageInputs } from '@/lib/workflow/stage-inputs';
 import { applyTriage, isTriageTable, splitUntriaged } from '@/lib/workflow/triage';
+import { modeForStage } from '@/lib/workflow/stage-mode';
 import { restoreDecided } from '@/lib/workflow/commit-check';
 import { proposeTargets } from '@/lib/workflow/proposals';
 import { proposeStatuses } from '@/lib/workflow/propose';
@@ -265,7 +266,7 @@ async function recordRun(
         source_operation: 'sandbox_result',
         instruction: ctx.step.rationale || 'Go mode ran the computation.',
         model: '',
-        mode: ctx.project.mode,
+        mode: modeForStage(ctx.project, ctx.stage),
         change_summary: `Row ${rowNumber} marked ${statusLabel}: the code ran in the sandbox (run ${run.id.slice(0, 8)}).`,
       });
       const id = (created as { id?: unknown } | null)?.id;
@@ -336,7 +337,7 @@ async function recordBlockedRun(
       source_operation: 'sandbox_result',
       instruction: ctx.step.rationale || 'Go mode tried to run the computation.',
       model: '',
-      mode: ctx.project.mode,
+      mode: modeForStage(ctx.project, ctx.stage),
       change_summary: `Row ${rowNumber} marked ${statusLabel}: the run could not be made. ${blocked.reason}`.slice(0, 300),
     });
     const id = (created as { id?: unknown } | null)?.id;
@@ -384,7 +385,7 @@ async function searchLiterature(ctx: PerformContext, key: string, wanted: string
       source_operation: 'literature_search',
       instruction: ctx.step.rationale || 'Go mode searched for works.',
       model: '',
-      mode: ctx.project.mode,
+      mode: modeForStage(ctx.project, ctx.stage),
       change_summary: `Found in OpenAlex for "${query}": ${plural(added.length)} added.`.slice(0, 300),
     });
     const id = (created as { id?: unknown } | null)?.id;
@@ -414,7 +415,8 @@ const withAnswer = (instruction: string, answer?: string) =>
 export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
   const key = ctx.step.action_key;
   const params = ctx.step.params ?? {};
-  const inputs = inputsFrom(ctx.project);
+  // The stage's own mode (13 Oct): Critique is worked as Cold Critic unless the user keeps theirs.
+  const inputs = { ...inputsFrom(ctx.project), mode: modeForStage(ctx.project, ctx.stage) };
   const model = ctx.project.model || undefined;
 
   // Sections already queued — after a reload, or by the user — are waited for
@@ -568,7 +570,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
           source_operation: 'literature_lookup',
           instruction: ctx.step.rationale || 'Go mode looked the works up and read their abstracts.',
           model: checked.verify ? ctx.project.model : '',
-          mode: ctx.project.mode,
+          mode: modeForStage(ctx.project, ctx.stage),
           change_summary: `Looked up in OpenAlex: ${result.found} found, ${result.notFound} not found${checked.verify ? `; ${checked.verify.supported} AI verified from the abstract` : ''}.`,
         });
         const id = (created as { id?: unknown } | null)?.id;
@@ -654,7 +656,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         base_content: head,
         instruction: instruction || ctx.step.rationale || ctx.stage.entry_prompt_hint || '',
         model: res.model_used || ctx.project.model,
-        mode: ctx.project.mode,
+        mode: modeForStage(ctx.project, ctx.stage),
         change_summary: revising ? `Go mode: ${instruction || 'revised'}` : 'Go mode draft.',
         finish_reason: whole.finishReason,
       });
@@ -695,7 +697,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         source_operation: 'continuation',
         instruction: 'Continue from where the draft stopped.',
         model: iteration.model_used || ctx.project.model,
-        mode: ctx.project.mode,
+        mode: modeForStage(ctx.project, ctx.stage),
         change_summary: iteration.summary || 'Go mode continued the draft from where it was cut off.',
         finish_reason: null,
       });
@@ -737,7 +739,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         instruction: ctx.step.rationale || 'Go mode generated the outline.',
         changeSummary: 'Go mode: generated the outline.',
         model: ctx.project.model,
-        mode: ctx.project.mode,
+        mode: modeForStage(ctx.project, ctx.stage),
       });
       ctx.refresh?.();
       const named = countNamedSections(parseOutlineDocument(created.content));
@@ -834,7 +836,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         base_content: ctx.bundles[ctx.stage.id]?.versions.at(-1)?.content ?? '',
         instruction: ctx.step.rationale || 'Go mode decided the routine findings.',
         model: res.model_used || ctx.project.model,
-        mode: ctx.project.mode,
+        mode: modeForStage(ctx.project, ctx.stage),
         change_summary: `Go mode decided ${applied.length} routine finding${applied.length === 1 ? '' : 's'}; ${r.material.length} left for you.`,
       });
       const versionId = (created as { id?: unknown } | null)?.id;
@@ -860,7 +862,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         base_content: ctx.bundles[ctx.stage.id]?.versions.at(-1)?.content ?? '',
         instruction: ctx.step.rationale || 'Go mode proposed a status for each row from its own text.',
         model: res.model_used || ctx.project.model,
-        mode: ctx.project.mode,
+        mode: modeForStage(ctx.project, ctx.stage),
         change_summary: `Go mode proposed a status for ${res.applied.length} row${res.applied.length === 1 ? '' : 's'}; they count once you confirm them.`,
       });
       const versionId = (created as { id?: unknown } | null)?.id;
@@ -1018,7 +1020,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         base_content: head,
         instruction,
         model: res.model_used || ctx.project.model,
-        mode: ctx.project.mode,
+        mode: modeForStage(ctx.project, target),
         change_summary: `Repaired after a change: ${why}${note.note ? ` — ${note.note}` : ''}`.slice(0, 1000),
         finish_reason: whole.finishReason,
       });
@@ -1126,7 +1128,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         base_content: ctx.bundles[ctx.stage.id]?.versions.at(-1)?.content ?? '',
         instruction: 'Confirmed the proposed statuses under the routine-decision policy.',
         model: ctx.project.model,
-        mode: ctx.project.mode,
+        mode: modeForStage(ctx.project, ctx.stage),
         change_summary: `Go mode confirmed ${ok.size} proposed status${ok.size === 1 ? '' : 'es'} under your routine-decision policy.`,
       });
       const versionId = (created as { id?: unknown } | null)?.id;
@@ -1399,7 +1401,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
           if (content) {
             const created = await ctx.appendStageVersion(target.id, target.label, {
               content, source_operation: 'agent_revise', base_content: head, instruction,
-              model: res.model_used || ctx.project.model, mode: ctx.project.mode,
+              model: res.model_used || ctx.project.model, mode: modeForStage(ctx.project, ctx.stage),
               change_summary: `Go mode: further work asked for by ${ctx.stage.label} — ${work}`.slice(0, 300),
               finish_reason: res.finish_reason || null,
             });

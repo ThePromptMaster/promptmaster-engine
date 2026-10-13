@@ -1,5 +1,7 @@
 'use client';
 
+import { formOf, inFormWords } from '@/lib/workflow/work-form';
+import { modeForStage } from '@/lib/workflow/stage-mode';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { StageHeader } from './stage-header';
@@ -279,6 +281,10 @@ export function WorkflowWorkspace({
   // browses it without moving the workflow cursor.
   const stageId = viewingStageId ?? state.current_stage_id;
   const stage = getStage(template, stageId);
+  // 13 Oct (Sean, 12.1): a screenplay on the Book workflow says so, and the
+  // stage's words follow the form ("sequence", not "chapter").
+  const workForm = useMemo(() => formOf(project), [project]);
+  const workflowName = workForm && template.key === 'book' ? `${template.name} workflow · ${workForm.label}` : template.name;
   const isCurrent = stageId === state.current_stage_id;
   // A stage moved past with requirements still open can be worked on when
   // viewed: that is how its box gets ticked and the stage closed (PM-13,
@@ -1526,7 +1532,7 @@ export function WorkflowWorkspace({
           label, so the block reads top-down instead of flat. */}
       <aside className="sticky top-0 hidden h-screen w-[248px] shrink-0 overflow-y-auto bg-[var(--surface-container-lowest)] px-2 pb-24 pt-6 md:block sidebar-scroll">
         <div className="mb-5 px-3">
-          <div className="text-title text-[var(--on-surface)]">{template.name}</div>
+          <div className="text-title text-[var(--on-surface)]">{workflowName}</div>
           <div className="mt-1 text-label text-[var(--on-surface-variant)]">{progressCaption}</div>
         </div>
 
@@ -1561,7 +1567,7 @@ export function WorkflowWorkspace({
           >
             <div className="mb-5 flex items-start gap-2 px-3">
               <div className="min-w-0 flex-1">
-                <div className="text-title text-[var(--on-surface)]">{template.name}</div>
+                <div className="text-title text-[var(--on-surface)]">{workflowName}</div>
                 <div className="mt-1 text-label text-[var(--on-surface-variant)]">{progressCaption}</div>
               </div>
               <button
@@ -1741,12 +1747,13 @@ export function WorkflowWorkspace({
           )}
 
           <StageHeader
-            stage={stage}
+            stage={{ ...stage, label: inFormWords(stage.label, workForm), entry_guidance: inFormWords(stage.entry_guidance ?? '', workForm) }}
             status={state.stages[stage.id]?.status ?? 'not_started'}
             skippedReason={state.stages[stage.id]?.skipped_reason}
             position={{ index: stageIndex + 1, total: template.stages.length }}
-            onPickMode={isCurrent ? (mode) => onPatchProject({ mode: mode as Project['mode'] }) : undefined}
-            currentMode={project.mode}
+            // Picking a mode is the user's override: it is used on every stage (13 Oct).
+            onPickMode={isCurrent ? (mode) => onPatchProject({ mode: mode as Project['mode'], stage_modes: 'project' }) : undefined}
+            currentMode={modeForStage(project, stage)}
             leftOpen={Boolean(state.stages[stage.id]?.left_open)}
             isCurrent={isCurrent}
             approvalPending={approvalPendingIds.has(stage.id)}
@@ -1763,6 +1770,7 @@ export function WorkflowWorkspace({
               needContext={goNeedContextOnPage}
               dockHost={goDockHost}
               routine={{ value: project.routine_decisions ?? 'ask', onChange: (v) => void setRoutineDecisions(v) }}
+              stageModes={{ value: project.stage_modes ?? 'stage', onChange: (v) => onPatchProject({ stage_modes: v }) }}
             />
           )}
           {isCurrent && project.status === 'finalized' && (

@@ -20,6 +20,7 @@
  * item schema declares and the statuses are whatever it offers.
  */
 
+import { findingRisk, isTriageTable } from '@/lib/workflow/triage';
 import { useEffect, useMemo, useState, useRef } from 'react';
 
 import { CustomSelect } from '@/components/shared/custom-select';
@@ -552,6 +553,12 @@ function ReviewRow({ row, columns, statuses, schema, readOnly, onPatch }: Review
             </span>
           ) : row.status_source === 'model' && option && option.decided !== false && (
             <span className="mt-1 block text-label text-[var(--on-surface-variant)]">Set by PromptMaster</span>
+          )}
+          {/* 13 Oct (Sean, 12.6): a finding "Handle them for me" left undecided says why. */}
+          {!row.status && isTriageTable(schema) && findingRisk(row, schema) === 'material' && (
+            <span data-left-for-you className="mt-1 block text-label text-[var(--on-surface-variant)]">
+              Left for you: {(row.severity ?? '').trim() ? `${row.severity} — ` : 'unrated — '}it changes what the work says, so routine decisions do not cover it.
+            </span>
           )}
           {row.status_source === 'policy' && option && (
             <span className="mt-1 block text-label text-[var(--on-surface-variant)]">Confirmed under your routine-decision policy</span>

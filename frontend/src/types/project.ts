@@ -113,6 +113,11 @@ export interface Project {
    * every approval to the user. The database re-reads it on each commit.
    */
   routine_decisions?: RoutineDecisions;
+  /**
+   * 13 Oct: 'stage' — each stage is worked in its recommended mode (Critique
+   * as Cold Critic); 'project' — the project's mode on every stage.
+   */
+  stage_modes?: 'stage' | 'project';
   /** PM-21: the project's critique dials. */
   critique_intensity?: CritiqueIntensity;
   critique_tone?: CritiqueTone;
@@ -296,6 +301,7 @@ export type ProjectPatch = Partial<
     | 'status'
     | 'manual_checks'
     | 'routine_decisions'
+    | 'stage_modes'
     | 'critique_intensity'
     | 'critique_tone'
   >

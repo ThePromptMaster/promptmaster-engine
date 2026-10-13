@@ -1574,3 +1574,41 @@ measured (lengths, sections, questions) on the saved text. It does not re-run a 
 evaluation.
 
 Pre-authorised further windows are read back from the record after a reload.
+
+### L-83 — The form of the work, fiction in the fact-check, and each stage's mode (2026-10-13)
+
+A screenplay, a stage play or fiction (novel, novella, short story) is recognised from
+the objective, output format and constraints by a keyword list, not a model. On the
+Book workflow:
+- The sidebar says "Book workflow · Screenplay".
+- The stage label and guidance say screenplay, sequence and script.
+- Every prompt is told the form and how it is written: scene headings, action and
+  dialogue for a screenplay, with no options left undecided.
+
+The stage definitions themselves are unchanged, so an exported audit trail still names
+the Book stages. A form the list does not know, such as a podcast script or a comic,
+is treated as a book. "Fictional evidence" in a business brief is not read as fiction.
+
+When the work is fiction, the fact-check prompt sorts what the draft says into four
+kinds:
+1. Invented story material. It gets no row unless it is presented as historical fact,
+   and then "Fiction — not an external claim".
+2. Internal continuity. Left out, because Continuity covers it.
+3. Historical setting.
+4. Claims about real dates, institutions and people.
+
+Setting and real-world claims are checked, and an unresolved alternative in the draft
+is left to Critique. The sorting is a model judgement. A row it gets wrong can be set
+by hand, and "Fiction" settles a row without a reason. "No source found yet" is a
+search result and still needs a decision. The OpenAlex lookup reads research
+abstracts and rarely settles a historical-setting detail, and the table now says so.
+No other search source is connected.
+
+A stage that recommends a mode is now worked in it (Critique as Cold Critic), by the
+user's buttons and by Go alike. "Use my mode on every stage" in the Go panel, or
+picking a mode on a stage, keeps the project's mode everywhere. A custom persona is
+never replaced. This needs the `projects.stage_modes` column (migration
+20261101000000).
+
+Material findings that "Handle them for me" leaves undecided now say so on their row.
+Choosing Accept, Defer or Reject for each is still the user's, one row at a time.

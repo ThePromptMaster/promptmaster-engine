@@ -9,6 +9,7 @@ import { factsForRequest } from './facts';
  * or the version history would record two kinds of "AI draft".
  */
 
+import { modeForStage } from './stage-mode';
 import { hintWithImages } from '@/lib/data/images';
 import { buildStageDigest, type StageArtifactBundle } from '@/lib/workflow/digest';
 import {
@@ -70,7 +71,7 @@ export function generationRequest(
 ): GenerateStageArtifactRequest {
   const schema = itemSchemaFor(target);
   return {
-    inputs: inputsFrom(project),
+    inputs: { ...inputsFrom(project), mode: modeForStage(project, target) },
     stage: {
       id: target.id,
       label: target.label,

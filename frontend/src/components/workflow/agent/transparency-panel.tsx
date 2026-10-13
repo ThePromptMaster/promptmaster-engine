@@ -144,6 +144,7 @@ export function TransparencyPanel({
   stageLabel,
   mode,
   stageMode,
+  stageModes = 'stage',
   thinking,
   stageName = (id) => id,
 }: {
@@ -154,6 +155,8 @@ export function TransparencyPanel({
   mode: string;
   /** The mode the stage recommends, when it differs from the project's (10 Oct, email 3). */
   stageMode?: string;
+  /** Whether each stage is worked in its own mode or the project's (13 Oct). */
+  stageModes?: 'stage' | 'project';
   thinking: boolean;
   /** A stage's name, for a step that worked on another stage than the one the run is on. */
   stageName?: (id: string) => string;
@@ -168,11 +171,16 @@ export function TransparencyPanel({
     ['Stage', target ? `${stageLabel} · this step worked on ${stageName(target)}` : stageLabel],
     // The project's mode is what every step uses; the stage only recommends one (Sean, 10 Oct:
     // "The execution record lists Clarity, while the stage displays Critic").
+    // Which mode this stage's work used, and why (13 Oct, Sean 12.7).
     [
-      'Project mode',
-      mode
-        ? `${modeName(mode)}${stageMode && stageMode !== mode ? ` · this stage suggests ${modeName(stageMode)}; Go uses the project's mode` : ''}`
-        : '—',
+      'Mode',
+      !mode
+        ? '—'
+        : stageMode && stageMode !== mode && mode !== 'custom'
+          ? stageModes === 'project'
+            ? `${modeName(mode)} — your mode, on every stage as you chose; this stage's own is ${modeName(stageMode)}`
+            : `${modeName(stageMode)} — this stage's mode; your project mode is ${modeName(mode)}`
+          : modeName(mode),
     ],
     ['Action', thinking ? 'Choosing the next move…' : step ? actionLabel(step.action_key) : '—'],
     [
