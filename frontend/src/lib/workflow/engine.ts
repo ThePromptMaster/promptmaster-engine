@@ -377,8 +377,15 @@ export function projectState(
         const before = prior?.evidence_version_id ?? prior?.left_version_id;
         if (!event.to_stage_id && typeof evidence === 'string' && before && before !== evidence) {
           const cutoff = order.indexOf(event.stage_id);
+          // With its reason and time, like every other reopening (13 Oct): a
+          // stale stage with no `since` was never counted as repaired, so Go
+          // repaired it again and again.
+          const label = template.stages[cutoff]?.label ?? event.stage_id;
           order.forEach((id, i) => {
-            if (i > cutoff && isDone(state.stages[id]?.status)) set(id, { status: 'stale' });
+            const was = state.stages[id]?.status;
+            if (i > cutoff && isDone(was)) {
+              set(id, { status: 'stale', stale: { reason: `${label} was completed again on a different version after this stage used it.`, since: event.created_at, was: was! } });
+            }
           });
         }
         set(event.stage_id, {
@@ -478,6 +485,14 @@ export function projectState(
       case 'stage_version_saved': {
         const cutoff = order.indexOf(event.stage_id);
         if (cutoff < 0) break;
+        // A draft in progress that was reopened is answered by its next
+        // version, made with the change known (13 Oct, Sean's PINE pack: the
+        // objective check's "measured 150 words" stayed on Output through a
+        // 99-word revision, and Go repeated it four times).
+        const own = state.stages[event.stage_id];
+        if (own?.status === 'stale' && own.stale?.was === 'in_progress' && own.stale.since <= event.created_at) {
+          set(event.stage_id, { status: 'in_progress', stale: undefined });
+        }
         const label = template.stages[cutoff]?.label ?? event.stage_id;
         const n = event.payload?.version_number;
         const reason = `${label} was changed${typeof n === 'number' ? ` (now v${n})` : ''} after this stage used it.`;
@@ -496,8 +511,11 @@ export function projectState(
 
       case 'brief_change_dismissed': {
         const at = event.payload?.change_at;
+        // "Keep it as it is" on one stage (13 Oct): only the stages named.
+        const only = Array.isArray(event.payload?.stage_ids) ? (event.payload.stage_ids as unknown[]).filter((x): x is string => typeof x === 'string') : null;
         for (const id of order) {
           const s = state.stages[id];
+          if (only && !only.includes(id)) continue;
           if (s?.status === 'stale' && s.stale && s.stale.since === at) set(id, { status: s.stale.was, stale: undefined });
         }
         break;
@@ -508,9 +526,11 @@ export function projectState(
         // Work after the point returned to is marked stale, never deleted —
         // the user may well keep it.
         const cutoff = order.indexOf(target);
+        const label = template.stages[cutoff]?.label ?? target;
         order.forEach((id, i) => {
-          if (i > cutoff && isDone(state.stages[id]?.status)) {
-            set(id, { status: 'stale' });
+          const was = state.stages[id]?.status;
+          if (i > cutoff && isDone(was)) {
+            set(id, { status: 'stale', stale: { reason: `The work went back to ${label} after this stage used it.`, since: event.created_at, was: was! } });
           }
         });
         set(target, { status: 'in_progress', entered_at: event.created_at });
@@ -857,6 +877,13 @@ export function outstandingBeyondCriteria(items: readonly OutstandingItem[], sta
 /** Items that are not on the given stage at all. */
 export function outstandingElsewhere(items: readonly OutstandingItem[], stageId: string): OutstandingItem[] {
   return items.filter((i) => !('stageId' in i) || i.stageId !== stageId);
+}
+
+/** Whichever of the two stages comes later in the workflow; `a` when `b` is absent or earlier. */
+export function laterOf(template: WorkflowTemplate, a: string, b?: string): string {
+  if (!b) return a;
+  const ids = template.stages.map((s) => s.id);
+  return ids.indexOf(b) > ids.indexOf(a) ? b : a;
 }
 
 /**

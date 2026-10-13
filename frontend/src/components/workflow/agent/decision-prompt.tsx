@@ -73,8 +73,11 @@ export function QuestionPrompt({
   approvals = [],
   onTick,
   expertPackage,
+  choices = [],
 }: {
   question: string;
+  /** One-click answers (13 Oct, Sean: "which version should govern" was a typed answer). */
+  choices?: string[];
   /** Q3a: the package prepared for an expert's review, as markdown. */
   expertPackage?: string;
   /** With the contradiction the user chose to record the answer over (L-65). */
@@ -106,6 +109,21 @@ export function QuestionPrompt({
       <p className="text-label uppercase tracking-wide text-[var(--on-surface-variant)]">Go mode asks</p>
       <p className="mt-1 text-body text-[var(--on-surface)]">{question}</p>
       {expertPackage && <ExpertPackageCard markdown={expertPackage} />}
+      {choices.length > 0 && (
+        <div aria-label="Answers" className="mt-3 flex flex-wrap gap-2">
+          {choices.map((c) => (
+            <button
+              key={c}
+              type="button"
+              disabled={checking}
+              onClick={() => onAnswer(c)}
+              className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-left text-title text-[var(--on-primary)] disabled:opacity-60"
+            >
+              {c}
+            </button>
+          ))}
+        </div>
+      )}
       {onTick && approvals.length > 0 && (
         <div className="mt-3 flex flex-col items-start gap-2">
           {approvals.map((a) => (
@@ -169,7 +187,7 @@ export function QuestionPrompt({
         }}
         rows={2}
         aria-label="Your answer"
-        placeholder="Your answer…"
+        placeholder={choices.length ? 'Or say something else…' : 'Your answer…'}
         className="mt-3 w-full resize-none rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2 text-body text-[var(--on-surface)] outline-none"
       />
       <div className="mt-2 flex flex-wrap items-center gap-3">

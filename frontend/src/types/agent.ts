@@ -130,6 +130,8 @@ export interface NextActionResponse {
   expected_outcome: string;
   needs_user_decision: boolean;
   decision_question: string | null;
+  /** One-click answers to the question, when it is a choice (13 Oct). */
+  decision_choices?: string[];
   objective_complete: boolean;
   model_used: string;
 }

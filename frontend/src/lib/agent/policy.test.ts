@@ -100,8 +100,21 @@ describe('preempt — checked before any model call', () => {
     expect(noProgress([saved[0], saved[1], revise(2, {})])).toBe(true);
     // A reasoning move never saves: three of it in a row still stop.
     expect(preempt({ ...base, steps: [0, 1, 2].map((idx) => step({ idx, action_key: 'compare_alternatives' })) })?.reason).toBe(
-      'Going round in circles: "Compare alternatives" was chosen 3 times in a row on this stage without changing it: none of it was saved to the document. What each produced is in the run log. It needs your direction.'
+      'Going round in circles: "Compare alternatives" was chosen 3 times in a row for the same stage, and none of them saved anything. What each produced is in the run log.'
     );
+  });
+
+  it('counts a repair by the stage it repaired, and a manuscript repair as saved (13 Oct, screenplay)', () => {
+    const repair = (idx: number, stage: string, changes: Record<string, unknown>) =>
+      step({ idx, stage_id: 'critique', action_key: 'recheck_stage', params: { stage_id: stage }, changes });
+    // Run from Critique: Continuity, Revision, Continuity — not one stage three times.
+    expect(noProgress([repair(0, 'continuity', {}), repair(1, 'revision', { sections_written: ['s1'] }), repair(2, 'continuity', {})])).toBe(false);
+    // Revision three times, each writing its sections: work, not a loop.
+    expect(noProgress([0, 1, 2].map((i) => repair(i, 'revision', { jobs: ['j'], sections_written: ['s1'] })))).toBe(false);
+    // Continuity three times, one refused: a loop, said as it was.
+    const steps = [repair(0, 'continuity', { version_ids: ['a'] }), repair(1, 'continuity', {}), repair(2, 'continuity', { version_ids: ['b'] })];
+    expect(noProgress(steps)).toBe(true);
+    expect(preempt({ ...base, steps })?.reason).toContain('only 2 of them saved a new version');
   });
 
   it('three repairs of three reopened stages, each saving a version, are progress (production, 7 Oct)', () => {

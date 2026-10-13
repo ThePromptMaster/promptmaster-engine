@@ -373,10 +373,15 @@ export function preempt(input: {
     };
   }
   if (noProgress(finished)) {
-    const last = finished.at(-1)!;
+    const tail = finished.slice(-NO_PROGRESS_REPEATS);
+    const last = tail.at(-1)!;
+    // Said as it was (13 Oct, Sean: the stop said "none of it was saved" over
+    // a run whose record showed a new version from one of the three).
+    const saved = tail.filter(savedSomething).length;
+    const result = saved === 0 ? 'none of them saved anything' : `only ${saved} of them saved a new version`;
     return {
       status: 'blocked',
-      reason: `Going round in circles: "${actionFor(last.action_key)?.label ?? last.action_key}" was chosen ${NO_PROGRESS_REPEATS} times in a row on this stage without changing it: none of it was saved to the document. What each produced is in the run log. It needs your direction.`,
+      reason: `Going round in circles: "${actionFor(last.action_key)?.label ?? last.action_key}" was chosen ${NO_PROGRESS_REPEATS} times in a row for the same stage, and ${result}. What each produced is in the run log.`,
       repeating: [last.action_key],
     };
   }
@@ -410,9 +415,19 @@ const SAVING = new Set(['draft', 'revise', 'continue', 'outline', 'apply', 'tria
 
 /** The step saved something new to the project. */
 function savedSomething(s: AgentStep): boolean {
-  if (s.status !== 'succeeded' || !SAVING.has(actionFor(s.action_key)?.performer ?? '')) return false;
-  const ids = (s.changes as { version_ids?: unknown } | null)?.version_ids;
-  return Array.isArray(ids) && ids.length > 0;
+  if (s.status !== 'succeeded') return false;
+  const changes = (s.changes ?? {}) as { version_ids?: unknown; sections_written?: unknown };
+  // Sections written into a manuscript are saved work too: a manuscript
+  // repair records its sections, not a version (13 Oct).
+  if (Array.isArray(changes.sections_written) && changes.sections_written.length > 0) return true;
+  if (!SAVING.has(actionFor(s.action_key)?.performer ?? '')) return false;
+  return Array.isArray(changes.version_ids) && changes.version_ids.length > 0;
+}
+
+/** The stage a step worked on: a repair names its target, every other move works where it ran. */
+export function stepTarget(s: AgentStep): string {
+  const target = (s.params as { stage_id?: unknown } | null)?.stage_id;
+  return typeof target === 'string' && target ? target : s.stage_id;
 }
 
 /**
@@ -524,7 +539,10 @@ export function noProgress(finished: readonly AgentStep[]): boolean {
   const tail = finished.slice(-NO_PROGRESS_REPEATS);
   if (
     tail.length >= NO_PROGRESS_REPEATS &&
-    tail.every((s) => s.action_key === tail[0].action_key && s.stage_id === tail[0].stage_id) &&
+    // The same move on the same stage — the repair's target, not the stage the
+    // run stood on (13 Oct: three repairs of Continuity, Revision and
+    // Continuity again, all run from Critique, were read as one stage).
+    tail.every((s) => s.action_key === tail[0].action_key && stepTarget(s) === stepTarget(tail[0])) &&
     !tail.every(savedSomething)
   ) {
     return true;

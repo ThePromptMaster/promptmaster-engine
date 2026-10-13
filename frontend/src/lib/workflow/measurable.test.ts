@@ -220,3 +220,32 @@ describe('the Diligence phrasings', () => {
     expect(m.value!.startsWith('280 words')).toBe(true);
   });
 });
+
+describe('a limit on a part not in the known list (13 Oct, Sean: PINE status pack)', () => {
+  const BRIEF =
+    'As of November 2, 2026. Produce exactly three sections: executive update capped at 120 words, action tracker for the three named workstreams with stable action IDs, and a decision log with only supplied approved decisions.';
+  const UPDATE = Array.from({ length: 98 }, () => 'word').join(' ');
+  const PACK = `## Executive update\n\n${UPDATE}\n\n## Action tracker\n\n| ID | Owner |\n|---|---|\n| PINE-A01 | Omar |\n\n## Decision log\n\n| Item | Detail |\n|---|---|\n| PINE-D01 | Sponsor Elena approved a December 18, 2026 completion target. |`;
+
+  it('reads the limit as the executive update’s, not the whole pack’s', () => {
+    expect(parseRequirements([BRIEF]).find((r) => r.kind === 'words')).toMatchObject({ subject: 'executive update', max: 120 });
+  });
+
+  it('measures only the update: 98 words, met', () => {
+    const req = parseRequirements([BRIEF]).find((r) => r.kind === 'words')!;
+    const m = measure(req, PACK, false)!;
+    expect(m.label).toBe('Executive update: at most 120 words');
+    expect(m.satisfied).toBe(true);
+    expect(m.value!.startsWith('98 words')).toBe(true);
+  });
+
+  it.each([
+    ['The report must be under 500 words.', 'report'],
+    ['Write it in under 500 words.', ''],
+    ['Cover note limited to 150 words.', 'cover note'],
+    ['Chapters capped at 3000 words.', 'chapter'],
+  ])('%s', (text, subject) => {
+    const r = parseRequirements([text]).find((x) => x.kind === 'words')!;
+    expect(r.subject).toBe(subject);
+  });
+});

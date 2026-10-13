@@ -34,6 +34,10 @@ export interface NeedsActions {
   showTable?: () => void;
   /** Bring the Data panel into view, where a file is attached. */
   showData?: () => void;
+  /** Keep a reopened stage as it is now: its recheck is dismissed, on that stage only. */
+  keepStage?: (stageId: string) => Promise<void>;
+  /** Show a stage on the page. */
+  openStage?: (stageId: string) => void;
 }
 
 export function GoPanel({
@@ -157,6 +161,19 @@ export function GoPanel({
         if (option === 'fix') return go.fixObjective(need.items);
         if (option === 'stop') return go.stop();
         await go.go();
+        return;
+      case 'repair_stuck':
+        // What each button does is on it (13 Oct): once more, keep it, or open it.
+        if (option === 'keep') {
+          await needsActions?.keepStage?.(need.stageId);
+          await go.go();
+          return;
+        }
+        if (option === 'open') {
+          needsActions?.openStage?.(need.stageId);
+          return;
+        }
+        await go.retryRepair(need.stageId);
         return;
       case 'decide_rows':
       case 'triage_findings':
@@ -299,6 +316,7 @@ export function GoPanel({
               key={go.run.stop_reason}
               question={go.run.stop_reason}
               expertPackage={go.run.needs?.kind === 'answer_question' ? go.run.needs.expertPackage : undefined}
+              choices={go.run.needs?.kind === 'answer_question' ? go.run.needs.choices : undefined}
               onAnswer={(t, contradicted) => void go.answer(t, contradicted)}
               checkAnswer={go.checkAnswer}
               approvals={approvalsAskedFor(go.run.stop_reason, needContext?.openApprovals)}
@@ -322,9 +340,10 @@ export function GoPanel({
               mode={mode}
               stageMode={stageMode}
               thinking={go.phase === 'thinking'}
+              stageName={go.stageLabelFor}
             />
           )}
-          <StepTimeline steps={go.steps} />
+          <StepTimeline steps={go.steps} stageName={go.stageLabelFor} />
         </div>
       )}
     </section>

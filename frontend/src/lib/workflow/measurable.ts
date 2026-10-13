@@ -76,6 +76,30 @@ function subjectNear(text: string, start: number, end: number): string {
 
 const canonical = (s: string) => (/frequently asked questions/i.test(s) ? 'faq' : s.toLowerCase());
 
+/** Words that make the words before a limit a sentence, not the name of a part. */
+const NOT_A_NAME = /^(?:a|an|the|it|this|that|them|each|every|keep|write|make|be|is|are|must|should|shall|will|stay|stays|remain|and|or|with|of|in|to|for|its|their|your|our|than|at|no|not|only|all|any|total)$/i;
+
+/**
+ * The part a limit is written straight after: "exactly three sections:
+ * executive update capped at 120 words". 13 Oct (Sean, Harbor/PINE): the
+ * part was not one of `SUBJECTS`, so the limit was read as the whole pack's
+ * and the 98-word update measured 150 words with the tracker and log.
+ * Only a short noun phrase opening its own clause counts; anything with a
+ * verb or an article in it falls back to `subjectNear`.
+ */
+function partBefore(text: string, start: number): string {
+  const clause = text.slice(Math.max(0, start - 60), start).split(/[:;,(.\n]|\band\b/).at(-1) ?? '';
+  const words = clause.trim().split(/\s+/).filter(Boolean);
+  if (!words.length || words.length > 3) return '';
+  if (words.some((w) => NOT_A_NAME.test(w) || !/^[a-z][a-z-]*$/i.test(w))) return '';
+  const phrase = words.join(' ').toLowerCase();
+  // "executive summary" is the summary every other check already knows.
+  const listed = phrase.match(SUBJECT_RE);
+  if (listed) return canonical(listed[1]);
+  // "chapters capped at 3,000 words" names each one, not a part: singular.
+  return phrase.replace(/(?<!s)s$/, '');
+}
+
 /** The measurable requirements stated in these texts, de-duplicated. */
 export function parseRequirements(texts: readonly string[]): MeasurableRequirement[] {
   const out = new Map<string, MeasurableRequirement>();
@@ -108,7 +132,8 @@ export function parseRequirements(texts: readonly string[]): MeasurableRequireme
         if ((r.min ?? 0) > 20_000 || (r.max ?? 0) > 20_000) continue;
         // "Keep the summary to 250 words" names its subject inside the match.
         const inside = m[0].match(SUBJECT_RE);
-        add({ kind: 'words', subject: inside ? canonical(inside[1]) : subjectNear(t, m.index!, m.index! + m[0].length), source: m[0].trim(), ...r });
+        const subject = inside ? canonical(inside[1]) : partBefore(t, m.index!) || subjectNear(t, m.index!, m.index! + m[0].length);
+        add({ kind: 'words', subject, source: m[0].trim(), ...r });
       }
     }
     // "a one-page plan", "fits on one page", "no more than two pages" (L-73,

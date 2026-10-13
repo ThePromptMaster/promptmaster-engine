@@ -631,3 +631,26 @@ def test_the_code_is_sized_to_the_sandbox_time_limit():
     from promptmaster.agent import _WRITE_CODE_INSTRUCTION
     assert "must finish within 30 seconds" in _WRITE_CODE_INSTRUCTION
     assert "`reduced: <what was reduced and why>`" in _WRITE_CODE_INSTRUCTION
+
+
+def test_a_question_that_is_a_choice_carries_its_answers():
+    """13 Oct (Sean, PINE): "which version should govern" was asked as free text."""
+    from promptmaster.agent import parse_next_action
+
+    raw = {
+        "action_key": "request_user_decision",
+        "decision_question": "Which version should govern?",
+        "decision_choices": ["Use the 98-word version", "Keep the visible version", "use the 98-word version", 7],
+    }
+    choice = parse_next_action(raw, ["request_user_decision"])
+    assert choice.decision_choices == ["Use the 98-word version", "Keep the visible version"]
+    # One answer is not a choice; an open question has none.
+    assert parse_next_action({**raw, "decision_choices": ["Only one"]}, ["request_user_decision"]).decision_choices == []
+    assert parse_next_action({**raw, "decision_choices": None}, ["request_user_decision"]).decision_choices == []
+
+
+def test_the_planner_is_told_to_offer_choices():
+    from promptmaster.agent import _NEXT_ACTION_INSTRUCTION
+
+    assert "decision_choices" in _NEXT_ACTION_INSTRUCTION
+    assert "2 to 4 short answers" in _NEXT_ACTION_INSTRUCTION

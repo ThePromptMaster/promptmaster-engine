@@ -53,6 +53,37 @@ export function droppedDecisions(before: readonly StageItem[], after: readonly S
   return dropped;
 }
 
+/**
+ * The decided rows of `before` put back where a repair left them out (13 Oct,
+ * Sean's screenplay: two Continuity repairs were refused for dropping two
+ * decided rows, and the next repair dropped them again). A repair is told to
+ * keep them; this makes sure it does, rather than refusing its whole result.
+ * Each comes back exactly as it was, in its old place in the order.
+ */
+export function restoreDecided(before: readonly StageItem[], after: readonly StageItem[]): StageItem[] {
+  const ids = new Set(after.map((r) => r.id));
+  // Not missing when a row carries it on under a new id (`carryUserFields` renumbers that way).
+  const carried = new Set(after.filter((r) => r.status).map((r) => `${r.status}\u0000${r.reason ?? ''}\u0000${rowName(r)}`));
+  const missing = before.filter((r) => r.status && !ids.has(r.id) && !carried.has(`${r.status}\u0000${r.reason ?? ''}\u0000${rowName(r)}`));
+  if (!missing.length) return [...after];
+  const out = [...after];
+  for (const row of missing) {
+    const at = before.indexOf(row);
+    // After the nearest earlier row that survived, else first.
+    const prev = before.slice(0, at).reverse().find((r) => out.some((o) => o.id === r.id));
+    const pos = prev ? out.findIndex((o) => o.id === prev.id) + 1 : 0;
+    out.splice(pos, 0, row);
+  }
+  return out;
+}
+
+/** Who decided a row, as the refusal says it (13 Oct: "you" was said of rows Go decided). */
+export function decidedBy(rows: readonly StageItem[]): string {
+  const byUser = rows.some((r) => r.status_source === 'user' || !r.status_source);
+  const byGo = rows.some((r) => r.status_source === 'policy' || r.status_source === 'model');
+  return byUser && byGo ? 'decided by you or by PromptMaster under your routine authority' : byGo ? 'PromptMaster decided under your routine authority' : 'you had decided';
+}
+
 /** A row as a person names it: its first non-empty field that isn't bookkeeping. */
 function rowName(row: StageItem): string {
   const skip = new Set(['id', 'status', 'reason', 'status_source']);
@@ -114,7 +145,7 @@ export function checkCommit(input: {
       if (dropped.length) {
         const names = dropped.slice(0, 3).map((r) => `"${rowName(r)}"`).join(', ');
         const more = dropped.length > 3 ? ` and ${dropped.length - 3} more` : '';
-        return `The revision dropped ${dropped.length === 1 ? 'a row you had decided' : `${dropped.length} rows you had decided`} (${names}${more}), so the current version was kept`;
+        return `The revision dropped ${dropped.length === 1 ? 'a row' : `${dropped.length} rows`} ${decidedBy(dropped)} (${names}${more}), so the current version was kept`;
       }
     }
   }
