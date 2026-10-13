@@ -275,16 +275,6 @@ export function GoPanel({
         <div className="mt-4 space-y-4">
           <PolicySelector value={go.policy} onChange={go.setPolicy} disabled={go.active || go.phase === 'watching'} />
           {routine && <RoutineDecisions value={routine.value} onChange={routine.onChange} />}
-          {stageModes && stageMode && stageMode !== mode && mode !== 'custom' && (
-            <label className="flex items-center gap-2 text-label text-[var(--on-surface-variant)]">
-              <input
-                type="checkbox"
-                checked={stageModes.value === 'project'}
-                onChange={(e) => stageModes.onChange(e.target.checked ? 'project' : 'stage')}
-              />
-              Use my mode ({MODE_DISPLAY[mode as ModeType]?.display_name ?? mode}) on every stage, instead of each stage&apos;s own
-            </label>
-          )}
           <div ref={controlsRef}>
             <GoControl {...controlProps} />
           </div>
@@ -344,6 +334,16 @@ export function GoPanel({
                   : undefined
               }
             />
+          )}
+          {stageModes && stageMode && stageMode !== mode && mode !== 'custom' && (
+            <label className="flex items-center gap-2 text-label text-[var(--on-surface-variant)]">
+              <input
+                type="checkbox"
+                checked={stageModes.value === 'project'}
+                onChange={(e) => stageModes.onChange(e.target.checked ? 'project' : 'stage')}
+              />
+              Use my mode ({MODE_DISPLAY[mode as ModeType]?.display_name ?? mode}) on every stage, instead of each stage&apos;s own
+            </label>
           )}
           <RunAccountCard run={go.run} steps={go.steps} stageLabel={go.stageLabelFor} />
           {(go.run || go.steps.length > 0) && (
