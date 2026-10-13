@@ -129,8 +129,12 @@ export default function NewProjectPage() {
 
   // An example goal from the empty project list arrives in the URL; it fills the
   // box and nothing more — the user still chooses how to start.
+  // 13 Oct (production pass): words typed into the box before the page became
+  // interactive were wiped when it did — they are taken from the box first.
+  const goalBox = useRef<HTMLTextAreaElement | null>(null);
   useEffect(() => {
-    const goal = goalFromSearch(window.location.search, INPUT_LIMITS.objective);
+    const typed = goalBox.current?.value ?? '';
+    const goal = typed.trim() ? typed.slice(0, INPUT_LIMITS.objective) : goalFromSearch(window.location.search, INPUT_LIMITS.objective);
     if (goal) setObjective((current) => current || goal);
   }, []);
 
@@ -470,6 +474,7 @@ export default function NewProjectPage() {
 
           <div className="mt-8 rounded-2xl bg-[var(--surface-container-lowest)] px-6 py-5 shadow-[0_1px_2px_rgba(25,28,30,0.04)]">
             <AutoGrowTextarea
+              ref={goalBox}
               value={objective}
               onChange={(e) => setObjective(e.target.value)}
               rows={3}

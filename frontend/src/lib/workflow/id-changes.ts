@@ -51,6 +51,34 @@ export interface IdChanges {
   restored: string[];
   /** IDs of the current text that the revision writes in another form: [was, now]. */
   renamed: [string, string][];
+  /** IDs kept, but given to a different item (13 Oct; Sean: the vacancy issue overwritten by an onboarding issue). */
+  reused?: string[];
+}
+
+/** Words that say little about what an item is about. */
+const STOP = new Set(['about', 'after', 'again', 'also', 'been', 'before', 'being', 'from', 'have', 'into', 'more', 'must', 'need', 'needs', 'once', 'only', 'open', 'closed', 'resolved', 'complete', 'completed', 'done', 'status', 'still', 'than', 'that', 'their', 'there', 'these', 'this', 'those', 'through', 'under', 'until', 'were', 'what', 'when', 'which', 'will', 'with', 'within', 'without', 'would', 'owner', 'target', 'pending', 'progress']);
+
+/** The meaningful words of the line an ID sits on: what that item is about. */
+function subjectOf(text: string, id: string): Set<string> {
+  const line = text.split('\n').find((l) => itemIds(l).has(id)) ?? '';
+  return new Set(
+    line.toLowerCase().replace(/[^a-z\s]/g, ' ').split(/\s+/).filter((w) => w.length >= 4 && !STOP.has(w))
+  );
+}
+
+/**
+ * An ID kept but now about something else: the words on its line barely
+ * overlap with what they were. A status change or a reworded description
+ * keeps most of them; a different issue does not.
+ */
+function reusedIds(head: string, generated: string, both: readonly string[]): string[] {
+  return both.filter((id) => {
+    const was = subjectOf(head, id);
+    const now = subjectOf(generated, id);
+    if (was.size < 4 || now.size < 4) return false;
+    const shared = [...was].filter((w) => now.has(w)).length;
+    return shared / Math.min(was.size, now.size) < 0.2;
+  });
 }
 
 export function idChanges(input: { head: string; generated: string; removed: ReadonlySet<string> }): IdChanges {
@@ -63,11 +91,12 @@ export function idChanges(input: { head: string; generated: string; removed: Rea
     const other = [...next].find((n) => !head.has(n) && base(n) === base(id));
     if (other) renamed.push([id, other]);
   }
-  return { restored, renamed };
+  const reused = reusedIds(input.head, input.generated, [...head].filter((id) => next.has(id)));
+  return { restored, renamed, reused };
 }
 
 export function hasIdChanges(c: IdChanges): boolean {
-  return c.restored.length > 0 || c.renamed.length > 0;
+  return c.restored.length > 0 || c.renamed.length > 0 || (c.reused?.length ?? 0) > 0;
 }
 
 /** The question Go asks instead of saving such a revision. */
@@ -75,6 +104,7 @@ export function idChangeQuestion(stageLabel: string, version: number, c: IdChang
   const parts = [
     c.restored.length ? `bring back ${c.restored.join(', ')}, which your earlier change removed` : '',
     c.renamed.length ? `rename ${c.renamed.map(([a, b]) => `${a} to ${b}`).join(', ')}` : '',
+    c.reused?.length ? `give ${c.reused.join(', ')} to a different item (a new item should get a new ID, and the old one stay in the record, closed if it is closed)` : '',
   ].filter(Boolean);
   return (
     `The revision of ${stageLabel} would ${parts.join(' and ')}. I have not saved it; v${version} stays current. ` +

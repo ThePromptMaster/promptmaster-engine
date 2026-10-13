@@ -28,10 +28,22 @@ describe('Meridian: a revision that undoes the user', () => {
 
   it('lets a revision that keeps the record through', () => {
     const c = idChanges({ head: NOV9, generated: NOV9.replace('Ops', 'Operations'), removed: removedByUser(versions) });
-    expect(c).toEqual({ restored: [], renamed: [] });
+    expect(c).toEqual({ restored: [], renamed: [], reused: [] });
   });
 
   it('does not count a removal by a generated version as the user’s', () => {
     expect([...removedByUser([versions[0], { content: NOV9, source_operation: 'agent_revise' }])]).toEqual([]);
+  });
+});
+
+describe('an ID given to a different item (13 Oct; Sean: vacancy issue overwritten)', () => {
+  const head = '| I-03 | Maintenance vacancy at the north depot remains unfilled after recruiting | Luis | Open |';
+  it('is caught when the line is about something else', () => {
+    const generated = '| I-03 | Onboarding checklist for new reporting analysts lacks training sessions | Morgan | Open |';
+    expect(idChanges({ head, generated, removed: new Set() }).reused).toEqual(['I-03']);
+  });
+  it('is not caught when the same item is closed or reworded', () => {
+    const closed = '| I-03 | Maintenance vacancy at the north depot filled after recruiting round | Luis | Closed |';
+    expect(idChanges({ head, generated: closed, removed: new Set() }).reused).toEqual([]);
   });
 });

@@ -1,8 +1,8 @@
 'use client';
 
-import { useLayoutEffect, useRef, type TextareaHTMLAttributes } from 'react';
+import { useLayoutEffect, useRef, type Ref, type TextareaHTMLAttributes } from 'react';
 
-type Props = TextareaHTMLAttributes<HTMLTextAreaElement> & { value: string };
+type Props = TextareaHTMLAttributes<HTMLTextAreaElement> & { value: string; ref?: Ref<HTMLTextAreaElement> };
 
 /**
  * A textarea that is always as tall as what it holds.
@@ -14,7 +14,7 @@ type Props = TextareaHTMLAttributes<HTMLTextAreaElement> & { value: string };
  * Measured in JS rather than with CSS `field-sizing: content`, which iPad
  * Safari does not reliably support.
  */
-export function AutoGrowTextarea({ value, className = '', style, ...rest }: Props) {
+export function AutoGrowTextarea({ value, className = '', style, ref: outer, ...rest }: Props) {
   const ref = useRef<HTMLTextAreaElement>(null);
 
   useLayoutEffect(() => {
@@ -26,7 +26,13 @@ export function AutoGrowTextarea({ value, className = '', style, ...rest }: Prop
 
   return (
     <textarea
-      ref={ref}
+      // The caller may hold the element too (the new-project goal box reads
+      // what was typed before the page became interactive).
+      ref={(el) => {
+        ref.current = el;
+        if (typeof outer === 'function') outer(el);
+        else if (outer) (outer as { current: HTMLTextAreaElement | null }).current = el;
+      }}
       value={value}
       className={`resize-none overflow-hidden ${className}`}
       style={style}

@@ -1630,3 +1630,18 @@ longer reads its own cut as missing work. These are model instructions: a model 
 still break them, and no code check stops it. The ID check in code catches IDs that are
 removed and come back, and IDs that are renamed. It does not catch an ID kept but
 reused for something else; only the prompt rule covers that.
+
+### L-85 — An ID reused for a different item; the readiness line; text typed while the page loads (2026-10-13)
+
+An ID that a revision keeps but gives to a different item is now caught in code. Go
+stops and asks, as it does for an ID that is restored or renamed. "Different" means the
+line carrying the ID shares under a fifth of its meaningful words with what it said
+before. A status change or a rewording keeps far more than that. A wholesale rewrite of
+the same item could be asked about needlessly, and a different item described in the old
+item's words would pass.
+
+The stage bar says "This stage is done · N still open elsewhere: …" instead of "Ready to
+move on" whenever other work is open.
+
+On New project, words typed into the goal box before the page became interactive are
+kept. They used to be wiped when the page finished loading.

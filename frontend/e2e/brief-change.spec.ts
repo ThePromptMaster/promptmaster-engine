@@ -32,7 +32,7 @@ test('a factual change reopens only what relied on it; a punctuation fix reopens
   expect(changed.payload.affected.map((a: { stage_id: string }) => a.stage_id)).toEqual(['objective']);
   // 6 Oct: the stage bar on Audience says so too, rather than only what is open on Audience.
   const bar = page.getByRole('group', { name: 'Stage actions' });
-  await expect(bar).toContainText('Ready to move on · 1 still open: Objective needs a recheck');
+  await expect(bar).toContainText('This stage is done · 1 still open elsewhere: Objective needs a recheck');
   await notice.scrollIntoViewIfNeeded();
   await page.screenshot({ path: test.info().outputPath('01-fact-change-reopens-what-relied-on-it.png') });
 
