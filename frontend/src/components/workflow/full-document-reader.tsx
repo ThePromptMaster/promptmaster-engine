@@ -19,7 +19,7 @@ export function FullDocumentReader({ bundle }: { bundle: ExportBundle }) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const markdown = useMemo(() => toManuscriptMarkdown(bundle), [bundle]);
-  const { deliverable: noun } = deliverableNouns(bundle.template);
+  const { deliverable: noun } = deliverableNouns(bundle.template, bundle.project);
   const words = useMemo(() => markdown.replace(/^# .*\n+/, '').split(/\s+/).filter(Boolean).length, [markdown]);
 
   useEffect(() => {

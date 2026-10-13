@@ -96,6 +96,14 @@ FICTION_CLAIMS_RULE = (
     "Set every row's 'kind': 'real world' for 4, 'historical setting' for 3, 'invented' for "
     "the work's own material. A row about something the work made up is 'invented', however "
     "official it sounds — a made-up memorandum, decree, register or search is invented.\n"
+    # 13 Oct production pass: lines spoken by invented characters, about each
+    # other, came back as "historical setting" claims needing archive sources.
+    "Anything that matters only because of who did or said it in the story — a character's "
+    "history, errands, relationships, documents or lines — is 'invented', even when it sounds "
+    "plausible for the period. A 'historical setting' row states the general period fact a "
+    "source could confirm on its own, in your words, not the scene: write \"Paris district "
+    "committees issued their own search warrants in 1793\", never \"Lucien says the committee "
+    "searches begin after sunrise\". Leave out a setting detail no reader could get wrong.\n"
     "A passage the draft leaves undecided — alternatives such as \"If he sees… / If he does not see "
     "her…\" — is a drafting problem, not a claim: leave it out (the critique covers it)."
 )

@@ -1,4 +1,6 @@
 import type { WorkflowTemplate } from './types';
+import { formOf } from './work-form';
+import type { Project } from '@/types/project';
 /**
  * Words a user can read, for codes the database stores (PM-07).
  *
@@ -87,7 +89,13 @@ export function versionTitle(versionNumber: number, operation: string | null | u
  * that, the outline flag decides: an outline built by hand is a book's, one
  * derived from the stages is a report's.
  */
-export function deliverableNouns(template: Pick<WorkflowTemplate, 'nouns' | 'outline_stage' | 'name'>): { deliverable: string; unit: string } {
+export function deliverableNouns(
+  template: Pick<WorkflowTemplate, 'nouns' | 'outline_stage' | 'name'>,
+  /** 13 Oct: a screenplay on the Book workflow is "the full screenplay", not "the full book". */
+  project?: Pick<Project, 'objective'> & Partial<Pick<Project, 'output_format' | 'constraints'>>
+): { deliverable: string; unit: string } {
+  const form = project && template.nouns?.deliverable === 'book' ? formOf(project) : null;
+  if (form && form.key !== 'novel') return { deliverable: form.key, unit: form.unit };
   if (template.nouns) return template.nouns;
   if (template.outline_stage === 'explicit') return { deliverable: template.name.toLowerCase(), unit: 'chapter' };
   if (template.outline_stage === 'derived') return { deliverable: `${template.name.toLowerCase()} report`, unit: 'section' };

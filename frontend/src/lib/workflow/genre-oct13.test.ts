@@ -64,3 +64,11 @@ describe('invented claims are not looked up (13 Oct, production pass)', () => {
     expect(lookupQueries(rows, schema).map((q) => q.id)).toEqual(['c2']);
   });
 });
+
+describe('the full-document reader names the form (13 Oct)', () => {
+  it('says screenplay on a screenplay, book on a book', async () => {
+    const { deliverableNouns } = await import('./labels');
+    expect(deliverableNouns(BOOK_V1, screenplay)).toEqual({ deliverable: 'screenplay', unit: 'sequence' });
+    expect(deliverableNouns(BOOK_V1, { objective: 'A book about tides' }).deliverable).toBe('book');
+  });
+});

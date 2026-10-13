@@ -49,7 +49,7 @@ export function ExportMenu({ bundle }: { bundle: ExportBundle }) {
   }
 
   const manuscript = toManuscriptMarkdown(bundle);
-  const { deliverable: noun, unit } = deliverableNouns(bundle.template);
+  const { deliverable: noun, unit } = deliverableNouns(bundle.template, bundle.project);
   async function exportWord() {
     const { manuscriptToDocx } = await import('@/lib/export/docx-export');
     const { imagesForDocx } = await import('@/lib/export/images-export');

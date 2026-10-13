@@ -68,3 +68,9 @@ def test_an_invented_row_is_settled_as_fiction_in_code():
 def test_the_fiction_rule_asks_for_a_kind_on_every_row():
     assert "Set every row's 'kind'" in FICTION_CLAIMS_RULE
     assert "a made-up memorandum, decree, register or search is invented" in FICTION_CLAIMS_RULE
+
+
+def test_story_lines_are_invented_and_setting_rows_state_the_period_fact():
+    """13 Oct production pass: characters' lines came back as setting claims."""
+    assert "matters only because of who did or said it in the story" in FICTION_CLAIMS_RULE
+    assert "Paris district committees issued their own search warrants in 1793" in FICTION_CLAIMS_RULE
