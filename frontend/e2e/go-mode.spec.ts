@@ -133,7 +133,7 @@ test('Autonomous moves stages on its own authority and stops, blocked, at data i
 
   const transparency = page.getByRole('region', { name: 'What Go mode is doing' });
   await expect(transparency).toContainText('Mock: missing data', { timeout: 30_000 });
-  await expect(transparency.locator('[data-field="Status"]')).toContainText('Could not continue');
+  await expect(transparency.locator('[data-field="Run"]')).toContainText('Could not continue');
   await expect(steps(page).last()).toContainText('Could not continue');
   await page.screenshot({ path: test.info().outputPath('01-autonomous-blocked-on-missing-data.png'), fullPage: true });
 
