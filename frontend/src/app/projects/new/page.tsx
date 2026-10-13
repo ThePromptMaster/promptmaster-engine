@@ -399,7 +399,10 @@ export default function NewProjectPage() {
         Projects
       </Link>
 
-      {kept && (
+      {/* 13 Oct (production pass): an unfinished setup found after the page
+          loaded pushed the goal box down under the user's click. On the first
+          step it sits below the start buttons, where it moves nothing. */}
+      {kept && step !== 'ask' && (
         <div role="region" aria-label="Unfinished setup" className="mb-6 rounded-xl bg-[var(--surface-container-high)] px-5 py-4 text-body text-[var(--on-surface)]">
           <p>{describeDraft(kept.data, kept.updated_at)}</p>
           {(kept.data.attachedNames?.length ?? 0) > 0 && (
@@ -528,6 +531,25 @@ export default function NewProjectPage() {
             <p role="status" className="mt-4 text-body text-[var(--on-surface-variant)]">
               {busyLabel}
             </p>
+          )}
+
+          {kept && (
+        <div role="region" aria-label="Unfinished setup" className="mt-6 rounded-xl bg-[var(--surface-container-high)] px-5 py-4 text-body text-[var(--on-surface)]">
+          <p>{describeDraft(kept.data, kept.updated_at)}</p>
+          {(kept.data.attachedNames?.length ?? 0) > 0 && (
+            <p className="mt-1 text-label text-[var(--on-surface-variant)]">
+              Files are not kept in a draft — attach {kept.data.attachedNames!.length === 1 ? 'it' : 'them'} again: {kept.data.attachedNames!.join(', ')}.
+            </p>
+          )}
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button onClick={restoreKept} className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label font-semibold text-[var(--on-primary)]">
+              Continue where I left off
+            </button>
+            <button onClick={discardKept} className="rounded-lg px-4 py-2 text-label text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-highest)]">
+              Discard the draft
+            </button>
+          </div>
+        </div>
           )}
 
           <button
