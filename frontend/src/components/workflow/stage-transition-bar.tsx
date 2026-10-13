@@ -198,8 +198,13 @@ export function StageTransitionBar({
   const elsewhereNote = elsewhere.length
     ? ` · ${elsewhere.length} still open: ${elsewhere.join('; ')}`
     : '';
+  // 13 Oct (Sean's regression list, "contradictory readiness"): "Ready to
+  // move on" beside open work read as two answers. With work open elsewhere it
+  // says this stage is done, and where the rest is.
   const statusLine = evaluation.canAdvance
-    ? `Ready to move on${elsewhereNote}`
+    ? elsewhere.length
+      ? `This stage is done · ${elsewhere.length} still open elsewhere: ${elsewhere.join('; ')}`
+      : 'Ready to move on'
     : `${evaluation.unmet.length} item${evaluation.unmet.length === 1 ? '' : 's'} outstanding${elsewhereNote}`;
 
   if (primary) {
