@@ -831,3 +831,18 @@ describe('a repair cascade stops (Sean, 10 Oct, email 7.6)', () => {
     expect(repairedTooOften(['a', 'b', 'c', 'd', 'e'].map((s, i) => repair(i, s)))).toBeNull();
   });
 });
+
+describe('a return the user chose in an answer (13 Oct, production pass)', () => {
+  it('names the stage to go back to, once, and only one this stage may return to', async () => {
+    const { answeredReturn } = await import('./policy');
+    const { BOOK_V1 } = await import('@/lib/workflow/templates/book.v1');
+    const critique = BOOK_V1.stages.find((s) => s.id === 'critique')!;
+    const answer = { action_key: 'user_answer', status: 'succeeded', output: 'Go back to Revision and fix the screenplay first' };
+    expect(answeredReturn(BOOK_V1, critique, [answer])).toMatchObject({ id: 'revision', label: 'Revision' });
+    // Carried out already: not again.
+    expect(answeredReturn(BOOK_V1, critique, [answer, { action_key: 'return_to_stage', status: 'succeeded' }])).toBeNull();
+    // A stage it may not go back to, or no going back named: nothing.
+    expect(answeredReturn(BOOK_V1, critique, [{ ...answer, output: 'Go back to Objective' }])).toBeNull();
+    expect(answeredReturn(BOOK_V1, critique, [{ ...answer, output: 'Override and continue to Fact-check' }])).toBeNull();
+  });
+});
