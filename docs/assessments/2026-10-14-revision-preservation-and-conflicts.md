@@ -65,7 +65,8 @@ Each scenario was replayed on production with Sean's wording, and screenshots ar
   - **Two faults, both fixed in #250:**
     - the model still once raised the November 12 update against "as of November 10"; this is now dropped in code;
     - the override confirmation cited the wrong fact.
-- **Front page.** A 390px render (#247).
+- **Front page (main f608fbe):** a 390px render on production. It shows the new section and the "A change, handled" example. "What a chat does not do" and "One click realigns" are gone, and no floating chip covers the text.
+- **LANTERN after #250:** a later-dated update ("as of November 14 … $25,000") went straight to a proposal, with no as-of conflict.
 
 ## 3. What is judged by a model, not by code
 
