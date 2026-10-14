@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useSyncExternalStore } from 'react';
+import { usePathname } from 'next/navigation';
 
 import { FeedbackForm } from './feedback-form';
 
@@ -70,6 +71,7 @@ function setDismissedState(dismissed: boolean) {
  */
 export function BetaNotice() {
   const state = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const pathname = usePathname();
   const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   function dismiss() {
@@ -86,6 +88,9 @@ export function BetaNotice() {
   if (state === 'server') return null;
 
   if (state === 'dismissed') {
+    // The landing page says "Beta" in its own header; the floating chip sat
+    // over its text on a phone (14 Oct, Sean).
+    if (pathname === '/') return null;
     return (
       <div className="pointer-events-none fixed bottom-4 left-4 z-50">
         <button
