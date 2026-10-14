@@ -18,6 +18,8 @@ import { appendWorkflowEvent, listWorkflowEvents } from '@/lib/supabase/workflow
 import { getArtifact } from '@/lib/supabase/versions';
 import { manuscriptArtifactFor, measureStageContent, stageRequirements } from '@/lib/workflow/context';
 import { COUNTING_RULE, isPart, measure, replaceSection, sectionFor, type MeasurableRequirement } from '@/lib/workflow/measurable';
+import { describeLines, keepUnasked } from '@/lib/workflow/preservation';
+import { addedClaims, noInventedDetails, suppliedText } from '@/lib/workflow/fact-boundary';
 import { isDone } from '@/lib/workflow/types';
 import { appliedFindingsVersion, carryUserFields, findingsInstruction, reviseWithFindings } from '@/lib/workflow/apply-findings';
 import { findInstructionConflicts } from '@/lib/workflow/conflict-trail';
@@ -616,7 +618,8 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         return done(key, { status: 'failed', output: 'The model returned nothing usable.', toolsUsed: ['model'], changes: {} });
       }
       const whole = await finishCutDraft(ctx, inputs, model, ctx.stage, joined, res.finish_reason);
-      const content = whole.content;
+      const checked = revising && !before ? await keptAndSupplied(ctx, head, whole.content, instruction, []) : { content: whole.content, notes: [] };
+      const content = checked.content;
       // The user's own latest version outranks an older fact it changed: a
       // revision that would put the fact's value back is not saved, and the
       // user is asked which is right (10 Oct, Sean: Go turned the Wednesday
@@ -657,7 +660,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         instruction: instruction || ctx.step.rationale || ctx.stage.entry_prompt_hint || '',
         model: res.model_used || ctx.project.model,
         mode: modeForStage(ctx.project, ctx.stage),
-        change_summary: revising ? `Go mode: ${instruction || 'revised'}` : 'Go mode draft.',
+        change_summary: (revising ? `Go mode: ${instruction || 'revised'}${checked.notes.length ? ` — ${checked.notes.join(' ')}` : ''}` : 'Go mode draft.').slice(0, 1000),
         finish_reason: whole.finishReason,
       });
       const versionId = (created as { id?: unknown } | null)?.id;
@@ -672,7 +675,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         status: 'succeeded', toolsUsed: ['model'],
         // What changed, so the record can be checked against the project (SN-25).
         changes: typeof versionId === 'string' ? { version_ids: [versionId] } : {},
-        output: `${revising ? 'Revised' : 'Drafted'} ${ctx.stage.label} — saved as a new version (${content.length.toLocaleString()} characters).`,
+        output: `${revising ? 'Revised' : 'Drafted'} ${ctx.stage.label} — saved as a new version (${content.length.toLocaleString()} characters).${checked.notes.length ? ` ${checked.notes.join(' ')}` : ''}`,
       });
     }
 
@@ -964,7 +967,13 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // stopped halfway through Q11 and the stage read as done).
       const whole = await finishCutDraft(ctx, inputs, model, target, content, res.finish_reason);
       content = whole.content;
-      if (whole.continued) stillUnmet = unmetMeasurementsOf(ctx, target, content);
+      // What the recheck dropped without being asked is put back (14 Oct, Sean,
+      // workshop: the recheck after a time change dropped "Confirm 12 attendees",
+      // the greeting and the sign-off) — never a line stating a replaced value.
+      // Not when it was shortening to meet a limit: what went is what was asked.
+      const checked = before || measuredFails.length ? { content, notes: [] as string[] } : await keptAndSupplied(ctx, head, content, why, superseded);
+      content = checked.content;
+      if (whole.continued || checked.notes.length) stillUnmet = unmetMeasurementsOf(ctx, target, content);
       // A repair does not undo the user's own latest version either (10 Oct),
       // nor bring back what they removed, nor rename an ID (12 Oct, Meridian).
       if (headVersion && !ctx.conflictAnswer) {
@@ -1028,7 +1037,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         instruction,
         model: res.model_used || ctx.project.model,
         mode: modeForStage(ctx.project, target),
-        change_summary: `Repaired after a change: ${why}${note.note ? ` — ${note.note}` : ''}`.slice(0, 1000),
+        change_summary: `Repaired after a change: ${why}${note.note ? ` — ${note.note}` : ''}${checked.notes.length ? ` ${checked.notes.join(' ')}` : ''}`.slice(0, 1000),
         finish_reason: whole.finishReason,
       });
       const versionId = (created as { id?: unknown } | null)?.id;
@@ -1745,6 +1754,32 @@ export function onlyParts(head: string, generated: string, parts: readonly Measu
   let out = head;
   for (const r of parts) out = replaceSection(out, body, r.subject) ?? out;
   return note ? `What changed: ${note}\n\n${out}` : out;
+}
+
+/**
+ * A Go revision checked against the version it was made from (14 Oct): the
+ * short lines it dropped without being asked are put back, unless they state a
+ * value a fact has replaced; when the project says not to invent details, the
+ * personal details it added are named. Each finding is a sentence for the
+ * step's record.
+ */
+async function keptAndSupplied(
+  ctx: PerformContext,
+  head: string,
+  content: string,
+  asked: string,
+  superseded: readonly SupersededValue[]
+): Promise<{ content: string; notes: string[] }> {
+  if (!head.trim() || !content.trim()) return { content, notes: [] };
+  const kept = keepUnasked(head, content, asked, (line) => leftoverValues(line, superseded).length === 0);
+  const notes: string[] = [];
+  if (kept.restored.length) notes.push(`Kept ${describeLines(kept.restored)}, which the revision dropped without being asked.`);
+  if (kept.reported.length) notes.push(`No longer there: ${describeLines(kept.reported, 2)}.`);
+  if (noInventedDetails(ctx.project)) {
+    const claims = await addedClaims({ before: head, after: kept.text, supplied: suppliedText(ctx.project), instruction: asked, model: ctx.project.model });
+    if (claims.length) notes.push(`It adds details you did not supply: ${describeLines(claims.map((c) => c.quote), 3)} — take them out in the side chat, or tell me the real ones.`);
+  }
+  return { content: kept.text, notes };
 }
 
 /** The same requirements measured on new text, before it is saved. */

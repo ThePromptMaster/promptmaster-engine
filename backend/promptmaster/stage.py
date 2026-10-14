@@ -293,7 +293,9 @@ def build_stage_prompt(
         "to be general knowledge. Where a number would decide the question (a price, a cost, "
         "a size, a time), give a working estimate labelled \"Assumption: …\" rather than "
         "leaving it out. Reach the conclusion these support, and say briefly what would "
-        "change it. Missing material is something to name, never the whole conclusion.",
+        "change it. Missing material is something to name, never the whole conclusion. "
+        "General knowledge is about the subject, never about the people in it: a memory, habit, "
+        "trait or event of a real person comes only from what the user supplied.",
     ]
     # A Diagnosis draft spent much of itself on Turnaround Options and the
     # 12-month plan — two stages later — and a later check had to flag it
@@ -381,7 +383,13 @@ def build_stage_prompt(
             "Every ID (R-002, D3, Q11) keeps its exact form and its meaning; never reuse an ID for "
             "something else. An item that is resolved, closed or removed stays resolved, closed or "
             "removed, marked as such; a new item gets a new ID. Restore nothing the current draft "
-            "removed unless the instruction asks for it.",
+            "removed unless the instruction asks for it. "
+            # 14 Oct (Sean, workshop): a time change dropped "Confirm 12
+            # attendees", the greeting and the sign-off. PromptMaster puts back
+            # what a revision removes without being asked; this says so first.
+            "The same holds for prose: every sentence, list item, greeting, sign-off and checklist "
+            "line the instruction does not concern is returned word for word. Being consistent with "
+            "the brief is never a reason to drop a line it does not mention.",
         ]
     elif existing_content.strip():
         # Regeneration with something already on the page. Saying so keeps the

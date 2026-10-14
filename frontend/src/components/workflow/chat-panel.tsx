@@ -30,6 +30,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { describeLines } from '@/lib/workflow/preservation';
+import { removeClaimsInstruction, type AddedClaim } from '@/lib/workflow/fact-boundary';
 
 import { MarkdownOutput } from '@/components/shared/markdown-output';
 import { useStageChat } from './use-stage-chat';
@@ -500,6 +502,22 @@ export function ChatPanel({
             busy={chat.busy}
             factChanges={chat.proposal.factChanges}
             summary={chat.proposal.changeSummary}
+            putBack={chat.proposal.putBack}
+            putBackKept={chat.proposal.nextContent !== chat.proposal.withoutPutBack}
+            onTogglePutBack={chat.togglePutBack}
+            removedUnasked={chat.proposal.removedUnasked}
+            addedClaims={chat.proposal.addedClaims}
+            onRemoveClaims={() => {
+              const p = chat.proposal;
+              if (!p?.addedClaims?.length) return;
+              const again = `${p.instruction}\n\n${removeClaimsInstruction(p.addedClaims)}`;
+              if (p.target.kind === 'document') void chat.propose(again, 'document');
+              else {
+                setDraft(again);
+                setMode('instruct');
+                chat.discard();
+              }
+            }}
             onAccept={(factIds) => void chat.accept(factIds)}
             onAdjust={() => {
               setDraft(chat.adjust());
@@ -844,11 +862,27 @@ export function ProposalCard({
   busy,
   factChanges = [],
   summary,
+  putBack = [],
+  putBackKept = true,
+  onTogglePutBack,
+  removedUnasked = [],
+  addedClaims = [],
+  onRemoveClaims,
   onAccept,
   onAdjust,
   onDiscard,
 }: {
   scopeLabel: string;
+  /** Lines the revision dropped without being asked, put back (14 Oct). */
+  putBack?: string[];
+  /** Whether they are still put back, or the user chose to let them go. */
+  putBackKept?: boolean;
+  onTogglePutBack?: () => void;
+  /** Longer passages that went without being asked, reported. */
+  removedUnasked?: string[];
+  /** Personal details the revision added that nobody supplied (14 Oct). */
+  addedClaims?: AddedClaim[];
+  onRemoveClaims?: () => void;
   /** What the revision changes, in one line (13 Oct). */
   summary?: string;
   /** Back to the instruction, to change what was asked (13 Oct, Sean: "Apply and Adjust buttons"). */
@@ -900,6 +934,55 @@ export function ProposalCard({
             {factChangesHeading(factChanges)}
           </p>
           <FactChangeList changes={factChanges} kept={kept} onToggle={(id, on) => setKept((prev) => toggled(prev, id, on))} />
+        </div>
+      )}
+
+      {(putBack.length > 0 || removedUnasked.length > 0) && (
+        <div className="mt-3 rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2" aria-label="Kept from before">
+          {putBack.length > 0 && (
+            <p className="text-label text-[var(--on-surface)]">
+              {putBackKept
+                ? `Kept ${describeLines(putBack)}: the revision dropped ${putBack.length === 1 ? 'it' : 'them'}, and your instruction did not ask for that.`
+                : `${describeLines(putBack)} will be removed, as the revision proposed.`}
+              {onTogglePutBack && (
+                <button onClick={onTogglePutBack} disabled={busy} className="ml-2 text-[var(--pm-primary)] underline-offset-2 hover:underline">
+                  {putBackKept ? 'Remove them anyway' : 'Keep them'}
+                </button>
+              )}
+            </p>
+          )}
+          {removedUnasked.length > 0 && (
+            <p className="mt-1 text-label text-[var(--on-surface-variant)]">
+              Also no longer there: {describeLines(removedUnasked, 2)}. If that was not intended, choose Adjust.
+            </p>
+          )}
+        </div>
+      )}
+
+      {addedClaims.length > 0 && (
+        <div className="mt-3 rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2" aria-label="Details you did not supply">
+          <p className="text-label text-[var(--on-surface)]">
+            This adds details you did not supply. You asked not to invent any:
+          </p>
+          <ul className="mt-1 list-disc pl-5 text-label text-[var(--on-surface-variant)]">
+            {addedClaims.map((c) => (
+              <li key={c.quote}>
+                “{c.quote}”{c.why ? ` — ${c.why}` : ''}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1 text-label text-[var(--on-surface-variant)]">
+            If a detail would help, tell me the real one in the chat.
+          </p>
+          {onRemoveClaims && (
+            <button
+              onClick={onRemoveClaims}
+              disabled={busy}
+              className="mt-2 rounded-lg bg-[var(--surface-container-highest)] px-3 py-1.5 text-label text-[var(--on-surface)] disabled:opacity-40"
+            >
+              Take these out
+            </button>
+          )}
         </div>
       )}
 

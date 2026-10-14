@@ -24,6 +24,7 @@ from promptmaster.schemas import ChatMessage, Iteration, PMInput
 from promptmaster.session_context import _label_trigger
 from promptmaster.reply_actions import ActionTable, ReplyAction, suggest_reply_actions
 from promptmaster.revision_facts import RevisionFactsRequest, RevisionFactsResponse, revision_facts
+from promptmaster.claim_check import NewClaimsRequest, NewClaimsResponse, check_new_claims
 from routers._pipeline import build_iteration_with_full_pipeline
 
 router = APIRouter(prefix="/api", tags=["conversation"])
@@ -243,3 +244,11 @@ async def api_revision_facts(req: RevisionFactsRequest, client: OpenRouterClient
     agree, for the user to tick with the revision (L-72). 1 small LLM call;
     commits nothing. A failed check reports nothing."""
     return await revision_facts(client, req)
+
+
+@router.post("/check-new-claims")
+async def api_check_new_claims(req: NewClaimsRequest, client: OpenRouterClient = Depends(get_client)) -> NewClaimsResponse:
+    """Personal details a revision states that the user never supplied, when the
+    project says not to invent them (14 Oct). 1 small LLM call; commits
+    nothing. A failed check reports nothing."""
+    return await check_new_claims(client, req)

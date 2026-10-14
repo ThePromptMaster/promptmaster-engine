@@ -147,7 +147,10 @@ _APPLY_INSTRUCTION = (
     "you to revise that answer to incorporate the discussed insights, while "
     "preserving alignment with the original objective and constraints. Produce "
     "a complete updated version of the answer — full text, ready to read. Keep "
-    "the structure and length appropriate to the objective."
+    "the structure and length appropriate to the objective. Change only what the "
+    "chat asked for: every line, list item, greeting, sign-off and fact the "
+    "instruction does not concern is kept, word for word (14 Oct: a time change "
+    "dropped a checklist line and an email's greeting)."
     + _INSTRUCTION_IS_LATER
 )
 

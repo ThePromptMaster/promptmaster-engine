@@ -46,8 +46,12 @@ export function starterQuestions(input: StarterInput): string[] {
     out.push('Does this still serve the objective?');
   }
 
-  if (requiredOpen.length > 0) {
-    out.push(`What does this stage still need from me? (${requiredOpen[0]})`);
+  // The open criterion is said as not met: "(An output exists)" beside a chat
+  // saying "There is no draft here yet" read as a contradiction (14 Oct, Sean).
+  // With nothing drafted, the first question already asks what it should hold.
+  const open = hasContent ? requiredOpen : requiredOpen.filter((l) => !/(?:output|draft|artifact|text).*exists?/i.test(l));
+  if (open.length > 0) {
+    out.push(`What does this stage still need from me? (Not yet: ${/^I\b/.test(open[0]) ? open[0] : open[0][0].toLowerCase() + open[0].slice(1)})`);
   } else if (nextStageLabel) {
     out.push(`Is this ready for ${nextStageLabel}?`);
   }
