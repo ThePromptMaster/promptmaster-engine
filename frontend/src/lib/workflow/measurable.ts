@@ -97,7 +97,10 @@ function partBefore(text: string, start: number): string {
     const name = (numbered[2] ?? numbered[3] ?? '').trim().toLowerCase();
     return name || `section ${num(numbered[1])}`;
   }
-  const clause = before.split(/[:;,(.\n]|\band\b/).at(-1) ?? '';
+  let clause = before.split(/[:;,(.\n]|\band\b/).at(-1) ?? '';
+  // "1. Executive update: no more than 100 words" — the name is the label
+  // before the colon (14 Oct, Sean's ASPEN brief).
+  if (!clause.trim() && /:\s*$/.test(before)) clause = (before.replace(/:\s*$/, '').split(/[;,(.\n]|\band\b|\b\d+[.)]\s/).at(-1) ?? '');
   // 14 Oct (Sean, ASPEN): "Executive update must be no more than 100 words"
   // was read as the whole pack's, because "must be" stopped the phrase being
   // a name. The verb is dropped from the end, and "the" from the front.

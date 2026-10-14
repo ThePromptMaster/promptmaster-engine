@@ -290,6 +290,8 @@ describe('a part named before "must be" (14 Oct, Sean: ASPEN status pack)', () =
     ['The deliverable must be under 300 words.', ''],
     ['Keep it under 300 words.', ''],
     ['A survey kickoff brief under 30 words', ''],
+    ['1. Executive update: no more than 100 words. This limit applies ONLY to this section.', 'executive update'],
+    ['Executive summary: under 250 words.', 'summary'],
     ['Write a launch announcement (100-140 words) and an FAQ.', 'announcement'],
   ])('%s', (text, subject) => {
     expect(parseRequirements([text]).find((x) => x.kind === 'words')!.subject).toBe(subject);
