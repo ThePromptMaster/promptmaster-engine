@@ -360,7 +360,7 @@ describe('PM-24: an instruction that conflicts asks which should control', () =>
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Treat January 15 as approved' }));
     // Not yet: overriding a recorded approval asks once more.
-    expect(screen.getByRole('alertdialog', { name: 'Override the recorded approval?' })).toHaveTextContent('Only Elena can approve a change.');
+    expect(screen.getByRole('alertdialog', { name: 'Override the recorded approval?' })).toHaveTextContent('Elena hasn’t approved this date change. Overriding the recorded approval treats the change as approved.');
     expect(applyToAnswer).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'Back' }));
     await user.click(screen.getByRole('button', { name: 'Keep December 18 approved (recommended)' }));

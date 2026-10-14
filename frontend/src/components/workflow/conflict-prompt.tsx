@@ -67,7 +67,7 @@ export function ConflictPrompt({
       {confirmingOverride ? (
         <div role="alertdialog" aria-label="Override the recorded approval?" className="mt-3 rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2">
           <p className="text-body text-[var(--on-surface)]">
-            The record says: {gist(lead.with_text, 200)} Overriding it treats the change as approved. Do this only if that approval has actually been given.
+            {lead.explanation.trim()} Overriding the recorded approval treats the change as approved. Do this only if that approval has actually been given.
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             <button

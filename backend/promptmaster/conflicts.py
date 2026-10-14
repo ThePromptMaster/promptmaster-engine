@@ -185,6 +185,31 @@ def _label(raw: object) -> str:
     return text[:80]
 
 
+_APPROVAL = re.compile(r"\bapprov|\bauthori[sz]|\bsign[- ]?off\b|\bonly [A-Z]?[a-z]+ (?:can|may)\b", re.IGNORECASE)
+
+#: A reporting date or a "use only this record" scope (14 Oct, Sean, LANTERN).
+_AS_OF = re.compile(
+    r"\bas of\b|\bcut-?off\b|\breporting date\b|\bonly (?:the |this )?(?:provided |original |supplied |given )?record\b"
+    r"|\boriginal record\b|\blater (?:information|evidence|facts|update)\b|\bnewer (?:information|evidence)\b",
+    re.IGNORECASE,
+)
+#: The user asked for the report as it stood: then a later date is a real conflict.
+_FROZEN = re.compile(r"\bfrozen\b|\bhistorical (?:report|record|snapshot)\b|\bas it stood\b|\bdo not update\b|\bno later (?:information|evidence)\b", re.IGNORECASE)
+
+
+def _only_as_of(kind: str, with_text: str, explanation: str, protects_approval: bool) -> bool:
+    """A conflict whose only ground is a reporting date or a "use only this
+    record" scope. 14 Oct, production pass: with the rule in the prompt, the
+    check still asked whether to "Keep November 10 report" against the user's
+    own November 12 update, and recommended it. An "as of" date allows later
+    evidence the user supplies; that is now held in code."""
+    return (
+        kind in ("objective", "constraint")
+        and not protects_approval
+        and bool(_AS_OF.search(with_text) or _AS_OF.search(explanation))
+    )
+
+
 def _words(text: str) -> list[str]:
     return re.findall(r"[a-z0-9]+", text.lower())
 
@@ -224,6 +249,7 @@ def parse_conflicts(
         return []
     known = {s.id: s.text for s in [*decisions, *others]}
     known_facts = {s.id: s.text for s in (facts or [])}
+    frozen = bool(user_text and _FROZEN.search(user_text))
     out: list[Conflict] = []
     for item in raw["conflicts"][:5]:
         if not isinstance(item, dict):
@@ -240,6 +266,16 @@ def parse_conflicts(
             if with_id not in known_facts:
                 continue
             with_text = known_facts[with_id]
+            # 14 Oct, prod LANTERN replay: the approval rule was in the
+            # objective, not the facts, and the check cited "As of November 12"
+            # as the rule. An approval conflict cites a fact about approval, or
+            # the user's own words that state the rule.
+            if item.get("protects_approval") is True and not _APPROVAL.search(with_text):
+                quoted = str(item.get("with_text") or "").strip()
+                if quoted and _APPROVAL.search(quoted) and (user_text is None or _from_user(quoted, user_text)):
+                    kind, with_id, with_text = "objective", "", quoted
+                else:
+                    continue
         elif kind in ("decision", "instruction"):
             # A conflict with something that was never listed is invented.
             if with_id not in known:
@@ -252,6 +288,9 @@ def parse_conflicts(
                 continue
             if user_text is not None and not _from_user(with_text, user_text):
                 continue
+        protects = item.get("protects_approval") is True
+        if not frozen and _only_as_of(kind, with_text, explanation, protects):
+            continue
         out.append(Conflict(
             kind=kind, with_id=with_id, with_text=with_text[:2_000], explanation=explanation[:500],
             keep_label=_label(item.get("keep_label")), override_label=_label(item.get("override_label")),
