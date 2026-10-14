@@ -27,7 +27,8 @@ REQ = NewClaimsRequest(before=BEFORE, after=AFTER, supplied=SUPPLIED, instructio
 def test_the_prompt_separates_restyling_from_new_claims():
     system, user = build_prompt(REQ)
     assert "embellishment of a supplied event" in system
-    assert "Do NOT report: rewording, tone" in system
+    assert "Do NOT report: a rewording or paraphrase of something supplied" in system
+    assert "the speaker's own impressions, feelings or praise" in system
     assert "WHAT THE USER SUPPLIED:\n" + SUPPLIED in user
     assert "THE REVISED TEXT:\n" + AFTER in user
 

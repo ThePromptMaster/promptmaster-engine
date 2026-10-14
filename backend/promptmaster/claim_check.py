@@ -48,12 +48,20 @@ class NewClaimsResponse(BaseModel):
 _INSTRUCTION = (
     "A user asked for a document about real people and said not to invent personal details. "
     "Compare the REVISED TEXT with what the user SUPPLIED and with the TEXT BEFORE. Report each "
-    "statement in the revised text that presents something about a person as true that neither "
-    "source states: a memory or event, a habit or lifelong pattern, a relationship history, a "
-    "trait, or an embellishment of a supplied event (it says more happened than was supplied). "
-    "Do NOT report: rewording, tone, jokes about the occasion itself, greetings, toasts, wishes "
-    "for the future, opinions the speaker plainly offers as their own feeling, or anything the "
-    "supplied text or the text before already says in other words. When in doubt, report nothing.\n"
+    "statement in the revised text that presents a new FACT about a person as true that neither "
+    "source states: a specific memory or event, something a person did, a habit or lifelong "
+    "pattern (\"always the organized one\"), a relationship history, a named trait the sources do "
+    "not give, or an embellishment of a supplied event (it says more happened than was supplied: "
+    "\"corrected me\" becoming \"made me do it again properly\").\n"
+    # 14 Oct, production pass: "It's not forced or showy" and "It just feels
+    # solid" were flagged — a rewording of "comfortable being themselves
+    # together" and the speaker's own impression. Reporting those would make
+    # the warning noise, and the real one would be clicked past.
+    "Do NOT report: a rewording or paraphrase of something supplied, however different the words "
+    "(\"comfortable being themselves together\" → \"nothing about them feels forced\"); the "
+    "speaker's own impressions, feelings or praise (\"there's something special in that\", \"it "
+    "feels easy\"); tone; jokes about the occasion; greetings, toasts and wishes for the future; "
+    "or anything the text before already says. When in doubt, report nothing.\n"
     "For each, quote the shortest span of the revised text that carries the new claim, copied "
     "verbatim (one sentence or less), and say in a few words what was not supplied.\n"
     'Return JSON: {"claims": [{"quote": string, "why": string}]}'
