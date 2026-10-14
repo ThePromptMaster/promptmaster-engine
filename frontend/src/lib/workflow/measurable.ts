@@ -103,7 +103,9 @@ function partBefore(text: string, start: number): string {
   // a name. The verb is dropped from the end, and "the" from the front.
   const words = clause.trim().replace(/[)\]]+/g, ' ').split(/\s+/).filter(Boolean);
   while (words.length && TRAILING_VERB.test(words.at(-1)!)) words.pop();
-  while (words.length && /^(?:the|a|an|each|every)$/i.test(words[0])) words.shift();
+  // Only "the": "a survey kickoff brief under 30 words" is the deliverable
+  // itself, as it was before (e2e objective-pause), not a part of it.
+  if (words.length && /^the$/i.test(words[0])) words.shift();
   if (!words.length || words.length > 3) return '';
   if (words.some((w) => NOT_A_NAME.test(w) || !/^[a-z][a-z-]*$/i.test(w))) return '';
   const phrase = words.join(' ').toLowerCase();
