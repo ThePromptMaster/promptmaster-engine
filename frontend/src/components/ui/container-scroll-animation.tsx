@@ -51,10 +51,10 @@ export const ContainerScroll = ({
 
   return (
     <div
-      className="h-[40rem] md:h-[60rem] flex items-center justify-center relative p-2 md:p-20"
+      className="h-[30rem] sm:h-[40rem] md:h-[60rem] flex items-center justify-center relative p-2 md:p-20"
       ref={containerRef}
     >
-      <div className="py-10 md:py-40 w-full relative" style={{ perspective: "1000px" }}>
+      <div className="py-4 sm:py-10 md:py-40 w-full relative" style={{ perspective: "1000px" }}>
         <Header translate={translate} titleComponent={titleComponent} />
         <Card rotate={rotate} scale={scale}>
           {children}
@@ -99,7 +99,7 @@ export const Card = ({
         backfaceVisibility: "hidden",
         transformStyle: "preserve-3d",
       }}
-      className="max-w-5xl mt-4 md:mt-8 mx-auto h-[30rem] md:h-[40rem] w-full container-scroll-card"
+      className="max-w-5xl mt-4 md:mt-8 mx-auto h-[20rem] sm:h-[30rem] md:h-[40rem] w-full container-scroll-card"
     >
       {/* Static inner shell — border-radius only here, NOT on the animated parent */}
       <div className="h-full w-full border-4 border-white/10 bg-[#111118] rounded-[30px] p-2 md:p-6">

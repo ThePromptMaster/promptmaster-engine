@@ -117,11 +117,15 @@ test('choosing the workflow yourself is still one click away', async ({ page }) 
  * Harold, via Sean (9 Oct): who is it for, and why this rather than a chat?
  * The landing page said "Five phases" and "8 Modes" — the retired product.
  */
-test('the landing page says who PromptMaster is for and what a chat does not do', async ({ page }) => {
+test('the landing page says who PromptMaster is for and how it manages a project', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { name: /Work you can\s*stand behind/ })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'For people who answer for their work.' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'What a chat does not do.' })).toBeVisible();
+  // 14 Oct (Sean): "What a chat does not do" was too absolute.
+  await expect(page.getByRole('heading', { name: 'How PromptMaster manages your project.' })).toBeVisible();
+  await expect(page.getByText('What a chat does not do.')).toHaveCount(0);
+  await expect(page.getByLabel('A change, handled')).toContainText('Confirm 12 attendees');
+  await expect(page.getByText('One click realigns drifted work.')).toHaveCount(0);
   await expect(page.getByText('Five phases. One aligned output.')).toHaveCount(0);
   await expect(page.getByText('8 Modes')).toHaveCount(0);
   await page.screenshot({ path: test.info().outputPath('landing.png'), fullPage: true });
