@@ -231,13 +231,22 @@ export function measureStageContent(
   content: string
 ): Measurement[] {
   if (!content.trim()) return [];
+  return stageRequirements(project, template, stage)
+    .map(({ requirement, whole }) => measure(requirement, content, whole))
+    .filter((m): m is Measurement => m !== null);
+}
+
+/** The measurable requirements a stage answers for, unmeasured. */
+export function stageRequirements(
+  project: Pick<Project, 'objective' | 'constraints'> & Partial<Pick<Project, 'output_format' | 'facts'>>,
+  template: WorkflowTemplate,
+  stage: StageDefinition
+): { requirement: MeasurableRequirement; whole: boolean }[] {
   const requirements = governingRequirements(
     project.objective ?? '',
     parseRequirements([project.objective ?? '', project.constraints ?? '', project.output_format ?? '']),
     currentFacts(project.facts).filter((f) => f.kind === 'requirement').map((f) => parseRequirements([f.statement]))
   );
   if (!requirements.length) return [];
-  return requirementsForStage(stage, deliverableStage(template)?.id, requirements)
-    .map(({ requirement, whole }) => measure(requirement, content, whole))
-    .filter((m): m is Measurement => m !== null);
+  return requirementsForStage(stage, deliverableStage(template)?.id, requirements);
 }

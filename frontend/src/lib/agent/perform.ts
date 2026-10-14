@@ -16,8 +16,8 @@ import { countNamedSections, parseOutlineDocument } from '@/lib/outline/model';
 import { approvedOutlineVersionId, commitOutlineVersion } from '@/lib/supabase/outline';
 import { appendWorkflowEvent, listWorkflowEvents } from '@/lib/supabase/workflow';
 import { getArtifact } from '@/lib/supabase/versions';
-import { manuscriptArtifactFor, measureStageContent } from '@/lib/workflow/context';
-import { COUNTING_RULE } from '@/lib/workflow/measurable';
+import { manuscriptArtifactFor, measureStageContent, stageRequirements } from '@/lib/workflow/context';
+import { COUNTING_RULE, isPart, measure, replaceSection, sectionFor, type MeasurableRequirement } from '@/lib/workflow/measurable';
 import { isDone } from '@/lib/workflow/types';
 import { appliedFindingsVersion, carryUserFields, findingsInstruction, reviseWithFindings } from '@/lib/workflow/apply-findings';
 import { findInstructionConflicts } from '@/lib/workflow/conflict-trail';
@@ -911,9 +911,16 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // Every repair of a stage whose measurement fails is told the count, not
       // only a measured repair: on production two repairs of a reopened Output
       // were not, and left the announcement at 99 words of 100–140 (9 Oct).
-      const measuredLine = measuredFails.length
-        ? ` MEASURED IN CODE AND NOT MET: ${measuredFails.join('; ')}. Revise so each is met — the count is made in code (${COUNTING_RULE}), so count exactly and leave a margin — and keep everything else the brief asks for: every required section, label and fact. Add nothing new.`
-        : '';
+      // A limit on one part ("Executive update: at most 100 words") is met by
+      // revising that part alone; the rest is put back in code, unchanged
+      // (14 Oct, ASPEN: the whole pack was cut to fit the update's limit).
+      const parts = measuredFails.length && !before ? failingParts(ctx, target, head) : [];
+      const partNames = parts.map((r) => `"${r.subject}"`).join(' and ');
+      const measuredLine = parts.length
+        ? ` MEASURED IN CODE AND NOT MET: ${measuredFails.join('; ')}. Revise ONLY the ${partNames} section so it is met — the count is made in code (${COUNTING_RULE}) on that section alone, so count exactly and leave a margin. Keep its heading and every fact it must state. Every other section is put back exactly as it is, so do not change them. Add nothing new.`
+        : measuredFails.length
+          ? ` MEASURED IN CODE AND NOT MET: ${measuredFails.join('; ')}. Revise so each is met — the count is made in code (${COUNTING_RULE}), so count exactly and leave a margin — and keep everything else the brief asks for: every required section, label and fact. Add nothing new.`
+          : '';
       // The rows already decided are named, to be returned as they are (13 Oct).
       const decidedLine = before?.some((r) => r.status)
         ? ` DECIDED ROWS — return each of these exactly as it is, with its id, text, status and reason: ${before.filter((r) => r.status).map((r) => r.id).join(', ')}. Add a row only for a new problem; never drop or renumber one.`
@@ -928,7 +935,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         );
         const generated = generationContent(target, res);
         const after = before ? withoutRevisionNotes(parseItems(generated)) : null;
-        const content = before && after ? serializeItems(restoreDecided(before, carryUserFields(before, after, itemSchemaFor(target)))) : generated;
+        const content = before && after ? serializeItems(restoreDecided(before, carryUserFields(before, after, itemSchemaFor(target)))) : parts.length ? onlyParts(head, generated, parts) : generated;
         return { res, content };
       };
       let { res, content } = await attempt(instruction);
@@ -1057,7 +1064,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
             })
           : done(key, {
               status: 'succeeded', toolsUsed: ['model'], changes,
-              output: `Repaired ${target.label} so that ${measuredValues(ctx, target, content).join('; ')} — measured in code on the saved text (${COUNTING_RULE}). Saved as a new version; the earlier one is kept${isDone(st?.status) ? ', and the stages that read it are reopened for a recheck' : ''}.`,
+              output: `Repaired ${target.label} so that ${measuredValues(ctx, target, content).join('; ')} — measured in code on the saved text (${COUNTING_RULE}).${parts.length ? ` Only the ${partNames} section was revised; every other section is unchanged.` : ''} Saved as a new version; the earlier one is kept${isDone(st?.status) ? ', and the stages that read it are reopened for a recheck' : ''}.`,
             });
       }
       if (evaluation.canAdvance && typeof versionId === 'string') {
@@ -1714,6 +1721,30 @@ function unmetMeasurements(ctx: Pick<PerformContext, 'context'>, stageId: string
 /** Each of a stage's measured requirements on new text, with its count: "Output: at most 200 words — 187 words". */
 function measuredValues(ctx: Pick<PerformContext, 'project' | 'template'>, stage: StageDefinition, content: string): string[] {
   return measureStageContent(ctx.project, ctx.template, stage, content).map((m) => `${m.label} — ${m.value ?? (m.satisfied ? 'met' : m.detail ?? 'not met')}`);
+}
+
+/**
+ * The part-scoped word limits a stage's text fails ("Executive update: at
+ * most 100 words"), each with a heading of its own to revise — or nothing,
+ * when anything else fails too and the whole text has to be revised.
+ */
+export function failingParts(ctx: Pick<PerformContext, 'project' | 'template'>, stage: StageDefinition, content: string): MeasurableRequirement[] {
+  const measured = stageRequirements(ctx.project, ctx.template, stage).map(({ requirement, whole }) => ({ requirement, m: measure(requirement, content, whole) }));
+  const failing = measured.filter(({ m }) => m && !m.satisfied);
+  const parts = failing.filter(({ requirement: r }) => r.kind === 'words' && isPart(r) && sectionFor(content, r.subject) !== null);
+  return parts.length && parts.length === failing.length ? parts.map(({ requirement }) => requirement) : [];
+}
+
+/**
+ * The repaired parts from `generated` set into `head`, everything else as it
+ * was in `head`. The model's "What changed:" line is kept in front, for the
+ * version's record.
+ */
+export function onlyParts(head: string, generated: string, parts: readonly MeasurableRequirement[]): string {
+  const { note, body } = splitChangeNote(generated);
+  let out = head;
+  for (const r of parts) out = replaceSection(out, body, r.subject) ?? out;
+  return note ? `What changed: ${note}\n\n${out}` : out;
 }
 
 /** The same requirements measured on new text, before it is saved. */

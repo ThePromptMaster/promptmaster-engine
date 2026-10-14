@@ -88,17 +88,38 @@ const NOT_A_NAME = /^(?:a|an|the|it|this|that|them|each|every|keep|write|make|be
  * verb or an article in it falls back to `subjectNear`.
  */
 function partBefore(text: string, start: number): string {
-  const clause = text.slice(Math.max(0, start - 60), start).split(/[:;,(.\n]|\band\b/).at(-1) ?? '';
-  const words = clause.trim().split(/\s+/).filter(Boolean);
+  const before = text.slice(Math.max(0, start - 80), start);
+  // "Section 1 (executive update) must be…", "Section 2, the tracker, is…",
+  // "Section 1 is limited to…": the section it names, by name when one is
+  // given, else by number.
+  const numbered = before.match(new RegExp(`\\bsection\\s+${NUM}\\b\\s*(?:\\(([^)]{2,40})\\)|[,:—–-]\\s*(?:the\\s+)?([a-z][a-z -]{1,40}?)\\s*[,—–-])?[^.;\\n]*$`, 'i'));
+  if (numbered) {
+    const name = (numbered[2] ?? numbered[3] ?? '').trim().toLowerCase();
+    return name || `section ${num(numbered[1])}`;
+  }
+  const clause = before.split(/[:;,(.\n]|\band\b/).at(-1) ?? '';
+  // 14 Oct (Sean, ASPEN): "Executive update must be no more than 100 words"
+  // was read as the whole pack's, because "must be" stopped the phrase being
+  // a name. The verb is dropped from the end, and "the" from the front.
+  const words = clause.trim().replace(/[)\]]+/g, ' ').split(/\s+/).filter(Boolean);
+  while (words.length && TRAILING_VERB.test(words.at(-1)!)) words.pop();
+  while (words.length && /^(?:the|a|an|each|every)$/i.test(words[0])) words.shift();
   if (!words.length || words.length > 3) return '';
   if (words.some((w) => NOT_A_NAME.test(w) || !/^[a-z][a-z-]*$/i.test(w))) return '';
   const phrase = words.join(' ').toLowerCase();
+  if (WHOLE.test(phrase)) return '';
   // "executive summary" is the summary every other check already knows.
   const listed = phrase.match(SUBJECT_RE);
   if (listed) return canonical(listed[1]);
   // "chapters capped at 3,000 words" names each one, not a part: singular.
   return phrase.replace(/(?<!s)s$/, '');
 }
+
+/** Words between a part's name and its limit: "must be", "is", "should stay". */
+const TRAILING_VERB = /^(?:is|are|be|must|should|shall|will|stays?|remains?|kept|runs?|needs?|to|has|have)$/i;
+
+/** Names for the whole deliverable, not a part of it. */
+const WHOLE = /^(?:deliverable|document|output|response|pack|whole(?: thing)?|text|draft|piece|it)$/i;
 
 /** The measurable requirements stated in these texts, de-duplicated. */
 export function parseRequirements(texts: readonly string[]): MeasurableRequirement[] {
@@ -231,8 +252,17 @@ const isListedQuestion = (l: Line) => l.level === 0 && /^(?:\d+[.)]|q\s*\d+[.:)]
  * subject ("# Cedar Summary", with the parts below it) is not the section.
  */
 export function sectionFor(text: string, subject: string): string | null {
-  const all = lines(text);
   if (!subject) return text;
+  const all = lines(text);
+  const range = sectionRange(all, subject);
+  if (!range) return null;
+  return all.slice(range.start + 1, range.end).map((l) => (l.level > 0 ? `# ${l.text}` : l.text)).join('\n');
+}
+
+/** The lines of `subject`'s section: its heading at `start`, its body up to `end`. */
+function sectionRange(all: Line[], subject: string): { start: number; end: number } | null {
+  const numbered = subject.match(/^section (\d+)$/);
+  if (numbered) return nthSection(all, Number(numbered[1]));
   const named = (l: Line) => {
     const t = l.text.toLowerCase();
     return subject === 'faq' ? /\bfaq\b|frequently asked questions/.test(t) : t.includes(subject);
@@ -248,16 +278,50 @@ export function sectionFor(text: string, subject: string): string | null {
   if (!found) return null;
   const start = found.i;
   const level = all[start].level;
-  const out: string[] = [];
-  for (const l of all.slice(start + 1)) {
-    if (isTableLine(l) || (subject !== 'faq' && isListedQuestion(l))) break;
+  for (let i = start + 1; i < all.length; i += 1) {
+    const l = all[i];
+    if (isTableLine(l) || (subject !== 'faq' && isListedQuestion(l))) return { start, end: i };
     if (l.level > 0 && !isQuestion(l)) {
       const ends = l.level <= level || (level <= 6 && l.level >= 7) || SUBJECT_RE.test(l.text) || NOTE.test(l.text) || !named(l) && PART_SUBJECTS.has(subject) && /\b(table|questions?|appendix|actions?|risks?|recommendations?|findings?|sources?)\b/i.test(l.text);
-      if (ends) break;
+      if (ends) return { start, end: i };
     }
-    out.push(l.level > 0 ? `# ${l.text}` : l.text);
   }
-  return out.join('\n');
+  return { start, end: all.length };
+}
+
+/**
+ * `target` with `subject`'s section replaced by the same section of `source`,
+ * every other line exactly as it was; null when either has no such section.
+ * A repair of one part's length changes that part and nothing else, in code
+ * (14 Oct, ASPEN: Go shortened the tracker and the log to fit the update's limit).
+ */
+export function replaceSection(target: string, source: string, subject: string): string | null {
+  const t = target.split('\n');
+  const s = source.split('\n');
+  const tr = sectionRange(lines(target), subject);
+  const sr = sectionRange(lines(source), subject);
+  if (!tr || !sr) return null;
+  const body = s.slice(sr.start + 1, sr.end);
+  // The blank lines that separated it from the next section stay as they were.
+  while (body.length && !body.at(-1)!.trim()) body.pop();
+  const trailing: string[] = [];
+  for (let i = tr.end - 1; i > tr.start && !t[i].trim(); i -= 1) trailing.push('');
+  return [...t.slice(0, tr.start + 1), ...body, ...trailing, ...t.slice(tr.end)].join('\n');
+}
+
+/**
+ * The Nth section of a text: the Nth heading at its top level (a lone title
+ * above them is not a section), up to the next heading at that level or above.
+ */
+function nthSection(all: Line[], n: number): { start: number; end: number } | null {
+  const heads = all.map((l, i) => ({ l, i })).filter(({ l }) => l.level > 0 && l.level <= 7 && !isQuestion(l) && !NOTE.test(l.text));
+  if (!heads.length) return null;
+  let top = Math.min(...heads.map((h) => h.l.level));
+  if (heads.filter((h) => h.l.level === top).length === 1 && heads.length > 1) top = Math.min(...heads.filter((h) => h.l.level > top).map((h) => h.l.level));
+  const found = heads.filter((h) => h.l.level === top)[n - 1];
+  if (!found) return null;
+  const next = all.findIndex((l, i) => i > found.i && l.level > 0 && l.level <= top && !isQuestion(l));
+  return { start: found.i, end: next < 0 ? all.length : next };
 }
 
 /**
@@ -353,6 +417,9 @@ export function countQuestions(text: string): { total: number; answered: number 
 const SUBJECT_LABEL: Record<string, string> = { faq: 'FAQ' };
 const subjectLabel = (s: string) => SUBJECT_LABEL[s] ?? (s ? s[0].toUpperCase() + s.slice(1) : 'The deliverable');
 
+/** A limit on one part of the deliverable, never on the whole of it. */
+export const isPart = (r: Pick<MeasurableRequirement, 'subject'>) => Boolean(r.subject) && !SUBJECTS.includes(r.subject) && r.subject !== 'frequently asked questions';
+
 function rangeText(r: MeasurableRequirement): string {
   if (r.min !== undefined && r.max !== undefined) return r.min === r.max ? `exactly ${r.min}` : `${r.min}–${r.max}`;
   return r.max !== undefined ? `at most ${r.max}` : `at least ${r.min}`;
@@ -434,7 +501,10 @@ export function requirementsForStage(
     if (aboutIt) out.push({ requirement: r, whole: true });
     // On the deliverable, a named part is looked for under its heading; the
     // whole text stands for it only when it is the one thing asked for.
-    else if (stage.id === deliverableId) out.push({ requirement: r, whole: subjects.size === 1 });
+    // A part of it ("executive update", "section 1") is only ever that part:
+    // with no heading for it, nothing is measured (14 Oct, ASPEN: 171 words
+    // of a three-section pack were held to the update's 100).
+    else if (stage.id === deliverableId) out.push({ requirement: r, whole: subjects.size === 1 && !isPart(r) });
   }
   return out;
 }
