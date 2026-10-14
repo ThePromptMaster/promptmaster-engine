@@ -185,6 +185,8 @@ def _label(raw: object) -> str:
     return text[:80]
 
 
+_APPROVAL = re.compile(r"\bapprov|\bauthori[sz]|\bsign[- ]?off\b|\bonly [A-Z]?[a-z]+ (?:can|may)\b", re.IGNORECASE)
+
 #: A reporting date or a "use only this record" scope (14 Oct, Sean, LANTERN).
 _AS_OF = re.compile(
     r"\bas of\b|\bcut-?off\b|\breporting date\b|\bonly (?:the |this )?(?:provided |original |supplied |given )?record\b"
@@ -264,6 +266,16 @@ def parse_conflicts(
             if with_id not in known_facts:
                 continue
             with_text = known_facts[with_id]
+            # 14 Oct, prod LANTERN replay: the approval rule was in the
+            # objective, not the facts, and the check cited "As of November 12"
+            # as the rule. An approval conflict cites a fact about approval, or
+            # the user's own words that state the rule.
+            if item.get("protects_approval") is True and not _APPROVAL.search(with_text):
+                quoted = str(item.get("with_text") or "").strip()
+                if quoted and _APPROVAL.search(quoted) and (user_text is None or _from_user(quoted, user_text)):
+                    kind, with_id, with_text = "objective", "", quoted
+                else:
+                    continue
         elif kind in ("decision", "instruction"):
             # A conflict with something that was never listed is invented.
             if with_id not in known:

@@ -214,3 +214,19 @@ def test_a_reporting_date_is_never_the_ground_of_a_conflict_in_code():
     # Asked for as it stood: then the date is a real conflict.
     frozen = user + " Keep this a frozen historical report."
     assert len(parse_conflicts(raw, [], [], user_text=frozen)) == 3
+
+
+def test_an_approval_conflict_never_cites_a_fact_about_something_else():
+    """14 Oct, prod: the override confirmation read "The record says: As of
+    November 12" — the rule was in the objective, and the check cited fact F1."""
+    facts = [ConflictSource(id="F1", text="As of November 12, 2026.")]
+    user = "Sponsor Elena approved a December 18, 2026 completion date. Only Elena can approve a change."
+    raw = {"conflicts": [{
+        "kind": "fact", "with_id": "F1", "with_text": "Only Elena can approve a change.",
+        "explanation": "Elena hasn't approved it.", "protects_approval": True,
+    }]}
+    [c] = parse_conflicts(raw, [], [], user_text=user, facts=facts)
+    assert (c.kind, c.with_text, c.protects_approval) == ("objective", "Only Elena can approve a change.", True)
+    # With no rule in the user's words to point at, it is dropped rather than misattributed.
+    raw["conflicts"][0]["with_text"] = "As of November 12"
+    assert parse_conflicts(raw, [], [], user_text=user, facts=facts) == []
