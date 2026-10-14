@@ -188,3 +188,12 @@ def test_a_fact_conflict_cites_a_listed_fact_and_carries_short_labels():
     assert first.resolution.startswith("I'll keep December 18")
     # Labels with quotation marks or too many words are dropped, for the browser's own.
     assert (parsed[2].keep_label, parsed[2].override_label) == ("", "")
+
+
+def test_a_value_the_user_changes_is_their_later_word():
+    """14 Oct, production: a start-time change was asked about against the
+    objective's old time and the end time it moves."""
+    system, _ = build_conflict_prompt(LANTERN, "The workshop now starts at 10:00 a.m. instead of 9:00 a.m.", [], [])
+    assert "A value the user changes in their own words" in system
+    assert "neither is anything that follows from it" in system
+    assert "a change someone else is reported to want is a request" in system

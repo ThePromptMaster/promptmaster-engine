@@ -79,7 +79,16 @@ _CONFLICT_INSTRUCTION = (
     "historical report. Recording a request someone made (\"Omar requests January 15\") is new "
     "evidence, not a decision: it conflicts with nothing, so long as it is recorded as a request. "
     "An instruction that repeats or carries out an earlier decision or applied instruction does not "
-    "conflict with it. A later value for a fact the user gives in the instruction updates the fact.\n\n"
+    "conflict with it. A later value for a fact the user gives in the instruction updates the fact.\n"
+    # 14 Oct, production pass: "The workshop now starts at 10:00 a.m. instead
+    # of 9:00 a.m." was asked about twice — against the objective's 9:00, with
+    # "Keep the objective" recommended, and against the noon end time that a
+    # later start necessarily moves.
+    "A value the user changes in their own words (\"the workshop now starts at 10:00 instead of 9:00\", "
+    "\"the budget is now $60,000\") is their later word: it is not a conflict with the objective, the "
+    "constraints or a fact that state the old value, and neither is anything that follows from it (a "
+    "later start moves the end time). Only a recorded approval rule can make such a change a "
+    "conflict — and a change someone else is reported to want is a request, not the user's decision.\n\n"
     "APPROVAL RULES come first. Where the objective, the context, a decision or an accepted fact says "
     "who must approve a change (\"only Elena can approve a date change\"), and following the "
     "instruction would treat a change that person has not approved as approved — writing the "
