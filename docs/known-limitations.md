@@ -1648,3 +1648,15 @@ push the goal box about 100px down, so a click aimed at the box landed on the ba
 the typing went nowhere. On the first step the banner now sits below the start buttons,
 where it moves nothing. Text typed before the page becomes interactive is also read back
 from the box.
+
+### L-86 — One reason for several rows; documents read or not (2026-10-14)
+
+When rows in a review table share a status that needs a reason, the reason typed on one
+row can be applied to the others still without one, by a click ("Use this reason for the
+N other rows marked … without one"). Nothing is copied onto a row the user has not acted
+on: a reason filled without a look would settle a row unexamined.
+
+Every prompt is told how to tell a document that was read (its text is in the project
+context under "From <name>") from one that was not added, and that a stage which does not
+need a document does not mention it. This is a model instruction. A document that cannot
+be read is reported when it is attached, as before.

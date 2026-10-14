@@ -679,3 +679,10 @@ def test_a_shortened_stage_is_not_read_as_missing_work():
 
     _, user = build_check_prompt(PMInput(objective="x", audience="y", mode="architect"), "Output", "c", "w " * MAX_CHECK_CONTENT)
     assert "never report anything as missing, cut off or truncated because of this note" in user
+
+
+def test_every_prompt_tells_read_documents_from_missing_ones():
+    from promptmaster.self_model import PROMPTMASTER_SELF_MODEL as m
+
+    assert "that document has been read. Never call it missing" in m
+    assert "say it is not in the project, not that you read it" in m
