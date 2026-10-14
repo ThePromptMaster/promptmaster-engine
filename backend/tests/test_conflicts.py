@@ -180,14 +180,14 @@ def test_a_fact_conflict_cites_a_listed_fact_and_carries_short_labels():
         {"kind": "fact", "with_id": "F2", "explanation": "x", "keep_label": "Keep \"Use only the provided record\"", "override_label": "My new instruction takes priority over everything else here"},
     ]}
     parsed = parse_conflicts(raw, [], [], facts=facts)
-    # The approval comes first; the invented fact is dropped.
-    assert [(c.kind, c.with_id) for c in parsed] == [("fact", "F2"), ("constraint", ""), ("fact", "F2")]
+    # The approval comes first; the invented fact and the as-of constraint are dropped.
+    assert [(c.kind, c.with_id) for c in parsed] == [("fact", "F2"), ("fact", "F2")]
     first = parsed[0]
     assert first.protects_approval and first.with_text.startswith("Sponsor Elena approved")
     assert (first.keep_label, first.override_label) == ("Keep December 18 approved", "Treat January 15 as approved")
     assert first.resolution.startswith("I'll keep December 18")
     # Labels with quotation marks or too many words are dropped, for the browser's own.
-    assert (parsed[2].keep_label, parsed[2].override_label) == ("", "")
+    assert (parsed[1].keep_label, parsed[1].override_label) == ("", "")
 
 
 def test_a_value_the_user_changes_is_their_later_word():
@@ -197,3 +197,20 @@ def test_a_value_the_user_changes_is_their_later_word():
     assert "A value the user changes in their own words" in system
     assert "neither is anything that follows from it" in system
     assert "a change someone else is reported to want is a request" in system
+
+
+def test_a_reporting_date_is_never_the_ground_of_a_conflict_in_code():
+    """14 Oct, production pass: the check still offered "Keep November 10 report
+    (recommended)" against the user's November 12 update."""
+    raw = {"conflicts": [
+        {"kind": "objective", "with_text": "Prepare a short status report for fictional Project LANTERN using only this record, as of November 10, 2026",
+         "explanation": "It conflicts with the objective's November 10 reporting cutoff."},
+        {"kind": "constraint", "with_text": "Use only the provided record as of November 10, 2026.",
+         "explanation": "Adds later information from November 12."},
+        {"kind": "constraint", "with_text": "Under 300 words", "explanation": "A long section breaks the limit."},
+    ]}
+    user = "Prepare a short status report for fictional Project LANTERN using only this record, as of November 10, 2026 Use only the provided record as of November 10, 2026. Under 300 words"
+    assert [c.with_text for c in parse_conflicts(raw, [], [], user_text=user)] == ["Under 300 words"]
+    # Asked for as it stood: then the date is a real conflict.
+    frozen = user + " Keep this a frozen historical report."
+    assert len(parse_conflicts(raw, [], [], user_text=frozen)) == 3
