@@ -61,6 +61,7 @@ export function removedLines(before: string, after: string): Removal[] {
   const afterExact = new Set(afterLines.map(norm));
   const afterMasked = new Set(afterLines.map(masked));
   const afterWords = new Set(afterLines.flatMap(words));
+  const afterSets = afterLines.map((l) => new Set(words(l)));
   const out: Removal[] = [];
   for (const raw of before.split('\n')) {
     const line = raw.trim();
@@ -70,6 +71,10 @@ export function removedLines(before: string, after: string): Removal[] {
     if (!w.length) continue;
     // A longer line reworded or split across lines still has its words.
     if (w.length > 3 && w.filter((x) => afterWords.has(x)).length / w.length >= 0.75) continue;
+    // A short line that was edited in place: one new line has all its words
+    // (14 Oct, prod: "- Training (0 minutes) — Maya" became "- 9:15 a.m.–10:15
+    // a.m. — Training … Maya facilitates", and the old line was put back beside it).
+    if (w.length >= 2 && afterSets.some((set) => w.every((x) => set.has(x)))) continue;
     out.push({ line: raw.replace(/\s+$/, ''), restorable: w.length <= SHORT_LINE_WORDS });
   }
   return out;
@@ -138,6 +143,10 @@ export function restoreLines(before: string, after: string, lines: readonly stri
   return out.join('\n').replace(/\n{3,}/g, '\n\n').replace(/^\n+/, '').replace(/\n+$/, after.endsWith('\n') ? '\n' : '');
 }
 
+/** "minutes" and "0-minute" are the same word to a reader. */
+const stem = (w: string) => w.toLowerCase().replace(/(?:ies)$/, 'y').replace(/(?<=[a-z]{3})s$/, '');
+const stems = (text: string) => new Set(text.toLowerCase().split(/[^\p{L}]+/u).filter((w) => w.length > 2).map(stem));
+
 export interface Preserved {
   /** The revision with the short lines it dropped put back. */
   text: string;
@@ -159,7 +168,14 @@ export function keepUnasked(
   keep: (line: string) => boolean = () => true
 ): Preserved {
   if (!before.trim() || !after.trim() || asksForRemovals(instruction)) return { text: after, restored: [], reported: [] };
-  const removed = removedLines(before, after).filter((r) => keep(r.line));
+  // A line the instruction itself names ("the 0-minute Training item") was
+  // asked about: whatever became of it is the instruction's doing.
+  const named = stems(instruction);
+  const mentioned = (line: string) => {
+    const w = [...new Set(words(line).map(stem))].filter((x) => x.length > 2);
+    return w.filter((x) => named.has(x)).length >= Math.min(2, w.length);
+  };
+  const removed = removedLines(before, after).filter((r) => keep(r.line) && !mentioned(r.line));
   const restored = removed.filter((r) => r.restorable).map((r) => r.line.trim());
   const reported = removed.filter((r) => !r.restorable).map((r) => r.line.trim());
   return { text: restoreLines(before, after, restored), restored, reported };
