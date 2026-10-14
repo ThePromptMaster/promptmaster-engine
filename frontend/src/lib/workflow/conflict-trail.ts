@@ -13,7 +13,7 @@ import { insertRecommendation, listRecommendations, recordDecision } from '@/lib
 import type { RecommendationScope } from './recommend';
 import { api } from '@/lib/api/client';
 import type { Project } from '@/types/project';
-import { describeWith, mergeConflicts, ruleConflicts, type ConflictSource, type Controls, type InstructionConflict } from './instruction-conflicts';
+import { choiceLabels, gist, mergeConflicts, nameOf, ruleConflicts, type ConflictSource, type Controls, type InstructionConflict } from './instruction-conflicts';
 import { inputsFrom } from './stage-requests';
 
 export const CONFLICT_CATEGORY = 'conflict:';
@@ -52,7 +52,10 @@ export async function conflictContext(
       .map((r) => ({ id: r.id, text: r.instruction })),
     ...recentInstructions.slice(-5).map((text, i) => ({ id: `chat-${i}`, text })),
   ];
-  return { decisions, others };
+  // An instruction already recorded as a decision is not also pending: the
+  // November 12 update was listed both ways and asked about twice (14 Oct).
+  const decided = decisions.map((d) => d.text.toLowerCase());
+  return { decisions, others: others.filter((o) => !decided.some((d) => d.includes(gist(o.text, 80).replace(/…$/, '').toLowerCase()))) };
 }
 
 /**
@@ -105,10 +108,13 @@ export async function recordConflictChoice(args: {
   controls: Controls;
 }): Promise<void> {
   const { conflict, controls, instruction } = args;
+  // Plain words, never a quote inside a quote: this title is read back as an
+  // earlier decision by the next check (14 Oct, Sean, LANTERN).
+  const { keep, override } = choiceLabels(conflict);
   const title =
     controls === 'new'
-      ? `"${instruction.slice(0, 160)}" takes precedence over ${describeWith(conflict)}`
-      : `${describeWith(conflict)} takes precedence over "${instruction.slice(0, 160)}"`;
+      ? `Chose "${override}" over ${nameOf(conflict)}, for the instruction: ${gist(instruction)}`
+      : `Chose "${keep}" over the instruction: ${gist(instruction)}`;
   const rec = await insertRecommendation(args.projectId, args.userId, {
     category: `${CONFLICT_CATEGORY}${Date.now()}`,
     kind: 'workflow',

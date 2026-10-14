@@ -53,17 +53,17 @@ test('PM-24: an instruction against the constraints asks which controls, without
 
   const chat = await instruct(page, 'Expand it with much more detail');
   const ask = chat.getByRole('region', { name: 'Which takes priority?' });
-  await expect(ask).toContainText('It pulls against your constraints: Under 300 words');
   await expect(ask).toContainText('opposite way on length');
+  // One question, two short answers, one click (14 Oct, LANTERN).
+  await expect(ask).not.toContainText('"');
   await page.screenshot({ path: test.info().outputPath('01-which-controls.png') });
-  await ask.getByRole('radio', { name: 'Keep the constraints' }).click();
-  await ask.getByRole('button', { name: 'Continue' }).click();
+  await ask.getByRole('button', { name: 'Keep the constraints' }).click();
   await expect(chat.getByLabel('Proposed revision')).toBeVisible();
 
   // On the decision trail, as a dismissed proposal with its decision.
   const [row] = await serviceSelect('recommendations', `project_id=eq.${id}&category=like.conflict:*&select=id,status,title`);
   expect(row).toMatchObject({ status: 'dismissed' });
-  expect(row.title).toContain('the constraints takes precedence over "Expand it with much more detail"');
+  expect(row.title).toBe('Chose "Keep the constraints" over the instruction: Expand it with much more detail');
   const decisions = await serviceSelect('decisions', `recommendation_id=eq.${row.id}&select=decision_type`);
   expect(decisions).toEqual([{ decision_type: 'dismiss_recommendation' }]);
 });
@@ -74,20 +74,18 @@ test('PM-24: a meaning-level conflict with the objective, then a prior decision 
 
   const chat = await instruct(page, 'Make it about elephants instead [[mock:conflict]]');
   const ask = chat.getByRole('region', { name: 'Which takes priority?' });
-  await expect(ask).toContainText('It pulls against your objective');
   await expect(ask).toContainText('Mock: this instruction pulls the work away from the objective.');
   // The order recommends keeping the objective (3 Oct call: "choose the
   // higher one"); the user can still choose otherwise.
-  await expect(ask.getByRole('radio', { name: 'Keep the objective (recommended)' })).toHaveAttribute('aria-checked', 'true');
+  await expect(ask.getByRole('button', { name: 'Keep the objective (recommended)' })).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('01-objective-recommended.png'), fullPage: true });
-  await ask.getByRole('radio', { name: 'My new instruction takes priority' }).click();
-  await ask.getByRole('button', { name: 'Continue' }).click();
+  await ask.getByRole('button', { name: 'Follow the new instruction' }).click();
   await expect(chat.getByLabel('Proposed revision')).toBeVisible();
   await chat.getByRole('button', { name: 'Discard' }).click();
 
   const [row] = await serviceSelect('recommendations', `project_id=eq.${id}&category=like.conflict:*&select=status,title`);
   expect(row).toMatchObject({ status: 'accepted' });
-  expect(row.title).toContain('takes precedence over the objective');
+  expect(row.title).toContain('over the objective, for the instruction: Make it about elephants instead');
 
   // An instruction that fits is sent straight through — no question.
   await chat.getByRole('textbox', { name: 'Give a revision instruction' }).fill('Fix the typo in the first line');
@@ -110,11 +108,10 @@ test('an action button whose revision conflicts with the objective asks which ta
   await chat.getByRole('region', { name: 'Act on this reply' }).getByRole('button', { name: 'Tighten the opening' }).click();
 
   const ask = chat.getByRole('region', { name: 'Which takes priority?' });
-  await expect(ask).toContainText('It pulls against your objective');
+  await expect(ask).toContainText('Before I change this');
   await page.screenshot({ path: test.info().outputPath('01-action-asks-which-takes-priority.png') });
   expect(await serviceSelect('artifact_versions', `project_id=eq.${id}&select=id`)).toHaveLength(1);
-  await ask.getByRole('radio', { name: 'Keep the objective' }).click();
-  await ask.getByRole('button', { name: 'Continue' }).click();
+  await ask.getByRole('button', { name: 'Keep the objective (recommended)' }).click();
   // The revision then goes through the ordinary preview, told what was decided.
   await expect(page.getByRole('dialog', { name: 'Revised version' })).toBeVisible({ timeout: 30_000 });
   const [row] = await serviceSelect('recommendations', `project_id=eq.${id}&category=like.conflict:*&select=status`);
@@ -136,8 +133,9 @@ test('Go stops and asks before a revision that conflicts with the objective, the
   await prompt.getByRole('button', { name: 'Approve' }).click();
 
   // Nothing is rewritten: the run asks.
-  await expect(panel).toContainText('conflicts with the objective', { timeout: 30_000 });
+  await expect(panel).toContainText('Before I change', { timeout: 30_000 });
   await expect(panel).toContainText('Which should take priority?');
+  await expect(panel.getByRole('button', { name: 'Keep the objective' })).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('01-go-asks-which-takes-priority.png'), fullPage: true });
   expect(await serviceSelect('artifact_versions', `project_id=eq.${id}&select=id`)).toHaveLength(1);
 

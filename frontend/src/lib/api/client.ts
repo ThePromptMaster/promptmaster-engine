@@ -877,7 +877,7 @@ export const api = {
     other_instructions: { id: string; text: string }[];
     stage?: { label: string; instruction: string };
     model?: string;
-  }): Promise<{ conflicts: { kind: 'objective' | 'constraint' | 'decision' | 'instruction'; with_id: string; with_text: string; explanation: string }[] }> {
+  }): Promise<{ conflicts: { kind: 'objective' | 'constraint' | 'decision' | 'fact' | 'instruction'; with_id: string; with_text: string; explanation: string; keep_label?: string; override_label?: string; resolution?: string; protects_approval?: boolean }[] }> {
     return apiFetch('/api/check-conflicts', { method: 'POST', body: JSON.stringify(req) });
   },
 

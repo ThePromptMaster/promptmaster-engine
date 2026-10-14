@@ -728,3 +728,16 @@ def test_a_speech_is_a_single_output():
     from promptmaster import setup_suggester
     import inspect
     assert "a speech, a talk, a letter" in inspect.getsource(setup_suggester)
+
+
+def test_a_decision_log_records_authority_and_approved_amounts(basic_inputs, prose_stage, digest):
+    """14 Oct (Sean, LANTERN): the log left out Elena's authority and the approved
+    budget, and listed "No budget increase is approved" as an approved decision."""
+    from promptmaster.stage import DECISION_LOG_RULE
+
+    lantern = basic_inputs.model_copy(update={"constraints": "Include a decision log separating approved decisions from Omar's unapproved request."})
+    system, user = build_stage_prompt(lantern, prose_stage, digest)
+    assert DECISION_LOG_RULE in system + user
+    assert "who may approve a change" in DECISION_LOG_RULE and "is a status" in DECISION_LOG_RULE
+    system, user = build_stage_prompt(basic_inputs, prose_stage, digest)
+    assert DECISION_LOG_RULE not in system + user

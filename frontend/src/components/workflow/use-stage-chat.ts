@@ -522,6 +522,9 @@ export function useStageChat({
       );
 
       if (proposal.messageId) {
+        // Applied, so no longer a pending instruction for the next conflict check.
+        const appliedId = proposal.messageId;
+        setMessages((prev) => prev.map((m) => (m.id === appliedId ? { ...m, appliedVersionId: previousVersionId ?? '' } : m)));
         // Best-effort breadcrumb; the version is already safely written.
         void markStageChatApplied(
           proposal.messageId,

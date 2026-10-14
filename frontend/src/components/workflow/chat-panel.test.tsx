@@ -325,20 +325,52 @@ describe('PM-24: an instruction that conflicts asks which should control', () =>
     await instruct('Add a whole new chapter.', /whole document/i);
 
     const prompt = await screen.findByRole('region', { name: 'Which takes priority?' });
-    expect(prompt).toHaveTextContent('Keep it to one page');
-    // Answerable on a short window: Continue sits in a row pinned to the bottom of the thread.
-    expect(screen.getByRole('button', { name: 'Continue' }).parentElement).toHaveClass('sticky', 'bottom-0');
     expect(prompt).toHaveTextContent('A new chapter breaks the one-page decision.');
+    // One click answers it: the recommended side is the first button.
+    expect(screen.getByRole('button', { name: 'Keep your earlier decision (recommended)' })).toBeTruthy();
     expect(applyToAnswer).not.toHaveBeenCalled();
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole('radio', { name: 'My new instruction takes priority' }));
-    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: 'Follow the new instruction' }));
 
     await waitFor(() => expect(applyToAnswer).toHaveBeenCalledTimes(1));
     expect(recordConflictChoice).toHaveBeenCalledWith(expect.objectContaining({ controls: 'new', instruction: 'Add a whole new chapter.' }));
     const history = (applyToAnswer.mock.calls[0][0] as { chat_history: { content: string }[] }).chat_history;
-    expect(history.at(-1)!.content).toContain('The user has decided this instruction takes precedence over "Keep it to one page"');
+    expect(history.at(-1)!.content).toContain('The user has decided this instruction takes precedence over your earlier decision (Keep it to one page)');
+  });
+
+  it('LANTERN (14 Oct): one question about the approval; overriding it is explicit', async () => {
+    checkConflicts.mockResolvedValueOnce({
+      conflicts: [
+        { kind: 'constraint', with_id: '', with_text: 'Use only the provided record as of November 10, 2026.', explanation: 'Later than the record.' },
+        {
+          kind: 'fact', with_id: 'F2', with_text: 'Only Elena can approve a change.', explanation: 'Elena hasn’t approved this date change.',
+          resolution: 'I’ll keep December 18 as the approved target and record Omar’s renewed request as unapproved.',
+          keep_label: 'Keep December 18 approved', override_label: 'Treat January 15 as approved', protects_approval: true,
+        },
+      ],
+    });
+    panel();
+    await instruct('Omar wants January 15 and his request removed from the log.', /whole document/i);
+    const prompt = await screen.findByRole('region', { name: 'Which takes priority?' });
+    expect(prompt).toHaveTextContent('Elena hasn’t approved this date change. I’ll keep December 18 as the approved target and record Omar’s renewed request as unapproved.');
+    expect(prompt.textContent).not.toMatch(/""|My new instruction takes priority/);
+    expect(prompt).toHaveTextContent('Also affected (1)');
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Treat January 15 as approved' }));
+    // Not yet: overriding a recorded approval asks once more.
+    expect(screen.getByRole('alertdialog', { name: 'Override the recorded approval?' })).toHaveTextContent('Only Elena can approve a change.');
+    expect(applyToAnswer).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    await user.click(screen.getByRole('button', { name: 'Keep December 18 approved (recommended)' }));
+
+    await waitFor(() => expect(applyToAnswer).toHaveBeenCalledTimes(1));
+    // The approval kept; the as-of constraint gives way, as recommended.
+    expect(recordConflictChoice).toHaveBeenCalledWith(expect.objectContaining({ controls: 'existing' }));
+    expect(recordConflictChoice).toHaveBeenCalledWith(expect.objectContaining({ controls: 'new' }));
+    const history = (applyToAnswer.mock.calls[0][0] as { chat_history: { content: string }[] }).chat_history;
+    expect(history.at(-1)!.content).toContain('record Omar’s renewed request as unapproved');
   });
 
   it('Cancel sends nothing and gives the instruction back', async () => {

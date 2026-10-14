@@ -142,4 +142,49 @@ def test_the_check_sees_accepted_facts_as_the_users_decisions():
     inputs = INPUTS.model_copy(update={"facts": [AcceptedFact(statement="Decided by the user: launch December 10, price $18.")]})
     _system, user = build_conflict_prompt(inputs, "Draft it with December 10 and $18", DECISIONS, OTHERS)
     assert "ACCEPTED PROJECT FACTS" in user
-    assert "- Decided by the user: launch December 10, price $18." in user
+    assert "- [F1] Decided by the user: launch December 10, price $18." in user
+
+
+# 14 Oct (Sean, LANTERN): Omar asks to move the completion date; only Elena can
+# approve a change and she has not. One question, about the approval, in plain words.
+from promptmaster.schemas import AcceptedFact  # noqa: E402
+
+LANTERN = PMInput(
+    objective="Prepare a short status report for fictional Project LANTERN using only this record:",
+    constraints="Use only the provided record as of November 10, 2026. Include a decision log separating approved decisions from Omar’s unapproved request.",
+    mode="architect",
+    facts=[
+        AcceptedFact(statement="As of November 12, 2026, update LANTERN with the final vacancy filled and actual spending at $24,000; everything else is unchanged."),
+        AcceptedFact(statement="Sponsor Elena approved a December 18, 2026 completion date. Only Elena can approve a change."),
+    ],
+)
+OMAR = "Omar wants the completion date changed to January 15 and his request removed from the decision log. Elena still hasn't approved it."
+
+
+def test_the_prompt_says_an_as_of_date_and_a_request_are_not_conflicts():
+    system, user = build_conflict_prompt(LANTERN, OMAR, [], [])
+    assert "an \"as of\" or reporting date describes the report, not a limit on later evidence" in system
+    assert "Recording a request someone made" in system
+    assert "APPROVAL RULES come first" in system
+    assert "- [F2] Sponsor Elena approved a December 18, 2026 completion date. Only Elena can approve a change." in user
+
+
+def test_a_fact_conflict_cites_a_listed_fact_and_carries_short_labels():
+    facts = [ConflictSource(id="F2", text="Sponsor Elena approved a December 18, 2026 completion date. Only Elena can approve a change.")]
+    raw = {"conflicts": [
+        {"kind": "constraint", "with_text": "Use only the provided record as of November 10, 2026.", "explanation": "Outside the record."},
+        {"kind": "fact", "with_id": "F2", "explanation": "Elena hasn't approved moving the date to January 15.",
+         "resolution": "I'll keep December 18 as the approved target and record Omar's request as unapproved.",
+         "keep_label": "Keep December 18 approved", "override_label": "Treat January 15 as approved", "protects_approval": True},
+        {"kind": "fact", "with_id": "F9", "explanation": "invented"},
+        {"kind": "fact", "with_id": "F2", "explanation": "x", "keep_label": "Keep \"Use only the provided record\"", "override_label": "My new instruction takes priority over everything else here"},
+    ]}
+    parsed = parse_conflicts(raw, [], [], facts=facts)
+    # The approval comes first; the invented fact is dropped.
+    assert [(c.kind, c.with_id) for c in parsed] == [("fact", "F2"), ("constraint", ""), ("fact", "F2")]
+    first = parsed[0]
+    assert first.protects_approval and first.with_text.startswith("Sponsor Elena approved")
+    assert (first.keep_label, first.override_label) == ("Keep December 18 approved", "Treat January 15 as approved")
+    assert first.resolution.startswith("I'll keep December 18")
+    # Labels with quotation marks or too many words are dropped, for the browser's own.
+    assert (parsed[2].keep_label, parsed[2].override_label) == ("", "")
