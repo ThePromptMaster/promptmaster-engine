@@ -577,6 +577,16 @@ export const api = {
   },
 
   /**
+   * Personal details a revision states that the user never supplied, when the
+   * project says not to invent them (14 Oct). Each quote is verbatim in the
+   * revision and absent from the text before. Records nothing; a failed check
+   * reports nothing.
+   */
+  async checkNewClaims(req: { before: string; after: string; supplied: string; instruction?: string; model?: string }): Promise<{ claims: { quote: string; why: string }[] }> {
+    return apiFetch('/api/check-new-claims', { method: 'POST', body: JSON.stringify(req) });
+  },
+
+  /**
    * Accepted facts a revision contradicts in meaning, each rewritten to agree
    * (L-72), and the standing changes its instruction states (12 Oct). Records nothing.
    */

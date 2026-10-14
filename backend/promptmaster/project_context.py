@@ -9,6 +9,8 @@ material to quote and reason from, never instructions to follow.
 
 from __future__ import annotations
 
+import re
+
 from .schemas import PMInput
 
 _HEADER = (
@@ -95,6 +97,37 @@ def brief_lines(inputs: PMInput) -> str:
     return "\n".join(f"{k}: {' '.join(v.split())}" for k, v in rows if v.strip() and v.strip().lower() != "general")
 
 
+#: "Do not invent memories or stories", "don't make up details", "add no new
+#: personal details", "use only what I tell you" (14 Oct, Sean's wedding speech).
+#: The frontend reads the same wording (`lib/workflow/fact-boundary.ts`).
+_NO_INVENTION = re.compile(
+    r"\b(?:do not|don['’]t|never|no|without)\s+(?:invent(?:ing|ed)?|mak(?:e|ing) up|fabricat\w*|embellish\w*|add(?:ing)?\s+(?:any\s+)?new)\b"
+    r"[^.\n]{0,40}?\b(?:memor\w*|stor\w*|details?|anecdotes?|facts?|events?|claims?)\b"
+    r"|\b(?:add|invent)\s+no\s+(?:new\s+)?(?:personal\s+)?(?:details?|memor\w*|stor\w*)",
+    re.IGNORECASE,
+)
+
+FACT_BOUNDARY = (
+    "FACT BOUNDARY — the user said not to invent details. About any real person, state only what "
+    "the user supplied: their answers, the brief, the accepted facts, the current text. Restyle, "
+    "reorder and shorten freely, but add no memory, event, habit, trait, relationship history or "
+    "quotation, and never make a supplied event bigger than it was (\"corrected him when he skipped "
+    "a line\" stays exactly that). Where another detail would help, leave it out rather than supply "
+    "one; PromptMaster asks the user for it."
+)
+
+
+def no_invented_details(inputs: PMInput) -> bool:
+    """Whether the brief or an instruction the user applied says not to invent details."""
+    texts = [
+        inputs.objective,
+        inputs.constraints,
+        *(i.instruction for i in (inputs.user_instructions or [])),
+        *(f.statement for f in (inputs.facts or []) if f.kind == "requirement"),
+    ]
+    return any(_NO_INVENTION.search(t or "") for t in texts)
+
+
 def context_block(inputs: PMInput, limit: int | None = None) -> str:
     """The accepted facts and the context as delimited blocks, or "" when there
     are neither.
@@ -114,7 +147,8 @@ def context_block(inputs: PMInput, limit: int | None = None) -> str:
         cut = cut[: cut.rfind("\n")] if cut.rfind("\n") > limit // 2 else cut
         text = cut.rstrip() + f"\n{CONTEXT_SHORTENED}"
     context = f"{_HEADER}\n<<<\n{text}\n>>>" if text else ""
-    return "\n\n".join(b for b in (facts, said, context) if b)
+    boundary = FACT_BOUNDARY if no_invented_details(inputs) else ""
+    return "\n\n".join(b for b in (facts, said, boundary, context) if b)
 
 
 def context_line(inputs: PMInput) -> str:

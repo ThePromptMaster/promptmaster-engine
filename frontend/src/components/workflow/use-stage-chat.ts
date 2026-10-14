@@ -55,6 +55,8 @@ import type { ArtifactVersion, Project } from '@/types/project';
 import { factChangesFromRevision, isNewFact, withMeaningChanges, type FactChange } from '@/lib/workflow/fact-reconcile';
 import { recordFacts, supersedeFact } from '@/lib/supabase/facts';
 import type { ChatContext, ChatMessage } from '@/types';
+import { describeLines, keepUnasked } from '@/lib/workflow/preservation';
+import { addedClaims, noInventedDetails, suppliedText, type AddedClaim } from '@/lib/workflow/fact-boundary';
 
 /** A revision the user has been shown but has not yet accepted. */
 export interface ChatProposal {
@@ -81,6 +83,17 @@ export interface ChatProposal {
    * Offered with the revision; the ones the user keeps ticked are updated on accept.
    */
   factChanges?: FactChange[];
+  /**
+   * Lines the revision dropped without being asked, put back in `nextContent`
+   * (14 Oct, Sean: a time change dropped "Confirm 12 attendees").
+   */
+  putBack?: string[];
+  /** `nextContent` as the model returned it, for "Remove them anyway". */
+  withoutPutBack?: string;
+  /** Longer passages that went without being asked, reported only. */
+  removedUnasked?: string[];
+  /** Personal details it added that nobody supplied, when the project says not to invent them. */
+  addedClaims?: AddedClaim[];
 }
 
 /** What was applied last, so it can be undone without hunting for it. */
@@ -280,6 +293,30 @@ export function useStageChat({
   );
 
   /**
+   * A revision checked against the text it was made from (14 Oct): what it
+   * dropped without being asked is put back, and — when the project says not
+   * to invent details — the personal details it added are found.
+   */
+  const checkedRevision = useCallback(
+    async (before: string, revised: string, instruction: string, said: readonly string[]) => {
+      const kept = keepUnasked(before, revised, instruction);
+      const claims = noInventedDetails(project, said)
+        ? await addedClaims({ before, after: kept.text, supplied: suppliedText(project, said), instruction, model: project.model })
+        : [];
+      return {
+        nextContent: kept.text,
+        putBack: kept.restored,
+        fields: {
+          ...(kept.restored.length ? { putBack: kept.restored, withoutPutBack: revised } : {}),
+          ...(kept.reported.length ? { removedUnasked: kept.reported } : {}),
+          ...(claims.length ? { addedClaims: claims } : {}),
+        },
+      };
+    },
+    [project]
+  );
+
+  /**
    * Draft a revision of one scope and return it for review. Writes nothing.
    *
    * The scope's text is handed to `apply-to-answer` as the version under
@@ -347,17 +384,21 @@ export function useStageChat({
         }
 
         if (!live.current) return;
+        const spliced = spliceScope(content, target, after);
+        const checked = await checkedRevision(content, spliced, text, [...messages.filter((m) => m.role === 'user').map((m) => m.content), text]);
+        if (!live.current) return;
         setProposal({
           instruction: text,
           target,
           before: describeScope(target),
-          after,
-          nextContent: spliceScope(content, target, after),
+          after: checked.putBack.length && kind === 'document' ? checked.nextContent : after,
+          nextContent: checked.nextContent,
+          ...checked.fields,
           baseContent: content,
           messageId: saved.id,
           factChanges: await withMeaningChanges(
-            factChangesFromRevision({ facts: project.facts, instruction: text, before: content, after: spliceScope(content, target, after) }),
-            { facts: project.facts, instruction: text, before: content, after: spliceScope(content, target, after), model: project.model },
+            factChangesFromRevision({ facts: project.facts, instruction: text, before: content, after: checked.nextContent }),
+            { facts: project.facts, instruction: text, before: content, after: checked.nextContent, model: project.model },
             (req) => api.revisionFacts(req)
           ),
           changeSummary:
@@ -372,7 +413,7 @@ export function useStageChat({
         if (live.current) setBusy(false);
       }
     },
-    [busy, loading, content, messages, persist, project, versionNumber]
+    [busy, loading, content, messages, persist, project, versionNumber, checkedRevision]
   );
 
   /**
@@ -404,12 +445,16 @@ export function useStageChat({
         return;
       }
       if (!live.current) return;
+      const said = messages.filter((m) => m.role === 'user').map((m) => m.content);
+      const checked = await checkedRevision(content, after, said.join('\n'), said);
+      if (!live.current) return;
       setProposal({
         instruction: 'Save the discussion as a new version',
         target,
         before: describeScope(target),
-        after,
-        nextContent: after,
+        after: checked.nextContent,
+        nextContent: checked.nextContent,
+        ...checked.fields,
         baseContent: content,
         messageId: null,
         changeSummary: response.iteration.summary?.trim() || 'Revised from the side-chat discussion.',
@@ -420,7 +465,7 @@ export function useStageChat({
     } finally {
       if (live.current) setBusy(false);
     }
-  }, [busy, messages, content, project, versionNumber, getChatContext]);
+  }, [busy, messages, content, project, versionNumber, getChatContext, checkedRevision]);
 
   /**
    * Accept the proposal: append it as a new version.
@@ -490,7 +535,13 @@ export function useStageChat({
           scope: proposal.target.label,
           previousVersionId,
           summary: proposal.changeSummary,
-          checks: checkRevision?.(proposal.nextContent) ?? [],
+          checks: [
+            ...(proposal.putBack?.length && proposal.nextContent !== proposal.withoutPutBack
+              ? [{ label: `Kept ${describeLines(proposal.putBack)}, which the change did not ask to remove`, ok: true }]
+              : []),
+            ...(proposal.addedClaims?.length ? [{ label: `Kept details you did not supply: ${describeLines(proposal.addedClaims.map((c) => c.quote))}`, ok: false }] : []),
+            ...(checkRevision?.(proposal.nextContent) ?? []),
+          ],
           auto: autoRef.current === proposal,
         });
         setProposal(null);
@@ -511,10 +562,21 @@ export function useStageChat({
   // version stays one click away on the notice.
   useEffect(() => {
     if (!autoApply || !proposal || busy || autoRef.current === proposal) return;
-    if (proposal.factChanges?.length || !appendStageVersion) return;
+    // Details nobody supplied are the user's to keep or take out (14 Oct).
+    if (proposal.factChanges?.length || proposal.addedClaims?.length || !appendStageVersion) return;
     autoRef.current = proposal;
     void accept();
   }, [autoApply, proposal, busy, appendStageVersion, accept]);
+
+  /** "Remove them anyway" / "Keep them": whether the lines put back stay put back. */
+  const togglePutBack = useCallback(() => {
+    setProposal((p) => {
+      if (!p?.putBack?.length || p.withoutPutBack === undefined) return p;
+      const kept = keepUnasked(p.baseContent ?? content, p.withoutPutBack, '').text;
+      const next = p.nextContent === p.withoutPutBack ? kept : p.withoutPutBack;
+      return { ...p, nextContent: next, after: p.target.kind === 'document' ? next : p.after };
+    });
+  }, [content]);
 
   /** "Adjust": the instruction back in the box, the proposal set aside, nothing saved. */
   const adjust = useCallback((): string => {
@@ -564,6 +626,7 @@ export function useStageChat({
     accept,
     adjust,
     discard,
+    togglePutBack,
     undo,
     dismissApplied,
     /** True when this surface can write at all. */

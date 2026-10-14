@@ -13,7 +13,7 @@ describe('the chat opens on the question the page poses (3 Oct call)', () => {
 
   it('names what the stage still needs before suggesting moving on', () => {
     const q = starterQuestions({ ...base, renderer: 'prose', requiredOpen: ['I approve this plan'] });
-    expect(q.at(-1)).toBe('What does this stage still need from me? (I approve this plan)');
+    expect(q.at(-1)).toBe('What does this stage still need from me? (Not yet: I approve this plan)');
   });
 
   it('asks what to produce on an empty stage', () => {
@@ -25,5 +25,20 @@ describe('the chat opens on the question the page poses (3 Oct call)', () => {
       expect(starterQuestions({ ...base, renderer, openRows: 2, requiredOpen: ['x'] }).length).toBeLessThanOrEqual(STARTERS_MAX);
     }
     expect(starterQuestions({ ...base, renderer: 'long_form' })[0]).toMatch(/chapter/);
+  });
+});
+
+describe('the chips agree with the chat about what exists (14 Oct, Sean: wedding speech)', () => {
+  const base = { renderer: 'prose' as const, stageLabel: 'Output', openRows: 0, nextStageLabel: 'Realign' };
+
+  it('with nothing drafted, no chip names "An output exists"', () => {
+    const chips = starterQuestions({ ...base, hasContent: false, requiredOpen: ['An output exists'] });
+    expect(chips.join(' ')).not.toMatch(/An output exists/);
+    expect(chips[0]).toBe('What should the Output stage produce for this project?');
+  });
+
+  it('an open criterion is said as not yet met', () => {
+    const chips = starterQuestions({ ...base, hasContent: true, requiredOpen: ['The deliverable: at most 100 words'] });
+    expect(chips).toContain('What does this stage still need from me? (Not yet: the deliverable: at most 100 words)');
   });
 });
