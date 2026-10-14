@@ -50,6 +50,13 @@ interface Options {
   bundles: Record<string, StageArtifactBundle>;
   /** Browsing an earlier stage must not start work on it. */
   enabled: boolean;
+  /**
+   * Go has taken over: a draft already running stops, and Go writes the stage.
+   * 14 Oct (Sean, ASPEN): the draft started when the project opened landed
+   * while Go was drafting the same stage, and Go's version was refused as
+   * "the stage changed while this revision was being made".
+   */
+  yieldToGo?: boolean;
   appendStageVersion: (
     stageId: string,
     name: string,
@@ -66,6 +73,7 @@ export function useStageGeneration({
   stage,
   bundles,
   enabled,
+  yieldToGo = false,
   appendStageVersion,
 }: Options) {
   /** The stage a draft is running for, if any. */
@@ -106,6 +114,14 @@ export function useStageGeneration({
       attempted.current.delete(left);
     }
   }, [currentStageId, cancel]);
+
+  useEffect(() => {
+    const running = inFlightFor.current;
+    if (!yieldToGo || !abortRef.current || !running) return;
+    cancel();
+    // Not drafted, so not "attempted": if Go stops first, it drafts on return.
+    attempted.current.delete(running);
+  }, [yieldToGo, cancel]);
 
   const generate = useCallback(
     async (target: StageDefinition, options?: { force?: boolean; auto?: boolean }) => {

@@ -249,3 +249,56 @@ describe('a limit on a part not in the known list (13 Oct, Sean: PINE status pac
     expect(r.subject).toBe(subject);
   });
 });
+
+describe('a part named before "must be" (14 Oct, Sean: ASPEN status pack)', () => {
+  // The constraints exactly as Sean entered them.
+  const CONSTRAINTS =
+    'As of November 2, 2026. Use only supplied facts and clearly labeled calculations. Deliver exactly three sections. Executive update must be no more than 100 words. Action tracker must contain exactly three actions with stable IDs A-001 to A-003 and specified columns. Decision log must use stable IDs D-001 to D-003 and record only the approved completion target, Elena’s authority to change it, and the approved budget.';
+  // The update from his screenshot: 81 words by whitespace.
+  const UPDATE =
+    'As of November 2, 2026, ASPEN is led by COO Maya. Delivery is 86% on-time against a 95% goal. Staffing has filled two of three maintenance vacancies; one remains. Reporting dashboard is built, but reconciliation to underlying records is incomplete. Actual expenditure to date is $41,000, against an approved budget of $90,000 and forecast total expenditure of $96,000. No budget increase has been approved. Maya estimates potential annual savings of $18,000; Finance has not verified the estimate or any realized savings.';
+  const PACK = `## 1. Executive update\n\n${UPDATE}\n\n## 2. Action tracker\n\n| ID | Action | Owner | Target | Open/Complete | Evidence |\n|---|---|---|---|---|---|\n| A-001 | Improve on-time delivery toward 95% goal | Omar | November 30, 2026 | Open | Latest on-time delivery is 86%; goal is 95%. |\n| A-002 | Fill remaining maintenance vacancy | Luis | November 20, 2026 | Open | Two of three maintenance vacancies are filled; one remains. |\n\n## 3. Decision log\n\n| ID | Decision | Status |\n|---|---|---|\n| D-001 | Completion target | Approved: December 18, 2026 |`;
+
+  it('reads the limit as the executive update’s', () => {
+    expect(parseRequirements([CONSTRAINTS]).find((r) => r.kind === 'words')).toMatchObject({ subject: 'executive update', max: 100 });
+  });
+
+  it('measures only the update: 81 words, met', () => {
+    const reqs = parseRequirements([CONSTRAINTS]);
+    const deliverable = { id: 'output', label: 'Output and evaluation', renderer: 'prose', expected_artifacts: [] } as unknown as StageDefinition;
+    const ms = requirementsForStage(deliverable, 'output', reqs).map(({ requirement, whole }) => measure(requirement, PACK, whole));
+    const words = ms.find((m) => m?.id === 'measured.words:executive update')!;
+    expect(words.label).toBe('Executive update: at most 100 words');
+    expect(words.satisfied).toBe(true);
+    expect(words.value!.startsWith('81 words')).toBe(true);
+    expect(ms.find((m) => m?.id === 'measured.sections:all')?.satisfied).toBe(true);
+  });
+
+  it('never measures a part as the whole pack when its heading is missing', () => {
+    const reqs = parseRequirements(['Executive update must be no more than 100 words.']);
+    const deliverable = { id: 'output', label: 'Output and evaluation', renderer: 'prose', expected_artifacts: [] } as unknown as StageDefinition;
+    const [only] = requirementsForStage(deliverable, 'output', reqs);
+    expect(only.whole).toBe(false);
+    expect(measure(only.requirement, `## Summary\n${UPDATE}\n\n## Tracker\ntext`, only.whole)).toBeNull();
+  });
+
+  it.each([
+    ['Section 1 (executive update) is limited to 100 words.', 'executive update'],
+    ['Section 1, the executive update, must be no more than 100 words.', 'executive update'],
+    ['Section 2 is limited to 80 words.', 'section 2'],
+    ['The executive update should be under 100 words.', 'executive update'],
+    ['The deliverable must be under 300 words.', ''],
+    ['Keep it under 300 words.', ''],
+    ['A survey kickoff brief under 30 words', ''],
+    ['Write a launch announcement (100-140 words) and an FAQ.', 'announcement'],
+  ])('%s', (text, subject) => {
+    expect(parseRequirements([text]).find((x) => x.kind === 'words')!.subject).toBe(subject);
+  });
+
+  it('measures a numbered section by position', () => {
+    const r = parseRequirements(['Section 2 is limited to 5 words.']).find((x) => x.kind === 'words')!;
+    const m = measure(r, '# Pack\n\n## One\na b c d e f g h\n\n## Two\none two three\n\n## Three\nx y z w v u', false)!;
+    expect(m.satisfied).toBe(true);
+    expect(m.value!.startsWith('3 words')).toBe(true);
+  });
+});

@@ -109,6 +109,21 @@ function tableRows(content: string | null | undefined) {
   return parseItems(content);
 }
 
+/**
+ * What saved a version, in words: the refusal says what changed the stage
+ * (14 Oct, Sean, ASPEN: "the cause of that concurrent change isn't clear").
+ */
+export function changedBy(operation: string): string {
+  if (operation === 'stage_draft') return 'the draft started when the stage opened';
+  if (operation === 'stage_regenerate') return 'a regenerated draft';
+  if (operation.startsWith('agent_')) return 'an earlier Go step';
+  if (operation.startsWith('chat_')) return 'a change from the side chat';
+  if (operation === 'stage_edit' || operation === 'user_edit') return 'your edit';
+  if (operation === 'restore') return 'a restored version';
+  if (operation.startsWith('applied_')) return 'applied suggestions';
+  return 'another save';
+}
+
 export function checkCommit(input: {
   before: string | null | undefined;
   after: string;
@@ -119,12 +134,15 @@ export function checkCommit(input: {
    * version), saving it would overwrite that change, so it is refused.
    */
   base?: string | null;
+  /** How the current version was made, to say what changed the stage. */
+  beforeOperation?: string;
 }): string | null {
   const { before, after, operation, base } = input;
   const byUser = USER_OPERATIONS.has(operation);
 
   if (base !== undefined && (base ?? '') !== (before ?? '')) {
-    return 'The stage changed while this revision was being made, so nothing was overwritten';
+    const by = input.beforeOperation ? changedBy(input.beforeOperation) : '';
+    return `The stage changed while this revision was being made${by ? ` (${by} was saved meanwhile)` : ''}, so nothing was overwritten`;
   }
 
   if (!after.trim()) {

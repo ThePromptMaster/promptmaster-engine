@@ -624,6 +624,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       after: version.content,
       operation: version.source_operation,
       ...(version.base_content !== undefined ? { base: version.base_content } : {}),
+      ...(head?.source_operation ? { beforeOperation: head.source_operation } : {}),
     });
     if (refused) {
       // The attempt stays in the history (5 Oct): what tried to save, and why

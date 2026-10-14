@@ -312,6 +312,7 @@ export function WorkflowWorkspace({
     // Never start work on a stage the user is only looking at, and never
     // before the event log has loaded — the current stage is not yet known.
     enabled: Boolean(appendStageVersion) && isCurrent && events !== null && !goDriving,
+    yieldToGo: goDriving,
     appendStageVersion: appendStageVersion ?? (async () => undefined),
   });
 
