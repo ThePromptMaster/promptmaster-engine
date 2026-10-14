@@ -1660,3 +1660,37 @@ Every prompt is told how to tell a document that was read (its text is in the pr
 context under "From <name>") from one that was not added, and that a stage which does not
 need a document does not mention it. This is a model instruction. A document that cannot
 be read is reported when it is attached, as before.
+
+### L-87 — Part limits, kept lines, invented details and one conflict question (2026-10-14)
+
+A word limit written about one part ("Executive update must be no more than 100 words",
+"Section 1 (executive update) is limited to 100 words") is measured on that part's
+section alone, found by its heading or, for "Section N", by position. A part whose
+heading is not in the text is not measured at all, rather than measured as the whole
+deliverable. Wording the parser does not recognise still measures nothing. A repair of
+a part's limit revises that part and puts every other section back in code.
+
+A revision is compared with the version it was made from, line by line, in code. A line
+counts as kept when it is there word for word, with only its numbers or times changed,
+or, for a longer line, with three quarters of its words. Short lines it dropped without
+being asked are put back where they stood. Longer passages are only reported, because a
+paragraph rewritten past recognition would otherwise appear twice. Nothing is checked
+when the instruction asks for a rewrite or a removal, or when a repair is shortening to
+meet a measured limit; then what goes is taken to be what was asked. A line that states a
+value a fact has since replaced is not put back. The matching is word-based: a line moved
+into a merged paragraph counts as kept, and a line reworded with new words counts as gone.
+
+When the brief, an applied instruction or a requirement says not to invent details,
+every prompt carries a fact boundary, and each revision is checked by one small model
+call for personal details nobody supplied. The check is the model's judgement; it is held
+in code only to quotes that are verbatim in the new text and absent from the old text and
+from what the user supplied. It can miss a detail and can flag a plain restyle. A
+revision it flags is not applied without a click. A failed check reports nothing.
+
+An instruction that conflicts with something is asked about once: the lead conflict,
+with a recorded approval first, its explanation, what keeping the record means, and two
+short labels. Any others are folded, set to their recommended side. Keeping a recorded
+approval is recommended; overriding it asks once more. Whether a fact is an approval
+rule is read by the model (`protects_approval`), not by a rule in code. An "as of" date,
+a recorded request and a repeated decision are told not to be conflicts in the prompt,
+and applied chat instructions are no longer counted as pending, in code.
