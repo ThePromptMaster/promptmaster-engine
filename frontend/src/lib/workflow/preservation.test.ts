@@ -55,3 +55,19 @@ describe('an instruction that asks for a rewrite or a removal', () => {
     expect(keepUnasked(SPEECH_BEFORE, SPEECH_AFTER, instruction).restored).toEqual([]);
   });
 });
+
+describe('a line edited in place, or named by the instruction, is not put back (14 Oct, production)', () => {
+  const before = '## Timed agenda\n\n- 9:00 a.m.–9:15 a.m. — Introduction\n- Training (0 minutes) — Maya\n- 10:15 a.m.–10:30 a.m. — Break';
+  const after = '## Timed agenda\n\n- 9:00 a.m.–9:15 a.m. — Introduction\n- 9:15 a.m.–10:15 a.m. — Training (60 minutes) — Maya facilitates\n- 10:15 a.m.–10:30 a.m. — Break';
+
+  it('an edited line still has all its words in one new line', () => {
+    expect(removedLines(before, after)).toEqual([]);
+  });
+
+  it('a line the instruction names is the instruction’s to change', () => {
+    const replaced = '## Timed agenda\n\n- 9:00 a.m.–9:15 a.m. — Introduction\n- 9:15 a.m.–10:15 a.m. — Session two\n- 10:15 a.m.–10:30 a.m. — Break';
+    expect(keepUnasked(before, replaced, 'Fix the timed agenda, including the 0-minute Training item.').restored).toEqual([]);
+    // Not named: put back, as before.
+    expect(keepUnasked(before, replaced, 'Fix the break.').restored).toEqual(['- Training (0 minutes) — Maya']);
+  });
+});
