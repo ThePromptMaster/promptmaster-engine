@@ -2,20 +2,21 @@
 
 import { useState } from 'react';
 
-import { describeWith, type Controls, type InstructionConflict } from '@/lib/workflow/instruction-conflicts';
+import { choiceLabels, gist, type Controls, type InstructionConflict } from '@/lib/workflow/instruction-conflicts';
 import { recommendedControl } from '@/lib/workflow/precedence';
-
-const KIND: Record<InstructionConflict['kind'], string> = {
-  objective: 'your objective',
-  constraint: 'your constraints',
-  decision: 'a decision you made earlier',
-  instruction: 'another pending instruction',
-};
 
 /**
  * PM-24: "user should be asked which should control when there is a real
- * conflict." Asked once per conflict, answered with one click each; nothing is
- * sent until the user continues, and the answers go on the decision trail.
+ * conflict."
+ *
+ * One question, in plain words (14 Oct, Sean, LANTERN): the screen had listed
+ * several overlapping priority choices whose buttons repeated raw instruction
+ * text, and recommended "My new instruction takes priority" against "only
+ * Elena can approve a change". Now the first conflict — a recorded approval
+ * first — is the question, said once with what keeping the record means, and
+ * answered with one click on a short label. Any others are folded below,
+ * already set to their recommended side. Overriding a recorded approval is
+ * possible, but explicit: it asks once more, and says what it means.
  */
 export function ConflictPrompt({
   instruction,
@@ -30,59 +31,119 @@ export function ConflictPrompt({
   onContinue: (choices: Controls[]) => void;
   onCancel: () => void;
 }) {
-  // The order recommends a side ("choose the higher one", 3 Oct call); the
-  // user still chooses, and can change it with one click.
-  const [choices, setChoices] = useState<(Controls | null)[]>(conflicts.map((c) => recommendedControl(c.kind)));
-  const ready = choices.every((c) => c !== null);
+  const recommended = conflicts.map((c) => recommendedControl(c.kind, c.protects_approval));
+  const [others, setOthers] = useState<(Controls | null)[]>(recommended);
+  const [confirmingOverride, setConfirmingOverride] = useState(false);
+  const lead = conflicts[0];
+  if (!lead) return null;
+  const labels = choiceLabels(lead);
+  const leadRecommended = recommended[0];
+
+  const choose = (controls: Controls) => {
+    if (controls === 'new' && lead.protects_approval && !confirmingOverride) {
+      setConfirmingOverride(true);
+      return;
+    }
+    // The rest follow their own recommendation, or this answer where the order has none.
+    onContinue([controls, ...others.slice(1).map((o) => o ?? controls)]);
+  };
+
+  const options: { value: Controls; label: string }[] = [
+    { value: 'existing', label: labels.keep },
+    { value: 'new', label: labels.override },
+  ];
+  // The recommended answer is the primary button.
+  if (leadRecommended === 'new') options.reverse();
+  const rest = conflicts.slice(1);
+
   return (
     <section aria-label="Which takes priority?" className="rounded-xl bg-[var(--surface-container-high)] px-4 py-3">
-      <p className="text-label uppercase tracking-wide text-[var(--pm-tertiary)]">
-        {conflicts.length === 1 ? 'This instruction conflicts with something' : `This instruction conflicts with ${conflicts.length} things`}
+      <p className="text-label uppercase tracking-wide text-[var(--pm-tertiary)]">Before I change this</p>
+      <p className="mt-1 text-body text-[var(--on-surface)]">
+        {lead.resolution && leadRecommended !== 'new' ? `${lead.explanation.trim()} ${lead.resolution.trim()}` : lead.explanation}
       </p>
-      <p className="mt-1 text-body text-[var(--on-surface)]">&ldquo;{instruction}&rdquo;</p>
-      <ol className="mt-3 space-y-3">
-        {conflicts.map((c, i) => (
-          <li key={`${c.kind}-${c.with_id}-${i}`}>
-            <p className="text-body text-[var(--on-surface)]">
-              It pulls against {KIND[c.kind]}: <span className="italic">{c.with_text}</span>
-            </p>
-            <p className="text-label text-[var(--on-surface-variant)]">{c.explanation}</p>
-            <div role="radiogroup" aria-label={`Which takes priority (${i + 1})`} className="mt-1.5 flex flex-wrap gap-2">
-              {(['new', 'existing'] as const).map((value) => (
-                <button
-                  key={value}
-                  role="radio"
-                  aria-checked={choices[i] === value}
-                  onClick={() => setChoices((prev) => prev.map((p, j) => (j === i ? value : p)))}
-                  className={`rounded-lg px-3 py-1.5 text-label ${
-                    choices[i] === value
-                      ? 'bg-[var(--pm-primary)] text-[var(--on-primary)]'
-                      : 'bg-[var(--surface-container-highest)] text-[var(--on-surface)]'
-                  }`}
-                >
-                  {value === 'new' ? 'My new instruction takes priority' : `Keep ${describeWith(c)}`}
-                  {recommendedControl(c.kind) === value && ' (recommended)'}
-                </button>
-              ))}
-            </div>
-          </li>
-        ))}
-      </ol>
-      {/* Pinned to the bottom of the chat thread's scroll area, so Continue is in
-          reach however many conflicts are listed and however short the window. */}
-      <div className="sticky bottom-0 -mx-4 mt-3 flex gap-2 bg-[var(--surface-container-high)] px-4 py-2">
-        <button
-          onClick={() => onContinue(choices as Controls[])}
-          disabled={!ready || busy}
-          className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label font-medium text-[var(--on-primary)] disabled:opacity-40"
-        >
-          Continue
-        </button>
-        <button onClick={onCancel} className="rounded-lg px-3 py-2 text-label text-[var(--on-surface-variant)]">
-          Cancel
-        </button>
-      </div>
-      <p className="mt-2 text-label text-[var(--on-surface-variant)]">Recommended follows PromptMaster&apos;s order — your objective, then your decisions, then your newest instruction, then the stage and the constraints. Your choice is recorded, and PromptMaster is told which one takes priority.</p>
+      <p className="mt-1 text-label text-[var(--on-surface-variant)]">Your instruction: {gist(instruction, 160)}</p>
+
+      {confirmingOverride ? (
+        <div role="alertdialog" aria-label="Override the recorded approval?" className="mt-3 rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2">
+          <p className="text-body text-[var(--on-surface)]">
+            The record says: {gist(lead.with_text, 200)} Overriding it treats the change as approved. Do this only if that approval has actually been given.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              onClick={() => choose('new')}
+              disabled={busy}
+              className="rounded-lg bg-[var(--surface-container-highest)] px-3 py-1.5 text-label text-[var(--on-surface)] disabled:opacity-40"
+            >
+              {labels.override}
+            </button>
+            <button
+              onClick={() => setConfirmingOverride(false)}
+              className="rounded-lg px-3 py-1.5 text-label text-[var(--on-surface-variant)]"
+            >
+              Back
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {options.map((o, i) => (
+            <button
+              key={o.value}
+              onClick={() => choose(o.value)}
+              disabled={busy}
+              className={`rounded-lg px-3 py-1.5 text-label disabled:opacity-40 ${
+                i === 0 && leadRecommended !== null
+                  ? 'bg-[var(--pm-primary)] text-[var(--on-primary)]'
+                  : 'bg-[var(--surface-container-highest)] text-[var(--on-surface)]'
+              }`}
+            >
+              {o.label}
+              {leadRecommended === o.value && ' (recommended)'}
+            </button>
+          ))}
+          <button onClick={onCancel} className="rounded-lg px-3 py-1.5 text-label text-[var(--on-surface-variant)]">
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {rest.length > 0 && (
+        <details className="mt-3">
+          <summary className="cursor-pointer text-label text-[var(--on-surface-variant)]">
+            Also affected ({rest.length}) — set to the recommended choice
+          </summary>
+          <ul className="mt-2 space-y-2">
+            {rest.map((c, j) => {
+              const i = j + 1;
+              const l = choiceLabels(c);
+              return (
+                <li key={`${c.kind}-${c.with_id}-${i}`}>
+                  <p className="text-label text-[var(--on-surface)]">{c.explanation}</p>
+                  <div role="radiogroup" aria-label={`Also affected (${i})`} className="mt-1 flex flex-wrap gap-2">
+                    {(['existing', 'new'] as const).map((value) => (
+                      <button
+                        key={value}
+                        role="radio"
+                        aria-checked={(others[i] ?? null) === value}
+                        onClick={() => setOthers((prev) => prev.map((p, k) => (k === i ? value : p)))}
+                        className={`rounded-lg px-2.5 py-1 text-label ${
+                          others[i] === value
+                            ? 'bg-[var(--pm-primary)] text-[var(--on-primary)]'
+                            : 'bg-[var(--surface-container-highest)] text-[var(--on-surface)]'
+                        }`}
+                      >
+                        {value === 'existing' ? l.keep : l.override}
+                      </button>
+                    ))}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </details>
+      )}
+      <p className="mt-2 text-label text-[var(--on-surface-variant)]">Your choice is recorded, and PromptMaster is told which one takes priority.</p>
     </section>
   );
 }

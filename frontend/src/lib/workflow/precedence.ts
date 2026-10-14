@@ -20,8 +20,13 @@ const rank = (key: PrecedenceKey) => PRECEDENCE.indexOf(key);
  * something: what ranks above an instruction is kept, what ranks below it
  * gives way, and two instructions are the user's to weigh.
  */
-export function recommendedControl(kind: InstructionConflict['kind']): Controls | null {
-  const theirs = rank(kind);
+export function recommendedControl(kind: InstructionConflict['kind'], protectsApproval = false): Controls | null {
+  // A recorded approval rule is kept unless the user explicitly overrides it
+  // (14 Oct, Sean, LANTERN: "My new instruction takes priority" was recommended
+  // against "only Elena can approve a change").
+  if (protectsApproval) return 'existing';
+  // An accepted fact is a decision the user made or accepted.
+  const theirs = rank(kind === 'fact' ? 'decision' : kind);
   const mine = rank('instruction');
   return theirs < mine ? 'existing' : theirs > mine ? 'new' : null;
 }

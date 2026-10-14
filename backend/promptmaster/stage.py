@@ -203,6 +203,15 @@ _PROMPT_KIND_RULE = (
 STAGE_PROSE_MAX_TOKENS = 12_000
 
 
+DECISION_LOG_RULE = (
+    "DECISION LOG: record every decision the material states — each approved value or amount "
+    "(an approved date, an approved budget) and each rule about who may approve a change "
+    "(\"only Elena can approve a change\"). A request nobody has approved is listed as a request, "
+    "marked unapproved, never as a decision. That something has NOT been approved (\"no budget "
+    "increase is approved\") is a status of the request or the budget, not an approved decision."
+)
+
+
 def build_stage_prompt(
     inputs: PMInput,
     stage: StageDescriptor,
@@ -297,6 +306,13 @@ def build_stage_prompt(
         "General knowledge is about the subject, never about the people in it: a memory, habit, "
         "trait or event of a real person comes only from what the user supplied.",
     ]
+    # 14 Oct (Sean, LANTERN): the decision log left out Elena's sole authority
+    # and the $50,000 approved budget, and listed "No budget increase is
+    # approved" among the approved decisions.
+    asked = " ".join([inputs.objective, inputs.constraints, inputs.output_format, inputs.context or ""]).lower()
+    if "decision log" in asked:
+        parts.append(DECISION_LOG_RULE)
+
     # A Diagnosis draft spent much of itself on Turnaround Options and the
     # 12-month plan — two stages later — and a later check had to flag it
     # (4 Oct). Each stage does its own work; the later ones get theirs.

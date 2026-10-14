@@ -23,7 +23,7 @@ import { addedClaims, noInventedDetails, suppliedText } from '@/lib/workflow/fac
 import { isDone } from '@/lib/workflow/types';
 import { appliedFindingsVersion, carryUserFields, findingsInstruction, reviseWithFindings } from '@/lib/workflow/apply-findings';
 import { findInstructionConflicts } from '@/lib/workflow/conflict-trail';
-import { describeWith, type InstructionConflict } from '@/lib/workflow/instruction-conflicts';
+import { choiceLabels, gist, type InstructionConflict } from '@/lib/workflow/instruction-conflicts';
 import { defaultOutlineForm, deriveOutlineItems, sectionRecords } from '@/lib/workflow/derived-outline';
 import { confirmableProposals, itemSchemaFor, parseItems, proposableStatuses, rendererHoldsItems, serializeItems } from '@/lib/workflow/stage-artifact';
 import { enoughWorksFound, lookupQueries, recordLine, rowsFromSearch } from '@/lib/workflow/lookup';
@@ -229,15 +229,19 @@ function manuscriptMissing(key: string, target: StageDefinition): StepOutcome {
 }
 
 function askWhichTakesPriority(key: string, params: Record<string, unknown>, instruction: string, conflicts: InstructionConflict[]): StepOutcome {
+  // One plain question with two short answers (14 Oct, Sean, LANTERN): the
+  // approval a record protects first, and what keeping it means.
   const c = conflicts[0];
+  const { keep, override } = choiceLabels(c);
   const question =
-    `Before I change this: "${instruction.replace(/\s+/g, ' ').slice(0, 200)}" conflicts with ${describeWith(c)}. ` +
-    `${c.explanation.trim()} Which should take priority?`;
+    `Before I change ${gist(instruction, 120)}: ${c.explanation.trim()}` +
+    (c.resolution?.trim() ? ` ${c.resolution.trim()}` : '') +
+    (c.protects_approval ? ' Overriding the recorded approval treats the change as approved; choose it only if that approval has been given.' : ' Which should take priority?');
   return done(key, {
     status: 'blocked', blockKind: 'needs_decision', toolsUsed: ['model'], changes: {},
     output: question, params: { ...params, conflict_question: true },
     stop: { status: 'awaiting_decision', reason: question },
-    needs: { kind: 'answer_question', question },
+    needs: { kind: 'answer_question', question, choices: [keep, override] },
   });
 }
 

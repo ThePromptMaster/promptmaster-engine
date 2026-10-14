@@ -365,7 +365,9 @@ export function ChatPanel({
       return;
     }
     setChecking(true);
-    const recent = chat.messages.filter((m) => m.role === 'user' && m.mode === 'instruct').map((m) => m.content);
+    // Only instructions not yet applied are pending: an applied one is the
+    // current version, and was counted twice (14 Oct, Sean, LANTERN).
+    const recent = chat.messages.filter((m) => m.role === 'user' && m.mode === 'instruct' && m.appliedVersionId == null).map((m) => m.content);
     const conflicts = await findInstructionConflicts({
       project, stageId, instruction: text, recentInstructions: recent, headVersionId: headVersion?.id ?? null,
       stage: { label: stageLabel, instruction: getChatContext?.().stage_instruction },

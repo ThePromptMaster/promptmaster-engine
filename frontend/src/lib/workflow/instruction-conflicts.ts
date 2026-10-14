@@ -22,7 +22,7 @@
 
 import { CONFLICT_AXES, type ConflictAxis } from './combine';
 
-export type ConflictKind = 'objective' | 'constraint' | 'decision' | 'instruction';
+export type ConflictKind = 'objective' | 'constraint' | 'decision' | 'fact' | 'instruction';
 
 export interface InstructionConflict {
   kind: ConflictKind;
@@ -30,6 +30,13 @@ export interface InstructionConflict {
   with_text: string;
   explanation: string;
   source: 'rule' | 'model';
+  /** The two choices in a few plain words (14 Oct, Sean: the buttons repeated raw instruction text). */
+  keep_label?: string;
+  override_label?: string;
+  /** What keeping the record means, in one sentence. */
+  resolution?: string;
+  /** The record says who must approve a change, and the instruction would treat an unapproved one as approved. */
+  protects_approval?: boolean;
 }
 
 export interface ConflictSource {
@@ -95,6 +102,7 @@ const WHAT: Record<ConflictKind, string> = {
   objective: 'the objective',
   constraint: 'the project constraints',
   decision: 'a decision you made earlier',
+  fact: 'an accepted fact',
   instruction: 'another pending instruction',
 };
 
@@ -157,7 +165,17 @@ export function mergeConflicts(rule: InstructionConflict[], model: InstructionCo
     const r = reasons.get(c)!;
     c.explanation = [...r.model, ...r.rule].join(' ');
   }
-  return out.slice(0, 5);
+  // The model's labels and approval flag are kept on whichever finding leads.
+  for (const c of model) {
+    const kept = byKey.get(c.with_id ? `${c.kind}:${c.with_id}` : c.kind);
+    if (!kept) continue;
+    kept.keep_label ||= c.keep_label;
+    kept.override_label ||= c.override_label;
+    kept.resolution ||= c.resolution;
+    kept.protects_approval ||= c.protects_approval;
+  }
+  // The approval a record protects is the question, so it comes first (14 Oct).
+  return [...out.filter((c) => c.protects_approval), ...out.filter((c) => !c.protects_approval)].slice(0, 5);
 }
 
 export type Controls = 'new' | 'existing';
@@ -167,13 +185,58 @@ export function describeWith(c: InstructionConflict): string {
 }
 
 /**
+ * What a conflict is with, in a few words and without quoting it: "the
+ * constraints", "the recorded approval rule". 14 Oct (Sean, LANTERN): a
+ * button read Keep ""Update LANTERN as of November 12…" takes precedence over
+ * the constraints" — a quoted instruction inside a quoted decision, cut off.
+ */
+export function nameOf(c: InstructionConflict): string {
+  if (c.protects_approval) return 'the recorded approval';
+  switch (c.kind) {
+    case 'objective': return 'the objective';
+    case 'constraint': return 'the constraints';
+    case 'decision': return 'your earlier decision';
+    case 'fact': return 'the recorded fact';
+    default: return 'the earlier instruction';
+  }
+}
+
+/** The two buttons: the model's short labels, or plain ones of our own. */
+export function choiceLabels(c: InstructionConflict): { keep: string; override: string } {
+  return {
+    keep: c.keep_label?.trim() || (c.protects_approval ? 'Keep the approved value' : `Keep ${nameOf(c)}`),
+    override: c.override_label?.trim() || (c.protects_approval ? 'Override the recorded approval' : 'Follow the new instruction'),
+  };
+}
+
+/** An instruction shortened at a word, for a sentence about it: never cut mid-word, never quoted twice. */
+export function gist(text: string, max = 120): string {
+  const t = text.replace(/[“”"]/g, '').replace(/\s+/g, ' ').trim();
+  if (t.length <= max) return t;
+  // As many whole sentences as fit; else whole words.
+  let out = '';
+  for (const sentence of t.match(/[^.!?]+[.!?]+(?=\s|$)/g) ?? []) {
+    const next = `${out} ${sentence.trim()}`.trim();
+    if (next.length > max) break;
+    out = next;
+  }
+  return out.length >= 20 ? out : `${t.slice(0, max).replace(/\s+\S*$/, '')}…`;
+}
+
+/**
  * The sentence the model is given with the instruction, so it knows what the
  * user decided — rather than being handed two contradictory orders and left
  * to pick.
  */
 export function precedenceNote(c: InstructionConflict, instruction: string, controls: Controls): string {
-  const other = describeWith(c);
+  const other = nameOf(c);
+  const what = gist(c.with_text, 200);
+  if (c.protects_approval) {
+    return controls === 'new'
+      ? `The user has explicitly overridden the recorded approval rule (${what}) for this instruction; follow the instruction.`
+      : `Keep what the record says is approved (${what}). ${c.resolution?.trim() || 'Record what the instruction asks for as a request that has not been approved, and change nothing that depends on the approval.'}`;
+  }
   return controls === 'new'
-    ? `The user has decided this instruction takes precedence over ${other} ("${c.with_text.slice(0, 200)}").`
-    : `The user has decided ${other} ("${c.with_text.slice(0, 200)}") takes precedence: apply the instruction only as far as it is consistent with it.`;
+    ? `The user has decided this instruction takes precedence over ${other} (${what}).`
+    : `The user has decided ${other} (${what}) takes precedence: apply the instruction only as far as it is consistent with it.`;
 }
