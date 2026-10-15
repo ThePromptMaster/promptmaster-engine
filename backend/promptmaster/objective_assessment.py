@@ -83,6 +83,9 @@ _ASSESS_INSTRUCTION = (
 class Blocker(BaseModel):
     need: str = Field(max_length=300)
     kind: BlockerKind = "data_missing"
+    #: One question to the user that would supply it, in their terms (Sean, 13
+    #: Oct, workshop: "PromptMaster left me figuring out what to provide next").
+    ask: str = Field(default="", max_length=300)
 
 
 class CriterionResult(BaseModel):
@@ -172,7 +175,8 @@ def build_assessment_prompt(
         '  "outcome": "met" | "not_met" | "partly",\n'
         '  "reason": "one sentence",\n'
         '  "basis_quote": "a short passage copied exactly from the deliverable that shows the outcome",\n'
-        '  "blockers": [{"need": "exactly what is missing", "kind": "data_missing|tool_missing|source_missing|needs_decision"}],\n'
+        '  "blockers": [{"need": "exactly what is missing — with the value or limit it must meet when the recorded figures give one", '
+        '"ask": "one question to the user that would supply it", "kind": "data_missing|tool_missing|source_missing|needs_decision"}],\n'
         '  "performed": ["S1", "S3"],\n'
         '  "proposed_next": ["each next step or investigation the text names but the record does not show done"],\n'
         '  "criteria": [{"requirement": "one thing the objective, an accepted requirement or a constraint asks for", '
@@ -181,6 +185,11 @@ def build_assessment_prompt(
         "}\n"
         # 10 Oct (Sean, emails 3 and 8): a heading is not evidence; a length you
         # cannot see (pages when printed) is not checked, and saying so is honest.
+        # 13 Oct (Sean, workshop): "For 20 lunches within $240, clearly explain
+        # that we need a confirmed price of $12 per person or less."
+        "A blocker is actionable: where the recorded figures fix what the missing value must be, say so with "
+        "the calculation (a confirmed lunch price of $12 per person or less: $240 approved / 20 attendees), "
+        "and ask for exactly that value. Use only figures the record gives.\n"
         "List each requirement separately in \"criteria\" — every part of the objective, every accepted "
         "requirement and constraint — at most 12. Mark one \"not_checked\" when the text alone cannot show it "
         "(how many pages it prints to, how it looks, anything outside the text). A heading is not a basis.\n"
@@ -323,6 +332,53 @@ def _is_request(requirement: str, requests: list[str]) -> bool:
     return any(len(words & _content_words(r)) >= max(4, len(words) // 2) for r in requests)
 
 
+_AMOUNT = re.compile(r"(?<![\w.])\$?(\d[\d,]*(?:\.\d+)?)(?![\d])")
+#: A figure with what it is held to: "$12 per person or less", "under $240".
+_FIGURE_PHRASE = re.compile(
+    r"(?:\s*(?:of|at|under|below|above|over|no more than|at most|at least|up to|within)\s+)?"
+    r"\$?\d[\d,]*(?:\.\d+)?(?:\s*(?:per|a|an|each)\s+\w+)?(?:\s+or\s+(?:less|fewer|more|lower|higher|under|below))?",
+    re.I,
+)
+
+
+def _amounts(text: str) -> set[float]:
+    out: set[float] = set()
+    for m in _AMOUNT.finditer(text):
+        try:
+            out.add(float(m.group(1).replace(",", "")))
+        except ValueError:
+            pass
+    return out
+
+
+def _derivable(value: float, record: set[float]) -> bool:
+    """On the record, or one step of arithmetic on two of its figures."""
+    if any(abs(value - r) < 0.005 for r in record):
+        return True
+    nums = sorted(record)[:60]
+    for a in nums:
+        for b in nums:
+            for v in (a + b, a - b, a * b, a / b if b else None):
+                if v is not None and abs(v - value) < 0.005:
+                    return True
+    return False
+
+
+def _figures_from_record(text: str, record: set[float]) -> str:
+    """`text` with any figure removed that the record neither gives nor yields in one step."""
+    def keep(m: re.Match[str]) -> str:
+        found = _amounts(m.group(0))
+        return m.group(0) if all(_derivable(v, record) for v in found) else ""
+    out = _FIGURE_PHRASE.sub(keep, text)
+    return re.sub(r"\s+([,.;:)])", r"\1", re.sub(r"\(\s*\)|\s{2,}", " ", out)).strip()
+
+
+def record_text(inputs: PMInput) -> str:
+    """Where a blocker's figures may come from: the brief, the context and the accepted facts."""
+    facts = "\n".join(f.statement for f in (inputs.facts or []))
+    return "\n".join([inputs.objective, inputs.constraints, inputs.context or "", facts])
+
+
 def parse_assessment(
     result: object,
     content: str,
@@ -330,6 +386,7 @@ def parse_assessment(
     failed_checks: list[str] | None = None,
     measured: list[str] | None = None,
     requests: list[str] | None = None,
+    record: str = "",
 ) -> ObjectiveAssessment:
     if not isinstance(result, dict):
         return ObjectiveAssessment(outcome="partly", reason="The check did not come back in a usable form.")
@@ -349,13 +406,19 @@ def parse_assessment(
         outcome = "partly"
 
     blockers: list[Blocker] = []
+    record_numbers = _amounts(f"{record}\n{content}")
     for b in result.get("blockers") or []:
         if not isinstance(b, dict):
             continue
         need = " ".join(str(b.get("need") or "").split())[:300]
+        ask = " ".join(str(b.get("ask") or "").split())[:300]
         kind = b.get("kind") if b.get("kind") in ("data_missing", "tool_missing", "source_missing", "needs_decision") else "data_missing"
         if need:
-            blockers.append(Blocker(need=need, kind=kind))
+            # A figure the record does not give, and no one step of arithmetic
+            # on its figures gives, is not shown: a threshold the model made
+            # up would send the user after the wrong number.
+            need, ask = _figures_from_record(need, record_numbers), _figures_from_record(ask, record_numbers)
+            blockers.append(Blocker(need=need, kind=kind, ask=ask))
     if outcome == "met":
         blockers = []
 
@@ -476,12 +539,12 @@ async def assess_objective(
     system, user = build_assessment_prompt(inputs, deliverable_label, content, steps, success_criterion, failed_checks, measured)
     result, _usage = await client.generate_json(prompt=user, system=system, temperature=0, max_tokens=1_600, model=model)
     requests = request_facts(inputs)
-    parsed = parse_assessment(result, content, steps, failed_checks, measured, requests)
+    parsed = parse_assessment(result, content, steps, failed_checks, measured, requests, record_text(inputs))
     # A "met" lost only for want of a quote is asked once more before it can
     # pause a run (11 Oct: the run stopped on "not met" for exactly this).
     if _needs_evidence_retry(result, parsed, failed_checks):
         again, _usage = await client.generate_json(
             prompt=user + EVIDENCE_RETRY, system=system, temperature=0, max_tokens=1_600, model=model
         )
-        parsed = parse_assessment(again, content, steps, failed_checks, measured, requests)
+        parsed = parse_assessment(again, content, steps, failed_checks, measured, requests, record_text(inputs))
     return parsed

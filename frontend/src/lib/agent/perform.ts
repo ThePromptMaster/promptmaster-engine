@@ -1632,15 +1632,19 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         const performed = assessment.performed.length ? ` Done: ${assessment.performed.join('; ')}.` : ' No computation or investigation was recorded as performed.';
         const proposed = assessment.proposed_next.length ? ` Proposed, not done: ${assessment.proposed_next.join('; ')}.` : '';
         const line = pausedLine(assessment);
-        const blocked = assessment.blockers.length > 0;
+        // A blocker the user can answer is asked, not only reported (13 Oct,
+        // Sean, workshop): the answer is recorded as a fact and the judged
+        // stage revised with it (`answer` in use-go-loop).
+        const asks = [...new Set(assessment.blockers.map((b) => b.ask?.trim()).filter((a): a is string => !!a))];
+        const blocked = assessment.blockers.length > 0 && !asks.length;
         // What was found unmet, by name, and what each button does (11 Oct,
         // survey brief: a pause that named nothing and asked nothing).
         const failed = unmetItems(assessment);
         return done(key, {
           ...judged, status: 'succeeded',
           output: `${line}${performed}${proposed} ${describeBasis(basis)}${assessment.model_note ? ` The check's own words: "${assessment.model_note}"` : ''}`,
-          stop: { status: blocked ? 'blocked' : 'awaiting_decision', reason: line },
-          ...(blocked ? {} : {
+          stop: { status: blocked ? 'blocked' : 'awaiting_decision', reason: asks.length ? `${line} ${asks.join(' ')}` : line },
+          ...(blocked ? {} : asks.length ? { needs: { kind: 'answer_question' as const, question: `${line} ${asks.join(' ')}` } } : {
             needs: {
               kind: 'objective_check' as const, stageId: holder?.id ?? ctx.stage.id,
               finding: failed.length ? 'unmet' as const : 'no_evidence' as const, items: failed,

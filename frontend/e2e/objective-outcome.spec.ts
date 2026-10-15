@@ -71,3 +71,44 @@ test('a finished cycle with an unmet objective pauses on its blocker; chat answe
   await expect(row).toContainText('Paused', { timeout: 15_000 });
   await page.screenshot({ path: test.info().outputPath('02-paused-on-the-list.png') });
 });
+
+/**
+ * 13 Oct (Sean, workshop): "Make blockers actionable. For 20 lunches within
+ * $240, clearly explain that we need a confirmed price of $12 per person or
+ * less … Make it obvious … exactly where I should respond." The blocker says
+ * the value needed, the notice asks for it, and the answer — recorded as a
+ * fact — lets Go finish.
+ */
+test('a blocker says what value is needed and is answered where it is shown', async ({ page }) => {
+  test.setTimeout(150_000);
+  const id = await createProject(page, {
+    workflow: 'Single output',
+    name: 'E2E actionable blocker',
+    objective: 'Plan lunch for 20 attendees within the approved $240 [[mock:plan=declare_objective_complete]] [[mock:objective=ask]]',
+  });
+  await pressTransition(page); // input
+  await pressTransition(page); // review
+  await expect(page.getByText('Mock output').first()).toBeVisible({ timeout: 30_000 });
+
+  const panel = goPanel(page);
+  await panel.getByRole('button', { name: 'Set up Go' }).click();
+  await panel.getByRole('radio', { name: /^Autonomous/ }).click();
+  await panel.getByRole('button', { name: /^Go$/ }).click();
+  await page.getByRole('button', { name: 'Authorize and go' }).click();
+
+  const paused = page.getByRole('status', { name: 'Objective not met' });
+  await expect(paused).toContainText('$12 per person or less ($240 approved / 20 attendees)', { timeout: 30_000 });
+  const form = paused.getByRole('form', { name: 'Answer what Go is waiting for' });
+  await expect(form).toContainText('Respond here: What is the confirmed lunch price per person, including taxes and fees?');
+  await paused.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: test.info().outputPath('01-blocker-asks-for-the-value.png') });
+
+  await form.getByRole('textbox').fill('$11 per person including taxes and fees');
+  await form.getByRole('button', { name: 'Record it and continue' }).click();
+
+  // The answer is a project fact, and the objective is met with it.
+  await expect.poll(async () => (await serviceSelect('project_facts', `project_id=eq.${id}&select=statement`)).map((f: { statement: string }) => f.statement).join(' '), { timeout: 30_000 })
+    .toContain('$11 per person');
+  await expect(paused).toBeHidden({ timeout: 60_000 });
+  await page.screenshot({ path: test.info().outputPath('02-answered-and-cleared.png') });
+});

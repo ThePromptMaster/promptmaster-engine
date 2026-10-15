@@ -344,3 +344,32 @@ def test_the_check_is_told_a_request_is_not_a_requirement():
 def test_done_is_written_in_the_users_words():
     a = parse_assessment({"outcome": "not_met", "reason": "r", "performed": ["S1"]}, "x", [RunStep(action_key="recheck_stage", execution_label="designed")])
     assert a.performed == ["Repair a reopened stage (draft written)"]
+
+
+# 13 Oct (Sean, workshop): "For 20 lunches within $240, clearly explain that we
+# need a confirmed price of $12 per person or less."
+_WORKSHOP_RECORD = "Attendance is now 20. The approved budget is $240. No cheaper lunch price is confirmed."
+
+
+def _blocked(need: str, ask: str) -> dict:
+    return {"outcome": "not_met", "reason": "No lunch plan fits.", "blockers": [{"need": need, "ask": ask, "kind": "source_missing"}]}
+
+
+def test_a_blocker_states_the_value_needed_and_asks_for_it():
+    a = parse_assessment(
+        _blocked("a confirmed lunch price of $12 per person or less ($240 approved / 20 attendees)", "What is the confirmed lunch price per person, including taxes and fees?"),
+        "Lunch: not confirmed.", [], record=_WORKSHOP_RECORD,
+    )
+    assert a.blockers[0].need == "a confirmed lunch price of $12 per person or less ($240 approved / 20 attendees)"
+    assert a.blockers[0].ask.startswith("What is the confirmed lunch price")
+
+
+def test_a_figure_the_record_does_not_give_is_not_shown():
+    a = parse_assessment(_blocked("a confirmed lunch price of $9.50 per person or less", "Can you confirm a price of $9.50 or less?"), "x", [], record=_WORKSHOP_RECORD)
+    assert "9.50" not in a.blockers[0].need and "9.50" not in a.blockers[0].ask
+    assert a.blockers[0].need.startswith("a confirmed lunch price")
+
+
+def test_the_check_is_asked_for_an_actionable_blocker():
+    _, user = build_assessment_prompt(PMInput(objective="Plan the workshop", mode="analyst"), "Output", "x", [])
+    assert '"ask"' in user and "A blocker is actionable" in user

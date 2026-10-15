@@ -23,7 +23,8 @@ export interface ObjectiveAssessment {
   outcome: 'met' | 'not_met' | 'partly';
   reason: string;
   basis_quote: string;
-  blockers: { need: string; kind: BlockerKind }[];
+  /** `ask`: one question that would supply it (13 Oct, workshop); absent on older records. */
+  blockers: { need: string; kind: BlockerKind; ask?: string }[];
   performed: string[];
   proposed_next: string[];
   /** Each requirement the check considered (10 Oct, email 6.5); absent on older records. */
