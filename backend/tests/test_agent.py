@@ -686,3 +686,11 @@ def test_every_prompt_tells_read_documents_from_missing_ones():
 
     assert "that document has been read. Never call it missing" in m
     assert "say it is not in the project, not that you read it" in m
+
+
+def test_a_question_for_a_missing_value_states_the_limit_it_must_meet():
+    """13 Oct (Sean, workshop): Go asked "Which should the planning pack say?"
+    when 20 lunches did not fit $240, and left the $12-per-person arithmetic to him."""
+    from promptmaster.agent import _NEXT_ACTION_INSTRUCTION
+    assert "$12 per person or less ($240 approved / 20 attendees)" in _NEXT_ACTION_INSTRUCTION
+    assert "Use only figures the record gives" in _NEXT_ACTION_INSTRUCTION
