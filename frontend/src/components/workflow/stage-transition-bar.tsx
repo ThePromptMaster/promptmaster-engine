@@ -69,6 +69,14 @@ interface Props {
    * "nothing is outstanding" for the project (6 Oct).
    */
   elsewhere?: readonly string[];
+  /**
+   * What is running instead of the primary action ("Checking this stage…").
+   * The button stays where it was, disabled and saying so, rather than
+   * vanishing (14 Oct, Sean: "This button seems to not work sometimes").
+   */
+  working?: string | null;
+  /** What the last action did, beside the bar ("Checked — the results are above"). */
+  done?: string | null;
 }
 
 /**
@@ -93,6 +101,8 @@ export function StageTransitionBar({
   more = [],
   nextStageLabel = null,
   elsewhere = [],
+  working = null,
+  done = null,
 }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [whyOpen, setWhyOpen] = useState(false);
@@ -242,6 +252,12 @@ export function StageTransitionBar({
         >
           <div className="mr-auto min-w-0">
             <span className="block text-label text-[var(--on-surface-variant)]">{statusLine}</span>
+            {done && !working && (
+              <span role="status" className="mt-0.5 flex items-center gap-1 text-label text-[var(--on-surface)]">
+                <span aria-hidden className="material-symbols-outlined text-[16px] text-[var(--pm-success)]">check_circle</span>
+                {done}
+              </span>
+            )}
             {primary.reason && (
               <span className="mt-0.5 block text-label text-[var(--on-surface-variant)] opacity-80">
                 {primary.reason}
@@ -324,6 +340,16 @@ export function StageTransitionBar({
             </div>
           )}
 
+          {primary.kind === 'none' && working && (
+            <button
+              disabled
+              aria-busy
+              className="inline-flex items-center gap-2 rounded-lg bg-[var(--pm-primary)] px-5 py-2 text-title text-[var(--on-primary)] opacity-60"
+            >
+              <span aria-hidden className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span>
+              {working}
+            </button>
+          )}
           {primary.kind !== 'none' && (
             <button
               onClick={() => {
