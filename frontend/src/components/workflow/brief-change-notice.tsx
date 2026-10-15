@@ -185,7 +185,12 @@ function listOf(names: readonly string[]): string {
 /** What the user did that started it, in their words. */
 function firstStep(event: WorkflowEvent): string {
   if (event.type === 'stage_version_saved') return 'Revision saved';
-  if (event.type === 'brief_changed') return event.payload?.field === 'facts' ? 'Facts recorded' : event.payload?.kind === 'reopened' ? 'Stage reopened' : 'Brief changed';
+  if (event.type === 'brief_changed') {
+    // An answer to Go, or "Have Go fix …", reopens the deliverable as a facts
+    // change; no fact was recorded by it (15 Oct, production pass).
+    if (event.payload?.kind === 'answer') return /^fix/i.test(event.reason ?? '') ? 'Fix requested' : 'Your answer recorded';
+    return event.payload?.field === 'facts' ? 'Facts recorded' : event.payload?.kind === 'reopened' ? 'Stage reopened' : 'Brief changed';
+  }
   if (event.type === 'stage_returned') return 'Went back';
   return 'Stage completed again';
 }
