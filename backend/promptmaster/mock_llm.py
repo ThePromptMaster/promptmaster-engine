@@ -556,6 +556,14 @@ def _json_reply(system: str, prompt: str) -> dict:
             return {"outcome": "met", "reason": "Mock: the brief satisfies all of the requirements.",
                     "basis_quote": first[:120], "blockers": [], "performed": [], "proposed_next": [],
                     "criteria": [{"requirement": "Exactly four sections", "verdict": "not_met", "basis": "It has two."}]}
+        if "[[mock:objective=ask]]" in prompt and "$11" not in prompt.split("--- THE DELIVERABLE:", 1)[0]:
+            # 13 Oct (Sean, workshop): a blocker that says what value is needed and asks for it,
+            # until the answer ($11) is among the accepted facts.
+            return {"outcome": "not_met", "reason": "Mock: no lunch price fits.", "basis_quote": first[:120],
+                    "blockers": [{"need": "a confirmed lunch price of $12 per person or less ($240 approved / 20 attendees)",
+                                  "ask": "What is the confirmed lunch price per person, including taxes and fees?",
+                                  "kind": "source_missing"}],
+                    "performed": [], "proposed_next": []}
         if "[[mock:objective=unmet]]" in prompt:
             return {"outcome": "not_met", "reason": "Mock: the log says the criterion is not met.",
                     "basis_quote": first[:120],

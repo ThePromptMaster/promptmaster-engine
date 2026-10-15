@@ -1831,6 +1831,11 @@ export function WorkflowWorkspace({
                   assessment={objectiveAssessment}
                   onResume={appendStageVersion ? () => void go.go() : undefined}
                   resumeDisabled={go.active}
+                  onAnswer={
+                    appendStageVersion && go.run && !go.run.ended_at && go.run.status === 'awaiting_decision' && go.run.needs?.kind === 'answer_question'
+                      ? (text) => go.answer(text)
+                      : undefined
+                  }
                 />
               </div>
             )}

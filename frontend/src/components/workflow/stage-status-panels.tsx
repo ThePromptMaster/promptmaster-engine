@@ -96,11 +96,21 @@ export function ObjectivePausedNotice({
   assessment,
   onResume,
   resumeDisabled = false,
+  onAnswer,
 }: {
   assessment: ObjectiveAssessment;
   onResume?: () => void;
   resumeDisabled?: boolean;
+  /**
+   * Answer the blocker here, where it is shown: the answer is recorded as a
+   * fact, the judged stage revised with it and Go carries on (13 Oct, Sean,
+   * workshop: "Make it obvious … exactly where I should respond").
+   */
+  onAnswer?: (text: string) => Promise<void> | void;
 }) {
+  const ask = assessment.blockers.map((b) => b.ask?.trim()).find(Boolean);
+  const [answer, setAnswer] = useState('');
+  const [sending, setSending] = useState(false);
   return (
     <section role="status" aria-label="Objective not met" className="rounded-xl bg-[var(--surface-container-high)] px-5 py-4">
       <div className="flex flex-wrap items-start gap-3">
@@ -120,6 +130,41 @@ export function ObjectivePausedNotice({
               </ul>
             </>
           )}
+          {ask && onAnswer && (
+            <form
+              aria-label="Answer what Go is waiting for"
+              className="mt-3 rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!answer.trim() || sending) return;
+                setSending(true);
+                void Promise.resolve(onAnswer(answer.trim())).finally(() => setSending(false));
+              }}
+            >
+              <label htmlFor="objective-answer" className="text-label font-semibold text-[var(--on-surface)]">
+                Respond here: {ask}
+              </label>
+              <div className="mt-1.5 flex flex-wrap gap-2">
+                <input
+                  id="objective-answer"
+                  value={answer}
+                  onChange={(e) => setAnswer(e.target.value.slice(0, 600))}
+                  className="min-w-0 flex-1 rounded-lg bg-[var(--surface-container-low)] px-3 py-1.5 text-body text-[var(--on-surface)]"
+                  placeholder="Your answer"
+                />
+                <button
+                  type="submit"
+                  disabled={!answer.trim() || sending || resumeDisabled}
+                  className="rounded-lg bg-[var(--pm-primary)] px-3 py-1.5 text-label text-[var(--on-primary)] disabled:opacity-50"
+                >
+                  {sending ? 'Recording…' : 'Record it and continue'}
+                </button>
+              </div>
+              <p className="mt-1 text-label text-[var(--on-surface-variant)]">
+                Recorded as a project fact; Go revises the work with it and checks the objective again.
+              </p>
+            </form>
+          )}
           <p className="mt-2 text-label text-[var(--on-surface-variant)]">
             <span className="font-semibold text-[var(--on-surface)]">Done: </span>
             {assessment.performed.length ? assessment.performed.map(readablePerformed).join('; ') : 'no computation or investigation was recorded as performed'}
@@ -131,7 +176,7 @@ export function ObjectivePausedNotice({
             </p>
           )}
         </div>
-        {onResume && (
+        {onResume && !(ask && onAnswer) && (
           <button
             onClick={onResume}
             disabled={resumeDisabled}
