@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { collapseSteps, deriveExecutionLabel } from './labels';
+import { collapseSteps, deriveExecutionLabel, readablePerformed } from './labels';
 
 const row = (action_key: string, status = 'succeeded', output = '', execution_label: string | null = null) =>
   ({ action_key, status, output, execution_label }) as Parameters<typeof collapseSteps>[0][number];
@@ -33,5 +33,13 @@ describe('collapseSteps: a repeated step is one row with a count (2 Oct, screens
 describe('a repair has a label (Sean, 10 Oct, email 7.5)', () => {
   it('is a draft written, nothing run', () => {
     expect(deriveExecutionLabel('recheck_stage', { blocked: false })).toBe('designed');
+  });
+});
+
+describe('what an objective check says was done (Sean, 14 Oct)', () => {
+  it('reads an older record in the user\'s words', () => {
+    expect(readablePerformed('recheck_stage (designed)')).toBe('Repair a reopened stage (draft written)');
+    expect(readablePerformed('run_computation (code_executed)')).toBe('Run a computation (code executed)');
+    expect(readablePerformed('Repair a reopened stage (draft written)')).toBe('Repair a reopened stage (draft written)');
   });
 });

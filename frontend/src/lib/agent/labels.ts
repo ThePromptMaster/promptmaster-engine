@@ -20,7 +20,7 @@
  */
 
 import type { AgentRun, AgentStep, ExecutionLabel } from '@/types/agent';
-import { actionFor, INTERPRET_STEP } from './actions';
+import { actionFor, actionLabel, INTERPRET_STEP } from './actions';
 
 export function deriveExecutionLabel(
   actionKey: string,
@@ -116,4 +116,16 @@ export function collapseSteps<T extends Pick<AgentStep, 'action_key' | 'status' 
     }
   }
   return out;
+}
+
+/**
+ * "recheck_stage (designed)", as an objective check recorded what was done
+ * before 15 Oct, in the user's words: "Repair a reopened stage (draft
+ * written)" (Sean, 14 Oct). Anything else is returned as it is.
+ */
+export function readablePerformed(text: string): string {
+  const m = /^([a-z_]+) \(([a-z_]+)\)$/.exec(text.trim());
+  if (!m) return text;
+  const label = LABEL_TEXT[m[2] as ExecutionLabel];
+  return `${actionLabel(m[1])} (${label ? label.text.toLowerCase() : m[2].replace(/_/g, ' ')})`;
 }

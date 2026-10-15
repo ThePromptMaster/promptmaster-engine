@@ -27,6 +27,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from .agent_actions import ACTIONS_BY_KEY
 from .llm_client import OpenRouterClient
 from .project_context import CHECK_CONTEXT_MAX, brief_lines, context_block
 from .schemas import PMInput
@@ -67,7 +68,15 @@ _ASSESS_INSTRUCTION = (
     "A result the deliverable labels as resting on an unverified assumption ('assumed, not "
     "verified', 'conditional on') does not meet the objective; nor does an AI pass where the "
     "objective requires people (independent human coders, participants, a laboratory "
-    "measurement). Return JSON only."
+    "measurement). "
+    # 14 Oct (Sean, SUMMIT): Luis's request to count two testing days was
+    # recorded as a requirement; the pack correctly refused it, and the check
+    # called the objective unmet because the request was not carried out.
+    "A request, suggestion or proposal made by someone in the project (\"Luis asks to count those "
+    "days\", \"Omar proposes a budget increase\") is not a requirement of the objective, even when it "
+    "is recorded as one. Never list it as a criterion to carry out. The deliverable handles it correctly "
+    "when it reports the request and treats it as the accepted facts and approvals allow — declining or "
+    "excluding it where it conflicts with them is correct, not a failure. Return JSON only."
 )
 
 
@@ -281,12 +290,46 @@ EVIDENCE_RETRY = (
 )
 
 
+#: Execution labels in the user's words; mirrors `LABEL_TEXT` in `lib/agent/labels.ts`.
+EXECUTION_TEXT = {
+    "discussed": "analyzed", "designed": "draft written", "code_written": "code written, not run",
+    "code_executed": "code executed", "simulation_run": "simulation run", "result_interpreted": "result interpreted",
+    "blocked": "could not continue",
+}
+
+_REQUEST = re.compile(r"\b(?:asks?|asked|requests?|requested|suggests?|suggested|proposes?|proposed|proposal|wants?|would like)\b", re.I)
+_WORDS = re.compile(r"[a-z0-9]{3,}")
+_STOP = {"the", "and", "for", "that", "this", "with", "can", "still", "toward", "towards", "those", "these", "from", "are", "was", "has", "have"}
+
+
+def _content_words(text: str) -> set[str]:
+    return {w for w in _WORDS.findall(text.lower()) if w not in _STOP}
+
+
+def request_facts(inputs: PMInput) -> list[str]:
+    """The accepted facts that record someone's request, suggestion or proposal."""
+    return [f.statement for f in (inputs.facts or []) if _REQUEST.search(f.statement)]
+
+
+def _is_request(requirement: str, requests: list[str]) -> bool:
+    """The criterion restates a recorded request ("Count the November 16 and 17
+    testing days toward the five" for "Luis asks to count those two days toward
+    the required five testing days"), or reads as one itself."""
+    if _REQUEST.search(requirement):
+        return True
+    words = _content_words(requirement)
+    if len(words) < 4:
+        return False
+    return any(len(words & _content_words(r)) >= max(4, len(words) // 2) for r in requests)
+
+
 def parse_assessment(
     result: object,
     content: str,
     steps: list[RunStep],
     failed_checks: list[str] | None = None,
     measured: list[str] | None = None,
+    requests: list[str] | None = None,
 ) -> ObjectiveAssessment:
     if not isinstance(result, dict):
         return ObjectiveAssessment(outcome="partly", reason="The check did not come back in a usable form.")
@@ -320,6 +363,7 @@ def parse_assessment(
     done_labels = {"code_written", "code_executed", "simulation_run", "result_interpreted", "designed"}
     performed: list[str] = []
     proposed: list[str] = []
+    # In the user's words, not the registry's (14 Oct, Sean: "Done: recheck_stage (designed)").
     for item in result.get("performed") or []:
         m = re.fullmatch(r"\s*S(\d+)\s*", str(item))
         idx = int(m.group(1)) - 1 if m else -1
@@ -327,7 +371,8 @@ def parse_assessment(
             # A step id: kept only if the record has it and it did something.
             if 0 <= idx < len(steps) and (steps[idx].execution_label or "") in done_labels:
                 s = steps[idx]
-                text = f"{s.action_key} ({s.execution_label})"
+                action = ACTIONS_BY_KEY.get(s.action_key)
+                text = f"{action.label if action else s.action_key} ({EXECUTION_TEXT.get(s.execution_label or '', s.execution_label)})"
                 if text not in performed:
                     performed.append(text)
         elif str(item).strip():
@@ -340,6 +385,7 @@ def parse_assessment(
 
     criteria: list[CriterionResult] = []
     overruled: list[str] = []
+    declined: list[str] = []
     for c in result.get("criteria") or []:
         if not isinstance(c, dict):
             continue
@@ -354,7 +400,12 @@ def parse_assessment(
         # A count code made is the count (11 Oct): the model's own reading of
         # a length or a number of sections does not overrule it.
         counted = _measured_for(requirement, measured or [])
-        if counted and verdict != "met":
+        # A request is not the objective's to carry out (14 Oct, SUMMIT): a
+        # verdict that it was "not met" is set aside, in code.
+        if verdict == "not_met" and _is_request(requirement, requests or []):
+            declined.append(requirement)
+            verdict, basis = "not_checked", "A request by someone in the project, not a requirement; the deliverable reports how it was handled."
+        elif counted and verdict != "met":
             overruled.append(f"{requirement} ({'said not met' if verdict == 'not_met' else 'not checked'})")
             verdict, basis = "met", f"Measured in code: {counted}"
         criteria.append(CriterionResult(requirement=requirement, verdict=verdict, basis=basis))
@@ -371,7 +422,7 @@ def parse_assessment(
     # Every requirement it found unmet was one code measured as met: its
     # verdict rested on a miscount. Met when it can show the text; else partly.
     if (
-        claimed != "met" and overruled and not failed_checks and not blockers
+        claimed != "met" and (overruled or declined) and not failed_checks and not blockers
         and not any(c.verdict == "not_met" for c in criteria)
     ):
         outcome = "met" if quoted else "partly"
@@ -381,9 +432,13 @@ def parse_assessment(
         said = f"{said} [Overruled by the count made in code: {'; '.join(overruled)}.]".strip()
         if outcome == "met":
             reason, note = "Met: every requirement holds; the measured ones were counted in code.", said
+    if declined:
+        said = f"{said} [Set aside as a request, not a requirement: {'; '.join(declined)}.]".strip()
+        if outcome == "met" and not overruled:
+            reason, note = "Met: every requirement holds; a request someone made is reported, not carried out.", said
     unmet = unmet_items(criteria, failed_checks or []) if outcome != "met" else []
     # The model's own "not met" with nothing named is still a thing unmet, in its words.
-    if outcome != "met" and not unmet and claimed != "met" and not overruled and said:
+    if outcome != "met" and not unmet and claimed != "met" and not overruled and not declined and said:
         unmet = [said.rstrip(". ")]
     if outcome != "met":
         named = unmet_reason(unmet)
@@ -420,12 +475,13 @@ async def assess_objective(
 ) -> ObjectiveAssessment:
     system, user = build_assessment_prompt(inputs, deliverable_label, content, steps, success_criterion, failed_checks, measured)
     result, _usage = await client.generate_json(prompt=user, system=system, temperature=0, max_tokens=1_600, model=model)
-    parsed = parse_assessment(result, content, steps, failed_checks, measured)
+    requests = request_facts(inputs)
+    parsed = parse_assessment(result, content, steps, failed_checks, measured, requests)
     # A "met" lost only for want of a quote is asked once more before it can
     # pause a run (11 Oct: the run stopped on "not met" for exactly this).
     if _needs_evidence_retry(result, parsed, failed_checks):
         again, _usage = await client.generate_json(
             prompt=user + EVIDENCE_RETRY, system=system, temperature=0, max_tokens=1_600, model=model
         )
-        parsed = parse_assessment(again, content, steps, failed_checks, measured)
+        parsed = parse_assessment(again, content, steps, failed_checks, measured, requests)
     return parsed
