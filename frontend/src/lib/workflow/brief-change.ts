@@ -93,11 +93,32 @@ export function finishedConclusions(
     .slice(0, 40);
 }
 
-/** The latest brief change that reopened stages, while any of them is still waiting for a recheck — and not kept as it was. */
-export function openBriefChange(
-  events: readonly WorkflowEvent[],
-  state: WorkflowState
-): { event: WorkflowEvent; stageIds: string[] } | null {
+export interface OpenChange {
+  event: WorkflowEvent;
+  stageIds: string[];
+  /** Why each was reopened, where the event itself does not say (a stage completed again, a return). */
+  reasons?: Record<string, string>;
+  /** Stages awaiting a recheck for some other change: "Update affected work" repairs them too. */
+  alsoWaiting?: string[];
+}
+
+/**
+ * The latest change that reopened stages, while any of them is still waiting
+ * for a recheck — and not kept as it was. Every way a stage is reopened has
+ * one (Sean, 14 Oct: "the new go button for revisions doesn't show up
+ * sometimes"): a stage completed again on another version, or a return to an
+ * earlier stage, reopened work with no notice and no button.
+ */
+export function openBriefChange(events: readonly WorkflowEvent[], state: WorkflowState): OpenChange | null {
+  const found = latestChange(events, state);
+  if (!found) return null;
+  const alsoWaiting = Object.entries(state.stages)
+    .filter(([id, st]) => st.status === 'stale' && !found.stageIds.includes(id))
+    .map(([id]) => id);
+  return alsoWaiting.length ? { ...found, alsoWaiting } : found;
+}
+
+function latestChange(events: readonly WorkflowEvent[], state: WorkflowState): OpenChange | null {
   for (let i = events.length - 1; i >= 0; i -= 1) {
     const e = events[i];
     // A saved revision of an earlier stage reopens what came after it the
@@ -119,6 +140,45 @@ export function openBriefChange(
     // changed then another taken out left no notice, and no "Update affected
     // work and resume" (8 Oct).
     if (stageIds.length) return { event: e, stageIds };
+  }
+  // Reopened some other way: by the event that made them stale, with its reason.
+  const stale = Object.entries(state.stages).filter(([, st]) => st.status === 'stale' && st.stale);
+  if (!stale.length) return null;
+  const since = stale.map(([, st]) => st.stale!.since).sort().at(-1)!;
+  const stageIds = stale.filter(([, st]) => st.stale!.since === since).map(([id]) => id);
+  const event =
+    [...events].reverse().find((e) => e.created_at === since) ??
+    ({ type: 'stage_returned', stage_id: stageIds[0], actor: 'system', created_at: since } as WorkflowEvent);
+  return { event, stageIds, reasons: Object.fromEntries(stageIds.map((id) => [id, state.stages[id]!.stale!.reason])) };
+}
+
+/** How long "Updated and checked" stays on the page after the last stage it reopened is done. */
+const SETTLED_SHOWN_MS = 12 * 60 * 60 * 1000;
+
+/**
+ * The last step of "facts recorded → affected work awaiting update → updated
+ * and checked" (Sean, 14 Oct, SUMMIT: "Could we make the sequence clearer?").
+ * The latest change of the brief or facts that reopened stages, once every one
+ * of them has been finished again after it. Null while any is still waiting,
+ * or once it is old.
+ */
+export function settledChange(
+  events: readonly WorkflowEvent[],
+  state: WorkflowState,
+  now: number
+): { event: WorkflowEvent; stageIds: string[] } | null {
+  for (let i = events.length - 1; i >= 0; i -= 1) {
+    const e = events[i];
+    if (e.type !== 'brief_changed' || e.payload?.presentation_only) continue;
+    const affected = Array.isArray(e.payload?.affected) ? (e.payload!.affected as { stage_id?: string }[]) : [];
+    const stageIds = [...new Set(affected.map((a) => a.stage_id ?? '').filter((id) => state.stages[id]))];
+    if (!stageIds.length) continue;
+    if (now - Date.parse(e.created_at) > SETTLED_SHOWN_MS) return null;
+    const settled = stageIds.every((id) => {
+      const st = state.stages[id]!;
+      return isDone(st.status) && !!st.completed_at && st.completed_at > e.created_at;
+    });
+    return settled ? { event: e, stageIds } : null;
   }
   return null;
 }

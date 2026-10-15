@@ -83,7 +83,7 @@ import { FactsNextStep } from './facts-next-step';
 import { FactReconcileNotice } from './fact-change-list';
 import { factChangesFromRevision, withMeaningChanges, type FactChange } from '@/lib/workflow/fact-reconcile';
 import { useBriefChange } from './use-brief-change';
-import { openBriefChange } from '@/lib/workflow/brief-change';
+import { openBriefChange, settledChange } from '@/lib/workflow/brief-change';
 import { contextFromDocuments } from '@/lib/data/extract-text';
 import { ChatAttach } from './chat-attach';
 import { INPUT_LIMITS } from '@/lib/projects/input-limits';
@@ -906,6 +906,12 @@ export function WorkflowWorkspace({
     enabled: project.status !== 'finalized' && events !== null,
   });
   const briefChange = useMemo(() => openBriefChange(events ?? [], state), [events, state]);
+  // The last step of the sequence, "Updated and checked", until dismissed.
+  const [settledDismissed, setSettledDismissed] = useState<string | null>(null);
+  const settled = useMemo(() => {
+    const found = settledChange(events ?? [], state, Date.now());
+    return found && found.event.created_at !== settledDismissed ? found : null;
+  }, [events, state, settledDismissed]);
 
   // A version the user saved themselves that states values the facts do not
   // (10 Oct, Sean: restoring the Wednesday draft left the facts on Thursday).
@@ -1834,6 +1840,9 @@ export function WorkflowWorkspace({
               onKeep={(changeAt) => void appendEvent({ type: 'brief_change_dismissed', stage_id: stageId, payload: { change_at: changeAt } })}
               onUpdate={appendStageVersion && project.status !== 'finalized' ? () => void go.update() : undefined}
               updating={go.active}
+              judging={judgingChange}
+              settled={settled}
+              onDismissSettled={() => settled && setSettledDismissed(settled.event.created_at)}
             />
             {factReconcile && factReconcile.stageId === stage.id && (
               <FactReconcileNotice
@@ -2265,9 +2274,10 @@ export function WorkflowWorkspace({
               afterActionDone={
                 <FactsNextStep
                   judging={judgingChange}
-                  waiting={(briefChange?.stageIds ?? []).map((id) => template.stages.find((s) => s.id === id)?.label ?? id)}
+                  waiting={[...(briefChange?.stageIds ?? []), ...(briefChange?.alsoWaiting ?? [])].map((id) => template.stages.find((s) => s.id === id)?.label ?? id)}
                   onUpdate={appendStageVersion && project.status !== 'finalized' ? () => void go.update() : undefined}
                   updating={go.active}
+                  updated={settledChange(events ?? [], state, Date.now())?.stageIds.map((id) => template.stages.find((s) => s.id === id)?.label ?? id)}
                 />
               }
               applying={applyFindings.running}

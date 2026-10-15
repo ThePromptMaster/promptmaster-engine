@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { meaningOf, openBriefChange, presentationOnly } from './brief-change';
+import { meaningOf, openBriefChange, presentationOnly, settledChange } from './brief-change';
 import { laterDoneStages, projectState } from './engine';
 import { BOOK_V1 } from './templates/book.v1';
 import type { WorkflowEvent } from './types';
@@ -108,5 +108,55 @@ describe('a draft in progress is rechecked too (8 Oct, production)', () => {
   it('a fact change reopens a named draft in progress', () => {
     const changed = ev('brief_changed', 'positioning', '2026-10-08T12:00:00Z', { payload: { affected: [{ stage_id: 'positioning', reason: 'It states $18' }] } });
     expect(projectState(BOOK_V1, [...done, changed]).stages.positioning.status).toBe('stale');
+  });
+});
+
+describe('every reopened stage has the notice and its button (Sean, 14 Oct: "the go button for revisions doesn\'t show up sometimes")', () => {
+  const three = [
+    ...done,
+    ev('stage_marked_complete', 'positioning', '2026-10-06T10:02:00Z', { to_stage_id: 'research', payload: { evidence_version_id: 'v3' } }),
+  ];
+
+  it('a return to an earlier stage', () => {
+    const back = ev('stage_returned', 'research', '2026-10-14T09:00:00Z', { to_stage_id: 'audience' });
+    const state = projectState(BOOK_V1, [...three, back]);
+    const open = openBriefChange([...three, back], state);
+    expect(open?.event).toBe(back);
+    expect(open?.stageIds).toEqual(['positioning']);
+    expect(open?.reasons?.positioning).toBe('The work went back to Audience after this stage used it.');
+  });
+
+  it('an earlier stage completed again on another version', () => {
+    const again = ev('stage_marked_complete', 'audience', '2026-10-14T09:00:00Z', { payload: { evidence_version_id: 'v2c' } });
+    const events = [...three, ev('stage_reopened', 'audience', '2026-10-14T08:59:00Z'), again];
+    const state = projectState(BOOK_V1, events);
+    expect(state.stages.positioning.status).toBe('stale');
+    expect(openBriefChange(events, state)).toMatchObject({ event: again, stageIds: ['positioning'] });
+  });
+
+  it('names stages still waiting from an earlier change beside the latest', () => {
+    const fact = ev('brief_changed', 'research', '2026-10-14T09:00:00Z', { payload: { field: 'facts', affected: [{ stage_id: 'objective', reason: 'a' }] } });
+    const back = ev('stage_returned', 'research', '2026-10-14T08:00:00Z', { to_stage_id: 'audience' });
+    const events = [...three, back, fact];
+    const open = openBriefChange(events, projectState(BOOK_V1, events));
+    expect(open).toMatchObject({ event: fact, stageIds: ['objective'], alsoWaiting: ['positioning'] });
+  });
+});
+
+describe('"Updated and checked", the last step (Sean, 14 Oct, SUMMIT)', () => {
+  const fact = ev('brief_changed', 'positioning', '2026-10-14T09:00:00Z', { payload: { field: 'facts', affected: [{ stage_id: 'audience', reason: 'spend changed' }] } });
+  const now = Date.parse('2026-10-14T10:00:00Z');
+
+  it('is reached once every stage the change reopened is finished again after it', () => {
+    const waiting = [...done, fact];
+    expect(settledChange(waiting, projectState(BOOK_V1, waiting), now)).toBeNull();
+    const repaired = [...waiting, ev('stage_marked_complete', 'audience', '2026-10-14T09:05:00Z', { actor: 'system', payload: { evidence_version_id: 'v2r' } })];
+    expect(settledChange(repaired, projectState(BOOK_V1, repaired), now)).toMatchObject({ event: fact, stageIds: ['audience'] });
+    expect(settledChange(repaired, projectState(BOOK_V1, repaired), now + 13 * 3600_000)).toBeNull();
+  });
+
+  it('is not reached when the user kept the work as it was', () => {
+    const kept = [...done, fact, ev('brief_change_dismissed', 'positioning', '2026-10-14T09:01:00Z', { payload: { change_at: fact.created_at } })];
+    expect(settledChange(kept, projectState(BOOK_V1, kept), now)).toBeNull();
   });
 });
