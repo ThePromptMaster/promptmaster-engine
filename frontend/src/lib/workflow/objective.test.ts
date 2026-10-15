@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { latestObjectiveAssessment, objectiveUnmet, pausedLine } from './objective';
+import { latestObjectiveAssessment, objectiveUnmet, pausedLine, goWaitingLine, OBJECTIVE_CHANGES } from './objective';
 import type { WorkflowEvent } from './types';
 
 const assessed = (outcome: string, created_at: string, blockers: { need: string; kind: string }[] = []): WorkflowEvent => ({
@@ -52,5 +52,22 @@ describe('stillMet (11 Oct: four checks of an unchanged Output v2)', () => {
     const elsewhere = { type: 'stage_version_saved', stage_id: 'summary', created_at: '2026-10-11T10:05:00Z' } as never;
     expect(stillMet([met, elsewhere], [], { stageId: 'output', versionId: 'v2' })).not.toBeNull();
     expect(stillMet([met], [{ created_at: '2026-10-11T10:06:00Z' }], { stageId: 'output', versionId: 'v2' })).toBeNull();
+  });
+});
+
+describe('one blocker said once, and gone when resolved (13 Oct, Sean, workshop)', () => {
+  const stop = 'Paused — the objective is not met. Waiting for: a revised lunch plan that fits 20 lunches within the approved $240 budget.';
+  it('says nothing beside the objective\'s own item, and only "resume" once it is out of date', () => {
+    expect(goWaitingLine(stop, true)).toBeNull();
+    expect(goWaitingLine(stop, false)).toBe('resume Go to check the objective again');
+    expect(goWaitingLine('Approve the analysis plan?', true)).toBe('Approve the analysis plan?');
+    expect(goWaitingLine(null, true)).toBeNull();
+  });
+  it('a later answer or new version clears the pause, as the projects list reads it', () => {
+    const assessed = { type: 'objective_assessed', stage_id: 'summary', actor: 'system', created_at: '2026-10-14T01:53:14Z', payload: { outcome: 'not_met', blockers: [{ need: 'lunch', kind: 'source_missing' }] } } as WorkflowEvent;
+    expect(objectiveUnmet([assessed])).not.toBeNull();
+    for (const type of OBJECTIVE_CHANGES) {
+      expect(objectiveUnmet([assessed, { type, stage_id: 'output', actor: 'user', created_at: '2026-10-14T01:58:00Z' } as WorkflowEvent])).toBeNull();
+    }
   });
 });

@@ -61,7 +61,7 @@ import {
   tickClosesStage,
 } from '@/lib/workflow/engine';
 import { buildStageDigest, formatManuscript, summariseStageContent } from '@/lib/workflow/digest';
-import { objectiveUnmet } from '@/lib/workflow/objective';
+import { goWaitingLine, objectiveUnmet } from '@/lib/workflow/objective';
 import { recordFacts, supersedeFact } from '@/lib/supabase/facts';
 import { factsAlreadyRecorded, planFactRecording } from '@/lib/workflow/record-facts';
 import { ProjectFacts } from './project-facts';
@@ -412,6 +412,13 @@ export function WorkflowWorkspace({
       }),
     [template, state, context, objectiveAssessment]
   );
+  // The last stage reads as finished while the objective is not (13 Oct, Sean,
+  // workshop: "Summary appeared completed while the project remained open").
+  const projectOpenOn = useMemo(() => {
+    if (!objectiveAssessment || project.status === 'finalized') return null;
+    const last = [...template.stages].reverse().find((s) => state.stages[s.id]?.status !== 'skipped');
+    return last && isDone(state.stages[last.id]?.status) ? last.id : null;
+  }, [objectiveAssessment, project.status, template, state]);
   const outstandingOther = useMemo(
     () => outstandingBeyondCriteria(outstanding, stageId).map(describeOutstanding),
     [outstanding, stageId]
@@ -1347,10 +1354,16 @@ export function WorkflowWorkspace({
   const deliverableBundle = deliverable ? stageBundles[deliverable.id] : undefined;
   const deliverableSections = deliverableBundle?.artifact?.long_form?.outline ?? [];
   // Go waiting on the user is outstanding work as much as an open finding is.
-  const goWaiting =
+  const goStopped =
     go.run && !go.run.ended_at && (go.run.status === 'awaiting_decision' || go.run.status === 'blocked')
       ? go.run.stop_reason || 'a decision from you'
       : null;
+  // 13 Oct (Sean, workshop): "2 still open: The objective is not met — waiting
+  // for …; Go is waiting for you: Paused — the objective is not met …" was one
+  // thing said twice, and after the $11 quote was rechecked Go's old stop
+  // reason still said it. The objective's own item says it while it holds;
+  // once a change has made it out of date, Go only needs resuming.
+  const goWaiting = goWaitingLine(goStopped, Boolean(objectiveAssessment));
   const completion = completionSummary(template, state, context, {
     goWaiting,
     objectiveUnmet: objectiveAssessment ? { blockers: objectiveAssessment.blockers.map((b) => b.need) } : null,
@@ -1553,6 +1566,7 @@ export function WorkflowWorkspace({
           nextSuggestedId={nextSuggested}
           onSelect={setViewingStageId}
           approvalPendingIds={approvalPendingIds}
+          projectOpenOn={projectOpenOn}
         />
       </aside>
 
@@ -1595,6 +1609,7 @@ export function WorkflowWorkspace({
             <StageRail
               template={template}
               state={state}
+              projectOpenOn={projectOpenOn}
               nextSuggestedId={nextSuggested}
               approvalPendingIds={approvalPendingIds}
               onSelect={(stageId) => {
@@ -2165,6 +2180,7 @@ export function WorkflowWorkspace({
                 // Go waiting for an answer is open work too (6 Oct, email 1:
                 // "nothing was outstanding while … Go was waiting for me").
                 elsewhere={goWaiting ? [...outstandingOther, `Go is waiting for you: ${goWaiting}`] : outstandingOther}
+                projectOpen={projectOpenOn === stage.id}
                 onSuggest={appendStageVersion && !go.active && !go.pendingStep ? () => void go.suggest() : undefined}
                 suggesting={go.active && go.run?.policy === 'guided'}
               />
