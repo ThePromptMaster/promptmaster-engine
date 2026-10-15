@@ -38,7 +38,12 @@ VERIFY_RULE = (
     "A general recommendation the objective asks for (\"set up their laptop and accounts "
     "before day one\") is not an invented fact and is not a finding. What may not be "
     "invented is a specific the user did not give: a company name, a person, a policy, a "
-    "figure, a date, a tool or product by name."
+    "figure, a date, a tool or product by name. "
+    # 14 Oct (Sean, HARBOR and the workshop): the review accepted a forecast
+    # listed as a confirmed decision, and a venue called selected that nobody chose.
+    "Flag a reported figure (a forecast, actual spending, a count) listed as a decision or "
+    "approval, an option called selected or chosen where no supplied fact says someone chose it, "
+    "and an authority stated more widely than the facts give it."
 )
 
 _MISSING = re.compile(
