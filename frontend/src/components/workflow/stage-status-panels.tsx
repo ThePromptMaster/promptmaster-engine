@@ -6,6 +6,7 @@ import type { EvaluationResult } from '@/types';
 
 import { blocksCompletion, describeOutstanding, type CompletionSummary } from '@/lib/workflow/engine';
 import type { ObjectiveAssessment } from '@/lib/workflow/objective';
+import { readablePerformed } from '@/lib/agent/labels';
 import type { BlockKind } from '@/lib/workflow/types';
 
 const BLOCK_KINDS: { kind: BlockKind; label: string; hint: string }[] = [
@@ -121,7 +122,7 @@ export function ObjectivePausedNotice({
           )}
           <p className="mt-2 text-label text-[var(--on-surface-variant)]">
             <span className="font-semibold text-[var(--on-surface)]">Done: </span>
-            {assessment.performed.length ? assessment.performed.join('; ') : 'no computation or investigation was recorded as performed'}
+            {assessment.performed.length ? assessment.performed.map(readablePerformed).join('; ') : 'no computation or investigation was recorded as performed'}
           </p>
           {assessment.proposed_next.length > 0 && (
             <p className="mt-1 text-label text-[var(--on-surface-variant)]">

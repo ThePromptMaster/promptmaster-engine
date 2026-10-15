@@ -60,7 +60,7 @@ def test_performed_names_only_recorded_steps_that_did_something():
     }, LOG, STEPS)
     # S1 was only discussed and S9 does not exist: neither is performed work.
     # A free-text claim of work the record does not show is at most a proposal.
-    assert a.performed == ["run_computation (code_executed)"]
+    assert a.performed == ["Run a computation (code executed)"]
     assert a.proposed_next == ["Computed the Hessian", "Compute the curvature"]
 
 
@@ -296,3 +296,51 @@ def test_a_count_of_another_part_does_not_overrule_the_summary_verdict():
     }, text, [], [], measured)
     assert a.outcome != "met"
     assert a.criteria[0].verdict == "not_met"
+
+
+# 14 Oct (Sean, SUMMIT): Luis's request was recorded as a requirement; the pack
+# correctly refused it, and the check paused Go because it was "not met".
+_SUMMIT_PACK = (
+    "The approved launch date of November 24, 2026 matches the earliest compliant launch date. "
+    "Reported November 16–17 activity is retained in history but excluded from the compliant five-day count."
+)
+_LUIS = "He asks to count those two days toward the required five testing days so testing can still finish November 20."
+
+
+def _summit_result(requirement: str) -> dict:
+    return {
+        "outcome": "not_met", "reason": "The request was not carried out.", "basis_quote": "",
+        "criteria": [
+            {"requirement": "Keep the November 24 launch date", "verdict": "met",
+             "basis": "The approved launch date of November 24, 2026 matches the earliest compliant launch date."},
+            {"requirement": requirement, "verdict": "not_met",
+             "basis": "the reported November 16–17 testing days cannot be counted as compliant testing days"},
+        ],
+    }
+
+
+def test_a_recorded_request_is_not_an_unmet_criterion():
+    a = parse_assessment(
+        _summit_result("Count the November 16 and November 17 testing days toward the required five testing days so testing can still finish November 20"),
+        _SUMMIT_PACK, [], requests=[_LUIS],
+    )
+    assert a.unmet == [] and "Count the November 16" not in a.reason
+    assert a.outcome == "partly"  # nothing quoted as the basis: not "met", but nothing unmet either
+    assert a.criteria[1].verdict == "not_checked"
+
+
+def test_a_request_and_a_real_failure_still_fail_on_the_real_one():
+    result = _summit_result("Omar proposes raising the budget to $86,000")
+    result["criteria"].append({"requirement": "State the actual spending", "verdict": "not_met", "basis": "missing"})
+    a = parse_assessment(result, _SUMMIT_PACK, [])
+    assert a.outcome == "not_met" and a.unmet == ["State the actual spending — missing"]
+
+
+def test_the_check_is_told_a_request_is_not_a_requirement():
+    system, _ = build_assessment_prompt(PMInput(objective="Manage SUMMIT", mode="analyst"), "Output", "x", [])
+    assert "is not a requirement of the objective" in system
+
+
+def test_done_is_written_in_the_users_words():
+    a = parse_assessment({"outcome": "not_met", "reason": "r", "performed": ["S1"]}, "x", [RunStep(action_key="recheck_stage", execution_label="designed")])
+    assert a.performed == ["Repair a reopened stage (draft written)"]
