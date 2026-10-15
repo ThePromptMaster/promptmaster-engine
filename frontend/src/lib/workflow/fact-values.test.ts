@@ -58,3 +58,41 @@ describe('a list of excluded values (8 Oct, production)', () => {
     expect(leftoverValues('Requirements:\n- Charge $18 per user per month.', s)).toHaveLength(1);
   });
 });
+
+describe('history is not a value left behind (Sean, 14 Oct: SUMMIT change log, JUNIPER review)', () => {
+  const launch = supersededValues('Elena approved a November 20, 2026 launch date.', 'Elena explicitly approved changing the launch date to November 23, 2026.');
+
+  it('a change-log section keeps the earlier value', () => {
+    const pack = [
+      '## 1. Executive status report',
+      'The approved launch date is November 23, 2026.',
+      '## 4. Decision and change log',
+      '| Type | Item | Detail | Date / status |',
+      '|---|---|---|---|',
+      '| Approval | Launch date | Elena approved November 20, 2026. | Superseded |',
+      '- The launch was set for November 20.',
+    ].join('\n');
+    expect(leftoverValues(pack, launch)).toHaveLength(0);
+  });
+
+  it('the same value in the current status is still found', () => {
+    expect(leftoverValues('## Status\nLaunch is on November 20, 2026.\n## Change log\n- November 20 replaced.', launch)).toHaveLength(1);
+  });
+
+  it('a table headed as history keeps its rows, under any heading', () => {
+    const table = '| History | Earlier value | Now |\n|---|---|---|\n| Launch | Nov 20 | Nov 23 |';
+    expect(leftoverValues(table, launch)).toHaveLength(0);
+  });
+
+  it('a quotation of an earlier version reports it; a declined request is not current', () => {
+    expect(leftoverValues('Fact check against v1: the memo says "the approved November 20, 2026 launch date is achievable".', launch)).toHaveLength(0);
+    expect(leftoverValues('{"items":[{"text":"The memo says \\"launch November 20\\" and is fine."}]}', launch)).toHaveLength(0);
+    expect(leftoverValues('Luis asks to keep the November 20 launch.', launch)).toHaveLength(0);
+  });
+
+  it('a task window ending on that day is not the launch date', () => {
+    expect(leftoverValues('- Testing — November 16 to November 20, 2026 — Owner: Luis', launch)).toHaveLength(0);
+    expect(leftoverValues('Testing runs Nov 16–20.', launch)).toHaveLength(0);
+    expect(leftoverValues('Launch: November 20, 2026.', launch)).toHaveLength(1);
+  });
+});
