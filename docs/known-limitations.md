@@ -1694,3 +1694,25 @@ approval is recommended; overriding it asks once more. Whether a fact is an appr
 rule is read by the model (`protects_approval`), not by a rule in code. An "as of" date,
 a recorded request and a repeated decision are told not to be conflicts in the prompt,
 and applied chat instructions are no longer counted as pending, in code.
+
+### L-88 — Facts recorded once, the change sequence, history in repairs, and actionable blockers (2026-10-15)
+
+Facts from the side chat are compared with the facts on record before they are offered
+and again before they are inserted, by their words and figures with punctuation and case
+ignored. A fact reworded with new words is a new fact. Filler ("all other facts remain
+unchanged") and instructions about the request ("Before recording anything…") are
+dropped by pattern in code and by the prompt; a form the patterns do not know relies on
+the prompt. A statement naming someone's request is never stored as a requirement.
+
+The "still states" check after a fact change treats as history: lines under a heading
+that names a change or decision log, history or superseded values; tables headed that
+way; quoted text; sentences about a request, proposal, decline or version; and a date
+that only ends a task window. A stale value written in such a place is not caught. On a
+table stage only undecided rows are checked.
+
+A blocker's threshold ("$12 per person or less: $240 / 20") is found by the model. Code
+removes any figure that is neither on the record nor one arithmetic step from two
+figures on it; it does not find a threshold the model missed. "Updated and checked" is
+shown for twelve hours after the last stage a change reopened is finished again, or
+until dismissed. The objective check sets aside a "not met" that restates a recorded
+request by word overlap; a request paraphrased with other words relies on the prompt.
