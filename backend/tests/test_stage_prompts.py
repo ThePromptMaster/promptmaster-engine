@@ -741,3 +741,20 @@ def test_a_decision_log_records_authority_and_approved_amounts(basic_inputs, pro
     assert "who may approve a change" in DECISION_LOG_RULE and "is a status" in DECISION_LOG_RULE
     system, user = build_stage_prompt(basic_inputs, prose_stage, digest)
     assert DECISION_LOG_RULE not in system + user
+
+
+def test_reported_figures_suitable_options_and_authority_keep_their_status(basic_inputs, prose_stage, digest):
+    """14 Oct (Sean): HARBOR listed an $86,000 forecast under "Confirmed decisions"
+    and left the $6,000 overrun to the reader; the workshop pack called Maple
+    selected when it only met the capacity requirement; SUMMIT stretched Elena's
+    authority to testing dependencies."""
+    from promptmaster.saved_text_checks import VERIFY_RULE
+    from promptmaster.stage import DECISION_LOG_RULE, RECORD_STATUS_RULE
+
+    assert "never a decision" in DECISION_LOG_RULE
+    harbor = basic_inputs.model_copy(update={"constraints": "Report the approved budget and forecast spending; separate decisions from proposals."})
+    system, user = build_stage_prompt(harbor, prose_stage, digest)
+    text = system + user
+    assert RECORD_STATUS_RULE in text
+    assert "suitable, not selected" in text and "never extend it" in text and "forecast overrun" in text
+    assert "listed as a decision or approval" in VERIFY_RULE and "called selected or chosen" in VERIFY_RULE

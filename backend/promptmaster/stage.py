@@ -208,7 +208,26 @@ DECISION_LOG_RULE = (
     "(an approved date, an approved budget) and each rule about who may approve a change "
     "(\"only Elena can approve a change\"). A request nobody has approved is listed as a request, "
     "marked unapproved, never as a decision. That something has NOT been approved (\"no budget "
-    "increase is approved\") is a status of the request or the budget, not an approved decision."
+    "increase is approved\") is a status of the request or the budget, not an approved decision. "
+    # 14 Oct (Sean, HARBOR): "Forecast spending of $86,000 appeared under 'Confirmed decisions.'"
+    "A reported figure — actual spending, a forecast, a count, a measured date — is a reported fact, "
+    "never a decision: keep it out of the decisions and put it with the reported facts or status."
+)
+
+#: 14 Oct (Sean): three ways a document overstated the record. Workshop: Maple
+#: met the capacity requirement and was presented as selected before anyone
+#: selected it. SUMMIT: Elena's authority over launch dates and budget became
+#: authority over testing dependencies. HARBOR: the $6,000 forecast overrun
+#: was left for the reader to work out.
+RECORD_STATUS_RULE = (
+    "STATUS OF WHAT THE RECORD SAYS: "
+    "An option that meets a requirement is suitable, not selected — call it selected, booked or chosen "
+    "only where the material says someone chose it, and then say who. "
+    "Someone's authority covers exactly what the material says it covers (\"only Elena can approve "
+    "changing the launch date or increasing the budget\" says nothing about testing rules); never extend it. "
+    "Where two recorded figures give a useful difference or total — a forecast overrun, an amount "
+    "remaining, a variance — state it with its calculation (\"$86,000 forecast − $80,000 approved = "
+    "$6,000 forecast overrun\")."
 )
 
 
@@ -312,6 +331,8 @@ def build_stage_prompt(
     asked = " ".join([inputs.objective, inputs.constraints, inputs.output_format, inputs.context or ""]).lower()
     if "decision log" in asked:
         parts.append(DECISION_LOG_RULE)
+    if inputs.facts or re.search(r"\b(approv|budget|select|choose|decision|forecast|status)", asked):
+        parts.append(RECORD_STATUS_RULE)
 
     # A Diagnosis draft spent much of itself on Turnaround Options and the
     # 12-month plan — two stages later — and a later check had to flag it
