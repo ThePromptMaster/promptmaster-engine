@@ -1282,7 +1282,9 @@ export function WorkflowWorkspace({
   const truncated = headVersion?.finish_reason === 'length';
   const primaryAction = nextStageAction({
     finished: project.status === 'finalized',
-    busy: generation.generating || stageEvaluation.evaluating || busy || tools.running !== null,
+    // Go working the project is busy too: a check pressed while Go appends a
+    // new version scores the one it replaced (14 Oct, Sean).
+    busy: generation.generating || stageEvaluation.evaluating || busy || tools.running !== null || go.active,
     dirty: Boolean(dirtyState?.dirty),
     draftable,
     hasContent,
@@ -2172,7 +2174,9 @@ export function WorkflowWorkspace({
                   else void handleTransition(option, note);
                 }}
                 busy={busy}
-                error={transitionError}
+                // A check that failed says so here, beside the button pressed:
+                // a long-form stage had nowhere to show it (14 Oct).
+                error={transitionError ?? (stageEvaluation.error ? `The check did not finish: ${stageEvaluation.error}` : null)}
                 primary={primaryAction}
                 onPrimary={runPrimary}
                 more={moreActions}
@@ -2180,6 +2184,14 @@ export function WorkflowWorkspace({
                 // Go waiting for an answer is open work too (6 Oct, email 1:
                 // "nothing was outstanding while … Go was waiting for me").
                 elsewhere={goWaiting ? [...outstandingOther, `Go is waiting for you: ${goWaiting}`] : outstandingOther}
+                working={
+                  stageEvaluation.evaluating ? 'Checking this stage…'
+                    : generation.generating ? 'Drafting…'
+                      : tools.running !== null ? 'Working…'
+                        : go.active ? 'Go is working…'
+                          : null
+                }
+                done={stageEvaluation.checked && stageEvaluation.checked === headVersion?.id ? 'Checked — the results are shown with the stage above.' : null}
                 projectOpen={projectOpenOn === stage.id}
                 onSuggest={appendStageVersion && !go.active && !go.pendingStep ? () => void go.suggest() : undefined}
                 suggesting={go.active && go.run?.policy === 'guided'}

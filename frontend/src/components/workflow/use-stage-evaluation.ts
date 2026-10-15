@@ -93,10 +93,12 @@ export function useStageEvaluation({
 
   // A recommendation describes one stage's artifact. Carrying it across a
   // stage change would attach last stage's advice to this stage's work.
+  const [checked, setChecked] = useState<string | null>(null);
   const stageId = stage?.id ?? null;
   useEffect(() => {
     setRecommendation(null);
     setFailure(null);
+    setChecked(null);
   }, [stageId]);
 
   const evaluate = useCallback(async () => {
@@ -151,6 +153,7 @@ export function useStageEvaluation({
       );
 
       setRecommendation(response.recommendation);
+      setChecked(version.id);
     } catch (err) {
       if (controller.signal.aborted || (err as Error)?.name === 'AbortError') return;
       setFailure(stageFailure(err, preserved));
@@ -169,6 +172,8 @@ export function useStageEvaluation({
     recommendation,
     dismissRecommendation: useCallback(() => setRecommendation(null), []),
     evaluate: enabled && recordStageEvaluation ? evaluate : undefined,
+    /** The version this hook last checked, so the page can say it was checked. */
+    checked,
     cancel,
   };
 }
