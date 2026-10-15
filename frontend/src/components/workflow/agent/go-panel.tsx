@@ -206,6 +206,16 @@ export function GoPanel({
   };
   // Something on the panel is waiting for the user: the pinned copy says so and takes them there.
   const waiting = Boolean(go.pendingStep || need || askingUser || go.authorizing);
+  // The pinned copy carries the button Go is waiting for, not only a way to
+  // find it (14 Oct, Sean: "the new go button for revisions doesn't show up
+  // sometimes" — it was on the card, scrolled out of view, with Resume hidden).
+  const needed = need ? describeNeed(need, go.stageLabelFor, needContext) : null;
+  const dockAction: { label: string; option?: StuckOption; acts: boolean } | null =
+    needed && needsActions && !needIsDecidedOnStage(need!) && (needed.options?.[0] || needed.action)
+      ? { label: needed.options?.[0]?.label ?? needed.action!, option: needed.options?.[0]?.id, acts: true }
+      : askingUser
+        ? { label: "Answer Go's question", acts: false }
+        : null;
   const dock =
     expanded && dockHost && !controlsInView
       ? createPortal(
@@ -213,25 +223,33 @@ export function GoPanel({
             {/* On a phone or an iPad the pinned copy is one small button, not a
                 bar over the text (Sean, 10 Oct, emails 6.11 and 8). */}
             <button
-              onClick={() => sectionRef.current?.scrollIntoView({ block: 'start' })}
-              className={`pointer-events-auto flex items-center gap-1 rounded-full px-3 py-1.5 text-label shadow-[0_4px_12px_rgba(0,0,0,0.15)] lg:hidden ${
+              onClick={() => (dockAction?.acts ? void act(dockAction.option).catch(() => sectionRef.current?.scrollIntoView({ block: 'start' })) : sectionRef.current?.scrollIntoView({ block: 'start' }))}
+              className={`pointer-events-auto flex max-w-[80vw] items-center gap-1 rounded-full px-3 py-1.5 text-label shadow-[0_4px_12px_rgba(0,0,0,0.15)] lg:hidden ${
                 waiting ? 'bg-[var(--pm-tertiary)] text-white' : 'bg-[var(--surface-container-highest)] text-[var(--on-surface)]'
               }`}
             >
               <span aria-hidden className="material-symbols-outlined text-[16px]">{go.active ? 'progress_activity' : 'play_arrow'}</span>
-              {waiting ? 'Go needs you' : go.active ? 'Go is working' : 'Go'}
+              <span className="truncate">{dockAction ? dockAction.label : waiting ? 'Go needs you' : go.active ? 'Go is working' : 'Go'}</span>
             </button>
             <div className="hidden flex-wrap items-center gap-3 lg:flex">
               <div className="min-w-0 flex-1">
                 <GoControl {...controlProps} compact />
               </div>
+              {dockAction && (
+                <button
+                  onClick={() => (dockAction.acts ? void act(dockAction.option).catch(() => sectionRef.current?.scrollIntoView({ block: 'start' })) : sectionRef.current?.scrollIntoView({ block: 'start' }))}
+                  className="shrink-0 rounded-lg bg-[var(--pm-primary)] px-3 py-1.5 text-label text-[var(--on-primary)] hover:opacity-90"
+                >
+                  {dockAction.label}
+                </button>
+              )}
               <button
                 onClick={() => sectionRef.current?.scrollIntoView({ block: 'start' })}
                 className={`shrink-0 rounded-lg px-3 py-1.5 text-label ${
                   waiting ? 'bg-[var(--pm-tertiary)] text-white' : 'bg-[var(--surface-container-highest)] text-[var(--on-surface)]'
                 }`}
               >
-                {waiting ? 'Go needs you — show' : go.active ? 'Show what Go is doing' : 'Show Go'}
+                {dockAction ? 'Show why' : waiting ? 'Go needs you — show' : go.active ? 'Show what Go is doing' : 'Show Go'}
               </button>
             </div>
           </section>,
