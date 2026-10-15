@@ -52,6 +52,14 @@ test('facts given in the chat are recorded on confirmation, read by every reques
     { statement: 'Candidate B has managed 100 or more employees for 4 years', source_kind: 'chat', accepted_by: 'user', retired_at: null },
   ]);
 
+  // Sean, 14 Oct (SUMMIT): the button becomes a confirmation, cannot record
+  // the same facts again, and says what comes next.
+  await expect(chat.getByRole('status').filter({ hasText: '2 facts recorded' })).toBeVisible();
+  await expect(chat.getByRole('button', { name: 'Record these 2 facts' })).toHaveCount(0);
+  await expect(chat).toContainText(/Nothing finished relied on these|awaiting an update|Checking what these facts affect/);
+  await page.screenshot({ path: test.info().outputPath('02-facts-recorded.png') });
+  expect(await serviceSelect('project_facts', `project_id=eq.${id}&select=id`)).toHaveLength(2);
+
   // The change check ran on the facts, and kept the text before and after.
   await expect.poll(async () => (await serviceSelect('workflow_events', `project_id=eq.${id}&type=eq.brief_changed&select=payload`)).length, { timeout: 20_000 }).toBe(1);
   const [changed] = await serviceSelect('workflow_events', `project_id=eq.${id}&type=eq.brief_changed&select=payload`);

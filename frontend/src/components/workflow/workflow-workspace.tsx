@@ -62,7 +62,8 @@ import {
 } from '@/lib/workflow/engine';
 import { buildStageDigest, formatManuscript, summariseStageContent } from '@/lib/workflow/digest';
 import { objectiveUnmet } from '@/lib/workflow/objective';
-import { recordFacts } from '@/lib/supabase/facts';
+import { recordFacts, supersedeFact } from '@/lib/supabase/facts';
+import { factsAlreadyRecorded, planFactRecording } from '@/lib/workflow/record-facts';
 import { ProjectFacts } from './project-facts';
 import { buildChatContext, chatContentFor } from '@/lib/workflow/chat-context';
 import { starterQuestions } from '@/lib/workflow/chat-starters';
@@ -78,6 +79,7 @@ import { ProjectData } from './project-data';
 import { lookupAndVerify } from '@/lib/workflow/verify';
 import { RefusedRevisions, refusedSince } from './refused-revisions';
 import { BriefChangeNotice } from './brief-change-notice';
+import { FactsNextStep } from './facts-next-step';
 import { FactReconcileNotice } from './fact-change-list';
 import { factChangesFromRevision, withMeaningChanges, type FactChange } from '@/lib/workflow/fact-reconcile';
 import { useBriefChange } from './use-brief-change';
@@ -775,14 +777,16 @@ export function WorkflowWorkspace({
       if (action.kind === 'record_facts') {
         // The facts the user gave in the chat become the project's record,
         // with where they came from (6 Oct, email 4). The change check then
-        // reopens what relied on the facts as they were.
+        // reopens what relied on the facts as they were. What is already on
+        // record is not recorded again, and a new value supersedes the fact it
+        // replaces (Sean, 14 Oct, SUMMIT: eight facts stored three times).
+        const ref = { stage_id: stage.id, via: from ?? 'side chat' };
+        const plan = planFactRecording(action.facts ?? [], project.facts);
         await recordFacts(
           project,
-          (action.facts ?? []).map((f) => ({
-            statement: f.statement, subject: f.subject || null, kind: f.kind ?? 'fact',
-            source_kind: 'chat' as const, source_ref: { stage_id: stage.id, via: from ?? 'side chat' },
-          }))
+          plan.insert.map((f) => ({ statement: f.statement, subject: f.subject || null, kind: f.kind ?? 'fact', source_kind: 'chat' as const, source_ref: ref }))
         );
+        for (const { old, fact } of plan.supersede) await supersedeFact(project, old, fact.statement, ref, 'chat');
         await onReload?.();
         return;
       }
@@ -897,7 +901,7 @@ export function WorkflowWorkspace({
     return out;
   }, [events, stageId, project.manual_checks]);
   // A saved change to the brief reopens only what relied on it (5 Oct).
-  useBriefChange({
+  const judgingChange = useBriefChange({
     project, template, state, bundles: stageBundles, stageId, appendEvent,
     enabled: project.status !== 'finalized' && events !== null,
   });
@@ -2257,6 +2261,15 @@ export function WorkflowWorkspace({
               suggestActions={draftable && headVersion ? suggestReplyActions : undefined}
               previewRows={previewReplyRows}
               onRunAction={runReplyAction}
+              isActionDone={(action) => factsAlreadyRecorded(action, project.facts)}
+              afterActionDone={
+                <FactsNextStep
+                  judging={judgingChange}
+                  waiting={(briefChange?.stageIds ?? []).map((id) => template.stages.find((s) => s.id === id)?.label ?? id)}
+                  onUpdate={appendStageVersion && project.status !== 'finalized' ? () => void go.update() : undefined}
+                  updating={go.active}
+                />
+              }
               applying={applyFindings.running}
             />
           </div>
