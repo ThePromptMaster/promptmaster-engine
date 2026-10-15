@@ -43,12 +43,24 @@ The short version:
 | #257, #261 | A blocker states the value it needs and the calculation, and asks one question. The paused notice has **"Respond here: …"** with **Record it and continue**. Any figure the record does not give, or one arithmetic step of it does not give, is removed in code. Go's own question while drafting (#261) is told the same. | Workshop replay: Go stopped while drafting, before the objective check, with "Lunch does not fit … Which should the planning pack say?" and no $12. That is why #261 was made. Answering "$11 per person…" recorded it, repaired three stages, and the objective was met. |
 | #258 | While the objective is not met, the finished last stage is drawn **"waiting on you"**, and its bar says the stage is done but the project is not, and where to respond. "Go is waiting for you" no longer repeats the objective's item. Once the check it stopped on is out of date, it says only "resume Go to check the objective again". The projects list follows the workspace's rule. | Unit-tested (each later change clears the pause as the list reads it). |
 | #256 | A reported figure is never a decision. "Suitable" is not "selected" until someone chooses. An authority covers what the facts say. Useful differences are stated with their calculation. The review flags each of these. | Workshop: "Maple is suitable for 20 attendees … No room is stated here as booked, selected, or confirmed", and "20 × $11 = $220 … $20 remaining". HARBOR: the Decision Log lists only the approved date, budget and Dana's authority; the $86,000 forecast is in the status. **The $6,000 overrun was not stated** (§3). |
-| #259 | "Check this stage" stays where it was while it runs ("Checking this stage…"), then says "Checked — the results are shown with the stage above". A failed check says so in the bar. The primary action waits while Go works. | Phase 3 pass (§2.1). |
-| #260 | The pinned Go bar carries the button Go is waiting for ("Have Go fix Output and check again"), and the phone chip performs it. | Phase 3 pass (§2.1). |
+| #259 | "Check this stage" stays where it was while it runs ("Checking this stage…"), then says "Checked — the results are shown with the stage above". A failed check says so in the bar. The primary action waits while Go works. | Workshop project: "Drafting…", then "Checking this stage…" in place of the button, then "✓ Checked — the results are shown with the stage above" (§2.1). |
+| #260 | The pinned Go bar carries the button Go is waiting for ("Have Go fix Output and check again"), and the phone chip performs it. | HARBOR: the pinned bar showed **Have Go fix Output and check again** and **Show why**, and later **Continue for 12 more steps**, which, pressed from the bar, ran Go (§2.1). |
+| #262 | The change strip names a fix or an answer ("Fix requested") rather than "Facts recorded". | Found on the Phase 3 pass. |
 
 ### 2.1 Phase 3 production pass
 
-*Filled in after the Phase 3 deploy; see the PR evidence for #259 and #260.*
+Run on production at main `7fca916`, on the HARBOR replay (`2b3872a4`) and the workshop replay (`beb3f361`).
+
+- **Pinned bar, HARBOR paused on "objective not met":**
+  - It carried **Have Go fix Output and check again**.
+  - My first press, by screen position, did not register: the page shifted as I clicked. The same button on the card reopened Output, which shows the action itself works.
+  - The next need, **Continue for 12 more steps**, pressed by element from the pinned bar, ran Go.
+  - Go revised Output, which now states "$86,000 forecast − $80,000 approved = $6,000 forecast overrun" and marks Omar's request unapproved in the Decision Log. The objective was met.
+- **Stage bar, workshop Summary:**
+  - "Draft this stage" became a disabled "Drafting…" in place.
+  - "Check this stage" became "Checking this stage…".
+  - Afterwards the bar read "✓ Checked — the results are shown with the stage above", above the next action ("Apply the suggested fix").
+- **Found:** the strip read "Facts recorded" for "Have Go fix Output", where no fact was recorded. Fixed in #262.
 
 ## 3. Approval protection in HARBOR: code or model?
 
