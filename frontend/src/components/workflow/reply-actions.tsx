@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 
 import type { RowChange } from '@/lib/workflow/row-actions';
 import type { ReplyAction } from '@/types';
@@ -24,6 +24,8 @@ export function ReplyActions({
   onRun,
   onDismiss,
   onRequest,
+  isDone,
+  afterDone,
   label = 'Act on this reply',
 }: {
   /** What these actions are about, for assistive technology. */
@@ -39,12 +41,25 @@ export function ReplyActions({
   onDismiss: () => void;
   /** Ask for actions on a reply that has none yet (one from an earlier visit). */
   onRequest?: () => void;
+  /**
+   * The action has done its job — every fact it offers is on record. Its
+   * button turns into a confirmation and cannot be pressed again (Sean, 14
+   * Oct, SUMMIT: eight facts recorded three times).
+   */
+  isDone?: (action: ReplyAction) => boolean;
+  /** Under a done action: what to do next. */
+  afterDone?: ReactNode;
 }) {
   const [confirming, setConfirming] = useState<ReplyAction | null>(null);
   const [working, setWorking] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
 
+  // A second press while the first is still saving would record twice: state
+  // updates too late to stop a fast double click, a ref does not.
+  const inFlight = useRef(false);
   const run = async (action: ReplyAction) => {
+    if (inFlight.current || isDone?.(action)) return;
+    inFlight.current = true;
     setWorking(true);
     setFailed(null);
     try {
@@ -53,9 +68,11 @@ export function ReplyActions({
     } catch (e) {
       setFailed(e instanceof Error && e.message ? e.message : 'That did not work. Nothing was changed.');
     } finally {
+      inFlight.current = false;
       setWorking(false);
     }
   };
+  const anyDone = (actions ?? []).some((a) => isDone?.(a));
 
   const button = 'rounded-lg px-3 py-1.5 text-label transition-colors disabled:opacity-50';
   const primary = `${button} bg-[var(--pm-primary)] text-[var(--on-primary)] hover:opacity-90`;
@@ -76,7 +93,7 @@ export function ReplyActions({
     ) : null;
   }
 
-  if (confirming?.kind === 'record_facts') {
+  if (confirming?.kind === 'record_facts' && !isDone?.(confirming)) {
     // Conversation never silently becomes project state (Sean, 6 Oct, email
     // 8): what will be recorded is shown, and only "Record" writes it.
     const facts = confirming.facts ?? [];
@@ -160,7 +177,17 @@ export function ReplyActions({
         <p role="alert" className="mt-1 text-label text-[var(--pm-error)]">{failed}</p>
       )}
       <div className="mt-2 flex flex-wrap gap-2">
-        {actions.map((action) => (
+        {actions.map((action) =>
+          isDone?.(action) ? (
+            <span
+              key={`${action.kind}:${action.label}`}
+              role="status"
+              className="inline-flex items-center gap-1 rounded-lg bg-[var(--surface-container-high)] px-3 py-1.5 text-label text-[var(--on-surface)]"
+            >
+              <span aria-hidden className="material-symbols-outlined text-[16px] text-[var(--pm-success)]">check_circle</span>
+              {action.facts?.length === 1 ? 'Fact recorded' : `${action.facts?.length ?? ''} facts recorded`}
+            </span>
+          ) : (
           <button
             key={`${action.kind}:${action.label}`}
             onClick={() => (action.kind === 'revise' ? void run(action) : setConfirming(action))}
@@ -169,11 +196,13 @@ export function ReplyActions({
           >
             {action.label}
           </button>
-        ))}
+          )
+        )}
         <button onClick={onDismiss} disabled={working} className={quiet}>
           Do nothing
         </button>
       </div>
+      {anyDone && afterDone && <div className="mt-2">{afterDone}</div>}
       {actions.some((a) => a.kind === 'revise') && (
         <p className="mt-2 text-label text-[var(--on-surface-variant)]">
           You see the revised version before it is saved.

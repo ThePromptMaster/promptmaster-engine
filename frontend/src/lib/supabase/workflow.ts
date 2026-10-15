@@ -1,4 +1,5 @@
 import { createClient } from './client';
+import { OBJECTIVE_CHANGES, objectiveUnmet } from '@/lib/workflow/objective';
 import type { StageDefinition, WorkflowEvent, WorkflowTemplate } from '@/lib/workflow/types';
 
 interface TemplateRow {
@@ -233,16 +234,19 @@ export async function appendWorkflowEvent(
 export async function pausedProjectIds(projectIds: readonly string[]): Promise<Set<string>> {
   if (!projectIds.length) return new Set();
   const supabase = createClient();
+  // The same rule as the workspace (`objectiveUnmet`): a later change, answer
+  // or new version makes a "not met" something to check again, not a pause
+  // (13 Oct, Sean: a resolved blocker must clear "throughout the interface").
   const { data, error } = await supabase
     .from('workflow_events')
-    .select('project_id, payload, seq')
-    .eq('type', 'objective_assessed')
+    .select('project_id, type, payload, created_at, seq')
+    .in('type', ['objective_assessed', ...OBJECTIVE_CHANGES])
     .in('project_id', projectIds as string[])
     .order('seq', { ascending: true });
   if (error) throw error;
-  const latest = new Map<string, string>();
-  for (const row of (data ?? []) as { project_id: string; payload: { outcome?: string } | null }[]) {
-    latest.set(row.project_id, row.payload?.outcome ?? '');
+  const byProject = new Map<string, WorkflowEvent[]>();
+  for (const row of (data ?? []) as (WorkflowEvent & { project_id: string })[]) {
+    byProject.set(row.project_id, [...(byProject.get(row.project_id) ?? []), row]);
   }
-  return new Set([...latest].filter(([, outcome]) => outcome && outcome !== 'met').map(([id]) => id));
+  return new Set([...byProject].filter(([, events]) => objectiveUnmet(events)).map(([id]) => id));
 }

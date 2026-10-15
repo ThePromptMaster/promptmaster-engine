@@ -54,14 +54,16 @@ export async function supersedeFact(
   old: Pick<ProjectFact, 'id' | 'kind' | 'subject'>,
   statement: string,
   /** Where the change came from, beside the fact it replaces: a revision names its stage and instruction. */
-  from?: Record<string, unknown>
+  from?: Record<string, unknown>,
+  /** Where the new value came from; a fact changed in the Facts panel is a user edit. */
+  sourceKind: ProjectFact['source_kind'] = 'user_edit'
 ): Promise<ProjectFact> {
   const supabase = createClient();
   const { data, error } = await supabase
     .from('project_facts')
     .insert({
       project_id: project.id, user_id: project.user_id, statement: statement.trim(), subject: old.subject,
-      kind: old.kind, source_kind: 'user_edit', source_ref: { ...(from ?? {}), supersedes: old.id }, supersedes: old.id,
+      kind: old.kind, source_kind: sourceKind, source_ref: { ...(from ?? {}), supersedes: old.id }, supersedes: old.id,
     })
     .select(COLUMNS)
     .single();

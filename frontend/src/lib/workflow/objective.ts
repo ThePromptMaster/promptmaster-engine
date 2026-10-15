@@ -23,7 +23,8 @@ export interface ObjectiveAssessment {
   outcome: 'met' | 'not_met' | 'partly';
   reason: string;
   basis_quote: string;
-  blockers: { need: string; kind: BlockerKind }[];
+  /** `ask`: one question that would supply it (13 Oct, workshop); absent on older records. */
+  blockers: { need: string; kind: BlockerKind; ask?: string }[];
   performed: string[];
   proposed_next: string[];
   /** Each requirement the check considered (10 Oct, email 6.5); absent on older records. */
@@ -108,7 +109,22 @@ export function objectiveUnmet(
 }
 
 /** What makes an "objective not met" a thing to check again rather than a standing verdict. */
-const CHANGES_SINCE = new Set<WorkflowEvent['type']>(['brief_changed', 'stage_version_saved', 'stage_unblocked']);
+export const OBJECTIVE_CHANGES = ['brief_changed', 'stage_version_saved', 'stage_unblocked'] as const satisfies readonly WorkflowEvent['type'][];
+const CHANGES_SINCE = new Set<WorkflowEvent['type']>(OBJECTIVE_CHANGES);
+
+/** A Go stop reason that is the objective check's pause (`pausedLine`). */
+const OBJECTIVE_STOP = /\bobjective is not met\b/i;
+
+/**
+ * What "Go is waiting for you" says, beside the objective's own item (13 Oct,
+ * Sean, workshop): nothing while the objective's item says the same thing,
+ * and only "resume" once a change has made the check it stopped on out of
+ * date — never the old blocker after it was resolved.
+ */
+export function goWaitingLine(stopReason: string | null, objectiveOpen: boolean): string | null {
+  if (!stopReason || !OBJECTIVE_STOP.test(stopReason)) return stopReason;
+  return objectiveOpen ? null : 'resume Go to check the objective again';
+}
 
 /** The pause, in words: "Paused — waiting for: the formulas; the data." */
 export function pausedLine(a: Pick<ObjectiveAssessment, 'blockers' | 'reason'>): string {

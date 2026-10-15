@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { api } from '@/lib/api/client';
 import { BRIEF_FIELDS, finishedConclusions, presentationOnly, type WatchedField } from '@/lib/workflow/brief-change';
@@ -56,6 +56,10 @@ export function useBriefChange({
   latest.current = { project, template, state, bundles, stageId, appendEvent };
   const values = watched(project);
   const key = WATCHED.map((f) => values[f]).join('\u0000');
+  // Between a change and its event: the page says it is being worked out
+  // rather than showing nothing (Sean, 14 Oct: "I couldn't tell whether it
+  // had worked").
+  const [judging, setJudging] = useState(false);
 
   useEffect(() => {
     if (!baseline.current) {
@@ -63,6 +67,7 @@ export function useBriefChange({
       return;
     }
     if (!enabled) return;
+    setJudging(WATCHED.some((f) => values[f] !== baseline.current![f]));
     // The latest edit: a stage finished before it was finished on older text.
     const now = watched(project);
     if (WATCHED.some((f) => now[f] !== baseline.current![f])) changedAt.current = new Date().toISOString();
@@ -71,7 +76,10 @@ export function useBriefChange({
       const was = baseline.current!;
       const is = watched(p);
       const changed = WATCHED.filter((f) => is[f] !== was[f]);
-      if (!changed.length) return;
+      if (!changed.length) {
+        setJudging(false);
+        return;
+      }
       baseline.current = is;
       const since = changedAt.current ?? new Date().toISOString();
       changedAt.current = null;
@@ -121,10 +129,11 @@ export function useBriefChange({
             // the change stands, and nothing is marked.
           }
         }
-      })();
+      })().finally(() => setJudging(false));
     }, SETTLE_MS);
     return () => clearTimeout(timer);
     // The brief's values are the trigger; everything else is read fresh.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, enabled]);
+  return judging;
 }

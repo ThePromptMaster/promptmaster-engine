@@ -126,6 +126,10 @@ interface Props {
   /** What a table action would change, for the row-by-row review. */
   previewRows?: (action: ReplyAction) => RowChange[];
   onRunAction?: (action: ReplyAction) => Promise<void> | void;
+  /** An action that has already done its job (its facts are on record). */
+  isActionDone?: (action: ReplyAction) => boolean;
+  /** What to do after a done action: the next step, pointed at. */
+  afterActionDone?: ReactNode;
   applying?: boolean;
   /**
    * The stage's work is not a prose version — a table, an outline or chapters —
@@ -182,6 +186,8 @@ export function ChatPanel({
   suggestActions,
   previewRows,
   onRunAction,
+  isActionDone,
+  afterActionDone,
   applying = false,
   isTable = false,
   getChatContext,
@@ -463,6 +469,8 @@ export function ChatPanel({
                       onRun={runAction}
                       onDismiss={() => setDismissedFor(message.id)}
                       onRequest={() => requestActions(message.id)}
+                      isDone={isActionDone}
+                      afterDone={afterActionDone}
                     />
                   </div>
                 )}

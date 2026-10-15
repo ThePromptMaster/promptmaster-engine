@@ -94,3 +94,55 @@ def test_a_later_fact_outranks_a_value_in_the_objective(basic_inputs):
     assert 'Launch date: November 19, 2026 — edited, 7 Oct (replaces "Launch date: November 12, 2026", which is no longer true)' in block
     assert "including a value written in the objective" in block
     assert "gives way to an accepted fact that supersedes it" in PRECEDENCE_TEXT
+
+
+# Sean, 14 Oct (SUMMIT): "Record these 8 facts" was clicked three times and
+# stored three times; a filler sentence, an instruction about the request and
+# a team member's request were each recorded, the last two as requirements.
+_SUMMIT_MESSAGE = (
+    "Before recording anything or revising documents, explain the conflict and calculate the earliest dates. "
+    "Morgan confirms reconciliation actually finished November 17, 2026. "
+    "Luis asks to count November 16 and November 17 toward the required five testing days. "
+    "Actual spending is now $25,000. All other facts and approvals remain unchanged."
+)
+
+
+def _summit_raw(*facts: dict) -> dict:
+    return {"actions": [{"label": "Record these facts", "kind": "record_facts", "facts": list(facts)}]}
+
+
+def test_recording_skips_facts_already_recorded_filler_and_instructions_about_the_request():
+    raw = _summit_raw(
+        {"statement": "Before recording anything or revising documents, explain the conflict and calculate the earliest dates.", "kind": "requirement"},
+        {"statement": "Morgan confirms reconciliation actually finished November 17, 2026.", "kind": "fact"},
+        {"statement": "All other facts and approvals remain unchanged.", "kind": "fact"},
+        {"statement": "Actual spending is now $25,000.", "kind": "fact"},
+    )
+    known = ["Morgan confirms reconciliation actually finished November 17, 2026"]
+    [action] = parse_reply_actions(raw, None, _SUMMIT_MESSAGE, known)
+    assert [f.statement for f in action.facts] == ["Actual spending is now $25,000."]
+
+
+def test_a_request_by_someone_in_the_project_is_a_fact_not_a_requirement():
+    raw = _summit_raw({"statement": "Luis asks to count November 16 and November 17 toward the required five testing days.", "kind": "requirement"})
+    [action] = parse_reply_actions(raw, None, _SUMMIT_MESSAGE)
+    assert action.facts[0].kind == "fact"
+
+
+def test_a_new_value_names_the_listed_fact_it_replaces_and_nothing_else():
+    raw = _summit_raw(
+        {"statement": "Actual spending is now $25,000.", "replaces": "Actual spending: $23,000."},
+        {"statement": "Morgan confirms reconciliation actually finished November 17, 2026.", "replaces": "A fact that was never recorded"},
+    )
+    actions = parse_reply_actions(raw, None, _SUMMIT_MESSAGE, ["Actual spending: $23,000."])
+    assert [f.replaces for f in actions[0].facts] == ["Actual spending: $23,000.", ""]
+
+
+def test_nothing_new_to_record_offers_no_record_button():
+    raw = _summit_raw({"statement": "Actual spending is now $25,000."})
+    assert parse_reply_actions(raw, None, _SUMMIT_MESSAGE, ["Actual spending is now $25,000"]) == []
+
+
+def test_the_record_prompt_rules_out_instructions_requests_and_repeats():
+    system, _ = build_reply_actions_prompt(_inputs(), "Summary", "q", "a", None)
+    assert "never record it" in system and "never as a requirement" in system and '"replaces"' in system

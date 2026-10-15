@@ -1,6 +1,6 @@
 'use client';
 
-import { BRIEF_FIELD_LABEL, type WatchedField } from '@/lib/workflow/brief-change';
+import { BRIEF_FIELD_LABEL, type OpenChange, type WatchedField } from '@/lib/workflow/brief-change';
 import type { WorkflowEvent } from '@/lib/workflow/types';
 
 /**
@@ -14,8 +14,11 @@ export function BriefChangeNotice({
   onKeep,
   onUpdate,
   updating = false,
+  judging = false,
+  settled = null,
+  onDismissSettled,
 }: {
-  change: { event: WorkflowEvent; stageIds: string[] } | null;
+  change: OpenChange | null;
   stageLabel: (id: string) => string;
   onKeep: (changeAt: string) => void;
   /**
@@ -25,16 +28,70 @@ export function BriefChangeNotice({
    */
   onUpdate?: () => void;
   updating?: boolean;
+  /** A change is saved and what it affects is still being worked out. */
+  judging?: boolean;
+  /** The last change, once everything it reopened is finished again. */
+  settled?: { event: WorkflowEvent; stageIds: string[] } | null;
+  onDismissSettled?: () => void;
 }) {
-  if (!change) return null;
+  if (!change) {
+    if (judging) {
+      return (
+        <div role="status" aria-label="Brief change" className="mb-6 rounded-xl bg-[var(--surface-container-low)] px-5 py-3 text-body text-[var(--on-surface-variant)]">
+          <Steps first="Change saved" second="Checking what it affects…" third="Updated and checked" at={1} />
+        </div>
+      );
+    }
+    if (!settled) return null;
+    const names = settled.stageIds.map(stageLabel);
+    return (
+      <div role="status" aria-label="Brief change" className="mb-6 flex flex-wrap items-center gap-3 rounded-xl bg-[var(--surface-container-low)] px-5 py-3 text-body text-[var(--on-surface-variant)]">
+        <Steps first={firstStep(settled.event)} second={`${listOf(names)} updated`} third="Checked again" at={3} />
+        {onDismissSettled && (
+          <button onClick={onDismissSettled} className="ml-auto text-label text-[var(--pm-primary)] hover:underline">
+            Dismiss
+          </button>
+        )}
+      </div>
+    );
+  }
   const { event, stageIds } = change;
+  const waiting = (
+    <>
+      <Steps first={firstStep(event)} second={updating ? 'Updating affected work…' : `${stageIds.length + (change.alsoWaiting?.length ?? 0)} awaiting update`} third="Updated and checked" at={2} />
+      {change.alsoWaiting?.length ? (
+        <p className="mt-1 text-label">Also awaiting a recheck after an earlier change: {listOf(change.alsoWaiting.map(stageLabel))}.</p>
+      ) : null}
+    </>
+  );
+  if (change.reasons) {
+    const names = stageIds.map(stageLabel);
+    return (
+      <div role="status" aria-label="Brief change" className="mb-6 rounded-xl bg-[var(--surface-container-low)] px-5 py-3 text-body text-[var(--on-surface-variant)]">
+        {waiting}
+        <p className="mt-2">
+          <span aria-hidden className="material-symbols-outlined mr-1 align-[-4px] text-[18px] text-[var(--pm-tertiary)]">history</span>
+          {`${listOf(names)} ${stageIds.length === 1 ? 'was' : 'were'} reopened for a recheck. Earlier versions stay in each stage's history.`}
+        </p>
+        <ul className="mt-1 list-disc pl-6 text-label">
+          {stageIds.map((id) => (
+            <li key={id}>
+              {stageLabel(id)}: {change.reasons![id]}
+            </li>
+          ))}
+        </ul>
+        <Actions onUpdate={onUpdate} updating={updating} onKeep={() => onKeep(event.created_at)} />
+      </div>
+    );
+  }
   if (event.type === 'stage_version_saved') {
     const names = stageIds.map(stageLabel);
     const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
     const n = event.payload?.version_number;
     return (
       <div role="status" aria-label="Brief change" className="mb-6 rounded-xl bg-[var(--surface-container-low)] px-5 py-3 text-body text-[var(--on-surface-variant)]">
-        <p>
+        {waiting}
+        <p className="mt-2">
           <span aria-hidden className="material-symbols-outlined mr-1 align-[-4px] text-[18px] text-[var(--pm-tertiary)]">history</span>
           {`${stageLabel(event.stage_id)} was revised${typeof n === 'number' ? ` (now v${n})` : ''}, so ${list} ${stageIds.length === 1 ? 'was' : 'were'} reopened for a recheck: ${stageIds.length === 1 ? 'it was' : 'they were'} built on the earlier version. Earlier versions stay in each stage's history.`}
         </p>
@@ -46,7 +103,8 @@ export function BriefChangeNotice({
   if (event.payload?.kind === 'reopened') {
     return (
       <div role="status" aria-label="Brief change" className="mb-6 rounded-xl bg-[var(--surface-container-low)] px-5 py-3 text-body text-[var(--on-surface-variant)]">
-        <p>
+        {waiting}
+        <p className="mt-2">
           <span aria-hidden className="material-symbols-outlined mr-1 align-[-4px] text-[18px] text-[var(--pm-tertiary)]">history</span>
           {`You reopened ${stageLabel(event.stage_id)} and asked Go to finish it with your changes. Go finishes it, then rechecks the stages after it. Earlier versions stay in its history.`}
         </p>
@@ -63,7 +121,8 @@ export function BriefChangeNotice({
   const holds = event.payload?.calculations_hold !== false && event.payload?.kind === 'intent' && event.payload?.had_computed === true;
   return (
     <div role="status" aria-label="Brief change" className="mb-6 rounded-xl bg-[var(--surface-container-low)] px-5 py-3 text-body text-[var(--on-surface-variant)]">
-      <p>
+      {waiting}
+      <p className="mt-2">
         <span aria-hidden className="material-symbols-outlined mr-1 align-[-4px] text-[18px] text-[var(--pm-tertiary)]">history</span>
         Changing the {field} reopened {list} for a recheck.{' '}
         {holds ? 'Calculations still hold; what was judged against the old priority is reopened. ' : ''}
@@ -117,4 +176,44 @@ export function partialUpdate(affected: readonly string[], waiting: readonly str
   if (!done.length || !waiting.length) return null;
   const names = (ids: readonly string[]) => ids.map(stageLabel).join(', ');
   return `${done.length} of ${all.length} updated (${names(done)}). Still awaiting a recheck: ${names(waiting)}.`;
+}
+
+function listOf(names: readonly string[]): string {
+  return names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
+}
+
+/** What the user did that started it, in their words. */
+function firstStep(event: WorkflowEvent): string {
+  if (event.type === 'stage_version_saved') return 'Revision saved';
+  if (event.type === 'brief_changed') return event.payload?.field === 'facts' ? 'Facts recorded' : event.payload?.kind === 'reopened' ? 'Stage reopened' : 'Brief changed';
+  if (event.type === 'stage_returned') return 'Went back';
+  return 'Stage completed again';
+}
+
+/**
+ * "✓ Facts recorded → ● 2 awaiting update → ○ Updated and checked" (Sean, 14
+ * Oct, SUMMIT: "Could we make the sequence clearer: facts recorded, affected
+ * work awaiting update, then updated and checked?"). `at` is the step under
+ * way; the steps before it are done.
+ */
+function Steps({ first, second, third, at }: { first: string; second: string; third: string; at: 1 | 2 | 3 }) {
+  const steps = [first, second, third];
+  return (
+    <ol aria-label="Progress of this change" className="flex flex-wrap items-center gap-x-2 gap-y-1 text-label">
+      {steps.map((text, i) => {
+        const n = i + 1;
+        const done = n < at || (at === 3 && n === 3);
+        const current = n === at && !done;
+        return (
+          <li key={text} className={`flex items-center gap-1 ${done || current ? 'text-[var(--on-surface)]' : ''}`} aria-current={current ? 'step' : undefined}>
+            {i > 0 && <span aria-hidden className="material-symbols-outlined text-[16px] text-[var(--outline)]">chevron_right</span>}
+            <span aria-hidden className={`material-symbols-outlined text-[16px] ${done ? 'text-[var(--pm-success)]' : current ? 'text-[var(--pm-tertiary)]' : 'text-[var(--outline)]'}`}>
+              {done ? 'check_circle' : current ? 'pending' : 'radio_button_unchecked'}
+            </span>
+            <span className={current ? 'font-semibold' : ''}>{text}</span>
+          </li>
+        );
+      })}
+    </ol>
+  );
 }

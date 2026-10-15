@@ -949,12 +949,19 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // A repair that still states a value the user changed is not a repair
       // (Sean, 7 Oct: "the final announcement still displayed November 12 and
       // $12"). Checked in code; one more try names what was left behind.
-      let leftover = content ? leftoverValues(content, superseded) : [];
+      // A decided row is put back exactly as it was (`restoreDecided`), so it
+      // is not checked: it records what was found then (14 Oct, JUNIPER: a
+      // review row quoting version 1 failed a repair that could not change it).
+      const leftoverIn = (text: string) => {
+        const rows = before ? parseItems(text) : null;
+        return leftoverValues(rows ? serializeItems(rows.filter((r) => !before!.some((b) => b.status && b.id === r.id))) : text, superseded);
+      };
+      let leftover = content ? leftoverIn(content) : [];
       if (content && leftover.length) {
         ({ res, content } = await attempt(
-          `${instruction} YOUR PREVIOUS ATTEMPT STILL STATED: ${leftover.map(describeValue).join(', ')}. Replace each with the current fact's value.`
+          `${instruction} YOUR PREVIOUS ATTEMPT STILL STATED AS CURRENT: ${leftover.map(describeValue).join(', ')}. Replace each where it is stated as current; keep it where the text records history, and say it was replaced.`
         ));
-        leftover = content ? leftoverValues(content, superseded) : [];
+        leftover = content ? leftoverIn(content) : [];
       }
       // A measured repair is measured again, in code; one more try names the count.
       // Every repair is measured on its new text, not only a measured one (12 Oct, Diligence).
@@ -1632,15 +1639,19 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         const performed = assessment.performed.length ? ` Done: ${assessment.performed.join('; ')}.` : ' No computation or investigation was recorded as performed.';
         const proposed = assessment.proposed_next.length ? ` Proposed, not done: ${assessment.proposed_next.join('; ')}.` : '';
         const line = pausedLine(assessment);
-        const blocked = assessment.blockers.length > 0;
+        // A blocker the user can answer is asked, not only reported (13 Oct,
+        // Sean, workshop): the answer is recorded as a fact and the judged
+        // stage revised with it (`answer` in use-go-loop).
+        const asks = [...new Set(assessment.blockers.map((b) => b.ask?.trim()).filter((a): a is string => !!a))];
+        const blocked = assessment.blockers.length > 0 && !asks.length;
         // What was found unmet, by name, and what each button does (11 Oct,
         // survey brief: a pause that named nothing and asked nothing).
         const failed = unmetItems(assessment);
         return done(key, {
           ...judged, status: 'succeeded',
           output: `${line}${performed}${proposed} ${describeBasis(basis)}${assessment.model_note ? ` The check's own words: "${assessment.model_note}"` : ''}`,
-          stop: { status: blocked ? 'blocked' : 'awaiting_decision', reason: line },
-          ...(blocked ? {} : {
+          stop: { status: blocked ? 'blocked' : 'awaiting_decision', reason: asks.length ? `${line} ${asks.join(' ')}` : line },
+          ...(blocked ? {} : asks.length ? { needs: { kind: 'answer_question' as const, question: `${line} ${asks.join(' ')}` } } : {
             needs: {
               kind: 'objective_check' as const, stageId: holder?.id ?? ctx.stage.id,
               finding: failed.length ? 'unmet' as const : 'no_evidence' as const, items: failed,
@@ -1879,7 +1890,9 @@ export function recheckInstruction(
   // and "keep every figure that still holds" kept November 12 (TeamNotes).
   const changes = [...new Map(superseded.map((v) => [`${v.kind}:${v.value}`, v])).values()];
   const replace = changes.length
-    ? ' CHANGED FACTS — these values are no longer true; replace every occurrence, in every form it is written, with the current fact: ' +
+    ? ' CHANGED FACTS — these values are no longer true; replace every place the work states one as current, in every form it is written, with the current fact. ' +
+      // 14 Oct (Sean, SUMMIT): "replace every occurrence" emptied the change log.
+      'Where the work records history — a change or decision log, a superseded value, a quotation of an earlier version, a request that was declined — keep the earlier value there and say it was replaced: ' +
       changes.map((v) => `${describeValue(v)} (was: "${v.was}"; now: "${v.now}")`).join('; ') + '.'
     : '';
   return (

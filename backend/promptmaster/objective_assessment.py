@@ -27,6 +27,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from .agent_actions import ACTIONS_BY_KEY
 from .llm_client import OpenRouterClient
 from .project_context import CHECK_CONTEXT_MAX, brief_lines, context_block
 from .schemas import PMInput
@@ -67,13 +68,24 @@ _ASSESS_INSTRUCTION = (
     "A result the deliverable labels as resting on an unverified assumption ('assumed, not "
     "verified', 'conditional on') does not meet the objective; nor does an AI pass where the "
     "objective requires people (independent human coders, participants, a laboratory "
-    "measurement). Return JSON only."
+    "measurement). "
+    # 14 Oct (Sean, SUMMIT): Luis's request to count two testing days was
+    # recorded as a requirement; the pack correctly refused it, and the check
+    # called the objective unmet because the request was not carried out.
+    "A request, suggestion or proposal made by someone in the project (\"Luis asks to count those "
+    "days\", \"Omar proposes a budget increase\") is not a requirement of the objective, even when it "
+    "is recorded as one. Never list it as a criterion to carry out. The deliverable handles it correctly "
+    "when it reports the request and treats it as the accepted facts and approvals allow — declining or "
+    "excluding it where it conflicts with them is correct, not a failure. Return JSON only."
 )
 
 
 class Blocker(BaseModel):
     need: str = Field(max_length=300)
     kind: BlockerKind = "data_missing"
+    #: One question to the user that would supply it, in their terms (Sean, 13
+    #: Oct, workshop: "PromptMaster left me figuring out what to provide next").
+    ask: str = Field(default="", max_length=300)
 
 
 class CriterionResult(BaseModel):
@@ -163,7 +175,8 @@ def build_assessment_prompt(
         '  "outcome": "met" | "not_met" | "partly",\n'
         '  "reason": "one sentence",\n'
         '  "basis_quote": "a short passage copied exactly from the deliverable that shows the outcome",\n'
-        '  "blockers": [{"need": "exactly what is missing", "kind": "data_missing|tool_missing|source_missing|needs_decision"}],\n'
+        '  "blockers": [{"need": "exactly what is missing — with the value or limit it must meet when the recorded figures give one", '
+        '"ask": "one question to the user that would supply it", "kind": "data_missing|tool_missing|source_missing|needs_decision"}],\n'
         '  "performed": ["S1", "S3"],\n'
         '  "proposed_next": ["each next step or investigation the text names but the record does not show done"],\n'
         '  "criteria": [{"requirement": "one thing the objective, an accepted requirement or a constraint asks for", '
@@ -172,6 +185,11 @@ def build_assessment_prompt(
         "}\n"
         # 10 Oct (Sean, emails 3 and 8): a heading is not evidence; a length you
         # cannot see (pages when printed) is not checked, and saying so is honest.
+        # 13 Oct (Sean, workshop): "For 20 lunches within $240, clearly explain
+        # that we need a confirmed price of $12 per person or less."
+        "A blocker is actionable: where the recorded figures fix what the missing value must be, say so with "
+        "the calculation (a confirmed lunch price of $12 per person or less: $240 approved / 20 attendees), "
+        "and ask for exactly that value. Use only figures the record gives.\n"
         "List each requirement separately in \"criteria\" — every part of the objective, every accepted "
         "requirement and constraint — at most 12. Mark one \"not_checked\" when the text alone cannot show it "
         "(how many pages it prints to, how it looks, anything outside the text). A heading is not a basis.\n"
@@ -281,12 +299,94 @@ EVIDENCE_RETRY = (
 )
 
 
+#: Execution labels in the user's words; mirrors `LABEL_TEXT` in `lib/agent/labels.ts`.
+EXECUTION_TEXT = {
+    "discussed": "analyzed", "designed": "draft written", "code_written": "code written, not run",
+    "code_executed": "code executed", "simulation_run": "simulation run", "result_interpreted": "result interpreted",
+    "blocked": "could not continue",
+}
+
+_REQUEST = re.compile(r"\b(?:asks?|asked|requests?|requested|suggests?|suggested|proposes?|proposed|proposal|wants?|would like)\b", re.I)
+_WORDS = re.compile(r"[a-z0-9]{3,}")
+_STOP = {"the", "and", "for", "that", "this", "with", "can", "still", "toward", "towards", "those", "these", "from", "are", "was", "has", "have"}
+
+
+def _content_words(text: str) -> set[str]:
+    return {w for w in _WORDS.findall(text.lower()) if w not in _STOP}
+
+
+def request_facts(inputs: PMInput) -> list[str]:
+    """The accepted facts that record someone's request, suggestion or proposal."""
+    return [f.statement for f in (inputs.facts or []) if _REQUEST.search(f.statement)]
+
+
+def _is_request(requirement: str, requests: list[str]) -> bool:
+    """The criterion restates a recorded request ("Count the November 16 and 17
+    testing days toward the five" for "Luis asks to count those two days toward
+    the required five testing days"), or reads as one itself."""
+    if _REQUEST.search(requirement):
+        return True
+    words = _content_words(requirement)
+    if len(words) < 4:
+        return False
+    return any(len(words & _content_words(r)) >= max(4, len(words) // 2) for r in requests)
+
+
+_AMOUNT = re.compile(r"(?<![\w.])\$?(\d[\d,]*(?:\.\d+)?)(?![\d])")
+#: A figure with what it is held to: "$12 per person or less", "under $240".
+_FIGURE_PHRASE = re.compile(
+    r"(?:\s*(?:of|at|under|below|above|over|no more than|at most|at least|up to|within)\s+)?"
+    r"\$?\d[\d,]*(?:\.\d+)?(?:\s*(?:per|a|an|each)\s+\w+)?(?:\s+or\s+(?:less|fewer|more|lower|higher|under|below))?",
+    re.I,
+)
+
+
+def _amounts(text: str) -> set[float]:
+    out: set[float] = set()
+    for m in _AMOUNT.finditer(text):
+        try:
+            out.add(float(m.group(1).replace(",", "")))
+        except ValueError:
+            pass
+    return out
+
+
+def _derivable(value: float, record: set[float]) -> bool:
+    """On the record, or one step of arithmetic on two of its figures."""
+    if any(abs(value - r) < 0.005 for r in record):
+        return True
+    nums = sorted(record)[:60]
+    for a in nums:
+        for b in nums:
+            for v in (a + b, a - b, a * b, a / b if b else None):
+                if v is not None and abs(v - value) < 0.005:
+                    return True
+    return False
+
+
+def _figures_from_record(text: str, record: set[float]) -> str:
+    """`text` with any figure removed that the record neither gives nor yields in one step."""
+    def keep(m: re.Match[str]) -> str:
+        found = _amounts(m.group(0))
+        return m.group(0) if all(_derivable(v, record) for v in found) else ""
+    out = _FIGURE_PHRASE.sub(keep, text)
+    return re.sub(r"\s+([,.;:)])", r"\1", re.sub(r"\(\s*\)|\s{2,}", " ", out)).strip()
+
+
+def record_text(inputs: PMInput) -> str:
+    """Where a blocker's figures may come from: the brief, the context and the accepted facts."""
+    facts = "\n".join(f.statement for f in (inputs.facts or []))
+    return "\n".join([inputs.objective, inputs.constraints, inputs.context or "", facts])
+
+
 def parse_assessment(
     result: object,
     content: str,
     steps: list[RunStep],
     failed_checks: list[str] | None = None,
     measured: list[str] | None = None,
+    requests: list[str] | None = None,
+    record: str = "",
 ) -> ObjectiveAssessment:
     if not isinstance(result, dict):
         return ObjectiveAssessment(outcome="partly", reason="The check did not come back in a usable form.")
@@ -306,13 +406,19 @@ def parse_assessment(
         outcome = "partly"
 
     blockers: list[Blocker] = []
+    record_numbers = _amounts(f"{record}\n{content}")
     for b in result.get("blockers") or []:
         if not isinstance(b, dict):
             continue
         need = " ".join(str(b.get("need") or "").split())[:300]
+        ask = " ".join(str(b.get("ask") or "").split())[:300]
         kind = b.get("kind") if b.get("kind") in ("data_missing", "tool_missing", "source_missing", "needs_decision") else "data_missing"
         if need:
-            blockers.append(Blocker(need=need, kind=kind))
+            # A figure the record does not give, and no one step of arithmetic
+            # on its figures gives, is not shown: a threshold the model made
+            # up would send the user after the wrong number.
+            need, ask = _figures_from_record(need, record_numbers), _figures_from_record(ask, record_numbers)
+            blockers.append(Blocker(need=need, kind=kind, ask=ask))
     if outcome == "met":
         blockers = []
 
@@ -320,6 +426,7 @@ def parse_assessment(
     done_labels = {"code_written", "code_executed", "simulation_run", "result_interpreted", "designed"}
     performed: list[str] = []
     proposed: list[str] = []
+    # In the user's words, not the registry's (14 Oct, Sean: "Done: recheck_stage (designed)").
     for item in result.get("performed") or []:
         m = re.fullmatch(r"\s*S(\d+)\s*", str(item))
         idx = int(m.group(1)) - 1 if m else -1
@@ -327,7 +434,8 @@ def parse_assessment(
             # A step id: kept only if the record has it and it did something.
             if 0 <= idx < len(steps) and (steps[idx].execution_label or "") in done_labels:
                 s = steps[idx]
-                text = f"{s.action_key} ({s.execution_label})"
+                action = ACTIONS_BY_KEY.get(s.action_key)
+                text = f"{action.label if action else s.action_key} ({EXECUTION_TEXT.get(s.execution_label or '', s.execution_label)})"
                 if text not in performed:
                     performed.append(text)
         elif str(item).strip():
@@ -340,6 +448,7 @@ def parse_assessment(
 
     criteria: list[CriterionResult] = []
     overruled: list[str] = []
+    declined: list[str] = []
     for c in result.get("criteria") or []:
         if not isinstance(c, dict):
             continue
@@ -354,7 +463,12 @@ def parse_assessment(
         # A count code made is the count (11 Oct): the model's own reading of
         # a length or a number of sections does not overrule it.
         counted = _measured_for(requirement, measured or [])
-        if counted and verdict != "met":
+        # A request is not the objective's to carry out (14 Oct, SUMMIT): a
+        # verdict that it was "not met" is set aside, in code.
+        if verdict == "not_met" and _is_request(requirement, requests or []):
+            declined.append(requirement)
+            verdict, basis = "not_checked", "A request by someone in the project, not a requirement; the deliverable reports how it was handled."
+        elif counted and verdict != "met":
             overruled.append(f"{requirement} ({'said not met' if verdict == 'not_met' else 'not checked'})")
             verdict, basis = "met", f"Measured in code: {counted}"
         criteria.append(CriterionResult(requirement=requirement, verdict=verdict, basis=basis))
@@ -371,7 +485,7 @@ def parse_assessment(
     # Every requirement it found unmet was one code measured as met: its
     # verdict rested on a miscount. Met when it can show the text; else partly.
     if (
-        claimed != "met" and overruled and not failed_checks and not blockers
+        claimed != "met" and (overruled or declined) and not failed_checks and not blockers
         and not any(c.verdict == "not_met" for c in criteria)
     ):
         outcome = "met" if quoted else "partly"
@@ -381,9 +495,13 @@ def parse_assessment(
         said = f"{said} [Overruled by the count made in code: {'; '.join(overruled)}.]".strip()
         if outcome == "met":
             reason, note = "Met: every requirement holds; the measured ones were counted in code.", said
+    if declined:
+        said = f"{said} [Set aside as a request, not a requirement: {'; '.join(declined)}.]".strip()
+        if outcome == "met" and not overruled:
+            reason, note = "Met: every requirement holds; a request someone made is reported, not carried out.", said
     unmet = unmet_items(criteria, failed_checks or []) if outcome != "met" else []
     # The model's own "not met" with nothing named is still a thing unmet, in its words.
-    if outcome != "met" and not unmet and claimed != "met" and not overruled and said:
+    if outcome != "met" and not unmet and claimed != "met" and not overruled and not declined and said:
         unmet = [said.rstrip(". ")]
     if outcome != "met":
         named = unmet_reason(unmet)
@@ -420,12 +538,13 @@ async def assess_objective(
 ) -> ObjectiveAssessment:
     system, user = build_assessment_prompt(inputs, deliverable_label, content, steps, success_criterion, failed_checks, measured)
     result, _usage = await client.generate_json(prompt=user, system=system, temperature=0, max_tokens=1_600, model=model)
-    parsed = parse_assessment(result, content, steps, failed_checks, measured)
+    requests = request_facts(inputs)
+    parsed = parse_assessment(result, content, steps, failed_checks, measured, requests, record_text(inputs))
     # A "met" lost only for want of a quote is asked once more before it can
     # pause a run (11 Oct: the run stopped on "not met" for exactly this).
     if _needs_evidence_retry(result, parsed, failed_checks):
         again, _usage = await client.generate_json(
             prompt=user + EVIDENCE_RETRY, system=system, temperature=0, max_tokens=1_600, model=model
         )
-        parsed = parse_assessment(again, content, steps, failed_checks, measured)
+        parsed = parse_assessment(again, content, steps, failed_checks, measured, requests, record_text(inputs))
     return parsed
