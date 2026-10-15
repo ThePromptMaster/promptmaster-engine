@@ -12,6 +12,7 @@ export function FactsNextStep({
   waiting,
   onUpdate,
   updating,
+  updated,
 }: {
   /** The change check is still working out what the facts affect. */
   judging: boolean;
@@ -19,6 +20,8 @@ export function FactsNextStep({
   waiting: readonly string[];
   onUpdate?: () => void;
   updating: boolean;
+  /** The stages the last change reopened, once each is finished again. */
+  updated?: readonly string[];
 }) {
   const text = 'text-label text-[var(--on-surface-variant)]';
   if (waiting.length) {
@@ -44,6 +47,14 @@ export function FactsNextStep({
     return (
       <p role="status" className={text}>
         Checking what these facts affect…
+      </p>
+    );
+  }
+  if (updated?.length) {
+    return (
+      <p role="status" className={text}>
+        <span aria-hidden className="material-symbols-outlined mr-1 align-[-3px] text-[16px] text-[var(--pm-success)]">check_circle</span>
+        Updated and checked: {updated.join(', ')}.
       </p>
     );
   }
