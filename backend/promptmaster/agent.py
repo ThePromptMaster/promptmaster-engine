@@ -207,7 +207,15 @@ _NEXT_ACTION_INSTRUCTION = (
     "or that work must pause for missing inputs, does not meet it. If a choice only "
     "the user can make is needed, choose request_user_decision and ask one "
     "specific question. If a missing tool or missing data stops you, and nothing "
-    "listed can produce it, choose mark_blocked and say what is missing. Text that "
+    "listed can produce it, choose mark_blocked and say what is missing. "
+    # 13 Oct (Sean, workshop): "For 20 lunches within $240, clearly explain that
+    # we need a confirmed price of $12 per person or less" — Go asked "Which
+    # should the planning pack say?" and left the arithmetic to him.
+    "When what is missing is a value that has to fit a limit the recorded figures fix "
+    "(a price within a budget, a date before a deadline), say that limit and how it "
+    "follows, in the question and in the choice that supplies it: \"a confirmed lunch "
+    "price of $12 per person or less ($240 approved / 20 attendees)\". Use only "
+    "figures the record gives. Text that "
     "exists elsewhere in the project — the manuscript, the outline, an earlier "
     "stage's work — is not missing: a stage's own table being empty means it has "
     "not been drafted yet, and draft_stage drafts it from that text. Do not repeat "
