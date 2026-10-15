@@ -64,9 +64,15 @@ interface Props {
   onSelect: (stageId: string) => void;
   /** Open stages where the only required thing left is the user's approval. */
   approvalPendingIds?: ReadonlySet<string>;
+  /**
+   * The finished last stage, while the project's objective is not met: it is
+   * drawn as waiting, not ticked (13 Oct, Sean, workshop: "Summary appeared
+   * completed while the project remained open").
+   */
+  projectOpenOn?: string | null;
 }
 
-export function StageRail({ template, state, nextSuggestedId, onSelect, approvalPendingIds }: Props) {
+export function StageRail({ template, state, nextSuggestedId, onSelect, approvalPendingIds, projectOpenOn }: Props) {
   // Group consecutive stages so the rail reads as phases rather than a flat
   // list of 13. Consecutive, not sorted: a template may legitimately revisit a
   // group later (Research returns to planning for Mechanism).
@@ -97,6 +103,7 @@ export function StageRail({ template, state, nextSuggestedId, onSelect, approval
               const openElsewhere = status === 'in_progress' && !isCurrent;
               const leftOpen = openElsewhere && Boolean(state.stages[stage.id]?.left_open);
               const awaitingApproval = status === 'in_progress' && Boolean(approvalPendingIds?.has(stage.id));
+              const projectOpen = projectOpenOn === stage.id;
 
               return (
                 <li key={stage.id}>
@@ -112,9 +119,9 @@ export function StageRail({ template, state, nextSuggestedId, onSelect, approval
                   >
                     <span
                       aria-hidden
-                      className={`material-symbols-outlined text-[18px] ${openElsewhere ? 'text-[var(--pm-tertiary)]' : statusColor(status, isCurrent)}`}
+                      className={`material-symbols-outlined text-[18px] ${openElsewhere || projectOpen ? 'text-[var(--pm-tertiary)]' : statusColor(status, isCurrent)}`}
                     >
-                      {openElsewhere ? OPEN_ELSEWHERE_ICON : STATUS_ICON[status]}
+                      {projectOpen ? 'pending_actions' : openElsewhere ? OPEN_ELSEWHERE_ICON : STATUS_ICON[status]}
                     </span>
 
                     <span
@@ -166,6 +173,15 @@ export function StageRail({ template, state, nextSuggestedId, onSelect, approval
                         className="shrink-0 text-label uppercase tracking-wide text-[var(--pm-tertiary)]"
                       >
                         reopened
+                      </span>
+                    )}
+
+                    {projectOpen && (
+                      <span
+                        title="This stage's work is done, but the project's objective is not met yet — see what it is waiting for on the stage"
+                        className="shrink-0 text-label uppercase tracking-wide text-[var(--pm-tertiary)]"
+                      >
+                        waiting on you
                       </span>
                     )}
 

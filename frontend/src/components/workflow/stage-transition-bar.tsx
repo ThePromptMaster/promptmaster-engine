@@ -69,6 +69,8 @@ interface Props {
    * "nothing is outstanding" for the project (6 Oct).
    */
   elsewhere?: readonly string[];
+  /** This is the last stage, done, and the project's objective is not met (13 Oct, Sean, workshop). */
+  projectOpen?: boolean;
 }
 
 /**
@@ -93,6 +95,7 @@ export function StageTransitionBar({
   more = [],
   nextStageLabel = null,
   elsewhere = [],
+  projectOpen = false,
 }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [whyOpen, setWhyOpen] = useState(false);
@@ -202,7 +205,9 @@ export function StageTransitionBar({
   // move on" beside open work read as two answers. With work open elsewhere it
   // says this stage is done, and where the rest is.
   const statusLine = evaluation.canAdvance
-    ? elsewhere.length
+    ? projectOpen
+      ? `This stage's work is done; the project is not finished · ${elsewhere.length || 1} open: ${elsewhere.join('; ') || 'the objective is not met'}. Respond in the notice at the top of this stage.`
+      : elsewhere.length
       ? `This stage is done · ${elsewhere.length} still open elsewhere: ${elsewhere.join('; ')}`
       : 'Ready to move on'
     : `${evaluation.unmet.length} item${evaluation.unmet.length === 1 ? '' : 's'} outstanding${elsewhereNote}`;
