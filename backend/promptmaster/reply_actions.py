@@ -62,6 +62,10 @@ class FactToRecord(BaseModel):
     statement: str = Field(max_length=2_000)
     subject: str = Field(default="", max_length=200)
     kind: Literal["fact", "requirement"] = "fact"
+    #: The accepted fact this one gives a new value for, exactly as listed: the
+    #: browser records it as superseding that fact, so history keeps was/now
+    #: rather than two current values (Sean, 14 Oct, SUMMIT).
+    replaces: str = Field(default="", max_length=2_000)
 
 
 class ReplyAction(BaseModel):
@@ -119,13 +123,24 @@ _FACTS_KIND = (
     "per fact, each in the user's own words and figures. Only what the user wrote — "
     "never what the answer inferred or suggested. Label it like \"Record these 3 facts\". "
     "Nothing is recorded until the user confirms.\n"
+    "- Leave out anything already among the accepted facts below, and filler such as "
+    "\"all other facts remain unchanged\".\n"
+    "- Where a statement gives a new value for an accepted fact, add \"replaces\": that "
+    "fact's statement copied exactly as listed.\n"
+    "- An instruction about how to handle THIS request (\"before recording anything, "
+    "explain…\", \"don't revise yet\", \"first calculate…\") is not a fact or a "
+    "requirement: never record it.\n"
+    "- A request, suggestion or proposal by someone in the project (\"Luis asks to count "
+    "those days\") is recorded as a fact about the request, never as a requirement: "
+    "nobody has approved it.\n"
 )
 
 _SHAPE = (
     "Return JSON only:\n"
     '{"actions": [{"label": "...", "kind": "revise", "instruction": "..."}, '
     '{"label": "...", "kind": "row_updates", "updates": [{"id": "...", "status": "...", "reason": "...", "fields": {}}]}, '
-    '{"label": "...", "kind": "add_rows", "rows": [{}]}]}'
+    '{"label": "...", "kind": "add_rows", "rows": [{}]}, '
+    '{"label": "...", "kind": "record_facts", "facts": [{"statement": "...", "subject": "...", "kind": "fact", "replaces": ""}]}]}'
 )
 
 
@@ -169,7 +184,9 @@ def _clean_label(value: object) -> str:
     return label[:60]
 
 
-def parse_reply_actions(raw: object, table: ActionTable | None, question: str = "") -> list[ReplyAction]:
+def parse_reply_actions(
+    raw: object, table: ActionTable | None, question: str = "", known_facts: list[str] | None = None
+) -> list[ReplyAction]:
     """Keep only actions that can be carried out as stated.
 
     A table action that names a row which is not there, or a status the table
@@ -193,7 +210,7 @@ def parse_reply_actions(raw: object, table: ActionTable | None, question: str = 
         if not label:
             continue
         if kind == "record_facts":
-            facts = parse_record_facts(item, question)
+            facts = parse_record_facts(item, question, known_facts)
             if facts:
                 out.append(ReplyAction(label=label, kind="record_facts", facts=facts))
         elif kind == "revise" and not table:
@@ -249,7 +266,38 @@ def _from_user(statement: str, question: str) -> bool:
     return bool(words) and sum(w in q for w in words) >= max(1, (len(words) + 1) // 2)
 
 
-def parse_record_facts(item: dict, question: str) -> list[FactToRecord]:
+def _norm(text: str) -> str:
+    return " ".join(re.sub(r"[^\w$%]+", " ", text.lower()).split())
+
+
+#: "All other facts and approvals remain unchanged": a sentence that records
+#: nothing. SUMMIT stored it four times over (Sean, 14 Oct).
+_FILLER = re.compile(
+    r"^(?:all |everything |any )?(?:other|else|remaining|the rest of the)\b[\w\s,/&-]*?\b"
+    r"(?:remain|remains|stay|stays|is|are)\s+(?:unchanged|the same|as (?:before|they were|it was))\b",
+    re.I,
+)
+#: How to handle this one request, addressed to the assistant: "Before
+#: recording anything or revising documents, explain the conflict…" became a
+#: standing requirement in SUMMIT (Sean, 14 Oct, email 5).
+_PROCESS = re.compile(
+    r"^(?:please\s+)?(?:before (?:you |recording|revising|updating|changing|doing|making|we )|"
+    r"first,? (?:explain|calculate|check|tell|show|list)|"
+    r"(?:do not|don't|don’t) (?:record|revise|update|change|edit) (?:anything|the|any|yet)|"
+    r"wait (?:before|until)|for now,? (?:do not|don't|just)|"
+    r"(?:explain|calculate|identify|tell me|show me)\b.*\bbefore (?:recording|revising|updating))",
+    re.I,
+)
+#: Someone in the project asking for something: a fact about a request.
+_REQUEST = re.compile(r"\b(?:asks?|asked|requests?|requested|suggests?|suggested|proposes?|proposed|wants?|would like)\b", re.I)
+
+
+def parse_record_facts(item: dict, question: str, known: list[str] | None = None) -> list[FactToRecord]:
+    """The facts to offer for recording, each checked in code: the user's own
+    words, not already recorded, not filler, and not an instruction about how
+    to handle this request. A request stays a fact, never a requirement."""
+    seen = {_norm(k) for k in (known or [])}
+    by_norm = {_norm(k): k for k in (known or [])}
     facts: list[FactToRecord] = []
     for f in (item.get("facts") or [])[:MAX_FACTS_PER_ACTION]:
         if not isinstance(f, dict):
@@ -257,8 +305,15 @@ def parse_record_facts(item: dict, question: str) -> list[FactToRecord]:
         statement = " ".join(str(f.get("statement") or "").split())[:2_000]
         if not statement or not _from_user(statement, question):
             continue
-        kind = "requirement" if f.get("kind") == "requirement" else "fact"
-        facts.append(FactToRecord(statement=statement, subject=" ".join(str(f.get("subject") or "").split())[:200], kind=kind))
+        if _norm(statement) in seen or _FILLER.search(statement) or _PROCESS.search(statement):
+            continue
+        seen.add(_norm(statement))
+        kind = "requirement" if f.get("kind") == "requirement" and not _REQUEST.search(statement) else "fact"
+        # Only a fact that is listed can be replaced; anything else is a new fact.
+        replaces = by_norm.get(_norm(" ".join(str(f.get("replaces") or "").split())), "")
+        facts.append(FactToRecord(
+            statement=statement, subject=" ".join(str(f.get("subject") or "").split())[:200], kind=kind, replaces=replaces,
+        ))
     return facts
 
 
@@ -268,4 +323,5 @@ async def suggest_reply_actions(
 ) -> list[ReplyAction]:
     system, user = build_reply_actions_prompt(inputs, stage_label, question, reply, table)
     raw, _usage = await client.generate_json(prompt=user, system=system, temperature=0.2, max_tokens=1_500, model=model)
-    return parse_reply_actions(raw, table, question)
+    known = [f.statement for f in (inputs.facts or [])]
+    return parse_reply_actions(raw, table, question, known)
