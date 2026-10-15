@@ -155,7 +155,39 @@ function answered(statement: string): string {
  * the value; it does not state it as current (8 Oct, production: a reviewed
  * prompt restating the two sources could never pass the leftover check).
  */
-const ATTRIBUTED = /\b(sources?|exclud\w*|conflict\w*|supersed\w*|instead of|replac\w*|previous\w*|earlier|formerly|alternative\w*|no longer|rather than|do not use|don't use|not use|was (?:originally|initially))\b/i;
+const ATTRIBUTED = /\b(sources?|exclud\w*|conflict\w*|supersed\w*|instead of|replac\w*|previous\w*|earlier|formerly|alternative\w*|no longer|rather than|do not use|don't use|not use|was (?:originally|initially)|histor(?:y|ical)|changed from|originally|request(?:s|ed)?|asks?|asked|declined|rejected|propos(?:al|als|ed|es)|v\d+)\b/i;
+
+/**
+ * A section that records history: a change log, a decision log, superseded
+ * values. Its lines report earlier values by design (Sean, 14 Oct, SUMMIT:
+ * "some earlier revisions also dropped prior values from the visible change
+ * log" — the repair's retry was told to replace them).
+ */
+const HISTORY_HEADING = /\b(change ?log|changes|decision (?:and change )?log|decisions? log|history|superseded|revision log|audit trail|what changed)\b/i;
+
+/**
+ * Text in quotation marks reports what a document said ("the memo says \"the
+ * approved November 20 launch date is achievable\""); it does not state it
+ * (14 Oct, JUNIPER: a review quoting version 1 failed the repair). In JSON
+ * only escaped or curly quotes are quotations.
+ */
+function withoutQuotations(text: string): string {
+  const json = /^\s*[[{]/.test(text);
+  let out = text.replace(/\\"(?:[^"\\]|\\(?!"))*\\"/g, ' ').replace(/[“][^”]*[”]/g, ' ');
+  if (!json) out = out.replace(/"[^"\n]{1,400}"/g, ' ');
+  return out;
+}
+
+/**
+ * "Testing — November 16 to November 20": a span of days for a task, not the
+ * single date a fact gave (14 Oct, JUNIPER: a testing window ending on the old
+ * launch date read as the launch date left behind). Removed only when the old
+ * fact itself gave no span.
+ */
+const RANGE = new RegExp(
+  `(?:\\b${MONTH}\\s+)?\\b\\d{1,2}(?:st|nd|rd|th)?(?:,?\\s*\\d{4})?\\s*(?:to|through|until|thru|–|—|-)\\s*(?:${MONTH}\\s+)?\\d{1,2}(?:st|nd|rd|th)?\\b`,
+  'gi'
+);
 
 /**
  * The superseded values `text` still states as current. A sentence that names
@@ -168,10 +200,29 @@ export function leftoverValues(text: string, superseded: readonly SupersededValu
   // A list under a line that sets values aside ("The following alternatives
   // are excluded:") is that line's: each item reports a value, it does not
   // state it (8 Oct, production: "- $18 per user per month price").
-  const lines = text.replace(/\\n/g, '\n').split('\n');
+  const lines = withoutQuotations(text.replace(/\\n/g, '\n')).split('\n');
   let underAttribution = false;
-  const kept = lines.filter((line) => {
+  // Under a markdown heading that records history, until the next heading.
+  let inHistory = false;
+  // A table whose header names history ("| Type | Item | Detail | Date / status |"
+  // under "Decision and change log"): handled by the heading; a table header
+  // row that itself says "superseded" or "history" marks the table.
+  let historyTable = false;
+  const kept = lines.filter((line, i) => {
     const t = line.trim();
+    const heading = /^#{1,6}\s+(.*)$/.exec(t) ?? /^\*\*([^*]+)\*\*:?$/.exec(t);
+    if (heading) {
+      inHistory = HISTORY_HEADING.test(heading[1]);
+      historyTable = false;
+      return !inHistory;
+    }
+    if (inHistory) return false;
+    if (t.startsWith('|')) {
+      if (HISTORY_HEADING.test(t) && /\|\s*:?-{2,}/.test(lines[i + 1] ?? '')) historyTable = true;
+      if (historyTable) return false;
+    } else if (t) {
+      historyTable = false;
+    }
     if (/:\s*$/.test(t)) {
       underAttribution = ATTRIBUTED.test(t);
       return !underAttribution;
@@ -188,9 +239,10 @@ export function leftoverValues(text: string, superseded: readonly SupersededValu
     .filter(Boolean);
   return superseded.filter((s) => {
     const now = factValues(s.now)[s.kind].filter((v) => v !== s.value);
+    const spanned = s.kind === 'dates' && new RegExp(RANGE.source, 'i').test(s.was);
     return pieces.some((p) => {
       if (/^\W*what changed\b/i.test(p) || ATTRIBUTED.test(p)) return false;
-      const found = factValues(p)[s.kind];
+      const found = factValues(s.kind === 'dates' && !spanned ? p.replace(RANGE, ' ') : p)[s.kind];
       return found.includes(s.value) && !now.some((v) => found.includes(v));
     });
   });
