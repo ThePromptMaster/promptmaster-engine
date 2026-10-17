@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { checkCommit } from './commit-check';
+import { checkCommit, restoreDecided, droppedDecisions } from './commit-check';
+import type { StageItem } from './stage-artifact';
 import { serializeItems } from './stage-artifact';
 
 const TABLE = serializeItems([
@@ -87,5 +88,37 @@ describe('checkCommit: what the user decided, and what moved underneath (6 Oct)'
     expect(checkCommit({ before: PROSE, after: 'New text.', operation: 'applied_findings', base: 'An older draft.' })).toMatch(/changed while this revision was being made/);
     expect(checkCommit({ before: PROSE, after: 'New text.', operation: 'applied_findings', base: PROSE })).toBeNull();
     expect(checkCommit({ before: undefined, after: 'First.', operation: 'agent_draft', base: '' })).toBeNull();
+  });
+});
+
+describe('one rule for a dropped decision and its restore (15 Oct, HARBOR)', () => {
+  const json = (items: StageItem[]) => JSON.stringify({ kind: 'stage_items', items });
+  const before: StageItem[] = [
+    { id: 'i1', finding: 'Launch moved to November 24', status: 'accepted', status_source: 'user' },
+    { id: 'i2', finding: 'Budget raised to $44,000', status: 'accepted', status_source: 'user' },
+    { id: 'i3', finding: 'Testing still open' },
+  ];
+
+  it('a model echo of a user decision under a new id is replaced by the original, and the save passes', () => {
+    const after: StageItem[] = [
+      { id: 'n1', finding: 'Launch moved to November 24', status: 'accepted', status_source: 'model' },
+      { id: 'i3', finding: 'Testing still open' },
+    ];
+    expect(droppedDecisions(before, after).map((r) => r.id)).toEqual(['i1', 'i2']);
+    const out = restoreDecided(before, after);
+    expect(out.map((r) => r.id)).toEqual(['i1', 'i2', 'i3']);
+    expect(checkCommit({ before: json(before), after: json(out), operation: 'agent_revise' })).toBeNull();
+  });
+
+  it('a surviving row does not stand in for a different dropped one', () => {
+    const after: StageItem[] = [before[0], before[2]];
+    expect(droppedDecisions(before, after).map((r) => r.id)).toEqual(['i2']);
+    expect(checkCommit({ before: json(before), after: json(restoreDecided(before, after)), operation: 'agent_revise' })).toBeNull();
+  });
+
+  it('a decision carried onto a renumbered row by the user still counts as kept', () => {
+    const after: StageItem[] = [{ ...before[0], id: 'n1' }, { ...before[1], id: 'n2' }, before[2]];
+    expect(droppedDecisions(before, after)).toEqual([]);
+    expect(restoreDecided(before, after).map((r) => r.id)).toEqual(['n1', 'n2', 'i3']);
   });
 });

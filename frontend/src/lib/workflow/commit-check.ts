@@ -36,21 +36,33 @@ function userDecided(row: StageItem): boolean {
 }
 
 /**
- * The user's decisions a revision would drop. A row counts as kept when its id
- * survives, or when a row carries the same decision under a new id —
- * `carryUserFields` moves a decision onto a renumbered row that way.
+ * The decided rows of `before` that `after` does not carry. A row is carried
+ * when its id survives, or when a row with the same decision (status and
+ * reason) by the same decider sits under a new id — `carryUserFields` moves a
+ * decision onto a renumbered row that way. Each carrying row counts once.
+ *
+ * One rule for both the refusal and the repair's restore: they had two, so a
+ * repair put back what it thought was missing and the save was still refused
+ * for dropping rows (15 Oct, HARBOR: "The revision dropped 4 rows you had
+ * decided", four times, each counted as a failed repair).
  */
-export function droppedDecisions(before: readonly StageItem[], after: readonly StageItem[]): StageItem[] {
+function uncarried(before: readonly StageItem[], after: readonly StageItem[]): StageItem[] {
   const ids = new Set(after.map((r) => r.id));
-  const carried = after.filter(userDecided).map((r) => `${r.status}\u0000${r.reason ?? ''}`);
-  const dropped: StageItem[] = [];
-  for (const row of before.filter(userDecided)) {
+  const key = (r: StageItem) => `${userDecided(r) ? 'user' : 'go'}\u0000${r.status}\u0000${r.reason ?? ''}`;
+  const carried = after.filter((r) => r.status && !before.some((b) => b.id === r.id)).map(key);
+  const out: StageItem[] = [];
+  for (const row of before.filter((r) => r.status)) {
     if (ids.has(row.id)) continue;
-    const at = carried.indexOf(`${row.status}\u0000${row.reason ?? ''}`);
+    const at = carried.indexOf(key(row));
     if (at >= 0) carried.splice(at, 1);
-    else dropped.push(row);
+    else out.push(row);
   }
-  return dropped;
+  return out;
+}
+
+/** The user's decisions a revision would drop. */
+export function droppedDecisions(before: readonly StageItem[], after: readonly StageItem[]): StageItem[] {
+  return uncarried(before, after).filter(userDecided);
 }
 
 /**
@@ -58,16 +70,20 @@ export function droppedDecisions(before: readonly StageItem[], after: readonly S
  * Sean's screenplay: two Continuity repairs were refused for dropping two
  * decided rows, and the next repair dropped them again). A repair is told to
  * keep them; this makes sure it does, rather than refusing its whole result.
- * Each comes back exactly as it was, in its old place in the order.
+ * Each comes back exactly as it was, in its old place in the order. A row the
+ * model echoed under a new id as its own decision is replaced by the original,
+ * so the user's decision is not shown twice.
  */
 export function restoreDecided(before: readonly StageItem[], after: readonly StageItem[]): StageItem[] {
-  const ids = new Set(after.map((r) => r.id));
-  // Not missing when a row carries it on under a new id (`carryUserFields` renumbers that way).
-  const carried = new Set(after.filter((r) => r.status).map((r) => `${r.status}\u0000${r.reason ?? ''}\u0000${rowName(r)}`));
-  const missing = before.filter((r) => r.status && !ids.has(r.id) && !carried.has(`${r.status}\u0000${r.reason ?? ''}\u0000${rowName(r)}`));
+  const missing = uncarried(before, after);
   if (!missing.length) return [...after];
   const out = [...after];
   for (const row of missing) {
+    const echo = out.findIndex((o) => o.status === row.status && (o.reason ?? '') === (row.reason ?? '') && rowName(o) === rowName(row) && !before.some((b) => b.id === o.id));
+    if (echo >= 0) {
+      out[echo] = row;
+      continue;
+    }
     const at = before.indexOf(row);
     // After the nearest earlier row that survived, else first.
     const prev = before.slice(0, at).reverse().find((r) => out.some((o) => o.id === r.id));
