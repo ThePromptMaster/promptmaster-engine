@@ -60,12 +60,13 @@ test('PM-24: an instruction against the constraints asks which controls, without
   await ask.getByRole('button', { name: 'Keep the constraints' }).click();
   await expect(chat.getByLabel('Proposed revision')).toBeVisible();
 
-  // On the decision trail, as a dismissed proposal with its decision.
+  // On the decision trail as the choice made — keeping the record is a choice,
+  // not a dismissal (17 Oct, HARBOR: "Keep Elena's values" was stored as dismissed).
   const [row] = await serviceSelect('recommendations', `project_id=eq.${id}&category=like.conflict:*&select=id,status,title`);
-  expect(row).toMatchObject({ status: 'dismissed' });
+  expect(row).toMatchObject({ status: 'accepted' });
   expect(row.title).toBe('Chose "Keep the constraints" over the instruction: Expand it with much more detail');
   const decisions = await serviceSelect('decisions', `recommendation_id=eq.${row.id}&select=decision_type`);
-  expect(decisions).toEqual([{ decision_type: 'dismiss_recommendation' }]);
+  expect(decisions).toEqual([{ decision_type: 'accept_recommendation' }]);
 });
 
 test('PM-24: a meaning-level conflict with the objective, then a prior decision is remembered', async ({ page }) => {
@@ -115,7 +116,7 @@ test('an action button whose revision conflicts with the objective asks which ta
   // The revision then goes through the ordinary preview, told what was decided.
   await expect(page.getByRole('dialog', { name: 'Revised version' })).toBeVisible({ timeout: 30_000 });
   const [row] = await serviceSelect('recommendations', `project_id=eq.${id}&category=like.conflict:*&select=status`);
-  expect(row).toMatchObject({ status: 'dismissed' });
+  expect(row).toMatchObject({ status: 'accepted' });
 });
 
 test('Go stops and asks before a revision that conflicts with the objective, then carries the answer', async ({ page }) => {
