@@ -446,6 +446,18 @@ describe('ReviewRenderer', () => {
     { id: 'i2', claim: 'Nine in ten agree', source: 'Unclear' },
   ]);
 
+  it('folds a finding a later fact superseded under "Earlier findings", with what replaced it (17 Oct, 20→12)', async () => {
+    const withOld = serializeItems([
+      { id: 'i1', claim: 'Delivery within 12 business days', source: 'Brief' },
+      { id: 'i2', claim: 'Delivery within 20 business days', source: 'Brief', status: 'verified', superseded_by: 'Delivery must now be within 12 business days, replacing 20 business days.' },
+    ]);
+    render(<ReviewRenderer {...props(bookStage('fact_check'), { versions: [version(withOld)] })} />);
+    expect(screen.queryByText('Delivery within 20 business days')).toBeNull();
+    await userEvent.setup().click(screen.getByRole('button', { name: /Earlier findings \(superseded\) — 1, show/ }));
+    expect(screen.getByText('Delivery within 20 business days')).toBeInTheDocument();
+    expect(screen.getByText(/Superseded by: Delivery must now be within 12 business days/)).toBeInTheDocument();
+  });
+
   it('renders a real table with the schema’s columns', () => {
     render(<ReviewRenderer {...props(bookStage('fact_check'), { versions: [version(rows)] })} />);
     const table = screen.getByRole('table');
