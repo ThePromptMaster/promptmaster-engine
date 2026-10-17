@@ -216,3 +216,13 @@ export const TIER_INFO = {
 } as const;
 
 export const DEFAULT_MODEL = 'openai/gpt-5.4';
+
+/**
+ * The models a project can be set to from its brief (17 Oct, Sean: compare
+ * PromptMaster with a plain chat on the same underlying model). Any other
+ * OpenRouter id still works through the recovery panel's model list.
+ */
+export const MODEL_CHOICES: ReadonlyArray<{ id: string; label: string }> = [
+  { id: DEFAULT_MODEL, label: 'GPT-5.4 (default)' },
+  { id: 'anthropic/claude-opus-5.5', label: 'Claude Opus 5.5' },
+];
