@@ -51,6 +51,41 @@ function byKind(text: string): Map<keyof FactValues, ValueMention[]> {
   return out;
 }
 
+/** Words too common to tell two places apart. */
+const PLAIN = new Set(['the', 'a', 'an', 'of', 'to', 'and', 'or', 'for', 'is', 'are', 'was', 'on', 'in', 'at', 'by', 'as', 'it', 'its', 'now', 'with', 'from', 'this', 'that', 'be']);
+
+/** The nearest words either side of where `raw` is written: what the value is about ("launch", "budget"). */
+function aroundWords(text: string, raw: string): Set<string> {
+  const at = text.indexOf(raw);
+  if (at < 0) return new Set();
+  const words = (t: string) => (t.toLowerCase().match(/[a-z]{3,}/g) ?? []).filter((w) => !PLAIN.has(w) && !MONTH_WORDS.has(w));
+  return new Set([...words(text.slice(Math.max(0, at - 80), at)).slice(-NEAR), ...words(text.slice(at + raw.length, at + raw.length + 80)).slice(0, NEAR)]);
+}
+const NEAR = 3;
+const MONTH_WORDS = new Set(['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december']);
+
+/**
+ * Of the values that could have replaced `old`, the one written in its place:
+ * the most words in common around it. 17 Oct, production pass: a revision
+ * moved the launch from November 20 to November 24 and the report date from
+ * November 6 to November 7, and the first new date found — November 7 — was
+ * offered as Elena's approved launch.
+ */
+function inItsPlace(old: ValueMention, oldTexts: readonly string[], candidates: readonly { m: ValueMention; text: string }[]): ValueMention {
+  const before = new Set(oldTexts.flatMap((t) => [...aroundWords(t, old.raw)]));
+  let best = candidates[0];
+  let bestScore = -1;
+  for (const c of candidates) {
+    const around = aroundWords(c.text, c.m.raw);
+    const score = [...around].filter((w) => before.has(w)).length;
+    if (score > bestScore) {
+      best = c;
+      bestScore = score;
+    }
+  }
+  return best.m;
+}
+
 const has = (list: readonly ValueMention[] | undefined, value: string) => (list ?? []).some((m) => m.value === value);
 /** A limit is replaced only by a limit on the same unit: "70 words" does not replace "one page". */
 const sameUnit = (a: string, b: string) => a.split(':')[0] === b.split(':')[0];
@@ -79,18 +114,20 @@ export function factChangesFromRevision(input: {
     let proposed = fact.statement;
     for (const m of valueMentions(fact.statement)) {
       if (!RECONCILED.includes(m.kind)) continue;
-      const newer = [
-        ...(said.get(m.kind) ?? []),
-        ...(after.get(m.kind) ?? []).filter((a) => !has(before.get(m.kind), a.value)),
-      ].filter((n) => n.value !== m.value && (m.kind !== 'limits' || sameUnit(n.value, m.value)));
+      const candidates = [
+        ...(said.get(m.kind) ?? []).map((n) => ({ m: n, text: input.instruction })),
+        ...(after.get(m.kind) ?? []).filter((a) => !has(before.get(m.kind), a.value)).map((n) => ({ m: n, text: input.after })),
+      ].filter(({ m: n }) => n.value !== m.value && (m.kind !== 'limits' || sameUnit(n.value, m.value)));
+      const newer = candidates.map((c) => c.m);
       if (!newer.length) continue;
       if (m.kind === 'limits') {
         if (!has(said.get(m.kind), newer[0].value)) continue;
       } else if (!has(before.get(m.kind), m.value) || has(after.get(m.kind), m.value)) {
         continue;
       }
-      // The user's own words where they gave them, else the new version's.
-      const replacement = newer[0];
+      // The value written where the old one stood; among equals, the user's
+      // own words where they gave them, else the new version's.
+      const replacement = m.kind === 'limits' ? newer[0] : inItsPlace(m, [fact.statement, input.before], candidates);
       if (changes.some((c) => c.kind === m.kind && c.was === describeValue(m))) continue;
       changes.push({ kind: m.kind, was: describeValue(m), now: describeValue(replacement) });
       // "p.m." before the fact's own full stop would read "p.m..".
@@ -183,7 +220,12 @@ export async function withMeaningChanges(
           ...(a.request ? { request: true } : {}),
         }))
       : [];
-    return [...valueChanges, ...meaning, ...added];
+    // A new fact that says what a changed value already says is offered once
+    // (17 Oct, production pass: "As of November 7, 2026." was listed under
+    // both "Changed values" and "New facts").
+    const already = new Set([...valueChanges, ...meaning].map((c) => sameWords(c.proposed)));
+    const fresh = added.filter((a) => !already.has(sameWords(a.proposed)));
+    return [...valueChanges, ...meaning, ...fresh];
   } catch {
     return valueChanges;
   }
@@ -226,4 +268,9 @@ export function revertsUserVersion(input: {
     }
   }
   return out;
+}
+
+/** A statement compared as words, whatever its case and punctuation. */
+function sameWords(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9$]+/g, ' ').trim();
 }

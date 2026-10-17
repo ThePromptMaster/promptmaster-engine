@@ -126,3 +126,37 @@ describe('the facts review keeps changed values, new facts and requests apart (1
     expect(applyChangesLabel(1)).toBe('Apply and record 1 change');
   });
 });
+
+describe('a replaced value takes the new value written in its place (18 Oct, production pass)', () => {
+  const facts = [
+    fact('d', 'As of November 6, 2026.'),
+    fact('e', 'Sponsor Elena approved a November 20 launch and a $40,000 budget. Only Elena can approve date or budget changes.'),
+  ];
+  const before = '## Status Project TIDEWATER is approved for a November 20 launch. The approved budget is $40,000. ## Key facts As of November 6, 2026.';
+  const after = '## Status Project TIDEWATER is approved for a November 24, 2026 launch. The approved budget is $44,000. ## Key facts As of November 7, 2026.';
+  const instruction = 'Update as of November 7, 2026. Elena approved changing the launch to November 24, 2026 and increasing the approved budget to $44,000.';
+
+  it('the launch moves to November 24, the report date to November 7', () => {
+    const changes = factChangesFromRevision({ facts, instruction, before, after });
+    expect(changes.map((c) => [c.fact.id, c.proposed])).toEqual([
+      ['d', 'As of November 7, 2026.'],
+      ['e', 'Sponsor Elena approved a November 24 launch and a $44,000 budget. Only Elena can approve date or budget changes.'],
+    ]);
+  });
+
+  it('a new fact that repeats a changed value is offered once', async () => {
+    const values = factChangesFromRevision({ facts, instruction, before, after });
+    const all = await withMeaningChanges(values, { facts, instruction, before, after }, async () => ({
+      changes: [],
+      additions: [
+        { statement: 'As of November 7, 2026.', kind: 'fact', quote: 'Update as of November 7, 2026.' },
+        { statement: 'Elena approved changing the launch to November 24, 2026.', kind: 'fact', quote: 'Elena approved changing the launch to November 24, 2026' },
+      ],
+    }));
+    expect(all.map((c) => c.proposed)).toEqual([
+      'As of November 7, 2026.',
+      'Sponsor Elena approved a November 24 launch and a $44,000 budget. Only Elena can approve date or budget changes.',
+      'Elena approved changing the launch to November 24, 2026.',
+    ]);
+  });
+});
