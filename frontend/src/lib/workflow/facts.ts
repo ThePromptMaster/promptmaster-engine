@@ -3,7 +3,7 @@
  * 7 Oct). Pure; the rows come from `lib/supabase/facts.ts`.
  */
 import type { Project, ProjectFact } from '@/types/project';
-import { supersededValues, type SupersededValue } from './fact-values';
+import { factValues, supersededValues, type SupersededValue } from './fact-values';
 
 /** Facts sent with a request: enough for every prompt, bounded. */
 export const MAX_FACTS_SENT = 200;
@@ -63,10 +63,16 @@ export function factsForRequest(facts: readonly ProjectFact[] | undefined) {
  */
 export function supersededFactValues(facts: readonly ProjectFact[] | undefined): SupersededValue[] {
   const byId = new Map((facts ?? []).map((f) => [f.id, f]));
-  return currentFacts(facts).flatMap((f) => {
+  const current = currentFacts(facts);
+  // A value another current fact still states is still true, whatever was
+  // replaced: "as of November 7" moved to November 8, but "reconciliation
+  // finished November 7" stands, and every repair of Output failed on it
+  // (15 Oct, HARBOR: "the new version still states November 7").
+  const live = current.map((f) => factValues(f.statement));
+  return current.flatMap((f) => {
     const old = f.supersedes ? byId.get(f.supersedes) : undefined;
     return old ? supersededValues(old.statement, f.statement) : [];
-  });
+  }).filter((s) => !live.some((v) => v[s.kind].includes(s.value)));
 }
 
 /**

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { currentFacts, factSource, factsForRequest, factsText, retiredFacts } from './facts';
+import { currentFacts, factSource, factsForRequest, factsText, retiredFacts, supersededFactValues } from './facts';
 import { figureFindings, figureSources } from './figure-support';
 import type { ProjectFact } from '@/types/project';
 
@@ -38,5 +38,19 @@ describe('accepted facts (F1–F3, 7 Oct)', () => {
     const text = 'Candidate A is recommended: the last turnaround saved $4.5m in its first year.';
     expect(figureFindings(text, figureSources({ ...base, facts: [] }, {}, 'final'))).toHaveLength(1);
     expect(figureFindings(text, figureSources({ ...base, facts: [saved] }, {}, 'final'))).toEqual([]);
+  });
+});
+
+describe('supersededFactValues: a value another current fact states is still true (15 Oct, HARBOR)', () => {
+  const asOf7 = fact({ id: 'd7', statement: 'Update Project HARBOR as of November 7, 2026.', retired_at: '2026-10-15T20:38:00Z', retired_reason: 'superseded' });
+  const asOf8 = fact({ id: 'd8', statement: 'Update Project HARBOR as of November 8, 2026.', supersedes: 'd7' });
+  const finished = fact({ id: 'r7', statement: 'Reconciliation actually finished November 7, 2026.' });
+
+  it('November 7 is no leftover while reconciliation finished that day', () => {
+    expect(supersededFactValues([asOf7, asOf8, finished])).toEqual([]);
+  });
+
+  it('without that fact, November 7 is what a repair must not still state', () => {
+    expect(supersededFactValues([asOf7, asOf8]).map((s) => s.value)).toEqual(['11-7']);
   });
 });
