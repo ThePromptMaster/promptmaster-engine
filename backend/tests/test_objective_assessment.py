@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 
 from deps import get_client
 from main import app
-from promptmaster.objective_assessment import RunStep, build_assessment_prompt, parse_assessment
+from promptmaster.objective_assessment import RunStep, build_assessment_prompt, parse_assessment, request_facts
 from promptmaster.schemas import PMInput
 
 LOG = (
@@ -373,3 +373,50 @@ def test_a_figure_the_record_does_not_give_is_not_shown():
 def test_the_check_is_asked_for_an_actionable_blocker():
     _, user = build_assessment_prompt(PMInput(objective="Plan the workshop", mode="analyst"), "Output", "x", [])
     assert '"ask"' in user and "A blocker is actionable" in user
+
+
+# 17 Oct (Sean, SUMMIT): "the completion checker treated Luis's unapproved
+# request to count premature testing days as an unmet objective, even though
+# the output correctly excluded those days". M1d caught only a criterion that
+# shared its words with a recorded request fact.
+_LUIS_FACT = "Luis asks to count November 16 and November 17 toward the required five testing days."
+_MET = {
+    "outcome": "not_met", "reason": "r", "basis_quote": "The approved launch date of November 24, 2026 matches the earliest compliant launch date.",
+    "criteria": [{"requirement": "Keep the November 24 launch date", "verdict": "met",
+                  "basis": "The approved launch date of November 24, 2026 matches the earliest compliant launch date."}],
+}
+
+
+def test_a_carried_forward_check_that_restates_the_request_is_set_aside():
+    a = parse_assessment(dict(_MET), _SUMMIT_PACK, [], failed_checks=["November 16 and 17 testing days are not counted"], requests=[_LUIS_FACT])
+    assert a.outcome == "met" and a.unmet == []
+    assert "Set aside as a request" in a.model_note
+
+
+def test_a_decision_blocker_about_the_request_is_set_aside():
+    result = {**_MET, "blockers": [{"need": "Decide whether Luis's two testing days should count", "ask": "Should they count?", "kind": "needs_decision"}]}
+    a = parse_assessment(result, _SUMMIT_PACK, [], requests=[_LUIS_FACT])
+    assert a.blockers == [] and a.outcome == "met"
+
+
+def test_a_reworded_request_is_matched_on_its_dates():
+    result = dict(_MET)
+    result["criteria"] = [*_MET["criteria"], {"requirement": "Testing finishes November 20 using November 16-17", "verdict": "not_met", "basis": "x"}]
+    a = parse_assessment(result, _SUMMIT_PACK, [], requests=[_LUIS_FACT])
+    assert a.unmet == [] and a.criteria[1].verdict == "not_checked"
+
+
+def test_the_rule_itself_and_a_line_held_against_the_request_still_fail():
+    for rule in ("Five compliant testing days are completed before launch", "Exclude November 16 and 17 from the testing count"):
+        result = dict(_MET)
+        result["criteria"] = [*_MET["criteria"], {"requirement": rule, "verdict": "not_met", "basis": "missing"}]
+        a = parse_assessment(result, _SUMMIT_PACK, [], requests=[_LUIS_FACT])
+        assert a.outcome != "met" and a.unmet, rule
+    a = parse_assessment(dict(_MET), _SUMMIT_PACK, [], failed_checks=["The executive summary is over 250 words"], requests=[_LUIS_FACT])
+    assert a.outcome != "met" and a.unmet == ["The executive summary is over 250 words"]
+
+
+def test_requests_are_read_from_the_source_material_too():
+    inputs = PMInput(objective="Report SUMMIT; the sponsor asks for three sections.", mode="analyst",
+                     context="Update. Luis asks to count November 16 and 17 toward the five testing days. Testing is on track.")
+    assert request_facts(inputs) == ["Luis asks to count November 16 and 17 toward the five testing days."]
