@@ -78,7 +78,7 @@ test('a reserved approval still stops Go, and the card says why it is the user\'
 
   const card = page.getByRole('region', { name: 'Go mode needs you' });
   await expect(card).toContainText('"I accept these hypotheses as the working set". This one is yours alone', { timeout: 30_000 });
-  await expect(card).toContainText('Approving it lets me carry on from');
+  await expect(card).toContainText('Needs your approval:');
   await card.scrollIntoViewIfNeeded();
   await page.screenshot({ path: test.info().outputPath('03-reserved-approval-asked.png') });
   expect(await serviceSelect('workflow_events', `project_id=eq.${id}&type=eq.criterion_committed&select=id`)).toEqual([]);

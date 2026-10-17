@@ -142,7 +142,7 @@ describe('B3: the findings that change the work are the user\'s', () => {
   it('with only material rows left, the user is asked, with no button — the table is the control', () => {
     const need = needsUser({ ...base, stage: stage('continuity'), facts: review(0, 2), stageEvaluation: evaluation('continuity'), allowed: ['advance_stage'] });
     expect(need).toEqual({ kind: 'triage_findings', stageId: 'continuity', count: 2 });
-    expect(describeNeed(need!, label)).toEqual({ message: '2 findings would change what the work says, so they are yours to decide. "Routine decisions: handle them for me" covers minor and moderate findings only; these are major or unrated. Accept, reject or defer each in the table below.', action: 'Go to the table' });
+    expect(describeNeed(need!, label)).toEqual({ message: '2 major or unrated findings are yours to decide: accept, reject or defer each in the table below.', action: 'Go to the table' });
   });
 
   it('a fully decided table needs nothing', () => {
@@ -164,7 +164,7 @@ describe('needsUser: an outcome table is the user\'s to decide (production pass,
     });
     expect(need).toMatchObject({ kind: 'decide_rows', count: 3, proposed: 2 });
     expect(describeNeed(need!, label)).toEqual({
-      message: 'I proposed a status for 2 alternative explanations, each with its reason, from what the row already says. They count once you confirm them: press "Confirm the 2 proposals" above the table, or change any that read wrong. 1 more needs a status from you.',
+      message: 'I proposed a status for 2 alternative explanations. Press "Confirm the 2 proposals" above the table, or change any that read wrong. 1 more needs a status from you.',
       action: 'Go to the table',
     });
   });
@@ -188,7 +188,7 @@ describe('needsUser: an outcome table is the user\'s to decide (production pass,
     });
     expect(need).toEqual({ kind: 'decide_rows', stageId: 'fact_check', count: 2, itemLabel: 'claim' });
     expect(describeNeed(need!, label)).toEqual({
-      message: '2 claims are waiting for your decision — only you can settle them. Set a status on each in the table below — that is how a check stage works.',
+      message: '2 claims need your decision: set a status on each in the table below.',
       // The button takes the user to the rows; deciding them stays theirs.
       action: 'Go to the table',
     });
@@ -278,7 +278,7 @@ describe('a suggestion to skip is the user\'s call (1 Oct, item 11)', () => {
   const need: NeedsUser = { kind: 'skip_stage', stageId: 'audience', reason: 'The audience is already fixed by the brief.', onStage: 'audience' };
   it('says what is normally next, why not now, and that it can be undone', () => {
     expect(describeNeed(need, label)).toEqual({
-      message: 'Audience is normally next, but I would skip it for now. The audience is already fixed by the brief. It is your call, and a skipped stage can be reopened later.',
+      message: 'I suggest skipping Audience: The audience is already fixed by the brief. You can reopen it later.',
       action: 'Skip Audience for now',
     });
   });
@@ -416,7 +416,6 @@ describe('routine decisions (Sean, 5 Oct): delegated, validated, and the user as
     const need = needsUser(args({ routine: 'ask' }));
     expect(need).toMatchObject({ kind: 'tick_criterion', criterionId: 'pos.differentiator', authority: 'policy_ask' });
     expect(describeNeed(need!, label).message).toContain('your routine decisions are set to "Ask me"');
-    expect(describeNeed(need!, label).message).toContain('Approving it lets me carry on from Positioning');
   });
 
   it('a failed check is repaired, not asked about: Go revises toward it', () => {

@@ -42,7 +42,7 @@ test('a request the user satisfies on the stage itself clears, and Resume carrie
   await criterion(page, 'differentiator').getByRole('checkbox').check();
 
   await expect(card).toBeHidden({ timeout: 15_000 });
-  await expect(panel.getByRole('status').filter({ hasText: 'That is done. Press Resume and I will carry on.' })).toBeVisible();
+  await expect(panel.getByRole('status').filter({ hasText: 'Ready to carry on — press Resume.' })).toBeVisible();
   await expect(panel.getByRole('button', { name: /^Resume$/ })).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('02-request-cleared-resume-offered.png'), fullPage: true });
   const [cleared] = await serviceSelect('agent_runs', `id=eq.${asked.id}&select=needs,status`);

@@ -129,7 +129,7 @@ test('Go suggests skipping a stage; the user skips it, and can reopen it later',
 
   // The suggestion is itself the pause: no "approve this move" in front of it.
   const card = page.getByRole('region', { name: 'Go mode needs you' });
-  await expect(card).toContainText('Literature is normally next, but I would skip it for now.', { timeout: 30_000 });
+  await expect(card).toContainText('I suggest skipping Literature:', { timeout: 30_000 });
   await expect(card).toContainText('Mock: the internal data should be looked at before any outside reading.');
   await expect(card).toContainText('a skipped stage can be reopened later');
   await expect(panel.getByRole('button', { name: /^Resume$/ })).toBeVisible(); // the other answer: do the stage
