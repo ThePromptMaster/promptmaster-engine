@@ -279,7 +279,7 @@ test('Autonomous decides the routine continuity findings and leaves the major on
   // Two minor findings decided by Go, as a version; the major one is the user's.
   const card = page.getByRole('region', { name: 'Go mode needs you' });
   await expect(card).toContainText('1 major or unrated finding is yours to decide', { timeout: 30_000 });
-  await expect(card).toContainText('covers minor and moderate findings only');
+  await expect(card).toContainText('major or unrated');
   const statuses = page.getByRole('table').getByRole('combobox');
   await expect(statuses.nth(0)).toContainText('Not looked at');
   await expect(statuses.nth(1)).toContainText('Accept');

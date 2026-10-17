@@ -131,7 +131,7 @@ test('Go suggests skipping a stage; the user skips it, and can reopen it later',
   const card = page.getByRole('region', { name: 'Go mode needs you' });
   await expect(card).toContainText('I suggest skipping Literature:', { timeout: 30_000 });
   await expect(card).toContainText('Mock: the internal data should be looked at before any outside reading.');
-  await expect(card).toContainText('a skipped stage can be reopened later');
+  await expect(card).toContainText('You can reopen it later.');
   await expect(panel.getByRole('button', { name: /^Resume$/ })).toBeVisible(); // the other answer: do the stage
   await page.screenshot({ path: test.info().outputPath('01-go-suggests-skipping.png'), fullPage: true });
   expect(await serviceSelect('workflow_events', `project_id=eq.${id}&type=eq.stage_skipped&select=id`)).toHaveLength(0);

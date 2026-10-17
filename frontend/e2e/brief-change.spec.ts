@@ -23,7 +23,7 @@ test('a factual change reopens only what relied on it; a punctuation fix reopens
   await page.getByText('Project brief').click();
   await page.locator('#brief-context').fill('Funding is pending until Q3 2026.');
   const notice = page.getByRole('status', { name: 'Brief change' });
-  await expect(notice).toContainText('Changing the project context reopened Objective', { timeout: 30_000 });
+  await expect(notice).toContainText('Changing the project context means Objective', { timeout: 30_000 });
   await expect(notice).toContainText("relied on 'pending'");
   await expect(page.getByRole('navigation').getByText('awaiting recheck', { exact: true })).toHaveCount(1);
   const [changed] = await serviceSelect('workflow_events', `project_id=eq.${id}&type=eq.brief_changed&select=actor,payload`);

@@ -33,7 +33,7 @@ test('a request the user satisfies on the stage itself clears, and Resume carrie
 
   // Positioning's one required item is the user's to confirm: the run stops and asks.
   const card = page.getByRole('region', { name: 'Go mode needs you' });
-  await expect(card).toContainText('I need your approval before I can continue', { timeout: 30_000 });
+  await expect(card).toContainText('Needs your approval:', { timeout: 30_000 });
   await page.screenshot({ path: test.info().outputPath('01-go-asks-for-the-confirmation.png'), fullPage: true });
   const [asked] = await serviceSelect('agent_runs', `project_id=eq.${id}&select=id,needs&order=created_at.desc&limit=1`);
   expect(asked.needs).toMatchObject({ kind: 'tick_criterion', onStage: 'positioning' });
@@ -155,7 +155,7 @@ test('on Research, "nothing more for me here" on a stage waiting for approval be
   // Only the user's approval is open, so Go asks for it at once — no
   // reasoning move first (4 Oct: Compare alternatives ×3 on an approval).
   const card = page.getByRole('region', { name: 'Go mode needs you' });
-  await expect(card).toContainText('I need your approval before I can continue: "I accept these hypotheses as the working set"', { timeout: 30_000 });
+  await expect(card).toContainText('Needs your approval: "I accept these hypotheses as the working set"', { timeout: 30_000 });
   await expect(panel).not.toContainText('The model thinks the work is done');
   const [first] = await serviceSelect('agent_runs', `project_id=eq.${id}&select=id&order=created_at.desc&limit=1`);
   expect(await serviceSelect('agent_steps', `run_id=eq.${first.id}&select=action_key`)).toEqual([]);
