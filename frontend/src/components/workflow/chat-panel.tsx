@@ -78,17 +78,17 @@ const MODES: Array<{
     key: 'discuss',
     label: 'Ask',
     icon: 'forum',
-    promise: 'Talk it through — nothing changes.',
+    promise: 'Ask only — this cannot change your document.',
     send: 'Ask',
-    placeholder: 'Ask about this draft — nothing you write here changes it.',
+    placeholder: 'Type your question here…',
   },
   {
     key: 'instruct',
     label: 'Change it',
     icon: 'edit_note',
-    promise: 'Rewrites the selection, section or draft — you approve before it is saved.',
+    promise: 'You see the change before anything is saved.',
     send: 'Draft revision',
-    placeholder: 'Say what to change — for example, “cut the second paragraph in half”.',
+    placeholder: 'Type the change you want — e.g. “cut the second paragraph in half”',
   },
 ];
 
@@ -522,7 +522,7 @@ export function ChatPanel({
         instructDisabledReason={
           canInstruct
             ? null
-            : (cannotChangeBecause ?? 'You are reading an earlier version. Open the latest one to revise it.')
+            : (cannotChangeBecause ?? 'Ask only — open the latest version to change it.')
         }
       />
 
@@ -534,7 +534,26 @@ export function ChatPanel({
         {chat.loading ? (
           <p className="text-label text-[var(--on-surface-variant)]">Loading the thread…</p>
         ) : chat.messages.length === 0 ? (
-          <EmptyThread mode={mode} hasContent={content.trim().length > 0} />
+          <>
+            <EmptyThread mode={mode} hasContent={content.trim().length > 0} />
+            {/* In the thread, not above the box: stacked over the input they
+                pushed it below the fold (17 Oct, Sean: "you have to kind of
+                scroll down to find it"). */}
+            {mode === 'discuss' && !readOnly && !chat.busy && !conflicting && starters.length > 0 && (
+              <div role="group" aria-label="Suggested questions" className="mt-4 flex flex-col gap-1.5">
+                {starters.map((q) => (
+                  <button
+                    key={q}
+                    type="button"
+                    onClick={() => void chat.discuss(q)}
+                    className="rounded-lg bg-[var(--surface-container-low)] px-3 py-1.5 text-left text-label text-[var(--on-surface)] hover:bg-[var(--surface-container-high)]"
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
         ) : (
           <ol className="space-y-4">
             {chat.messages.map((message) => (
@@ -679,21 +698,6 @@ export function ChatPanel({
             />
           )}
 
-          {mode === 'discuss' && !chat.loading && chat.messages.length === 0 && !chat.busy && !conflicting && starters.length > 0 && (
-            <div role="group" aria-label="Suggested questions" className="mb-2 flex flex-col gap-1.5">
-              {starters.map((q) => (
-                <button
-                  key={q}
-                  type="button"
-                  onClick={() => void chat.discuss(q)}
-                  className="rounded-lg bg-[var(--surface-container-low)] px-3 py-1.5 text-left text-label text-[var(--on-surface)] hover:bg-[var(--surface-container-high)]"
-                >
-                  {q}
-                </button>
-              ))}
-            </div>
-          )}
-
           <div
             className={`rounded-xl px-3 py-2 ${
               mode === 'instruct'
@@ -712,13 +716,13 @@ export function ChatPanel({
               }}
               rows={3}
               aria-label={mode === 'discuss' ? 'Ask a question' : 'Give a revision instruction'}
-              placeholder={mode === 'discuss' && !content.trim() ? 'Ask about this stage — nothing you write here changes anything.' : spec.placeholder}
-              className="w-full resize-y bg-transparent text-body text-[var(--on-surface)] outline-none placeholder:text-[var(--on-surface-variant)]"
+              placeholder={spec.placeholder}
+              className="w-full resize-y rounded-lg bg-[var(--surface-container-lowest)] px-2 py-1.5 text-body text-[var(--on-surface)] outline-none ring-1 ring-[var(--outline-variant)] placeholder:text-[var(--on-surface-variant)] focus:ring-2 focus:ring-[var(--pm-primary)]/50"
+             
             />
             <LimitCounter length={draft.length} limit={INPUT_LIMITS.message} />
             <div className="mt-1 flex items-center gap-2">
               {attach}
-              <span className="text-label text-[var(--on-surface-variant)]">{spec.promise}</span>
               <button
                 onClick={() => void send()}
                 disabled={!canSend}
@@ -764,6 +768,7 @@ function ModeSwitch({
               role="tab"
               aria-selected={active}
               disabled={disabled || (m.key === 'instruct' && Boolean(instructDisabledReason))}
+              title={m.key === 'instruct' && instructDisabledReason ? instructDisabledReason : undefined}
               onClick={() => onChange(m.key)}
               className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-label disabled:opacity-40 ${
                 active
@@ -780,26 +785,15 @@ function ModeSwitch({
         })}
       </div>
 
-      {/* Stated, not implied. The one thing a user must never be unsure of is
-          whether the box they are typing into edits their work. */}
-      <p
-        className={`mt-2 flex items-start gap-1.5 text-label ${
-          mode === 'discuss' ? 'text-[var(--pm-success)]' : 'text-[var(--on-surface-variant)]'
-        }`}
-      >
+      {/* Stated, not implied, and once (17 Oct, Sean: the lock line and a red
+          note under it read as more instructions than the task). Where the
+          change tab is unavailable, the reason is the line. */}
+      <p className="mt-2 flex items-start gap-1.5 text-label text-[var(--on-surface-variant)]">
         <span aria-hidden className="material-symbols-outlined text-[16px]">
           {mode === 'discuss' ? 'lock' : 'rate_review'}
         </span>
-        <span>
-          {mode === 'discuss'
-            ? 'Ask only — talking here cannot change your document. Only an action you choose does, as a new version.'
-            : 'Revisions are shown for review first, and never replace a version.'}
-        </span>
+        <span>{mode === 'discuss' && instructDisabledReason ? instructDisabledReason : MODES.find((m) => m.key === mode)!.promise}</span>
       </p>
-
-      {instructDisabledReason && (
-        <p className="mt-1.5 text-label text-[var(--pm-tertiary)]">{instructDisabledReason}</p>
-      )}
     </div>
   );
 }
