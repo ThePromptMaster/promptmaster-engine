@@ -246,6 +246,13 @@ describe('needStillHolds: a recorded stop is checked against the project (1 Oct,
     expect(needStillHolds(need, { ...at('positioning'), allowed })).toBe(false);
   });
 
+  it('a repair that did not settle holds while the stage still waits for its recheck (15 Oct, HARBOR Resume loop)', () => {
+    const need: NeedsUser = { kind: 'repair_stuck', stageId: 'objective', why: 'the brief changed', last: '', tries: 2, saved: 0 };
+    const withStage = (status: string) => ({ ...base.state, stages: { ...base.state.stages, objective: { ...(base.state.stages.objective ?? {}), status } } });
+    expect(needStillHolds(need, at('positioning', { state: withStage('stale') }))).toBe(true);
+    expect(needStillHolds(need, at('positioning', { state: withStage('complete') }))).toBe(false);
+  });
+
   it('a request raised on a stage the project has left no longer holds', () => {
     const need: NeedsUser = { kind: 'answer_question', question: 'Which audience?', onStage: 'audience' };
     expect(needStillHolds(need, at('audience'))).toBe(true);

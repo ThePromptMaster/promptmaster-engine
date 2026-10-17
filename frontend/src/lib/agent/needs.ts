@@ -618,6 +618,12 @@ export function needStillHolds(
       return input.state.stages[need.stageId]?.status === 'blocked';
     case 'wait_for_jobs':
       return (input.facts.manuscript?.pendingJobs.length ?? 0) > 0;
+    case 'repair_stuck':
+      // needsUser never raises this one, so asking it again always said "no":
+      // the card was cleared to "That is done. Press Resume", Resume hit the
+      // used-up repair again, and round it went (15 Oct, HARBOR). It holds
+      // while the stage is still waiting for its recheck.
+      return input.state.stages[need.stageId]?.status === 'stale';
     case 'tick_criterion':
       // Asked for directly: the box is either still unticked or it is not.
       // (Going back through needsUser would drop a request raised while other
