@@ -20,7 +20,13 @@ const rank = (key: PrecedenceKey) => PRECEDENCE.indexOf(key);
  * something: what ranks above an instruction is kept, what ranks below it
  * gives way, and two instructions are the user's to weigh.
  */
-export function recommendedControl(kind: InstructionConflict['kind'], protectsApproval = false): Controls | null {
+export function recommendedControl(kind: InstructionConflict['kind'], protectsApproval = false, authorised = false): Controls | null {
+  // The instruction itself records the approval or a confirmed amendment,
+  // checked in code against its words: it is the later authorised word, and
+  // applying it is the recommendation (17 Oct, Sean: Elena's November 6
+  // approval drew "Keep November 5 update"; a confirmed amendment withdrawing
+  // the Cedar exception drew "Keep Cedar exception").
+  if (authorised) return 'new';
   // A recorded approval rule is kept unless the user explicitly overrides it
   // (14 Oct, Sean, LANTERN: "My new instruction takes priority" was recommended
   // against "only Elena can approve a change").
