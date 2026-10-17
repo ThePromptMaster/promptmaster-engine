@@ -22,14 +22,12 @@ test('"Let Go run this" delegates in two clicks and keeps the authorization', as
   await page.screenshot({ path: test.info().outputPath('01-let-go-run-this.png') });
   await panel.getByRole('button', { name: 'Let Go run this' }).click();
 
-  // The authorization is still asked for: it is the record of what was delegated.
-  const dialog = page.getByRole('dialog', { name: 'Authorize Go mode' });
-  await expect(dialog).toBeVisible();
+  // One click (17 Oct): no dialog; the authorization is still recorded, below.
+  await expect(page.getByRole('dialog', { name: 'Authorize Go mode' })).toHaveCount(0);
   await expect(panel.getByRole('radio', { name: /^Autonomous/ })).toHaveAttribute('aria-checked', 'true');
   await expect(panel.getByRole('radio', { name: /^Handle them for me/ })).toHaveAttribute('aria-checked', 'true');
   await expect.poll(async () => (await serviceSelect('projects', `id=eq.${id}&select=routine_decisions`))[0].routine_decisions).toBe('handle');
   await page.screenshot({ path: test.info().outputPath('02-authorize.png') });
-  await page.getByRole('button', { name: 'Authorize and go' }).click();
 
   await expect.poll(async () => (await serviceSelect('agent_runs', `project_id=eq.${id}&select=policy,authorization_id`))[0] ?? null, { timeout: 30_000 })
     .toMatchObject({ policy: 'autonomous' });

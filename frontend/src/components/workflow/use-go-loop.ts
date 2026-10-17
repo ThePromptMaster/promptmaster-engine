@@ -48,7 +48,7 @@ import { requestProjectCancel } from '@/lib/supabase/jobs';
 import { recordFacts } from '@/lib/supabase/facts';
 import { appendWorkflowEvent } from '@/lib/supabase/workflow';
 import { answerAsFact, answerDocuments, measuredDocument } from '@/lib/workflow/answers';
-import { authorizeRun } from '@/lib/agent/authorize';
+import { authorizeRun, DEFAULT_AUTO_WINDOWS } from '@/lib/agent/authorize';
 import { buildAgentState } from '@/lib/agent/digest';
 import { performStep, type PerformContext, type StepOutcome } from '@/lib/agent/perform';
 import { needsExpert, packageMarkdown, recordDocuments } from '@/lib/agent/expert';
@@ -189,8 +189,13 @@ const settle = () => new Promise((r) => setTimeout(r, 60));
 export function useGoLoop(opts: Options) {
   const [policy, setPolicy] = useState<ExecutionPolicy>('guided');
   const [budget, setBudget] = useState(DEFAULT_BUDGET_STEPS);
-  /** Further windows an Autonomous run may start on its own (chosen in the authorization). */
-  const [autoWindows, setAutoWindows] = useState(0);
+  /**
+   * Further windows an Autonomous run may start on its own. Three by default
+   * (17 Oct, Sean: "Should we automatically have it on maximum steps and
+   * windows if that is necessary?") — a run still stops whenever it needs the
+   * user, so the windows only spare a click between them.
+   */
+  const [autoWindows, setAutoWindows] = useState(DEFAULT_AUTO_WINDOWS);
   const autoLeftRef = useRef(0);
   // Whether a used-up window will be followed by another without asking.
   // State, not the ref, so the "window used up" card is not shown for the
@@ -201,7 +206,9 @@ export function useGoLoop(opts: Options) {
   const [steps, setSteps] = useState<AgentStep[]>([]);
   const [phase, setPhase] = useState<GoPhase>('idle');
   const [pendingStepId, setPendingStepId] = useState<string | null>(null);
+  /** The policy being authorized and started this moment (one click; no dialog any more). */
   const [authorizing, setAuthorizing] = useState<Exclude<ExecutionPolicy, 'guided'> | null>(null);
+  const startingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
 
   const latest = useRef(opts);
@@ -863,6 +870,34 @@ export function useGoLoop(opts: Options) {
   }, [commitRun, commitSteps, loop]);
   continueRef.current = continueRun;
 
+  /**
+   * Go in one click (17 Oct, Sean: "do we need it if the versions are saved
+   * anyway?"). Nothing a run does can destroy a version — every save appends —
+   * so the separate "Authorize and go" dialog is gone. The authorization it
+   * wrote stays: pressing Go with Checkpoint or Autonomous records the same
+   * accepted proposal and decision, with the window and the further windows
+   * shown beside the button, and the database still refuses a run without it.
+   */
+  const authorizeAndStart = useCallback(
+    async (chosen: Exclude<ExecutionPolicy, 'guided'>) => {
+      const o = latest.current;
+      if (!o.stage || startingRef.current) return;
+      startingRef.current = true;
+      setAuthorizing(chosen);
+      try {
+        const authId = await authorizeRun({
+          projectId: o.project.id, userId: o.project.user_id, policy: chosen, budgetSteps: budget, stageId: o.stage.id,
+          autoContinueWindows: chosen === 'autonomous' ? autoWindows : 0,
+        });
+        await startRun(chosen, authId);
+      } finally {
+        startingRef.current = false;
+        setAuthorizing(null);
+      }
+    },
+    [budget, autoWindows, startRun]
+  );
+
   const go = useCallback(async () => {
     setError(null);
     const live = runRef.current;
@@ -892,11 +927,11 @@ export function useGoLoop(opts: Options) {
         return;
       }
       if (policy === 'guided') await startRun('guided', null);
-      else setAuthorizing(policy);
+      else await authorizeAndStart(policy);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not start Go mode.');
     }
-  }, [policy, budget, pendingStepId, commitRun, loop, startRun, continueRun]);
+  }, [policy, budget, pendingStepId, commitRun, loop, startRun, continueRun, authorizeAndStart]);
 
   /**
    * "Update affected work and resume" (D2): repairing every reopened stage
@@ -943,32 +978,15 @@ export function useGoLoop(opts: Options) {
 
   /**
    * "Let Go run this" (Harold, via Sean, 9 Oct: a new user should give it a
-   * goal and see work happen, not configure a run). Autonomous, straight to the
-   * authorization — which stays, because it is the record of what was
-   * delegated. Reserved approvals still stop the run.
+   * goal and see work happen, not configure a run). Autonomous, started at
+   * once and recorded as authorized. Reserved approvals still stop the run.
    */
   const handsOff = useCallback(() => {
     if (runRef.current && !runRef.current.ended_at) return;
     setError(null);
     setPolicy('autonomous');
-    setAuthorizing('autonomous');
-  }, []);
-
-  const confirmAuthorization = useCallback(async () => {
-    const chosen = authorizing;
-    const o = latest.current;
-    if (!chosen || !o.stage) return;
-    try {
-      const authId = await authorizeRun({
-        projectId: o.project.id, userId: o.project.user_id, policy: chosen, budgetSteps: budget, stageId: o.stage.id,
-        autoContinueWindows: chosen === 'autonomous' ? autoWindows : 0,
-      });
-      setAuthorizing(null);
-      await startRun(chosen, authId);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not authorize Go mode.');
-    }
-  }, [authorizing, budget, autoWindows, startRun]);
+    void authorizeAndStart('autonomous').catch((e) => setError(e instanceof Error ? e.message : 'Could not start Go mode.'));
+  }, [authorizeAndStart]);
 
   const approve = useCallback(async () => {
     const id = pendingStepId;
@@ -1375,8 +1393,7 @@ export function useGoLoop(opts: Options) {
     stepEffect,
     autoWindows, setAutoWindows, autoPending,
     policy, setPolicy, budget, setBudget, run, steps, phase, active, pendingStep, pendingStale, authorizing, error,
-    go, update, suggest, replan, stop, approve, decline, answer, fixObjective, retryRepair, checkAnswer, confirmAuthorization,
-    cancelAuthorization: useCallback(() => setAuthorizing(null), []),
+    go, update, suggest, replan, stop, approve, decline, answer, fixObjective, retryRepair, checkAnswer,
     handsOff,
     dismissError: useCallback(() => setError(null), []),
   };

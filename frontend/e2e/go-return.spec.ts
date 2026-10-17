@@ -45,7 +45,6 @@ test('from Analysis, Go goes back to Experiment with its reason, and adds the wo
   await expect.poll(async () => (await serviceSelect('projects', `id=eq.${id}&select=routine_decisions`))[0].routine_decisions).toBe('handle');
   await panel.getByRole('radio', { name: /^Autonomous/ }).click();
   await panel.getByRole('button', { name: /^Go$/ }).click();
-  await page.getByRole('button', { name: 'Authorize and go' }).click();
 
   await expect.poll(
     async () => (await serviceSelect('workflow_events', `project_id=eq.${id}&type=eq.stage_returned&select=actor,stage_id,to_stage_id,agent_run_id,payload`)).length,

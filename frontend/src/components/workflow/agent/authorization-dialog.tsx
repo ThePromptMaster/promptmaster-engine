@@ -4,81 +4,63 @@ import { KEEP_GOING_WINDOWS, POLICY_TERMS } from '@/lib/agent/authorize';
 import type { ExecutionPolicy } from '@/types/agent';
 
 /**
- * Checkpoint and Autonomous act without asking each time, so they start with
- * an explicit authorization that is recorded (an accepted proposal plus a
- * decision) and that the database checks every autonomous stage move against.
+ * What Go may do, said once beside the button (17 Oct, Sean: "the directions
+ * are a little too wordy for the authorized button … somebody just felt
+ * paralyzed"). Pressing Go with Checkpoint or Autonomous is the authorization:
+ * it is recorded on the decision trail (an accepted proposal plus a decision)
+ * and the database checks every autonomous stage move against it. The full
+ * terms are one click away rather than a dialog in the way.
  */
-export function AuthorizationDialog({
+export function GoTerms({
   policy,
   budget,
   autoWindows = 0,
   onAutoWindows,
-  onAuthorize,
-  onCancel,
+  disabled = false,
 }: {
   policy: Exclude<ExecutionPolicy, 'guided'>;
   budget: number;
   /** Further windows the run may start on its own. Offered for Autonomous only. */
   autoWindows?: number;
   onAutoWindows?: (n: number) => void;
-  onAuthorize: () => void;
-  onCancel: () => void;
+  disabled?: boolean;
 }) {
   return (
-    <section
-      role="dialog"
-      aria-label="Authorize Go mode"
-      className="rounded-xl bg-[var(--surface-container-highest)] px-5 py-4"
-    >
-      <h3 className="text-title text-[var(--on-surface)]">
-        Let Go mode run {policy === 'autonomous' ? 'autonomously' : 'with checkpoints'}?
-      </h3>
-      <ul className="mt-2 list-disc space-y-1 pl-5 text-body text-[var(--on-surface)]">
-        {POLICY_TERMS[policy].map((t) => (
-          <li key={t}>{t}</li>
-        ))}
-        {/* What happens at the end of a window follows the choice below (13 Oct,
-            Sean: "every window needs my click" sat above a dropdown authorising them). */}
-        <li>
-          {windowsLine(policy, budget, autoWindows)} You can press Stop at any time.
-        </li>
-      </ul>
+    <div aria-label="What Go may do" className="space-y-2 text-label text-[var(--on-surface-variant)]">
+      <p>
+        {policy === 'autonomous'
+          ? 'Go works through the stages and stops when it needs you. Finishing the project is always your click.'
+          : 'Go works on its own and stops for your approval before important moves.'}{' '}
+        Pressing Go is recorded on the decision trail.
+      </p>
       {policy === 'autonomous' && onAutoWindows && (
-        <label className="mt-3 flex flex-wrap items-center gap-2 text-body text-[var(--on-surface)]">
-          When a window is used up, carry on without asking for
+        <label className="flex flex-wrap items-center gap-2">
+          When a window of {budget} steps is used up, carry on for
           <select
             value={autoWindows}
+            disabled={disabled}
             onChange={(e) => onAutoWindows(Number(e.target.value))}
             aria-label="Further windows without asking"
-            className="rounded-md bg-[var(--surface-container-low)] px-2 py-1 text-body text-[var(--on-surface)]"
+            className="rounded-md bg-[var(--surface-container-highest)] px-2 py-1 text-label text-[var(--on-surface)] disabled:opacity-60"
           >
-            <option value={0}>no further windows</option>
+            <option value={0}>no more windows</option>
             <option value={1}>1 more window</option>
             <option value={2}>2 more windows</option>
             <option value={3}>3 more windows</option>
-            <option value={KEEP_GOING_WINDOWS}>keep going — up to {KEEP_GOING_WINDOWS} more windows</option>
+            <option value={KEEP_GOING_WINDOWS}>up to {KEEP_GOING_WINDOWS} more windows</option>
           </select>
-          <span className="text-label text-[var(--on-surface-variant)]">
-            {autoWindows > 0
-              ? `At most ${budget * (autoWindows + 1)} steps before it stops and asks. Each window is recorded${
-                  autoWindows >= KEEP_GOING_WINDOWS ? '; it still stops whenever it needs you, and each new round of open-ended work is yours to start' : ''
-                }.`
-              : 'It stops and asks after each window.'}
-          </span>
         </label>
       )}
-      <p className="mt-2 text-label text-[var(--on-surface-variant)]">
-        This authorization is recorded on the project&apos;s decision trail.
-      </p>
-      <div className="mt-3 flex gap-2">
-        <button onClick={onAuthorize} className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-title text-[var(--on-primary)]">
-          Authorize and go
-        </button>
-        <button onClick={onCancel} className="rounded-lg px-4 py-2 text-title text-[var(--on-surface-variant)]">
-          Cancel
-        </button>
-      </div>
-    </section>
+      <details>
+        <summary className="cursor-pointer">Everything Go may and may not do</summary>
+        <ul className="mt-1 list-disc space-y-1 pl-5">
+          {POLICY_TERMS[policy].map((t) => (
+            <li key={t}>{t}</li>
+          ))}
+          <li>{windowsLine(policy, budget, autoWindows)} You can press Stop at any time.</li>
+        </ul>
+      </details>
+    </div>
   );
 }
 
