@@ -545,3 +545,13 @@ describe('a change refused because the stage moved on', () => {
     expect(history.at(-1)!.content).toContain('Instruction: Tighten the opening.');
   });
 });
+
+describe('a stage that cannot change the deliverable says where it is changed (17 Oct, Sean)', () => {
+  it('names the stage and opens it', async () => {
+    const onOpen = vi.fn();
+    panel({ canInstruct: false, isTable: true, editElsewhere: { label: 'Output', onOpen } });
+    expect(screen.getByText(/To change the Output, open it and press Edit this stage\./)).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Open Output' }));
+    expect(onOpen).toHaveBeenCalled();
+  });
+});

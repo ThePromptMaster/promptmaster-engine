@@ -23,7 +23,10 @@ test('a done stage can be reopened, edited, closed again, and the stages after i
   await expect(page.getByRole('heading', { name: /Objective/ })).toBeVisible();
   const artifact = page.getByRole('region', { name: /Objective.*work/ });
   await expect(artifact.getByRole('button', { name: 'Edit' })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Reopen to edit' }).click();
+  // 16 Oct (Sean): clicking into finished work says how to change it.
+  await page.getByText('Mock output').first().click();
+  await expect(page.getByRole('status').filter({ hasText: 'This stage is finished. Press Edit this stage to change it' })).toBeVisible();
+  await page.getByRole('button', { name: 'Edit this stage' }).first().click();
   await expect(page.getByText(/Reopened — change it here/)).toBeVisible();
   // 13 Oct (Sean, email 1): the way back to Go is on the reopened stage itself.
   await expect(page.getByRole('button', { name: 'Apply my changes and let Go continue' })).toBeVisible();

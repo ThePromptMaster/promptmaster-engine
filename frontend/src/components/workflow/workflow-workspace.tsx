@@ -300,6 +300,20 @@ export function WorkflowWorkspace({
   const reopenedHere = !isCurrent && viewedState?.status === 'in_progress' && !viewedState.left_open;
   // A skipped stage can be come back to as well as a done one (1 Oct, item 11).
   const canReopen = !isCurrent && (isDone(viewedState?.status) || viewedState?.status === 'skipped') && project.status !== 'finalized';
+  // 16 Oct (Sean): "when you click on something editable but you haven't
+  // clicked reopen … it explains how to edit it". Shown on the first click
+  // into a finished stage's work, until another stage is opened.
+  const [finishedHint, setFinishedHint] = useState<string | null>(null);
+  const showFinishedHint = finishedHint === stageId;
+  // "Open Output" from the chat on a later stage lands on its Edit button.
+  const editButtonRef = useRef<HTMLButtonElement | null>(null);
+  const [focusEdit, setFocusEdit] = useState(false);
+  useEffect(() => {
+    if (!focusEdit || !canReopen) return;
+    editButtonRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    editButtonRef.current?.focus();
+    setFocusEdit(false);
+  }, [focusEdit, canReopen]);
 
   const stageBundles = useMemo(() => bundles ?? {}, [bundles]);
 
@@ -1496,6 +1510,20 @@ export function WorkflowWorkspace({
   );
   const chatEditsProse =
     !rendererHoldsItems(stage.renderer) && stage.renderer !== 'outline' && stage.renderer !== 'long_form';
+  // 15–17 Oct (Sean): "Should we be able to change it in summary?" A later
+  // stage that cannot rewrite the deliverable says where it is changed, with
+  // the way there — rather than leaving "Change it" greyed out.
+  const editElsewhere =
+    isCurrent && !chatEditsProse && deliverable && deliverable.id !== stage.id &&
+    isDone(state.stages[deliverable.id]?.status) && project.status !== 'finalized'
+      ? {
+          label: deliverable.short_label,
+          onOpen: () => {
+            setViewingStageId(deliverable.id);
+            setFocusEdit(true);
+          },
+        }
+      : undefined;
   // The stuck card names the stage bar's own transition button in the words
   // that are on the page ("Continue to X" or "Override and continue to X").
   const goNeedContextOnPage = {
@@ -1721,14 +1749,21 @@ export function WorkflowWorkspace({
                   Reopened — change it here (edit it, or use the side chat), then let Go continue: it keeps this version as the new one, rechecks the stages after it, and carries on. Or mark it complete yourself.
                 </span>
               )}
+              {/* 16 Oct (Sean): "Reopen and edit button should be more
+                  prominent" — the one way to change finished work, so it is
+                  the primary button, with what it does said beside it. */}
               {canReopen && (
-                <button
-                  onClick={() => void reopenStage()}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-highest)] px-3 py-1.5 text-label font-semibold text-[var(--on-surface)] hover:opacity-90"
-                >
-                  <span className="material-symbols-outlined text-[16px]">edit</span>
-                  Reopen to edit
-                </button>
+                <>
+                  <button
+                    ref={editButtonRef}
+                    onClick={() => void reopenStage()}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--pm-primary)] px-3.5 py-1.5 text-label font-semibold text-[var(--on-primary)] hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[var(--pm-primary)]/50 focus:ring-offset-2"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">edit</span>
+                    Edit this stage
+                  </button>
+                  <span className="text-label text-[var(--on-surface-variant)]">Later stages will be rechecked after you change it.</span>
+                </>
               )}
               {reopenedHere && appendStageVersion && project.status !== 'finalized' && (
                 <button
@@ -1941,10 +1976,28 @@ export function WorkflowWorkspace({
                 drafting stage, whose renderer still has work to do, so only the
                 explicit case suppresses it. */}
             <RefusedRevisions refused={refusedSince(events ?? [], stage.id, headVersion)} head={headVersion} />
+            {showFinishedHint && canReopen && (
+              <div role="status" className="mb-3 flex flex-wrap items-center gap-2 rounded-lg bg-[var(--surface-container-high)] px-4 py-2.5">
+                <span className="material-symbols-outlined text-[18px] text-[var(--on-surface-variant)]" aria-hidden>lock</span>
+                <span className="text-label text-[var(--on-surface)]">
+                  This stage is finished. Press Edit this stage to change it — later stages will be rechecked.
+                </span>
+                <button
+                  onClick={() => void reopenStage()}
+                  className="rounded-lg bg-[var(--pm-primary)] px-3 py-1 text-label font-semibold text-[var(--on-primary)] hover:opacity-90"
+                >
+                  Edit this stage
+                </button>
+              </div>
+            )}
             {explicitOutlineHere ? null : !stageDrafts(stage) &&
               stage.renderer !== 'long_form' ? (
               <CheckpointPanel />
             ) : (
+              <div
+                onPointerDownCapture={canReopen ? () => setFinishedHint(stageId) : undefined}
+                onKeyDownCapture={canReopen ? () => setFinishedHint(stageId) : undefined}
+              >
               <StageRenderer
                 hideStageActions={isCurrent}
                 onDirtyChange={setDirtyState}
@@ -1982,6 +2035,7 @@ export function WorkflowWorkspace({
                 }
                 longForm={longFormContext}
               />
+              </div>
             )}
           </div>
 
@@ -2319,6 +2373,7 @@ export function WorkflowWorkspace({
                       : undefined
               }
               isTable={!chatEditsProse}
+              editElsewhere={editElsewhere}
               suggestActions={draftable && headVersion ? suggestReplyActions : undefined}
               previewRows={previewReplyRows}
               onRunAction={runReplyAction}

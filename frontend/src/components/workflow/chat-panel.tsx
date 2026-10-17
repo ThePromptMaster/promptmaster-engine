@@ -124,6 +124,8 @@ interface Props {
   canInstruct?: boolean;
   /** Why "Change it" is unavailable, when it is for a reason other than reading an old version. */
   cannotChangeBecause?: string;
+  /** Where the deliverable is changed, when this stage cannot change it (17 Oct). */
+  editElsewhere?: { label: string; onOpen: () => void };
   /**
    * "Buttonize it" (PM-22), compressed (1 Oct, items 13 and 34): a reply is
    * offered as at most four actions, asked for from the model, instead of
@@ -198,6 +200,7 @@ export function ChatPanel({
   initialMode = 'discuss',
   canInstruct = true,
   cannotChangeBecause,
+  editElsewhere,
   suggestActions,
   previewRows,
   onRunAction,
@@ -525,6 +528,18 @@ export function ChatPanel({
             : (cannotChangeBecause ?? 'You are reading an earlier version. Open the latest one to revise it.')
         }
       />
+      {editElsewhere && (
+        <p className="flex flex-wrap items-center gap-2 px-5 pt-2 text-label text-[var(--on-surface-variant)]">
+          To change the {editElsewhere.label}, open it and press Edit this stage.
+          <button
+            type="button"
+            onClick={editElsewhere.onOpen}
+            className="rounded-lg bg-[var(--surface-container-high)] px-2.5 py-1 font-semibold text-[var(--pm-primary)] hover:bg-[var(--surface-container-highest)]"
+          >
+            Open {editElsewhere.label}
+          </button>
+        </p>
+      )}
 
       <div
         ref={threadRef}
