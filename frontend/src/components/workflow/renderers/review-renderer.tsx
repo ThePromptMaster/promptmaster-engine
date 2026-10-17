@@ -414,17 +414,20 @@ export function ReviewRenderer({
           {/* The table scrolls inside its own container: at five columns it is
               wider than the 820px content well on a laptop, and a horizontally
               scrolling page is worse than a horizontally scrolling table. */}
-          {/* Below md each row is a card — the finding, then its status and
-              reason under it — so nothing scrolls sideways on a phone or an iPad
-              in portrait (Sean, 10 Oct, emails 6.11 and 8). */}
-          <div data-stage-table tabIndex={-1} className="scroll-mt-24 overflow-x-auto rounded-xl bg-[var(--surface-container-lowest)] outline-none">
-            <table className="w-full border-collapse max-md:block md:min-w-[720px]">
+          {/* In a narrow pane each row is a card — the finding, then its status
+              and reason under it — so nothing scrolls sideways on a phone or an
+              iPad in portrait (Sean, 10 Oct, emails 6.11 and 8). Measured on the
+              pane, not the screen: an iPad in landscape with the side chat open
+              left the table about 470px and still forced it to 720 (17 Oct,
+              NORTHSTAR-2). */}
+          <div data-stage-table tabIndex={-1} className="@container scroll-mt-24 overflow-x-auto rounded-xl bg-[var(--surface-container-lowest)] outline-none">
+            <table className="w-full border-collapse @max-2xl:block">
               <caption className="sr-only">
                 {stage.label}: one row per {schema.itemLabel}, each with a status and, where the
                 status requires it, a reason.
               </caption>
               <thead>
-                <tr className="bg-[var(--surface-container-low)] max-md:hidden">
+                <tr className="bg-[var(--surface-container-low)] @max-2xl:hidden">
                   {columns.map((c) => (
                     <th
                       key={c.key}
@@ -436,13 +439,13 @@ export function ReviewRenderer({
                   ))}
                   <th
                     scope="col"
-                    className="w-[200px] px-4 py-3 text-left text-label uppercase tracking-wider text-[var(--on-surface-variant)]"
+                    className="w-[180px] px-4 py-3 text-left text-label uppercase tracking-wider text-[var(--on-surface-variant)]"
                   >
                     Status
                   </th>
                 </tr>
               </thead>
-              <tbody className="max-md:block">
+              <tbody className="@max-2xl:block">
                 {openRows.map((row) => (
                   <ReviewRow
                     key={row.id}
@@ -457,8 +460,8 @@ export function ReviewRenderer({
                   />
                 ))}
                 {foldedRows.length > 0 && (
-                  <tr className="max-md:block">
-                    <td colSpan={columns.length + 1} className="px-4 py-2 max-md:block">
+                  <tr className="@max-2xl:block">
+                    <td colSpan={columns.length + 1} className="px-4 py-2 @max-2xl:block">
                       <button
                         type="button"
                         aria-expanded={showSettled}
@@ -542,17 +545,17 @@ function ReviewRow({ row, columns, statuses, schema, readOnly, onPatch, sameMiss
 
   return (
     <>
-      <tr className="align-top max-md:block max-md:border-b max-md:border-[var(--surface-container-high)] max-md:py-2" {...(isTriaged(row, schema) ? {} : { 'data-undecided': '' })}>
+      <tr className="align-top @max-2xl:block @max-2xl:border-b @max-2xl:border-[var(--surface-container-high)] @max-2xl:py-2" {...(isTriaged(row, schema) ? {} : { 'data-undecided': '' })}>
         {columns.map((c) => (
           <td
             key={c.key}
             data-label={c.label}
-            className="px-4 py-3 text-body leading-relaxed text-[var(--on-surface)] max-md:block max-md:py-1 max-md:before:block max-md:before:text-label max-md:before:uppercase max-md:before:tracking-wider max-md:before:text-[var(--on-surface-variant)] max-md:before:content-[attr(data-label)]"
+            className="px-4 py-3 text-body leading-relaxed text-[var(--on-surface)] @max-2xl:block @max-2xl:py-1 @max-2xl:before:block @max-2xl:before:text-label @max-2xl:before:uppercase @max-2xl:before:tracking-wider @max-2xl:before:text-[var(--on-surface-variant)] @max-2xl:before:content-[attr(data-label)]"
           >
             {row[c.key] || <span className="text-[var(--on-surface-variant)]">—</span>}
           </td>
         ))}
-        <td data-label="Status" className="px-4 py-3 max-md:block max-md:py-1 max-md:before:block max-md:before:text-label max-md:before:uppercase max-md:before:tracking-wider max-md:before:text-[var(--on-surface-variant)] max-md:before:content-[attr(data-label)]">
+        <td data-label="Status" className="px-4 py-3 @max-2xl:block @max-2xl:py-1 @max-2xl:before:block @max-2xl:before:text-label @max-2xl:before:uppercase @max-2xl:before:tracking-wider @max-2xl:before:text-[var(--on-surface-variant)] @max-2xl:before:content-[attr(data-label)]">
           {readOnly ? (
             <span className={`text-body ${TONE_CLASS[option?.tone ?? 'neutral']}`}>
               {option?.label ?? 'Not looked at'}
@@ -610,8 +613,8 @@ function ReviewRow({ row, columns, statuses, schema, readOnly, onPatch, sameMiss
           the identical control for the identical reason — dismissing a
           recommendation is dismissing a finding. It was extracted from here. */}
       {needsReason && (
-        <tr className="max-md:block">
-          <td colSpan={columns.length + 1} className="px-4 pb-4 max-md:block">
+        <tr className="@max-2xl:block">
+          <td colSpan={columns.length + 1} className="px-4 pb-4 @max-2xl:block">
             <ReasonField
               id={`${row.id}-reason`}
               label={`Why ${option?.label.toLowerCase()}?`}
