@@ -56,7 +56,7 @@ import { documentSections, type ScopeKind } from './chat-scope';
 import type { StageChatMessage } from '@/lib/supabase/conversation';
 import type { NewVersion } from '@/lib/supabase/versions';
 import type { ArtifactVersion, Project } from '@/types/project';
-import { isNewFact, type FactChange } from '@/lib/workflow/fact-reconcile';
+import { applyChangesLabel, factChangeGroup, type FactChange } from '@/lib/workflow/fact-reconcile';
 import { FactChangeList, toggled } from './fact-change-list';
 import { LimitCounter } from '@/components/shared/limit-counter';
 import { INPUT_LIMITS } from '@/lib/projects/input-limits';
@@ -1102,7 +1102,7 @@ export function ProposalCard({
           className="rounded-lg bg-[var(--pm-primary)] px-4 py-1.5 text-label text-[var(--on-primary)] disabled:opacity-40"
         >
           {updating.length
-            ? `Apply and ${factChanges.some((c) => updating.includes(c.fact.id) && !isNewFact(c)) ? 'update' : 'record'} ${updating.length === 1 ? 'the fact' : `${updating.length} facts`}`
+            ? applyChangesLabel(updating.length)
             : 'Apply as new version'}
         </button>
         <button
@@ -1188,13 +1188,17 @@ export function AppliedNotice({
   );
 }
 
-/** "This changes an accepted fact", "This states 2 new facts", or both. */
+/** "This changes an accepted fact", "This states 2 new facts", "notes a request", or a mix. */
 function factChangesHeading(changes: readonly FactChange[]): string {
-  const added = changes.filter(isNewFact).length;
-  const changed = changes.length - added;
+  const count = (g: ReturnType<typeof factChangeGroup>) => changes.filter((c) => factChangeGroup(c) === g).length;
+  const changed = count('changed');
+  const added = count('new');
+  const requests = count('request');
   const parts = [
     changed ? `changes ${changed === 1 ? 'an accepted fact' : `${changed} accepted facts`}` : '',
-    added ? `states ${added === 1 ? 'something later work must respect' : `${added} things later work must respect`}` : '',
+    added ? `states ${added === 1 ? 'a new fact' : `${added} new facts`}` : '',
+    requests ? `notes ${requests === 1 ? 'a request' : `${requests} requests`} nobody has approved` : '',
   ].filter(Boolean);
-  return `This ${parts.join(' and ')}. Record ${changes.length === 1 ? 'it' : 'them'} so every later stage and check uses ${changes.length === 1 ? 'it' : 'them'}?`;
+  const list = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}` : parts[0];
+  return `This ${list}. Record ${changes.length === 1 ? 'it' : 'them'} so every later stage and check uses ${changes.length === 1 ? 'it' : 'them'}?`;
 }

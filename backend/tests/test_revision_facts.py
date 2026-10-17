@@ -85,3 +85,39 @@ def test_the_check_runs_when_the_project_has_no_facts_yet():
         assert r.json()["additions"][0]["statement"].startswith("Supplier was removed")
     finally:
         app.dependency_overrides.pop(get_client, None)
+
+
+HARBOR = RevisionFactsRequest(
+    instruction=(
+        "Update Project HARBOR as of November 6, 2026. Elena approved changing launch to November 24, 2026. "
+        "Omar proposes moving testing to November 20. All other facts and approvals remain unchanged. "
+        "Before revising anything, explain what changes."
+    ),
+    after="Launch: November 24, 2026 (approved by Elena on November 6).",
+)
+
+
+def test_the_revision_path_records_nothing_for_filler_or_an_instruction_about_this_request():
+    """17 Oct (Sean, HARBOR): "Apply and update 6 facts" carried "other
+    information remains unchanged" and how-to-handle-this instructions."""
+    out = parse({"additions": [
+        {"statement": "All other facts and approvals remain unchanged.", "kind": "fact", "quote": "All other facts and approvals remain unchanged."},
+        {"statement": "Before revising anything, explain what changes.", "kind": "requirement", "quote": "Before revising anything, explain what changes."},
+        {"statement": "Elena approved changing launch to November 24, 2026.", "kind": "fact", "quote": "Elena approved changing launch to November 24, 2026."},
+    ]}, HARBOR)
+    assert [a.statement for a in out.additions] == ["Elena approved changing launch to November 24, 2026."]
+    assert out.additions[0].request is False
+
+
+def test_a_request_on_the_revision_path_is_a_fact_about_the_request():
+    out = parse({"additions": [
+        {"statement": "Omar proposes moving testing to November 20.", "kind": "requirement", "quote": "Omar proposes moving testing to November 20."},
+    ]}, HARBOR)
+    [a] = out.additions
+    assert (a.kind, a.request) == ("fact", True)
+
+
+def test_the_revision_prompt_carries_the_same_rules_as_the_reply_actions():
+    system, _ = build_prompt(HARBOR)
+    assert "all other facts remain unchanged" in system
+    assert "is recorded as a fact about the request, never as a requirement" in system

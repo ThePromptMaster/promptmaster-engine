@@ -28,6 +28,7 @@ import re
 
 from pydantic import BaseModel, Field
 
+from .fact_filters import RULES, is_request, record_kind, records_nothing
 from .llm_client import OpenRouterClient
 
 MAX_FACTS = 60
@@ -59,6 +60,9 @@ class NewStandingFact(BaseModel):
     statement: str
     kind: str = "fact"  # "fact" | "requirement"
     quote: str
+    #: Someone's request, suggestion or proposal: recorded as a fact about it,
+    #: shown apart as "Requests noted (not approved)" (17 Oct, Sean, HARBOR).
+    request: bool = False
 
 
 class RevisionFactsResponse(BaseModel):
@@ -83,6 +87,7 @@ _INSTRUCTION = (
     "binds what the work may say or must keep and \"fact\" otherwise, and quote the instruction verbatim "
     "(one sentence or less). A one-off wording or style request is not a standing change. When in doubt, "
     "report nothing.\n"
+    "Rules for standing changes:\n" + RULES +
     "Return JSON: {\"changes\": [{\"fact_id\": string, \"proposed\": string, \"quote\": string, \"why\": string}], "
     "\"additions\": [{\"statement\": string, \"kind\": \"fact\" | \"requirement\", \"quote\": string}]}"
 )
@@ -123,12 +128,17 @@ def _additions(raw: dict, req: RevisionFactsRequest) -> list[NewStandingFact]:
             continue
         statement = " ".join(str(item.get("statement") or "").split())[:2_000]
         quote = " ".join(str(item.get("quote") or "").split()).strip('"“”')[:600]
-        kind = "requirement" if str(item.get("kind") or "").strip().lower() == "requirement" else "fact"
         if len(statement) < 4 or len(quote) < 4 or _norm(quote) not in instruction:
             continue
+        # Filler and how-to-handle-this instructions are never recorded; a
+        # request is a fact about the request (the reply-actions path's rules).
+        if records_nothing(statement) or records_nothing(quote):
+            continue
+        request = is_request(statement)
+        kind = "fact" if request else record_kind(str(item.get("kind") or "").strip().lower(), statement)
         if _norm(statement) in known or any(_norm(a.statement) == _norm(statement) for a in out):
             continue
-        out.append(NewStandingFact(statement=statement, kind=kind, quote=quote))
+        out.append(NewStandingFact(statement=statement, kind=kind, quote=quote, request=request))
     return out
 
 

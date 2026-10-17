@@ -38,6 +38,8 @@ export interface FactChange {
   changes: FactValueChange[];
   /** The fact as it would read with the revision's values. */
   proposed: string;
+  /** A new fact that records someone's request or proposal: nobody has approved it (17 Oct). */
+  request?: boolean;
 }
 
 function byKind(text: string): Map<keyof FactValues, ValueMention[]> {
@@ -117,6 +119,29 @@ export function isNewFact(c: FactChange): boolean {
 }
 
 /**
+ * Which kind of change a review row is, so the review keeps them apart
+ * (17 Oct, Sean, HARBOR: "Apply and update 6 facts" mixed facts, instructions
+ * and statements that other information remained unchanged).
+ */
+export type FactChangeGroup = 'changed' | 'new' | 'request';
+
+export function factChangeGroup(c: FactChange): FactChangeGroup {
+  if (!isNewFact(c)) return 'changed';
+  return c.request ? 'request' : 'new';
+}
+
+export const FACT_CHANGE_GROUPS: ReadonlyArray<{ group: FactChangeGroup; label: string }> = [
+  { group: 'changed', label: 'Changed values' },
+  { group: 'new', label: 'New facts' },
+  { group: 'request', label: 'Requests noted (not approved)' },
+];
+
+/** "Apply and record 3 changes": what the button does, whatever the mix. */
+export function applyChangesLabel(count: number): string {
+  return `Apply and record ${count === 1 ? '1 change' : `${count} changes`}`;
+}
+
+/**
  * The facts a revision contradicts in meaning, not by a value (L-72, 11 Oct:
  * in-office to fully remote). One small AI call for the facts the value
  * matcher did not already offer; each is kept only with a quote from the new
@@ -127,7 +152,7 @@ export async function withMeaningChanges(
   input: { facts: readonly ProjectFact[] | undefined; instruction: string; before: string; after: string; model?: string },
   check: (req: { instruction: string; before: string; after: string; facts: { id: string; statement: string }[]; model?: string }) => Promise<{
     changes: { fact_id: string; proposed: string; quote: string; why: string }[];
-    additions?: { statement: string; kind: 'fact' | 'requirement'; quote: string }[];
+    additions?: { statement: string; kind: 'fact' | 'requirement'; quote: string; request?: boolean }[];
   }>
 ): Promise<FactChange[]> {
   const offered = new Set(valueChanges.map((c) => c.fact.id));
@@ -155,6 +180,7 @@ export async function withMeaningChanges(
           fact: { id: `${NEW_PREFIX}${i}`, statement: '', subject: null, kind: a.kind === 'requirement' ? 'requirement' : 'fact' },
           changes: [{ kind: 'new', was: '', now: `from your instruction — “${a.quote}”` }],
           proposed: a.statement,
+          ...(a.request ? { request: true } : {}),
         }))
       : [];
     return [...valueChanges, ...meaning, ...added];

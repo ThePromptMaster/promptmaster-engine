@@ -51,7 +51,7 @@ test('a revision that changes accepted facts updates them with it; a restore off
   await expect(card).toContainText('The invitation is under 70 words.');
   await card.scrollIntoViewIfNeeded();
   await page.screenshot({ path: test.info().outputPath('01-revision-offers-fact-updates.png') });
-  await card.getByRole('button', { name: 'Apply and update 2 facts' }).click();
+  await card.getByRole('button', { name: 'Apply and record 2 changes' }).click();
 
   // The record now says what the document says; the old facts are history.
   await expect
@@ -81,7 +81,7 @@ test('a revision that changes a fact in meaning offers it, with the words that c
   await expect(card).toContainText('The team works fully remote.');
   await expect(card).toContainText('was “The team works in-office.”');
   await page.screenshot({ path: test.info().outputPath('03-meaning-change-offered.png') });
-  await card.getByRole('button', { name: 'Apply and update the fact' }).click();
+  await card.getByRole('button', { name: 'Apply and record 1 change' }).click();
   await expect
     .poll(async () => (await serviceSelect('project_facts', `project_id=eq.${id}&retired_at=is.null&select=statement`)).map((r: { statement: string }) => r.statement), { timeout: 15_000 })
     .toEqual(['The team works fully remote.']);
