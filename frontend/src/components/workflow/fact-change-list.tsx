@@ -9,7 +9,7 @@
 import { useState } from 'react';
 
 import { recordFacts, supersedeFact } from '@/lib/supabase/facts';
-import { describeFactChange, isNewFact, type FactChange } from '@/lib/workflow/fact-reconcile';
+import { describeFactChange, FACT_CHANGE_GROUPS, factChangeGroup, isNewFact, type FactChange } from '@/lib/workflow/fact-reconcile';
 import type { Project } from '@/types/project';
 
 export function FactChangeList({
@@ -22,25 +22,35 @@ export function FactChangeList({
   kept: ReadonlySet<string>;
   onToggle: (factId: string, update: boolean) => void;
 }) {
+  // Grouped by kind, so a changed value, a new fact and someone's request are
+  // never read as the same thing (17 Oct, Sean, HARBOR).
+  const groups = FACT_CHANGE_GROUPS.map((g) => ({ ...g, items: changes.filter((c) => factChangeGroup(c) === g.group) })).filter((g) => g.items.length);
   return (
     <>
-      <ul className="mt-2 space-y-2">
-        {changes.map((c) => (
-          <li key={c.fact.id}>
-            <label className="flex items-start gap-2 text-label text-[var(--on-surface)]">
-              <input type="checkbox" className="mt-0.5" checked={!kept.has(c.fact.id)} onChange={(e) => onToggle(c.fact.id, e.target.checked)} />
-              <span>
-                <span className="block">{c.proposed}</span>
-                <span className="block text-[var(--on-surface-variant)]">
-                  {isNewFact(c)
-                    ? `New ${c.fact.kind === 'requirement' ? 'requirement' : 'fact'} ${describeFactChange(c)}`
-                    : <>{describeFactChange(c)} · was &ldquo;{c.fact.statement}&rdquo;</>}
-                </span>
-              </span>
-            </label>
-          </li>
-        ))}
-      </ul>
+      {groups.map((g) => (
+        <div key={g.group} role="group" aria-label={g.label} className="mt-2">
+          <p className="text-label uppercase tracking-wide text-[var(--on-surface-variant)]">{g.label}</p>
+          <ul className="mt-1 space-y-2">
+            {g.items.map((c) => (
+              <li key={c.fact.id}>
+                <label className="flex items-start gap-2 text-label text-[var(--on-surface)]">
+                  <input type="checkbox" className="mt-0.5" checked={!kept.has(c.fact.id)} onChange={(e) => onToggle(c.fact.id, e.target.checked)} />
+                  <span>
+                    <span className="block">{c.proposed}</span>
+                    <span className="block text-[var(--on-surface-variant)]">
+                      {isNewFact(c)
+                        ? g.group === 'request'
+                          ? `Recorded as a request, not an approval ${describeFactChange(c)}`
+                          : `New ${c.fact.kind === 'requirement' ? 'requirement' : 'fact'} ${describeFactChange(c)}`
+                        : <>{describeFactChange(c)} · was &ldquo;{c.fact.statement}&rdquo;</>}
+                    </span>
+                  </span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
       {kept.size > 0 && (
         <p className="mt-2 text-label text-[var(--on-surface-variant)]">
           A fact left unticked keeps its old value, and a new one unticked is not recorded. Go treats accepted facts as authoritative, so it may change the draft back to match.

@@ -598,7 +598,7 @@ export const api = {
     model?: string;
   }): Promise<{
     changes: { fact_id: string; proposed: string; quote: string; why: string }[];
-    additions?: { statement: string; kind: 'fact' | 'requirement'; quote: string }[];
+    additions?: { statement: string; kind: 'fact' | 'requirement'; quote: string; request?: boolean }[];
   }> {
     return apiFetch('/api/revision-facts', { method: 'POST', body: JSON.stringify(req) });
   },

@@ -471,7 +471,7 @@ describe('a revision that changes an accepted fact', () => {
     expect(card).toHaveTextContent('Under 70 words.');
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: /apply and update 2 facts/i }));
+    await user.click(screen.getByRole('button', { name: /apply and record 2 changes/i }));
 
     await waitFor(() => expect(appendStageVersion).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(supersedeFact).toHaveBeenCalledTimes(2));
@@ -488,7 +488,7 @@ describe('a revision that changes an accepted fact', () => {
     const user = userEvent.setup();
     await user.click(screen.getAllByRole('checkbox')[1]!);
     expect(screen.getByLabelText('Proposed revision')).toHaveTextContent(/may change the draft back/);
-    await user.click(screen.getByRole('button', { name: /apply and update the fact/i }));
+    await user.click(screen.getByRole('button', { name: /apply and record 1 change/i }));
 
     await waitFor(() => expect(supersedeFact).toHaveBeenCalledTimes(1));
     expect(supersedeFact.mock.calls[0]![2]).toBe('Lunch is Wednesday at 1:00 p.m.');

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { ProjectFact } from '@/types/project';
 import { factValues } from './fact-values';
-import { describeFactChange, factChangesFromRevision, revertsUserVersion, withMeaningChanges } from './fact-reconcile';
+import { applyChangesLabel, describeFactChange, factChangeGroup, factChangesFromRevision, revertsUserVersion, withMeaningChanges } from './fact-reconcile';
 
 const fact = (id: string, statement: string, kind: ProjectFact['kind'] = 'fact'): ProjectFact =>
   ({ id, statement, subject: null, kind, source_kind: 'chat', source_ref: {}, retired_at: null, supersedes: null, created_at: '2026-10-10T00:00:00Z' }) as unknown as ProjectFact;
@@ -106,5 +106,23 @@ describe('a change of meaning, not a value (L-72, 11 Oct: in-office to fully rem
   it('a failed check leaves the value changes as they were', async () => {
     const values = factChangesFromRevision({ facts, instruction: 'x', before, after });
     expect(await withMeaningChanges(values, { facts, instruction: 'x', before, after }, async () => { throw new Error('down'); })).toEqual(values);
+  });
+});
+
+describe('the facts review keeps changed values, new facts and requests apart (17 Oct, Sean, HARBOR)', () => {
+  it('groups each change by kind and labels the button by count', async () => {
+    const facts = [fact('f1', 'Lunch is Thursday at 12:30.')];
+    const values = factChangesFromRevision({ facts, instruction: INSTRUCTION, before: BEFORE, after: AFTER });
+    const check = vi.fn(async () => ({
+      changes: [],
+      additions: [
+        { statement: 'Elena approved a November 24 launch.', kind: 'fact' as const, quote: 'Elena approved a November 24 launch' },
+        { statement: 'Omar proposes moving testing to November 20.', kind: 'fact' as const, quote: 'Omar proposes moving testing to November 20', request: true },
+      ],
+    }));
+    const all = await withMeaningChanges(values, { facts, instruction: 'Elena approved a November 24 launch. Omar proposes moving testing to November 20.', before: BEFORE, after: AFTER }, check);
+    expect(all.map(factChangeGroup)).toEqual(['changed', 'new', 'request']);
+    expect(applyChangesLabel(all.length)).toBe('Apply and record 3 changes');
+    expect(applyChangesLabel(1)).toBe('Apply and record 1 change');
   });
 });

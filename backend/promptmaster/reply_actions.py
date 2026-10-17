@@ -22,6 +22,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from .conversation import _shared_system
+from .fact_filters import from_user, record_kind, records_nothing
 from .llm_client import OpenRouterClient
 from .project_context import facts_block
 from .schemas import PMInput
@@ -249,47 +250,8 @@ def parse_reply_actions(
     return out
 
 
-_NUMBER = re.compile(r"\d[\d,]*(?:\.\d+)?")
-_WORD = re.compile(r"[a-zA-Z]{4,}")
-
-
-def _from_user(statement: str, question: str) -> bool:
-    """A fact to record must be the user's: every figure in it appears in what
-    the user wrote, and, without figures, most of its words do. A model that
-    "records" a figure from its own answer is the stale-evidence problem in
-    another form."""
-    q = question.lower().replace(",", "")
-    numbers = [n.replace(",", "") for n in _NUMBER.findall(statement)]
-    if numbers:
-        return all(n in q for n in numbers)
-    words = [w.lower() for w in _WORD.findall(statement)]
-    return bool(words) and sum(w in q for w in words) >= max(1, (len(words) + 1) // 2)
-
-
 def _norm(text: str) -> str:
     return " ".join(re.sub(r"[^\w$%]+", " ", text.lower()).split())
-
-
-#: "All other facts and approvals remain unchanged": a sentence that records
-#: nothing. SUMMIT stored it four times over (Sean, 14 Oct).
-_FILLER = re.compile(
-    r"^(?:all |everything |any )?(?:other|else|remaining|the rest of the)\b[\w\s,/&-]*?\b"
-    r"(?:remain|remains|stay|stays|is|are)\s+(?:unchanged|the same|as (?:before|they were|it was))\b",
-    re.I,
-)
-#: How to handle this one request, addressed to the assistant: "Before
-#: recording anything or revising documents, explain the conflict…" became a
-#: standing requirement in SUMMIT (Sean, 14 Oct, email 5).
-_PROCESS = re.compile(
-    r"^(?:please\s+)?(?:before (?:you |recording|revising|updating|changing|doing|making|we )|"
-    r"first,? (?:explain|calculate|check|tell|show|list)|"
-    r"(?:do not|don't|don’t) (?:record|revise|update|change|edit) (?:anything|the|any|yet)|"
-    r"wait (?:before|until)|for now,? (?:do not|don't|just)|"
-    r"(?:explain|calculate|identify|tell me|show me)\b.*\bbefore (?:recording|revising|updating))",
-    re.I,
-)
-#: Someone in the project asking for something: a fact about a request.
-_REQUEST = re.compile(r"\b(?:asks?|asked|requests?|requested|suggests?|suggested|proposes?|proposed|wants?|would like)\b", re.I)
 
 
 def parse_record_facts(item: dict, question: str, known: list[str] | None = None) -> list[FactToRecord]:
@@ -303,12 +265,12 @@ def parse_record_facts(item: dict, question: str, known: list[str] | None = None
         if not isinstance(f, dict):
             continue
         statement = " ".join(str(f.get("statement") or "").split())[:2_000]
-        if not statement or not _from_user(statement, question):
+        if not statement or not from_user(statement, question):
             continue
-        if _norm(statement) in seen or _FILLER.search(statement) or _PROCESS.search(statement):
+        if _norm(statement) in seen or records_nothing(statement):
             continue
         seen.add(_norm(statement))
-        kind = "requirement" if f.get("kind") == "requirement" and not _REQUEST.search(statement) else "fact"
+        kind = record_kind(f.get("kind"), statement)
         # Only a fact that is listed can be replaced; anything else is a new fact.
         replaces = by_norm.get(_norm(" ".join(str(f.get("replaces") or "").split())), "")
         facts.append(FactToRecord(
