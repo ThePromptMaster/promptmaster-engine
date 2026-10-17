@@ -315,21 +315,75 @@ def _content_words(text: str) -> set[str]:
     return {w for w in _WORDS.findall(text.lower()) if w not in _STOP}
 
 
+_SENTENCE = re.compile(r"(?<=[.!?])\s+|\n+")
+
+
 def request_facts(inputs: PMInput) -> list[str]:
-    """The accepted facts that record someone's request, suggestion or proposal."""
-    return [f.statement for f in (inputs.facts or []) if _REQUEST.search(f.statement)]
+    """The requests, suggestions and proposals on record: in the accepted facts,
+    and in the source material (17 Oct, Sean: Luis's request lived in the
+    update text, not only in a fact). Not the objective or constraints — those
+    are the user's own words, and "the sponsor asks for three sections" there
+    is the brief."""
+    facts = [f.statement for f in (inputs.facts or []) if _REQUEST.search(f.statement)]
+    context = [" ".join(t.split()) for t in _SENTENCE.split(inputs.context or "") if _REQUEST.search(t)]
+    return [*facts, *(c[:400] for c in context if c and c not in facts)][:40]
+
+
+_MONTH_DAY = re.compile(
+    r"\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})(?:\s*(?:and|&|to|through|–|—|-)\s*(\d{1,2}))?\b",
+    re.I,
+)
+#: A criterion that holds the line against a request ("Exclude November 16–17
+#: from the count") is the rule, not the request: its failure is real.
+_HOLDS_LINE = re.compile(r"\b(?:never|do not|don't|must not|may not|exclud\w*|without|reject\w*|declin\w*|refus\w*|only)\b", re.I)
+_NAME_BEFORE_ASK = re.compile(r"\b([A-Z][a-z]{2,})(?:'s)?\s+(?:\w+\s+){0,2}(?:asks?|asked|requests?|requested|suggests?|suggested|proposes?|proposed|wants?|would like)\b")
+
+
+def _subject(text: str) -> set[str]:
+    """The specific dates and figures a sentence is about: "11-16", "11-17", "86000"."""
+    out: set[str] = set()
+    for m in _MONTH_DAY.finditer(text):
+        month = m.group(0)[:3].lower()
+        out.update(f"{month}-{d}" for d in m.groups() if d)
+    out.update(f"#{int(a)}" if a == int(a) else f"#{a}" for a in _amounts(re.sub(_MONTH_DAY, " ", text)) if a >= 10)
+    return out
 
 
 def _is_request(requirement: str, requests: list[str]) -> bool:
     """The criterion restates a recorded request ("Count the November 16 and 17
     testing days toward the five" for "Luis asks to count those two days toward
-    the required five testing days"), or reads as one itself."""
+    the required five testing days"), or reads as one itself.
+
+    17 Oct (Sean, SUMMIT): matched only on shared words, a reworded request
+    ("Decide whether Luis's days count") or one about the request's own dates
+    slipped through. It also matches on the request's specific dates or
+    figures, or on the person who asked — but never a criterion that holds the
+    line against it ("exclude November 16–17"), and never a rule that names
+    none of the request's specifics ("five testing days before launch")."""
     if _REQUEST.search(requirement):
         return True
     words = _content_words(requirement)
-    if len(words) < 4:
+    if len(words) >= 4 and any(len(words & _content_words(r)) >= max(4, len(words) // 2) for r in requests):
+        return True
+    if _HOLDS_LINE.search(requirement):
         return False
-    return any(len(words & _content_words(r)) >= max(4, len(words) // 2) for r in requests)
+    subject = _subject(requirement)
+    for r in requests:
+        shared = words & _content_words(r)
+        theirs = _subject(r)
+        if theirs and subject and len(subject & theirs) >= min(2, len(theirs)) and shared:
+            return True
+        if any(n in requirement for n in _NAME_BEFORE_ASK.findall(r)) and shared:
+            return True
+    return False
+
+
+def set_aside_requests(items: list[str] | None, requests: list[str]) -> tuple[list[str], list[str]]:
+    """`items` split into those that stand and those that only restate a request."""
+    kept, declined = [], []
+    for item in items or []:
+        (declined if requests and _is_request(item, requests) else kept).append(item)
+    return kept, declined
 
 
 _AMOUNT = re.compile(r"(?<![\w.])\$?(\d[\d,]*(?:\.\d+)?)(?![\d])")
@@ -390,6 +444,9 @@ def parse_assessment(
 ) -> ObjectiveAssessment:
     if not isinstance(result, dict):
         return ObjectiveAssessment(outcome="partly", reason="The check did not come back in a usable form.")
+    # A carried-forward finding that only restates a request is not a failure
+    # (17 Oct, Sean, SUMMIT: "Luis's days not counted" kept the objective unmet).
+    failed_checks, declined = set_aside_requests(failed_checks, requests or [])
     claimed = result.get("outcome") if result.get("outcome") in ("met", "not_met", "partly") else "partly"
     outcome = claimed
     quote = " ".join(str(result.get("basis_quote") or "").split())[:400]
@@ -418,6 +475,11 @@ def parse_assessment(
             # on its figures gives, is not shown: a threshold the model made
             # up would send the user after the wrong number.
             need, ask = _figures_from_record(need, record_numbers), _figures_from_record(ask, record_numbers)
+            # A decision about a request is not the user's to make for the
+            # objective: the deliverable reports how the request was handled.
+            if kind == "needs_decision" and requests and (_is_request(need, requests) or (ask and _is_request(ask, requests))):
+                declined.append(need)
+                continue
             blockers.append(Blocker(need=need, kind=kind, ask=ask))
     if outcome == "met":
         blockers = []
@@ -448,7 +510,6 @@ def parse_assessment(
 
     criteria: list[CriterionResult] = []
     overruled: list[str] = []
-    declined: list[str] = []
     for c in result.get("criteria") or []:
         if not isinstance(c, dict):
             continue
@@ -536,9 +597,11 @@ async def assess_objective(
     failed_checks: list[str] | None = None,
     measured: list[str] | None = None,
 ) -> ObjectiveAssessment:
+    requests = request_facts(inputs)
+    # The check is not shown a carried-forward finding that only restates a request.
+    failed_checks = set_aside_requests(failed_checks, requests)[0]
     system, user = build_assessment_prompt(inputs, deliverable_label, content, steps, success_criterion, failed_checks, measured)
     result, _usage = await client.generate_json(prompt=user, system=system, temperature=0, max_tokens=1_600, model=model)
-    requests = request_facts(inputs)
     parsed = parse_assessment(result, content, steps, failed_checks, measured, requests, record_text(inputs))
     # A "met" lost only for want of a quote is asked once more before it can
     # pause a run (11 Oct: the run stopped on "not met" for exactly this).
