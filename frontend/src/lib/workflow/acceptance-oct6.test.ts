@@ -168,7 +168,8 @@ describe('Superseded recommendations are repaired consistently; valid figures re
     expect(withChange).toContain('CHANGED FACTS');
     expect(withChange).toContain('November 12 (was: "Launch: November 12, 2026"; now: "Launch: November 19, 2026")');
     // 14 Oct (Sean, SUMMIT): a change log keeps the earlier value.
-    expect(withChange).toContain('keep the earlier value there and say it was replaced');
+    expect(withChange).toContain('keep the earlier value there under its kind');
+    expect(withChange).toContain('never call it superseded or a correction');
     expect(withChange).not.toContain('replace every occurrence');
   });
   it('a table repair is told to put no note in the table, and a note row is dropped (9 Oct, production replay)', () => {
