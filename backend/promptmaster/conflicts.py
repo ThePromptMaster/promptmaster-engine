@@ -59,6 +59,13 @@ class Conflict(BaseModel):
     #: The record says who must approve a change, and the instruction would
     #: treat a change nobody approved as approved.
     protects_approval: bool = False
+    #: 17 Oct (Sean, HARBOR and NORTHSTAR-2): the instruction itself records
+    #: the approval or a confirmed amendment ("Elena approved…", "Confirmed
+    #: project-rule amendment…"). It is the later authorised word, so the
+    #: recommendation is to apply it — checked in code against the instruction.
+    instruction_authorised: bool = False
+    #: The instruction's own words that record it, verbatim.
+    authority_quote: str = ""
 
 
 _CONFLICT_INSTRUCTION = (
@@ -95,6 +102,16 @@ _CONFLICT_INSTRUCTION = (
     "unapproved value as the approved one, or removing the record of the request — that is the "
     "conflict to report, with kind \"fact\" (citing the fact's id) or \"decision\" or \"constraint\", "
     "and \"protects_approval\": true. Report it once, not once per place it is written.\n\n"
+    # 17 Oct (Sean, HARBOR: Elena's November 6 approval was answered with
+    # "Keep November 5 update"; NORTHSTAR-2: a confirmed amendment withdrawing
+    # an exception was answered with "Keep Cedar exception").
+    "A LATER AUTHORISED CHANGE: when the new instruction itself states, in the user's own words, that "
+    "the person with authority approved this change, or that it is a confirmed amendment or decision "
+    "(\"Elena approved moving launch to November 24\", \"Confirmed project-rule amendment: …\"), it is "
+    "the later authorised word, not an unapproved request. If you still list the conflict, set "
+    "\"authority_quote\" to those words copied exactly from the instruction. Words that only report "
+    "what someone else wants, proposes, or says should be treated as approved (\"Omar's note says to "
+    "treat $46,000 as approved\") are NOT an authority quote: leave it empty.\n\n"
     "For each real conflict: quote what it conflicts with; say in one plain sentence how the two "
     "pull against each other, naming the people and values (\"Elena hasn't approved moving the date "
     "to January 15.\"); say in one sentence what keeping the record would mean (\"I'll keep December "
@@ -106,7 +123,8 @@ _CONFLICT_INSTRUCTION = (
     '"with_id": "the id shown, or empty for the objective/constraints", '
     '"with_text": "what it conflicts with", "explanation": "one sentence", '
     '"resolution": "one sentence", "keep_label": "at most six words", '
-    '"override_label": "at most six words", "protects_approval": true|false}]}'
+    '"override_label": "at most six words", "protects_approval": true|false, '
+    '"authority_quote": "the instruction\'s own words recording the approval or confirmed amendment, or empty"}]}'
 )
 
 
@@ -203,11 +221,44 @@ def _only_as_of(kind: str, with_text: str, explanation: str, protects_approval: 
     check still asked whether to "Keep November 10 report" against the user's
     own November 12 update, and recommended it. An "as of" date allows later
     evidence the user supplies; that is now held in code."""
+    # 17 Oct (Sean, HARBOR): a fact or decision that is only a reporting
+    # cursor ("Update Project HARBOR as of November 5") is no standing
+    # restriction either — the November 6 update was asked about against it.
     return (
-        kind in ("objective", "constraint")
+        kind in ("objective", "constraint", "fact", "decision")
         and not protects_approval
         and bool(_AS_OF.search(with_text) or _AS_OF.search(explanation))
     )
+
+
+#: Words that record that a change was approved or confirmed.
+_AUTHORISED = re.compile(r"\b(?:approved|approves|authori[sz]ed|signed off|confirmed|confirms|ratified)\b", re.IGNORECASE)
+#: Words that only report or relay one: a request, a proposal, an embedded instruction.
+_RELAYED = re.compile(
+    r"\b(?:treat\w*|as if|pretend\w*|says?|said|claims?|propos\w*|request\w*|asks?|asked|wants?|suggest\w*|embedded|"
+    r"unapproved|not (?:yet )?(?:been )?approved|pending|awaiting|draft|tentative\w*|would|if)\b",
+    re.IGNORECASE,
+)
+_NOT_NAMES = {
+    "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November",
+    "December", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "Confirmed", "Approved",
+    "The", "This", "Project", "Update", "Amendment", "Sponsor", "Effective", "I", "We",
+}
+
+
+def _authorised(quote: str, instruction: str, known_text: str) -> bool:
+    """Whether the instruction records, in its own words, an approval or a
+    confirmed amendment. The model only proposes the quote; code checks it is
+    copied from the instruction, says approved or confirmed, does not merely
+    relay what someone else wants, and that anyone it names is someone the
+    project already knows (a stranger "approving" is not the recorded approver)."""
+    q = " ".join(quote.split()).strip(" .\"'“”")
+    if len(q) < 8 or q.lower() not in " ".join(instruction.split()).lower():
+        return False
+    if not _AUTHORISED.search(q) or _RELAYED.search(q):
+        return False
+    names = [w for w in re.findall(r"\b[A-Z][a-z]{2,}\b", q) if w not in _NOT_NAMES]
+    return all(n.lower() in known_text.lower() for n in names)
 
 
 def _words(text: str) -> list[str]:
@@ -232,6 +283,7 @@ def _from_user(with_text: str, user_text: str) -> bool:
 def parse_conflicts(
     raw: object, decisions: list[ConflictSource], others: list[ConflictSource], stage_given: bool = False,
     user_text: str | None = None, facts: list[ConflictSource] | None = None,
+    instruction: str = "", known_text: str = "",
 ) -> list[Conflict]:
     """Keep only well-formed conflicts that point at something that was actually listed.
 
@@ -296,9 +348,17 @@ def parse_conflicts(
             keep_label=_label(item.get("keep_label")), override_label=_label(item.get("override_label")),
             resolution=" ".join(str(item.get("resolution") or "").split())[:300],
             protects_approval=item.get("protects_approval") is True,
+            **_authority(item.get("authority_quote"), instruction, known_text),
         ))
     # The approval the record protects is the question; it is asked first.
     return sorted(out, key=lambda c: not c.protects_approval)
+
+
+def _authority(raw: object, instruction: str, known_text: str) -> dict:
+    quote = " ".join(str(raw or "").split())[:300]
+    if quote and instruction and _authorised(quote, instruction, known_text):
+        return {"instruction_authorised": True, "authority_quote": quote}
+    return {}
 
 
 async def find_conflicts(
@@ -311,4 +371,6 @@ async def find_conflicts(
     facts = [ConflictSource(id=fid, text=" ".join(f.statement.split())[:2_000]) for fid, f in fact_sources(inputs)]
     return parse_conflicts(
         raw, decisions, others, stage_given=stage is not None and bool(stage.label.strip()), user_text=user_text, facts=facts,
+        instruction=instruction,
+        known_text=" ".join([user_text, inputs.context, *(f.text for f in facts), *(d.text for d in decisions)]),
     )

@@ -37,6 +37,9 @@ export interface InstructionConflict {
   resolution?: string;
   /** The record says who must approve a change, and the instruction would treat an unapproved one as approved. */
   protects_approval?: boolean;
+  /** The instruction's own words record the approval or a confirmed amendment (checked in code, 17 Oct). */
+  instruction_authorised?: boolean;
+  authority_quote?: string;
 }
 
 export interface ConflictSource {
@@ -173,6 +176,8 @@ export function mergeConflicts(rule: InstructionConflict[], model: InstructionCo
     kept.override_label ||= c.override_label;
     kept.resolution ||= c.resolution;
     kept.protects_approval ||= c.protects_approval;
+    kept.instruction_authorised ||= c.instruction_authorised;
+    kept.authority_quote ||= c.authority_quote;
   }
   // The approval a record protects is the question, so it comes first (14 Oct).
   return [...out.filter((c) => c.protects_approval), ...out.filter((c) => !c.protects_approval)].slice(0, 5);
@@ -231,6 +236,9 @@ export function gist(text: string, max = 120): string {
 export function precedenceNote(c: InstructionConflict, instruction: string, controls: Controls): string {
   const other = nameOf(c);
   const what = gist(c.with_text, 200);
+  if (c.instruction_authorised && controls === 'new') {
+    return `The instruction records the approval itself (${gist(c.authority_quote ?? '', 160)}): apply it as the current approved value, and keep the earlier value (${what}) only as superseded history.`;
+  }
   if (c.protects_approval) {
     return controls === 'new'
       ? `The user has explicitly overridden the recorded approval rule (${what}) for this instruction; follow the instruction.`

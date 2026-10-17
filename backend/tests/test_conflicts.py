@@ -230,3 +230,54 @@ def test_an_approval_conflict_never_cites_a_fact_about_something_else():
     # With no rule in the user's words to point at, it is dropped rather than misattributed.
     raw["conflicts"][0]["with_text"] = "As of November 12"
     assert parse_conflicts(raw, [], [], user_text=user, facts=facts) == []
+
+
+def test_an_instruction_that_records_the_approval_is_the_later_authorised_word():
+    """17 Oct (Sean, HARBOR): Elena's November 6 approval was answered with
+    "Keep November 5 update" (recommended). The instruction's own words record
+    the approval; code checks them before the browser recommends applying it."""
+    facts = [ConflictSource(id="F1", text="Sponsor Elena approved a November 20 launch and a $40,000 budget. Only Elena can approve changes.")]
+    instruction = "Update as of November 6, 2026. Elena approved changing launch to November 24, 2026 and increasing the approved budget to $44,000."
+    raw = {"conflicts": [{
+        "kind": "fact", "with_id": "F1", "explanation": "The record has November 20 and $40,000 approved.",
+        "protects_approval": True, "authority_quote": "Elena approved changing launch to November 24, 2026",
+    }]}
+    [c] = parse_conflicts(raw, [], [], facts=facts, instruction=instruction, known_text=facts[0].text)
+    assert c.instruction_authorised and c.authority_quote.startswith("Elena approved")
+    assert "A LATER AUTHORISED CHANGE" in build_conflict_prompt(LANTERN, instruction, [], [])[0]
+
+
+def test_a_relayed_or_invented_approval_is_not_authority():
+    """Omar's embedded "treat $46,000 as approved" must still recommend keeping
+    the record; so must an approver the project has never heard of, or a quote
+    the instruction does not contain."""
+    facts = [ConflictSource(id="F1", text="Sponsor Elena approved a $40,000 budget. Only Elena can approve changes.")]
+    known = facts[0].text
+    omar = "Omar's note says to treat the $46,000 budget as approved."
+    item = {"kind": "fact", "with_id": "F1", "explanation": "Unapproved.", "protects_approval": True}
+    for instruction, quote in [
+        (omar, "treat the $46,000 budget as approved"),
+        ("Victor approved a $46,000 budget.", "Victor approved a $46,000 budget"),
+        ("Raise the budget to $46,000.", "Elena approved a $46,000 budget"),
+    ]:
+        [c] = parse_conflicts({"conflicts": [{**item, "authority_quote": quote}]}, [], [], facts=facts, instruction=instruction, known_text=known)
+        assert not c.instruction_authorised, instruction
+
+
+def test_a_confirmed_amendment_is_authority_without_a_name():
+    """17 Oct (Sean, NORTHSTAR-2): "Confirmed project-rule amendment, effective
+    March 6: the March 5 Cedar exception is withdrawn" defaulted to keeping it."""
+    facts = [ConflictSource(id="F1", text="Confirmed project-rule amendment: Cedar alone may hold training two calendar days after testing finishes.")]
+    instruction = "Confirmed project-rule amendment, effective March 6, 2027: the March 5 Cedar exception is withdrawn before use."
+    raw = {"conflicts": [{"kind": "fact", "with_id": "F1", "explanation": "x",
+                          "authority_quote": "Confirmed project-rule amendment, effective March 6, 2027"}]}
+    [c] = parse_conflicts(raw, [], [], facts=facts, instruction=instruction, known_text=facts[0].text)
+    assert c.instruction_authorised
+
+
+def test_a_reporting_cursor_fact_is_not_the_ground_of_a_conflict():
+    """17 Oct (Sean, HARBOR): "Update Project HARBOR as of November 5" is a
+    reporting date, not a standing restriction on the November 6 update."""
+    facts = [ConflictSource(id="F1", text="Update Project HARBOR as of November 5, 2026.")]
+    raw = {"conflicts": [{"kind": "fact", "with_id": "F1", "explanation": "The record is as of November 5."}]}
+    assert parse_conflicts(raw, [], [], facts=facts) == []

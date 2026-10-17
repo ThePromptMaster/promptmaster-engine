@@ -31,8 +31,10 @@ export function ConflictPrompt({
   onContinue: (choices: Controls[]) => void;
   onCancel: () => void;
 }) {
-  const recommended = conflicts.map((c) => recommendedControl(c.kind, c.protects_approval));
+  const recommended = conflicts.map((c) => recommendedControl(c.kind, c.protects_approval, c.instruction_authorised));
   const [others, setOthers] = useState<(Controls | null)[]>(recommended);
+  // Folded choices the user set by hand; the rest follow the answer above.
+  const [touched, setTouched] = useState<ReadonlySet<number>>(new Set());
   const [confirmingOverride, setConfirmingOverride] = useState(false);
   const lead = conflicts[0];
   if (!lead) return null;
@@ -40,12 +42,24 @@ export function ConflictPrompt({
   const leadRecommended = recommended[0];
 
   const choose = (controls: Controls) => {
-    if (controls === 'new' && lead.protects_approval && !confirmingOverride) {
+    if (controls === 'new' && lead.protects_approval && !lead.instruction_authorised && !confirmingOverride) {
       setConfirmingOverride(true);
       return;
     }
-    // The rest follow their own recommendation, or this answer where the order has none.
-    onContinue([controls, ...others.slice(1).map((o) => o ?? controls)]);
+    // Applying the change carries the rest with it (17 Oct, Sean, NORTHSTAR-2:
+    // "Also affected" kept a second copy of the withdrawn exception while the
+    // answer above withdrew it) — except an approval this instruction does not
+    // itself record. Keeping the record leaves each to its own recommendation.
+    // A choice set by hand stands.
+    onContinue([
+      controls,
+      ...conflicts.slice(1).map((c, j) => {
+        const i = j + 1;
+        if (touched.has(i)) return others[i] ?? controls;
+        if (controls === 'new') return c.protects_approval && !c.instruction_authorised ? 'existing' : 'new';
+        return recommended[i] ?? controls;
+      }),
+    ]);
   };
 
   const options: { value: Controls; label: string }[] = [
@@ -111,7 +125,7 @@ export function ConflictPrompt({
       {rest.length > 0 && (
         <details className="mt-3">
           <summary className="cursor-pointer text-label text-[var(--on-surface-variant)]">
-            Also affected ({rest.length}) — set to the recommended choice
+            Also affected ({rest.length}) — applying your change updates these too, unless you choose here
           </summary>
           <ul className="mt-2 space-y-2">
             {rest.map((c, j) => {
@@ -125,10 +139,13 @@ export function ConflictPrompt({
                       <button
                         key={value}
                         role="radio"
-                        aria-checked={(others[i] ?? null) === value}
-                        onClick={() => setOthers((prev) => prev.map((p, k) => (k === i ? value : p)))}
+                        aria-checked={touched.has(i) && others[i] === value}
+                        onClick={() => {
+                          setOthers((prev) => prev.map((p, k) => (k === i ? value : p)));
+                          setTouched((prev) => new Set(prev).add(i));
+                        }}
                         className={`rounded-lg px-2.5 py-1 text-label ${
-                          others[i] === value
+                          touched.has(i) && others[i] === value
                             ? 'bg-[var(--pm-primary)] text-[var(--on-primary)]'
                             : 'bg-[var(--surface-container-highest)] text-[var(--on-surface)]'
                         }`}
