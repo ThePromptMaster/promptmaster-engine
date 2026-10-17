@@ -407,7 +407,12 @@ export function useStageChat({
         const checked = await checkedRevision(content, spliced, text, [...messages.filter((m) => m.role === 'user').map((m) => m.content), text]);
         if (!live.current) return;
         setProposal({
-          instruction: text,
+          // What the user decided travels with the instruction it answered.
+          // Saved bare, "Write them as approved" was read by every later
+          // prompt as the user's instruction, though they had chosen to keep
+          // the recorded approval — and the objective check then held the
+          // work to the values they declined (18 Oct, production pass).
+          instruction: withDecision(text, options.precedence),
           target,
           before: describeScope(target),
           after: checked.putBack.length && kind === 'document' ? checked.nextContent : after,
@@ -610,7 +615,8 @@ export function useStageChat({
 
   /** "Adjust": the instruction back in the box, the proposal set aside, nothing saved. */
   const adjust = useCallback((): string => {
-    const text = proposal?.instruction ?? '';
+    // The words the user typed, without the recorded decision.
+    const text = proposal?.ask?.instruction ?? proposal?.instruction ?? '';
     setProposal(null);
     setError(null);
     return text;
@@ -674,4 +680,14 @@ export function useStageChat({
     canApply: Boolean(appendStageVersion),
     canUndo: Boolean(restoreStageVersion),
   };
+}
+
+/**
+ * An instruction as it is recorded on the version it made: with the user's
+ * answer to any "which takes priority?" question, so a later prompt never
+ * reads a request the user declined as one they gave.
+ */
+export function withDecision(instruction: string, precedence: readonly string[] | undefined): string {
+  const notes = (precedence ?? []).map((n) => n.trim()).filter(Boolean);
+  return notes.length ? `${instruction}\n\nDecided when this was applied: ${notes.join(' ')}` : instruction;
 }
