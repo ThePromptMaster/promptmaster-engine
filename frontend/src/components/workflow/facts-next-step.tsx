@@ -4,8 +4,8 @@
  * Under "8 facts recorded": what happens next, and the one button for it
  * (Sean, 14 Oct, SUMMIT: "Could 'Record these facts' change to 'Facts
  * recorded' after success … and clearly direct me to 'Update affected work and
- * resume'?"). The same button as the notice above the stage, so the chat and
- * the page never disagree about the next step.
+ * resume'?"). The same button, in the same words, as the next-step bar at the
+ * top of every stage, so the chat and the page never disagree (17 Oct).
  */
 export function FactsNextStep({
   judging,
@@ -37,7 +37,7 @@ export function FactsNextStep({
             disabled={updating}
             className="mt-1.5 rounded-lg bg-[var(--pm-primary)] px-3 py-1.5 text-label text-[var(--on-primary)] hover:opacity-90 disabled:opacity-50"
           >
-            {updating ? 'Updating affected work…' : 'Update affected work and resume'}
+            {updating ? 'Updating affected work…' : 'Apply and continue'}
           </button>
         )}
       </div>

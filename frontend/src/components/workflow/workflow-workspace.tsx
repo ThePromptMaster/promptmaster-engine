@@ -80,6 +80,8 @@ import { lookupAndVerify } from '@/lib/workflow/verify';
 import { RefusedRevisions, refusedSince } from './refused-revisions';
 import { BriefChangeNotice } from './brief-change-notice';
 import { PendingChangeNotice } from './pending-change-notice';
+import { NextActionBar } from './next-action-bar';
+import { nextAction } from '@/lib/workflow/next-step';
 import { pendingChanges, settlePendingChange, type PendingChange } from '@/lib/workflow/conflict-trail';
 import { FactsNextStep } from './facts-next-step';
 import { FactReconcileNotice } from './fact-change-list';
@@ -1154,12 +1156,27 @@ export function WorkflowWorkspace({
           },
         });
       }
-      setViewingStageId(null);
+      // Go runs from where the user is: no jump to the current stage (17 Oct,
+      // Sean: "I gotta go press authorize in summary").
       await go.go();
     } catch (e) {
       setTransitionError(`That didn't go through${e instanceof Error && e.message ? `: ${e.message}` : ''}. Nothing was changed.`);
     }
   }, [stage, reopenedHere, evaluation, markComplete, appendEvent, go]);
+
+  // The one next action, at the top of whichever stage is open (17 Oct, Sean).
+  const nextStep = nextAction({
+    finalized: project.status === 'finalized',
+    canAct: Boolean(appendStageVersion),
+    heldChanges: heldChanges.length,
+    reopenedHere,
+    reopenedLabel: stage?.label,
+    awaitingUpdate: [...(briefChange?.stageIds ?? []), ...(briefChange?.alsoWaiting ?? [])].map((id) => template.stages.find((s) => s.id === id)?.label ?? id),
+    goActive: go.active,
+    goWorkingOn: getStage(template, state.current_stage_id)?.label,
+    run: go.run ? { status: go.run.status, ended_at: go.run.ended_at, hasNeed: Boolean(go.run.needs), asking: Boolean(go.run.stop_reason) } : null,
+    onCurrentStage: isCurrent,
+  });
   // A paused run holds the next move too: the page drafting Realign while Go
   // proposed skipping it, or Summary while Go waited for approval to draft it,
   // made versions no Go step accounted for (Sean, 10 Oct, email 6.7). The stage
@@ -1718,7 +1735,7 @@ export function WorkflowWorkspace({
                   marked for a recheck if what it was built on changed. */}
               {reopenedHere && (
                 <span className="text-label text-[var(--on-surface-variant)]">
-                  Reopened — change it here (edit it, or use the side chat), then let Go continue: it keeps this version as the new one, rechecks the stages after it, and carries on. Or mark it complete yourself.
+                  Reopened — change it here (edit it, or use the side chat), then press Apply and continue. Or mark it complete yourself.
                 </span>
               )}
               {canReopen && (
@@ -1728,16 +1745,6 @@ export function WorkflowWorkspace({
                 >
                   <span className="material-symbols-outlined text-[16px]">edit</span>
                   Reopen to edit
-                </button>
-              )}
-              {reopenedHere && appendStageVersion && project.status !== 'finalized' && (
-                <button
-                  onClick={() => void continueFromReopened()}
-                  disabled={go.active}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--pm-primary)] px-3 py-1.5 text-label font-semibold text-[var(--on-primary)] hover:opacity-90 disabled:opacity-50"
-                >
-                  <span className="material-symbols-outlined text-[16px]">play_arrow</span>
-                  Apply my changes and let Go continue
                 </button>
               )}
               {canMarkComplete && !isCurrent && (
@@ -1751,6 +1758,19 @@ export function WorkflowWorkspace({
               )}
             </div>
           )}
+
+          <NextActionBar
+            action={nextStep}
+            onAct={(a) => {
+              if (a.kind === 'apply_continue_reopened') void continueFromReopened();
+              else if (a.kind === 'apply_continue') void go.update();
+              else if (a.kind === 'resume') void go.go();
+              else if (a.kind === 'answer_go') {
+                setViewingStageId(null);
+                setTimeout(() => document.querySelector('[aria-label="Go mode"]')?.scrollIntoView({ block: 'start' }), 100);
+              }
+            }}
+          />
 
           {/* FR-20. Above the stage header rather than inside it: exporting is
               a property of the project, not of whichever stage happens to be
@@ -1879,7 +1899,8 @@ export function WorkflowWorkspace({
               change={briefChange}
               stageLabel={(id) => template.stages.find((s) => s.id === id)?.label ?? id}
               onKeep={(changeAt) => void appendEvent({ type: 'brief_change_dismissed', stage_id: stageId, payload: { change_at: changeAt } })}
-              onUpdate={appendStageVersion && project.status !== 'finalized' ? () => void go.update() : undefined}
+              // The button is the next-step bar's, at the top of every stage.
+              onUpdate={undefined}
               updating={go.active}
               judging={judgingChange}
               settled={settled}
