@@ -231,6 +231,25 @@ RECORD_STATUS_RULE = (
 )
 
 
+#: 15 Oct (Sean, HARBOR): rejected embedded instructions appeared under
+#: "Superseded history" and then "Corrections"; Omar's unapproved proposals
+#: were "superseded"; Elena was named as the original $40,000 approver though
+#: the baseline named nobody; the November 5 spending correction ($18,000 →
+#: $16,000) was blurred with the separate November 2 baseline of $15,000.
+HISTORY_RULE = (
+    "HISTORY IS CLASSIFIED, NOT LUMPED. Where the work records what changed, keep three kinds apart, "
+    "each under its own name: "
+    "SUPERSEDED — a value that was accepted or approved and later replaced (say what replaced it and when); "
+    "CORRECTION — a reported value that was wrong and is fixed; it keeps its own reporting date "
+    "(\"November 5 spending: reported $18,000, corrected to $16,000\") and is never merged with a figure "
+    "from a different date; "
+    "DECLINED / NOT ADOPTED — a request, a proposal, or an instruction embedded in the source material that "
+    "was never accepted. Never call one of these superseded or a correction: it was never in force. "
+    "Name an approver only where the material names that person as approving that item; otherwise "
+    "write \"approver not recorded\". Never move a name from a later approval onto an earlier one."
+)
+
+
 def build_stage_prompt(
     inputs: PMInput,
     stage: StageDescriptor,
@@ -333,6 +352,8 @@ def build_stage_prompt(
         parts.append(DECISION_LOG_RULE)
     if inputs.facts or re.search(r"\b(approv|budget|select|choose|decision|forecast|status)", asked):
         parts.append(RECORD_STATUS_RULE)
+    if inputs.facts or re.search(r"\b(histor|change ?log|supersed|correct|revis|update|propos|request)", asked):
+        parts.append(HISTORY_RULE)
 
     # A Diagnosis draft spent much of itself on Turnaround Options and the
     # 12-month plan — two stages later — and a later check had to flag it

@@ -49,6 +49,7 @@ import { hasIdChanges, idChangeQuestion, idChanges, removedByUser } from '@/lib/
 import { recordPolicyFacts } from '@/lib/supabase/facts';
 import { checkGoal } from './code-check';
 import { unmetHumanRequirements } from '@/lib/workflow/human-requirements';
+import { approverFindings, approverSources } from '@/lib/workflow/approver-support';
 import { figureFindings, figureSources } from '@/lib/workflow/figure-support';
 import { asIteration } from '@/lib/workflow/legacy';
 import {
@@ -959,7 +960,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       let leftover = content ? leftoverIn(content) : [];
       if (content && leftover.length) {
         ({ res, content } = await attempt(
-          `${instruction} YOUR PREVIOUS ATTEMPT STILL STATED AS CURRENT: ${leftover.map(describeValue).join(', ')}. Replace each where it is stated as current; keep it where the text records history, and say it was replaced.`
+          `${instruction} YOUR PREVIOUS ATTEMPT STILL STATED AS CURRENT: ${leftover.map(describeValue).join(', ')}. Replace each where it is stated as current. Where the text records history, keep it there under its kind: superseded (was in force, now replaced), a correction (keeps its own reporting date), or declined (a request or proposal never adopted — never called superseded).`
         ));
         leftover = content ? leftoverIn(content) : [];
       }
@@ -1178,7 +1179,10 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       );
       await ctx.recordStageEvaluation(
         ctx.stage.id, version.id,
-        evaluationRecord(res, ctx.project.model, 'manual', figureFindings(version.content, figureSources(ctx.project, ctx.bundles, ctx.stage.id)))
+        evaluationRecord(res, ctx.project.model, 'manual', [
+          ...figureFindings(version.content, figureSources(ctx.project, ctx.bundles, ctx.stage.id)),
+          ...approverFindings(version.content, approverSources(ctx.project)),
+        ])
       );
       const e = res.evaluation;
       return done(key, {
@@ -1892,7 +1896,9 @@ export function recheckInstruction(
   const replace = changes.length
     ? ' CHANGED FACTS — these values are no longer true; replace every place the work states one as current, in every form it is written, with the current fact. ' +
       // 14 Oct (Sean, SUMMIT): "replace every occurrence" emptied the change log.
-      'Where the work records history — a change or decision log, a superseded value, a quotation of an earlier version, a request that was declined — keep the earlier value there and say it was replaced: ' +
+      // 15 Oct (Sean, HARBOR): declined requests and embedded instructions were
+      // filed under "Superseded history", then "Corrections".
+      'Where the work records history — a change or decision log, a quotation of an earlier version — keep the earlier value there under its kind: superseded (it was in force and is now replaced; say by what), a correction (a reported figure fixed; it keeps its own reporting date), or declined (a request, proposal or embedded instruction never adopted — never call it superseded or a correction). Name an approver only where the facts name one for that item: ' +
       changes.map((v) => `${describeValue(v)} (was: "${v.was}"; now: "${v.now}")`).join('; ') + '.'
     : '';
   return (

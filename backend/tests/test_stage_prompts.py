@@ -758,3 +758,21 @@ def test_reported_figures_suitable_options_and_authority_keep_their_status(basic
     assert RECORD_STATUS_RULE in text
     assert "suitable, not selected" in text and "never extend it" in text and "forecast overrun" in text
     assert "listed as a decision or approval" in VERIFY_RULE and "called selected or chosen" in VERIFY_RULE
+
+
+def test_history_keeps_superseded_corrections_and_declined_apart(basic_inputs, prose_stage, digest):
+    """15 Oct (Sean, HARBOR): rejected embedded instructions sat under "Superseded
+    history" then "Corrections"; Omar's unapproved proposals were "superseded";
+    Elena was named as the baseline's approver; the November 5 correction was
+    blurred with the November 2 baseline."""
+    from promptmaster.stage import HISTORY_RULE
+
+    harbor = basic_inputs.model_copy(update={"constraints": "Preserve superseded history and Omar's proposals."})
+    system, user = build_stage_prompt(harbor, prose_stage, digest)
+    assert HISTORY_RULE in system + user
+    for phrase in ("SUPERSEDED", "CORRECTION", "DECLINED / NOT ADOPTED", "keeps its own reporting date",
+                   "Never call one of these superseded or a correction", "approver not recorded"):
+        assert phrase in HISTORY_RULE
+    plain = basic_inputs.model_copy(update={"objective": "Write a haiku about rain", "constraints": "", "context": ""})
+    system, user = build_stage_prompt(plain, prose_stage, digest)
+    assert HISTORY_RULE not in system + user
