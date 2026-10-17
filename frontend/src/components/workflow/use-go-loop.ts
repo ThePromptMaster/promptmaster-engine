@@ -870,6 +870,12 @@ export function useGoLoop(opts: Options) {
       // Resume a paused run of the same policy rather than starting over:
       // it keeps its budget and its history.
       if (live && !live.ended_at && live.policy === policy && (live.status === 'blocked' || live.status === 'awaiting_decision') && !pendingStepId) {
+        // Resume on a repair that did not settle is "Try once more": without
+        // the extra try the same used-up repair stopped the run again at once.
+        if (live.needs?.kind === 'repair_stuck') {
+          const stageId = live.needs.stageId;
+          extraTriesRef.current.set(stageId, (extraTriesRef.current.get(stageId) ?? 0) + 1);
+        }
         sinceRef.current = stepsRef.current.length;
         fingerprintsRef.current = [];
         reconsiderRef.current = null;
