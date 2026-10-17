@@ -1716,3 +1716,27 @@ figures on it; it does not find a threshold the model missed. "Updated and check
 shown for twelve hours after the last stage a change reopened is finished again, or
 until dismissed. The objective check sets aside a "not met" that restates a recorded
 request by word overlap; a request paraphrased with other words relies on the prompt.
+
+### L-89 — Later authorised changes, approver names, outside revisions and one pilot (2026-10-17)
+
+A conflict recommends applying the new instruction when the instruction itself records
+the approval or a confirmed amendment. The model proposes the words; code accepts them
+only if they are copied from the instruction, say approved, confirmed, authorised or
+signed off, do not relay a request ("says", "treat as", "proposes", "requests",
+"pending"…), and name only people the project already knows. A relayed approval worded
+without one of those verbs, or a stranger with a name already on record, relies on the
+prompt. Dates are not compared: the instruction is taken as the user's latest word,
+unless the brief asks for a frozen historical report.
+
+The approver check flags a person named as approving something when the brief, context
+and facts never name that person as approving anything. It checks the name, not the
+item: if Elena approved the November change, it cannot tell whether she also approved
+the baseline. How history is worded (superseded, corrected, declined) is a prompt rule.
+
+A revision made in another assistant from an older export is not detected as stale: the
+export carries no version stamp, and a pasted revision is drafted against the current
+version. The stale-base refusal covers revisions made inside PromptMaster only.
+
+The same-model comparison is one scripted scenario run once per arm. It shows whether a
+difference is worth measuring, not its size. Missed requirements, unsupported claims,
+drift, expansion and false completion are scored against an answer key by a person.
