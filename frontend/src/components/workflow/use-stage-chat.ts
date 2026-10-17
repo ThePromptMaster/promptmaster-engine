@@ -58,6 +58,20 @@ import type { ChatContext, ChatMessage } from '@/types';
 import { describeLines, keepUnasked } from '@/lib/workflow/preservation';
 import { addedClaims, noInventedDetails, suppliedText, type AddedClaim } from '@/lib/workflow/fact-boundary';
 
+/** An instruction as it was sent, ready to be drafted again. */
+export interface RedraftRequest {
+  instruction: string;
+  kind: ScopeKind;
+  options: { selection?: string; sectionId?: string; precedence?: string[] };
+}
+
+/**
+ * A refusal because the stage moved on under the proposal — Go saved a
+ * version while it was being drafted (16 Oct, Sean, NORTHSTAR-2). The change
+ * itself is still wanted; only the text it was drafted on is gone.
+ */
+export const isStaleBaseRefusal = (message: string): boolean => /^The stage changed while this revision was being made/.test(message);
+
 /** A revision the user has been shown but has not yet accepted. */
 export interface ChatProposal {
   /** The user's instruction, as they typed it. */
@@ -72,6 +86,8 @@ export interface ChatProposal {
   nextContent: string;
   /** The document the proposal was made on; accepting it after the stage moved on is refused. */
   baseContent?: string;
+  /** How it was asked for, so it can be drafted again on a newer version in one click. */
+  ask?: RedraftRequest;
   /** The message row the instruction was persisted as, to stamp on accept. */
   messageId: string | null;
   changeSummary: string;
@@ -182,6 +198,8 @@ export function useStageChat({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [proposal, setProposal] = useState<ChatProposal | null>(null);
+  /** A change refused only because the stage moved on: "Apply my change to the new version". */
+  const [redo, setRedo] = useState<RedraftRequest | null>(null);
   const [applied, setApplied] = useState<AppliedRevision | null>(null);
 
   // A reply that lands after the user has moved to another stage belongs to a
@@ -350,6 +368,7 @@ export function useStageChat({
 
       try {
         const priorHistory = asHistory(messages);
+        setRedo(null);
         const saved = await persist('user', text, 'instruct', target.label);
 
         // The persisted message is the user's own words; the message *sent*
@@ -395,6 +414,7 @@ export function useStageChat({
           nextContent: checked.nextContent,
           ...checked.fields,
           baseContent: content,
+          ask: { instruction: text, kind, options },
           messageId: saved.id,
           factChanges: await withMeaningChanges(
             factChangesFromRevision({ facts: project.facts, instruction: text, before: content, after: checked.nextContent }),
@@ -553,7 +573,14 @@ export function useStageChat({
       // A refusal says why (6 Oct production pass: the stage had been edited
       // under the proposal, and the chat only said "Could not save").
       if (live.current) {
-        setError(e instanceof RefusedRevision ? `${e.message}. Draft it again from the current version.` : 'Could not save that revision. Nothing was changed.');
+        if (e instanceof RefusedRevision && isStaleBaseRefusal(e.message) && proposal.ask) {
+          // Nothing to retype: the same instruction, drafted on the new version.
+          setError(`${e.message}. Your change is not applied yet.`);
+          setRedo(proposal.ask);
+          setProposal(null);
+        } else {
+          setError(e instanceof RefusedRevision ? `${e.message}. Draft it again from the current version.` : 'Could not save that revision. Nothing was changed.');
+        }
       }
     } finally {
       if (live.current) setBusy(false);
@@ -616,6 +643,14 @@ export function useStageChat({
 
   const dismissApplied = useCallback(() => setApplied(null), []);
 
+  /** "Apply my change to the new version": the refused instruction, drafted again on the current text. */
+  const redraft = useCallback(async () => {
+    if (!redo) return;
+    const ask = redo;
+    setRedo(null);
+    await propose(ask.instruction, ask.kind, ask.options);
+  }, [redo, propose]);
+
   return {
     messages,
     loading,
@@ -632,6 +667,9 @@ export function useStageChat({
     togglePutBack,
     undo,
     dismissApplied,
+    /** A change refused because the stage moved on, waiting to be drafted again. */
+    redo,
+    redraft,
     /** True when this surface can write at all. */
     canApply: Boolean(appendStageVersion),
     canUndo: Boolean(restoreStageVersion),

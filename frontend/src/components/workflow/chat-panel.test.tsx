@@ -26,6 +26,9 @@ const applyToAnswer = vi.fn();
 const saveAsNewVersion = vi.fn();
 const checkConflicts = vi.fn<(...args: unknown[]) => Promise<{ conflicts: unknown[] }>>(async () => ({ conflicts: [] }));
 const recordConflictChoice = vi.fn<(...args: unknown[]) => Promise<void>>(async () => {});
+const HELD = { id: 'held-1', status: 'pending', category: 'pending-change:1' };
+const holdPendingChange = vi.fn<(...args: unknown[]) => Promise<unknown>>(async () => HELD);
+const settlePendingChange = vi.fn<(...args: unknown[]) => Promise<unknown>>(async (id) => ({ ...HELD, id, status: 'accepted' }));
 const supersedeFact = vi.fn<(...args: unknown[]) => Promise<unknown>>(async () => ({}));
 
 vi.mock('@/lib/supabase/facts', () => ({
@@ -43,6 +46,8 @@ vi.mock('@/lib/supabase/recommendations', () => ({
 vi.mock('@/lib/workflow/conflict-trail', async (importActual) => ({
   ...(await importActual<typeof import('@/lib/workflow/conflict-trail')>()),
   recordConflictChoice: (...args: unknown[]) => recordConflictChoice(...args),
+  holdPendingChange: (...args: unknown[]) => holdPendingChange(...args),
+  settlePendingChange: (...args: unknown[]) => settlePendingChange(...args),
 }));
 
 vi.mock('@/lib/api/client', () => ({
@@ -385,6 +390,51 @@ describe('PM-24: an instruction that conflicts asks which should control', () =>
     expect(screen.getByLabelText('Give a revision instruction')).toHaveValue('Rewrite it for adults.');
   });
 
+  it('NORTHSTAR-2 (16 Oct): the change is held while the question is open, and settled by the answer', async () => {
+    checkConflicts.mockResolvedValueOnce({
+      conflicts: [{ kind: 'fact', with_id: 'F7', with_text: 'Cedar may train two days after testing.', explanation: 'This withdraws the Cedar exception.' }],
+    });
+    panel();
+    await instruct('Withdraw the Cedar exception, effective March 6.', /whole document/i);
+    await screen.findByRole('region', { name: 'Which takes priority?' });
+    expect(holdPendingChange).toHaveBeenCalledWith(expect.objectContaining({ instruction: 'Withdraw the Cedar exception, effective March 6.', stageId: 'objective' }));
+    await waitFor(() => expect(holdPendingChange).toHaveBeenCalledTimes(1));
+
+    await userEvent.setup().click(screen.getByRole('button', { name: /^Follow the new instruction/ }));
+    await waitFor(() => expect(settlePendingChange).toHaveBeenCalledWith('held-1', 'applied'));
+  });
+
+  it('Cancel withdraws the held change', async () => {
+    checkConflicts.mockResolvedValueOnce({
+      conflicts: [{ kind: 'objective', with_id: '', with_text: 'the objective', explanation: 'x' }],
+    });
+    panel();
+    await instruct('Rewrite it for adults.', /whole document/i);
+    await screen.findByRole('region', { name: 'Which takes priority?' });
+    await waitFor(() => expect(holdPendingChange).toHaveBeenCalledTimes(1));
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(settlePendingChange).toHaveBeenCalledWith('held-1', 'withdrawn'));
+  });
+
+  it('"Choose and apply" brings the held question back without asking the model again', async () => {
+    const onResumeTaken = vi.fn();
+    panel({
+      resumeChange: {
+        id: 'held-9', stageId: 'objective', instruction: 'Withdraw the Cedar exception.', createdAt: '2026-10-16T23:34:58Z',
+        conflicts: [{ kind: 'fact', with_id: 'F7', with_text: 'Cedar exception', explanation: 'This withdraws the Cedar exception.', source: 'model' }],
+      },
+      onResumeTaken,
+    });
+    const prompt = await screen.findByRole('region', { name: 'Which takes priority?' });
+    expect(prompt).toHaveTextContent('This withdraws the Cedar exception.');
+    expect(onResumeTaken).toHaveBeenCalled();
+    expect(checkConflicts).not.toHaveBeenCalled();
+    expect(holdPendingChange).not.toHaveBeenCalled();
+    await userEvent.setup().click(screen.getByRole('button', { name: /^Follow the new instruction/ }));
+    await waitFor(() => expect(settlePendingChange).toHaveBeenCalledWith('held-9', 'applied'));
+    await waitFor(() => expect(applyToAnswer).toHaveBeenCalledTimes(1));
+  });
+
   it('a failed check never blocks the instruction', async () => {
     checkConflicts.mockRejectedValueOnce(new Error('provider down'));
     panel();
@@ -472,5 +522,26 @@ describe('the side chat belongs to its project', () => {
     answer({ assistant_message: { content: 'Tariffs are mostly bad for the overall economy.' } });
     await new Promise((r) => setTimeout(r, 50));
     expect(screen.queryByText(/Tariffs are mostly bad/)).not.toBeInTheDocument();
+  });
+});
+
+// --- a revision refused because Go saved meanwhile (16 Oct, NORTHSTAR-2) ---
+
+describe('a change refused because the stage moved on', () => {
+  it('offers "Apply my change to the new version", which drafts the same instruction again', async () => {
+    const { RefusedRevision } = await import('@/lib/workflow/commit-check');
+    const appendStageVersion = vi.fn<(stageId: string, name: string, version: NewVersion) => Promise<unknown>>(async () => {
+      throw new RefusedRevision('The stage changed while this revision was being made (an earlier Go step was saved meanwhile), so nothing was overwritten');
+    });
+    panel({ appendStageVersion });
+    await instruct('Tighten the opening.', /whole document/i);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: /apply as new version/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Your change is not applied yet.');
+    await user.click(screen.getByRole('button', { name: 'Apply my change to the new version' }));
+    await waitFor(() => expect(applyToAnswer).toHaveBeenCalledTimes(2));
+    const history = (applyToAnswer.mock.calls[1][0] as { chat_history: { content: string }[] }).chat_history;
+    expect(history.at(-1)!.content).toContain('Instruction: Tighten the opening.');
   });
 });

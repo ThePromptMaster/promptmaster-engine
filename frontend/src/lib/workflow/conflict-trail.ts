@@ -9,7 +9,13 @@
  * decision the user already made.
  */
 
-import { insertRecommendation, listRecommendations, recordDecision } from '@/lib/supabase/recommendations';
+import {
+  insertRecommendation,
+  listRecommendations,
+  recordDecision,
+  resolveRecommendation,
+  type Recommendation,
+} from '@/lib/supabase/recommendations';
 import type { RecommendationScope } from './recommend';
 import { api } from '@/lib/api/client';
 import type { Project } from '@/types/project';
@@ -17,6 +23,83 @@ import { choiceLabels, gist, mergeConflicts, nameOf, ruleConflicts, type Conflic
 import { inputsFrom } from './stage-requests';
 
 export const CONFLICT_CATEGORY = 'conflict:';
+
+/**
+ * A change waiting on a "which takes priority?" answer.
+ *
+ * The question used to live only in the side chat's memory: leaving the card
+ * — another stage, a reload, closing the chat — lost the change without a
+ * trace (16 Oct, Sean, NORTHSTAR-2: the March 6 withdrawal was checked at
+ * 23:34 and never saved, and nothing said so). It is held as a pending row
+ * the moment the question is asked, and settled when it is answered or
+ * withdrawn. The row deliberately has no `scope.stage_id` and no version, so
+ * it is never a stage proposal, never superseded by leaving a stage, and
+ * never read as a pending instruction by the next conflict check.
+ */
+export const PENDING_CHANGE_CATEGORY = 'pending-change:';
+
+export interface PendingChange {
+  id: string;
+  stageId: string;
+  instruction: string;
+  conflicts: InstructionConflict[];
+  createdAt: string;
+}
+
+export const isPendingChangeRow = (r: Pick<Recommendation, 'category'>): boolean =>
+  Boolean(r.category?.startsWith(PENDING_CHANGE_CATEGORY));
+
+/** Changes the user has not yet chosen for, oldest first. */
+export function pendingChanges(rows: readonly Recommendation[]): PendingChange[] {
+  return rows
+    .filter((r) => r.status === 'pending' && isPendingChangeRow(r))
+    .map((r) => {
+      const held = r.rationale as unknown as { conflicts?: InstructionConflict[] };
+      const scope = r.scope as unknown as { pending_stage_id?: string };
+      return {
+        id: r.id,
+        stageId: scope.pending_stage_id ?? '',
+        instruction: r.suggested_change,
+        conflicts: Array.isArray(held.conflicts) ? held.conflicts : [],
+        createdAt: r.created_at,
+      };
+    })
+    .filter((c) => c.stageId && c.instruction.trim());
+}
+
+/** Hold a change that is waiting on a priority answer. */
+export async function holdPendingChange(args: {
+  projectId: string;
+  userId: string;
+  stageId: string;
+  stageLabel: string;
+  instruction: string;
+  conflicts: InstructionConflict[];
+}): Promise<Recommendation> {
+  return insertRecommendation(args.projectId, args.userId, {
+    category: `${PENDING_CHANGE_CATEGORY}${Date.now()}`,
+    kind: 'workflow',
+    title: `Not applied yet: ${gist(args.instruction)}`,
+    summary: `Waiting for your choice on ${args.stageLabel}.`,
+    suggested_change: args.instruction,
+    instruction: '',
+    rationale: {
+      triggering_issue: args.conflicts[0]?.explanation ?? '',
+      relevant_stage: args.stageId,
+      expected_benefit: 'The change is kept until you choose, instead of being lost.',
+      scope: 'A change waiting for a priority answer',
+      conflicts: args.conflicts,
+    } as never,
+    scope: { kind: 'document', described_as: 'A change waiting for your choice', pending_stage_id: args.stageId } as never,
+    tags: ['conflict'],
+    severity: 'minor',
+  });
+}
+
+/** Answered (`applied`) or taken back (`withdrawn`). */
+export function settlePendingChange(id: string, outcome: 'applied' | 'withdrawn'): Promise<Recommendation> {
+  return resolveRecommendation(id, outcome === 'applied' ? 'accepted' : 'dismissed');
+}
 
 export async function conflictContext(
   projectId: string,
@@ -31,7 +114,12 @@ export async function conflictContext(
 ): Promise<{ decisions: ConflictSource[]; others: ConflictSource[] }> {
   const rows = await listRecommendations(projectId).catch(() => []);
   const decisions: ConflictSource[] = rows
-    .filter((r) => (r.status === 'accepted' || r.status === 'dismissed') && (r.scope as { kind?: string })?.kind !== 'agent_authorization')
+    .filter(
+      (r) =>
+        (r.status === 'accepted' || r.status === 'dismissed') &&
+        (r.scope as { kind?: string })?.kind !== 'agent_authorization' &&
+        !isPendingChangeRow(r)
+    )
     .slice(-15)
     .map((r) => ({
       id: r.id,
@@ -131,12 +219,15 @@ export async function recordConflictChoice(args: {
     scope: { kind: 'document', described_as: 'A conflict between instructions', stage_id: args.stageId },
     tags: ['conflict'],
     severity: 'minor',
-    status: controls === 'new' ? 'accepted' : 'dismissed',
+    // The row is the user's answer, whichever side it took: keeping the
+    // record is a choice made, not a suggestion turned down. It was stored as
+    // `dismissed` for "keep", which read as rejected (15 Oct, HARBOR).
+    status: 'accepted',
   });
   await recordDecision(args.projectId, args.userId, {
-    decision_type: controls === 'new' ? 'accept_recommendation' : 'dismiss_recommendation',
+    decision_type: 'accept_recommendation',
     recommendation_id: rec.id,
     rationale: title,
-    metadata: { conflict_kind: conflict.kind, with_id: conflict.with_id, source: conflict.source },
+    metadata: { conflict_kind: conflict.kind, with_id: conflict.with_id, source: conflict.source, controls },
   });
 }

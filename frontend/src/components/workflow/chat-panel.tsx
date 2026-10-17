@@ -36,7 +36,14 @@ import { removeClaimsInstruction, type AddedClaim } from '@/lib/workflow/fact-bo
 import { MarkdownOutput } from '@/components/shared/markdown-output';
 import { useStageChat } from './use-stage-chat';
 import { ConflictPrompt } from './conflict-prompt';
-import { findInstructionConflicts, recordConflictChoice } from '@/lib/workflow/conflict-trail';
+import {
+  findInstructionConflicts,
+  holdPendingChange,
+  recordConflictChoice,
+  settlePendingChange,
+  type PendingChange,
+} from '@/lib/workflow/conflict-trail';
+import { useProjectStore } from '@/stores/project-store';
 import {
   precedenceNote,
   type Controls,
@@ -148,6 +155,14 @@ interface Props {
   checkRevision?: (content: string) => { label: string; ok: boolean }[];
   /** Routine revisions are applied without a click (delegated routine decisions). */
   autoApply?: boolean;
+  /**
+   * A held change to ask about again ("Choose and apply" on the not-applied
+   * notice). Taken once: `onResumeTaken` is called when the question is back.
+   */
+  resumeChange?: PendingChange | null;
+  onResumeTaken?: () => void;
+  /** The held change whose question is open here now, so the notice does not repeat it. */
+  onPendingShown?: (id: string | null) => void;
 }
 
 /**
@@ -196,6 +211,9 @@ export function ChatPanel({
   onFactsChanged,
   checkRevision,
   autoApply,
+  resumeChange = null,
+  onResumeTaken,
+  onPendingShown,
 }: Props) {
   const [offerActions, setOfferActions] = useState(true);
   useEffect(() => setOfferActions(readOfferActions()), []);
@@ -280,8 +298,71 @@ export function ChatPanel({
 
   // PM-24: an instruction is checked for conflicts before it is sent.
   const [checking, setChecking] = useState(false);
-  const [conflicting, setConflicting] = useState<{ text: string; conflicts: InstructionConflict[]; action?: ReplyAction } | null>(null);
+  const [conflicting, setConflicting] = useState<{
+    text: string;
+    conflicts: InstructionConflict[];
+    action?: ReplyAction;
+    /** The held row (see `holdPendingChange`), once it is written. */
+    pendingId?: string;
+  } | null>(null);
   const conflictRef = useRef<HTMLDivElement>(null);
+  const upsertRecommendation = useProjectStore((s) => s.upsertRecommendation);
+
+  /**
+   * Ask "which takes priority?" and hold the change while it is asked: an
+   * unanswered question is a change not applied yet, and says so wherever the
+   * user goes next (16 Oct, Sean, NORTHSTAR-2).
+   */
+  /** Answers given before the held row was written: settled as soon as it is. */
+  const answeredEarly = useRef(new Map<string, 'applied' | 'withdrawn'>());
+  const settle = useCallback(
+    (id: string | undefined, text: string, outcome: 'applied' | 'withdrawn') => {
+      if (!id) {
+        answeredEarly.current.set(text, outcome);
+        return;
+      }
+      void settlePendingChange(id, outcome).then(upsertRecommendation, () => undefined);
+    },
+    [upsertRecommendation]
+  );
+  const askPriority = useCallback(
+    (text: string, conflicts: InstructionConflict[], action?: ReplyAction) => {
+      answeredEarly.current.delete(text);
+      setConflicting({ text, conflicts, action });
+      holdPendingChange({ projectId: project.id, userId: project.user_id, stageId, stageLabel, instruction: text, conflicts }).then(
+        (row) => {
+          upsertRecommendation(row);
+          const early = answeredEarly.current.get(text);
+          if (early) {
+            answeredEarly.current.delete(text);
+            settle(row.id, text, early);
+            return;
+          }
+          setConflicting((c) => (c && c.text === text && !c.pendingId ? { ...c, pendingId: row.id } : c));
+        },
+        () => undefined
+      );
+    },
+    [project.id, project.user_id, stageId, stageLabel, upsertRecommendation, settle]
+  );
+
+  // "Choose and apply": the held question, back as it was asked.
+  useEffect(() => {
+    if (!resumeChange || conflicting || readOnly) return;
+    if (resumeChange.stageId !== stageId) return;
+    if (resumeChange.conflicts.length) {
+      setConflicting({ text: resumeChange.instruction, conflicts: resumeChange.conflicts, pendingId: resumeChange.id });
+    } else {
+      setDraft(resumeChange.instruction);
+      settle(resumeChange.id, resumeChange.instruction, 'withdrawn');
+    }
+    onResumeTaken?.();
+  }, [resumeChange, conflicting, readOnly, stageId, onResumeTaken, settle]);
+
+  useEffect(() => {
+    onPendingShown?.(conflicting?.pendingId ?? null);
+  }, [conflicting?.pendingId, onPendingShown]);
+  useEffect(() => () => onPendingShown?.(null), [onPendingShown]);
 
   // The question is only useful if it can be answered: bring its top into the
   // thread's view when it appears. Its buttons stay pinned (see ConflictPrompt),
@@ -348,13 +429,13 @@ export function ChatPanel({
         });
         setChecking(false);
         if (conflicts.length) {
-          setConflicting({ text: action.instruction, conflicts, action });
+          askPriority(action.instruction, conflicts, action);
           return;
         }
       }
       await onRunAction(action);
     },
-    [onRunAction, project, stageId, stageLabel, getChatContext, headVersion?.id]
+    [onRunAction, project, stageId, stageLabel, getChatContext, headVersion?.id, askPriority]
   );
 
   const canSend =
@@ -380,17 +461,18 @@ export function ChatPanel({
     });
     setChecking(false);
     if (conflicts.length) {
-      setConflicting({ text, conflicts });
+      askPriority(text, conflicts);
       return;
     }
     await chat.propose(text, scope, { selection, sectionId: effectiveSectionId });
-  }, [draft, mode, scope, selection, effectiveSectionId, chat, project, stageId, stageLabel, getChatContext, headVersion?.id]);
+  }, [draft, mode, scope, selection, effectiveSectionId, chat, project, stageId, stageLabel, getChatContext, headVersion?.id, askPriority]);
 
   const resolveConflicts = useCallback(
     async (choices: Controls[]) => {
       if (!conflicting) return;
-      const { text, conflicts, action } = conflicting;
+      const { text, conflicts, action, pendingId } = conflicting;
       setConflicting(null);
+      settle(pendingId, text, 'applied');
       await Promise.all(
         conflicts.map((conflict, i) =>
           recordConflictChoice({ projectId: project.id, userId: project.user_id, stageId, instruction: text, conflict, controls: choices[i] })
@@ -405,7 +487,7 @@ export function ChatPanel({
       }
       await chat.propose(text, scope, { selection, sectionId: effectiveSectionId, precedence });
     },
-    [conflicting, project, stageId, chat, scope, selection, effectiveSectionId, onRunAction]
+    [conflicting, project, stageId, chat, scope, selection, effectiveSectionId, onRunAction, settle]
   );
 
   return (
@@ -497,6 +579,7 @@ export function ChatPanel({
               onContinue={(choices) => void resolveConflicts(choices)}
               onCancel={() => {
                 if (!conflicting.action) setDraft(conflicting.text);
+                settle(conflicting.pendingId, conflicting.text, 'withdrawn');
                 setConflicting(null);
               }}
             />
@@ -555,6 +638,18 @@ export function ChatPanel({
         <p role="alert" className="px-5 pb-2 text-label text-[var(--pm-error)]">
           {chat.error}
         </p>
+      )}
+      {chat.redo && !readOnly && (
+        <div className="px-5 pb-2">
+          <button
+            type="button"
+            onClick={() => void chat.redraft()}
+            disabled={chat.busy}
+            className="rounded-lg bg-[var(--pm-primary)] px-3 py-1.5 text-label font-semibold text-[var(--on-primary)] disabled:opacity-40"
+          >
+            Apply my change to the new version
+          </button>
+        </div>
       )}
 
       {!readOnly && (
