@@ -184,7 +184,6 @@ test('Go is given the buttons that are really on the page, and may name only tho
   await panel.getByRole('radio', { name: /^Autonomous/ }).click();
   const planned = page.waitForRequest((r) => r.url().includes('/api/agent/next-action') && r.method() === 'POST');
   await panel.getByRole('button', { name: /^Go$/ }).click();
-  await page.getByRole('button', { name: /^Authorize/ }).click();
   const { state } = (await planned).postDataJSON();
   const controls: { label: string; where: string }[] = state.controls;
   expect(controls.length).toBeGreaterThan(3);
@@ -214,7 +213,6 @@ test('a button Go invents is dropped, not shown to the user as if it existed', a
   await panel.getByRole('button', { name: 'Set up Go' }).click();
   await panel.getByRole('radio', { name: /^Autonomous/ }).click();
   await panel.getByRole('button', { name: /^Go$/ }).click();
-  await page.getByRole('button', { name: /^Authorize/ }).click();
   const ask = page.getByRole('region', { name: 'Go mode asks you' });
   await expect(ask).toContainText('Mock: which way should this go?', { timeout: 30_000 });
   await expect(ask).not.toContainText('The button is');
