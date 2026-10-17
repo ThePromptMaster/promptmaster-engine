@@ -10,7 +10,7 @@
  * runs' steps — so there is no second store of "memory" to drift from them.
  */
 
-import { CONFLICT_CATEGORY } from '@/lib/workflow/conflict-trail';
+import { CONFLICT_CATEGORY, isPendingChangeRow } from '@/lib/workflow/conflict-trail';
 import type { Recommendation } from '@/lib/supabase/recommendations';
 import type { WorkflowEvent, WorkflowTemplate } from '@/lib/workflow/types';
 import type { AgentStep } from '@/types/agent';
@@ -43,7 +43,8 @@ export function projectMemory(input: {
   }
 
   // What the user answered when asked which of two things takes priority.
-  const settled = recommendations.filter((r) => r.status === 'accepted' || r.status === 'dismissed');
+  // A held change's row is bookkeeping; the answer is the conflict row.
+  const settled = recommendations.filter((r) => (r.status === 'accepted' || r.status === 'dismissed') && !isPendingChangeRow(r));
   for (const r of settled) {
     if (r.category?.startsWith(CONFLICT_CATEGORY)) lines.push(`Decided: ${r.title}`);
   }

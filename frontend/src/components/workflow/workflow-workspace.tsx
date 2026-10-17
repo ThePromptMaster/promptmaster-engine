@@ -79,6 +79,8 @@ import { ProjectData } from './project-data';
 import { lookupAndVerify } from '@/lib/workflow/verify';
 import { RefusedRevisions, refusedSince } from './refused-revisions';
 import { BriefChangeNotice } from './brief-change-notice';
+import { PendingChangeNotice } from './pending-change-notice';
+import { pendingChanges, settlePendingChange, type PendingChange } from '@/lib/workflow/conflict-trail';
 import { FactsNextStep } from './facts-next-step';
 import { FactReconcileNotice } from './fact-change-list';
 import { factChangesFromRevision, withMeaningChanges, type FactChange } from '@/lib/workflow/fact-reconcile';
@@ -720,6 +722,13 @@ export function WorkflowWorkspace({
    * meant.
    */
   const reloadRecommendations = useProjectStore((s) => s.reloadRecommendations);
+  // Changes waiting on a "which takes priority?" answer, shown on every stage (16 Oct, NORTHSTAR-2).
+  const recommendationRows = useProjectStore((s) => s.recommendations);
+  const upsertRecommendation = useProjectStore((s) => s.upsertRecommendation);
+  const heldChanges = useMemo(() => pendingChanges(recommendationRows), [recommendationRows]);
+  const [resumeChange, setResumeChange] = useState<PendingChange | null>(null);
+  const [pendingShown, setPendingShown] = useState<string | null>(null);
+  const takeResume = useCallback(() => setResumeChange(null), []);
   const tools = useStageTools({
     project, stage: stage ?? null, headVersion, appendStageVersion, onRecorded: reloadRecommendations,
     // A long-form stage's text lives in its chapters, not in a version.
@@ -1856,6 +1865,16 @@ export function WorkflowWorkspace({
                 />
               </div>
             )}
+            <PendingChangeNotice
+              changes={project.status === 'finalized' ? [] : heldChanges.filter((c) => c.id !== pendingShown)}
+              stageLabel={(id) => template.stages.find((s) => s.id === id)?.label ?? id}
+              onChoose={(c) => {
+                setViewingStageId(c.stageId === state.current_stage_id ? null : c.stageId);
+                setChatOpen(true);
+                setResumeChange(c);
+              }}
+              onDiscard={(c) => void settlePendingChange(c.id, 'withdrawn').then(upsertRecommendation, () => undefined)}
+            />
             <BriefChangeNotice
               change={briefChange}
               stageLabel={(id) => template.stages.find((s) => s.id === id)?.label ?? id}
@@ -2314,6 +2333,9 @@ export function WorkflowWorkspace({
                 />
               }
               applying={applyFindings.running}
+              resumeChange={resumeChange}
+              onResumeTaken={takeResume}
+              onPendingShown={setPendingShown}
             />
           </div>
         </aside>
