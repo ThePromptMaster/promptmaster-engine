@@ -8,6 +8,8 @@
  * it at the top of whichever stage is open. Pure.
  */
 
+import { NEXT_STEP_LABELS } from './stage-controls';
+
 export type NextActionKind = 'apply_continue_reopened' | 'apply_continue' | 'answer_go' | 'resume' | 'working';
 
 export interface NextAction {
@@ -43,17 +45,17 @@ export function nextAction(i: NextActionInput): NextAction | null {
   if (i.reopenedHere) {
     return {
       kind: 'apply_continue_reopened',
-      label: 'Apply and continue',
+      label: NEXT_STEP_LABELS.applyContinue,
       why: `Keeps your changes to ${i.reopenedLabel ?? 'this stage'} and has Go recheck what came after it.`,
     };
   }
   if (i.awaitingUpdate.length) {
     const names = i.awaitingUpdate.length <= 3 ? i.awaitingUpdate.join(', ') : `${i.awaitingUpdate.length} stages`;
-    return { kind: 'apply_continue', label: 'Apply and continue', why: `${names} ${i.awaitingUpdate.length === 1 ? 'needs' : 'need'} updating after your change; Go does it and carries on.` };
+    return { kind: 'apply_continue', label: NEXT_STEP_LABELS.applyContinue, why: `${names} ${i.awaitingUpdate.length === 1 ? 'needs' : 'need'} updating after your change; Go does it and carries on.` };
   }
   const paused = i.run && !i.run.ended_at && (i.run.status === 'awaiting_decision' || i.run.status === 'blocked');
   // On the current stage Go's own panel carries its card and Resume: not twice.
   if (!paused || i.onCurrentStage) return null;
-  if (i.run!.hasNeed || i.run!.asking) return { kind: 'answer_go', label: "Answer Go's question", why: 'Go is waiting for you on the current stage.' };
-  return { kind: 'resume', label: 'Resume', why: 'Go is paused and can carry on from here.' };
+  if (i.run!.hasNeed || i.run!.asking) return { kind: 'answer_go', label: NEXT_STEP_LABELS.answerGo, why: 'Go is waiting for you on the current stage.' };
+  return { kind: 'resume', label: NEXT_STEP_LABELS.resume, why: 'Go is paused and can carry on from here.' };
 }

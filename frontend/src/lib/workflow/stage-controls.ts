@@ -26,6 +26,16 @@ export interface StageControl {
 }
 
 /** Where a control is, in words for the user. */
+/**
+ * The next-step bar's buttons, at the top of every stage (17 Oct, N4b). Named
+ * here like every other page button, so Go and the page use the same words.
+ */
+export const NEXT_STEP_LABELS = {
+  applyContinue: 'Apply and continue',
+  answerGo: "Answer Go's question",
+  resume: 'Resume',
+} as const;
+
 export const PLACE_WORDS: Record<ControlPlace, string> = {
   stage_bar: 'the main button at the bottom of the stage',
   more_menu: 'under "More" at the bottom of the stage',

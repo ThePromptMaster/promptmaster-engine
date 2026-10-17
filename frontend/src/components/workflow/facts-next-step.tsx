@@ -1,5 +1,7 @@
 'use client';
 
+import { NEXT_STEP_LABELS } from '@/lib/workflow/stage-controls';
+
 /**
  * Under "8 facts recorded": what happens next, and the one button for it
  * (Sean, 14 Oct, SUMMIT: "Could 'Record these facts' change to 'Facts
@@ -37,7 +39,7 @@ export function FactsNextStep({
             disabled={updating}
             className="mt-1.5 rounded-lg bg-[var(--pm-primary)] px-3 py-1.5 text-label text-[var(--on-primary)] hover:opacity-90 disabled:opacity-50"
           >
-            {updating ? 'Updating affected work…' : 'Apply and continue'}
+            {updating ? 'Updating affected work…' : NEXT_STEP_LABELS.applyContinue}
           </button>
         )}
       </div>
