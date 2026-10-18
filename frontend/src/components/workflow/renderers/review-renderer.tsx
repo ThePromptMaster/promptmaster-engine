@@ -20,6 +20,7 @@
  * item schema declares and the statuses are whatever it offers.
  */
 
+import { isSuperseded } from '@/lib/workflow/superseded-rows';
 import { findingRisk, isTriageTable } from '@/lib/workflow/triage';
 import { useEffect, useMemo, useState, useRef } from 'react';
 
@@ -92,6 +93,7 @@ export function ReviewRenderer({
   const [lookingUp, setLookingUp] = useState(false);
   const [lookupNote, setLookupNote] = useState<string | null>(null);
   const [showSettled, setShowSettled] = useState(false);
+  const [showSuperseded, setShowSuperseded] = useState(false);
 
   // The named sources, searched for in a public index. What comes back is
   // unsaved: the user reads what was found, then saves.
@@ -148,8 +150,10 @@ export function ReviewRenderer({
     const settled = saved.filter((r) => isTriaged(r, schema));
     return new Set(saved.length > FOLD_AFTER && settled.length < saved.length ? settled.map((r) => r.id) : []);
   }, [saved, schema]);
-  const openRows = rows.filter((r) => !settledIds.has(r.id));
-  const foldedRows = rows.filter((r) => settledIds.has(r.id));
+  // Findings on a value a later fact replaced (17 Oct, Sean, 20→12): kept, folded apart.
+  const supersededRows = rows.filter(isSuperseded);
+  const openRows = rows.filter((r) => !settledIds.has(r.id) && !isSuperseded(r));
+  const foldedRows = rows.filter((r) => settledIds.has(r.id) && !isSuperseded(r));
   const outstanding = rows.length - triaged;
   // Whether the stage requires a status on every row. Final review's open
   // items do not: "10 still to resolve" beside "0 required" read as a
@@ -489,6 +493,39 @@ export function ReviewRenderer({
                       onApplyReasonToSame={() => applyReasonToSame(row.id)}
                     />
                   ))}
+                {supersededRows.length > 0 && (
+                  <tr className="max-md:block">
+                    <td colSpan={columns.length + 1} className="px-4 py-2 max-md:block">
+                      <button
+                        type="button"
+                        aria-expanded={showSuperseded}
+                        onClick={() => setShowSuperseded((v) => !v)}
+                        className="inline-flex items-center gap-1 text-label text-[var(--pm-primary)]"
+                      >
+                        <span aria-hidden className="material-symbols-outlined text-[18px]">
+                          {showSuperseded ? 'expand_less' : 'expand_more'}
+                        </span>
+                        {showSuperseded
+                          ? `Hide the ${supersededRows.length} earlier findings`
+                          : `Earlier findings (superseded) — ${supersededRows.length}, show`}
+                      </button>
+                    </td>
+                  </tr>
+                )}
+                {showSuperseded &&
+                  supersededRows.map((row) => (
+                    <ReviewRow
+                      key={row.id}
+                      row={row}
+                      columns={columns}
+                      statuses={statuses}
+                      schema={schema}
+                      readOnly={readOnly}
+                      onPatch={patch}
+                      sameMissing={missingReasonFor(row.status, row.id)}
+                      onApplyReasonToSame={() => applyReasonToSame(row.id)}
+                    />
+                  ))}
               </tbody>
             </table>
           </div>
@@ -550,6 +587,9 @@ function ReviewRow({ row, columns, statuses, schema, readOnly, onPatch, sameMiss
             className="px-4 py-3 text-body leading-relaxed text-[var(--on-surface)] max-md:block max-md:py-1 max-md:before:block max-md:before:text-label max-md:before:uppercase max-md:before:tracking-wider max-md:before:text-[var(--on-surface-variant)] max-md:before:content-[attr(data-label)]"
           >
             {row[c.key] || <span className="text-[var(--on-surface-variant)]">—</span>}
+            {c === columns[0] && isSuperseded(row) && (
+              <span className="mt-1 block text-label text-[var(--on-surface-variant)]">Superseded by: {row.superseded_by}</span>
+            )}
           </td>
         ))}
         <td data-label="Status" className="px-4 py-3 max-md:block max-md:py-1 max-md:before:block max-md:before:text-label max-md:before:uppercase max-md:before:tracking-wider max-md:before:text-[var(--on-surface-variant)] max-md:before:content-[attr(data-label)]">

@@ -50,6 +50,7 @@ import { recordPolicyFacts } from '@/lib/supabase/facts';
 import { checkGoal } from './code-check';
 import { unmetHumanRequirements } from '@/lib/workflow/human-requirements';
 import { approverFindings, approverSources } from '@/lib/workflow/approver-support';
+import { isSuperseded, markSuperseded, replacedValues } from '@/lib/workflow/superseded-rows';
 import { figureFindings, figureSources } from '@/lib/workflow/figure-support';
 import { asIteration } from '@/lib/workflow/legacy';
 import {
@@ -943,7 +944,10 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         );
         const generated = generationContent(target, res);
         const after = before ? withoutRevisionNotes(parseItems(generated)) : null;
-        const content = before && after ? serializeItems(restoreDecided(before, carryUserFields(before, after, itemSchemaFor(target)))) : parts.length ? onlyParts(head, generated, parts) : generated;
+        // A decided finding on a value a later fact replaced is kept, marked superseded (17 Oct, 20→12).
+        const content = before && after
+          ? serializeItems(markSuperseded(restoreDecided(before, carryUserFields(before, after, itemSchemaFor(target))), replacedValues(ctx.project.facts)))
+          : parts.length ? onlyParts(head, generated, parts) : generated;
         return { res, content };
       };
       let { res, content } = await attempt(instruction);
@@ -955,7 +959,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // review row quoting version 1 failed a repair that could not change it).
       const leftoverIn = (text: string) => {
         const rows = before ? parseItems(text) : null;
-        return leftoverValues(rows ? serializeItems(rows.filter((r) => !before!.some((b) => b.status && b.id === r.id))) : text, superseded);
+        return leftoverValues(rows ? serializeItems(rows.filter((r) => !isSuperseded(r) && !before!.some((b) => b.status && b.id === r.id))) : text, superseded);
       };
       let leftover = content ? leftoverIn(content) : [];
       if (content && leftover.length) {
