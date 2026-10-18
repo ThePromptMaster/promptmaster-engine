@@ -2252,7 +2252,7 @@ export function WorkflowWorkspace({
       {chatOpen && (
         <aside
           id="stage-side-chat"
-          className="fixed inset-0 z-40 bg-[var(--surface)] p-4 lg:sticky lg:inset-auto lg:top-0 lg:z-auto lg:h-screen lg:w-[380px] lg:shrink-0 lg:bg-transparent lg:py-6 lg:pl-0 lg:pr-6"
+          className="fixed inset-0 z-40 flex flex-col bg-[var(--surface)] p-4 lg:sticky lg:inset-auto lg:top-0 lg:z-auto lg:h-[100dvh] lg:max-h-[100dvh] lg:w-[380px] lg:shrink-0 lg:self-start lg:bg-transparent lg:py-6 lg:pl-0 lg:pr-6"
         >
           <button
             onClick={() => setChatOpen(false)}
@@ -2264,7 +2264,7 @@ export function WorkflowWorkspace({
             Close
           </button>
 
-          <div className="h-[calc(100%-2rem)] lg:h-full">
+          <div className="min-h-0 flex-1">
             <ChatPanel
               project={project}
               stageId={stage.id}
@@ -2332,11 +2332,11 @@ export function WorkflowWorkspace({
               }
               cannotChangeBecause={
                 rendererHoldsItems(stage.renderer)
-                  ? 'This stage is a table. Ask about it here and the answer will offer row changes you can review, or change the rows in the table itself.'
+                  ? 'Ask only — answers offer row changes for you to review.'
                   : stage.renderer === 'outline'
-                    ? 'Ask about the outline here; change it in the outline editor on the page.'
+                    ? 'Ask only — edit the outline on the page.'
                     : stage.renderer === 'long_form'
-                      ? 'Ask about the chapters here; rewrite one from its own section on the page.'
+                      ? 'Ask only — rewrite a chapter from its own section.'
                       : undefined
               }
               isTable={!chatEditsProse}

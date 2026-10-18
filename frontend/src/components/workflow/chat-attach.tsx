@@ -96,7 +96,7 @@ export function ChatAttach({
   };
 
   return (
-    <div className="flex min-w-0 flex-col gap-1">
+    <div className="flex shrink-0 flex-col gap-1">
       <input
         ref={input}
         type="file"

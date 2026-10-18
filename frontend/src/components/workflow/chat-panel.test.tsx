@@ -294,7 +294,7 @@ describe('reading an older version', () => {
     // from version 1 and silently drop two versions of work.
     panel({ canInstruct: false });
     expect(screen.getByRole('tab', { name: /change it/i })).toBeDisabled();
-    expect(screen.getByText(/open the latest one to revise/i)).toBeInTheDocument();
+    expect(screen.getByText(/open the latest version to change it/i)).toBeInTheDocument();
   });
 
   it('still allows discussion of it', async () => {
