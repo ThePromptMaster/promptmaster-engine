@@ -116,12 +116,15 @@ export interface StageChatMessage extends ChatMessage {
   scope?: string | null;
   /** Instruct only: the version the revision produced, once accepted. */
   appliedVersionId?: string | null;
+  /** Instruct only: the proposal was discarded or set aside; it never changed anything. */
+  discarded?: boolean;
 }
 
 interface StageChatMeta {
   mode?: ChatMode;
   scope?: string | null;
   applied_version_id?: string | null;
+  discarded?: boolean;
 }
 
 interface StageRow extends ConversationMessageRow {
@@ -137,6 +140,7 @@ function rowToStageMessage(row: StageRow): StageChatMessage {
     mode: meta.mode === 'instruct' ? 'instruct' : 'discuss',
     scope: meta.scope ?? null,
     appliedVersionId: meta.applied_version_id ?? null,
+    discarded: meta.discarded === true,
   };
 }
 
@@ -250,6 +254,24 @@ export async function markStageChatApplied(
   await supabase
     .from('conversation_messages')
     .update({ meta: { mode: 'instruct', scope, applied_version_id: versionId } })
+    .eq('id', messageId)
+    .eq('user_id', user.id);
+}
+
+/**
+ * Record that an instruction's proposal was discarded (18 Oct, production
+ * pass): left looking unapplied, it was sent with every later revision as
+ * history, and a discarded "$17,000" correction was applied with an unrelated
+ * edit. Best-effort, like `markStageChatApplied`.
+ */
+export async function markStageChatDiscarded(messageId: string, scope: string | null): Promise<void> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  await supabase
+    .from('conversation_messages')
+    .update({ meta: { mode: 'instruct', scope, discarded: true } })
     .eq('id', messageId)
     .eq('user_id', user.id);
 }

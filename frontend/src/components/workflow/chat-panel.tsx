@@ -457,7 +457,7 @@ export function ChatPanel({
     setChecking(true);
     // Only instructions not yet applied are pending: an applied one is the
     // current version, and was counted twice (14 Oct, Sean, LANTERN).
-    const recent = chat.messages.filter((m) => m.role === 'user' && m.mode === 'instruct' && m.appliedVersionId == null).map((m) => m.content);
+    const recent = chat.messages.filter((m) => m.role === 'user' && m.mode === 'instruct' && m.appliedVersionId == null && !m.discarded).map((m) => m.content);
     // Checked as it will be sent: a revision pasted back from an older export
     // is only its edits, so a value the user did not touch is not asked about.
     const resolved = await chat.instructionFor(text, scope);
