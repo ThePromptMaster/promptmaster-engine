@@ -1733,9 +1733,17 @@ and facts never name that person as approving anything. It checks the name, not 
 item: if Elena approved the November change, it cannot tell whether she also approved
 the baseline. How history is worded (superseded, corrected, declined) is a prompt rule.
 
-A revision made in another assistant from an older export is not detected as stale: the
-export carries no version stamp, and a pasted revision is drafted against the current
-version. The stale-base refusal covers revisions made inside PromptMaster only.
+A revision made in another assistant from an older export is now detected, if its stamp
+survives (18 Oct). Every Markdown export stamps each stage's head version
+(`[PromptMaster output v5 1a2b3c4d]`), and the Word, PDF, LaTeX and notebook exports
+stamp the deliverable. When text pasted into "Change it" for the whole document carries
+an older stamp for that stage, only the user's own edits against that version (a line
+diff) are applied to the current one, and the proposal says so. Limits:
+- the other assistant must keep the stamp. Without it the paste is treated as before,
+  drafted against the current version with no warning;
+- the edits are applied by the model as an instruction, so an edit to a passage that
+  changed here since can still be resolved the wrong way;
+- a long-form manuscript is not stamped: it is revised chapter by chapter.
 
 Found on the 18 October production passes and fixed the same day (#287–#290):
 - **Status went back to the older date** (REEF `37116f51`: back to the November 2 figures over the November 5 fact). Fixed in #290: when an accepted fact is dated later than the brief's "as of", code adds a CURRENT REPORTING DATE line to the facts block. The brief's value for an item a later fact updates is the baseline. This is a prompt rule, not a check: the frontend's leftover check cannot pair a brief value with the fact that updates it, so a model that ignores the line is not caught.

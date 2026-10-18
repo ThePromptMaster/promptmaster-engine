@@ -4,7 +4,7 @@ import { use, useEffect, useMemo, useState } from 'react';
 
 import { MarkdownOutput } from '@/components/shared/markdown-output';
 import { ProjectImagesProvider } from '@/components/shared/project-images';
-import { toManuscriptMarkdown } from '@/lib/export/project-export';
+import { stampedManuscript } from '@/lib/export/project-export';
 import { getLatestTemplate, getTemplateById } from '@/lib/supabase/workflow';
 import { initialState } from '@/lib/workflow/engine';
 import type { WorkflowTemplate } from '@/lib/workflow/types';
@@ -38,7 +38,7 @@ export default function PrintPage({ params }: { params: Promise<{ id: string }> 
 
   const markdown = useMemo(() => {
     if (!project || !template) return '';
-    return toManuscriptMarkdown({ project, template, state: initialState(template), events: [], stages, evaluations: {} });
+    return stampedManuscript({ project, template, state: initialState(template), events: [], stages, evaluations: {} });
   }, [project, template, stages]);
 
   if (loading || (!project && !error)) return <p className="p-8 text-body">Loading…</p>;

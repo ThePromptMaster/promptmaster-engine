@@ -50,7 +50,8 @@ import {
   type ScopeKind,
   type ScopeTarget,
 } from './chat-scope';
-import type { NewVersion } from '@/lib/supabase/versions';
+import { listVersions, type NewVersion } from '@/lib/supabase/versions';
+import { editsBetween, editsInstruction, staleStamp, withoutStamps } from '@/lib/workflow/version-stamp';
 import type { ArtifactVersion, Project } from '@/types/project';
 import { factChangesFromRevision, isNewFact, withMeaningChanges, type FactChange } from '@/lib/workflow/fact-reconcile';
 import { recordFacts, supersedeFact } from '@/lib/supabase/facts';
@@ -110,6 +111,11 @@ export interface ChatProposal {
   removedUnasked?: string[];
   /** Personal details it added that nobody supplied, when the project says not to invent them. */
   addedClaims?: AddedClaim[];
+  /**
+   * A revision pasted back from outside PromptMaster that started from an
+   * older version: only its edits were applied, keeping what changed since.
+   */
+  revisedFrom?: { version: number; head: number; edits: number };
 }
 
 /** What was applied last, so it can be undone without hunting for it. */
@@ -348,8 +354,11 @@ export function useStageChat({
       kind: ScopeKind,
       options: { selection?: string; sectionId?: string; precedence?: string[] } = {}
     ) => {
-      const text = instruction.trim();
-      if (!text || busy || loading) return;
+      const typed = instruction.trim();
+      if (!typed || busy || loading) return;
+      // An export's version stamps never reach the document or the model as words.
+      const stale = kind === 'document' && headVersion ? staleStamp(typed, stageId, versionNumber) : null;
+      const text = withoutStamps(typed) || typed;
 
       const target = resolveScope(content, kind, options);
       if (!target) {
@@ -369,6 +378,25 @@ export function useStageChat({
       try {
         const priorHistory = asHistory(messages);
         setRedo(null);
+
+        // Revised elsewhere from an older version (17 Oct, Sean: work alongside
+        // other assistants). Sent whole, it would undo what changed here since;
+        // only the user's own edits against the version they started from go.
+        let ask = text;
+        let revisedFrom: ChatProposal['revisedFrom'];
+        if (stale && headVersion) {
+          const base = (await listVersions(headVersion.artifact_id)).find((v) => v.version_number === stale.version);
+          if (base) {
+            const edits = editsBetween(withoutStamps(base.content), text);
+            if (!edits.length) {
+              if (live.current) setError(`This is version ${stale.version} unchanged — there is nothing to apply. The current version is ${versionNumber}.`);
+              return;
+            }
+            ask = editsInstruction(edits, stale.version, versionNumber);
+            revisedFrom = { version: stale.version, head: versionNumber, edits: edits.length };
+          }
+        }
+
         const saved = await persist('user', text, 'instruct', target.label);
 
         // The persisted message is the user's own words; the message *sent*
@@ -382,7 +410,7 @@ export function useStageChat({
             `Revise ONLY the passage given as the current version. It is ` +
             `${scopeNoun(kind)} of a longer document, not the whole of it. Return the ` +
             `revised passage alone — no preamble, no surrounding text, no commentary.\n\n` +
-            `Instruction: ${text}` +
+            `Instruction: ${ask}` +
             // PM-24: what the user decided when this instruction conflicted with something.
             (options.precedence?.length ? `\n\n${options.precedence.join('\n')}` : ''),
           created_at: new Date().toISOString(),
@@ -404,7 +432,7 @@ export function useStageChat({
 
         if (!live.current) return;
         const spliced = spliceScope(content, target, after);
-        const checked = await checkedRevision(content, spliced, text, [...messages.filter((m) => m.role === 'user').map((m) => m.content), text]);
+        const checked = await checkedRevision(content, spliced, ask, [...messages.filter((m) => m.role === 'user').map((m) => m.content), ask]);
         if (!live.current) return;
         setProposal({
           // What the user decided travels with the instruction it answered.
@@ -412,7 +440,7 @@ export function useStageChat({
           // prompt as the user's instruction, though they had chosen to keep
           // the recorded approval — and the objective check then held the
           // work to the values they declined (18 Oct, production pass).
-          instruction: withDecision(text, options.precedence),
+          instruction: withDecision(ask, options.precedence),
           target,
           before: describeScope(target),
           after: checked.putBack.length && kind === 'document' ? checked.nextContent : after,
@@ -422,13 +450,14 @@ export function useStageChat({
           ask: { instruction: text, kind, options },
           messageId: saved.id,
           factChanges: await withMeaningChanges(
-            factChangesFromRevision({ facts: project.facts, instruction: text, before: content, after: checked.nextContent }),
-            { facts: project.facts, instruction: text, before: content, after: checked.nextContent, model: project.model },
+            factChangesFromRevision({ facts: project.facts, instruction: ask, before: content, after: checked.nextContent }),
+            { facts: project.facts, instruction: ask, before: content, after: checked.nextContent, model: project.model },
             (req) => api.revisionFacts(req)
           ),
           changeSummary:
             response.iteration.summary?.trim() ||
             `Revised ${scopeNoun(kind)} from the side chat: ${text}`,
+          revisedFrom,
         });
       } catch (err) {
         if (live.current) {
@@ -438,7 +467,7 @@ export function useStageChat({
         if (live.current) setBusy(false);
       }
     },
-    [busy, loading, content, messages, persist, project, versionNumber, checkedRevision]
+    [busy, loading, content, messages, persist, project, versionNumber, checkedRevision, headVersion, stageId]
   );
 
   /**

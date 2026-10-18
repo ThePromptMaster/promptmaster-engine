@@ -634,6 +634,7 @@ export function ChatPanel({
             onTogglePutBack={chat.togglePutBack}
             removedUnasked={chat.proposal.removedUnasked}
             addedClaims={chat.proposal.addedClaims}
+            revisedFrom={chat.proposal.revisedFrom}
             onRemoveClaims={() => {
               const p = chat.proposal;
               if (!p?.addedClaims?.length) return;
@@ -982,11 +983,14 @@ export function ProposalCard({
   removedUnasked = [],
   addedClaims = [],
   onRemoveClaims,
+  revisedFrom,
   onAccept,
   onAdjust,
   onDiscard,
 }: {
   scopeLabel: string;
+  /** Pasted back from outside, revised from an older version: only its edits were applied (17 Oct). */
+  revisedFrom?: { version: number; head: number; edits: number };
   /** Lines the revision dropped without being asked, put back (14 Oct). */
   putBack?: string[];
   /** Whether they are still put back, or the user chose to let them go. */
@@ -1021,6 +1025,12 @@ export function ProposalCard({
         Proposed — not saved yet
       </p>
       <p className="mt-0.5 text-body text-[var(--on-surface)]">{scopeLabel}</p>
+      {revisedFrom && (
+        <p aria-label="Revised from an older version" className="mt-1 text-label text-[var(--on-surface)]">
+          Your revision started from version {revisedFrom.version}; this stage is now at version {revisedFrom.head}. Only your{' '}
+          {revisedFrom.edits === 1 ? 'edit was' : `${revisedFrom.edits} edits were`} applied, so the changes made here since are kept.
+        </p>
+      )}
       {summary && (
         <p aria-label="What changed" className="mt-1 text-label text-[var(--on-surface)]">
           <span className="text-[var(--on-surface-variant)]">What changed: </span>

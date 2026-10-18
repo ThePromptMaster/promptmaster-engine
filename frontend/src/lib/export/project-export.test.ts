@@ -10,8 +10,8 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { carriedForward, exportFilename, toJson, toManuscriptMarkdown, toMarkdown, type ExportBundle } from './project-export';
-import { BOOK_V1, projectState } from '@/lib/workflow';
+import { carriedForward, exportFilename, stampedManuscript, toJson, toManuscriptMarkdown, toMarkdown, type ExportBundle } from './project-export';
+import { BOOK_V1, SINGLE_OUTPUT_V1, projectState } from '@/lib/workflow';
 import type { WorkflowEvent } from '@/lib/workflow/types';
 import type { Artifact, ArtifactVersion, Evaluation, Project } from '@/types/project';
 
@@ -199,6 +199,13 @@ describe('Markdown export', () => {
     expect(md).toContain('Paragraph two runs long.');
   });
 
+  it('stamps each stage with its head version, and says to keep the stamps (17 Oct)', () => {
+    expect(md).toContain('[PromptMaster objective v2 vobjecti]');
+    expect(md).toContain('[PromptMaster audience v1 vaudienc]');
+    expect(md).not.toContain('objective v1');
+    expect(md).toMatch(/Keep the \[PromptMaster …\] stamps/);
+  });
+
   it('is a document, not a wall of blank lines', () => {
     expect(md).not.toMatch(/\n{3}/);
     expect(md.endsWith('\n')).toBe(true);
@@ -361,5 +368,34 @@ describe('JSON export carries the manuscript (A2)', () => {
     expect(drafting.artifact.long_form.sections[1]).toMatchObject({ status: 'complete', revision: 2, outline_version_id: 'ov1', content: 'Acacia leaves, mostly.' });
     // The snapshot is there too, as the version it is.
     expect(drafting.versions[0].source_operation).toBe('long_form_complete');
+  });
+});
+
+describe('what leaves PromptMaster carries the version stamp (17 Oct)', () => {
+  const single: ExportBundle = {
+    project: { ...PROJECT, workflow: 'single_output' } as Project,
+    template: SINGLE_OUTPUT_V1,
+    state: projectState(SINGLE_OUTPUT_V1, [], 'output'),
+    events: [],
+    stages: {
+      output: {
+        artifact: null,
+        versions: [
+          version('11111111-0000-4000-8000-000000000000', 'The first status pack.', 1),
+          version('2f3e4d5c-0000-4000-8000-000000000000', 'The status pack, as revised.', 2),
+        ],
+      },
+    },
+    evaluations: {},
+  };
+
+  it('the Word, PDF and LaTeX text ends with the head version stamp; the screen text has none', () => {
+    expect(stampedManuscript(single)).toMatch(/The status pack, as revised\.[\s\S]*_\[PromptMaster output v2 2f3e4d5c\]_\n$/);
+    expect(toManuscriptMarkdown(single)).not.toContain('[PromptMaster');
+  });
+
+  it('a long-form manuscript, revised chapter by chapter, is not stamped', () => {
+    const book = bookWithChapters();
+    expect(stampedManuscript(book)).toBe(toManuscriptMarkdown(book));
   });
 });

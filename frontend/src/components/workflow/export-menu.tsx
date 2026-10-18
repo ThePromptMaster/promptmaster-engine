@@ -20,6 +20,7 @@ import { useEffect, useRef, useState } from 'react';
 import { downloadBlob, downloadFile } from '@/lib/utils';
 import {
   exportFilename,
+  stampedManuscript,
   toJson,
   toManuscriptMarkdown,
   toMarkdown,
@@ -49,11 +50,13 @@ export function ExportMenu({ bundle }: { bundle: ExportBundle }) {
   }
 
   const manuscript = toManuscriptMarkdown(bundle);
+  // What leaves PromptMaster carries the version stamp; the menu's own checks read the bare text.
+  const outgoing = stampedManuscript(bundle, manuscript);
   const { deliverable: noun, unit } = deliverableNouns(bundle.template, bundle.project);
   async function exportWord() {
     const { manuscriptToDocx } = await import('@/lib/export/docx-export');
     const { imagesForDocx } = await import('@/lib/export/images-export');
-    const blob = await manuscriptToDocx(manuscript, bundle.project.title || 'Untitled project', await imagesForDocx(manuscript, bundle.project.data_files));
+    const blob = await manuscriptToDocx(outgoing, bundle.project.title || 'Untitled project', await imagesForDocx(outgoing, bundle.project.data_files));
     downloadBlob(blob, exportFilename(bundle.project, 'md').replace(/\.md$/, '.docx'));
     setOpen(false);
   }
@@ -62,7 +65,7 @@ export function ExportMenu({ bundle }: { bundle: ExportBundle }) {
   async function exportLatex() {
     const { markdownToLatex } = await import('@/lib/export/latex-export');
     const title = bundle.project.title || 'Untitled project';
-    downloadFile(markdownToLatex(manuscript || toMarkdown(bundle), title), exportFilename(bundle.project, 'md').replace(/\.md$/, '.tex'), 'application/x-tex;charset=utf-8');
+    downloadFile(markdownToLatex(outgoing || toMarkdown(bundle), title), exportFilename(bundle.project, 'md').replace(/\.md$/, '.tex'), 'application/x-tex;charset=utf-8');
     setOpen(false);
   }
 
@@ -70,7 +73,7 @@ export function ExportMenu({ bundle }: { bundle: ExportBundle }) {
   async function exportNotebook() {
     const { markdownToNotebook } = await import('@/lib/export/notebook-export');
     const title = bundle.project.title || 'Untitled project';
-    downloadFile(markdownToNotebook(manuscript || toMarkdown(bundle), title), exportFilename(bundle.project, 'md').replace(/\.md$/, '.ipynb'), 'application/x-ipynb+json;charset=utf-8');
+    downloadFile(markdownToNotebook(outgoing || toMarkdown(bundle), title), exportFilename(bundle.project, 'md').replace(/\.md$/, '.ipynb'), 'application/x-ipynb+json;charset=utf-8');
     setOpen(false);
   }
 
