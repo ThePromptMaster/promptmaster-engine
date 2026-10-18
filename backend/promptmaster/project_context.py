@@ -10,6 +10,7 @@ material to quote and reason from, never instructions to follow.
 from __future__ import annotations
 
 import re
+from datetime import date
 
 from .schemas import PMInput
 
@@ -34,6 +35,78 @@ FACTS_HEADER = (
 )
 
 
+_MONTHS = {
+    m: i + 1
+    for i, names in enumerate(
+        ("jan january", "feb february", "mar march", "apr april", "may", "jun june",
+         "jul july", "aug august", "sep sept september", "oct october", "nov november", "dec december")
+    )
+    for m in names.split()
+}
+_MONTH = r"(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?"
+#: "as of November 5, 2026", "as of 5 November 2026", "as of Nov 5", "as at 2026-11-05".
+_AS_OF = re.compile(
+    rf"\bas (?:of|at)\s+(?:{_MONTH}\s+(\d{{1,2}})(?:st|nd|rd|th)?(?:,?\s+(\d{{4}}))?"
+    rf"|(\d{{1,2}})(?:st|nd|rd|th)?\s+{_MONTH}(?:,?\s+(\d{{4}}))?"
+    rf"|(\d{{4}})-(\d{{2}})-(\d{{2}}))",
+    re.IGNORECASE,
+)
+
+
+def as_of_dates(text: str) -> list[date]:
+    """Every "as of <date>" in a text. A date without a year takes the text's
+    latest stated year; one with no year anywhere is skipped rather than guessed."""
+    years = [int(y) for y in re.findall(r"\b(20\d{2}|19\d{2})\b", text or "")]
+    out: list[date] = []
+    for m in _AS_OF.finditer(text or ""):
+        mon1, day1, yr1, day2, mon2, yr2, iy, im, iday = m.groups()
+        try:
+            if iy:
+                out.append(date(int(iy), int(im), int(iday)))
+                continue
+            month = _MONTHS[(mon1 or mon2).lower().rstrip(".")]
+            day = int(day1 or day2)
+            year = int(yr1 or yr2) if (yr1 or yr2) else (max(years) if years else None)
+            if year:
+                out.append(date(year, month, day))
+        except (KeyError, ValueError):
+            continue
+    return out
+
+
+def _spoken(d: date) -> str:
+    return f"{d.strftime('%B')} {d.day}, {d.year}"
+
+
+def reporting_date_line(inputs: PMInput) -> str:
+    """The current reporting date, when an accepted fact is dated later than the
+    brief's own "as of" — or "".
+
+    18 Oct (L-89, a status pack): the brief said "as of November 2" with spending
+    $15,000; an accepted fact said "as of November 5, spending $16,000". Both are
+    true, so nothing contradicted the brief, and a repair put the Status section
+    back on November 2 and $15,000. Which date is current is worked out here,
+    not left to the model.
+    """
+    brief = " ".join(t or "" for t in (inputs.objective, inputs.constraints, inputs.context))
+    baseline = as_of_dates(brief)
+    if not baseline:
+        return ""
+    stated = [d for f in (inputs.facts or []) for d in as_of_dates(f.statement)]
+    latest = max(stated, default=None)
+    base = max(baseline)
+    if latest is None or latest <= base:
+        return ""
+    return (
+        f"CURRENT REPORTING DATE — the latest accepted facts are as of {_spoken(latest)}, later than the "
+        f"brief's {_spoken(base)} baseline. Anything that reports the current position (a status section, "
+        f"a summary, current figures) uses, for each item, the newest dated value the facts give, with its "
+        f"date. The brief's {_spoken(base)} value of an item a later fact updates is the baseline: it "
+        f"belongs in history, never back in the current position. An item no later fact updates keeps "
+        f"its baseline value, stated with its own date."
+    )
+
+
 def facts_block(inputs: PMInput) -> str:
     """The accepted facts as a block, or "" when there are none. Never cut: they
     are bounded where they are sent, and a fact silently dropped is the stale
@@ -48,7 +121,8 @@ def facts_block(inputs: PMInput) -> str:
         src = f" — {f.source.strip()}" if f.source.strip() else ""
         replaces = f' (replaces "{" ".join(f.replaces.split())}", which is no longer true)' if f.replaces.strip() else ""
         lines.append(f"- {label}{about}: {' '.join(f.statement.split())}{src}{replaces}")
-    return f"{FACTS_HEADER}\n" + "\n".join(lines)
+    current = reporting_date_line(inputs)
+    return f"{FACTS_HEADER}\n" + "\n".join(lines) + (f"\n{current}" if current else "")
 
 
 INSTRUCTIONS_HEADER = (
