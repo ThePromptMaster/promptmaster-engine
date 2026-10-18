@@ -26,7 +26,7 @@ test('a done stage can be reopened, edited, closed again, and the stages after i
   await page.getByRole('button', { name: 'Reopen to edit' }).click();
   await expect(page.getByText(/Reopened — change it here/)).toBeVisible();
   // 13 Oct (Sean, email 1): the way back to Go is on the reopened stage itself.
-  await expect(page.getByRole('button', { name: 'Apply my changes and let Go continue' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Next step' }).getByRole('button', { name: 'Apply and continue' })).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('01-reopened.png') });
 
   // Edit it: a new version, the stage's new evidence.
