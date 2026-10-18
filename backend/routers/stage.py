@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 from deps import get_client
 from promptmaster.errors import PRESERVED_EVALUATION, PRESERVED_STAGE_VERSIONS
 from promptmaster.limits import MAX_INSTRUCTION_CHARS
-from promptmaster.llm_client import OpenRouterClient, OpenRouterError
+from promptmaster.llm_client import OpenRouterClient, OpenRouterError, resolve_model
 from promptmaster.schemas import (
     GenerateStageArtifactResponse,
     Iteration,
@@ -41,7 +41,7 @@ def _model_used(requested: str, client: OpenRouterClient) -> str:
     its default; recording the "" would leave the version unattributable.
     """
     if requested:
-        return requested
+        return resolve_model(requested)
     default = getattr(client, "model", "")
     return default if isinstance(default, str) else ""
 

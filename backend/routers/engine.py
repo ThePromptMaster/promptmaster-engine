@@ -24,7 +24,7 @@ from promptmaster.flow_triggers import (
     FlowInspectType,
 )
 from promptmaster.errors import PRESERVED_NOTHING_WRITTEN
-from promptmaster.llm_client import OpenRouterClient, OpenRouterError
+from promptmaster.llm_client import OpenRouterClient, OpenRouterError, resolve_model
 from routers._errors import llm_http_error
 from routers._pipeline import build_iteration_with_full_pipeline
 from deps import get_client
@@ -201,7 +201,7 @@ async def api_flow_trigger(
                 evaluation=None,
                 trigger_source=req.trigger,
                 created_at=datetime.now(timezone.utc).isoformat(),
-                model_used=model or "",
+                model_used=resolve_model(model) if model else "",
                 instruction=_label_trigger(req.trigger),
             )
             return RunIterationResponse(iteration=iteration, suggestions=[])

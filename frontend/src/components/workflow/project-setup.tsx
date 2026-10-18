@@ -32,7 +32,7 @@ import type { Project, ProjectPatch } from '@/types/project';
 import { AutoGrowTextarea } from '@/components/shared/auto-grow-textarea';
 import { LimitCounter } from '@/components/shared/limit-counter';
 import { INPUT_LIMITS, withinLimit } from '@/lib/projects/input-limits';
-import { DEFAULT_MODEL, MODEL_CHOICES } from '@/lib/constants';
+import { DEFAULT_MODEL, MODEL_CHOICES, currentModel } from '@/lib/constants';
 
 /** The project columns a criterion is allowed to require, and how to label one. */
 const FIELDS = {
@@ -233,7 +233,7 @@ export function ProjectBrief({ project, onPatch, readOnly }: Omit<Props, 'stage'
 
 /** Which model writes and checks this project's work; every request already carries it. */
 function ModelChoice({ model, readOnly, onPick }: { model: string | null | undefined; readOnly?: boolean; onPick: (model: string) => void }) {
-  const current = model || DEFAULT_MODEL;
+  const current = currentModel(model) || DEFAULT_MODEL;
   const choices = MODEL_CHOICES.some((c) => c.id === current) ? MODEL_CHOICES : [...MODEL_CHOICES, { id: current, label: current }];
   return (
     <div>

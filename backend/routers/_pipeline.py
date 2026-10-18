@@ -13,7 +13,7 @@ from typing import Awaitable
 
 from promptmaster.evaluator import evaluate_output
 from promptmaster.guidance import generate_suggestions
-from promptmaster.llm_client import OpenRouterClient
+from promptmaster.llm_client import OpenRouterClient, resolve_model
 from promptmaster.schemas import (
     ChatMessage,
     CompletenessResult,
@@ -78,7 +78,7 @@ async def build_iteration_with_full_pipeline(
         evaluation=None,
         trigger_source=trigger_source,
         created_at=created_at,
-        model_used=model or "",
+        model_used=resolve_model(model) if model else "",
         instruction=instruction,
     )
 
@@ -122,7 +122,7 @@ async def build_iteration_with_full_pipeline(
         trigger_source=trigger_source,
         summary=summary,
         created_at=created_at,
-        model_used=model or "",
+        model_used=resolve_model(model) if model else "",
         instruction=instruction,
     )
     return iteration, suggestions

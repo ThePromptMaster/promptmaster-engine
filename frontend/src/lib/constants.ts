@@ -215,14 +215,28 @@ export const TIER_INFO = {
   4: { name: 'PromptMaster', color: '#F59E0B', bg: '#FFFBEB' },
 } as const;
 
-export const DEFAULT_MODEL = 'openai/gpt-5.4';
+export const DEFAULT_MODEL = 'anthropic/claude-opus-5.5';
 
 /**
  * The models a project can be set to from its brief (17 Oct, Sean: compare
- * PromptMaster with a plain chat on the same underlying model). Any other
- * OpenRouter id still works through the recovery panel's model list.
+ * PromptMaster with a plain chat on the same underlying model; 18 Oct: GPT-5.4
+ * retired for the newer models). Any other OpenRouter id still works through
+ * the recovery panel's model list.
  */
 export const MODEL_CHOICES: ReadonlyArray<{ id: string; label: string }> = [
-  { id: DEFAULT_MODEL, label: 'GPT-5.4 (default)' },
-  { id: 'anthropic/claude-opus-5.5', label: 'Claude Opus 5.5' },
+  { id: DEFAULT_MODEL, label: 'Claude Opus 5.5 (default)' },
+  { id: 'anthropic/claude-sonnet-5.5', label: 'Claude Sonnet 5.5' },
+  { id: 'anthropic/claude-haiku-5.5', label: 'Claude Haiku 5.5' },
+  { id: 'openai/gpt-5.6-sol', label: 'GPT-5.6 Sol' },
 ];
+
+/** Models no longer used, and what replaces them. Mirrors `RETIRED_MODELS` in backend/promptmaster/llm_client.py. */
+export const RETIRED_MODELS: Readonly<Record<string, string>> = {
+  'openai/gpt-5.4': DEFAULT_MODEL,
+  'anthropic/claude-sonnet-4': 'anthropic/claude-sonnet-5.5',
+};
+
+/** The model a project runs on: a retired one is replaced, anything else ("" included) is kept. */
+export function currentModel(model: string | null | undefined): string {
+  return (model && RETIRED_MODELS[model]) || model || '';
+}

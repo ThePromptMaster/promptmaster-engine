@@ -123,13 +123,13 @@ def test_iteration_carries_the_fr10_provenance_fields(
     """FR-10 requires timestamp, model, and the instruction that produced a version."""
     client, _ev, _sg, _sm = client_with_mocks
     payload = _payload(basic_inputs, [basic_iteration])
-    payload["model"] = "openai/gpt-5.4"
+    payload["model"] = "openai/gpt-5.6-sol"
     res = client.post("/api/run-iteration", json=payload)
     assert res.status_code == 200, res.text
     it = res.json()["iteration"]
     assert it["created_at"], "created_at must be set"
     assert it["created_at"].startswith("20"), f"expected ISO-8601, got {it['created_at']!r}"
-    assert it["model_used"] == "openai/gpt-5.4"
+    assert it["model_used"] == "openai/gpt-5.6-sol"
 
 
 def test_flow_trigger_records_the_instruction_that_produced_the_version(
