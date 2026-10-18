@@ -18,7 +18,7 @@ import { appendWorkflowEvent, listWorkflowEvents } from '@/lib/supabase/workflow
 import { getArtifact } from '@/lib/supabase/versions';
 import { manuscriptArtifactFor, measureStageContent, stageRequirements } from '@/lib/workflow/context';
 import { COUNTING_RULE, isPart, measure, replaceSection, sectionFor, type MeasurableRequirement } from '@/lib/workflow/measurable';
-import { describeLines, keepUnasked } from '@/lib/workflow/preservation';
+import { describeLines, isChangeNote, keepUnasked } from '@/lib/workflow/preservation';
 import { addedClaims, noInventedDetails, suppliedText } from '@/lib/workflow/fact-boundary';
 import { isDone } from '@/lib/workflow/types';
 import { appliedFindingsVersion, carryUserFields, findingsInstruction, reviseWithFindings } from '@/lib/workflow/apply-findings';
@@ -1951,9 +1951,26 @@ export function honestChangeNote(content: string, measured: readonly string[]): 
  */
 export function splitChangeNote(content: string): { note: string | null; body: string } {
   const m = /^\s*\**What changed:?\**:?\s*([^\n]*)\n*/i.exec(content);
-  if (!m) return { note: null, body: content };
-  const note = m[1].replace(/\*+$/, '').trim();
-  return { note: note || null, body: content.slice(m[0].length).replace(/^\s+/, '') };
+  const said = m ? m[1].replace(/\*+$/, '').trim() : '';
+  const rest = m ? content.slice(m[0].length).replace(/^\s+/, '') : content;
+  const { notes, body } = leadingNotes(rest);
+  const note = [said, ...notes].filter(Boolean).join(' ');
+  return { note: note || null, body: notes.length || m ? body : content };
+}
+
+/**
+ * Revision notes written above the document's first heading instead of in a
+ * "What changed:" line (18 Oct, pilot: "- The summary now includes the $6,000
+ * … calculation" and three more bullets sat above "## Status summary").
+ * Taken off only when every line before the heading is such a note, so an
+ * opening paragraph that is part of the document stays.
+ */
+function leadingNotes(content: string): { notes: string[]; body: string } {
+  const heading = /^#{1,6}\s/m.exec(content);
+  if (!heading || heading.index === 0) return { notes: [], body: content };
+  const lines = content.slice(0, heading.index).split('\n').map((l) => l.trim()).filter(Boolean);
+  if (!lines.length || !lines.every(isChangeNote)) return { notes: [], body: content };
+  return { notes: lines.map((l) => l.replace(/^(?:[-+*]|\d+[.)])\s+/, '')), body: content.slice(heading.index) };
 }
 
 /** How many times a cut-off draft is continued before it is saved as cut off. */
