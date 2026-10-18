@@ -27,6 +27,7 @@
 import { useEffect, useState } from 'react';
 
 import { api } from '@/lib/api/client';
+import { RETIRED_MODELS } from '@/lib/constants';
 import { CustomSelect } from '@/components/shared/custom-select';
 import { ACTION_ICON, ACTION_LABEL, type StageFailure } from '@/lib/errors/recovery';
 
@@ -189,7 +190,7 @@ function ModelSwitcher({
     let live = true;
     api
       .getModels()
-      .then((r) => live && setModels(r.models))
+      .then((r) => live && setModels(r.models.filter((m) => !(m.id in RETIRED_MODELS))))
       .catch(() => live && setFailed(true));
     return () => {
       live = false;

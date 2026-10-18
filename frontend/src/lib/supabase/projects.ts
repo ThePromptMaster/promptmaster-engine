@@ -7,6 +7,7 @@ import {
   type DeletedProjectSummary,
   type ProjectSummary,
 } from '@/types/project';
+import { currentModel } from '@/lib/constants';
 
 const LIST_COLUMNS =
   'id, title, objective, mode, workflow, stage, status, updated_at, created_at';
@@ -42,7 +43,10 @@ export async function getProject(id: string): Promise<Project | null> {
     .maybeSingle();
 
   if (error) throw error;
-  return (data as unknown as Project) ?? null;
+  if (!data) return null;
+  const project = data as unknown as Project;
+  // A project still set to a retired model is shown, and run, on its replacement.
+  return { ...project, model: currentModel(project.model) };
 }
 
 export async function createProject(

@@ -173,10 +173,28 @@ def _retry_after_seconds(response: httpx.Response) -> float | None:
 #: first step.
 REASONING_HEADROOM = 2048
 
+#: Models that reason before answering on OpenRouter, so they get the headroom.
+_REASONING_PREFIXES = ("anthropic/", "openai/gpt-5.6")
+
+#: The model every project uses unless it picked another (18 Oct: GPT-5.4 retired).
+DEFAULT_MODEL = "anthropic/claude-opus-5.5"
+
+#: Models no longer used, and what a project still set to one runs on instead.
+#: Mirrored in the frontend's `RETIRED_MODELS` (lib/constants.ts).
+RETIRED_MODELS = {
+    "openai/gpt-5.4": DEFAULT_MODEL,
+    "anthropic/claude-sonnet-4": "anthropic/claude-sonnet-5.5",
+}
+
+
+def resolve_model(model: str) -> str:
+    """The model a call runs on: a retired one is replaced, anything else is kept."""
+    return RETIRED_MODELS.get(model, model)
+
 
 def _token_budget(model: str, max_tokens: int) -> dict[str, Any]:
-    """The answer keeps `max_tokens`; an Anthropic model's reasoning gets its own budget."""
-    if model.startswith("anthropic/"):
+    """The answer keeps `max_tokens`; a reasoning model's reasoning gets its own budget."""
+    if model.startswith(_REASONING_PREFIXES):
         return {"max_tokens": max_tokens + REASONING_HEADROOM, "reasoning": {"max_tokens": REASONING_HEADROOM}}
     return {"max_tokens": max_tokens}
 
@@ -193,7 +211,7 @@ class OpenRouterClient:
 
     BASE_URL = "https://openrouter.ai/api/v1/chat/completions"
     MODELS_URL = "https://openrouter.ai/api/v1/models"
-    DEFAULT_MODEL = "openai/gpt-5.4"
+    DEFAULT_MODEL = DEFAULT_MODEL
 
     def __init__(
         self,
@@ -234,11 +252,12 @@ class OpenRouterClient:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
 
+        runs_on = resolve_model(model or self.model)
         payload: dict[str, Any] = {
-            "model": model or self.model,
+            "model": runs_on,
             "messages": messages,
             "temperature": temperature,
-            **_token_budget(model or self.model, max_tokens),
+            **_token_budget(runs_on, max_tokens),
         }
 
         if json_mode:
@@ -278,11 +297,12 @@ class OpenRouterClient:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
 
+        runs_on = resolve_model(model or self.model)
         payload: dict[str, Any] = {
-            "model": model or self.model,
+            "model": runs_on,
             "messages": messages,
             "temperature": temperature,
-            **_token_budget(model or self.model, max_tokens),
+            **_token_budget(runs_on, max_tokens),
         }
 
         if json_mode:

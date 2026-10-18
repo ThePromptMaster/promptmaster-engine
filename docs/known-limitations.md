@@ -1749,3 +1749,20 @@ difference is worth measuring, not its size. Missed requirements, unsupported cl
 drift, expansion and false completion are scored against an answer key by a person.
 On the 18 October run both arms met the key; PromptMaster cost about 20 times as much and
 needed about 13 more clicks.
+
+### L-90 — GPT-5.4 retired; Claude Opus 5.5 is the default (2026-10-18)
+
+Every project now runs on Claude Opus 5.5 unless its brief picks Claude Sonnet 5.5, Claude
+Haiku 5.5 or GPT-5.6 Sol (OpenRouter's flagship 5.6 tier; Terra and Luna are not offered).
+A project still set to `openai/gpt-5.4` or `anthropic/claude-sonnet-4` is not rewritten in
+the database: the backend's `resolve_model` and the frontend's `currentModel` run and show
+it on the replacement, and the recovery panel no longer lists the retired ids. Versions
+written earlier keep the model that wrote them.
+
+Opus 5.5 costs about 1.5 times GPT-5.4 per token ($4 / $20 per million, against $2.50 /
+$15). Sonnet 5.5 ($2 / $10) and Haiku 5.5 ($0.10 / $0.50) are cheaper than GPT-5.4 was.
+
+On a probe before the switch, Opus 5.5 stopped with `finish_reason: content_filter` on one
+wording of a short planning prompt, every time, while other wordings and 112 earlier
+production calls ran normally. No production call has been stopped that way, but a stopped
+call fails the step rather than falling back to another model.
