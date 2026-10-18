@@ -143,7 +143,7 @@ test('Go suggests skipping a stage; the user skips it, and can reopen it later',
 
   // And back: a skipped stage can be reopened.
   await page.getByRole('navigation', { name: 'Workflow stages' }).getByRole('button', { name: /Literature/ }).click();
-  await expect(page.getByRole('button', { name: 'Reopen to edit' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Edit this stage' })).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('02-skipped-and-reopenable.png') });
 });
 
