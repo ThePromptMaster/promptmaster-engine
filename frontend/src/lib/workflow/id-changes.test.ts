@@ -47,3 +47,21 @@ describe('an ID given to a different item (13 Oct; Sean: vacancy issue overwritt
     expect(idChanges({ head, generated: closed, removed: new Set() }).reused).toEqual([]);
   });
 });
+
+describe('a prefixed ID, and an ID mentioned in prose (18 Oct, pilot)', () => {
+  it('reads KES-T3 whole, never as a separate T3', () => {
+    expect([...itemIds('KES-T3 Testing starts after KES-T2; see D3.')].sort()).toEqual(['D3', 'KES-T2', 'KES-T3']);
+  });
+
+  it('an objective that mentions KES-T3 in a different sentence has not reused it', () => {
+    const head = 'The pack covers five tasks. KES-T3 Testing has not started and starts after KES-T2 completes.';
+    const generated = 'As of November 5, the build forecast moved to November 12. That delays KES-T3 Testing by three days after KES-T2 finishes.';
+    expect(idChanges({ head, generated, removed: new Set() }).reused).toEqual([]);
+  });
+
+  it('a register row that now holds a different item is still caught', () => {
+    const head = '| KES-T3 | Testing of the release candidate on staging servers | Not started |';
+    const generated = '| KES-T3 | Vendor contract renewal negotiation with procurement lawyers | Open |';
+    expect(idChanges({ head, generated, removed: new Set() }).reused).toEqual(['KES-T3']);
+  });
+});

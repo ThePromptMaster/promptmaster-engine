@@ -16,7 +16,7 @@
  */
 
 import type { ProjectFact } from '@/types/project';
-import { describeValue, valueMentions, type FactValues, type ValueMention } from './fact-values';
+import { answered, describeValue, valueMentions, type FactValues, type ValueMention } from './fact-values';
 import { currentFacts } from './facts';
 
 /** Kinds a revision can change; a bare number is too easily something else. */
@@ -111,8 +111,13 @@ export function factChangesFromRevision(input: {
   const out: FactChange[] = [];
   for (const fact of currentFacts(input.facts)) {
     const changes: FactValueChange[] = [];
-    let proposed = fact.statement;
-    for (const m of valueMentions(fact.statement)) {
+    // A recorded answer carries the question it answered; only the answer is
+    // the user's value (18 Oct, pilot: "$25,000" inside Go's question was
+    // offered for change to "$18,000").
+    const own = answered(fact.statement);
+    const asked = fact.statement.slice(0, fact.statement.length - own.length);
+    let proposed = own;
+    for (const m of valueMentions(own)) {
       if (!RECONCILED.includes(m.kind)) continue;
       const candidates = [
         ...(said.get(m.kind) ?? []).map((n) => ({ m: n, text: input.instruction })),
@@ -127,7 +132,7 @@ export function factChangesFromRevision(input: {
       }
       // The value written where the old one stood; among equals, the user's
       // own words where they gave them, else the new version's.
-      const replacement = m.kind === 'limits' ? newer[0] : inItsPlace(m, [fact.statement, input.before], candidates);
+      const replacement = m.kind === 'limits' ? newer[0] : inItsPlace(m, [own, input.before], candidates);
       if (changes.some((c) => c.kind === m.kind && c.was === describeValue(m))) continue;
       changes.push({ kind: m.kind, was: describeValue(m), now: describeValue(replacement) });
       // "p.m." before the fact's own full stop would read "p.m..".
@@ -136,6 +141,7 @@ export function factChangesFromRevision(input: {
       const cased = /^[A-Z]/.test(m.raw) ? words.charAt(0).toUpperCase() + words.slice(1) : words;
       proposed = proposed.split(m.raw).join(cased);
     }
+    proposed = asked + proposed;
     if (changes.length && proposed !== fact.statement) {
       out.push({ fact: { id: fact.id, statement: fact.statement, subject: fact.subject, kind: fact.kind }, changes, proposed });
     }

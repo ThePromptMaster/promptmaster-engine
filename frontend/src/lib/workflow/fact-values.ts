@@ -144,7 +144,7 @@ export function supersededValues(oldStatement: string, newStatement: string): Su
 }
 
 /** The part of a recorded answer that is the answer. */
-function answered(statement: string): string {
+export function answered(statement: string): string {
   const at = statement.lastIndexOf('answered:');
   return at >= 0 ? statement.slice(at + 'answered:'.length) : statement;
 }
