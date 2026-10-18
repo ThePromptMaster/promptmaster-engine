@@ -157,6 +157,8 @@ export function ProjectSetup({ project, stage, onPatch, readOnly }: Props) {
             </div>
           );
         })}
+        {/* The first stage shows this instead of the brief, so the model is set here too (18 Oct, pilot). */}
+        <ModelChoice model={project.model} readOnly={readOnly} onPick={(model) => onPatch({ model })} />
       </div>
     </section>
   );

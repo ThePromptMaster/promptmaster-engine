@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-import { ProjectBrief } from './project-setup';
+import { ProjectBrief, ProjectSetup } from './project-setup';
 import type { Project } from '@/types/project';
 
 const project = (model: string) =>
@@ -21,5 +21,13 @@ describe('the project brief sets the model (17 Oct, Sean: same-model comparison)
   it('keeps a model chosen elsewhere visible rather than showing the default', () => {
     render(<ProjectBrief project={project('google/gemini-3-pro')} onPatch={() => {}} readOnly={false} />);
     expect((screen.getByLabelText('Model') as HTMLSelectElement).value).toBe('google/gemini-3-pro');
+  });
+});
+
+describe('the first stage sets the model too (18 Oct, pilot)', () => {
+  it('the setup panel the first stage shows instead of the brief has the model choice', () => {
+    const stage = { id: 'input', exit_criteria: [{ id: 'c', rule: { type: 'field_non_empty', field: 'objective' }, blocking: true }] } as never;
+    render(<ProjectSetup project={project('openai/gpt-5.4')} stage={stage} onPatch={() => {}} readOnly={false} />);
+    expect(screen.getByLabelText('Model')).toBeInTheDocument();
   });
 });
