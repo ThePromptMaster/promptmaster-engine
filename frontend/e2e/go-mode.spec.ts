@@ -32,12 +32,10 @@ async function choose(page: Page, policy: 'Guided' | 'Checkpoint' | 'Autonomous'
   const panel = goPanel(page);
   await panel.getByRole('radio', { name: new RegExp(`^${policy}`) }).click();
   if (budget) await panel.getByLabel('Step budget').selectOption(String(budget));
+  // These tests watch one window end: no further windows on their own.
+  if (policy === 'Autonomous') await panel.getByLabel('Further windows without asking').selectOption('0');
+  if (policy !== 'Guided') await page.screenshot({ path: test.info().outputPath(`authorize-${policy.toLowerCase()}.png`) });
   await panel.getByRole('button', { name: /^Go$/ }).click();
-  if (policy !== 'Guided') {
-    await expect(page.getByRole('dialog', { name: 'Authorize Go mode' })).toBeVisible();
-    await page.screenshot({ path: test.info().outputPath(`authorize-${policy.toLowerCase()}.png`) });
-    await page.getByRole('button', { name: 'Authorize and go' }).click();
-  }
 }
 
 async function runOf(projectId: string) {

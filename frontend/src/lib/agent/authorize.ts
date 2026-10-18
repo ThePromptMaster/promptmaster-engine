@@ -24,6 +24,9 @@ import type { ExecutionPolicy } from '@/types/agent';
  */
 export const KEEP_GOING_WINDOWS = 20;
 
+/** Further windows an Autonomous run starts on its own unless the user picks otherwise (17 Oct). */
+export const DEFAULT_AUTO_WINDOWS = 3;
+
 export const POLICY_TERMS: Record<Exclude<ExecutionPolicy, 'guided'>, string[]> = {
   checkpoint: [
     'Go mode chooses and performs moves on its own.',

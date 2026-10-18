@@ -29,7 +29,6 @@ test('a request the user satisfies on the stage itself clears, and Resume carrie
   await panel.getByRole('button', { name: 'Set up Go' }).click();
   await panel.getByRole('radio', { name: /^Autonomous/ }).click();
   await panel.getByRole('button', { name: /^Go$/ }).click();
-  await page.getByRole('button', { name: 'Authorize and go' }).click();
 
   // Positioning's one required item is the user's to confirm: the run stops and asks.
   const card = page.getByRole('region', { name: 'Go mode needs you' });
@@ -101,13 +100,12 @@ test('the planner is told what the user already decided, and an autonomous run c
   await panel.getByRole('button', { name: 'Set up Go' }).click();
   await panel.getByRole('radio', { name: /^Autonomous/ }).click();
   await panel.getByLabel('Step budget').selectOption('5');
+  // One click (17 Oct): the further windows are chosen beside Go, and pressing Go records them.
+  await panel.getByLabel('Further windows without asking').selectOption('1');
+  await expect(panel.getByLabel('What Go may do')).toContainText('When a window of 5 steps is used up');
+  await page.screenshot({ path: test.info().outputPath('01-authorize-further-windows.png') });
   const planned = page.waitForRequest((r) => r.url().includes('/api/agent/next-action') && r.method() === 'POST');
   await panel.getByRole('button', { name: /^Go$/ }).click();
-  const dialog = page.getByRole('dialog', { name: 'Authorize Go mode' });
-  await dialog.getByLabel('Further windows without asking').selectOption('1');
-  await expect(dialog).toContainText('At most 10 steps before it stops and asks.');
-  await page.screenshot({ path: test.info().outputPath('01-authorize-further-windows.png') });
-  await dialog.getByRole('button', { name: 'Authorize and go' }).click();
 
   // The first planning call already knows the skip and why.
   const { state } = (await planned).postDataJSON();
@@ -150,7 +148,6 @@ test('on Research, "nothing more for me here" on a stage waiting for approval be
   await panel.getByRole('button', { name: 'Set up Go' }).click();
   await panel.getByRole('radio', { name: /^Autonomous/ }).click();
   await panel.getByRole('button', { name: /^Go$/ }).click();
-  await page.getByRole('button', { name: 'Authorize and go' }).click();
 
   // Only the user's approval is open, so Go asks for it at once — no
   // reasoning move first (4 Oct: Compare alternatives ×3 on an approval).
@@ -187,7 +184,6 @@ test('Go is given the buttons that are really on the page, and may name only tho
   await panel.getByRole('radio', { name: /^Autonomous/ }).click();
   const planned = page.waitForRequest((r) => r.url().includes('/api/agent/next-action') && r.method() === 'POST');
   await panel.getByRole('button', { name: /^Go$/ }).click();
-  await page.getByRole('button', { name: /^Authorize/ }).click();
   const { state } = (await planned).postDataJSON();
   const controls: { label: string; where: string }[] = state.controls;
   expect(controls.length).toBeGreaterThan(3);
@@ -217,7 +213,6 @@ test('a button Go invents is dropped, not shown to the user as if it existed', a
   await panel.getByRole('button', { name: 'Set up Go' }).click();
   await panel.getByRole('radio', { name: /^Autonomous/ }).click();
   await panel.getByRole('button', { name: /^Go$/ }).click();
-  await page.getByRole('button', { name: /^Authorize/ }).click();
   const ask = page.getByRole('region', { name: 'Go mode asks you' });
   await expect(ask).toContainText('Mock: which way should this go?', { timeout: 30_000 });
   await expect(ask).not.toContainText('The button is');
@@ -253,7 +248,6 @@ test('a stuck stage says whether anything changed; a retry is called a retry; ne
   await panel.getByRole('button', { name: 'Set up Go' }).click();
   await panel.getByRole('radio', { name: /^Autonomous/ }).click();
   await panel.getByRole('button', { name: /^Go$/ }).click();
-  await page.getByRole('button', { name: 'Authorize and go' }).click();
 
   // The card is there at once — no second press of Resume to find it. At most
   // three ways forward, named for what they do (2 Oct screenshots: five on one
@@ -289,11 +283,11 @@ test('a stuck stage says whether anything changed; a retry is called a retry; ne
   // lifted, Go stays stopped, and Resume is back. No step is spent on it.
   await card.getByRole('button', { name: 'Resume with what has changed' }).click();
   await expect(card).toContainText('Nothing in the project has changed since', { timeout: 30_000 });
-  await expect(panel.getByLabel('Budget used')).toContainText('2 / 12 steps');
+  await expect(panel.getByLabel('Budget used')).toContainText('2 / 25 steps');
   await card.getByRole('button', { name: 'Continue this stage by hand' }).click();
   await expect(card).toHaveCount(0, { timeout: 30_000 });
   await expect(panel.getByRole('button', { name: /^Resume$/ })).toBeVisible();
-  await expect(panel.getByLabel('Budget used')).toContainText('2 / 12 steps');
+  await expect(panel.getByLabel('Budget used')).toContainText('2 / 25 steps');
   await expect(transparency).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('02-continued-by-hand.png'), fullPage: true });
 
@@ -327,7 +321,6 @@ test('a reasoning move chosen again is saved, not repeated a fourth time', async
   await panel.getByRole('button', { name: 'Set up Go' }).click();
   await panel.getByRole('radio', { name: /^Autonomous/ }).click();
   await panel.getByRole('button', { name: /^Go$/ }).click();
-  await page.getByRole('button', { name: 'Authorize and go' }).click();
 
   const transparency = page.getByRole('region', { name: 'What Go mode is doing' });
   // Once the derivation is saved, a further repeat on a stage whose own work is
@@ -354,7 +347,7 @@ test('the Go buttons stay in view while the page is scrolled, and point back whe
   await expect(dock).toBeVisible();
   await expect(dock).toBeInViewport();
   await expect(dock.getByRole('button', { name: /^Go$/ })).toBeVisible();
-  await expect(dock.getByLabel('Step budget')).toHaveValue('12');
+  await expect(dock.getByLabel('Step budget')).toHaveValue('25');
   await page.screenshot({ path: test.info().outputPath('01-go-controls-pinned.png') });
 
   // Go from the pinned copy; the proposal waits on the panel, and the copy says so.

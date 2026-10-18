@@ -30,7 +30,6 @@ test('under "handle them for me", Go checks a routine approval and commits it, a
   await page.screenshot({ path: test.info().outputPath('01-routine-decisions-setting.png') });
   await panel.getByRole('radio', { name: /^Autonomous/ }).click();
   await panel.getByRole('button', { name: /^Go$/ }).click();
-  await page.getByRole('button', { name: 'Authorize and go' }).click();
 
   // Committed by the policy, after a check — the user was not asked.
   await expect.poll(
@@ -74,7 +73,6 @@ test('a reserved approval still stops Go, and the card says why it is the user\'
   await expect.poll(async () => (await serviceSelect('projects', `id=eq.${id}&select=routine_decisions`))[0].routine_decisions).toBe('handle');
   await panel.getByRole('radio', { name: /^Autonomous/ }).click();
   await panel.getByRole('button', { name: /^Go$/ }).click();
-  await page.getByRole('button', { name: 'Authorize and go' }).click();
 
   const card = page.getByRole('region', { name: 'Go mode needs you' });
   await expect(card).toContainText('"I accept these hypotheses as the working set". This one is yours alone', { timeout: 30_000 });

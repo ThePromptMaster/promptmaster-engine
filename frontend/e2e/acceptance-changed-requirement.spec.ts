@@ -58,7 +58,6 @@ test('a changed requirement reopens what relied on it, and Go repairs it under "
   await expect.poll(async () => (await serviceSelect('projects', `id=eq.${id}&select=routine_decisions`))[0].routine_decisions).toBe('handle');
   await panel.getByRole('radio', { name: /^Autonomous/ }).click();
   await panel.getByRole('button', { name: /^Go$/ }).click();
-  await page.getByRole('button', { name: 'Authorize and go' }).click();
 
   await expect.poll(async () => {
     const [run] = await serviceSelect('agent_runs', `project_id=eq.${id}&select=status&order=created_at.desc&limit=1`);

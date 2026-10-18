@@ -22,7 +22,6 @@ async function runGo(page: Page) {
   await panel.getByRole('button', { name: 'Set up Go' }).click();
   await panel.getByRole('radio', { name: /^Autonomous/ }).click();
   await panel.getByRole('button', { name: /^Go$/ }).click();
-  await page.getByRole('button', { name: 'Authorize and go' }).click();
 }
 
 test('a "met" the check could not quote is not shown as a failure, and the stop says what to decide', async ({ page }) => {
@@ -122,7 +121,6 @@ test('under "Handle them for me" a met objective carries on through the stages t
   await expect(page.getByText('Mock output').first()).toBeVisible({ timeout: 30_000 });
   const panel = goPanel(page);
   await panel.getByRole('button', { name: 'Let Go run this' }).click();
-  await page.getByRole('button', { name: 'Authorize and go' }).click();
 
   // 11 Oct, production retest: it stopped twice to ask whether to carry on.
   await expect.poll(async () => {

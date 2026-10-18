@@ -53,9 +53,10 @@ test('“Keep going” lets an autonomous run continue for up to 20 windows', as
   const panel = goPanel(page);
   await panel.getByRole('button', { name: 'Set up Go' }).click();
   await panel.getByRole('radio', { name: /^Autonomous/ }).click();
-  await panel.getByRole('button', { name: /^Go$/ }).click();
-  const dialog = page.getByRole('dialog', { name: 'Authorize Go mode' });
-  await dialog.getByLabel('Further windows without asking').selectOption('20');
-  await expect(dialog).toContainText('each new round of open-ended work is yours to start');
+  // Chosen beside Go now (17 Oct); the terms are one click away.
+  const terms = panel.getByLabel('What Go may do');
+  await terms.getByLabel('Further windows without asking').selectOption('20');
+  await terms.getByText('Everything Go may and may not do').click();
+  await expect(terms).toContainText('up to 20 more windows');
   await page.screenshot({ path: test.info().outputPath('03-keep-going.png'), fullPage: true });
 });

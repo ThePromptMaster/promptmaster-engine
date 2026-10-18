@@ -101,7 +101,6 @@ test('an ongoing workflow keeps its success criterion and loops; Go starts the n
   await panel.getByRole('radio', { name: /^Autonomous/ }).click();
   await panel.getByLabel('Step budget').selectOption('12');
   await panel.getByRole('button', { name: /^Go$/ }).click();
-  await page.getByRole('button', { name: 'Authorize and go' }).click();
 
   // The round is started by Go, under the policy, along the template's loop.
   await expect.poll(
@@ -140,7 +139,6 @@ test('when a round meets the objective, Go does not start another: it moves on t
   await panel.getByRole('radio', { name: /^Autonomous/ }).click();
   await panel.getByLabel('Step budget').selectOption('12');
   await panel.getByRole('button', { name: /^Go$/ }).click();
-  await page.getByRole('button', { name: 'Authorize and go' }).click();
 
   // The round's work meets the objective: no new round; the round stage is
   // closed and the project moves on to the write-up, with the judgment recorded.

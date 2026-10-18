@@ -274,7 +274,6 @@ test('Autonomous decides the routine continuity findings and leaves the major on
   await panel.getByRole('button', { name: 'Set up Go' }).click();
   await panel.getByRole('radio', { name: /^Autonomous/ }).click();
   await panel.getByRole('button', { name: /^Go$/ }).click();
-  await page.getByRole('button', { name: 'Authorize and go' }).click();
 
   // Two minor findings decided by Go, as a version; the major one is the user's.
   const card = page.getByRole('region', { name: 'Go mode needs you' });

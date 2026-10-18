@@ -33,7 +33,6 @@ test('a finished cycle with an unmet objective pauses on its blocker; chat answe
   await panel.getByRole('button', { name: 'Set up Go' }).click();
   await panel.getByRole('radio', { name: /^Autonomous/ }).click();
   await panel.getByRole('button', { name: /^Go$/ }).click();
-  await page.getByRole('button', { name: 'Authorize and go' }).click();
 
   // Not "Objective met": paused, with what it waits for.
   const paused = page.getByRole('status', { name: 'Objective not met' });
@@ -94,7 +93,6 @@ test('a blocker says what value is needed and is answered where it is shown', as
   await panel.getByRole('button', { name: 'Set up Go' }).click();
   await panel.getByRole('radio', { name: /^Autonomous/ }).click();
   await panel.getByRole('button', { name: /^Go$/ }).click();
-  await page.getByRole('button', { name: 'Authorize and go' }).click();
 
   const paused = page.getByRole('status', { name: 'Objective not met' });
   await expect(paused).toContainText('$12 per person or less ($240 approved / 20 attendees)', { timeout: 30_000 });

@@ -47,7 +47,6 @@ test('a goal alone reaches a finished, checked deliverable on the primary button
   // Two clicks hand the rest to Go; the authorization is the delegation record.
   const panel = page.getByRole('region', { name: 'Go mode' }).first();
   await panel.getByRole('button', { name: 'Let Go run this' }).click();
-  await page.getByRole('button', { name: 'Authorize and go' }).click();
 
   await expect.poll(async () => {
     const [run] = await serviceSelect('agent_runs', `project_id=eq.${id}&select=status&order=created_at.desc&limit=1`);

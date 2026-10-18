@@ -7,7 +7,7 @@ import { createPortal } from 'react-dom';
 
 import { approvalsAskedFor, describeNeed, isClearedNote, needIsDecidedOnStage, type NeedContext, type StuckOption } from '@/lib/agent/needs';
 import type { useGoLoop } from '../use-go-loop';
-import { AuthorizationDialog } from './authorization-dialog';
+import { GoTerms } from './authorization-dialog';
 import { DecisionPrompt, QuestionPrompt } from './decision-prompt';
 import { GoControl } from './go-control';
 import { NeedsYouCard } from './needs-you-card';
@@ -296,6 +296,15 @@ export function GoPanel({
           <div ref={controlsRef}>
             <GoControl {...controlProps} />
           </div>
+          {go.policy !== 'guided' && !live && (
+            <GoTerms
+              policy={go.policy}
+              budget={go.budget}
+              autoWindows={go.autoWindows}
+              onAutoWindows={go.setAutoWindows}
+              disabled={go.active || Boolean(go.authorizing)}
+            />
+          )}
           {need && (
             <NeedsYouCard
               key={`${need.kind}:${go.run?.id}`} need={need} stageLabel={go.stageLabelFor} onAction={act} context={needContext}
@@ -306,16 +315,6 @@ export function GoPanel({
             <p role="status" className="text-body text-[var(--on-surface-variant)]">
               This run is being driven from another tab. It will continue here if that tab closes.
             </p>
-          )}
-          {go.authorizing && (
-            <AuthorizationDialog
-              policy={go.authorizing}
-              budget={go.budget}
-              autoWindows={go.autoWindows}
-              onAutoWindows={go.setAutoWindows}
-              onAuthorize={() => void go.confirmAuthorization()}
-              onCancel={go.cancelAuthorization}
-            />
           )}
           {go.error && (
             <div role="alert" className="flex items-start gap-3 rounded-xl bg-[var(--pm-tertiary)]/10 px-4 py-3 text-body text-[var(--on-surface)]">

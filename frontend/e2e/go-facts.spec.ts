@@ -32,7 +32,6 @@ test('Go records the facts an attached brief states, citing the file, under the 
   await expect.poll(async () => (await serviceSelect('projects', `id=eq.${id}&select=routine_decisions`))[0].routine_decisions).toBe('handle');
   await panel.getByRole('radio', { name: /^Autonomous/ }).click();
   await panel.getByRole('button', { name: /^Go$/ }).click();
-  await page.getByRole('button', { name: 'Authorize and go' }).click();
 
   await expect.poll(async () => (await serviceSelect('project_facts', `project_id=eq.${id}&select=id`)).length, { timeout: 60_000 }).toBeGreaterThan(0);
   const facts = await serviceSelect('project_facts', `project_id=eq.${id}&select=statement,source_kind,source_ref,accepted_by,agent_run_id`);

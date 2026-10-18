@@ -29,7 +29,6 @@ test('a cut-off draft with findings: continue, check, apply — then ask for the
   await panel.getByRole('button', { name: 'Set up Go' }).click();
   await panel.getByRole('radio', { name: /^Autonomous/ }).click();
   await panel.getByRole('button', { name: /^Go$/ }).click();
-  await page.getByRole('button', { name: 'Authorize and go' }).click();
 
   const card = page.getByRole('region', { name: 'Go mode needs you' });
   await expect(card).toContainText('I confirm the one-sentence differentiator is stated', { timeout: 120_000 });

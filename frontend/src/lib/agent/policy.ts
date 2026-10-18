@@ -25,7 +25,13 @@ import { actionFor, INTERPRET_STEP, USER_ANSWER_STEP } from './actions';
 import type { StageFacts } from './facts';
 import { proposeTargets } from '@/lib/workflow/proposals';
 
-export const DEFAULT_BUDGET_STEPS = 12;
+/**
+ * The largest window by default (17 Oct, Sean: "Should we automatically have
+ * it on maximum steps and windows if that is necessary?"). A window is a
+ * ceiling, not a target: Go stops sooner whenever the work is done or needs
+ * the user.
+ */
+export const DEFAULT_BUDGET_STEPS = 25;
 /** The same move on the same stage this many times running is not progress. */
 export const NO_PROGRESS_REPEATS = 3;
 export const MAX_CONSECUTIVE_FAILURES = 2;
