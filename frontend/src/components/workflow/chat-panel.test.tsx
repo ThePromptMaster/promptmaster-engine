@@ -71,6 +71,7 @@ vi.mock('@/lib/supabase/conversation', () => ({
     created_at: '2026-09-09T00:00:00Z',
   })),
   markStageChatApplied: vi.fn(async () => {}),
+  markStageChatDiscarded: vi.fn(async () => {}),
 }));
 
 const CONTENT = `# Opening

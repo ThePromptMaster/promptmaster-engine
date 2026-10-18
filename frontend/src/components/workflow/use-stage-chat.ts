@@ -37,6 +37,7 @@ import { api, ApiError } from '@/lib/api/client';
 import {
   loadStageChat,
   markStageChatApplied,
+  markStageChatDiscarded,
   saveStageChatMessage,
   type StageChatMessage,
 } from '@/lib/supabase/conversation';
@@ -172,6 +173,11 @@ interface Options {
  */
 
 /** The thread as the backend wants it: role and content, nothing else. */
+/** The thread without instructions that never changed the document. */
+export function inForce(messages: readonly StageChatMessage[]): StageChatMessage[] {
+  return messages.filter((m) => !(m.role === 'user' && m.mode === 'instruct' && !m.appliedVersionId));
+}
+
 function asHistory(messages: StageChatMessage[]): ChatMessage[] {
   return messages.map(({ id, iteration_number, role, content, created_at }) => ({
     id,
@@ -394,7 +400,11 @@ export function useStageChat({
       setError(null);
 
       try {
-        const priorHistory = asHistory(messages);
+        // An instruction that was never applied — discarded, set aside, or
+        // replaced by this one — is not part of the document. Sent as history,
+        // the model applied it anyway (18 Oct, production pass: a discarded
+        // "$17,000" correction came back with an unrelated edit).
+        const priorHistory = asHistory(inForce(messages));
         setRedo(null);
 
         // Revised elsewhere from an older version: only the user's own edits go.
@@ -440,7 +450,7 @@ export function useStageChat({
 
         if (!live.current) return;
         const spliced = spliceScope(content, target, after);
-        const checked = await checkedRevision(content, spliced, ask, [...messages.filter((m) => m.role === 'user').map((m) => m.content), ask]);
+        const checked = await checkedRevision(content, spliced, ask, [...inForce(messages).filter((m) => m.role === 'user').map((m) => m.content), ask]);
         if (!live.current) return;
         setProposal({
           // What the user decided travels with the instruction it answered.
@@ -650,14 +660,28 @@ export function useStageChat({
     });
   }, [content]);
 
+  /**
+   * A proposal discarded or taken back to adjust never changed anything: its
+   * instruction is marked so, and is no longer sent as history or counted as
+   * pending (18 Oct, production pass).
+   */
+  const setAside = useCallback((p: ChatProposal | null) => {
+    const id = p?.messageId;
+    if (!id) return;
+    setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, discarded: true } : m)));
+    // Best-effort, and never in the way of closing the proposal.
+    void Promise.resolve().then(() => markStageChatDiscarded(id, p.target.label)).catch(() => undefined);
+  }, []);
+
   /** "Adjust": the instruction back in the box, the proposal set aside, nothing saved. */
   const adjust = useCallback((): string => {
     // The words the user typed, without the recorded decision.
     const text = proposal?.ask?.instruction ?? proposal?.instruction ?? '';
+    setAside(proposal);
     setProposal(null);
     setError(null);
     return text;
-  }, [proposal]);
+  }, [proposal, setAside]);
 
   /**
    * Discard the proposal.
@@ -666,9 +690,10 @@ export function useStageChat({
    * there is nothing to undo — the artifact is untouched and stays untouched.
    */
   const discard = useCallback(() => {
+    setAside(proposal);
     setProposal(null);
     setError(null);
-  }, []);
+  }, [proposal, setAside]);
 
   /** FR-08's third verb: put back the version the revision replaced. */
   const undo = useCallback(async () => {
