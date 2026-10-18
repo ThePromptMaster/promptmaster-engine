@@ -12,7 +12,7 @@
 
 import type { AgentRun, AgentStep } from '@/types/agent';
 import { actionFor, actionLabel, ROUTINE_DEFAULT_STEP } from './actions';
-import { describeNeed, type NeedsUser } from './needs';
+import { describeNeed, isClearedNote, type NeedsUser } from './needs';
 
 export type PauseKind = 'working' | 'window' | 'blocker' | 'decision' | 'complete' | 'stopped';
 
@@ -81,6 +81,9 @@ export function runAccount(run: AgentRun | null, steps: readonly AgentStep[], st
     case 'awaiting_decision':
       // The decision itself, not the stop's statement (11 Oct: "Your decision
       // is needed" over a sentence that asked nothing).
+      // A cleared request asks nothing (15 Oct screenshot: "Your decision is
+      // needed: That is done. Press Resume and I will carry on.").
+      if (!run.needs && isClearedNote(reason)) return { did, kind: 'decision', now: reason, setAside };
       return { did, kind: 'decision', now: `Your decision is needed: ${decisionAsked(run.needs ?? null, reason, stageLabel)}`, setAside };
     case 'completed':
       // What was deferred is said with the finish, not counted as resolved (10 Oct, 6.6).

@@ -1751,7 +1751,7 @@ export function WorkflowWorkspace({
                 <span className="text-label text-[var(--on-surface-variant)]">
                   {state.stages[stage.id]?.status === 'not_started' || !state.stages[stage.id]
                     ? 'Viewing only — the project has not reached this stage yet.'
-                    : 'Viewing only — nothing changes while you look, and the project stays where it is.'}
+                    : 'Viewing only — nothing changes here.'}
                 </span>
               )}
               {isEditable && !reopenedHere && (

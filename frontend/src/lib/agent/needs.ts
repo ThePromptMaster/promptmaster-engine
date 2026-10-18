@@ -86,13 +86,13 @@ type Need =
 export type NeedsUser = Need & { onStage?: string };
 
 /** What the run says once the user has done what it asked for, themselves. */
-export const NEED_CLEARED = 'That is done. Press Resume and I will carry on.';
+export const NEED_CLEARED = 'Ready to carry on — press Resume.';
 /**
  * …and once the project has left the stage the request was about. Nothing
  * was done: "That is done" over findings the user chose to leave undecided
  * was simply untrue (production pass, 2026-10-01).
  */
-export const NEED_MOVED_ON = 'The project has moved on from the stage I was waiting on. Press Resume and I will carry on from here.';
+export const NEED_MOVED_ON = 'The project has moved past that stage — press Resume to carry on from here.';
 
 /** The button on a request that is settled row by row: it takes the user to the rows. */
 export const SHOW_TABLE = 'Go to the table';
@@ -754,7 +754,7 @@ export function describeNeed(
             ? ' It is a routine approval, but your routine decisions are set to "Ask me".'
             : '';
       return {
-        message: `I need your approval before I can continue: "${need.label}".${why}${need.hint ? ` ${need.hint}` : ''} Approving it lets me carry on from ${stageLabel(need.stageId)}.`,
+        message: `Needs your approval: "${need.label}".${why}${need.hint ? ` ${need.hint}` : ''}`,
         action: 'Approve and resume',
       };
     }
@@ -762,12 +762,12 @@ export function describeNeed(
       return { message: need.question, action: null };
     case 'skip_stage':
       return {
-        message: `${stageLabel(need.stageId)} is normally next, but I would skip it for now. ${need.reason.replace(/\s+$/, '')} It is your call, and a skipped stage can be reopened later.`,
+        message: `I suggest skipping ${stageLabel(need.stageId)}: ${need.reason.replace(/\s+$/, '')} You can reopen it later.`,
         action: `Skip ${stageLabel(need.stageId)} for now`,
       };
     case 'next_round':
       return {
-        message: `This round is done. ${need.reason.replace(/\s+$/, '')} Start the next round from ${stageLabel(need.toStageId)} when you are ready — or stop here and write it up.`,
+        message: `This round is done. ${need.reason.replace(/\s+$/, '')} Start the next round from ${stageLabel(need.toStageId)}, or stop here.`,
         action: `Start the next round from ${stageLabel(need.toStageId)}`,
       };
     case 'wait_for_jobs':
@@ -789,12 +789,12 @@ export function describeNeed(
       if (need.proposed) {
         const rest = need.count - need.proposed;
         return {
-          message: `I proposed a status for ${need.proposed} ${need.proposed === 1 ? need.itemLabel : `${need.itemLabel}s`}, each with its reason, from what the row already says. They count once you confirm them: press "${confirmProposalsLabel(need.proposed)}" above the table, or change any that read wrong.${rest > 0 ? ` ${rest} more ${rest === 1 ? 'needs' : 'need'} a status from you.` : ''}`,
+          message: `I proposed a status for ${need.proposed} ${need.proposed === 1 ? need.itemLabel : `${need.itemLabel}s`}. Press "${confirmProposalsLabel(need.proposed)}" above the table, or change any that read wrong.${rest > 0 ? ` ${rest} more ${rest === 1 ? 'needs' : 'need'} a status from you.` : ''}`,
           action: SHOW_TABLE,
         };
       }
       return {
-        message: `${need.count} ${need.count === 1 ? need.itemLabel : `${need.itemLabel}s`} ${need.count === 1 ? 'is' : 'are'} waiting for your decision — only you can settle ${need.count === 1 ? 'it' : 'them'}. Set a status on each in the table below — that is how a check stage works.`,
+        message: `${need.count} ${need.count === 1 ? need.itemLabel : `${need.itemLabel}s`} ${need.count === 1 ? 'needs' : 'need'} your decision: set a status on each in the table below.`,
         action: SHOW_TABLE,
       };
     case 'objective_check':
@@ -806,7 +806,7 @@ export function describeNeed(
         // Why these were not handled under "Handle them for me" (Sean, 10 Oct,
         // email 7.1): the setting covers minor and moderate findings; these are
         // major, or have no severity, and change what the work says.
-        message: `${need.count} finding${need.count === 1 ? '' : 's'} would change what the work says, so ${need.count === 1 ? 'it is' : 'they are'} yours to decide. "Routine decisions: handle them for me" covers minor and moderate findings only; ${need.count === 1 ? 'this one is' : 'these are'} major or unrated. Accept, reject or defer each in the table below.`,
+        message: `${need.count} major or unrated finding${need.count === 1 ? '' : 's'} ${need.count === 1 ? 'is' : 'are'} yours to decide: accept, reject or defer each in the table below.`,
         action: SHOW_TABLE,
       };
   }
@@ -859,7 +859,7 @@ function describeObjectiveCheck(
         { id: 'stop' as const, label: 'I will fix it myself' },
       ];
       return {
-        message: `The objective is not met yet — not met: ${list || 'see the check in the record below'}. I can revise ${stage} to fix ${need.items.length === 1 ? 'it' : 'them'}, keeping everything else the brief asks for, save it as a new version and check again.`,
+        message: `The objective is not met yet — not met: ${list || 'see the check in the record below'}. I can fix ${stage} and check again.`,
         action: options[0].label, options,
       };
     }
@@ -869,7 +869,7 @@ function describeObjectiveCheck(
         { id: 'stop' as const, label: 'Stop here' },
       ];
       return {
-        message: `The check found nothing unmet in ${stage}, but it could not point to a passage that shows the objective is met, even when asked twice, so I have not recorded it as met. Nothing needs fixing that I know of. Carry on to what the workflow still holds — accepting the output is yours there — or stop here.`,
+        message: `The check found nothing unmet in ${stage}, but no passage shows the objective is met, so I have not recorded it as met. Carry on, or stop here.`,
         action: options[0].label, options,
       };
     }

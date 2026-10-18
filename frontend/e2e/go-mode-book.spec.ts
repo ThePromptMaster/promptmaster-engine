@@ -173,7 +173,7 @@ test('the full book can be read from the drafting stage, before the project is f
 
   // Looking back at a finished stage says that looking is all it is.
   await page.getByRole('navigation', { name: 'Workflow stages' }).getByRole('button', { name: /Objective/ }).click();
-  await expect(page.getByText('Viewing only — nothing changes while you look, and the project stays where it is.')).toBeVisible();
+  await expect(page.getByText('Viewing only — nothing changes here.')).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('02-viewing-only.png') });
 });
 
@@ -277,8 +277,8 @@ test('Autonomous decides the routine continuity findings and leaves the major on
 
   // Two minor findings decided by Go, as a version; the major one is the user's.
   const card = page.getByRole('region', { name: 'Go mode needs you' });
-  await expect(card).toContainText('1 finding would change what the work says, so it is yours to decide', { timeout: 30_000 });
-  await expect(card).toContainText('covers minor and moderate findings only');
+  await expect(card).toContainText('1 major or unrated finding is yours to decide', { timeout: 30_000 });
+  await expect(card).toContainText('major or unrated');
   const statuses = page.getByRole('table').getByRole('combobox');
   await expect(statuses.nth(0)).toContainText('Not looked at');
   await expect(statuses.nth(1)).toContainText('Accept');

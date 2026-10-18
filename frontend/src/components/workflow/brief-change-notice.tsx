@@ -60,7 +60,7 @@ export function BriefChangeNotice({
     <>
       <Steps first={firstStep(event)} second={updating ? 'Updating affected work…' : `${stageIds.length + (change.alsoWaiting?.length ?? 0)} awaiting update`} third="Updated and checked" at={2} />
       {change.alsoWaiting?.length ? (
-        <p className="mt-1 text-label">Also awaiting a recheck after an earlier change: {listOf(change.alsoWaiting.map(stageLabel))}.</p>
+        <p className="mt-1 text-label">Also waiting for a recheck: {listOf(change.alsoWaiting.map(stageLabel))}.</p>
       ) : null}
     </>
   );
@@ -71,7 +71,7 @@ export function BriefChangeNotice({
         {waiting}
         <p className="mt-2">
           <span aria-hidden className="material-symbols-outlined mr-1 align-[-4px] text-[18px] text-[var(--pm-tertiary)]">history</span>
-          {`${listOf(names)} ${stageIds.length === 1 ? 'was' : 'were'} reopened for a recheck. Earlier versions stay in each stage's history.`}
+          {`${listOf(names)} ${stageIds.length === 1 ? 'needs' : 'need'} a recheck. Earlier versions are kept.`}
         </p>
         <ul className="mt-1 list-disc pl-6 text-label">
           {stageIds.map((id) => (
@@ -93,7 +93,7 @@ export function BriefChangeNotice({
         {waiting}
         <p className="mt-2">
           <span aria-hidden className="material-symbols-outlined mr-1 align-[-4px] text-[18px] text-[var(--pm-tertiary)]">history</span>
-          {`${stageLabel(event.stage_id)} was revised${typeof n === 'number' ? ` (now v${n})` : ''}, so ${list} ${stageIds.length === 1 ? 'was' : 'were'} reopened for a recheck: ${stageIds.length === 1 ? 'it was' : 'they were'} built on the earlier version. Earlier versions stay in each stage's history.`}
+          {`${stageLabel(event.stage_id)} changed${typeof n === 'number' ? ` (now v${n})` : ''}, so ${list} ${stageIds.length === 1 ? 'needs' : 'need'} a recheck. Earlier versions are kept.`}
         </p>
         <Actions onUpdate={onUpdate} updating={updating} onKeep={() => onKeep(event.created_at)} />
       </div>
@@ -106,7 +106,7 @@ export function BriefChangeNotice({
         {waiting}
         <p className="mt-2">
           <span aria-hidden className="material-symbols-outlined mr-1 align-[-4px] text-[18px] text-[var(--pm-tertiary)]">history</span>
-          {`You reopened ${stageLabel(event.stage_id)} and asked Go to finish it with your changes. Go finishes it, then rechecks the stages after it. Earlier versions stay in its history.`}
+          {`You reopened ${stageLabel(event.stage_id)}. Go finishes it with your changes, then rechecks what follows.`}
         </p>
         <Actions onUpdate={onUpdate} updating={updating} onKeep={() => onKeep(event.created_at)} />
       </div>
@@ -124,7 +124,7 @@ export function BriefChangeNotice({
       {waiting}
       <p className="mt-2">
         <span aria-hidden className="material-symbols-outlined mr-1 align-[-4px] text-[18px] text-[var(--pm-tertiary)]">history</span>
-        Changing the {field} reopened {list} for a recheck.{' '}
+        Changing the {field} means {list} {stageIds.length === 1 ? 'needs' : 'need'} a recheck.{' '}
         {holds ? 'Calculations still hold; what was judged against the old priority is reopened. ' : ''}
         Everything else stands.
       </p>

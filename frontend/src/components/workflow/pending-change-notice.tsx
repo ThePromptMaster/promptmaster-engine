@@ -34,7 +34,7 @@ export function PendingChangeNotice({
             pending_actions
           </span>
           <p className="min-w-0 flex-1 text-body text-[var(--on-surface)]">
-            Your change is not applied yet — it needs your choice first.
+            Not applied yet — choose which takes priority.
             <span className="block text-label text-[var(--on-surface-variant)]">
               {stageLabel(c.stageId)}: {gist(c.instruction, 140)}
             </span>
