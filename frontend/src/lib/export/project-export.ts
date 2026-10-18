@@ -28,6 +28,7 @@ import { manuscriptArtifactFor } from '@/lib/workflow/context';
 import { formatManuscript } from '@/lib/workflow/digest';
 import { deliverableStage } from '@/lib/workflow/engine';
 import { isProposed, parseItems, primaryArtifactKind, statusOption, itemSchemaFor } from '@/lib/workflow/stage-artifact';
+import { STAMP_NOTE, stampFor } from '@/lib/workflow/version-stamp';
 import type { StageDefinition, WorkflowEvent, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
 import type { Artifact, ArtifactVersion, Evaluation, Project } from '@/types/project';
 
@@ -131,6 +132,20 @@ ${carriedSection(bundle)}`;
 }
 
 /**
+ * The manuscript as it leaves PromptMaster (Word, PDF, LaTeX, notebook): with
+ * the deliverable's version stamp at the end, so a revision made elsewhere and
+ * pasted back is known by the version it started from (17 Oct). Not on the
+ * screen's own reading of it. A long-form manuscript is revised chapter by
+ * chapter, never pasted back whole, so it carries none.
+ */
+export function stampedManuscript(bundle: ExportBundle, manuscript: string = toManuscriptMarkdown(bundle)): string {
+  const stage = deliverableStage(bundle.template);
+  const head = stage && stage.renderer !== 'long_form' ? bundle.stages[stage.id]?.versions.at(-1) : undefined;
+  if (!manuscript || !stage || !head) return manuscript;
+  return `${manuscript.trimEnd()}\n\n_${stampFor(stage.id, head)}_\n`;
+}
+
+/**
  * The artifact, as a document.
  *
  * Every stage the project actually reached appears in template order, under its
@@ -161,7 +176,7 @@ export function toMarkdown(bundle: ExportBundle): string {
   for (const [label, value] of meta) {
     if (value) lines.push(`**${label}:** ${value}  `);
   }
-  lines.push('');
+  lines.push('', `_${STAMP_NOTE}_`, '');
 
   for (const stage of template.stages) {
     const status = stageStatus(state, stage);
@@ -228,7 +243,7 @@ export function toMarkdown(bundle: ExportBundle): string {
       current.model && `model ${current.model}`,
       current.source_operation,
     ].filter(Boolean);
-    lines.push(`_${provenance.join(' · ')}_`, '');
+    lines.push(`_${provenance.join(' · ')}_`, '', `_${stampFor(stage.id, current)}_`, '');
 
     const evaluation = evaluations[current.id];
     if (evaluation) {
