@@ -51,7 +51,7 @@ import {
   type ScopeTarget,
 } from './chat-scope';
 import { listVersions, type NewVersion } from '@/lib/supabase/versions';
-import { editsBetween, editsInstruction, staleStamp, withoutStamps } from '@/lib/workflow/version-stamp';
+import { resolveInstruction, withoutStamps, type ResolvedInstruction } from '@/lib/workflow/version-stamp';
 import type { ArtifactVersion, Project } from '@/types/project';
 import { factChangesFromRevision, isNewFact, withMeaningChanges, type FactChange } from '@/lib/workflow/fact-reconcile';
 import { recordFacts, supersedeFact } from '@/lib/supabase/facts';
@@ -348,6 +348,25 @@ export function useStageChat({
    * of the whole artifact — which is what makes selection and section scopes
    * mean anything.
    */
+  /**
+   * What a typed instruction asks for, as it will be sent (17 Oct, Sean: work
+   * alongside other assistants). Text pasted back from an export whose stamp
+   * names an older version of this stage was revised from that version: sent
+   * whole, it would undo what changed here since, so only the user's own edits
+   * against it go. The conflict check reads this too, so it never asks about a
+   * value the user did not touch. Stamps never reach the model or the document.
+   */
+  const instructionFor = useCallback(
+    (typed: string, kind: ScopeKind): Promise<ResolvedInstruction> =>
+      resolveInstruction(typed, {
+        wholeDocument: kind === 'document',
+        stageId,
+        head: headVersion,
+        loadVersion: async (n) => (headVersion ? (await listVersions(headVersion.artifact_id)).find((v) => v.version_number === n) : undefined),
+      }),
+    [headVersion, stageId]
+  );
+
   const propose = useCallback(
     async (
       instruction: string,
@@ -357,7 +376,6 @@ export function useStageChat({
       const typed = instruction.trim();
       if (!typed || busy || loading) return;
       // An export's version stamps never reach the document or the model as words.
-      const stale = kind === 'document' && headVersion ? staleStamp(typed, stageId, versionNumber) : null;
       const text = withoutStamps(typed) || typed;
 
       const target = resolveScope(content, kind, options);
@@ -379,23 +397,13 @@ export function useStageChat({
         const priorHistory = asHistory(messages);
         setRedo(null);
 
-        // Revised elsewhere from an older version (17 Oct, Sean: work alongside
-        // other assistants). Sent whole, it would undo what changed here since;
-        // only the user's own edits against the version they started from go.
-        let ask = text;
-        let revisedFrom: ChatProposal['revisedFrom'];
-        if (stale && headVersion) {
-          const base = (await listVersions(headVersion.artifact_id)).find((v) => v.version_number === stale.version);
-          if (base) {
-            const edits = editsBetween(withoutStamps(base.content), text);
-            if (!edits.length) {
-              if (live.current) setError(`This is version ${stale.version} unchanged — there is nothing to apply. The current version is ${versionNumber}.`);
-              return;
-            }
-            ask = editsInstruction(edits, stale.version, versionNumber);
-            revisedFrom = { version: stale.version, head: versionNumber, edits: edits.length };
-          }
+        // Revised elsewhere from an older version: only the user's own edits go.
+        const resolved = await instructionFor(typed, kind);
+        if ('error' in resolved) {
+          if (live.current) setError(resolved.error);
+          return;
         }
+        const { ask, revisedFrom } = resolved;
 
         const saved = await persist('user', text, 'instruct', target.label);
 
@@ -467,7 +475,7 @@ export function useStageChat({
         if (live.current) setBusy(false);
       }
     },
-    [busy, loading, content, messages, persist, project, versionNumber, checkedRevision, headVersion, stageId]
+    [busy, loading, content, messages, persist, project, versionNumber, checkedRevision, instructionFor]
   );
 
   /**
@@ -687,6 +695,7 @@ export function useStageChat({
   }, [redo, propose]);
 
   return {
+    instructionFor,
     messages,
     loading,
     busy,
