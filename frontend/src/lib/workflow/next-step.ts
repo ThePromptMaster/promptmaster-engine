@@ -49,13 +49,19 @@ export function nextAction(i: NextActionInput): NextAction | null {
       why: `Keeps your changes to ${i.reopenedLabel ?? 'this stage'} and has Go recheck what came after it.`,
     };
   }
+  // While Go waits, Go's own controls are the next step, and only they (18 Oct,
+  // pilot: "Apply and continue" sat above the Go strip's "Answer Go's
+  // question"). Its question comes first; its Resume also updates work a
+  // change reopened, before anything else.
+  const paused = Boolean(i.run && !i.run.ended_at && (i.run.status === 'awaiting_decision' || i.run.status === 'blocked'));
+  const asking = paused && Boolean(i.run!.hasNeed || i.run!.asking);
+  // On the current stage Go's own panel carries its card and Resume: not twice.
+  if (paused && i.onCurrentStage) return null;
+  if (asking) return { kind: 'answer_go', label: NEXT_STEP_LABELS.answerGo, why: 'Go is waiting for you on the current stage.' };
   if (i.awaitingUpdate.length) {
     const names = i.awaitingUpdate.length <= 3 ? i.awaitingUpdate.join(', ') : `${i.awaitingUpdate.length} stages`;
     return { kind: 'apply_continue', label: NEXT_STEP_LABELS.applyContinue, why: `${names} ${i.awaitingUpdate.length === 1 ? 'needs' : 'need'} updating after your change; Go does it and carries on.` };
   }
-  const paused = i.run && !i.run.ended_at && (i.run.status === 'awaiting_decision' || i.run.status === 'blocked');
-  // On the current stage Go's own panel carries its card and Resume: not twice.
-  if (!paused || i.onCurrentStage) return null;
-  if (i.run!.hasNeed || i.run!.asking) return { kind: 'answer_go', label: NEXT_STEP_LABELS.answerGo, why: 'Go is waiting for you on the current stage.' };
+  if (!paused) return null;
   return { kind: 'resume', label: NEXT_STEP_LABELS.resume, why: 'Go is paused and can carry on from here.' };
 }

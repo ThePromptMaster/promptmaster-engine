@@ -147,33 +147,56 @@ export function returnTargets(input: {
     .map((s) => ({ id: s.id, label: s.label }));
 }
 
-/**
- * The earlier stage the user's latest answer sends the work back to, or null
- * (13 Oct, production pass: the user clicked "Go back to Revision and fix the
- * screenplay first", and Go asked again whether to use "Go back to Revision").
- * An explicit answer naming the move is the user's own return, carried out by
- * Go — only to a stage this one may go back to, and only once per answer.
- */
-export function answeredReturn(
-  template: WorkflowTemplate,
-  stage: StageDefinition,
-  steps: readonly { action_key: string; status: string; output?: string | null }[]
-): { id: string; label: string; answer: string } | null {
-  const at = steps.map((s) => s.action_key).lastIndexOf(USER_ANSWER_STEP);
-  if (at < 0) return null;
-  // Already carried out since that answer.
-  if (steps.slice(at + 1).some((s) => s.action_key === 'return_to_stage' && s.status === 'succeeded')) return null;
-  const answer = (steps[at].output ?? '').trim();
-  const m = answer.match(/\b(?:go|going|move|send it|take it)\s+back\s+to\s+(?:the\s+)?([A-Za-z][A-Za-z -]{1,60})/i);
+/** "go back to Output…", "move back to the Revision stage". */
+const BACK_TO = /\b(?:go|going|move|send it|take it)\s+back\s+to\s+(?:the\s+)?([A-Za-z][A-Za-z -]{1,60})/i;
+/** An answer agreeing to what was asked: "Yes, go back and remove them", "OK, do it". */
+const AGREES = /^\s*(?:yes|yeah|yep|ok(?:ay)?|sure|please|go ahead|do it|do that|go back|agreed|fine|right)\b/i;
+const DECLINES = /\b(?:no|not|don't|do not|keep|leave|stay)\b/i;
+
+/** The stage this one may go back to that `text` names in "go back to <stage>", or null. */
+function namedReturn(template: WorkflowTemplate, stage: StageDefinition, text: string): { id: string; label: string } | null {
+  const m = text.match(BACK_TO);
   if (!m) return null;
   const named = m[1].toLowerCase();
   for (const id of stage.transitions.allow_return_to ?? []) {
     const s = template.stages.find((x) => x.id === id);
     if (!s) continue;
     const names = [s.label, s.short_label ?? '', s.id].map((n) => n.toLowerCase()).filter(Boolean);
-    if (names.some((n) => named.startsWith(n))) return { id: s.id, label: s.label, answer };
+    if (names.some((n) => named.startsWith(n))) return { id: s.id, label: s.label };
   }
   return null;
+}
+
+/**
+ * The earlier stage the user's latest answer sends the work back to, or null
+ * (13 Oct, production pass: the user clicked "Go back to Revision and fix the
+ * screenplay first", and Go asked again whether to use "Go back to Revision").
+ * An explicit answer naming the move is the user's own return, carried out by
+ * Go — only to a stage this one may go back to, and only once per answer.
+ *
+ * A plain yes to Go's own question counts too, when that question named the
+ * stage (18 Oct, pilot: asked "Shall we go back to Output and evaluation and
+ * remove them?", the user answered "Yes, go back and remove the revision
+ * notes", and Go asked them to press "Go back to Output" themselves).
+ */
+export function answeredReturn(
+  template: WorkflowTemplate,
+  stage: StageDefinition,
+  steps: readonly { action_key: string; status: string; output?: string | null; decision_question?: string | null }[]
+): { id: string; label: string; answer: string } | null {
+  const at = steps.map((s) => s.action_key).lastIndexOf(USER_ANSWER_STEP);
+  if (at < 0) return null;
+  // Already carried out since that answer.
+  if (steps.slice(at + 1).some((s) => s.action_key === 'return_to_stage' && s.status === 'succeeded')) return null;
+  const answer = (steps[at].output ?? '').trim();
+  const named = namedReturn(template, stage, answer);
+  if (named) return { ...named, answer };
+  if (BACK_TO.test(answer) || !AGREES.test(answer) || DECLINES.test(answer)) return null;
+  // The question this answers: the last one Go asked before it.
+  const asked = steps.slice(0, at).reverse().find((s) => s.action_key === 'request_user_decision');
+  const question = (asked?.decision_question || (asked?.output ?? '').split('\n')[0] || '').trim();
+  const proposed = question ? namedReturn(template, stage, question) : null;
+  return proposed ? { ...proposed, answer } : null;
 }
 
 /** Moves that polish a stage rather than move the work on. */
