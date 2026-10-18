@@ -845,4 +845,26 @@ describe('a return the user chose in an answer (13 Oct, production pass)', () =>
     expect(answeredReturn(BOOK_V1, critique, [{ ...answer, output: 'Go back to Objective' }])).toBeNull();
     expect(answeredReturn(BOOK_V1, critique, [{ ...answer, output: 'Override and continue to Fact-check' }])).toBeNull();
   });
+
+  it('a plain yes to Go asking to go back to a stage goes back to that stage (18 Oct, pilot)', async () => {
+    const { answeredReturn } = await import('./policy');
+    const { SINGLE_OUTPUT_V1 } = await import('@/lib/workflow/templates/single-output.v1');
+    const summary = SINGLE_OUTPUT_V1.stages.find((s) => s.id === 'summary')!;
+    const asked = {
+      action_key: 'request_user_decision',
+      status: 'succeeded',
+      decision_question:
+        'The current pack still opens with revision notes above the status summary, which breaks the three-sections-only rule. Shall we go back to Output and evaluation and remove them, so the pack starts with the status summary?',
+      output: 'The current pack still opens with revision notes…\n\nThe button is "Go back to Output", under "More" at the bottom of the stage.',
+    };
+    const yes = { action_key: 'user_answer', status: 'succeeded', output: 'Yes, go back and remove the revision notes' };
+    expect(answeredReturn(SINGLE_OUTPUT_V1, summary, [asked, yes])).toMatchObject({ id: 'output', label: 'Output and evaluation' });
+    // Done once already: not again.
+    expect(answeredReturn(SINGLE_OUTPUT_V1, summary, [asked, yes, { action_key: 'return_to_stage', status: 'succeeded' }])).toBeNull();
+    // A no, or a yes with a reservation, is not a go-ahead.
+    expect(answeredReturn(SINGLE_OUTPUT_V1, summary, [asked, { ...yes, output: 'No, keep the pack as it is' }])).toBeNull();
+    expect(answeredReturn(SINGLE_OUTPUT_V1, summary, [asked, { ...yes, output: 'Yes, but leave the notes for now' }])).toBeNull();
+    // A question that names no stage gives a yes nowhere to go.
+    expect(answeredReturn(SINGLE_OUTPUT_V1, summary, [{ ...asked, decision_question: 'Shall I add the remaining budget?', output: '' }, yes])).toBeNull();
+  });
 });

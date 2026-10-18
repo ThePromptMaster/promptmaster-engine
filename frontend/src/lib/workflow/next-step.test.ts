@@ -28,6 +28,20 @@ describe('one next action, on whichever stage is open (17 Oct, Sean, emails 2.2 
     expect(nextAction({ ...base, run: { ...run, ended_at: '2026-10-18T00:00:00Z' } })).toBeNull();
   });
 
+  it('while Go waits, its controls are the one next step: no "Apply and continue" beside them (18 Oct, pilot)', () => {
+    const asking = { status: 'awaiting_decision', ended_at: null, hasNeed: false, asking: true };
+    const paused = { status: 'blocked', ended_at: null, hasNeed: false, asking: false };
+    // On the current stage, Go's strip has it — Answer Go's question, or Resume, which updates the work too.
+    expect(nextAction({ ...base, run: asking, awaitingUpdate: ['Output'], onCurrentStage: true })).toBeNull();
+    expect(nextAction({ ...base, run: paused, awaitingUpdate: ['Output'], onCurrentStage: true })).toBeNull();
+    // Elsewhere, Go's question comes before the update it would otherwise skip past.
+    expect(nextAction({ ...base, run: asking, awaitingUpdate: ['Output'] })).toMatchObject({ kind: 'answer_go' });
+    // A paused run with nothing asked: the update is the next step, and it resumes Go.
+    expect(nextAction({ ...base, run: paused, awaitingUpdate: ['Output'] })).toMatchObject({ kind: 'apply_continue' });
+    // No run, or a finished one: the update stands on any stage.
+    expect(nextAction({ ...base, awaitingUpdate: ['Output'], onCurrentStage: true })).toMatchObject({ kind: 'apply_continue' });
+  });
+
   it('while Go works, the bar says so instead of offering a button', () => {
     expect(nextAction({ ...base, goActive: true, goWorkingOn: 'Output', awaitingUpdate: ['Input'] })).toEqual({ kind: 'working', label: 'Go is working on Output…', why: '' });
   });

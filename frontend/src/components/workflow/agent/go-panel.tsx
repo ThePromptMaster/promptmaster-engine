@@ -195,7 +195,10 @@ export function GoPanel({
     running: go.active,
     budget: go.budget,
     onBudget: go.setBudget,
-    onGo: () => void go.go(),
+    // Resume is also the way to update work a change reopened: with the
+    // next-step bar out of the way while Go waits, it opens a fresh window
+    // when this one is nearly spent, as "Apply and continue" did (18 Oct).
+    onGo: () => void go.update(),
     onStop: () => void go.stop(),
     canResume,
     canContinue,
