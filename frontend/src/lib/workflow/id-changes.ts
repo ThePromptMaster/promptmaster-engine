@@ -13,8 +13,12 @@
 import type { ArtifactVersion } from '@/types/project';
 import { USER_CHOSEN_OPERATIONS } from './fact-reconcile';
 
-/** R-002, D3, Q11, S7, A-12, and a suffixed form such as D3-P. */
-const ID = /\b([A-Z]{1,3})-?(\d{1,3})(?:-([A-Z]{1,2}))?\b(?![-.]?\d)/g;
+/**
+ * R-002, D3, Q11, S7, A-12, a suffixed form such as D3-P, and a prefixed one
+ * such as KES-T3 — whole: "T3" inside "KES-T3" is not an ID of its own (18 Oct,
+ * pilot: a project's KES-T3 was read as a "T3" and every repair was refused).
+ */
+const ID = /(?<![A-Za-z0-9-])((?:[A-Z]{2,5}-)?[A-Z]{1,3})-?(\d{1,3})(?:-([A-Z]{1,2}))?\b(?![-.]?\d)/g;
 
 /** The IDs a text names, as written. */
 export function itemIds(text: string): Set<string> {
@@ -23,7 +27,7 @@ export function itemIds(text: string): Set<string> {
 
 /** "D3-P" → "D3"; "R-002" → "R2": what an ID is, whatever its decoration. */
 function base(id: string): string {
-  const m = /^([A-Z]{1,3})-?(\d{1,3})/.exec(id);
+  const m = /^((?:[A-Z]{2,5}-)?[A-Z]{1,3})-?(\d{1,3})/.exec(id);
   return m ? `${m[1]}${Number(m[2])}` : id;
 }
 
@@ -58,12 +62,23 @@ export interface IdChanges {
 /** Words that say little about what an item is about. */
 const STOP = new Set(['about', 'after', 'again', 'also', 'been', 'before', 'being', 'from', 'have', 'into', 'more', 'must', 'need', 'needs', 'once', 'only', 'open', 'closed', 'resolved', 'complete', 'completed', 'done', 'status', 'still', 'than', 'that', 'their', 'there', 'these', 'this', 'those', 'through', 'under', 'until', 'were', 'what', 'when', 'which', 'will', 'with', 'within', 'without', 'would', 'owner', 'target', 'pending', 'progress']);
 
-/** The meaningful words of the line an ID sits on: what that item is about. */
+/**
+ * The meaningful words of the line the ID labels — a table row or list entry
+ * that starts with it: what that item is about. A sentence that merely
+ * mentions the ID says nothing about which item it is (18 Oct, pilot: prose
+ * naming KES-T3 in a different sentence was read as a reused ID).
+ */
 function subjectOf(text: string, id: string): Set<string> {
-  const line = text.split('\n').find((l) => itemIds(l).has(id)) ?? '';
+  const line = text.split('\n').find((l) => labels(l, id)) ?? '';
   return new Set(
     line.toLowerCase().replace(/[^a-z\s]/g, ' ').split(/\s+/).filter((w) => w.length >= 4 && !STOP.has(w))
   );
+}
+
+/** Whether the line is the item the ID labels: it starts with the ID, after a table bar, bullet or number. */
+function labels(line: string, id: string): boolean {
+  const start = line.replace(/^[\s|*>#\-+]*(?:\d+[.)]\s*)?(?:\*\*)?/, '');
+  return start.startsWith(id) && itemIds(start.slice(0, id.length + 1)).has(id);
 }
 
 /**

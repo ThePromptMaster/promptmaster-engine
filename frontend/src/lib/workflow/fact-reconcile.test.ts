@@ -160,3 +160,12 @@ describe('a replaced value takes the new value written in its place (18 Oct, pro
     ]);
   });
 });
+
+describe('a recorded answer is matched on its answer only (18 Oct, pilot)', () => {
+  it('a figure inside the question Go asked is not offered for change', () => {
+    const facts = [fact('q', 'Decided by the user — asked "Should I add the remaining-budget calculation ($40,000 − $15,000 = $25,000) to the status summary?", answered: No, keep the pack as it is')];
+    const before = 'Budget $40,000. Spent $15,000. Remaining $25,000.';
+    const after = 'Budget $40,000. Spent $18,000. Remaining $22,000.';
+    expect(factChangesFromRevision({ facts, instruction: 'Spending to date is $18,000.', before, after })).toEqual([]);
+  });
+});
