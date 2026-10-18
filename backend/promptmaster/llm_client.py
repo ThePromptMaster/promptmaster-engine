@@ -166,6 +166,21 @@ def _retry_after_seconds(response: httpx.Response) -> float | None:
         return None
 
 
+#: Room for a model that reasons before it answers, on top of the answer's own
+#: budget. 18 Oct (same-model pilot): Claude Opus 5.5 reasons by default on
+#: OpenRouter, the reasoning counted against Go's 900-token planner budget, and
+#: the plan came back as cut-off JSON — every run on that model failed at its
+#: first step.
+REASONING_HEADROOM = 2048
+
+
+def _token_budget(model: str, max_tokens: int) -> dict[str, Any]:
+    """The answer keeps `max_tokens`; an Anthropic model's reasoning gets its own budget."""
+    if model.startswith("anthropic/"):
+        return {"max_tokens": max_tokens + REASONING_HEADROOM, "reasoning": {"max_tokens": REASONING_HEADROOM}}
+    return {"max_tokens": max_tokens}
+
+
 class OpenRouterClient:
     """Async client for the OpenRouter API.
 
@@ -223,7 +238,7 @@ class OpenRouterClient:
             "model": model or self.model,
             "messages": messages,
             "temperature": temperature,
-            "max_tokens": max_tokens,
+            **_token_budget(model or self.model, max_tokens),
         }
 
         if json_mode:
@@ -267,7 +282,7 @@ class OpenRouterClient:
             "model": model or self.model,
             "messages": messages,
             "temperature": temperature,
-            "max_tokens": max_tokens,
+            **_token_budget(model or self.model, max_tokens),
         }
 
         if json_mode:
