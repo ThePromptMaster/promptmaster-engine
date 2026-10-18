@@ -1737,12 +1737,12 @@ A revision made in another assistant from an older export is not detected as sta
 export carries no version stamp, and a pasted revision is drafted against the current
 version. The stale-base refusal covers revisions made inside PromptMaster only.
 
-Open after the 18 October production passes:
-- **Status went back to the older date.** A repair can put a Status section back on the brief's "as of" date when a later accepted fact gives a newer one (REEF `37116f51`: back to the November 2 figures over the November 5 fact).
-- **A change note was put back into the document.** The "kept lines" guard restores a line a revision dropped. When that line was a change note ("The summary now includes the $6,000 … calculation"), it went back into the document.
-- **Go asked the user to do what it had just been told.** After the user answered "yes, go back and remove them", Go asked the user to press "Go back to Output" themselves.
-- **Two next steps on one screen.** With Go waiting and stages awaiting an update, the pinned Go strip (Resume / Answer Go's question) and the next-step bar (Apply and continue) show at once.
-- **Instructions and repeats offered as facts.** "Keep X as it was" is offered as a requirement. A correction can be offered both as a changed value and as a reworded new fact.
+Found on the 18 October production passes and fixed the same day (#287–#290):
+- **Status went back to the older date** (REEF `37116f51`: back to the November 2 figures over the November 5 fact). Fixed in #290: when an accepted fact is dated later than the brief's "as of", code adds a CURRENT REPORTING DATE line to the facts block. The brief's value for an item a later fact updates is the baseline. This is a prompt rule, not a check: the frontend's leftover check cannot pair a brief value with the fact that updates it, so a model that ignores the line is not caught.
+- **A change note was put back into the document** ("The summary now includes the $6,000 … calculation"). Fixed in #287: the kept-lines guard never restores a line about the revision itself (`isChangeNote`). Notes written above the first heading go into the version's change note. Table rows and sentences about the subject are still kept.
+- **Go asked the user to do what it had just been told.** Fixed in #289: a plain yes to Go's own question naming a stage to go back to now counts as the go-back. A no, or a yes with a reservation ("keep", "not"), still does not.
+- **Two next steps on one screen.** Fixed in #289: while Go waits, only Go's controls show. Its Resume also opens a fresh window to update reopened work, as "Apply and continue" did.
+- **Instructions and repeats offered as facts.** Fixed in #288. A statement with no figure that something "remains unchanged" or should be kept "as it was" records nothing. "… unchanged except that X" records X only. A new fact that restates an offered change (at least two shared values, one of them the new value) is dropped.
 
 The same-model comparison is one scripted scenario run once per arm. It shows whether a
 difference is worth measuring, not its size. Missed requirements, unsupported claims,
