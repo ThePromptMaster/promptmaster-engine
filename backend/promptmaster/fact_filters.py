@@ -51,9 +51,40 @@ PROCESS = re.compile(
 REQUEST = re.compile(r"\b(?:asks?|asked|requests?|requested|suggests?|suggested|proposes?|proposed|wants?|would like)\b", re.I)
 
 
+#: "The existing training rules remain unchanged", "Keep the review date as it
+#: was": a statement that something stays as recorded. Without a figure it
+#: adds nothing the record does not already hold, so it is not a new fact or a
+#: requirement (18 Oct, production pass: REEF stored "All existing dependency
+#: and duration rules remain unchanged" as a requirement).
+UNCHANGED = re.compile(
+    r"\b(?:remain|remains|stay|stays|is|are|was|were)\s+(?:unchanged|the same|as (?:before|they were|it was|is))\b",
+    re.I,
+)
+KEEP_AS_IS = re.compile(
+    r"^(?:please\s+)?(?:keep|leave|retain)\b.*\b(?:as (?:it|they) (?:was|were|is|are|stands?)|as (?:before|is)|unchanged|the same)\W*$",
+    re.I,
+)
+#: "All other facts remain unchanged except that the launch is November 24":
+#: only the change after "except" is a statement worth recording.
+_EXCEPT = re.compile(r"\b(?:remain|remains|stay|stays|is|are)\s+(?:unchanged|the same)\s*,?\s+except\s+(?:that\s+|for\s+)?", re.I)
+
+
+def the_change(statement: str) -> str:
+    """A statement less any "everything else is unchanged, except that" preface."""
+    m = _EXCEPT.search(statement)
+    if not m:
+        return statement
+    rest = statement[m.end():].strip()
+    return rest[:1].upper() + rest[1:] if rest else statement
+
+
 def records_nothing(statement: str) -> bool:
-    """Filler, or an instruction about how to handle this request: never a fact."""
-    return bool(FILLER.search(statement) or PROCESS.search(statement))
+    """Filler, a statement that something stays as recorded, or an instruction
+    about how to handle this request: never a fact."""
+    if FILLER.search(statement) or PROCESS.search(statement):
+        return True
+    no_figure = not _NUMBER.search(statement)
+    return no_figure and bool(UNCHANGED.search(statement) or KEEP_AS_IS.search(statement))
 
 
 def is_request(statement: str) -> bool:
@@ -68,7 +99,9 @@ def record_kind(kind: object, statement: str) -> str:
 
 #: The prompt rules that go with the code above, for every path that offers facts.
 RULES = (
-    "- Leave out filler such as \"all other facts remain unchanged\": it records nothing.\n"
+    "- Leave out filler such as \"all other facts remain unchanged\", \"the existing rules remain "
+    "unchanged\" or \"keep X as it was\": they record nothing. From \"everything else is unchanged "
+    "except that X\", record only X.\n"
     "- An instruction about how to handle THIS request (\"before recording anything, "
     "explain…\", \"don't revise yet\", \"first calculate…\") is not a fact or a "
     "requirement: never record it.\n"

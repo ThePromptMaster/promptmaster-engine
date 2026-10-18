@@ -22,7 +22,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from .conversation import _shared_system
-from .fact_filters import from_user, record_kind, records_nothing
+from .fact_filters import from_user, record_kind, records_nothing, the_change
 from .llm_client import OpenRouterClient
 from .project_context import facts_block
 from .schemas import PMInput
@@ -264,7 +264,7 @@ def parse_record_facts(item: dict, question: str, known: list[str] | None = None
     for f in (item.get("facts") or [])[:MAX_FACTS_PER_ACTION]:
         if not isinstance(f, dict):
             continue
-        statement = " ".join(str(f.get("statement") or "").split())[:2_000]
+        statement = the_change(" ".join(str(f.get("statement") or "").split())[:2_000])
         if not statement or not from_user(statement, question):
             continue
         if _norm(statement) in seen or records_nothing(statement):

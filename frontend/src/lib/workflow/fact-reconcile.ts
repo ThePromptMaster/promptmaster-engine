@@ -136,7 +136,9 @@ export function factChangesFromRevision(input: {
       if (changes.some((c) => c.kind === m.kind && c.was === describeValue(m))) continue;
       changes.push({ kind: m.kind, was: describeValue(m), now: describeValue(replacement) });
       // "p.m." before the fact's own full stop would read "p.m..".
-      const words = m.raw.endsWith('.') ? replacement.raw : replacement.raw.replace(/\.$/, '');
+      // "$16,000," from "was $16,000, not $18,000" would leave its comma behind.
+      const unpunctuated = m.raw.endsWith(',') ? replacement.raw : replacement.raw.replace(/,$/, '');
+      const words = m.raw.endsWith('.') ? unpunctuated : unpunctuated.replace(/\.$/, '');
       // "Under 120 words" stays capitalised as "Under 70 words".
       const cased = /^[A-Z]/.test(m.raw) ? words.charAt(0).toUpperCase() + words.slice(1) : words;
       proposed = proposed.split(m.raw).join(cased);
@@ -229,8 +231,9 @@ export async function withMeaningChanges(
     // A new fact that says what a changed value already says is offered once
     // (17 Oct, production pass: "As of November 7, 2026." was listed under
     // both "Changed values" and "New facts").
-    const already = new Set([...valueChanges, ...meaning].map((c) => sameWords(c.proposed)));
-    const fresh = added.filter((a) => !already.has(sameWords(a.proposed)));
+    const offeredChanges = [...valueChanges, ...meaning];
+    const already = new Set(offeredChanges.map((c) => sameWords(c.proposed)));
+    const fresh = added.filter((a) => !already.has(sameWords(a.proposed)) && !offeredChanges.some((c) => restates(a.proposed, c)));
     return [...valueChanges, ...meaning, ...fresh];
   } catch {
     return valueChanges;
@@ -274,6 +277,25 @@ export function revertsUserVersion(input: {
     }
   }
   return out;
+}
+
+/**
+ * A new fact that only restates an offered change in other words: every value
+ * it states is in the changed fact, and it states the value the change brings
+ * (18 Oct, production pass: "As of November 5, 2026, spending to date is
+ * $16,000." was offered as a new fact beside the change from $18,000 to
+ * "…was reported as $16,000."). It takes two shared values, such as the date
+ * and the amount: one shared date is too little to call a statement a repeat.
+ * A new fact with a value of its own is kept.
+ */
+function restates(statement: string, change: FactChange): boolean {
+  const mine = valueMentions(statement).filter((m) => RECONCILED.includes(m.kind));
+  if (mine.length < 2) return false;
+  const proposed = valueMentions(change.proposed);
+  const was = valueMentions(change.fact.statement);
+  const inProposed = (m: ValueMention) => proposed.some((p) => p.kind === m.kind && p.value === m.value);
+  const brought = (m: ValueMention) => inProposed(m) && !was.some((w) => w.kind === m.kind && w.value === m.value);
+  return mine.every(inProposed) && mine.some(brought);
 }
 
 /** A statement compared as words, whatever its case and punctuation. */
