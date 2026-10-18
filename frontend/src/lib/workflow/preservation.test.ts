@@ -102,7 +102,7 @@ describe('a revision note is never put back into the document (18 Oct, pilot)', 
 
   it('reads the notes as notes, and the document as the document', () => {
     for (const line of notes.split('\n').filter(Boolean)) expect(isChangeNote(line)).toBe(true);
-    for (const line of ['- It is now forecast to finish November 12.', '- Confirm 12 attendees.', log, '## Status summary', '- Build is in progress, 60% as last reported.', '- Elena now says the launch is November 24.', 'The risk register lists three open risks.'])
+    for (const line of ['- It is now forecast to finish November 12.', '- Confirm 12 attendees.', log, '## Status summary', '- Build is in progress, 60% as last reported.', '- Elena now says the launch is November 24.', 'The risk register lists three open risks.', '- We added two engineers in Q3.', 'We kept the Friday deadline.'])
       expect(isChangeNote(line)).toBe(false);
   });
 
@@ -118,6 +118,12 @@ describe('a revision note is never put back into the document (18 Oct, pilot)', 
     const kept = keepUnasked(v4, dropped, 'Repair the Output after the November 6 approval.');
     expect(kept.restored).toEqual(['- It is now forecast to finish November 12.', '- Confirm 12 attendees.', log]);
     expect(kept.text).not.toMatch(/now includes/);
+  });
+
+  it('a line in the authors’ own voice is the document, and comes back when dropped', () => {
+    const withTeam = body.replace('- Confirm 12 attendees.', '- Confirm 12 attendees.\n- We added two engineers in Q3.');
+    const kept = keepUnasked(`${notes}\n\n${withTeam}`, body, 'Repair the Output after the November 6 approval.');
+    expect(kept.restored).toEqual(['- We added two engineers in Q3.']);
   });
 
   it('notes written above the first heading go to the version’s record, not the document', () => {

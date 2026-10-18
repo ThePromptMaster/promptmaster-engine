@@ -53,8 +53,9 @@ const DOC_PART = String.raw`(?:summary|tracker|log|table|pack|draft|document|rep
 const NOTE_PATTERNS: readonly RegExp[] = [
   // A labelled note.
   /^(?:what changed|change note|changes? (?:in|to|made in) this (?:version|revision|draft)|correction note|revision note|note on this (?:version|revision))\b/,
-  // The model narrating its own revision.
-  /^(?:i|we) (?:followed|kept|set aside|added|removed|changed|updated|dropped|moved|corrected|restored|regrouped|folded|replaced|rewrote|reworded|fixed|left|renamed|restated)\b/,
+  // The model narrating its own revision. "I" only: "We kept the Friday
+  // deadline" is the document speaking for its authors.
+  /^i (?:followed|kept|set aside|added|removed|changed|updated|dropped|moved|corrected|restored|regrouped|folded|replaced|rewrote|reworded|fixed|left|renamed|restated)\b/,
   // 'KES-T2 now reads "60% as last reported"'.
   /\bnow (?:reads|says) ["“]/,
   // "The summary now includes …", "The tracker's last column is now "…"",
