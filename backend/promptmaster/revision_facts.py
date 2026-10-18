@@ -28,7 +28,7 @@ import re
 
 from pydantic import BaseModel, Field
 
-from .fact_filters import RULES, is_request, record_kind, records_nothing
+from .fact_filters import RULES, is_request, record_kind, records_nothing, the_change
 from .llm_client import OpenRouterClient
 
 MAX_FACTS = 60
@@ -126,13 +126,13 @@ def _additions(raw: dict, req: RevisionFactsRequest) -> list[NewStandingFact]:
     for item in items[:MAX_ADDITIONS]:
         if not isinstance(item, dict):
             continue
-        statement = " ".join(str(item.get("statement") or "").split())[:2_000]
+        statement = the_change(" ".join(str(item.get("statement") or "").split())[:2_000])
         quote = " ".join(str(item.get("quote") or "").split()).strip('"“”')[:600]
         if len(statement) < 4 or len(quote) < 4 or _norm(quote) not in instruction:
             continue
         # Filler and how-to-handle-this instructions are never recorded; a
         # request is a fact about the request (the reply-actions path's rules).
-        if records_nothing(statement) or records_nothing(quote):
+        if records_nothing(statement) or records_nothing(the_change(quote)):
             continue
         request = is_request(statement)
         kind = "fact" if request else record_kind(str(item.get("kind") or "").strip().lower(), statement)
