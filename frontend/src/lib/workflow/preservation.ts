@@ -47,6 +47,45 @@ function norm(line: string): string {
 const masked = (line: string) => norm(line).replace(TIME, '#').replace(NUMBER, '#').replace(/[^\p{L}\p{N}#\s]/gu, '').replace(/\s+/g, ' ').trim();
 const words = (line: string) => masked(line).split(' ').filter((w) => w && w !== '#');
 
+/** Things a document is made of, as a revision note names them. */
+const DOC_PART = String.raw`(?:summary|tracker|log|table|pack|draft|document|report|section|closing sentence|opening sentence|heading|column|row|list|paragraph|chapter|introduction|conclusion)`;
+
+const NOTE_PATTERNS: readonly RegExp[] = [
+  // A labelled note.
+  /^(?:what changed|change note|changes? (?:in|to|made in) this (?:version|revision|draft)|correction note|revision note|note on this (?:version|revision))\b/,
+  // The model narrating its own revision. "I" only: "We kept the Friday
+  // deadline" is the document speaking for its authors.
+  /^i (?:followed|kept|set aside|added|removed|changed|updated|dropped|moved|corrected|restored|regrouped|folded|replaced|rewrote|reworded|fixed|left|renamed|restated)\b/,
+  // 'KES-T2 now reads "60% as last reported"'.
+  /\bnow (?:reads|says) ["“]/,
+  // "The summary now includes …", "The tracker's last column is now "…"",
+  // "The log is regrouped …", "The closing sentence is dropped …".
+  new RegExp(
+    String.raw`^(?:the|this|each|every)\s+(?:[\w-]+'s\s+)?(?:[\w-]+\s+){0,2}${DOC_PART}s?\b[^.]*?\b(?:now (?:includes?|lists?|shows?|states?|has|have|carries|carry|groups?|names?)|(?:is|are) now ["“]|(?:is|are|was|were|has been|have been) (?:now )?(?:added|removed|dropped|regrouped|folded|moved|renamed|replaced|updated|corrected|changed|reworded|restated|merged|split|reordered|shortened)\b)`
+  ),
+];
+
+/**
+ * A line about the revision rather than part of the document: "The summary now
+ * includes the $6,000 … calculation", "I followed the accepted facts …" (18 Oct,
+ * pilot: the kept-lines guard put such a line back into the pack after a review
+ * had asked for it to go). A table row is never one — a change log's rows are
+ * the document — and a sentence about the subject ("It is now forecast to
+ * finish November 12") names no part of the document.
+ */
+export function isChangeNote(line: string): boolean {
+  const text = line
+    .trim()
+    .replace(/^\s*(?:[-+*]|\d+[.)])\s+/, '')
+    .replace(/[*_`>]/g, '')
+    .replace(/[’]/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+  if (!text || text.startsWith('|') || /^#{1,6}\s/.test(text)) return false;
+  return NOTE_PATTERNS.some((re) => re.test(text));
+}
+
 export interface Removal {
   /** The line as it stood in the earlier version. */
   line: string;
@@ -65,7 +104,7 @@ export function removedLines(before: string, after: string): Removal[] {
   const out: Removal[] = [];
   for (const raw of before.split('\n')) {
     const line = raw.trim();
-    if (!line || /^\|?[\s:|-]+\|?$/.test(line) || /^#{1,6}\s/.test(line) || /^what changed\b/i.test(norm(line))) continue;
+    if (!line || /^\|?[\s:|-]+\|?$/.test(line) || /^#{1,6}\s/.test(line) || isChangeNote(line)) continue;
     if (afterExact.has(norm(line)) || afterMasked.has(masked(line))) continue;
     const w = words(line);
     if (!w.length) continue;
