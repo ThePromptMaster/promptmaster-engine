@@ -88,7 +88,13 @@ export interface Edit {
   added: string[];
   /** The unchanged line just before, to say where an addition goes. */
   after: string | null;
+  /** The heading the edit sits under in the old version, if any. */
+  heading: string | null;
+  /** The unchanged line just after, if any. */
+  next: string | null;
 }
+
+const isHeading = (line: string) => /^#{1,6}\s/.test(line);
 
 /** The user's edits: how their revision differs from the version they started from. */
 export function editsBetween(before: string, after: string): Edit[] {
@@ -99,7 +105,10 @@ export function editsBetween(before: string, after: string): Edit[] {
   let i = 0;
   let j = 0;
   for (const [ai, bj] of anchors) {
-    if (ai > i || bj > j) edits.push({ removed: a.slice(i, ai), added: b.slice(j, bj), after: i > 0 ? a[i - 1] : null });
+    if (ai > i || bj > j) {
+      const heading = a.slice(0, i).reverse().find(isHeading) ?? null;
+      edits.push({ removed: a.slice(i, ai), added: b.slice(j, bj), after: i > 0 ? a[i - 1] : null, heading, next: ai < a.length ? a[ai] : null });
+    }
     i = ai + 1;
     j = bj + 1;
   }
@@ -108,6 +117,25 @@ export function editsBetween(before: string, after: string): Edit[] {
 
 const quote = (ls: string[]) => ls.map((l) => `    ${l}`).join('\n');
 
+/** The opening words of a line: enough to find it, not its figures. */
+const opening = (line: string) => {
+  const words = line.split(/\s+/);
+  return words.length > 6 ? `${words.slice(0, 6).join(' ')} …` : line;
+};
+
+/**
+ * Where an addition goes, named by headings where there are any. Quoting the
+ * whole line before it put that line's old figures back in front of the model
+ * and the conflict check (18 Oct, production pass: "$18,000", which the user
+ * had not touched, was asked about).
+ */
+function place(e: Edit): string {
+  if (e.next && isHeading(e.next)) return e.heading ? `under "${e.heading}", just before "${e.next}"` : `just before "${e.next}"`;
+  if (e.after && isHeading(e.after)) return `straight after "${e.after}"`;
+  if (e.heading) return `under "${e.heading}"${e.after ? `, after the line that begins "${opening(e.after)}"` : ''}`;
+  return e.after ? `after the line that begins "${opening(e.after)}"` : 'at the start';
+}
+
 /** The edits as an instruction a model applies to the current version. */
 export function editsInstruction(edits: readonly Edit[], from: number, head: number): string {
   const listed = edits
@@ -115,7 +143,7 @@ export function editsInstruction(edits: readonly Edit[], from: number, head: num
       const label = `${n + 1}.`;
       if (e.removed.length && e.added.length) return `${label} Replace\n${quote(e.removed)}\n  with\n${quote(e.added)}`;
       if (e.removed.length) return `${label} Remove\n${quote(e.removed)}`;
-      return `${label} Add${e.after ? ` after\n${quote([e.after])}\n  this` : ' at the start'}\n${quote(e.added)}`;
+      return `${label} Add ${place(e)}\n${quote(e.added)}`;
     })
     .join('\n');
   return (
@@ -124,4 +152,27 @@ export function editsInstruction(edits: readonly Edit[], from: number, head: num
     `in the current version; where the current version already says something different there, keep the current wording ` +
     `unless the edit is plainly about that point.\n\n${listed}`
   );
+}
+
+export type ResolvedInstruction = { ask: string; revisedFrom?: { version: number; head: number; edits: number } } | { error: string };
+
+/**
+ * What a typed instruction asks for, as it will be sent. Text pasted back from
+ * an export whose stamp names an older version of this stage becomes the
+ * user's edits against that version, so "Change it" and the conflict check
+ * read the same thing, and neither sees a value the user did not touch.
+ */
+export async function resolveInstruction(
+  typed: string,
+  o: { wholeDocument: boolean; stageId: string; head: { version_number: number } | null; loadVersion: (n: number) => Promise<{ content: string } | undefined> }
+): Promise<ResolvedInstruction> {
+  const text = withoutStamps(typed) || typed;
+  const stale = o.wholeDocument && o.head ? staleStamp(typed, o.stageId, o.head.version_number) : null;
+  if (!stale || !o.head) return { ask: text };
+  const base = await o.loadVersion(stale.version);
+  if (!base) return { ask: text };
+  const edits = editsBetween(withoutStamps(base.content), text);
+  const head = o.head.version_number;
+  if (!edits.length) return { error: `This is version ${stale.version} unchanged — there is nothing to apply. The current version is ${head}.` };
+  return { ask: editsInstruction(edits, stale.version, head), revisedFrom: { version: stale.version, head, edits: edits.length } };
 }

@@ -458,8 +458,16 @@ export function ChatPanel({
     // Only instructions not yet applied are pending: an applied one is the
     // current version, and was counted twice (14 Oct, Sean, LANTERN).
     const recent = chat.messages.filter((m) => m.role === 'user' && m.mode === 'instruct' && m.appliedVersionId == null).map((m) => m.content);
+    // Checked as it will be sent: a revision pasted back from an older export
+    // is only its edits, so a value the user did not touch is not asked about.
+    const resolved = await chat.instructionFor(text, scope);
+    if ('error' in resolved) {
+      setChecking(false);
+      await chat.propose(text, scope, { selection, sectionId: effectiveSectionId });
+      return;
+    }
     const conflicts = await findInstructionConflicts({
-      project, stageId, instruction: text, recentInstructions: recent, headVersionId: headVersion?.id ?? null,
+      project, stageId, instruction: resolved.ask, recentInstructions: recent, headVersionId: headVersion?.id ?? null,
       stage: { label: stageLabel, instruction: getChatContext?.().stage_instruction },
     });
     setChecking(false);
