@@ -1716,3 +1716,36 @@ figures on it; it does not find a threshold the model missed. "Updated and check
 shown for twelve hours after the last stage a change reopened is finished again, or
 until dismissed. The objective check sets aside a "not met" that restates a recorded
 request by word overlap; a request paraphrased with other words relies on the prompt.
+
+### L-89 — Later authorised changes, approver names, outside revisions and one pilot (2026-10-17)
+
+A conflict recommends applying the new instruction when the instruction itself records
+the approval or a confirmed amendment. The model proposes the words; code accepts them
+only if they are copied from the instruction, say approved, confirmed, authorised or
+signed off, do not relay a request ("says", "treat as", "proposes", "requests",
+"pending"…), and name only people the project already knows. A relayed approval worded
+without one of those verbs, or a stranger with a name already on record, relies on the
+prompt. Dates are not compared: the instruction is taken as the user's latest word,
+unless the brief asks for a frozen historical report.
+
+The approver check flags a person named as approving something when the brief, context
+and facts never name that person as approving anything. It checks the name, not the
+item: if Elena approved the November change, it cannot tell whether she also approved
+the baseline. How history is worded (superseded, corrected, declined) is a prompt rule.
+
+A revision made in another assistant from an older export is not detected as stale: the
+export carries no version stamp, and a pasted revision is drafted against the current
+version. The stale-base refusal covers revisions made inside PromptMaster only.
+
+Open after the 18 October production passes:
+- **Status went back to the older date.** A repair can put a Status section back on the brief's "as of" date when a later accepted fact gives a newer one (REEF `37116f51`: back to the November 2 figures over the November 5 fact).
+- **A change note was put back into the document.** The "kept lines" guard restores a line a revision dropped. When that line was a change note ("The summary now includes the $6,000 … calculation"), it went back into the document.
+- **Go asked the user to do what it had just been told.** After the user answered "yes, go back and remove them", Go asked the user to press "Go back to Output" themselves.
+- **Two next steps on one screen.** With Go waiting and stages awaiting an update, the pinned Go strip (Resume / Answer Go's question) and the next-step bar (Apply and continue) show at once.
+- **Instructions and repeats offered as facts.** "Keep X as it was" is offered as a requirement. A correction can be offered both as a changed value and as a reworded new fact.
+
+The same-model comparison is one scripted scenario run once per arm. It shows whether a
+difference is worth measuring, not its size. Missed requirements, unsupported claims,
+drift, expansion and false completion are scored against an answer key by a person.
+On the 18 October run both arms met the key; PromptMaster cost about 20 times as much and
+needed about 13 more clicks.
