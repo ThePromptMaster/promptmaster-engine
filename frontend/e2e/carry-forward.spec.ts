@@ -31,7 +31,11 @@ test('Final review: marking is optional, and what is carried forward is listed w
       await expect(prompt).toContainText('Draft the sections', { timeout: 30_000 });
       await prompt.getByRole('button', { name: 'Approve' }).click();
       await expect(page.getByText(/(\d+) of \1 sections written/)).toBeVisible({ timeout: 180_000 });
-      await panel.getByRole('button', { name: /^Stop/ }).click({ timeout: 5_000 }).catch(() => {}); // only there while Go is thinking
+      // The scripted planner next proposes declaring the objective met. Declined, so Go is
+      // not left waiting: a waiting run holds back the Final review's own draft.
+      await expect(prompt).toContainText('Check the objective is met', { timeout: 30_000 });
+      await prompt.getByRole('button', { name: 'Decline' }).click();
+      await expect(prompt).toHaveCount(0);
     }
   }
   const artifact = stageArtifact(page);
