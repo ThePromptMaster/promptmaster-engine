@@ -316,7 +316,7 @@ test('Validation tells independent reproduction from support by earlier evidence
   await expect(legend).toContainText('Only you can say this — PromptMaster never sets it.');
 
   await artifact.getByRole('combobox').first().click();
-  await expect(page.getByRole('option')).toHaveText([
+  await expect(page.getByRole('listbox').getByRole('option')).toHaveText([
     'Independently reproduced', 'Supported by prior evidence', 'Consistency check only', 'Not reproduced', 'Not attempted',
   ]);
   await page.screenshot({ path: test.info().outputPath('03-validation-status-choices.png') });

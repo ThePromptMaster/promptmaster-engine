@@ -32,6 +32,7 @@ import type { Project, ProjectPatch } from '@/types/project';
 import { AutoGrowTextarea } from '@/components/shared/auto-grow-textarea';
 import { LimitCounter } from '@/components/shared/limit-counter';
 import { INPUT_LIMITS, withinLimit } from '@/lib/projects/input-limits';
+import { DEFAULT_MODEL, MODEL_CHOICES } from '@/lib/constants';
 
 /** The project columns a criterion is allowed to require, and how to label one. */
 const FIELDS = {
@@ -222,7 +223,35 @@ export function ProjectBrief({ project, onPatch, readOnly }: Omit<Props, 'stage'
             </div>
           );
         })}
+        <ModelChoice model={project.model} readOnly={readOnly} onPick={(model) => onPatch({ model })} />
       </div>
     </details>
+  );
+}
+
+/** Which model writes and checks this project's work; every request already carries it. */
+function ModelChoice({ model, readOnly, onPick }: { model: string | null | undefined; readOnly?: boolean; onPick: (model: string) => void }) {
+  const current = model || DEFAULT_MODEL;
+  const choices = MODEL_CHOICES.some((c) => c.id === current) ? MODEL_CHOICES : [...MODEL_CHOICES, { id: current, label: current }];
+  return (
+    <div>
+      <label htmlFor="brief-model" className="mb-1.5 block text-label text-[var(--on-surface-variant)]">
+        Model
+      </label>
+      <select
+        id="brief-model"
+        value={current}
+        disabled={readOnly}
+        onChange={(e) => onPick(e.target.value)}
+        className="rounded-lg bg-[var(--surface-container-low)] px-4 py-2.5 text-body text-[var(--on-surface)] outline-none focus:ring-2 focus:ring-[var(--pm-primary)]/40 disabled:opacity-70"
+      >
+        {choices.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.label}
+          </option>
+        ))}
+      </select>
+      <p className="mt-1 text-label text-[var(--on-surface-variant)]">Used for every draft, check and chat from now on. Earlier versions keep the model that wrote them.</p>
+    </div>
   );
 }
