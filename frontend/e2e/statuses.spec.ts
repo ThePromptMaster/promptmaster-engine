@@ -64,7 +64,7 @@ test('moving on does not complete a stage; finished stages carry their evidence;
 test('finishing is about the deliverable, and a finished project can be reopened', async ({ page }) => {
   const projectId = await createProject(page, { workflow: 'Single output', name: 'E2E complete', objective: 'Explain the plan to the board' });
   await pressTransition(page); // input
-  await expect(page.getByRole('heading', { name: 'Review the prompt' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Review the plan' })).toBeVisible();
   await pressTransition(page); // review
   await expect(page.getByRole('heading', { name: 'Output and evaluation' })).toBeVisible();
   await expect(page.getByText('Mock output').first()).toBeVisible();

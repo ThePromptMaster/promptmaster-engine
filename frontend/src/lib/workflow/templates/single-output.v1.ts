@@ -19,9 +19,13 @@ export const SINGLE_OUTPUT_V1: WorkflowTemplate = {
   // v4 (2026-10-06): each approval says who may satisfy it — a routine one
   // Go may commit under the project's "Routine decisions: handle them for me",
   // a reserved one only the user (Sean, 5 Oct). Criterion ids are unchanged.
-  version: 4,
+  // v5 (2026-10-19): Review reads as the plan PromptMaster follows, not a
+  // prompt to take elsewhere — a new beta user could not tell whether he would
+  // get the result or "a handoff prompt for ChatGPT" (Sean, 18 Oct, email 7).
+  // Stage and criterion ids are unchanged.
+  version: 5,
   name: 'Single output',
-  description: 'One prompt, evaluated and refined.',
+  description: 'One deliverable, planned, written, checked and finished.',
   outline_stage: 'none',
   stages: [
     {
@@ -51,21 +55,21 @@ export const SINGLE_OUTPUT_V1: WorkflowTemplate = {
     },
     {
       id: 'review',
-      label: 'Review the prompt',
+      label: 'Review the plan',
       short_label: 'Review',
       group: 'planning',
       required: true,
       renderer: 'prose',
       entry_guidance:
-        'This is the instruction PromptMaster will send to produce your deliverable — not the deliverable itself. Check it asks for what you want, edit anything that reads wrong, then move on to Output.',
+        'This is the plan PromptMaster follows to write your deliverable on the next stage — nothing to copy or paste anywhere. Check it asks for what you want, edit anything that reads wrong, then move on to Output, where PromptMaster writes it.',
       entry_prompt_hint:
         'Write the prompt that will be sent to produce the deliverable the objective describes. Address it to the model that will do the work: the task, the audience, what the deliverable must contain and in what structure, the constraints, the format and length, and what to avoid. It is an instruction, not the deliverable: write none of the deliverable itself.',
       exit_criteria: [
-        { id: 'review.checked', label: 'I have read the prompt and it asks for what I want', check: 'manual', authority: 'delegable' },
+        { id: 'review.checked', label: 'I have read the plan and it asks for what I want', check: 'manual', authority: 'delegable' },
       ],
       expected_artifacts: [{ kind: 'prompt', cardinality: 'one', primary: true }],
       recommended_modes: [],
-      skip_reasons: ['The prompt is already right'],
+      skip_reasons: ['The plan is already right'],
       transitions: { default_next: 'output', allow_skip: true, allow_return_to: ['input'] },
     },
     {

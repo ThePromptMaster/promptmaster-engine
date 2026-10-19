@@ -22,7 +22,7 @@ test('Finish closes the project even when the server wrote events the page has n
   await expect(transitionBar(page).getByText('Ready to move on')).toBeVisible();
   await pressTransition(page);
 
-  await expect(page.getByRole('heading', { name: 'Review the prompt' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Review the plan' })).toBeVisible();
   await pressTransition(page);
 
   await expect(page.getByRole('heading', { name: 'Output and evaluation' })).toBeVisible();

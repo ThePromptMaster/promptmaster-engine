@@ -257,13 +257,13 @@ describe('the single-output workflow walks its five stages in the workspace', ()
     await advance(user);
 
     // --- 2. Review ----------------------------------------------------------
-    expect(await screen.findByRole('heading', { name: /Review the prompt/ })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /Review the plan/ })).toBeInTheDocument();
     // The full setup panel belongs to the stage that asks for it; every other
     // stage carries the project brief, collapsed to one line (PM-10).
     expect(screen.queryByRole('region', { name: 'Project setup' })).not.toBeInTheDocument();
     expect(screen.getByText('Project brief')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('checkbox', { name: /I have read the prompt and it asks for what I want/ }));
+    await user.click(screen.getByRole('checkbox', { name: /I have read the plan and it asks for what I want/ }));
     await advance(user);
 
     // --- 3. Output ----------------------------------------------------------
