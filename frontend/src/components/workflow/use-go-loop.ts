@@ -37,7 +37,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, type AnswerContradiction } from '@/lib/api/client';
 import { actionFor, actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, ROUTINE_DEFAULT_STEP, stepActionLabel, USER_ANSWER_STEP, whatApprovalDoes } from '@/lib/agent/actions';
 import { contextWithFacts, readOutcomeProof, readStageFacts, type StageFacts } from '@/lib/agent/facts';
-import { stageDrafts } from '@/lib/workflow/stage-artifact';
+import { serializeItems, stageDrafts } from '@/lib/workflow/stage-artifact';
+import { carryNewerFixes, describeCarried } from '@/lib/agent/review-rounds';
 import { approvedAsItStands, delegableToCommit, exhaustedRepair, policyConfirmable, repairStuckNeed, repairTries, staleRepair, describeNeed, NEED_CLEARED, NEED_MOVED_ON, needStillHolds, needsUser, requiredWork, type NeedsUser } from '@/lib/agent/needs';
 import { assertHonestOutcome, verifyOutcome } from '@/lib/agent/outcome';
 import { outlineStageFor } from '@/lib/outline/actions';
@@ -671,6 +672,48 @@ export function useGoLoop(opts: Options) {
         // Nor is an unchanged deliverable judged again (9 Oct, production).
         const moving = required ? null : moveOnInsteadOfRejudging(choice, [...priorStepsRef.current, ...stepsRef.current], o.stage.id, allowed, stageEvaluation.canAdvance);
         if (moving) Object.assign(choice, moving, { needs_user_decision: false, decision_question: null });
+        // A second round of review fixes is carried forward, not another trip back (19 Oct, FIELDGUIDE).
+        const performer = actionFor(choice.action_key)?.performer;
+        const newerFixes = !required && (performer === 'ask' || performer === 'return') && facts.review && o.appendStageVersion
+          ? carryNewerFixes({
+              question: `${choice.decision_question ?? ''} ${choice.rationale ?? ''}`,
+              isReviewStage: effectiveRenderer(o.stage) === 'review', stageId: o.stage.id,
+              items: facts.review.items, schema: facts.review.schema, steps: stepsRef.current,
+              versions: o.bundles[o.stage.id]?.versions ?? [], policy: current.policy, routine,
+            })
+          : null;
+        if (newerFixes && o.appendStageVersion) {
+          const step = await startAgentStep({
+            runId: current.id, userId: o.project.user_id, projectId: o.project.id, idx: stepsRef.current.length,
+            stageId: o.stage.id, mode: modeForStage(o.project, o.stage), actionKey: 'confirm_proposals',
+            params: { carried_forward: newerFixes.carried.map((i) => i.id) },
+            rationale: `Instead of going back again: one round of accepted fixes was already merged in this run, and the newer ones are routine.`,
+            expectedOutcome: 'The newer fixes left open on the review, with the reason; the work goes on.', needsDecision: false, decisionQuestion: null,
+          });
+          upsertStep(step);
+          const output = describeCarried(newerFixes);
+          let failed = false;
+          try {
+            await o.appendStageVersion(o.stage.id, o.stage.label, {
+              content: serializeItems(newerFixes.items),
+              source_operation: 'agent_triage',
+              base_content: o.bundles[o.stage.id]?.versions.at(-1)?.content ?? '',
+              instruction: 'Carried the newer review fixes forward under the routine-decision policy.',
+              model: o.project.model,
+              mode: modeForStage(o.project, o.stage),
+              change_summary: output,
+            });
+          } catch {
+            failed = true;
+          }
+          upsertStep(await finishAgentStep(step.id, failed
+            ? { status: 'failed', label: null, output: 'Could not save the carried-forward fixes; asking instead.' }
+            : { status: 'succeeded', label: null, output }));
+          if (!failed) {
+            await o.onRefresh?.();
+            continue;
+          }
+        }
         // Before a question interrupts the user: does it hold the work up? (Q1b)
         if (!required && actionFor(choice.action_key)?.performer === 'ask') {
           const nextId = nextSuggestedStage(o.template, o.state);
