@@ -678,7 +678,7 @@ export function useGoLoop(opts: Options) {
           ? carryNewerFixes({
               question: `${choice.decision_question ?? ''} ${choice.rationale ?? ''}`,
               isReviewStage: effectiveRenderer(o.stage) === 'review', stageId: o.stage.id,
-              items: facts.review.items, schema: facts.review.schema, steps: stepsRef.current,
+              items: facts.review.items, schema: facts.review.schema, steps: stepsRef.current, events: freshEvents,
               versions: o.bundles[o.stage.id]?.versions ?? [], policy: current.policy, routine,
             })
           : null;
@@ -687,7 +687,7 @@ export function useGoLoop(opts: Options) {
             runId: current.id, userId: o.project.user_id, projectId: o.project.id, idx: stepsRef.current.length,
             stageId: o.stage.id, mode: modeForStage(o.project, o.stage), actionKey: 'confirm_proposals',
             params: { carried_forward: newerFixes.carried.map((i) => i.id) },
-            rationale: `Instead of going back again: one round of accepted fixes was already merged in this run, and the newer ones are routine.`,
+            rationale: `Instead of going back again: one round of accepted fixes was already merged, and the newer ones are routine.`,
             expectedOutcome: 'The newer fixes left open on the review, with the reason; the work goes on.', needsDecision: false, decisionQuestion: null,
           });
           upsertStep(step);
