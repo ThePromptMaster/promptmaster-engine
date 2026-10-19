@@ -40,15 +40,20 @@ export function ProjectFinished({ bundle, completion, evaluation, onReopen, onEd
   const chapters = inSections ? (body.match(/^## /gm) ?? []).length - (carried.length ? 1 : 0) : 0;
   const words = body.split(/\s+/).filter(Boolean).length;
   const [reading, setReading] = useState(false);
-  const [note, setNote] = useState<string | null>(null);
+  // A note belongs to the text it was about: once a new version is shown,
+  // "Copied." would describe a copy of a different version (Sean, 17 Oct).
+  const [said, setSaid] = useState<{ text: string; about: string } | null>(null);
+  const note = said && said.about === markdown ? said.text : null;
+  const setNote = (text: string | null) => setSaid(text === null ? null : { text, about: markdown });
   const [busy, setBusy] = useState(false);
+  const head = stage ? bundle.stages[stage.id]?.versions.at(-1) : undefined;
 
   const stem = () => exportFilename(project, 'md').replace(/\.md$/, '');
   const copy = async () => {
     try {
       const { markdownWithImageLinks } = await import('@/lib/export/images-export');
       await navigator.clipboard.writeText(await markdownWithImageLinks(markdown, project.data_files));
-      setNote('Copied.');
+      setNote(copiedNote(head));
     } catch {
       setNote('Could not copy — select the text and copy it yourself.');
     }
@@ -182,4 +187,17 @@ export function ProjectFinished({ bundle, completion, evaluation, onReopen, onEd
       )}
     </section>
   );
+}
+
+/**
+ * What the clipboard now holds, by version (Sean, 17 Oct: after starting a
+ * new version, a bare "Copied." read as if the new version were the copied one).
+ */
+export function copiedNote(head?: { version_number: number; created_at: string }): string {
+  if (!head) return 'Copied.';
+  const when = new Date(head.created_at);
+  const date = Number.isNaN(when.getTime())
+    ? ''
+    : ` (${when.toLocaleString(undefined, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })})`;
+  return `Copied version ${head.version_number}${date} to the clipboard.`;
 }
