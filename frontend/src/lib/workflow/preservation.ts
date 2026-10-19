@@ -227,3 +227,49 @@ export function describeLines(lines: readonly string[], max = 4): string {
   if (shown.length <= 1) return shown.join('') + more;
   return `${shown.slice(0, -1).join(', ')}${more ? ', ' : ' and '}${shown.at(-1)}${more}`;
 }
+
+/**
+ * What a shortening dropped that the brief's structure needs (17 Oct, Sean,
+ * FIELDGUIDE): two repairs cut a 2,407-word package to 616 words to meet a
+ * limit, and the curriculum lost its timed activities. A repair made to meet a
+ * limit may cut words — that is what was asked — but not a heading, and not
+ * every timing under one that had them. Named for the step's record, in the
+ * order they stood.
+ */
+export function structureDropped(before: string, after: string): string[] {
+  const out: string[] = [];
+  const old = headedSections(before);
+  const now = headedSections(after);
+  for (const [key, s] of old) {
+    const kept = now.get(key);
+    if (!kept) {
+      out.push(`the "${s.heading}" heading`);
+      continue;
+    }
+    if ((s.body.match(DURATION) ?? []).length >= 2 && !(kept.body.match(DURATION) ?? []).length) out.push(`the timings under "${s.heading}"`);
+  }
+  return out;
+}
+
+/** "10 minutes", "15 min", "1 hr", "0:00–0:10". */
+const DURATION = /\b\d{1,3}\s*(?:[-–]\s*\d{1,3}\s*)?(?:min(?:ute)?s?|hrs?|hours?)\b|\b\d{1,2}:\d{2}\s*[-–]\s*\d{1,2}:\d{2}\b/gi;
+
+/** Each markdown heading's text below it, up to the next heading, keyed by its words without numbering. */
+function headedSections(text: string): Map<string, { heading: string; body: string }> {
+  const out = new Map<string, { heading: string; body: string }>();
+  let current: { heading: string; body: string } | null = null;
+  for (const line of text.split('\n')) {
+    const h = line.trim().match(/^#{1,6}\s+(.*)$/);
+    if (h) {
+      const heading = h[1].trim();
+      const key = norm(heading).replace(/^(?:\d+[.)]|part\s+\d+[.:)]?|section\s+\d+[.:)]?)\s*/i, '').replace(/[^\p{L}\p{N}\s]/gu, '').replace(/\s+/g, ' ').trim();
+      if (!key || out.has(key)) {
+        current = null;
+        continue;
+      }
+      current = { heading, body: '' };
+      out.set(key, current);
+    } else if (current) current.body += `${line}\n`;
+  }
+  return out;
+}

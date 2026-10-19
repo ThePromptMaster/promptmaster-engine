@@ -18,7 +18,7 @@ import { appendWorkflowEvent, listWorkflowEvents } from '@/lib/supabase/workflow
 import { getArtifact } from '@/lib/supabase/versions';
 import { manuscriptArtifactFor, measureStageContent, stageRequirements } from '@/lib/workflow/context';
 import { COUNTING_RULE, isPart, measure, replaceSection, sectionFor, type MeasurableRequirement } from '@/lib/workflow/measurable';
-import { describeLines, isChangeNote, keepUnasked } from '@/lib/workflow/preservation';
+import { describeLines, isChangeNote, keepUnasked, structureDropped } from '@/lib/workflow/preservation';
 import { addedClaims, noInventedDetails, suppliedText } from '@/lib/workflow/fact-boundary';
 import { isDone } from '@/lib/workflow/types';
 import { appliedFindingsVersion, carryUserFields, findingsInstruction, reviseWithFindings } from '@/lib/workflow/apply-findings';
@@ -974,6 +974,25 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       if (content && stillUnmet.length) {
         ({ res, content } = await attempt(`${instruction} YOUR PREVIOUS ATTEMPT MEASURED: ${stillUnmet.join('; ')}. Fix exactly that.`));
         stillUnmet = content ? unmetMeasurementsOf(ctx, target, content) : [];
+      }
+      // Shortening to meet a limit cuts words, never a heading or every timing
+      // under one (17 Oct, Sean, FIELDGUIDE: the curriculum lost its timed
+      // activities). One more try names what went; if it still goes, nothing
+      // is saved and the trade-off is the user's — a decision, not a failed try.
+      let dropped = content && measuredFails.length && !before ? structureDropped(head, content) : [];
+      if (dropped.length) {
+        ({ res, content } = await attempt(`${instruction} YOUR PREVIOUS ATTEMPT DROPPED ${dropped.join(', ')}. Keep every heading and the timings under them; shorten by tightening the prose instead.`));
+        stillUnmet = content ? unmetMeasurementsOf(ctx, target, content) : [];
+        dropped = content ? structureDropped(head, content) : [];
+      }
+      if (dropped.length) {
+        const question =
+          `Meeting ${measuredFails.join('; ')} would drop ${dropped.join(', ')} from ${target.label}, so I have not saved it; ` +
+          `${headVersion ? `v${headVersion.version_number}` : 'the saved version'} stays as it is. Should the limit change, or should ${target.label} be cut to fit even if those go?`;
+        return done(key, {
+          status: 'blocked', blockKind: 'needs_decision', toolsUsed: ['model'], changes: {},
+          output: question, stop: { status: 'awaiting_decision', reason: question }, needs: { kind: 'answer_question', question },
+        });
       }
       if (!content) {
         return done(key, { status: 'failed', output: 'The model returned nothing usable.', toolsUsed: ['model'], changes: {} });
