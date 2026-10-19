@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { carryNewerFixes, describeCarried, CARRY_REASON } from './review-rounds';
+import { carryNewerFixes, describeCarried, reasksCarried, CARRY_REASON } from './review-rounds';
 import { serializeItems, type StageItem, type StageItemSchema } from '@/lib/workflow/stage-artifact';
 
 const schema: StageItemSchema = {
@@ -76,5 +76,27 @@ describe('a second round of review fixes (19 Oct, FIELDGUIDE)', () => {
     expect(carryNewerFixes({ ...base, items: newerRoutine, policy: 'checkpoint' })).toBeNull();
     expect(carryNewerFixes({ ...base, items: newerRoutine, isReviewStage: false })).toBeNull();
     expect(carryNewerFixes({ ...base, items: newerRoutine, question: 'Which audience should the memo address?' })).toBeNull();
+  });
+});
+
+describe('going back for fixes already carried forward (19 Oct, FIELDGUIDE, after Resume)', () => {
+  const carried = carryNewerFixes({ ...base, items: newerRoutine })!.items;
+  const ask = { isReviewStage: true, items: carried, policy: 'autonomous' as const, routine: 'handle' as const };
+  const reask = 'Five fixes from the latest review are still open. Should I accept them and go back to Output to apply them in one merged version?';
+
+  it('is not asked: Go finishes and names them', () => {
+    expect(reasksCarried({ ...ask, question: reask })).toMatch(/^2 newer fixes are already carried forward/);
+  });
+
+  it('is still asked under "ask me", outside Autonomous, off a review, or for another question', () => {
+    expect(reasksCarried({ ...ask, question: reask, routine: 'ask' })).toBeNull();
+    expect(reasksCarried({ ...ask, question: reask, policy: 'checkpoint' })).toBeNull();
+    expect(reasksCarried({ ...ask, question: reask, isReviewStage: false })).toBeNull();
+    expect(reasksCarried({ ...ask, question: 'Which audience should the memo address?' })).toBeNull();
+  });
+
+  it('is still asked when nothing was carried, or the user accepted a fix themselves', () => {
+    expect(reasksCarried({ ...ask, question: reask, items: newerRoutine })).toBeNull();
+    expect(reasksCarried({ ...ask, question: reask, items: [...carried, row('fr15', 'Add the reason.', { status_source: 'user' })] })).toBeNull();
   });
 });
