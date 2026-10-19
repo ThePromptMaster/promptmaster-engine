@@ -189,3 +189,27 @@ describe('buildAgentState: the planner is told which workflow it is on (2 Oct, s
     expect(research.workflow).toMatchObject({ key: 'research', has_data_stages: true });
   });
 });
+
+describe('buildAgentState: the latest change on the stage (19 Oct, Research › Method)', () => {
+  const version = (n: number, content: string, over: Record<string, unknown> = {}) =>
+    ({ id: `v${n}`, version_number: n, content, source_operation: 'agent_draft', change_summary: null, ...over }) as never;
+
+  it('is worked out from the last two versions, with how the newest was made', () => {
+    const digest = buildAgentState({
+      template: BOOK_V1, state: initialState(BOOK_V1), stage: stage('positioning'), steps: [], stageEvaluation: evaluation('positioning'),
+      bundles: { positioning: { versions: [version(3, 'Effect size 13.5%.'), version(4, 'Effect size from the pilot.', { source_operation: 'agent_apply', change_summary: 'Applied from the stage check: unsourced figures' })] } } as never,
+    });
+    expect(digest.latest_change).toEqual({
+      version: 4, previous: 3, how: 'agent_apply', summary: 'Applied from the stage check: unsourced figures',
+      diff: '− Effect size 13.5%.\n+ Effect size from the pilot.',
+    });
+  });
+
+  it('is absent for a first version', () => {
+    const digest = buildAgentState({
+      template: BOOK_V1, state: initialState(BOOK_V1), stage: stage('positioning'), steps: [], stageEvaluation: evaluation('positioning'),
+      bundles: { positioning: { versions: [version(1, 'First.')] } } as never,
+    });
+    expect(digest.latest_change).toBeUndefined();
+  });
+});

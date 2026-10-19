@@ -48,3 +48,29 @@ describe('a question that is a choice (13 Oct, PINE)', () => {
     expect(screen.getByPlaceholderText('Or say something else…')).toBeTruthy();
   });
 });
+
+describe('a question about an applied finding shows what it changed (19 Oct, Research › Method)', () => {
+  const change = {
+    stageLabel: 'Method', version: 4, previous: 3,
+    before: 'Effect size 13.5% from prior work.', after: 'Effect size to be estimated from the pilot.',
+    summary: 'Applied from the stage check: 4 figures have no source in the project',
+  };
+
+  it('names the versions and the finding, and opens to the change itself', () => {
+    render(<QuestionPrompt question="Which version of the Method should go forward?" onAnswer={vi.fn()} change={change} />);
+    const box = screen.getByLabelText('What changed');
+    expect(box.textContent).toContain('What changed in Method v4 (against v3)');
+    expect(box.textContent).toContain('4 figures have no source');
+    expect(screen.queryByTestId('what-changed-diff')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /What changed in Method v4/ }));
+    const diff = screen.getByTestId('what-changed-diff');
+    const text = (tag: string) => [...diff.querySelectorAll(tag)].map((n) => n.textContent).join(' ');
+    expect(text('del')).toContain('13.5%');
+    expect(text('ins')).toContain('pilot');
+  });
+
+  it('is absent when the question is not about such a version', () => {
+    render(<QuestionPrompt question="Anything else?" onAnswer={vi.fn()} />);
+    expect(screen.queryByLabelText('What changed')).not.toBeInTheDocument();
+  });
+});

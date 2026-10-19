@@ -8,7 +8,7 @@ import { createPortal } from 'react-dom';
 import { approvalsAskedFor, describeNeed, isClearedNote, needIsDecidedOnStage, type NeedContext, type StuckOption } from '@/lib/agent/needs';
 import type { useGoLoop } from '../use-go-loop';
 import { GoTerms } from './authorization-dialog';
-import { DecisionPrompt, QuestionPrompt } from './decision-prompt';
+import { DecisionPrompt, QuestionPrompt, type LatestChange } from './decision-prompt';
 import { GoControl } from './go-control';
 import { NeedsYouCard } from './needs-you-card';
 import { PolicySelector } from './policy-selector';
@@ -52,6 +52,7 @@ export function GoPanel({
   dockHost = null,
   routine,
   stageModes,
+  latestChange = null,
 }: {
   go: ReturnType<typeof useGoLoop>;
   stageLabel: string;
@@ -70,6 +71,8 @@ export function GoPanel({
   dockHost?: HTMLElement | null;
   /** 13 Oct: each stage in its own recommended mode, or the project's mode everywhere. */
   stageModes?: { value: 'stage' | 'project'; onChange: (v: 'stage' | 'project') => void };
+  /** The latest version of the stage Go asks about, when it came from applied findings. */
+  latestChange?: LatestChange | null;
   /** "Routine decisions": who may decide an approval Go can check (5 Oct). */
   routine?: { value: RoutinePolicy; onChange: (v: RoutinePolicy) => void };
 }) {
@@ -342,6 +345,7 @@ export function GoPanel({
               question={go.run.stop_reason}
               expertPackage={go.run.needs?.kind === 'answer_question' ? go.run.needs.expertPackage : undefined}
               choices={go.run.needs?.kind === 'answer_question' ? go.run.needs.choices : undefined}
+              change={latestChange ?? undefined}
               onAnswer={(t, contradicted) => void go.answer(t, contradicted)}
               checkAnswer={go.checkAnswer}
               approvals={approvalsAskedFor(go.run.stop_reason, needContext?.openApprovals)}

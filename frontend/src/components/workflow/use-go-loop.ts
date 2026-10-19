@@ -38,7 +38,7 @@ import { api, type AnswerContradiction } from '@/lib/api/client';
 import { actionFor, actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, ROUTINE_DEFAULT_STEP, stepActionLabel, USER_ANSWER_STEP, whatApprovalDoes } from '@/lib/agent/actions';
 import { contextWithFacts, readOutcomeProof, readStageFacts, type StageFacts } from '@/lib/agent/facts';
 import { stageDrafts } from '@/lib/workflow/stage-artifact';
-import { delegableToCommit, exhaustedRepair, policyConfirmable, repairStuckNeed, repairTries, staleRepair, describeNeed, NEED_CLEARED, NEED_MOVED_ON, needStillHolds, needsUser, requiredWork, type NeedsUser } from '@/lib/agent/needs';
+import { approvedAsItStands, delegableToCommit, exhaustedRepair, policyConfirmable, repairStuckNeed, repairTries, staleRepair, describeNeed, NEED_CLEARED, NEED_MOVED_ON, needStillHolds, needsUser, requiredWork, type NeedsUser } from '@/lib/agent/needs';
 import { assertHonestOutcome, verifyOutcome } from '@/lib/agent/outcome';
 import { outlineStageFor } from '@/lib/outline/actions';
 import { effectiveRenderer } from '@/lib/workflow/stage-artifact';
@@ -615,11 +615,14 @@ export function useGoLoop(opts: Options) {
           break;
         }
 
+        // "Approve it as it stands": nothing more is checked or applied there.
+        const asItStands = approvedAsItStands([...priorStepsRef.current, ...stepsRef.current], o.stage.id);
+
         // Before the planner is asked: is the next move the user's? (B4)
         const need = repair ? null : needsUser({
           state: o.state, stage: o.stage, facts, stageEvaluation, allowed, policy: current.policy,
           outlineStageId: outlineStageFor(o.template)?.id ?? null, largeJobAcknowledged: largeJobOkRef.current,
-          runAttemptsLeft, lookupDue, routine, commitTried,
+          runAttemptsLeft, lookupDue, routine, commitTried, asItStands,
         });
         if (need) {
           await setRunStatus('awaiting_decision', describeNeed(need, stageLabelFor).message, need);
@@ -638,7 +641,7 @@ export function useGoLoop(opts: Options) {
               params: { stage_id: userReturn.id, reason: `You chose: ${userReturn.answer}`.slice(0, 1_000), work: userReturn.answer.slice(0, 2_000), by_user: true },
             }
           : null) ?? requiredWork({
-          stage: o.stage, facts, stageEvaluation, allowed, lookupDue, routine, commitTried, runAttemptsLeft,
+          stage: o.stage, facts, stageEvaluation, allowed, lookupDue, routine, commitTried, runAttemptsLeft, asItStands,
           ...(loops ? { round: { staleDraft: stageDrafts(o.stage) && !hasDraft } } : {}),
         });
         const choice = required

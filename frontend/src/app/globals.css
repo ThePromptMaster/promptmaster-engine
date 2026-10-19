@@ -90,6 +90,9 @@
   --pm-success: #0f6b45;
   --success-container: #b7f0cf;
   --on-success-container: #00301c;
+  /* Words a newer version added or removed, wherever two versions are compared. */
+  --diff-added: var(--success-container);
+  --diff-removed: var(--error-container);
 
   /* === Secondary === */
   --pm-secondary: #495c95;

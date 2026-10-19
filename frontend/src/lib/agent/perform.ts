@@ -72,6 +72,7 @@ import type { StageFacts } from './facts';
 import type { NeedsUser } from './needs';
 import { deriveExecutionLabel } from './labels';
 import { stageMoveActor } from './policy';
+import { describeVersionChange, versionChange } from '@/lib/workflow/version-change';
 
 export interface PerformContext {
   project: Project;
@@ -816,10 +817,16 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // Go's own apply, told apart from the user's Apply button in the history.
       const created = await ctx.appendStageVersion(ctx.stage.id, ctx.stage.label, { ...appliedFindingsVersion(rev, ctx.project), source_operation: 'agent_apply' });
       const versionId = (created as { id?: unknown } | null)?.id;
+      // What was applied and what it changed, worked out here, so neither the
+      // planner nor the user has to guess (19 Oct, Research › Method).
       return done(key, {
         status: 'succeeded', toolsUsed: ['model'],
         changes: typeof versionId === 'string' ? { version_ids: [versionId] } : {},
-        output: `Applied ${findings.length} finding${findings.length === 1 ? '' : 's'} to ${ctx.stage.label} — saved as a new version.`,
+        output: [
+          `Applied ${findings.length} finding${findings.length === 1 ? '' : 's'} to ${ctx.stage.label} — saved as a new version.`,
+          ...findings.slice(0, 4).map((f) => `Finding: ${f.summary.slice(0, 200)}`),
+          `What changed:\n${describeVersionChange(versionChange(rev.before, rev.after, 6))}`,
+        ].join('\n'),
       });
     }
 

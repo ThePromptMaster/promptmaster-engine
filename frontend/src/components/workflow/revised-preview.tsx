@@ -21,9 +21,7 @@ export function RevisedPreview({
   onKeep: () => void;
   onDiscard: () => void;
 }) {
-  const parts = useMemo(() => diffWords(revision.before, revision.after), [revision]);
-  const added = parts.filter((p) => p.added).reduce((n, p) => n + p.value.trim().split(/\s+/).filter(Boolean).length, 0);
-  const removed = parts.filter((p) => p.removed).reduce((n, p) => n + p.value.trim().split(/\s+/).filter(Boolean).length, 0);
+  const { parts, added, removed } = useWordDiff(revision.before, revision.after);
 
   return (
     <div role="dialog" aria-modal="true" aria-label="Revised version" className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-10">
@@ -39,20 +37,7 @@ export function RevisedPreview({
             <li key={f.id}>{f.summary}</li>
           ))}
         </ul>
-        <div
-          data-testid="revision-diff"
-          className="mt-4 max-h-[55vh] overflow-y-auto whitespace-pre-wrap rounded-lg bg-[var(--surface-container-lowest)] px-4 py-3 text-body leading-relaxed text-[var(--on-surface)]"
-        >
-          {parts.map((p, i) =>
-            p.added ? (
-              <ins key={i} className="rounded-sm bg-[var(--success-container)] text-[var(--on-surface)] no-underline decoration-[var(--pm-success)]">{p.value}</ins>
-            ) : p.removed ? (
-              <del key={i} className="rounded-sm bg-[var(--error-container)] text-[var(--on-surface-variant)]">{p.value}</del>
-            ) : (
-              <span key={i}>{p.value}</span>
-            )
-          )}
-        </div>
+        <DiffText parts={parts} testId="revision-diff" className="mt-4 max-h-[55vh]" />
         <p className="mt-2 text-label text-[var(--on-surface-variant)]">
           Keeping it saves a new version; the current one stays in history.
         </p>
@@ -65,6 +50,38 @@ export function RevisedPreview({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+type DiffPart = ReturnType<typeof diffWords>[number];
+
+/** Two texts as word changes, with the words added and removed counted. */
+export function useWordDiff(before: string, after: string): { parts: DiffPart[]; added: number; removed: number } {
+  return useMemo(() => {
+    const parts = diffWords(before, after);
+    const count = (keep: (p: DiffPart) => boolean) =>
+      parts.filter(keep).reduce((n, p) => n + p.value.trim().split(/\s+/).filter(Boolean).length, 0);
+    return { parts, added: count((p) => Boolean(p.added)), removed: count((p) => Boolean(p.removed)) };
+  }, [before, after]);
+}
+
+/** The text with additions and removals marked in place. */
+export function DiffText({ parts, testId, className = '' }: { parts: DiffPart[]; testId?: string; className?: string }) {
+  return (
+    <div
+      data-testid={testId}
+      className={`overflow-y-auto whitespace-pre-wrap rounded-lg bg-[var(--surface-container-lowest)] px-4 py-3 text-body leading-relaxed text-[var(--on-surface)] ${className}`}
+    >
+      {parts.map((p, i) =>
+        p.added ? (
+          <ins key={i} className="rounded-sm bg-[var(--diff-added)] text-[var(--on-surface)] no-underline">{p.value}</ins>
+        ) : p.removed ? (
+          <del key={i} className="rounded-sm bg-[var(--diff-removed)] text-[var(--on-surface-variant)]">{p.value}</del>
+        ) : (
+          <span key={i}>{p.value}</span>
+        )
+      )}
     </div>
   );
 }
