@@ -539,8 +539,8 @@ describe('a change refused because the stage moved on', () => {
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: /apply as new version/i }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Your change is not applied yet.');
-    await user.click(screen.getByRole('button', { name: 'Apply my change to the new version' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Your change is kept but not applied yet — press "Apply my change to the new version" below.');
+    await user.click(screen.getByRole('button', { name: /^Apply my change to the new version/ }));
     await waitFor(() => expect(applyToAnswer).toHaveBeenCalledTimes(2));
     const history = (applyToAnswer.mock.calls[1][0] as { chat_history: { content: string }[] }).chat_history;
     expect(history.at(-1)!.content).toContain('Instruction: Tighten the opening.');
