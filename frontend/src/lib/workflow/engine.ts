@@ -760,6 +760,12 @@ export type OutstandingItem =
   | { kind: 'carried_forward'; stageId: string; label: string; rows: string[] }
   | { kind: 'unmet_blocking'; stageId: string; label: string; criteria: string[] }
   | { kind: 'blocked_stage'; stageId: string; label: string; reason: string }
+  /**
+   * The latest check of the stage's current draft says it is incomplete or
+   * off the objective, and Go will not move on past it (18 Oct). A model's
+   * judgment, so it is listed but holds nothing up (`blocksCompletion`).
+   */
+  | { kind: 'check_says'; stageId: string; label: string; says: string }
   | { kind: 'go_waiting'; label: string; need: string }
   | { kind: 'objective_unmet'; label: string; blockers: string[] };
 
@@ -768,6 +774,8 @@ export interface OutstandingExtras {
   goWaiting?: string | null;
   /** The latest objective assessment said the objective is not met. */
   objectiveUnmet?: { blockers: string[] } | null;
+  /** What the latest check of the current stage's draft holds against it (`checkVerdict`). */
+  checkSays?: { stageId: string; says: string } | null;
 }
 
 export function outstandingWork(
@@ -828,6 +836,10 @@ export function outstandingWork(
       }
     }
   }
+  if (extras.checkSays) {
+    const stage = template.stages.find((s) => s.id === extras.checkSays!.stageId);
+    if (stage) out.push({ kind: 'check_says', stageId: stage.id, label: stage.short_label || stage.label, says: extras.checkSays.says });
+  }
   if (extras.objectiveUnmet) {
     out.push({ kind: 'objective_unmet', label: 'Objective', blockers: extras.objectiveUnmet.blockers });
   }
@@ -850,6 +862,8 @@ export function describeOutstanding(item: OutstandingItem): string {
       return `${item.label}: ${item.criteria.join('; ')}`;
     case 'blocked_stage':
       return `${item.label} is stuck — ${item.reason}`;
+    case 'check_says':
+      return `${item.label}: the latest check says ${item.says}`;
     case 'go_waiting':
       return `Go is waiting for you: ${item.need}`;
     case 'objective_unmet':
@@ -861,6 +875,7 @@ export function describeOutstanding(item: OutstandingItem): string {
 
 /** Whether an outstanding item holds up "Objective met" and plain "Finish project". Optional rows do not. */
 export function blocksCompletion(item: OutstandingItem): boolean {
+  if (item.kind === 'check_says') return false;
   return !('optional' in item && item.optional);
 }
 
@@ -871,7 +886,8 @@ export function blocksCompletion(item: OutstandingItem): boolean {
  * one of the stage's criteria unless the template made it one.
  */
 export function outstandingBeyondCriteria(items: readonly OutstandingItem[], stageId: string): OutstandingItem[] {
-  return items.filter((i) => !(i.kind === 'unmet_blocking' && i.stageId === stageId));
+  // The check's verdict on this stage is the bar's own status line, not "elsewhere".
+  return items.filter((i) => !((i.kind === 'unmet_blocking' || i.kind === 'check_says') && i.stageId === stageId));
 }
 
 /** Items that are not on the given stage at all. */

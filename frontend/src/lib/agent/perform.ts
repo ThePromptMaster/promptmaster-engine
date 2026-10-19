@@ -34,6 +34,7 @@ import { inputsChanged, stageInputs } from '@/lib/workflow/stage-inputs';
 import { applyTriage, isTriageTable, splitUntriaged } from '@/lib/workflow/triage';
 import { modeForStage } from '@/lib/workflow/stage-mode';
 import { restoreDecided } from '@/lib/workflow/commit-check';
+import { checkVerdict as sharedCheckVerdict } from '@/lib/workflow/check-verdict';
 import { proposeTargets } from '@/lib/workflow/proposals';
 import { proposeStatuses } from '@/lib/workflow/propose';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
@@ -2087,23 +2088,9 @@ function roundContent(ctx: Pick<PerformContext, 'bundles' | 'template' | 'stage'
     .join('\n\n');
 }
 
-/**
- * What the latest check of the current draft says is wrong with it, in words,
- * or null: "incomplete" or "it needs realigning to the objective". Only a
- * check of the head version counts — one about an earlier draft says nothing
- * about this one.
- */
+/** What the latest check of the current draft says is wrong with it (`checkVerdict` in lib/workflow, shared with the stage bar). */
 export function checkVerdict(ctx: Pick<PerformContext, 'latestEvaluation' | 'bundles' | 'stage'>): string | null {
-  const e = ctx.latestEvaluation;
-  const head = ctx.bundles[ctx.stage.id]?.versions.at(-1);
-  if (!e || !head || e.version_id !== head.id) return null;
-  const said: string[] = [];
-  // A planning stage (a question, a method) is not held to the deliverable's
-  // completeness: on production (9 Oct) Method was refused for holding no
-  // computed examples — the report's format, which no method contains.
-  if ((e.completeness_status ?? '').toLowerCase() === 'incomplete' && ctx.stage.group !== 'planning') said.push(`it is incomplete${e.completeness_reason ? ` (${e.completeness_reason.trim().replace(/\.$/, '')})` : ''}`);
-  if (e.needs_realignment) said.push('it needs realigning to the objective');
-  return said.length ? said.join(', and ') : null;
+  return sharedCheckVerdict(ctx.latestEvaluation, ctx.bundles[ctx.stage.id]?.versions.at(-1)?.id, ctx.stage);
 }
 
 /**

@@ -79,6 +79,8 @@ interface Props {
   done?: string | null;
   /** This is the last stage, done, and the project's objective is not met (13 Oct, Sean, workshop). */
   projectOpen?: boolean;
+  /** What the latest check holds against this draft — Go will not move on past it (`checkVerdict`). */
+  checkSays?: string | null;
 }
 
 /**
@@ -106,6 +108,7 @@ export function StageTransitionBar({
   working = null,
   done = null,
   projectOpen = false,
+  checkSays = null,
 }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [whyOpen, setWhyOpen] = useState(false);
@@ -215,7 +218,9 @@ export function StageTransitionBar({
   // move on" beside open work read as two answers. With work open elsewhere it
   // says this stage is done, and where the rest is.
   const statusLine = evaluation.canAdvance
-    ? projectOpen
+    ? checkSays
+      ? `Not ready for Go to move on: the latest check says ${checkSays}`
+      : projectOpen
       ? `This stage's work is done; the project is not finished · ${elsewhere.length || 1} open: ${elsewhere.join('; ') || 'the objective is not met'}. Respond in the notice at the top of this stage.`
       : elsewhere.length
       ? `This stage is done · ${elsewhere.length} still open elsewhere: ${elsewhere.join('; ')}`

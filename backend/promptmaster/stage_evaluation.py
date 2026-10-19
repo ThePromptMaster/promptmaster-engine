@@ -228,6 +228,34 @@ def build_stage_evaluation_prompt(
         *([context_block(inputs), ""] if context_block(inputs) else []),
         f"WHAT THE EARLIER STAGES ESTABLISHED:\n{_format_prior_stages(digest)}",
         "",
+        # 18 Oct (Theory of Everything): a row naming "Check targets" and the
+        # other later stages was called unsupported — the evaluator was never
+        # shown the workflow the drafter was shown.
+        *(
+            [
+                "LATER STAGES OF THIS WORKFLOW (real stages, out of scope here): "
+                + ", ".join(s[:120] for s in digest.later_stages[:40])
+                + ". A reference to one of them is supported by the workflow itself; "
+                "do not call it unsupported, and do not ask this stage to do their work.",
+                "",
+            ]
+            if digest.later_stages
+            else []
+        ),
+        # The same day: a table stage was judged "incomplete" for being a JSON
+        # list rather than a short table. Its rows are stored as items and drawn
+        # as a table; no revision can change that.
+        *(
+            [
+                "HOW THIS ARTIFACT IS SHOWN: its rows are stored as structured items (the JSON "
+                "below) and displayed to the user as a table, one row per item. Judge what the "
+                "rows say. Do not mark it incomplete, or raise a finding, for being JSON, a list "
+                "or not a table.",
+                "",
+            ]
+            if stage.renderer in ("list", "review")
+            else []
+        ),
         *(
             [
                 "THE INSTRUCTION THE USER REVIEWED, which this artifact was produced from:",

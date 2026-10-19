@@ -100,6 +100,11 @@ export interface NextActionInput {
   applyableFixes: number;
   /** No blocking exit criterion is unmet. */
   canAdvance: boolean;
+  /**
+   * What the latest check of the draft holds against it (`checkVerdict`): Go
+   * will not move on past it, so the bar does not say everything is done.
+   */
+  checkSays?: string | null;
   /** This is the workflow's last stage. */
   isLast: boolean;
   /** Short label of the stage after this one, for the button. */
@@ -240,7 +245,9 @@ function chooseAction(input: NextActionInput): StageAction {
     kind: 'continue',
     label: input.canAdvance ? `Continue to ${to}` : `Override and continue to ${to}`,
     reason: input.canAdvance
-      ? clean
+      ? input.checkSays
+        ? `The checklist is met, but the latest check says ${input.checkSays}. Go will not move on until that is fixed; you can still continue yourself.`
+        : clean
         ? done
         : 'Everything this stage needs is done.'
       : 'Some required items are still open — overriding them needs a reason.',
