@@ -31,7 +31,8 @@ test('a new user gets one box, a link warning, one screen and Start', async ({ p
   await expect(page.getByRole('region', { name: 'What you will get' })).toBeVisible();
   // Mode, audience and the rest wait under More options.
   await expect(page.getByLabel('How PromptMaster should think')).toBeHidden();
-  await page.getByText('More options').click();
+  // The disclosure itself: the suggested-constraints note names "More options" too.
+  await page.locator('summary', { hasText: 'More options' }).click();
   await expect(page.getByLabel('How PromptMaster should think')).toBeVisible();
 
   await page.getByRole('button', { name: /^Start / }).click();
