@@ -847,6 +847,26 @@ export function outstandingWork(
   return out;
 }
 
+/**
+ * Per stage: the findings still open on it — undecided rows that are not
+ * optional, rows carried forward as unmet, and measured requirements a
+ * finished stage fails. The rail draws a finished stage with any of these as
+ * "done · N open", not a plain tick (18 Oct, Sean, Summit: "completed-stage
+ * checkmarks alongside unresolved findings").
+ */
+export function openFindingsByStage(items: readonly OutstandingItem[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const item of items) {
+    const n =
+      item.kind === 'open_findings' && !item.optional ? item.count
+      : item.kind === 'carried_forward' ? item.rows.length
+      : item.kind === 'unmet_blocking' ? item.criteria.length
+      : 0;
+    if (n && 'stageId' in item) out[item.stageId] = (out[item.stageId] ?? 0) + n;
+  }
+  return out;
+}
+
 /** One line per item, in the words every surface uses. */
 export function describeOutstanding(item: OutstandingItem): string {
   switch (item.kind) {

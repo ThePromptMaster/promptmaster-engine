@@ -58,6 +58,7 @@ import {
   deliverableStage,
   describeOutstanding,
   outstandingBeyondCriteria,
+  openFindingsByStage,
   outstandingWork,
   tickClosesStage,
 } from '@/lib/workflow/engine';
@@ -441,6 +442,7 @@ export function WorkflowWorkspace({
       }),
     [template, state, context, objectiveAssessment, currentCheckSays]
   );
+  const openFindings = useMemo(() => openFindingsByStage(outstanding), [outstanding]);
   // The last stage reads as finished while the objective is not (13 Oct, Sean,
   // workshop: "Summary appeared completed while the project remained open").
   const projectOpenOn = useMemo(() => {
@@ -1638,6 +1640,7 @@ export function WorkflowWorkspace({
           onSelect={setViewingStageId}
           approvalPendingIds={approvalPendingIds}
           projectOpenOn={projectOpenOn}
+          openFindings={openFindings}
         />
       </aside>
 
@@ -1681,6 +1684,7 @@ export function WorkflowWorkspace({
               template={template}
               state={state}
               projectOpenOn={projectOpenOn}
+              openFindings={openFindings}
               nextSuggestedId={nextSuggested}
               approvalPendingIds={approvalPendingIds}
               onSelect={(stageId) => {

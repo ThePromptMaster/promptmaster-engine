@@ -7,8 +7,8 @@ import { describe, expect, it } from 'vitest';
 
 import { staleRepair } from '@/lib/agent/needs';
 import { partialUpdate } from '@/components/workflow/brief-change-notice';
-import { initialState, outstandingWork, progressCaptionText, progressSummary } from './engine';
-import { carriedForwardUnmet, deferredNotBlocking, itemSchemaFor, type StageItem } from './stage-artifact';
+import { initialState, openFindingsByStage, outstandingWork, progressCaptionText, progressSummary } from './engine';
+import { carriedForwardUnmet, deferredNotBlocking, ITEM_SCHEMAS, itemSchemaFor, positiveVerdict, type StageItem } from './stage-artifact';
 import { SINGLE_OUTPUT_V1 } from './templates/single-output.v1';
 import type { WorkflowState } from './types';
 
@@ -77,5 +77,56 @@ describe('a partial update says what is left', () => {
   });
   it('says nothing before anything is updated', () => {
     expect(partialUpdate(['output'], ['output'], label)).toBeNull();
+  });
+});
+
+// 18 Oct (Sean, Summit): "PromptMaster's workflow also showed … a positive 'No
+// change required' finding carried forward as unmet." Rows from the saved
+// final_pack_check v4: "missing-data register" matched UNMET.
+describe('a finding that reports nothing wrong is never unmet', () => {
+  const schema = ITEM_SCHEMAS.critique_report;
+  const usable: StageItem = {
+    id: 'i7',
+    finding: 'Accept: The pack is practically usable for Summit Precision’s quarterly operating review now. It gives a board-ready sequence from results to … open questions, and a missing-data register.',
+    why_it_matters: 'Usability depends on whether board members can identify what happened, what is known, what is not known.',
+    suggested_change: 'No change required for current-quarter usability. If desired, add page-numbering in the later finalisation stage.',
+    severity: 'minor', status: 'deferred', status_source: 'model',
+    reason: 'Usability should be judged after the accepted factual corrections are reflected.',
+  } as StageItem;
+
+  it('the Summit "No change required" row is listed, not carried forward as unmet', () => {
+    expect(positiveVerdict(usable)).toBe(true);
+    expect(carriedForwardUnmet([usable], schema)).toEqual([]);
+    expect(deferredNotBlocking([usable], schema)).toHaveLength(1);
+    expect(carriedForwardUnmet([{ ...usable, severity: 'major', status_source: 'user' }], schema)).toEqual([]);
+  });
+
+  it('a hyphenated "missing-data" in the finding is not a missing requirement', () => {
+    const r = { ...usable, finding: 'The pack keeps a consolidated missing-data section.', suggested_change: 'Keep it.', status_source: 'user' } as StageItem;
+    expect(carriedForwardUnmet([r], schema)).toEqual([]);
+  });
+
+  it('a caveat, a real gap, or an unmet word in the finding still blocks', () => {
+    const caveat = { ...usable, finding: 'Accept with caveat: it lacks a dedicated assumptions subsection.', suggested_change: 'Add one.', severity: 'moderate' } as StageItem;
+    expect(carriedForwardUnmet([caveat], schema)).toHaveLength(1);
+    const gap = { ...usable, finding: 'The EBITDA bridge is missing from the pack.', suggested_change: 'Add the bridge.', severity: 'moderate' } as StageItem;
+    expect(carriedForwardUnmet([gap], schema)).toHaveLength(1);
+  });
+
+  it('only the finding is read: "missing" in a suggested change is not the row saying something is missing', () => {
+    const r = { ...usable, finding: 'Wording in section 3 is long.', suggested_change: 'Shorten it; the missing sentence about overtime can go.', severity: 'moderate', status_source: 'user' } as StageItem;
+    expect(carriedForwardUnmet([r], schema)).toEqual([]);
+  });
+});
+
+describe('the rail does not tick a stage over open findings', () => {
+  it('counts carried-forward, undecided and measured items per stage, not optional ones', () => {
+    expect(openFindingsByStage([
+      { kind: 'carried_forward', stageId: 'review', label: 'Review', rows: ['a', 'b'] },
+      { kind: 'open_findings', stageId: 'review', label: 'Review', count: 1 },
+      { kind: 'open_findings', stageId: 'summary', label: 'Summary', count: 3, optional: true },
+      { kind: 'unmet_blocking', stageId: 'output', label: 'Output', criteria: ['Summary: at most 100 words'] },
+      { kind: 'go_waiting', label: 'Go', need: 'x' },
+    ])).toEqual({ review: 3, output: 1 });
   });
 });

@@ -1,5 +1,6 @@
 'use client';
 
+import { isDone } from '@/lib/workflow/types';
 import type {
   StageDefinition,
   StageGroup,
@@ -70,9 +71,14 @@ interface Props {
    * completed while the project remained open").
    */
   projectOpenOn?: string | null;
+  /**
+   * Per stage, findings still open (`openFindingsByStage`): a finished stage
+   * with any is drawn "done · N open", not a plain tick (18 Oct, Sean, Summit).
+   */
+  openFindings?: Readonly<Record<string, number>>;
 }
 
-export function StageRail({ template, state, nextSuggestedId, onSelect, approvalPendingIds, projectOpenOn }: Props) {
+export function StageRail({ template, state, nextSuggestedId, onSelect, approvalPendingIds, projectOpenOn, openFindings }: Props) {
   // Group consecutive stages so the rail reads as phases rather than a flat
   // list of 13. Consecutive, not sorted: a template may legitimately revisit a
   // group later (Research returns to planning for Mechanism).
@@ -104,6 +110,7 @@ export function StageRail({ template, state, nextSuggestedId, onSelect, approval
               const leftOpen = openElsewhere && Boolean(state.stages[stage.id]?.left_open);
               const awaitingApproval = status === 'in_progress' && Boolean(approvalPendingIds?.has(stage.id));
               const projectOpen = projectOpenOn === stage.id;
+              const openCount = isDone(status) && !projectOpen ? openFindings?.[stage.id] ?? 0 : 0;
 
               return (
                 <li key={stage.id}>
@@ -119,7 +126,7 @@ export function StageRail({ template, state, nextSuggestedId, onSelect, approval
                   >
                     <span
                       aria-hidden
-                      className={`material-symbols-outlined text-[18px] ${openElsewhere || projectOpen ? 'text-[var(--pm-tertiary)]' : statusColor(status, isCurrent)}`}
+                      className={`material-symbols-outlined text-[18px] ${openElsewhere || projectOpen || (openCount && !isCurrent) ? 'text-[var(--pm-tertiary)]' : statusColor(status, isCurrent)}`}
                     >
                       {projectOpen ? 'pending_actions' : openElsewhere ? OPEN_ELSEWHERE_ICON : STATUS_ICON[status]}
                     </span>
@@ -173,6 +180,15 @@ export function StageRail({ template, state, nextSuggestedId, onSelect, approval
                         className="shrink-0 text-label uppercase tracking-wide text-[var(--pm-tertiary)]"
                       >
                         reopened
+                      </span>
+                    )}
+
+                    {openCount > 0 && (
+                      <span
+                        title={`Done, with ${openCount} finding${openCount === 1 ? '' : 's'} still open — open the stage to see ${openCount === 1 ? 'it' : 'them'}`}
+                        className="shrink-0 text-label uppercase tracking-wide text-[var(--pm-tertiary)]"
+                      >
+                        done · {openCount} open
                       </span>
                     )}
 
