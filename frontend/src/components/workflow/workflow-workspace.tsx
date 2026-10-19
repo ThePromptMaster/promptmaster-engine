@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { StageHeader } from './stage-header';
 import { StageRail } from './stage-rail';
-import { ExitCriteriaChecklist } from './exit-criteria-checklist';
+import { approvedVersions, ExitCriteriaChecklist } from './exit-criteria-checklist';
 import { MORE_GROUPS, StageTransitionBar, type MoreAction } from './stage-transition-bar';
 import { ConfirmOverwrite } from './renderers/stage-chrome';
 import { CheckpointPanel } from './checkpoint-panel';
@@ -163,6 +163,9 @@ interface Props {
 
 /** Per-viewer convenience only: whether this person last left the side chat open. */
 const CHAT_OPEN_KEY = 'pm.sideChatOpen';
+
+/** Versions saved by applying a check's findings, by Go or by the user's Apply. */
+const APPLIED_SOURCES = new Set(['agent_apply', 'applied_findings']);
 
 export function WorkflowWorkspace({
   project: projectProp,
@@ -895,7 +898,10 @@ export function WorkflowWorkspace({
   const handleToggleManual = useCallback(
     async (id: string, checked: boolean) => {
       const manual_checks = { ...(project.manual_checks ?? {}), [id]: checked };
-      onPatchProject({ manual_checks });
+      // Which version the approval was given on (19 Oct).
+      const head = stageBundles[stageId]?.versions.at(-1)?.id;
+      const others = Object.fromEntries(Object.entries(project.manual_check_versions ?? {}).filter(([k]) => k !== id));
+      onPatchProject({ manual_checks, manual_check_versions: checked && head ? { ...others, [id]: head } : others });
 
       // Ticking the last required box on a stage that was left open closes
       // it. The tick is the user's declaration, so the event is theirs
@@ -1560,6 +1566,18 @@ export function WorkflowWorkspace({
       : undefined;
   // The stuck card names the stage bar's own transition button in the words
   // that are on the page ("Continue to X" or "Override and continue to X").
+  // The stage Go is asking about, when its newest version came from applied
+  // findings: the question card shows what that version changed (19 Oct).
+  const goAskedOn = go.steps.at(-1)?.stage_id ?? state.current_stage_id;
+  const [goPrior, goLatest] = goAskedOn ? (stageBundles[goAskedOn]?.versions ?? []).slice(-2) : [];
+  const goLatestChange = goPrior && goLatest && APPLIED_SOURCES.has(goLatest.source_operation)
+    ? {
+        stageLabel: template.stages.find((s) => s.id === goAskedOn)?.label ?? 'the stage',
+        version: goLatest.version_number, previous: goPrior.version_number,
+        before: goPrior.content, after: goLatest.content, summary: goLatest.change_summary ?? '',
+      }
+    : null;
+
   const goNeedContextOnPage = {
     ...goNeedContext,
     advanceControl: pageControls?.find((c) => c.id === 'advance')?.label ?? null,
@@ -1882,6 +1900,7 @@ export function WorkflowWorkspace({
               dockHost={goDockHost}
               routine={{ value: project.routine_decisions ?? 'ask', onChange: (v) => void setRoutineDecisions(v) }}
               stageModes={{ value: project.stage_modes ?? 'stage', onChange: (v) => onPatchProject({ stage_modes: v }) }}
+              latestChange={goLatestChange}
             />
           )}
           {isCurrent && project.status === 'finalized' && (
@@ -2149,6 +2168,7 @@ export function WorkflowWorkspace({
               criteria={evaluation.criteria}
               manualIds={manualIds}
               committedByPolicy={committedByPolicy}
+              approvedVersions={approvedVersions(stageBundles[stageId]?.versions ?? [], project.manual_check_versions)}
               onToggleManual={(id, checked) => void handleToggleManual(id, checked)}
               readOnly={!isEditable}
               collapsible={foldStageExtras}

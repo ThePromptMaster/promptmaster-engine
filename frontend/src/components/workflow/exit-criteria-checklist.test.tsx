@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { ExitCriteriaChecklist } from './exit-criteria-checklist';
+import { approvedVersions, ExitCriteriaChecklist } from './exit-criteria-checklist';
 
 const auto = { id: 'a', label: 'Every finding resolved or dismissed', satisfied: false, blocking: false };
 const approve = { id: 'm', label: 'I approve this review', satisfied: false, blocking: true, manual: true };
@@ -26,5 +26,25 @@ describe('the checklist folds on a check stage (3 Oct call)', () => {
     render(<ExitCriteriaChecklist criteria={[auto]} onToggleManual={() => {}} />);
     expect(screen.getByText('Every finding resolved or dismissed')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /To finish this stage/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('an approval says which version it was given on (19 Oct)', () => {
+  const versions = [{ id: 'v3', version_number: 3 }, { id: 'v4', version_number: 4 }];
+
+  it('only an approval given on an earlier version than the current one is listed', () => {
+    expect(approvedVersions(versions, { m: 'v3', other: 'v4', gone: 'v1' })).toEqual({ m: { approved: 3, current: 4 } });
+    expect(approvedVersions([], { m: 'v3' })).toEqual({});
+  });
+
+  it('the ticked box says "approved v3 · current v4"', () => {
+    render(
+      <ExitCriteriaChecklist
+        criteria={[{ ...approve, satisfied: true }]}
+        onToggleManual={() => {}}
+        approvedVersions={approvedVersions(versions, { m: 'v3' })}
+      />
+    );
+    expect(screen.getByText('approved v3 · current v4')).toBeInTheDocument();
   });
 });

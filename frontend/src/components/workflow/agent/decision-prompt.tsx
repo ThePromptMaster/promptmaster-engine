@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { actionLabel } from '@/lib/agent/actions';
 import { MarkdownOutput } from '@/components/shared/markdown-output';
+import { DiffText, useWordDiff } from '@/components/workflow/revised-preview';
 import type { AgentStep } from '@/types/agent';
 import type { AnswerContradiction } from '@/lib/api/client';
 
@@ -74,8 +75,15 @@ export function QuestionPrompt({
   onTick,
   expertPackage,
   choices = [],
+  change,
 }: {
   question: string;
+  /**
+   * The stage's latest version came from applied findings: what it changed,
+   * shown beside the question (19 Oct, Research › Method — Go asked which
+   * version should go forward and could not say what the newer one changed).
+   */
+  change?: LatestChange;
   /** One-click answers (13 Oct, Sean: "which version should govern" was a typed answer). */
   choices?: string[];
   /** Q3a: the package prepared for an expert's review, as markdown. */
@@ -108,6 +116,7 @@ export function QuestionPrompt({
     <section aria-label="Go mode asks you" className="rounded-xl bg-[var(--surface-container-highest)] px-5 py-4">
       <p className="text-label uppercase tracking-wide text-[var(--on-surface-variant)]">Go mode asks</p>
       <p className="mt-1 text-body text-[var(--on-surface)]">{question}</p>
+      {change && <WhatChanged change={change} />}
       {expertPackage && <ExpertPackageCard markdown={expertPackage} />}
       {choices.length > 0 && (
         <div aria-label="Answers" className="mt-3 flex flex-wrap gap-2">
@@ -251,5 +260,39 @@ function ExpertPackageCard({ markdown }: { markdown: string }) {
         </button>
       </div>
     </details>
+  );
+}
+
+export interface LatestChange {
+  stageLabel: string;
+  version: number;
+  previous: number;
+  before: string;
+  after: string;
+  summary: string;
+}
+
+/** What the newest version changed against the one before, in place. */
+function WhatChanged({ change }: { change: LatestChange }) {
+  const [open, setOpen] = useState(false);
+  const { parts, added, removed } = useWordDiff(change.before, change.after);
+  return (
+    <div aria-label="What changed" className="mt-3 rounded-lg bg-[var(--surface-container)] px-4 py-3">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-2 text-left text-title text-[var(--on-surface)]"
+      >
+        <span>
+          What changed in {change.stageLabel} v{change.version} (against v{change.previous}) ·{' '}
+          <span className="text-[var(--pm-success)]">+{added} words</span> ·{' '}
+          <span className="text-[var(--pm-error)]">−{removed} words</span>
+        </span>
+        <span aria-hidden className="material-symbols-outlined text-[20px]">{open ? 'expand_less' : 'expand_more'}</span>
+      </button>
+      {change.summary && <p className="mt-1 text-label text-[var(--on-surface-variant)]">{change.summary}</p>}
+      {open && <DiffText parts={parts} testId="what-changed-diff" className="mt-2 max-h-[40vh]" />}
+    </div>
   );
 }

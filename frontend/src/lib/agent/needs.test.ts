@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { BOOK_V1 } from '@/lib/workflow/templates/book.v1';
 import { initialState, projectState } from '@/lib/workflow/engine';
 import type { StageEvaluation, WorkflowEvent } from '@/lib/workflow/types';
-import { delegableToCommit, describeNeed, needIsDecidedOnStage, needStillHolds, needsUser, requiredWork, type NeedsUser } from './needs';
+import { approvedAsItStands, delegableToCommit, describeNeed, needIsDecidedOnStage, needStillHolds, needsUser, requiredWork, type NeedsUser } from './needs';
 import { RESEARCH_V1 } from '@/lib/workflow/templates/research.v1';
 
 const stage = (id: string) => BOOK_V1.stages.find((s) => s.id === id)!;
@@ -484,4 +484,31 @@ describe('the objective check\'s stop (11 Oct, survey brief)', () => {
 it('met while still on the stage: the button finishes it, not "carry on to" it', () => {
   const d = describeNeed({ kind: 'objective_check', stageId: 'output', finding: 'stages_left', items: ['Output', 'Summary'], next: 'Output' }, (id) => (id === 'output' ? 'Output' : id));
   expect(d.options?.[0].label).toBe('Finish Output and carry on');
+});
+
+describe('"Approve it as it stands" (19 Oct, Research › Method screenshot)', () => {
+  const approval = [{ id: 'method.approved', label: 'I approve this analysis plan for execution', satisfied: false, blocking: true, manual: true }];
+  const allowed = ['evaluate_stage', 'apply_findings', 'revise_stage'];
+  const step = (over: Record<string, unknown>) =>
+    ({ stage_id: 'method', action_key: 'request_user_decision', output: '', changes: {}, ...over }) as never;
+  const pending = { draft: { truncated: false, checked: false }, evaluationFindings: { count: 1, aboutHead: true } } as never;
+
+  it('the production answer, given after the latest version, means approve as it stands', () => {
+    const steps = [step({ action_key: 'revise_stage', changes: { version_ids: ['v3'] } }), step({}), step({ action_key: 'user_answer', output: 'Approve the analysis plan as it stands' })];
+    expect(approvedAsItStands(steps, 'method')).toBe(true);
+  });
+
+  it('a newer version, a later different answer, or another stage does not count', () => {
+    const said = step({ action_key: 'user_answer', output: 'Approve the analysis plan as it stands' });
+    expect(approvedAsItStands([said, step({ action_key: 'apply_findings', changes: { version_ids: ['v4'] } })], 'method')).toBe(false);
+    expect(approvedAsItStands([said, step({ action_key: 'user_answer', output: 'Check the latest version first, then I\'ll decide' })], 'method')).toBe(false);
+    expect(approvedAsItStands([said], 'experiment')).toBe(false);
+  });
+
+  it('nothing is checked or applied: the approval tick is what is left', () => {
+    const args = { stage: { ...stage('positioning'), id: 'method' }, facts: pending, stageEvaluation: evaluation('method', approval), allowed };
+    expect(requiredWork(args)?.key).toBe('apply_findings');
+    expect(requiredWork({ ...args, asItStands: true })).toBeNull();
+    expect(needsUser({ ...base, ...args, asItStands: true })).toMatchObject({ kind: 'tick_criterion', criterionId: 'method.approved' });
+  });
 });

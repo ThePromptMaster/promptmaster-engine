@@ -27,6 +27,31 @@ interface Props {
    * never approved by the user.
    */
   committedByPolicy?: Record<string, string>;
+  /**
+   * Approvals given on an earlier version than the one now current, by
+   * criterion id (`approvedVersions`): "approved v3 · current v4".
+   */
+  approvedVersions?: Record<string, { approved: number; current: number }>;
+}
+
+/**
+ * The ticked approvals that were given on an earlier version than the
+ * stage's current one (19 Oct, Research › Method: Go saved a newer version
+ * after the user approved, and nothing said which one the tick was for). Pure.
+ */
+export function approvedVersions(
+  versions: readonly { id: string; version_number: number }[],
+  given: Readonly<Record<string, string>> = {}
+): Record<string, { approved: number; current: number }> {
+  const head = versions.at(-1);
+  if (!head) return {};
+  const out: Record<string, { approved: number; current: number }> = {};
+  for (const [criterion, versionId] of Object.entries(given)) {
+    if (versionId === head.id) continue;
+    const approved = versions.find((v) => v.id === versionId);
+    if (approved) out[criterion] = { approved: approved.version_number, current: head.version_number };
+  }
+  return out;
 }
 
 /**
@@ -49,6 +74,7 @@ export function ExitCriteriaChecklist({
   readOnly = false,
   collapsible = false,
   committedByPolicy = {},
+  approvedVersions: olderApprovals = {},
 }: Props) {
   // A box only the user can tick is never folded away, ticked or not.
   const needsYou = criteria.some((c) => c.manual ?? manualIds.has(c.id));
@@ -115,6 +141,11 @@ export function ExitCriteriaChecklist({
             )}
             {manual && c.authority === 'delegable' && !c.satisfied && (
               <span className="ml-2 text-label uppercase tracking-wide text-[var(--on-surface-variant)]">routine</span>
+            )}
+            {c.satisfied && olderApprovals[c.id] && (
+              <span data-approved-version className="ml-2 text-label text-[var(--pm-tertiary)]">
+                approved v{olderApprovals[c.id].approved} · current v{olderApprovals[c.id].current}
+              </span>
             )}
             {c.satisfied && committedByPolicy[c.id] !== undefined && (
               <span className="mt-0.5 block text-label leading-snug text-[var(--on-surface-variant)]">

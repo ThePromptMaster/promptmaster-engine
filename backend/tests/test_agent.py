@@ -694,3 +694,24 @@ def test_a_question_for_a_missing_value_states_the_limit_it_must_meet():
     from promptmaster.agent import _NEXT_ACTION_INSTRUCTION
     assert "$12 per person or less ($240 approved / 20 attendees)" in _NEXT_ACTION_INSTRUCTION
     assert "Use only figures the record gives" in _NEXT_ACTION_INSTRUCTION
+
+
+def test_the_latest_change_reaches_the_planner():
+    """19 Oct, Research › Method: asked what an applied finding changed, Go said
+    "I cannot see what the one applied finding changed". The client works the
+    change out in code and the planner is told it, with the instruction to say it."""
+    from promptmaster.agent import AgentLatestChange
+
+    state = STATE.model_copy(update={
+        "latest_change": AgentLatestChange(
+            version=4, previous=3, how="agent_apply",
+            summary="Applied from the stage check: 4 figures have no source",
+            diff="− Effect size 13.5%\n+ Effect size (to be estimated from the pilot)",
+        ),
+    })
+    _, user = build_next_action_prompt(INPUTS, state, RESEARCH, "guided")
+    assert "LATEST CHANGE ON THIS STAGE (v4 against v3, agent apply: Applied from the stage check: 4 figures have no source)" in user
+    assert "never say you cannot see it" in user
+    assert "+ Effect size (to be estimated from the pilot)" in user
+    _, without = build_next_action_prompt(INPUTS, STATE, RESEARCH, "guided")
+    assert "LATEST CHANGE" not in without

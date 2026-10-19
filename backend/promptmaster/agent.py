@@ -143,6 +143,17 @@ class AgentStageRef(BaseModel):
     label: str = Field(default="", max_length=200)
 
 
+class AgentLatestChange(BaseModel):
+    """What the stage's latest version changed against the one before, worked
+    out by the client in code (19 Oct, Research › Method: Go told the user "I
+    cannot see what the one applied finding changed")."""
+    version: int = 0
+    previous: int = 0
+    how: str = Field(default="", max_length=100)
+    summary: str = Field(default="", max_length=1_000)
+    diff: str = Field(default="", max_length=4_000)
+
+
 class AgentState(BaseModel):
     """What the planner may know. Assembled by the client from the project.
 
@@ -180,6 +191,8 @@ class AgentState(BaseModel):
     return_targets: list[AgentStageRef] = Field(default_factory=list, max_length=12)
     #: The project's "Routine decisions": 'handle' when they are Go's to make.
     routine_decisions: str = Field(default="", max_length=20)
+    #: What the stage's latest version changed. None for a first version.
+    latest_change: AgentLatestChange | None = None
 
 
 class NextAction(BaseModel):
@@ -383,6 +396,18 @@ def _format_state(inputs: PMInput, state: AgentState) -> str:
         )
     else:
         facts.append("BUTTONS ON THIS PAGE NOW: none. Do not name any button.")
+    if state.latest_change is not None:
+        # 19 Oct (Research › Method): asked what an applied finding changed, Go
+        # said it could not see it. The change is computed by the client.
+        c = state.latest_change
+        facts.append(
+            f"LATEST CHANGE ON THIS STAGE (v{c.version} against v{c.previous}"
+            + (f", {c.how.replace('_', ' ')}" if c.how else "")
+            + (f": {c.summary.strip()}" if c.summary.strip() else "")
+            + "). Lines removed (−) and added (+), worked out in code — when the user asks what "
+            "changed, say this; never say you cannot see it:\n"
+            + (c.diff.strip() or "(no text changed)")
+        )
     if state.tools:
         facts.append("TOOLS: " + ", ".join(f"{k}={'yes' if v else 'no'}" for k, v in sorted(state.tools.items())))
     workflow_line = (

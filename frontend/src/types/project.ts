@@ -120,6 +120,11 @@ export interface Project {
    */
   routine_decisions?: RoutineDecisions;
   /**
+   * The stage version each ticked approval was given on, by criterion id
+   * (19 Oct). Display only — "approved v3 · current v4".
+   */
+  manual_check_versions?: Record<string, string>;
+  /**
    * 13 Oct: 'stage' — each stage is worked in its recommended mode (Critique
    * as Cold Critic); 'project' — the project's mode on every stage.
    */
@@ -306,6 +311,7 @@ export type ProjectPatch = Partial<
     | 'stage'
     | 'status'
     | 'manual_checks'
+    | 'manual_check_versions'
     | 'routine_decisions'
     | 'stage_modes'
     | 'critique_intensity'

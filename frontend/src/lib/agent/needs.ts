@@ -133,6 +133,27 @@ export function onlyApprovalLeft(stageEvaluation: StageEvaluation): boolean {
   return blockingUnmet.length > 0 && stageEvaluation.unmet.every((c) => c.manual);
 }
 
+/** "Approve it as it stands", "approve as is", "no further changes". */
+const AS_IT_STANDS = /\b(?:as it stands|as is|without (?:further |more )?(?:changes|checks|checking)|no (?:further|more) changes)\b/i;
+
+/**
+ * The user's latest answer on this stage, given since its latest saved
+ * version, says to approve that version as it stands. Go then checks and
+ * applies nothing more there: on production (19 Oct, Research › Method) it
+ * checked again and applied a finding straight after "Approve the analysis
+ * plan as it stands", and the user was asked to approve a version they had
+ * not seen. Pure.
+ */
+export function approvedAsItStands(steps: readonly AgentStep[], stageId: string): boolean {
+  for (let i = steps.length - 1; i >= 0; i--) {
+    const s = steps[i];
+    if (s.stage_id !== stageId) continue;
+    if (s.changes?.version_ids?.length) return false;
+    if (s.action_key === 'user_answer') return AS_IT_STANDS.test(s.output) && /\b(?:approv|accept|keep)/i.test(s.output);
+  }
+  return false;
+}
+
 function authorityOf(stage: StageDefinition, criterionId: string): 'delegable' | 'reserved' {
   return stage.exit_criteria.find((c) => c.id === criterionId)?.authority === 'delegable' ? 'delegable' : 'reserved';
 }
@@ -380,6 +401,8 @@ export function requiredWork(input: {
   round?: { staleDraft: boolean };
   /** Computations the run may still try against this table (`runAttemptsFor`). */
   runAttemptsLeft?: number;
+  /** The user said to approve the current version as it stands (`approvedAsItStands`). */
+  asItStands?: boolean;
 }): RequiredMove | null {
   const { stage, facts, stageEvaluation, allowed, round } = input;
   const can = (k: string) => allowed.includes(k);
@@ -446,14 +469,14 @@ export function requiredWork(input: {
   if (!onlyApprovalLeft(stageEvaluation) || !facts.draft) return null;
 
   const findings = facts.evaluationFindings;
-  if (findings?.aboutHead && findings.count > 0 && can('apply_findings')) {
+  if (!input.asItStands && findings?.aboutHead && findings.count > 0 && can('apply_findings')) {
     return {
       key: 'apply_findings',
       rationale: `Only your approval is left on ${stage.label}, and the stage check raised ${findings.count} finding${findings.count === 1 ? '' : 's'} Go can fix first.`,
       expected: 'A new version with the findings applied.',
     };
   }
-  if (!facts.draft.checked && can('evaluate_stage')) {
+  if (!input.asItStands && !facts.draft.checked && can('evaluate_stage')) {
     return {
       key: 'evaluate_stage',
       rationale: `Only your approval is left on ${stage.label}; checking this version first, so you approve work that has been checked.`,
@@ -501,6 +524,8 @@ export function needsUser(input: {
    * out, the project holds data, and the run has not yet tried once per row.
    */
   runAttemptsLeft?: number;
+  /** The user said to approve the current version as it stands (`approvedAsItStands`). */
+  asItStands?: boolean;
 }): NeedsUser | null {
   const { state, stage, facts, stageEvaluation, allowed, policy, outlineStageId } = input;
 
@@ -568,7 +593,7 @@ export function needsUser(input: {
     allowed.includes('return_to_stage') ||
     // An optional automatic item still open is something a lookup or a run may settle.
     (!onlyApprovalLeft(stageEvaluation) && allowed.some((k) => REASONING_MOVES.has(k))) ||
-    requiredWork({ stage, facts, stageEvaluation, allowed, routine: input.routine, commitTried: input.commitTried }) !== null;
+    requiredWork({ stage, facts, stageEvaluation, allowed, routine: input.routine, commitTried: input.commitTried, asItStands: input.asItStands }) !== null;
   // A routine approval whose check failed is repaired, not asked about: Go
   // revises toward it and checks again (Sean, 5 Oct: "'Ask the user' should
   // not be the default response to every failed check").

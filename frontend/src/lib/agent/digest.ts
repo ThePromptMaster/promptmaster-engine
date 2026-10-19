@@ -31,6 +31,7 @@ import type { AgentTools } from './policy';
 import { NO_TOOLS } from './policy';
 import type { StageFacts } from './facts';
 import { PLACE_WORDS, type StageControl } from '@/lib/workflow/stage-controls';
+import { describeVersionChange, versionChange } from '@/lib/workflow/version-change';
 
 /** The backend's cap on `artifact_excerpt` (AgentState in promptmaster/agent.py) — marker included. */
 export const ARTIFACT_EXCERPT_CHARS = 12_000;
@@ -101,6 +102,11 @@ export interface AgentStateDigest {
   tools: AgentTools;
   /** The project's "Routine decisions" (Q1b): the planner makes routine choices itself under 'handle'. */
   routine_decisions?: string;
+  /**
+   * What the stage's latest version changed against the one before, worked
+   * out in code (19 Oct: "I cannot see what the one applied finding changed").
+   */
+  latest_change?: { version: number; previous: number; how: string; summary: string; diff: string };
 }
 
 function cap(text: string, max: number): string {
@@ -171,7 +177,16 @@ export function buildAgentState(input: {
   const outlineApproved = facts?.outline?.approved ?? facts?.outlineApproved ?? input.outlineApproved ?? approvedOutline.length > 0;
   const dataFiles = input.dataFiles ?? [];
   const tools = dataFiles.length ? { ...(input.tools ?? NO_TOOLS), datasets: true } : (input.tools ?? NO_TOOLS);
-  const head = bundles[stage.id]?.versions.at(-1)?.content ?? '';
+  const versions = bundles[stage.id]?.versions ?? [];
+  const head = versions.at(-1)?.content ?? '';
+  const [prior, latest] = versions.slice(-2);
+  const latestChange = latest && prior
+    ? {
+        version: latest.version_number, previous: prior.version_number,
+        how: latest.source_operation, summary: (latest.change_summary ?? '').slice(0, 400),
+        diff: describeVersionChange(versionChange(prior.content, latest.content)),
+      }
+    : null;
   const next = nextSuggestedStage(template, state);
   const index = template.stages.findIndex((s) => s.id === stage.id);
   const ev = latestEvaluation;
@@ -328,5 +343,6 @@ export function buildAgentState(input: {
     workflow: describeWorkflow(template),
     tools,
     ...(input.routine ? { routine_decisions: input.routine } : {}),
+    ...(latestChange ? { latest_change: latestChange } : {}),
   };
 }
