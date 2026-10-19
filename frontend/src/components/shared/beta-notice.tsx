@@ -92,15 +92,17 @@ export function BetaNotice() {
     // over its text on a phone (14 Oct, Sean).
     if (pathname === '/') return null;
     return (
-      <div className="pointer-events-none fixed bottom-4 left-4 z-50">
+      // Icon only on a phone: the labelled chip covered the primary button of
+      // the new-project page at 390px (19 Oct, production pass).
+      <div className="pointer-events-none fixed bottom-2 left-2 z-50 sm:bottom-4 sm:left-4">
         <button
           type="button"
           onClick={reopen}
           aria-label="Show the beta notice"
-          className="pointer-events-auto flex items-center gap-2 rounded-full bg-[var(--surface-container-high)] px-4 py-2 text-label uppercase tracking-wider text-[var(--on-surface-variant)] shadow-lg transition-opacity hover:opacity-90"
+          className="pointer-events-auto flex items-center gap-2 rounded-full bg-[var(--surface-container-high)] p-2 text-label uppercase tracking-wider text-[var(--on-surface-variant)] shadow-lg transition-opacity hover:opacity-90 sm:px-4 sm:py-2"
         >
-          <span className="material-symbols-outlined text-[20px]">science</span>
-          Beta
+          <span aria-hidden className="material-symbols-outlined text-[18px] sm:text-[20px]">science</span>
+          <span className="hidden sm:inline">Beta</span>
         </button>
       </div>
     );
