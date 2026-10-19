@@ -98,3 +98,30 @@ export function describeCarried(n: NewerFixes): string {
   const round = n.rounds === 1 ? 'second' : n.rounds === 2 ? 'third' : `${n.rounds + 1}th`;
   return `Carried forward: ${count} newer fix${count === 1 ? '' : 'es'} from the ${round} review, left open on the review instead of going back again. Accept any of them to have it applied.`;
 }
+
+/**
+ * Going back for fixes Go has already carried forward is not asked either.
+ *
+ * 19 Oct, production (FIELDGUIDE copy, after the rounds counted across runs):
+ * Go carried five newer fixes forward, then on its next move asked "Five fixes
+ * from the latest review are still open. Should I accept them and go back to
+ * Output?" — the same trip back, asked about the rows it had just set aside.
+ * The rows stay open on the review for the user to accept; the run finishes
+ * and names them. Returns the rationale for finishing, or null to ask.
+ */
+export function reasksCarried(args: {
+  question: string;
+  isReviewStage: boolean;
+  items: readonly StageItem[];
+  policy: ExecutionPolicy;
+  routine: RoutineDecisions;
+}): string | null {
+  if (!args.isReviewStage || args.policy !== 'autonomous' || args.routine !== 'handle') return null;
+  if (!MERGE_ASK.test(args.question)) return null;
+  const carried = args.items.filter((i) => i.status === 'deferred' && i.reason === CARRY_REASON);
+  if (!carried.length) return null;
+  // An accepted fix not yet carried is a new round: `carryNewerFixes` decides it.
+  if (args.items.some((i) => i.status === 'accepted' && i.status_source === 'user')) return null;
+  const n = carried.length;
+  return `${n} newer fix${n === 1 ? ' is' : 'es are'} already carried forward on the review under your routine-decision policy, so going back for ${n === 1 ? 'it' : 'them'} is not asked again. They stay open there for you to accept; finishing names them.`;
+}

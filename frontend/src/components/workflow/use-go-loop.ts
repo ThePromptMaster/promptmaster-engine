@@ -38,7 +38,7 @@ import { api, type AnswerContradiction } from '@/lib/api/client';
 import { actionFor, actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, ROUTINE_DEFAULT_STEP, stepActionLabel, USER_ANSWER_STEP, whatApprovalDoes } from '@/lib/agent/actions';
 import { contextWithFacts, readOutcomeProof, readStageFacts, type StageFacts } from '@/lib/agent/facts';
 import { serializeItems, stageDrafts } from '@/lib/workflow/stage-artifact';
-import { carryNewerFixes, describeCarried } from '@/lib/agent/review-rounds';
+import { carryNewerFixes, describeCarried, reasksCarried } from '@/lib/agent/review-rounds';
 import { approvedAsItStands, delegableToCommit, exhaustedRepair, policyConfirmable, repairStuckNeed, repairTries, staleRepair, describeNeed, NEED_CLEARED, NEED_MOVED_ON, needStillHolds, needsUser, requiredWork, type NeedsUser } from '@/lib/agent/needs';
 import { assertHonestOutcome, verifyOutcome } from '@/lib/agent/outcome';
 import { outlineStageFor } from '@/lib/outline/actions';
@@ -713,6 +713,17 @@ export function useGoLoop(opts: Options) {
             await o.onRefresh?.();
             continue;
           }
+        }
+        // Nor is going back for the fixes it just carried forward (19 Oct, FIELDGUIDE).
+        const carriedNote = !required && (performer === 'ask' || performer === 'return') && facts.review && allowed.includes('declare_objective_complete')
+          ? reasksCarried({
+              question: `${choice.decision_question ?? ''} ${choice.rationale ?? ''}`,
+              isReviewStage: effectiveRenderer(o.stage) === 'review',
+              items: facts.review.items, policy: current.policy, routine,
+            })
+          : null;
+        if (carriedNote) {
+          Object.assign(choice, { action_key: 'declare_objective_complete', params: {}, rationale: carriedNote, expected_outcome: 'The objective judged with the carried-forward fixes named.', needs_user_decision: false, decision_question: null });
         }
         // Before a question interrupts the user: does it hold the work up? (Q1b)
         if (!required && actionFor(choice.action_key)?.performer === 'ask') {
