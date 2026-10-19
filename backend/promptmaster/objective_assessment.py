@@ -190,6 +190,12 @@ def build_assessment_prompt(
         "A blocker is actionable: where the recorded figures fix what the missing value must be, say so with "
         "the calculation (a confirmed lunch price of $12 per person or less: $240 approved / 20 attendees), "
         "and ask for exactly that value. Use only figures the record gives.\n"
+        # 19 Oct (prod pass, FIELDGUIDE copy): the deliverable said the Final
+        # review's rows were "not among the documents available", and the check
+        # asked the user to paste rows the project already held.
+        "A blocker is something only the user can supply from outside the project. Work already saved in this "
+        "project — another stage's rows, findings or drafts — is never a blocker, even when the deliverable says it "
+        "could not see it: mark the requirement \"not_met\" and name the work still to apply.\n"
         "List each requirement separately in \"criteria\" — every part of the objective, every accepted "
         "requirement and constraint — at most 12. Mark one \"not_checked\" when the text alone cannot show it "
         "(how many pages it prints to, how it looks, anything outside the text). A heading is not a basis.\n"

@@ -460,3 +460,11 @@ def test_the_prompt_keeps_exercise_material_out_of_proposed_next():
         assert "INSIDE fictional, sample, practice, training or exercise material" in prompt
     finally:
         app.dependency_overrides.pop(get_client, None)
+
+
+def test_work_saved_in_the_project_is_never_a_blocker():
+    # 19 Oct (prod pass, FIELDGUIDE copy): the check asked the user to paste
+    # the Final review rows the project already held.
+    _system, user = build_assessment_prompt(_inputs(), "Final", LOG, STEPS)
+    assert "Work already saved in this project" in user
+    assert "is never a blocker" in user

@@ -71,6 +71,7 @@ import type { AgentStateDigest } from './digest';
 import type { StageFacts } from './facts';
 import type { NeedsUser } from './needs';
 import { deriveExecutionLabel } from './labels';
+import { returnInstruction } from './return-work';
 import { stageMoveActor } from './policy';
 
 export interface PerformContext {
@@ -1447,9 +1448,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       }
       const head = ctx.bundles[target.id]?.versions.at(-1)?.content ?? '';
       if (ctx.appendStageVersion && head.trim() && target.renderer !== 'long_form' && target.renderer !== 'outline') {
-        const instruction = rendererHoldsItems(target.renderer)
-          ? `Further investigation asked for by ${ctx.stage.label}: ${work}\nAdd a row for each piece of this work that is not already in the table. Keep every existing row, its text and its status exactly as they are.`
-          : `Further investigation asked for by ${ctx.stage.label}: ${work}\nRevise to take this in. Keep everything that still holds exactly as it is.`;
+        const instruction = returnInstruction(ctx.stage, ctx.bundles[ctx.stage.id]?.versions.at(-1)?.content, target, work);
         try {
           const fresh = await withFreshManuscript(ctx.template, target, ctx.bundles).catch(() => ctx.bundles);
           const res = await api.generateStageArtifact(generationRequest(ctx.project, ctx.template, ctx.state, fresh, target, head, instruction), ctx.signal);
