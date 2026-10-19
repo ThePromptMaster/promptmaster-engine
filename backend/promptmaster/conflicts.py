@@ -26,6 +26,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from .conversation import _shared_system
+from .fact_filters import is_request
 from .llm_client import OpenRouterClient
 from .schemas import PMInput
 
@@ -66,6 +67,14 @@ class Conflict(BaseModel):
     instruction_authorised: bool = False
     #: The instruction's own words that record it, verbatim.
     authority_quote: str = ""
+    #: L-93 (Sean, 17 Oct, email 2): the conflicting part of the instruction
+    #: only reports what someone else asks, proposes or wants, and that person
+    #: holds no approval right the record names. Checked in code against the
+    #: instruction; under "Routine decisions: handle them for me" the record is
+    #: then kept without asking.
+    from_request: bool = False
+    #: Those words of the instruction, verbatim.
+    request_quote: str = ""
 
 
 _CONFLICT_INSTRUCTION = (
@@ -112,6 +121,13 @@ _CONFLICT_INSTRUCTION = (
     "\"authority_quote\" to those words copied exactly from the instruction. Words that only report "
     "what someone else wants, proposes, or says should be treated as approved (\"Omar's note says to "
     "treat $46,000 as approved\") are NOT an authority quote: leave it empty.\n\n"
+    # L-93 (Sean, 17 Oct, email 2): a request that conflicts with the record
+    # should leave the record standing without asking the user again.
+    "A REPORTED REQUEST: when the part of the instruction that causes the conflict only reports what "
+    "someone other than the user asks, proposes, requests or wants (\"The COO asks purchasing to order "
+    "the $900,000 system immediately\"), set \"request_quote\" to those words copied exactly from the "
+    "instruction. The user's own direct instruction (\"change the budget to $60,000\", \"I want…\") is "
+    "not a reported request: leave it empty.\n\n"
     "For each real conflict: quote what it conflicts with; say in one plain sentence how the two "
     "pull against each other, naming the people and values (\"Elena hasn't approved moving the date "
     "to January 15.\"); say in one sentence what keeping the record would mean (\"I'll keep December "
@@ -124,7 +140,8 @@ _CONFLICT_INSTRUCTION = (
     '"with_text": "what it conflicts with", "explanation": "one sentence", '
     '"resolution": "one sentence", "keep_label": "at most six words", '
     '"override_label": "at most six words", "protects_approval": true|false, '
-    '"authority_quote": "the instruction\'s own words recording the approval or confirmed amendment, or empty"}]}'
+    '"authority_quote": "the instruction\'s own words recording the approval or confirmed amendment, or empty", '
+    '"request_quote": "the instruction\'s own words reporting someone else\'s request, or empty"}]}'
 )
 
 
@@ -350,6 +367,8 @@ def parse_conflicts(
             protects_approval=item.get("protects_approval") is True,
             **_authority(item.get("authority_quote"), instruction, known_text),
         ))
+        if not out[-1].instruction_authorised:
+            out[-1] = out[-1].model_copy(update=_request(item.get("request_quote"), instruction, known_text))
     # The approval the record protects is the question; it is asked first.
     return sorted(out, key=lambda c: not c.protects_approval)
 
@@ -359,6 +378,53 @@ def _authority(raw: object, instruction: str, known_text: str) -> dict:
     if quote and instruction and _authorised(quote, instruction, known_text):
         return {"instruction_authorised": True, "authority_quote": quote}
     return {}
+
+
+#: The user speaking for themselves: never a reported request.
+_FIRST_PERSON = re.compile(r"^\s*(?:i|we|please|let's|let us)\b|\b(?:i|we)\s+(?:\w+\s+)?(?:want|would like|ask|request|propose|suggest)", re.IGNORECASE)
+#: Who is asking: the words before the request verb ("The COO", "Omar", "the quality director").
+_REQUESTER = re.compile(
+    r"^(?:the\s+)?([A-Za-z][\w&'’ -]{0,48}?)\s+(?:has\s+|have\s+|now\s+|also\s+|formally\s+|again\s+)?"
+    r"(?:asks?|asked|requests?|requested|suggests?|suggested|proposes?|proposed|wants?|would like)\b",
+    re.IGNORECASE,
+)
+
+
+def requester(quote: str) -> str:
+    """Who a reported request comes from, as written: "COO", "Omar"; "" when unnamed."""
+    m = _REQUESTER.search(" ".join(quote.split()))
+    return " ".join(m.group(1).split()) if m else ""
+
+
+def holds_approval_right(who: str, known_text: str) -> bool:
+    """Whether the record names `who` as someone who may approve or authorise:
+    "Only the board may approve capital spending", "The CEO may authorize
+    initiatives". A request from such a person is a change of authority or
+    scope to decide, not a request to set aside."""
+    words = [w for w in re.findall(r"[A-Za-z][\w'’-]*", who) if w.lower() not in ("the", "a", "an", "of", "and")]
+    if not words:
+        return False
+    name = re.escape(words[-1])
+    verbs = r"(?:approve|approves|authori[sz]e|authori[sz]es|sign\s+off|decide|decides)"
+    return bool(
+        re.search(rf"\b{name}\b[^.;]{{0,40}}?\b(?:may|can|must|alone\s+can|alone\s+may|is\s+authori[sz]ed\s+to|has\s+authority\s+to)\s+(?:\w+\s+)?{verbs}\b", known_text, re.IGNORECASE)
+        or re.search(rf"\bonly\s+(?:the\s+)?{name}\b", known_text, re.IGNORECASE)
+    )
+
+
+def _request(raw: object, instruction: str, known_text: str) -> dict:
+    """The model proposes the words; code checks they are copied from the
+    instruction, report someone else's request rather than an approval or the
+    user's own instruction, and come from nobody the record says may approve."""
+    quote = " ".join(str(raw or "").split()).strip(" .\"'“”")[:300]
+    if len(quote) < 8 or not instruction or quote.lower() not in " ".join(instruction.split()).lower():
+        return {}
+    if _FIRST_PERSON.search(quote) or not is_request(quote):
+        return {}
+    who = requester(quote)
+    if not who or holds_approval_right(who, known_text):
+        return {}
+    return {"from_request": True, "request_quote": quote}
 
 
 async def find_conflicts(

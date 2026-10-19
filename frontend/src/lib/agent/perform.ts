@@ -22,8 +22,9 @@ import { describeLines, isChangeNote, keepUnasked, structureDropped } from '@/li
 import { addedClaims, noInventedDetails, suppliedText } from '@/lib/workflow/fact-boundary';
 import { isDone } from '@/lib/workflow/types';
 import { appliedFindingsVersion, carryUserFields, findingsInstruction, reviseWithFindings } from '@/lib/workflow/apply-findings';
-import { findInstructionConflicts } from '@/lib/workflow/conflict-trail';
+import { findInstructionConflicts, recordConflictChoice } from '@/lib/workflow/conflict-trail';
 import { choiceLabels, gist, type InstructionConflict } from '@/lib/workflow/instruction-conflicts';
+import { keepWithoutAsking, routinePrecedenceNote, type KeptConflicts } from '@/lib/workflow/routine-conflicts';
 import { defaultOutlineForm, deriveOutlineItems, sectionRecords } from '@/lib/workflow/derived-outline';
 import { confirmableProposals, itemSchemaFor, parseItems, proposableStatuses, rendererHoldsItems, serializeItems } from '@/lib/workflow/stage-artifact';
 import { enoughWorksFound, lookupQueries, recordLine, rowsFromSearch } from '@/lib/workflow/lookup';
@@ -249,6 +250,39 @@ function askWhichTakesPriority(key: string, params: Record<string, unknown>, ins
     stop: { status: 'awaiting_decision', reason: question },
     needs: { kind: 'answer_question', question, choices: [keep, override] },
   });
+}
+
+/**
+ * L-93 (Sean, 17 Oct, email 2: "can the system preserve those facts and
+ * continue without asking the user to reconfirm them?"): under Autonomous
+ * with routine decisions handed to Go, Go's own revision never overrides the
+ * accepted record. The record is kept, the choice goes on the decision trail
+ * as the policy's, and the revision goes ahead within it. Null when it must
+ * be asked (`keepWithoutAsking` says when).
+ */
+async function keptUnderRoutine(
+  ctx: PerformContext,
+  instruction: string,
+  conflicts: InstructionConflict[]
+): Promise<{ instruction: string; precedence: string; note: string; params: { routine_conflict_kept: KeptConflicts } } | null> {
+  const r = keepWithoutAsking(conflicts, {
+    routineHandled: ctx.run.policy === 'autonomous' && ctx.project.routine_decisions === 'handle',
+    origin: 'go',
+  });
+  if (!r.keep) return null;
+  await Promise.all(
+    conflicts.map((conflict) =>
+      recordConflictChoice({ projectId: ctx.project.id, userId: ctx.project.user_id, stageId: ctx.stage.id, instruction, conflict, controls: 'existing', routine: true })
+        .catch(() => undefined)
+    )
+  );
+  const precedence = conflicts.map(routinePrecedenceNote).join(' ');
+  return {
+    instruction: `${instruction}\n${precedence}`,
+    precedence,
+    note: `${r.note} Kept under your routine-decision policy; "Apply it anyway" on this step asks you which takes priority.`,
+    params: { routine_conflict_kept: { instruction: instruction.slice(0, 4_000), conflicts, note: r.note } },
+  };
 }
 
 /**
@@ -600,13 +634,17 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       const head = ctx.bundles[ctx.stage.id]?.versions.at(-1)?.content ?? '';
       const revising = actionFor(key)!.performer === 'revise';
       const instruction = typeof params.instruction === 'string' ? params.instruction : '';
+      let routineKept: Awaited<ReturnType<typeof keptUnderRoutine>> = null;
       if (revising && instruction && !ctx.conflictAnswer) {
         const conflicts = await findInstructionConflicts({
           project: ctx.project, stageId: ctx.stage.id, instruction,
           headVersionId: ctx.bundles[ctx.stage.id]?.versions.at(-1)?.id ?? null,
           stage: { label: ctx.stage.label, instruction: ctx.stage.entry_prompt_hint },
         });
-        if (conflicts.length) return askWhichTakesPriority(key, params, instruction, conflicts);
+        if (conflicts.length) {
+          routineKept = await keptUnderRoutine(ctx, instruction, conflicts);
+          if (!routineKept) return askWhichTakesPriority(key, params, instruction, conflicts);
+        }
       }
       // The instruction used to reach only the version's metadata, never the
       // model: "revise" was "regenerate with the old draft as context" (B0).
@@ -614,7 +652,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       const fresh = await readManuscript(ctx, ctx.stage);
       if (!fresh) return manuscriptMissing(key, ctx.stage);
       const res = await api.generateStageArtifact(
-        generationRequest(ctx.project, ctx.template, ctx.state, fresh, ctx.stage, revising ? head : '', revising ? withDerivation(withAnswer(instruction, ctx.conflictAnswer), ctx.derived) : ''),
+        generationRequest(ctx.project, ctx.template, ctx.state, fresh, ctx.stage, revising ? head : '', revising ? withDerivation(routineKept?.instruction ?? withAnswer(instruction, ctx.conflictAnswer), ctx.derived) : ''),
         ctx.signal
       );
       const generated = generationContent(ctx.stage, res);
@@ -685,7 +723,8 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         status: 'succeeded', toolsUsed: ['model'],
         // What changed, so the record can be checked against the project (SN-25).
         changes: typeof versionId === 'string' ? { version_ids: [versionId] } : {},
-        output: `${revising ? 'Revised' : 'Drafted'} ${ctx.stage.label} — saved as a new version (${content.length.toLocaleString()} characters).${checked.notes.length ? ` ${checked.notes.join(' ')}` : ''}`,
+        output: `${revising ? 'Revised' : 'Drafted'} ${ctx.stage.label} — saved as a new version (${content.length.toLocaleString()} characters).${checked.notes.length ? ` ${checked.notes.join(' ')}` : ''}${routineKept ? ` ${routineKept.note}` : ''}`,
+        ...(routineKept ? { params: { ...params, ...routineKept.params } } : {}),
       });
     }
 
@@ -798,18 +837,25 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       if (!head?.content.trim() || !findings.length) {
         return done(key, { status: 'failed', output: 'There are no findings on the current draft to apply.', toolsUsed: [], changes: {} });
       }
+      let routineKept: Awaited<ReturnType<typeof keptUnderRoutine>> = null;
       if (!ctx.conflictAnswer) {
         const conflicts = await findInstructionConflicts({
           project: ctx.project, stageId: ctx.stage.id, instruction: findingsInstruction(findings), headVersionId: head.id,
           stage: { label: ctx.stage.label, instruction: ctx.stage.entry_prompt_hint },
         });
-        if (conflicts.length) return askWhichTakesPriority(key, params, findings.map((f) => f.summary).join('; '), conflicts);
+        if (conflicts.length) {
+          const asked = findings.map((f) => f.summary).join('; ');
+          routineKept = await keptUnderRoutine(ctx, asked, conflicts);
+          if (!routineKept) return askWhichTakesPriority(key, params, asked, conflicts);
+        }
       }
       const rev = await reviseWithFindings({
         project: ctx.project, content: head.content,
         findings: ctx.conflictAnswer
           ? [...findings, { id: 'priority', category: 'Priority', summary: 'Which takes priority, as the user decided', suggested_change: ctx.conflictAnswer }]
-          : findings,
+          : routineKept
+            ? [...findings, { id: 'priority', category: 'Priority', summary: 'Which takes priority, under the routine-decision policy', suggested_change: routineKept.precedence }]
+            : findings,
         source: 'the stage check', signal: ctx.signal,
         // A table is revised as rows, by the generator that drafted it.
         ...(rendererHoldsItems(ctx.stage.renderer)
@@ -828,7 +874,9 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
           `Applied ${findings.length} finding${findings.length === 1 ? '' : 's'} to ${ctx.stage.label} — saved as a new version.`,
           ...findings.slice(0, 4).map((f) => `Finding: ${f.summary.slice(0, 200)}`),
           `What changed:\n${describeVersionChange(versionChange(rev.before, rev.after, 6))}`,
+          ...(routineKept ? [routineKept.note] : []),
         ].join('\n'),
+        ...(routineKept ? { params: { ...params, ...routineKept.params } } : {}),
       });
     }
 

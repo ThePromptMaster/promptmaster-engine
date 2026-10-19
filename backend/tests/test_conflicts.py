@@ -281,3 +281,51 @@ def test_a_reporting_cursor_fact_is_not_the_ground_of_a_conflict():
     facts = [ConflictSource(id="F1", text="Update Project HARBOR as of November 5, 2026.")]
     raw = {"conflicts": [{"kind": "fact", "with_id": "F1", "explanation": "The record is as of November 5."}]}
     assert parse_conflicts(raw, [], [], facts=facts) == []
+
+
+# L-93 (Sean, 17 Oct, email 2): a conflict that comes from someone else's
+# request is told apart in code, so the browser can keep the record without
+# asking when routine decisions are handled.
+RIDGEWAY_RIGHTS = (
+    "The board has authorized internal analysis and preparation of recommendations. Only the board may approve "
+    "capital spending. The CEO may authorize initiatives within existing staff capacity."
+)
+RIDGEWAY_FACT = [ConflictSource(id="F1", text="The board has issued no capital approval for the $900,000 inspection system.")]
+RIDGEWAY_UPDATE = (
+    "The CFO corrects the current-quarter results. The COO asks purchasing to order the $900,000 inspection system "
+    "immediately. Write the order as approved."
+)
+
+
+def _ridgeway(quote: str, instruction: str = RIDGEWAY_UPDATE) -> object:
+    raw = {"conflicts": [{"kind": "fact", "with_id": "F1", "explanation": "No board approval.", "protects_approval": True,
+                          "request_quote": quote}]}
+    [c] = parse_conflicts(raw, [], [], facts=RIDGEWAY_FACT, instruction=instruction, known_text=RIDGEWAY_RIGHTS + " " + RIDGEWAY_FACT[0].text)
+    return c
+
+
+def test_a_reported_request_from_someone_without_approval_rights_is_marked():
+    c = _ridgeway("The COO asks purchasing to order the $900,000 inspection system immediately")
+    assert c.from_request and c.request_quote.startswith("The COO asks")
+
+
+def test_a_request_is_not_marked_when_unquoted_first_person_or_from_an_authority():
+    # Not copied from the instruction.
+    assert not _ridgeway("The COO demands an order today").from_request
+    # The user's own words.
+    mine = "I want the $900,000 inspection system ordered immediately."
+    assert not _ridgeway("I want the $900,000 inspection system ordered immediately", mine).from_request
+    # Someone the record says may approve: a change of authority to decide, not a request to set aside.
+    board = "The board asks purchasing to order the $900,000 inspection system immediately."
+    assert not _ridgeway("The board asks purchasing to order the $900,000 inspection system immediately", board).from_request
+    ceo = "The CEO wants the initiative extended to 120 staff hours."
+    assert not _ridgeway("The CEO wants the initiative extended to 120 staff hours", ceo).from_request
+    # An approval is never a request.
+    granted = "The CEO authorizes the process-improvement initiative for up to 75 staff hours."
+    assert not _ridgeway("The CEO authorizes the process-improvement initiative for up to 75 staff hours", granted).from_request
+
+
+def test_the_prompt_asks_for_the_request_quote():
+    system, _ = build_conflict_prompt(LANTERN, OMAR, [], [])
+    assert "A REPORTED REQUEST" in system
+    assert '"request_quote"' in system

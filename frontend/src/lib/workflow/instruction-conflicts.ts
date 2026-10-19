@@ -40,6 +40,9 @@ export interface InstructionConflict {
   /** The instruction's own words record the approval or a confirmed amendment (checked in code, 17 Oct). */
   instruction_authorised?: boolean;
   authority_quote?: string;
+  /** The conflicting words only report someone else's request, from nobody the record lets approve (checked in code, L-93). */
+  from_request?: boolean;
+  request_quote?: string;
 }
 
 export interface ConflictSource {

@@ -889,7 +889,7 @@ export const api = {
     other_instructions: { id: string; text: string }[];
     stage?: { label: string; instruction: string };
     model?: string;
-  }): Promise<{ conflicts: { kind: 'objective' | 'constraint' | 'decision' | 'fact' | 'instruction'; with_id: string; with_text: string; explanation: string; keep_label?: string; override_label?: string; resolution?: string; protects_approval?: boolean; instruction_authorised?: boolean; authority_quote?: string }[] }> {
+  }): Promise<{ conflicts: { kind: 'objective' | 'constraint' | 'decision' | 'fact' | 'instruction'; with_id: string; with_text: string; explanation: string; keep_label?: string; override_label?: string; resolution?: string; protects_approval?: boolean; instruction_authorised?: boolean; authority_quote?: string; from_request?: boolean; request_quote?: string }[] }> {
     return apiFetch('/api/check-conflicts', { method: 'POST', body: JSON.stringify(req) });
   },
 
