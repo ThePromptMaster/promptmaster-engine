@@ -192,3 +192,68 @@ def test_no_material_adds_nothing_and_a_long_brief_is_cut_for_setup():
     long_prompt = build_setup_prompt("x", None, "y" * (SETUP_MATERIAL_MAX * 3))
     assert long_prompt.count("y") <= SETUP_MATERIAL_MAX + 5
     assert "the rest is in the project context" in long_prompt
+
+
+# ---------------------------------------------------------------------------
+# The simple start (Sean, 18 Oct, email 7): fewer questions, and links said
+# plainly to be unreadable.
+# ---------------------------------------------------------------------------
+
+def test_simple_start_caps_the_guide_and_says_so_in_the_prompt():
+    prompt = _capture_prompt(
+        "/api/guide-next-question",
+        {"objective": "A cookbook of family recipes", "answered": [{"question": "Who is it for?", "answer": "My kids"}], "max_questions": 3},
+        {"enough": True, "reason": "Enough."},
+    )
+    assert "At most 3 questions in all; 1 asked." in prompt
+    # The full intake says nothing about a cap.
+    full = _capture_prompt(
+        "/api/guide-next-question",
+        {"objective": "A cookbook of family recipes", "answered": []},
+        {"enough": True, "reason": "Enough."},
+    )
+    assert "questions in all" not in full
+
+
+def test_simple_start_stops_at_its_cap_without_a_call():
+    fake_client = AsyncMock()
+    fake_client.generate_json = AsyncMock(return_value=({"enough": True}, {}))
+    app.dependency_overrides[get_client] = lambda: fake_client
+    answered = [{"question": f"Q{i}", "answer": "a"} for i in range(3)]
+    try:
+        response = TestClient(app).post(
+            "/api/guide-next-question", json={"objective": "x", "answered": answered, "max_questions": 3}
+        )
+        too_many = TestClient(app).post(
+            "/api/guide-next-question", json={"objective": "x", "answered": [], "max_questions": 40}
+        )
+    finally:
+        app.dependency_overrides.pop(get_client, None)
+    assert response.status_code == 200
+    assert response.json()["enough"] is True
+    fake_client.generate_json.assert_not_called()
+    # Never more than the server's own limit.
+    assert too_many.status_code == 422
+
+
+def test_setup_and_front_door_say_links_cannot_be_opened():
+    from promptmaster.front_door import build_front_door_prompt, DraftBrief, Turn
+    from promptmaster.setup_suggester import SETUP_SUGGESTER_SYSTEM
+
+    fake_client = AsyncMock()
+    fake_client.generate_json = AsyncMock(return_value=(
+        {"mode": "clarity", "audience": "General", "constraints": "", "output_format": "", "rationale": {}}, {}
+    ))
+    app.dependency_overrides[get_client] = lambda: fake_client
+    try:
+        TestClient(app).post("/api/generate-setup", json={"objective": "A cookbook from https://www.instagram.com/somecook/"})
+    finally:
+        app.dependency_overrides.pop(get_client, None)
+    system = fake_client.generate_json.call_args.kwargs["system"]
+    assert system == SETUP_SUGGESTER_SYSTEM
+    assert "cannot open links, web pages or videos" in system
+    assert "uses only text and files the user supplies" in system
+
+    front_system, _ = build_front_door_prompt([Turn(role="user", content="Use the videos on my YouTube channel")], DraftBrief())
+    assert "cannot open links, web pages or videos" in front_system
+    assert "never write as if you had seen it" in front_system

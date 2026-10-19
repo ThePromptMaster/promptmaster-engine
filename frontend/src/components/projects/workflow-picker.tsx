@@ -13,7 +13,7 @@ const ICON: Record<string, string> = {
  * A one-line promise per workflow. The template's own description is written
  * for the stage list; this is written for someone deciding.
  */
-const PITCH: Record<string, string> = {
+export const PITCH: Record<string, string> = {
   book: 'Long-form writing that has to hold together across chapters.',
   research: 'An investigation where the method matters as much as the result.',
   single_output: 'One deliverable — a memo, a brief, a report — drafted, checked and finished in minutes.',
