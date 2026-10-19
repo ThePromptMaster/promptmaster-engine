@@ -344,20 +344,41 @@ export function projectState(
   const set = (id: string, patch: Partial<StageState>) => {
     state.stages[id] = { ...(state.stages[id] ?? { status: 'not_started' }), ...patch };
   };
+  // Moving into a stage that is awaiting a recheck does not recheck it (19 Oct,
+  // FIELDGUIDE copy): Realign, built on Output v5, became "in progress" when
+  // Go moved on from Output v8, so its repair never ran and Go checked the
+  // old version twice as if it were the new package.
+  // When each stage last changed, and when each skipped stage was skipped: a
+  // skipped stage keeps its old draft, and coming back to it after an earlier
+  // stage changed is coming back to work built on something else.
+  const changedAt: Record<string, string> = {};
+  const skippedAt: Record<string, string> = {};
+  const enter = (id: string, at: string) => {
+    const status = state.stages[id]?.status;
+    const skipped = skippedAt[id];
+    const changed = status === 'skipped' && skipped
+      ? order.slice(0, order.indexOf(id)).find((u) => (changedAt[u] ?? '') > skipped)
+      : undefined;
+    if (changed) {
+      const label = template.stages[order.indexOf(changed)]?.label ?? changed;
+      set(id, { status: 'stale', entered_at: at, skipped_reason: undefined, stale: { reason: `${label} changed after this stage was skipped.`, since: at, was: 'in_progress' } });
+    } else {
+      set(id, status === 'stale' ? { entered_at: at } : { status: 'in_progress', entered_at: at });
+    }
+    state.current_stage_id = id;
+  };
 
   for (const event of events) {
     switch (event.type) {
       case 'stage_entered':
-        set(event.stage_id, { status: 'in_progress', entered_at: event.created_at });
-        state.current_stage_id = event.stage_id;
+        enter(event.stage_id, event.created_at);
         break;
 
       // Legacy: every log written before PM-13 projects exactly as it did.
       case 'stage_completed':
         set(event.stage_id, { status: 'complete', completed_at: event.created_at, left_open: false, stale: undefined });
         if (event.to_stage_id) {
-          set(event.to_stage_id, { status: 'in_progress', entered_at: event.created_at });
-          state.current_stage_id = event.to_stage_id;
+          enter(event.to_stage_id, event.created_at);
         }
         break;
 
@@ -375,6 +396,7 @@ export function projectState(
         // box, on the version it was left with, flags nothing.
         const prior = state.stages[event.stage_id];
         const before = prior?.evidence_version_id ?? prior?.left_version_id;
+        if (typeof evidence === 'string' && evidence !== before) changedAt[event.stage_id] = event.created_at;
         if (!event.to_stage_id && typeof evidence === 'string' && before && before !== evidence) {
           const cutoff = order.indexOf(event.stage_id);
           // With its reason and time, like every other reopening (13 Oct): a
@@ -397,8 +419,7 @@ export function projectState(
           stale: undefined,
         });
         if (event.to_stage_id) {
-          set(event.to_stage_id, { status: 'in_progress', entered_at: event.created_at });
-          state.current_stage_id = event.to_stage_id;
+          enter(event.to_stage_id, event.created_at);
         }
         break;
       }
@@ -413,8 +434,7 @@ export function projectState(
           ...(event.reason ? { left_reason: event.reason } : {}),
         });
         if (event.to_stage_id) {
-          set(event.to_stage_id, { status: 'in_progress', entered_at: event.created_at });
-          state.current_stage_id = event.to_stage_id;
+          enter(event.to_stage_id, event.created_at);
         }
         break;
       }
@@ -457,9 +477,9 @@ export function projectState(
 
       case 'stage_skipped':
         set(event.stage_id, { status: 'skipped', skipped_reason: event.reason });
+        skippedAt[event.stage_id] = event.created_at;
         if (event.to_stage_id) {
-          set(event.to_stage_id, { status: 'in_progress', entered_at: event.created_at });
-          state.current_stage_id = event.to_stage_id;
+          enter(event.to_stage_id, event.created_at);
         }
         break;
 
@@ -485,6 +505,7 @@ export function projectState(
       case 'stage_version_saved': {
         const cutoff = order.indexOf(event.stage_id);
         if (cutoff < 0) break;
+        changedAt[event.stage_id] = event.created_at;
         // A draft in progress that was reopened is answered by its next
         // version, made with the change known (13 Oct, Sean's PINE pack: the
         // objective check's "measured 150 words" stayed on Output through a
@@ -535,6 +556,7 @@ export function projectState(
         });
         set(target, { status: 'in_progress', entered_at: event.created_at });
         state.current_stage_id = target;
+        changedAt[target] = event.created_at;
         break;
       }
 
