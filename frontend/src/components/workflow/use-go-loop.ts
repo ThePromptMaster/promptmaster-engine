@@ -884,7 +884,11 @@ export function useGoLoop(opts: Options) {
   const authorizeAndStart = useCallback(
     async (chosen: Exclude<ExecutionPolicy, 'guided'>) => {
       const o = latest.current;
-      if (!o.stage || startingRef.current) return;
+      if (startingRef.current) return;
+      if (!o.stage) {
+        setError('Go has no stage to start from yet. Reload the page and press Go.');
+        return;
+      }
       startingRef.current = true;
       setAuthorizing(chosen);
       try {
