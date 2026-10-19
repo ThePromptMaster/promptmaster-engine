@@ -245,6 +245,20 @@ def test_a_length_the_model_miscounted_is_overruled_by_the_count_code_made():
     assert "Overruled by the count made in code" in a.model_note
 
 
+def test_a_long_reason_with_code_notes_appended_still_parses():
+    """19 Oct (FIELDGUIDE copy): a 600-character reason plus "[Overruled by the
+    count made in code: …]" broke the 600 limit on `model_note`; the check
+    raised and the browser saw a dropped connection, twice."""
+    a = parse_assessment({
+        "outcome": "not_met", "reason": "The brief exceeds 200 words. " + "It needs work throughout. " * 40,
+        "basis_quote": "The survey will tell us why customers renew.",
+        "criteria": [{"requirement": "Capped at 200 words", "verdict": "not_met", "basis": "About 230 words."}],
+    }, BRIEF, [], [], MEASURED)
+    assert len(a.model_note) <= 600
+    assert a.model_note.endswith("…")
+    assert a.model_note.startswith("The brief exceeds 200 words.")
+
+
 def test_a_miscount_stated_only_in_the_reason_is_overruled_too():
     a = parse_assessment({"outcome": "not_met", "reason": "The saved deliverable exceeds 200 words."}, BRIEF, [], [], MEASURED)
     assert a.outcome == "partly"  # nothing quoted: not recorded as met, and not as a failure

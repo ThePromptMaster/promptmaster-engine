@@ -625,8 +625,12 @@ def parse_assessment(
     return ObjectiveAssessment(
         outcome=outcome,
         criteria=criteria[:MAX_CRITERIA],
-        model_note=note,
-        unmet=unmet,
+        # The notes code appends ("[Overruled by the count made in code: …]")
+        # took a 600-character reason past the field's limit, and the check
+        # failed as a 500 the browser reported as a dropped connection (19 Oct,
+        # FIELDGUIDE copy, and three times on another account that evening).
+        model_note=note if len(note) <= 600 else f"{note[:599].rstrip()}…",
+        unmet=unmet[:MAX_CRITERIA + 30],
         reason=reason[:600],
         basis_quote=quote,
         blockers=blockers[:MAX_BLOCKERS],
