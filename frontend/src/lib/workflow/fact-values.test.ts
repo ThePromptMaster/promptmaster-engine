@@ -34,6 +34,15 @@ describe('the values a fact states (8 Oct; Sean, 7 Oct, TeamNotes)', () => {
     expect(leftoverValues('The launch moved from November 12 to November 19.', s)).toHaveLength(0);
     expect(leftoverValues('{"items":[{"claim":"Launch is November 12","status":"matches"}]}', s)).toHaveLength(1);
   });
+
+  it('a value the text says was not adopted is history, not left behind (19 Oct, Ridgeway copy)', () => {
+    const s = supersededValues(
+      'The quality director proposes a process-improvement initiative requiring 100 staff hours over five weeks.',
+      'The CEO authorized the process-improvement initiative for up to 75 staff hours over five weeks.',
+    );
+    expect(leftoverValues('Its capacity condition was also tied to the 100 hours, which were not adopted.', s)).toHaveLength(0);
+    expect(leftoverValues('The initiative uses 100 staff hours over five weeks.', s)).toHaveLength(1);
+  });
 });
 
 describe('superseded values from a recorded answer (8 Oct, production)', () => {

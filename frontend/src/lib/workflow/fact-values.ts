@@ -154,8 +154,10 @@ export function answered(statement: string): string {
  * $18", "do not use $24", "previously November 12". Such a sentence reports
  * the value; it does not state it as current (8 Oct, production: a reviewed
  * prompt restating the two sources could never pass the leftover check).
+ * "Not adopted" reports a proposal the record replaced (19 Oct, Ridgeway copy:
+ * "tied to the 100 hours, which were not adopted" failed two repairs).
  */
-const ATTRIBUTED = /\b(sources?|exclud\w*|conflict\w*|supersed\w*|instead of|replac\w*|previous\w*|earlier|formerly|alternative\w*|no longer|rather than|do not use|don't use|not use|was (?:originally|initially)|histor(?:y|ical)|changed from|originally|request(?:s|ed)?|asks?|asked|declined|rejected|propos(?:al|als|ed|es)|v\d+)\b/i;
+const ATTRIBUTED = /\b(sources?|exclud\w*|conflict\w*|supersed\w*|instead of|replac\w*|previous\w*|earlier|formerly|alternative\w*|no longer|rather than|do not use|don't use|not use|was (?:originally|initially)|histor(?:y|ical)|changed from|originally|request(?:s|ed)?|asks?|asked|declined|rejected|not (?:adopted|approved|authori[sz]ed|taken up)|propos(?:al|als|ed|es)|v\d+)\b/i;
 
 /**
  * A section that records history: a change log, a decision log, superseded
