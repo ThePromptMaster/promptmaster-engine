@@ -1,0 +1,99 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+
+import {
+  ACCENTS,
+  applyColours,
+  DEFAULT_COLOURS,
+  loadColours,
+  PALETTES,
+  saveColours,
+  STARTING,
+  type ColourPreferences,
+} from '@/lib/appearance/colours';
+
+/**
+ * Applies the colours this browser chose, after the first render: the server
+ * renders the stylesheet's defaults, so applying them in an effect keeps the
+ * hydrated markup identical.
+ */
+export function ApplyColourPreferences() {
+  useEffect(() => {
+    applyColours(loadColours());
+  }, []);
+  return null;
+}
+
+/** Accent, starting-version colour and version palette, from the account menu (Sean, 18 Oct). */
+export function ColourPicker() {
+  const [prefs, setPrefs] = useState<ColourPreferences>(() => (typeof window === 'undefined' ? DEFAULT_COLOURS : loadColours()));
+
+  const choose = (next: Partial<ColourPreferences>) => {
+    const merged = { ...prefs, ...next };
+    setPrefs(merged);
+    applyColours(merged);
+    saveColours(merged);
+  };
+
+  const swatch = (selected: boolean, colour: string, label: string, onPick: () => void) => (
+    <button
+      key={label}
+      type="button"
+      onClick={onPick}
+      aria-pressed={selected}
+      aria-label={label}
+      title={label}
+      className={`h-7 w-7 rounded-full transition-transform hover:scale-110 ${selected ? 'ring-2 ring-[var(--on-surface)] ring-offset-2 ring-offset-[var(--surface-container-lowest)]' : ''}`}
+      style={{ background: colour }}
+    />
+  );
+
+  return (
+    <div aria-label="Colours" className="space-y-3 px-4 py-2">
+      <fieldset>
+        <legend className="text-label text-[var(--on-surface-variant)]">Accent</legend>
+        <div className="mt-1.5 flex flex-wrap gap-2">
+          {ACCENTS.map((a) => swatch(prefs.accent === a.id, a.colour, `Accent: ${a.label}`, () => choose({ accent: a.id })))}
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend className="text-label text-[var(--on-surface-variant)]">Starting version (v1)</legend>
+        <div className="mt-1.5 flex flex-wrap gap-2">
+          {STARTING.map((s) => swatch(prefs.starting === s.id, s.colour, `Starting version: ${s.label}`, () => choose({ starting: s.id })))}
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend className="text-label text-[var(--on-surface-variant)]">Later versions</legend>
+        <div className="mt-1.5 space-y-1.5">
+          {PALETTES.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => choose({ palette: p.id })}
+              aria-pressed={prefs.palette === p.id}
+              className={`flex w-full items-center gap-2 rounded-lg px-2 py-1 text-left text-label transition-colors ${
+                prefs.palette === p.id ? 'bg-[var(--surface-container-high)] text-[var(--on-surface)]' : 'text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-low)]'
+              }`}
+            >
+              <span className="flex gap-0.5" aria-hidden>
+                {p.colours.map((c) => (
+                  <span key={c} className="h-3 w-3 rounded-full" style={{ background: c }} />
+                ))}
+              </span>
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </fieldset>
+      <button
+        type="button"
+        onClick={() => choose(DEFAULT_COLOURS)}
+        className="text-label text-[var(--pm-primary)] hover:underline"
+      >
+        Reset to the defaults
+      </button>
+      <p className="text-label leading-snug text-[var(--on-surface-variant)]">Kept in this browser only.</p>
+    </div>
+  );
+}

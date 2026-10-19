@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 import { useAuth } from '@/hooks/use-auth';
+import { ColourPicker } from './colour-preferences';
 
 /**
  * The application header.
@@ -39,6 +40,7 @@ export function AppHeader() {
 
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [colours, setColours] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
@@ -140,6 +142,23 @@ export function AppHeader() {
               </div>
 
               <div className="my-1 h-px bg-[var(--surface-container-high)]" />
+
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => setColours((v) => !v)}
+                aria-expanded={colours}
+                className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-body text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-low)]"
+              >
+                <span aria-hidden className="material-symbols-outlined text-[18px]">
+                  palette
+                </span>
+                Colours
+                <span aria-hidden className="material-symbols-outlined ml-auto text-[18px] text-[var(--on-surface-variant)]">
+                  {colours ? 'expand_less' : 'expand_more'}
+                </span>
+              </button>
+              {colours && <ColourPicker />}
 
               <button
                 type="button"
