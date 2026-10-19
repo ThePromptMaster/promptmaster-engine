@@ -434,6 +434,18 @@ export const api = {
     return apiFetch('/api/extract-figures', { method: 'POST', body: JSON.stringify(req) });
   },
 
+  /**
+   * Sentences whose conclusion no longer follows from a fact that replaced
+   * something (18 Oct, Summit). One small call; records nothing; a failed
+   * check reports nothing.
+   */
+  async dependentClaims(
+    req: { stage_label: string; text: string; changed: { statement: string; replaces?: string }[]; facts?: string[]; model?: string },
+    signal?: AbortSignal
+  ): Promise<{ claims: { quote: string; fact: string; why: string }[] }> {
+    return apiFetch('/api/dependent-claims', { method: 'POST', body: JSON.stringify(req), signal });
+  },
+
   /** Look named works up in OpenAlex. No model call; nothing is stored. */
   async agentLiterature(works: { id: string; work: string }[], signal?: AbortSignal): Promise<{ matches: WorkMatch[]; source: string }> {
     return apiFetch('/api/agent/literature', { method: 'POST', body: JSON.stringify({ works }), signal });

@@ -778,3 +778,23 @@ def test_history_keeps_superseded_corrections_and_declined_apart(basic_inputs, p
     plain = basic_inputs.model_copy(update={"objective": "Write a haiku about rain", "constraints": "", "context": ""})
     system, user = build_stage_prompt(plain, prose_stage, digest)
     assert HISTORY_RULE not in system + user
+
+
+def test_a_final_check_reads_conclusions_against_the_current_record(basic_inputs, digest):
+    """18 Oct (Sean, Summit): "EBITDA deterioration despite higher revenue"
+    survived a revenue correction; the final check passed it."""
+    from promptmaster.schemas import AcceptedFact
+    from promptmaster.stage import DEPENDENT_CONCLUSIONS_RULE
+
+    stage = StageDescriptor(id="final_pack_check", label="Final pack check", renderer="review", entry_prompt_hint="", artifact_kind="critique_report")
+    summit = basic_inputs.model_copy(update={"facts": [AcceptedFact(
+        statement="Current-quarter revenue was $22.5 million.", replaces="Current-quarter revenue was $24 million.")]})
+    system, user = build_stage_prompt(summit, stage, digest)
+    assert DEPENDENT_CONCLUSIONS_RULE in system
+    assert "despite higher revenue" in DEPENDENT_CONCLUSIONS_RULE
+    assert "even where every number around it is already correct" in DEPENDENT_CONCLUSIONS_RULE
+    assert 'replaces "Current-quarter revenue was $24 million."' in system + user
+    # No facts, nothing to read against; a prose stage is not a check.
+    assert DEPENDENT_CONCLUSIONS_RULE not in build_stage_prompt(basic_inputs.model_copy(update={"facts": []}), stage, digest)[0]
+    prose = StageDescriptor(id="finalise", label="Finalise", renderer="prose", entry_prompt_hint="", artifact_kind="output")
+    assert DEPENDENT_CONCLUSIONS_RULE not in build_stage_prompt(summit, prose, digest)[0]
