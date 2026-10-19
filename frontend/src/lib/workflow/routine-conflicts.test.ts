@@ -16,7 +16,7 @@ describe('L-93: an accepted record kept against a request, without asking', () =
     const r = keepWithoutAsking([COO], handled);
     expect(r.keep).toBe(true);
     if (r.keep) {
-      expect(r.note).toContain('Kept the recorded approval');
+      expect(r.note).toContain('Kept the approval status on record');
       expect(r.note).toContain('The COO asks purchasing');
       expect(r.note).toContain('a request nobody with authority has approved');
     }

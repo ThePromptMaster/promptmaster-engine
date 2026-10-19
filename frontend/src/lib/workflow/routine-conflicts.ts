@@ -54,7 +54,7 @@ export function keepWithoutAsking(
 export function keptNote(conflicts: readonly InstructionConflict[], origin: ConflictOrigin): string {
   return conflicts
     .map((c) => {
-      const what = `Kept ${nameOf(c)} (${gist(c.with_text, 120)})`;
+      const what = `Kept ${keptName(c)} (${gist(c.with_text, 120)})`;
       const against =
         origin === 'go'
           ? 'Go’s own proposal does not override it'
@@ -62,6 +62,15 @@ export function keptNote(conflicts: readonly InstructionConflict[], origin: Conf
       return `${what}: ${against}.`;
     })
     .join(' ');
+}
+
+/**
+ * What was kept, as the note names it. A record that protects an approval
+ * often says nothing is approved yet ("The board has not approved it"), so
+ * "the recorded approval" read as the opposite of the record (19 Oct, prod).
+ */
+function keptName(c: InstructionConflict): string {
+  return c.protects_approval ? 'the approval status on record' : nameOf(c);
 }
 
 function requestOf(c: InstructionConflict): string {
