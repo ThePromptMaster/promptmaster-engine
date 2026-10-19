@@ -164,6 +164,19 @@ interface Props {
 
 /** Per-viewer convenience only: whether this person last left the side chat open. */
 const CHAT_OPEN_KEY = 'pm.sideChatOpen';
+/** Where the side chat stops being a full-screen sheet and sits beside the work (Tailwind `lg`). */
+const CHAT_RAIL_QUERY = '(min-width: 1024px)';
+
+/**
+ * Whether the side chat starts open. On a wide screen it is a rail beside the
+ * work: open by default, and the user's last choice sticks. On a narrow one it
+ * is a sheet over the stage, so it always starts closed — a choice remembered
+ * on a desktop must not cover the work on a phone (19 Oct, production pass).
+ */
+export function initialChatOpen(remembered: string | null, wide: boolean): boolean {
+  if (!wide) return false;
+  return remembered === '0' ? false : true;
+}
 
 /** Versions saved by applying a check's findings, by Go or by the user's Apply. */
 const APPLIED_SOURCES = new Set(['agent_apply', 'applied_findings']);
@@ -209,7 +222,10 @@ export function WorkflowWorkspace({
   // Except on a narrow screen, where "open" is a full-screen sheet over the
   // stage: a first visit on a phone landed on the chat, not the work (PM-08).
   // There it starts closed, and either way the user's last choice sticks.
+  // A narrow screen always starts closed, and its toggles are not remembered:
+  // the stored choice is the wide screen's.
   const [chatOpen, setChatOpenState] = useState(true);
+  const chatWide = useRef(true);
   useEffect(() => {
     let remembered: string | null = null;
     try {
@@ -217,18 +233,18 @@ export function WorkflowWorkspace({
     } catch {
       // Storage unavailable (private window, blocked site data): use the default.
     }
-    if (remembered === '0' || remembered === '1') setChatOpenState(remembered === '1');
-    else if (typeof window.matchMedia === 'function' && !window.matchMedia('(min-width: 1024px)').matches) {
-      setChatOpenState(false);
-    }
+    chatWide.current = typeof window.matchMedia !== 'function' || window.matchMedia(CHAT_RAIL_QUERY).matches;
+    setChatOpenState(initialChatOpen(remembered, chatWide.current));
   }, []);
   const setChatOpen = useCallback((next: boolean | ((open: boolean) => boolean)) => {
     setChatOpenState((open) => {
       const value = typeof next === 'function' ? next(open) : next;
-      try {
-        window.localStorage.setItem(CHAT_OPEN_KEY, value ? '1' : '0');
-      } catch {
-        // Not remembering is fine; the toggle still works.
+      if (chatWide.current) {
+        try {
+          window.localStorage.setItem(CHAT_OPEN_KEY, value ? '1' : '0');
+        } catch {
+          // Not remembering is fine; the toggle still works.
+        }
       }
       return value;
     });
