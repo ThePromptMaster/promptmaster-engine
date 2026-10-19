@@ -10,6 +10,7 @@ import { GuideInterview } from '@/components/projects/guide-interview';
 import { DOES_THE_WORK, SetupCard, type SetupDraft } from '@/components/projects/setup-card';
 import { CustomWorkflowDesigner } from '@/components/projects/custom-workflow-designer';
 import { FrontDoor, type DraftBrief } from '@/components/projects/front-door';
+import { DraftStatus, type DraftSaveState } from '@/components/projects/draft-status';
 import { recordFacts, type NewFact } from '@/lib/supabase/facts';
 import { assumedByModel } from '@/lib/workflow/facts';
 import { designFromTemplate } from '@/lib/workflow/custom';
@@ -117,7 +118,7 @@ export default function NewProjectPage() {
   /** Remounts the front door and designer with what was restored. */
   const [restoredAt, setRestoredAt] = useState(0);
   const [kept, setKept] = useState<{ data: SetupDraftState; updated_at: string } | null>(null);
-  const [draftSaved, setDraftSaved] = useState<'saved' | 'saving' | 'failed' | null>(null);
+  const [draftSaved, setDraftSaved] = useState<DraftSaveState>(null);
   const draftChecked = useRef(false);
 
   const loadTemplates = useCallback(() => {
@@ -439,18 +440,7 @@ export default function NewProjectPage() {
         </div>
       )}
 
-      {!kept && draftSaved && (
-        <p role="status" aria-label="Setup draft" className="mb-4 text-label text-[var(--on-surface-variant)]">
-          <span aria-hidden className="material-symbols-outlined mr-1 align-[-3px] text-[16px]">
-            {draftSaved === 'failed' ? 'cloud_off' : 'cloud_done'}
-          </span>
-          {draftSaved === 'saving'
-            ? 'Saving your setup…'
-            : draftSaved === 'saved'
-              ? 'Your setup is kept as a draft, conversation included — you can sign out and come back. No project exists until you press Start.'
-              : 'Your setup could not be saved as a draft; it is kept on this page until you leave.'}
-        </p>
-      )}
+      <DraftStatus state={kept ? null : draftSaved} />
 
       {error && (
         <div role="alert" className="mb-6 rounded-xl bg-[var(--error-container)] px-4 py-3 text-body text-[var(--on-error-container)]">
