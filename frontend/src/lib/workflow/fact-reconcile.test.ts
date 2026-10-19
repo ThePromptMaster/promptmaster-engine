@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { ProjectFact } from '@/types/project';
 import { factValues } from './fact-values';
-import { applyChangesLabel, describeFactChange, factChangeGroup, factChangesFromRevision, revertsUserVersion, withMeaningChanges } from './fact-reconcile';
+import { applyChangesLabel, describeFactChange, factChangeGroup, factChangesFromRevision, newFactNote, newFactSource, revertsUserVersion, withMeaningChanges } from './fact-reconcile';
 
 const fact = (id: string, statement: string, kind: ProjectFact['kind'] = 'fact'): ProjectFact =>
   ({ id, statement, subject: null, kind, source_kind: 'chat', source_ref: {}, retired_at: null, supersedes: null, created_at: '2026-10-10T00:00:00Z' }) as unknown as ProjectFact;
@@ -124,6 +124,31 @@ describe('the facts review keeps changed values, new facts and requests apart (1
     expect(all.map(factChangeGroup)).toEqual(['changed', 'new', 'request']);
     expect(applyChangesLabel(all.length)).toBe('Apply and record 3 changes');
     expect(applyChangesLabel(1)).toBe('Apply and record 1 change');
+  });
+});
+
+describe('an authority granting something is an approval, not a request (18 Oct, Sean, Ridgeway)', () => {
+  const CEO = 'The CEO authorizes the process-improvement initiative for up to 75 staff hours over five weeks, using the existing team with no incremental spending.';
+  const COO = 'The COO asks purchasing to order the $900,000 inspection system immediately.';
+  it('lists the CEO line under approvals, with who granted it, and the COO line as a request', async () => {
+    const check = vi.fn(async () => ({
+      changes: [],
+      additions: [
+        { statement: 'The CEO authorized up to 75 staff hours. This supersedes the proposed 100 hours.', kind: 'requirement' as const, quote: CEO, approval: true, approved_by: 'CEO' },
+        { statement: 'The COO has asked purchasing to order the $900,000 inspection system.', kind: 'fact' as const, quote: COO, request: true },
+      ],
+    }));
+    const [ceo, coo] = await withMeaningChanges([], { facts: [], instruction: `${CEO} ${COO}`, before: 'a', after: 'b' }, check);
+    expect([factChangeGroup(ceo), factChangeGroup(coo)]).toEqual(['approval', 'request']);
+    expect(newFactNote(ceo)).toBe(`Approved by the CEO, from your instruction — “${CEO}”`);
+    expect(newFactNote(coo)).toMatch(/^Recorded as a request, not an approval/);
+    expect(newFactSource(ceo, { via: 'revision' })).toEqual({ via: 'revision', approval: true, approved_by: 'CEO' });
+    expect(newFactSource(coo, { via: 'revision' })).toEqual({ via: 'revision', request: true });
+  });
+
+  it('names a person without "the"', () => {
+    const c = { fact: { id: 'new:0', statement: '', subject: null, kind: 'fact' as const }, changes: [{ kind: 'new' as const, was: '', now: 'from your instruction — “x”' }], proposed: 'Elena approved it.', approvedBy: 'Elena' };
+    expect(newFactNote(c)).toBe('Approved by Elena, from your instruction — “x”');
   });
 });
 

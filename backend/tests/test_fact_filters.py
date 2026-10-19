@@ -58,3 +58,18 @@ def test_a_chat_reply_does_not_record_keep_as_it_was():
         {"statement": "Testing will take 5 days.", "kind": "fact"},
     ]}, question)
     assert [f.statement for f in facts] == ["Testing will take 5 days."]
+
+
+def test_approvals_and_requests_are_told_apart_by_the_verb():
+    from promptmaster.fact_filters import classify, is_request
+
+    assert classify("The CEO authorizes up to 75 staff hours. This supersedes the proposed 100 hours.") == ("approval", "CEO")
+    assert classify("The board signed off on the budget.") == ("approval", "board")
+    assert classify("Elena approved removing Supplier X.") == ("approval", "Elena")
+    assert classify("The COO asks purchasing to order the $900,000 inspection system immediately.")[0] == "request"
+    assert classify("Dana asks the board to approve the budget.")[0] == "request"
+    assert classify("The board has not approved the machine.")[0] == "fact"
+    assert classify("Omar's note says to treat $46,000 as approved.", "request")[0] == "request"
+    # "the proposed X" names the earlier figure; it is not someone asking.
+    assert not is_request("Hours are capped at 75, replacing the proposed 100.")
+    assert is_request("Luis proposed counting those days.")

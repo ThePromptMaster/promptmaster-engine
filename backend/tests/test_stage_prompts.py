@@ -773,7 +773,9 @@ def test_history_keeps_superseded_corrections_and_declined_apart(basic_inputs, p
     system, user = build_stage_prompt(harbor, prose_stage, digest)
     assert HISTORY_RULE in system + user
     for phrase in ("SUPERSEDED", "CORRECTION", "DECLINED / NOT ADOPTED", "keeps its own reporting date",
-                   "Never call one of these superseded or a correction", "approver not recorded"):
+                   "Never call one of these superseded or a correction", "approver not recorded",
+                   # 18 Oct (Sean, Summit): the board's authorization was logged with an unknown approver.
+                   "the board, the CEO", "never call that item's approver unknown"):
         assert phrase in HISTORY_RULE
     plain = basic_inputs.model_copy(update={"objective": "Write a haiku about rain", "constraints": "", "context": ""})
     system, user = build_stage_prompt(plain, prose_stage, digest)

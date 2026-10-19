@@ -12,7 +12,7 @@ import type { ProjectFact } from '@/types/project';
  */
 
 const COLUMNS =
-  'id, project_id, user_id, statement, subject, kind, source_kind, source_ref, accepted_by, agent_run_id, supersedes, retired_at, retired_reason, created_at';
+  'id, project_id, user_id, statement, subject, kind, source_kind, source_ref, accepted_by, origin, agent_run_id, supersedes, retired_at, retired_reason, created_at';
 
 export interface NewFact {
   statement: string;
@@ -20,6 +20,8 @@ export interface NewFact {
   kind?: ProjectFact['kind'];
   source_kind: ProjectFact['source_kind'];
   source_ref?: Record<string, unknown>;
+  /** Default `user_stated`; `model_assumed` for what the brief's drafter inferred. */
+  origin?: 'user_stated' | 'model_assumed';
 }
 
 export async function listProjectFacts(projectId: string): Promise<ProjectFact[]> {
@@ -42,6 +44,7 @@ export async function recordFacts(project: { id: string; user_id: string }, fact
     kind: f.kind ?? 'fact',
     source_kind: f.source_kind,
     source_ref: f.source_ref ?? {},
+    ...(f.origin ? { origin: f.origin } : {}),
   }));
   const { data, error } = await supabase.from('project_facts').insert(rows).select(COLUMNS);
   if (error) throw error;

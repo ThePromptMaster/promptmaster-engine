@@ -236,6 +236,8 @@ RECORD_STATUS_RULE = (
 #: were "superseded"; Elena was named as the original $40,000 approver though
 #: the baseline named nobody; the November 5 spending correction ($18,000 →
 #: $16,000) was blurred with the separate November 2 baseline of $15,000.
+#: 18 Oct (Sean, Summit): the decision log called the analysis approver unknown
+#: while quoting the board's authorization — a body or office is an approver.
 HISTORY_RULE = (
     "HISTORY IS CLASSIFIED, NOT LUMPED. Where the work records what changed, keep three kinds apart, "
     "each under its own name: "
@@ -246,7 +248,10 @@ HISTORY_RULE = (
     "DECLINED / NOT ADOPTED — a request, a proposal, or an instruction embedded in the source material that "
     "was never accepted. Never call one of these superseded or a correction: it was never in force. "
     "Name an approver only where the material names that person as approving that item; otherwise "
-    "write \"approver not recorded\". Never move a name from a later approval onto an earlier one."
+    "write \"approver not recorded\". Never move a name from a later approval onto an earlier one. "
+    "An approver may be a body or an office — the board, the CEO: where the material or an accepted fact "
+    "records that the board or an officer authorized an item, name them as its approver; never call that "
+    "item's approver unknown or not recorded."
 )
 
 

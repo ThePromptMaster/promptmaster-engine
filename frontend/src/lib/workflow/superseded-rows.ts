@@ -10,13 +10,10 @@
  * Pure.
  */
 
-import { currentFacts } from './facts';
+import { currentFacts, REPLACING, replacedClause } from './facts';
 import { factValues, supersededValues, type SupersededValue } from './fact-values';
 import type { StageItem } from './stage-artifact';
 import type { ProjectFact } from '@/types/project';
-
-/** Words in a fact that introduce the value it replaces: "…12 business days, replacing 20 business days". */
-const REPLACING = /\b(?:replacing|replaces|replaced|instead of|rather than|no longer|previously|formerly|changed from|down from|up from)\b/i;
 
 /**
  * The values the current facts made untrue: those of a fact a newer one
@@ -31,8 +28,8 @@ export function replacedValues(facts: readonly ProjectFact[] | undefined): Super
   for (const f of current) {
     const old = f.supersedes ? byId.get(f.supersedes) : undefined;
     if (old) out.push(...supersededValues(old.statement, f.statement));
-    const at = f.statement.search(REPLACING);
-    if (at > 0) out.push(...supersededValues(f.statement.slice(at), f.statement.slice(0, at)).map((v) => ({ ...v, now: f.statement })));
+    const clause = replacedClause(f.statement);
+    if (clause) out.push(...supersededValues(clause.was, clause.now).map((v) => ({ ...v, now: f.statement })));
   }
   // Still true where another current fact states it.
   const live = current.map((f) => factValues(f.statement));
