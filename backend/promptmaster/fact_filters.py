@@ -49,6 +49,30 @@ PROCESS = re.compile(
 )
 #: Someone in the project asking for something: a fact about a request.
 REQUEST = re.compile(r"\b(?:asks?|asked|requests?|requested|suggests?|suggested|proposes?|proposed|wants?|would like)\b", re.I)
+#: "This supersedes the proposed 100 hours": the word names the earlier
+#: figure, not a request someone is making. It made the CEO's authorization a
+#: request in Ridgeway (Sean, 18 Oct, email 9).
+_NAMING_EARLIER = re.compile(
+    r"\b(?:the|a|an|its|their|his|her|earlier|original|originally|previously|initially|first)\s+"
+    r"(?:proposed|requested|suggested)\b",
+    re.I,
+)
+#: An authority granting something: "The CEO authorizes…", "Elena approved…",
+#: "the board signed off on…". Granting, not asking.
+APPROVAL = re.compile(
+    r"\b(?:authori[sz]es|authori[sz]ed|approves|approved|signs? off|signed off|grants|granted|sanctions|sanctioned)\b",
+    re.I,
+)
+#: …unless the sentence says it was not granted, or only asks for it:
+#: "has not approved", "treat $46,000 as approved", "asks the board to approve",
+#: "once approved", "pending approval".
+_NOT_GRANTED = re.compile(
+    r"\b(?:not|never|no longer|yet to be|to be|be|as|once|if|until|unless|when|pending)\s+"
+    r"(?:\w+\s+)?(?:authori[sz]ed|approved|signed off|granted|sanctioned)\b"
+    r"|\b(?:unapproved|unauthori[sz]ed)\b"
+    r"|\b(?:asks?|asked|requests?|requested|wants?|seeks?|sought)\b[^.;]*\b(?:approv|authori[sz]|sign)",
+    re.I,
+)
 
 
 #: "The existing training rules remain unchanged", "Keep the review date as it
@@ -87,9 +111,51 @@ def records_nothing(statement: str) -> bool:
     return no_figure and bool(UNCHANGED.search(statement) or KEEP_AS_IS.search(statement))
 
 
+def is_approval(statement: str) -> bool:
+    """An authority granting something in so many words, and not a sentence
+    that says it was refused, is pending, or is only being asked for."""
+    return bool(APPROVAL.search(statement)) and not _NOT_GRANTED.search(statement)
+
+
 def is_request(statement: str) -> bool:
-    """A request, suggestion or proposal by someone: recorded as a fact about it, never a requirement."""
-    return bool(REQUEST.search(statement))
+    """A request, suggestion or proposal by someone: recorded as a fact about it,
+    never a requirement. An approval is never a request, and "the proposed 100
+    hours" only names the figure an approval replaces."""
+    if is_approval(statement):
+        return False
+    return bool(REQUEST.search(_NAMING_EARLIER.sub(" ", statement)))
+
+
+#: Who grants it: the words before the verb ("The CEO", "Elena", "the board").
+_APPROVER = re.compile(
+    r"(?:^|[.;:]\s+)(?:[Tt]he\s+)?([A-Za-z][\w&'’ -]{0,58}?)\s+(?:has\s+|have\s+|formally\s+|now\s+)?"
+    r"(?:authori[sz]es|authori[sz]ed|approves|approved|signs? off|signed off|grants|granted|sanctions|sanctioned)\b"
+)
+
+
+def approver(statement: str) -> str:
+    """The authority an approval names, as written: "CEO", "Elena", "board"; "" when none is named."""
+    m = _APPROVER.search(statement)
+    return " ".join(m.group(1).split()) if m else ""
+
+
+def classify(statement: str, model_label: object = "", model_authority: object = "") -> tuple[str, str]:
+    """("approval", who) | ("request", "") | ("fact", "").
+
+    The code reads the verb first: an authority granting something is an
+    approval, whatever the model said, and a request word makes it a request.
+    The model's label only decides what the words do not: it can call a
+    sentence a request (the safer reading), and an approval only when it names
+    who granted it and the sentence grants something.
+    """
+    if is_approval(statement):
+        return "approval", approver(statement) or " ".join(str(model_authority or "").split())[:80]
+    if is_request(statement):
+        return "request", ""
+    label = str(model_label or "").strip().lower()
+    if label == "request":
+        return "request", ""
+    return "fact", ""
 
 
 def record_kind(kind: object, statement: str) -> str:
@@ -108,4 +174,7 @@ RULES = (
     "- A request, suggestion or proposal by someone in the project (\"Luis asks to count "
     "those days\", \"Omar's note says to treat $46,000 as approved\") is recorded as a fact "
     "about the request, never as a requirement: nobody has approved it.\n"
+    "- An authority granting something (\"The CEO authorizes up to 75 hours\", \"the board "
+    "approved the budget\") is an approval, not a request, even where it replaces an earlier "
+    "proposed figure. Say who granted it.\n"
 )

@@ -54,7 +54,7 @@ import {
 import { listVersions, type NewVersion } from '@/lib/supabase/versions';
 import { resolveInstruction, withoutStamps, type ResolvedInstruction } from '@/lib/workflow/version-stamp';
 import type { ArtifactVersion, Project } from '@/types/project';
-import { factChangesFromRevision, isNewFact, withMeaningChanges, type FactChange } from '@/lib/workflow/fact-reconcile';
+import { factChangesFromRevision, isNewFact, newFactSource, withMeaningChanges, type FactChange } from '@/lib/workflow/fact-reconcile';
 import { recordFacts, supersedeFact } from '@/lib/supabase/facts';
 import type { ChatContext, ChatMessage } from '@/types';
 import { describeLines, keepUnasked } from '@/lib/workflow/preservation';
@@ -573,7 +573,7 @@ export function useStageChat({
       for (const c of chosen) {
         try {
           const from = { via: 'revision', stage_id: stageId, instruction: proposal.instruction.slice(0, 500) };
-          if (isNewFact(c)) await recordFacts(project, [{ statement: c.proposed, kind: c.fact.kind, source_kind: 'user_edit', source_ref: from }]);
+          if (isNewFact(c)) await recordFacts(project, [{ statement: c.proposed, kind: c.fact.kind, source_kind: 'user_edit', source_ref: newFactSource(c, from) }]);
           else await supersedeFact(project, c.fact, c.proposed, from);
           factsUpdated += 1;
         } catch {
