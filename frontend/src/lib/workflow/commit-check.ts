@@ -1,4 +1,4 @@
-import { parseItems, type StageItem } from './stage-artifact';
+import { ITEM_SCHEMAS, parseItems, type StageItem } from './stage-artifact';
 
 /**
  * The one check every new stage version passes before it becomes current.
@@ -30,9 +30,46 @@ const USER_OPERATIONS = new Set(['stage_edit', 'outline_edit', 'restore']);
  */
 const REVIEWED_OPERATIONS = new Set([...USER_OPERATIONS, 'chat_instruct', 'chat_save', 'chat_rows']);
 
-/** A row whose status the user set (no source is the user, from before sources were recorded). */
+/**
+ * Statuses that are provenance PromptMaster sets, never a decision: every
+ * schema that offers them marks them `decided: false` ("Candidate source —
+ * verify it yourself").
+ */
+const PROVENANCE = (() => {
+  const all = Object.values(ITEM_SCHEMAS).flatMap((s) => s.statuses ?? []);
+  return new Set(all.filter((o) => o.decided === false && all.every((p) => p.value !== o.value || p.decided === false)).map((o) => o.value));
+})();
+
+/**
+ * A row whose status the user set (no source is the user, from before sources
+ * were recorded). A provenance status is nobody's decision, whatever its
+ * source says (18 Oct, Theory of Everything: ten "candidate source" rows with
+ * no source recorded were protected as the user's, and a list-to-table repair
+ * was refused for "dropping" two of them).
+ */
 function userDecided(row: StageItem): boolean {
-  return Boolean(row.status) && (row.status_source === 'user' || !row.status_source);
+  if (!row.status || PROVENANCE.has(row.status)) return false;
+  return row.status_source === 'user' || !row.status_source;
+}
+
+/** The words of a row a reader would recognise it by: every field that isn't bookkeeping. */
+function rowWords(row: StageItem): Set<string> {
+  const skip = new Set(['id', 'status', 'reason', 'status_source', 'superseded_by']);
+  const text = Object.entries(row)
+    .filter(([k, v]) => !skip.has(k) && typeof v === 'string')
+    .map(([, v]) => v)
+    .join(' ');
+  return new Set(text.toLowerCase().match(/[a-z0-9]+(?:[.,'-][a-z0-9]+)*/g)?.filter((w) => w.length > 2) ?? []);
+}
+
+/** Most of `row`'s words appear in `other`: the same row, reworded or merged into a larger one. */
+function carriesText(row: StageItem, other: StageItem): boolean {
+  const words = rowWords(row);
+  if (words.size < 4) return false;
+  const there = rowWords(other);
+  let hit = 0;
+  for (const w of words) if (there.has(w)) hit += 1;
+  return hit / words.size >= 0.7;
 }
 
 /**
@@ -49,13 +86,16 @@ function userDecided(row: StageItem): boolean {
 function uncarried(before: readonly StageItem[], after: readonly StageItem[]): StageItem[] {
   const ids = new Set(after.map((r) => r.id));
   const key = (r: StageItem) => `${userDecided(r) ? 'user' : 'go'}\u0000${r.status}\u0000${r.reason ?? ''}`;
-  const carried = after.filter((r) => r.status && !before.some((b) => b.id === r.id)).map(key);
+  const fresh = after.filter((r) => r.status && !before.some((b) => b.id === r.id));
+  const carried = fresh.map(key);
   const out: StageItem[] = [];
   for (const row of before.filter((r) => r.status)) {
     if (ids.has(row.id)) continue;
     const at = carried.indexOf(key(row));
     if (at >= 0) carried.splice(at, 1);
-    else out.push(row);
+    // A restructured table (a list made a table, two rows merged) keeps the
+    // row's words and its status under a new id: that is carried, not dropped.
+    else if (!fresh.some((r) => r.status === row.status && carriesText(row, r))) out.push(row);
   }
   return out;
 }

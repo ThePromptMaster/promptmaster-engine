@@ -362,6 +362,8 @@ def test_a_claim_with_no_status_starts_as_provenance(claim_schema):
         claim_schema,
     )
     assert [i.model_dump()["status"] for i in items] == ["candidate_source", "no_source", "no_source"]
+    # Provenance is PromptMaster's, never the user's decision (18 Oct).
+    assert {i.model_dump().get("status_source") for i in items} == {"model"}
 
 
 def test_other_tables_keep_whatever_status_the_model_sent(audience_schema):

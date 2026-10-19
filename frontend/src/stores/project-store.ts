@@ -630,13 +630,24 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       // The attempt stays in the history (5 Oct): what tried to save, and why
       // not. Best effort — the refusal stands whether or not it is recorded.
       const byGo = version.source_operation.startsWith('agent_');
+      // The version the revision was made from, not the head it met: they
+      // differ exactly when the refusal is "the stage changed meanwhile".
+      const versions = get().stages[stageId]?.versions ?? [];
+      const base = version.base_content !== undefined ? [...versions].reverse().find((v) => (v.content ?? '') === (version.base_content ?? '')) : head;
       void get()
         .appendEvent({
           type: 'revision_refused',
           stage_id: stageId,
           actor: byGo ? 'system' : 'user',
           reason: refused,
-          payload: { operation: version.source_operation, base_version_id: head?.id ?? null },
+          payload: {
+            operation: version.source_operation,
+            base_version_id: base?.id ?? null,
+            head_version_id: head?.id ?? null,
+            // What was refused, so a later look can tell a real loss from a
+            // guard that misread a restructure (18 Oct, Theory of Everything).
+            refused_content: version.content.slice(0, 40_000),
+          },
         })
         .catch(() => undefined);
       throw new RefusedRevision(refused);
