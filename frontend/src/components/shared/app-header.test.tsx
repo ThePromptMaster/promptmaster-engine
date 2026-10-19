@@ -103,3 +103,17 @@ describe('AppHeader', () => {
     expect(signOut).not.toHaveBeenCalled();
   });
 });
+
+describe('Colours in the account menu (Sean, 18 Oct)', () => {
+  it('opens a picker whose choice is applied at once', async () => {
+    window.localStorage.clear();
+    render(<AppHeader />);
+    await userEvent.click(screen.getByRole('button', { name: 'Account' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: /Colours/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Accent: Teal' }));
+    expect(screen.getByRole('button', { name: 'Accent: Teal' })).toHaveAttribute('aria-pressed', 'true');
+    expect(document.documentElement.style.getPropertyValue('--pm-primary')).toBe('#00696b');
+    await userEvent.click(screen.getByRole('button', { name: 'Reset to the defaults' }));
+    expect(document.documentElement.style.getPropertyValue('--pm-primary')).toBe('');
+  });
+});

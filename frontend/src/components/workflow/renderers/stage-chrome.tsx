@@ -18,6 +18,7 @@ import { RecoveryPanel } from '../recovery-panel';
 import type { StageFailure } from '@/lib/errors/recovery';
 import type { ArtifactVersion, Evaluation } from '@/types/project';
 import { isSaved, operationLabel, versionTitle } from '@/lib/workflow/labels';
+import { versionColour } from '@/lib/appearance/colours';
 
 interface VersionBarProps {
   versions: ArtifactVersion[];
@@ -66,6 +67,13 @@ export function VersionBar({
                 : 'bg-[var(--surface-container-low)] text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)]'
             }`}
           >
+            {/* Each version keeps its colour, the user's choice (Sean, 18 Oct). */}
+            <span
+              aria-hidden
+              data-version-colour
+              className="mr-1.5 inline-block h-2 w-2 rounded-full align-middle"
+              style={{ background: versionColour(v.version_number) }}
+            />
             {versionPillLabel(v, v.id === headId)}
             {v.restored_from_version_id && (
               <span aria-label=" (restored)" title="Restored"> ↩</span>

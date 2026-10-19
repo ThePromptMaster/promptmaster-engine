@@ -93,6 +93,14 @@
   /* Words a newer version added or removed, wherever two versions are compared. */
   --diff-added: var(--success-container);
   --diff-removed: var(--error-container);
+  /* Version colours: v1 is the starting colour, later versions cycle 2–6.
+     The user can pick others (lib/appearance/colours.ts); these are the defaults. */
+  --version-1: #737686;
+  --version-2: #2563eb;
+  --version-3: #0f8a8c;
+  --version-4: #6a3d9a;
+  --version-5: #b26a00;
+  --version-6: #3f8a48;
 
   /* === Secondary === */
   --pm-secondary: #495c95;

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { Toaster } from '@/components/ui/sonner';
 import { BetaNotice } from '@/components/shared/beta-notice';
+import { ApplyColourPreferences } from '@/components/shared/colour-preferences';
 import './globals.css';
 
 const inter = Inter({
@@ -68,6 +69,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="font-sans antialiased bg-[var(--surface)] text-[var(--on-surface)] min-h-screen">
         {/* FR-22: the beta notice is global — every route has to carry it. */}
         <BetaNotice />
+        <ApplyColourPreferences />
         {children}
         <Toaster />
       </body>
