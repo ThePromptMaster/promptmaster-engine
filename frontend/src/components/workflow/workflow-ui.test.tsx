@@ -534,6 +534,18 @@ describe('the finished screen puts the work at the centre (C4, Sean 28 Sep item 
     expect(screen.getByText('One two three four five.')).toBeInTheDocument();
   });
 
+  it('Copy says which version it copied, and the note goes when another version is shown (Sean, 17 Oct)', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    const { rerender } = render(<ProjectFinished bundle={bundle('First text.')} completion={summary} onReopen={vi.fn()} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Copy' }));
+    expect(await screen.findByRole('status')).toHaveTextContent(/^Copied version 1 \(.+\) to the clipboard\.$/);
+    const next = bundle('Second text.');
+    next.stages[stage.id].versions = [{ ...researchVersion('Second text.'), id: 'v2', version_number: 2 }];
+    rerender(<ProjectFinished bundle={next} completion={summary} onReopen={vi.fn()} />);
+    expect(screen.queryByText(/Copied version/)).not.toBeInTheDocument();
+  });
+
   it('a research project is a research report in sections, not a book in chapters (1 Oct, item 26)', () => {
     const drafting = deliverableStage(RESEARCH_V1)!;
     const outline = ['Question', 'Results'].map((title, i) => ({
