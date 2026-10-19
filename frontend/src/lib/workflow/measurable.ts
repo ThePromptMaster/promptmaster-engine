@@ -33,6 +33,12 @@ export interface MeasurableRequirement {
   answered?: boolean;
   /** The words it was read from, for the checklist. */
   source: string;
+  /**
+   * "There is no 500-word limit on the complete package": a statement that a
+   * limit does not apply. It measures nothing; it retires the requirement it
+   * names (`governingRequirements`).
+   */
+  retires?: boolean;
 }
 
 export interface Measurement {
@@ -63,9 +69,11 @@ function subjectNear(text: string, start: number, end: number): string {
   // 100–140 words", "a launch announcement (100-140 words) and a … FAQ":
   // before it. Whichever is nearer — on production the second form was read
   // as the FAQ's (9 Oct).
-  const afterText = text.slice(end, end + 40);
+  // Never across a sentence: "A memo (≤400 words). The package is at most
+  // 1500 words in total" — the 1500 is not the memo's (17 Oct).
+  const afterText = text.slice(end, end + 40).split(/[.!?](?:\s|$)/)[0];
   const after = afterText.match(SUBJECT_RE);
-  const beforeText = text.slice(Math.max(0, start - 60), start);
+  const beforeText = text.slice(Math.max(0, start - 60), start).split(/[.!?]\s/).at(-1)!;
   const all = [...beforeText.matchAll(new RegExp(SUBJECT_RE.source, 'gi'))];
   const before = all.at(-1);
   const afterGap = after ? after.index! : Infinity;
@@ -120,11 +128,58 @@ function partBefore(text: string, start: number): string {
   return phrase.replace(/(?<!s)s$/, '');
 }
 
+/**
+ * The deliverable a limit closes, when the limits are written into a list of
+ * deliverables: "a decision memo (≤400 words), a three-workshop curriculum
+ * (≤900 words), one fictional practice case with interview exercise, sample
+ * summary, and facilitator notes (≤900 words), a pilot evaluation plan (≤500
+ * words)". 17 Oct (Sean, FIELDGUIDE): only names in `SUBJECTS` were known, so
+ * the curriculum's 900 was read as the memo's and dropped, and the pilot
+ * plan's 500 was read as the whole package's — 2,254 words against 500.
+ *
+ * The item runs from the previous limit (or the start of the clause) to this
+ * one; its name is the noun phrase it opens with, up to "with", "distinguishing"
+ * and the like, and the last two words of that phrase are kept so a heading
+ * such as "Pilot Evaluation Plan" is found by it. Only a limit that closes
+ * its item — in brackets, or after a comma — in a text with more than one
+ * limit: "a survey kickoff brief under 30 words" is the deliverable itself.
+ */
+function itemBefore(text: string, start: number): string {
+  let seg = text.slice(Math.max(0, start - 240), start);
+  if (!/[(,]\s*$/.test(seg) || (text.match(new RegExp(`\\b${NUM}[\\s-]*words?\\b`, 'gi')) ?? []).length < 2) return '';
+  const cut = Math.max(
+    ...[/\bwords?\b\)?/gi, /[\n:;]/g, /[.!?]\s/g].map((re) => {
+      const all = [...seg.matchAll(re)];
+      const last = all.at(-1);
+      return last ? last.index! + last[0].length : 0;
+    })
+  );
+  seg = seg.slice(cut).replace(/^[\s),.]+/, '').replace(/^(?:\d+[.)]|[-*•])\s+/, '');
+  const head = seg.split(/\s(?:with|that|which|distinguishing|including|covering|containing|listing|for|of|on|about|at|in|under|to)\b|[,(]/i)[0] ?? '';
+  const words = head.trim().split(/\s+/).filter(Boolean);
+  if (words.length && /^(?:a|an|the|one|single|each)$/i.test(words[0])) words.shift();
+  // "three-workshop curriculum": the count is not part of the name.
+  while (words.length && new RegExp(`^${NUM}-`, 'i').test(words[0])) words.shift();
+  if (!words.length || words.length > 4) return '';
+  if (words.some((w) => NOT_A_NAME.test(w) || !/^[a-z][a-z-]*$/i.test(w))) return '';
+  const phrase = words.slice(-2).join(' ').toLowerCase();
+  if (WHOLE.test(phrase) || WHOLE.test(words.at(-1)!)) return '';
+  const listed = phrase.match(SUBJECT_RE);
+  if (listed) return canonical(listed[1]);
+  return phrase.replace(/(?<!s)s$/, '');
+}
+
+/** Words that say a limit is on the whole, not a part: "300 words in total". */
+const WHOLE_CONTEXT = /\b(?:total|overall|whole|entire|combined|altogether|in all|complete|full)\b/i;
+
+/** "no 500-word limit", "not a 500-word cap", "without a word limit of 500". */
+const NEGATED = /\b(?:no|not an?|without an?|never an?)\s+(?:[a-z-]+\s+){0,2}$/i;
+
 /** Words between a part's name and its limit: "must be", "is", "should stay". */
 const TRAILING_VERB = /^(?:is|are|be|must|should|shall|will|stays?|remains?|kept|runs?|needs?|to|has|have)$/i;
 
 /** Names for the whole deliverable, not a part of it. */
-const WHOLE = /^(?:deliverable|document|output|response|pack|whole(?: thing)?|text|draft|piece|it)$/i;
+const WHOLE = /^(?:deliverable|document|output|response|pack|package|whole(?: thing)?|text|draft|piece|it)$/i;
 
 /** The measurable requirements stated in these texts, de-duplicated. */
 export function parseRequirements(texts: readonly string[]): MeasurableRequirement[] {
@@ -134,6 +189,10 @@ export function parseRequirements(texts: readonly string[]): MeasurableRequireme
     if (!out.has(id)) out.set(id, { id, ...r });
   };
   for (const text of texts) {
+    // Word limits with no name, in a text that names other parts' limits: a
+    // part this could not name, not the whole — unless the sentence says so.
+    const unnamed: { id: string; whole: boolean }[] = [];
+    let named = 0;
     if (!text?.trim()) continue;
     const t = text.replace(/ /g, ' ');
     const patterns: [RegExp, (m: RegExpMatchArray) => Partial<MeasurableRequirement>][] = [
@@ -158,10 +217,20 @@ export function parseRequirements(texts: readonly string[]): MeasurableRequireme
         if ((r.min ?? 0) > 20_000 || (r.max ?? 0) > 20_000) continue;
         // "Keep the summary to 250 words" names its subject inside the match.
         const inside = m[0].match(SUBJECT_RE);
-        const subject = inside ? canonical(inside[1]) : partBefore(t, m.index!) || subjectNear(t, m.index!, m.index! + m[0].length);
+        const subject = inside ? canonical(inside[1]) : partBefore(t, m.index!) || itemBefore(t, m.index!) || subjectNear(t, m.index!, m.index! + m[0].length);
+        if (NEGATED.test(t.slice(Math.max(0, m.index! - 40), m.index!))) {
+          out.set(`retire:words:${subject || 'all'}`, { id: `words:${subject || 'all'}`, kind: 'words', subject, source: m[0].trim(), retires: true, ...r });
+          continue;
+        }
+        if (subject) named += 1;
+        else {
+          const sentence = t.slice(Math.max(0, t.lastIndexOf('.', m.index!) + 1), t.indexOf('.', m.index! + m[0].length) + 1 || t.length);
+          if (!out.has('words:all')) unnamed.push({ id: 'words:all', whole: WHOLE_CONTEXT.test(sentence) });
+        }
         add({ kind: 'words', subject, source: m[0].trim(), ...r });
       }
     }
+    if (named > 0) for (const u of unnamed) if (!u.whole) out.delete(u.id);
     // "a one-page plan", "fits on one page", "no more than two pages" (L-73,
     // 11 Oct: Sean's onboarding plan was declared finished with its one-page
     // requirement never checked). Pages are estimated from the word count.
@@ -287,7 +356,11 @@ function sectionRange(all: Line[], subject: string): { start: number; end: numbe
     const l = all[i];
     if (isTableLine(l) || (subject !== 'faq' && isListedQuestion(l))) return { start, end: i };
     if (l.level > 0 && !isQuestion(l)) {
-      const ends = l.level <= level || (level <= 6 && l.level >= 7) || SUBJECT_RE.test(l.text) || NOTE.test(l.text) || !named(l) && PART_SUBJECTS.has(subject) && /\b(table|questions?|appendix|actions?|risks?|recommendations?|findings?|sources?)\b/i.test(l.text);
+      // A markdown subheading of a named part is inside it: "## Sample
+      // candidate summary" under "# 3. Fictional practice case" (17 Oct,
+      // FIELDGUIDE) is part of the case, not a part beside it.
+      const inside = level <= 6 && l.level > level && l.level <= 6 && isPart({ subject });
+      const ends = l.level <= level || (level <= 6 && l.level >= 7) || (!inside && SUBJECT_RE.test(l.text)) || NOTE.test(l.text) || !named(l) && PART_SUBJECTS.has(subject) && /\b(table|questions?|appendix|actions?|risks?|recommendations?|findings?|sources?)\b/i.test(l.text);
       if (ends) return { start, end: i };
     }
   }

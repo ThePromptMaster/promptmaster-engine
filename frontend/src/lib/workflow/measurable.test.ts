@@ -304,3 +304,58 @@ describe('a part named before "must be" (14 Oct, Sean: ASPEN status pack)', () =
     expect(m.value!.startsWith('3 words')).toBe(true);
   });
 });
+
+describe('limits written into a list of deliverables (17 Oct, Sean: FIELDGUIDE)', () => {
+  // The constraints exactly as Sean entered them.
+  const CONSTRAINTS =
+    "Develop and maintain a decision-ready design package for a fictional executive-search firm's recruiter training program. Deliver five connected outputs: a decision memo (≤400 words), a three-workshop curriculum (≤900 words), one fictional practice case with interview exercise, sample summary, and facilitator notes (≤900 words), a pilot evaluation plan (≤500 words), and a compact project register. Use only confirmed facts plus labeled design assumptions where needed.";
+  const FACT = 'Each section has its own separate word limit; there is no 500-word limit on the complete package.';
+  const PACKAGE = `# FIELDGUIDE design package\n\n## 1. Decision memo\n\n${words(380)}\n\n## 2. Three-workshop curriculum\n\n${words(880)}\n\n## 3. Fictional practice case\n\n${words(700)}\n\n## 4. Pilot evaluation plan\n\n${words(450)}\n\n## 5. Project register\n\n${words(300)}`;
+
+  it('reads each limit as its own deliverable’s, and none as the whole package’s', () => {
+    const reqs = parseRequirements([CONSTRAINTS]).filter((r) => r.kind === 'words');
+    expect(reqs.map((r) => [r.subject, r.max])).toEqual([
+      ['memo', 400],
+      ['curriculum', 900],
+      ['practice case', 900],
+      ['evaluation plan', 500],
+    ]);
+  });
+
+  it('measures each section on the package, all met; nothing measures the whole', async () => {
+    const { governingRequirements } = await import('./context');
+    const reqs = governingRequirements('', parseRequirements([CONSTRAINTS]), [parseRequirements([FACT])]);
+    const deliverable = { id: 'output', label: 'Output', renderer: 'prose', expected_artifacts: [] } as unknown as StageDefinition;
+    const ms = requirementsForStage(deliverable, 'output', reqs).map(({ requirement, whole }) => measure(requirement, PACKAGE, whole));
+    expect(ms.map((m) => [m?.id, m?.satisfied])).toEqual([
+      ['measured.words:memo', true],
+      ['measured.words:curriculum', true],
+      ['measured.words:practice case', true],
+      ['measured.words:evaluation plan', true],
+    ]);
+  });
+
+  it('a part’s subheadings are inside it, even one naming a summary', () => {
+    const r = parseRequirements([CONSTRAINTS]).find((x) => x.subject === 'practice case')!;
+    const pack = `# 1. Executive decision memo\n\n${words(10)}\n\n# 3. Fictional practice case\n\n## Case scenario\n\n${words(20)}\n\n## Sample candidate summary\n\n${words(30)}\n\n## Facilitator notes\n\n${words(40)}\n\n# 4. Pilot evaluation plan\n\n${words(5)}`;
+    expect(measure(r, pack, false)!.value!.startsWith('90 words')).toBe(true);
+  });
+
+  it('the clarification retires a whole-package limit instead of creating one', async () => {
+    const { governingRequirements } = await import('./context');
+    expect(parseRequirements([FACT])).toEqual([expect.objectContaining({ id: 'words:all', retires: true, max: 500 })]);
+    const brief = parseRequirements(['The package must be under 500 words in total.']);
+    expect(brief.map((r) => r.id)).toEqual(['words:all']);
+    expect(governingRequirements('', brief, [parseRequirements([FACT])])).toEqual([]);
+    // A different whole limit is not what the clarification speaks of.
+    const other = parseRequirements(['The package must be under 3000 words in total.']);
+    expect(governingRequirements('', other, [parseRequirements([FACT])]).map((r) => r.max)).toEqual([3000]);
+  });
+
+  it('a limit it cannot name, beside named ones, is not taken for the whole', () => {
+    const reqs = parseRequirements(['A memo (≤400 words), a register (≤300 words), and supporting notes, under 500 words.']);
+    expect(reqs.filter((r) => r.kind === 'words').map((r) => r.subject)).toEqual(['memo', 'register']);
+    // Unless the sentence says the limit is on the whole.
+    expect(parseRequirements(['A memo (≤400 words). The package is at most 1500 words in total.']).map((r) => r.subject).sort()).toEqual(['', 'memo']);
+  });
+});

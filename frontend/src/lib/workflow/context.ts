@@ -200,15 +200,24 @@ export function buildStageContext(input: BuildContextInput): StageContext {
  * what it asks for ("a lunch invitation … under 120 words"); then it measures
  * the whole deliverable, as the figure it replaces did. Facts are in the order
  * they were accepted, so a later one governs.
+ *
+ * A fact that says a limit does not apply ("there is no 500-word limit on the
+ * complete package") removes it rather than adding one (17 Oct, Sean,
+ * FIELDGUIDE: that clarification was read back as a 500-word limit and kept
+ * the package blocked).
  */
 export function governingRequirements(
   objective: string,
   brief: readonly MeasurableRequirement[],
   facts: readonly (readonly MeasurableRequirement[])[]
 ): MeasurableRequirement[] {
-  let out = [...brief];
+  let out = brief.filter((r) => !r.retires);
   for (const fromFact of facts) {
     for (const f of fromFact) {
+      if (f.retires) {
+        out = out.filter((r) => !(r.kind === f.kind && r.subject === f.subject && (f.max === undefined || r.max === undefined || r.max === f.max)));
+        continue;
+      }
       const names = (subject: string) => Boolean(subject) && new RegExp(`\\b${subject}s?\\b`, 'i').test(objective);
       const same = out.findIndex((r) => r.kind === f.kind && r.subject === f.subject);
       const whole = out.findIndex((r) => r.kind === f.kind && r.subject === '' && names(f.subject));
