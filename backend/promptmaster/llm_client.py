@@ -192,9 +192,23 @@ def resolve_model(model: str) -> str:
     return RETIRED_MODELS.get(model, model)
 
 
+#: An answer ceiling at or above this is a writing call (a stage draft, a
+#: continuation, a full table), not a judgment.
+LONG_ANSWER_TOKENS = 4096
+
+
 def _token_budget(model: str, max_tokens: int) -> dict[str, Any]:
-    """The answer keeps `max_tokens`; a reasoning model's reasoning gets its own budget."""
+    """The answer keeps `max_tokens`; a reasoning model's reasoning gets its own budget.
+
+    A reasoning budget is a hint, not a cap: Opus 5.5 overran a 256-token one
+    two-fold and a 2,048-token one by a fifth. On a 24,000-token merge prompt
+    it spent the whole 14,048 and returned no text at all (19 Oct, FIELDGUIDE
+    copy: "No content in response (finish_reason='length')"). Low effort is the
+    setting it keeps to, so a writing call uses that and the answer gets the room.
+    """
     if model.startswith(_REASONING_PREFIXES):
+        if max_tokens >= LONG_ANSWER_TOKENS:
+            return {"max_tokens": max_tokens + REASONING_HEADROOM, "reasoning": {"effort": "low"}}
         return {"max_tokens": max_tokens + REASONING_HEADROOM, "reasoning": {"max_tokens": REASONING_HEADROOM}}
     return {"max_tokens": max_tokens}
 
@@ -478,6 +492,17 @@ class OpenRouterClient:
             finish_reason = choices[0].get("finish_reason", "unknown")
 
             if not content:
+                # Billed all the same: a reply spent wholly on reasoning still
+                # cost its tokens, and an unmetered failure is an unread bill.
+                usage = data.get("usage", {})
+                _meter(
+                    model=str(payload.get("model") or ""),
+                    tokens_in=usage.get("prompt_tokens", 0),
+                    tokens_out=usage.get("completion_tokens", 0),
+                    elapsed=time.monotonic() - t0,
+                    finish_reason=finish_reason,
+                    attempt=attempt,
+                )
                 raise OpenRouterError(f"No content in response (finish_reason={finish_reason!r})")
 
             if finish_reason == "length":
