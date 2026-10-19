@@ -255,6 +255,19 @@ HISTORY_RULE = (
 )
 
 
+#: 18 Oct (Sean, Summit): the final check passed a pack that kept "EBITDA
+#: deterioration despite higher revenue" after revenue was corrected downwards.
+#: Every figure had been updated; the conclusion drawn from the old one had not.
+DEPENDENT_CONCLUSIONS_RULE = (
+    "CHECK THE WORK AGAINST THE CURRENT RECORD, NOT ONLY ITS FIGURES. The accepted facts above are current; "
+    "one that replaces an earlier value or statement makes it untrue. For each such change, read every "
+    "conclusion, comparison, trend, attribution, status and recommendation in the work under review: one that "
+    "only followed from the replaced value (\"despite higher revenue\" once revenue is lower; \"within budget\", "
+    "\"not approved\", \"the largest customer\" once that changed) is a finding, quoted exactly, even where every "
+    "number around it is already correct. History recorded on purpose — a change log, a correction note — is not."
+)
+
+
 def build_stage_prompt(
     inputs: PMInput,
     stage: StageDescriptor,
@@ -282,6 +295,8 @@ def build_stage_prompt(
         instruction_parts.append(f"THIS STAGE — {stage.label or stage.id}:\n{hint}")
     if stage.renderer == "review":
         instruction_parts.append(VERIFY_RULE)
+        if inputs.facts:
+            instruction_parts.append(DEPENDENT_CONCLUSIONS_RULE)
     # 13 Oct (Sean's screenplay): a fact-check of fiction sorts invented story
     # material from claims about the world before it writes a row.
     form = form_of(inputs)

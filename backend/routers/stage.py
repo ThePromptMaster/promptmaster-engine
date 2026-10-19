@@ -26,6 +26,7 @@ from promptmaster.schemas import (
     StageEvaluationResponse,
     StageItemSchema,
 )
+from promptmaster.dependent_claims import DependentClaimsRequest, DependentClaimsResponse, dependent_claims
 from promptmaster.figures import Figure, extract_figures
 from promptmaster.stage import generate_stage_artifact
 from routers._errors import llm_http_error
@@ -156,3 +157,15 @@ async def api_extract_figures(
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_STAGE_VERSIONS)
     return ExtractFiguresResponse(figures=figures)
+
+
+@router.post("/dependent-claims")
+async def api_dependent_claims(
+    req: DependentClaimsRequest,
+    client: OpenRouterClient = Depends(get_client),
+) -> DependentClaimsResponse:
+    """Sentences whose conclusion no longer follows from a fact that replaced
+    something (18 Oct, Sean, Summit: "despite higher revenue" survived a
+    revenue correction). 1 small LLM call, made only when a fact changed;
+    commits nothing. A failed check reports nothing."""
+    return await dependent_claims(client, req)

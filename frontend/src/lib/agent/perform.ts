@@ -51,6 +51,7 @@ import { recordPolicyFacts } from '@/lib/supabase/facts';
 import { checkGoal } from './code-check';
 import { unmetHumanRequirements } from '@/lib/workflow/human-requirements';
 import { approverFindings, approverSources } from '@/lib/workflow/approver-support';
+import { claimsInstruction, claimsStillIn, dependentClaimFindings, dependentClaimsFor } from '@/lib/workflow/dependent-claims';
 import { isSuperseded, markSuperseded, replacedValues } from '@/lib/workflow/superseded-rows';
 import { figureFindings, figureSources } from '@/lib/workflow/figure-support';
 import { asIteration } from '@/lib/workflow/legacy';
@@ -935,7 +936,12 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       const decidedLine = before?.some((r) => r.status)
         ? ` DECIDED ROWS — return each of these exactly as it is, with its id, text, status and reason: ${before.filter((r) => r.status).map((r) => r.id).join(', ')}. Add a row only for a new problem; never drop or renumber one.`
         : '';
-      const instruction = recheckInstruction(target.label, why, superseded, before ? 'table' : 'prose') + measuredLine + decidedLine;
+      // 18 Oct (Sean, Summit): a conclusion drawn from a corrected figure
+      // ("despite higher revenue") holds no old value for `leftoverValues` to
+      // find. One call names those sentences, only when a fact replaced
+      // something; the repair must change each, checked in code below.
+      const claims = before || measuredRepair ? [] : await dependentClaimsFor(ctx.project, target.label, head, ctx.signal);
+      const instruction = recheckInstruction(target.label, why, superseded, before ? 'table' : 'prose') + measuredLine + decidedLine + claimsInstruction(claims);
       const fresh = await readManuscript(ctx, target);
       if (!fresh) return manuscriptMissing(key, target);
       const attempt = async (text: string) => {
@@ -968,6 +974,14 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
           `${instruction} YOUR PREVIOUS ATTEMPT STILL STATED AS CURRENT: ${leftover.map(describeValue).join(', ')}. Replace each where it is stated as current. Where the text records history, keep it there under its kind: superseded (was in force, now replaced), a correction (keeps its own reporting date), or declined (a request or proposal never adopted — never called superseded).`
         ));
         leftover = content ? leftoverIn(content) : [];
+      }
+      let staleClaims = content ? claimsStillIn(content, claims) : [];
+      if (content && staleClaims.length) {
+        ({ res, content } = await attempt(
+          `${instruction} YOUR PREVIOUS ATTEMPT KEPT THESE SENTENCES WORD FOR WORD, though they no longer follow: ${staleClaims.map((c) => `"${c.quote}"`).join('; ')}. Rewrite or remove each.`
+        ));
+        leftover = content ? leftoverIn(content) : [];
+        staleClaims = content ? claimsStillIn(content, claims) : [];
       }
       // A measured repair is measured again, in code; one more try names the count.
       // Every repair is measured on its new text, not only a measured one (12 Oct, Diligence).
@@ -1090,6 +1104,13 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // old text: they are taken from the new one (L-63).
       const evaluation = withFreshMeasurements(evaluateStage(ctx.template, target.id, ctx.context), measureStageContent(ctx.project, ctx.template, target, content).length > 0, stillUnmet);
       const actor = stageMoveActor(ctx.run.policy, ctx.approvedByUser);
+      if (staleClaims.length && !leftover.length) {
+        return done(key, {
+          status: 'failed', toolsUsed: ['model'],
+          changes: typeof versionId === 'string' ? { version_ids: [versionId] } : {},
+          output: `Couldn't finish repairing ${target.label}: the new version still says ${staleClaims.map((c) => `"${c.quote}"`).join('; ')}, which no longer follows from the current facts. It is saved, so you can see it, and the stage stays reopened; edit those sentences or ask Go to try again.`,
+        });
+      }
       if (leftover.length) {
         const named = leftover.map((v) => `${describeValue(v)} (now: "${v.now}")`).join('; ');
         return done(key, {
@@ -1206,6 +1227,8 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         evaluationRecord(res, ctx.project.model, 'manual', [
           ...figureFindings(version.content, figureSources(ctx.project, ctx.bundles, ctx.stage.id)),
           ...approverFindings(version.content, approverSources(ctx.project)),
+          // 18 Oct (Summit): a conclusion the corrected facts no longer support is a finding, not a pass.
+          ...(rendererHoldsItems(ctx.stage.renderer) ? [] : dependentClaimFindings(await dependentClaimsFor(ctx.project, ctx.stage.label, version.content, ctx.signal))),
         ])
       );
       const e = res.evaluation;

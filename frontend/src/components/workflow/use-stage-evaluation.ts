@@ -37,6 +37,8 @@ import type { Evaluation, Project } from '@/types/project';
 import type { OutlineSection, StageRecommendation } from '@/types';
 import { approverFindings, approverSources } from '@/lib/workflow/approver-support';
 import { figureFindings, figureSources } from '@/lib/workflow/figure-support';
+import { dependentClaimFindings, dependentClaimsFor } from '@/lib/workflow/dependent-claims';
+import { rendererHoldsItems } from '@/lib/workflow/stage-artifact';
 
 interface Options {
   project: Project;
@@ -150,7 +152,11 @@ export function useStageEvaluation({
       // the four-call pipeline producing one as a side effect.
       await record(
         stage.id, version.id,
-        evaluationRecord(response, p.model, 'manual', [...figureFindings(version.content, figureSources(p, b, stage.id)), ...approverFindings(version.content, approverSources(p))])
+        evaluationRecord(response, p.model, 'manual', [
+          ...figureFindings(version.content, figureSources(p, b, stage.id)),
+          ...approverFindings(version.content, approverSources(p)),
+          ...(rendererHoldsItems(stage.renderer) ? [] : dependentClaimFindings(await dependentClaimsFor(p, stage.label, version.content))),
+        ])
       );
 
       setRecommendation(response.recommendation);

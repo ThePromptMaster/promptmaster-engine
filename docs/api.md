@@ -79,6 +79,7 @@ Stage work:
 | POST | `/api/generate-stage-artifact` | `generateStageArtifact` | `stage.py` | **Live** — **one** LLM call, deliberately not the full pipeline. The request carries the item schema's statuses and which of them the model may set; anything else it returns is dropped |
 | POST | `/api/evaluate-stage-artifact` | `evaluateStageArtifact` | `stage.py` | **Live** |
 | POST | `/api/extract-figures` | `extractFigures` | `stage.py` | **Live** — called once when a stage is completed. Returns `{figures: [{name, value, context}]}`; a value is kept only if the stage's text contains it verbatim (`promptmaster/figures.py`) |
+| POST | `/api/dependent-claims` | `dependentClaims` | `stage.py` | **Live** — sentences whose conclusion no longer follows from an accepted fact that replaced something (18 Oct, Summit). Called by Go's stage check and repair, and the manual stage check, only when a fact changed; a quote is kept only if it is verbatim in the text (`promptmaster/dependent_claims.py`) |
 | POST | `/api/apply-recommendations` | `applyRecommendations` | `audit.py` | **Live** — FR-09, one call for a multi-select apply |
 | POST | `/api/check-conflicts` | `checkConflicts` | `conflicts.py` | **Live** — one JSON call per instruction (side chat, reply action buttons, Go's revisions); returns only conflicts with things actually listed |
 | POST | `/api/flow-trigger` | `flowTrigger` | `engine.py` | **Live** — Refine, Realign, Challenge, Reframe, Self-audit from the stage's More menu |
