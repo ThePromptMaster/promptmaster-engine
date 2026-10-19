@@ -312,7 +312,10 @@ export function allowedActions(
     // 2026-09-29 an autonomous run checked a fully decided critique table,
     // revised it (wiping every decision) and triaged it again.
     else if (stage.renderer !== 'review') {
-      keys.push('evaluate_stage', 'revise_stage');
+      // A version already checked is not checked again (19 Oct: the same
+      // stale Realign version was checked twice and the run stalled).
+      if (!facts.draft?.checked) keys.push('evaluate_stage');
+      keys.push('revise_stage');
       if (facts.draft?.truncated) keys.push('continue_writing');
       if (facts.evaluationFindings?.aboutHead && facts.evaluationFindings.count > 0) keys.push('apply_findings');
     }
