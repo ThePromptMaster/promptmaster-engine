@@ -7,6 +7,7 @@ import { stepLabel } from '@/lib/agent/actions';
 import { collapseSteps, STEP_STATUS_TEXT } from '@/lib/agent/labels';
 import { createClient } from '@/lib/supabase/client';
 import { getSandboxRun } from '@/lib/supabase/agent';
+import { keptConflictsOf } from '@/lib/workflow/routine-conflicts';
 import type { AgentStep } from '@/types/agent';
 import { ExecutionBadge } from './execution-badge';
 
@@ -57,7 +58,16 @@ function SandboxFiles({ runId }: { runId: string }) {
   );
 }
 
-export function StepTimeline({ steps, stageName }: { steps: AgentStep[]; stageName?: (id: string) => string }) {
+export function StepTimeline({
+  steps,
+  stageName,
+  onApplyAnyway,
+}: {
+  steps: AgentStep[];
+  stageName?: (id: string) => string;
+  /** L-93: a step that kept the record under the routine-decision policy offers the usual question back. */
+  onApplyAnyway?: (step: AgentStep) => void;
+}) {
   if (!steps.length) return null;
   // Repeated identical steps are one row with a count (2 Oct, screenshot 7).
   const rows = collapseSteps(steps);
@@ -89,6 +99,14 @@ export function StepTimeline({ steps, stageName }: { steps: AgentStep[]; stageNa
               {s.rationale && <p className="text-label text-[var(--on-surface-variant)]">Why: {s.rationale}</p>}
               {s.output && <MarkdownOutput content={s.output} />}
               {s.changes?.sandbox_run_id && <SandboxFiles runId={s.changes.sandbox_run_id} />}
+              {onApplyAnyway && keptConflictsOf(s.params) && (
+                <button
+                  onClick={() => onApplyAnyway(s)}
+                  className="rounded-lg bg-[var(--surface-container-highest)] px-3 py-1.5 text-label text-[var(--on-surface)]"
+                >
+                  Apply it anyway
+                </button>
+              )}
             </div>
           </details>
         </li>

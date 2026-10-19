@@ -85,7 +85,8 @@ import { BriefChangeNotice } from './brief-change-notice';
 import { PendingChangeNotice } from './pending-change-notice';
 import { NextActionBar } from './next-action-bar';
 import { nextAction } from '@/lib/workflow/next-step';
-import { pendingChanges, settlePendingChange, type PendingChange } from '@/lib/workflow/conflict-trail';
+import { holdPendingChange, pendingChanges, settlePendingChange, type PendingChange } from '@/lib/workflow/conflict-trail';
+import { keptConflictsOf } from '@/lib/workflow/routine-conflicts';
 import { FactsNextStep } from './facts-next-step';
 import { FactReconcileNotice } from './fact-change-list';
 import { factChangesFromRevision, withMeaningChanges, type FactChange } from '@/lib/workflow/fact-reconcile';
@@ -780,6 +781,32 @@ export function WorkflowWorkspace({
   const [resumeChange, setResumeChange] = useState<PendingChange | null>(null);
   const [pendingShown, setPendingShown] = useState<string | null>(null);
   const takeResume = useCallback(() => setResumeChange(null), []);
+  /**
+   * L-93: "Apply it anyway" on a Go step that kept the record under the
+   * routine-decision policy. The change is held like any change waiting on a
+   * priority answer, and the usual question opens in the side chat on its stage.
+   */
+  const applyAnyway = useCallback(
+    (step: { stage_id: string | null; params?: Record<string, unknown> | null }) => {
+      const kept = keptConflictsOf(step.params);
+      if (!kept || !step.stage_id) return;
+      const stageId = step.stage_id;
+      void holdPendingChange({
+        projectId: project.id, userId: project.user_id, stageId,
+        stageLabel: template.stages.find((s) => s.id === stageId)?.label ?? stageId,
+        instruction: kept.instruction,
+        conflicts: kept.conflicts.map((c) => ({ ...c, from_request: false })),
+      }).then((row) => {
+        upsertRecommendation(row);
+        const held = pendingChanges([row])[0];
+        if (!held) return;
+        setViewingStageId(stageId === state.current_stage_id ? null : stageId);
+        setChatOpen(true);
+        setResumeChange(held);
+      }, () => undefined);
+    },
+    [project.id, project.user_id, template.stages, upsertRecommendation, state.current_stage_id, setChatOpen]
+  );
   const tools = useStageTools({
     project, stage: stage ?? null, headVersion, appendStageVersion, onRecorded: reloadRecommendations,
     // A long-form stage's text lives in its chapters, not in a version.
@@ -1923,6 +1950,7 @@ export function WorkflowWorkspace({
               routine={{ value: project.routine_decisions ?? 'ask', onChange: (v) => void setRoutineDecisions(v) }}
               stageModes={{ value: project.stage_modes ?? 'stage', onChange: (v) => onPatchProject({ stage_modes: v }) }}
               latestChange={goLatestChange}
+              onApplyAnyway={applyAnyway}
             />
           )}
           {isCurrent && project.status === 'finalized' && (

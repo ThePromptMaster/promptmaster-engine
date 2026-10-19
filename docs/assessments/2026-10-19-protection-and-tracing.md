@@ -71,7 +71,7 @@ The short version:
 **"Preserve the facts and continue without asking" (email 2's fourth question).**
 - **What happens today: it asks.** When an instruction conflicts with an accepted fact, the conflict check asks which takes priority, in "Change it" and in Go (`askWhichTakesPriority`, `perform.ts`). That is true even with routine decisions set to "Handle them for me". The recommended answer keeps the record, but the user still has to click it. That is the extra confirmation step Sean saw.
 - **What should change:** a request that conflicts with an accepted fact, and carries no authority, can be kept out without asking. The recorded fact stands, and the deliverable says the request was not adopted. A change in authority or scope, such as overriding an approval or widening scope, should still ask, as Sean wants.
-- **Status:** not built this round (L-93). The request/approval split in #302 is the piece that makes it safe to build.
+- **Status:** built after this round (L-93): with routine decisions handled, a conflict that is only someone else's request, or Go's own proposal under Autonomous, keeps the record without asking, records the choice as the policy's, and offers "Apply it anyway". Approvals, the user's own instructions and requests from someone with approval rights are still asked.
 - **Why it is not trivial:** whether there is a conflict at all is model-judged (`conflicts.py`). A reworded restatement of a fact can be raised as a conflict, and we have not measured how often that happens.
 
 ## 3. One update, traced (Ridgeway, email 10)

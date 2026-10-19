@@ -1822,7 +1822,7 @@ and a correction worded without one of those phrases is not paired.
 in what the user wrote. A close paraphrase counts as stated. Facts recorded before
 19 October are all `user_stated` except policy ones.
 
-### L-93 — Conclusions that depend on a changed fact; conflicts still ask (2026-10-19)
+### L-93 — Conclusions that depend on a changed fact; conflicts with a request (2026-10-19)
 
 When a fact replaces something, one model call per prose-stage check or repair lists the
 sentences whose conclusion no longer follows (`dependent_claims.py`). Code keeps only
@@ -1831,9 +1831,26 @@ sentences are flagged is model-judged; a stale conclusion the call misses is not
 and a reworded but still stale sentence passes. Item stages (tables) are not checked this
 way.
 
-A conflict between an instruction and an accepted fact still asks the user which takes
-priority, even with routine decisions handled. Keeping the record and continuing without
-asking, for a request with no authority, is not built.
+A conflict with the accepted record is kept without asking when routine decisions are
+"handle them for me" and the conflict is a request with no authority behind it
+(`lib/workflow/routine-conflicts.ts`, decided in code):
+- In the side chat and its action buttons: the conflicting words only report someone
+  else's request ("The COO asks purchasing to order…"). The model proposes those words;
+  code keeps the flag only if they are copied from the instruction, read as a request and
+  not an approval or first-person wording, and come from nobody the brief, facts or
+  decisions say "may approve" or "may authorise" (`conflicts.py` `_request`).
+- In Go (Autonomous only): any revision or apply Go chose for itself.
+
+The record is kept, the choice is recorded on the decision trail as the policy's
+(`policy: 'routine_decisions'`), the revision goes ahead within it, and a note with
+"Apply it anyway" is shown (side chat note; Go step). "Apply it anyway" asks the usual
+question.
+
+Still asked: routine decisions set to "Ask me"; Go under Guided or Checkpoint; an
+instruction that records an approval; the user's own instruction; two instructions in
+conflict; a request from someone the record says may approve (a change of authority or
+scope); a conflict found only by the keyword rule. Which words are a request is the
+model's proposal; a request it fails to quote is asked about, never kept silently.
 
 Positive findings ("Accept", "No change required") are never counted as unmet, and the
 unmet wording is matched only on a finding's own text. A stage with open findings shows

@@ -14,6 +14,7 @@ import { NeedsYouCard } from './needs-you-card';
 import { PolicySelector } from './policy-selector';
 import { RoutineDecisions } from './routine-decisions';
 import type { RoutineDecisions as RoutinePolicy } from '@/types/project';
+import type { AgentStep } from '@/types/agent';
 import { StepTimeline } from './step-timeline';
 import { RunAccountCard } from './run-account';
 import { TransparencyPanel } from './transparency-panel';
@@ -53,6 +54,7 @@ export function GoPanel({
   routine,
   stageModes,
   latestChange = null,
+  onApplyAnyway,
 }: {
   go: ReturnType<typeof useGoLoop>;
   stageLabel: string;
@@ -75,6 +77,8 @@ export function GoPanel({
   latestChange?: LatestChange | null;
   /** "Routine decisions": who may decide an approval Go can check (5 Oct). */
   routine?: { value: RoutinePolicy; onChange: (v: RoutinePolicy) => void };
+  /** L-93: ask which takes priority about a record Go kept under the routine-decision policy. */
+  onApplyAnyway?: (step: AgentStep) => void;
 }) {
   const [open, setOpen] = useState(false);
   const sectionRef = useRef<HTMLElement>(null);
@@ -383,7 +387,7 @@ export function GoPanel({
               stageName={go.stageLabelFor}
             />
           )}
-          <StepTimeline steps={go.steps} stageName={go.stageLabelFor} />
+          <StepTimeline steps={go.steps} stageName={go.stageLabelFor} onApplyAnyway={onApplyAnyway} />
         </div>
       )}
     </section>

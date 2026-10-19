@@ -194,13 +194,19 @@ export async function recordConflictChoice(args: {
   instruction: string;
   conflict: InstructionConflict;
   controls: Controls;
+  /**
+   * L-93: kept under the routine-decision policy, not chosen by the user.
+   * Recorded the same way, saying so, with `policy: 'routine_decisions'`.
+   */
+  routine?: boolean;
 }): Promise<void> {
-  const { conflict, controls, instruction } = args;
+  const { conflict, controls, instruction, routine = false } = args;
   // Plain words, never a quote inside a quote: this title is read back as an
   // earlier decision by the next check (14 Oct, Sean, LANTERN).
   const { keep, override } = choiceLabels(conflict);
-  const title =
-    controls === 'new'
+  const title = routine
+    ? `Kept "${keep}" under the routine-decision policy, over the request: ${gist(instruction)}`
+    : controls === 'new'
       ? `Chose "${override}" over ${nameOf(conflict)}, for the instruction: ${gist(instruction)}`
       : `Chose "${keep}" over the instruction: ${gist(instruction)}`;
   const rec = await insertRecommendation(args.projectId, args.userId, {
@@ -228,6 +234,6 @@ export async function recordConflictChoice(args: {
     decision_type: 'accept_recommendation',
     recommendation_id: rec.id,
     rationale: title,
-    metadata: { conflict_kind: conflict.kind, with_id: conflict.with_id, source: conflict.source, controls },
+    metadata: { conflict_kind: conflict.kind, with_id: conflict.with_id, source: conflict.source, controls, ...(routine ? { policy: 'routine_decisions' } : {}) },
   });
 }

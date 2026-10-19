@@ -49,6 +49,7 @@ import {
   type Controls,
   type InstructionConflict,
 } from '@/lib/workflow/instruction-conflicts';
+import { keepWithoutAsking, routinePrecedenceNote } from '@/lib/workflow/routine-conflicts';
 import { ReplyActions } from './reply-actions';
 import type { RowChange } from '@/lib/workflow/row-actions';
 import type { ChatContext, ReplyAction } from '@/types';
@@ -418,6 +419,33 @@ export function ChatPanel({
   }, [latestReplyId, offerActions, readOnly, chat.loading]);
   useEffect(() => () => actionsAbort.current?.abort(), []);
   const [dismissedFor, setDismissedFor] = useState<string | null>(null);
+  /**
+   * L-93 (Sean, 17 Oct, email 2): someone else's request that conflicts with
+   * the accepted record is set aside without asking, when routine decisions
+   * are handled — the record is kept, the choice goes on the decision trail
+   * as the policy's, and the revision goes ahead within it. "Apply it anyway"
+   * brings back the usual question. Returns false when it must be asked.
+   */
+  const [autoKept, setAutoKept] = useState<{ text: string; conflicts: InstructionConflict[]; note: string; action?: ReplyAction } | null>(null);
+  const keepUnderRoutine = useCallback(
+    async (text: string, conflicts: InstructionConflict[], action?: ReplyAction): Promise<boolean> => {
+      const r = keepWithoutAsking(conflicts, { routineHandled: project.routine_decisions === 'handle', origin: 'user' });
+      if (!r.keep) return false;
+      await Promise.all(
+        conflicts.map((conflict) =>
+          recordConflictChoice({ projectId: project.id, userId: project.user_id, stageId, instruction: text, conflict, controls: 'existing', routine: true })
+            .catch(() => undefined)
+        )
+      );
+      setAutoKept({ text, conflicts, note: r.note, action });
+      const precedence = conflicts.map(routinePrecedenceNote);
+      if (action) await onRunAction?.({ ...action, instruction: [text, ...precedence].join('\n') });
+      else await chat.propose(text, scope, { selection, sectionId: effectiveSectionId, precedence });
+      return true;
+    },
+    [project, stageId, onRunAction, chat, scope, selection, effectiveSectionId]
+  );
+
   // A revision from a button is an instruction like any other: checked
   // against the objective and earlier decisions before it reaches the model
   // (1 Oct, item 33). Row changes are shown row by row and are not checked.
@@ -432,13 +460,13 @@ export function ChatPanel({
         });
         setChecking(false);
         if (conflicts.length) {
-          askPriority(action.instruction, conflicts, action);
+          if (!(await keepUnderRoutine(action.instruction, conflicts, action))) askPriority(action.instruction, conflicts, action);
           return;
         }
       }
       await onRunAction(action);
     },
-    [onRunAction, project, stageId, stageLabel, getChatContext, headVersion?.id, askPriority]
+    [onRunAction, project, stageId, stageLabel, getChatContext, headVersion?.id, askPriority, keepUnderRoutine]
   );
 
   const canSend =
@@ -450,6 +478,7 @@ export function ChatPanel({
     // Cleared up front: a message the user has to delete by hand before typing
     // the next one reads as a failure even when it succeeded.
     setDraft('');
+    setAutoKept(null);
     if (mode === 'discuss') {
       await chat.discuss(text);
       return;
@@ -472,11 +501,11 @@ export function ChatPanel({
     });
     setChecking(false);
     if (conflicts.length) {
-      askPriority(text, conflicts);
+      if (!(await keepUnderRoutine(text, conflicts))) askPriority(text, conflicts);
       return;
     }
     await chat.propose(text, scope, { selection, sectionId: effectiveSectionId });
-  }, [draft, mode, scope, selection, effectiveSectionId, chat, project, stageId, stageLabel, getChatContext, headVersion?.id, askPriority]);
+  }, [draft, mode, scope, selection, effectiveSectionId, chat, project, stageId, stageLabel, getChatContext, headVersion?.id, askPriority, keepUnderRoutine]);
 
   const resolveConflicts = useCallback(
     async (choices: Controls[]) => {
@@ -611,6 +640,30 @@ export function ChatPanel({
 
         {checking && (
           <p role="status" className="mt-3 text-label text-[var(--on-surface-variant)]">Checking it against your objective and earlier decisions…</p>
+        )}
+        {autoKept && !conflicting && (
+          <div role="note" aria-label="Kept the record" className="mt-3 rounded-xl bg-[var(--surface-container-high)] px-4 py-3">
+            <p className="text-label uppercase tracking-wide text-[var(--on-surface-variant)]">Kept the record</p>
+            <p className="mt-1 text-body text-[var(--on-surface)]">{autoKept.note}</p>
+            <p className="mt-1 text-label text-[var(--on-surface-variant)]">Decided under your routine-decision policy, without asking you.</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                onClick={() => {
+                  const k = autoKept;
+                  setAutoKept(null);
+                  // The usual question, answered by the user this time.
+                  askPriority(k.text, k.conflicts.map((c) => ({ ...c, from_request: false })), k.action);
+                }}
+                disabled={chat.busy}
+                className="rounded-lg bg-[var(--surface-container-highest)] px-3 py-1.5 text-label text-[var(--on-surface)] disabled:opacity-40"
+              >
+                Apply it anyway
+              </button>
+              <button onClick={() => setAutoKept(null)} className="rounded-lg px-3 py-1.5 text-label text-[var(--on-surface-variant)]">
+                Dismiss
+              </button>
+            </div>
+          </div>
         )}
         {conflicting && (
           <div ref={conflictRef} className="mt-3">
