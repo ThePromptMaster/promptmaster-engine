@@ -8,7 +8,8 @@
  * find something, so the question can come round for as long as the user keeps
  * answering it.
  *
- * The rule: once a review stage has sent the work back in a run, the newer
+ * The rule: once a review stage has sent the work back (in this run or an
+ * earlier one), the newer
  * fixes it accepts under the routine-decision policy are carried forward —
  * deferred on the review with the reason, and named when Go finishes
  * (`deferredNotBlocking`) — instead of another return.
@@ -20,6 +21,7 @@
  */
 
 import type { ExecutionPolicy, AgentStep } from '@/types/agent';
+import type { WorkflowEvent } from '@/lib/workflow/types';
 import type { RoutineDecisions } from '@/types/project';
 import type { StageItem, StageItemSchema } from '@/lib/workflow/stage-artifact';
 import { carriedForwardUnmet, parseItems, positiveVerdict } from '@/lib/workflow/stage-artifact';
@@ -28,7 +30,7 @@ import { carriedForwardUnmet, parseItems, positiveVerdict } from '@/lib/workflow
 const MERGE_ASK = /\b(?:go(?:ing)? back|return(?:ing)?|merge[ds]?)\b/i;
 const ACCEPTED = /\baccept(?:ed|s)?\b/i;
 
-export const CARRY_REASON = 'Carried forward: a newer fix from a later review round. Go already merged one round of accepted fixes in this run, so it is left open here instead of going back again. Accept it to have it applied.';
+export const CARRY_REASON = 'Carried forward: a newer fix from a later review round. Go already merged one round of accepted fixes, so it is left open here instead of going back again. Accept it to have it applied.';
 
 export interface NewerFixes {
   /** The review's rows with the newer fixes marked "Carry forward" under the routine-decision policy. */
@@ -47,6 +49,12 @@ export function carryNewerFixes(args: {
   schema: StageItemSchema;
   /** This run's steps. */
   steps: readonly Pick<AgentStep, 'stage_id' | 'action_key' | 'status' | 'started_at'>[];
+  /**
+   * The project's events: a return made in an earlier run counts too. Each
+   * Resume starts a new run, and on 19 Oct (FIELDGUIDE copy) the round merged
+   * before a block was forgotten, so Go asked to go back a third time.
+   */
+  events?: readonly Pick<WorkflowEvent, 'type' | 'stage_id' | 'created_at'>[];
   /** The review stage's versions, oldest first. */
   versions: readonly { content: string; created_at: string }[];
   policy: ExecutionPolicy;
@@ -56,9 +64,11 @@ export function carryNewerFixes(args: {
   if (!args.isReviewStage || args.policy !== 'autonomous' || args.routine !== 'handle') return null;
   if (!MERGE_ASK.test(question) || !ACCEPTED.test(question)) return null;
 
-  const returns = args.steps.filter((s) => s.stage_id === args.stageId && s.action_key === 'return_to_stage' && s.status === 'succeeded');
+  const inRun = args.steps.filter((s) => s.stage_id === args.stageId && s.action_key === 'return_to_stage' && s.status === 'succeeded').map((s) => s.started_at);
+  const logged = (args.events ?? []).filter((e) => e.type === 'stage_returned' && e.stage_id === args.stageId).map((e) => e.created_at);
+  const returns = logged.length > inRun.length ? logged : inRun;
   if (!returns.length) return null;
-  const lastReturn = returns.reduce((a, b) => (a.started_at > b.started_at ? a : b)).started_at;
+  const lastReturn = returns.reduce((a, b) => (a > b ? a : b));
 
   // The rows the review held when it last sent the work back: that round was merged.
   const before = [...args.versions].reverse().find((v) => v.created_at <= lastReturn);

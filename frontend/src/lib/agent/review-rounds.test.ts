@@ -46,6 +46,15 @@ describe('a second round of review fixes (19 Oct, FIELDGUIDE)', () => {
     expect(describeCarried(r!)).toMatch(/^Carried forward: 2 newer fixes from the second review/);
   });
 
+  it('counts a round merged in an earlier run: each Resume starts a new run', () => {
+    // 19 Oct, prod: the merge round was in the run that blocked; after Resume
+    // the new run had no return of its own and Go asked to go back again.
+    const events = [{ type: 'stage_returned' as const, stage_id: 'summary', created_at: '2026-10-19T15:56:00Z' }];
+    expect(carryNewerFixes({ ...base, items: newerRoutine, steps: [], events })?.carried.map((i) => i.id)).toEqual(['fr11', 'fr12']);
+    // A return from another stage does not count.
+    expect(carryNewerFixes({ ...base, items: newerRoutine, steps: [], events: [{ ...events[0], stage_id: 'realign' }] })).toBeNull();
+  });
+
   it('still asks the first time: nothing has been merged yet', () => {
     expect(carryNewerFixes({ ...base, items: newerRoutine, steps: [] })).toBeNull();
   });
