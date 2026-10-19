@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { asksForRemovals, describeLines, isChangeNote, keepUnasked, removedLines } from './preservation';
+import { asksForRemovals, describeLines, isChangeNote, keepUnasked, removedLines, structureDropped } from './preservation';
 import { splitChangeNote } from '@/lib/agent/perform';
 
 const V3 = "## Invitation email\n\nSubject: Workshop invitation — November 20, 2026\n\nHello,\n\nYou are invited to the team workshop on November 20, 2026, from 9:00 a.m. to noon in Room Cedar. There will be 12 attendees, and Maya will facilitate every session.\n\nBest,  \nMaya\n\n## Timed agenda\n\nNovember 20, 2026  \n9:00 a.m. to noon  \nRoom Cedar\n\n- 9:00 a.m. to 9:15 a.m. — Introduction\n- 9:15 a.m. to 10:15 a.m. — Training\n- 10:15 a.m. to 10:30 a.m. — Break\n- 10:30 a.m. to 11:30 a.m. — Group exercise\n- 11:30 a.m. to noon — Closing discussion\n\n## Facilitator checklist\n\nNovember 20, 2026  \n9:00 a.m. to noon  \nRoom Cedar\n\n- Maya facilitates every session.\n- Prepare 12 handouts.\n- Confirm 12 attendees.\n- Be ready for the introduction, training, break, group exercise, and closing discussion.";
@@ -135,5 +135,29 @@ describe('a revision note is never put back into the document (18 Oct, pilot)', 
     // An opening paragraph that is part of the document stays.
     const intro = `Prepared for the steering group.\n\n${body}`;
     expect(splitChangeNote(intro)).toEqual({ note: null, body: intro });
+  });
+});
+
+describe('a shortening keeps the structure the brief needs (17 Oct, Sean: FIELDGUIDE)', () => {
+  const BEFORE = [
+    '# 2. Three-workshop curriculum',
+    '## Workshop 1: Structured Interview Foundations',
+    '- Opening and objectives (10 minutes)',
+    '- Paired practice (25 minutes)',
+    '- Debrief (15 min)',
+    '## Workshop 2: Live Interview Practice',
+    'Practice in pairs.',
+    '# 4. Pilot evaluation plan',
+    'Proposed measures.',
+  ].join('\n');
+
+  it('names a dropped heading and timings that all went', () => {
+    const after = ['# 2. Three-workshop curriculum', '## Workshop 1: Structured Interview Foundations', 'Objectives, paired practice and a debrief.', '# 4. Pilot evaluation plan', 'Measures.'].join('\n');
+    expect(structureDropped(BEFORE, after)).toEqual(['the timings under "Workshop 1: Structured Interview Foundations"', 'the "Workshop 2: Live Interview Practice" heading']);
+  });
+
+  it('is content with shorter text that keeps every heading and some timing, renumbered or not', () => {
+    const after = ['# Three-workshop curriculum', '## Workshop 1: Structured Interview Foundations', '- Objectives (10 min); practice (35 min)', '## Workshop 2: Live Interview Practice', 'Pairs.', '# 3. Pilot evaluation plan', 'Measures.'].join('\n');
+    expect(structureDropped(BEFORE, after)).toEqual([]);
   });
 });
