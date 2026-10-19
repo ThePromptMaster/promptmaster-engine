@@ -1838,10 +1838,11 @@ export function WorkflowWorkspace({
 
           <NextActionBar
             action={nextStep}
-            onAct={(a) => {
-              if (a.kind === 'apply_continue_reopened') void continueFromReopened();
-              else if (a.kind === 'apply_continue') void go.update();
-              else if (a.kind === 'resume') void go.go();
+            go={{ phase: go.phase, pendingStep: Boolean(go.pendingStep), authorizing: Boolean(go.authorizing), error: go.error }}
+            onAct={async (a) => {
+              if (a.kind === 'apply_continue_reopened') await continueFromReopened();
+              else if (a.kind === 'apply_continue') await go.update();
+              else if (a.kind === 'resume') await go.go();
               else if (a.kind === 'answer_go') {
                 setViewingStageId(null);
                 setTimeout(() => document.querySelector('[aria-label="Go mode"]')?.scrollIntoView({ block: 'start' }), 100);
