@@ -97,6 +97,7 @@ export function ObjectivePausedNotice({
   onResume,
   resumeDisabled = false,
   onAnswer,
+  resumeLabel,
 }: {
   assessment: ObjectiveAssessment;
   onResume?: () => void;
@@ -107,6 +108,12 @@ export function ObjectivePausedNotice({
    * workshop: "Make it obvious … exactly where I should respond").
    */
   onAnswer?: (text: string) => Promise<void> | void;
+  /**
+   * The button's words when Go is waiting on this check: the same action the
+   * Go panel offers (17 Oct, Sean, FIELDGUIDE: Output said "Have Go fix
+   * Output and check again" while Summary said "Resume Go").
+   */
+  resumeLabel?: string;
 }) {
   const ask = assessment.blockers.map((b) => b.ask?.trim()).find(Boolean);
   const [answer, setAnswer] = useState('');
@@ -182,7 +189,7 @@ export function ObjectivePausedNotice({
             disabled={resumeDisabled}
             className="rounded-lg bg-[var(--surface-container-highest)] px-4 py-2 text-title text-[var(--on-surface)] disabled:opacity-40"
           >
-            {assessment.blockers.length ? 'I have added it — resume Go' : 'Resume Go'}
+            {resumeLabel ?? (assessment.blockers.length ? 'I have added it — resume Go' : 'Resume Go')}
           </button>
         )}
       </div>

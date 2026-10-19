@@ -16,6 +16,7 @@ import { BlockForm, BlockedNotice, CompletionDialog, ObjectivePausedNotice } fro
 import { StageToolResult } from './stage-tool-result';
 import { CRITIQUE_TOOLS, REWRITE_TOOLS, useStageTools } from './use-stage-tools';
 import { FRAMING_KINDS, nextStageAction, type ReportedPanelStep } from '@/lib/workflow/next-action';
+import { describeNeed } from '@/lib/agent/needs';
 import { stageControls, type StageControl } from '@/lib/workflow/stage-controls';
 import { inputsChanged, stageInputs } from '@/lib/workflow/stage-inputs';
 import { isApplyable } from '@/lib/workflow/recommend';
@@ -1417,6 +1418,9 @@ export function WorkflowWorkspace({
   // reason still said it. The objective's own item says it while it holds;
   // once a change has made it out of date, Go only needs resuming.
   const goWaiting = goWaitingLine(goStopped, Boolean(objectiveAssessment));
+  // Go stopped on the objective check: the pause notice offers Go's own action.
+  const objectiveNeed =
+    go.run && !go.run.ended_at && go.run.status === 'awaiting_decision' && go.run.needs?.kind === 'objective_check' ? go.run.needs : null;
   const completion = completionSummary(template, state, context, {
     goWaiting,
     objectiveUnmet: objectiveAssessment ? { blockers: objectiveAssessment.blockers.map((b) => b.need) } : null,
@@ -1921,7 +1925,16 @@ export function WorkflowWorkspace({
               <div className="mb-4">
                 <ObjectivePausedNotice
                   assessment={objectiveAssessment}
-                  onResume={appendStageVersion ? () => void go.go() : undefined}
+                  // One action for one pause: when Go is waiting on this check,
+                  // the button is the Go panel's own (17 Oct, FIELDGUIDE).
+                  onResume={
+                    !appendStageVersion
+                      ? undefined
+                      : objectiveNeed?.finding === 'unmet'
+                        ? () => void go.fixObjective(objectiveNeed.items)
+                        : () => void go.go()
+                  }
+                  resumeLabel={objectiveNeed ? (describeNeed(objectiveNeed, go.stageLabelFor).action ?? undefined) : undefined}
                   resumeDisabled={go.active}
                   onAnswer={
                     appendStageVersion && go.run && !go.run.ended_at && go.run.status === 'awaiting_decision' && go.run.needs?.kind === 'answer_question'

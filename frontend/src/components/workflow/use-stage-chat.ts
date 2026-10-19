@@ -627,7 +627,9 @@ export function useStageChat({
       if (live.current) {
         if (e instanceof RefusedRevision && isStaleBaseRefusal(e.message) && proposal.ask) {
           // Nothing to retype: the same instruction, drafted on the new version.
-          setError(`${e.message}. Your change is not applied yet.`);
+          // 17 Oct (Sean, FIELDGUIDE): the refusal left him unsure what to
+          // press. It says the change is kept and names the one button.
+          setError(`${e.message}. Your change is kept but not applied yet — press "Apply my change to the new version" below.`);
           setRedo(proposal.ask);
           setProposal(null);
         } else {

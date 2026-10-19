@@ -690,7 +690,7 @@ export function ChatPanel({
             disabled={chat.busy}
             className="rounded-lg bg-[var(--pm-primary)] px-3 py-1.5 text-label font-semibold text-[var(--on-primary)] disabled:opacity-40"
           >
-            Apply my change to the new version
+            Apply my change to the new version{headVersion ? ` (v${headVersion.version_number})` : ''}
           </button>
         </div>
       )}
