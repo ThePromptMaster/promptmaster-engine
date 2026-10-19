@@ -36,6 +36,8 @@ export function GuideInterview({
   busy = false,
   onDone,
   onBack,
+  maxQuestions,
+  foldWhy = false,
 }: {
   objective: string;
   /** What was attached on the start screen, so no question asks what it says. */
@@ -44,6 +46,10 @@ export function GuideInterview({
   busy?: boolean;
   onDone: (answers: { question: string; answer: string }[]) => void;
   onBack: () => void;
+  /** The simple start asks at most this many (Sean, 18 Oct, email 7); unset, the server's own limit. */
+  maxQuestions?: number;
+  /** Each question's reason behind "Why this question?" rather than printed under it. */
+  foldWhy?: boolean;
 }) {
   const [answered, setAnswered] = useState<GuideAnswered[]>([]);
   const [current, setCurrent] = useState<GuideQuestion | null>(null);
@@ -51,6 +57,7 @@ export function GuideInterview({
   const [typed, setTyped] = useState('');
   const [loading, setLoading] = useState(true);
   const [enough, setEnough] = useState<string | null>(null);
+  const [whyOpen, setWhyOpen] = useState(false);
   const started = useRef(false);
 
   const ask = useCallback(
@@ -58,10 +65,20 @@ export function GuideInterview({
       setLoading(true);
       setPicked([]);
       setTyped('');
+      setWhyOpen(false);
+      if (maxQuestions !== undefined && soFar.length >= maxQuestions) {
+        // No call: the cap is the answer.
+        setCurrent(null);
+        setEnough('That is enough to set this up.');
+        onDone(answersForSetup(soFar));
+        setLoading(false);
+        return;
+      }
       try {
         const res = await api.guideNextQuestion({
           objective,
           ...(material ? { material } : {}),
+          ...(maxQuestions !== undefined ? { max_questions: maxQuestions } : {}),
           answered: soFar.map((a) => ({ question: a.question.question, answer: a.answers.join('; ') })),
         });
         if (res.enough || !res.question) {
@@ -80,7 +97,7 @@ export function GuideInterview({
         setLoading(false);
       }
     },
-    [objective, material, onDone]
+    [objective, material, onDone, maxQuestions]
   );
 
   useEffect(() => {
@@ -153,8 +170,19 @@ export function GuideInterview({
 
       {!loading && current && (
         <section aria-label="Question" className="rounded-2xl bg-[var(--surface-container-lowest)] px-6 py-5">
+          {maxQuestions !== undefined && (
+            <p className="mb-1 text-label text-[var(--on-surface-variant)]">Question {answered.length + 1} of up to {maxQuestions}</p>
+          )}
           <h2 className="text-title text-[var(--on-surface)]">{answered.length + 1}. {current.question}</h2>
-          {current.why && <p className="mt-1 text-label text-[var(--on-surface-variant)]">{current.why}</p>}
+          {current.why && !foldWhy && <p className="mt-1 text-label text-[var(--on-surface-variant)]">{current.why}</p>}
+          {current.why && foldWhy && (
+            <p className="mt-1 text-label text-[var(--on-surface-variant)]">
+              <button type="button" aria-expanded={whyOpen} onClick={() => setWhyOpen((o) => !o)} className="underline-offset-4 hover:underline">
+                Why this question?
+              </button>
+              {whyOpen && <span className="ml-2">{current.why}</span>}
+            </p>
+          )}
 
           {current.options.length > 0 && (
             <>

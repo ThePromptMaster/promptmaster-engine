@@ -14,7 +14,7 @@ from promptmaster.schemas import GuideAnswer, GuideQuestion, SetupSuggestion
 from promptmaster.workflow_designer import DesignedWorkflow, design_workflow
 from promptmaster.workflow_revision import RevisedWorkflow, revise_workflow
 from promptmaster.front_door import DraftBrief, FrontDoorTurn, Turn, front_door_turn
-from promptmaster.setup_suggester import suggest_guide_questions, suggest_next_guide_question, suggest_setup
+from promptmaster.setup_suggester import MAX_GUIDE_QUESTIONS, suggest_guide_questions, suggest_next_guide_question, suggest_setup
 
 router = APIRouter(prefix="/api", tags=["setup"])
 
@@ -83,6 +83,8 @@ class GuideNextRequest(BaseModel):
     answered: list[GuideAnswered] = Field(default_factory=list, max_length=12)
     model: str = ""
     material: str = Field(default="", max_length=MAX_CONTEXT_CHARS)
+    #: The simple start asks fewer (Sean, 18 Oct, email 7); never more than the server's own limit.
+    max_questions: int = Field(default=MAX_GUIDE_QUESTIONS, ge=1, le=MAX_GUIDE_QUESTIONS)
 
 
 class GuideNextResponse(BaseModel):
@@ -103,6 +105,7 @@ async def api_guide_next_question(
         client=client, model=req.model or None, objective=req.objective,
         answered=[a.model_dump() for a in req.answered],
         material=req.material,
+        limit=req.max_questions,
     )
     return GuideNextResponse(enough=enough, question=question, reason=reason)
 

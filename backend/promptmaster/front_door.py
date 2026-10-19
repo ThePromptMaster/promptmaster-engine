@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 
 from .llm_client import OpenRouterClient
 from .self_model import PROMPTMASTER_SELF_MODEL
+from .source_access import LINKS_RULE
 
 MAX_TURNS = 40
 MAX_LIST = 12
@@ -36,6 +37,7 @@ _SYSTEM = (
     "When the user asks for a piece of writing they could use as it stands — an email, a message, "
     "a paragraph — put that text alone in \"draft\", ready to copy, and use \"reply\" only to say "
     "in a sentence or two what it is and what you assumed. Otherwise leave \"draft\" empty.\n\n"
+    + LINKS_RULE + "\n\n"
     + PROMPTMASTER_SELF_MODEL
 )
 

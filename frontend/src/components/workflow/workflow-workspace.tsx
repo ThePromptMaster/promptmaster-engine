@@ -114,6 +114,7 @@ import { EventRecordedError, useProjectStore, type StageBundle } from '@/stores/
 import { withAppliedInstructions } from '@/lib/workflow/applied-instructions';
 import { commitOutlineVersion, approvedOutlineVersionId, ensureOutlineArtifact } from '@/lib/supabase/outline';
 import type { Artifact, ArtifactVersion, Evaluation, Project, ProjectPatch, RoutineDecisions } from '@/types/project';
+import { useExperience } from '@/lib/projects/experience';
 
 interface Props {
   project: Project;
@@ -183,6 +184,8 @@ export function WorkflowWorkspace({
   ensureStageArtifact,
   onReload,
 }: Props) {
+  const [experience] = useExperience();
+  const simpleExperience = experience === 'simple';
   // Every request built from the project carries the instructions the user
   // applied, beside its facts (12 Oct, Atlas and Meridian).
   const project = useMemo(() => withAppliedInstructions(projectProp, template, bundles), [projectProp, template, bundles]);
@@ -1539,7 +1542,9 @@ export function WorkflowWorkspace({
   controlsRef.current = pageControls;
   // Check and chapter stages: the work is the table or the chapters, so the
   // supporting panels fold to a line each (3 Oct call).
-  const foldStageExtras = stage.renderer === 'review' || stage.renderer === 'long_form';
+  // The simple setup folds them on every stage (Sean, 18 Oct, email 7): the
+  // checklist still opens by itself when a box is the user's to tick.
+  const foldStageExtras = simpleExperience || stage.renderer === 'review' || stage.renderer === 'long_form';
   const showDials = isCurrent && draftable && hasContent;
   const dials = (
     <CritiqueStyleControl

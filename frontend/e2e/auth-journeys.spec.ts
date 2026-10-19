@@ -29,7 +29,8 @@ test('a link to a page behind sign-in survives the login screen', async ({ page 
   await page.getByRole('button', { name: 'Sign In', exact: true }).click();
   await expect(page).toHaveURL(/\/projects\/new$/);
   await dismissBetaNotice(page);
-  await expect(page.getByLabel('What do you want to do or figure out?')).toBeVisible();
+  // A fresh browser gets the simple start (18 Oct, email 7).
+  await expect(page.getByLabel('What do you want done?')).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('01-deep-link-after-login.png') });
 });
 

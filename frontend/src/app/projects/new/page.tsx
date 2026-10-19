@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 
 import { useAuth } from '@/hooks/use-auth';
 import { GuideInterview } from '@/components/projects/guide-interview';
-import { SetupCard, type SetupDraft } from '@/components/projects/setup-card';
+import { DOES_THE_WORK, SetupCard, type SetupDraft } from '@/components/projects/setup-card';
 import { CustomWorkflowDesigner } from '@/components/projects/custom-workflow-designer';
 import { FrontDoor, type DraftBrief } from '@/components/projects/front-door';
 import { recordFacts, type NewFact } from '@/lib/supabase/facts';
@@ -30,6 +30,8 @@ import { goalFromSearch } from '@/lib/projects/example-goals';
 import { attachProjectFile } from '@/lib/supabase/project-files';
 import { LimitCounter } from '@/components/shared/limit-counter';
 import { clearSetupDraft, loadSetupDraft, saveSetupDraft } from '@/lib/supabase/setup-drafts';
+import { SIMPLE_GUIDE_QUESTIONS, useExperience } from '@/lib/projects/experience';
+import { sourceAccessNote } from '@/lib/projects/links';
 import { describeDraft, worthKeeping, type DesignerState, type FrontDoorState, type SetupDraftState } from '@/lib/projects/setup-draft';
 
 /**
@@ -64,6 +66,9 @@ export default function NewProjectPage() {
   // (4 Oct). Start stays disabled until the user is known.
   const { user } = useAuth();
   const router = useRouter();
+  // Simple unless the user chose advanced (Sean, 18 Oct, email 7).
+  const [experience, setExperience] = useExperience();
+  const simple = experience === 'simple';
 
   const [templates, setTemplates] = useState<(WorkflowTemplate & { id: string })[]>([]);
   const [step, setStep] = useState<Step>('ask');
@@ -381,7 +386,17 @@ export default function NewProjectPage() {
 
   // With a recommendation the user can start from the top; choosing the
   // workflow yourself still ends the form with Start (Harold, via Sean, 9 Oct).
-  const startAtTop = Boolean(recommendedKey) && selected?.key === recommendedKey;
+  const startAtTop = simple || (Boolean(recommendedKey) && selected?.key === recommendedKey);
+  const linkNote = sourceAccessNote(objective);
+  const experienceSwitch = (
+    <button
+      type="button"
+      onClick={() => setExperience(simple ? 'advanced' : 'simple')}
+      className="text-body text-[var(--on-surface-variant)] underline-offset-4 hover:text-[var(--on-surface)] hover:underline"
+    >
+      {simple ? 'Advanced setup — choose the workflow, talk it through, see every field' : 'Simple setup'}
+    </button>
+  );
   const startButton = (
     <button
       onClick={() => void handleCreate()}
@@ -472,10 +487,11 @@ export default function NewProjectPage() {
 
       {step === 'ask' && (
         <>
-          <h1 className="text-display text-[var(--on-surface)]">What do you want to do or figure out?</h1>
+          <h1 className="text-display text-[var(--on-surface)]">{simple ? 'What do you want done?' : 'What do you want to do or figure out?'}</h1>
           <p className="mt-3 text-body text-[var(--on-surface-variant)]">
-            Say it in your own words. PromptMaster will suggest how to set it up — which workflow,
-            how to think about it, who it is for — and you can change any of it.
+            {simple
+              ? `Say it in a sentence or two. ${DOES_THE_WORK}`
+              : 'Say it in your own words. PromptMaster will suggest how to set it up — which workflow, how to think about it, who it is for — and you can change any of it.'}
           </p>
 
           <div className="mt-8 rounded-2xl bg-[var(--surface-container-lowest)] px-6 py-5 shadow-[0_1px_2px_rgba(25,28,30,0.04)]">
@@ -485,7 +501,7 @@ export default function NewProjectPage() {
               onChange={(e) => setObjective(e.target.value)}
               rows={3}
               autoFocus
-              aria-label="What do you want to do or figure out?"
+              aria-label={simple ? 'What do you want done?' : 'What do you want to do or figure out?'}
               placeholder="e.g. Write a short book about giraffes for curious ten-year-olds"
               className="w-full bg-transparent text-title leading-relaxed text-[var(--on-surface)] outline-none placeholder:text-[var(--outline)]"
             />
@@ -497,6 +513,13 @@ export default function NewProjectPage() {
               onImages={setStartImages}
               disabled={working !== null}
             />
+            {/* The backend opens no link; say so before any work rests on one (email 7). */}
+            {linkNote && (
+              <p role="note" aria-label="Links" className="mt-3 flex gap-1.5 text-label text-[var(--pm-tertiary)]">
+                <span aria-hidden className="material-symbols-outlined text-[16px]">link_off</span>
+                {linkNote}
+              </p>
+            )}
           </div>
 
           <div className="mt-6 grid gap-3 sm:grid-cols-2">
@@ -505,19 +528,20 @@ export default function NewProjectPage() {
               disabled={!hasObjective || working !== null}
               className="rounded-2xl bg-[var(--pm-primary)] px-6 py-5 text-left text-[var(--on-primary)] transition-opacity hover:opacity-90 disabled:opacity-40"
             >
-              <span className="block text-title">I know what I want to do</span>
-              <span className="mt-1 block text-label opacity-90">Recommend a setup from what I wrote</span>
+              <span className="block text-title">{simple ? 'Set it up for me' : 'I know what I want to do'}</span>
+              <span className="mt-1 block text-label opacity-90">{simple ? 'One screen to check, then Start' : 'Recommend a setup from what I wrote'}</span>
             </button>
             <button
               onClick={() => void guideMe()}
               disabled={!hasObjective || working !== null}
               className="rounded-2xl bg-[var(--surface-container-high)] px-6 py-5 text-left text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-highest)] disabled:opacity-40"
             >
-              <span className="block text-title">Guide me — ask me questions</span>
+              <span className="block text-title">{simple ? 'Ask me a few questions' : 'Guide me — ask me questions'}</span>
               <span className="mt-1 block text-label text-[var(--on-surface-variant)]">
-                One question at a time, then a setup
+                {simple ? `At most ${SIMPLE_GUIDE_QUESTIONS}, then the same one screen` : 'One question at a time, then a setup'}
               </span>
             </button>
+            {!simple && (
             <button
               onClick={() => { setError(null); setStep('talk'); }}
               disabled={!hasObjective || working !== null}
@@ -528,6 +552,7 @@ export default function NewProjectPage() {
                 Talk it through; a draft brief builds up beside the chat. No project exists until you press Start
               </span>
             </button>
+            )}
           </div>
 
           {busyLabel && (
@@ -555,13 +580,18 @@ export default function NewProjectPage() {
         </div>
           )}
 
-          <button
-            onClick={chooseYourself}
-            disabled={templates.length === 0}
-            className="mt-6 text-body text-[var(--on-surface-variant)] underline-offset-4 hover:text-[var(--on-surface)] hover:underline"
-          >
-            Or choose the workflow yourself
-          </button>
+          <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2">
+            {!simple && (
+              <button
+                onClick={chooseYourself}
+                disabled={templates.length === 0}
+                className="text-body text-[var(--on-surface-variant)] underline-offset-4 hover:text-[var(--on-surface)] hover:underline"
+              >
+                Or choose the workflow yourself
+              </button>
+            )}
+            {experienceSwitch}
+          </div>
         </>
       )}
 
@@ -578,6 +608,8 @@ export default function NewProjectPage() {
             busy={working === 'setup'}
             onDone={(given) => void recommend(given)}
             onBack={() => setStep('ask')}
+            maxQuestions={simple ? SIMPLE_GUIDE_QUESTIONS : undefined}
+            foldWhy={simple}
           />
         </>
       )}
@@ -604,11 +636,14 @@ export default function NewProjectPage() {
         <>
           <h1 className="text-display text-[var(--on-surface)]">Your setup</h1>
           <p className="mt-3 mb-8 text-body text-[var(--on-surface-variant)]">
-            {recommendedKey
+            {simple
+              ? 'Check this, then press Start.'
+              : recommendedKey
               ? 'Recommended from what you told us. Start now, or change anything first — all of it stays editable later.'
               : 'Pick a workflow and fill in what you know. All of it stays editable later.'}
           </p>
           <SetupCard
+            simple={simple}
             start={startAtTop ? startButton : undefined}
             templates={templates}
             templateId={templateId}
@@ -670,6 +705,7 @@ export default function NewProjectPage() {
             >
               Back
             </button>
+            {experienceSwitch}
           </div>
         </>
       )}

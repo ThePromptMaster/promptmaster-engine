@@ -13,5 +13,8 @@ setup('sign in', async ({ page }) => {
   await page.getByRole('button', { name: 'Sign In', exact: true }).click();
 
   await expect(page).toHaveURL(/\/projects$/);
+  // The specs were written against the full setup; the simple start, which
+  // every new user sees, has its own spec (simple-start.spec.ts).
+  await page.evaluate(() => localStorage.setItem('pm.experience.v1', 'advanced'));
   await page.context().storageState({ path: path.join(__dirname, '.auth', 'state.json') });
 });

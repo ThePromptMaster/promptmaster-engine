@@ -12,6 +12,7 @@ import logging
 
 from .llm_client import OpenRouterClient
 from .schemas import GuideAnswer, GuideQuestion, ModeType, SetupRationale, SetupSuggestion
+from .source_access import LINKS_RULE
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,7 @@ _VALID_MODES = {
 }
 
 _VALID_WORKFLOWS = {"book", "research", "single_output", "exploration"}
+
 
 
 SETUP_SUGGESTER_SYSTEM = (
@@ -75,6 +77,10 @@ SETUP_SUGGESTER_SYSTEM = (
     "fixed end.\n"
     "Pick the smallest workflow that fits; most everyday objectives are "
     "single_output. Give workflow_reason as one line (≤100 chars).\n\n"
+    # Sean, 18 Oct (email 7): a cookbook from an Instagram account's videos.
+    + LINKS_RULE + " Here, that means: when the objective rests on content behind a link "
+    "or in a video, the constraints say the work uses only text and files the user supplies, "
+    "and the constraints rationale says what to paste or upload.\n\n"
     "Return JSON only."
 )
 
@@ -291,7 +297,9 @@ GUIDE_NEXT_SYSTEM = (
 )
 
 
-def build_guide_next_prompt(objective: str, answered: list[dict[str, str]], material: str = "") -> str:
+def build_guide_next_prompt(
+    objective: str, answered: list[dict[str, str]], material: str = "", limit: int = MAX_GUIDE_QUESTIONS
+) -> str:
     so_far = "\n".join(
         f"- Q: {a.get('question', '').strip()}\n  A: {a.get('answer', '').strip() or '(skipped)'}" for a in answered
     ) or "(nothing asked yet)"
@@ -299,7 +307,10 @@ def build_guide_next_prompt(objective: str, answered: list[dict[str, str]], mate
         f"Objective: {objective}\n\n"
         f"{material_block(material)}"
         f"ASKED AND ANSWERED SO FAR:\n{so_far}\n\n"
-        "Return JSON in exactly one of these shapes:\n"
+        # The simple start (Sean, 18 Oct, email 7): a short intake asks only what matters most.
+        + (f"At most {limit} questions in all; {len(answered)} asked. Ask only what most changes the setup.\n\n"
+           if limit < MAX_GUIDE_QUESTIONS else "")
+        + "Return JSON in exactly one of these shapes:\n"
         '{"enough": true, "reason": "one line: what you now know"}\n'
         '{"enough": false, "question": {"question": "...", "why": "...", "options": ["...", "..."], "multi": false}}'
     )
@@ -330,17 +341,19 @@ async def suggest_next_guide_question(
     objective: str,
     answered: list[dict[str, str]],
     material: str = "",
+    limit: int = MAX_GUIDE_QUESTIONS,
 ) -> tuple[bool, GuideQuestion | None, str]:
     """The next question, or that there is enough. One small call.
 
-    Stops by itself at MAX_GUIDE_QUESTIONS without a call. If the call fails,
+    Stops by itself at `limit` (at most MAX_GUIDE_QUESTIONS) without a call. If the call fails,
     the generic questions are asked in turn so the path still works.
     """
-    if len(answered) >= MAX_GUIDE_QUESTIONS:
+    limit = max(1, min(limit, MAX_GUIDE_QUESTIONS))
+    if len(answered) >= limit:
         return True, None, "That is enough to set this up."
     try:
         result, _usage = await client.generate_json(
-            prompt=build_guide_next_prompt(objective, answered, material),
+            prompt=build_guide_next_prompt(objective, answered, material, limit),
             system=GUIDE_NEXT_SYSTEM,
             temperature=0.3,
             max_tokens=400,

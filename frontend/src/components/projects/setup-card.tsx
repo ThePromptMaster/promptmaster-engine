@@ -1,7 +1,7 @@
 'use client';
 
 import { AutoGrowTextarea } from '@/components/shared/auto-grow-textarea';
-import { WorkflowPicker } from '@/components/projects/workflow-picker';
+import { PITCH, WorkflowPicker } from '@/components/projects/workflow-picker';
 import { MODE_DISPLAY } from '@/lib/constants';
 import type { WorkflowTemplate } from '@/lib/workflow/types';
 import type { ModeType, SetupRationale } from '@/types';
@@ -41,7 +41,15 @@ interface Props {
    * Sean, 9 Oct: "keep the question tree simple and easy").
    */
   start?: React.ReactNode;
+  /**
+   * The simple start (Sean, 18 Oct, email 7): what you will get and Start on
+   * one screen, everything else under "More options".
+   */
+  simple?: boolean;
 }
+
+/** Said beside Start, so nobody wonders whether they get a prompt to paste elsewhere (email 7). */
+export const DOES_THE_WORK = 'PromptMaster writes the result itself; you review and approve.';
 
 const SELECTABLE_MODES = (Object.keys(MODE_DISPLAY) as ModeType[]).filter((m) => m !== 'custom');
 
@@ -61,6 +69,7 @@ export function SetupCard({
   onChange,
   designer,
   start,
+  simple = false,
 }: Props) {
   const field =
     'w-full rounded-lg bg-[var(--surface-container-low)] px-4 py-3 text-body leading-relaxed text-[var(--on-surface)] outline-none placeholder:text-[var(--on-surface-variant)]/70 focus:ring-2 focus:ring-[var(--pm-primary)]/40';
@@ -68,7 +77,9 @@ export function SetupCard({
   const why = (text?: string) =>
     text ? <p className="mt-1 text-label text-[var(--on-surface-variant)]">{text}</p> : null;
 
-  return (
+  const recommended = templates.find((t) => t.key === recommendedKey) ?? templates.find((t) => t.id === templateId);
+
+  const full = (
     <div className="space-y-8">
       <section>
         <h2 className={label}>Workflow</h2>
@@ -82,7 +93,7 @@ export function SetupCard({
             {workflowReason}
           </p>
         )}
-        {start && (
+        {start && !simple && (
           <div className="mb-6">
             {start}
             <p className="mt-2 text-label text-[var(--on-surface-variant)]">
@@ -202,6 +213,44 @@ export function SetupCard({
           {why(rationale?.output_format)}
         </section>
       </div>
+    </div>
+  );
+
+  if (!simple) return full;
+
+  const suggestedConstraints = Boolean(rationale?.constraints && draft.constraints.trim());
+  return (
+    <div className="space-y-6">
+      <section aria-label="What you will get" className="rounded-2xl bg-[var(--surface-container-lowest)] px-6 py-5">
+        <p className={label}>What you&apos;ll get</p>
+        {recommended && (
+          <p className="text-title text-[var(--on-surface)]">
+            {recommended.name}
+            <span className="font-normal text-[var(--on-surface-variant)]"> — {PITCH[recommended.key] ?? recommended.description}</span>
+          </p>
+        )}
+        {workflowReason && <p className="mt-1 text-body text-[var(--on-surface-variant)]">{workflowReason}</p>}
+        <p className="mt-3 text-body text-[var(--on-surface)]">{draft.objective}</p>
+        {suggestedConstraints && (
+          <p data-suggested className="mt-3 text-label text-[var(--pm-tertiary)]">
+            PromptMaster also suggested some constraints you did not say. They become requirements when you press
+            Start — check them under More options.
+          </p>
+        )}
+      </section>
+      {start && (
+        <div>
+          {start}
+          <p className="mt-2 text-label text-[var(--on-surface-variant)]">{DOES_THE_WORK} Everything stays editable in the project.</p>
+        </div>
+      )}
+      <details data-more-options className="rounded-2xl bg-[var(--surface-container-low)] px-6 py-4">
+        <summary className="cursor-pointer text-body text-[var(--on-surface)]">
+          More options
+          <span className="ml-2 text-label text-[var(--on-surface-variant)]">workflow, how it thinks, name, context, audience, constraints, format</span>
+        </summary>
+        <div className="mt-6">{full}</div>
+      </details>
     </div>
   );
 }
