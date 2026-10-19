@@ -28,7 +28,7 @@ import re
 
 from pydantic import BaseModel, Field
 
-from .fact_filters import RULES, is_request, record_kind, records_nothing, the_change
+from .fact_filters import RULES, classify, record_kind, records_nothing, the_change
 from .llm_client import OpenRouterClient
 
 MAX_FACTS = 60
@@ -63,6 +63,10 @@ class NewStandingFact(BaseModel):
     #: Someone's request, suggestion or proposal: recorded as a fact about it,
     #: shown apart as "Requests noted (not approved)" (17 Oct, Sean, HARBOR).
     request: bool = False
+    #: An authority granting something ("The CEO authorizes up to 75 hours"):
+    #: shown as an approval, with who granted it (18 Oct, Sean, Ridgeway).
+    approval: bool = False
+    approved_by: str = ""
 
 
 class RevisionFactsResponse(BaseModel):
@@ -86,10 +90,13 @@ _INSTRUCTION = (
     "preserve something. Write each as one short self-contained statement, mark it \"requirement\" when it "
     "binds what the work may say or must keep and \"fact\" otherwise, and quote the instruction verbatim "
     "(one sentence or less). A one-off wording or style request is not a standing change. When in doubt, "
-    "report nothing.\n"
+    "report nothing. Give each a status: \"approval\" when someone with authority grants or authorizes it "
+    "(and name them in \"authority\"), \"request\" when someone only asks for or proposes it, otherwise "
+    "\"fact\".\n"
     "Rules for standing changes:\n" + RULES +
     "Return JSON: {\"changes\": [{\"fact_id\": string, \"proposed\": string, \"quote\": string, \"why\": string}], "
-    "\"additions\": [{\"statement\": string, \"kind\": \"fact\" | \"requirement\", \"quote\": string}]}"
+    "\"additions\": [{\"statement\": string, \"kind\": \"fact\" | \"requirement\", \"quote\": string, "
+    "\"status\": \"fact\" | \"request\" | \"approval\", \"authority\": string}]}"
 )
 
 
@@ -134,11 +141,14 @@ def _additions(raw: dict, req: RevisionFactsRequest) -> list[NewStandingFact]:
         # request is a fact about the request (the reply-actions path's rules).
         if records_nothing(statement) or records_nothing(the_change(quote)):
             continue
-        request = is_request(statement)
+        # The verb decides first (an authority granting it is an approval, a
+        # request word a request); the model's status only where the words don't.
+        status, by = classify(statement, item.get("status"), item.get("authority"))
+        request = status == "request"
         kind = "fact" if request else record_kind(str(item.get("kind") or "").strip().lower(), statement)
         if _norm(statement) in known or any(_norm(a.statement) == _norm(statement) for a in out):
             continue
-        out.append(NewStandingFact(statement=statement, kind=kind, quote=quote, request=request))
+        out.append(NewStandingFact(statement=statement, kind=kind, quote=quote, request=request, approval=status == "approval", approved_by=by))
     return out
 
 

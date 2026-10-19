@@ -1215,15 +1215,17 @@ export function AppliedNotice({
   );
 }
 
-/** "This changes an accepted fact", "This states 2 new facts", "notes a request", or a mix. */
+/** "This changes an accepted fact", "This states 2 new facts", "records an approval", "notes a request", or a mix. */
 function factChangesHeading(changes: readonly FactChange[]): string {
   const count = (g: ReturnType<typeof factChangeGroup>) => changes.filter((c) => factChangeGroup(c) === g).length;
   const changed = count('changed');
   const added = count('new');
+  const approvals = count('approval');
   const requests = count('request');
   const parts = [
     changed ? `changes ${changed === 1 ? 'an accepted fact' : `${changed} accepted facts`}` : '',
     added ? `states ${added === 1 ? 'a new fact' : `${added} new facts`}` : '',
+    approvals ? `records ${approvals === 1 ? 'an approval' : `${approvals} approvals`}` : '',
     requests ? `notes ${requests === 1 ? 'a request' : `${requests} requests`} nobody has approved` : '',
   ].filter(Boolean);
   const list = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}` : parts[0];

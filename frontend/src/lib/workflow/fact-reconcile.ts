@@ -40,6 +40,12 @@ export interface FactChange {
   proposed: string;
   /** A new fact that records someone's request or proposal: nobody has approved it (17 Oct). */
   request?: boolean;
+  /**
+   * A new fact that records an authority granting something, and who: "CEO"
+   * (18 Oct, Sean, Ridgeway: "The CEO authorizes … 75 staff hours" was listed
+   * as a request). An empty string when the approval names nobody.
+   */
+  approvedBy?: string;
 }
 
 function byKind(text: string): Map<keyof FactValues, ValueMention[]> {
@@ -168,18 +174,52 @@ export function isNewFact(c: FactChange): boolean {
  * (17 Oct, Sean, HARBOR: "Apply and update 6 facts" mixed facts, instructions
  * and statements that other information remained unchanged).
  */
-export type FactChangeGroup = 'changed' | 'new' | 'request';
+export type FactChangeGroup = 'changed' | 'new' | 'approval' | 'request';
 
 export function factChangeGroup(c: FactChange): FactChangeGroup {
   if (!isNewFact(c)) return 'changed';
+  if (c.approvedBy !== undefined) return 'approval';
   return c.request ? 'request' : 'new';
 }
 
 export const FACT_CHANGE_GROUPS: ReadonlyArray<{ group: FactChangeGroup; label: string }> = [
   { group: 'changed', label: 'Changed values' },
   { group: 'new', label: 'New facts' },
+  { group: 'approval', label: 'Approvals recorded' },
   { group: 'request', label: 'Requests noted (not approved)' },
 ];
+
+/** "the CEO", "the board", "Elena": a role takes "the", a name does not. */
+function approverName(by: string): string {
+  const bare = by.replace(/^the\s+/i, '').trim();
+  return /^[A-Z][a-z]/.test(bare) ? bare : `the ${bare}`;
+}
+
+/** The line under a new fact in the review: what it will be recorded as, and from where. */
+export function newFactNote(c: FactChange): string {
+  const from = describeFactChange(c);
+  switch (factChangeGroup(c)) {
+    case 'approval':
+      return c.approvedBy ? `Approved by ${approverName(c.approvedBy)}, ${from}` : `Recorded as an approval, ${from}`;
+    case 'request':
+      return `Recorded as a request, not an approval ${from}`;
+    default:
+      return `New ${c.fact.kind === 'requirement' ? 'requirement' : 'fact'} ${from}`;
+  }
+}
+
+/**
+ * Where a new fact came from, as stored on it: an approval keeps who granted
+ * it and a request is marked, so a later reader of the record does not have
+ * to work either out again from the wording.
+ */
+export function newFactSource(c: FactChange, from: Record<string, unknown>): Record<string, unknown> {
+  return {
+    ...from,
+    ...(c.approvedBy !== undefined ? { approval: true, approved_by: c.approvedBy } : {}),
+    ...(c.request ? { request: true } : {}),
+  };
+}
 
 /** "Apply and record 3 changes": what the button does, whatever the mix. */
 export function applyChangesLabel(count: number): string {
@@ -197,7 +237,7 @@ export async function withMeaningChanges(
   input: { facts: readonly ProjectFact[] | undefined; instruction: string; before: string; after: string; model?: string },
   check: (req: { instruction: string; before: string; after: string; facts: { id: string; statement: string }[]; model?: string }) => Promise<{
     changes: { fact_id: string; proposed: string; quote: string; why: string }[];
-    additions?: { statement: string; kind: 'fact' | 'requirement'; quote: string; request?: boolean }[];
+    additions?: { statement: string; kind: 'fact' | 'requirement'; quote: string; request?: boolean; approval?: boolean; approved_by?: string }[];
   }>
 ): Promise<FactChange[]> {
   const offered = new Set(valueChanges.map((c) => c.fact.id));
@@ -225,7 +265,7 @@ export async function withMeaningChanges(
           fact: { id: `${NEW_PREFIX}${i}`, statement: '', subject: null, kind: a.kind === 'requirement' ? 'requirement' : 'fact' },
           changes: [{ kind: 'new', was: '', now: `from your instruction — “${a.quote}”` }],
           proposed: a.statement,
-          ...(a.request ? { request: true } : {}),
+          ...(a.approval ? { approvedBy: a.approved_by ?? '' } : a.request ? { request: true } : {}),
         }))
       : [];
     // A new fact that says what a changed value already says is offered once

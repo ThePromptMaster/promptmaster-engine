@@ -121,3 +121,64 @@ def test_the_revision_prompt_carries_the_same_rules_as_the_reply_actions():
     system, _ = build_prompt(HARBOR)
     assert "all other facts remain unchanged" in system
     assert "is recorded as a fact about the request, never as a requirement" in system
+
+
+RIDGEWAY_CEO = (
+    "The CEO authorizes the process-improvement initiative for up to 75 staff hours over five weeks, "
+    "using the existing team with no incremental spending."
+)
+RIDGEWAY_COO = "The COO asks purchasing to order the $900,000 inspection system immediately."
+RIDGEWAY = RevisionFactsRequest(
+    instruction=f"Revenue was $27 million, not $30 million. {RIDGEWAY_CEO} {RIDGEWAY_COO}",
+    before="Revenue: $30 million. Proposed initiative: 100 staff hours.",
+    after="Revenue: $27 million. The CEO authorized up to 75 staff hours. The COO asked purchasing to order the system.",
+    facts=[],
+)
+
+
+def test_an_authority_granting_something_is_an_approval_not_a_request():
+    """18 Oct, Sean, Ridgeway: "The CEO authorizes … 75 staff hours" was listed
+    under "Requests noted (not approved)" because the model's statement said it
+    "supersedes the proposed 100 hours"."""
+    out = parse({"additions": [
+        {"statement": "The CEO authorized the process-improvement initiative for up to 75 staff hours over five weeks, "
+                      "using the existing team with no incremental spending. This supersedes the proposed 100 hours.",
+         "kind": "requirement", "quote": RIDGEWAY_CEO, "status": "request"},
+        {"statement": "The COO has asked purchasing to order the $900,000 inspection system immediately. "
+                      "The board has issued no capital approval.",
+         "kind": "fact", "quote": RIDGEWAY_COO, "status": "fact"},
+    ]}, RIDGEWAY)
+    ceo, coo = out.additions
+    assert (ceo.approval, ceo.approved_by, ceo.request, ceo.kind) == (True, "CEO", False, "requirement")
+    assert (coo.approval, coo.request, coo.kind) == (False, True, "fact")
+
+
+def test_the_model_cannot_make_an_unstated_grant_an_approval():
+    out = parse({"additions": [
+        {"statement": "Revenue was $27 million.", "kind": "fact", "quote": "Revenue was $27 million", "status": "approval", "authority": "CFO"},
+    ]}, RIDGEWAY)
+    assert (out.additions[0].approval, out.additions[0].request) == (False, False)
+
+
+def test_the_revision_prompt_asks_for_who_granted_an_approval():
+    system, _user = build_prompt(RIDGEWAY)
+    assert "\"status\": \"fact\" | \"request\" | \"approval\", \"authority\": string" in system
+    assert "is an approval, not a request, even where it replaces an earlier proposed figure" in system
+
+
+def test_the_endpoint_returns_the_ridgeway_approval_and_request():
+    stub = AsyncMock()
+    stub.generate_json = AsyncMock(return_value=({"changes": [], "additions": [
+        {"statement": RIDGEWAY_CEO + " This supersedes the proposed 100 hours.", "kind": "fact", "quote": RIDGEWAY_CEO},
+        {"statement": RIDGEWAY_COO, "kind": "requirement", "quote": RIDGEWAY_COO},
+    ]}, None))
+    app.dependency_overrides[get_client] = lambda: stub
+    try:
+        r = TestClient(app).post("/api/revision-facts", json=RIDGEWAY.model_dump())
+        adds = r.json()["additions"]
+        assert [(a["approval"], a["approved_by"], a["request"]) for a in adds] == [(True, "CEO", False), (False, "", True)]
+        assert adds[1]["kind"] == "fact"
+        _args, kwargs = stub.generate_json.call_args
+        assert "approval" in kwargs["system"]
+    finally:
+        app.dependency_overrides.pop(get_client, None)

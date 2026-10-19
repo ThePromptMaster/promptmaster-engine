@@ -9,7 +9,7 @@
 import { useState } from 'react';
 
 import { recordFacts, supersedeFact } from '@/lib/supabase/facts';
-import { describeFactChange, FACT_CHANGE_GROUPS, factChangeGroup, isNewFact, type FactChange } from '@/lib/workflow/fact-reconcile';
+import { describeFactChange, FACT_CHANGE_GROUPS, factChangeGroup, isNewFact, newFactNote, newFactSource, type FactChange } from '@/lib/workflow/fact-reconcile';
 import type { Project } from '@/types/project';
 
 export function FactChangeList({
@@ -39,9 +39,7 @@ export function FactChangeList({
                     <span className="block">{c.proposed}</span>
                     <span className="block text-[var(--on-surface-variant)]">
                       {isNewFact(c)
-                        ? g.group === 'request'
-                          ? `Recorded as a request, not an approval ${describeFactChange(c)}`
-                          : `New ${c.fact.kind === 'requirement' ? 'requirement' : 'fact'} ${describeFactChange(c)}`
+                        ? newFactNote(c)
                         : <>{describeFactChange(c)} · was &ldquo;{c.fact.statement}&rdquo;</>}
                     </span>
                   </span>
@@ -96,7 +94,7 @@ export function FactReconcileNotice({
     setError(null);
     try {
       for (const c of updating) {
-        if (isNewFact(c)) await recordFacts(project, [{ statement: c.proposed, kind: c.fact.kind, source_kind: 'user_edit', source_ref: { via: 'revision', stage: stageLabel, how } }]);
+        if (isNewFact(c)) await recordFacts(project, [{ statement: c.proposed, kind: c.fact.kind, source_kind: 'user_edit', source_ref: newFactSource(c, { via: 'revision', stage: stageLabel, how }) }]);
         else await supersedeFact(project, c.fact, c.proposed, { via: 'revision', stage: stageLabel, how });
       }
       await onChanged?.();
