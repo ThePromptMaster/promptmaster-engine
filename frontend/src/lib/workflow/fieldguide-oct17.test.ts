@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 
 import { failingParts, onlyParts } from '@/lib/agent/perform';
 import { measureStageContent } from './context';
+import { measure, parseRequirements } from './measurable';
 import { structureDropped } from './preservation';
 import { SINGLE_OUTPUT_V1 } from './templates/single-output.v1';
 import type { Project } from '@/types/project';
@@ -59,5 +60,49 @@ describe('FIELDGUIDE: each section against its own limit', () => {
     const head = pack(1000);
     const cut = head.replace(curriculum(1000), `# 2. Three-workshop curriculum\n\n## Workshop 1: Structured Interview Foundations\n\nOpening, practice and debrief.`);
     expect(structureDropped(head, cut)).toEqual(['the timings under "Workshop 1: Structured Interview Foundations"']);
+  });
+});
+
+describe('word limits written as a list by a generated setup (19 Oct, simple start)', () => {
+  const constraints = "Only the design package is authorized. Word limits: memo 400, curriculum 900, practice case 900, evaluation plan 500, register compact. Label assumptions.";
+  const reqs = parseRequirements([constraints]);
+
+  it('reads one limit per part, and nothing for a part with no number', () => {
+    expect(reqs.map((r) => [r.subject, r.max])).toEqual([
+      ['memo', 400], ['curriculum', 900], ['practice case', 900], ['evaluation plan', 500],
+    ]);
+  });
+
+  it('measures each under its own heading in the package', () => {
+    const pkg = [
+      '## 1. Executive decision memo', 'word '.repeat(380),
+      '## 2. Three-workshop curriculum', 'word '.repeat(950),
+      '## 3. Practice case', 'word '.repeat(600),
+      '## 4. Pilot evaluation plan', 'word '.repeat(450),
+    ].join('\n');
+    const byId = Object.fromEntries(reqs.map((r) => [r.subject, measure(r, pkg)]));
+    expect(byId.memo?.satisfied).toBe(true);
+    expect(byId.curriculum?.satisfied).toBe(false);
+    expect(byId['practice case']?.satisfied).toBe(true);
+    expect(byId['evaluation plan']?.satisfied).toBe(true);
+  });
+});
+
+describe('a named part is counted whole: bold labels, tables and questions inside it are its content (19 Oct)', () => {
+  const [curriculum] = parseRequirements(['Word limits: curriculum 900, memo 400.']);
+  const pkg = [
+    '## 1. Executive decision memo', 'word '.repeat(50),
+    '## 2. Three-workshop curriculum',
+    '**Roles.** One facilitator and two role-players.',
+    '**Assumptions.**', '- ' + 'word '.repeat(300),
+    '### Workshop 1', '| Time | Activity |', '|---|---|', '| 10 | Warm-up |',
+    '1. What did the candidate own?', 'word '.repeat(600),
+    '## 3. Practice case', 'word '.repeat(50),
+  ].join('\n');
+
+  it('counts past a bold label, a subheading, a table and a numbered question, to the next part', () => {
+    const m = measure(curriculum, pkg)!;
+    expect(m.satisfied).toBe(false);
+    expect(m.value).toMatch(/^9\d\d words/);
   });
 });

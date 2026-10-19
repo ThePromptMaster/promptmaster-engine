@@ -230,6 +230,26 @@ export function parseRequirements(texts: readonly string[]): MeasurableRequireme
         add({ kind: 'words', subject, source: m[0].trim(), ...r });
       }
     }
+    // "Word limits: memo 400, curriculum 900, practice case 900, evaluation
+    // plan 500, register compact" — the form a generated setup writes them in.
+    // 19 Oct (FIELDGUIDE copy made with the simple start): none of the four
+    // was read, so nothing was counted in code and Go was asked for a recount.
+    for (const list of t.matchAll(/\bword (?:limits?|counts?|caps?)\s*[:—–-]\s*([^.;\n]+)/gi)) {
+      for (const item of list[1].split(/,|\band\b/)) {
+        const m = item.trim().match(new RegExp(`^(?:the\\s+)?([a-z][a-z -]{1,40}?)\\s*(?:[:=—–-]\\s*)?(?:≤|<=|max(?:imum)?\\s+|at most\\s+|up to\\s+)?${NUM}(?:[\\s-]*words?)?$`, 'i'));
+        if (!m) continue;
+        const words = m[1].trim().split(/\s+/);
+        if (words.length > 4 || words.some((w) => NOT_A_NAME.test(w))) continue;
+        const phrase = words.slice(-2).join(' ').toLowerCase();
+        if (WHOLE.test(phrase)) continue;
+        const max = num(m[2]);
+        if (!max || max > 20_000) continue;
+        const listed = phrase.match(SUBJECT_RE);
+        const subject = listed ? canonical(listed[1]) : phrase.replace(/(?<!s)s$/, '');
+        named += 1;
+        add({ kind: 'words', subject, source: item.trim(), max });
+      }
+    }
     if (named > 0) for (const u of unnamed) if (!u.whole) out.delete(u.id);
     // "a one-page plan", "fits on one page", "no more than two pages" (L-73,
     // 11 Oct: Sean's onboarding plan was declared finished with its one-page
@@ -354,13 +374,18 @@ function sectionRange(all: Line[], subject: string): { start: number; end: numbe
   const level = all[start].level;
   for (let i = start + 1; i < all.length; i += 1) {
     const l = all[i];
-    if (isTableLine(l) || (subject !== 'faq' && isListedQuestion(l))) return { start, end: i };
+    // A table, listed questions or a bold label end a summary-like part that
+    // sits beside them ("a summary, followed by a table and questions"). Inside
+    // a named part under a markdown heading they are its content: FIELDGUIDE's
+    // curriculum was counted as its first 11 words, up to "**Assumptions.**",
+    // and passed a 900-word limit at 869 (19 Oct).
+    if (PART_SUBJECTS.has(subject) && (isTableLine(l) || isListedQuestion(l))) return { start, end: i };
     if (l.level > 0 && !isQuestion(l)) {
       // A markdown subheading of a named part is inside it: "## Sample
       // candidate summary" under "# 3. Fictional practice case" (17 Oct,
       // FIELDGUIDE) is part of the case, not a part beside it.
       const inside = level <= 6 && l.level > level && l.level <= 6 && isPart({ subject });
-      const ends = l.level <= level || (level <= 6 && l.level >= 7) || (!inside && SUBJECT_RE.test(l.text)) || NOTE.test(l.text) || !named(l) && PART_SUBJECTS.has(subject) && /\b(table|questions?|appendix|actions?|risks?|recommendations?|findings?|sources?)\b/i.test(l.text);
+      const ends = l.level <= level || (level <= 6 && l.level >= 7 && PART_SUBJECTS.has(subject)) || (!inside && SUBJECT_RE.test(l.text)) || NOTE.test(l.text) || !named(l) && PART_SUBJECTS.has(subject) && /\b(table|questions?|appendix|actions?|risks?|recommendations?|findings?|sources?)\b/i.test(l.text);
       if (ends) return { start, end: i };
     }
   }
