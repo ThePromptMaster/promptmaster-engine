@@ -60,6 +60,7 @@ import {
   outstandingWork,
   tickClosesStage,
 } from '@/lib/workflow/engine';
+import { checkVerdict } from '@/lib/workflow/check-verdict';
 import { buildStageDigest, formatManuscript, summariseStageContent } from '@/lib/workflow/digest';
 import { goWaitingLine, objectiveUnmet } from '@/lib/workflow/objective';
 import { recordFacts, supersedeFact } from '@/lib/supabase/facts';
@@ -423,12 +424,21 @@ export function WorkflowWorkspace({
   // The latest judgment of the objective (7 Oct): "not met" is outstanding
   // work, and the banner says what it waits for.
   const objectiveAssessment = useMemo(() => objectiveUnmet(events ?? [], project.facts ?? []), [events, project.facts]);
+  // What the latest check of the current stage's draft holds against it — the
+  // same verdict Go's move-on gate reads (18 Oct, Theory of Everything: the bar
+  // said "Ready to move on" while Go refused to move on).
+  const currentCheckSays = useMemo(() => {
+    const current = getStage(template, state.current_stage_id);
+    const headId = stageBundles[state.current_stage_id]?.versions.at(-1)?.id;
+    return current ? checkVerdict(evaluations?.[headId ?? ''], headId, current) : null;
+  }, [template, state.current_stage_id, stageBundles, evaluations]);
   const outstanding = useMemo(
     () =>
       outstandingWork(template, state, context, {
         objectiveUnmet: objectiveAssessment ? { blockers: objectiveAssessment.blockers.map((b) => b.need) } : null,
+        checkSays: currentCheckSays ? { stageId: state.current_stage_id, says: currentCheckSays } : null,
       }),
-    [template, state, context, objectiveAssessment]
+    [template, state, context, objectiveAssessment, currentCheckSays]
   );
   // The last stage reads as finished while the objective is not (13 Oct, Sean,
   // workshop: "Summary appeared completed while the project remained open").
@@ -1345,6 +1355,7 @@ export function WorkflowWorkspace({
       headEvaluation?.further_pass_needed === false ? headEvaluation.further_pass_reason || null : null,
     applyableFixes: applyable.length,
     canAdvance: evaluation.canAdvance,
+    checkSays: isCurrent ? currentCheckSays : null,
     isLast: !stage.transitions.default_next,
     nextLabel: nextStage?.short_label ?? null,
     panelStep: isCurrent ? (panelSteps[stage.id] ?? null) : null,
@@ -2287,6 +2298,7 @@ export function WorkflowWorkspace({
                 }
                 done={stageEvaluation.checked && stageEvaluation.checked === headVersion?.id ? 'Checked — the results are shown with the stage above.' : null}
                 projectOpen={projectOpenOn === stage.id}
+                checkSays={currentCheckSays}
                 onSuggest={appendStageVersion && !go.active && !go.pendingStep ? () => void go.suggest() : undefined}
                 suggesting={go.active && go.run?.policy === 'guided'}
               />

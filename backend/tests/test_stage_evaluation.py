@@ -574,3 +574,42 @@ def test_completeness_is_judged_against_the_stage_not_the_deliverable(book_input
     _system, user = build_stage_evaluation_prompt(book_inputs, positioning_stage, "Some text", book_digest, [])
     assert "Requested output format (of the final deliverable — not a requirement of an earlier stage" in user
     assert "never against the final deliverable's format" in user
+
+
+def test_the_evaluator_sees_the_later_stages_and_how_a_table_is_shown():
+    """18 Oct, Theory of Everything: a row naming the later stages was called
+    unsupported, and a table stage was "incomplete" for being a JSON list —
+    the evaluator saw neither the workflow nor how the rows are displayed."""
+    from deps import get_client
+
+    client = AsyncMock()
+    client.model = "provider/default-model"
+    client.generate_json = AsyncMock(return_value=(_defect_response(), {}))
+    app.dependency_overrides[get_client] = lambda: client
+    try:
+        http = TestClient(app, raise_server_exceptions=False)
+        response = http.post(
+            "/api/evaluate-stage-artifact",
+            json={
+                "inputs": {"objective": "Assess a candidate unified theory.", "mode": "architect"},
+                "stage": {"id": "targets", "label": "Known constraints and targets", "renderer": "list",
+                          "entry_prompt_hint": "A short table of targets."},
+                "content": '{"kind": "stage_items", "items": [{"id": "i1", "claim": "Recover GR"}]}',
+                "digest": {"objective": "Assess a candidate unified theory.",
+                           "later_stages": ["Check targets", "Candidate framework options"]},
+            },
+        )
+    finally:
+        app.dependency_overrides.pop(get_client, None)
+
+    assert response.status_code == 200
+    sent = client.generate_json.await_args.kwargs["prompt"]
+    assert "LATER STAGES OF THIS WORKFLOW" in sent and "Check targets, Candidate framework options" in sent
+    assert "do not call it unsupported" in sent
+    assert "displayed to the user as a table" in sent
+
+
+def test_a_prose_stage_is_not_told_it_is_shown_as_a_table(book_inputs, positioning_stage):
+    _, user = build_stage_evaluation_prompt(book_inputs, positioning_stage, "Text.", StageDigest())
+    assert "displayed to the user as a table" not in user
+    assert "LATER STAGES OF THIS WORKFLOW" not in user
