@@ -420,3 +420,43 @@ def test_requests_are_read_from_the_source_material_too():
     inputs = PMInput(objective="Report SUMMIT; the sponsor asks for three sections.", mode="analyst",
                      context="Update. Luis asks to count November 16 and 17 toward the five testing days. Testing is on track.")
     assert request_facts(inputs) == ["Luis asks to count November 16 and 17 toward the five testing days."]
+
+
+FIELDGUIDE_PACKAGE = (
+    "# 1. Executive decision memo\n\nDana should decide whether to authorize a pilot.\n\n"
+    "# 3. Fictional practice case\n\n## Sample candidate summary\n\n"
+    "Maya Chen merits further consideration based on stated leadership of four regional team leads.\n\n"
+    "If advanced, the next interview should test quantified operating results, level of decision authority, "
+    "budget accountability, and whether her regional experience transfers to enterprise-wide COO demands.\n\n"
+    "# 4. Pilot evaluation plan\n\nProposed measures only.\n"
+)
+
+
+def test_a_next_step_inside_the_fictional_exercise_is_not_the_projects_work():
+    # 17 Oct (Sean, FIELDGUIDE): the practice candidate's follow-up questions
+    # were listed under "Proposed, not done". The items are prod's, verbatim.
+    a = parse_assessment({
+        "outcome": "partly", "basis_quote": "",
+        "proposed_next": [
+            "Whether Dana wants revisions before any pilot authorization.",
+            "If advanced, the next interview should test quantified operating results, level of decision authority, "
+            "budget accountability, and whether her regional experience transfers to enterprise-wide COO demands.",
+        ],
+    }, FIELDGUIDE_PACKAGE, [])
+    assert a.proposed_next == ["Whether Dana wants revisions before any pilot authorization."]
+
+
+def test_the_prompt_keeps_exercise_material_out_of_proposed_next():
+    stub = AsyncMock()
+    stub.generate_json.return_value = ({"outcome": "partly", "basis_quote": "", "proposed_next": []}, None)
+    app.dependency_overrides[get_client] = lambda: stub
+    try:
+        r = TestClient(app).post("/api/agent/assess-objective", json={
+            "inputs": _inputs().model_dump(), "deliverable_label": "Output", "content": FIELDGUIDE_PACKAGE, "steps": [],
+        })
+        assert r.status_code == 200, r.text
+        prompt = stub.generate_json.call_args.kwargs["prompt"]
+        assert "next step or investigation for THIS project" in prompt
+        assert "INSIDE fictional, sample, practice, training or exercise material" in prompt
+    finally:
+        app.dependency_overrides.pop(get_client, None)
