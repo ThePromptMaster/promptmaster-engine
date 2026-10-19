@@ -711,7 +711,7 @@ export function confirmProposals(items: readonly StageItem[], schema: StageItemS
  */
 /** Wording that says a requirement is not met: missing, not run, contradicted, incomplete. */
 const UNMET =
-  /\b(missing|omit(?:s|ted)?|absent|not (?:included|present|shown|preserved|run|met|proved|proven|answered|reflected|reached|carried|recorded|verified|done)|incomplete|contradict\w*|inconsisten\w*|unresolved|unmet|lacks?|does not (?:contain|include|meet|satisfy|state|show|reflect|match))\b/i;
+  /\b(missing(?![-‑]\w)|omit(?:s|ted)?|absent|not (?:included|present|shown|preserved|run|met|proved|proven|answered|reflected|reached|carried|recorded|verified|done)|incomplete|contradict\w*|inconsisten\w*|unresolved|unmet|lacks?|does not (?:contain|include|meet|satisfy|state|show|reflect|match))\b/i;
 
 /**
  * Rows deferred or carried forward that say an objective requirement is
@@ -725,7 +725,7 @@ export function carriedForwardUnmet(items: readonly StageItem[], schema: StageIt
     .filter((i) => i.status === 'deferred' && isTriaged(i, schema))
     // On a table whose rows do not block finishing (Final review's open items:
     // "marking them does not block finishing"), only a major finding does (12 Oct).
-    .filter((i) => (optional ? i.severity === 'major' : deferralBlocks(i)))
+    .filter((i) => (optional ? i.severity === 'major' : deferralBlocks(i, schema)))
     .map((i) => {
       const text = rowText(i);
       return text.length > 600 ? `${text.slice(0, 599).trimEnd()}…` : text;
@@ -741,7 +741,7 @@ export function carriedForwardUnmet(items: readonly StageItem[], schema: StageIt
 export function deferredNotBlocking(items: readonly StageItem[], schema: StageItemSchema, optional = false): { row: string; reason: string }[] {
   return items
     .filter((i) => i.status === 'deferred' && isTriaged(i, schema))
-    .filter((i) => !(optional ? i.severity === 'major' : deferralBlocks(i)))
+    .filter((i) => !(optional ? i.severity === 'major' : deferralBlocks(i, schema)))
     .map((i) => ({ row: rowText(i).slice(0, 160), reason: (i.reason ?? '').trim().slice(0, 200) }));
 }
 
@@ -753,10 +753,39 @@ export function deferredNotBlocking(items: readonly StageItem[], schema: StageIt
  * re-asked (12 Oct; Sean: a wording finding marked "Defer — confirmed under
  * your routine-decision policy" still stopped Go).
  */
-function deferralBlocks(i: StageItem): boolean {
+function deferralBlocks(i: StageItem, schema: StageItemSchema): boolean {
+  if (positiveVerdict(i)) return false;
   if (i.severity === 'major') return true;
-  const routine = i.status_source === 'policy' && (i.severity === 'minor' || i.severity === 'moderate');
-  return !routine && UNMET.test(rowText(i));
+  // A minor finding PromptMaster deferred is as routine as one deferred under
+  // the user's policy (18 Oct, Sean, Summit: "The pack is practically usable…
+  // No change required" was carried forward as unmet).
+  const routine =
+    (i.status_source === 'policy' && (i.severity === 'minor' || i.severity === 'moderate')) ||
+    (i.status_source === 'model' && i.severity === 'minor');
+  return !routine && UNMET.test(problemText(i, schema));
+}
+
+/**
+ * A row that reports nothing wrong: "Accept: …" with no caveat, or a suggested
+ * change of "No change required". It is a finding that something holds, and
+ * is never an unmet requirement however it is filed (18 Oct, Sean, Summit).
+ */
+export function positiveVerdict(i: StageItem): boolean {
+  const finding = (i.finding ?? '').trim();
+  const change = (i.suggested_change ?? '').trim();
+  if (/^no changes? (?:is |are )?(?:required|needed)\b/i.test(change) || /^none(?: required| needed)?\.?$/i.test(change)) return true;
+  return /^accept(?:ed)?\s*[:.—–-]/i.test(finding) && !/\b(?:caveat|but|however|except)\b/i.test(finding.slice(0, 80));
+}
+
+/**
+ * What the row says is wrong: its first field (the finding, the item), not
+ * every field. "Add it to the missing-data register" in a suggested change is
+ * not the row saying something is missing (18 Oct, Summit).
+ */
+function problemText(i: StageItem, schema: StageItemSchema): string {
+  const key = schema.fields.find((f) => f.key !== 'severity')?.key;
+  const text = key ? (i[key] ?? '').trim() : '';
+  return text || rowText(i);
 }
 
 /**
@@ -765,7 +794,7 @@ function deferralBlocks(i: StageItem): boolean {
  * says the rows need no decision, not that a missing proof does not matter.
  */
 export function openUnmet(items: readonly StageItem[], schema: StageItemSchema): number {
-  return items.filter((i) => (!isTriaged(i, schema) || i.status_source === 'proposed') && (i.severity === 'major' || UNMET.test(rowText(i)))).length;
+  return items.filter((i) => (!isTriaged(i, schema) || i.status_source === 'proposed') && !positiveVerdict(i) && (i.severity === 'major' || UNMET.test(problemText(i, schema)))).length;
 }
 
 function rowText(item: StageItem): string {

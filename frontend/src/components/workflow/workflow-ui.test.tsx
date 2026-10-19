@@ -105,6 +105,18 @@ describe('approval pending reads the same everywhere (2 Oct, item 3)', () => {
 });
 
 describe('StageRail', () => {
+  it('draws a finished stage with open findings as "done · N open", not a plain tick (18 Oct, Summit)', () => {
+    const state = projectState(SINGLE_OUTPUT_V1, []);
+    state.stages.input = { ...state.stages.input, status: 'complete' } as never;
+    state.current_stage_id = 'review';
+    render(
+      <StageRail template={SINGLE_OUTPUT_V1} state={state} nextSuggestedId={null} onSelect={vi.fn()} openFindings={{ input: 2, review: 4 }} />
+    );
+    expect(screen.getByRole('button', { name: /Input/ })).toHaveTextContent('done · 2 open');
+    // Not finished: the count belongs to the stage's own checklist, not the rail.
+    expect(screen.getByRole('button', { name: /Review/ })).not.toHaveTextContent('open');
+  });
+
   it('renders every stage of whichever template it is given', () => {
     const { unmount } = render(
       <StageRail
