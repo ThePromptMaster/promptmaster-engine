@@ -1774,3 +1774,86 @@ On a probe before the switch, Opus 5.5 stopped with `finish_reason: content_filt
 wording of a short planning prompt, every time, while other wordings and 112 earlier
 production calls ran normally. No production call has been stopped that way, but a stopped
 call fails the step rather than falling back to another model.
+
+### L-91 — Section limits, length repairs, the row guard and one verdict (2026-10-19)
+
+Word and item limits are read per section from the brief: the name before "(≤N words)" or
+"at most N words" in a list of deliverables. A limit with no name applies to the whole
+text only when its sentence says so ("in total", "overall", "the package"). A fact saying
+"no N-word limit on …" retires the matching limit. A section whose name does not appear in
+any heading of the draft is not measured at all (it is left to the model's check), so a
+draft that renames a section escapes its limit.
+
+After a length repair, code checks only that no heading disappeared and that a section
+with two or more timings kept some. Other required content (an exercise, a named
+activity without a heading) relies on the prompt.
+
+The row guard protects rows that the user or the policy decided. A model's provenance
+label is not a decision. A row under a new id counts as carried when it keeps at least
+70% of its words and the same decision. A heavy rewrite of a decided row is therefore
+refused even if the meaning survives. Refused revisions are stored from 19 October. The
+Theory of Everything rows `i7` and `i8` were refused before then, so whether they were
+really lost cannot be shown.
+
+Go's gate, the stage bar and the next step read one verdict (`check-verdict.ts`). That
+verdict is the evaluator's completeness judgment, so it is model-judged. A complaint that
+is only about format, on a table stage, does not block. Next steps written inside
+fictional or sample sections are dropped by matching their words to those sections. A
+next step paraphrased from the exercise can still be listed.
+
+When Go returns to an earlier stage to apply a later review stage's rows, those rows go
+with the instruction, up to 6,000 characters (#311). The objective check's rule that work
+already saved in the project is never a blocker is a prompt rule.
+
+### L-92 — Approvals, brief-only corrections and assumed facts (2026-10-19)
+
+An approval verb ("authorizes", "approves", "signs off", "authorized") by a named
+authority makes a statement an approval. "Has not approved", "pending approval" and "asks
+the board to approve" do not. The model labels the rest. An approval worded without one
+of those verbs relies on the model. Whether the named authority may approve that item
+(the CEO within staff capacity, the board for capital) is not checked in code.
+
+A correction to a figure stated only in the brief now names what it replaces, when its
+wording says so: ", superseding the earlier $30 million", ", not $30 million",
+"corrected from". It still has no `supersedes` link, because there is no earlier fact,
+and a correction worded without one of those phrases is not paired.
+
+`origin` marks a fact as `model_assumed` when its figures, or most of its words, are not
+in what the user wrote. A close paraphrase counts as stated. Facts recorded before
+19 October are all `user_stated` except policy ones.
+
+### L-93 — Conclusions that depend on a changed fact; conflicts still ask (2026-10-19)
+
+When a fact replaces something, one model call per prose-stage check or repair lists the
+sentences whose conclusion no longer follows (`dependent_claims.py`). Code keeps only
+quotes found word for word, and fails a repair that leaves one word for word. Which
+sentences are flagged is model-judged; a stale conclusion the call misses is not caught,
+and a reworded but still stale sentence passes. Item stages (tables) are not checked this
+way.
+
+A conflict between an instruction and an accepted fact still asks the user which takes
+priority, even with routine decisions handled. Keeping the record and continuing without
+asking, for a request with no authority, is not built.
+
+Positive findings ("Accept", "No change required") are never counted as unmet, and the
+unmet wording is matched only on a finding's own text. A stage with open findings shows
+"done · N open" on the rail; it still counts as done.
+
+### L-94 — Not yet live on 19 October: what changed, copy note, colours, simple start
+
+#306–#310 are open. Once merged:
+- "Approve as it stands" holds until a newer version or a different answer. An approval
+  records the version it was given on. Approvals before then have no version.
+- Colours and the simple/advanced choice are kept in the browser (localStorage), not on
+  the account: another device or a cleared browser starts from the defaults. The app has
+  no dark theme, so the colours have no dark variant.
+- Simple mode caps Guide at three questions. A brief that needs more is completed with
+  the setup's defaults, which the user can open under "More options".
+
+### L-95 — PromptMaster cannot open links
+
+The backend never fetches a user-supplied URL. Its only outbound calls are to the model
+provider, OpenAlex and pricing. A request that depends on a web page, Instagram, YouTube
+or any video is answered from what was pasted or uploaded. From #309, the start screen
+and the front-door and setup prompts say so; nothing stops a later stage from being
+asked about a link's content, and the prompts are the only guard there.
