@@ -26,9 +26,9 @@ describe('a conclusion drawn from a corrected figure', () => {
 
   it('is read against the facts that replaced something, with what each replaced', () => {
     expect(changedFacts({ facts: [OLD, NEW, OTHER] })).toEqual([{ statement: NEW.statement, replaces: OLD.statement }]);
-    // Ridgeway: a correction of a figure only the brief stated has no fact to supersede, but says so.
+    // Ridgeway: a correction of a figure only the brief stated has no fact to supersede, but says what it replaces.
     const ridgeway = fact({ statement: 'The CFO corrected current-quarter revenue to $27 million, superseding the earlier $30 million.' });
-    expect(changedFacts({ facts: [ridgeway, OTHER] })).toEqual([{ statement: ridgeway.statement }]);
+    expect(changedFacts({ facts: [ridgeway, OTHER] })).toEqual([{ statement: ridgeway.statement, replaces: 'the earlier $30 million' }]);
   });
 
   it('makes no call when no fact changed', async () => {
