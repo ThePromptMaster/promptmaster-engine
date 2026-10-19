@@ -178,7 +178,7 @@ def build_assessment_prompt(
         '  "blockers": [{"need": "exactly what is missing — with the value or limit it must meet when the recorded figures give one", '
         '"ask": "one question to the user that would supply it", "kind": "data_missing|tool_missing|source_missing|needs_decision"}],\n'
         '  "performed": ["S1", "S3"],\n'
-        '  "proposed_next": ["each next step or investigation the text names but the record does not show done"],\n'
+        '  "proposed_next": ["each next step or investigation for THIS project that the text names but the record does not show done"],\n'
         '  "criteria": [{"requirement": "one thing the objective, an accepted requirement or a constraint asks for", '
         '"verdict": "met" | "not_met" | "not_checked", "basis": "for met: a sentence copied exactly from the deliverable that shows it; '
         'otherwise why"}]\n'
@@ -193,7 +193,13 @@ def build_assessment_prompt(
         "List each requirement separately in \"criteria\" — every part of the objective, every accepted "
         "requirement and constraint — at most 12. Mark one \"not_checked\" when the text alone cannot show it "
         "(how many pages it prints to, how it looks, anything outside the text). A heading is not a basis.\n"
-        '"performed" lists ONLY step ids from the RUN RECORD whose execution label shows work was done.'
+        '"performed" lists ONLY step ids from the RUN RECORD whose execution label shows work was done.\n'
+        # 17 Oct (Sean, FIELDGUIDE): follow-up questions about the fictional
+        # practice candidate were listed as the project's unfinished work.
+        '"proposed_next" is the project\'s own open work. A next step written INSIDE fictional, sample, practice, '
+        'training or exercise material (a role-play candidate\'s "next interview should test…", a case study\'s '
+        'recommendations, a template\'s placeholders) is part of that material, not a step for this project: '
+        'never list it.'
     )
     return _ASSESS_INSTRUCTION, user
 
@@ -316,6 +322,42 @@ def _content_words(text: str) -> set[str]:
 
 
 _SENTENCE = re.compile(r"(?<=[.!?])\s+|\n+")
+
+# Headings of material that is an exercise, not the project: a fictional
+# practice case, a sample summary, a role-play, facilitator notes.
+_EXERCISE_HEADING = re.compile(
+    r"\b(fictional|sample|practice|exercise|role[- ]?play|scenario|case study|facilitator|worked example|mock|illustrative)\b",
+    re.I,
+)
+_HEADING = re.compile(r"^(#{1,6})\s+(.*)$")
+
+
+def _exercise_text(content: str) -> str:
+    """The deliverable's exercise material: every section under a heading that
+    names one, with the subsections below it (17 Oct, Sean, FIELDGUIDE)."""
+    out: list[str] = []
+    depth = 0  # the level of the exercise heading we are inside; 0 when outside
+    for line in content.splitlines():
+        h = _HEADING.match(line.strip())
+        if h:
+            level = len(h.group(1))
+            if depth and level > depth:
+                out.append(line)
+                continue
+            depth = level if _EXERCISE_HEADING.search(h.group(2)) else 0
+            continue
+        if depth:
+            out.append(line)
+    return "\n".join(out)
+
+
+def _inside(item: str, exercise: str) -> bool:
+    """Whether a proposed step is the exercise's own text: nearly all its words
+    are in one sentence of it."""
+    words = _content_words(item)
+    if len(words) < 4 or not exercise:
+        return False
+    return any(len(words & _content_words(s)) >= 0.7 * len(words) for s in _SENTENCE.split(exercise) if s.strip())
 
 
 def request_facts(inputs: PMInput) -> list[str]:
@@ -503,9 +545,10 @@ def parse_assessment(
         elif str(item).strip():
             # Claimed as done, not in the record: it is at most a proposal.
             proposed.append(" ".join(str(item).split())[:300])
+    exercise = _exercise_text(content)
     for item in result.get("proposed_next") or []:
         text = " ".join(str(item).split())[:300]
-        if text and text not in proposed:
+        if text and text not in proposed and not _inside(text, exercise):
             proposed.append(text)
 
     criteria: list[CriterionResult] = []
