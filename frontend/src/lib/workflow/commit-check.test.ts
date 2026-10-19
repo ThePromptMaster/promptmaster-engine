@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { checkCommit, restoreDecided, droppedDecisions } from './commit-check';
 import type { StageItem } from './stage-artifact';
-import { serializeItems } from './stage-artifact';
+import { parseItems, serializeItems } from './stage-artifact';
 
 const TABLE = serializeItems([
   { id: 'a', claim: 'Option A: close the plant' },
@@ -120,5 +120,48 @@ describe('one rule for a dropped decision and its restore (15 Oct, HARBOR)', () 
     const after: StageItem[] = [{ ...before[0], id: 'n1' }, { ...before[1], id: 'n2' }, before[2]];
     expect(droppedDecisions(before, after)).toEqual([]);
     expect(restoreDecided(before, after).map((r) => r.id)).toEqual(['n1', 'n2', 'i3']);
+  });
+});
+
+describe('checkCommit: provenance is not a decision, and a restructure is not a drop (18 Oct, Theory of Everything)', () => {
+  // Rows from prod v1 90090ce6: ten "candidate source" rows, no status_source.
+  const I7 = {
+    id: 'i7',
+    claim: 'Established target: empirical recovery conditions are mandatory—there must be a controlled classical/low-energy limit reproducing GR where tested and a controlled nongravitational limit reproducing established particle physics.',
+    source: 'Project record: “recovery of GR and established QFT limits”',
+    status: 'candidate_source',
+  };
+  const I8 = {
+    id: 'i8',
+    claim: 'Established target: mathematical consistency must cover anomalies, divergences, and approximation control—a candidate cannot rely on undefined dynamics, inconsistent couplings, or uncontrolled truncations.',
+    source: 'Project record: “controlled approximations,” “anomalies,” “uncontrollable divergences”',
+    status: 'candidate_source',
+  };
+  const I1 = { id: 'i1', claim: 'Established target: recover general relativity in an appropriate limit.', source: 'Project record', status: 'candidate_source' };
+  const V1 = serializeItems([I1, I7, I8]);
+
+  it('a "candidate source" row with no source recorded is not the user\'s decision', () => {
+    expect(droppedDecisions(parseItems(V1)!, [I1])).toEqual([]);
+    expect(checkCommit({ before: V1, after: serializeItems([I1]), operation: 'applied_findings' })).toBeNull();
+  });
+
+  it('a row the user decided, reworded into a table row under a new id, is carried', () => {
+    const decided = { ...I7, status: 'verified', status_source: 'user' };
+    const table = { id: 'r2', claim: 'Empirical recovery conditions (mandatory): a controlled classical/low-energy limit reproducing GR where tested, and a controlled nongravitational limit reproducing established particle physics.', source: I7.source, status: 'verified', status_source: 'user' };
+    const before = serializeItems([I1, decided]);
+    expect(checkCommit({ before, after: serializeItems([I1, table]), operation: 'applied_findings' })).toBeNull();
+    expect(restoreDecided(parseItems(before)!, [I1, table])).toEqual([I1, table]);
+  });
+
+  it('a row the user decided that is really gone is still refused', () => {
+    const decided = { ...I7, status: 'verified', status_source: 'user' };
+    const other = { id: 'r2', claim: 'Something else entirely about cosmology and dark energy budgets', source: 'x' };
+    expect(checkCommit({ before: serializeItems([I1, decided]), after: serializeItems([I1, other]), operation: 'applied_findings' })).toMatch(/dropped a row you had decided/);
+  });
+
+  it('a reworded row whose decision changed is not carried', () => {
+    const decided = { ...I7, status: 'verified', status_source: 'user' };
+    const table = { id: 'r2', claim: I7.claim, source: I7.source, status: 'removed', status_source: 'user' };
+    expect(checkCommit({ before: serializeItems([I1, decided]), after: serializeItems([I1, table]), operation: 'applied_findings' })).toMatch(/dropped a row/);
   });
 });

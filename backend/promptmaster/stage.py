@@ -521,7 +521,10 @@ def _claim_provenance(row: dict) -> dict:
         return {"status": normalised}
     source = row.get("source")
     named = isinstance(source, str) and source.strip().lower() not in _NO_SOURCE
-    out = {"status": "candidate_source" if named else "no_source"}
+    # Stamped as PromptMaster's (18 Oct): a provenance row with no source read
+    # as the user's decision, and the commit guard refused a restructure for
+    # "dropping" two of them.
+    out = {"status": "candidate_source" if named else "no_source", "status_source": "model"}
     row.pop("reason", None)
     return out
 
