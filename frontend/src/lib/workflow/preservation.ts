@@ -1,3 +1,5 @@
+import { statesValue, valueMentions, type ValueMention } from './fact-values';
+
 /**
  * What a revision removed that it was not asked to remove (14 Oct).
  *
@@ -101,6 +103,12 @@ export function removedLines(before: string, after: string): Removal[] {
   const afterMasked = new Set(afterLines.map(masked));
   const afterWords = new Set(afterLines.flatMap(words));
   const afterSets = afterLines.map((l) => new Set(words(l)));
+  // Labels carried by lines the revision wrote new: "(C6)" on a line that was
+  // not there before is the C6 line reworded (19 Oct, prod: a revenue
+  // correction turned "Conversion of the quarter-on-quarter growth (C6)" into
+  // "Quarter-on-quarter decline (C6)", and the stale growth line was put back).
+  const beforeExact = new Set(before.split('\n').map((l) => norm(l.trim())).filter(Boolean));
+  const relabelled = new Set(afterLines.filter((l) => !beforeExact.has(norm(l))).flatMap(labels));
   const out: Removal[] = [];
   for (const raw of before.split('\n')) {
     const line = raw.trim();
@@ -114,10 +122,14 @@ export function removedLines(before: string, after: string): Removal[] {
     // (14 Oct, prod: "- Training (0 minutes) — Maya" became "- 9:15 a.m.–10:15
     // a.m. — Training … Maya facilitates", and the old line was put back beside it).
     if (w.length >= 2 && afterSets.some((set) => w.every((x) => set.has(x)))) continue;
+    if (labels(line).some((l) => relabelled.has(l))) continue;
     out.push({ line: raw.replace(/\s+$/, ''), restorable: w.length <= SHORT_LINE_WORDS });
   }
   return out;
 }
+
+/** A line's own reference label, in brackets: "(C6)", "[R2]", "(Table 3)". */
+const labels = (line: string) => [...line.matchAll(/[([]((?:[A-Z]{1,3}|table|figure|exhibit|step|item)\s?\d{1,3}[a-z]?)[)\]]/gi)].map((m) => m[1].toLowerCase().replace(/\s+/g, ''));
 
 const isJson = (text: string) => /^\s*[{[]/.test(text) && /[}\]]\s*$/.test(text);
 
@@ -214,10 +226,22 @@ export function keepUnasked(
     const w = [...new Set(words(line).map(stem))].filter((x) => x.length > 2);
     return w.filter((x) => named.has(x)).length >= Math.min(2, w.length);
   };
-  const removed = removedLines(before, after).filter((r) => keep(r.line) && !mentioned(r.line));
+  const replaced = correctedValues(instruction);
+  const stale = (line: string) => replaced.some((v) => statesValue(line, v.kind, v.value));
+  const removed = removedLines(before, after).filter((r) => keep(r.line) && !stale(r.line) && !mentioned(r.line));
   const restored = removed.filter((r) => r.restorable).map((r) => r.line.trim());
   const reported = removed.filter((r) => !r.restorable).map((r) => r.line.trim());
   return { text: restoreLines(before, after, restored), restored, reported };
+}
+
+/**
+ * The values an instruction says are wrong: "revenue was $27 million, not $30
+ * million", "instead of 100 hours". A line the revision dropped that states
+ * one is the old figure, and is never put back (19 Oct, Ridgeway).
+ */
+export function correctedValues(instruction: string): ValueMention[] {
+  const spans = [...instruction.matchAll(/\b(?:not(?!\s+(?:more|less|fewer|over|under|exceed\w*|above|below|later|earlier)\b)|instead of|rather than|replacing|supersed\w+|corrected from)\s+(?:the\s+)?(?:(?:earlier|previous|old|proposed|original)\s+)?([^,;:]+?)(?=[,;:]|\.(?:\s|$)|$)/gi)];
+  return spans.flatMap((m) => valueMentions(m[1]));
 }
 
 /** "“Hello,”, “Best,” and “Confirm 12 attendees.”" — lines named for a person to read. */

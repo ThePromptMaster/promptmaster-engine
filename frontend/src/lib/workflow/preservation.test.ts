@@ -161,3 +161,53 @@ describe('a shortening keeps the structure the brief needs (17 Oct, Sean: FIELDG
     expect(structureDropped(BEFORE, after)).toEqual([]);
   });
 });
+
+describe('a labelled line a correction reworded (19 Oct, Ridgeway)', () => {
+  const BEFORE = [
+    '## Calculations',
+    '',
+    '**[Calculation] Conversion of the quarter-on-quarter growth (C6).**',
+    'Revenue rose from $28 million to $30 million.',
+    '',
+    'Prepared for the board.',
+  ].join('\n');
+  const AFTER = [
+    '## Calculations',
+    '',
+    '[Calculation] Quarter-on-quarter decline (C6).',
+    'Revenue fell from $28 million to $27 million.',
+  ].join('\n');
+  const INSTRUCTION = 'The CFO corrects the current-quarter results: revenue was $27 million, not $30 million.';
+
+  it('is the same line reworded, not a line dropped, so the stale growth line is not put back', () => {
+    const kept = keepUnasked(BEFORE, AFTER, INSTRUCTION);
+    expect(kept.restored).not.toContain('**[Calculation] Conversion of the quarter-on-quarter growth (C6).**');
+    expect(kept.text).not.toMatch(/quarter-on-quarter growth/);
+  });
+
+  it('still puts back an unrelated line the revision dropped', () => {
+    expect(keepUnasked(BEFORE, AFTER, INSTRUCTION).restored).toEqual(['Prepared for the board.']);
+  });
+
+  it('keeps a labelled line whose label no new line carries', () => {
+    const after = AFTER.replace(' (C6)', '') + '\n\nPrepared for the board.';
+    expect(removedLines(BEFORE, after).map((r) => r.line.trim())).toContain(
+      '**[Calculation] Conversion of the quarter-on-quarter growth (C6).**'
+    );
+  });
+});
+
+describe('values an instruction corrects', () => {
+  it('are read from "not X" and "instead of X", decimals included', async () => {
+    const { correctedValues } = await import('./preservation');
+    const v = correctedValues('Revenue was $27 million, not $30 million, and EBITDA was $3.6 million, not $4.2 million. Use 75 hours instead of 100 hours. Keep it not more than 400 words.');
+    expect(v.map((m) => `${m.kind}:${m.value}`)).toEqual(['money:30', 'money:4.2', 'numbers:100']);
+  });
+
+  it('are never put back when the revision dropped the line stating them', () => {
+    const before = 'Revenue: $30 million.\nPrepared for the board.';
+    const after = 'Current-quarter revenue is now reported at $27 million after the CFO correction.';
+    const kept = keepUnasked(before, after, 'Revenue was $27 million, not $30 million.');
+    expect(kept.restored).toEqual(['Prepared for the board.']);
+  });
+});
