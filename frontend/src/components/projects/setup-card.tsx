@@ -219,17 +219,25 @@ export function SetupCard({
   if (!simple) return full;
 
   const suggestedConstraints = Boolean(rationale?.constraints && draft.constraints.trim());
+  // What Start will create: the workflow picked under More options, not the
+  // recommendation it replaced (19 Oct, production: "Start Research" under a
+  // card still describing Single output).
+  const chosen = templates.find((t) => t.id === templateId) ?? recommended;
+  const isRecommended = !recommendedKey || chosen?.key === recommendedKey;
+  const recommendedName = templates.find((t) => t.key === recommendedKey)?.name ?? recommendedKey;
   return (
     <div className="space-y-6">
       <section aria-label="What you will get" className="rounded-2xl bg-[var(--surface-container-lowest)] px-6 py-5">
         <p className={label}>What you&apos;ll get</p>
-        {recommended && (
+        {chosen && (
           <p className="text-title text-[var(--on-surface)]">
-            {recommended.name}
-            <span className="font-normal text-[var(--on-surface-variant)]"> — {PITCH[recommended.key] ?? recommended.description}</span>
+            {chosen.name}
+            <span className="font-normal text-[var(--on-surface-variant)]"> — {PITCH[chosen.key] ?? chosen.description}</span>
           </p>
         )}
-        {workflowReason && <p className="mt-1 text-body text-[var(--on-surface-variant)]">{workflowReason}</p>}
+        {isRecommended
+          ? workflowReason && <p className="mt-1 text-body text-[var(--on-surface-variant)]">{workflowReason}</p>
+          : <p className="mt-1 text-body text-[var(--on-surface-variant)]">You chose this instead of the recommended {recommendedName}.</p>}
         <p className="mt-3 text-body text-[var(--on-surface)]">{draft.objective}</p>
         {suggestedConstraints && (
           <p data-suggested className="mt-3 text-label text-[var(--pm-tertiary)]">

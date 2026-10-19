@@ -32,13 +32,13 @@ const DRAFT: SetupDraft = {
   mode: 'clarity',
 };
 
-function card(simple: boolean) {
+function card(simple: boolean, templateId = 't-so') {
   return render(
     <SetupCard
       simple={simple}
       start={<button>Start Single output</button>}
       templates={TEMPLATES}
-      templateId="t-so"
+      templateId={templateId}
       onSelectTemplate={() => undefined}
       workflowReason="One finished document."
       recommendedKey="single_output"
@@ -61,6 +61,15 @@ describe('SetupCard, simple', () => {
     expect(more).toHaveTextContent('How PromptMaster should think');
     // Suggested constraints are still pointed out: they become requirements on Start (10 Oct).
     expect(screen.getByText(/suggested some constraints you did not say/)).toBeInTheDocument();
+  });
+
+  it('describes the workflow chosen under More options, not the recommendation it replaced (19 Oct)', () => {
+    card(true, 't-book');
+    const got = screen.getByRole('region', { name: 'What you will get' });
+    expect(got).toHaveTextContent('Book');
+    expect(got).not.toHaveTextContent('Single output —');
+    expect(got).not.toHaveTextContent('One finished document.');
+    expect(got).toHaveTextContent('You chose this instead of the recommended Single output.');
   });
 
   it('advanced is the full setup, unchanged', () => {
