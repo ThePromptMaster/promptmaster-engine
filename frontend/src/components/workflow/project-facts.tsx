@@ -104,6 +104,9 @@ export function ProjectFacts({
                     </div>
                   ) : (
                     <>
+                      {f.origin === 'model_assumed' && (
+                        <span className="mr-1 rounded bg-[var(--surface-container-highest)] px-1.5 py-0.5 text-label text-[var(--on-surface-variant)]">Assumed</span>
+                      )}
                       {f.kind === 'requirement' && <span className="font-semibold">Requirement: </span>}
                       {f.subject ? `${f.subject}: ` : ''}
                       {f.statement}

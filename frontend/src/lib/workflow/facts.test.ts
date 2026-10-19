@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { currentFacts, factSource, factsForRequest, factsText, retiredFacts, supersededFactValues } from './facts';
+import { assumedByModel, currentFacts, factSource, factsForRequest, factsText, replacedClause, retiredFacts, supersededFactValues } from './facts';
+import { factValues } from './fact-values';
 import { figureFindings, figureSources } from './figure-support';
 import type { ProjectFact } from '@/types/project';
 
@@ -52,5 +53,40 @@ describe('supersededFactValues: a value another current fact states is still tru
 
   it('without that fact, November 7 is what a repair must not still state', () => {
     expect(supersededFactValues([asOf7, asOf8]).map((s) => s.value)).toEqual(['11-7']);
+  });
+});
+
+describe('a correction to a figure only the brief stated (18 Oct, Sean, Ridgeway)', () => {
+  const revenue = fact({ id: 'r', statement: 'The CFO corrected current-quarter revenue to $27 million, superseding the earlier $30 million for the same quarter.' });
+  const ebitda = fact({ id: 'e', statement: 'Revenue was $27 million, not $30 million. EBITDA was $3.6 million.' });
+
+  it('tells every prompt what it replaces', () => {
+    expect(factsForRequest([revenue])[0].replaces).toBe('the earlier $30 million for the same quarter');
+    expect(factsForRequest([ebitda])[0].replaces).toBe('$30 million');
+  });
+
+  it('makes the old figure one a repair must not leave', () => {
+    expect(supersededFactValues([revenue]).map((v) => v.value)).toEqual(factValues('$30 million').money);
+    expect(supersededFactValues([ebitda]).map((v) => v.value)).toEqual(factValues('$30 million').money);
+  });
+
+  it('a fact that only states a figure replaces nothing', () => {
+    expect(factsForRequest([fact({ id: 'x', statement: 'EBITDA was $3.6 million.' })])[0].replaces).toBeUndefined();
+    expect(replacedClause('Hours are not 5 per week of effort')).toBeNull();
+  });
+});
+
+describe('what the brief drafter assumed (S2b)', () => {
+  const said = 'I need a quarterly operating review for the board. Revenue was $27 million.';
+  it('a figure the user did not give, or words they did not use, are assumptions', () => {
+    expect(assumedByModel('Revenue was $27 million.', said)).toBe(false);
+    expect(assumedByModel('Margins were 14%.', said)).toBe(true);
+    expect(assumedByModel('The review goes to the board each quarter.', said)).toBe(false);
+    expect(assumedByModel('Include a competitor benchmarking appendix.', said)).toBe(true);
+  });
+
+  it('the provenance says so', () => {
+    expect(factSource({ source_kind: 'chat', source_ref: { via: 'front door' }, created_at: '', accepted_by: 'user', origin: 'model_assumed' }))
+      .toBe('from your conversation, assumed by PromptMaster (you did not say it)');
   });
 });
