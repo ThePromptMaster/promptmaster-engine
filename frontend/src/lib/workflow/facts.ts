@@ -26,7 +26,7 @@ function day(iso: string): string {
 }
 
 /** "from the side chat, 6 Oct" — the provenance chip. */
-export function factSource(f: Pick<ProjectFact, 'source_kind' | 'source_ref' | 'created_at' | 'accepted_by'>): string {
+export function factSource(f: Pick<ProjectFact, 'source_kind' | 'source_ref' | 'created_at' | 'accepted_by' | 'origin'>): string {
   const file = typeof f.source_ref?.name === 'string' ? ` ${f.source_ref.name}` : '';
   const base =
     f.source_kind === 'file' && file
@@ -39,8 +39,50 @@ export function factSource(f: Pick<ProjectFact, 'source_kind' | 'source_ref' | '
             ? 'updated with your revision'
             : SOURCE_WORDS[f.source_kind];
   const by = f.accepted_by === 'policy' ? ', accepted under your routine-decision policy' : '';
+  // Said apart from what the user said, in the chip and in every prompt (S2b).
+  const assumed = f.origin === 'model_assumed' ? ', assumed by PromptMaster (you did not say it)' : '';
   const when = day(f.created_at);
-  return `${base}${when ? `, ${when}` : ''}${by}`;
+  return `${base}${when ? `, ${when}` : ''}${by}${assumed}`;
+}
+
+/**
+ * Words in a fact that introduce the value it replaces: "…12 business days,
+ * replacing 20 business days", "…$27 million, superseding the earlier $30
+ * million", "revenue was $27 million, not $30 million" (a "not" after a comma,
+ * before a figure). The last two are how
+ * a correction to a figure only the brief stated is written (18 Oct, Sean,
+ * Ridgeway): there is no earlier fact to supersede, so the statement itself is
+ * the record of what is no longer true.
+ */
+export const REPLACING =
+  /\b(?:replacing|replaces|replaced|instead of|rather than|no longer|previously|formerly|changed from|down from|up from|supersed(?:ing|es|ed)|corrected from|(?<=,\s?)not(?=\s+(?:the\s+)?[$€£]?\d))\b/i;
+
+/**
+ * A fact that names what it replaces, split: what it says now, and the clause
+ * that names the earlier value, up to the end of that sentence. Null when it
+ * names nothing.
+ */
+export function replacedClause(statement: string): { now: string; was: string } | null {
+  const at = statement.search(REPLACING);
+  if (at <= 0) return null;
+  const rest = statement.slice(at);
+  const end = rest.search(/[.;](?=\s|$)/);
+  return end > 0 ? { now: statement.slice(0, at) + rest.slice(end), was: rest.slice(0, end) } : { now: statement.slice(0, at), was: rest };
+}
+
+/**
+ * Of a fact recorded with the user's words, those PromptMaster did not take
+ * from them: every figure must be the user's, and without figures most of its
+ * words. The front door's drafter can only add what it was told (figures are
+ * checked on the server), but a requirement in words of its own is still its
+ * assumption, and is recorded as one.
+ */
+export function assumedByModel(statement: string, userText: string): boolean {
+  const said = userText.toLowerCase().replace(/,/g, '');
+  const numbers = (statement.match(/\d[\d,]*(?:\.\d+)?/g) ?? []).map((n) => n.replace(/,/g, ''));
+  if (numbers.length) return !numbers.every((n) => said.includes(n));
+  const words = (statement.toLowerCase().match(/[a-z]{4,}/g) ?? []);
+  return !words.length || words.filter((w) => said.includes(w)).length < Math.max(1, Math.ceil(words.length / 2));
 }
 
 /** What a request carries: the current facts, each with its source in words. */
@@ -51,7 +93,9 @@ export function factsForRequest(facts: readonly ProjectFact[] | undefined) {
     .map((f) => {
       // The value it replaced rides with it, so every prompt is told what is
       // no longer true rather than left to reconcile two dates (8 Oct).
-      const replaced = f.supersedes ? byId.get(f.supersedes)?.statement : undefined;
+      // A correction to a figure only the brief stated names it in its own
+      // words, with no earlier fact to point at (18 Oct, Ridgeway).
+      const replaced = (f.supersedes ? byId.get(f.supersedes)?.statement : undefined) ?? namedReplaced(f.statement);
       return { statement: f.statement, subject: f.subject ?? '', kind: f.kind, source: factSource(f), ...(replaced ? { replaces: replaced } : {}) };
     });
 }
@@ -68,11 +112,23 @@ export function supersededFactValues(facts: readonly ProjectFact[] | undefined):
   // replaced: "as of November 7" moved to November 8, but "reconciliation
   // finished November 7" stands, and every repair of Output failed on it
   // (15 Oct, HARBOR: "the new version still states November 7").
-  const live = current.map((f) => factValues(f.statement));
+  // What each fact states now: not the earlier value it names as replaced.
+  const live = current.map((f) => factValues(replacedClause(f.statement)?.now ?? f.statement));
   return current.flatMap((f) => {
     const old = f.supersedes ? byId.get(f.supersedes) : undefined;
-    return old ? supersededValues(old.statement, f.statement) : [];
+    if (old) return supersededValues(old.statement, f.statement);
+    // "…to $27 million, superseding the earlier $30 million": the brief's
+    // $30 million is what a repair must not leave (18 Oct, Ridgeway).
+    const clause = replacedClause(f.statement);
+    return clause ? supersededValues(clause.was, clause.now).map((v) => ({ ...v, now: f.statement })) : [];
   }).filter((s) => !live.some((v) => v[s.kind].includes(s.value)));
+}
+
+/** "the earlier $30 million for the same quarter": the clause a fact says it replaces, without its leading word. */
+function namedReplaced(statement: string): string | undefined {
+  const word = statement.match(REPLACING)?.[0] ?? '';
+  const was = replacedClause(statement)?.was.slice(word.length).replace(/^[\s,:]+/, '').trim();
+  return was && /\d/.test(was) ? was : undefined;
 }
 
 /**

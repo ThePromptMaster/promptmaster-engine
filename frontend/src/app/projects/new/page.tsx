@@ -11,6 +11,7 @@ import { SetupCard, type SetupDraft } from '@/components/projects/setup-card';
 import { CustomWorkflowDesigner } from '@/components/projects/custom-workflow-designer';
 import { FrontDoor, type DraftBrief } from '@/components/projects/front-door';
 import { recordFacts, type NewFact } from '@/lib/supabase/facts';
+import { assumedByModel } from '@/lib/workflow/facts';
 import { designFromTemplate } from '@/lib/workflow/custom';
 import { AutoGrowTextarea } from '@/components/shared/auto-grow-textarea';
 import { api } from '@/lib/api/client';
@@ -244,16 +245,18 @@ export default function NewProjectPage() {
   }
 
   /** The front door confirmed: its brief becomes the setup, and its facts the initial record. */
-  function fromConversation(brief: DraftBrief, transcript: string) {
+  function fromConversation(brief: DraftBrief, transcript: string, said: string) {
     setObjective(brief.objective);
     // A point the brief lists as a requirement is not recorded again as a fact.
     const norm = (t: string) => t.toLowerCase().replace(/[^a-z0-9$%]+/g, ' ').trim();
     const required = new Set(brief.requirements.map(norm));
+    // What the user did not say is recorded as PromptMaster's assumption (S2b, 18 Oct).
+    const origin = (statement: string) => (assumedByModel(statement, said) ? 'model_assumed' as const : 'user_stated' as const);
     setInitialFacts([
-      ...brief.requirements.map((statement) => ({ statement, kind: 'requirement' as const, source_kind: 'chat' as const, source_ref: { via: 'front door' } })),
+      ...brief.requirements.map((statement) => ({ statement, kind: 'requirement' as const, source_kind: 'chat' as const, source_ref: { via: 'front door' }, origin: origin(statement) })),
       ...brief.evidence
         .filter((statement) => !required.has(norm(statement)))
-        .map((statement) => ({ statement, kind: 'fact' as const, source_kind: 'chat' as const, source_ref: { via: 'front door' } })),
+        .map((statement) => ({ statement, kind: 'fact' as const, source_kind: 'chat' as const, source_ref: { via: 'front door' }, origin: origin(statement) })),
     ]);
     const lines = [
       brief.audience && `Audience: ${brief.audience}`,
@@ -650,7 +653,11 @@ export default function NewProjectPage() {
               <p className="mt-1 text-label text-[var(--on-surface-variant)]">From your conversation; every stage reads them. You can change or take out any of them later.</p>
               <ul className="mt-2 list-disc pl-5 text-label text-[var(--on-surface)]">
                 {initialFacts.map((f) => (
-                  <li key={f.statement}>{f.kind === 'requirement' ? <span className="font-semibold">Requirement: </span> : null}{f.statement}</li>
+                  <li key={f.statement}>
+                    {f.kind === 'requirement' ? <span className="font-semibold">Requirement: </span> : null}
+                    {f.statement}
+                    {f.origin === 'model_assumed' && <span className="ml-1 text-[var(--on-surface-variant)]">(assumed — you did not say this)</span>}
+                  </li>
                 ))}
               </ul>
             </section>

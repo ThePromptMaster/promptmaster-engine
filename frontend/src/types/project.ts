@@ -48,6 +48,12 @@ export interface ProjectFact {
   source_kind: 'brief' | 'file' | 'chat' | 'user_edit' | 'stage';
   source_ref: Record<string, unknown>;
   accepted_by: 'user' | 'policy';
+  /**
+   * Where the statement came from, apart from who accepted it: the user's own
+   * words, PromptMaster's inference while drafting the brief, or Go's policy
+   * (S2b, 18 Oct). Absent on rows read before the column existed.
+   */
+  origin?: 'user_stated' | 'model_assumed' | 'policy';
   agent_run_id: string | null;
   supersedes: string | null;
   retired_at: string | null;

@@ -569,7 +569,7 @@ routine repairs, and how completion is kept from contradicting open work. Assess
 
 | Concern | Where it lives |
 |---|---|
-| Accepted facts and requirements | `project_facts` (`20261024000000`): append-only; a change is a new row with `supersedes`, which the insert retires; `source_kind` / `source_ref` / `accepted_by` |
+| Accepted facts and requirements | `project_facts` (`20261024000000`): append-only; a change is a new row with `supersedes`, which the insert retires; `source_kind` / `source_ref` / `accepted_by`; `origin` (`20261102000000`) says whether the user stated it, PromptMaster assumed it while drafting the brief, or Go's policy accepted it. A correction to a figure only the brief stated names the old value in its own words ("…, superseding the earlier $30 million"), and `lib/workflow/facts.ts::replacedClause` reads it as superseded |
 | One read path | `PMInput.facts` (the current rows, sent by `inputsFrom`) → `project_context.facts_block`, carried by `context_block` into every prompt that has the context; `test_project_facts.py` holds it |
 | Facts from chat | `record_facts` reply action; figures must be in the user's own message (`reply_actions._from_user`); recorded only on *Record* |
 | A fact changed | the change check watches `facts` like a brief field (`use-brief-change.ts`); `brief_changed` keeps `before` / `after` |

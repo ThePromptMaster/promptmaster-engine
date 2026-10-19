@@ -37,7 +37,8 @@ export function FrontDoor({
   onStateChange,
 }: {
   opening: string;
-  onReady: (brief: DraftBrief, transcript: string) => void;
+  /** `said`: the user's own turns, to tell what they said from what the brief's drafter assumed. */
+  onReady: (brief: DraftBrief, transcript: string, said: string) => void;
   onBack: () => void;
   /** A conversation kept from an earlier visit (U2). */
   initialState?: { turns: Turn[]; brief: DraftBrief; ready: boolean } | null;
@@ -168,7 +169,7 @@ export function FrontDoor({
               Next you choose the workflow and can still change everything. Pressing Start there creates the project.
             </p>
             <div className="mt-2 flex gap-2">
-              <button onClick={() => onReady(brief, transcript)} className="rounded-lg bg-[var(--pm-primary)] px-3 py-1.5 text-label text-[var(--on-primary)]">
+              <button onClick={() => onReady(brief, transcript, turns.filter((t) => t.role === 'user').map((t) => t.content).join('\n'))} className="rounded-lg bg-[var(--pm-primary)] px-3 py-1.5 text-label text-[var(--on-primary)]">
                 Use this brief
               </button>
               <button onClick={() => setConfirming(false)} className="rounded-lg px-3 py-1.5 text-label text-[var(--on-surface-variant)]">
