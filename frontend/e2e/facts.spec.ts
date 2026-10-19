@@ -20,7 +20,7 @@ test('facts given in the chat are recorded on confirmation, read by every reques
   test.setTimeout(120_000);
   const id = await createProject(page, { workflow: 'Single output', name: 'E2E facts', objective: 'Choose the strongest finalist for COO' });
   await pressTransition(page); // input is finished: the facts can reopen it
-  await expect(page.getByRole('heading', { name: 'Review the prompt' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Review the plan' })).toBeVisible();
 
   const chat = page.getByRole('region', { name: 'Side chat' });
   await chat.getByRole('textbox', { name: 'Ask a question' }).fill(

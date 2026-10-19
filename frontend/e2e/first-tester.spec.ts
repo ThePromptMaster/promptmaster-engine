@@ -32,7 +32,7 @@ test('a goal alone reaches a finished, checked deliverable on the primary button
 
   // Planning stages lead with moving on; the check waits in More.
   const bar = transitionBar(page);
-  for (const next of ['Review the prompt', 'Output and evaluation']) {
+  for (const next of ['Review the plan', 'Output and evaluation']) {
     const primary = bar.getByRole('button', { name: /^Continue to/ });
     await expect(primary).toBeVisible({ timeout: 30_000 });
     await expect(bar.getByRole('button', { name: /^Check this stage/ })).toHaveCount(0);
