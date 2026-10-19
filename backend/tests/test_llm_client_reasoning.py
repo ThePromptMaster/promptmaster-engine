@@ -1,7 +1,19 @@
 """A reasoning model's reasoning gets its own budget (18 Oct, same-model pilot),
 and a retired model is replaced rather than called (18 Oct: GPT-5.4 retired)."""
 
-from promptmaster.llm_client import DEFAULT_MODEL, REASONING_HEADROOM, OpenRouterClient, _token_budget, resolve_model
+import httpx
+import pytest
+
+from observability import UsageAccumulator, usage_var
+from promptmaster.llm_client import (
+    DEFAULT_MODEL,
+    LONG_ANSWER_TOKENS,
+    REASONING_HEADROOM,
+    OpenRouterClient,
+    OpenRouterError,
+    _token_budget,
+    resolve_model,
+)
 
 
 def test_a_reasoning_model_keeps_the_answer_budget_and_reasons_on_top():
@@ -9,6 +21,36 @@ def test_a_reasoning_model_keeps_the_answer_budget_and_reasons_on_top():
         assert _token_budget(model, 900) == {
             "max_tokens": 900 + REASONING_HEADROOM, "reasoning": {"max_tokens": REASONING_HEADROOM},
         }
+
+
+def test_a_writing_call_reasons_at_low_effort_so_the_answer_keeps_its_room():
+    """19 Oct: a reasoning budget is a hint Opus 5.5 overruns; on a long merge it
+    spent all 14,048 tokens reasoning and returned no text."""
+    for model in ("anthropic/claude-opus-5.5", "openai/gpt-5.6-sol"):
+        assert _token_budget(model, 12_000) == {
+            "max_tokens": 12_000 + REASONING_HEADROOM, "reasoning": {"effort": "low"},
+        }
+        assert _token_budget(model, LONG_ANSWER_TOKENS)["reasoning"] == {"effort": "low"}
+        assert _token_budget(model, LONG_ANSWER_TOKENS - 1)["reasoning"] == {"max_tokens": REASONING_HEADROOM}
+
+
+async def test_a_reply_spent_wholly_on_reasoning_is_still_metered():
+    def handler(request):
+        return httpx.Response(200, json={
+            "choices": [{"message": {"content": ""}, "finish_reason": "length"}],
+            "usage": {"prompt_tokens": 23831, "completion_tokens": 14048},
+        })
+
+    client = OpenRouterClient(api_key="k")
+    client._client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    acc = UsageAccumulator()
+    token = usage_var.set(acc)
+    try:
+        with pytest.raises(OpenRouterError, match="No content"):
+            await client._single_request({"model": "anthropic/claude-opus-5.5"}, {}, attempt=1)
+    finally:
+        usage_var.reset(token)
+    assert [(e.tokens_in, e.tokens_out) for e in acc.events] == [(23831, 14048)]
 
 
 def test_other_models_are_sent_as_before():
