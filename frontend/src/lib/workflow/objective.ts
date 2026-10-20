@@ -83,6 +83,10 @@ export function latestObjectiveAssessment(events: readonly WorkflowEvent[]): (Ob
       proposed_next: Array.isArray(p.proposed_next) ? p.proposed_next : [],
       ...(Array.isArray(p.criteria) ? { criteria: p.criteria } : {}),
       ...(Array.isArray(p.unmet) ? { unmet: p.unmet } : {}),
+      // 20 Oct (prod pass): recorded since #330, but not read back, so the
+      // pause card never showed what was carried as a limitation.
+      ...(Array.isArray(p.limitations) ? { limitations: p.limitations } : {}),
+      ...(p.ready_for_later_stage ? { ready_for_later_stage: true } : {}),
       at: e.created_at ?? '',
     };
   }
@@ -101,6 +105,11 @@ export function objectiveUnmet(
 ): ObjectiveAssessment | null {
   const latest = latestObjectiveAssessment(events);
   if (!latest || latest.outcome === 'met') return null;
+  // A round check that found nothing left for the user moved the work on to
+  // the stage that writes the deliverable: it is not a pause (20 Oct, prod
+  // pass: "The objective is not met yet" and "Resume Go" stood beside a Go
+  // waiting only for the package's approval).
+  if (latest.ready_for_later_stage) return null;
   // Until 8 Oct this returned the latest assessment whatever happened after
   // it, so a project kept "waiting for" the launch date and the price after
   // both had been answered (Sean, 7 Oct, email 11).
