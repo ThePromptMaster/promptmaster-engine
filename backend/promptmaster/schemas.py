@@ -34,6 +34,17 @@ class AcceptedFact(BaseModel):
     replaces: str = Field(default="", max_length=2_000)
 
 
+class SavedSource(BaseModel):
+    """A web source the project saved (20 Oct): cited in stages as [S1], [S2], …,
+    in the order sent. The browser sends the current ones; nothing is stored here."""
+    url: str = Field(..., min_length=1, max_length=2_000)
+    title: str = Field(default="", max_length=300)
+    #: What the search returned from the page.
+    excerpt: str = Field(default="", max_length=600)
+    #: When it was retrieved, as a date.
+    retrieved: str = Field(default="", max_length=40)
+
+
 class UserInstruction(BaseModel):
     """An instruction the user applied to a stage, as the version it made records it."""
     stage: str = Field(default="", max_length=200)
@@ -61,6 +72,9 @@ class PMInput(BaseModel):
     # first (`project_context.context_block`), so every stage, check and chat
     # reads the same current evidence.
     facts: list[AcceptedFact] = Field(default_factory=list, max_length=200)
+    # 20 Oct (Sean: "citations and saved sources"): the web sources the
+    # project saved, numbered [S1]… in this order.
+    sources: list[SavedSource] = Field(default_factory=list, max_length=40)
     # 12 Oct (Sean, Atlas and Meridian): the instructions the user applied with
     # "Change it", oldest first. Saved only on their versions, they reached no
     # later prompt, so a review held the work to the brief they had changed.

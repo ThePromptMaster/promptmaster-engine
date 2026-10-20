@@ -33,6 +33,7 @@ from promptmaster.agent import (
     triage_findings,
     write_code,
 )
+from promptmaster.web_search import MAX_RESULTS as MAX_WEB_RESULTS, WebSearchResult, search_web
 from promptmaster.verify_sources import MAX_VERIFY, SourceToVerify, SourceVerdict, verify_sources
 from promptmaster.criterion_check import CriterionCheck, check_criterion
 from promptmaster.answer_check import CheckAnswerRequest, CheckAnswerResponse, check_answer
@@ -239,6 +240,34 @@ async def api_literature_search(req: LiteratureSearchRequest) -> LiteratureSearc
     stored. Nobody has read what is returned."""
     works, reached = await search_works(req.query, req.limit, mock=llm_mode() == "mock")
     return LiteratureSearchResponse(works=works, reached=reached)
+
+
+class WebSearchRequest(BaseModel):
+    inputs: PMInput
+    query: str = Field(min_length=2, max_length=400)
+    purpose: str = Field(default="", max_length=600)
+    #: The project's "Web access" switch, as the browser read it. Off refuses.
+    web_access: Literal["on", "off"] = "off"
+    max_results: int = Field(default=MAX_WEB_RESULTS, ge=1, le=10)
+    model: str = ""
+
+
+class WebSearchResponse(WebSearchResult):
+    model_used: str = ""
+
+
+@router.post("/web-search")
+async def api_web_search(req: WebSearchRequest, client: OpenRouterClient = Depends(get_client)) -> WebSearchResponse:
+    """Search the public web for this project (20 Oct): a summary and the
+    search's own sources, for the browser to save. 1 model call with the web
+    plugin; nothing stored here. Refused unless the project's switch is on."""
+    if req.web_access != "on":
+        raise HTTPException(status_code=403, detail="Web access is off for this project. Turn it on to search the web.")
+    try:
+        result = await search_web(client, req.model or None, req.inputs, req.query, req.purpose, req.max_results)
+    except OpenRouterError as e:
+        raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
+    return WebSearchResponse(**result.model_dump(), model_used=_model_used(req.model, client))
 
 
 class VerifySourcesRequest(BaseModel):

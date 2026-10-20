@@ -1,4 +1,5 @@
 import { factsForRequest } from './facts';
+import { sourcesForRequest } from './sources';
 /**
  * The requests a stage's draft and evaluation send, and what is stored from
  * their responses. Pure.
@@ -47,6 +48,7 @@ export function inputsFrom(project: Project): PMInput {
     output_format: project.output_format,
     context: project.context ?? '',
     facts: factsForRequest(project.facts),
+    ...(project.sources?.some((s) => !s.retired_at) ? { sources: sourcesForRequest(project.sources) } : {}),
     ...(project.applied_instructions?.length
       ? { user_instructions: project.applied_instructions.map(({ stage, version, instruction }) => ({ stage, version, instruction })) }
       : {}),

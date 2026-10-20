@@ -125,6 +125,25 @@ def facts_block(inputs: PMInput) -> str:
     return f"{FACTS_HEADER}\n" + "\n".join(lines) + (f"\n{current}" if current else "")
 
 
+SOURCES_HEADER = (
+    "SOURCES ON RECORD — web sources this project saved, with what the search returned from each. "
+    "Where the work uses one, cite it by its number, [S1], at the point it is used, and end with a "
+    "\"Sources\" list of those cited: number, title, link and the date retrieved. Never cite a source "
+    "that is not listed here, and never claim more than its excerpt says."
+)
+
+
+def sources_block(inputs: PMInput) -> str:
+    """The saved web sources, numbered, or "" when there are none (20 Oct)."""
+    lines = []
+    for i, s in enumerate(inputs.sources or [], start=1):
+        title = " ".join(s.title.split()) or s.url
+        when = f", retrieved {s.retrieved}" if s.retrieved.strip() else ""
+        excerpt = f"\n  {' '.join(s.excerpt.split())}" if s.excerpt.strip() else ""
+        lines.append(f"[S{i}] {title} — {s.url}{when}{excerpt}")
+    return f"{SOURCES_HEADER}\n" + "\n".join(lines) if lines else ""
+
+
 INSTRUCTIONS_HEADER = (
     "INSTRUCTIONS THE USER APPLIED SINCE THE BRIEF — their own words, oldest first, each with the "
     "version it made. Each is the user's later word: where one changes the brief, the objective's "
@@ -211,6 +230,7 @@ def context_block(inputs: PMInput, limit: int | None = None) -> str:
     dropped. The facts are never cut.
     """
     facts = facts_block(inputs)
+    sources = sources_block(inputs)
     said = instructions_block(inputs)
     text = (inputs.context or "").strip()
     if limit is not None and len(text) > limit:
@@ -222,7 +242,7 @@ def context_block(inputs: PMInput, limit: int | None = None) -> str:
         text = cut.rstrip() + f"\n{CONTEXT_SHORTENED}"
     context = f"{_HEADER}\n<<<\n{text}\n>>>" if text else ""
     boundary = FACT_BOUNDARY if no_invented_details(inputs) else ""
-    return "\n\n".join(b for b in (facts, said, boundary, context) if b)
+    return "\n\n".join(b for b in (facts, sources, said, boundary, context) if b)
 
 
 def context_line(inputs: PMInput) -> str:

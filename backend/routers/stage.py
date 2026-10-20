@@ -9,6 +9,7 @@ engine.
 
 from __future__ import annotations
 
+from promptmaster.web_search import strip_unknown_citations
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
@@ -86,6 +87,8 @@ async def api_generate_stage_artifact(
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_STAGE_VERSIONS)
     result.model_used = _model_used(req.model, client)
+    # A citation to a source not on record points at nothing (20 Oct).
+    result.content = strip_unknown_citations(result.content, len(req.inputs.sources))
     return result
 
 

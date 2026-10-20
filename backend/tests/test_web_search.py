@@ -1,0 +1,105 @@
+"""Web search (20 Oct, Sean: "web search and source retrieval … with citations
+and saved sources? On and off button?")."""
+
+from __future__ import annotations
+
+from unittest.mock import AsyncMock
+
+from fastapi.testclient import TestClient
+
+from deps import get_client
+from main import app
+from promptmaster.web_search import build_search_prompt, keep_found_links, sources_from, WebSource
+from promptmaster.schemas import PMInput
+
+ANNOTATIONS = [
+    {"type": "url_citation", "url_citation": {"url": "https://example.org/a", "title": "A report", "content": "Growth was 4%."}},
+    {"type": "url_citation", "url_citation": {"url": "https://example.org/a", "title": "Duplicate"}},
+    {"type": "url_citation", "url_citation": {"url": "javascript:alert(1)", "title": "Not a web link"}},
+]
+
+
+def _inputs() -> PMInput:
+    return PMInput(objective="Screen Harbor Industrial Services for Northbridge.", mode="analyst")
+
+
+def _post(body: dict, stub: AsyncMock):
+    app.dependency_overrides[get_client] = lambda: stub
+    try:
+        return TestClient(app).post("/api/agent/web-search", json=body)
+    finally:
+        app.dependency_overrides.pop(get_client, None)
+
+
+def test_web_search_is_refused_while_the_switch_is_off():
+    stub = AsyncMock()
+    r = _post({"inputs": _inputs().model_dump(), "query": "Harbor Industrial Services revenue"}, stub)
+    assert r.status_code == 403
+    assert "Web access is off" in r.json()["detail"]
+    stub.generate_with_web.assert_not_called()
+
+
+def test_web_search_returns_the_searchs_own_sources_and_unlinks_any_other():
+    stub = AsyncMock()
+    stub.generate_with_web.return_value = (
+        "Growth was 4% ([example.org](https://example.org/a)); a rival says 9% ([made up](https://invented.example/x)).",
+        ANNOTATIONS,
+    )
+    r = _post({"inputs": _inputs().model_dump(), "query": "Harbor revenue growth", "purpose": "the growth row", "web_access": "on"}, stub)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["sources"] == [{"url": "https://example.org/a", "title": "A report", "excerpt": "Growth was 4%."}]
+    assert "[example.org](https://example.org/a)" in body["summary"]
+    assert "invented.example" not in body["summary"] and "made up" in body["summary"]
+    prompt = stub.generate_with_web.call_args.args[0]
+    assert "SEARCH FOR: Harbor revenue growth" in prompt and "WHAT THIS SEARCH IS FOR: the growth row" in prompt
+    assert "Never invent a source" in stub.generate_with_web.call_args.kwargs["system"]
+
+
+def test_sources_and_links_helpers():
+    sources = sources_from(ANNOTATIONS)
+    assert [s.url for s in sources] == ["https://example.org/a"]
+    assert keep_found_links("See https://example.org/a and https://other.example/b.", [WebSource(url="https://example.org/a")]) == "See https://example.org/a and ."
+    system, user = build_search_prompt(_inputs(), "q")
+    assert "PROJECT OBJECTIVE: Screen Harbor" in user
+
+
+async def test_the_client_asks_for_the_web_plugin_and_reads_the_annotations(monkeypatch):
+    from promptmaster import llm_client
+    from promptmaster.llm_client import OpenRouterClient
+
+    client = OpenRouterClient(api_key="k")
+    sent: dict = {}
+
+    async def fake(payload, headers, timeout, deadline):
+        sent.update(payload)
+        llm_client.WEB_ANNOTATIONS.set(ANNOTATIONS)
+        return "summary", {"tokens_in": 1, "tokens_out": 1}, "stop"
+
+    monkeypatch.setattr(client, "_request_with_retries", fake)
+    content, annotations = await client.generate_with_web("p", system="s", max_results=3)
+    assert content == "summary" and annotations == ANNOTATIONS
+    assert sent["plugins"] == [{"id": "web", "engine": "exa", "max_results": 3}]
+    assert sent["usage"] == {"include": True}
+
+
+def test_saved_sources_reach_every_prompt_numbered_with_the_citation_rule():
+    from promptmaster.project_context import context_block
+    from promptmaster.schemas import SavedSource
+
+    inputs = _inputs().model_copy(update={"sources": [
+        SavedSource(url="https://example.org/a", title="A report", excerpt="Growth was 4%.", retrieved="2026-10-20"),
+        SavedSource(url="https://example.org/b"),
+    ]})
+    block = context_block(inputs)
+    assert "SOURCES ON RECORD" in block and "Never cite a source that is not listed here" in block
+    assert "[S1] A report — https://example.org/a, retrieved 2026-10-20\n  Growth was 4%." in block
+    assert "[S2] https://example.org/b — https://example.org/b" in block
+    assert context_block(_inputs()) == ""
+
+
+def test_a_stage_draft_loses_citations_to_sources_the_project_does_not_hold():
+    from promptmaster.web_search import strip_unknown_citations
+
+    assert strip_unknown_citations("Growth was 4% [S1]; a rival says 9% [S7].", 2) == "Growth was 4% [S1]; a rival says 9% ."
+    assert strip_unknown_citations("Nothing cited [S1].", 0) == "Nothing cited ."

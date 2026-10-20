@@ -61,9 +61,34 @@ export interface ProjectFact {
   created_at: string;
 }
 
+/** A web source the project saved (`project_sources`, 20 Oct). Never edited; only retired. */
+export interface ProjectSource {
+  id: string;
+  project_id: string;
+  user_id: string;
+  url: string;
+  title: string;
+  /** What the search returned from the page, not the page itself. */
+  excerpt: string;
+  query: string;
+  stage_id: string | null;
+  provider: 'openrouter_web';
+  origin: 'user' | 'agent';
+  agent_run_id: string | null;
+  retrieved_at: string;
+  retired_at: string | null;
+  created_at: string;
+}
+
 export interface Project {
   id: string;
   user_id: string;
+  /**
+   * The web sources the project saved, current and retired, oldest first.
+   * Not a column: joined on in the browser like `facts`; prompts cite the
+   * current ones as [S1], [S2], … (20 Oct).
+   */
+  sources?: ProjectSource[];
   /**
    * Every fact the project has accepted, current and retired, oldest first.
    * Not a column: joined on in the browser like `data_files`, so every prompt
@@ -119,6 +144,8 @@ export interface Project {
    * every approval to the user. The database re-reads it on each commit.
    */
   routine_decisions?: RoutineDecisions;
+  /** 20 Oct (Sean: "On and off button?"): whether PromptMaster may search the web for this project. Off by default. */
+  web_access?: 'off' | 'on';
   /**
    * The stage version each ticked approval was given on, by criterion id
    * (19 Oct). Display only — "approved v3 · current v4".
@@ -313,6 +340,7 @@ export type ProjectPatch = Partial<
     | 'manual_checks'
     | 'manual_check_versions'
     | 'routine_decisions'
+    | 'web_access'
     | 'stage_modes'
     | 'critique_intensity'
     | 'critique_tone'

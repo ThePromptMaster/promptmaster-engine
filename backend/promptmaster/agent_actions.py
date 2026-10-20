@@ -58,6 +58,10 @@ AGENT_ACTIONS: list[AgentAction] = [
                      "the works this project already lists up in OpenAlex. Params: query (a few plain search "
                      "words for the topic) searches OpenAlex for works not yet listed; give it when no works "
                      "are listed, or the list is missing what the question needs."),
+    AgentAction(key="search_web", family="research", label="Search the web",
+                when="The work needs current public facts the project does not hold (market figures, a company's "
+                     "filings or news, a regulation). Offered only while the project's Web access is on. Params: "
+                     "query (a few plain search words). The sources found are saved; every stage cites them as [S1]…"),
     AgentAction(key="update_assumptions", family="research", label="Update assumptions",
                 when="Something found so far means an assumption no longer holds.",
                 important=True),

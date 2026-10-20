@@ -349,6 +349,7 @@ export type WorkflowEventType =
   | 'revision_refused'
   /** The user set "Routine decisions" (6 Oct); payload.routine_decisions. */
   | 'routine_policy_changed'
+  | 'web_access_changed'
   /** Go committed a delegable approval under that policy; payload.criterion_id. */
   | 'criterion_committed'
   /**

@@ -102,6 +102,7 @@ import { isTriaged, proposableStatuses, stageDrafts, itemSchemaFor, parseItems, 
 import { previewRowAction } from '@/lib/workflow/row-actions';
 import { readStageFigures, type StageFigures } from '@/lib/workflow/figures';
 import { FiguresOnRecord } from './figures-on-record';
+import { WebSources } from './web-sources';
 import type { ReplyAction } from '@/types';
 import { buildStageContext, measureStageContent } from '@/lib/workflow/context';
 import { proposeSummary, proposeTargets } from '@/lib/workflow/proposals';
@@ -982,6 +983,21 @@ export function WorkflowWorkspace({
         await appendEvent({ type: 'routine_policy_changed', stage_id: stageId, payload: { routine_decisions: value } });
       } catch (e) {
         setTransitionError(`Routine decisions could not be saved${e instanceof Error && e.message ? `: ${e.message}` : ''}.`);
+      }
+    },
+    [onPatchProject, flushProject, appendEvent, stageId]
+  );
+
+  // "Web access" (20 Oct): the project's switch, written through before the
+  // event, so a search that follows reads it on; only the user turns it.
+  const setWebAccess = useCallback(
+    async (value: 'on' | 'off') => {
+      onPatchProject({ web_access: value });
+      try {
+        await flushProject();
+        await appendEvent({ type: 'web_access_changed', stage_id: stageId, payload: { web_access: value } });
+      } catch (e) {
+        setTransitionError(`Web access could not be saved${e instanceof Error && e.message ? `: ${e.message}` : ''}.`);
       }
     },
     [onPatchProject, flushProject, appendEvent, stageId]
@@ -2051,6 +2067,14 @@ export function WorkflowWorkspace({
             <FiguresOnRecord template={template} state={state} bundles={stageBundles} />
             {/* On every stage: the accepted facts are the project's record (F3, 7 Oct). */}
             <ProjectFacts project={project} onChanged={() => onReload?.()} readOnly={!isEditable || project.status === 'finalized'} />
+            {/* On every stage: the switch and the sources every stage cites (20 Oct). */}
+            <WebSources
+              project={project}
+              stageId={stage.id}
+              onToggle={setWebAccess}
+              onChanged={() => onReload?.()}
+              readOnly={!isEditable || project.status === 'finalized'}
+            />
             {/* On every stage: data is the project's, not a stage's. */}
             <ProjectData
               project={project}

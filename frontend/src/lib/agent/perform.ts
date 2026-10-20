@@ -9,6 +9,7 @@
  */
 
 import { api } from '@/lib/api/client';
+import { saveSources } from '@/lib/supabase/sources';
 import { awaitSectionJobs, type WaitResult } from '@/lib/jobs/await';
 import { enqueueDraftJobs, enqueueRevisionJobs, writtenSections } from '@/lib/jobs/sections';
 import { generateOutlineDraft } from '@/lib/outline/actions';
@@ -572,6 +573,32 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         followUp: ran && classification.stepStatus === 'succeeded'
           ? { sandboxRunId: run.id, code: written.code, stdout: run.stdout, stderr: run.stderr, exitCode: run.exit_code }
           : undefined,
+      });
+    }
+
+    case 'web': {
+      // 20 Oct (Sean: "web search and source retrieval … with citations and
+      // saved sources"). Only while the project's Web access is on; the
+      // backend refuses otherwise. The search's own sources are saved, citing
+      // this run; what Go reports is what was saved.
+      if (ctx.project.web_access !== 'on') {
+        return done(key, { status: 'failed', toolsUsed: [], changes: {}, output: "Web access is off for this project, so nothing was searched." });
+      }
+      const asked = typeof params.query === 'string' ? params.query.trim().slice(0, 400) : '';
+      const query = asked.length >= 2 ? asked : `${ctx.stage.label}: ${ctx.project.objective}`.slice(0, 400);
+      const found = await api.agentWebSearch(
+        { inputs: inputsFrom(ctx.project), query, purpose: ctx.step.rationale || ctx.stage.label, web_access: 'on', model: ctx.project.model },
+        ctx.signal
+      );
+      if (!found.sources.length) {
+        return done(key, { status: 'failed', toolsUsed: ['web'], changes: {}, output: `Searched the web for "${query}": no sources came back, so nothing was saved.` });
+      }
+      const saved = await saveSources(ctx.project, found.sources, { query, stageId: ctx.stage.id, agentRunId: ctx.run.id });
+      await ctx.refresh?.();
+      const names = found.sources.map((s) => s.title || s.url).join('; ');
+      return done(key, {
+        status: 'succeeded', toolsUsed: ['web'], changes: {},
+        output: `Searched the web for "${query}". ${saved.length ? `Saved ${saved.length} new source${saved.length === 1 ? '' : 's'}` : 'Every source found was already saved'}: ${names}.\n\n${found.summary}`.slice(0, MAX_OUTPUT),
       });
     }
 
