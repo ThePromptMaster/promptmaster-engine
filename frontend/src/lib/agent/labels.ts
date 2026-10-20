@@ -51,6 +51,8 @@ export function deriveExecutionLabel(
       return outcome.sandboxLabel ?? 'code_written';
     // A lookup reads an index; it runs no code and writes no draft.
     case 'literature':
+    // A web search reads results and saves sources; it writes no draft.
+    case 'web':
       return 'discussed';
     default:
       return null;

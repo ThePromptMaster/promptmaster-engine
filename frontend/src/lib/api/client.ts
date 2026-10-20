@@ -805,6 +805,17 @@ export const api = {
     return apiFetch('/api/agent/assess-objective', { method: 'POST', body: JSON.stringify(req), signal });
   },
 
+  /**
+   * Search the public web for the project (20 Oct): a summary and the search's
+   * own sources, for the browser to save. Refused (403) unless `web_access` is "on".
+   */
+  async agentWebSearch(
+    req: { inputs: PMInput; query: string; purpose?: string; web_access: 'on' | 'off'; max_results?: number; model?: string },
+    signal?: AbortSignal
+  ): Promise<{ summary: string; sources: { url: string; title: string; excerpt: string }[]; model_used: string }> {
+    return apiFetch('/api/agent/web-search', { method: 'POST', body: JSON.stringify(req), signal });
+  },
+
   /** The facts attached documents state, each quoted from its source (7 Oct, L-51). Records nothing. */
   async agentExtractFacts(
     req: { inputs: PMInput; sources: { id: string; label: string; text: string }[]; model?: string },

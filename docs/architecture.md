@@ -283,6 +283,18 @@ always starts it. In a looping workflow:
 `template.inquiry` gives a workflow Go's reasoning moves. An Autonomous authorization may allow
 up to 20 further windows.
 
+Web access (2026-10-20): each project has a `web_access` switch (`off` by default, the user's
+alone, each change a `web_access_changed` event). While it is on:
+- "Search the web" in the Web sources panel, and Go's `search_web` move, call
+  `POST /api/agent/web-search`. That is one model call with OpenRouter's web plugin, engine Exa.
+- The search's own results (`url_citation` annotations) are saved by the browser to
+  `project_sources`. The table is append-only, retire-only, and its insert policy requires the
+  switch on. A link the model wrote that the search did not return is unlinked in code.
+- Every request carries the current sources as `PMInput.sources`. `project_context.context_block`
+  numbers them [S1]… with the rule to cite only those. `generate-stage-artifact` removes any [Sn]
+  beyond the list.
+- Cost is metered from OpenRouter's own `usage.cost`, which includes the search fee.
+
 ## Go mode (Phase B: PM-12, PM-15, PM-17 … PM-20)
 
 The next-best-action loop runs **in the browser** (`components/workflow/use-go-loop.ts`)

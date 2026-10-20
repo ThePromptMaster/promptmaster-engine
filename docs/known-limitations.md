@@ -1910,3 +1910,23 @@ Limits:
 - **Not passed to the write-up.** The package stage is not handed the limitations list. It
   carries gaps through its own prompt ("Information gaps and outstanding requests").
 
+### L-97 — Web access: what it does and does not do (2026-10-20)
+
+Sean asked (20 Oct) for web search with citations and saved sources, and an on/off button. Each
+project has a Web access switch, off by default. Web search and Go's search_web move run only
+while it is on. Limits:
+- **The backend does not read the switch.** It is stateless (CLAUDE.md), so it trusts the
+  `web_access` the browser sends and refuses "off". The database is the real guard: a source
+  cannot be saved unless the project's switch is on (insert policy). A caller who skipped the
+  browser could still pay for a search, but could not save its results.
+- **Excerpts, not pages.** A source is what the search engine returned from the page (up to 600
+  characters), not the page itself. Nothing fetches or reads the full page, a PDF behind it, or
+  a paywalled article. A stage that cites [S1] is citing that excerpt.
+- **One engine.** Exa, through OpenRouter, at about $0.007 per search plus the tokens. It finds
+  what Exa indexes; recency and coverage are Exa's.
+- **Citations are checked only for existence.** Code removes a citation to a source that is not
+  on record ([S7] with five saved). It does not check that [S2] supports the sentence it follows.
+  That is the model's reading of the excerpt.
+- **Go searches only from stages that write.** It doesn't search on review tables or on the stage
+  that closes a round.
+

@@ -45,6 +45,7 @@ const UNION: WorkflowEventType[] = [
   'brief_change_dismissed',
   'objective_assessed',
   'stage_version_saved',
+  'web_access_changed',
 ];
 
 function checkConstraintValues(): string[] {

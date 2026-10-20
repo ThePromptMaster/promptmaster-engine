@@ -161,7 +161,7 @@ function authorityOf(stage: StageDefinition, criterionId: string): 'delegable' |
 /** Moves that reason about the work; they cannot tick an approval. */
 const REASONING_MOVES = new Set([
   'derive', 'prove', 'simplify', 'limiting_case', 'try_contradiction', 'run_computation',
-  'falsify_hypothesis', 'compare_alternatives', 'check_literature', 'update_assumptions',
+  'falsify_hypothesis', 'compare_alternatives', 'check_literature', 'update_assumptions', 'search_web',
 ]);
 
 /** The first row awaiting an attempt, as the planner would name it (1-based), with what it is to compute. */

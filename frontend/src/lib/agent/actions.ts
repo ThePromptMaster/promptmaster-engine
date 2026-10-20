@@ -13,6 +13,7 @@ export type Performer =
   | 'reason' // /api/agent/reason — label: discussed
   | 'compute' // write-code → /api/sandbox/run → (follow-up) interpret
   | 'literature' // looks named works up in OpenAlex, or searches it by topic when given a query
+  | 'web' // searches the public web and saves the sources, when the project's Web access is on (20 Oct)
   | 'draft' // generate-stage-artifact
   | 'evaluate' // evaluate-stage-artifact
   | 'revise' // generate-stage-artifact with the current draft
@@ -53,6 +54,7 @@ export const AGENT_ACTIONS: readonly AgentAction[] = [
   { key: 'falsify_hypothesis', family: 'research', label: 'Falsify a hypothesis', performer: 'reason', important: false },
   { key: 'compare_alternatives', family: 'research', label: 'Compare alternatives', performer: 'reason', important: false },
   { key: 'check_literature', family: 'research', label: 'Check literature', performer: 'literature', important: false },
+  { key: 'search_web', family: 'research', label: 'Search the web', performer: 'web', important: false },
   { key: 'update_assumptions', family: 'research', label: 'Update assumptions', performer: 'reason', important: true },
   { key: 'draft_stage', family: 'writing', label: 'Draft this stage', performer: 'draft', important: false },
   { key: 'evaluate_stage', family: 'writing', label: 'Check this stage', performer: 'evaluate', important: false },

@@ -24,6 +24,10 @@ _RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 #: `generate_json`, read by `_meter` (E1, 6 Oct: repair work is measured).
 _REPAIRING: contextvars.ContextVar[bool] = contextvars.ContextVar("pm_repairing", default=False)
 
+#: The sources a web-search call returned (OpenRouter's `url_citation`
+#: annotations). Set by the request, read by `generate_with_web` (20 Oct).
+WEB_ANNOTATIONS: contextvars.ContextVar[list[dict[str, Any]] | None] = contextvars.ContextVar("pm_web_annotations", default=None)
+
 
 def _meter(
     *,
@@ -33,6 +37,7 @@ def _meter(
     elapsed: float,
     finish_reason: str,
     attempt: int = 1,
+    provider_cost: float | None = None,
 ) -> None:
     """FR-18/FR-19: record one provider call, both to the log and to the meter.
 
@@ -67,7 +72,9 @@ def _meter(
         # Warm the cache for the *next* call, never for this one.
         cache.ensure_fresh()
 
-        cost = price.cost(tokens_in, tokens_out) if price else None
+        # A web search is billed per search as well as per token; the
+        # provider's own total covers both (20 Oct). Otherwise, from tokens.
+        cost = provider_cost if provider_cost is not None else price.cost(tokens_in, tokens_out) if price else None
         if cost is not None:
             line_extra["cost_usd"] = round(cost, 8)
 
@@ -331,6 +338,46 @@ class OpenRouterClient:
 
         return await self._request_with_retries(payload, headers, timeout, deadline)
 
+    async def generate_with_web(
+        self,
+        prompt: str,
+        system: str | None = None,
+        model: str | None = None,
+        max_results: int = 5,
+        timeout: float | None = None,
+        deadline: float | None = None,
+    ) -> tuple[str, list[dict[str, Any]]]:
+        """One call with OpenRouter's web search on (20 Oct, Sean: "web search
+        and source retrieval … with citations and saved sources").
+
+        Returns the reply and the sources the search returned, as OpenRouter's
+        `url_citation` annotations. Exa is named as the engine so every model
+        searches the same way, at a known price per search.
+        """
+        messages = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
+        runs_on = resolve_model(model or self.model)
+        payload: dict[str, Any] = {
+            "model": runs_on,
+            "messages": messages,
+            "temperature": 0.2,
+            **_token_budget(runs_on, 2_000),
+            "plugins": [{"id": "web", "engine": "exa", "max_results": max(1, min(max_results, 10))}],
+            # The provider's total, search included, for the meter.
+            "usage": {"include": True},
+        }
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://github.com/graphcs/promptmaster-engine",
+            "X-Title": "PromptMaster Engine",
+        }
+        WEB_ANNOTATIONS.set(None)
+        content, _usage, _finish = await self._request_with_retries(payload, headers, timeout, deadline)
+        return content, WEB_ANNOTATIONS.get() or []
+
     async def generate_json(
         self,
         prompt: str,
@@ -515,6 +562,7 @@ class OpenRouterClient:
             }
 
             elapsed = time.monotonic() - t0
+            provider_cost = usage.get("cost") if payload.get("plugins") and isinstance(usage.get("cost"), (int, float)) else None
             _meter(
                 model=str(payload.get("model") or ""),
                 tokens_in=usage_stats["tokens_in"],
@@ -522,7 +570,10 @@ class OpenRouterClient:
                 elapsed=elapsed,
                 finish_reason=finish_reason,
                 attempt=attempt,
+                provider_cost=provider_cost,
             )
+            if payload.get("plugins"):
+                WEB_ANNOTATIONS.set([a for a in (message.get("annotations") or []) if isinstance(a, dict)])
 
             return content, usage_stats, finish_reason
 

@@ -55,7 +55,7 @@ import { performStep, type PerformContext, type StepOutcome } from '@/lib/agent/
 import { needsExpert, packageMarkdown, recordDocuments } from '@/lib/agent/expert';
 import { auditStop, describeAudit, proposedDefault, touchesObjective } from '@/lib/agent/stop-audit';
 import { recordRoutineDefault } from '@/lib/supabase/facts';
-import { allowedActions, answeredReturn, reconsiderNote, returnTargets, runAttemptsFor, stageHasCurrentDraft, LIVE_TOOLS, polishSinceDirection, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, withoutEndlessPolish, withoutSettledRuns, withoutOverride, DEFAULT_BUDGET_STEPS, fitsBudget, noChange, plannedBeforeLatestChange, preempt, shouldPause, stateFingerprint, stepCost } from '@/lib/agent/policy';
+import { allowedActions, answeredReturn, reconsiderNote, returnTargets, runAttemptsFor, stageHasCurrentDraft, toolsFor, polishSinceDirection, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, withoutEndlessPolish, withoutSettledRuns, withoutOverride, DEFAULT_BUDGET_STEPS, fitsBudget, noChange, plannedBeforeLatestChange, preempt, shouldPause, stateFingerprint, stepCost } from '@/lib/agent/policy';
 import {
   autoWindowsLeft,
   createAgentRun,
@@ -316,7 +316,7 @@ export function useGoLoop(opts: Options) {
           template: o.template, state: o.state, stage: o.stage, bundles: o.bundles,
           stageEvaluation: evaluateStage(o.template, o.stage.id, context), latestEvaluation: o.latestEvaluation,
           steps: [...priorStepsRef.current, ...stepsRef.current],
-          context, approvedOutline: o.approvedOutline, facts, dataFiles: dataFileBriefs(o.project), tools: LIVE_TOOLS, routine: o.project.routine_decisions ?? undefined, memory, controls: o.getControls?.() ?? undefined,
+          context, approvedOutline: o.approvedOutline, facts, dataFiles: dataFileBriefs(o.project), tools: toolsFor(o.project), routine: o.project.routine_decisions ?? undefined, memory, controls: o.getControls?.() ?? undefined,
         }),
         approvedByUser, deliverableDone: o.deliverableDone,
         interpret: interpret
@@ -524,7 +524,7 @@ export function useGoLoop(opts: Options) {
         const polishedHere = polishSinceDirection([...priorStepsRef.current, ...stepsRef.current], o.stage!.id);
         const allowed = withoutSettledRuns(withoutEndlessPolish(
           withoutOverride(
-            allowedActions(o.template, o.state, o.stage, hasDraft, LIVE_TOOLS, facts), stageEvaluation.canAdvance, current.policy
+            allowedActions(o.template, o.state, o.stage, hasDraft, toolsFor(o.project), facts), stageEvaluation.canAdvance, current.policy
             // Asked once: if the user stayed, the stage is to be done.
           ).filter((k) => (k !== 'propose_skip' || !proposedSkipHere) && (k !== 'propose_statuses' || !proposedStatusesHere)),
           polishedHere,
@@ -657,7 +657,7 @@ export function useGoLoop(opts: Options) {
                 state: buildAgentState({
                   template: o.template, state: o.state, stage: o.stage, bundles: o.bundles,
                   stageEvaluation, latestEvaluation: o.latestEvaluation, steps: [...priorStepsRef.current, ...stepsRef.current],
-                  context, approvedOutline: o.approvedOutline, facts, dataFiles: dataFileBriefs(o.project), tools: LIVE_TOOLS, routine: o.project.routine_decisions ?? undefined, memory: reconsider ? [reconsider.note, ...memory].slice(0, 24) : memory, controls: o.getControls?.() ?? undefined,
+                  context, approvedOutline: o.approvedOutline, facts, dataFiles: dataFileBriefs(o.project), tools: toolsFor(o.project), routine: o.project.routine_decisions ?? undefined, memory: reconsider ? [reconsider.note, ...memory].slice(0, 24) : memory, controls: o.getControls?.() ?? undefined,
                   returnTargets: goBackTo,
                 }),
                 allowed_actions: allowed, policy: current.policy, model: o.project.model,
@@ -1399,7 +1399,7 @@ export function useGoLoop(opts: Options) {
         const context = contextWithFacts(o.context, o.stage, facts);
         const holds = needStillHolds(need, {
           state: o.state, stage: o.stage, facts, stageEvaluation: evaluateStage(o.template, o.stage.id, context),
-          allowed: allowedActions(o.template, o.state, o.stage, hasDraft, LIVE_TOOLS, facts), policy: current.policy,
+          allowed: allowedActions(o.template, o.state, o.stage, hasDraft, toolsFor(o.project), facts), policy: current.policy,
           outlineStageId: outlineStageFor(o.template)?.id ?? null, largeJobAcknowledged: largeJobOkRef.current,
           objective: o.project.objective, currentStageId: o.state.current_stage_id,
         });

@@ -788,7 +788,22 @@ class ScriptedClient(OpenRouterClient):
         if "500" in markers:
             raise OpenRouterError("OpenRouter API error 500: provider error (mock)", status_code=500)
 
-        if payload.get("response_format", {}).get("type") == "json_object":
+        if payload.get("plugins"):
+            # A web search (20 Oct): two scripted sources, cited in the reply.
+            from promptmaster.llm_client import WEB_ANNOTATIONS
+
+            content = (
+                "Mock web summary: the market grew 4% in 2025 "
+                "([example.org](https://example.org/market-2025)) and two competitors merged "
+                "([news.example.com](https://news.example.com/merger))."
+            )
+            WEB_ANNOTATIONS.set([
+                {"type": "url_citation", "url_citation": {"url": "https://example.org/market-2025", "title": "Market report 2025",
+                                                          "content": "The market grew 4% in 2025."}},
+                {"type": "url_citation", "url_citation": {"url": "https://news.example.com/merger", "title": "Two competitors merge",
+                                                          "content": "Two regional competitors announced a merger."}},
+            ])
+        elif payload.get("response_format", {}).get("type") == "json_object":
             content = json.dumps(_json_reply(system, prompt))
         else:
             content = _prose_reply(system, prompt)

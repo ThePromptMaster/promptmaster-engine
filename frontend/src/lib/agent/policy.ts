@@ -251,6 +251,8 @@ export function withoutEndlessPolish(
 /** Which tools a run can actually call. */
 export interface AgentTools {
   literature: boolean;
+  /** The project's Web access is on (20 Oct): Go may search the web. */
+  web?: boolean;
   /** The project has data files the sandbox can read. */
   datasets?: boolean;
 }
@@ -258,6 +260,11 @@ export interface AgentTools {
 export const NO_TOOLS: AgentTools = { literature: false };
 /** What a run can call today: a literature lookup (OpenAlex) is connected since 2026-10-01, and a topic search of it since 2026-10-02. */
 export const LIVE_TOOLS: AgentTools = { literature: true };
+
+/** What a run on this project can call: the web, too, while its Web access is on (20 Oct). */
+export function toolsFor(project: { web_access?: 'off' | 'on' }): AgentTools {
+  return project.web_access === 'on' ? { ...LIVE_TOOLS, web: true } : LIVE_TOOLS;
+}
 
 /**
  * Whether the stage holds a draft for the work now in hand. Ordinarily any
@@ -305,6 +312,9 @@ export function allowedActions(
     // them up and reads their abstracts before handing the table to the user.
     keys.push('check_literature');
   }
+  // 20 Oct: with the project's Web access on, any stage that writes may look
+  // public facts up; the sources are saved and cited.
+  if (tools.web && stageDrafts(stage)) keys.push('search_web');
   if (stageDrafts(stage)) {
     if (!stageHasDraft) keys.push('draft_stage');
     // A review table, once drafted, is decided row by row — never checked
@@ -374,7 +384,7 @@ export function allowedActions(
 /** The inquiry moves (derive, compare, look up…): offered where a stage investigates. */
 const REASONING_MOVES = new Set([
   'derive', 'prove', 'simplify', 'limiting_case', 'try_contradiction', 'run_computation',
-  'falsify_hypothesis', 'compare_alternatives', 'update_assumptions', 'check_literature',
+  'falsify_hypothesis', 'compare_alternatives', 'update_assumptions', 'check_literature', 'search_web',
 ]);
 
 export interface Preemption {
