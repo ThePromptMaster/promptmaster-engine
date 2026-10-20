@@ -152,3 +152,4 @@ test('when a round meets the objective, Go does not start another: it moves on t
   const [judged] = await serviceSelect('workflow_events', `project_id=eq.${id}&type=eq.objective_assessed&select=payload&order=seq&limit=1`);
   expect(judged.payload.outcome).toBe('met');
 });
+

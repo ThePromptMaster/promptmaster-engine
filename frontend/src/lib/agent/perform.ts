@@ -63,7 +63,8 @@ import {
   generationRequest,
   inputsFrom,
 } from '@/lib/workflow/stage-requests';
-import type { StageContext, StageDefinition, StageEvaluation, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
+import type { StageContext, StageDefinition, StageEvaluation, WorkflowEvent, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
+import { roundClose, type RoundClose } from '@/lib/agent/round-close';
 import type { NewEvaluation, NewVersion } from '@/lib/supabase/versions';
 import type { AgentRun, AgentStep, BlockKind, ExecutionLabel } from '@/types/agent';
 import type { OutlineSection } from '@/types';
@@ -114,6 +115,8 @@ export interface PerformContext {
   setStageFigures?: (stageId: string, figures: StageFigures) => Promise<void>;
   /** Re-read the event log (and move the cursor) after a stage event. */
   afterStageEvent: () => Promise<void>;
+  /** The project's events, read fresh: what earlier runs did counts too. */
+  loadEvents?: () => Promise<readonly WorkflowEvent[]>;
   /** Tick an approval the routine-decision policy committed; the event is written first, by the performer. */
   commitCriterion?: (stageId: string, criterionId: string) => Promise<void>;
   /** Untick approvals: the reserved ones of a stage Go goes back to (Q2e). */
@@ -1424,6 +1427,19 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // autonomous run whose routine decisions are Go's starts the round
       // itself, along the template's own loop; the database checks all three.
       if (ctx.run.policy === 'autonomous' && ctx.project.routine_decisions === 'handle') {
+        // 19 Oct (HARBOR): nine rounds with nothing new between them. A round
+        // Go starts must have something new to work on; otherwise it moves
+        // on to the stage after the round (round-close.ts).
+        const close = ctx.loadEvents
+          ? roundClose({
+              stage: ctx.stage,
+              label: (id) => ctx.template.stages.find((s) => s.id === id)?.label ?? id,
+              events: await ctx.loadEvents(),
+              files: ctx.project.data_files,
+              facts: ctx.project.facts,
+            })
+          : null;
+        if (close) return closeRound(ctx, key, close);
         // 7 Oct (L-54): before another round, is the objective already met —
         // or blocked on something no round can produce? Judged on this round's
         // work, the same check as at the end, and recorded.
@@ -2171,6 +2187,45 @@ async function judgeObjective(ctx: PerformContext, holder: StageDefinition | nul
   });
   await ctx.afterStageEvent();
   return { assessment, basis };
+}
+
+/**
+ * Move on from the stage that closes a round to the stage after it, instead
+ * of starting another round. Complete when its requirements are met, with the
+ * head version as evidence; otherwise moved past and left open, as "Continue
+ * anyway" does — an approval reserved to the user stays theirs.
+ */
+async function closeRound(ctx: PerformContext, key: string, close: RoundClose): Promise<StepOutcome> {
+  const evaluation = evaluateStage(ctx.template, ctx.stage.id, ctx.context);
+  const head = ctx.bundles[ctx.stage.id]?.versions.at(-1);
+  const complete = evaluation.canAdvance && Boolean(head);
+  if (complete && ctx.setStageSummary) {
+    const summary = summariseStageContent(ctx.stage, stageContentForSummary(ctx.template, ctx.stage, ctx.bundles));
+    if (summary) await ctx.setStageSummary(ctx.stage.id, summary).catch(() => undefined);
+  }
+  if (complete && ctx.setStageFigures) {
+    const figures = await readStageFigures(ctx.project, ctx.stage, head, ctx.bundles[ctx.stage.id]?.artifact?.key_figures);
+    if (figures) await ctx.setStageFigures(ctx.stage.id, figures).catch(() => undefined);
+  }
+  const type = complete ? 'stage_marked_complete' : 'stage_advanced';
+  await appendWorkflowEvent(ctx.project.id, ctx.project.user_id, {
+    type,
+    stage_id: ctx.stage.id,
+    to_stage_id: close.to,
+    actor: 'system',
+    agent_run_id: ctx.run.id,
+    reason: close.reason,
+    payload: {
+      ...(complete ? { evidence_version_id: head!.id } : head ? { left_version_id: head.id } : {}),
+      rounds_closed: close.rounds,
+    },
+  });
+  await ctx.afterStageEvent();
+  const open = complete ? '' : ` ${ctx.stage.label} is left open: ${evaluation.unmet.map((c) => c.label).join('; ') || 'requirements not met'}.`;
+  return done(key, {
+    status: 'succeeded', toolsUsed: [], changes: { event_types: [type] },
+    output: `${close.reason}${open}`,
+  });
 }
 
 /** This round's work as one text: every stage from where the round starts to the one that closes it. */

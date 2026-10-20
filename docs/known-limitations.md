@@ -1874,3 +1874,21 @@ provider, OpenAlex and pricing. A request that depends on a web page, Instagram,
 or any video is answered from what was pasted or uploaded. From #309, the start screen
 and the front-door and setup prompts say so; nothing stops a later stage from being
 asked about a link's content, and the prompts are the only guard there.
+
+### L-96 — Go's round limit is fixed, and new material is judged by timestamps (2026-10-20)
+
+Under Autonomous + "Handle them for me", Go starts at most two rounds of an ongoing workflow
+after the last outside input, then moves on to the stage after the round (`round-close.ts`).
+It counts the following as outside input:
+- a data file;
+- a fact recorded from the brief, chat, a file or the user's edit;
+- a round the user started themselves.
+
+Limits of this rule:
+- **The two-round limit is fixed.** It is not a setting.
+- **Pasted text is not counted.** Text pasted into the brief without being recorded as a fact
+  does not count as new material.
+- **Exploration is affected too.** An exploration under the same policy also stops looping
+  after two rounds and moves to the write-up. The write-up's approval is still the user's,
+  and so is any further round.
+

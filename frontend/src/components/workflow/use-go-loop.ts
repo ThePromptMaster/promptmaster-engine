@@ -323,7 +323,8 @@ export function useGoLoop(opts: Options) {
           ? { sandboxRunId: interpret.sandboxRunId, code: interpret.code, stdout: interpret.stdout, stderr: interpret.stderr, exitCode: interpret.exitCode }
           : undefined,
         appendStageVersion: o.appendStageVersion, recordStageEvaluation: o.recordStageEvaluation,
-        setStageSummary: o.setStageSummary, setStageFigures: o.setStageFigures, afterStageEvent: o.reloadEvents, commitCriterion: o.commitCriterion, reopenApprovals: o.reopenApprovals, signal,
+        setStageSummary: o.setStageSummary, setStageFigures: o.setStageFigures, afterStageEvent: o.reloadEvents,
+        loadEvents: async () => (o.loadEvents ? o.loadEvents() : latest.current.events), commitCriterion: o.commitCriterion, reopenApprovals: o.reopenApprovals, signal,
         facts, latestEvaluation: o.latestEvaluation, refresh: o.onRefresh, onProgress: setProgress,
         conflictAnswer: answerToConflict(stepsRef.current, o.stage.id),
         derived: unsavedDerivation([...priorStepsRef.current, ...stepsRef.current], o.stage.id) ?? undefined,
