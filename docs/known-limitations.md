@@ -1875,6 +1875,41 @@ or any video is answered from what was pasted or uploaded. From #309, the start 
 and the front-door and setup prompts say so; nothing stops a later stage from being
 asked about a link's content, and the prompts are the only guard there.
 
+### L-96 — Go's round limit is fixed, and new material is judged by timestamps (2026-10-20)
+
+Under Autonomous + "Handle them for me", Go starts at most two rounds of an ongoing workflow
+after the last outside input, then moves on to the stage after the round (`round-close.ts`).
+It counts the following as outside input:
+- a data file;
+- a fact recorded from the brief, chat, a file or the user's edit;
+- a round the user started themselves.
+
+Limits of this rule:
+- **The two-round limit is fixed.** It is not a setting.
+- **Pasted text is not counted.** Text pasted into the brief without being recorded as a fact
+  does not count as new material.
+- **Exploration is affected too.** An exploration under the same policy also stops looping
+  after two rounds and moves to the write-up. The write-up's approval is still the user's,
+  and so is any further round.
+
+**The objective check's history and limitations (same day, H1b–c).**
+
+The check is now told which saved versions exist. It is also given the earlier versions
+the text cites, such as "Check v18" (a table's rows with their decisions; prose clipped to
+3,000 characters; 12,000 in all).
+
+Limits:
+- **Citation form.** A citation is recognised only in the form "<stage label> v<N>". A
+  version cited another way ("the eighteenth check") is not found.
+- **Limitation allowances.** A gap becomes a limitation only when the brief, the context or
+  the accepted facts contain an allowance that code can find. That means "limitation",
+  "may remain", "left open" or "note what is unknown". Other wordings stay blockers.
+- **Saved-work decisions.** A `needs_decision` about a finding on a saved version is moved to
+  "Proposed, not done" as "Settle from the saved record". Nothing then settles it
+  automatically. The write-up stage sees it only through the stages it reads.
+- **Not passed to the write-up.** The package stage is not handed the limitations list. It
+  carries gaps through its own prompt ("Information gaps and outstanding requests").
+
 ### L-97 — Web access: what it does and does not do (2026-10-20)
 
 Sean asked (20 Oct) for web search with citations and saved sources, and an on/off button. Each

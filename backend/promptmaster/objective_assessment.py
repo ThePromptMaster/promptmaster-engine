@@ -76,7 +76,15 @@ _ASSESS_INSTRUCTION = (
     "days\", \"Omar proposes a budget increase\") is not a requirement of the objective, even when it "
     "is recorded as one. Never list it as a criterion to carry out. The deliverable handles it correctly "
     "when it reports the request and treats it as the accepted facts and approvals allow — declining or "
-    "excluding it where it conflicts with them is correct, not a failure. Return JSON only."
+    "excluding it where it conflicts with them is correct, not a failure. "
+    # 19 Oct (Sean, HARBOR): "The prompt allowed missing diligence evidence to
+    # remain as limitations", and the run paused asking for that evidence.
+    "When the objective, brief, constraints or accepted facts allow gaps to remain (\"missing evidence may "
+    "remain as limitations\", \"note what is unknown\"), a gap of that kind is neither a blocker nor an unmet "
+    "requirement: list it under \"limitations\", with \"allowed_by\" copied exactly from the words that allow it. "
+    "\"needs_decision\" is only for a decision that changes what the deliverable concludes or commits someone to. "
+    "How to word, place, round or label something is not the user's decision: name it under proposed_next. "
+    "Return JSON only."
 )
 
 
@@ -86,6 +94,13 @@ class Blocker(BaseModel):
     #: One question to the user that would supply it, in their terms (Sean, 13
     #: Oct, workshop: "PromptMaster left me figuring out what to provide next").
     ask: str = Field(default="", max_length=300)
+
+
+class Limitation(BaseModel):
+    """A gap the brief allows to remain, stated rather than waited for (19 Oct, HARBOR)."""
+    item: str = Field(max_length=300)
+    #: The brief's own words that allow it, verbatim.
+    allowed_by: str = Field(default="", max_length=300)
 
 
 class CriterionResult(BaseModel):
@@ -118,6 +133,11 @@ class ObjectiveAssessment(BaseModel):
     model_note: str = Field(default="", max_length=600)
     #: What was found unmet, by name: measured and carried-forward checks first.
     unmet: list[str] = Field(default_factory=list, max_length=MAX_CRITERIA + 30)
+    #: Gaps the brief allows to remain: carried in the deliverable, never waited for.
+    limitations: list[Limitation] = Field(default_factory=list, max_length=MAX_ITEMS)
+    #: A round check: nothing in this round is left for the user, and the stage
+    #: that writes the deliverable comes next (19 Oct, HARBOR).
+    ready_for_later_stage: bool = False
 
 
 class RunStep(BaseModel):
@@ -142,6 +162,9 @@ def build_assessment_prompt(
     success_criterion: str = "",
     failed_checks: list[str] | None = None,
     measured: list[str] | None = None,
+    history: list[str] | None = None,
+    known_versions: dict[str, int] | None = None,
+    later_stage: str = "",
 ) -> tuple[str, str]:
     record = "\n".join(
         f"- S{i + 1}: {s.action_key} — {s.execution_label or 'no execution label'}"
@@ -155,6 +178,25 @@ def build_assessment_prompt(
         + (f"{context_block(inputs, limit=CHECK_CONTEXT_MAX)}\n" if context_block(inputs) else "")
         + f"\nRUN RECORD (what the autonomous run actually did; execution labels are derived from what happened):\n{record}\n\n"
         f"--- THE DELIVERABLE: {deliverable_label} ---\n{_clip(content)}\n--- END ---\n\n"
+        + (
+            # 19 Oct (HARBOR): "Check v18 is not in the project" — it was; the
+            # check was shown only the latest version of each stage.
+            "SAVED VERSIONS IN THIS PROJECT (every one of them is in the project): "
+            + "; ".join(f"{label} v1–v{n}" for label, n in known_versions.items()) + ".\n"
+            if known_versions else ""
+        )
+        + (
+            "EARLIER VERSIONS THE DELIVERABLE REFERS TO, with the decisions recorded on their rows:\n"
+            + "\n".join(history) + "\n\n"
+            if history else ""
+        )
+        + (
+            f"THIS IS A ROUND CHECK, NOT THE FINAL ONE. The deliverable in its finished form is written by a later "
+            f"stage, \"{later_stage}\", which has not run yet. Do not mark a requirement not_met, or name a blocker, "
+            f"only because \"{later_stage}\" has not produced its part. Judge whether this work leaves anything that "
+            f"only the user can supply.\n\n"
+            if later_stage.strip() else ""
+        )
         + (
             # C2 (8 Oct): what the project's own checks found still wrong. A
             # finding carried forward is still a finding (Sean, sequence test).
@@ -181,7 +223,8 @@ def build_assessment_prompt(
         '  "proposed_next": ["each next step or investigation for THIS project that the text names but the record does not show done"],\n'
         '  "criteria": [{"requirement": "one thing the objective, an accepted requirement or a constraint asks for", '
         '"verdict": "met" | "not_met" | "not_checked", "basis": "for met: a sentence copied exactly from the deliverable that shows it; '
-        'otherwise why"}]\n'
+        'otherwise why"}],\n'
+        '  "limitations": [{"item": "a gap the brief allows to remain", "allowed_by": "the brief\'s words that allow it, copied exactly"}]\n'
         "}\n"
         # 10 Oct (Sean, emails 3 and 8): a heading is not evidence; a length you
         # cannot see (pages when printed) is not checked, and saying so is honest.
@@ -195,7 +238,9 @@ def build_assessment_prompt(
         # asked the user to paste rows the project already held.
         "A blocker is something only the user can supply from outside the project. Work already saved in this "
         "project — another stage's rows, findings or drafts — is never a blocker, even when the deliverable says it "
-        "could not see it: mark the requirement \"not_met\" and name the work still to apply.\n"
+        "could not see it: mark the requirement \"not_met\" and name the work still to apply. A version or finding "
+        "the deliverable names (\"Check v18 f4\") is in the project when SAVED VERSIONS lists it; what an accepted "
+        "finding meant is in its own text.\n"
         "List each requirement separately in \"criteria\" — every part of the objective, every accepted "
         "requirement and constraint — at most 12. Mark one \"not_checked\" when the text alone cannot show it "
         "(how many pages it prints to, how it looks, anything outside the text). A heading is not a basis.\n"
@@ -438,7 +483,8 @@ _AMOUNT = re.compile(r"(?<![\w.])\$?(\d[\d,]*(?:\.\d+)?)(?![\d])")
 #: A figure with what it is held to: "$12 per person or less", "under $240".
 _FIGURE_PHRASE = re.compile(
     r"(?:\s*(?:of|at|under|below|above|over|no more than|at most|at least|up to|within)\s+)?"
-    r"\$?\d[\d,]*(?:\.\d+)?(?:\s*(?:per|a|an|each)\s+\w+)?(?:\s+or\s+(?:less|fewer|more|lower|higher|under|below))?",
+    # Not a number inside a word: "v18" is a version, not a figure (19 Oct, HARBOR).
+    r"(?<![\w.])\$?\d[\d,]*(?:\.\d+)?(?:\s*(?:per|a|an|each)\s+\w+)?(?:\s+or\s+(?:less|fewer|more|lower|higher|under|below))?",
     re.I,
 )
 
@@ -481,6 +527,55 @@ def record_text(inputs: PMInput) -> str:
     return "\n".join([inputs.objective, inputs.constraints, inputs.context or "", facts])
 
 
+#: Words in a brief that let a gap stay open as a stated limitation (19 Oct, HARBOR).
+_ALLOWANCE = re.compile(
+    r"\blimitations?\b"
+    r"|\b(?:may|can|could|might|is allowed to|are allowed to)\s+(?:remain|stay|be left|be recorded|be noted|be stated)\b"
+    r"|\bleft open\b|\bremains? open\b|\bnote what is (?:unknown|missing)\b",
+    re.I,
+)
+
+
+def allowance(record: str) -> str:
+    """The brief's sentence that lets gaps remain as limitations, if it has one."""
+    for sentence in _SENTENCE.split(record):
+        text = " ".join(sentence.split())
+        if text and _ALLOWANCE.search(text):
+            return text[:300]
+    return ""
+
+
+_VERSION_REF = re.compile(r"\b([A-Za-z][\w&'’-]*(?:\s+[A-Za-z][\w&'’-]*){0,3})\s+v(\d{1,3})\b")
+#: "is not in the project", "is not available", "no saved document has it".
+_NOT_HERE = re.compile(
+    r"\bnot (?:in|part of|saved in|available in|among)\b[^.;]*\bproject\b|\bnot (?:available|provided|supplied|found|saved)\b"
+    r"|\bmissing from\b|\bcannot be (?:found|read|seen)\b",
+    re.I,
+)
+#: A row of a saved version: "Check v18 f4", "v21 row 3".
+_ROW_REF = re.compile(r"\bv\d{1,3}\s+(?:row\s*)?[a-z]?\d{1,3}\b", re.I)
+
+
+def saved_refs(text: str, known: dict[str, int] | None) -> list[str]:
+    """The saved versions a text names: "Check v18" when Check has 22 versions."""
+    known_lower = {k.lower(): n for k, n in (known or {}).items()}
+    out: list[str] = []
+    for m in _VERSION_REF.finditer(text):
+        words = m.group(1).split()
+        n = int(m.group(2))
+        # The shortest trailing run of words that is a stage's label: "accepting Check" is "Check".
+        for i in range(len(words) - 1, -1, -1):
+            label = " ".join(words[i:])
+            if label.lower() in known_lower and 1 <= n <= known_lower[label.lower()]:
+                out.append(f"{label} v{n}")
+                break
+    return out
+
+
+def _mentions(text: str, label: str) -> bool:
+    return bool(label.strip()) and _norm(label) in _norm(text)
+
+
 def parse_assessment(
     result: object,
     content: str,
@@ -489,6 +584,8 @@ def parse_assessment(
     measured: list[str] | None = None,
     requests: list[str] | None = None,
     record: str = "",
+    known_versions: dict[str, int] | None = None,
+    later_stage: str = "",
 ) -> ObjectiveAssessment:
     if not isinstance(result, dict):
         return ObjectiveAssessment(outcome="partly", reason="The check did not come back in a usable form.")
@@ -511,6 +608,13 @@ def parse_assessment(
         outcome = "partly"
 
     blockers: list[Blocker] = []
+    limitations: list[Limitation] = []
+    #: Blockers about saved work, set aside: it is in the project (19 Oct, HARBOR).
+    in_project: list[str] = []
+    settle: list[str] = []
+    #: Something was unmet only because the later stage has not written it yet.
+    for_later = False
+    allowed = allowance(record)
     record_numbers = _amounts(f"{record}\n{content}")
     for b in result.get("blockers") or []:
         if not isinstance(b, dict):
@@ -528,7 +632,39 @@ def parse_assessment(
             if kind == "needs_decision" and requests and (_is_request(need, requests) or (ask and _is_request(ask, requests))):
                 declined.append(need)
                 continue
+            # Saved work is never a blocker: "Check v18 is not in the project"
+            # when Check has 22 versions; or what an accepted finding on a saved
+            # version meant, which its own text answers.
+            if saved_refs(f"{need} {ask}", known_versions) and (
+                _NOT_HERE.search(need) or (kind == "needs_decision" and _ROW_REF.search(need))
+            ):
+                in_project.append(need)
+                if kind == "needs_decision":
+                    settle.append(f"Settle from the saved record: {need}"[:300])
+                continue
+            # A round check: what the later stage writes is not missing yet.
+            if later_stage and _mentions(f"{need} {ask}", later_stage):
+                for_later = True
+                continue
+            # A gap the brief allows to remain is stated, not waited for.
+            if allowed and kind in ("data_missing", "source_missing"):
+                limitations.append(Limitation(item=need, allowed_by=allowed))
+                continue
             blockers.append(Blocker(need=need, kind=kind, ask=ask))
+    for item in result.get("limitations") or []:
+        if not isinstance(item, dict):
+            continue
+        what = " ".join(str(item.get("item") or "").split())[:300]
+        by = " ".join(str(item.get("allowed_by") or "").split())[:300]
+        if not what:
+            continue
+        if by and _norm(by) in _norm(record):
+            limitations.append(Limitation(item=what, allowed_by=by))
+        elif allowed:
+            limitations.append(Limitation(item=what, allowed_by=allowed))
+        else:
+            # Called allowed, but nothing in the brief allows it: it is a gap.
+            blockers.append(Blocker(need=what, kind="data_missing"))
     if outcome == "met":
         blockers = []
 
@@ -551,6 +687,7 @@ def parse_assessment(
         elif str(item).strip():
             # Claimed as done, not in the record: it is at most a proposal.
             proposed.append(" ".join(str(item).split())[:300])
+    proposed.extend(settle)
     exercise = _exercise_text(content)
     for item in result.get("proposed_next") or []:
         text = " ".join(str(item).split())[:300]
@@ -559,6 +696,7 @@ def parse_assessment(
 
     criteria: list[CriterionResult] = []
     overruled: list[str] = []
+
     for c in result.get("criteria") or []:
         if not isinstance(c, dict):
             continue
@@ -567,6 +705,9 @@ def parse_assessment(
             continue
         verdict = c.get("verdict") if c.get("verdict") in ("met", "not_met", "not_checked") else "not_checked"
         basis = " ".join(str(c.get("basis") or "").split())[:400]
+        # A round check: the part the later stage writes is not unmet yet (19 Oct, HARBOR).
+        if verdict == "not_met" and later_stage and (_mentions(basis, later_stage) or _mentions(requirement, later_stage)):
+            verdict, basis, for_later = "not_checked", f"Written by {later_stage}, after this round.", True
         # "Met" needs a sentence the deliverable says; without one it was not shown.
         if verdict == "met" and not _is_evidence(basis, content):
             verdict, basis = "not_checked", "No passage in the deliverable shows it."
@@ -605,6 +746,8 @@ def parse_assessment(
         said = f"{said} [Overruled by the count made in code: {'; '.join(overruled)}.]".strip()
         if outcome == "met":
             reason, note = "Met: every requirement holds; the measured ones were counted in code.", said
+    if in_project:
+        said = f"{said} [Set aside: it names saved work that is in the project: {'; '.join(in_project)}.]".strip()
     if declined:
         said = f"{said} [Set aside as a request, not a requirement: {'; '.join(declined)}.]".strip()
         if outcome == "met" and not overruled:
@@ -621,6 +764,15 @@ def parse_assessment(
             reason, note = named, said
         elif claimed == "met" or overruled:
             reason, note = NO_EVIDENCE_REASON, said
+    # A round check whose only gap is what the later stage writes. A "not
+    # there yet" that names nothing is not that: another round may be worth it.
+    for_later = for_later or _mentions(said, later_stage)
+    ready = for_later and outcome != "met" and not blockers and not failed_checks and not any(
+        c.verdict == "not_met" for c in criteria
+    )
+    if ready:
+        unmet = []
+        reason, note = f"Nothing in this work is left for you: {later_stage} writes the deliverable next.", said
 
     return ObjectiveAssessment(
         outcome=outcome,
@@ -636,6 +788,8 @@ def parse_assessment(
         blockers=blockers[:MAX_BLOCKERS],
         performed=performed[:MAX_ITEMS],
         proposed_next=proposed[:MAX_ITEMS],
+        limitations=limitations[:MAX_ITEMS],
+        ready_for_later_stage=ready,
     )
 
 
@@ -649,18 +803,23 @@ async def assess_objective(
     success_criterion: str = "",
     failed_checks: list[str] | None = None,
     measured: list[str] | None = None,
+    history: list[str] | None = None,
+    known_versions: dict[str, int] | None = None,
+    later_stage: str = "",
 ) -> ObjectiveAssessment:
     requests = request_facts(inputs)
     # The check is not shown a carried-forward finding that only restates a request.
     failed_checks = set_aside_requests(failed_checks, requests)[0]
-    system, user = build_assessment_prompt(inputs, deliverable_label, content, steps, success_criterion, failed_checks, measured)
+    system, user = build_assessment_prompt(
+        inputs, deliverable_label, content, steps, success_criterion, failed_checks, measured, history, known_versions, later_stage
+    )
     result, _usage = await client.generate_json(prompt=user, system=system, temperature=0, max_tokens=1_600, model=model)
-    parsed = parse_assessment(result, content, steps, failed_checks, measured, requests, record_text(inputs))
+    parsed = parse_assessment(result, content, steps, failed_checks, measured, requests, record_text(inputs), known_versions, later_stage)
     # A "met" lost only for want of a quote is asked once more before it can
     # pause a run (11 Oct: the run stopped on "not met" for exactly this).
     if _needs_evidence_retry(result, parsed, failed_checks):
         again, _usage = await client.generate_json(
             prompt=user + EVIDENCE_RETRY, system=system, temperature=0, max_tokens=1_600, model=model
         )
-        parsed = parse_assessment(again, content, steps, failed_checks, measured, requests, record_text(inputs))
+        parsed = parse_assessment(again, content, steps, failed_checks, measured, requests, record_text(inputs), known_versions, later_stage)
     return parsed

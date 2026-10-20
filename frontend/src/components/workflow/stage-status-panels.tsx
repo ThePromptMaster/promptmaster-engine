@@ -120,9 +120,11 @@ export function ObjectivePausedNotice({
   const [sending, setSending] = useState(false);
   return (
     <section role="status" aria-label="Objective not met" className="rounded-xl bg-[var(--surface-container-high)] px-5 py-4">
-      <div className="flex flex-wrap items-start gap-3">
+      {/* The button sits below the text, not beside it: beside it, a phone
+          left the text one word wide (20 Oct, Sean, HARBOR screenshots). */}
+      <div className="flex items-start gap-3">
         <span aria-hidden className="material-symbols-outlined text-[var(--pm-tertiary)]">pause_circle</span>
-        <div className="mr-auto min-w-0 flex-1">
+        <div className="min-w-0 flex-1">
           <p className="text-title text-[var(--on-surface)]">
             {assessment.blockers.length ? 'Paused — the objective is not met' : 'The objective is not met yet'}
           </p>
@@ -135,6 +137,18 @@ export function ObjectivePausedNotice({
                   <li key={i}>{b.need}</li>
                 ))}
               </ul>
+            </>
+          )}
+          {/* 19 Oct (HARBOR): what the brief lets stay open is stated, not waited for. */}
+          {(assessment.limitations?.length ?? 0) > 0 && (
+            <>
+              <p className="mt-2 text-label font-semibold text-[var(--on-surface)]">Carried as limitations, as your brief allows</p>
+              <ul aria-label="Carried as limitations" className="list-disc pl-5 text-label text-[var(--on-surface-variant)]">
+                {assessment.limitations!.map((l, i) => (
+                  <li key={i}>{l.item}</li>
+                ))}
+              </ul>
+              <p className="mt-1 text-label text-[var(--on-surface-variant)]">Allowed by: “{assessment.limitations![0].allowed_by}”</p>
             </>
           )}
           {ask && onAnswer && (
@@ -156,7 +170,7 @@ export function ObjectivePausedNotice({
                   id="objective-answer"
                   value={answer}
                   onChange={(e) => setAnswer(e.target.value.slice(0, 600))}
-                  className="min-w-0 flex-1 rounded-lg bg-[var(--surface-container-low)] px-3 py-1.5 text-body text-[var(--on-surface)]"
+                  className="min-w-0 flex-[1_1_12rem] rounded-lg bg-[var(--surface-container-low)] px-3 py-1.5 text-body text-[var(--on-surface)]"
                   placeholder="Your answer"
                 />
                 <button
@@ -182,16 +196,18 @@ export function ObjectivePausedNotice({
               {assessment.proposed_next.join('; ')}
             </p>
           )}
+          {onResume && !(ask && onAnswer) && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                onClick={onResume}
+                disabled={resumeDisabled}
+                className="rounded-lg bg-[var(--surface-container-highest)] px-4 py-2 text-title text-[var(--on-surface)] disabled:opacity-40"
+              >
+                {resumeLabel ?? (assessment.blockers.length ? 'I have added it — resume Go' : 'Resume Go')}
+              </button>
+            </div>
+          )}
         </div>
-        {onResume && !(ask && onAnswer) && (
-          <button
-            onClick={onResume}
-            disabled={resumeDisabled}
-            className="rounded-lg bg-[var(--surface-container-highest)] px-4 py-2 text-title text-[var(--on-surface)] disabled:opacity-40"
-          >
-            {resumeLabel ?? (assessment.blockers.length ? 'I have added it — resume Go' : 'Resume Go')}
-          </button>
-        )}
       </div>
     </section>
   );

@@ -273,6 +273,12 @@ always starts it. In a looping workflow:
 - the digest carries the last round's stale stages, labelled "(last round)";
 - Go treats a stage's draft as current only if it was written since the stage was last
   entered (`stageHasCurrentDraft`).
+- under Autonomous + `handle`, Go starts at most `MAX_AUTO_ROUNDS` (2) rounds since the
+  last outside input (a data file, a fact from the brief, chat, a file or the user's edit,
+  or a round the user started). After that it moves on to the stage after the round
+  (`lib/agent/round-close.ts`) instead of starting another one. It marks the round complete
+  when its requirements are met, and otherwise moves past it and leaves it open
+  (2026-10-20, after nine rounds of HARBOR with nothing new between them).
 
 `template.inquiry` gives a workflow Go's reasoning moves. An Autonomous authorization may allow
 up to 20 further windows.

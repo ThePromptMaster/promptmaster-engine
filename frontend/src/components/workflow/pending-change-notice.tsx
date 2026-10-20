@@ -33,7 +33,7 @@ export function PendingChangeNotice({
           <span aria-hidden className="material-symbols-outlined text-[20px] text-[var(--pm-tertiary)]">
             pending_actions
           </span>
-          <p className="min-w-0 flex-1 text-body text-[var(--on-surface)]">
+          <p className="min-w-0 flex-[1_1_16rem] text-body text-[var(--on-surface)]">
             Not applied yet — choose which takes priority.
             <span className="block text-label text-[var(--on-surface-variant)]">
               {stageLabel(c.stageId)}: {gist(c.instruction, 140)}
