@@ -792,6 +792,12 @@ export const api = {
       failed_checks?: string[];
       /** Requirements code measured and found met, with the count (11 Oct). */
       measured?: string[];
+      /** Earlier versions the text cites, with their rows' decisions (19 Oct). */
+      history?: string[];
+      /** Each stage's label and how many versions it has saved. */
+      known_versions?: Record<string, number>;
+      /** A round check: the stage that writes the deliverable next. */
+      later_stage?: string;
       model?: string;
     },
     signal?: AbortSignal

@@ -33,6 +33,10 @@ export interface ObjectiveAssessment {
   unmet?: string[];
   /** The model's own sentence when code overruled its "met" — kept, never shown as the reason. */
   model_note?: string;
+  /** Gaps the brief allows to remain, with its words that allow them (19 Oct, HARBOR). */
+  limitations?: { item: string; allowed_by: string }[];
+  /** A round check: nothing is left for the user; the next stage writes the deliverable. */
+  ready_for_later_stage?: boolean;
 }
 
 /**

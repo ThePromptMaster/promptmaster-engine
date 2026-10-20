@@ -1892,3 +1892,21 @@ Limits of this rule:
   after two rounds and moves to the write-up. The write-up's approval is still the user's,
   and so is any further round.
 
+**The objective check's history and limitations (same day, H1b–c).**
+
+The check is now told which saved versions exist. It is also given the earlier versions
+the text cites, such as "Check v18" (a table's rows with their decisions; prose clipped to
+3,000 characters; 12,000 in all).
+
+Limits:
+- **Citation form.** A citation is recognised only in the form "<stage label> v<N>". A
+  version cited another way ("the eighteenth check") is not found.
+- **Limitation allowances.** A gap becomes a limitation only when the brief, the context or
+  the accepted facts contain an allowance that code can find. That means "limitation",
+  "may remain", "left open" or "note what is unknown". Other wordings stay blockers.
+- **Saved-work decisions.** A `needs_decision` about a finding on a saved version is moved to
+  "Proposed, not done" as "Settle from the saved record". Nothing then settles it
+  automatically. The write-up stage sees it only through the stages it reads.
+- **Not passed to the write-up.** The package stage is not handed the limitations list. It
+  carries gaps through its own prompt ("Information gaps and outstanding requests").
+
