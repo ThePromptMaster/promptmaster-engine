@@ -547,6 +547,12 @@ def _json_reply(system: str, prompt: str) -> dict:
             # Not met, and nothing missing: another round is worth it.
             return {"outcome": "not_met", "reason": "Mock: not there yet.", "basis_quote": first[:120],
                     "blockers": [], "performed": [], "proposed_next": ["Mock: another round."]}
+        if "[[mock:objective=later]]" in prompt:
+            # 19 Oct (HARBOR): unmet only because the stage after the round has not run.
+            later = re.search(r'written by a later stage, "([^"]+)"', prompt)
+            name = later.group(1) if later else "the next"
+            return {"outcome": "not_met", "reason": f"The {name} stage has not been reached.", "basis_quote": first[:120],
+                    "blockers": [], "performed": [], "proposed_next": []}
         if "[[mock:objective=noquote]]" in prompt:
             # 11 Oct (survey brief): "met", quoting a heading — twice.
             return {"outcome": "met", "reason": "Mock: the brief satisfies all of the requirements.",

@@ -31,3 +31,20 @@ describe('the objective pause offers the same action as the Go panel (17 Oct, FI
     expect(screen.getByRole('button', { name: 'Resume Go' })).toBeInTheDocument();
   });
 });
+
+describe('gaps the brief allows are carried, not waited for (19 Oct, HARBOR)', () => {
+  it('lists them apart from what Go is waiting for, with the words that allow them', () => {
+    render(
+      <ObjectivePausedNotice
+        assessment={{
+          ...assessment,
+          blockers: [{ need: 'Whether Northbridge pursues at all.', kind: 'needs_decision' as const }],
+          limitations: [{ item: 'Who set the $60m EV and on what EBITDA base.', allowed_by: 'Missing diligence evidence may remain as limitations.' }],
+        }}
+      />
+    );
+    expect(screen.getByText('Waiting for')).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: 'Carried as limitations' })).toHaveTextContent('Who set the $60m EV');
+    expect(screen.getByText(/Allowed by: “Missing diligence evidence may remain as limitations.”/)).toBeInTheDocument();
+  });
+});

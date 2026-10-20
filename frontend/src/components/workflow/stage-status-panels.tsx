@@ -137,6 +137,18 @@ export function ObjectivePausedNotice({
               </ul>
             </>
           )}
+          {/* 19 Oct (HARBOR): what the brief lets stay open is stated, not waited for. */}
+          {(assessment.limitations?.length ?? 0) > 0 && (
+            <>
+              <p className="mt-2 text-label font-semibold text-[var(--on-surface)]">Carried as limitations, as your brief allows</p>
+              <ul aria-label="Carried as limitations" className="list-disc pl-5 text-label text-[var(--on-surface-variant)]">
+                {assessment.limitations!.map((l, i) => (
+                  <li key={i}>{l.item}</li>
+                ))}
+              </ul>
+              <p className="mt-1 text-label text-[var(--on-surface-variant)]">Allowed by: “{assessment.limitations![0].allowed_by}”</p>
+            </>
+          )}
           {ask && onAnswer && (
             <form
               aria-label="Answer what Go is waiting for"

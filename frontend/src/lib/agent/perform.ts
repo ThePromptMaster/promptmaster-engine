@@ -65,6 +65,7 @@ import {
 } from '@/lib/workflow/stage-requests';
 import type { StageContext, StageDefinition, StageEvaluation, WorkflowEvent, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
 import { roundClose, type RoundClose } from '@/lib/agent/round-close';
+import { knownVersions, referencedVersions } from '@/lib/agent/version-history';
 import type { NewEvaluation, NewVersion } from '@/lib/supabase/versions';
 import type { AgentRun, AgentStep, BlockKind, ExecutionLabel } from '@/types/agent';
 import type { OutlineSection } from '@/types';
@@ -1444,7 +1445,13 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         // or blocked on something no round can produce? Judged on this round's
         // work, the same check as at the end, and recorded.
         const roundText = roundContent(ctx, to);
-        const { assessment: verdict } = await judgeObjective(ctx, ctx.stage, roundText, `the round that ended at ${ctx.stage.label}`);
+        const next = ctx.stage.transitions.default_next;
+        const nextLabel = next ? ctx.template.stages.find((s) => s.id === next)?.label : undefined;
+        const { assessment: verdict } = await judgeObjective(ctx, ctx.stage, roundText, `the round that ended at ${ctx.stage.label}`, nextLabel);
+        // 19 Oct (HARBOR): all that was missing is what the next stage writes.
+        if (verdict.ready_for_later_stage && next && nextLabel && verdict.outcome !== 'met') {
+          return closeRound(ctx, key, { to: next, rounds: 0, reason: `${verdict.reason} Moving on to ${nextLabel} instead of another round.` });
+        }
         if (verdict.outcome === 'met') {
           const target = ctx.stage.transitions.default_next;
           const head = ctx.bundles[ctx.stage.id]?.versions.at(-1);
@@ -2137,7 +2144,7 @@ function cutOffMessage(label: string, content: string): string {
  * `objective_assessed`, and return it (6–7 Oct). Used at the end of the work
  * and at the end of each round of ongoing work.
  */
-async function judgeObjective(ctx: PerformContext, holder: StageDefinition | null, content: string, labelOverride?: string) {
+async function judgeObjective(ctx: PerformContext, holder: StageDefinition | null, content: string, labelOverride?: string, laterStage?: string) {
   const label = labelOverride ?? holder?.label ?? 'the deliverable';
   // What code counted and found met, with the count: the check may not count
   // again (11 Oct, survey brief: "the saved deliverable exceeds 200 words").
@@ -2154,6 +2161,10 @@ async function judgeObjective(ctx: PerformContext, holder: StageDefinition | nul
       success_criterion: ctx.template.execution?.success_criterion ?? '',
       failed_checks: failedChecks(ctx),
       measured,
+      // The saved versions, and the earlier ones the text cites (19 Oct, HARBOR).
+      known_versions: knownVersions(ctx.template, ctx.bundles),
+      history: referencedVersions(ctx.template, ctx.bundles, content),
+      later_stage: laterStage ?? '',
       model: ctx.project.model,
     },
     ctx.signal
@@ -2174,6 +2185,8 @@ async function judgeObjective(ctx: PerformContext, holder: StageDefinition | nul
     outcome: assessment.outcome, reason: assessment.reason, basis_quote: assessment.basis_quote,
     blockers: assessment.blockers, performed: assessment.performed, proposed_next: assessment.proposed_next,
     criteria, basis,
+    ...(assessment.limitations?.length ? { limitations: assessment.limitations } : {}),
+    ...(assessment.ready_for_later_stage ? { ready_for_later_stage: true } : {}),
     ...(assessment.unmet?.length ? { unmet: assessment.unmet } : {}),
     ...(assessment.model_note ? { model_note: assessment.model_note } : {}),
   };
@@ -2217,7 +2230,7 @@ async function closeRound(ctx: PerformContext, key: string, close: RoundClose): 
     reason: close.reason,
     payload: {
       ...(complete ? { evidence_version_id: head!.id } : head ? { left_version_id: head.id } : {}),
-      rounds_closed: close.rounds,
+      ...(close.rounds ? { rounds_closed: close.rounds } : {}),
     },
   });
   await ctx.afterStageEvent();

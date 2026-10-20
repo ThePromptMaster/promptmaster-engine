@@ -482,3 +482,116 @@ def test_work_saved_in_the_project_is_never_a_blocker():
     _system, user = build_assessment_prompt(_inputs(), "Final", LOG, STEPS)
     assert "Work already saved in this project" in user
     assert "is never a blocker" in user
+
+
+# 19 Oct (Sean, HARBOR): the round check paused on review history and on
+# evidence the brief allowed to remain as limitations.
+HARBOR_KNOWN = {"Sources": 10, "Analysis": 10, "Red flags": 9, "Check": 22, "Update": 10}
+HARBOR_RECORD = (
+    "Prepare and maintain an acquisition screening package for Harbor Industrial Services.\n"
+    "Missing diligence evidence may remain as limitations in the package."
+)
+HARBOR_ROUND = "## Update round\n\nThe customer-loss EV effect is 12.9 under the accepted rounding. EV is $60m."
+
+
+def test_a_blocker_that_says_a_saved_version_is_not_in_the_project_is_set_aside():
+    a = parse_assessment(
+        {"outcome": "not_met", "reason": "Open points.", "blockers": [
+            {"need": "Definitions of option (a) and option (b) for the management row. No saved document defines them, and Check v18 is not in the project.", "kind": "data_missing"},
+            {"need": "A decision on whether accepting Check v18 f4 adopted the rounding convention.", "kind": "needs_decision"},
+        ]},
+        HARBOR_ROUND, [], known_versions=HARBOR_KNOWN,
+    )
+    assert a.blockers == []
+    assert a.proposed_next == ["Settle from the saved record: A decision on whether accepting Check v18 f4 adopted the rounding convention."]
+    assert "names saved work that is in the project" in a.model_note
+
+
+def test_a_version_the_project_does_not_hold_is_still_a_blocker():
+    a = parse_assessment(
+        {"outcome": "not_met", "blockers": [{"need": "Check v30 is not in the project.", "kind": "data_missing"}]},
+        HARBOR_ROUND, [], known_versions=HARBOR_KNOWN,
+    )
+    assert [b.need for b in a.blockers] == ["Check v30 is not in the project."]
+
+
+def test_missing_evidence_the_brief_allows_is_a_limitation_not_a_blocker():
+    a = parse_assessment(
+        {"outcome": "not_met", "blockers": [
+            {"need": "Who set the $60m EV and on what EBITDA base.", "kind": "data_missing"},
+            {"need": "Whether Northbridge pursues at all.", "kind": "needs_decision"},
+        ]},
+        HARBOR_ROUND, [], record=HARBOR_RECORD,
+    )
+    assert [b.need for b in a.blockers] == ["Whether Northbridge pursues at all."]
+    assert a.limitations[0].item == "Who set the $60m EV and on what EBITDA base."
+    assert a.limitations[0].allowed_by == "Missing diligence evidence may remain as limitations in the package."
+
+
+def test_without_an_allowance_missing_evidence_stays_a_blocker():
+    a = parse_assessment(
+        {"outcome": "not_met", "blockers": [{"need": "Who set the $60m EV.", "kind": "data_missing"}],
+         "limitations": [{"item": "The union contract terms.", "allowed_by": "gaps may remain"}]},
+        HARBOR_ROUND, [], record="Prepare a screening package.",
+    )
+    assert [b.need for b in a.blockers] == ["Who set the $60m EV.", "The union contract terms."]
+    assert a.limitations == []
+
+
+def test_a_round_check_does_not_hold_the_later_stage_against_the_round():
+    a = parse_assessment(
+        {"outcome": "not_met", "reason": "No IC memo is produced; the Screening package stage has not been reached.",
+         "criteria": [
+             {"requirement": "Concise investment-committee memo", "verdict": "not_met", "basis": "No IC memo is produced; the Screening package stage has not been reached."},
+         ],
+         "blockers": [{"need": "The Screening package stage must be run.", "kind": "needs_decision"}]},
+        HARBOR_ROUND, [], later_stage="Screening package",
+    )
+    assert a.blockers == [] and a.unmet == []
+    assert a.criteria[0].verdict == "not_checked"
+    assert a.ready_for_later_stage is True
+    assert a.reason == "Nothing in this work is left for you: Screening package writes the deliverable next."
+
+
+def test_a_round_check_with_a_real_gap_is_not_ready():
+    a = parse_assessment(
+        {"outcome": "not_met", "criteria": [{"requirement": "Every figure traces to a source", "verdict": "not_met", "basis": "EBITDA 7.0 has no source."}]},
+        HARBOR_ROUND, [], later_stage="Screening package",
+    )
+    assert a.ready_for_later_stage is False
+
+
+def test_the_round_check_prompt_names_saved_versions_history_and_the_later_stage():
+    system, user = build_assessment_prompt(
+        _inputs(), "the round that ended at Update round", HARBOR_ROUND, [],
+        history=["Check v18 f4: [accepted] Use one rounding convention: one decimal place throughout."],
+        known_versions={"Check": 22}, later_stage="Screening package",
+    )
+    assert "SAVED VERSIONS IN THIS PROJECT (every one of them is in the project): Check v1–v22." in user
+    assert "Check v18 f4: [accepted] Use one rounding convention" in user
+    assert 'THIS IS A ROUND CHECK, NOT THE FINAL ONE' in user and '"Screening package"' in user
+    assert '"limitations"' in user
+    assert "list it under \"limitations\"" in system
+
+
+def test_the_router_passes_history_versions_and_the_later_stage():
+    stub = AsyncMock()
+    stub.generate_json.return_value = ({"outcome": "not_met", "reason": "The Screening package stage has not been reached.", "blockers": [{"need": "Check v18 is not in the project.", "kind": "data_missing"}]}, None)
+    app.dependency_overrides[get_client] = lambda: stub
+    try:
+        r = TestClient(app).post("/api/agent/assess-objective", json={
+            "inputs": _inputs().model_dump(), "deliverable_label": "Round", "content": HARBOR_ROUND, "steps": [],
+            "history": ["Check v18 f4: [accepted] One decimal place."], "known_versions": {"Check": 22}, "later_stage": "Screening package",
+        })
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["blockers"] == [] and body["ready_for_later_stage"] is True
+        prompt = stub.generate_json.call_args.kwargs["prompt"]
+        assert "Check v18 f4: [accepted] One decimal place." in prompt and "Check v1–v22" in prompt
+    finally:
+        app.dependency_overrides.pop(get_client, None)
+
+
+def test_a_round_check_that_names_nothing_is_not_ready_for_the_later_stage():
+    a = parse_assessment({"outcome": "not_met", "reason": "Mock: not there yet.", "blockers": []}, HARBOR_ROUND, [], later_stage="Write-up")
+    assert a.ready_for_later_stage is False

@@ -153,3 +153,41 @@ test('when a round meets the objective, Go does not start another: it moves on t
   expect(judged.payload.outcome).toBe('met');
 });
 
+// 19 Oct (HARBOR): the round check said "not met" only because the package
+// stage after the round had not run, so another round followed every time.
+test('a round whose only gap is the stage after it moves on at once', async ({ page }) => {
+  test.setTimeout(240_000);
+  const designer = await openDesigner(page, 'Continue investigating the Regge Hessian until a supported result [[mock:plan=advance_stage,advance_stage,advance_stage]] [[mock:objective=later]]');
+  await designer.getByLabel('What kind of work is this?').fill('research [[mock:ongoing]]');
+  await designer.getByRole('button', { name: 'Design it' }).click();
+  await expect(designer.getByLabel('Finite or ongoing')).toHaveValue('ongoing', { timeout: 30_000 });
+  const name = `Open research ${Date.now()}`;
+  await designer.getByLabel('Name', { exact: true }).fill(name);
+  await designer.getByRole('button', { name: 'Use this workflow' }).click();
+  await expect(page.getByRole('radio', { name: new RegExp(`^${name}`) })).toHaveAttribute('aria-checked', 'true', { timeout: 15_000 });
+  await page.getByLabel('Project name').fill('E2E round ready');
+  await page.getByRole('button', { name: /^Start / }).click();
+  await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}$/);
+  const id = page.url().split('/').at(-1)!;
+  await expect(page.getByText('Mock output').first()).toBeVisible({ timeout: 30_000 });
+
+  const panel = page.getByRole('region', { name: 'Go mode' });
+  await panel.getByRole('button', { name: 'Set up Go' }).click();
+  await panel.getByRole('radio', { name: /^Handle them for me/ }).click();
+  await expect.poll(async () => (await serviceSelect('projects', `id=eq.${id}&select=routine_decisions`))[0].routine_decisions).toBe('handle');
+  await panel.getByRole('radio', { name: /^Autonomous/ }).click();
+  await panel.getByLabel('Step budget').selectOption('12');
+  await panel.getByRole('button', { name: /^Go$/ }).click();
+
+  const moved = async () =>
+    (await serviceSelect('workflow_events', `project_id=eq.${id}&stage_id=eq.next_round&to_stage_id=eq.research_log&select=type,actor,reason`))
+      .filter((e: { type: string }) => e.type === 'stage_marked_complete' || e.type === 'stage_advanced');
+  await expect.poll(async () => (await moved()).length, { timeout: 180_000 }).toBeGreaterThan(0);
+  const [move] = await moved();
+  expect(move.actor).toBe('system');
+  expect(move.reason).toContain('Nothing in this work is left for you');
+  expect(await serviceSelect('workflow_events', `project_id=eq.${id}&type=eq.stage_returned&select=id`)).toEqual([]);
+  const [judged] = await serviceSelect('workflow_events', `project_id=eq.${id}&type=eq.objective_assessed&select=payload&order=seq&limit=1`);
+  expect(judged.payload.ready_for_later_stage).toBe(true);
+  await page.screenshot({ path: test.info().outputPath('06-round-ready-moves-on.png'), fullPage: true });
+});

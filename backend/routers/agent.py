@@ -298,6 +298,12 @@ class AssessObjectiveRequest(BaseModel):
     failed_checks: list[str] = Field(default_factory=list, max_length=30)
     #: Requirements code measured and found met, with the count (11 Oct).
     measured: list[str] = Field(default_factory=list, max_length=30)
+    #: Earlier versions the deliverable names ("Check v18"), with their rows' decisions (19 Oct, HARBOR).
+    history: list[str] = Field(default_factory=list, max_length=60)
+    #: Each stage's label and how many versions it has saved.
+    known_versions: dict[str, int] = Field(default_factory=dict, max_length=60)
+    #: A round check: the stage that writes the deliverable next.
+    later_stage: str = Field(default="", max_length=200)
     model: str = ""
 
 
@@ -321,6 +327,9 @@ async def api_assess_objective(req: AssessObjectiveRequest, client: OpenRouterCl
             client, req.model or None, req.inputs, req.deliverable_label, req.content, req.steps, req.success_criterion,
             [_line(c) for c in req.failed_checks if c.strip()],
             [_line(m) for m in req.measured if m.strip()],
+            [h[:4_000] for h in req.history if h.strip()],
+            req.known_versions,
+            req.later_stage,
         )
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)

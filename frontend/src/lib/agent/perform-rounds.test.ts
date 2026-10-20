@@ -66,4 +66,22 @@ describe('Go and the rounds of ongoing work', () => {
     const types = appendWorkflowEvent.mock.calls.map((c) => (c[2] as { type: string }).type);
     expect(types).toContain('stage_returned');
   });
+
+  // 19 Oct (HARBOR): the round check said "not met" only because the package
+  // stage after the round had not run yet.
+  it('a round whose only gap is the stage after it moves on at once, with the check told which stage that is', async () => {
+    agentAssessObjective.mockResolvedValue({
+      outcome: 'not_met', reason: 'Nothing in this work is left for you: Write-up writes the deliverable next.', basis_quote: '',
+      blockers: [], performed: [], proposed_next: [], ready_for_later_stage: true,
+    });
+    const out = await performStep(ctx([]));
+    const next = EXPLORATION_V1.stages.find((s) => s.id === stage.transitions.default_next)!;
+    expect(agentAssessObjective.mock.calls[0][0]).toMatchObject({ later_stage: next.label, known_versions: { [stage.short_label]: 3 } });
+    const types = appendWorkflowEvent.mock.calls.map((c) => (c[2] as { type: string }).type);
+    expect(types[0]).toBe('objective_assessed');
+    expect(['stage_marked_complete', 'stage_advanced']).toContain(types[1]);
+    expect(types).not.toContain('stage_returned');
+    expect(out.output).toContain(`Moving on to ${next.label} instead of another round.`);
+  });
 });
+
