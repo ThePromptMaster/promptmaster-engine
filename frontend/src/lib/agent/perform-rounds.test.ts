@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const appendWorkflowEvent = vi.fn(async (..._args: unknown[]) => undefined);
+const appendWorkflowEvent = vi.fn<(...args: unknown[]) => Promise<undefined>>(async () => undefined);
 const agentAssessObjective = vi.fn();
 vi.mock('@/lib/supabase/workflow', () => ({ appendWorkflowEvent: (...a: unknown[]) => appendWorkflowEvent(...a), listWorkflowEvents: vi.fn() }));
 vi.mock('@/lib/api/client', () => ({ api: { agentAssessObjective: (...a: unknown[]) => agentAssessObjective(...a) } }));
