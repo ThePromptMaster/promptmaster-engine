@@ -642,7 +642,7 @@ function RevisionPanel({
   return (
     <Panel>
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-[1_1_16rem]">
           <p className="text-label text-[var(--on-surface-variant)]">{revise.stageLabel}</p>
           <p className="mt-1 text-body text-[var(--on-surface)]">
             {revised > 0

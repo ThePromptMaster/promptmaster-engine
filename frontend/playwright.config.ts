@@ -33,7 +33,16 @@ export default defineConfig({
     { name: 'setup', testMatch: /auth\.setup\.ts/ },
     {
       name: 'chromium',
+      testIgnore: /mobile-.*\.spec\.ts/,
       use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 }, storageState: 'e2e/.auth/state.json' },
+      dependencies: ['setup'],
+    },
+    // A phone's width (20 Oct, Sean: the pause card was one word wide on an iPhone).
+    // Chromium at an iPhone's size: CI installs only Chromium.
+    {
+      name: 'mobile',
+      testMatch: /mobile-.*\.spec\.ts/,
+      use: { ...devices['Desktop Chrome'], viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 3, storageState: 'e2e/.auth/state.json' },
       dependencies: ['setup'],
     },
   ],
