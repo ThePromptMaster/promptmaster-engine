@@ -71,3 +71,20 @@ describe('one blocker said once, and gone when resolved (13 Oct, Sean, workshop)
     }
   });
 });
+
+describe('a round check read back from the log (20 Oct, prod pass)', () => {
+  const round = (extra: Record<string, unknown>): WorkflowEvent => ({
+    type: 'objective_assessed', stage_id: 'next_round', actor: 'system', created_at: '1',
+    payload: { outcome: 'not_met', reason: 'Nothing in this work is left for you.', basis_quote: '', blockers: [], performed: [], proposed_next: [], ...extra },
+  });
+
+  it('keeps the limitations it carried, for the pause card', () => {
+    const lim = [{ item: 'No legal invoices', allowed_by: 'Record missing evidence as limitations.' }];
+    expect(latestObjectiveAssessment([round({ limitations: lim })])?.limitations).toEqual(lim);
+    expect(objectiveUnmet([round({ limitations: lim })])?.limitations).toEqual(lim);
+  });
+
+  it('is not a pause when the round was ready for the stage that writes the deliverable', () => {
+    expect(objectiveUnmet([round({ ready_for_later_stage: true })])).toBeNull();
+  });
+});
