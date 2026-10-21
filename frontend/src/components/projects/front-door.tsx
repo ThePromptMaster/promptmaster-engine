@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 import { api } from '@/lib/api/client';
 import { AutoGrowTextarea } from '@/components/shared/auto-grow-textarea';
@@ -19,55 +19,91 @@ export interface DraftBrief {
 
 export const EMPTY_BRIEF: DraftBrief = { objective: '', audience: '', requirements: [], evidence: [], deliverables: [], stages: [], approvals: [] };
 
+/** The outline's parts, as the backend names them. */
+export type BriefField = keyof DraftBrief;
+
 /** A turn; an assistant turn may carry a piece of writing to use as it stands (10 Oct, email 1). */
 export type Turn = { role: 'user' | 'assistant'; content: string; draft?: string };
 
+export interface FrontDoorState {
+  turns: Turn[];
+  brief: DraftBrief;
+  ready: boolean;
+  /** Parts of the outline the user edited: kept as they wrote them (14 Oct call). */
+  edited?: BriefField[];
+}
+
+const LISTS: { field: Exclude<BriefField, 'objective' | 'audience'>; title: string; add: string }[] = [
+  { field: 'requirements', title: 'Requirements', add: 'Add a requirement' },
+  { field: 'evidence', title: 'Facts you gave', add: 'Add a fact' },
+  { field: 'deliverables', title: 'Deliverables', add: 'Add a deliverable' },
+  { field: 'stages', title: 'Stages', add: 'Add a stage' },
+  { field: 'approvals', title: 'Your approvals', add: 'Add an approval' },
+];
+
 /**
- * "Keep this as a conversation for now" (Sean, 6 Oct, email 8). The user talks;
- * PromptMaster answers, asks at most one question at a time, and keeps a
- * visible draft brief of what the user has said. Nothing is saved: when the
- * user is ready, the brief is shown as what will become the project's initial
- * authoritative state, and only their confirmation carries it on.
+ * The start of every project: a conversation, with an outline beside it.
+ *
+ * "Keep this as a conversation for now" (Sean, 6 Oct, email 8) was one of
+ * three ways in, hidden in the advanced setup. On the 14 Oct call Sean asked
+ * for it to be the way in: "they just start off like they normally would …
+ * and if it has an outline on the side … then they can shift over to more of
+ * a project level." So the first message is sent as soon as the user starts,
+ * the outline beside the chat can be edited directly (a part the user edits
+ * is theirs — the backend keeps it as written), and one button turns it into
+ * a project. Nothing is saved as project state until that button.
  */
 export function FrontDoor({
   opening,
   onReady,
+  onReview,
   onBack,
   initialState = null,
   onStateChange,
+  material = '',
+  attach,
+  busyLabel,
 }: {
   opening: string;
   /** `said`: the user's own turns, to tell what they said from what the brief's drafter assumed. */
-  onReady: (brief: DraftBrief, transcript: string, said: string) => void;
+  onReady: (brief: DraftBrief, transcript: string, said: string, turns: Turn[]) => void;
+  /** The same brief, to the full setup screen first. */
+  onReview?: (brief: DraftBrief, transcript: string, said: string, turns: Turn[]) => void;
   onBack: () => void;
   /** A conversation kept from an earlier visit (U2). */
-  initialState?: { turns: Turn[]; brief: DraftBrief; ready: boolean } | null;
+  initialState?: FrontDoorState | null;
   /** Told of every change, so the page can keep the setup between visits. */
-  onStateChange?: (state: { turns: Turn[]; brief: DraftBrief; ready: boolean }) => void;
+  onStateChange?: (state: FrontDoorState) => void;
+  /** The words of what the user attached, read with every turn. */
+  material?: string;
+  /** The attach control, in the composer. */
+  attach?: ReactNode;
+  /** Set while the page is making the project: the button says so and nothing else can be pressed. */
+  busyLabel?: string | null;
 }) {
   const [turns, setTurns] = useState<Turn[]>(initialState?.turns ?? []);
   const [brief, setBrief] = useState<DraftBrief>(initialState?.brief ?? EMPTY_BRIEF);
   const [ready, setReady] = useState(initialState?.ready ?? false);
+  const [edited, setEdited] = useState<BriefField[]>(initialState?.edited ?? []);
   useEffect(() => {
-    onStateChange?.({ turns, brief, ready });
-  }, [turns, brief, ready, onStateChange]);
-  const [draft, setDraft] = useState(initialState?.turns.length ? '' : opening);
+    onStateChange?.({ turns, brief, ready, edited });
+  }, [turns, brief, ready, edited, onStateChange]);
+  const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [confirming, setConfirming] = useState(false);
 
-  const send = async () => {
-    const text = draft.trim();
+  const send = async (given?: string) => {
+    const text = (given ?? draft).trim();
     if (!text || busy) return;
     const next: Turn[] = [...turns, { role: 'user', content: text }];
     setTurns(next);
-    setDraft('');
+    if (given === undefined) setDraft('');
     setBusy(true);
     setError(null);
     try {
       // The model reads back its own drafts with the conversation.
       const sent = next.map((t) => ({ role: t.role, content: t.draft ? `${t.content}\n\nDRAFT YOU WROTE:\n${t.draft}` : t.content }));
-      const res = await api.frontDoor({ turns: sent, brief });
+      const res = await api.frontDoor({ turns: sent, brief, edited, ...(material.trim() ? { material } : {}) });
       setTurns([...next, { role: 'assistant', content: res.reply, ...(res.draft?.trim() ? { draft: res.draft.trim() } : {}) }]);
       setBrief(res.brief);
       setReady(res.ready);
@@ -78,25 +114,38 @@ export function FrontDoor({
     }
   };
 
+  // The first message is what the user typed to start: sent at once, as a
+  // chat would, not left in the box for a second press.
+  const opened = useRef(false);
+  useEffect(() => {
+    if (opened.current || turns.length || !opening.trim()) return;
+    opened.current = true;
+    void send(opening);
+    // Once, on arrival.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const edit = (field: BriefField, value: string | string[]) => {
+    setBrief((b) => ({ ...b, [field]: value }));
+    setEdited((e) => (e.includes(field) ? e : [...e, field]));
+  };
+
   const transcript = turns.map((t) => `${t.role === 'user' ? 'Me' : 'PromptMaster'}: ${t.content}`).join('\n\n');
-  const section = (title: string, items: string[]) =>
-    items.length ? (
-      <div className="mt-2">
-        <p className="text-label font-semibold text-[var(--on-surface)]">{title}</p>
-        <ul className="list-disc pl-5 text-label text-[var(--on-surface-variant)]">
-          {items.map((i) => <li key={i}>{i}</li>)}
-        </ul>
-      </div>
-    ) : null;
+  // What the user typed into the outline is theirs as much as what they said:
+  // a requirement added there is never recorded as PromptMaster's assumption.
+  const said = [
+    ...turns.filter((t) => t.role === 'user').map((t) => t.content),
+    ...edited.flatMap((f) => (Array.isArray(brief[f]) ? (brief[f] as string[]) : [brief[f] as string])),
+  ].join('\n');
+  const making = Boolean(busyLabel);
 
   return (
     <div className="grid gap-6 md:grid-cols-[1fr_300px]">
       <section aria-label="Conversation" className="rounded-2xl bg-[var(--surface-container-lowest)] px-5 py-4">
         <div className="space-y-3">
-          {turns.length === 0 && (
+          {turns.length === 0 && !busy && (
             <p className="text-body text-[var(--on-surface-variant)]">
-              Say what you have in mind. The conversation is kept as a draft you can come back to; no project
-              exists until you press Start.
+              Say what you have in mind, as you would in any chat. The outline beside it builds up as you talk.
             </p>
           )}
           {turns.map((t, i) =>
@@ -129,56 +178,115 @@ export function FrontDoor({
             aria-label="Your message"
             className="min-w-0 flex-1 resize-none rounded-lg bg-[var(--surface-container-low)] px-3 py-2 text-body text-[var(--on-surface)] outline-none focus:ring-2 focus:ring-[var(--pm-primary)]/40"
           />
-          <button onClick={() => void send()} disabled={!draft.trim() || busy} className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label text-[var(--on-primary)] disabled:opacity-40">
+          <button onClick={() => void send()} disabled={!draft.trim() || busy || making} className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label text-[var(--on-primary)] disabled:opacity-40">
             Send
           </button>
         </div>
+        {attach && <div className="mt-2">{attach}</div>}
         {error && <p role="alert" className="mt-2 text-label text-[var(--pm-error)]">{error}</p>}
         <button onClick={onBack} className="mt-4 text-label text-[var(--on-surface-variant)] hover:underline">Back</button>
       </section>
 
       <aside aria-label="Draft brief" className="h-fit rounded-2xl bg-[var(--surface-container-low)] px-5 py-4">
-        <p className="text-label uppercase tracking-wider text-[var(--on-surface-variant)]">Draft brief — not a project yet</p>
-        <p className="mt-1 text-label text-[var(--on-surface-variant)]">Kept with your setup draft. It becomes the project&apos;s record only when you press Start.</p>
-        {brief.objective ? (
-          <p className="mt-2 text-body text-[var(--on-surface)]">{brief.objective}</p>
-        ) : (
-          <p className="mt-2 text-label text-[var(--on-surface-variant)]">Builds up as you talk.</p>
-        )}
-        {brief.audience && <p className="mt-1 text-label text-[var(--on-surface-variant)]">For {brief.audience}</p>}
-        {section('Requirements', brief.requirements)}
-        {section('Facts you gave', brief.evidence)}
-        {section('Deliverables', brief.deliverables)}
-        {section('Stages', brief.stages)}
-        {section('Your approvals', brief.approvals)}
+        <p className="text-label uppercase tracking-wider text-[var(--on-surface-variant)]">Outline — not a project yet</p>
+        <p className="mt-1 text-label text-[var(--on-surface-variant)]">Builds up as you talk. Change anything here; what you change stays as you wrote it.</p>
 
-        {brief.objective && !confirming && (
-          <button
-            onClick={() => setConfirming(true)}
-            className={`mt-4 w-full rounded-lg px-4 py-2 text-label ${ready ? 'bg-[var(--pm-primary)] text-[var(--on-primary)]' : 'bg-[var(--surface-container-high)] text-[var(--on-surface)]'}`}
-          >
-            {ready ? 'Ready to create' : 'Create from this now'}
-          </button>
-        )}
-        {confirming && (
-          <div role="group" aria-label="Confirm the brief" className="mt-4 rounded-lg bg-[var(--surface-container-lowest)] px-3 py-3">
-            <p className="text-label text-[var(--on-surface)]">
-              I&apos;m ready to create this project. These facts, requirements and decisions will become its initial authoritative state.
+        <label className="mt-3 block text-label font-semibold text-[var(--on-surface)]" htmlFor="outline-objective">Objective</label>
+        <AutoGrowTextarea
+          id="outline-objective"
+          value={brief.objective}
+          onChange={(e) => edit('objective', e.target.value.slice(0, INPUT_LIMITS.objective))}
+          rows={2}
+          placeholder="What you want done"
+          className="mt-1 w-full resize-none rounded-lg bg-[var(--surface-container-lowest)] px-2.5 py-1.5 text-body text-[var(--on-surface)] outline-none focus:ring-2 focus:ring-[var(--pm-primary)]/40"
+        />
+        <label className="mt-2 block text-label font-semibold text-[var(--on-surface)]" htmlFor="outline-audience">For</label>
+        <input
+          id="outline-audience"
+          value={brief.audience}
+          onChange={(e) => edit('audience', e.target.value.slice(0, 1000))}
+          placeholder="Who it is for"
+          className="mt-1 w-full rounded-lg bg-[var(--surface-container-lowest)] px-2.5 py-1.5 text-label text-[var(--on-surface)] outline-none focus:ring-2 focus:ring-[var(--pm-primary)]/40"
+        />
+        {LISTS.map(({ field, title, add }) => (
+          <OutlineList key={field} title={title} addLabel={add} items={brief[field]} onChange={(items) => edit(field, items)} />
+        ))}
+
+        {brief.objective.trim() && (
+          <>
+            <button
+              onClick={() => onReady(brief, transcript, said, turns)}
+              disabled={busy || making}
+              className={`mt-4 w-full rounded-lg px-4 py-2 text-label font-semibold disabled:opacity-60 ${ready ? 'bg-[var(--pm-primary)] text-[var(--on-primary)]' : 'bg-[var(--surface-container-high)] text-[var(--on-surface)]'}`}
+            >
+              {busyLabel ?? 'Make it a project'}
+            </button>
+            <p className="mt-1.5 text-label text-[var(--on-surface-variant)]">
+              {ready ? 'There is enough to set it up. ' : ''}The requirements and facts here become the project&apos;s starting record, and this conversation comes with it. All of it stays editable.
             </p>
-            <p className="mt-1 text-label text-[var(--on-surface-variant)]">
-              Next you choose the workflow and can still change everything. Pressing Start there creates the project.
-            </p>
-            <div className="mt-2 flex gap-2">
-              <button onClick={() => onReady(brief, transcript, turns.filter((t) => t.role === 'user').map((t) => t.content).join('\n'))} className="rounded-lg bg-[var(--pm-primary)] px-3 py-1.5 text-label text-[var(--on-primary)]">
-                Use this brief
+            {onReview && (
+              <button
+                onClick={() => onReview(brief, transcript, said, turns)}
+                disabled={busy || making}
+                className="mt-2 text-label text-[var(--on-surface-variant)] underline-offset-4 hover:underline disabled:opacity-60"
+              >
+                Review the setup first
               </button>
-              <button onClick={() => setConfirming(false)} className="rounded-lg px-3 py-1.5 text-label text-[var(--on-surface-variant)]">
-                Keep talking
-              </button>
-            </div>
-          </div>
+            )}
+          </>
         )}
       </aside>
+    </div>
+  );
+}
+
+/** One list in the outline: each item editable in place, removable, and one more to add. */
+function OutlineList({ title, addLabel, items, onChange }: { title: string; addLabel: string; items: string[]; onChange: (items: string[]) => void }) {
+  const [adding, setAdding] = useState('');
+  const add = () => {
+    const text = adding.trim();
+    if (!text) return;
+    if (!items.includes(text)) onChange([...items, text]);
+    setAdding('');
+  };
+  return (
+    <div className="mt-3">
+      <p className="text-label font-semibold text-[var(--on-surface)]">{title}</p>
+      <ul className="mt-1 space-y-1">
+        {items.map((item, i) => (
+          <li key={i} className="flex items-start gap-1">
+            <input
+              aria-label={`${title} ${i + 1}`}
+              value={item}
+              onChange={(e) => onChange(items.map((x, j) => (j === i ? e.target.value.slice(0, 600) : x)))}
+              onBlur={() => !items[i].trim() && onChange(items.filter((_, j) => j !== i))}
+              className="min-w-0 flex-1 rounded-md bg-transparent px-1.5 py-0.5 text-label text-[var(--on-surface-variant)] outline-none hover:bg-[var(--surface-container-lowest)] focus:bg-[var(--surface-container-lowest)] focus:ring-1 focus:ring-[var(--pm-primary)]/40"
+            />
+            <button
+              type="button"
+              aria-label={`Remove: ${item}`}
+              onClick={() => onChange(items.filter((_, j) => j !== i))}
+              className="rounded p-0.5 text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)]"
+            >
+              <span aria-hidden className="material-symbols-outlined text-[14px]">close</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      <input
+        aria-label={addLabel}
+        value={adding}
+        onChange={(e) => setAdding(e.target.value.slice(0, 600))}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            add();
+          }
+        }}
+        onBlur={add}
+        placeholder={`+ ${addLabel.toLowerCase()}`}
+        className="mt-1 w-full rounded-md bg-transparent px-1.5 py-0.5 text-label text-[var(--on-surface)] outline-none placeholder:text-[var(--outline)] focus:bg-[var(--surface-container-lowest)] focus:ring-1 focus:ring-[var(--pm-primary)]/40"
+      />
     </div>
   );
 }

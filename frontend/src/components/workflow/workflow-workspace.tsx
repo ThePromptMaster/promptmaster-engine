@@ -84,6 +84,7 @@ import { RefusedRevisions, refusedSince } from './refused-revisions';
 import { BriefChangeNotice } from './brief-change-notice';
 import { PendingChangeNotice } from './pending-change-notice';
 import { NextActionBar } from './next-action-bar';
+import { ProjectTimeline } from './project-timeline';
 import { accentVariables } from '@/lib/appearance/colours';
 import { nextAction } from '@/lib/workflow/next-step';
 import { holdPendingChange, pendingChanges, settlePendingChange, type PendingChange } from '@/lib/workflow/conflict-trail';
@@ -354,8 +355,9 @@ export function WorkflowWorkspace({
   const stageBundles = useMemo(() => bundles ?? {}, [bundles]);
 
   // Viewing resets per stage: a version pill selected on one stage means
-  // nothing on the next.
-  useEffect(() => setActiveVersionId(null), [stageId]);
+  // nothing on the next — unless the timeline asked for a version there.
+  const openVersionRef = useRef<string | null>(null);
+  useEffect(() => setActiveVersionId(openVersionRef.current), [stageId]);
 
   const generation = useStageGeneration({
     project,
@@ -523,7 +525,11 @@ export function WorkflowWorkspace({
   // A new version on this stage is what the page shows next, not an older
   // pill left selected (13 Oct, Sean's PINE pack: Go read the new 98-word
   // version while the page still showed the 159-word one).
-  useEffect(() => setActiveVersionId(null), [headVersion?.id]);
+  // The stage's head changes with the stage too: a version the timeline asked for is shown, once.
+  useEffect(() => {
+    setActiveVersionId(openVersionRef.current);
+    openVersionRef.current = null;
+  }, [headVersion?.id]);
   const shownEvaluation = evaluations?.[activeVersionId ?? headVersion?.id ?? ''];
 
   // A stage's unsaved edits belong to that stage.
@@ -1931,6 +1937,20 @@ export function WorkflowWorkspace({
               a property of the project, not of whichever stage happens to be
               open, and burying it in a stage would make it look like one. */}
           <div className="mb-3 flex flex-wrap justify-end gap-2">
+            <ProjectTimeline
+              template={template}
+              events={events ?? []}
+              stages={stageBundles}
+              onOpen={(id, versionId) => {
+                const target = id === state.current_stage_id ? null : id;
+                if (target === viewingStageId) setActiveVersionId(versionId);
+                else {
+                  openVersionRef.current = versionId;
+                  setViewingStageId(target);
+                }
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+            />
             <FullDocumentReader
               bundle={{ project, template, state, events: events ?? [], stages: bundles ?? {}, evaluations: evaluations ?? {} }}
             />
