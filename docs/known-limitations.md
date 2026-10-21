@@ -1940,10 +1940,12 @@ didn't feel like that button was working sometimes"):
   in the reader until the deliverable is updated. The reader now says so, naming both stages
   (`readerLag`). It does not merge stages into one document. A manuscript is the exception: it
   is read from its sections, so every chapter edit appears at once.
-- **Apply and continue authorizes a Checkpoint run.** Under Guided, the press used to propose one
-  step and wait, so it looked dead. It now starts Checkpoint, recorded as an authorization like
-  pressing Go with Checkpoint chosen. Approvals and important moves still stop it. A user who
-  wants Guided can press Go in the Go panel instead.
+- **Apply and continue authorizes an Autonomous run.** Under Guided, the press used to propose one
+  step and wait, so it looked dead; under Checkpoint it stopped on the recheck itself, an
+  important move. It now starts Autonomous, recorded as an authorization like pressing Go with
+  Autonomous chosen, and leaves the Go panel on Autonomous. Reserved approvals and questions only
+  the user can answer still stop it. A user who wants Guided or Checkpoint presses Go in the Go
+  panel instead.
 - **"Nothing else needs updating" covers finished stages only.** After an applied revision, the
   note lists the later stages a change left waiting. Stages not yet written are not listed: they
   read the new version when they are drafted.
