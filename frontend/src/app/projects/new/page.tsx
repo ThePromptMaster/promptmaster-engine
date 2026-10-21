@@ -9,7 +9,8 @@ import { useAuth } from '@/hooks/use-auth';
 import { GuideInterview } from '@/components/projects/guide-interview';
 import { DOES_THE_WORK, SetupCard, type SetupDraft } from '@/components/projects/setup-card';
 import { CustomWorkflowDesigner } from '@/components/projects/custom-workflow-designer';
-import { FrontDoor, type DraftBrief } from '@/components/projects/front-door';
+import { FrontDoor, type DraftBrief, type Turn } from '@/components/projects/front-door';
+import { saveStageChatMessage } from '@/lib/supabase/conversation';
 import { DraftStatus, type DraftSaveState } from '@/components/projects/draft-status';
 import { recordFacts, type NewFact } from '@/lib/supabase/facts';
 import { assumedByModel } from '@/lib/workflow/facts';
@@ -80,6 +81,8 @@ export default function NewProjectPage() {
    * confirmed: recorded as the project's accepted facts when it is created.
    */
   const [initialFacts, setInitialFacts] = useState<NewFact[]>([]);
+  /** The conversation the project starts from, kept as its first stage's chat. */
+  const [openingChat, setOpeningChat] = useState<Turn[]>([]);
   /** A saved workflow being edited as a copy. */
   const [copying, setCopying] = useState<(WorkflowTemplate & { id: string }) | null>(null);
   const [recommendedKey, setRecommendedKey] = useState<string | null>(null);
@@ -200,6 +203,10 @@ export default function NewProjectPage() {
 
   const templateFor = (key: string) => templates.find((t) => t.key === key) ?? null;
   const selected = templates.find((t) => t.id === templateId) ?? null;
+  // The setup screen's own values, under names `create` can tell from what it is given.
+  const selectedTemplate = selected;
+  const setupDraft = draft;
+  const factsSoFar = initialFacts;
 
   // The list arrived after the setup was recommended (a retry): select what
   // was recommended, so the user is not left to find it again.
@@ -212,34 +219,41 @@ export default function NewProjectPage() {
   }
   const hasObjective = objective.trim().length > 0;
 
+  /** A recommended setup for the ask (or the conversation's brief), without applying it. */
+  async function suggestSetup(given?: { question: string; answer: string }[], from?: { objective: string; material: string; audience?: string }) {
+    const ask = from?.objective ?? objective;
+    const brought = [material, from?.material ?? ''].filter(Boolean).join('\n\n');
+    const { suggestion } = await api.generateSetup({
+      objective: ask.trim(),
+      answers: given?.length ? given.slice(0, 8) : undefined,
+      ...(brought ? { material: brought } : {}),
+    });
+    const recommended = templateFor(suggestion.workflow) ?? templateFor('single_output');
+    const split = withDocuments(ask);
+    const suggested: SetupDraft = {
+      title: titleFrom(ask),
+      objective: split.objective,
+      context: split.context,
+      // The audience the user stated in the conversation is theirs; a preset
+      // the suggester picked ("Student" for an eleven-year-old) is not (12 Oct, Colette).
+      audience: from?.audience?.trim() || suggestion.audience || 'General',
+      constraints: suggestion.constraints,
+      output_format: suggestion.output_format,
+      mode: suggestion.mode,
+    };
+    return { suggestion, recommended, draft: suggested };
+  }
+
   async function recommend(given?: { question: string; answer: string }[], from?: { objective: string; material: string; audience?: string }) {
     setWorking('setup');
     setError(null);
-    const ask = from?.objective ?? objective;
-    const brought = [material, from?.material ?? ''].filter(Boolean).join('\n\n');
     try {
-      const { suggestion } = await api.generateSetup({
-        objective: ask.trim(),
-        answers: given?.length ? given.slice(0, 8) : undefined,
-        ...(brought ? { material: brought } : {}),
-      });
-      const recommended = templateFor(suggestion.workflow) ?? templateFor('single_output');
+      const { suggestion, recommended, draft: suggested } = await suggestSetup(given, from);
       setTemplateId(recommended?.id ?? null);
       setRecommendedKey(suggestion.workflow);
       setWorkflowReason(suggestion.workflow_reason);
       setRationale(suggestion.rationale);
-      const split = withDocuments(ask);
-      setDraft({
-        title: titleFrom(ask),
-        objective: split.objective,
-        context: split.context,
-        // The audience the user stated in the conversation is theirs; a preset
-        // the suggester picked ("Student" for an eleven-year-old) is not (12 Oct, Colette).
-        audience: from?.audience?.trim() || suggestion.audience || 'General',
-        constraints: suggestion.constraints,
-        output_format: suggestion.output_format,
-        mode: suggestion.mode,
-      });
+      setDraft(suggested);
       setStep('setup');
     } catch (e) {
       setError(
@@ -250,27 +264,60 @@ export default function NewProjectPage() {
     }
   }
 
-  /** The front door confirmed: its brief becomes the setup, and its facts the initial record. */
-  function fromConversation(brief: DraftBrief, transcript: string, said: string) {
-    setObjective(brief.objective);
+  /** What the user gave in the conversation, as the project's initial record. */
+  function factsFromBrief(brief: DraftBrief, said: string): NewFact[] {
     // A point the brief lists as a requirement is not recorded again as a fact.
     const norm = (t: string) => t.toLowerCase().replace(/[^a-z0-9$%]+/g, ' ').trim();
     const required = new Set(brief.requirements.map(norm));
     // What the user did not say is recorded as PromptMaster's assumption (S2b, 18 Oct).
     const origin = (statement: string) => (assumedByModel(statement, said) ? 'model_assumed' as const : 'user_stated' as const);
-    setInitialFacts([
+    return [
       ...brief.requirements.map((statement) => ({ statement, kind: 'requirement' as const, source_kind: 'chat' as const, source_ref: { via: 'front door' }, origin: origin(statement) })),
       ...brief.evidence
         .filter((statement) => !required.has(norm(statement)))
         .map((statement) => ({ statement, kind: 'fact' as const, source_kind: 'chat' as const, source_ref: { via: 'front door' }, origin: origin(statement) })),
-    ]);
+    ];
+  }
+
+  /** The brief and the conversation, as material for the setup recommendation. */
+  function conversationMaterial(brief: DraftBrief, transcript: string): { objective: string; audience: string; material: string } {
     const lines = [
       brief.audience && `Audience: ${brief.audience}`,
       brief.deliverables.length && `Deliverables: ${brief.deliverables.join('; ')}`,
       brief.stages.length && `Stages discussed: ${brief.stages.join(' › ')}`,
       brief.approvals.length && `Approvals wanted: ${brief.approvals.join('; ')}`,
     ].filter(Boolean);
-    void recommend(undefined, { objective: brief.objective, audience: brief.audience, material: [lines.join('\n'), `The conversation:\n${transcript}`].filter(Boolean).join('\n\n') });
+    return { objective: brief.objective, audience: brief.audience, material: [lines.join('\n'), `The conversation:\n${transcript}`].filter(Boolean).join('\n\n') };
+  }
+
+  /** "Review the setup first": the brief becomes the setup screen, and its facts the initial record. */
+  function fromConversation(brief: DraftBrief, transcript: string, said: string, turns: Turn[]) {
+    setObjective(brief.objective);
+    setInitialFacts(factsFromBrief(brief, said));
+    setOpeningChat(turns);
+    void recommend(undefined, conversationMaterial(brief, transcript));
+  }
+
+  /**
+   * "Make it a project" (14 Oct call: start like a normal chat, then "shift
+   * over at one point to more of a project level"). One press: the setup is
+   * recommended from the conversation and the project made with it, the
+   * conversation coming along as the first stage's chat. The setup screen is
+   * still there under "Review the setup first".
+   */
+  async function makeFromConversation(brief: DraftBrief, transcript: string, said: string, turns: Turn[]) {
+    if (!user || working) return;
+    setWorking('setup');
+    setError(null);
+    try {
+      const { recommended, draft: suggested } = await suggestSetup(undefined, conversationMaterial(brief, transcript));
+      if (!recommended) throw new Error('No workflow is available');
+      setWorking(null);
+      await create({ template: recommended, draft: suggested, facts: factsFromBrief(brief, said), chat: turns });
+    } catch (e) {
+      setError(`Could not set the project up${e instanceof Error && e.message ? `: ${e.message}` : ''}. Try again, or review the setup first.`);
+      setWorking(null);
+    }
   }
 
   // The questions are asked one at a time, on their own screen (1 Oct, item 9).
@@ -288,8 +335,18 @@ export default function NewProjectPage() {
     setStep('setup');
   }
 
-  async function handleCreate() {
-    if (!user || !selected || working || createdWithFailures) return;
+  function handleCreate() {
+    if (working || createdWithFailures) return;
+    void create();
+  }
+
+  /** Make the project: from the setup screen, or with what the conversation produced. */
+  async function create(given?: { template: WorkflowTemplate & { id: string }; draft: SetupDraft; facts: NewFact[]; chat: Turn[] }) {
+    const selected = given?.template ?? selectedTemplate;
+    const draft = given?.draft ?? setupDraft;
+    const initialFacts = given?.facts ?? factsSoFar;
+    const chat = given?.chat ?? openingChat;
+    if (!user || !selected || createdWithFailures) return;
     setWorking('creating');
     setError(null);
     let createdId: string | null = null;
@@ -368,6 +425,21 @@ export default function NewProjectPage() {
 
       // What the user confirmed in the front door is the project's initial record.
       if (initialFacts.length) await recordFacts(project, initialFacts);
+      // The conversation it started from comes along, as the first stage's
+      // chat (14 Oct call): the user carries on talking where they were.
+      const firstStage = selected.stages[0]?.id;
+      if (firstStage) {
+        for (const t of chat) {
+          await saveStageChatMessage({
+            project_id: project.id,
+            stage_id: firstStage,
+            iteration_number: 0,
+            role: t.role,
+            content: t.draft ? `${t.content}\n\n${t.draft}` : t.content,
+            mode: 'discuss',
+          }).catch(() => undefined);
+        }
+      }
       await clearSetupDraft(user.id).catch(() => undefined);
       router.push(`/projects/${project.id}`);
     } catch (e) {
@@ -489,6 +561,13 @@ export default function NewProjectPage() {
               ref={goalBox}
               value={objective}
               onChange={(e) => setObjective(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && hasObjective && working === null) {
+                  e.preventDefault();
+                  setError(null);
+                  setStep('talk');
+                }
+              }}
               rows={3}
               autoFocus
               aria-label={simple ? 'What do you want done?' : 'What do you want to do or figure out?'}
@@ -512,37 +591,42 @@ export default function NewProjectPage() {
             )}
           </div>
 
-          <div className="mt-6 grid gap-3 sm:grid-cols-2">
+          {/* 14 Oct call: start as in any chat — the conversation is the way in,
+              with the outline beside it. The other ways stay, one row below. */}
+          <div className="mt-4 flex justify-end">
+            <button
+              onClick={() => { setError(null); setStep('talk'); }}
+              disabled={!hasObjective || working !== null}
+              className="inline-flex items-center gap-2 rounded-xl bg-[var(--pm-primary)] px-6 py-3 text-title text-[var(--on-primary)] transition-opacity hover:opacity-90 disabled:opacity-40"
+            >
+              Start the conversation
+              <span aria-hidden className="material-symbols-outlined text-[20px]">arrow_upward</span>
+            </button>
+          </div>
+          <p className="mt-2 text-right text-label text-[var(--on-surface-variant)]">
+            Chat as you normally would; an outline builds up beside it. It becomes a project when you say so.
+          </p>
+
+          <p className="mt-8 text-label uppercase tracking-wider text-[var(--on-surface-variant)]">Or skip the conversation</p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <button
               onClick={() => void recommend()}
               disabled={!hasObjective || working !== null}
-              className="rounded-2xl bg-[var(--pm-primary)] px-6 py-5 text-left text-[var(--on-primary)] transition-opacity hover:opacity-90 disabled:opacity-40"
+              className="rounded-2xl bg-[var(--surface-container-high)] px-6 py-4 text-left text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-highest)] disabled:opacity-40"
             >
               <span className="block text-title">{simple ? 'Set it up for me' : 'I know what I want to do'}</span>
-              <span className="mt-1 block text-label opacity-90">{simple ? 'One screen to check, then Start' : 'Recommend a setup from what I wrote'}</span>
+              <span className="mt-1 block text-label text-[var(--on-surface-variant)]">{simple ? 'One screen to check, then Start' : 'Recommend a setup from what I wrote'}</span>
             </button>
             <button
               onClick={() => void guideMe()}
               disabled={!hasObjective || working !== null}
-              className="rounded-2xl bg-[var(--surface-container-high)] px-6 py-5 text-left text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-highest)] disabled:opacity-40"
+              className="rounded-2xl bg-[var(--surface-container-high)] px-6 py-4 text-left text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-highest)] disabled:opacity-40"
             >
               <span className="block text-title">{simple ? 'Ask me a few questions' : 'Guide me — ask me questions'}</span>
               <span className="mt-1 block text-label text-[var(--on-surface-variant)]">
                 {simple ? `At most ${SIMPLE_GUIDE_QUESTIONS}, then the same one screen` : 'One question at a time, then a setup'}
               </span>
             </button>
-            {!simple && (
-            <button
-              onClick={() => { setError(null); setStep('talk'); }}
-              disabled={!hasObjective || working !== null}
-              className="rounded-2xl bg-[var(--surface-container-high)] px-6 py-5 text-left text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-highest)] disabled:opacity-40 sm:col-span-2"
-            >
-              <span className="block text-title">Keep this as a conversation for now</span>
-              <span className="mt-1 block text-label text-[var(--on-surface-variant)]">
-                Talk it through; a draft brief builds up beside the chat. No project exists until you press Start
-              </span>
-            </button>
-            )}
           </div>
 
           {busyLabel && (
@@ -606,18 +690,26 @@ export default function NewProjectPage() {
 
       {step === 'talk' && (
         <>
-          <h1 className="text-display text-[var(--on-surface)]">Talk it through</h1>
-          <p className="mt-3 mb-8 text-body text-[var(--on-surface-variant)]">
-            PromptMaster asks one useful question at a time and keeps a draft brief of what you say. When it is
-            right, you confirm what becomes the project&apos;s starting record.
-          </p>
+          <h1 className="sr-only">Talk it through</h1>
           <FrontDoor
             key={`fd-${restoredAt}`}
             opening={objective}
-            onReady={fromConversation}
+            onReady={(brief, transcript, said, turns) => void makeFromConversation(brief, transcript, said, turns)}
+            onReview={fromConversation}
             onBack={() => setStep('ask')}
             initialState={frontDoorState}
             onStateChange={setFrontDoorState}
+            material={material}
+            busyLabel={working === 'setup' ? 'Working out the setup…' : working === 'creating' ? 'Creating the project…' : null}
+            attach={
+              <StartAttachments
+                files={startFiles}
+                images={startImages}
+                onFiles={setStartFiles}
+                onImages={setStartImages}
+                disabled={working !== null}
+              />
+            }
           />
         </>
       )}

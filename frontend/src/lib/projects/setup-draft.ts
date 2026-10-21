@@ -8,16 +8,12 @@
  * offered back when they return. Pure: the page and the store do the I/O.
  */
 import type { SetupDraft } from '@/components/projects/setup-card';
-import type { DraftBrief, Turn } from '@/components/projects/front-door';
+import type { FrontDoorState } from '@/components/projects/front-door';
 import type { NewFact } from '@/lib/supabase/facts';
 import type { DesignedWorkflow } from '@/lib/workflow/custom';
 import type { SetupRationale } from '@/types';
 
-export interface FrontDoorState {
-  turns: Turn[];
-  brief: DraftBrief;
-  ready: boolean;
-}
+export type { FrontDoorState } from '@/components/projects/front-door';
 
 export interface DesignerState {
   open: boolean;
