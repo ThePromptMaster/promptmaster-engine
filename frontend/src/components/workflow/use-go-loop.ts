@@ -1001,10 +1001,10 @@ export function useGoLoop(opts: Options) {
    * window spent them on the first repair and stopped (8 Oct, production), so
    * a nearly spent window is closed and the next one opened instead.
    */
-  const update = useCallback(async () => {
+  const update = useCallback(async (chosen: ExecutionPolicy = policy) => {
     const live = runRef.current;
     const left = live ? live.budget_steps - stepsRef.current.length : 0;
-    if (live && !live.ended_at && live.policy === policy && (live.status === 'blocked' || live.status === 'awaiting_decision') && left < 4 && !pendingStepId) {
+    if (live && !live.ended_at && live.policy === chosen && (live.status === 'blocked' || live.status === 'awaiting_decision') && left < 4 && !pendingStepId) {
       try {
         await updateAgentRun(live.id, { status: 'budget_exhausted', stop_reason: 'Window closed to update affected work.', needs: null });
         commitRun({ ...live, status: 'budget_exhausted', needs: null });
@@ -1015,8 +1015,28 @@ export function useGoLoop(opts: Options) {
         return;
       }
     }
+    if (chosen !== policy) {
+      setError(null);
+      setPolicy(chosen);
+      try {
+        await authorizeAndStart(chosen as Exclude<ExecutionPolicy, 'guided'>);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Could not start updating the affected work.');
+      }
+      return;
+    }
     await go();
-  }, [policy, pendingStepId, commitRun, continueRun, go]);
+  }, [policy, pendingStepId, commitRun, continueRun, go, authorizeAndStart]);
+
+  /**
+   * "Apply and continue": the button says Go updates the work and carries on,
+   * so the press is the go-ahead. Under Guided — the policy a project starts
+   * with — it used to propose one step and wait, the bar disappeared, and
+   * nothing changed (14 Oct call: "I didn't feel like that button was working
+   * sometimes"). It runs with checkpoints instead; approvals and important
+   * moves still stop it. Go's own button keeps the policy chosen there.
+   */
+  const applyAndContinue = useCallback(() => update(policy === 'guided' ? 'checkpoint' : policy), [policy, update]);
 
   /**
    * PM-23: "next logical action; why it is recommended; ability to apply".
@@ -1455,7 +1475,7 @@ export function useGoLoop(opts: Options) {
     stepEffect,
     autoWindows, setAutoWindows, autoPending,
     policy, setPolicy, budget, setBudget, run, steps, phase, active, pendingStep, pendingStale, authorizing, error,
-    go, update, suggest, replan, stop, approve, decline, answer, fixObjective, retryRepair, checkAnswer,
+    go, update, applyAndContinue, suggest, replan, stop, approve, decline, answer, fixObjective, retryRepair, checkAnswer,
     handsOff,
     dismissError: useCallback(() => setError(null), []),
   };

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 import { useAuth } from '@/hooks/use-auth';
+import { SAVE_ACCOUNT_EVENT } from '@/components/projects/guest-banner';
 import { ColourPicker } from './colour-preferences';
 
 /**
@@ -41,13 +42,19 @@ export function AppHeader() {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [colours, setColours] = useState(false);
+  // A guest's sign-out is asked twice (14 Oct call): it ends the only identity
+  // their projects belong to, and there is no signing back in to it.
+  const [confirmGuestOut, setConfirmGuestOut] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   // Click-outside and Escape both close, because a menu that only closes by
   // pressing its own trigger again is a menu people leave open by accident.
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setConfirmGuestOut(false);
+      return;
+    }
 
     function onPointerDown(e: MouseEvent) {
       if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
@@ -160,17 +167,42 @@ export function AppHeader() {
               </button>
               {colours && <ColourPicker />}
 
+              {confirmGuestOut && (
+                <div role="alert" className="mx-2 mt-1 rounded-lg bg-[var(--surface-container-low)] px-3 py-2.5">
+                  <p className="text-label text-[var(--on-surface)]">
+                    A guest can&apos;t sign back in. Signing out loses this browser&apos;s projects for good
+                    unless you create an account first.
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOpen(false);
+                        router.push('/projects#save-account');
+                        window.setTimeout(() => window.dispatchEvent(new Event(SAVE_ACCOUNT_EVENT)), 0);
+                      }}
+                      className="rounded-lg bg-[var(--pm-primary)] px-3 py-1 text-label text-[var(--on-primary)]"
+                    >
+                      Create an account
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <button
                 type="button"
                 role="menuitem"
-                onClick={() => void handleSignOut()}
+                onClick={() => {
+                  if (isGuest && !confirmGuestOut) setConfirmGuestOut(true);
+                  else void handleSignOut();
+                }}
                 disabled={busy}
                 className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-body text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-low)] disabled:opacity-60"
               >
                 <span aria-hidden className="material-symbols-outlined text-[18px]">
                   logout
                 </span>
-                {busy ? 'Signing out…' : 'Sign out'}
+                {busy ? 'Signing out…' : confirmGuestOut ? 'Sign out anyway' : 'Sign out'}
               </button>
             </div>
           )}

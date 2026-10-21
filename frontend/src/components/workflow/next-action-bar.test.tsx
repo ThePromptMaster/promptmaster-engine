@@ -43,3 +43,22 @@ describe('the next-step bar never looks pressed for nothing (19 Oct, production)
     expect(screen.queryByText(/Starting Go/)).toBeNull();
   });
 });
+
+describe('Apply and continue answers every press (14 Oct call)', () => {
+  it('stops saying "Starting Go…" as soon as Go moves on, not eight seconds later', async () => {
+    const onAct = vi.fn(() => new Promise<void>(() => undefined));
+    const { rerender } = render(<NextActionBar action={apply} onAct={onAct} go={idle} />);
+    await userEvent.click(screen.getByRole('button', { name: /Apply and continue/ }));
+    expect(screen.getByRole('button', { name: /Starting Go/ })).toBeDisabled();
+    // Go started and stopped at once: the phase changed, so the press is answered.
+    rerender(<NextActionBar action={apply} onAct={onAct} go={{ ...idle, phase: 'awaiting' }} />);
+    expect(screen.getByRole('button', { name: /Apply and continue/ })).toBeEnabled();
+  });
+
+  it("offers to show Go's waiting proposal instead of only disabling the button", async () => {
+    const onShowGo = vi.fn();
+    render(<NextActionBar action={apply} onAct={vi.fn()} go={{ ...idle, pendingStep: true }} onShowGo={onShowGo} />);
+    await userEvent.click(screen.getByRole('button', { name: /Show Go's proposal/ }));
+    expect(onShowGo).toHaveBeenCalled();
+  });
+});

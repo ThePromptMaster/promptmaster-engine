@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { useAuth } from '@/hooks/use-auth';
 
@@ -12,6 +12,9 @@ import { useAuth } from '@/hooks/use-auth';
  * data is cleared. Creating an account upgrades that same identity in place,
  * so nothing is migrated and nothing is lost.
  */
+/** Fired after navigating to `#save-account`, which a same-page push does not announce. */
+export const SAVE_ACCOUNT_EVENT = 'pm:save-account';
+
 export function GuestBanner() {
   const { isGuest, createAccountFromGuest } = useAuth();
 
@@ -21,6 +24,17 @@ export function GuestBanner() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+
+  // The account menu's guest sign-out warning sends people here to save their
+  // work first, so arriving that way opens the form rather than the pitch.
+  useEffect(() => {
+    const openIfAsked = () => {
+      if (window.location.hash === '#save-account') setOpen(true);
+    };
+    openIfAsked();
+    window.addEventListener(SAVE_ACCOUNT_EVENT, openIfAsked);
+    return () => window.removeEventListener(SAVE_ACCOUNT_EVENT, openIfAsked);
+  }, []);
 
   if (!isGuest) return null;
 
@@ -50,7 +64,7 @@ export function GuestBanner() {
   }
 
   return (
-    <div className="mb-8 rounded-2xl bg-[var(--surface-container-low)] px-6 py-5">
+    <div id="save-account" className="mb-8 rounded-2xl bg-[var(--surface-container-low)] px-6 py-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <p className="text-title text-[var(--on-surface)]">You are working as a guest</p>

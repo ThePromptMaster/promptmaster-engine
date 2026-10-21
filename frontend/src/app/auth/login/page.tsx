@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { createClient } from '@/lib/supabase/client';
+import { guestErrorMessage } from '@/lib/auth/guest';
 import { forgetResetRequest, nextFromLocation, rememberResetRequest } from '@/lib/auth/next-path';
 
 /**
@@ -38,16 +39,11 @@ export default function LoginPage() {
     setGuestLoading(true);
     try {
       await continueAsGuest();
-      router.push('/projects');
+      // Where they were going, as a password sign-in does — a guest who
+      // followed a link to a project used to land on the project list.
+      router.push(nextFromLocation() ?? '/projects');
     } catch (err) {
-      // The project's anonymous provider can be turned off, in which case
-      // saying so is more useful than a generic failure.
-      const message = err instanceof Error ? err.message : '';
-      setError(
-        /anonymous/i.test(message)
-          ? 'Guest access is turned off for this workspace. Sign in or create an account to continue.'
-          : message || 'Could not start a guest session.'
-      );
+      setError(guestErrorMessage(err instanceof Error ? err.message : ''));
       setGuestLoading(false);
     }
   };
