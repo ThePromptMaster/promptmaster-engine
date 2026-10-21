@@ -146,6 +146,8 @@ export interface Project {
   routine_decisions?: RoutineDecisions;
   /** 20 Oct (Sean: "On and off button?"): whether PromptMaster may search the web for this project. Off by default. */
   web_access?: 'off' | 'on';
+  /** 14 Oct call: the project's own accent colour (an `ACCENTS` id); null follows the user's choice. */
+  accent?: string | null;
   /**
    * The stage version each ticked approval was given on, by criterion id
    * (19 Oct). Display only — "approved v3 · current v4".
@@ -180,6 +182,8 @@ export interface ProjectSummary {
   workflow: string;
   stage: string;
   status: ProjectStatus;
+  /** The project's own accent colour, shown on its card. */
+  accent?: string | null;
   updated_at: string;
   created_at: string;
 }
@@ -341,6 +345,7 @@ export type ProjectPatch = Partial<
     | 'manual_check_versions'
     | 'routine_decisions'
     | 'web_access'
+    | 'accent'
     | 'stage_modes'
     | 'critique_intensity'
     | 'critique_tone'

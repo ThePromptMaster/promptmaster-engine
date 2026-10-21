@@ -10,13 +10,13 @@ import {
 import { currentModel } from '@/lib/constants';
 
 const LIST_COLUMNS =
-  'id, title, objective, mode, workflow, stage, status, updated_at, created_at';
+  'id, title, objective, mode, workflow, stage, status, accent, updated_at, created_at';
 
 const FULL_COLUMNS = `
   id, user_id, title, objective, audience, constraints, output_format, context,
   mode, custom_name, custom_preamble, custom_tone,
   model, session_facts, active_stack_id, constraint_presets, format_presets,
-  workflow, workflow_template_id, stage, status, manual_checks, manual_check_versions, routine_decisions, web_access, stage_modes, revision,
+  workflow, workflow_template_id, stage, status, manual_checks, manual_check_versions, routine_decisions, web_access, accent, stage_modes, revision,
   critique_intensity, critique_tone,
   archived_at, deleted_at, legacy_session_id, created_at, updated_at
 `;

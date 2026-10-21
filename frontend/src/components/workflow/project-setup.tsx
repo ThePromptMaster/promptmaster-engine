@@ -29,6 +29,7 @@ import { useMemo } from 'react';
 
 import type { StageDefinition } from '@/lib/workflow/types';
 import type { Project, ProjectPatch } from '@/types/project';
+import { ACCENTS } from '@/lib/appearance/colours';
 import { AutoGrowTextarea } from '@/components/shared/auto-grow-textarea';
 import { LimitCounter } from '@/components/shared/limit-counter';
 import { INPUT_LIMITS, withinLimit } from '@/lib/projects/input-limits';
@@ -159,6 +160,7 @@ export function ProjectSetup({ project, stage, onPatch, readOnly }: Props) {
         })}
         {/* The first stage shows this instead of the brief, so the model is set here too (18 Oct, pilot). */}
         <ModelChoice model={project.model} readOnly={readOnly} onPick={(model) => onPatch({ model })} />
+        <AccentChoice accent={project.accent} readOnly={readOnly} onPick={(accent) => onPatch({ accent })} />
       </div>
     </section>
   );
@@ -226,12 +228,50 @@ export function ProjectBrief({ project, onPatch, readOnly }: Omit<Props, 'stage'
           );
         })}
         <ModelChoice model={project.model} readOnly={readOnly} onPick={(model) => onPatch({ model })} />
+        <AccentChoice accent={project.accent} readOnly={readOnly} onPick={(accent) => onPatch({ accent })} />
       </div>
     </details>
   );
 }
 
 /** Which model writes and checks this project's work; every request already carries it. */
+/**
+ * The project's own colour (14 Oct call: "the whole thing could change color
+ * based on what project you're working on"). Its buttons, selected version and
+ * card take it; "Mine" follows the colours chosen in the account menu.
+ */
+function AccentChoice({ accent, readOnly, onPick }: { accent: string | null | undefined; readOnly?: boolean; onPick: (accent: string | null) => void }) {
+  const current = ACCENTS.some((a) => a.id === accent) ? accent : null;
+  return (
+    <fieldset disabled={readOnly}>
+      <legend className="mb-1.5 block text-label text-[var(--on-surface-variant)]">Project colour</legend>
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => onPick(null)}
+          aria-pressed={current === null}
+          className={`rounded-full px-3 py-1 text-label ${current === null ? 'bg-[var(--surface-container-highest)] text-[var(--on-surface)]' : 'bg-[var(--surface-container-low)] text-[var(--on-surface-variant)]'}`}
+        >
+          Mine
+        </button>
+        {ACCENTS.map((a) => (
+          <button
+            key={a.id}
+            type="button"
+            onClick={() => onPick(a.id)}
+            aria-pressed={current === a.id}
+            aria-label={`Project colour: ${a.label}`}
+            title={a.label}
+            className={`h-7 w-7 rounded-full transition-transform hover:scale-110 ${current === a.id ? 'ring-2 ring-[var(--on-surface)] ring-offset-2 ring-offset-[var(--surface-container-lowest)]' : ''}`}
+            style={{ background: a.colour }}
+          />
+        ))}
+      </div>
+      <p className="mt-1 text-label text-[var(--on-surface-variant)]">Tells your projects apart at a glance, here and on the project list.</p>
+    </fieldset>
+  );
+}
+
 function ModelChoice({ model, readOnly, onPick }: { model: string | null | undefined; readOnly?: boolean; onPick: (model: string) => void }) {
   const current = currentModel(model) || DEFAULT_MODEL;
   const choices = MODEL_CHOICES.some((c) => c.id === current) ? MODEL_CHOICES : [...MODEL_CHOICES, { id: current, label: current }];
