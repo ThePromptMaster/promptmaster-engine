@@ -1259,6 +1259,11 @@ export function WorkflowWorkspace({
     }
   }, [stage, reopenedHere, evaluation, markComplete, appendEvent, go]);
 
+  /** Stages a change left waiting for an update, by label: the next-step bar and the "Revision applied" note both say it. */
+  const awaitingLabels = [...(briefChange?.stageIds ?? []), ...(briefChange?.alsoWaiting ?? [])].map(
+    (id) => template.stages.find((s) => s.id === id)?.label ?? id
+  );
+
   // The one next action, at the top of whichever stage is open (17 Oct, Sean).
   const nextStep = nextAction({
     finalized: project.status === 'finalized',
@@ -1266,7 +1271,7 @@ export function WorkflowWorkspace({
     heldChanges: heldChanges.length,
     reopenedHere,
     reopenedLabel: stage?.label,
-    awaitingUpdate: [...(briefChange?.stageIds ?? []), ...(briefChange?.alsoWaiting ?? [])].map((id) => template.stages.find((s) => s.id === id)?.label ?? id),
+    awaitingUpdate: awaitingLabels,
     goActive: go.active,
     goWorkingOn: getStage(template, state.current_stage_id)?.label,
     run: go.run ? { status: go.run.status, ended_at: go.run.ended_at, hasNeed: Boolean(go.run.needs), asking: Boolean(go.run.stop_reason) } : null,
@@ -2451,6 +2456,7 @@ export function WorkflowWorkspace({
               // against what can be measured, and the result shown with it.
               checkRevision={(text) => measureStageContent(project, template, stage, text).map((m) => ({ label: `${m.label} — ${m.value ?? (m.satisfied ? 'met' : 'not met')}`, ok: m.satisfied }))}
               autoApply={project.routine_decisions === 'handle'}
+              awaitingUpdate={awaitingLabels.filter((l) => l !== stage.label)}
               attach={
                 project.status === 'finalized' ? undefined : (
                   <ChatAttach
