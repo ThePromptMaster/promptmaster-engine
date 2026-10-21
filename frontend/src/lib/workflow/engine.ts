@@ -647,6 +647,18 @@ export function leftOpenStages(template: WorkflowTemplate, state: WorkflowState)
 }
 
 /**
+ * Finished stages the user reopened to change (C5), in workflow order: in
+ * progress again, not left open, and not the stage the project is on. Apply
+ * and continue closes every one of them before Go carries on (21 Oct).
+ */
+export function reopenedStages(template: WorkflowTemplate, state: WorkflowState): StageDefinition[] {
+  return template.stages.filter((s) => {
+    const st = state.stages[s.id];
+    return s.id !== state.current_stage_id && st?.status === 'in_progress' && !st.left_open;
+  });
+}
+
+/**
  * Does ticking a box close a stage that was left open?
  *
  * A stage moved past with a required box unticked stayed open for good: the

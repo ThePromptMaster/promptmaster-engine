@@ -203,10 +203,12 @@ export default function ProjectsPage() {
               {rows.map((p) => (
                 <li key={p.id}>
                   <div style={accentVariables(p.accent) as React.CSSProperties} className="group relative flex items-center gap-4 rounded-2xl bg-[var(--surface-container-low)] transition-all duration-200 hover:bg-[var(--surface-container-lowest)] hover:shadow-[0_1px_2px_rgba(25,28,30,0.04),0_8px_20px_-10px_rgba(25,28,30,0.2)]">
+                    {/* The project's own colour, as a bar and a tinted icon: the icon alone was easy to miss (21 Oct). */}
+                    {p.accent && <span aria-hidden className="absolute inset-y-3 left-0 w-1 rounded-r-full bg-[var(--pm-primary)]" />}
                     <Link href={`/projects/${p.id}`} className="flex min-w-0 flex-1 items-center gap-4 px-6 py-5">
                       <span
                         aria-hidden
-                        className={`material-symbols-outlined shrink-0 text-[22px] ${p.accent ? 'text-[var(--pm-primary)]' : 'text-[var(--on-surface-variant)]'}`}
+                        className={`material-symbols-outlined shrink-0 text-[22px] ${p.accent ? 'rounded-lg bg-[color-mix(in_srgb,var(--pm-primary)_14%,transparent)] p-1.5 text-[var(--pm-primary)]' : 'text-[var(--on-surface-variant)]'}`}
                       >
                         {WORKFLOW_ICON[p.workflow] ?? 'workspaces'}
                       </span>
