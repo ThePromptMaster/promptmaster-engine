@@ -1254,7 +1254,7 @@ export function WorkflowWorkspace({
       // Go runs from where the user is: no jump to the current stage (17 Oct,
       // Sean: "I gotta go press authorize in summary"). `update`, not `go`:
       // the button promises the work is carried on, which Guided would not do.
-      await go.update();
+      await go.applyAndContinue();
     } catch (e) {
       setTransitionError(`That didn't go through${e instanceof Error && e.message ? `: ${e.message}` : ''}. Nothing was changed.`);
     }
@@ -1907,7 +1907,7 @@ export function WorkflowWorkspace({
             go={{ phase: go.phase, pendingStep: Boolean(go.pendingStep), authorizing: Boolean(go.authorizing), error: go.error }}
             onAct={async (a) => {
               if (a.kind === 'apply_continue_reopened') await continueFromReopened();
-              else if (a.kind === 'apply_continue') await go.update();
+              else if (a.kind === 'apply_continue') await go.applyAndContinue();
               else if (a.kind === 'resume') await go.go();
               else if (a.kind === 'answer_go') showGo();
             }}
@@ -2531,7 +2531,7 @@ export function WorkflowWorkspace({
                 <FactsNextStep
                   judging={judgingChange}
                   waiting={[...(briefChange?.stageIds ?? []), ...(briefChange?.alsoWaiting ?? [])].map((id) => template.stages.find((s) => s.id === id)?.label ?? id)}
-                  onUpdate={appendStageVersion && project.status !== 'finalized' ? () => void go.update() : undefined}
+                  onUpdate={appendStageVersion && project.status !== 'finalized' ? () => void go.applyAndContinue() : undefined}
                   updating={go.active}
                   updated={settledChange(events ?? [], state, Date.now())?.stageIds.map((id) => template.stages.find((s) => s.id === id)?.label ?? id)}
                 />
