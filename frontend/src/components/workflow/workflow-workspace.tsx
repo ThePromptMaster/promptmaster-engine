@@ -48,6 +48,7 @@ import {
   availableTransitions,
   approvalPending,
   evaluateStage,
+  reopenedStages,
   getStage,
   nextSuggestedStage,
   progressCaptionText,
@@ -1245,24 +1246,35 @@ export function WorkflowWorkspace({
    * requirements hold — which reopens the work after it for a recheck — or
    * handed to Go to finish with the user's changes kept; then Go carries on
    * from where the project is, rechecking what the change affected first.
+   *
+   * Every reopened stage, not only the one open on screen (21 Oct, production:
+   * Output was reopened and changed, Apply and continue was pressed on Summary,
+   * and Output stayed "Reopened" after Go had finished).
    */
-  const continueFromReopened = useCallback(async () => {
-    if (!stage || !reopenedHere) return;
+  const continueWork = useCallback(async () => {
     setTransitionError(null);
     try {
-      if (evaluation.canAdvance) {
-        await markComplete();
-      } else {
-        const unmet = evaluation.unmet.filter((c) => c.blocking).map((c) => c.label).join('; ');
-        await appendEvent({
-          type: 'brief_changed',
-          stage_id: stage.id,
-          reason: `Reopened and handed to Go to finish`,
-          payload: {
-            kind: 'reopened',
-            affected: [{ stage_id: stage.id, reason: `You reopened ${stage.label} and changed it. Finish it keeping every change you made${unmet ? `, so that: ${unmet}` : ''}.` }],
-          },
-        });
+      for (const s of reopenedStages(template, state)) {
+        const ev = evaluateStage(template, s.id, context);
+        if (ev.canAdvance) {
+          const evidenceId = await stageEvidence({ template, stage: s, bundles: stageBundles, project, appendStageVersion });
+          await appendEvent({
+            type: 'stage_marked_complete',
+            stage_id: s.id,
+            ...(evidenceId ? { payload: { evidence_version_id: evidenceId } } : {}),
+          });
+        } else {
+          const unmet = ev.unmet.filter((c) => c.blocking).map((c) => c.label).join('; ');
+          await appendEvent({
+            type: 'brief_changed',
+            stage_id: s.id,
+            reason: `Reopened and handed to Go to finish`,
+            payload: {
+              kind: 'reopened',
+              affected: [{ stage_id: s.id, reason: `You reopened ${s.label} and changed it. Finish it keeping every change you made${unmet ? `, so that: ${unmet}` : ''}.` }],
+            },
+          });
+        }
       }
       // Go runs from where the user is: no jump to the current stage (17 Oct,
       // Sean: "I gotta go press authorize in summary"). `update`, not `go`:
@@ -1271,7 +1283,7 @@ export function WorkflowWorkspace({
     } catch (e) {
       setTransitionError(`That didn't go through${e instanceof Error && e.message ? `: ${e.message}` : ''}. Nothing was changed.`);
     }
-  }, [stage, reopenedHere, evaluation, markComplete, appendEvent, go]);
+  }, [template, state, context, stageBundles, project, appendStageVersion, appendEvent, go]);
 
   /** Stages a change left waiting for an update, by label: the next-step bar and the "Revision applied" note both say it. */
   const awaitingLabels = [...(briefChange?.stageIds ?? []), ...(briefChange?.alsoWaiting ?? [])].map(
@@ -1925,8 +1937,7 @@ export function WorkflowWorkspace({
             action={nextStep}
             go={{ phase: go.phase, pendingStep: Boolean(go.pendingStep), authorizing: Boolean(go.authorizing), error: go.error }}
             onAct={async (a) => {
-              if (a.kind === 'apply_continue_reopened') await continueFromReopened();
-              else if (a.kind === 'apply_continue') await go.applyAndContinue();
+              if (a.kind === 'apply_continue_reopened' || a.kind === 'apply_continue') await continueWork();
               else if (a.kind === 'resume') await go.go();
               else if (a.kind === 'answer_go') showGo();
             }}
@@ -2565,7 +2576,7 @@ export function WorkflowWorkspace({
                 <FactsNextStep
                   judging={judgingChange}
                   waiting={[...(briefChange?.stageIds ?? []), ...(briefChange?.alsoWaiting ?? [])].map((id) => template.stages.find((s) => s.id === id)?.label ?? id)}
-                  onUpdate={appendStageVersion && project.status !== 'finalized' ? () => void go.applyAndContinue() : undefined}
+                  onUpdate={appendStageVersion && project.status !== 'finalized' ? () => void continueWork() : undefined}
                   updating={go.active}
                   updated={settledChange(events ?? [], state, Date.now())?.stageIds.map((id) => template.stages.find((s) => s.id === id)?.label ?? id)}
                 />

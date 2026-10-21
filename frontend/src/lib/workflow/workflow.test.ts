@@ -641,6 +641,13 @@ describe('a stage left open can be closed by its own tick (A3, Sean 28 Sep item 
     expect(leftOpenStages(BOOK_V1, state).map((s) => s.id)).toEqual(['positioning']);
   });
 
+  it('reopenedStages lists a finished stage reopened to change it, not a left-open one or the current one (21 Oct)', async () => {
+    const { reopenedStages } = await import('./engine');
+    const state = projectState(BOOK_V1, [...movedPast, event('stage_reopened', 'audience')]);
+    expect(reopenedStages(BOOK_V1, state).map((s) => s.id)).toEqual(['audience']);
+    expect(reopenedStages(BOOK_V1, projectState(BOOK_V1, movedPast))).toEqual([]);
+  });
+
   it('ticking the last required box closes a left-open stage', async () => {
     const { tickClosesStage } = await import('./engine');
     const state = projectState(BOOK_V1, movedPast);
