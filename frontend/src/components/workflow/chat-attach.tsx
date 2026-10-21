@@ -96,7 +96,11 @@ export function ChatAttach({
   };
 
   return (
-    <div className="flex shrink-0 flex-col gap-1">
+    // `min-w-0 flex-1`, not `shrink-0`: the status line below the button can
+    // be a long sentence, and a column that refused to shrink grew to its full
+    // width and pushed Send over the composer (14 Oct call, "attachment
+    // buttons overlapping"). Now the sentence wraps beside Send instead.
+    <div className="flex min-w-0 flex-1 flex-col items-start gap-1">
       <input
         ref={input}
         type="file"
@@ -117,7 +121,7 @@ export function ChatAttach({
         {busy ? 'Attaching…' : 'Attach'}
       </button>
       {message && (
-        <p role="status" className="text-label text-[var(--on-surface-variant)]">
+        <p role="status" className="break-words text-label text-[var(--on-surface-variant)]">
           {message}
         </p>
       )}
