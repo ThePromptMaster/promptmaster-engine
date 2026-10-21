@@ -166,6 +166,8 @@ interface Props {
   onResumeTaken?: () => void;
   /** The held change whose question is open here now, so the notice does not repeat it. */
   onPendingShown?: (id: string | null) => void;
+  /** Later stages waiting for an update after a change, by label (shown once a revision is applied). */
+  awaitingUpdate?: readonly string[];
 }
 
 /**
@@ -218,6 +220,7 @@ export function ChatPanel({
   resumeChange = null,
   onResumeTaken,
   onPendingShown,
+  awaitingUpdate,
 }: Props) {
   const [offerActions, setOfferActions] = useState(true);
   useEffect(() => setOfferActions(readOfferActions()), []);
@@ -726,6 +729,7 @@ export function ChatPanel({
             busy={chat.busy}
             onUndo={() => void chat.undo()}
             onDismiss={chat.dismissApplied}
+            awaitingUpdate={awaitingUpdate}
           />
         )}
       </div>
@@ -1215,6 +1219,7 @@ export function AppliedNotice({
   busy,
   onUndo,
   onDismiss,
+  awaitingUpdate,
 }: {
   scope: string;
   summary?: string;
@@ -1224,6 +1229,13 @@ export function AppliedNotice({
   busy: boolean;
   onUndo: () => void;
   onDismiss: () => void;
+  /**
+   * Later stages a change left waiting for an update, by label; undefined
+   * when the surface cannot tell. After a "Change it" the page used to say
+   * nothing either way, and "nothing changed" could not be told apart from
+   * "nothing needed to" (14 Oct call).
+   */
+  awaitingUpdate?: readonly string[];
 }) {
   return (
     <section
@@ -1244,6 +1256,13 @@ export function AppliedNotice({
           ))}
         </ul>
       )}
+      {awaitingUpdate && (
+        <p className="mt-0.5 text-label text-[var(--on-success-container)]">
+          {awaitingUpdate.length
+            ? `Later work built on this — ${awaitingUpdate.join(', ')} — needs updating. Press Apply and continue at the top of the page and Go updates it.`
+            : 'Nothing finished after this stage depends on it, so nothing else needs updating.'}
+        </p>
+      )}
       <p className="mt-0.5 text-label text-[var(--on-success-container)]">
         The previous version is still in this stage&rsquo;s history.
       </p>
@@ -1259,9 +1278,10 @@ export function AppliedNotice({
         )}
         <button
           onClick={onDismiss}
+          title="Close this note. The change is already saved as the newest version."
           className="rounded-lg px-3 py-1.5 text-label text-[var(--on-success-container)]"
         >
-          Keep it
+          Keep this version
         </button>
       </div>
     </section>
