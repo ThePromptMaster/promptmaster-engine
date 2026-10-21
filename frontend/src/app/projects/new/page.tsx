@@ -448,7 +448,7 @@ export default function NewProjectPage() {
       // a second one. Take the half-made one back out, so a retry starts clean.
       if (createdId) await hardDeleteProject(createdId).catch(() => undefined);
       const reason = e instanceof Error && e.message ? e.message : 'Could not create the project.';
-      setError(`${reason} Nothing was created — press Start to try again.`);
+      setError(`${reason} Nothing was created — try again.`);
       setWorking(null);
     }
   }

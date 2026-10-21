@@ -27,7 +27,7 @@ describe('DraftStatus', () => {
       expect(slot.textContent!.length).toBeLessThan(80);
     }
     rerender(<DraftStatus state="saved" />);
-    expect(slot).toHaveTextContent('no project exists until you press Start');
+    expect(slot).toHaveTextContent('nothing is a project until you make it one');
     expect(slot).toHaveAttribute('title', expect.stringContaining('you can sign out and come back'));
   });
 });

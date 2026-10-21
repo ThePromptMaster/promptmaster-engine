@@ -4,13 +4,13 @@ export type DraftSaveState = 'saved' | 'saving' | 'failed' | null;
 
 const SHORT: Record<Exclude<DraftSaveState, null>, string> = {
   saving: 'Saving your setup…',
-  saved: 'Setup kept as a draft — no project exists until you press Start.',
+  saved: 'Setup kept as a draft — nothing is a project until you make it one.',
   failed: 'Not saved as a draft — kept on this page until you leave.',
 };
 
 const FULL: Record<Exclude<DraftSaveState, null>, string> = {
   saving: 'Saving your setup…',
-  saved: 'Your setup is kept as a draft, conversation included — you can sign out and come back. No project exists until you press Start.',
+  saved: 'Your setup is kept as a draft, conversation included — you can sign out and come back. Nothing is a project until you make it one (Make it a project, or Start).',
   failed: 'Your setup could not be saved as a draft; it is kept on this page until you leave.',
 };
 
