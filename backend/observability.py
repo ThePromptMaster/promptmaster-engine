@@ -55,9 +55,23 @@ logger = logging.getLogger(__name__)
 # log drain will already know to index on; the other two are ours.
 REQUEST_ID_HEADER = "X-Request-Id"
 PROJECT_HEADER = "X-PromptMaster-Project"
+
 USER_HEADER = "X-PromptMaster-User"
 #: Response header carrying what this request spent. See `usage.py`.
 USAGE_HEADER = "X-PromptMaster-Usage"
+
+#: How hard a project asks the model to think (14 Oct call: "maybe use a better
+#: model or increase the thinking level"). Set per request from the
+#: `X-PromptMaster-Thinking` header by `ObservabilityMiddleware`, so every
+#: call a request makes — the draft, its checks, Go's planner — thinks alike
+#: without the level being threaded through each engine function.
+THINKING_HEADER = "X-PromptMaster-Thinking"
+thinking_var: ContextVar[str] = ContextVar("thinking", default="standard")
+
+
+def parse_thinking(raw: str | None) -> str:
+    """`deep`, or `standard` for anything else — an unknown level never raises the bill."""
+    return "deep" if (raw or "").strip().lower() == "deep" else "standard"
 
 
 # ---------------------------------------------------------------------------
@@ -276,6 +290,8 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
         request_id_var.set(request_id)
         project_id_var.set((request.headers.get(PROJECT_HEADER) or "").strip()[:64])
         route_var.set(request.url.path)
+        # The project's thinking level, for every model call this request makes.
+        thinking_var.set(parse_thinking(request.headers.get(THINKING_HEADER)))
         user_id_var.set("")
         accumulator = UsageAccumulator()
         usage_var.set(accumulator)

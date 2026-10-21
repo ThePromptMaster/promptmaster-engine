@@ -28,7 +28,7 @@
 import { useMemo } from 'react';
 
 import type { StageDefinition } from '@/lib/workflow/types';
-import type { Project, ProjectPatch } from '@/types/project';
+import type { Project, ProjectPatch, Thinking } from '@/types/project';
 import { AutoGrowTextarea } from '@/components/shared/auto-grow-textarea';
 import { LimitCounter } from '@/components/shared/limit-counter';
 import { INPUT_LIMITS, withinLimit } from '@/lib/projects/input-limits';
@@ -159,6 +159,7 @@ export function ProjectSetup({ project, stage, onPatch, readOnly }: Props) {
         })}
         {/* The first stage shows this instead of the brief, so the model is set here too (18 Oct, pilot). */}
         <ModelChoice model={project.model} readOnly={readOnly} onPick={(model) => onPatch({ model })} />
+        <ThinkingChoice thinking={project.thinking} readOnly={readOnly} onPick={(thinking) => onPatch({ thinking })} />
       </div>
     </section>
   );
@@ -226,12 +227,41 @@ export function ProjectBrief({ project, onPatch, readOnly }: Omit<Props, 'stage'
           );
         })}
         <ModelChoice model={project.model} readOnly={readOnly} onPick={(model) => onPatch({ model })} />
+        <ThinkingChoice thinking={project.thinking} readOnly={readOnly} onPick={(thinking) => onPatch({ thinking })} />
       </div>
     </details>
   );
 }
 
 /** Which model writes and checks this project's work; every request already carries it. */
+/**
+ * How hard the model thinks (14 Oct call: "increase the thinking level or
+ * effort"). Deep reasons at high effort on every call this project makes:
+ * slower and dearer, and the usage page shows by how much.
+ */
+function ThinkingChoice({ thinking, readOnly, onPick }: { thinking: Thinking | undefined; readOnly?: boolean; onPick: (thinking: Thinking) => void }) {
+  return (
+    <div>
+      <label htmlFor="brief-thinking" className="mb-1.5 block text-label text-[var(--on-surface-variant)]">
+        Thinking
+      </label>
+      <select
+        id="brief-thinking"
+        value={thinking ?? 'standard'}
+        disabled={readOnly}
+        onChange={(e) => onPick(e.target.value === 'deep' ? 'deep' : 'standard')}
+        className="rounded-lg bg-[var(--surface-container-low)] px-4 py-2.5 text-body text-[var(--on-surface)] outline-none focus:ring-2 focus:ring-[var(--pm-primary)]/40 disabled:opacity-70"
+      >
+        <option value="standard">Standard</option>
+        <option value="deep">Deep — reasons longer before answering</option>
+      </select>
+      <p className="mt-1 text-label text-[var(--on-surface-variant)]">
+        Deep takes longer and costs more per answer. Try it when answers feel shallow or miss a constraint.
+      </p>
+    </div>
+  );
+}
+
 function ModelChoice({ model, readOnly, onPick }: { model: string | null | undefined; readOnly?: boolean; onPick: (model: string) => void }) {
   const current = currentModel(model) || DEFAULT_MODEL;
   const choices = MODEL_CHOICES.some((c) => c.id === current) ? MODEL_CHOICES : [...MODEL_CHOICES, { id: current, label: current }];

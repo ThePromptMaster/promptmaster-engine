@@ -21,8 +21,10 @@ test('Web access is off by default; on, a search saves its sources and every sta
 
   await toggle.check();
   await expect.poll(async () => (await serviceSelect('projects', `id=eq.${id}&select=web_access`))[0].web_access).toBe('on');
-  const [changed] = await serviceSelect('workflow_events', `project_id=eq.${id}&type=eq.web_access_changed&select=actor,payload`);
-  expect(changed).toMatchObject({ actor: 'user', payload: { web_access: 'on' } });
+  // The event is written just after the switch's own row: wait for it rather than race it.
+  await expect
+    .poll(async () => (await serviceSelect('workflow_events', `project_id=eq.${id}&type=eq.web_access_changed&select=actor,payload`))[0])
+    .toMatchObject({ actor: 'user', payload: { web_access: 'on' } });
 
   await panel.getByLabel('What to search the web for').fill('Harbor Industrial Services market growth');
   await panel.getByRole('button', { name: 'Search the web' }).click();

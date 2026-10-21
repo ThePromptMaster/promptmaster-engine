@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { MarkdownOutput } from '@/components/shared/markdown-output';
 import { toManuscriptMarkdown, type ExportBundle } from '@/lib/export/project-export';
 import { deliverableNouns } from '@/lib/workflow/labels';
+import { readerLag, readerLagNote } from '@/lib/workflow/reader-lag';
 
 /**
  * The whole thing being made, readable at any point — not only after Finish.
@@ -20,6 +21,7 @@ export function FullDocumentReader({ bundle }: { bundle: ExportBundle }) {
   const [copied, setCopied] = useState(false);
   const markdown = useMemo(() => toManuscriptMarkdown(bundle), [bundle]);
   const { deliverable: noun } = deliverableNouns(bundle.template, bundle.project);
+  const lag = useMemo(() => readerLag(bundle.template, bundle.stages), [bundle]);
   const words = useMemo(() => markdown.replace(/^# .*\n+/, '').split(/\s+/).filter(Boolean).length, [markdown]);
 
   useEffect(() => {
@@ -69,6 +71,11 @@ export function FullDocumentReader({ bundle }: { bundle: ExportBundle }) {
                 Close
               </button>
             </div>
+            {lag && (
+              <p role="note" className="mb-4 rounded-lg bg-[var(--surface-container-low)] px-3 py-2 text-label text-[var(--on-surface)]">
+                {readerLagNote(lag)}
+              </p>
+            )}
             <MarkdownOutput content={markdown} />
           </div>
         </div>

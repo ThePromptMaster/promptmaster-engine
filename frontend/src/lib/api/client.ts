@@ -55,6 +55,7 @@ import {
   recordErrorEvent,
   recordModelUsage,
 } from '@/lib/supabase/model-usage';
+import { thinkingHeaders } from './thinking';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -214,6 +215,8 @@ async function rawFetch(
       // an authorisation input on either side, and it is absent outside a
       // project, which is a real and expected state.
       ...(projectId ? { 'X-PromptMaster-Project': projectId } : {}),
+      // How hard the model thinks for this project (Standard sends nothing).
+      ...thinkingHeaders(),
       ...(await authHeader()),
       ...options?.headers,
     },
