@@ -617,6 +617,19 @@ and say what it did. Assessment: `docs/assessments/2026-10-09-research-go-and-br
 | The account | `lib/agent/account.ts` → `RunAccountCard`: did / now (working, window, blocker, decision, complete) / set aside, from the steps |
 | Adapting the structure | optional stages skipped by Go under `handle` (`20261030000000`); Research v11's Final review may return to Analysis or Experiment |
 
+### The 14 Oct call (2026-10-21)
+
+Assessment: `docs/assessments/2026-10-21-oct14-call.md`.
+
+| Concern | Where it lives |
+|---|---|
+| Thinking level | `projects.thinking` (`20261106000000`); `lib/api/thinking.ts` sends `X-PromptMaster-Thinking`; `observability.thinking_var` sets it per request; `llm_client._token_budget` sends `effort: "high"` + `DEEP_HEADROOM` for Deep |
+| Apply and continue | `use-go-loop.ts` `applyAndContinue()` (Autonomous, authorized), separate from `update()`, which Go's own button uses |
+| Chat-first start | `components/projects/front-door.tsx` (auto-sent opening, editable outline, `edited`, `material`); `promptmaster/front_door.py` `_keep_edits`; `app/projects/new/page.tsx` `makeFromConversation` → `create()`, the transcript saved with `saveStageChatMessage` on the first stage |
+| Timeline | `lib/workflow/timeline.ts` (`projectTimeline`, pure); `components/workflow/project-timeline.tsx` |
+| Project colour | `projects.accent` (`20261107000000`, checked by `accent-drift.test.ts`); `lib/appearance/colours.ts` `accentVariables`, set on the workspace root and the project card |
+| Full-work reader note | `lib/workflow/reader-lag.ts` |
+
 ## Extension points
 
 These are the seams the system was built to be extended at. Working with them is

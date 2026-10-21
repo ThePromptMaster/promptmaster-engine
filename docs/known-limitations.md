@@ -1949,3 +1949,12 @@ didn't feel like that button was working sometimes"):
 - **"Nothing else needs updating" covers finished stages only.** After an applied revision, the
   note lists the later stages a change left waiting. Stages not yet written are not listed: they
   read the new version when they are drafted.
+
+### L-99 — Thinking: Deep, the chat-first start, the timeline and project colour (2026-10-21)
+
+From the 14 Oct call (assessment `docs/assessments/2026-10-21-oct14-call.md`):
+- **Deep is a request, not a guarantee.** Deep sends `reasoning.effort: "high"` to models that reason (Anthropic, GPT-5.6). Other models are sent as before. The level travels as a header, `X-PromptMaster-Thinking`, set by the open project's page. A call made from outside a project (the start page, the project list) is Standard. Its cost is recorded per call in `model_usage` as before; the level itself is in the backend's log line, not the table.
+- **The outline keeps what the user edited, by field.** Once a user edits a field, it is theirs for the rest of the conversation: the backend keeps their text and the model may only add list items. To let the model rewrite a field again, the user clears it in the outline.
+- **Make it a project picks the recommended workflow.** It does not ask which one. "Review the setup first" is the way to choose. A file attached in the chat is stored on the project when the project is made, as before. A conversation kept as a draft keeps its text, not its files.
+- **The timeline shows what the page has loaded.** It lists versions and decisions, not every event: job and cursor events are left out. It does not show chat messages.
+- **Project colour is an accent only.** It changes the buttons, the selected version and the project's card. Surfaces and version colours stay the user's own.
