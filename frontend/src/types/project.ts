@@ -151,6 +151,8 @@ export interface Project {
   web_access?: 'off' | 'on';
   /** 14 Oct call ("increase the thinking level"): Deep asks the model to reason at high effort on every call. */
   thinking?: Thinking;
+  /** 14 Oct call: the project's own accent colour (an `ACCENTS` id); null follows the user's choice. */
+  accent?: string | null;
   /**
    * The stage version each ticked approval was given on, by criterion id
    * (19 Oct). Display only — "approved v3 · current v4".
@@ -185,6 +187,8 @@ export interface ProjectSummary {
   workflow: string;
   stage: string;
   status: ProjectStatus;
+  /** The project's own accent colour, shown on its card. */
+  accent?: string | null;
   updated_at: string;
   created_at: string;
 }
@@ -347,6 +351,7 @@ export type ProjectPatch = Partial<
     | 'routine_decisions'
     | 'web_access'
     | 'thinking'
+    | 'accent'
     | 'stage_modes'
     | 'critique_intensity'
     | 'critique_tone'

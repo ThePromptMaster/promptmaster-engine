@@ -92,6 +92,16 @@ export function colourVariables(prefs: ColourPreferences): Record<string, string
   };
 }
 
+/**
+ * A project's own accent (14 Oct call: "the whole thing could change color
+ * based on what project you're working on"), as the variables to set on the
+ * project's page. Empty for none or an unknown id: the user's own accent shows.
+ */
+export function accentVariables(id: string | null | undefined): Record<string, string> {
+  const accent = ACCENTS.find((a) => a.id === id);
+  return accent ? { '--pm-primary': accent.colour, '--pm-primary-container': accent.container } : {};
+}
+
 /** The colour token for a version: v1 is the starting colour, later ones cycle the palette. */
 export function versionColour(versionNumber: number): string {
   if (versionNumber <= 1) return 'var(--version-1)';

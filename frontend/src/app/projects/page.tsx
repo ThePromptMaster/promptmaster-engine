@@ -9,6 +9,7 @@ import { listProjects, softDeleteProject } from '@/lib/supabase/projects';
 import { pausedProjectIds } from '@/lib/supabase/workflow';
 import { useProjectStore } from '@/stores/project-store';
 import type { ProjectSummary } from '@/types/project';
+import { accentVariables } from '@/lib/appearance/colours';
 import { GuestBanner } from '@/components/projects/guest-banner';
 import { DeletedProjects } from '@/components/projects/deleted-projects';
 import { EXAMPLE_GOALS, newProjectHref } from '@/lib/projects/example-goals';
@@ -201,11 +202,11 @@ export default function ProjectsPage() {
             <ul className="space-y-2">
               {rows.map((p) => (
                 <li key={p.id}>
-                  <div className="group relative flex items-center gap-4 rounded-2xl bg-[var(--surface-container-low)] transition-all duration-200 hover:bg-[var(--surface-container-lowest)] hover:shadow-[0_1px_2px_rgba(25,28,30,0.04),0_8px_20px_-10px_rgba(25,28,30,0.2)]">
+                  <div style={accentVariables(p.accent) as React.CSSProperties} className="group relative flex items-center gap-4 rounded-2xl bg-[var(--surface-container-low)] transition-all duration-200 hover:bg-[var(--surface-container-lowest)] hover:shadow-[0_1px_2px_rgba(25,28,30,0.04),0_8px_20px_-10px_rgba(25,28,30,0.2)]">
                     <Link href={`/projects/${p.id}`} className="flex min-w-0 flex-1 items-center gap-4 px-6 py-5">
                       <span
                         aria-hidden
-                        className="material-symbols-outlined shrink-0 text-[22px] text-[var(--on-surface-variant)]"
+                        className={`material-symbols-outlined shrink-0 text-[22px] ${p.accent ? 'text-[var(--pm-primary)]' : 'text-[var(--on-surface-variant)]'}`}
                       >
                         {WORKFLOW_ICON[p.workflow] ?? 'workspaces'}
                       </span>
