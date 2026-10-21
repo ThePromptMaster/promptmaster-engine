@@ -61,6 +61,7 @@ def _meter(
         "duration_ms": int(elapsed * 1000),
         "finish_reason": finish_reason,
         "attempt": "repair" if _REPAIRING.get() else "retry" if attempt > 1 else "first",
+        "thinking": _thinking(),
     }
 
     try:
@@ -204,6 +205,19 @@ def resolve_model(model: str) -> str:
 LONG_ANSWER_TOKENS = 4096
 
 
+#: Room for Deep's reasoning, on top of the answer's own budget. Opus 5.5
+#: reasons adaptively: a 600-word memo at high effort used 555 reasoning
+#: tokens against 71 at low (21 Oct probe), so this is generous, and an
+#: unspent ceiling costs nothing.
+DEEP_HEADROOM = 8192
+
+
+def _thinking() -> str:
+    from observability import thinking_var  # late, as `current_usage` below
+
+    return thinking_var.get()
+
+
 def _token_budget(model: str, max_tokens: int) -> dict[str, Any]:
     """The answer keeps `max_tokens`; a reasoning model's reasoning gets its own budget.
 
@@ -214,6 +228,10 @@ def _token_budget(model: str, max_tokens: int) -> dict[str, Any]:
     setting it keeps to, so a writing call uses that and the answer gets the room.
     """
     if model.startswith(_REASONING_PREFIXES):
+        if _thinking() == "deep":
+            # Deep: the model decides how long to think, up to high effort,
+            # and the answer still keeps its own full budget beside it.
+            return {"max_tokens": max_tokens + DEEP_HEADROOM, "reasoning": {"effort": "high"}}
         if max_tokens >= LONG_ANSWER_TOKENS:
             return {"max_tokens": max_tokens + REASONING_HEADROOM, "reasoning": {"effort": "low"}}
         return {"max_tokens": max_tokens + REASONING_HEADROOM, "reasoning": {"max_tokens": REASONING_HEADROOM}}
