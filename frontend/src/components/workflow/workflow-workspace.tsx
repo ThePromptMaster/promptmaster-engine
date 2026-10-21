@@ -85,6 +85,7 @@ import { BriefChangeNotice } from './brief-change-notice';
 import { PendingChangeNotice } from './pending-change-notice';
 import { NextActionBar } from './next-action-bar';
 import { ProjectTimeline } from './project-timeline';
+import { accentVariables } from '@/lib/appearance/colours';
 import { nextAction } from '@/lib/workflow/next-step';
 import { holdPendingChange, pendingChanges, settlePendingChange, type PendingChange } from '@/lib/workflow/conflict-trail';
 import { keptConflictsOf } from '@/lib/workflow/routine-conflicts';
@@ -1711,7 +1712,8 @@ export function WorkflowWorkspace({
       : undefined;
 
   return (
-    <div className="flex min-h-screen">
+    // The project's own accent, if it has one (14 Oct call), for everything on its page.
+    <div className="flex min-h-screen" style={accentVariables(project.accent) as React.CSSProperties}>
       {/* FR-09: what is about to happen, before it happens. Opening this makes
           no model call — everything on it is computed from rows already in
           memory, and nothing is spent until Apply is pressed. */}
