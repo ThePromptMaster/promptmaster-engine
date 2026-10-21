@@ -80,6 +80,9 @@ export interface ProjectSource {
   created_at: string;
 }
 
+/** How hard the model is asked to think for a project (`projects.thinking`). */
+export type Thinking = 'standard' | 'deep';
+
 export interface Project {
   id: string;
   user_id: string;
@@ -146,6 +149,8 @@ export interface Project {
   routine_decisions?: RoutineDecisions;
   /** 20 Oct (Sean: "On and off button?"): whether PromptMaster may search the web for this project. Off by default. */
   web_access?: 'off' | 'on';
+  /** 14 Oct call ("increase the thinking level"): Deep asks the model to reason at high effort on every call. */
+  thinking?: Thinking;
   /** 14 Oct call: the project's own accent colour (an `ACCENTS` id); null follows the user's choice. */
   accent?: string | null;
   /**
@@ -345,6 +350,7 @@ export type ProjectPatch = Partial<
     | 'manual_check_versions'
     | 'routine_decisions'
     | 'web_access'
+    | 'thinking'
     | 'accent'
     | 'stage_modes'
     | 'critique_intensity'
