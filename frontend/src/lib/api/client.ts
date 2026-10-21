@@ -622,6 +622,10 @@ export const api = {
   async frontDoor(req: {
     turns: { role: 'user' | 'assistant'; content: string }[];
     brief: import('@/components/projects/front-door').DraftBrief;
+    /** Parts of the outline the user edited; the backend keeps them as written (14 Oct call). */
+    edited?: import('@/components/projects/front-door').BriefField[];
+    /** The words of what the user attached. */
+    material?: string;
   }): Promise<{ reply: string; draft?: string; brief: import('@/components/projects/front-door').DraftBrief; ready: boolean }> {
     return apiFetch('/api/front-door', { method: 'POST', body: JSON.stringify(req) });
   },

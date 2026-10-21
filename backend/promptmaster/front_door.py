@@ -32,7 +32,10 @@ _SYSTEM = (
     "empty instead. When the objective, the deliverable and the main requirements are known, set "
     "\"enough\" to true and tell the user, in plain words, that you have enough to set the project "
     "up. Never name a field or a flag in your reply. No project exists until the user presses "
-    "Start on the next screen; the conversation is kept as a draft meanwhile.\n\n"
+    "Make it a project; the conversation is kept as a draft meanwhile.\n\n"
+    # 14 Oct call: the brief beside the chat is an outline the user can edit.
+    "The user can edit the brief themselves. A part they edited is theirs: keep it exactly as "
+    "they wrote it, and add to it only from what they say next.\n\n"
     # Sean, 10 Oct (email 1): an email draft arrived mixed into the explanation.
     "When the user asks for a piece of writing they could use as it stands — an email, a message, "
     "a paragraph — put that text alone in \"draft\", ready to copy, and use \"reply\" only to say "
@@ -65,11 +68,24 @@ class FrontDoorTurn(BaseModel):
     ready: bool = False
 
 
-def build_front_door_prompt(turns: list[Turn], brief: DraftBrief) -> tuple[str, str]:
+#: The brief's parts a user can edit in the outline beside the chat.
+BRIEF_FIELDS = ("objective", "audience", "requirements", "evidence", "deliverables", "stages", "approvals")
+
+#: How much attached material goes into one turn's prompt.
+MAX_MATERIAL = 40_000
+
+
+def build_front_door_prompt(
+    turns: list[Turn], brief: DraftBrief, edited: list[str] | None = None, material: str = ""
+) -> tuple[str, str]:
     convo = "\n".join(f"{'USER' if t.role == 'user' else 'YOU'}: {t.content.strip()}" for t in turns[-MAX_TURNS:])
+    owned = [f for f in BRIEF_FIELDS if f in (edited or [])]
     user = (
         f"THE CONVERSATION SO FAR:\n{convo}\n\n"
-        f"THE DRAFT BRIEF SO FAR (update it; keep what still holds):\n{brief.model_dump_json()}\n\n"
+        + (f"WHAT THE USER ATTACHED (their own material; it counts as something they said):\n{material.strip()[:MAX_MATERIAL]}\n\n" if material.strip() else "")
+        + f"THE DRAFT BRIEF SO FAR (update it; keep what still holds):\n{brief.model_dump_json()}\n\n"
+        + (f"THE USER EDITED THESE PARTS OF THE BRIEF THEMSELVES — keep them as written: {', '.join(owned)}\n\n" if owned else "")
+        + 
         'Return JSON only: {"reply": "your next message", "brief": {"objective": "", "audience": "", '
         '"requirements": [], "evidence": [], "deliverables": [], "stages": [], "approvals": []}, "draft": "", "enough": false}'
     )
@@ -94,11 +110,20 @@ def _said(item: str, user_text: str) -> bool:
     return all(n in user_text for n in numbers)
 
 
-def parse_front_door(result: object, turns: list[Turn]) -> FrontDoorTurn:
+def parse_front_door(
+    result: object,
+    turns: list[Turn],
+    *,
+    given: DraftBrief | None = None,
+    edited: list[str] | None = None,
+    material: str = "",
+) -> FrontDoorTurn:
     if not isinstance(result, dict):
-        return FrontDoorTurn(reply="Sorry — could you say that again?", brief=DraftBrief())
+        return FrontDoorTurn(reply="Sorry — could you say that again?", brief=given or DraftBrief())
     raw = result.get("brief") if isinstance(result.get("brief"), dict) else {}
-    user_text = " ".join(t.content for t in turns if t.role == "user").lower().replace(",", "")
+    # What the user wrote, typed into the outline or attached counts as said.
+    typed = " ".join(" ".join(getattr(given, f)) if isinstance(getattr(given, f), list) else getattr(given, f) for f in (edited or []) if given and f in BRIEF_FIELDS)
+    user_text = " ".join([*(t.content for t in turns if t.role == "user"), typed, material]).lower().replace(",", "")
     requirements = [r for r in _clean(raw.get("requirements")) if _said(r, user_text)]
     norm = lambda t: re.sub(r"[^a-z0-9$%]+", " ", t.lower()).strip()  # noqa: E731
     required = {norm(r) for r in requirements}
@@ -112,12 +137,32 @@ def parse_front_door(result: object, turns: list[Turn]) -> FrontDoorTurn:
         stages=_clean(raw.get("stages"), 120),
         approvals=_clean(raw.get("approvals"), 200),
     )
+    if given and edited:
+        brief = _keep_edits(brief, given, edited)
     return FrontDoorTurn(
         reply=_plain(str(result.get("reply") or "").strip())[:8_000] or "Tell me more about what you want to get done.",
         draft=str(result.get("draft") or "").strip()[:20_000],
         brief=brief,
         ready=bool(result.get("enough", result.get("ready"))) and bool(brief.objective),
     )
+
+
+def _keep_edits(brief: DraftBrief, given: DraftBrief, edited: list[str]) -> DraftBrief:
+    """A part of the outline the user edited stays as they wrote it (14 Oct call).
+
+    Code, not the prompt, guarantees it: a text field keeps the user's words; a
+    list keeps every item the user wrote, and the model may only add to it.
+    """
+    out = brief.model_copy()
+    for field in BRIEF_FIELDS:
+        if field not in edited:
+            continue
+        mine = getattr(given, field)
+        if isinstance(mine, list):
+            setattr(out, field, (list(mine) + [i for i in getattr(brief, field) if i not in mine])[:MAX_LIST])
+        else:
+            setattr(out, field, mine)
+    return out
 
 
 # "Ready is true" (Sean, 10 Oct, email 1): a sentence that names the flag is the
@@ -130,7 +175,14 @@ def _plain(reply: str) -> str:
     return re.sub(r"[ \t]{2,}", " ", cleaned).strip() or reply
 
 
-async def front_door_turn(client: OpenRouterClient, model: str | None, turns: list[Turn], brief: DraftBrief) -> FrontDoorTurn:
-    system, user = build_front_door_prompt(turns, brief)
+async def front_door_turn(
+    client: OpenRouterClient,
+    model: str | None,
+    turns: list[Turn],
+    brief: DraftBrief,
+    edited: list[str] | None = None,
+    material: str = "",
+) -> FrontDoorTurn:
+    system, user = build_front_door_prompt(turns, brief, edited, material)
     result, _usage = await client.generate_json(prompt=user, system=system, temperature=0.4, max_tokens=2_000, model=model)
-    return parse_front_door(result, turns)
+    return parse_front_door(result, turns, given=brief, edited=edited, material=material)

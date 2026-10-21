@@ -19,7 +19,7 @@ def test_the_prompt_asks_one_question_and_keeps_only_what_the_user_said():
     system, user = build_front_door_prompt(TURNS, DraftBrief())
     assert "at most ONE useful question" in system
     assert "Never put in the brief anything the user did not say" in system
-    assert "No project exists until the user presses Start" in system
+    assert "No project exists until the user presses Make it a project" in system
     assert "USER: The board. One researcher must stay free." in user
 
 
@@ -66,3 +66,38 @@ def test_a_usable_piece_of_writing_comes_apart_from_the_reply_and_no_flag_is_nam
     system, user = build_front_door_prompt(TURNS, DraftBrief())
     assert "Never name a field or a flag in your reply." in system
     assert '"draft": ""' in user and '"enough": false' in user
+
+
+def test_an_outline_part_the_user_edited_stays_as_they_wrote_it():
+    """14 Oct call: the brief beside the chat is an outline the user can change."""
+    mine = DraftBrief(objective="Pick the project the board can fund", requirements=["Under 160 staff hours"])
+    out = parse_front_door({"reply": "ok", "brief": {
+        "objective": "Choose one project", "requirements": ["One researcher must stay free"]}},
+        TURNS, given=mine, edited=["objective", "requirements"])
+    assert out.brief.objective == "Pick the project the board can fund"
+    # The user's item first; the model may add what the user said in the chat.
+    assert out.brief.requirements == ["Under 160 staff hours", "One researcher must stay free"]
+    system, user = build_front_door_prompt(TURNS, mine, ["objective", "requirements"], material="Budget sheet: 160 hours")
+    assert "keep them as written: objective, requirements" in user
+    assert "WHAT THE USER ATTACHED" in user and "Budget sheet: 160 hours" in user
+
+
+def test_a_figure_from_attached_material_counts_as_said():
+    out = parse_front_door({"reply": "ok", "brief": {"objective": "o", "evidence": ["Budget is 9,500 hours"]}},
+                           TURNS, material="Budget is 9500 hours across the year")
+    assert out.brief.evidence == ["Budget is 9,500 hours"]
+
+
+def test_the_endpoint_passes_edits_and_material_through():
+    stub = AsyncMock()
+    stub.generate_json = AsyncMock(return_value=({"reply": "Noted.", "brief": {"objective": "model's words"}}, {}))
+    app.dependency_overrides[get_client] = lambda: stub
+    try:
+        r = TestClient(app).post("/api/front-door", json={
+            "turns": [t.model_dump() for t in TURNS], "brief": {"objective": "my words"},
+            "edited": ["objective"], "material": "Attached plan"})
+        assert r.status_code == 200, r.text
+        assert r.json()["brief"]["objective"] == "my words"
+        assert "Attached plan" in stub.generate_json.call_args.kwargs["prompt"]
+    finally:
+        app.dependency_overrides.pop(get_client, None)

@@ -1,0 +1,58 @@
+/**
+ * 14 Oct call: start like a normal chat, with an outline beside it, and move
+ * to project-level work when ready.
+ */
+import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+
+import { FrontDoor } from './front-door';
+
+const frontDoor = vi.fn();
+vi.mock('@/lib/api/client', () => ({ api: { frontDoor: (...a: unknown[]) => frontDoor(...a) } }));
+
+const reply = (objective: string, requirements: string[] = []) => ({
+  reply: 'Who is it for?',
+  brief: { objective, audience: '', requirements, evidence: [], deliverables: [], stages: [], approvals: [] },
+  ready: false,
+});
+
+beforeEach(() => frontDoor.mockReset());
+
+describe('FrontDoor', () => {
+  it('sends the opening message at once, as a chat would', async () => {
+    frontDoor.mockResolvedValue(reply('Plan the offsite'));
+    render(<FrontDoor opening="Plan the offsite" onReady={vi.fn()} onBack={vi.fn()} />);
+    await screen.findByText('Who is it for?');
+    expect(frontDoor).toHaveBeenCalledTimes(1);
+    expect(frontDoor.mock.calls[0][0].turns).toEqual([{ role: 'user', content: 'Plan the offsite' }]);
+  });
+
+  it('sends what the user changed in the outline, and the attached material', async () => {
+    frontDoor.mockResolvedValue(reply('Plan the offsite'));
+    render(<FrontDoor opening="Plan the offsite" onReady={vi.fn()} onBack={vi.fn()} material="Venue list" />);
+    await screen.findByText('Who is it for?');
+    const add = screen.getByLabelText('Add a requirement');
+    await userEvent.type(add, 'Under $5,000{Enter}');
+    await userEvent.type(screen.getByLabelText('Your message'), 'For the leadership team');
+    await userEvent.click(screen.getByRole('button', { name: 'Send' }));
+    await waitFor(() => expect(frontDoor).toHaveBeenCalledTimes(2));
+    const sent = frontDoor.mock.calls[1][0];
+    expect(sent.brief.requirements).toEqual(['Under $5,000']);
+    expect(sent.edited).toEqual(['requirements']);
+    expect(sent.material).toBe('Venue list');
+  });
+
+  it('makes the project in one press, counting outline edits as the user\'s own words', async () => {
+    frontDoor.mockResolvedValue(reply('Plan the offsite'));
+    const onReady = vi.fn();
+    render(<FrontDoor opening="Plan the offsite" onReady={onReady} onBack={vi.fn()} />);
+    await screen.findByText('Who is it for?');
+    await userEvent.type(screen.getByLabelText('Add a requirement'), 'Under $5,000{Enter}');
+    await userEvent.click(screen.getByRole('button', { name: 'Make it a project' }));
+    const [brief, , said, turns] = onReady.mock.calls[0];
+    expect(brief.requirements).toEqual(['Under $5,000']);
+    expect(said).toContain('Under $5,000');
+    expect(turns.map((t: { role: string }) => t.role)).toEqual(['user', 'assistant']);
+  });
+});
