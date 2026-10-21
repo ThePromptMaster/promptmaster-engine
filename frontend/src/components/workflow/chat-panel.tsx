@@ -798,7 +798,7 @@ export function ChatPanel({
              
             />
             <LimitCounter length={draft.length} limit={INPUT_LIMITS.message} />
-            <div className="mt-1 flex items-center gap-2">
+            <div className="mt-1 flex items-start gap-2">
               {attach}
               <button
                 onClick={() => void send()}
