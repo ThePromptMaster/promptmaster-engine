@@ -31,15 +31,33 @@ const STARTS_GO = new Set<NextAction['kind']>(['apply_continue', 'apply_continue
  * The one next action, at the top of whichever stage is open (`nextAction`).
  * One button, one short reason — the same words on every stage.
  */
-export function NextActionBar({ action, onAct, go }: { action: NextAction | null; onAct: (a: NextAction) => void | Promise<void>; go?: GoControlState }) {
-  const [pressed, setPressed] = useState(false);
+export function NextActionBar({
+  action,
+  onAct,
+  go,
+  onShowGo,
+}: {
+  action: NextAction | null;
+  onAct: (a: NextAction) => void | Promise<void>;
+  go?: GoControlState;
+  /** Takes the user to Go's panel, where a waiting proposal can be answered. */
+  onShowGo?: () => void;
+}) {
+  // The Go phase at the moment of the press, or null when not pressed.
+  const [pressedAt, setPressedAt] = useState<string | null>(null);
+  const pressed = pressedAt !== null;
   // A press shows "Starting…" until Go reports it is working (the bar then
   // shows that), what went wrong, or a few seconds pass.
   useEffect(() => {
     if (!pressed) return;
-    const t = setTimeout(() => setPressed(false), 8_000);
+    const t = setTimeout(() => setPressedAt(null), 8_000);
     return () => clearTimeout(t);
   }, [pressed]);
+  // …or until Go's phase moves on at all. A run that stopped at once (nothing
+  // to do, a pause) left "Starting Go…" spinning for the full eight seconds,
+  // which read as a button that had hung (14 Oct call).
+  const phase = go?.phase ?? null;
+  if (pressed && phase !== null && phase !== pressedAt && !go?.authorizing) setPressedAt(null);
   if (!action) return null;
   if (action.kind === 'working') {
     return (
@@ -60,8 +78,8 @@ export function NextActionBar({ action, onAct, go }: { action: NextAction | null
       </p>
       <button
         onClick={() => {
-          if (STARTS_GO.has(action.kind)) setPressed(true);
-          void Promise.resolve(onAct(action)).catch(() => setPressed(false));
+          if (STARTS_GO.has(action.kind)) setPressedAt(go?.phase ?? '');
+          void Promise.resolve(onAct(action)).catch(() => setPressedAt(null));
         }}
         disabled={Boolean(blocked) || busy}
         title={blocked ?? undefined}
@@ -73,6 +91,13 @@ export function NextActionBar({ action, onAct, go }: { action: NextAction | null
       {(blocked || go?.error) && (
         <p role="alert" className="basis-full text-label text-[var(--pm-error)]">
           {blocked ?? go?.error}
+          {/* The proposal is in Go's panel, often off screen: a disabled
+              button and a sentence were all the bar offered (14 Oct call). */}
+          {go?.pendingStep && onShowGo && (
+            <button type="button" onClick={onShowGo} className="ml-2 font-semibold text-[var(--pm-primary)] underline">
+              Show Go&apos;s proposal
+            </button>
+          )}
         </p>
       )}
     </section>
