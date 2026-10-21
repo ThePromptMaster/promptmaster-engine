@@ -1258,12 +1258,19 @@ export function WorkflowWorkspace({
         });
       }
       // Go runs from where the user is: no jump to the current stage (17 Oct,
-      // Sean: "I gotta go press authorize in summary").
-      await go.go();
+      // Sean: "I gotta go press authorize in summary"). `update`, not `go`:
+      // the button promises the work is carried on, which Guided would not do.
+      await go.applyAndContinue();
     } catch (e) {
       setTransitionError(`That didn't go through${e instanceof Error && e.message ? `: ${e.message}` : ''}. Nothing was changed.`);
     }
   }, [stage, reopenedHere, evaluation, markComplete, appendEvent, go]);
+
+  /** Go's panel lives on the current stage: open that and bring the panel into view. */
+  const showGo = useCallback(() => {
+    setViewingStageId(null);
+    setTimeout(() => document.querySelector('[aria-label="Go mode"]')?.scrollIntoView({ block: 'start' }), 100);
+  }, []);
 
   // The one next action, at the top of whichever stage is open (17 Oct, Sean).
   const nextStep = nextAction({
@@ -1906,13 +1913,11 @@ export function WorkflowWorkspace({
             go={{ phase: go.phase, pendingStep: Boolean(go.pendingStep), authorizing: Boolean(go.authorizing), error: go.error }}
             onAct={async (a) => {
               if (a.kind === 'apply_continue_reopened') await continueFromReopened();
-              else if (a.kind === 'apply_continue') await go.update();
+              else if (a.kind === 'apply_continue') await go.applyAndContinue();
               else if (a.kind === 'resume') await go.go();
-              else if (a.kind === 'answer_go') {
-                setViewingStageId(null);
-                setTimeout(() => document.querySelector('[aria-label="Go mode"]')?.scrollIntoView({ block: 'start' }), 100);
-              }
+              else if (a.kind === 'answer_go') showGo();
             }}
+            onShowGo={showGo}
           />
 
           {/* FR-20. Above the stage header rather than inside it: exporting is
@@ -2532,7 +2537,7 @@ export function WorkflowWorkspace({
                 <FactsNextStep
                   judging={judgingChange}
                   waiting={[...(briefChange?.stageIds ?? []), ...(briefChange?.alsoWaiting ?? [])].map((id) => template.stages.find((s) => s.id === id)?.label ?? id)}
-                  onUpdate={appendStageVersion && project.status !== 'finalized' ? () => void go.update() : undefined}
+                  onUpdate={appendStageVersion && project.status !== 'finalized' ? () => void go.applyAndContinue() : undefined}
                   updating={go.active}
                   updated={settledChange(events ?? [], state, Date.now())?.stageIds.map((id) => template.stages.find((s) => s.id === id)?.label ?? id)}
                 />

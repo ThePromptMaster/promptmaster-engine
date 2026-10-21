@@ -90,9 +90,17 @@ export function useAuth() {
    * Requires the project's anonymous provider to be enabled; the caller gets a
    * recognisable error if it is not.
    */
-  const continueAsGuest = useCallback(async () => {
+  const continueAsGuest = useCallback(async (): Promise<'started' | 'already signed in'> => {
+    // Never start a guest over a session this browser already has. The login
+    // page is normally unreachable while signed in (the proxy redirects), but
+    // a page restored from the back/forward cache — which mobile Safari does
+    // constantly — skips the proxy, and a second anonymous sign-in silently
+    // replaced the account the work belonged to (14 Oct call).
+    const { data } = await supabase.auth.getSession();
+    if (data.session?.user) return 'already signed in';
     const { error } = await supabase.auth.signInAnonymously();
     if (error) throw error;
+    return 'started';
   }, [supabase]);
 
   /**
