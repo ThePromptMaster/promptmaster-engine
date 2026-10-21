@@ -1033,10 +1033,14 @@ export function useGoLoop(opts: Options) {
    * so the press is the go-ahead. Under Guided — the policy a project starts
    * with — it used to propose one step and wait, the bar disappeared, and
    * nothing changed (14 Oct call: "I didn't feel like that button was working
-   * sometimes"). It runs with checkpoints instead; approvals and important
-   * moves still stop it. Go's own button keeps the policy chosen there.
+   * sometimes"). Checkpoint was not enough either: the recheck of the work
+   * the change reopened is an important move, so Checkpoint stopped on it
+   * and asked again (21 Oct, production pass). The press authorizes an
+   * Autonomous run, recorded as pressing Go with Autonomous is; reserved
+   * approvals and real questions still stop it. Go's own button keeps the
+   * policy chosen there.
    */
-  const applyAndContinue = useCallback(() => update(policy === 'guided' ? 'checkpoint' : policy), [policy, update]);
+  const applyAndContinue = useCallback(() => update('autonomous'), [update]);
 
   /**
    * PM-23: "next logical action; why it is recommended; ability to apply".
