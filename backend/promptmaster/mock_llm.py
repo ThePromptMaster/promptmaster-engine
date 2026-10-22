@@ -263,7 +263,9 @@ def _next_action(system: str, prompt: str) -> dict:
             break
     else:
         workflow = {"advance_stage", "mark_blocked", "request_user_decision", "declare_objective_complete", "return_to_stage"}
-        choice = next((k for k in allowed if k not in done and k not in workflow), None)
+        # search_web only when planned: Web access is on by default (22 Oct),
+        # and an unplanned run that searched would change every scripted run.
+        choice = next((k for k in allowed if k not in done and k not in workflow and k != "search_web"), None)
     if choice is None:
         choice = "declare_objective_complete"
     params: dict = {}

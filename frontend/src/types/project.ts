@@ -147,7 +147,7 @@ export interface Project {
    * every approval to the user. The database re-reads it on each commit.
    */
   routine_decisions?: RoutineDecisions;
-  /** 20 Oct (Sean: "On and off button?"): whether PromptMaster may search the web for this project. Off by default. */
+  /** 20 Oct (Sean: "On and off button?"): whether PromptMaster may search the web for this project. On by default since 22 Oct. */
   web_access?: 'off' | 'on';
   /** 14 Oct call ("increase the thinking level"): Deep asks the model to reason at high effort on every call. */
   thinking?: Thinking;

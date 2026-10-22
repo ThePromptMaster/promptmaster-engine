@@ -13,7 +13,7 @@ import type { Project } from '@/types/project';
  * search and source retrieval … with citations and saved sources? On and off
  * button? I don't know, what's the best option").
  *
- * Off by default, per project. When on, a search goes through the backend's
+ * On by default (22 Oct), per project. When on, a search goes through the backend's
  * web search, and what it returns is saved here: every stage, check and chat
  * is sent the current sources and cites them as [S1], [S2], …. Taking one out
  * keeps it in the history; a later prompt no longer cites it.
@@ -35,7 +35,9 @@ export function WebSources({
   const on = project.web_access === 'on';
   const sources = currentSources(project.sources);
   const [toggled, setToggled] = useState<boolean | null>(null);
-  const open = toggled ?? (on || sources.length > 0);
+  // Open by itself only once there are sources: with the switch on by default,
+  // opening on `on` would unfold this panel on every stage of every project.
+  const open = toggled ?? sources.length > 0;
   const [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);

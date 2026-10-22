@@ -283,8 +283,8 @@ always starts it. In a looping workflow:
 `template.inquiry` gives a workflow Go's reasoning moves. An Autonomous authorization may allow
 up to 20 further windows.
 
-Web access (2026-10-20): each project has a `web_access` switch (`off` by default, the user's
-alone, each change a `web_access_changed` event). While it is on:
+Web access (2026-10-20): each project has a `web_access` switch (`on` by default since
+2026-10-22, `off` before that; the user's alone, each change a `web_access_changed` event). While it is on:
 - "Search the web" in the Web sources panel, and Go's `search_web` move, call
   `POST /api/agent/web-search`. That is one model call with OpenRouter's web plugin, engine Exa.
 - The search's own results (`url_citation` annotations) are saved by the browser to
