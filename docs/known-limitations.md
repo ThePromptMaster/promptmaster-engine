@@ -1913,7 +1913,8 @@ Limits:
 ### L-97 — Web access: what it does and does not do (2026-10-20)
 
 Sean asked (20 Oct) for web search with citations and saved sources, and an on/off button. Each
-project has a Web access switch, off by default. Web search and Go's search_web move run only
+project has a Web access switch, on by default since 22 Oct (off before; the migration turned
+on every project nobody had switched). Web search and Go's search_web move run only
 while it is on. Limits:
 - **The backend does not read the switch.** It is stateless (CLAUDE.md), so it trusts the
   `web_access` the browser sends and refuses "off". The database is the real guard: a source
@@ -1937,6 +1938,11 @@ while it is on. Limits:
   saved sources. A failed search doesn't lose the reply: it is answered from the project and
   says so. What the chat cites is saved before the reply is, numbered after the saved sources;
   past 40 saved sources (the most a request carries) the numbers stop lining up.
+- **On by default costs something on every project (22 Oct).** Since the switch starts on, every
+  Ask message in the side chat makes the extra decision call above unless the user turns Web
+  access off, and Go may search from any stage that writes. The Web sources panel stays folded
+  until a source is saved, so the switch is one click further away than the heading's "web
+  access on".
 
 
 ### L-98 — The full-work reader shows the deliverable only; Apply and continue runs with checkpoints (2026-10-21)

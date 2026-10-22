@@ -5,25 +5,29 @@ import { createProject, serviceSelect } from './helpers';
 /**
  * 20 Oct (Sean): "Can we add web search and source retrieval to research
  * workflows, with citations and saved sources? On and off button?"
- * Off by default, per project; on, a search saves the search's own sources,
+ * On by default, per project (22 Oct; off before); on, a search saves the search's own sources,
  * numbered as every stage cites them. The scripted model returns two sources.
  */
-test('Web access is off by default; on, a search saves its sources and every stage is sent them', async ({ page }) => {
+test('Web access is on by default; on, a search saves its sources and every stage is sent them', async ({ page }) => {
   test.setTimeout(120_000);
   const id = await createProject(page, { workflow: 'Single output', name: 'E2E web search', objective: 'Screen Harbor Industrial Services' });
 
   const panel = page.getByRole('region', { name: 'Web access and sources' });
-  await expect(panel).toContainText('web access off');
+  await expect(panel).toContainText('web access on');
+  expect((await serviceSelect('projects', `id=eq.${id}&select=web_access`))[0].web_access).toBe('on');
   await panel.getByRole('button', { name: /Web sources/ }).click();
   const toggle = panel.getByRole('switch', { name: 'Web access' });
-  await expect(toggle).not.toBeChecked();
-  await expect(panel.getByRole('form', { name: 'Search the web' })).toHaveCount(0);
+  await expect(toggle).toBeChecked();
 
+  // Off, then on again: each is the user's, recorded.
+  await toggle.uncheck();
+  await expect(panel.getByRole('form', { name: 'Search the web' })).toHaveCount(0);
+  await expect.poll(async () => (await serviceSelect('projects', `id=eq.${id}&select=web_access`))[0].web_access).toBe('off');
   await toggle.check();
   await expect.poll(async () => (await serviceSelect('projects', `id=eq.${id}&select=web_access`))[0].web_access).toBe('on');
   // The event is written just after the switch's own row: wait for it rather than race it.
   await expect
-    .poll(async () => (await serviceSelect('workflow_events', `project_id=eq.${id}&type=eq.web_access_changed&select=actor,payload`))[0])
+    .poll(async () => (await serviceSelect('workflow_events', `project_id=eq.${id}&type=eq.web_access_changed&select=actor,payload&order=created_at`))[1])
     .toMatchObject({ actor: 'user', payload: { web_access: 'on' } });
 
   await panel.getByLabel('What to search the web for').fill('Harbor Industrial Services market growth');
