@@ -1932,8 +1932,8 @@ while it is on. Limits:
 - **The side chat decides for itself (22 Oct).** While Web access is on, every Ask message costs
   one more small call, which decides whether the question needs the web; a search follows only
   when it does. That decision is a model's judgement: a question it wrongly thinks the project
-  answers is answered without searching, and the user can't force a search from the chat (the
-  sources panel's "Search the web" still can). Change it (Instruct) never searches; it cites the
+  answers is answered without searching; asking it to "search for …" or "look up …" does
+  search. The chat is told on every message whether it can search, so it never denies it. Change it (Instruct) never searches; it cites the
   saved sources. A failed search doesn't lose the reply: it is answered from the project and
   says so. What the chat cites is saved before the reply is, numbered after the saved sources;
   past 40 saved sources (the most a request carries) the numbers stop lining up.

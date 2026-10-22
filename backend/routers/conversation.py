@@ -30,6 +30,7 @@ from promptmaster.revision_facts import RevisionFactsRequest, RevisionFactsRespo
 from promptmaster.claim_check import NewClaimsRequest, NewClaimsResponse, check_new_claims
 from promptmaster.web_search import (
     WebSource,
+    chat_web_line,
     decide_chat_search,
     found_block,
     numbered_found,
@@ -159,6 +160,7 @@ async def api_chat_message(
             iterations=req.iteration_history,
             context=req.context,
             found=found,
+            web=chat_web_line(req.web_access),
         )
         reply = await generate(
             client=client,

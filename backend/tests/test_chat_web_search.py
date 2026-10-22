@@ -130,3 +130,24 @@ def test_found_sources_are_numbered_after_the_saved_ones():
         (2, "https://a.example/2", False),
         (4, "https://b.example/y", True),
     ]
+
+
+def test_the_chat_is_told_it_can_search_even_when_this_message_did_not(body):
+    # 22 Oct: "can you access the internet" — rightly not searched — was answered
+    # "No, I can't browse" while Web access was on.
+    stub = _stub({"search": False, "query": ""})
+    r = _post(body(web_access="on", user_message="can you access the internet"), stub)
+    assert r.status_code == 200, r.text
+    prompt = _reply_prompt(stub)
+    assert "WEB SEARCH IN THIS CHAT: on" in prompt and "say yes" in prompt
+    assert "Never say you searched when no new web results are given below" in prompt
+    assert "When the user asks you to search or look something up, search" in stub.generate_json.call_args.kwargs["system"]
+
+
+def test_with_web_access_off_the_chat_is_told_it_cannot_search_and_how_to_turn_it_on(body):
+    stub = _stub()
+    _post(body(user_message="can you access the internet"), stub)
+    prompt = _reply_prompt(stub)
+    assert "WEB SEARCH IN THIS CHAT: off for this project" in prompt
+    assert "turning on Web access under Web sources" in prompt
+    assert "WEB SEARCH IN THIS CHAT: on" not in prompt
