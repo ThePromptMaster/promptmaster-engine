@@ -433,7 +433,8 @@ export default function NewProjectPage() {
           await saveStageChatMessage({
             project_id: project.id,
             stage_id: firstStage,
-            iteration_number: 0,
+            // The stage's first version is 1; the backend refuses a 0.
+            iteration_number: 1,
             role: t.role,
             content: t.draft ? `${t.content}\n\n${t.draft}` : t.content,
             mode: 'discuss',
