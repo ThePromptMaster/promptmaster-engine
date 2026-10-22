@@ -11,13 +11,26 @@ checked in code), so the confirmation screen shows nothing the model made up.
 
 from __future__ import annotations
 
+import logging
 import re
 
 from pydantic import BaseModel, Field
 
-from .llm_client import OpenRouterClient
+from .llm_client import OpenRouterClient, OpenRouterError
+from .schemas import ChatMessage, PMInput, SavedSource
 from .self_model import PROMPTMASTER_SELF_MODEL
 from .source_access import LINKS_RULE
+from .web_search import (
+    WebSource,
+    chat_web_line,
+    decide_chat_search,
+    found_block,
+    numbered_found,
+    search_web,
+    strip_unknown_citations,
+)
+
+logger = logging.getLogger(__name__)
 
 MAX_TURNS = 40
 MAX_LIST = 12
@@ -66,6 +79,13 @@ class FrontDoorTurn(BaseModel):
     draft: str = Field(default="", max_length=20_000)
     brief: DraftBrief
     ready: bool = False
+    #: What this turn searched the web for, or "" when it did not (22 Oct).
+    web_query: str = ""
+    #: The search's sources not yet found in this conversation, in the order
+    #: they are cited ([S n+1]…): saved to the project when it is made.
+    web_sources: list[WebSource] = Field(default_factory=list)
+    #: Set when a search was wanted but failed: the reply was made without it.
+    web_note: str = ""
 
 
 #: The brief's parts a user can edit in the outline beside the chat.
@@ -76,7 +96,13 @@ MAX_MATERIAL = 40_000
 
 
 def build_front_door_prompt(
-    turns: list[Turn], brief: DraftBrief, edited: list[str] | None = None, material: str = ""
+    turns: list[Turn],
+    brief: DraftBrief,
+    edited: list[str] | None = None,
+    material: str = "",
+    *,
+    web: str = "",
+    found: str = "",
 ) -> tuple[str, str]:
     convo = "\n".join(f"{'USER' if t.role == 'user' else 'YOU'}: {t.content.strip()}" for t in turns[-MAX_TURNS:])
     owned = [f for f in BRIEF_FIELDS if f in (edited or [])]
@@ -85,6 +111,8 @@ def build_front_door_prompt(
         + (f"WHAT THE USER ATTACHED (their own material; it counts as something they said):\n{material.strip()[:MAX_MATERIAL]}\n\n" if material.strip() else "")
         + f"THE DRAFT BRIEF SO FAR (update it; keep what still holds):\n{brief.model_dump_json()}\n\n"
         + (f"THE USER EDITED THESE PARTS OF THE BRIEF THEMSELVES — keep them as written: {', '.join(owned)}\n\n" if owned else "")
+        + (f"{web}\n\n" if web else "")
+        + (f"{found}\n\n" if found else "")
         + 
         'Return JSON only: {"reply": "your next message", "brief": {"objective": "", "audience": "", '
         '"requirements": [], "evidence": [], "deliverables": [], "stages": [], "approvals": []}, "draft": "", "enough": false}'
@@ -117,6 +145,8 @@ def parse_front_door(
     given: DraftBrief | None = None,
     edited: list[str] | None = None,
     material: str = "",
+    web_access: str = "off",
+    sources: list[SavedSource] | None = None,
 ) -> FrontDoorTurn:
     if not isinstance(result, dict):
         return FrontDoorTurn(reply="Sorry — could you say that again?", brief=given or DraftBrief())
@@ -182,7 +212,36 @@ async def front_door_turn(
     brief: DraftBrief,
     edited: list[str] | None = None,
     material: str = "",
+    web_access: str = "off",
+    sources: list[SavedSource] | None = None,
 ) -> FrontDoorTurn:
-    system, user = build_front_door_prompt(turns, brief, edited, material)
+    web_query, new_sources, web_note, found = "", [], "", ""
+    saved = sources or []
+    if web_access == "on":
+        # The side chat's search (22 Oct, client: "I don't think the internet
+        # works with the initial chatbox"): the same decision and search, with
+        # the conversation standing in for a project that does not exist yet.
+        asked = next((t.content for t in reversed(turns) if t.role == "user"), "")
+        inputs = PMInput(objective=(brief.objective or asked)[:4_000] or "A new project", mode="analyst", sources=saved)
+        history = [
+            ChatMessage(id=str(i), iteration_number=1, role=t.role, content=t.content, created_at="")
+            for i, t in enumerate(turns[:-1][-4:])
+        ]
+        try:
+            query = await decide_chat_search(client, model, inputs, history, asked[:4_000], "")
+            if query:
+                result = await search_web(client, model, inputs, query, purpose=asked[:600])
+                web_query, found = query, found_block(saved, query, result)
+                new_sources = [s for _n, s, new in numbered_found(saved, result.sources) if new]
+        except OpenRouterError as e:
+            logger.warning("front door web search failed: %s", e)
+            web_note = "The web search failed, so this reply uses only what you have said."
+    system, user = build_front_door_prompt(
+        turns, brief, edited, material, web=chat_web_line(web_access), found=found
+    )
     result, _usage = await client.generate_json(prompt=user, system=system, temperature=0.4, max_tokens=2_000, model=model)
-    return parse_front_door(result, turns, given=brief, edited=edited, material=material)
+    turn = parse_front_door(result, turns, given=brief, edited=edited, material=material)
+    if web_query:
+        turn.reply = strip_unknown_citations(turn.reply, len(saved) + len(new_sources))
+    turn.web_query, turn.web_sources, turn.web_note = web_query, new_sources, web_note
+    return turn

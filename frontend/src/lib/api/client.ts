@@ -626,7 +626,20 @@ export const api = {
     edited?: import('@/components/projects/front-door').BriefField[];
     /** The words of what the user attached. */
     material?: string;
-  }): Promise<{ reply: string; draft?: string; brief: import('@/components/projects/front-door').DraftBrief; ready: boolean }> {
+    /** On, a turn that needs the web is searched (22 Oct). */
+    web_access?: 'on' | 'off';
+    /** What the conversation's searches found so far, in citation order. */
+    sources?: { url: string; title: string; excerpt: string }[];
+  }): Promise<{
+    reply: string;
+    draft?: string;
+    brief: import('@/components/projects/front-door').DraftBrief;
+    ready: boolean;
+    web_query?: string;
+    /** Sources new to the conversation, cited after the ones sent. */
+    web_sources?: { url: string; title: string; excerpt: string }[];
+    web_note?: string;
+  }> {
     return apiFetch('/api/front-door', { method: 'POST', body: JSON.stringify(req) });
   },
 

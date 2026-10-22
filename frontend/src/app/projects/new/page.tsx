@@ -11,6 +11,8 @@ import { DOES_THE_WORK, SetupCard, type SetupDraft } from '@/components/projects
 import { CustomWorkflowDesigner } from '@/components/projects/custom-workflow-designer';
 import { FrontDoor, type DraftBrief, type Turn } from '@/components/projects/front-door';
 import { saveStageChatMessage } from '@/lib/supabase/conversation';
+import { saveSources } from '@/lib/supabase/sources';
+import type { ProjectSource } from '@/types/project';
 import { DraftStatus, type DraftSaveState } from '@/components/projects/draft-status';
 import { recordFacts, type NewFact } from '@/lib/supabase/facts';
 import { assumedByModel } from '@/lib/workflow/facts';
@@ -415,6 +417,17 @@ export default function NewProjectPage() {
           await attachProjectFile(project, file, imagePreview(file.name, caption, width, height));
         } catch (e) {
           failed.push(`${file.name} (${e instanceof Error && e.message ? e.message : 'not stored'})`);
+        }
+      }
+      // What its searches found (22 Oct), saved in the order the conversation
+      // cited it, so [S1] in the carried-over chat is [S1] under Web sources.
+      let found: ProjectSource[] = [];
+      for (const t of chat) {
+        if (!t.web?.sources.length) continue;
+        try {
+          found = [...found, ...(await saveSources({ ...project, sources: found }, t.web.sources, { query: t.web.query, stageId: selected.stages[0]?.id ?? null }))];
+        } catch (e) {
+          failed.push(`web sources found for “${t.web.query}” (${e instanceof Error && e.message ? e.message : 'not stored'})`);
         }
       }
       if (failed.length) {
