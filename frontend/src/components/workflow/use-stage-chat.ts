@@ -176,16 +176,22 @@ interface Options {
  * tests without a backend change.
  */
 
-/** The thread as the backend wants it: role and content, nothing else. */
 /** The thread without instructions that never changed the document. */
 export function inForce(messages: readonly StageChatMessage[]): StageChatMessage[] {
   return messages.filter((m) => !(m.role === 'user' && m.mode === 'instruct' && !m.appliedVersionId));
 }
 
-function asHistory(messages: StageChatMessage[]): ChatMessage[] {
+/**
+ * The thread as the backend wants it: role and content, nothing else.
+ *
+ * Numbered from 1: the conversation carried over from the start screen was
+ * stored as iteration 0 until 22 Oct, and the backend refuses a message below
+ * 1 — every question asked under it failed with a 422.
+ */
+export function asHistory(messages: StageChatMessage[]): ChatMessage[] {
   return messages.map(({ id, iteration_number, role, content, created_at }) => ({
     id,
-    iteration_number,
+    iteration_number: Math.max(1, iteration_number),
     role,
     content,
     created_at,
