@@ -116,7 +116,9 @@ _CHAT_DECIDE_SYSTEM = (
     "people, organisations, prices, laws, publications — that the project's accepted facts, its "
     "saved sources and the current version do not already settle. Do not search for a question "
     "about the document itself (its wording, structure, length or tone), for an opinion, or for "
-    "anything the user has just told you. Reply in JSON: "
+    "anything the user has just told you. A question about the chat itself (\"can you search the "
+    "web?\") is not a search. When the user asks you to search or look something up, search for "
+    "what they named. Reply in JSON: "
     '{"search": true or false, "query": "the words to search for, at most 12, or empty"}.'
 )
 
@@ -172,6 +174,27 @@ def numbered_found(saved: list[SavedSource], found: list[WebSource]) -> list[tup
             have[s.url] = nxt
             out.append((nxt, s, True))
     return out
+
+
+#: What the chat is told it can do, every message (22 Oct): asked "can you
+#: access the internet", a reply with no search in its prompt said no — and
+#: described Go's OpenAlex lookups instead — while Web access was on.
+CHAT_WEB_ON = (
+    "WEB SEARCH IN THIS CHAT: on. PromptMaster searches the public web for a question that "
+    "needs current or outside facts, and saves the sources a reply cites to the project. "
+    "If the user asks whether you can search or reach the internet, say yes: they can ask the "
+    "question, or ask you to look something up. Never say you searched when no new web results "
+    "are given below."
+)
+CHAT_WEB_OFF = (
+    "WEB SEARCH IN THIS CHAT: off for this project. You cannot search the web here. If the user "
+    "asks, say so, and that turning on Web access under Web sources lets this chat search."
+)
+
+
+def chat_web_line(web_access: str | None) -> str:
+    """The chat's web ability as a prompt line; "" for a caller that sent no switch."""
+    return {"on": CHAT_WEB_ON, "off": CHAT_WEB_OFF}.get(web_access or "", "")
 
 
 FOUND_HEADER = (
