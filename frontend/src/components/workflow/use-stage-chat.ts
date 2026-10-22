@@ -39,8 +39,10 @@ import {
   markStageChatApplied,
   markStageChatDiscarded,
   saveStageChatMessage,
+  type ChatWebSearch,
   type StageChatMessage,
 } from '@/lib/supabase/conversation';
+import { saveSources } from '@/lib/supabase/sources';
 import { inputsFrom } from './use-stage-generation';
 import { asIteration } from '@/lib/workflow/legacy';
 import {
@@ -151,6 +153,8 @@ interface Options {
   getChatContext?: () => ChatContext;
   /** After facts were updated with a revision, so the project reloads them. */
   onFactsChanged?: () => Promise<unknown> | void;
+  /** After the chat saved web sources, so the project reloads them (22 Oct). */
+  onSourcesChanged?: () => Promise<unknown> | void;
   /** The requirements checked on a revision's saved text, each met or not (13 Oct). */
   checkRevision?: (content: string) => { label: string; ok: boolean }[];
   /**
@@ -202,6 +206,7 @@ export function useStageChat({
   restoreStageVersion,
   getChatContext,
   onFactsChanged,
+  onSourcesChanged,
   checkRevision,
   autoApply = false,
 }: Options) {
@@ -264,7 +269,8 @@ export function useStageChat({
       role: 'user' | 'assistant',
       text: string,
       mode: 'discuss' | 'instruct',
-      scope?: string
+      scope?: string,
+      web?: ChatWebSearch | null
     ): Promise<StageChatMessage> => {
       const own = `${project.id}:${stageId}`;
       const saved = await saveStageChatMessage({
@@ -276,6 +282,7 @@ export function useStageChat({
         content: text,
         mode,
         scope: scope ?? null,
+        web: web ?? null,
       });
       if (live.current && thread.current === own) setMessages((prior) => [...prior, saved]);
       return saved;
@@ -308,9 +315,24 @@ export function useStageChat({
           user_message: message,
           model: project.model,
           context: getChatContext?.(),
+          web_access: project.web_access ?? 'off',
         });
 
-        await persist('assistant', response.assistant_message.content, 'discuss');
+        // The sources the reply cites are saved before the reply is, so a
+        // reloaded thread never shows an [S#] the project does not hold
+        // (22 Oct). They are numbered after the saved ones, as saveSources
+        // appends them.
+        let web: ChatWebSearch | null = null;
+        if (response.web_query) {
+          const found = response.web_sources ?? [];
+          const saved = found.length ? await saveSources(project, found, { query: response.web_query, stageId }) : [];
+          if (saved.length) await onSourcesChanged?.();
+          web = { query: response.web_query, saved: saved.length };
+        } else if (response.web_note) {
+          web = { query: '', saved: 0, note: response.web_note };
+        }
+
+        await persist('assistant', response.assistant_message.content, 'discuss', undefined, web);
       } catch (err) {
         if (live.current) {
           setError(errorText(err, 'Could not reach the model. Try again in a moment.'));
@@ -319,7 +341,7 @@ export function useStageChat({
         if (live.current) setBusy(false);
       }
     },
-    [busy, loading, messages, persist, project, content, versionNumber, getChatContext]
+    [busy, loading, messages, persist, project, stageId, content, versionNumber, getChatContext, onSourcesChanged]
   );
 
   /**

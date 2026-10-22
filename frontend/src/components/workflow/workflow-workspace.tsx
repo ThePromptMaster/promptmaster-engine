@@ -2496,6 +2496,7 @@ export function WorkflowWorkspace({
               stageId={stage.id}
               stageLabel={stage.label}
               onFactsChanged={() => onReload?.()}
+              onSourcesChanged={() => onReload?.()}
               // 13 Oct (Sean, email 6): the revision's saved text is checked
               // against what can be measured, and the result shown with it.
               checkRevision={(text) => measureStageContent(project, template, stage, text).map((m) => ({ label: `${m.label} — ${m.value ?? (m.satisfied ? 'met' : 'not met')}`, ok: m.satisfied }))}

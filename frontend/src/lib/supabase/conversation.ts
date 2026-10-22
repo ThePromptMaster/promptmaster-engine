@@ -118,6 +118,17 @@ export interface StageChatMessage extends ChatMessage {
   appliedVersionId?: string | null;
   /** Instruct only: the proposal was discarded or set aside; it never changed anything. */
   discarded?: boolean;
+  /** Discuss only: the web search this reply was made with (22 Oct). */
+  web?: ChatWebSearch | null;
+}
+
+/** A search the chat made for a reply: what for, and what it saved. */
+export interface ChatWebSearch {
+  query: string;
+  /** Sources newly saved to the project. */
+  saved: number;
+  /** Set when the search failed and the reply used only the project. */
+  note?: string;
 }
 
 interface StageChatMeta {
@@ -125,6 +136,7 @@ interface StageChatMeta {
   scope?: string | null;
   applied_version_id?: string | null;
   discarded?: boolean;
+  web?: ChatWebSearch | null;
 }
 
 interface StageRow extends ConversationMessageRow {
@@ -141,6 +153,7 @@ function rowToStageMessage(row: StageRow): StageChatMessage {
     scope: meta.scope ?? null,
     appliedVersionId: meta.applied_version_id ?? null,
     discarded: meta.discarded === true,
+    web: meta.web ?? null,
   };
 }
 
@@ -192,6 +205,7 @@ export async function saveStageChatMessage(msg: {
   mode: ChatMode;
   scope?: string | null;
   applied_version_id?: string | null;
+  web?: ChatWebSearch | null;
 }): Promise<StageChatMessage> {
   const local = (): StageChatMessage => ({
     id: crypto.randomUUID(),
@@ -202,6 +216,7 @@ export async function saveStageChatMessage(msg: {
     mode: msg.mode,
     scope: msg.scope ?? null,
     appliedVersionId: msg.applied_version_id ?? null,
+    web: msg.web ?? null,
   });
 
   const supabase = createClient();
@@ -212,6 +227,7 @@ export async function saveStageChatMessage(msg: {
     mode: msg.mode,
     scope: msg.scope ?? null,
     applied_version_id: msg.applied_version_id ?? null,
+    ...(msg.web ? { web: msg.web } : {}),
   };
 
   const { data, error } = await supabase

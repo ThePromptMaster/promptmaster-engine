@@ -31,6 +31,11 @@ const holdPendingChange = vi.fn<(...args: unknown[]) => Promise<unknown>>(async 
 const settlePendingChange = vi.fn<(...args: unknown[]) => Promise<unknown>>(async (id) => ({ ...HELD, id, status: 'accepted' }));
 const supersedeFact = vi.fn<(...args: unknown[]) => Promise<unknown>>(async () => ({}));
 
+const saveSources = vi.fn<(...args: unknown[]) => Promise<unknown[]>>(async (_project, found) => found as unknown[]);
+vi.mock('@/lib/supabase/sources', () => ({
+  saveSources: (...args: unknown[]) => saveSources(...args),
+}));
+
 vi.mock('@/lib/supabase/facts', () => ({
   supersedeFact: (...args: unknown[]) => supersedeFact(...args),
 }));
@@ -554,5 +559,47 @@ describe('a stage that cannot change the deliverable says where it is changed (1
     expect(screen.getByText(/To change the Output, open it and press Edit this stage\./)).toBeInTheDocument();
     await userEvent.setup().click(screen.getByRole('button', { name: 'Open Output' }));
     expect(onOpen).toHaveBeenCalled();
+  });
+});
+
+describe('the chat searches the web while Web access is on (22 Oct)', () => {
+  const WEB = { ...PROJECT, web_access: 'on' } as unknown as Project;
+  const FOUND = [{ url: 'https://example.org/market-2025', title: 'Market report 2025', excerpt: 'The market grew 4% in 2025.' }];
+
+  it('sends the switch, saves what the reply cites, says so, and changes no version', async () => {
+    chatMessage.mockResolvedValueOnce({
+      assistant_message: { content: 'The market grew 4% in 2025 [S1].' },
+      web_query: 'market growth 2025',
+      web_sources: FOUND,
+    });
+    const onSourcesChanged = vi.fn();
+    const { appendStageVersion } = panel({ project: WEB, onSourcesChanged });
+    expect(screen.getByText(/the chat searches the web when a question needs it/i)).toBeInTheDocument();
+    await ask('What is the latest market growth?');
+    await waitFor(() => expect(screen.getByText(/Searched the web for “market growth 2025” · 1 new source saved/)).toBeInTheDocument());
+    expect(chatMessage.mock.calls[0][0]).toMatchObject({ web_access: 'on' });
+    expect(saveSources).toHaveBeenCalledWith(WEB, FOUND, { query: 'market growth 2025', stageId: 'objective' });
+    expect(onSourcesChanged).toHaveBeenCalledTimes(1);
+    expect(appendStageVersion).not.toHaveBeenCalled();
+  });
+
+  it('with the switch off, says the chat answers from the project and saves nothing', async () => {
+    panel();
+    expect(screen.getByText(/Web access is off: the chat answers from the project only/)).toBeInTheDocument();
+    await ask('What is the latest market growth?');
+    await waitFor(() => expect(chatMessage).toHaveBeenCalledTimes(1));
+    expect(chatMessage.mock.calls[0][0]).toMatchObject({ web_access: 'off' });
+    expect(saveSources).not.toHaveBeenCalled();
+  });
+
+  it('a failed search is said under the reply', async () => {
+    chatMessage.mockResolvedValueOnce({
+      assistant_message: { content: 'From the project: no growth figure is recorded.' },
+      web_note: 'The web search failed, so this answer uses only what the project holds.',
+    });
+    panel({ project: WEB });
+    await ask('What is the latest market growth?');
+    await waitFor(() => expect(screen.getByText(/The web search failed/)).toBeInTheDocument());
+    expect(saveSources).not.toHaveBeenCalled();
   });
 });
