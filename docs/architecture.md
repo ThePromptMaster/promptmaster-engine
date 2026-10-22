@@ -291,7 +291,9 @@ Web access (2026-10-20): each project has a `web_access` switch (`on` by default
   `project_sources`. The table is append-only, retire-only, and its insert policy requires the
   switch on. A link the model wrote that the search did not return is unlinked in code.
 - Every request carries the current sources as `PMInput.sources`. `project_context.context_block`
-  numbers them [S1]… with the rule to cite only those. `generate-stage-artifact` removes any [Sn]
+  numbers them [S1]… with the rule to cite only those. The numbering follows `project_sources.seq`,
+  an identity column, so it is the order the sources were saved in. It is not `created_at`,
+  because one search saves all its sources in one insert and they share a timestamp (2026-10-22). `generate-stage-artifact` removes any [Sn]
   beyond the list.
 - Cost is metered from OpenRouter's own `usage.cost`, which includes the search fee.
 

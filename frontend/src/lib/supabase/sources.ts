@@ -11,7 +11,7 @@ import type { ProjectSource } from '@/types/project';
  * and is sent the current sources with every request (`inputsFrom`).
  */
 
-const COLUMNS = 'id, project_id, user_id, url, title, excerpt, query, stage_id, provider, origin, agent_run_id, retrieved_at, retired_at, created_at';
+const COLUMNS = 'id, seq, project_id, user_id, url, title, excerpt, query, stage_id, provider, origin, agent_run_id, retrieved_at, retired_at, created_at';
 
 export interface NewSource {
   url: string;
@@ -19,10 +19,14 @@ export interface NewSource {
   excerpt: string;
 }
 
+/**
+ * In the order they were saved (`seq`), which is the order they are cited in.
+ * Not `created_at`: one search's sources share one (22 Oct).
+ */
 export async function listProjectSources(projectId: string): Promise<ProjectSource[]> {
   const supabase = createClient();
   const { data, error } = await supabase
-    .from('project_sources').select(COLUMNS).eq('project_id', projectId).order('created_at', { ascending: true });
+    .from('project_sources').select(COLUMNS).eq('project_id', projectId).order('seq', { ascending: true });
   if (error) throw error;
   return (data ?? []) as unknown as ProjectSource[];
 }
@@ -50,7 +54,8 @@ export async function saveSources(
   }));
   const { data, error } = await supabase.from('project_sources').insert(rows).select(COLUMNS);
   if (error) throw error;
-  return (data ?? []) as unknown as ProjectSource[];
+  // In the order they were saved, as the reply cited them and as a reload lists them.
+  return ((data ?? []) as unknown as ProjectSource[]).sort((a, b) => a.seq - b.seq);
 }
 
 /** Take a source out of the current list; it stays in the history. */

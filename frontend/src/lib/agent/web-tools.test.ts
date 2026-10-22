@@ -25,7 +25,7 @@ describe('search_web follows the project switch', () => {
 
 describe('saved sources in a request', () => {
   const row = (id: string, retired = false): ProjectSource => ({
-    id, project_id: 'p', user_id: 'u', url: `https://example.org/${id}`, title: `Title ${id}`, excerpt: 'x', query: 'q',
+    id, seq: 0, project_id: 'p', user_id: 'u', url: `https://example.org/${id}`, title: `Title ${id}`, excerpt: 'x', query: 'q',
     stage_id: null, provider: 'openrouter_web', origin: 'user', agent_run_id: null,
     retrieved_at: '2026-10-20T10:00:00Z', retired_at: retired ? '2026-10-20T11:00:00Z' : null, created_at: '2026-10-20T10:00:00Z',
   });

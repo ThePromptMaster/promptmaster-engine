@@ -64,6 +64,8 @@ export interface ProjectFact {
 /** A web source the project saved (`project_sources`, 20 Oct). Never edited; only retired. */
 export interface ProjectSource {
   id: string;
+  /** Its place in the order sources were saved: [S n] counts in this order. */
+  seq: number;
   project_id: string;
   user_id: string;
   url: string;
