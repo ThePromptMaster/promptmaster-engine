@@ -6,6 +6,7 @@ import { api } from '@/lib/api/client';
 import { AutoGrowTextarea } from '@/components/shared/auto-grow-textarea';
 import { INPUT_LIMITS } from '@/lib/projects/input-limits';
 import { MarkdownOutput } from '@/components/shared/markdown-output';
+import type { NewSource } from '@/lib/supabase/sources';
 
 export interface DraftBrief {
   objective: string;
@@ -23,7 +24,23 @@ export const EMPTY_BRIEF: DraftBrief = { objective: '', audience: '', requiremen
 export type BriefField = keyof DraftBrief;
 
 /** A turn; an assistant turn may carry a piece of writing to use as it stands (10 Oct, email 1). */
-export type Turn = { role: 'user' | 'assistant'; content: string; draft?: string };
+export type Turn = { role: 'user' | 'assistant'; content: string; draft?: string; web?: FrontDoorSearch };
+
+/** A search a reply made (22 Oct): what for, and what it found that is new to the conversation. */
+export interface FrontDoorSearch {
+  query: string;
+  sources: NewSource[];
+  /** Set when the search failed and the reply was made without it. */
+  note?: string;
+}
+
+/**
+ * Every source the conversation's searches found, in the order they are cited
+ * ([S1], [S2], …): sent with each turn, and saved to the project when it is made.
+ */
+export function sourcesFound(turns: readonly Turn[]): NewSource[] {
+  return turns.flatMap((t) => t.web?.sources ?? []);
+}
 
 export interface FrontDoorState {
   turns: Turn[];
@@ -103,8 +120,21 @@ export function FrontDoor({
     try {
       // The model reads back its own drafts with the conversation.
       const sent = next.map((t) => ({ role: t.role, content: t.draft ? `${t.content}\n\nDRAFT YOU WROTE:\n${t.draft}` : t.content }));
-      const res = await api.frontDoor({ turns: sent, brief, edited, ...(material.trim() ? { material } : {}) });
-      setTurns([...next, { role: 'assistant', content: res.reply, ...(res.draft?.trim() ? { draft: res.draft.trim() } : {}) }]);
+      // A new project has Web access on (22 Oct), so the conversation that
+      // starts one searches as its side chat will.
+      const res = await api.frontDoor({
+        turns: sent,
+        brief,
+        edited,
+        ...(material.trim() ? { material } : {}),
+        web_access: 'on',
+        sources: sourcesFound(turns),
+      });
+      const web = res.web_query || res.web_note ? { query: res.web_query ?? '', sources: res.web_sources ?? [], ...(res.web_note ? { note: res.web_note } : {}) } : null;
+      setTurns([
+        ...next,
+        { role: 'assistant', content: res.reply, ...(res.draft?.trim() ? { draft: res.draft.trim() } : {}), ...(web ? { web } : {}) },
+      ]);
       setBrief(res.brief);
       setReady(res.ready);
     } catch (e) {
@@ -159,6 +189,7 @@ export function FrontDoor({
                   <MarkdownOutput content={t.content} />
                 </div>
                 {t.draft && <DraftBlock text={t.draft} />}
+                {t.web && <SearchNote search={t.web} first={sourcesFound(turns.slice(0, i)).length + 1} />}
               </div>
             )
           )}
@@ -182,6 +213,10 @@ export function FrontDoor({
             Send
           </button>
         </div>
+        <p className="mt-2 flex items-start gap-1.5 text-label text-[var(--on-surface-variant)]">
+          <span aria-hidden className="material-symbols-outlined text-[16px]">travel_explore</span>
+          <span>Web access is on: PromptMaster searches the web when a question needs it, and what it cites is saved with the project.</span>
+        </p>
         {attach && <div className="mt-2">{attach}</div>}
         {error && <p role="alert" className="mt-2 text-label text-[var(--pm-error)]">{error}</p>}
         <button onClick={onBack} className="mt-4 text-label text-[var(--on-surface-variant)] hover:underline">Back</button>
@@ -287,6 +322,35 @@ function OutlineList({ title, addLabel, items, onChange }: { title: string; addL
         placeholder={`+ ${addLabel.toLowerCase()}`}
         className="mt-1 w-full rounded-md bg-transparent px-1.5 py-0.5 text-label text-[var(--on-surface)] outline-none placeholder:text-[var(--outline)] focus:bg-[var(--surface-container-lowest)] focus:ring-1 focus:ring-[var(--pm-primary)]/40"
       />
+    </div>
+  );
+}
+
+/** What a reply searched for, and the sources it found, numbered as the reply cites them. */
+function SearchNote({ search, first }: { search: FrontDoorSearch; first: number }) {
+  return (
+    <div className="text-label text-[var(--on-surface-variant)]">
+      <p className="flex items-start gap-1.5">
+        <span aria-hidden className="material-symbols-outlined text-[16px]">{search.note ? 'public_off' : 'travel_explore'}</span>
+        <span>
+          {search.note ||
+            `Searched the web for “${search.query}” · ${
+              search.sources.length ? `${search.sources.length} new source${search.sources.length === 1 ? '' : 's'}` : 'no new sources'
+            }`}
+        </span>
+      </p>
+      {search.sources.length > 0 && (
+        <ol className="mt-1 space-y-0.5 pl-6">
+          {search.sources.map((s, i) => (
+            <li key={s.url} className="break-words">
+              [S{first + i}]{' '}
+              <a href={s.url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-[var(--on-surface)]">
+                {s.title || s.url}
+              </a>
+            </li>
+          ))}
+        </ol>
+      )}
     </div>
   );
 }

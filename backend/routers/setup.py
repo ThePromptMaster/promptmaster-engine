@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
@@ -10,7 +12,7 @@ from promptmaster.errors import PRESERVED_NOTHING_WRITTEN
 from promptmaster.limits import MAX_CHAT_MESSAGE_CHARS, MAX_CONTEXT_CHARS, MAX_OBJECTIVE_CHARS
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError
 from routers._errors import llm_http_error
-from promptmaster.schemas import GuideAnswer, GuideQuestion, SetupSuggestion
+from promptmaster.schemas import GuideAnswer, GuideQuestion, SavedSource, SetupSuggestion
 from promptmaster.workflow_designer import DesignedWorkflow, design_workflow
 from promptmaster.workflow_revision import RevisedWorkflow, revise_workflow
 from promptmaster.front_door import BRIEF_FIELDS, DraftBrief, FrontDoorTurn, Turn, front_door_turn
@@ -167,13 +169,22 @@ class FrontDoorRequest(BaseModel):
     edited: list[str] = Field(default=[], max_length=len(BRIEF_FIELDS))
     #: What the user attached on the start screen, as text.
     material: str = Field(default="", max_length=MAX_CONTEXT_CHARS)
+    #: Web access for the conversation (22 Oct). A new project has it on, so
+    #: the start screen sends "on"; a caller that sends nothing gets no search.
+    web_access: Literal["on", "off"] = "off"
+    #: What this conversation's searches have found so far, numbered [S1]… in
+    #: this order: a new search's sources follow them.
+    sources: list[SavedSource] = Field(default=[], max_length=60)
 
 
 @router.post("/front-door")
 async def api_front_door(req: FrontDoorRequest, client: OpenRouterClient = Depends(get_client)) -> FrontDoorTurn:
     """One turn of talking a project into shape: a reply, and the draft brief as
-    it stands (6 Oct, email 8). 1 LLM call; saves nothing."""
+    it stands (6 Oct, email 8). 1 LLM call, or 3 when Web access is on and the
+    turn needs a search (22 Oct); saves nothing."""
     try:
-        return await front_door_turn(client, req.model or None, req.turns, req.brief, req.edited, req.material)
+        return await front_door_turn(
+            client, req.model or None, req.turns, req.brief, req.edited, req.material, req.web_access, req.sources
+        )
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)

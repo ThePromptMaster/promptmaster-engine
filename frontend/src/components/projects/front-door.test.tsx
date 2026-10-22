@@ -6,7 +6,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { FrontDoor } from './front-door';
+import { FrontDoor, sourcesFound } from './front-door';
 
 const frontDoor = vi.fn();
 vi.mock('@/lib/api/client', () => ({ api: { frontDoor: (...a: unknown[]) => frontDoor(...a) } }));
@@ -54,5 +54,27 @@ describe('FrontDoor', () => {
     expect(brief.requirements).toEqual(['Under $5,000']);
     expect(said).toContain('Under $5,000');
     expect(turns.map((t: { role: string }) => t.role)).toEqual(['user', 'assistant']);
+  });
+
+  it('searches the web (22 Oct), shows what it found, and numbers the next search after it', async () => {
+    const source = (n: number) => ({ url: `https://example.org/${n}`, title: `Source ${n}`, excerpt: '' });
+    frontDoor
+      .mockResolvedValueOnce({ ...reply('A guide to Portugal'), reply: 'About 10.7 million [S1].', web_query: 'Portugal population', web_sources: [source(1)] })
+      .mockResolvedValueOnce({ ...reply('A guide to Portugal'), reply: 'Lisbon [S2].', web_query: 'Portugal capital', web_sources: [source(2)] });
+    const onReady = vi.fn();
+    render(<FrontDoor opening="How many people live in Portugal?" onReady={onReady} onBack={vi.fn()} />);
+    await screen.findByText(/Searched the web for “Portugal population”/);
+    expect(screen.getByRole('link', { name: 'Source 1' })).toHaveAttribute('href', 'https://example.org/1');
+    expect(frontDoor.mock.calls[0][0]).toMatchObject({ web_access: 'on', sources: [] });
+
+    await userEvent.type(screen.getByLabelText('Your message'), 'And its capital?');
+    await userEvent.click(screen.getByRole('button', { name: 'Send' }));
+    await screen.findByText(/Searched the web for “Portugal capital”/);
+    expect(frontDoor.mock.calls[1][0].sources).toEqual([source(1)]);
+    expect(screen.getByRole('link', { name: 'Source 2' }).closest('li')).toHaveTextContent('[S2] Source 2');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Make it a project' }));
+    const turns = onReady.mock.calls[0][3];
+    expect(sourcesFound(turns).map((s) => s.url)).toEqual(['https://example.org/1', 'https://example.org/2']);
   });
 });

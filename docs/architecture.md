@@ -626,6 +626,7 @@ Assessment: `docs/assessments/2026-10-21-oct14-call.md`.
 | Thinking level | `projects.thinking` (`20261106000000`); `lib/api/thinking.ts` sends `X-PromptMaster-Thinking`; `observability.thinking_var` sets it per request; `llm_client._token_budget` sends `effort: "high"` + `DEEP_HEADROOM` for Deep |
 | Apply and continue | `use-go-loop.ts` `applyAndContinue()` (Autonomous, authorized), separate from `update()`, which Go's own button uses |
 | Chat-first start | `components/projects/front-door.tsx` (auto-sent opening, editable outline, `edited`, `material`); `promptmaster/front_door.py` `_keep_edits`; `app/projects/new/page.tsx` `makeFromConversation` → `create()`, the transcript saved with `saveStageChatMessage` on the first stage |
+| Web search before the project exists (22 Oct) | `front_door_turn` runs the side chat's `decide_chat_search` → `search_web` while `web_access` is on (the start screen always sends on: a new project has it on); each turn's new sources ride on the turn (`Turn.web`), are sent back as `sources` so numbering continues, and `create()` saves them with `saveSources` in citation order, so [S n] in the carried-over chat is [S n] under Web sources |
 | Timeline | `lib/workflow/timeline.ts` (`projectTimeline`, pure); `components/workflow/project-timeline.tsx` |
 | Project colour | `projects.accent` (`20261107000000`, checked by `accent-drift.test.ts`); `lib/appearance/colours.ts` `accentVariables`, set on the workspace root and the project card |
 | Full-work reader note | `lib/workflow/reader-lag.ts` |
