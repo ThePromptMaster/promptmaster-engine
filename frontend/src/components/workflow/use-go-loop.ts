@@ -1,5 +1,6 @@
 'use client';
 
+import { keepFound, webAccessOf } from '@/lib/workflow/web-found';
 import { sourcesToCheck } from '@/lib/workflow/lookup';
 
 /**
@@ -781,7 +782,9 @@ export function useGoLoop(opts: Options) {
               const pkg = await api.agentExpertPackage({
                 inputs: inputsFrom(o.project), issue: question.slice(0, 2_000), stage_label: o.stage.label,
                 documents: recordDocuments(o.template, o.state, o.bundles), model: o.project.model,
+                web_access: webAccessOf(o.project),
               }, signal).catch(() => null);
+              if (pkg) await keepFound(o.project, pkg, { stageId: o.stage.id, agentRunId: current.id });
               if (pkg) choice.params = { ...choice.params, expert_package: packageMarkdown(pkg, o.project.title) };
             }
           }

@@ -11,6 +11,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from promptmaster.web_search import WebAccess, WebUse, cite_only_known, with_web
 from deps import get_client
 from promptmaster.audit_findings import (
     _format_findings_block,
@@ -50,6 +51,9 @@ class ApplyAuditRequest(BaseModel):
     iteration_number: int
     iteration_history: list[Iteration] = []
     model: str = ""
+    #: The project's Web access switch (22 Oct): on, this searches the web
+    #: first when the work needs outside facts.
+    web_access: WebAccess = "off"
 
 
 class ApplyRecommendationsRequest(BaseModel):
@@ -71,9 +75,12 @@ class ApplyRecommendationsRequest(BaseModel):
     content: str
     findings: list[AuditFinding]
     model: str = ""
+    #: The project's Web access switch (22 Oct): on, this searches the web
+    #: first when the work needs outside facts.
+    web_access: WebAccess = "off"
 
 
-class ApplyRecommendationsResponse(BaseModel):
+class ApplyRecommendationsResponse(WebUse):
     content: str
     #: What was sent, so the caller can store it as the version's `instruction`
     #: (FR-10 provenance) without rebuilding the string and risking a mismatch.
@@ -113,8 +120,13 @@ async def api_apply_audit(
     """Apply selected audit findings -> new iteration. 4 LLM calls (1 + 3 parallel)."""
     try:
         model = req.model or None
+        inputs, web = await with_web(
+            client, model, req.inputs, req.web_access,
+            task="\n".join(f.suggested_change for f in req.findings)[:2_000],
+            current=req.source_iteration.output,
+        )
         system_text, prompt_text = build_apply_audit_prompt(
-            inputs=req.inputs,
+            inputs=inputs,
             source_iteration=req.source_iteration,
             findings=req.findings,
             iterations=req.iteration_history,
@@ -131,7 +143,7 @@ async def api_apply_audit(
         iteration, suggestions = await build_iteration_with_full_pipeline(
             client=client,
             model=model,
-            inputs=req.inputs,
+            inputs=inputs,
             output=revised_output,
             iteration_number=req.iteration_number,
             system_text=system_text,
@@ -143,7 +155,8 @@ async def api_apply_audit(
             user_action_label=_label_trigger("applied_audit"),
             finish_reason=finish_reason,
         )
-        return IterationFromConversationResponse(iteration=iteration, suggestions=suggestions)
+        iteration.output = cite_only_known(iteration.output, inputs, web)
+        return IterationFromConversationResponse(iteration=iteration, suggestions=suggestions, **dict(web))
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
 
@@ -170,6 +183,11 @@ async def api_apply_recommendations(
     """
     try:
         model = req.model or None
+        inputs, web = await with_web(
+            client, model, req.inputs, req.web_access,
+            task="\n".join(f.suggested_change for f in req.findings)[:2_000],
+            current=req.content,
+        )
 
         # A minimal Iteration purely to feed the existing builder, which reads
         # `.output` from it and nothing else. Constructed here rather than
@@ -179,12 +197,12 @@ async def api_apply_recommendations(
             iteration_number=1,
             prompt_sent="",
             output=req.content,
-            mode=req.inputs.mode,
+            mode=inputs.mode,
             trigger_source="applied_recommendations",
         )
 
         system_text, prompt_text = build_apply_audit_prompt(
-            inputs=req.inputs,
+            inputs=inputs,
             source_iteration=source,
             findings=req.findings,
             iterations=[],
@@ -197,12 +215,13 @@ async def api_apply_recommendations(
         )
 
         return ApplyRecommendationsResponse(
-            content=revised,
+            content=cite_only_known(revised, inputs, web),
             # Returned rather than recomputed by the caller: the version row
             # stores it as FR-10 provenance, and two places building the same
             # string is two places for it to drift.
             instruction=_format_findings_block(req.findings),
             finish_reason=finish_reason or "",
+            **dict(web),
         )
     except OpenRouterError as e:
         # Lane C's classified detail rather than a bare string: applying a

@@ -14,13 +14,17 @@ it refuses a request that does not say "on" rather than reading the row (L-97).
 
 from __future__ import annotations
 
+import logging
 import re
-from typing import Any
+from datetime import datetime, timezone
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from .llm_client import OpenRouterClient
-from .schemas import ChatMessage, PMInput, SavedSource
+from .llm_client import OpenRouterClient, OpenRouterError
+from .schemas import ChatMessage, PMInput, SavedSource, WebSource, WebUse
+
+logger = logging.getLogger(__name__)
 
 MAX_RESULTS = 5
 MAX_EXCERPT = 600
@@ -31,13 +35,6 @@ _SEARCH_SYSTEM = (
     "comes from. If the results do not answer the question, say so plainly. Never invent a "
     "source, a figure or a link, and never fill a gap from memory."
 )
-
-
-class WebSource(BaseModel):
-    url: str = Field(max_length=2_000)
-    title: str = Field(default="", max_length=300)
-    #: What the search returned from the page, clipped.
-    excerpt: str = Field(default="", max_length=MAX_EXCERPT)
 
 
 class WebSearchResult(BaseModel):
@@ -212,3 +209,77 @@ def found_block(saved: list[SavedSource], query: str, result: WebSearchResult) -
     if not result.sources:
         lines.append("(the search returned no sources)")
     return "\n".join(lines)
+
+
+# --------------------------------------------------------------------------
+# Every writer searches (22 Oct): "every AI agent should have web access".
+# --------------------------------------------------------------------------
+
+_WORK_DECIDE_SYSTEM = (
+    "You decide whether a piece of work for a PromptMaster project needs a search of the public web "
+    "before it is written. Search only for current or outside facts — figures, events, people, "
+    "organisations, prices, laws, publications — that the work will need and that the project's "
+    "accepted facts, its saved sources and the current draft do not already settle. Do not search "
+    "for work that only reorganises, shortens, restyles, continues or critiques what the project "
+    "already holds, for a matter of opinion or judgement, or for anything the user has supplied. "
+    "When in doubt, do not search. Reply in JSON: "
+    '{"search": true or false, "query": "the words to search for, at most 12, or empty"}.'
+)
+
+
+def build_work_decision_prompt(inputs: PMInput, task: str, current: str) -> tuple[str, str]:
+    saved = "\n".join(f"- {s.title or s.url}" for s in inputs.sources) or "(none)"
+    facts = "\n".join(f"- {f.statement}" for f in inputs.facts) or "(none)"
+    user = (
+        f"PROJECT OBJECTIVE: {inputs.objective[:2_000]}\n"
+        f"ACCEPTED FACTS:\n{facts[:3_000]}\n"
+        f"SAVED SOURCES:\n{saved}\n"
+        + (f"CURRENT DRAFT (start):\n{current[:1_500]}\n" if current.strip() else "")
+        + f"\nTHE WORK TO DO NOW:\n{task[:2_000]}\n\n"
+        "Does doing this need a web search first? If so, what should be searched for?"
+    )
+    return _WORK_DECIDE_SYSTEM, user
+
+
+WebAccess = Literal["on", "off"]
+
+WEB_FAILED_NOTE = "The web search failed, so this was written from what the project holds."
+
+
+async def with_web(
+    client: OpenRouterClient,
+    model: str | None,
+    inputs: PMInput,
+    web_access: str | None,
+    task: str,
+    current: str = "",
+) -> tuple[PMInput, WebUse]:
+    """Search the web for a piece of work when it needs it, while Web access is on.
+
+    What is found joins `inputs.sources`, numbered after the saved ones, so
+    every prompt builder cites it through `context_block` as it cites any
+    saved source — no builder changes. Off, or not needed, the inputs come back
+    as they were. A failed decision or search never costs the work: it is done
+    from the project, and `web_note` says so.
+    """
+    if web_access != "on":
+        return inputs, WebUse()
+    try:
+        system, user = build_work_decision_prompt(inputs, task, current)
+        data, _usage = await client.generate_json(user, system=system, temperature=0.0, max_tokens=200, model=model)
+        query = " ".join(str(data.get("query") or "").split())[:400] if isinstance(data, dict) else ""
+        if not (isinstance(data, dict) and data.get("search") is True and len(query) >= 2):
+            return inputs, WebUse()
+        result = await search_web(client, model, inputs, query, purpose=task[:600])
+    except OpenRouterError as e:
+        logger.warning("web search for a writer failed: %s", e)
+        return inputs, WebUse(web_note=WEB_FAILED_NOTE)
+    new = [s for _n, s, is_new in numbered_found(inputs.sources, result.sources) if is_new]
+    today = datetime.now(timezone.utc).date().isoformat()
+    added = [SavedSource(url=s.url, title=s.title, excerpt=s.excerpt, retrieved=today) for s in new]
+    return inputs.model_copy(update={"sources": [*inputs.sources, *added]}), WebUse(web_query=query, web_sources=new)
+
+
+def cite_only_known(text: str, inputs: PMInput, web: WebUse) -> str:
+    """After a search, a citation past the sources now on record is removed."""
+    return strip_unknown_citations(text, len(inputs.sources)) if web.web_query else text

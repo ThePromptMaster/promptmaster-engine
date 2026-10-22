@@ -1,5 +1,6 @@
 'use client';
 
+import { keepFound, webAccessOf } from '@/lib/workflow/web-found';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { DerivedOutlineNotice } from './derived-outline-notice';
@@ -356,13 +357,13 @@ export function OutlineStagePanel({
       // The same call Go mode's generate_outline makes (B2a). Derived outlines
       // re-derive and never call a model; either way the merge keeps a section
       // that has left the outline in the orphan tray with its prose intact.
-      edit(await generateOutlineDraft({ project, doc, drafts, derive: derive ? () => derive(form) : undefined }));
+      edit(await generateOutlineDraft({ project, doc, drafts, derive: derive ? () => derive(form) : undefined, stageId }));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not regenerate the outline.');
     } finally {
       setRegeneratingAll(false);
     }
-  }, [project, doc, drafts, edit, derive, form]);
+  }, [project, doc, drafts, edit, derive, form, stageId]);
 
   const handleRegenerateItem = useCallback(
     async (itemId: string) => {
@@ -390,11 +391,14 @@ export function OutlineStagePanel({
         // fresh outline of the same length and everything else is left alone —
         // including the item's id, so its prose stays attached. Swaps for an
         // item-scoped generator without touching anything above this line.
-        const { outline } = await api.generateOutline({
+        const res = await api.generateOutline({
           inputs: inputsFor(project),
           suggested_section_count: doc.items.length,
           model: project.model,
+          web_access: webAccessOf(project),
         });
+        await keepFound(project, res, { stageId });
+        const { outline } = res;
         const fresh = outline[index];
         if (!fresh) throw new Error('The model returned a shorter outline.');
         edit(applyItemRegeneration(doc, itemId, { title: fresh.title, abstract: fresh.abstract }));
@@ -404,7 +408,7 @@ export function OutlineStagePanel({
         setRegeneratingItemId(null);
       }
     },
-    [doc, project, edit, derive, formOf, form]
+    [doc, project, edit, derive, formOf, form, stageId]
   );
 
   const handleDiscardDraft = useCallback(() => {

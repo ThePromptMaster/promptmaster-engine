@@ -8,6 +8,7 @@
  * a workflow event the database checks like any other.
  */
 
+import { keepFound, webAccessOf, webLine, withWebLine, type WebUse } from '@/lib/workflow/web-found';
 import { api } from '@/lib/api/client';
 import { saveSources } from '@/lib/supabase/sources';
 import { awaitSectionJobs, type WaitResult } from '@/lib/jobs/await';
@@ -495,8 +496,9 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
 
   switch (actionFor(key)?.performer) {
     case 'reason': {
-      const res = await api.agentReason({ inputs, state: ctx.digest, action_key: key, params, model }, ctx.signal);
-      return done(key, { status: 'succeeded', output: clip(res.text), toolsUsed: ['model'], changes: {} });
+      const res = await api.agentReason({ inputs, state: ctx.digest, action_key: key, params, model, web_access: webAccessOf(ctx.project) }, ctx.signal);
+      const web = await keepWeb(ctx, res, ctx.stage);
+      return done(key, { status: 'succeeded', output: clip([res.text, webLine(web)].filter(Boolean).join('\n\n')), toolsUsed: res.web_query ? ['model', 'web'] : ['model'], changes: {} });
     }
 
     case 'compute': {
@@ -686,6 +688,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         generationRequest(ctx.project, ctx.template, ctx.state, fresh, ctx.stage, revising ? head : '', revising ? withDerivation(routineKept?.instruction ?? withAnswer(instruction, ctx.conflictAnswer), ctx.derived) : ''),
         ctx.signal
       );
+      await keepWeb(ctx, res, ctx.stage);
       const generated = generationContent(ctx.stage, res);
       // A revised table keeps what a lookup, a run or the user established on
       // its rows: the model may not claim "Retrieved", so without this every
@@ -766,22 +769,25 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         return done(key, { status: 'failed', output: 'There is no draft to continue.', toolsUsed: [], changes: {} });
       }
       // The same call as the page's "Continue writing" (use-stage-tools).
-      const { iteration } = await api.continueDocument(
+      const continued = await api.continueDocument(
         {
           inputs,
           incomplete_iteration: asIteration(head.content, head.version_number, ctx.project.mode),
           iteration_number: head.version_number + 1,
           model,
+          web_access: webAccessOf(ctx.project),
         },
         ctx.signal
       );
+      const { iteration } = continued;
+      const continuedWeb = await keepWeb(ctx, continued, ctx.stage);
       const created = await ctx.appendStageVersion(ctx.stage.id, ctx.stage.label, {
         content: iteration.output,
         source_operation: 'continuation',
         instruction: 'Continue from where the draft stopped.',
         model: iteration.model_used || ctx.project.model,
         mode: modeForStage(ctx.project, ctx.stage),
-        change_summary: iteration.summary || 'Go mode continued the draft from where it was cut off.',
+        change_summary: withWebLine(iteration.summary || 'Go mode continued the draft from where it was cut off.', continuedWeb),
         finish_reason: null,
       });
       const versionId = (created as { id?: unknown } | null)?.id;
@@ -805,7 +811,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // by the same function the panel's own button calls; no model is asked.
       const derived = ctx.template.outline_stage === 'derived';
       const doc = await generateOutlineDraft({
-        project: ctx.project, doc: f.doc, drafts: [],
+        project: ctx.project, doc: f.doc, drafts: [], stageId: ctx.stage.id, agentRunId: ctx.run.id,
         // In the form the project's reader calls for; the user can lay it out the other way on the outline.
         ...(derived ? { derive: () => deriveOutlineItems(ctx.template, ctx.state, ctx.bundles, { form: defaultOutlineForm(ctx.template, ctx.project) }) } : {}),
       });
@@ -887,7 +893,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
           : routineKept
             ? [...findings, { id: 'priority', category: 'Priority', summary: 'Which takes priority, under the routine-decision policy', suggested_change: routineKept.precedence }]
             : findings,
-        source: 'the stage check', signal: ctx.signal,
+        source: 'the stage check', signal: ctx.signal, stageId: ctx.stage.id, agentRunId: ctx.run.id,
         // A table is revised as rows, by the generator that drafted it.
         ...(rendererHoldsItems(ctx.stage.renderer)
           ? { table: { stage: ctx.stage, request: (instruction: string) => generationRequest(ctx.project, ctx.template, ctx.state, ctx.bundles, ctx.stage, head.content, instruction) } }
@@ -1031,11 +1037,13 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       const instruction = recheckInstruction(target.label, why, superseded, before ? 'table' : 'prose') + measuredLine + decidedLine + claimsInstruction(claims);
       const fresh = await readManuscript(ctx, target);
       if (!fresh) return manuscriptMissing(key, target);
+      // Only the first attempt may search: a retry fixes what it wrote, not what it knew.
+      let searched = false;
       const attempt = async (text: string) => {
-        const res = await api.generateStageArtifact(
-          generationRequest(ctx.project, ctx.template, ctx.state, fresh, target, head, text),
-          ctx.signal
-        );
+        const request = generationRequest(ctx.project, ctx.template, ctx.state, fresh, target, head, text);
+        const res = await api.generateStageArtifact(searched ? { ...request, web_access: 'off' } : request, ctx.signal);
+        searched = true;
+        await keepWeb(ctx, res, target);
         const generated = generationContent(target, res);
         const after = before ? withoutRevisionNotes(parseItems(generated)) : null;
         // A decided finding on a value a later fact replaced is kept, marked superseded (17 Oct, 20→12).
@@ -1580,6 +1588,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         try {
           const fresh = await withFreshManuscript(ctx.template, target, ctx.bundles).catch(() => ctx.bundles);
           const res = await api.generateStageArtifact(generationRequest(ctx.project, ctx.template, ctx.state, fresh, target, head, instruction), ctx.signal);
+          await keepWeb(ctx, res, target);
           const generated = generationContent(target, res);
           const before = rendererHoldsItems(target.renderer) ? parseItems(head) : null;
           const after = before ? parseItems(generated) : null;
@@ -2309,4 +2318,9 @@ export function failedChecks(ctx: Pick<PerformContext, 'context' | 'template'> &
   // Q3b: work only people can do is not done until a human result is on record.
   const people = ctx.project ? unmetHumanRequirements(ctx.project).map((r) => `Needs people: "${r}" — no human result is on record, and no AI pass stands in for it`) : [];
   return [...measured, ...carried, ...people].slice(0, 30);
+}
+
+/** Save what a Go step's search found, citing the run (22 Oct). */
+function keepWeb(ctx: PerformContext, res: WebUse, stage: StageDefinition) {
+  return keepFound(ctx.project, res, { stageId: stage.id, agentRunId: ctx.run.id });
 }

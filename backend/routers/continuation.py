@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from promptmaster.web_search import WebAccess, cite_only_known, with_web
 from deps import get_client
 from promptmaster.continuity import (
     build_continuation_prompt,
@@ -29,6 +30,9 @@ class ContinueDocumentRequest(BaseModel):
     iteration_number: int
     iteration_history: list[Iteration] = []
     model: str = ""
+    #: The project's Web access switch (22 Oct): on, this searches the web
+    #: first when the work needs outside facts.
+    web_access: WebAccess = "off"
 
 
 @router.post("/continue-document")
@@ -48,18 +52,23 @@ async def api_continue_document(
     """
     try:
         model = req.model or None
+        inputs, web = await with_web(
+            client, model, req.inputs, req.web_access,
+            task="Continue the document from where it stops, to the end the brief asks for.",
+            current=req.incomplete_iteration.output[-1_500:],
+        )
 
         # Step 1: snapshot
         snapshot = await generate_continuity_snapshot(
             client=client,
             model=model,
-            inputs=req.inputs,
+            inputs=inputs,
             previous_output=req.incomplete_iteration.output,
         )
 
         # Step 2: build continuation prompt
         system_text, prompt_text = build_continuation_prompt(
-            inputs=req.inputs,
+            inputs=inputs,
             incomplete_iteration=req.incomplete_iteration,
             snapshot=snapshot,
             iterations=req.iteration_history,
@@ -79,7 +88,7 @@ async def api_continue_document(
         iteration, suggestions = await build_iteration_with_full_pipeline(
             client=client,
             model=model,
-            inputs=req.inputs,
+            inputs=inputs,
             output=merged_output,
             iteration_number=req.iteration_number,
             system_text=system_text,
@@ -94,7 +103,8 @@ async def api_continue_document(
 
         # Step 6: attach snapshot to the resulting iteration
         iteration = iteration.model_copy(update={"continuity_snapshot": snapshot})
+        iteration.output = cite_only_known(iteration.output, inputs, web)
 
-        return IterationFromConversationResponse(iteration=iteration, suggestions=suggestions)
+        return IterationFromConversationResponse(iteration=iteration, suggestions=suggestions, **dict(web))
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)

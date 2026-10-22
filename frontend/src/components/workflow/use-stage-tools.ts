@@ -11,6 +11,7 @@
  * replacing it — so nothing here can lose work.
  */
 
+import { keepFound, webAccessOf, withWebLine } from '@/lib/workflow/web-found';
 import { insertRecommendation } from '@/lib/supabase/recommendations';
 import { pointsFromCommentary } from '@/lib/workflow/critique-points';
 import { useCallback, useRef, useState } from 'react';
@@ -121,31 +122,37 @@ export function useStageTools({ project, stage, headVersion, fallbackContent = '
 
       try {
         if (kind === 'continue') {
-          const { iteration } = await api.continueDocument({
+          const res = await api.continueDocument({
             inputs: inputsFrom(project),
             incomplete_iteration: asIteration(content, headVersion?.version_number ?? 0, project.mode),
             iteration_number: next,
             model: project.model,
+            web_access: webAccessOf(project),
           });
+          const { iteration } = res;
+          const web = await keepFound(project, res, { stageId: stage.id });
           await appendStageVersion?.(stage.id, stage.label, {
             content: iteration.output,
             source_operation: 'continuation',
             instruction: 'Continue from where the draft stopped.',
             model: iteration.model_used || project.model,
             mode: project.mode,
-            change_summary: iteration.summary || 'Continued from where the draft was cut off.',
+            change_summary: withWebLine(iteration.summary || 'Continued from where the draft was cut off.', web),
             finish_reason: null,
           });
           return;
         }
 
-        const { iteration } = await api.flowTrigger({
+        const res = await api.flowTrigger({
           inputs: inputsFrom(project),
           current_output: content,
           trigger: kind,
           iteration_number: next,
           model: project.model,
+          web_access: webAccessOf(project),
         });
+        const { iteration } = res;
+        const web = await keepFound(project, res, { stageId: stage.id });
         const output = iteration.output.trim();
         if (!output) throw new Error('The model returned nothing usable. Trying again often works.');
 
@@ -168,7 +175,7 @@ export function useStageTools({ project, stage, headVersion, fallbackContent = '
           instruction: tool.label,
           model: iteration.model_used || project.model,
           mode: project.mode,
-          change_summary: iteration.summary || tool.label,
+          change_summary: withWebLine(iteration.summary || tool.label, web),
         });
       } catch (e) {
         setError(

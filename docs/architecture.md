@@ -296,6 +296,14 @@ Web access (2026-10-20): each project has a `web_access` switch (`on` by default
   because one search saves all its sources in one insert and they share a timestamp (2026-10-22). `generate-stage-artifact` removes any [Sn]
   beyond the list.
 - Cost is metered from OpenRouter's own `usage.cost`, which includes the search fee.
+- Every writer may search too (2026-10-22), not only the panel, Go's `search_web` and the side chat.
+  Its request sends `web_access`, and `web_search.with_web` makes one small decision call ("does
+  this work need outside facts?") and searches if so. The new sources are appended to
+  `inputs.sources`, so the prompt numbers and cites them through `context_block` unchanged.
+  The response returns `web_query` / `web_sources` / `web_note` (`schemas.WebUse`). The browser
+  saves them with `keepFound` (`lib/workflow/web-found.ts`) before the version that cites them,
+  and adds them to the store; `WebFoundNotice` shows the search on the stage, and the version's
+  change summary records it. What is excluded is in L-100.
 
 ## Go mode (Phase B: PM-12, PM-15, PM-17 … PM-20)
 

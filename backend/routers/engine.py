@@ -27,6 +27,7 @@ from promptmaster.errors import PRESERVED_NOTHING_WRITTEN
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError, resolve_model
 from routers._errors import llm_http_error
 from routers._pipeline import build_iteration_with_full_pipeline
+from promptmaster.web_search import WebAccess, WebUse, cite_only_known, with_web
 from deps import get_client
 
 # Triggers that produce commentary *about* the previous answer rather than a
@@ -55,7 +56,7 @@ class RunIterationRequest(BaseModel):
     source: str = "initial"
 
 
-class RunIterationResponse(BaseModel):
+class RunIterationResponse(WebUse):
     iteration: Iteration
     suggestions: list[str]
 
@@ -96,6 +97,9 @@ class FlowTriggerRequest(BaseModel):
     evaluation: EvaluationResult | None = None
     iteration_history: list[Iteration] = []
     model: str = ""
+    #: The project's Web access switch (22 Oct): on, this searches the web
+    #: first when the work needs outside facts.
+    web_access: WebAccess = "off"
 
 
 class FlowInspectRequest(BaseModel):
@@ -176,9 +180,14 @@ async def api_flow_trigger(
     try:
         model = req.model or None
         history = req.iteration_history
+        inputs, web = await with_web(
+            client, model, req.inputs, req.web_access,
+            task=f"{_label_trigger(req.trigger)} of the current version",
+            current=req.current_output,
+        )
 
         system_text, prompt_text = build_flow_trigger_prompt(
-            inputs=req.inputs,
+            inputs=inputs,
             current_output=req.current_output,
             trigger=req.trigger,
             evaluation=req.evaluation,
@@ -197,19 +206,20 @@ async def api_flow_trigger(
                 prompt_sent=prompt_text,
                 system_prompt_used=system_text,
                 output=output,
-                mode=req.inputs.mode,
+                mode=inputs.mode,
                 evaluation=None,
                 trigger_source=req.trigger,
                 created_at=datetime.now(timezone.utc).isoformat(),
                 model_used=resolve_model(model) if model else "",
                 instruction=_label_trigger(req.trigger),
             )
-            return RunIterationResponse(iteration=iteration, suggestions=[])
+            iteration.output = cite_only_known(iteration.output, inputs, web)
+            return RunIterationResponse(iteration=iteration, suggestions=[], **dict(web))
 
         iteration, suggestions = await build_iteration_with_full_pipeline(
             client=client,
             model=model,
-            inputs=req.inputs,
+            inputs=inputs,
             output=output,
             iteration_number=req.iteration_number,
             system_text=system_text,
@@ -223,7 +233,8 @@ async def api_flow_trigger(
             instruction=_label_trigger(req.trigger),
         )
 
-        return RunIterationResponse(iteration=iteration, suggestions=suggestions)
+        iteration.output = cite_only_known(iteration.output, inputs, web)
+        return RunIterationResponse(iteration=iteration, suggestions=suggestions, **dict(web))
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
 

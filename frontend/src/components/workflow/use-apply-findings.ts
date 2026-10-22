@@ -61,7 +61,7 @@ export function useApplyFindings({
       setRunning(true);
       setError(null);
       try {
-        const rev = await reviseWithFindings({ project, content, findings, source: opts.source, signal: controller.signal, table });
+        const rev = await reviseWithFindings({ project, content, findings, source: opts.source, signal: controller.signal, table, stageId: stage?.id ?? null });
         if (controller.signal.aborted) return;
         // The before/after preview is a text view; a table is saved as a
         // version straight away, and the one before it is a click to restore.
@@ -76,7 +76,7 @@ export function useApplyFindings({
         setRunning(false);
       }
     },
-    [headVersion, running, project, save, table]
+    [headVersion, running, project, save, table, stage?.id]
   );
 
   const keep = useCallback(async () => {

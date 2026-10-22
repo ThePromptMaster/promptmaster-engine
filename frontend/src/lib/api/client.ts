@@ -405,7 +405,8 @@ export const api = {
     evaluation?: EvaluationResult | null;
     iteration_history?: Iteration[];
     model?: string;
-  }): Promise<{ iteration: Iteration; suggestions: string[] }> {
+    web_access?: 'on' | 'off';
+  }): Promise<{ iteration: Iteration; suggestions: string[] } & import('@/lib/workflow/web-found').WebUse> {
     return apiFetch('/api/flow-trigger', {
       method: 'POST',
       body: JSON.stringify(req),
@@ -512,6 +513,7 @@ export const api = {
     inputs: PMInput;
     suggested_section_count: number;
     model?: string;
+    web_access?: 'on' | 'off';
   }): Promise<GenerateOutlineResponse> {
     return apiFetch('/api/generate-outline', {
       method: 'POST',
@@ -860,14 +862,15 @@ export const api = {
       stage_label: string;
       documents: { label: string; text: string; executed: boolean }[];
       model?: string;
+      web_access?: 'on' | 'off';
     },
     signal?: AbortSignal
-  ): Promise<import('@/lib/agent/expert').ExpertPackage & { model_used: string }> {
+  ): Promise<import('@/lib/agent/expert').ExpertPackage & { model_used: string } & import('@/lib/workflow/web-found').WebUse> {
     return apiFetch('/api/agent/expert-package', { method: 'POST', body: JSON.stringify(req), signal });
   },
 
   async agentReason(
-    req: { inputs: PMInput; state: AgentStateDigest; action_key: string; params: Record<string, unknown>; model?: string },
+    req: { inputs: PMInput; state: AgentStateDigest; action_key: string; params: Record<string, unknown>; model?: string; web_access?: 'on' | 'off' },
     signal?: AbortSignal
   ): Promise<AgentTextResponse> {
     return apiFetch('/api/agent/reason', { method: 'POST', body: JSON.stringify(req), signal });

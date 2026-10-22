@@ -9,7 +9,7 @@ engine.
 
 from __future__ import annotations
 
-from promptmaster.web_search import strip_unknown_citations
+from promptmaster.web_search import WebAccess, strip_unknown_citations, with_web
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
@@ -60,6 +60,9 @@ class GenerateStageArtifactRequest(BaseModel):
     # What to change about it: a revision instruction from the user or Go mode.
     instruction: str = Field(default="", max_length=MAX_INSTRUCTION_CHARS)
     model: str = ""
+    #: The project's Web access switch (22 Oct): on, the stage searches the
+    #: web first when its work needs outside facts.
+    web_access: WebAccess = "off"
 
 
 @router.post("/generate-stage-artifact")
@@ -74,10 +77,18 @@ async def api_generate_stage_artifact(
     produce audience segments, and costs four calls where one will do.
     """
     try:
+        inputs, web = await with_web(
+            client,
+            req.model or None,
+            req.inputs,
+            req.web_access,
+            task="\n".join(t for t in (req.stage.label, req.stage.entry_prompt_hint, req.instruction) if t.strip()),
+            current=req.existing_content,
+        )
         result = await generate_stage_artifact(
             client=client,
             model=req.model or None,
-            inputs=req.inputs,
+            inputs=inputs,
             stage=req.stage,
             digest=req.digest,
             item_schema=req.item_schema,
@@ -88,8 +99,8 @@ async def api_generate_stage_artifact(
         raise llm_http_error(e, PRESERVED_STAGE_VERSIONS)
     result.model_used = _model_used(req.model, client)
     # A citation to a source not on record points at nothing (20 Oct).
-    result.content = strip_unknown_citations(result.content, len(req.inputs.sources))
-    return result
+    result.content = strip_unknown_citations(result.content, len(inputs.sources))
+    return result.model_copy(update=dict(web))
 
 
 class EvaluateStageArtifactRequest(BaseModel):

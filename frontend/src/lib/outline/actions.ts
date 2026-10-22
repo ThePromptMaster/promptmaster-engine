@@ -9,6 +9,7 @@
  * behaviour is unchanged, and the store's rows are the same rows.
  */
 
+import { keepFound, webAccessOf } from '@/lib/workflow/web-found';
 import { api } from '@/lib/api/client';
 import { coerceOutlineDocument, mergeRegeneratedOutline } from '@/lib/outline/model';
 import { longFormFromOutline } from '@/lib/outline/long-form';
@@ -69,6 +70,10 @@ export interface GenerateOutlineArgs {
   derive?: () => OutlineItem[];
   /** How many sections to ask for; at least the current count, at least 3. */
   sectionCount?: number;
+  /** The outline stage, where a web search's sources are saved from (22 Oct). */
+  stageId?: string | null;
+  /** Go's run, when Go asked for it. */
+  agentRunId?: string | null;
 }
 
 /**
@@ -81,11 +86,14 @@ export async function generateOutlineDraft(args: GenerateOutlineArgs): Promise<O
   const { project, doc, drafts = [], derive } = args;
   const keep = drafts.filter((d) => d.word_count > 0).map((d) => d.item_id);
   if (derive) return mergeRegeneratedOutline(doc, derive(), keep);
-  const { outline } = await api.generateOutline({
+  const res = await api.generateOutline({
     inputs: inputsFrom(project),
     suggested_section_count: Math.max(args.sectionCount ?? 0, doc.items.length, 3),
     model: project.model,
+    web_access: webAccessOf(project),
   });
+  await keepFound(project, res, { stageId: args.stageId ?? null, agentRunId: args.agentRunId ?? null });
+  const { outline } = res;
   return mergeRegeneratedOutline(doc, outline.map((s) => ({ title: s.title, abstract: s.abstract })), keep);
 }
 

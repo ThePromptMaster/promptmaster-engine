@@ -36,6 +36,10 @@ from promptmaster.web_search import (
     numbered_found,
     search_web,
     strip_unknown_citations,
+    WebAccess,
+    WebUse,
+    cite_only_known,
+    with_web,
 )
 from routers._pipeline import build_iteration_with_full_pipeline
 
@@ -84,6 +88,9 @@ class ApplyToAnswerRequest(BaseModel):
     #: Where the user is (stage, workflow, outline, chapters, buttons). Optional,
     #: so a caller that predates it gets the old prompt.
     context: ChatContext | None = None
+    #: The project's Web access switch (22 Oct): on, the revision searches
+    #: the web first when the change needs outside facts.
+    web_access: WebAccess = "off"
 
 
 class SaveAsNewVersionRequest(BaseModel):
@@ -96,9 +103,12 @@ class SaveAsNewVersionRequest(BaseModel):
     #: Where the user is (stage, workflow, outline, chapters, buttons). Optional,
     #: so a caller that predates it gets the old prompt.
     context: ChatContext | None = None
+    #: The project's Web access switch (22 Oct): on, the revision searches
+    #: the web first when the change needs outside facts.
+    web_access: WebAccess = "off"
 
 
-class IterationFromConversationResponse(BaseModel):
+class IterationFromConversationResponse(WebUse):
     iteration: Iteration
     suggestions: list[str]
 
@@ -118,6 +128,11 @@ class SuggestActionsResponse(BaseModel):
 
 
 # --- Helpers ---
+
+def _asked(chat_history: list[ChatMessage]) -> str:
+    """What the user asked for in the discussion, latest last: a revision's task."""
+    return "\n".join(m.content[:600] for m in chat_history if m.role == "user")[-2_000:]
+
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -196,8 +211,12 @@ async def api_apply_to_answer(
     """Patch the active iteration's answer with conversation insights → new iteration."""
     try:
         model = req.model or None
+        inputs, web = await with_web(
+            client, model, req.inputs, req.web_access,
+            task=_asked(req.chat_history), current=req.active_iteration.output,
+        )
         system_text, prompt_text = build_apply_to_answer_prompt(
-            inputs=req.inputs,
+            inputs=inputs,
             active_iteration=req.active_iteration,
             chat_history=req.chat_history,
             iterations=req.iteration_history,
@@ -212,7 +231,7 @@ async def api_apply_to_answer(
         iteration, suggestions = await build_iteration_with_full_pipeline(
             client=client,
             model=model,
-            inputs=req.inputs,
+            inputs=inputs,
             output=output,
             iteration_number=req.iteration_number,
             system_text=system_text,
@@ -224,7 +243,8 @@ async def api_apply_to_answer(
             user_action_label=_label_trigger(trigger_source),
             finish_reason=finish_reason,
         )
-        return IterationFromConversationResponse(iteration=iteration, suggestions=suggestions)
+        iteration.output = cite_only_known(iteration.output, inputs, web)
+        return IterationFromConversationResponse(iteration=iteration, suggestions=suggestions, **dict(web))
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
 
@@ -237,8 +257,12 @@ async def api_save_as_new_version(
     """Generate a fresh new version using chat as guidance → new iteration."""
     try:
         model = req.model or None
+        inputs, web = await with_web(
+            client, model, req.inputs, req.web_access,
+            task=_asked(req.chat_history), current=req.active_iteration.output,
+        )
         system_text, prompt_text = build_save_as_new_version_prompt(
-            inputs=req.inputs,
+            inputs=inputs,
             active_iteration=req.active_iteration,
             chat_history=req.chat_history,
             iterations=req.iteration_history,
@@ -253,7 +277,7 @@ async def api_save_as_new_version(
         iteration, suggestions = await build_iteration_with_full_pipeline(
             client=client,
             model=model,
-            inputs=req.inputs,
+            inputs=inputs,
             output=output,
             iteration_number=req.iteration_number,
             system_text=system_text,
@@ -265,7 +289,8 @@ async def api_save_as_new_version(
             user_action_label=_label_trigger(trigger_source),
             finish_reason=finish_reason,
         )
-        return IterationFromConversationResponse(iteration=iteration, suggestions=suggestions)
+        iteration.output = cite_only_known(iteration.output, inputs, web)
+        return IterationFromConversationResponse(iteration=iteration, suggestions=suggestions, **dict(web))
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
 

@@ -355,6 +355,11 @@ def _json_reply(system: str, prompt: str) -> dict:
             # "[[mock:draft]]" asks for a piece of writing: it comes back apart from the reply.
             **({"draft": "Hi team — lunch is on Wednesday at 1:00 p.m. Bring your own; coming is optional."} if "[[mock:draft]]" in said else {}),
         }
+    if system.startswith("You decide whether a piece of work for a PromptMaster project needs a search"):
+        # Every writer may search (22 Oct). Scripted runs search only when the
+        # work names "[[mock:web]]", so a run that never asked is unchanged.
+        wants = "[[mock:web]]" in prompt
+        return {"search": wants, "query": "market growth 2025" if wants else ""}
     if system.startswith("You decide whether a question in a PromptMaster project's side chat"):
         # The chat searches the web only for a question about the outside
         # world; "latest" or "on the web" stands in for one (22 Oct).

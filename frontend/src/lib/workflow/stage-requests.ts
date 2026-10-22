@@ -19,6 +19,7 @@ import {
   serializeItems,
   type StageItem,
 } from '@/lib/workflow/stage-artifact';
+import { webAccessOf } from '@/lib/workflow/web-found';
 import type { AuditFinding } from '@/types';
 import type { StageDefinition, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
 import type { NewEvaluation } from '@/lib/supabase/versions';
@@ -74,6 +75,8 @@ export function generationRequest(
   const schema = itemSchemaFor(target);
   return {
     inputs: { ...inputsFrom(project), mode: modeForStage(project, target) },
+    // Every stage may search the web first, while the switch is on (22 Oct).
+    web_access: webAccessOf(project),
     stage: {
       id: target.id,
       label: target.label,
