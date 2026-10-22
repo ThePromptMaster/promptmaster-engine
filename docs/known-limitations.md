@@ -1972,3 +1972,35 @@ From the 14 Oct call (assessment `docs/assessments/2026-10-21-oct14-call.md`):
 - **Make it a project picks the recommended workflow.** It does not ask which one. "Review the setup first" is the way to choose. A file attached in the chat is stored on the project when the project is made, as before. A conversation kept as a draft keeps its text, not its files.
 - **The timeline shows what the page has loaded.** It lists versions and decisions, not every event: job and cursor events are left out. It does not show chat messages.
 - **Project colour is an accent only.** It changes the buttons, the selected version and the project's card. Surfaces and version colours stay the user's own.
+
+### L-100 — Every writer may search the web; checks and setup do not (2026-10-22)
+
+"Every AI agent should have web access." While a project's Web access is on (the default), these
+search the public web first when the work needs current or outside facts:
+- stage drafts and regenerations
+- Change it and "Save this discussion as a new version"
+- Continue writing, and the Refine, Challenge, Reframe and Drift tools
+- applying recommendations or findings, and the outline
+- Go's drafts, rechecks, reasoning moves and expert packages
+- the side chat and the start-screen conversation
+
+All of them use one helper (`web_search.with_web`), and what it finds is saved and cited as [S n],
+the same way the side chat's sources are.
+- **One extra call, every time.** Each of these makes one small model call to decide whether a
+  search is needed, even when it is not. A search, when made, is a second call plus OpenRouter's
+  search fee. Both are metered in `model_usage`. Turning Web access off removes both.
+- **Checks never search.** Evaluations, conflict and claim checks, fact and figure extraction,
+  dependent-claim checks, objective assessment and reply-action parsing judge what the project
+  holds. A check that pulls in outside facts no longer checks the project.
+- **Setup does not search.** Guide me, the workflow designer and the setup suggestion run
+  before a project exists and design the work rather than state facts. The start-screen
+  conversation does search, and its sources come with the project.
+- **Chapters do not search yet.** Long-form sections are written by the server-side job
+  (`lib/jobs/generator.ts`), which has no path to save sources. They cite the sources already
+  saved.
+- **A retry does not search again.** When Go retries a recheck that left an old value behind,
+  only the first attempt may search.
+- **Numbering assumes one writer at a time.** New sources are numbered after the ones the
+  request carried, as `saveSources` appends them. Two writers searching on the same project at
+  once (a stage draft and the side chat, say) can number a source differently from where it is
+  saved. A project sends at most 40 current sources, so the same holds past 40.

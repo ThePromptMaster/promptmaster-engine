@@ -1,3 +1,4 @@
+import type { WebUse } from '@/lib/workflow/web-found';
 /**
  * Go mode's records (B1). Mirrors supabase/migrations/20260928000000_agent_runs.sql.
  */
@@ -136,7 +137,7 @@ export interface NextActionResponse {
   model_used: string;
 }
 
-export interface AgentTextResponse {
+export interface AgentTextResponse extends WebUse {
   text: string;
   model_used: string;
   usage: AgentUsage;

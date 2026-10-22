@@ -1,3 +1,4 @@
+import type { WebUse } from '@/lib/workflow/web-found';
 export type ModeType = 'architect' | 'critic' | 'clarity' | 'coach' | 'therapist' | 'cold_critic' | 'analyst' | 'custom';
 export type ScoreLevel = 'Low' | 'Medium' | 'High';
 export type Phase = 'input' | 'review' | 'output' | 'realign' | 'summary';
@@ -114,7 +115,7 @@ export interface DetectLongFormResponse {
   reason: string;
 }
 
-export interface GenerateOutlineResponse {
+export interface GenerateOutlineResponse extends WebUse {
   outline: OutlineSection[];
 }
 
@@ -270,6 +271,8 @@ export interface ChatMessageResponse {
 }
 
 export interface ApplyToAnswerRequest {
+  /** The project's Web access switch: on, the work searches the web first when it needs outside facts (22 Oct). */
+  web_access?: 'on' | 'off';
   inputs: PMInput;
   active_iteration: Iteration;
   chat_history: ChatMessage[];
@@ -279,6 +282,8 @@ export interface ApplyToAnswerRequest {
 }
 
 export interface SaveAsNewVersionRequest {
+  /** The project's Web access switch: on, the work searches the web first when it needs outside facts (22 Oct). */
+  web_access?: 'on' | 'off';
   inputs: PMInput;
   active_iteration: Iteration;
   chat_history: ChatMessage[];
@@ -288,12 +293,14 @@ export interface SaveAsNewVersionRequest {
   context?: ChatContext;
 }
 
-export interface IterationFromConversationResponse {
+export interface IterationFromConversationResponse extends WebUse {
   iteration: Iteration;
   suggestions: string[];
 }
 
 export interface ContinueDocumentRequest {
+  /** The project's Web access switch: on, the work searches the web first when it needs outside facts (22 Oct). */
+  web_access?: 'on' | 'off';
   inputs: PMInput;
   incomplete_iteration: Iteration;
   iteration_number: number;
@@ -380,6 +387,8 @@ export interface AuditFindingsResponse {
 }
 
 export interface ApplyAuditRequest {
+  /** The project's Web access switch: on, the work searches the web first when it needs outside facts (22 Oct). */
+  web_access?: 'on' | 'off';
   inputs: PMInput;
   source_iteration: Iteration;
   findings: AuditFinding[];
@@ -397,6 +406,8 @@ export interface ApplyAuditRequest {
  * dialog is the one spliced into the prompt.
  */
 export interface ApplyRecommendationsRequest {
+  /** The project's Web access switch: on, the work searches the web first when it needs outside facts (22 Oct). */
+  web_access?: 'on' | 'off';
   inputs: PMInput;
   /** The artifact as stored — Markdown for prose, the item document otherwise. */
   content: string;
@@ -404,7 +415,7 @@ export interface ApplyRecommendationsRequest {
   model?: string;
 }
 
-export interface ApplyRecommendationsResponse {
+export interface ApplyRecommendationsResponse extends WebUse {
   content: string;
   /** The findings block that was sent. Stored as the new version's FR-10 instruction. */
   instruction: string;
@@ -509,6 +520,8 @@ export interface SuggestActionsRequest {
 }
 
 export interface GenerateStageArtifactRequest {
+  /** The project's Web access switch: on, the work searches the web first when it needs outside facts (22 Oct). */
+  web_access?: 'on' | 'off';
   inputs: PMInput;
   stage: StageDescriptorRequest;
   digest: StageDigestRequest;
@@ -519,7 +532,7 @@ export interface GenerateStageArtifactRequest {
   model?: string;
 }
 
-export interface GenerateStageArtifactResponse {
+export interface GenerateStageArtifactResponse extends WebUse {
   content: string;
   /** Rows for list and review stages; the extra keys are schema-defined. */
   items: Record<string, string>[];

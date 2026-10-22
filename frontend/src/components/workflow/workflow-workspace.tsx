@@ -1,5 +1,6 @@
 'use client';
 
+import { WebFoundNotice } from './web-found-notice';
 import { formOf, inFormWords } from '@/lib/workflow/work-form';
 import { modeForStage } from '@/lib/workflow/stage-mode';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -2002,6 +2003,7 @@ export function WorkflowWorkspace({
             approvalPending={approvalPendingIds.has(stage.id)}
             hasDraft={Boolean(context.artifactNonEmpty[stage.id])}
           />
+          <WebFoundNotice projectId={project.id} stageId={stage.id} />
 
           {isCurrent && appendStageVersion && project.status !== 'finalized' && (
             <GoPanel

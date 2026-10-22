@@ -24,6 +24,7 @@
  *   Stop aborted the real draft somewhere else (4 Oct).
  */
 
+import { keepFound, withWebLine } from '@/lib/workflow/web-found';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { api } from '@/lib/api/client';
@@ -156,6 +157,8 @@ export function useStageGeneration({
         );
 
         if (controller.signal.aborted) return;
+        // What a search found is saved before the draft that cites it (22 Oct).
+        const web = await keepFound(p, response, { stageId: target.id });
 
         const content = generationContent(target, response);
 
@@ -180,7 +183,10 @@ export function useStageGeneration({
           model: response.model_used || p.model,
           mode: p.mode,
           // Where a version came from is on the version (10 Oct, email 6.7).
-          change_summary: options?.force ? 'Regenerated draft.' : options?.auto ? 'Drafted automatically when the stage opened.' : 'Drafted from the stage menu.',
+          change_summary: withWebLine(
+            options?.force ? 'Regenerated draft.' : options?.auto ? 'Drafted automatically when the stage opened.' : 'Drafted from the stage menu.',
+            web
+          ),
           finish_reason: response.finish_reason || null,
         });
       } catch (err) {

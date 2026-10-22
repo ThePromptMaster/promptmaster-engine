@@ -1,5 +1,6 @@
 'use client';
 
+import { keepFound, webAccessOf, withWebLine } from '@/lib/workflow/web-found';
 import { RefusedRevision } from '@/lib/workflow/commit-check';
 
 /**
@@ -468,7 +469,10 @@ export function useStageChat({
           chat_history: [...priorHistory, scoped],
           iteration_number: versionNumber + 1,
           model: project.model,
+          web_access: webAccessOf(project),
         });
+        // Saved before the revision is offered, so what it cites is on record (22 Oct).
+        const web = await keepFound(project, response, { stageId });
 
         const after = response.iteration.output.trim();
         if (!after) {
@@ -500,9 +504,10 @@ export function useStageChat({
             { facts: project.facts, instruction: ask, before: content, after: checked.nextContent, model: project.model },
             (req) => api.revisionFacts(req)
           ),
-          changeSummary:
-            response.iteration.summary?.trim() ||
-            `Revised ${scopeNoun(kind)} from the side chat: ${text}`,
+          changeSummary: withWebLine(
+            response.iteration.summary?.trim() || `Revised ${scopeNoun(kind)} from the side chat: ${text}`,
+            web
+          ),
           revisedFrom,
         });
       } catch (err) {
@@ -513,7 +518,7 @@ export function useStageChat({
         if (live.current) setBusy(false);
       }
     },
-    [busy, loading, content, messages, persist, project, versionNumber, checkedRevision, instructionFor]
+    [busy, loading, content, messages, persist, project, versionNumber, checkedRevision, instructionFor, stageId]
   );
 
   /**
@@ -538,7 +543,9 @@ export function useStageChat({
         iteration_number: versionNumber + 1,
         model: project.model,
         context: getChatContext?.(),
+        web_access: webAccessOf(project),
       });
+      const web = await keepFound(project, response, { stageId });
       const after = response.iteration.output.trim();
       if (!after) {
         if (live.current) setError('The new version came back empty. Try again in a moment.');
@@ -557,7 +564,7 @@ export function useStageChat({
         ...checked.fields,
         baseContent: content,
         messageId: null,
-        changeSummary: response.iteration.summary?.trim() || 'Revised from the side-chat discussion.',
+        changeSummary: withWebLine(response.iteration.summary?.trim() || 'Revised from the side-chat discussion.', web),
         source: 'chat_save',
       });
     } catch (err) {
@@ -565,7 +572,7 @@ export function useStageChat({
     } finally {
       if (live.current) setBusy(false);
     }
-  }, [busy, messages, content, project, versionNumber, getChatContext, checkedRevision]);
+  }, [busy, messages, content, project, versionNumber, getChatContext, checkedRevision, stageId]);
 
   /**
    * Accept the proposal: append it as a new version.

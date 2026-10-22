@@ -34,6 +34,26 @@ class AcceptedFact(BaseModel):
     replaces: str = Field(default="", max_length=2_000)
 
 
+class WebSource(BaseModel):
+    url: str = Field(max_length=2_000)
+    title: str = Field(default="", max_length=300)
+    #: What the search returned from the page, clipped (`web_search.MAX_EXCERPT`).
+    excerpt: str = Field(default="", max_length=600)
+
+
+class WebUse(BaseModel):
+    """What a writer searched the web for, for the browser to save and show.
+
+    A response that writes something carries these; all empty when nothing was
+    searched. `web_sources` are the ones new to the project, in the order the
+    work cites them ([S n+1]…), which is the order `saveSources` appends them.
+    """
+    web_query: str = ""
+    web_sources: list[WebSource] = Field(default_factory=list)
+    #: Set when a search was wanted but failed: the work was done without it.
+    web_note: str = ""
+
+
 class SavedSource(BaseModel):
     """A web source the project saved (20 Oct): cited in stages as [S1], [S2], …,
     in the order sent. The browser sends the current ones; nothing is stored here."""
@@ -306,7 +326,7 @@ class DetectLongFormResponse(BaseModel):
     reason: str = ""
 
 
-class GenerateOutlineResponse(BaseModel):
+class GenerateOutlineResponse(WebUse):
     """Response from outline generation call."""
     outline: list[OutlineSection]
 
@@ -623,7 +643,7 @@ class StageItem(BaseModel):
     id: str
 
 
-class GenerateStageArtifactResponse(BaseModel):
+class GenerateStageArtifactResponse(WebUse):
     """Prose stages fill `content`; list stages fill `items`."""
     content: str = Field(default="")
     items: list[StageItem] = Field(default_factory=list)

@@ -66,3 +66,14 @@ describe('the request says who may set which status (1 Oct, items 3, 12, 18)', (
     expect(schema.fields.map((f) => f.key)).toEqual(['work', 'finding', 'relation']);
   });
 });
+
+describe('every stage may search the web while the switch is on (22 Oct)', () => {
+  const state = initialState(RESEARCH_V1);
+  const target = RESEARCH_V1.stages[0];
+  const project = (web_access: 'on' | 'off') =>
+    ({ objective: 'o', audience: 'a', constraints: '', mode: 'architect', model: 'm', web_access }) as never;
+  it('sends the project\'s switch with every stage request', () => {
+    expect(generationRequest(project('on'), RESEARCH_V1, state, {}, target, '').web_access).toBe('on');
+    expect(generationRequest(project('off'), RESEARCH_V1, state, {}, target, '').web_access).toBe('off');
+  });
+});

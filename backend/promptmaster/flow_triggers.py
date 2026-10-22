@@ -23,6 +23,7 @@ from .schemas import PMInput, EvaluationResult, Iteration
 from .llm_client import OpenRouterClient
 from .modes import MODES
 from .prompt_builder import build_prompt
+from .project_context import context_block
 from .self_model import PROMPTMASTER_SELF_MODEL
 from .session_context import format_session_history
 
@@ -67,6 +68,14 @@ _PROMPTMASTER_CONTEXT = (
 )
 
 
+
+def _project(inputs: PMInput) -> str:
+    """The project's facts, sources and material, as every prompt carries them
+    (22 Oct): a Refine that cannot see the accepted facts or the saved
+    sources can contradict the one and cannot cite the other."""
+    block = context_block(inputs)
+    return f"{block}\n\n" if block else ""
+
 def build_challenge_prompt(
     inputs: PMInput, current_output: str, iterations: list[Iteration] | None = None
 ) -> tuple[str, str]:
@@ -86,6 +95,7 @@ def build_challenge_prompt(
     )
     user = (
         f"Original objective: {inputs.objective}\n\n"
+        f"{_project(inputs)}"
         f"{format_session_history(iterations or [])}\n\n"
         f"--- PREVIOUS ANSWER (the one you are challenging) ---\n{current_output}\n--- END PREVIOUS ANSWER ---\n\n"
         "Now challenge this answer. Structure your response as:\n"
@@ -120,6 +130,7 @@ def build_reframe_prompt(
     )
     user = (
         f"Original objective: {inputs.objective}\n\n"
+        f"{_project(inputs)}"
         f"{format_session_history(iterations or [])}\n\n"
         f"--- CURRENT ANSWER (working within the existing frame) ---\n{current_output}\n--- END CURRENT ANSWER ---\n\n"
         "Now reframe. Structure your response as:\n\n"
@@ -154,6 +165,7 @@ def build_self_audit_response_prompt(
     )
     user = (
         f"Original objective: {inputs.objective}\n\n"
+        f"{_project(inputs)}"
         f"{format_session_history(iterations or [])}\n\n"
         f"--- PREVIOUS ANSWER (the one you are auditing) ---\n{current_output}\n--- END PREVIOUS ANSWER ---\n\n"
         "Structure your response in two parts:\n\n"
@@ -206,6 +218,7 @@ def build_drift_alert_prompt(
         user += f"Constraints: {inputs.constraints}\n"
     if inputs.output_format.strip():
         user += f"Format: {inputs.output_format}\n"
+    user += f"\n{_project(inputs)}" if _project(inputs) else ""
     user += (
         f"\nRe-answer the objective now. Stay strictly within scope. Do not repeat the drift patterns above. "
         f"Operate as {mode_display} Mode throughout."
@@ -241,6 +254,7 @@ def build_refine_prompt(
     )
     user = (
         f"Original objective: {inputs.objective}\n\n"
+        f"{_project(inputs)}"
         f"{format_session_history(iterations or [])}\n\n"
         f"--- PREVIOUS ANSWER (the one you are refining) ---\n{current_output}\n--- END PREVIOUS ANSWER ---\n\n"
         f"REFINEMENT INSTRUCTION: {refine_instruction}\n\n"

@@ -20,6 +20,7 @@ import { itemSchemaFor, parseItems, serializeItems, type StageItem, type StageIt
 import type { StageDefinition } from '@/lib/workflow/types';
 import type { AuditFinding, GenerateStageArtifactRequest } from '@/types';
 import type { Project } from '@/types/project';
+import { keepFound, webAccessOf, withWebLine, type WebFound } from '@/lib/workflow/web-found';
 
 export interface PendingRevision {
   findings: AuditFinding[];
@@ -29,6 +30,8 @@ export interface PendingRevision {
   finishReason: string | null;
   /** Where the findings came from, for the version's change summary. */
   source: string;
+  /** The web search the revision made, if any; its sources are already saved (22 Oct). */
+  web?: WebFound | null;
 }
 
 /** How to revise a stage whose draft is a table: the stage, and the generator request for an instruction. */
@@ -91,11 +94,16 @@ export async function reviseWithFindings(args: {
   signal?: AbortSignal;
   /** Set for a stage whose draft is a table. */
   table?: TableRevision;
+  /** Where a web search's sources are saved from: the stage, and Go's run. */
+  stageId?: string | null;
+  agentRunId?: string | null;
 }): Promise<PendingRevision> {
   const { project, content, findings, source, signal, table } = args;
+  const where = { stageId: args.stageId ?? table?.stage.id ?? null, agentRunId: args.agentRunId ?? null };
   if (table) {
     const instruction = findingsInstruction(findings);
     const res = await api.generateStageArtifact(table.request(instruction), signal);
+    const web = await keepFound(project, res, where);
     const rows = parseItems(generationContent(table.stage, res));
     if (!rows || rows.length === 0) {
       throw new Error(
@@ -111,14 +119,16 @@ export async function reviseWithFindings(args: {
       instruction,
       finishReason: res.finish_reason || null,
       source,
+      web,
     };
   }
   // A table must never reach the prose revision: what comes back is not rows.
   if (parseItems(content)) throw new Error('This stage is a table and cannot be revised as text');
   const res = await api.applyRecommendations(
-    { inputs: inputsFrom(project), content, findings, model: project.model },
+    { inputs: inputsFrom(project), content, findings, model: project.model, web_access: webAccessOf(project) },
     signal
   );
+  const web = await keepFound(project, res, where);
   if (!res.content.trim()) throw new Error('The model returned nothing usable.');
   return {
     findings,
@@ -127,6 +137,7 @@ export async function reviseWithFindings(args: {
     instruction: res.instruction,
     finishReason: res.finish_reason || null,
     source,
+    web,
   };
 }
 
@@ -138,10 +149,12 @@ export function appliedFindingsVersion(rev: PendingRevision, project: Pick<Proje
     instruction: rev.instruction,
     model: project.model,
     mode: project.mode,
-    change_summary:
+    change_summary: withWebLine(
       rev.findings.length === 1
         ? `Applied from ${rev.source}: ${rev.findings[0].summary.slice(0, 120)}`
         : `Applied ${rev.findings.length} points from ${rev.source}.`,
+      rev.web ?? null
+    ),
     finish_reason: rev.finishReason,
     base_content: rev.before,
   };

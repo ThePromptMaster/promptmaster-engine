@@ -464,6 +464,7 @@ export function useRecommendations({
         source: 'the recommendations',
         signal: controller.signal,
         table,
+        stageId: stage?.id ?? null,
       });
       const response = { content: rev.after, instruction: rev.instruction, finish_reason: rev.finishReason ?? '' };
       if (controller.signal.aborted) return;

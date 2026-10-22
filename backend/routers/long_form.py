@@ -25,6 +25,7 @@ import time
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from promptmaster.web_search import WebAccess, with_web
 from deps import get_client
 from promptmaster.errors import PRESERVED_NOTHING_WRITTEN, preserved_sections
 from promptmaster.limits import (
@@ -94,6 +95,9 @@ class GenerateOutlineRequest(BaseModel):
         default=8, ge=MIN_SECTION_COUNT, le=MAX_SECTION_COUNT
     )
     model: str = ModelField
+    #: The project's Web access switch (22 Oct): on, this searches the web
+    #: first when the work needs outside facts.
+    web_access: WebAccess = "off"
 
 
 class GenerateSectionRequest(BaseModel):
@@ -199,13 +203,18 @@ async def api_generate_outline(
     client: OpenRouterClient = Depends(get_client),
 ):
     try:
+        inputs, web = await with_web(
+            client, req.model or None, req.inputs, req.web_access,
+            task=f"Outline the work: {req.inputs.objective[:1_000]}",
+            current="",
+        )
         outline = await generate_outline(
             client=client,
             model=req.model or None,
-            inputs=req.inputs,
+            inputs=inputs,
             suggested_section_count=req.suggested_section_count,
         )
-        return GenerateOutlineResponse(outline=outline)
+        return GenerateOutlineResponse(outline=outline, **dict(web))
     except (OpenRouterError, ValueError) as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
 

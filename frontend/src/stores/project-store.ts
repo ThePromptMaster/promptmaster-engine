@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import { listProjectFiles } from '@/lib/supabase/project-files';
 import { listProjectFacts } from '@/lib/supabase/facts';
 import { listProjectSources } from '@/lib/supabase/sources';
+import type { WebFound } from '@/lib/workflow/web-found';
 import type { StageFigures } from '@/lib/workflow/figures';
 
 import {
@@ -132,6 +133,8 @@ interface ProjectState {
   facts: ProjectFact[];
   /** Saved web sources, current and retired (20 Oct). */
   sources: ProjectSource[];
+  /** The latest web search a writer made on this project (22 Oct), for the stage it was made from. */
+  lastWeb: WebFound | null;
 
   /** Which version the UI is *displaying*. Never implies a restore. */
   activeVersionId: string | null;
@@ -215,6 +218,8 @@ interface ProjectState {
   /** Retire a stage's pending proposals after its head moved; `keep` are being accepted. */
   retireStageProposals: (stageId: string, keep?: readonly string[]) => Promise<void>;
   upsertTask: (task: ProjectTask) => void;
+  /** Reflect sources just saved, and the search that found them, without a round trip (22 Oct). */
+  addSources: (rows: readonly ProjectSource[], search?: WebFound | null) => void;
 
   /**
    * Attach an evaluation to a stage version that already exists.
@@ -294,6 +299,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
   files: [],
   facts: [],
   sources: [],
+  lastWeb: null,
   activeVersionId: null,
   loading: false,
   error: null,
@@ -431,6 +437,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       files: [],
       facts: [],
   sources: [],
+      lastWeb: null,
       activeVersionId: null,
       saveState: 'idle',
       conflict: null,
@@ -503,6 +510,13 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       recommendations: s.recommendations.some((r) => r.id === row.id)
         ? s.recommendations.map((r) => (r.id === row.id ? row : r))
         : [...s.recommendations, row],
+    }));
+  },
+
+  addSources(rows, search) {
+    set((s) => ({
+      sources: [...s.sources, ...rows.filter((r) => !s.sources.some((o) => o.id === r.id))],
+      ...(search !== undefined ? { lastWeb: search } : {}),
     }));
   },
 

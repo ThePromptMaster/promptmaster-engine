@@ -20,6 +20,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from promptmaster.web_search import WebAccess, WebUse, cite_only_known, with_web
 from deps import get_client, llm_mode
 from promptmaster.literature import MAX_SEARCH_RESULTS, MAX_WORKS, WorkMatch, WorkQuery, lookup_works, search_works
 from promptmaster.agent import (
@@ -102,9 +103,12 @@ class ReasonRequest(BaseModel):
     action_key: str
     params: dict = Field(default_factory=dict)
     model: str = ""
+    #: The project's Web access switch (22 Oct): on, this searches the web
+    #: first when the work needs outside facts.
+    web_access: WebAccess = "off"
 
 
-class TextResponse(BaseModel):
+class TextResponse(WebUse):
     text: str
     model_used: str = ""
     usage: Usage = Usage()
@@ -116,12 +120,17 @@ async def api_reason(req: ReasonRequest, client: OpenRouterClient = Depends(get_
     if req.action_key not in REASONING_ACTIONS:
         raise HTTPException(status_code=422, detail=f"'{req.action_key}' is not a reasoning action")
     try:
+        inputs, web = await with_web(
+            client, req.model or None, req.inputs, req.web_access,
+            task=f"{req.action_key.replace('_', ' ')}: {req.params}"[:2_000],
+            current="",
+        )
         text, usage = await perform_reason(
-            client, req.model or None, req.inputs, req.state, req.action_key, req.params
+            client, req.model or None, inputs, req.state, req.action_key, req.params
         )
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
-    return TextResponse(text=text, model_used=_model_used(req.model, client), usage=_usage(usage))
+    return TextResponse(text=cite_only_known(text, inputs, web), model_used=_model_used(req.model, client), usage=_usage(usage), **dict(web))
 
 
 class WriteCodeRequest(BaseModel):
@@ -371,9 +380,12 @@ class ExpertPackageRequest(BaseModel):
     stage_label: str = Field(default="", max_length=200)
     documents: list[RecordDocument] = Field(default_factory=list, max_length=30)
     model: str = ""
+    #: The project's Web access switch (22 Oct): on, this searches the web
+    #: first when the work needs outside facts.
+    web_access: WebAccess = "off"
 
 
-class ExpertPackageResponse(ExpertPackage):
+class ExpertPackageResponse(ExpertPackage, WebUse):
     model_used: str = ""
 
 
@@ -383,10 +395,15 @@ async def api_expert_package(req: ExpertPackageRequest, client: OpenRouterClient
     the saved working, evidence, what is unresolved and the judgment requested.
     1 LLM call; commits nothing — the client saves it."""
     try:
-        result = await prepare_expert_package(client, req.model or None, req.inputs, req.issue, req.stage_label, req.documents)
+        inputs, web = await with_web(
+            client, req.model or None, req.inputs, req.web_access,
+            task=req.issue,
+            current="",
+        )
+        result = await prepare_expert_package(client, req.model or None, inputs, req.issue, req.stage_label, req.documents)
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
-    return ExpertPackageResponse(**result.model_dump(), model_used=_model_used(req.model, client))
+    return ExpertPackageResponse(**result.model_dump(), model_used=_model_used(req.model, client), **dict(web))
 
 
 @router.post("/check-answer")
