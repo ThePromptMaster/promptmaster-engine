@@ -1929,6 +1929,14 @@ while it is on. Limits:
   That is the model's reading of the excerpt.
 - **Go searches only from stages that write.** It doesn't search on review tables or on the stage
   that closes a round.
+- **The side chat decides for itself (22 Oct).** While Web access is on, every Ask message costs
+  one more small call, which decides whether the question needs the web; a search follows only
+  when it does. That decision is a model's judgement: a question it wrongly thinks the project
+  answers is answered without searching, and the user can't force a search from the chat (the
+  sources panel's "Search the web" still can). Change it (Instruct) never searches; it cites the
+  saved sources. A failed search doesn't lose the reply: it is answered from the project and
+  says so. What the chat cites is saved before the reply is, numbered after the saved sources;
+  past 40 saved sources (the most a request carries) the numbers stop lining up.
 
 
 ### L-98 — The full-work reader shows the deliverable only; Apply and continue runs with checkpoints (2026-10-21)

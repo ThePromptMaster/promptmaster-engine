@@ -104,8 +104,13 @@ def build_chat_reply_prompt(
     user_message: str,
     iterations: list[Iteration],
     context: ChatContext | None = None,
+    found: str = "",
 ) -> tuple[str, str]:
-    """Build (system, user) prompt for a fluid chat reply."""
+    """Build (system, user) prompt for a fluid chat reply.
+
+    `found` is the block of a web search made for this message (22 Oct;
+    `web_search.found_block`), or "" when none was made.
+    """
     system = _shared_system(inputs, iterations, _CHAT_REPLY_INSTRUCTION)
     chat_block = _format_chat_thread(chat_history)
     user_prompt = (
@@ -118,7 +123,8 @@ def build_chat_reply_prompt(
         f"CURRENT VERSION (#{active_iteration.iteration_number}):\n"
         f"{active_iteration.output}\n\n"
         f"CHAT SO FAR:\n{chat_block}\n\n"
-        f"USER MESSAGE:\n{user_message}\n\n"
+        + (f"{found}\n\n" if found else "")
+        + f"USER MESSAGE:\n{user_message}\n\n"
         "Reply to the user's message. Be conversational and concise."
     )
     return system, user_prompt

@@ -255,10 +255,18 @@ export interface ChatMessageRequest {
   iteration_history?: Iteration[];
   model?: string;
   context?: ChatContext;
+  /** The project's Web access switch (22 Oct): on, the chat may search the web. */
+  web_access?: 'on' | 'off';
 }
 
 export interface ChatMessageResponse {
   assistant_message: ChatMessage;
+  /** What the chat searched the web for; "" when it did not search. */
+  web_query?: string;
+  /** The search's sources not yet on record, numbered after the saved ones: to be saved. */
+  web_sources?: { url: string; title: string; excerpt: string }[];
+  /** A search was wanted but failed; the reply used only the project. */
+  web_note?: string;
 }
 
 export interface ApplyToAnswerRequest {

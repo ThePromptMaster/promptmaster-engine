@@ -353,6 +353,12 @@ def _json_reply(system: str, prompt: str) -> dict:
             # "[[mock:draft]]" asks for a piece of writing: it comes back apart from the reply.
             **({"draft": "Hi team — lunch is on Wednesday at 1:00 p.m. Bring your own; coming is optional."} if "[[mock:draft]]" in said else {}),
         }
+    if system.startswith("You decide whether a question in a PromptMaster project's side chat"):
+        # The chat searches the web only for a question about the outside
+        # world; "latest" or "on the web" stands in for one (22 Oct).
+        asked = prompt.split("THE USER ASKS:", 1)[-1].lower()
+        wants = "latest" in asked or "on the web" in asked
+        return {"search": wants, "query": "market growth 2025" if wants else ""}
     if "You change a workflow the user is designing" in system:
         # Adds "Verification" after stage 3; a request to repeat only part of a
         # round comes back as unsupported.
@@ -677,6 +683,10 @@ def _prose_reply(system: str, prompt: str) -> str:
         if "--- BEGIN MANUSCRIPT ---" in prompt or re.search(r"^## \d+\. ", prompt, re.M):
             seen.append("the chapters")
         where = f"Mock: I can see {', '.join(seen)}; nothing needs pasting.\n\n" if seen else ""
+        # A web search made for this message (22 Oct): cite what it found.
+        cited = re.findall(r"^\[S(\d+)\] ", prompt.split("NEW WEB RESULTS", 1)[1], re.M) if "NEW WEB RESULTS" in prompt else []
+        if cited:
+            where += f"Mock: the web says the market grew 4% in 2025 [S{cited[0]}].\n\n"
         return (
             where
             + "Mock reply: it reads well, but three things would help.\n\n"

@@ -154,6 +154,8 @@ interface Props {
   attach?: ReactNode;
   /** After a revision updated accepted facts, so the project reloads them. */
   onFactsChanged?: () => Promise<unknown> | void;
+  /** After the chat saved web sources, so the project reloads them (22 Oct). */
+  onSourcesChanged?: () => Promise<unknown> | void;
   /** The requirements checked on a revision's saved text (13 Oct). */
   checkRevision?: (content: string) => { label: string; ok: boolean }[];
   /** Routine revisions are applied without a click (delegated routine decisions). */
@@ -215,6 +217,7 @@ export function ChatPanel({
   starters = [],
   attach,
   onFactsChanged,
+  onSourcesChanged,
   checkRevision,
   autoApply,
   resumeChange = null,
@@ -234,6 +237,7 @@ export function ChatPanel({
     restoreStageVersion,
     getChatContext,
     onFactsChanged,
+    onSourcesChanged,
     checkRevision,
     autoApply,
   });
@@ -567,6 +571,7 @@ export function ChatPanel({
             ? null
             : (cannotChangeBecause ?? 'Ask only — open the latest version to change it.')
         }
+        webAccess={project.web_access === 'on'}
       />
       {editElsewhere && (
         <p className="flex flex-wrap items-center gap-2 px-5 pt-2 text-label text-[var(--on-surface-variant)]">
@@ -831,12 +836,15 @@ function ModeSwitch({
   onChange,
   disabled,
   instructDisabledReason,
+  webAccess,
 }: {
   mode: Mode;
   onChange: (mode: Mode) => void;
   disabled: boolean;
   /** Present when Instruct is unavailable — and then it says why. */
   instructDisabledReason: string | null;
+  /** The project's Web access switch: whether Ask may search the web (22 Oct). */
+  webAccess: boolean;
 }) {
   return (
     <div className="px-5 pt-4">
@@ -875,6 +883,16 @@ function ModeSwitch({
         </span>
         <span>{mode === 'discuss' && instructDisabledReason ? instructDisabledReason : MODES.find((m) => m.key === mode)!.promise}</span>
       </p>
+      {mode === 'discuss' && (
+        <p className="mt-1 flex items-start gap-1.5 text-label text-[var(--on-surface-variant)]">
+          <span aria-hidden className="material-symbols-outlined text-[16px]">{webAccess ? 'travel_explore' : 'public_off'}</span>
+          <span>
+            {webAccess
+              ? 'Web access is on: the chat searches the web when a question needs it, and saves what it cites.'
+              : 'Web access is off: the chat answers from the project only.'}
+          </span>
+        </p>
+      )}
     </div>
   );
 }
@@ -929,6 +947,17 @@ function Bubble({ message }: { message: StageChatMessage }) {
       >
         <MarkdownOutput content={message.content} />
       </div>
+      {message.web && (
+        <p className="mt-1 flex items-start gap-1.5 text-label text-[var(--on-surface-variant)]">
+          <span aria-hidden className="material-symbols-outlined text-[16px]">{message.web.note ? 'public_off' : 'travel_explore'}</span>
+          <span>
+            {message.web.note ||
+              `Searched the web for “${message.web.query}” · ${
+                message.web.saved ? `${message.web.saved} new source${message.web.saved === 1 ? '' : 's'} saved` : 'no new sources'
+              }`}
+          </span>
+        </p>
+      )}
     </div>
   );
 }

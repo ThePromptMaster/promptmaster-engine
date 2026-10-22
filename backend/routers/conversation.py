@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import datetime, timezone
+
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -25,7 +28,17 @@ from promptmaster.session_context import _label_trigger
 from promptmaster.reply_actions import ActionTable, ReplyAction, suggest_reply_actions
 from promptmaster.revision_facts import RevisionFactsRequest, RevisionFactsResponse, revision_facts
 from promptmaster.claim_check import NewClaimsRequest, NewClaimsResponse, check_new_claims
+from promptmaster.web_search import (
+    WebSource,
+    decide_chat_search,
+    found_block,
+    numbered_found,
+    search_web,
+    strip_unknown_citations,
+)
 from routers._pipeline import build_iteration_with_full_pipeline
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["conversation"])
 
@@ -44,10 +57,20 @@ class ChatMessageRequest(BaseModel):
     #: Where the user is (stage, workflow, outline, chapters, buttons). Optional,
     #: so a caller that predates it gets the old prompt.
     context: ChatContext | None = None
+    #: The project's "Web access" switch, as the browser read it (22 Oct).
+    #: On, the chat may search the web for a question that needs it.
+    web_access: Literal["on", "off"] = "off"
 
 
 class ChatMessageResponse(BaseModel):
     assistant_message: ChatMessage
+    #: What the chat searched the web for, or "" when it did not search.
+    web_query: str = ""
+    #: The search's sources not yet on record, in the order they are cited
+    #: ([S n+1]…): for the browser to save.
+    web_sources: list[WebSource] = []
+    #: Set when a search was wanted but failed: the reply was made without it.
+    web_note: str = ""
 
 
 class ApplyToAnswerRequest(BaseModel):
@@ -106,9 +129,28 @@ async def api_chat_message(
     req: ChatMessageRequest,
     client: OpenRouterClient = Depends(get_client),
 ) -> ChatMessageResponse:
-    """Pure chat reply — 1 LLM call, no eval, no iteration created."""
+    """Pure chat reply — 1 LLM call, no eval, no iteration created.
+
+    While Web access is on (22 Oct), one more call decides whether the question
+    needs the web, and a third searches when it does. A failed decision or
+    search never costs the reply: it is answered from the project, and says so.
+    """
     try:
         model = req.model or None
+        saved = req.inputs.sources
+        web_query, new_sources, web_note, found = "", [], "", ""
+        if req.web_access == "on":
+            try:
+                query = await decide_chat_search(
+                    client, model, req.inputs, req.chat_history, req.user_message, req.active_iteration.output
+                )
+                if query:
+                    result = await search_web(client, model, req.inputs, query, purpose=req.user_message[:600])
+                    web_query, found = query, found_block(saved, query, result)
+                    new_sources = [s for _n, s, new in numbered_found(saved, result.sources) if new]
+            except OpenRouterError as e:
+                logger.warning("chat web search failed: %s", e)
+                web_note = "The web search failed, so this answer uses only what the project holds."
         system_text, prompt_text = build_chat_reply_prompt(
             inputs=req.inputs,
             active_iteration=req.active_iteration,
@@ -116,6 +158,7 @@ async def api_chat_message(
             user_message=req.user_message,
             iterations=req.iteration_history,
             context=req.context,
+            found=found,
         )
         reply = await generate(
             client=client,
@@ -136,7 +179,9 @@ async def api_chat_message(
             ),
             created_at=_now_iso(),
         )
-        return ChatMessageResponse(assistant_message=msg)
+        if web_query:
+            msg.content = strip_unknown_citations(msg.content, len(saved) + len(new_sources))
+        return ChatMessageResponse(assistant_message=msg, web_query=web_query, web_sources=new_sources, web_note=web_note)
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
 
