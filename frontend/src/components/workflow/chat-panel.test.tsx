@@ -603,3 +603,29 @@ describe('the chat searches the web while Web access is on (22 Oct)', () => {
     expect(saveSources).not.toHaveBeenCalled();
   });
 });
+
+describe('a section quoted from the project beside (client feedback, 21 Oct, email 4)', () => {
+  it('lands in the composer after what is typed, and is not sent', async () => {
+    const user = userEvent.setup();
+    const onPrefillTaken = vi.fn();
+    const { rerender } = render(
+      <ChatPanel project={PROJECT} stageId="objective" stageLabel="Objective" content={CONTENT} headVersion={HEAD} />
+    );
+    const box = screen.getAllByRole('textbox').at(-1) as HTMLTextAreaElement;
+    await user.type(box, 'Compare this:');
+    rerender(
+      <ChatPanel
+        project={PROJECT}
+        stageId="objective"
+        stageLabel="Objective"
+        content={CONTENT}
+        headVersion={HEAD}
+        prefill={{ text: '> They rose.\n\nFrom "Harbor" — Findings\n\n', nonce: 1 }}
+        onPrefillTaken={onPrefillTaken}
+      />
+    );
+    expect(box.value).toBe('Compare this:\n\n> They rose.\n\nFrom "Harbor" — Findings\n\n');
+    expect(onPrefillTaken).toHaveBeenCalledTimes(1);
+    expect(chatMessage).not.toHaveBeenCalled();
+  });
+});

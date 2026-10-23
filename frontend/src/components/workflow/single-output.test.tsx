@@ -72,6 +72,16 @@ vi.mock('@/lib/api/client', () => ({
   ApiError: class ApiError extends Error {},
 }));
 
+// The reader beside the work loads another project; here it is a stub that
+// hands a section to the side chat, so the slot's tabs are what is tested.
+vi.mock('./project-reader-pane', () => ({
+  ProjectReaderPane: ({ onSendToChat }: { onSendToChat: (text: string) => void }) => (
+    <button type="button" onClick={() => onSendToChat('> A quoted section\n\nFrom "Other" — Draft\n\n')}>
+      stub: send a section
+    </button>
+  ),
+}));
+
 import { WorkflowWorkspace } from './workflow-workspace';
 import { SINGLE_OUTPUT_V1 } from '@/lib/workflow';
 import type { WorkflowEvent } from '@/lib/workflow/types';
@@ -369,3 +379,35 @@ describe('the single-output workflow walks its five stages in the workspace', ()
     expect(getStage(SINGLE_OUTPUT_V1, resumed.current_stage_id)!.renderer).toBe('review');
   });
 });
+
+describe('another project beside this one (client feedback, 21 Oct, email 4)', () => {
+  it('reads in the chat\'s slot without unmounting the chat, and a quoted section lands in the composer unsent', async () => {
+    const user = userEvent.setup();
+    window.sessionStorage.clear();
+    render(<Harness />);
+    await screen.findByRole('heading', { name: /Objective and setup/ });
+
+    const chatSlot = screen.getByTestId('chat-slot');
+    const composer = within(chatSlot).getByRole('textbox');
+    await user.type(composer, 'my half-typed question');
+
+    await user.click(screen.getByRole('button', { name: 'Open another project' }));
+    expect(screen.getByRole('tab', { name: /Reading/ })).toHaveAttribute('aria-selected', 'true');
+    // Hidden, not gone: the draft is still there.
+    expect(screen.getByTestId('chat-slot')).toHaveClass('hidden');
+    expect(within(screen.getByTestId('chat-slot')).getByRole('textbox')).toHaveValue('my half-typed question');
+
+    const callsBefore = generateStageArtifact.mock.calls.length;
+    await user.click(screen.getByRole('button', { name: 'stub: send a section' }));
+    expect(screen.getByRole('tab', { name: /Side chat/ })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId('chat-slot')).not.toHaveClass('hidden');
+    const value = (within(screen.getByTestId('chat-slot')).getByRole('textbox') as HTMLTextAreaElement).value;
+    expect(value).toContain('my half-typed question');
+    expect(value).toContain('> A quoted section');
+    expect(value).toContain('From "Other" — Draft');
+    // Put in the composer, not sent: nothing was asked of the model.
+    expect(generateStageArtifact.mock.calls.length).toBe(callsBefore);
+    expect(JSON.parse(window.sessionStorage.getItem('pm.reader.p1') ?? '{}')).toMatchObject({ open: true, tab: 'chat' });
+  });
+});
+
