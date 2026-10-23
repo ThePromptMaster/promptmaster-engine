@@ -222,14 +222,13 @@ export default function NewProjectPage() {
   const setupDraft = draft;
   const factsSoFar = initialFacts;
 
-  // The list arrived after the setup was recommended (a retry): select what
-  // was recommended, so the user is not left to find it again.
-  const [prevTemplates, setPrevTemplates] = useState(templates);
-  if (prevTemplates !== templates) {
-    setPrevTemplates(templates);
-    if (step === 'setup' && !templateId && templates.length) {
-      setTemplateId((templates.find((t) => t.key === (recommendedKey ?? 'book')) ?? templates[0]).id);
-    }
+  // The setup screen with nothing selected: select what was recommended, so
+  // the user is not left to find it again. The list can arrive after the
+  // recommendation (a retry), or while it was being worked out — then
+  // `recommend` read the list as it was at the click, found nothing, and the
+  // screen opened with no workflow chosen and Start at the foot (23 Oct, CI).
+  if (step === 'setup' && !templateId && templates.length) {
+    setTemplateId((templates.find((t) => t.key === (recommendedKey ?? 'book')) ?? templates[0]).id);
   }
   const hasObjective = objective.trim().length > 0;
 
