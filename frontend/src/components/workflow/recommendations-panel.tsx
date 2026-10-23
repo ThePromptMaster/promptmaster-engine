@@ -39,12 +39,12 @@
  */
 
 import { useState } from 'react';
+import { useT } from '@/lib/i18n/i18n-provider';
+import type { MessageKey } from '@/lib/i18n/messages/en';
 
 import { CustomSelect } from '@/components/shared/custom-select';
 import { ReasonField } from '@/components/shared/reason-field';
 import {
-  SEVERITY_LABEL,
-  describeScope,
   isApplyable,
   type ProposedRecommendation,
   type RecommendationSeverity,
@@ -123,6 +123,7 @@ export function RecommendationsPanel({
   busy = false,
   readOnly = false,
 }: Props) {
+  const t = useT();
   if (rows.length === 0) return null;
 
   const applyable = rows.filter(isApplyable);
@@ -130,13 +131,13 @@ export function RecommendationsPanel({
 
   return (
     <section
-      aria-label="Recommendations"
+      aria-label={t('rcm.label')}
       className="rounded-xl bg-[var(--surface-container-low)] px-5 py-4"
     >
       <header className="mb-3 flex items-baseline justify-between gap-3">
-        <h3 className="text-title text-[var(--on-surface)]">What to do next</h3>
+        <h3 className="text-title text-[var(--on-surface)]">{t('rcm.title')}</h3>
         <span className="text-label text-[var(--on-surface-variant)]">
-          {rows.length} for {stageLabel}
+          {t('rcm.forStage', { n: rows.length, stage: stageLabel })}
         </span>
       </header>
 
@@ -160,14 +161,14 @@ export function RecommendationsPanel({
       {!readOnly && selectedApplyable.length > 1 && (
         <div className="mt-4 flex items-center justify-between gap-3 rounded-lg bg-[var(--surface-container-high)] px-4 py-3">
           <span className="text-label text-[var(--on-surface-variant)]">
-            {selectedApplyable.length} selected — they will be applied as one revision.
+            {t('rcm.selected', { n: selectedApplyable.length })}
           </span>
           <button
             onClick={() => onApply(selectedApplyable.map((r) => r.category))}
             disabled={busy}
             className="shrink-0 rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label font-medium text-[var(--on-primary)] disabled:opacity-40"
           >
-            Combine {selectedApplyable.length}…
+            {t('rcm.combine', { n: selectedApplyable.length })}
           </button>
         </div>
       )}
@@ -198,6 +199,15 @@ function RecommendationRow({
 }: RowProps) {
   const [status, setStatus] = useState('');
   const [reason, setReason] = useState('');
+  const t = useT();
+  const hintKey = rec.kind === 'setup' ? 'rcm.hintSetup' : rec.kind === 'workflow' ? 'rcm.hintWorkflow' : null;
+  const scopeText = (scope: typeof rec.scope): string => {
+    if (scope.kind === 'selection') {
+      return scope.selection ? t('rcm.scope.selectionRange', { start: scope.selection.start, end: scope.selection.end }) : t('rcm.scope.selection');
+    }
+    if (scope.kind === 'section') return scope.section_id ? t('rcm.scope.sectionId', { id: scope.section_id }) : t('rcm.scope.section');
+    return t('rcm.scope.document');
+  };
   const [expanded, setExpanded] = useState(false);
 
   const statuses = triageFor(rec);
@@ -231,7 +241,7 @@ function RecommendationRow({
             type="checkbox"
             checked={selected}
             onChange={(e) => onToggleSelect(rec.category, e.target.checked)}
-            aria-label={`Include "${rec.title}" in a combined revision`}
+            aria-label={t('rcm.include', { title: rec.title })}
             className="mt-1 h-4 w-4 shrink-0 accent-[var(--pm-primary)]"
           />
         )}
@@ -241,7 +251,7 @@ function RecommendationRow({
             <span
               className={`text-label uppercase tracking-wide ${SEVERITY_CLASS[rec.severity]}`}
             >
-              {SEVERITY_LABEL[rec.severity]}
+              {t(`rcm.sev.${rec.severity}` as MessageKey)}
             </span>
             <p className="text-body text-[var(--on-surface)]">{rec.title}</p>
           </div>
@@ -254,7 +264,7 @@ function RecommendationRow({
             aria-expanded={expanded}
             className="mt-1.5 inline-flex items-center gap-1 text-label text-[var(--pm-primary)]"
           >
-            {expanded ? 'Hide why' : 'Why this'}
+            {expanded ? t('rcm.hideWhy') : t('rcm.whyThis')}
             <span aria-hidden className="material-symbols-outlined text-[14px]">
               {expanded ? 'expand_less' : 'expand_more'}
             </span>
@@ -265,20 +275,20 @@ function RecommendationRow({
               data-testid={`rationale-${rec.category}`}
               className="mt-2 space-y-1.5 rounded-lg bg-[var(--surface-container-low)] px-3 py-2.5"
             >
-              <Slot label="What triggered it" value={rec.rationale.triggering_issue} />
-              <Slot label="Stage" value={rec.rationale.relevant_stage} />
-              <Slot label="What it should give you" value={rec.rationale.expected_benefit} />
-              <Slot label="What it affects" value={rec.rationale.scope} />
+              <Slot label={t('rcm.triggered')} value={rec.rationale.triggering_issue} />
+              <Slot label={t('rcm.stage')} value={rec.rationale.relevant_stage} />
+              <Slot label={t('rcm.benefit')} value={rec.rationale.expected_benefit} />
+              <Slot label={t('rcm.affects')} value={rec.rationale.scope} />
             </dl>
           )}
 
           {hint && (
-            <p className="mt-1.5 text-label text-[var(--on-surface-variant)]">{hint}</p>
+            <p className="mt-1.5 text-label text-[var(--on-surface-variant)]">{hintKey ? t(hintKey) : hint}</p>
           )}
 
           {canApply && (
             <p className="mt-1.5 text-label text-[var(--on-surface-variant)]">
-              Affects: {describeScope(rec.scope)}
+              {t('rcm.affectsLine', { scope: scopeText(rec.scope) })}
             </p>
           )}
         </div>
@@ -291,15 +301,15 @@ function RecommendationRow({
                 disabled={busy}
                 className="rounded-lg bg-[var(--pm-primary)] px-3 py-1.5 text-label text-[var(--on-primary)] disabled:opacity-40"
               >
-                Apply…
+                {t('rcm.applyDots')}
               </button>
             )}
             <CustomSelect
               value={status}
-              options={statuses.map((s) => ({ value: s.value, label: s.label }))}
-              placeholder="Decide"
+              options={statuses.map((s) => ({ value: s.value, label: t(`rcm.triage.${s.value}` as MessageKey) }))}
+              placeholder={t('rcm.decide')}
               disabled={busy}
-              ariaLabel={`What to do about "${rec.title}"`}
+              ariaLabel={t('rcm.whatToDo', { title: rec.title })}
               onChange={(value) => {
                 setStatus(value);
                 setReason('');
@@ -329,15 +339,15 @@ function RecommendationRow({
             id={`rec-${rec.category}-reason`}
             label={
               chosen?.value === 'deferred'
-                ? 'What still needs doing?'
-                : `Why ${chosen?.label.toLowerCase()}?`
+                ? t('rcm.stillNeeds')
+                : t('rcm.whyDismiss')
             }
             value={reason}
             missing={reasonMissing}
             missingMessage={
               chosen?.value === 'deferred'
-                ? 'The task carries this sentence forward — without it, it is just a reminder that something was here.'
-                : 'A dismissal without a reason is a shrug. Six months from now it will not be possible to tell it from an oversight.'
+                ? t('rcm.deferMissing')
+                : t('rcm.dismissMissing')
             }
             onChange={setReason}
           />
@@ -347,7 +357,7 @@ function RecommendationRow({
               disabled={reasonMissing || busy}
               className="rounded-lg bg-[var(--pm-primary)] px-4 py-1.5 text-label text-[var(--on-primary)] disabled:opacity-40"
             >
-              {chosen?.value === 'deferred' ? 'Add to tasks' : 'Dismiss'}
+              {chosen?.value === 'deferred' ? t('rcm.addToTasks') : t('rcm.triage.dismissed')}
             </button>
             <button
               onClick={() => {
@@ -356,7 +366,7 @@ function RecommendationRow({
               }}
               className="rounded-lg px-3 py-1.5 text-label text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
             >
-              Cancel
+              {t('pnl.cancel')}
             </button>
           </div>
         </div>

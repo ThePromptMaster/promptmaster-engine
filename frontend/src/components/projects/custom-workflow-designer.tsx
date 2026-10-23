@@ -1,6 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useT } from '@/lib/i18n/i18n-provider';
+import { tr } from '@/lib/i18n/store';
+import type { MessageKey } from '@/lib/i18n/messages/en';
 
 import { api } from '@/lib/api/client';
 import { publishUserTemplate } from '@/lib/supabase/workflow';
@@ -11,7 +14,6 @@ import { AutoGrowTextarea } from '@/components/shared/auto-grow-textarea';
 import { LimitCounter } from '@/components/shared/limit-counter';
 import { INPUT_LIMITS } from '@/lib/projects/input-limits';
 
-const KIND_WORDS: Record<DesignedKind, string> = { write: 'Writing', list: 'List', check: 'Check' };
 const MAX_STAGES = 10;
 
 const NEW_STAGE: DesignedStage = {
@@ -56,6 +58,7 @@ export function CustomWorkflowDesigner({
   /** Told of every change, so the page can keep the design between visits. */
   onStateChange?: (state: { open: boolean; description: string; design: DesignedWorkflow | null }) => void;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(initialState?.open ?? (startOpen || Boolean(initial)));
   const [description, setDescription] = useState(initialState?.description ?? '');
   const [design, setDesign] = useState<DesignedWorkflow | null>(initialState?.design ?? initial);
@@ -77,7 +80,7 @@ export function CustomWorkflowDesigner({
       setDesign(workflow);
       setEditing(null);
     } catch (e) {
-      setErrors([e instanceof Error && e.message ? e.message : 'Could not design a workflow. Try again.']);
+      setErrors([e instanceof Error && e.message ? e.message : tr('cwd.designFailed')]);
     } finally {
       setBusy(null);
     }
@@ -93,7 +96,7 @@ export function CustomWorkflowDesigner({
       setRevision({ changes: res.changes, unsupported: res.unsupported, note: res.note });
       setRequest('');
     } catch (e) {
-      setErrors([e instanceof Error && e.message ? e.message : 'Could not make that change. Nothing was changed.']);
+      setErrors([e instanceof Error && e.message ? e.message : tr('cwd.changeFailed')]);
     } finally {
       setBusy(null);
     }
@@ -117,7 +120,7 @@ export function CustomWorkflowDesigner({
     setDesign((d) => {
       if (!d || d.stages.length >= MAX_STAGES) return d;
       const stages = [...d.stages];
-      stages.splice(at, 0, { ...NEW_STAGE });
+      stages.splice(at, 0, { ...NEW_STAGE, label: tr('cwd.newStage'), short_label: tr('cwd.newStage') });
       return { ...d, stages };
     });
     setEditing(at);
@@ -140,7 +143,7 @@ export function CustomWorkflowDesigner({
       setOpen(false);
       setDesign(null);
     } catch (e) {
-      setErrors([e instanceof Error && e.message ? e.message : 'Could not save the workflow.']);
+      setErrors([e instanceof Error && e.message ? e.message : tr('cwd.saveFailed')]);
     } finally {
       setBusy(null);
     }
@@ -153,7 +156,7 @@ export function CustomWorkflowDesigner({
         className="mt-3 inline-flex items-center gap-1.5 text-body text-[var(--pm-primary)] hover:underline"
       >
         <span aria-hidden className="material-symbols-outlined text-[18px]">auto_awesome</span>
-        None of these fits? Design a workflow for this work
+        {t('cwd.noneFits')}
       </button>
     );
   }
@@ -164,11 +167,10 @@ export function CustomWorkflowDesigner({
   const execution = design?.execution ?? FINITE;
 
   return (
-    <section aria-label="Design a workflow" className="mt-4 rounded-2xl bg-[var(--surface-container-lowest)] px-6 py-5">
-      <h3 className="text-title text-[var(--on-surface)]">{initial ? `Edit a copy of ${initial.name}` : 'Design a workflow'}</h3>
+    <section aria-label={t('cwd.label')} className="mt-4 rounded-2xl bg-[var(--surface-container-lowest)] px-6 py-5">
+      <h3 className="text-title text-[var(--on-surface)]">{initial ? t('cwd.editCopy', { name: initial.name }) : t('cwd.label')}</h3>
       <p className="mt-1 text-label text-[var(--on-surface-variant)]">
-        Say what kind of work this is. PromptMaster proposes the stages an expert would go through; change any of them —
-        add a stage, edit what each one does, or ask for a change in words — then save it as your own workflow to use again.
+        {t('cwd.intro')}
       </p>
       {!initial && (
         <div className="mt-3 flex items-start gap-2">
@@ -178,8 +180,8 @@ export function CustomWorkflowDesigner({
               value={description}
               onChange={(e) => setDescription(e.target.value.slice(0, INPUT_LIMITS.message))}
               rows={1}
-              aria-label="What kind of work is this?"
-              placeholder="e.g. a magazine feature, a grant proposal, a client pitch — or paste the whole workflow you have in mind"
+              aria-label={t('cwd.whatKind')}
+              placeholder={t('cwd.whatKindPh')}
               className={`${field} resize-none`}
             />
             <LimitCounter length={description.length} limit={INPUT_LIMITS.message} />
@@ -189,62 +191,62 @@ export function CustomWorkflowDesigner({
             disabled={description.trim().length < 3 || busy !== null}
             className="shrink-0 rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label text-[var(--on-primary)] disabled:opacity-40"
           >
-            {busy === 'design' ? 'Designing…' : design ? 'Design again' : 'Design it'}
+            {busy === 'design' ? t('cwd.designing') : design ? t('cwd.designAgain') : t('cwd.designIt')}
           </button>
         </div>
       )}
       {design && !initial && (
         <p className="mt-1 text-label text-[var(--on-surface-variant)]">
-          &ldquo;Design again&rdquo; replaces every stage. To change one, edit it below or ask for the change.
+          {t('cwd.againNote')}
         </p>
       )}
 
       {design && (
         <div className="mt-5">
           <label className="block text-label uppercase tracking-wider text-[var(--on-surface-variant)]">
-            Name
+            {t('cwd.name')}
             <input value={design.name} onChange={(e) => setDesign({ ...design, name: e.target.value })} className={`${field} mt-1 normal-case tracking-normal`} />
           </label>
 
           {/* Whether the work ends after one pass, and what counts as done. */}
-          <div role="group" aria-label="When this work is done" className="mt-4 rounded-xl bg-[var(--surface-container-low)] px-4 py-3">
+          <div role="group" aria-label={t('cwd.whenDone')} className="mt-4 rounded-xl bg-[var(--surface-container-low)] px-4 py-3">
             <div className="flex flex-wrap items-center gap-2 text-label text-[var(--on-surface)]">
-              <span className="font-semibold">This work</span>
+              <span className="font-semibold">{t('cwd.thisWork')}</span>
               <select
                 value={execution.kind}
                 onChange={(e) => setExecution({ kind: e.target.value as WorkflowExecution['kind'] })}
-                aria-label="Finite or ongoing"
+                aria-label={t('cwd.finiteOrOngoing')}
                 className={small}
               >
-                <option value="finite">ends after one pass</option>
-                <option value="ongoing">goes on, round after round, until it is done</option>
+                <option value="finite">{t('cwd.finite')}</option>
+                <option value="ongoing">{t('cwd.ongoing')}</option>
               </select>
             </div>
             <label className="mt-2 block text-label text-[var(--on-surface-variant)]">
-              Done means
+              {t('cwd.doneMeans')}
               <AutoGrowTextarea
                 value={execution.success_criterion}
                 onChange={(e) => setExecution({ success_criterion: e.target.value.slice(0, 2_000) })}
                 rows={1}
-                aria-label="Done means"
-                placeholder="What counts as the objective met — reaching the last stage is not it"
+                aria-label={t('cwd.doneMeans')}
+                placeholder={t('cwd.doneMeansPh')}
                 className={`${field} mt-1 resize-none bg-[var(--surface-container-lowest)]`}
               />
             </label>
             <label className="mt-2 block text-label text-[var(--on-surface-variant)]">
-              Stop short of it when (one per line)
+              {t('cwd.stopWhen')}
               <AutoGrowTextarea
                 value={execution.stop_conditions.join('\n')}
                 onChange={(e) => setExecution({ stop_conditions: e.target.value.split('\n').slice(0, 8) })}
                 rows={1}
-                aria-label="Stop conditions"
-                placeholder="e.g. a concrete blocker; every branch exhausted; a decision only I can make"
+                aria-label={t('cwd.stopConditions')}
+                placeholder={t('cwd.stopPh')}
                 className={`${field} mt-1 resize-none bg-[var(--surface-container-lowest)]`}
               />
             </label>
           </div>
 
-          <ol aria-label="Proposed stages" className="mt-4 space-y-2">
+          <ol aria-label={t('cwd.proposedStages')} className="mt-4 space-y-2">
             {design.stages.map((s, i) => (
               <li key={i} className="rounded-xl bg-[var(--surface-container-low)] px-4 py-3">
                 <div className="flex items-center gap-2">
@@ -252,65 +254,65 @@ export function CustomWorkflowDesigner({
                   <input
                     value={s.label}
                     onChange={(e) => edit(i, { label: e.target.value, short_label: e.target.value.slice(0, 20) })}
-                    aria-label={`Name of stage ${i + 1}`}
+                    aria-label={t('cwd.nameOf', { n: i + 1 })}
                     className="min-w-0 flex-1 bg-transparent text-body font-semibold text-[var(--on-surface)] outline-none"
                   />
-                  <span className="rounded-md bg-[var(--surface-container-high)] px-1.5 py-0.5 text-label text-[var(--on-surface-variant)]">{KIND_WORDS[s.kind]}</span>
-                  <button onClick={() => setEditing(editing === i ? null : i)} aria-label={`Edit stage ${i + 1}`} aria-expanded={editing === i} className="material-symbols-outlined text-[18px] text-[var(--on-surface-variant)]">edit</button>
-                  <button onClick={() => move(i, -1)} disabled={i === 0} aria-label={`Move stage ${i + 1} up`} className="material-symbols-outlined text-[18px] text-[var(--on-surface-variant)] disabled:opacity-30">arrow_upward</button>
-                  <button onClick={() => move(i, 1)} disabled={i === design.stages.length - 1} aria-label={`Move stage ${i + 1} down`} className="material-symbols-outlined text-[18px] text-[var(--on-surface-variant)] disabled:opacity-30">arrow_downward</button>
-                  <button onClick={() => remove(i)} disabled={design.stages.length <= 2} aria-label={`Remove stage ${i + 1}`} className="material-symbols-outlined text-[18px] text-[var(--on-surface-variant)] disabled:opacity-30">close</button>
+                  <span className="rounded-md bg-[var(--surface-container-high)] px-1.5 py-0.5 text-label text-[var(--on-surface-variant)]">{t(`cwd.kind.${s.kind}` as MessageKey)}</span>
+                  <button onClick={() => setEditing(editing === i ? null : i)} aria-label={t('cwd.editStage', { n: i + 1 })} aria-expanded={editing === i} className="material-symbols-outlined text-[18px] text-[var(--on-surface-variant)]">edit</button>
+                  <button onClick={() => move(i, -1)} disabled={i === 0} aria-label={t('cwd.moveUp', { n: i + 1 })} className="material-symbols-outlined text-[18px] text-[var(--on-surface-variant)] disabled:opacity-30">arrow_upward</button>
+                  <button onClick={() => move(i, 1)} disabled={i === design.stages.length - 1} aria-label={t('cwd.moveDown', { n: i + 1 })} className="material-symbols-outlined text-[18px] text-[var(--on-surface-variant)] disabled:opacity-30">arrow_downward</button>
+                  <button onClick={() => remove(i)} disabled={design.stages.length <= 2} aria-label={t('cwd.removeStage', { n: i + 1 })} className="material-symbols-outlined text-[18px] text-[var(--on-surface-variant)] disabled:opacity-30">close</button>
                 </div>
                 {editing === i ? (
-                  <div role="group" aria-label={`Stage ${i + 1} details`} className="ml-7 mt-2 grid gap-2">
+                  <div role="group" aria-label={t('cwd.details', { n: i + 1 })} className="ml-7 mt-2 grid gap-2">
                     <label className="text-label text-[var(--on-surface-variant)]">
-                      Kind
-                      <select value={s.kind} onChange={(e) => edit(i, { kind: e.target.value as DesignedKind })} aria-label={`Kind of stage ${i + 1}`} className={`${small} ml-2`}>
-                        <option value="write">Writing — a page of prose</option>
-                        <option value="list">List — a table of items</option>
-                        <option value="check">Check — findings about earlier work</option>
+                      {t('cwd.kind')}
+                      <select value={s.kind} onChange={(e) => edit(i, { kind: e.target.value as DesignedKind })} aria-label={t('cwd.kindOf', { n: i + 1 })} className={`${small} ml-2`}>
+                        <option value="write">{t('cwd.kindWrite')}</option>
+                        <option value="list">{t('cwd.kindList')}</option>
+                        <option value="check">{t('cwd.kindCheck')}</option>
                       </select>
                     </label>
                     <label className="text-label text-[var(--on-surface-variant)]">
-                      What it is for
-                      <input value={s.purpose} onChange={(e) => edit(i, { purpose: e.target.value.slice(0, 2_000) })} aria-label={`Purpose of stage ${i + 1}`} className={`${field} mt-1 bg-[var(--surface-container-lowest)]`} />
+                      {t('cwd.purpose')}
+                      <input value={s.purpose} onChange={(e) => edit(i, { purpose: e.target.value.slice(0, 2_000) })} aria-label={t('cwd.purposeOf', { n: i + 1 })} className={`${field} mt-1 bg-[var(--surface-container-lowest)]`} />
                     </label>
                     <label className="text-label text-[var(--on-surface-variant)]">
-                      Instructions — what PromptMaster produces here
+                      {t('cwd.instructions')}
                       <AutoGrowTextarea
                         value={s.instruction}
                         onChange={(e) => edit(i, { instruction: e.target.value.slice(0, INPUT_LIMITS.instruction) })}
                         rows={3}
-                        aria-label={`Instructions for stage ${i + 1}`}
+                        aria-label={t('cwd.instructionsOf', { n: i + 1 })}
                         className={`${field} mt-1 resize-none bg-[var(--surface-container-lowest)]`}
                       />
                     </label>
                     <label className="flex items-center gap-2 text-label text-[var(--on-surface)]">
                       <input type="checkbox" checked={s.required} onChange={(e) => edit(i, { required: e.target.checked })} disabled={i === 0 || i === design.stages.length - 1} />
-                      Required
+                      {t('cwd.required')}
                     </label>
                     <label className="text-label text-[var(--on-surface-variant)]">
-                      Sign-off, in your words (leave empty for none)
-                      <input value={s.approval} onChange={(e) => edit(i, { approval: e.target.value.slice(0, 120) })} aria-label={`Sign-off for stage ${i + 1}`} placeholder="e.g. I approve this analysis plan" className={`${field} mt-1 bg-[var(--surface-container-lowest)]`} />
+                      {t('cwd.signOff')}
+                      <input value={s.approval} onChange={(e) => edit(i, { approval: e.target.value.slice(0, 120) })} aria-label={t('cwd.signOffOf', { n: i + 1 })} placeholder={t('cwd.signOffPh')} className={`${field} mt-1 bg-[var(--surface-container-lowest)]`} />
                     </label>
                     {s.approval.trim() && (
                       <label className="text-label text-[var(--on-surface-variant)]">
-                        Who may give it
-                        <select value={s.approval_kind ?? 'decision'} onChange={(e) => edit(i, { approval_kind: e.target.value as 'routine' | 'decision' })} aria-label={`Who signs off stage ${i + 1}`} className={`${small} ml-2`}>
-                          <option value="decision">Only me — it needs my judgment</option>
-                          <option value="routine">Routine — PromptMaster checks it, and may give it when I let it handle routine decisions</option>
+                        {t('cwd.whoMay')}
+                        <select value={s.approval_kind ?? 'decision'} onChange={(e) => edit(i, { approval_kind: e.target.value as 'routine' | 'decision' })} aria-label={t('cwd.whoSigns', { n: i + 1 })} className={`${small} ml-2`}>
+                          <option value="decision">{t('cwd.onlyMe')}</option>
+                          <option value="routine">{t('cwd.routine')}</option>
                         </select>
                       </label>
                     )}
                     <label className="text-label text-[var(--on-surface-variant)]">
-                      A separate decision on new commitments it proposes (leave empty for none)
-                      <input value={s.decision ?? ''} onChange={(e) => edit(i, { decision: e.target.value.slice(0, 120) })} aria-label={`Decision for stage ${i + 1}`} className={`${field} mt-1 bg-[var(--surface-container-lowest)]`} />
+                      {t('cwd.decision')}
+                      <input value={s.decision ?? ''} onChange={(e) => edit(i, { decision: e.target.value.slice(0, 120) })} aria-label={t('cwd.decisionOf', { n: i + 1 })} className={`${field} mt-1 bg-[var(--surface-container-lowest)]`} />
                     </label>
                     {execution.kind === 'ongoing' && i > 0 && i < design.stages.length - 1 && (
                       <label className="text-label text-[var(--on-surface-variant)]">
-                        Closes a round — the next round starts from
-                        <select value={s.loop_back_to ?? ''} onChange={(e) => edit(i, { loop_back_to: e.target.value })} aria-label={`Next round of stage ${i + 1}`} className={`${small} ml-2`}>
-                          <option value="">— no, this stage does not close a round</option>
+                        {t('cwd.closesRound')}
+                        <select value={s.loop_back_to ?? ''} onChange={(e) => edit(i, { loop_back_to: e.target.value })} aria-label={t('cwd.nextRoundOf', { n: i + 1 })} className={`${small} ml-2`}>
+                          <option value="">{t('cwd.noRound')}</option>
                           {design.stages.slice(0, i).map((t) => (
                             <option key={t.label} value={t.label}>{t.label}</option>
                           ))}
@@ -323,18 +325,18 @@ export function CustomWorkflowDesigner({
                     {s.purpose && <p className="ml-7 mt-1 text-label text-[var(--on-surface-variant)]">{s.purpose}</p>}
                     {s.approval && (
                       <p className="ml-7 mt-1 text-label text-[var(--on-surface-variant)]">
-                        {s.approval_kind === 'routine' ? 'Checked, and routine: ' : 'You approve: '}“{s.approval}”
+                        {s.approval_kind === 'routine' ? t('cwd.checkedRoutine') : t('cwd.youApprove')}“{s.approval}”
                       </p>
                     )}
-                    {s.decision && <p className="ml-7 mt-1 text-label text-[var(--on-surface-variant)]">You decide: “{s.decision}”</p>}
+                    {s.decision && <p className="ml-7 mt-1 text-label text-[var(--on-surface-variant)]">{t('cwd.youDecide', { d: s.decision })}</p>}
                     {s.loop_back_to && execution.kind === 'ongoing' && (
-                      <p className="ml-7 mt-1 text-label text-[var(--on-surface-variant)]">Closes a round; the next starts from “{s.loop_back_to}”.</p>
+                      <p className="ml-7 mt-1 text-label text-[var(--on-surface-variant)]">{t('cwd.closesNext', { s: s.loop_back_to })}</p>
                     )}
                   </>
                 )}
-                <button onClick={() => add(i + 1)} disabled={design.stages.length >= MAX_STAGES} className={`${quiet} ml-6 mt-1`} aria-label={`Add a stage after stage ${i + 1}`}>
+                <button onClick={() => add(i + 1)} disabled={design.stages.length >= MAX_STAGES} className={`${quiet} ml-6 mt-1`} aria-label={t('cwd.addAfter', { n: i + 1 })}>
                   <span aria-hidden className="material-symbols-outlined text-[16px]">add</span>
-                  Add stage
+                  {t('cwd.addStage')}
                 </button>
               </li>
             ))}
@@ -347,8 +349,8 @@ export function CustomWorkflowDesigner({
                 value={request}
                 onChange={(e) => setRequest(e.target.value.slice(0, INPUT_LIMITS.message))}
                 rows={1}
-                aria-label="Ask for a change"
-                placeholder="Ask for a change — e.g. add a verification stage after Analysis"
+                aria-label={t('cwd.askChange')}
+                placeholder={t('cwd.askChangePh')}
                 className={`${field} resize-none`}
               />
             </div>
@@ -357,16 +359,16 @@ export function CustomWorkflowDesigner({
               disabled={request.trim().length < 3 || busy !== null}
               className="shrink-0 rounded-lg bg-[var(--surface-container-high)] px-4 py-2 text-label text-[var(--on-surface)] disabled:opacity-40"
             >
-              {busy === 'revise' ? 'Changing…' : 'Make the change'}
+              {busy === 'revise' ? t('cwd.changing') : t('cwd.makeChange')}
             </button>
           </div>
           {revision && (
-            <div role="status" aria-label="What changed" className="mt-2 text-label text-[var(--on-surface-variant)]">
-              {revision.changes.length ? <p>Changed: {revision.changes.join('; ')}. Everything else is as it was.</p> : <p>Nothing was changed.</p>}
+            <div role="status" aria-label={t('cwd.whatChanged')} className="mt-2 text-label text-[var(--on-surface-variant)]">
+              {revision.changes.length ? <p>{t('cwd.changed', { list: revision.changes.join('; ') })}</p> : <p>{t('cwd.nothingChanged')}</p>}
               {revision.note && <p>{revision.note}</p>}
               {revision.unsupported.map((u) => (
                 <p key={u.request} className="text-[var(--pm-error)]">
-                  Not possible: {u.request} — {u.reason}
+                  {t('cwd.notPossible', { req: u.request, why: u.reason })}
                 </p>
               ))}
             </div>
@@ -377,7 +379,7 @@ export function CustomWorkflowDesigner({
             disabled={busy !== null || !ownerId}
             className="mt-4 rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label text-[var(--on-primary)] disabled:opacity-40"
           >
-            {busy === 'save' ? 'Saving…' : initial ? 'Save as a new workflow' : 'Use this workflow'}
+            {busy === 'save' ? t('cwd.saving') : initial ? t('cwd.saveNew') : t('cwd.useThis')}
           </button>
         </div>
       )}

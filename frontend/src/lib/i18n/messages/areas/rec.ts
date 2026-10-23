@@ -116,7 +116,7 @@ export const pt: Keys = {
   'rec.findingsDecided_one': '{count} constatação de rotina decidida',
   'rec.findingsDecided_other': '{count} constatações de rotina decididas',
   'rec.evaluation': 'uma avaliação da versão atual',
-  'rec.outline': 'o roteiro, salvo como versão',
+  'rec.outline': 'a estrutura, salva como versão',
   'rec.applied': 'uma nova versão com as constatações aplicadas',
   'rec.newDraft': 'uma nova versão deste rascunho',
   'rec.versions_one': '{count} nova versão',

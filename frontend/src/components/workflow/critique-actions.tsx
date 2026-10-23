@@ -13,6 +13,7 @@
  */
 
 import { useState } from 'react';
+import { useT } from '@/lib/i18n/i18n-provider';
 
 export interface ActionablePoint {
   id: string;
@@ -33,6 +34,7 @@ interface Props {
 }
 
 export function CritiqueActions({ title, points, busy, onApply }: Props) {
+  const t = useT();
   const [selected, setSelected] = useState<string[]>([]);
   const [showFirst, setShowFirst] = useState(true);
   const [reviewing, setReviewing] = useState(false);
@@ -52,7 +54,7 @@ export function CritiqueActions({ title, points, busy, onApply }: Props) {
             onChange={(e) => setShowFirst(e.target.checked)}
             className="h-4 w-4 accent-[var(--pm-primary)]"
           />
-          Show the revised version first
+          {t('pnl.showFirst')}
         </label>
       </header>
 
@@ -63,7 +65,7 @@ export function CritiqueActions({ title, points, busy, onApply }: Props) {
               type="checkbox"
               checked={selected.includes(p.id)}
               onChange={(e) => toggle(p.id, e.target.checked)}
-              aria-label={`Select: ${p.text}`}
+              aria-label={t('pnl.select', { text: p.text })}
               className="mt-1 h-4 w-4 shrink-0 accent-[var(--pm-primary)]"
             />
             <div className="min-w-0 flex-1">
@@ -72,16 +74,16 @@ export function CritiqueActions({ title, points, busy, onApply }: Props) {
               )}
               <p className="text-body text-[var(--on-surface)]">{p.text}</p>
               {p.detail && <p className="text-label text-[var(--on-surface-variant)]">{p.detail}</p>}
-              {p.change && <p className="text-label text-[var(--on-surface-variant)]">Fix: {p.change}</p>}
+              {p.change && <p className="text-label text-[var(--on-surface-variant)]">{t('pnl.fix', { change: p.change })}</p>}
             </div>
             <button
               onClick={() => onApply([p.id], showFirst)}
               disabled={busy}
-              aria-label={`Apply: ${p.text}`}
+              aria-label={t('pnl.applyOne', { text: p.text })}
               className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--pm-primary)]/10 px-3 py-1 text-label font-medium text-[var(--pm-primary)] hover:bg-[var(--pm-primary)]/20 disabled:opacity-40"
             >
               <span aria-hidden className="material-symbols-outlined text-[16px]">auto_fix_high</span>
-              Apply
+              {t('pnl.apply')}
             </button>
           </li>
         ))}
@@ -93,25 +95,25 @@ export function CritiqueActions({ title, points, busy, onApply }: Props) {
           disabled={busy}
           className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label font-medium text-[var(--on-primary)] disabled:opacity-40"
         >
-          {points.length === 1 ? 'Apply the recommended fix' : `Apply all ${points.length} recommended fixes`}
+          {points.length === 1 ? t('pnl.applyRecommended') : t('pnl.applyAllRecommended', { n: points.length })}
         </button>
         <button
           onClick={() => onApply(selected, showFirst)}
           disabled={busy || selected.length === 0}
           className="rounded-lg bg-[var(--surface-container-highest)] px-4 py-2 text-label font-medium text-[var(--on-surface)] disabled:opacity-40"
         >
-          Apply selected{selected.length ? ` (${selected.length})` : ''}
+          {t('pnl.applySelected')}{selected.length ? ` (${selected.length})` : ''}
         </button>
         <button
           onClick={() => setReviewing(true)}
           disabled={busy}
           className="rounded-lg bg-[var(--surface-container-highest)] px-4 py-2 text-label font-medium text-[var(--on-surface)] disabled:opacity-40"
         >
-          Review one by one
+          {t('pnl.reviewOne')}
         </button>
       </div>
       <p className="mt-2 text-label text-[var(--on-surface-variant)]">
-        Every fix makes a new version; the current one stays in history.
+        {t('pnl.everyFix')}
       </p>
 
       {reviewing && (
@@ -138,6 +140,7 @@ function ReviewOneByOne({
   onDone: (ids: string[]) => void;
   onCancel: () => void;
 }) {
+  const t = useT();
   const [index, setIndex] = useState(0);
   const [kept, setKept] = useState<string[]>([]);
   const finished = index >= points.length;
@@ -149,38 +152,38 @@ function ReviewOneByOne({
   };
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Review one by one" className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 py-16">
+    <div role="dialog" aria-modal="true" aria-label={t('pnl.reviewOne')} className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 py-16">
       <div className="w-full max-w-[620px] rounded-2xl bg-[var(--surface-container)] px-7 py-6 shadow-2xl">
         {!finished ? (
           <>
             <p className="text-label uppercase tracking-wide text-[var(--on-surface-variant)]">
-              Point {index + 1} of {points.length}
+              {t('pnl.pointOf', { n: index + 1, total: points.length })}
             </p>
             {point.group && <p className="mt-2 text-label uppercase tracking-wide text-[var(--on-surface-variant)]">{point.group}</p>}
             <p className="mt-2 text-body text-[var(--on-surface)]">{point.text}</p>
             {point.detail && <p className="mt-1 text-label text-[var(--on-surface-variant)]">{point.detail}</p>}
-            {point.change && <p className="mt-1 text-label text-[var(--on-surface-variant)]">Fix: {point.change}</p>}
+            {point.change && <p className="mt-1 text-label text-[var(--on-surface-variant)]">{t('pnl.fix', { change: point.change })}</p>}
             <div className="mt-5 flex flex-wrap gap-2">
               <button onClick={() => decide(true)} className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-title text-[var(--on-primary)]">
-                Apply this
+                {t('pnl.applyThis')}
               </button>
               <button onClick={() => decide(false)} className="rounded-lg bg-[var(--surface-container-highest)] px-4 py-2 text-title text-[var(--on-surface)]">
-                Skip
+                {t('pnl.skip')}
               </button>
               {index > 0 && (
                 <button onClick={() => setIndex((i) => i - 1)} className="rounded-lg px-3 py-2 text-title text-[var(--on-surface-variant)]">
-                  Back
+                  {t('pnl.back')}
                 </button>
               )}
               <button onClick={onCancel} className="ml-auto rounded-lg px-3 py-2 text-title text-[var(--on-surface-variant)]">
-                Cancel
+                {t('pnl.cancel')}
               </button>
             </div>
           </>
         ) : (
           <>
             <p className="text-title text-[var(--on-surface)]">
-              {kept.length === 0 ? 'Nothing kept' : `${kept.length} of ${points.length} to apply`}
+              {kept.length === 0 ? t('pnl.nothingKept') : t('pnl.nOfToApply', { n: kept.length, total: points.length })}
             </p>
             <ul className="mt-2 list-disc space-y-1 pl-5 text-body text-[var(--on-surface)]">
               {points.filter((p) => kept.includes(p.id)).map((p) => (
@@ -193,13 +196,13 @@ function ReviewOneByOne({
                 disabled={kept.length === 0}
                 className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-title text-[var(--on-primary)] disabled:opacity-40"
               >
-                Apply {kept.length || ''} {kept.length === 1 ? 'fix' : 'fixes'}
+                {kept.length ? t('pnl.applyFixes', { count: kept.length }) : t('pnl.apply')}
               </button>
               <button onClick={() => setIndex(0)} className="rounded-lg px-3 py-2 text-title text-[var(--on-surface-variant)]">
-                Start over
+                {t('pnl.startOver')}
               </button>
               <button onClick={onCancel} className="ml-auto rounded-lg px-3 py-2 text-title text-[var(--on-surface-variant)]">
-                Cancel
+                {t('pnl.cancel')}
               </button>
             </div>
           </>

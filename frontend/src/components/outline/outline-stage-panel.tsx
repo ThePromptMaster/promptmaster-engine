@@ -2,6 +2,8 @@
 
 import { keepFound, webAccessOf } from '@/lib/workflow/web-found';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useT } from '@/lib/i18n/i18n-provider';
+import { tr } from '@/lib/i18n/store';
 
 import { DerivedOutlineNotice } from './derived-outline-notice';
 import { OutlineEditor } from './outline-editor';
@@ -127,6 +129,7 @@ export function OutlineStagePanel({
   readOnly = false,
   refreshToken = 0,
 }: Props) {
+  const t = useT();
   const [artifact, setArtifact] = useState<Artifact | null>(null);
   const [versions, setVersions] = useState<ArtifactVersion[]>([]);
   const [draft, setDraft] = useState<OutlineDocument | null>(null);
@@ -192,7 +195,7 @@ export function OutlineStagePanel({
           setDraft(saved);
         }
       })
-      .catch((e: unknown) => live && setError(e instanceof Error ? e.message : 'Could not open the outline.'))
+      .catch((e: unknown) => live && setError(e instanceof Error ? e.message : tr('ol.couldNotOpen')))
       .finally(() => live && !silent && setLoading(false));
     return () => {
       live = false;
@@ -260,7 +263,7 @@ export function OutlineStagePanel({
       if (saveTimer.current) clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(() => {
         saveOutlineDraft(artifact, next).catch(() =>
-          setError('Your outline changes are not being saved. Copy anything important.')
+          setError(tr('ol.notSaving'))
         );
       }, DRAFT_SAVE_DELAY_MS);
     },
@@ -317,7 +320,7 @@ export function OutlineStagePanel({
     try {
       await commit(`${(draft ?? headDocument).items.length} sections`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not save the outline.');
+      setError(e instanceof Error ? e.message : tr('ol.couldNotSave'));
     } finally {
       setBusy(false);
     }
@@ -330,7 +333,7 @@ export function OutlineStagePanel({
       // Approval always pins a saved version. Approving unsaved edits would
       // bind drafting to something that exists only in this tab.
       const version = await commit('Approved outline');
-      if (!version) throw new Error('Save the outline before approving it.');
+      if (!version) throw new Error(tr('ol.saveBeforeApprove'));
 
       // The same call Go mode makes (B2a): the event, then the materialisation,
       // so a failure to materialise leaves an approval that can be retried.
@@ -344,7 +347,7 @@ export function OutlineStagePanel({
       });
       await onEventsChanged?.();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not approve the outline.');
+      setError(e instanceof Error ? e.message : tr('ol.couldNotApprove'));
     } finally {
       setBusy(false);
     }
@@ -359,7 +362,7 @@ export function OutlineStagePanel({
       // that has left the outline in the orphan tray with its prose intact.
       edit(await generateOutlineDraft({ project, doc, drafts, derive: derive ? () => derive(form) : undefined, stageId }));
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not regenerate the outline.');
+      setError(e instanceof Error ? e.message : tr('ol.couldNotRegen'));
     } finally {
       setRegeneratingAll(false);
     }
@@ -379,7 +382,7 @@ export function OutlineStagePanel({
         if (derive) {
           const fresh = derive(formOf?.(doc.items) ?? form).find((i) => i.id === itemId);
           if (!fresh) {
-            throw new Error('No stage feeds this section any more — edit it here instead.');
+            throw new Error(tr('ol.noStageFeedsThis'));
           }
           edit(
             applyItemRegeneration(doc, itemId, { title: fresh.title, abstract: fresh.abstract })
@@ -400,10 +403,10 @@ export function OutlineStagePanel({
         await keepFound(project, res, { stageId });
         const { outline } = res;
         const fresh = outline[index];
-        if (!fresh) throw new Error('The model returned a shorter outline.');
+        if (!fresh) throw new Error(tr('ol.shorter'));
         edit(applyItemRegeneration(doc, itemId, { title: fresh.title, abstract: fresh.abstract }));
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Could not regenerate that section.');
+        setError(e instanceof Error ? e.message : tr('ol.couldNotRegenSection'));
       } finally {
         setRegeneratingItemId(null);
       }
@@ -427,14 +430,14 @@ export function OutlineStagePanel({
         ? { label: '', reason: '', busy: true }
         : namedSections === 0
           ? {
-              label: 'Generate the outline',
-              reason: 'Drafts the sections from the stages before this one. Every line stays editable.',
+              label: t('ol.generate'),
+              reason: t('ol.generateReason'),
               run: () => void handleRegenerateAll(),
             }
           : draft !== null || !headApproved
             ? {
-                label: draft !== null ? 'Save and approve' : 'Approve this outline',
-                reason: 'Drafting writes against the approved outline.',
+                label: draft !== null ? t('ol.saveApprove') : t('ol.approveThis'),
+                reason: t('ol.approveReason'),
                 run: () => void handleApprove(),
               }
             : null
@@ -443,7 +446,7 @@ export function OutlineStagePanel({
   if (loading) {
     return (
       <p className="rounded-2xl bg-[var(--surface-container-lowest)] px-6 py-10 text-center text-body text-[var(--on-surface-variant)]">
-        Opening the outline…
+        {t('ol.opening')}
       </p>
     );
   }
@@ -469,8 +472,8 @@ export function OutlineStagePanel({
 
       {forms.length > 1 && !readOnly && (
         <div className="rounded-xl bg-[var(--surface-container-low)] px-5 py-4">
-          <p className="mb-2 text-label uppercase tracking-wide text-[var(--on-surface-variant)]">Form of the write-up</p>
-          <div role="radiogroup" aria-label="Form of the write-up" className="flex flex-wrap gap-2">
+          <p className="mb-2 text-label uppercase tracking-wide text-[var(--on-surface-variant)]">{t('ol.form')}</p>
+          <div role="radiogroup" aria-label={t('ol.form')} className="flex flex-wrap gap-2">
             {forms.map((f) => (
               <button
                 key={f.id}
@@ -483,14 +486,14 @@ export function OutlineStagePanel({
                     : 'bg-[var(--surface-container-highest)] text-[var(--on-surface)] hover:opacity-90'
                 }`}
               >
-                <span className="block text-title">{f.label} · {f.sections.length} sections</span>
+                <span className="block text-title">{t('ol.formSections', { label: f.label, n: f.sections.length })}</span>
                 <span className="mt-0.5 block text-label opacity-90">{f.description}</span>
               </button>
             ))}
           </div>
           {doc.items.length > 0 && formOf && formOf(doc.items) !== form && (
             <p className="mt-2 text-label text-[var(--on-surface-variant)]">
-              The outline below is in the other form. Regenerate it to lay it out as chosen; sections already written are kept.
+              {t('ol.otherForm')}
             </p>
           )}
         </div>

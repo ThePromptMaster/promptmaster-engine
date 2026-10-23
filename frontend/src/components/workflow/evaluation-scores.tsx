@@ -1,5 +1,7 @@
 'use client';
 
+import { useT } from '@/lib/i18n/i18n-provider';
+import type { MessageKey } from '@/lib/i18n/messages/en';
 import type { Evaluation } from '@/types/project';
 
 /**
@@ -16,16 +18,17 @@ import type { Evaluation } from '@/types/project';
  * dimension rather than per value.
  */
 export function EvaluationScores({ evaluation }: { evaluation: Evaluation | undefined }) {
+  const t = useT();
   if (!evaluation) return null;
 
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-      <Score label="Alignment" value={evaluation.alignment_score} good="High" />
-      <Score label="Clarity" value={evaluation.clarity_score} good="High" />
-      <Score label="Drift" value={evaluation.drift_score} good="Low" />
+      <Score label={t('pnl.alignment')} value={evaluation.alignment_score} good="High" />
+      <Score label={t('pnl.clarity')} value={evaluation.clarity_score} good="High" />
+      <Score label={t('pnl.drift')} value={evaluation.drift_score} good="Low" />
       {evaluation.needs_realignment && (
         <span className="rounded-full bg-[var(--error-container)] px-2 py-0.5 text-label text-[var(--on-error-container)]">
-          Needs realignment
+          {t('pnl.needsRealign')}
         </span>
       )}
     </div>
@@ -41,6 +44,7 @@ function Score({
   value: string | null;
   good: 'High' | 'Low';
 }) {
+  const t = useT();
   if (!value) return null;
 
   const isGood = value === good;
@@ -53,7 +57,7 @@ function Score({
 
   return (
     <span className="text-label text-[var(--on-surface-variant)]">
-      {label} <span className={`font-medium ${tone}`}>{value}</span>
+      {label} <span className={`font-medium ${tone}`}>{['High', 'Medium', 'Low'].includes(value) ? t(`pnl.level.${value}` as MessageKey) : value}</span>
     </span>
   );
 }

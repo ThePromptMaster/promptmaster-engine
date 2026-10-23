@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useT } from '@/lib/i18n/i18n-provider';
 
 import { OutlineRow } from './outline-row';
 import { OrphanTray } from './orphan-tray';
@@ -78,6 +79,7 @@ export function OutlineEditor({
   // Keyed on named sections, like the stage bar's own button: an outline of
   // blank rows said "Regenerate" here and "Generate" there (1 Oct, item 27).
   const nothingNamed = countNamedSections(doc) === 0;
+  const t = useT();
   const [announcement, setAnnouncement] = useState('');
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const pendingFocus = useRef<string | null>(null);
@@ -108,14 +110,14 @@ export function OutlineEditor({
 
     onChange(moveItemBy(doc, item.id, delta));
     setAnnouncement(
-      `“${item.title.trim() || `Section ${index + 1}`}” moved to position ${to + 1} of ${doc.items.length}.`
+      t('ol.movedTo', { name: item.title.trim() || t('ol.sectionN', { n: index + 1 }), n: to + 1, total: doc.items.length })
     );
   }
 
   function insertAt(index: number) {
     const item = newItem();
     onChange(insertItemAt(doc, index, item));
-    setAnnouncement(`New section inserted at position ${index + 1}.`);
+    setAnnouncement(t('ol.inserted', { n: index + 1 }));
   }
 
   function regenerateAll() {
@@ -132,10 +134,9 @@ export function OutlineEditor({
       <section className="rounded-2xl bg-[var(--surface-container-lowest)] px-6 py-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="text-headline text-[var(--on-surface)]">Outline</h2>
+            <h2 className="text-headline text-[var(--on-surface)]">{t('ol.outline')}</h2>
             <p className="mt-1 text-body text-[var(--on-surface-variant)]">
-              Shape the argument before writing it. Moving a section here costs nothing; later it
-              costs a rewrite.
+              {t('ol.outlineNote')}
             </p>
           </div>
           <VersionPill
@@ -154,7 +155,7 @@ export function OutlineEditor({
 
         {doc.items.length === 0 ? (
           <p className="mt-6 rounded-xl bg-[var(--surface-container-low)] px-5 py-8 text-center text-body text-[var(--on-surface-variant)]">
-            No sections yet. Add one, or generate an outline to start from.
+            {t('ol.noSections')}
           </p>
         ) : (
           <ol className="mt-5 space-y-2.5">
@@ -174,9 +175,7 @@ export function OutlineEditor({
                 onRemove={(keepProse) => {
                   onChange(removeItem(doc, item.id, { keepProse }));
                   setAnnouncement(
-                    `“${item.title.trim() || `Section ${index + 1}`}” removed${
-                      keepProse ? '; its writing was kept' : ''
-                    }.`
+                    t(keepProse ? 'ol.removedKept' : 'ol.removed', { name: item.title.trim() || t('ol.sectionN', { n: index + 1 }) })
                   );
                 }}
               />
@@ -197,7 +196,7 @@ export function OutlineEditor({
               <span aria-hidden className="material-symbols-outlined text-[18px]">
                 add
               </span>
-              Add a section
+              {t('ol.addSection')}
             </button>
 
             {onRegenerateAll && (
@@ -217,8 +216,8 @@ export function OutlineEditor({
                     missed (Sean, 28 Sep, item 8). Generate first; regenerate
                     once there is an outline to replace. */}
                 {regeneratingAll
-                  ? nothingNamed ? 'Generating…' : 'Regenerating…'
-                  : nothingNamed ? 'Generate the outline' : 'Regenerate the outline'}
+                  ? nothingNamed ? t('ol.generating') : t('ol.regenerating')
+                  : nothingNamed ? t('ol.generate') : t('ol.regenerate')}
               </button>
             )}
           </div>
@@ -227,9 +226,7 @@ export function OutlineEditor({
         {confirmRegenerate && (
           <div className="mt-3 rounded-xl bg-[var(--surface-container-high)] px-5 py-4">
             <p className="text-body text-[var(--on-surface)]">
-              Regenerating replaces the section list. {draftedIds.length} section
-              {draftedIds.length === 1 ? '' : 's'} you have already written will be kept as
-              detached sections, not deleted — you can put any of them back.
+              {t('ol.regenConfirm', { count: draftedIds.length })}
             </p>
             <div className="mt-3 flex gap-2">
               <button
@@ -240,14 +237,14 @@ export function OutlineEditor({
                 }}
                 className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-body text-[var(--on-primary)] transition-opacity hover:opacity-90"
               >
-                Regenerate
+                {t('ol.regenerateBtn')}
               </button>
               <button
                 type="button"
                 onClick={() => setConfirmRegenerate(false)}
                 className="rounded-lg px-4 py-2 text-body text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
               >
-                Cancel
+                {t('pnl.cancel')}
               </button>
             </div>
           </div>
@@ -260,7 +257,7 @@ export function OutlineEditor({
         readOnly={readOnly}
         onReattach={(id) => {
           onChange(reattachOrphan(doc, id));
-          setAnnouncement('Section put back into the outline.');
+          setAnnouncement(t('ol.putBackDone'));
         }}
         onDiscard={(id) => onChange(discardOrphan(doc, id))}
       />
@@ -271,7 +268,7 @@ export function OutlineEditor({
           titleFor={(id) =>
             doc.items.find((i) => i.id === id)?.title.trim() ||
             doc.orphans.find((o) => o.item_id === id)?.title.trim() ||
-            'Untitled section'
+            t('ol.untitled')
           }
           onRewrite={onRewriteSection}
         />
@@ -281,10 +278,10 @@ export function OutlineEditor({
         <div className="flex flex-wrap items-center gap-2 rounded-xl bg-[var(--surface-container-low)] px-5 py-4">
           <span className="mr-auto text-label text-[var(--on-surface-variant)]">
             {isDraft
-              ? 'Unsaved changes. Approving saves them as a new version first.'
+              ? t('ol.unsaved')
               : approvedVersionNumber !== null
-                ? `Drafting is using outline v${approvedVersionNumber}.`
-                : 'Nothing approved yet — drafting has no outline to write against.'}
+                ? t('ol.usingV', { n: approvedVersionNumber })
+                : t('ol.nothingApproved')}
           </span>
 
           {isDraft && onDiscardDraft && (
@@ -294,7 +291,7 @@ export function OutlineEditor({
               disabled={busy}
               className="rounded-lg px-3 py-2 text-body text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)] hover:text-[var(--on-surface)] disabled:opacity-40"
             >
-              Discard changes
+              {t('ol.discardChanges')}
             </button>
           )}
 
@@ -305,7 +302,7 @@ export function OutlineEditor({
               disabled={busy}
               className="rounded-lg px-3 py-2 text-body text-[var(--on-surface)] hover:bg-[var(--surface-container-high)] disabled:opacity-40"
             >
-              Save draft
+              {t('ol.saveDraft')}
             </button>
           )}
 
@@ -316,7 +313,7 @@ export function OutlineEditor({
               disabled={busy || doc.items.length === 0}
               className="rounded-lg bg-[var(--pm-primary)] px-5 py-2 text-body font-medium text-[var(--on-primary)] transition-opacity hover:opacity-90 disabled:opacity-40"
             >
-              {isDraft ? 'Save and approve' : 'Approve this outline'}
+              {isDraft ? t('ol.saveApprove') : t('ol.approveThis')}
             </button>
           )}
         </div>
@@ -336,6 +333,7 @@ function VersionPill({
   approvedVersionNumber: number | null;
   forkedFromVersionNumber: number | null;
 }) {
+  const t = useT();
   if (isDraft) {
     // "from vN" is reserved for a genuine fork of an APPROVED version, because
     // that is the case where two documents now exist and the user needs to know
@@ -345,7 +343,7 @@ function VersionPill({
         <span aria-hidden className="material-symbols-outlined text-[16px]">
           edit_note
         </span>
-        {forkedFromVersionNumber !== null ? `Draft, from v${forkedFromVersionNumber}` : 'Draft'}
+        {forkedFromVersionNumber !== null ? t('ol.draftFrom', { n: forkedFromVersionNumber }) : t('ol.draft')}
       </span>
     );
   }
@@ -356,14 +354,14 @@ function VersionPill({
         <span aria-hidden className="material-symbols-outlined text-[16px]">
           check_circle
         </span>
-        Approved · v{approvedVersionNumber}
+        {t('ol.approvedV', { n: approvedVersionNumber })}
       </span>
     );
   }
 
   return (
     <span className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-high)] px-3 py-1.5 text-label text-[var(--on-surface-variant)]">
-      {headVersionNumber !== null ? `v${headVersionNumber}` : 'Not saved yet'}
+      {headVersionNumber !== null ? `v${headVersionNumber}` : t('ol.notSaved')}
     </span>
   );
 }

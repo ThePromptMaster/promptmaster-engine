@@ -2,6 +2,7 @@
 
 import { diffWords } from 'diff';
 import { useMemo } from 'react';
+import { useT } from '@/lib/i18n/i18n-provider';
 
 import type { PendingRevision } from './use-apply-findings';
 
@@ -21,16 +22,17 @@ export function RevisedPreview({
   onKeep: () => void;
   onDiscard: () => void;
 }) {
+  const t = useT();
   const { parts, added, removed } = useWordDiff(revision.before, revision.after);
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Revised version" className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-10">
+    <div role="dialog" aria-modal="true" aria-label={t('pnl.revisedLabel')} className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-10">
       <div className="w-full max-w-[860px] rounded-2xl bg-[var(--surface-container)] px-7 py-6 shadow-2xl">
-        <h2 className="text-title text-[var(--on-surface)]">The revised version — not saved yet</h2>
+        <h2 className="text-title text-[var(--on-surface)]">{t('pnl.revisedTitle')}</h2>
         <p className="mt-1 text-label text-[var(--on-surface-variant)]">
-          {revision.findings.length === 1 ? 'One point' : `${revision.findings.length} points`} applied ·{' '}
-          <span className="text-[var(--pm-success)]">+{added} words</span> ·{' '}
-          <span className="text-[var(--pm-error)]">−{removed} words</span>
+          {t('pnl.points', { count: revision.findings.length })} ·{' '}
+          <span className="text-[var(--pm-success)]">{t('pnl.wordsAdded', { n: added })}</span> ·{' '}
+          <span className="text-[var(--pm-error)]">{t('pnl.wordsRemoved', { n: removed })}</span>
         </p>
         <ul className="mt-3 list-disc space-y-0.5 pl-5 text-label text-[var(--on-surface-variant)]">
           {revision.findings.map((f) => (
@@ -39,14 +41,14 @@ export function RevisedPreview({
         </ul>
         <DiffText parts={parts} testId="revision-diff" className="mt-4 max-h-[55vh]" />
         <p className="mt-2 text-label text-[var(--on-surface-variant)]">
-          Keeping it saves a new version; the current one stays in history.
+          {t('pnl.keepingSaves')}
         </p>
         <div className="mt-4 flex gap-2">
           <button onClick={onKeep} disabled={busy} className="rounded-lg bg-[var(--pm-primary)] px-5 py-2 text-title text-[var(--on-primary)] disabled:opacity-50">
-            Keep this version
+            {t('pnl.keepVersion')}
           </button>
           <button onClick={onDiscard} disabled={busy} className="rounded-lg px-4 py-2 text-title text-[var(--on-surface-variant)]">
-            Discard
+            {t('pnl.discard')}
           </button>
         </div>
       </div>

@@ -3,7 +3,7 @@ import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 
 // Material Symbols are written as their ligature names; they are icons, not words.
-const ICONS = ["person", "expand_more", "expand_less", "palette", "translate", "logout", "science", "arrow_back", "attach_file", "close", "check", "add", "arrow_upward", "arrow_forward", "description", "image", "delete", "edit", "refresh", "info", "lightbulb", "help", "chat", "auto_awesome", "menu_book", "bolt", "tune", "undo", "link_off", "travel_explore", "public_off", "content_copy", "recommend", "edit_note", "compress", "folder_open", "workspaces", "chevron_right", "restore_from_trash", "create_new_folder", "drive_file_move", "link", "download", "table_view", "fact_check", "check_circle", "forum", "lock", "list_alt", "splitscreen_right", "task_alt", "history", "note_add", "progress_activity", "pending_actions", "check_box", "stop_circle", "play_arrow", "rocket_launch", "flag", "arrow_downward", "error", "radio_button_unchecked", "done_all", "rule"];
+const ICONS = ["person", "expand_more", "expand_less", "palette", "translate", "logout", "science", "arrow_back", "attach_file", "close", "check", "add", "arrow_upward", "arrow_forward", "description", "image", "delete", "edit", "refresh", "info", "lightbulb", "help", "chat", "auto_awesome", "menu_book", "bolt", "tune", "undo", "link_off", "travel_explore", "public_off", "content_copy", "recommend", "edit_note", "compress", "folder_open", "workspaces", "chevron_right", "restore_from_trash", "create_new_folder", "drive_file_move", "link", "download", "table_view", "fact_check", "check_circle", "forum", "lock", "list_alt", "splitscreen_right", "task_alt", "history", "note_add", "progress_activity", "pending_actions", "check_box", "stop_circle", "play_arrow", "rocket_launch", "flag", "arrow_downward", "error", "radio_button_unchecked", "done_all", "rule", "auto_fix_high", "block", "keyboard_arrow_down", "keyboard_arrow_up", "pause_circle", "savings", "sync_problem", "upgrade"];
 
 const eslintConfig = defineConfig([
   ...nextVitals,
@@ -73,6 +73,35 @@ const eslintConfig = defineConfig([
       "src/components/workflow/renderers/long-form-renderer.tsx",
       "src/components/workflow/renderers/stage-renderer.tsx",
       "src/components/workflow/project-timeline.tsx",
+      "src/components/workflow/checkpoint-panel.tsx",
+      "src/components/workflow/refused-revisions.tsx",
+      "src/components/workflow/figures-on-record.tsx",
+      "src/components/shared/error-boundary.tsx",
+      "src/components/shared/loading-spinner.tsx",
+      "src/components/workflow/evaluation-scores.tsx",
+      "src/components/workflow/next-move-card.tsx",
+      "src/components/workflow/project-finished-banner.tsx",
+      "src/components/workflow/upgrade-banner.tsx",
+      "src/components/workflow/revised-preview.tsx",
+      "src/components/workflow/tasks-panel.tsx",
+      "src/components/workflow/large-job-warning.tsx",
+      "src/components/workflow/critique-style-control.tsx",
+      "src/components/workflow/chat-attach.tsx",
+      "src/components/shared/markdown-output.tsx",
+      "src/components/workflow/evaluation-panel.tsx",
+      "src/components/workflow/evaluation-ratings.tsx",
+      "src/components/workflow/critique-actions.tsx",
+      "src/components/workflow/project-finished.tsx",
+      "src/components/outline/derived-outline-notice.tsx",
+      "src/components/outline/orphan-tray.tsx",
+      "src/components/outline/stale-drafts-notice.tsx",
+      "src/components/outline/outline-history.tsx",
+      "src/components/outline/outline-row.tsx",
+      "src/components/outline/outline-editor.tsx",
+      "src/components/outline/outline-stage-panel.tsx",
+      "src/components/workflow/recommendations-panel.tsx",
+      "src/components/workflow/stage-status-panels.tsx",
+      "src/components/projects/custom-workflow-designer.tsx",
     ],
     rules: {
       "react/jsx-no-literals": ["error", { noStrings: false, ignoreProps: true, allowedStrings: ["PromptMaster", "·", "—", "…", ".", "/", "+", "[S", "[R", "]", ";", ":", "“", "”", "&ldquo;", "&rdquo;", "×", "↩", ...ICONS] }],

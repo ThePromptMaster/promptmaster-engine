@@ -21,6 +21,9 @@
  */
 
 import { ratingDisplay, type RatingRow, type RatingTone } from '@/lib/workflow/evaluation-display';
+import { useT } from '@/lib/i18n/i18n-provider';
+import { DICTIONARIES } from '@/lib/i18n/translate';
+import type { MessageKey } from '@/lib/i18n/messages/en';
 import type { Evaluation } from '@/types/project';
 import type { AuditFinding } from '@/types';
 
@@ -31,6 +34,7 @@ const TONE_TEXT: Record<RatingTone, string> = {
 };
 
 export function EvaluationRatings({ evaluation }: { evaluation: Evaluation }) {
+  const t = useT();
   const { rows, otherFindings } = ratingDisplay(evaluation);
 
   if (rows.length === 0 && otherFindings.length === 0) return null;
@@ -44,7 +48,7 @@ export function EvaluationRatings({ evaluation }: { evaluation: Evaluation }) {
       {otherFindings.length > 0 && (
         <div className="rounded-lg bg-[var(--surface-container)] px-4 py-3">
           <p className="text-label uppercase tracking-wider text-[var(--on-surface-variant)]">
-            {otherFindings.length} further finding{otherFindings.length === 1 ? '' : 's'}
+            {t('pnl.furtherFindings', { count: otherFindings.length })}
           </p>
           {/* Deliberately not filed under a rating. `category` is free text
               from the model, and a finding shown under a dimension it does not
@@ -62,20 +66,35 @@ export function EvaluationRatings({ evaluation }: { evaluation: Evaluation }) {
   );
 }
 
+/** The display's own fixed sentences, in the interface's language; the model's words come back as written. */
+const FIXED: Record<string, MessageKey> = {
+  'No change needed.': 'pnl.noChangeNeeded',
+  'No specific correction was returned for this rating.': 'pnl.noCorrection',
+  "The draft as a whole, against this stage's declared intent.": 'pnl.area.alignment',
+  'How the draft is structured and worded.': 'pnl.area.clarity',
+  'The objective, audience, constraints, approved outline and current stage.': 'pnl.area.drift',
+  'Whether the draft is structurally finished.': 'pnl.area.completeness',
+};
+
 function RatingCard({ row }: { row: RatingRow }) {
+  const t = useT();
+  const fixed = (text: string) => (FIXED[text] ? t(FIXED[text]) : text);
+  const label = t(`pnl.rate.${row.key}` as MessageKey);
+  const levelKey = `pnl.level.${row.value}`;
+  const value = row.value && levelKey in DICTIONARIES.en ? t(levelKey as MessageKey) : row.value;
   return (
     <section
-      aria-label={`${row.label} rating`}
+      aria-label={t('pnl.ratingLabel', { label })}
       className="rounded-lg bg-[var(--surface-container)] px-4 py-3"
     >
       <div className="flex flex-wrap items-baseline gap-x-2">
         <h4 className="text-label uppercase tracking-wider text-[var(--on-surface-variant)]">
-          {row.label}
+          {label}
         </h4>
-        <span className={`text-body font-medium ${TONE_TEXT[row.tone]}`}>{row.value}</span>
+        <span className={`text-body font-medium ${TONE_TEXT[row.tone]}`}>{value}</span>
         {row.key === 'drift' && (
           <span className="text-label text-[var(--on-surface-variant)]">
-            (low is good)
+            {t('pnl.lowIsGood')}
           </span>
         )}
       </div>
@@ -99,16 +118,16 @@ function RatingCard({ row }: { row: RatingRow }) {
                 </p>
               )}
               <dl className="space-y-1">
-                <Field term="Affected area" detail={finding.summary} />
-                <Field term="Corrective action" detail={finding.suggested_change} />
+                <Field term={t('pnl.affectedArea')} detail={finding.summary} />
+                <Field term={t('pnl.corrective')} detail={finding.suggested_change} />
               </dl>
             </li>
           ))}
         </ul>
       ) : (
         <dl className="mt-2 space-y-1">
-          <Field term="Affected area" detail={row.affected} />
-          <Field term="Corrective action" detail={row.corrective} />
+          <Field term={t('pnl.affectedArea')} detail={fixed(row.affected)} />
+          <Field term={t('pnl.corrective')} detail={fixed(row.corrective)} />
         </dl>
       )}
     </section>

@@ -1,10 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { useLocale, useT } from '@/lib/i18n/i18n-provider';
+import type { MessageKey } from '@/lib/i18n/messages/en';
 
 import type { EvaluationResult } from '@/types';
 
-import { blocksCompletion, describeOutstanding, type CompletionSummary } from '@/lib/workflow/engine';
+import { blocksCompletion, shownOutstanding, type CompletionSummary } from '@/lib/workflow/engine';
 import type { ObjectiveAssessment } from '@/lib/workflow/objective';
 import { readablePerformed } from '@/lib/agent/labels';
 import type { BlockKind } from '@/lib/workflow/types';
@@ -23,12 +25,13 @@ export function BlockForm({
   onSubmit: (block: { kind: BlockKind; reason: string }) => void;
   onCancel: () => void;
 }) {
+  const t = useT();
   const [kind, setKind] = useState<BlockKind>('data_missing');
   const [reason, setReason] = useState('');
   return (
-    <section aria-label="Mark as stuck" className="rounded-xl bg-[var(--surface-container-high)] px-5 py-4">
-      <p className="text-body text-[var(--on-surface)]">What is this stage waiting on?</p>
-      <div role="radiogroup" aria-label="Why it is stuck" className="mt-3 grid gap-2 sm:grid-cols-3">
+    <section aria-label={t('ssp.markStuck')} className="rounded-xl bg-[var(--surface-container-high)] px-5 py-4">
+      <p className="text-body text-[var(--on-surface)]">{t('ssp.waitingOn')}</p>
+      <div role="radiogroup" aria-label={t('ssp.whyStuck')} className="mt-3 grid gap-2 sm:grid-cols-3">
         {BLOCK_KINDS.map((option) => (
           <button
             key={option.kind}
@@ -41,8 +44,8 @@ export function BlockForm({
                 : 'bg-[var(--surface-container-highest)] text-[var(--on-surface)]'
             }`}
           >
-            <span className="block text-label font-semibold">{option.label}</span>
-            <span className="block text-label opacity-80">{option.hint}</span>
+            <span className="block text-label font-semibold">{t(`ssp.block.${option.kind}` as MessageKey)}</span>
+            <span className="block text-label opacity-80">{t(`ssp.block.${option.kind}.hint` as MessageKey)}</span>
           </button>
         ))}
       </div>
@@ -50,8 +53,8 @@ export function BlockForm({
         value={reason}
         onChange={(e) => setReason(e.target.value)}
         rows={2}
-        aria-label="What exactly is missing"
-        placeholder="What exactly is missing? (required)"
+        aria-label={t('ssp.whatMissing')}
+        placeholder={t('ssp.whatMissingPh')}
         className="mt-3 w-full resize-none rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2 text-body text-[var(--on-surface)] outline-none"
       />
       <div className="mt-3 flex gap-2">
@@ -60,10 +63,10 @@ export function BlockForm({
           disabled={!reason.trim()}
           className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-title text-[var(--on-primary)] disabled:opacity-40"
         >
-          Mark as stuck
+          {t('ssp.markStuck')}
         </button>
         <button onClick={onCancel} className="rounded-lg px-4 py-2 text-title text-[var(--on-surface-variant)]">
-          Cancel
+          {t('pnl.cancel')}
         </button>
       </div>
     </section>
@@ -71,16 +74,17 @@ export function BlockForm({
 }
 
 export function BlockedNotice({ kind, reason, onUnblock }: { kind: BlockKind; reason: string; onUnblock: () => void }) {
-  const label = BLOCK_KINDS.find((k) => k.kind === kind)?.label ?? 'Stuck';
+  const t = useT();
+  const label = BLOCK_KINDS.some((k) => k.kind === kind) ? t(`ssp.block.${kind}` as MessageKey) : t('ssp.stuck');
   return (
     <div role="status" className="flex flex-wrap items-center gap-3 rounded-xl bg-[var(--surface-container-high)] px-5 py-4">
       <span aria-hidden className="material-symbols-outlined text-[var(--pm-tertiary)]">block</span>
       <div className="mr-auto">
-        <p className="text-title text-[var(--on-surface)]">Stuck — {label.toLowerCase()}</p>
+        <p className="text-title text-[var(--on-surface)]">{t('ssp.stuckLabel', { label: label.toLowerCase() })}</p>
         <p className="text-label text-[var(--on-surface-variant)]">{reason}</p>
       </div>
       <button onClick={onUnblock} className="rounded-lg bg-[var(--surface-container-highest)] px-4 py-2 text-title text-[var(--on-surface)]">
-        Continue this stage
+        {t('ssp.continueStage')}
       </button>
     </div>
   );
@@ -115,23 +119,24 @@ export function ObjectivePausedNotice({
    */
   resumeLabel?: string;
 }) {
+  const t = useT();
   const ask = assessment.blockers.map((b) => b.ask?.trim()).find(Boolean);
   const [answer, setAnswer] = useState('');
   const [sending, setSending] = useState(false);
   return (
-    <section role="status" aria-label="Objective not met" className="rounded-xl bg-[var(--surface-container-high)] px-5 py-4">
+    <section role="status" aria-label={t('ssp.objNotMet')} className="rounded-xl bg-[var(--surface-container-high)] px-5 py-4">
       {/* The button sits below the text, not beside it: beside it, a phone
           left the text one word wide (20 Oct, Sean, HARBOR screenshots). */}
       <div className="flex items-start gap-3">
         <span aria-hidden className="material-symbols-outlined text-[var(--pm-tertiary)]">pause_circle</span>
         <div className="min-w-0 flex-1">
           <p className="text-title text-[var(--on-surface)]">
-            {assessment.blockers.length ? 'Paused — the objective is not met' : 'The objective is not met yet'}
+            {assessment.blockers.length ? t('ssp.paused') : t('ssp.notMetYet')}
           </p>
           <p className="mt-1 text-label text-[var(--on-surface-variant)]">{assessment.reason}</p>
           {assessment.blockers.length > 0 && (
             <>
-              <p className="mt-2 text-label font-semibold text-[var(--on-surface)]">Waiting for</p>
+              <p className="mt-2 text-label font-semibold text-[var(--on-surface)]">{t('ssp.waitingFor')}</p>
               <ul className="list-disc pl-5 text-label text-[var(--on-surface-variant)]">
                 {assessment.blockers.map((b, i) => (
                   <li key={i}>{b.need}</li>
@@ -142,18 +147,18 @@ export function ObjectivePausedNotice({
           {/* 19 Oct (HARBOR): what the brief lets stay open is stated, not waited for. */}
           {(assessment.limitations?.length ?? 0) > 0 && (
             <>
-              <p className="mt-2 text-label font-semibold text-[var(--on-surface)]">Carried as limitations, as your brief allows</p>
-              <ul aria-label="Carried as limitations" className="list-disc pl-5 text-label text-[var(--on-surface-variant)]">
+              <p className="mt-2 text-label font-semibold text-[var(--on-surface)]">{t('ssp.limitations')}</p>
+              <ul aria-label={t('ssp.limitationsLabel')} className="list-disc pl-5 text-label text-[var(--on-surface-variant)]">
                 {assessment.limitations!.map((l, i) => (
                   <li key={i}>{l.item}</li>
                 ))}
               </ul>
-              <p className="mt-1 text-label text-[var(--on-surface-variant)]">Allowed by: “{assessment.limitations![0].allowed_by}”</p>
+              <p className="mt-1 text-label text-[var(--on-surface-variant)]">{t('ssp.allowedBy', { by: assessment.limitations![0].allowed_by })}</p>
             </>
           )}
           {ask && onAnswer && (
             <form
-              aria-label="Answer what Go is waiting for"
+              aria-label={t('ssp.answerLabel')}
               className="mt-3 rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2"
               onSubmit={(e) => {
                 e.preventDefault();
@@ -163,7 +168,7 @@ export function ObjectivePausedNotice({
               }}
             >
               <label htmlFor="objective-answer" className="text-label font-semibold text-[var(--on-surface)]">
-                Respond here: {ask}
+                {t('ssp.respond', { ask })}
               </label>
               <div className="mt-1.5 flex flex-wrap gap-2">
                 <input
@@ -171,28 +176,28 @@ export function ObjectivePausedNotice({
                   value={answer}
                   onChange={(e) => setAnswer(e.target.value.slice(0, 600))}
                   className="min-w-0 flex-[1_1_12rem] rounded-lg bg-[var(--surface-container-low)] px-3 py-1.5 text-body text-[var(--on-surface)]"
-                  placeholder="Your answer"
+                  placeholder={t('ssp.yourAnswer')}
                 />
                 <button
                   type="submit"
                   disabled={!answer.trim() || sending || resumeDisabled}
                   className="rounded-lg bg-[var(--pm-primary)] px-3 py-1.5 text-label text-[var(--on-primary)] disabled:opacity-50"
                 >
-                  {sending ? 'Recording…' : 'Record it and continue'}
+                  {sending ? t('ssp.recording') : t('ssp.recordContinue')}
                 </button>
               </div>
               <p className="mt-1 text-label text-[var(--on-surface-variant)]">
-                Recorded as a project fact; Go revises the work with it and checks the objective again.
+                {t('ssp.recordedNote')}
               </p>
             </form>
           )}
           <p className="mt-2 text-label text-[var(--on-surface-variant)]">
-            <span className="font-semibold text-[var(--on-surface)]">Done: </span>
-            {assessment.performed.length ? assessment.performed.map(readablePerformed).join('; ') : 'no computation or investigation was recorded as performed'}
+            <span className="font-semibold text-[var(--on-surface)]">{t('ssp.done')}</span>
+            {assessment.performed.length ? assessment.performed.map(readablePerformed).join('; ') : t('ssp.nothingPerformed')}
           </p>
           {assessment.proposed_next.length > 0 && (
             <p className="mt-1 text-label text-[var(--on-surface-variant)]">
-              <span className="font-semibold text-[var(--on-surface)]">Proposed, not done: </span>
+              <span className="font-semibold text-[var(--on-surface)]">{t('ssp.proposed')}</span>
               {assessment.proposed_next.join('; ')}
             </p>
           )}
@@ -203,7 +208,7 @@ export function ObjectivePausedNotice({
                 disabled={resumeDisabled}
                 className="rounded-lg bg-[var(--surface-container-highest)] px-4 py-2 text-title text-[var(--on-surface)] disabled:opacity-40"
               >
-                {resumeLabel ?? (assessment.blockers.length ? 'I have added it — resume Go' : 'Resume Go')}
+                {resumeLabel ?? (assessment.blockers.length ? t('ssp.addedResume') : t('ssp.resumeGo'))}
               </button>
             </div>
           )}
@@ -238,6 +243,8 @@ export function CompletionDialog({
   /** Go and look at a stage that was left open, to close it before finishing. */
   onViewStage?: (stageId: string) => void;
 }) {
+  const t = useT();
+  const locale = useLocale();
   const [reason, setReason] = useState('');
   // Left-open stages have their own line above; everything else still open is
   // listed here, and finishing past it asks why (6 Oct: the project "allowed
@@ -246,15 +253,15 @@ export function CompletionDialog({
   // Optional rows are listed, and finishing past them needs no reason (C3).
   const needsReason = open.some(blocksCompletion);
   const rows: [string, number][] = [
-    ['completed', summary.completed],
-    ['skipped on purpose', summary.skipped],
-    ['left open', summary.leftOpen],
-    ['blocked', summary.blocked],
-    ['not started', summary.notStarted],
+    [t('ssp.row.completed'), summary.completed],
+    [t('ssp.row.skipped'), summary.skipped],
+    [t('ssp.row.leftOpen'), summary.leftOpen],
+    [t('ssp.row.blocked'), summary.blocked],
+    [t('ssp.row.notStarted'), summary.notStarted],
   ];
   return (
-    <section aria-label="Finish the project" className="rounded-xl bg-[var(--surface-container-high)] px-6 py-5">
-      <h3 className="text-title text-[var(--on-surface)]">Finish this project?</h3>
+    <section aria-label={t('ssp.finishLabel')} className="rounded-xl bg-[var(--surface-container-high)] px-6 py-5">
+      <h3 className="text-title text-[var(--on-surface)]">{t('ssp.finishQ')}</h3>
       <p className="mt-3 flex items-center gap-2 text-body text-[var(--on-surface)]">
         <span
           aria-hidden
@@ -263,18 +270,16 @@ export function CompletionDialog({
           {summary.deliverableDone ? 'task_alt' : 'error'}
         </span>
         {summary.deliverableDone
-          ? `The deliverable (${summary.deliverable?.short_label ?? 'the main work'}) is done.`
-          : `The deliverable (${summary.deliverable?.short_label ?? 'the main work'}) is not done yet.`}
+          ? t('ssp.delivDone', { name: summary.deliverable?.short_label ?? t('ssp.theMainWork') })
+          : t('ssp.delivNotDone', { name: summary.deliverable?.short_label ?? t('ssp.theMainWork') })}
       </p>
       <p className="mt-2 text-label text-[var(--on-surface-variant)]">
-        Stages: {rows.filter(([, n]) => n > 0).map(([label, n]) => `${n} ${label}`).join(' · ') || 'none'}
+        {t('ssp.stages', { list: rows.filter(([, n]) => n > 0).map(([label, n]) => `${n} ${label}`).join(' · ') || t('ssp.none') })}
       </p>
       {summary.leftOpenStages.length > 0 && (
         <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-label text-[var(--on-surface-variant)]">
           <span>
-            Left open, requirements still unticked:{' '}
-            {summary.leftOpenStages.map((s) => s.short_label).join(', ')}.
-            Finishing keeps {summary.leftOpenStages.length === 1 ? 'it' : 'them'} open.
+            {t('ssp.leftOpenList', { count: summary.leftOpenStages.length, stages: summary.leftOpenStages.map((s) => s.short_label).join(', ') })}
           </span>
           {onViewStage &&
             summary.leftOpenStages.map((s) => (
@@ -284,55 +289,55 @@ export function CompletionDialog({
                 onClick={() => onViewStage(s.id)}
                 className="rounded px-1.5 py-0.5 text-label font-semibold text-[var(--pm-primary)] hover:bg-[var(--surface-container-low)]"
               >
-                Close {s.short_label}
+                {t('pnl.closeStage', { stage: s.short_label })}
               </button>
             ))}
         </p>
       )}
       {!summary.deliverableDone && (
         <p className="mt-2 text-label text-[var(--on-surface-variant)]">
-          Finishing now records the project as finished without it. You can reopen it at any time.
+          {t('ssp.finishWithout')}
         </p>
       )}
       {!needsReason && open.length > 0 && (
         // Optional rows only: named, and finishing needs no reason (C3, 8 Oct).
-        <div role="group" aria-label="Optional, left as they are" className="mt-3 rounded-lg bg-[var(--surface-container-low)] px-4 py-3">
-          <p className="text-label font-semibold text-[var(--on-surface)]">Optional, left as they are:</p>
+        <div role="group" aria-label={t('ssp.optional')} className="mt-3 rounded-lg bg-[var(--surface-container-low)] px-4 py-3">
+          <p className="text-label font-semibold text-[var(--on-surface)]">{t('ssp.optionalTitle')}</p>
           <ul className="mt-1 list-disc pl-5 text-label text-[var(--on-surface-variant)]">
             {open.map((item, i) => (
-              <li key={i}>{describeOutstanding(item)}</li>
+              <li key={i}>{shownOutstanding(item, locale)}</li>
             ))}
           </ul>
         </div>
       )}
       {needsReason && (
-        <div role="group" aria-label="Still open" className="mt-3 rounded-lg bg-[var(--surface-container-low)] px-4 py-3">
+        <div role="group" aria-label={t('ssp.stillOpenLabel')} className="mt-3 rounded-lg bg-[var(--surface-container-low)] px-4 py-3">
           <p className="text-label font-semibold text-[var(--on-surface)]">
-            Still open — {open.length === 1 ? 'one thing' : `${open.length} things`}:
+            {t('ssp.stillOpen', { count: open.length })}
           </p>
           <ul className="mt-1 list-disc pl-5 text-label text-[var(--on-surface-variant)]">
             {open.map((item, i) => (
               <li key={i}>
-                {describeOutstanding(item)}
+                {shownOutstanding(item, locale)}
                 {onViewStage && 'stageId' in item && (
                   <button
                     type="button"
                     onClick={() => onViewStage(item.stageId)}
                     className="ml-2 rounded px-1.5 py-0.5 font-semibold text-[var(--pm-primary)] hover:bg-[var(--surface-container-high)]"
                   >
-                    Go to {item.label}
+                    {t('ssp.goTo', { stage: item.label })}
                   </button>
                 )}
               </li>
             ))}
           </ul>
           <label className="mt-3 block text-label text-[var(--on-surface)]">
-            Why finish with this open? It is recorded with the project.
+            {t('ssp.whyFinish')}
             <textarea
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               rows={2}
-              aria-label="Why finish with work still open"
+              aria-label={t('ssp.whyFinishLabel')}
               className="mt-1 w-full rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2 text-body text-[var(--on-surface)] outline-none focus:ring-2 focus:ring-[var(--pm-primary)]/40"
             />
           </label>
@@ -342,10 +347,9 @@ export function CompletionDialog({
         <div className="mt-4 rounded-lg bg-[var(--surface-container-low)] px-4 py-3">
           {check.result ? (
             <>
-              <p className="text-label font-semibold text-[var(--on-surface)]">Against your objective</p>
+              <p className="text-label font-semibold text-[var(--on-surface)]">{t('ssp.against')}</p>
               <p className="mt-1 text-body text-[var(--on-surface)]">
-                Alignment {check.result.alignment.score} · Clarity {check.result.clarity.score} · Drift{' '}
-                {check.result.drift.score} (low is good)
+                {t('ssp.scores', { a: check.result.alignment.score, c: check.result.clarity.score, d: check.result.drift.score })}
                 {check.result.completeness?.status ? ` · ${check.result.completeness.status}` : ''}
               </p>
               <p className="mt-1 text-label text-[var(--on-surface-variant)]">
@@ -357,20 +361,20 @@ export function CompletionDialog({
                 </p>
               ))}
               <p className="mt-2 text-label text-[var(--on-surface-variant)]">
-                Recorded with the project when you finish.
+                {t('ssp.recordedOnFinish')}
               </p>
             </>
           ) : (
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-label text-[var(--on-surface-variant)]">
-                {check.error ?? 'Score the finished deliverable against your objective before you close it.'}
+                {check.error ?? t('ssp.scoreFirst')}
               </p>
               <button
                 onClick={onCheck}
                 disabled={check.running || busy}
                 className="rounded-lg bg-[var(--surface-container-high)] px-4 py-2 text-label font-semibold text-[var(--on-surface)] disabled:opacity-50"
               >
-                {check.running ? 'Checking…' : 'Check it against the objective · one AI check'}
+                {check.running ? t('ssp.checking') : t('ssp.checkIt')}
               </button>
             </div>
           )}
@@ -382,10 +386,10 @@ export function CompletionDialog({
           disabled={busy || (needsReason && !reason.trim())}
           className="rounded-lg bg-[var(--pm-primary)] px-5 py-2 text-title text-[var(--on-primary)] disabled:opacity-50"
         >
-          {!summary.deliverableDone ? 'Override and finish' : needsReason ? 'Finish anyway' : 'Finish project'}
+          {!summary.deliverableDone ? t('ssp.override') : needsReason ? t('ssp.finishAnyway') : t('ssp.finishProject')}
         </button>
         <button onClick={onCancel} className="rounded-lg px-4 py-2 text-title text-[var(--on-surface-variant)]">
-          Not yet
+          {t('pnl.notYet')}
         </button>
       </div>
     </section>

@@ -1,5 +1,6 @@
 'use client';
 
+import { useT } from '@/lib/i18n/i18n-provider';
 import type { StaleDraftReport } from '@/lib/outline/model';
 
 /**
@@ -17,6 +18,7 @@ interface Props {
 }
 
 export function StaleDraftsNotice({ report, titleFor, onRewrite }: Props) {
+  const t = useT();
   if (report.stale.length === 0) return null;
 
   const count = report.stale.length;
@@ -36,12 +38,10 @@ export function StaleDraftsNotice({ report, titleFor, onRewrite }: Props) {
         </span>
         <div className="min-w-0 flex-1">
           <h3 id="outline-stale-heading" className="text-title text-[var(--on-surface)]">
-            {count} section{count === 1 ? ' was' : 's were'} written against outline
-            {versions ? ` ${versions}` : ' an earlier version'}
+            {t('ol.staleTitle', { count, versions: versions || t('ol.anEarlierVersion') })}
           </h3>
           <p className="mt-1 text-body text-[var(--on-surface-variant)]">
-            The writing is untouched. Rewrite a section only if the outline change actually
-            affects it.
+            {t('ol.staleNote')}
           </p>
 
           <ul className="mt-3 space-y-1.5">
@@ -54,16 +54,16 @@ export function StaleDraftsNotice({ report, titleFor, onRewrite }: Props) {
                   {titleFor(binding.item_id)}
                 </span>
                 <span className="text-label text-[var(--on-surface-variant)]">
-                  {binding.word_count.toLocaleString()} words
+                  {t('ol.words', { n: binding.word_count.toLocaleString() })}
                 </span>
                 {onRewrite && (
                   <button
                     type="button"
                     onClick={() => onRewrite(binding.item_id)}
-                    aria-label={`Rewrite “${titleFor(binding.item_id)}” against the approved outline`}
+                    aria-label={t('ol.rewriteLabel', { name: titleFor(binding.item_id) })}
                     className="rounded-lg px-3 py-1.5 text-body text-[var(--pm-primary)] hover:bg-[var(--surface-container-high)]"
                   >
-                    Rewrite
+                    {t('ol.rewrite')}
                   </button>
                 )}
               </li>

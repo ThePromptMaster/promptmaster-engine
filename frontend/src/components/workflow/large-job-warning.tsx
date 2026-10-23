@@ -29,6 +29,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { useT } from '@/lib/i18n/i18n-provider';
 
 import { api, type JobEstimate } from '@/lib/api/client';
 import { formatTokens, formatUsd } from '@/lib/observability/usage';
@@ -42,6 +43,7 @@ interface Props {
 }
 
 export function LargeJobWarning({ sectionCount, model, onConfirm, onCancel }: Props) {
+  const t = useT();
   const [estimate, setEstimate] = useState<JobEstimate | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -76,26 +78,26 @@ export function LargeJobWarning({ sectionCount, model, onConfirm, onCancel }: Pr
         </span>
         <div className="min-w-0 flex-1">
           <p id="large-job-title" className="text-title text-[var(--on-surface)]">
-            This is a large drafting run
+            {t('pnl.largeTitle')}
           </p>
 
           <p className="mt-1 max-w-[68ch] text-body text-[var(--on-surface-variant)]">
             {estimate?.warning ??
               (failed
-                ? `This will draft ${sectionCount} sections. The cost estimate could not be loaded, but drafting runs in the background and can be paused at any time.`
-                : `Working out what ${sectionCount} sections will involve…`)}
+                ? t('pnl.largeNoEstimate', { n: sectionCount })
+                : t('pnl.largeWorking', { n: sectionCount }))}
           </p>
 
           {estimate && (
             <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1">
-              <Figure label="Sections" value={formatTokens(estimate.section_count)} />
-              <Figure label="AI requests" value={formatTokens(estimate.llm_calls)} />
+              <Figure label={t('pnl.sections')} value={formatTokens(estimate.section_count)} />
+              <Figure label={t('pnl.aiRequests')} value={formatTokens(estimate.llm_calls)} />
               <Figure
-                label="Estimated cost"
+                label={t('pnl.estimatedCost')}
                 value={formatUsd(estimate.estimated_cost_usd)}
                 // Never "$0.00" when the price is simply unknown — see
                 // lib/observability/usage.ts and the migration.
-                note={estimate.estimated_cost_usd === null ? 'price unavailable' : 'approximate'}
+                note={estimate.estimated_cost_usd === null ? t('pnl.priceUnavailable') : t('pnl.approximate')}
               />
             </dl>
           )}
@@ -108,14 +110,14 @@ export function LargeJobWarning({ sectionCount, model, onConfirm, onCancel }: Pr
           onClick={onConfirm}
           className="rounded-full bg-[var(--pm-primary)] px-4 py-2 text-label text-[var(--on-primary)] transition-opacity hover:opacity-90"
         >
-          Start drafting
+          {t('pnl.startDrafting')}
         </button>
         <button
           type="button"
           onClick={onCancel}
           className="rounded-full bg-[var(--surface-container-lowest)] px-4 py-2 text-label text-[var(--on-surface)] transition-opacity hover:opacity-80"
         >
-          Not yet
+          {t('pnl.notYet')}
         </button>
       </div>
     </div>

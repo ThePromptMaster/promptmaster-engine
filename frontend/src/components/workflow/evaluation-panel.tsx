@@ -22,6 +22,7 @@
  * nothing and blocks nothing, exactly as the transition bar stays enabled.
  */
 
+import { useT } from '@/lib/i18n/i18n-provider';
 import { EvaluationRatings } from './evaluation-ratings';
 import type { Evaluation } from '@/types/project';
 
@@ -30,6 +31,7 @@ interface Props {
 }
 
 export function StageEvaluationPanel({ evaluation }: Props) {
+  const t = useT();
   const findings = evaluation?.findings ?? [];
   const interpretation = evaluation?.interpretation ?? null;
 
@@ -37,11 +39,11 @@ export function StageEvaluationPanel({ evaluation }: Props) {
 
   return (
     <section
-      aria-label="Stage evaluation"
+      aria-label={t('pnl.evalLabel')}
       className="rounded-xl bg-[var(--surface-container-low)] px-5 py-4"
     >
       <h3 className="text-label uppercase tracking-wider text-[var(--on-surface-variant)]">
-        Evaluation
+        {t('pnl.evaluation')}
       </h3>
 
       {/* Section 8: each rating carries its explanation, affected area and
@@ -54,31 +56,30 @@ export function StageEvaluationPanel({ evaluation }: Props) {
         <div role="status" className="mt-2 flex items-start gap-2 rounded-lg bg-[var(--pm-secondary)]/10 px-3 py-2">
           <span aria-hidden className="material-symbols-outlined text-[var(--pm-secondary)]">task_alt</span>
           <div>
-            <p className="text-body font-semibold text-[var(--on-surface)]">No further AI pass needed</p>
+            <p className="text-body font-semibold text-[var(--on-surface)]">{t('pnl.noFurther')}</p>
             {evaluation.further_pass_reason && (
               <p className="text-label text-[var(--on-surface-variant)]">{evaluation.further_pass_reason}</p>
             )}
             <p className="text-label text-[var(--on-surface-variant)]">
-              You can move on. Refining again is still there under More, but it is not needed.
+              {t('pnl.moveOn')}
             </p>
           </div>
         </div>
       )}
       {evaluation.further_pass_needed === true && evaluation.further_pass_reason && (
         <p className="mt-2 text-label text-[var(--on-surface-variant)]">
-          Another pass would help: {evaluation.further_pass_reason}
+          {t('pnl.anotherPass', { why: evaluation.further_pass_reason })}
         </p>
       )}
 
       {evaluation && (
         <>
           {evaluation.needs_realignment && (
-            <p className="mt-2 text-label text-[var(--pm-error)]">Needs realignment</p>
+            <p className="mt-2 text-label text-[var(--pm-error)]">{t('pnl.needsRealign')}</p>
           )}
           {findings.length > 0 && (
             <p className="mt-2 text-label text-[var(--on-surface-variant)]">
-              {findings.length} finding{findings.length === 1 ? '' : 's'}, shown against the
-              rating each one affects.
+              {t('pnl.findingsShown', { count: findings.length })}
             </p>
           )}
           <EvaluationRatings evaluation={evaluation} />
@@ -105,7 +106,7 @@ export function StageEvaluationPanel({ evaluation }: Props) {
 
       {findings.length === 0 && (
         <p className="mt-4 text-body text-[var(--on-surface-variant)]">
-          No specific defects found.
+          {t('pnl.noDefects')}
         </p>
       )}
     </section>

@@ -3,6 +3,7 @@
 import { shownModeReason } from '@/lib/i18n/stage';
 import { stageText, workflowName as workflowNameText, templateWord } from '@/lib/i18n/templates';
 import { useLocale, useT } from '@/lib/i18n/i18n-provider';
+import { tr } from '@/lib/i18n/store';
 import { shownGoWaiting } from '@/lib/i18n/stop-reasons';
 import { WebFoundNotice } from './web-found-notice';
 import { formOf, inFormWords } from '@/lib/workflow/work-form';
@@ -967,7 +968,7 @@ export function WorkflowWorkspace({
         return;
       }
       const { items, changes } = previewRowAction(headItems, action, itemSchemaFor(stage));
-      if (!changes.length) throw new Error('Nothing in the table would change.');
+      if (!changes.length) throw new Error(tr('wserr.noChange'));
       await appendStageVersion(stage.id, stage.label, {
         content: serializeItems(items),
         source_operation: 'chat_rows',
@@ -1216,7 +1217,7 @@ export function WorkflowWorkspace({
       // keeps every section already written — approving a revised outline must
       // not cost prose that has been generated and paid for.
       const destination = draftingStage ?? stage;
-      if (!destination) throw new Error('This workflow has no drafting stage.');
+      if (!destination) throw new Error(tr('wserr.noDrafting'));
 
       // Only an artifact filed under the drafting stage. The project-level
       // row (no stage) is never the manuscript of a staged workflow, and before
@@ -1231,7 +1232,7 @@ export function WorkflowWorkspace({
           : ensureStageArtifact
             ? await ensureStageArtifact(destination.id, destination.label)
             : null);
-      if (!target) throw new Error('This stage has nowhere to keep a draft yet. Reload the page and try again.');
+      if (!target) throw new Error(tr('wserr.noPlace'));
 
       await materialiseOutlineInto(doc, target);
       onReload?.();
@@ -1389,7 +1390,7 @@ export function WorkflowWorkspace({
               model: project.model, mode: project.mode,
             })
           : versions.at(-1);
-        if (!head) throw new Error('There is no saved outline to approve yet.');
+        if (!head) throw new Error(tr('wserr.noOutline'));
         await approveOutline({
           project: { id: project.id, user_id: project.user_id },
           stageId: outlineStageId,
@@ -1410,13 +1411,13 @@ export function WorkflowWorkspace({
       // The user's skip, with Go's reason as the recorded one.
       skip: async (reason: string) => {
         const option = transitions.find((t) => t.kind === 'skip');
-        if (!option) throw new Error('This stage cannot be skipped.');
+        if (!option) throw new Error(tr('wserr.cannotSkip'));
         await handleTransition(option, reason.slice(0, 500));
       },
       // The user's return to where the next round starts, with Go's reason.
       nextRound: async (toStageId: string, reason: string) => {
         const option = transitions.find((t) => t.kind === 'return' && t.toStageId === toStageId);
-        if (!option) throw new Error('This stage does not start another round.');
+        if (!option) throw new Error(tr('wserr.noRound'));
         await handleTransition(option, reason.slice(0, 500));
       },
       showTable: () => {
@@ -2122,7 +2123,7 @@ export function WorkflowWorkspace({
                       if (!holder) return;
                       // The finished text is saved before anything can change it.
                       const kept = await keepFinishedVersion({ template, stage: holder, bundles: stageBundles, project, appendStageVersion });
-                      if (!kept) throw new Error('The finished work could not be kept as a version, so nothing was reopened.');
+                      if (!kept) throw new Error(tr('wserr.notKept'));
                       await reopenProject();
                       setViewingStageId(holder.id === state.current_stage_id ? null : holder.id);
                     }

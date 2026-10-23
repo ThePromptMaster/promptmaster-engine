@@ -2,6 +2,8 @@
 
 import { Component, type ReactNode } from 'react';
 
+import { tr } from '@/lib/i18n/store';
+
 interface Props {
   children: ReactNode;
 }
@@ -41,16 +43,16 @@ export class ErrorBoundary extends Component<Props, State> {
             >
               error
             </span>
-            <h2 className="mt-3 text-headline text-[var(--on-surface)]">Something went wrong</h2>
+            <h2 className="mt-3 text-headline text-[var(--on-surface)]">{tr('pnl.wentWrong')}</h2>
             <p className="mx-auto mt-2 text-body text-[var(--on-surface-variant)]">
-              {this.state.error?.message || 'An unexpected error occurred.'}
+              {this.state.error?.message || tr('pnl.unexpected')}
             </p>
             <button
               type="button"
               onClick={() => this.setState({ hasError: false, error: null })}
               className="mt-6 rounded-xl bg-[var(--pm-primary)] px-5 py-2.5 text-title text-[var(--on-primary)] transition-opacity hover:opacity-90"
             >
-              Try again
+              {tr('pnl.tryAgain')}
             </button>
           </div>
         </div>

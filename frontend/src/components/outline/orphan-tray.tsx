@@ -1,5 +1,6 @@
 'use client';
 
+import { useT } from '@/lib/i18n/i18n-provider';
 import type { OrphanedSection } from '@/types/outline';
 
 /**
@@ -19,6 +20,7 @@ interface Props {
 }
 
 export function OrphanTray({ orphans, wordsFor, readOnly, onReattach, onDiscard }: Props) {
+  const t = useT();
   if (orphans.length === 0) return null;
 
   return (
@@ -27,15 +29,15 @@ export function OrphanTray({ orphans, wordsFor, readOnly, onReattach, onDiscard 
       className="rounded-xl bg-[var(--surface-container-low)] px-5 py-4"
     >
       <h3 id="outline-orphans-heading" className="text-title text-[var(--on-surface)]">
-        Detached sections
+        {t('ol.detached')}
       </h3>
       <p className="mt-1 text-body text-[var(--on-surface-variant)]">
-        Writing that is no longer in the outline. It is kept until you say otherwise.
+        {t('ol.detachedNote')}
       </p>
 
       <ul className="mt-3 space-y-2">
         {orphans.map((orphan) => {
-          const name = orphan.title.trim() || 'Untitled section';
+          const name = orphan.title.trim() || t('ol.untitled');
           const words = wordsFor(orphan.item_id);
           return (
             <li
@@ -51,10 +53,10 @@ export function OrphanTray({ orphans, wordsFor, readOnly, onReattach, onDiscard 
               <div className="min-w-0 flex-1">
                 <p className="truncate text-body text-[var(--on-surface)]">{name}</p>
                 <p className="text-label text-[var(--on-surface-variant)]">
-                  {words > 0 ? `${words.toLocaleString()} words · ` : ''}
+                  {words > 0 ? t('ol.wordsDot', { n: words.toLocaleString() }) : ''}
                   {orphan.reason === 'regenerated'
-                    ? 'dropped when the outline was regenerated'
-                    : 'removed from the outline'}
+                    ? t('ol.droppedRegen')
+                    : t('ol.removedFrom')}
                 </p>
               </div>
 
@@ -63,18 +65,18 @@ export function OrphanTray({ orphans, wordsFor, readOnly, onReattach, onDiscard 
                   <button
                     type="button"
                     onClick={() => onReattach(orphan.item_id)}
-                    aria-label={`Put “${name}” back into the outline`}
+                    aria-label={t('ol.putBackLabel', { name })}
                     className="rounded-lg px-3 py-1.5 text-body text-[var(--pm-primary)] hover:bg-[var(--surface-container-high)]"
                   >
-                    Put it back
+                    {t('ol.putBack')}
                   </button>
                   <button
                     type="button"
                     onClick={() => onDiscard(orphan.item_id)}
-                    aria-label={`Discard “${name}” permanently`}
+                    aria-label={t('ol.discardLabel', { name })}
                     className="rounded-lg px-3 py-1.5 text-body text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)] hover:text-[var(--pm-error)]"
                   >
-                    Discard
+                    {t('pnl.discard')}
                   </button>
                 </div>
               )}

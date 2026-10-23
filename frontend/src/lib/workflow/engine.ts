@@ -7,6 +7,10 @@
  */
 
 import { tr } from '@/lib/i18n/store';
+import { translate } from '@/lib/i18n/translate';
+import { shownCheckText } from '@/lib/i18n/check-text';
+import { templateWord } from '@/lib/i18n/templates';
+import type { Locale } from '@/lib/i18n/locales';
 import type {
   CriterionResult,
   ExitCriterion,
@@ -904,28 +908,40 @@ export function openFindingsByStage(items: readonly OutstandingItem[]): Record<s
 }
 
 /** One line per item, in the words every surface uses. */
+/**
+ * One outstanding item in words. English is the default and what tests and
+ * other code read; the Finish dialog asks for the interface's language
+ * (client, 21 Oct: "pick your language").
+ */
 export function describeOutstanding(item: OutstandingItem): string {
+  return shownOutstanding(item, 'en');
+}
+
+/** As `describeOutstanding`, in `locale`. */
+export function shownOutstanding(item: OutstandingItem, locale: Locale): string {
+  const t = (key: string, vars?: Record<string, string | number>) => translate(locale, key, vars);
   switch (item.kind) {
     case 'stale_stage':
-      return `${item.label} needs a recheck — ${item.reason}`;
+      return t('out.stale', { label: item.label, reason: shownCheckText(locale, item.reason) });
     case 'open_findings':
-      return `${item.label}: ${item.count}${item.optional ? ' optional' : ''} finding${item.count === 1 ? '' : 's'} not yet accepted or rejected`;
+      return t(item.optional ? 'out.optFindings' : 'out.findings', { label: item.label, count: item.count });
     case 'unconfirmed_proposals':
-      return `${item.label}: ${item.count}${item.optional ? ' optional' : ''} proposed status${item.count === 1 ? '' : 'es'} not yet confirmed${item.optional ? '' : ' (confirm them on that stage; it stays finished)'}`;
+      return t(item.optional ? 'out.optProposals' : 'out.proposals', { label: item.label, count: item.count });
     case 'carried_forward':
-      return `${item.label}: carried forward, still unmet — ${item.rows.slice(0, 3).map((r) => `"${r}"`).join('; ')}${item.rows.length > 3 ? ` and ${item.rows.length - 3} more` : ''}`;
+      return t('out.carried', {
+        label: item.label,
+        rows: `${item.rows.slice(0, 3).map((r) => `"${r}"`).join('; ')}${item.rows.length > 3 ? t('out.andMore', { n: item.rows.length - 3 }) : ''}`,
+      });
     case 'unmet_blocking':
-      return `${item.label}: ${item.criteria.join('; ')}`;
+      return t('out.unmet', { label: item.label, criteria: item.criteria.map((c) => templateWord(locale, c)).join('; ') });
     case 'blocked_stage':
-      return `${item.label} is stuck — ${item.reason}`;
+      return t('out.stuck', { label: item.label, reason: item.reason });
     case 'check_says':
-      return `${item.label}: the latest check says ${item.says}`;
+      return t('out.checkSays', { label: item.label, says: shownCheckText(locale, item.says) });
     case 'go_waiting':
-      return `Go is waiting for you: ${item.need}`;
+      return t('out.goWaiting', { need: item.need });
     case 'objective_unmet':
-      return item.blockers.length
-        ? `The objective is not met — waiting for: ${item.blockers.join('; ')}`
-        : 'The objective is not met';
+      return item.blockers.length ? t('out.objWaiting', { list: item.blockers.join('; ') }) : t('out.objNotMet');
   }
 }
 
