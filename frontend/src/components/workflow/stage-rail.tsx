@@ -2,6 +2,7 @@
 
 import { isDone } from '@/lib/workflow/types';
 import { useLocale, useT } from '@/lib/i18n/i18n-provider';
+import { shownCheckText } from '@/lib/i18n/check-text';
 import { groupLabel, stageText } from '@/lib/i18n/templates';
 import type { MessageKey } from '@/lib/i18n/messages/en';
 import type {
@@ -208,7 +209,7 @@ export function StageRail({ template, state, nextSuggestedId, onSelect, approval
                       <span
                         title={
                           state.stages[stage.id]?.stale?.reason
-                            ? t('rail.recheckWhy', { reason: state.stages[stage.id]!.stale!.reason })
+                            ? t('rail.recheckWhy', { reason: shownCheckText(locale, state.stages[stage.id]!.stale!.reason, template.key, template.stages) })
                             : t('rail.recheckEarlier')
                         }
                         className="shrink-0 text-label uppercase tracking-wide text-[var(--pm-tertiary)]"

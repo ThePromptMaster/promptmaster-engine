@@ -18,6 +18,7 @@
 import type { ProjectFact } from '@/types/project';
 import { answered, describeValue, valueMentions, type FactValues, type ValueMention } from './fact-values';
 import { currentFacts } from './facts';
+import { getLocale, tr } from '@/lib/i18n/store';
 
 /** Kinds a revision can change; a bare number is too easily something else. */
 const RECONCILED: readonly (keyof FactValues)[] = ['dates', 'money', 'weekdays', 'times', 'limits'];
@@ -195,16 +196,19 @@ function approverName(by: string): string {
   return /^[A-Z][a-z]/.test(bare) ? bare : `the ${bare}`;
 }
 
-/** The line under a new fact in the review: what it will be recorded as, and from where. */
+/** The line under a new fact in the review: what it will be recorded as, and from where. Shown only, in the interface's language. */
 export function newFactNote(c: FactChange): string {
   const from = describeFactChange(c);
   switch (factChangeGroup(c)) {
     case 'approval':
-      return c.approvedBy ? `Approved by ${approverName(c.approvedBy)}, ${from}` : `Recorded as an approval, ${from}`;
+      // English gives a role its "the"; other languages take the approver as written.
+      return c.approvedBy
+        ? tr('fnote.approvedBy', { by: getLocale() === 'en' ? approverName(c.approvedBy) : c.approvedBy.trim(), from })
+        : tr('fnote.approval', { from });
     case 'request':
-      return `Recorded as a request, not an approval ${from}`;
+      return tr('fnote.request', { from });
     default:
-      return `New ${c.fact.kind === 'requirement' ? 'requirement' : 'fact'} ${from}`;
+      return tr(c.fact.kind === 'requirement' ? 'fnote.newRequirement' : 'fnote.newFact', { from });
   }
 }
 

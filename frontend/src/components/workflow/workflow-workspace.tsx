@@ -1,7 +1,7 @@
 'use client';
 
 import { shownModeReason } from '@/lib/i18n/stage';
-import { stageText, workflowName as workflowNameText } from '@/lib/i18n/templates';
+import { stageText, workflowName as workflowNameText, templateWord } from '@/lib/i18n/templates';
 import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import { WebFoundNotice } from './web-found-notice';
 import { formOf, inFormWords } from '@/lib/workflow/work-form';
@@ -2685,7 +2685,7 @@ export function WorkflowWorkspace({
                 stageLabel: stage.short_label,
                 hasContent: hasContent || (stage.renderer === 'long_form' && (stageBundles[draftingStageId(template) ?? '']?.artifact?.long_form?.outline ?? []).some((sec) => (sec.content ?? '').trim())),
                 openRows: rendererHoldsItems(stage.renderer) ? headItems.filter((i) => !isTriaged(i, itemSchemaFor(stage))).length : 0,
-                requiredOpen: evaluation.criteria.filter((c) => c.blocking && !c.satisfied).map((c) => c.label),
+                requiredOpen: evaluation.criteria.filter((c) => c.blocking && !c.satisfied).map((c) => templateWord(locale, c.label)),
                 nextStageLabel: nextStage?.short_label ?? null,
               }) : []}
               headVersion={stageVersions.at(-1) ?? null}

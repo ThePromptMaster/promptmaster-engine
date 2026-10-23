@@ -6,6 +6,8 @@
  * it; the file itself goes only to the sandbox that runs that code.
  */
 
+import { tr } from '@/lib/i18n/store';
+
 export const MAX_FILE_BYTES = 5_000_000;
 export const MAX_FILES = 20;
 export const ACCEPTED_EXTENSIONS = ['.csv', '.tsv', '.json', '.txt'] as const;
@@ -66,16 +68,12 @@ export function rejectReason(name: string, bytes: number, existing: readonly str
     !(DOCUMENT_ONLY_EXTENSIONS as readonly string[]).includes(ext) &&
     !isImage(name)
   ) {
-    return ext === '.xls'
-      ? `${name} is in the old Excel format. Save it as .xlsx or CSV first.`
-      : ext === '.doc'
-        ? `${name} is in the old Word format. Save it as .docx or PDF first.`
-        : `${name} is not a PDF, Word (.docx), Markdown, text, spreadsheet (.xlsx), CSV, TSV, JSON or image (PNG, JPEG, WebP, GIF, HEIC) file.`;
+    return ext === '.xls' ? tr('file.oldExcel', { name }) : ext === '.doc' ? tr('file.oldWord', { name }) : tr('file.unsupported', { name });
   }
-  if (bytes > MAX_FILE_BYTES) return `${name} is larger than ${MAX_FILE_BYTES / 1_000_000} MB.`;
-  if (bytes === 0) return `${name} is empty.`;
-  if (existing.includes(name)) return `A file called ${name} is already attached. Remove it first to replace it.`;
-  if (existing.length >= MAX_FILES) return `A project can hold ${MAX_FILES} files.`;
+  if (bytes > MAX_FILE_BYTES) return tr('file.tooLarge', { name, mb: MAX_FILE_BYTES / 1_000_000 });
+  if (bytes === 0) return tr('file.empty', { name });
+  if (existing.includes(name)) return tr('file.duplicate', { name });
+  if (existing.length >= MAX_FILES) return tr('file.limit', { max: MAX_FILES });
   return null;
 }
 
@@ -140,10 +138,10 @@ export function imagePreview(name: string, caption: string, width = 0, height = 
 export function describePreview(preview: DataPreview): string {
   if (preview.kind === 'image') {
     const size = preview.width && preview.height ? ` · ${preview.width}×${preview.height}` : '';
-    return `image${size}${preview.caption ? ` · ${preview.caption}` : ''}`;
+    return `${tr('preview.image')}${size}${preview.caption ? ` · ${preview.caption}` : ''}`;
   }
-  const count = `${preview.rows.toLocaleString()} ${preview.kind === 'text' ? 'line' : 'row'}${preview.rows === 1 ? '' : 's'}`;
+  const count = tr(preview.kind === 'text' ? 'preview.lines' : 'preview.rows', { count: preview.rows, n: preview.rows.toLocaleString() });
   if (!preview.columns.length) return count;
   const shown = preview.columns.slice(0, 6).join(', ');
-  return `${count} · ${shown}${preview.columns.length > 6 ? `, +${preview.columns.length - 6} more` : ''}`;
+  return `${count} · ${shown}${preview.columns.length > 6 ? `, ${tr('preview.more', { n: preview.columns.length - 6 })}` : ''}`;
 }

@@ -12,6 +12,7 @@
 
 import { installPdfShims } from './browser-shims';
 import { extensionOf } from './preview';
+import { tr } from '@/lib/i18n/store';
 
 /** Attachments whose words, not rows, are what matters. */
 export const DOCUMENT_EXTENSIONS = ['.pdf', '.docx', '.md', '.txt'] as const;
@@ -83,9 +84,7 @@ export async function extractText(name: string, data: ArrayBuffer): Promise<{ te
     if (!text) {
       return {
         error:
-          ext === '.pdf'
-            ? `${name} has no text to read — it may be a scanned image. Paste its words instead.`
-            : `${name} has no text in it.`,
+          ext === '.pdf' ? tr('file.noTextPdf', { name }) : tr('file.noText', { name }),
       };
     }
     return { text };
@@ -95,7 +94,7 @@ export async function extractText(name: string, data: ArrayBuffer): Promise<{ te
     const why = e instanceof Error && e.message ? ` (${e.message.slice(0, 160)})` : '';
     if (typeof console !== 'undefined') console.warn('[extract-text]', name, e);
     return {
-      error: `${name} could not be read${why}. Save it again as PDF or Word (.docx), or paste its words instead.`,
+      error: tr('file.unreadable', { name, why }),
     };
   }
 }

@@ -7,7 +7,9 @@ import type { WorkflowTemplate } from '@/lib/workflow/types';
 import type { ModeType, SetupRationale } from '@/types';
 import { LimitCounter } from '@/components/shared/limit-counter';
 import { INPUT_LIMITS, withinLimit } from '@/lib/projects/input-limits';
-import { useT } from '@/lib/i18n/i18n-provider';
+import { useLocale, useT } from '@/lib/i18n/i18n-provider';
+import { templateWord } from '@/lib/i18n/templates';
+import { shownModeName } from '@/lib/i18n/stage';
 import { useWorkflowWords } from '@/components/projects/workflow-picker';
 
 
@@ -74,6 +76,7 @@ export function SetupCard({
   simple = false,
 }: Props) {
   const t = useT();
+  const locale = useLocale();
   const words = useWorkflowWords();
   const field =
     'w-full rounded-lg bg-[var(--surface-container-low)] px-4 py-3 text-body leading-relaxed text-[var(--on-surface)] outline-none placeholder:text-[var(--on-surface-variant)]/70 focus:ring-2 focus:ring-[var(--pm-primary)]/40';
@@ -122,7 +125,7 @@ export function SetupCard({
         >
           {SELECTABLE_MODES.map((m) => (
             <option key={m} value={m}>
-              {MODE_DISPLAY[m].display_name} — {MODE_DISPLAY[m].tagline}
+              {shownModeName(m, MODE_DISPLAY[m].display_name)} — {templateWord(locale, MODE_DISPLAY[m].tagline)}
             </option>
           ))}
         </select>
