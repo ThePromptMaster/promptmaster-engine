@@ -4,6 +4,9 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
+import { authErrorMessage } from '@/lib/auth/auth-errors';
+import { useT } from '@/lib/i18n/i18n-provider';
+import { LocaleSwitch } from '@/components/shared/locale-switch';
 
 /**
  * Create an account.
@@ -29,6 +32,7 @@ const LABEL_CLASS =
 
 export default function SignupPage() {
   const { signUp } = useAuth();
+  const t = useT();
   const router = useRouter();
 
   const [fullName, setFullName] = useState('');
@@ -44,11 +48,11 @@ export default function SignupPage() {
     setError(null);
 
     if (password.length < 6) {
-      setError('Password must be at least 6 characters.');
+      setError(t('auth.err.tooShort'));
       return;
     }
     if (password !== confirmPassword) {
-      setError('Passwords do not match.');
+      setError(t('auth.err.mismatch'));
       return;
     }
 
@@ -60,7 +64,7 @@ export default function SignupPage() {
       if (signedIn) router.push('/projects');
       else setSuccess(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create account.');
+      setError(authErrorMessage(err, 'auth.err.create'));
     } finally {
       setIsLoading(false);
     }
@@ -71,7 +75,7 @@ export default function SignupPage() {
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/logo.svg" alt="PromptMaster" className="w-12 h-12 rounded-xl mx-auto mb-6" />
       <h1 className="text-[var(--on-surface)] text-headline tracking-tight">PromptMaster</h1>
-      <p className="text-[var(--on-surface-variant)] text-body">A system for thinking with AI</p>
+      <p className="text-[var(--on-surface-variant)] text-body">{t('auth.tagline')}</p>
     </header>
   );
 
@@ -99,17 +103,16 @@ export default function SignupPage() {
             >
               mark_email_read
             </span>
-            <h2 className="text-title text-[var(--on-surface)]">Check your email</h2>
+            <h2 className="text-title text-[var(--on-surface)]">{t('auth.checkEmail')}</h2>
             <p className="text-body text-[var(--on-surface-variant)]">
-              We sent a confirmation link to{' '}
-              <strong className="text-[var(--on-surface)]">{email}</strong>. Click the link to
-              activate your account.
+              {t('auth.confirmSentTo')}{' '}
+              <strong className="text-[var(--on-surface)]">{email}</strong>{t('auth.confirmSentAfter')}
             </p>
             <Link
               href="/auth/login"
               className="inline-block text-body font-medium text-[var(--pm-primary)] hover:underline"
             >
-              Back to sign in
+              {t('auth.backToSignInLower')}
             </Link>
           </section>
         </main>
@@ -129,9 +132,9 @@ export default function SignupPage() {
           style={{ boxShadow: '0px 4px 20px rgba(25, 28, 30, 0.04)' }}
         >
           <div className="space-y-1">
-            <h2 className="text-title text-[var(--on-surface)]">Create an account</h2>
+            <h2 className="text-title text-[var(--on-surface)]">{t('auth.createTitle')}</h2>
             <p className="text-label text-[var(--on-surface-variant)]">
-              Get started with PromptMaster for free
+              {t('auth.createIntro')}
             </p>
           </div>
 
@@ -144,12 +147,12 @@ export default function SignupPage() {
 
             <div className="space-y-2">
               <label className={LABEL_CLASS} htmlFor="fullName">
-                Full name
+                {t('auth.fullName')}
               </label>
               <input
                 id="fullName"
                 type="text"
-                placeholder="Jane Smith"
+                placeholder={t('auth.fullNamePlaceholder')}
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 required
@@ -160,7 +163,7 @@ export default function SignupPage() {
 
             <div className="space-y-2">
               <label className={LABEL_CLASS} htmlFor="email">
-                Email address
+                {t('auth.emailAddressLower')}
               </label>
               <input
                 id="email"
@@ -176,12 +179,12 @@ export default function SignupPage() {
 
             <div className="space-y-2">
               <label className={LABEL_CLASS} htmlFor="password">
-                Password
+                {t('auth.password')}
               </label>
               <input
                 id="password"
                 type="password"
-                placeholder="Min. 6 characters"
+                placeholder={t('auth.passwordPlaceholder')}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -192,12 +195,12 @@ export default function SignupPage() {
 
             <div className="space-y-2">
               <label className={LABEL_CLASS} htmlFor="confirmPassword">
-                Confirm password
+                {t('auth.confirmPassword')}
               </label>
               <input
                 id="confirmPassword"
                 type="password"
-                placeholder="Repeat your password"
+                placeholder={t('auth.confirmPlaceholder')}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
@@ -211,22 +214,23 @@ export default function SignupPage() {
               disabled={isLoading}
               className="w-full py-3 px-4 bg-[var(--pm-primary)] text-[var(--on-primary)] font-semibold rounded-lg hover:bg-[var(--pm-primary-container)] active:scale-[0.98] transition-all duration-200 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {isLoading ? 'Creating account...' : 'Create Account'}
+              {isLoading ? t('auth.creating') : t('auth.createAccount')}
             </button>
           </form>
         </section>
 
         <footer className="mt-6 text-center">
           <p className="text-body text-[var(--on-surface-variant)]">
-            Already have an account?{' '}
+            {t('auth.haveAccount')}{' '}
             <Link
               href="/auth/login"
               className="text-[var(--pm-primary)] font-medium hover:underline ml-1"
             >
-              Sign in
+              {t('auth.signInLower')}
             </Link>
           </p>
         </footer>
+        <LocaleSwitch />
       </main>
 
       {decoration}

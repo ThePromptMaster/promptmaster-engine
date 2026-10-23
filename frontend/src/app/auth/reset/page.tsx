@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { forgetResetRequest } from '@/lib/auth/next-path';
+import { authErrorMessage } from '@/lib/auth/auth-errors';
+import { useT } from '@/lib/i18n/i18n-provider';
 
 /**
  * Set a new password, reached from the reset email through the callback.
@@ -23,6 +25,7 @@ const LABEL_CLASS =
 
 export default function ResetPasswordPage() {
   const router = useRouter();
+  const t = useT();
   const [hasSession, setHasSession] = useState<boolean | null>(null);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -40,11 +43,11 @@ export default function ResetPasswordPage() {
     e.preventDefault();
     setError(null);
     if (password.length < 6) {
-      setError('Password must be at least 6 characters.');
+      setError(t('auth.err.tooShort'));
       return;
     }
     if (password !== confirmPassword) {
-      setError('Passwords do not match.');
+      setError(t('auth.err.mismatch'));
       return;
     }
     setSaving(true);
@@ -55,7 +58,7 @@ export default function ResetPasswordPage() {
       forgetResetRequest();
       router.replace('/projects');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not set the new password.');
+      setError(authErrorMessage(err, 'auth.err.setNew'));
       setSaving(false);
     }
   };
@@ -66,27 +69,27 @@ export default function ResetPasswordPage() {
         <header className="text-center space-y-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.svg" alt="PromptMaster" className="w-12 h-12 rounded-xl mx-auto mb-6" />
-          <h1 className="text-[var(--on-surface)] text-headline tracking-tight">Set a new password</h1>
+          <h1 className="text-[var(--on-surface)] text-headline tracking-tight">{t('auth.newTitle')}</h1>
         </header>
 
         {hasSession === null ? (
-          <p className="text-center text-body text-[var(--on-surface-variant)]">Checking your reset link…</p>
+          <p className="text-center text-body text-[var(--on-surface-variant)]">{t('auth.checkingLink')}</p>
         ) : !hasSession ? (
           <div className="space-y-5 text-center">
             <p className="text-body text-[var(--on-surface-variant)]">
-              This reset link has expired or was already used. Ask for a new one from the sign-in page.
+              {t('auth.linkExpired')}
             </p>
             <Link
               href="/auth/login"
               className="inline-block w-full py-3 px-4 bg-[var(--pm-primary)] text-[var(--on-primary)] font-semibold rounded-lg text-title"
             >
-              Back to sign in
+              {t('auth.backToSignInLower')}
             </Link>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
-              <label htmlFor="new-password" className={LABEL_CLASS}>New password</label>
+              <label htmlFor="new-password" className={LABEL_CLASS}>{t('auth.newPassword')}</label>
               <input
                 id="new-password"
                 type="password"
@@ -98,7 +101,7 @@ export default function ResetPasswordPage() {
               />
             </div>
             <div className="space-y-2">
-              <label htmlFor="confirm-password" className={LABEL_CLASS}>Confirm new password</label>
+              <label htmlFor="confirm-password" className={LABEL_CLASS}>{t('auth.confirmNewPassword')}</label>
               <input
                 id="confirm-password"
                 type="password"
@@ -117,7 +120,7 @@ export default function ResetPasswordPage() {
               disabled={saving}
               className="w-full py-3 px-4 bg-[var(--pm-primary)] text-[var(--on-primary)] font-semibold rounded-lg text-title disabled:opacity-60"
             >
-              {saving ? 'Saving…' : 'Save new password'}
+              {saving ? t('auth.saving') : t('auth.saveNew')}
             </button>
           </form>
         )}

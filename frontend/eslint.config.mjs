@@ -3,7 +3,7 @@ import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 
 // Material Symbols are written as their ligature names; they are icons, not words.
-const ICONS = ["person", "expand_more", "expand_less", "palette", "translate", "logout", "science", "arrow_back", "attach_file", "close", "check", "add", "arrow_upward", "arrow_forward", "description", "image", "delete", "edit", "refresh", "info", "lightbulb", "help", "chat", "auto_awesome", "menu_book", "bolt", "tune", "undo", "link_off", "travel_explore", "public_off", "content_copy", "recommend", "edit_note", "compress", "folder_open", "workspaces", "chevron_right", "restore_from_trash", "create_new_folder", "drive_file_move", "link", "download", "table_view", "fact_check", "check_circle", "forum", "lock", "list_alt", "splitscreen_right", "task_alt", "history", "note_add", "progress_activity", "pending_actions", "check_box", "stop_circle", "play_arrow", "rocket_launch", "flag", "arrow_downward", "error", "radio_button_unchecked", "done_all", "rule", "auto_fix_high", "block", "keyboard_arrow_down", "keyboard_arrow_up", "pause_circle", "savings", "sync_problem", "upgrade"];
+const ICONS = ["gavel", "verified_user", "account_tree", "login", "dashboard", "explore_off", "architecture", "visibility_off", "visibility", "mark_email_read", "person", "expand_more", "expand_less", "palette", "translate", "logout", "science", "arrow_back", "attach_file", "close", "check", "add", "arrow_upward", "arrow_forward", "description", "image", "delete", "edit", "refresh", "info", "lightbulb", "help", "chat", "auto_awesome", "menu_book", "bolt", "tune", "undo", "link_off", "travel_explore", "public_off", "content_copy", "recommend", "edit_note", "compress", "folder_open", "workspaces", "chevron_right", "restore_from_trash", "create_new_folder", "drive_file_move", "link", "download", "table_view", "fact_check", "check_circle", "forum", "lock", "list_alt", "splitscreen_right", "task_alt", "history", "note_add", "progress_activity", "pending_actions", "check_box", "stop_circle", "play_arrow", "rocket_launch", "flag", "arrow_downward", "error", "radio_button_unchecked", "done_all", "rule", "auto_fix_high", "block", "keyboard_arrow_down", "keyboard_arrow_up", "pause_circle", "savings", "sync_problem", "upgrade"];
 
 const eslintConfig = defineConfig([
   ...nextVitals,
@@ -14,6 +14,15 @@ const eslintConfig = defineConfig([
   {
     files: [
       "src/components/shared/app-header.tsx",
+      "src/app/auth/login/page.tsx",
+      "src/app/auth/signup/page.tsx",
+      "src/app/auth/reset/page.tsx",
+      "src/app/auth/callback/page.tsx",
+      "src/app/(marketing)/page.tsx",
+      "src/app/not-found.tsx",
+      "src/app/projects/[[]id]/page.tsx",
+      "src/app/projects/[[]id]/print/page.tsx",
+      "src/components/shared/locale-switch.tsx",
       "src/components/shared/colour-preferences.tsx",
       "src/components/shared/beta-notice.tsx",
       "src/components/shared/feedback-form.tsx",

@@ -5,9 +5,12 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { resetWasRequested, safeNext } from '@/lib/auth/next-path';
+import { useT } from '@/lib/i18n/i18n-provider';
+import { getLocale, tr } from '@/lib/i18n/store';
 
 export default function AuthCallbackPage() {
   const router = useRouter();
+  const t = useT();
   const searchParams = useSearchParams();
   const [timeoutError, setTimeoutError] = useState<string | null>(null);
 
@@ -22,7 +25,7 @@ export default function AuthCallbackPage() {
   const urlError = errorParam
     ? errorDescription
       ? errorDescription.replace(/\+/g, ' ')
-      : 'Authentication failed. Please try again.'
+      : t('auth.err.failed')
     : null;
   const error = urlError ?? verifyError ?? timeoutError;
 
@@ -35,7 +38,7 @@ export default function AuthCallbackPage() {
     let done = false;
     // Timeout — if nothing has signed in after 10s, say so.
     const timeout = setTimeout(() => {
-      if (!done) setTimeoutError('Sign in timed out. Please try again.');
+      if (!done) setTimeoutError(tr('auth.err.timeout'));
     }, 10000);
     const go = (to: string) => {
       if (done) return;
@@ -58,7 +61,7 @@ export default function AuthCallbackPage() {
           if (otpError) {
             done = true;
             clearTimeout(timeout);
-            setVerifyError(otpError.message || 'This link has expired or was already used.');
+            setVerifyError(otpError.message && getLocale() === 'en' ? otpError.message : tr('auth.err.linkUsed'));
           } else if (otpType === 'recovery') go('/auth/reset');
           else signedIn();
         });
@@ -96,7 +99,7 @@ export default function AuthCallbackPage() {
           </div>
           <div className="space-y-2">
             <h2 className="text-lg font-semibold text-[var(--on-surface)]">
-              Authentication Error
+              {t('auth.callbackError')}
             </h2>
             <p className="text-body text-[var(--on-surface-variant)] leading-relaxed">
               {error}
@@ -107,13 +110,13 @@ export default function AuthCallbackPage() {
               href="/auth/login"
               className="w-full py-3 px-4 bg-[var(--pm-primary)] text-[var(--on-primary)] font-semibold rounded-lg hover:bg-[var(--pm-primary-container)] active:scale-[0.98] transition-all duration-200 text-center text-title"
             >
-              Back to Sign In
+              {t('auth.backToSignIn')}
             </Link>
             <button
               onClick={() => router.back()}
               className="text-body text-[var(--on-surface-variant)] hover:text-[var(--pm-primary)] transition-colors"
             >
-              Go Back
+              {t('auth.goBack')}
             </button>
           </div>
         </div>
@@ -127,7 +130,7 @@ export default function AuthCallbackPage() {
         <span className="material-symbols-outlined text-[var(--pm-primary)] text-[32px] animate-spin">
           progress_activity
         </span>
-        <p className="text-body text-[var(--on-surface-variant)]">Completing sign in...</p>
+        <p className="text-body text-[var(--on-surface-variant)]">{t('auth.completing')}</p>
       </div>
     </div>
   );
