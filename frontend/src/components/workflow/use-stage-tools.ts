@@ -124,7 +124,7 @@ export function useStageTools({ project, stage, headVersion, fallbackContent = '
         if (kind === 'continue') {
           const res = await api.continueDocument({
             inputs: inputsFrom(project),
-            incomplete_iteration: asIteration(content, headVersion?.version_number ?? 0, project.mode),
+            incomplete_iteration: asIteration(content, headVersion?.version_number ?? 1, project.mode),
             iteration_number: next,
             model: project.model,
             web_access: webAccessOf(project),
