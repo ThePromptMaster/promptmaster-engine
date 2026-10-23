@@ -142,7 +142,7 @@ export function FoldersSidebar({ folders, counts, selected, onSelect, onCreate, 
         style={{ paddingLeft: `${indent * 14 + 8}px` }}
       >
         <span aria-hidden className="material-symbols-outlined shrink-0 text-[18px]">{icon}</span>
-        <span className="min-w-0 flex-1 truncate">{label}</span>
+        <span className="min-w-0 flex-1 truncate" title={label}>{label}</span>
         {count !== undefined && <span className="shrink-0 text-label tabular-nums text-[var(--on-surface-variant)]">{count}</span>}
       </button>
     );
@@ -153,9 +153,12 @@ export function FoldersSidebar({ folders, counts, selected, onSelect, onCreate, 
       {naming?.kind === 'rename' && naming.id === f.id ? (
         nameInput(f.depth)
       ) : (
-        <div className="group flex items-center">
+        // The actions sit over the row's end while it is hovered or focused, so
+        // at rest the name has the whole width (23 Oct pass: "Prod ..." for a
+        // short name). On a touch screen, with no hover, they stay in the row.
+        <div className="group relative flex items-center">
           <div className="min-w-0 flex-1">{row(f.id, f.name, selected === f.id ? 'folder_open' : 'folder', counts[f.id] ?? 0, f.id, f.depth)}</div>
-          <div className="flex shrink-0 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100">
+          <div className="absolute right-0 top-1/2 hidden -translate-y-1/2 rounded-md bg-[var(--surface-container-high)] group-focus-within:flex group-hover:flex [@media(hover:none)]:static [@media(hover:none)]:flex [@media(hover:none)]:shrink-0 [@media(hover:none)]:translate-y-0 [@media(hover:none)]:bg-transparent">
             {f.depth + 1 < MAX_DEPTH && (
               <button type="button" onClick={() => startNaming({ kind: 'new', parentId: f.id })} aria-label={`New folder in ${f.name}`} title="New folder inside" className="rounded-md p-1 text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)]">
                 <span className="material-symbols-outlined text-[16px]">create_new_folder</span>
