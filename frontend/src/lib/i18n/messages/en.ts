@@ -30,6 +30,10 @@ import { en as modesArea } from './areas/modes';
 import { en as wordsArea } from './areas/words';
 import { en as checksArea } from './areas/checks';
 import { en as filesArea } from './areas/files';
+import { en as needArea } from './areas/need';
+import { en as stopArea } from './areas/stop';
+import { en as acctArea } from './areas/acct';
+import { en as recArea } from './areas/rec';
 
 export const en = {
   // The account menu (components/shared/app-header.tsx)
@@ -313,6 +317,10 @@ export const en = {
   ...wordsArea,
   ...checksArea,
   ...filesArea,
+  ...needArea,
+  ...stopArea,
+  ...acctArea,
+  ...recArea,
 } as const;
 
 /** A key as the dictionaries hold it. */

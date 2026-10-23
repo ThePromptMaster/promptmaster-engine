@@ -3,6 +3,7 @@
 import { shownModeReason } from '@/lib/i18n/stage';
 import { stageText, workflowName as workflowNameText, templateWord } from '@/lib/i18n/templates';
 import { useLocale, useT } from '@/lib/i18n/i18n-provider';
+import { shownGoWaiting } from '@/lib/i18n/stop-reasons';
 import { WebFoundNotice } from './web-found-notice';
 import { formOf, inFormWords } from '@/lib/workflow/work-form';
 import { modeForStage } from '@/lib/workflow/stage-mode';
@@ -2157,7 +2158,7 @@ export function WorkflowWorkspace({
                         ? () => void go.fixObjective(objectiveNeed.items)
                         : () => void go.go()
                   }
-                  resumeLabel={objectiveNeed ? (describeNeed(objectiveNeed, go.stageLabelFor).action ?? undefined) : undefined}
+                  resumeLabel={objectiveNeed ? (describeNeed(objectiveNeed, go.stageLabelFor, {}, locale).action ?? undefined) : undefined}
                   resumeDisabled={go.active}
                   onAnswer={
                     appendStageVersion && go.run && !go.run.ended_at && go.run.status === 'awaiting_decision' && go.run.needs?.kind === 'answer_question'
@@ -2537,7 +2538,7 @@ export function WorkflowWorkspace({
                 stageName={shownStageName}
                 // Go waiting for an answer is open work too (6 Oct, email 1:
                 // "nothing was outstanding while … Go was waiting for me").
-                elsewhere={goWaiting ? [...outstandingOther, t('wsa.goWaitingFor', { what: goWaiting })] : outstandingOther}
+                elsewhere={goWaiting ? [...outstandingOther, t('wsa.goWaitingFor', { what: shownGoWaiting(locale, goWaiting) ?? goWaiting })] : outstandingOther}
                 working={
                   stageEvaluation.evaluating ? t('wsa.checking')
                     : generation.generating ? t('wsa.drafting')

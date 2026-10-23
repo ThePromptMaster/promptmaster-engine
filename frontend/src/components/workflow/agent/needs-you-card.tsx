@@ -1,6 +1,6 @@
 'use client';
 
-import { useT } from '@/lib/i18n/i18n-provider';
+import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import { useState } from 'react';
 
 import { describeNeed, needIsDecidedOnStage, type NeedContext, type NeedsUser, type StuckOption } from '@/lib/agent/needs';
@@ -31,9 +31,10 @@ export function NeedsYouCard({
   context?: NeedContext;
 }) {
   const t = useT();
+  const locale = useLocale();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { message, action, options, footer } = describeNeed(need, stageLabel, context);
+  const { message, action, options, footer } = describeNeed(need, stageLabel, context, locale);
   const run = (option?: StuckOption) => {
     setBusy(true);
     setError(null);

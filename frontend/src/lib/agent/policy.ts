@@ -24,6 +24,8 @@ import type { RoutineDecisions } from '@/types/project';
 import { actionFor, INTERPRET_STEP, USER_ANSWER_STEP } from './actions';
 import type { StageFacts } from './facts';
 import { proposeTargets } from '@/lib/workflow/proposals';
+import { LOCALES } from '@/lib/i18n/locales';
+import { stageText } from '@/lib/i18n/templates';
 
 /**
  * The largest window by default (17 Oct, Sean: "Should we automatically have
@@ -148,20 +150,34 @@ export function returnTargets(input: {
 }
 
 /** "go back to Output…", "move back to the Revision stage". */
-const BACK_TO = /\b(?:go|going|move|send it|take it)\s+back\s+to\s+(?:the\s+)?([A-Za-z][A-Za-z -]{1,60})/i;
-/** An answer agreeing to what was asked: "Yes, go back and remove them", "OK, do it". */
-const AGREES = /^\s*(?:yes|yeah|yep|ok(?:ay)?|sure|please|go ahead|do it|do that|go back|agreed|fine|right)\b/i;
-const DECLINES = /\b(?:no|not|don't|do not|keep|leave|stay)\b/i;
+const BACK_TO_EN = /\b(?:go|going|move|send it|take it)\s+back\s+to\s+(?:the\s+)?([A-Za-z][A-Za-z -]{1,60})/i;
+/**
+ * The same in Spanish, French and Portuguese (client, 21 Oct: "pick your
+ * language"): "vuelve a Revisión", "retourne à la Révision", "volte para a
+ * Revisão". Answers are read as typed, so a Spanish project's "sí, vuelve a
+ * Resultado" is the same answer as "yes, go back to Output".
+ */
+const BACK_TO_X = /(?<![\p{L}])(?:vuelve|volver|volvamos|regresa|regresar|regresemos|retourne[rz]?|retournons|reviens|revenir|revenons|volte|voltar|voltemos|retorne|retornar)\s+(?:a|al|à|au|aux|ao|à|para|en)\s+(?:la\s+|el\s+|l['’]|le\s+|a\s+|o\s+)?(?:(?:etapa|étape|fase)\s+(?:de\s+|d['’]\s*)?)?(\p{L}[\p{L} -]{1,60})/iu;
+const BACK_TO = { test: (t: string) => BACK_TO_EN.test(t) || BACK_TO_X.test(t), match: (t: string) => t.match(BACK_TO_EN) ?? t.match(BACK_TO_X) };
+/** An answer agreeing to what was asked: "Yes, go back and remove them", "OK, do it" — or "Sí, hazlo", "Oui, vas-y", "Sim, pode". */
+const AGREES_EN = /^\s*(?:yes|yeah|yep|ok(?:ay)?|sure|please|go ahead|do it|do that|go back|agreed|fine|right)\b/i;
+const AGREES_X = /^\s*(?:s[ií]|claro|vale|de acuerdo|adelante|hazlo|por favor|oui|d['’]accord|vas-y|allez-y|bien s[uû]r|entendu|sim|pode|fa[cç]a|combinado|certo|beleza)(?![\p{L}])/iu;
+const AGREES = { test: (t: string) => AGREES_EN.test(t) || AGREES_X.test(t) };
+const DECLINES_EN = /\b(?:no|not|don't|do not|keep|leave|stay)\b/i;
+const DECLINES_X = /(?<![\p{L}])(?:non|não|nao|pas|jamais|nunca|mant[eé]n|mantener|deja|dejar|qu[eé]date|garde[rz]?|laisse[rz]?|reste[rz]?|mantenha|manter|deixe|deixa|fique)(?![\p{L}])/iu;
+const DECLINES = { test: (t: string) => DECLINES_EN.test(t) || DECLINES_X.test(t) };
 
 /** The stage this one may go back to that `text` names in "go back to <stage>", or null. */
 function namedReturn(template: WorkflowTemplate, stage: StageDefinition, text: string): { id: string; label: string } | null {
-  const m = text.match(BACK_TO);
+  const m = BACK_TO.match(text);
   if (!m) return null;
   const named = m[1].toLowerCase();
   for (const id of stage.transitions.allow_return_to ?? []) {
     const s = template.stages.find((x) => x.id === id);
     if (!s) continue;
-    const names = [s.label, s.short_label ?? '', s.id].map((n) => n.toLowerCase()).filter(Boolean);
+    // The stage by any name the user may have seen: English, or the screen's own words.
+    const shown = LOCALES.filter((l) => l.code !== 'en').flatMap((l) => [stageText(l.code, template.key, s, 'label'), stageText(l.code, template.key, s, 'short')]);
+    const names = [s.label, s.short_label ?? '', s.id, ...shown].map((n) => n.toLowerCase()).filter(Boolean);
     if (names.some((n) => named.startsWith(n))) return { id: s.id, label: s.label };
   }
   return null;

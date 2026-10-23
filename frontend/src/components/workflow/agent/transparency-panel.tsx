@@ -2,51 +2,44 @@
 
 import type { MessageKey } from '@/lib/i18n/messages/en';
 import { shownActionLabel } from '@/lib/i18n/go';
-import { tr } from '@/lib/i18n/store';
+import { getLocale, tr } from '@/lib/i18n/store';
+import { shownStopReason } from '@/lib/i18n/stop-reasons';
 import { shownModeName } from '@/lib/i18n/stage';
 import { MODE_DISPLAY } from '@/lib/constants';
 import type { AgentRun, AgentStep } from '@/types/agent';
 import type { ModeType } from '@/types';
 import { ExecutionBadge } from './execution-badge';
 
-const EVENT_PHRASE: Record<string, string> = {
-  objective_assessed: 'an objective check recorded',
-  stage_marked_complete: 'a stage marked complete',
-  stage_advanced: 'the project moved on, leaving the stage open',
-  stage_blocked: 'a stage marked stuck',
-  stage_unblocked: 'a stage continued',
-};
-
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+const EVENTS = new Set(['objective_assessed', 'stage_marked_complete', 'stage_advanced', 'stage_blocked', 'stage_unblocked']);
 
 /**
  * What the step changed, in the user's words (C2, PM-12), with the document
  * and the workflow apart (Sean, 10 Oct, email 6.8: "the record said nothing
  * changed in the project … although the interface changed to a finished
- * state"). Either can be empty.
+ * state"). Either can be empty. In the interface's language (client, 21 Oct).
  */
 function changes(step: AgentStep, run: AgentRun | null): { document: string[]; workflow: string[] } {
   const document: string[] = [];
   const workflow: string[] = [];
   const c = step.changes ?? {};
-  if (c.event_types?.length) workflow.push(...c.event_types.map((t) => EVENT_PHRASE[t] ?? t.replace(/_/g, ' ')));
-  if (c.sandbox_run_id) document.push('a recorded code run');
+  if (c.event_types?.length) workflow.push(...c.event_types.map((t) => (EVENTS.has(t) ? tr(`rec.event.${t}` as MessageKey) : t.replace(/_/g, ' '))));
+  if (c.sandbox_run_id) document.push(tr('rec.codeRun'));
   if (c.sections_written?.length) {
-    document.push(step.action_key === 'revise_sections' ? `${plural(c.sections_written.length, 'section')} revised` : `${plural(c.sections_written.length, 'section')} drafted`);
+    document.push(tr(step.action_key === 'revise_sections' ? 'rec.sectionsRevised' : 'rec.sectionsDrafted', { count: c.sections_written.length }));
   }
-  if (c.items_triaged?.length) workflow.push(`${plural(c.items_triaged.length, 'routine finding')} decided`);
+  if (c.items_triaged?.length) workflow.push(tr('rec.findingsDecided', { count: c.items_triaged.length }));
   if (c.version_ids?.length) {
-    if (step.action_key === 'evaluate_stage') workflow.push('an evaluation of the current version');
-    else if (step.action_key === 'generate_outline') document.push('the outline, saved as a version');
-    else if (step.action_key === 'apply_findings') document.push('a new version with the findings applied');
-    else if (step.action_key === 'draft_stage' || step.action_key === 'revise_stage') document.push('a new version of this draft');
-    else if (!c.sections_written?.length && !c.items_triaged?.length) document.push(plural(c.version_ids.length, 'new version'));
+    if (step.action_key === 'evaluate_stage') workflow.push(tr('rec.evaluation'));
+    else if (step.action_key === 'generate_outline') document.push(tr('rec.outline'));
+    else if (step.action_key === 'apply_findings') document.push(tr('rec.applied'));
+    else if (step.action_key === 'draft_stage' || step.action_key === 'revise_stage') document.push(tr('rec.newDraft'));
+    else if (!c.sections_written?.length && !c.items_triaged?.length) document.push(tr('rec.versions', { count: c.version_ids.length }));
   } else if ((step.action_key === 'draft_stage' || step.action_key === 'revise_stage') && step.status === 'succeeded') {
-    document.push('a new version of this draft');
+    document.push(tr('rec.newDraft'));
   }
   // The step that ended the run changed the run's state, whatever else it did.
   if (run && run.status !== 'running' && run.steps_used > 0 && step.status === 'succeeded' && step.action_key === 'declare_objective_complete') {
-    workflow.push(run.status === 'completed' ? 'Go run finished' : 'Go run paused for you');
+    workflow.push(tr(run.status === 'completed' ? 'rec.runFinished' : 'rec.runPaused'));
   }
   return { document, workflow };
 }
@@ -71,32 +64,40 @@ function firstSentence(text: string | null | undefined): string {
  * new version" in one record, with no way to tell what happened).
  */
 export function outcomeLines(step: AgentStep, run: AgentRun | null): { saved: string; checked: string } {
-  const { document } = changes(step, run);
-  const out = step.output ?? '';
-  const saved =
-    step.status === 'running' || step.status === 'awaiting_decision'
-      ? '—'
-      : document.length
-        ? `Yes — ${document.join('; ')}`
-        : step.status === 'failed' || step.status === 'blocked'
-          ? `No — ${firstSentence(out) || 'nothing was saved'}`
-          : 'Nothing to save — this step reads or decides';
-  const checked = step.changes?.event_types?.includes('stage_marked_complete')
-    ? 'Passed — the stage was marked complete'
-    : /stays reopened until:?\s*([^.]*)/i.test(out)
-      ? `Not yet — still needs: ${out.match(/stays reopened until:?\s*([^.]*)/i)![1]}`
-      : /stays reopened/i.test(out)
-        ? 'Not passed — the stage stays reopened'
-        : /couldn't meet the measured requirement|measured in code and not met/i.test(out)
-          ? 'Not passed — a measured requirement is still unmet'
-          : '—';
+  const { saved, checked } = outcome(step, run);
   return { saved, checked };
 }
 
-function changed(step: AgentStep, run: AgentRun | null): string {
+/** As `outcomeLines`, with whether anything was saved said as a flag, not read back from the words. */
+function outcome(step: AgentStep, run: AgentRun | null): { saved: string; checked: string; savedSomething: boolean } {
+  const { document } = changes(step, run);
+  const out = step.output ?? '';
+  const pending = step.status === 'running' || step.status === 'awaiting_decision';
+  const saved = pending
+    ? '—'
+    : document.length
+      ? tr('rec.yes', { what: document.join('; ') })
+      : step.status === 'failed' || step.status === 'blocked'
+        ? tr('rec.no', { why: firstSentence(out) || tr('rec.nothingSaved') })
+        : tr('rec.nothingToSave');
+  // The step's output is read as Go wrote it (English); only what is shown is translated.
+  const checked = step.changes?.event_types?.includes('stage_marked_complete')
+    ? tr('rec.passed')
+    : /stays reopened until:?\s*([^.]*)/i.test(out)
+      ? tr('rec.stillNeeds', { what: out.match(/stays reopened until:?\s*([^.]*)/i)![1] })
+      : /stays reopened/i.test(out)
+        ? tr('rec.reopened')
+        : /couldn't meet the measured requirement|measured in code and not met/i.test(out)
+          ? tr('rec.measured')
+          : '—';
+  return { saved, checked, savedSomething: !pending && document.length > 0 };
+}
+
+/** What the step changed in one line, and whether that was nothing. */
+function changed(step: AgentStep, run: AgentRun | null): { text: string; nothing: boolean } {
   const { document, workflow } = changes(step, run);
   const parts = [...document, ...workflow];
-  return parts.length ? parts.join('; ') : 'Nothing in the project — this step only produced the text below.';
+  return parts.length ? { text: parts.join('; '), nothing: false } : { text: tr('rec.nothingChanged'), nothing: true };
 }
 
 /**
@@ -116,14 +117,13 @@ function narrative(run: AgentRun | null, step: AgentStep | null, next: string, t
       return tr('tp.n.awaiting', { label });
     case 'succeeded': {
       const what = changed(step, run);
-      const tail = what.startsWith('Nothing in the project') ? tr('tp.n.noChange') : tr('tp.n.changed', { what });
+      const tail = what.nothing ? tr('tp.n.noChange') : tr('tp.n.changed', { what: what.text });
       return `${tr('tp.n.done', { label })}${tail}${run.status === 'awaiting_decision' ? tr('tp.n.waiting') : run.status === 'running' ? tr('tp.n.next', { next }) : ''}`;
     }
     case 'blocked':
       return tr('tp.n.blocked', { label });
     case 'failed': {
-      const { saved } = outcomeLines(step, run);
-      return saved.startsWith('Yes')
+      return outcome(step, run).savedSomething
         ? tr('tp.n.savedNotPassed', { label, why: firstSentence(step.output) })
         : tr('tp.n.notSaved', { label, why: firstSentence(step.output) || tr('tp.n.itFailed') });
     }
@@ -224,7 +224,7 @@ export function TransparencyPanel({
       </details>
       {run?.stop_reason && run.status !== 'running' && (
         <p role="status" className="mt-3 text-body text-[var(--on-surface)]">
-          {run.stop_reason}
+          {shownStopReason(getLocale(), run.stop_reason)}
         </p>
       )}
     </section>

@@ -12,6 +12,10 @@
 
 import type { AgentRun, AgentStep } from '@/types/agent';
 import { actionFor, actionLabel, ROUTINE_DEFAULT_STEP } from './actions';
+import { translate, type Vars } from '@/lib/i18n/translate';
+import type { Locale } from '@/lib/i18n/locales';
+import { shownStopReason } from '@/lib/i18n/stop-reasons';
+import { shownActionLabel } from '@/lib/i18n/go';
 import { describeNeed, isClearedNote, type NeedsUser } from './needs';
 
 export type PauseKind = 'working' | 'window' | 'blocker' | 'decision' | 'complete' | 'stopped';
@@ -26,16 +30,26 @@ export interface RunAccount {
   setAside: string[];
 }
 
-const n = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`;
-
 function firstSentence(text: string): string {
   const t = text.trim().split('\n')[0];
   const m = /^(.{20,}?[.?!])\s/.exec(`${t} `);
   return (m ? m[1] : t).slice(0, 300);
 }
 
-export function runAccount(run: AgentRun | null, steps: readonly AgentStep[], stageLabel: (id: string) => string): RunAccount | null {
+/**
+ * The account in the interface's language (client, 21 Oct: "pick your
+ * language"). It is derived on every render and never stored; the stop
+ * reason it quotes is recorded in English and shown translated where Go wrote
+ * it in code (`shownStopReason`).
+ */
+export function runAccount(
+  run: AgentRun | null,
+  steps: readonly AgentStep[],
+  stageLabel: (id: string) => string,
+  locale: Locale = 'en'
+): RunAccount | null {
   if (!run) return null;
+  const t = (key: string, vars?: Vars) => translate(locale, key, vars);
   const ok = steps.filter((s) => s.status === 'succeeded');
   const executed = ok.filter((s) => s.execution_label === 'code_executed' || s.execution_label === 'simulation_run').length;
   const derived = ok.filter((s) => actionFor(s.action_key)?.performer === 'reason').length;
@@ -48,64 +62,76 @@ export function runAccount(run: AgentRun | null, steps: readonly AgentStep[], st
   );
   const returns = ok.filter((s) => s.action_key === 'return_to_stage');
   const parts = [
-    executed ? `ran ${n(executed, 'computation')} in the sandbox` : '',
-    derived ? `worked out ${n(derived, 'result')} by reasoning (not executed)` : '',
-    lookups ? `searched the literature ${n(lookups, 'time')}` : '',
-    written.size ? `wrote or revised ${[...written].map(stageLabel).join(', ')}` : '',
-    repaired.size ? `repaired ${[...repaired].filter(Boolean).map(stageLabel).join(', ')} after a change` : '',
-    fitted.size ? `revised ${[...fitted].filter(Boolean).map(stageLabel).join(', ')} to meet a requirement measured in code` : '',
-    returns.length ? `went back ${n(returns.length, 'time')} for further work (${returns.map((s) => stageLabel(String(s.params?.stage_id ?? ''))).join(', ')})` : '',
+    executed ? t('acct.computations', { count: executed }) : '',
+    derived ? t('acct.derived', { count: derived }) : '',
+    lookups ? t('acct.lookups', { count: lookups }) : '',
+    written.size ? t('acct.wrote', { stages: [...written].map(stageLabel).join(', ') }) : '',
+    repaired.size ? t('acct.repaired', { stages: [...repaired].filter(Boolean).map(stageLabel).join(', ') }) : '',
+    fitted.size ? t('acct.fitted', { stages: [...fitted].filter(Boolean).map(stageLabel).join(', ') }) : '',
+    returns.length
+      ? t('acct.returns', { count: returns.length, stages: returns.map((s) => stageLabel(String(s.params?.stage_id ?? ''))).join(', ') })
+      : '',
   ].filter(Boolean);
   const did = parts.length ? `${parts.join('; ')}.`.replace(/^./, (c) => c.toUpperCase()) : '';
 
   const setAside = [
-    ...steps.filter((s) => typeof s.params?.set_aside_question === 'string').map((s) => `Question kept for you: ${String(s.params!.set_aside_question).slice(0, 300)}`),
-    ...steps.filter((s) => typeof s.changes?.set_aside === 'string').map((s) => `Could not be done here: ${s.changes!.set_aside}`),
-    ...steps.filter((s) => s.action_key === ROUTINE_DEFAULT_STEP && s.status === 'succeeded').map((s) => firstSentence(s.output).replace(/^Routine default taken by Go under your routine-decision policy \(yours to change\): /, 'Routine default taken (yours to change): ')),
+    ...steps.filter((s) => typeof s.params?.set_aside_question === 'string').map((s) => t('acct.questionKept', { question: String(s.params!.set_aside_question).slice(0, 300) })),
+    ...steps.filter((s) => typeof s.changes?.set_aside === 'string').map((s) => t('acct.couldNot', { what: String(s.changes!.set_aside) })),
+    ...steps.filter((s) => s.action_key === ROUTINE_DEFAULT_STEP && s.status === 'succeeded').map((s) => firstSentence(s.output).replace(/^Routine default taken by Go under your routine-decision policy \(yours to change\): /, t('acct.routine'))),
   ];
 
+  // Read as recorded (English); said as shown.
   const reason = run.stop_reason?.trim() ?? '';
+  const shown = shownStopReason(locale, reason);
   const current = steps.at(-1);
   switch (run.status) {
     case 'running':
-      return { did, kind: 'working', now: current?.status === 'running' ? `Doing now: ${actionLabel(current.action_key)}${current.stage_id ? ` on ${stageLabel(current.stage_id)}` : ''}.` : 'Choosing the next move.', setAside };
+      return {
+        did, kind: 'working', setAside,
+        now: current?.status === 'running'
+          ? current.stage_id
+            ? t('acct.doingNowOn', { action: (locale === 'en' ? actionLabel(current.action_key) : shownActionLabel(current.action_key, locale)), stage: stageLabel(current.stage_id) })
+            : t('acct.doingNow', { action: (locale === 'en' ? actionLabel(current.action_key) : shownActionLabel(current.action_key, locale)) })
+          : t('acct.choosing'),
+      };
     case 'budget_exhausted':
-      return { did, kind: 'window', now: 'Paused at the end of this window — a resource limit, not a problem. Everything is saved; Continue picks up from here and does not repeat finished work.', setAside };
+      return { did, kind: 'window', now: t('acct.window'), setAside };
     case 'blocked':
       // A loop stop is not a missing tool or missing data (Sean, 10 Oct, email 7.6:
       // "distinguish a step-budget pause from a technical block and from project completion").
       if (/^Going round in circles: /.test(reason)) {
-        return { did, kind: 'blocker', now: `Stopped to avoid repeating itself: ${firstSentence(reason.replace(/^Going round in circles: /, ''))} Nothing is lost; tell Go what to do differently, or do it yourself.`, setAside };
+        const why = locale === 'en' ? reason.replace(/^Going round in circles: /, '') : shown.replace(/^[^:]+: /, '');
+        return { did, kind: 'blocker', now: t('acct.circles', { why: firstSentence(why) }), setAside };
       }
-      return { did, kind: 'blocker', now: `Can't continue: ${firstSentence(reason) || 'something it needs is missing.'}`, setAside };
+      return { did, kind: 'blocker', now: t('acct.cantContinue', { why: firstSentence(shown) || t('acct.missing') }), setAside };
     case 'awaiting_decision':
       // The decision itself, not the stop's statement (11 Oct: "Your decision
       // is needed" over a sentence that asked nothing).
       // A cleared request asks nothing (15 Oct screenshot: "Your decision is
       // needed: That is done. Press Resume and I will carry on.").
-      if (!run.needs && isClearedNote(reason)) return { did, kind: 'decision', now: reason, setAside };
-      return { did, kind: 'decision', now: `Your decision is needed: ${decisionAsked(run.needs ?? null, reason, stageLabel)}`, setAside };
+      if (!run.needs && isClearedNote(reason)) return { did, kind: 'decision', now: shown, setAside };
+      return { did, kind: 'decision', now: t('acct.decision', { what: decisionAsked(run.needs ?? null, shown, stageLabel, locale) }), setAside };
     case 'completed':
       // What was deferred is said with the finish, not counted as resolved (10 Oct, 6.6).
       return {
         did, kind: 'complete', setAside,
         now: /objective (?:is )?met/i.test(reason)
-          ? `Finished: the objective is verified as met.${reason.match(/ Deferred, not blocking[\s\S]*$/)?.[0] ?? ''}`
-          : `Finished: ${firstSentence(reason) || 'nothing left to do.'}`,
+          ? `${t('acct.met')}${reason.match(/ Deferred, not blocking[\s\S]*$/)?.[0] ?? ''}`
+          : t('acct.finished', { why: firstSentence(shown) || t('acct.nothingLeft') }),
       };
     case 'failed':
-      return { did, kind: 'blocker', now: `Stopped on an error: ${firstSentence(reason) || 'see the record below.'}`, setAside };
+      return { did, kind: 'blocker', now: t('acct.error', { why: firstSentence(shown) || t('acct.seeRecord') }), setAside };
     default:
-      return { did, kind: 'stopped', now: 'Stopped by you. Everything done so far is saved.', setAside };
+      return { did, kind: 'stopped', now: t('acct.stopped'), setAside };
   }
 }
 
 /** What the user is asked to decide, in one line: the request's own buttons when it has them. */
-function decisionAsked(need: NeedsUser | null, reason: string, stageLabel: (id: string) => string): string {
+function decisionAsked(need: NeedsUser | null, reason: string, stageLabel: (id: string) => string, locale: Locale): string {
   if (need && need.kind !== 'answer_question') {
-    const d = describeNeed(need, stageLabel);
+    const d = describeNeed(need, stageLabel, {}, locale);
     const choices = d.options?.map((o) => o.label) ?? (d.action ? [d.action] : []);
-    if (choices.length) return `${choices.map((c) => `“${c}”`).join(' or ')}. ${firstSentence(d.message)}`;
+    if (choices.length) return `${choices.map((c) => `“${c}”`).join(translate(locale, 'acct.or'))}. ${firstSentence(d.message)}`;
   }
-  return firstSentence(reason) || 'see below.';
+  return firstSentence(reason) || translate(locale, 'acct.seeBelow');
 }

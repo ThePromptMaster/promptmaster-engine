@@ -1,6 +1,6 @@
 'use client';
 
-import { useT } from '@/lib/i18n/i18n-provider';
+import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import { runAccount } from '@/lib/agent/account';
 import type { AgentRun, AgentStep } from '@/types/agent';
 
@@ -14,7 +14,8 @@ const ICON: Record<string, string> = {
  */
 export function RunAccountCard({ run, steps, stageLabel }: { run: AgentRun | null; steps: readonly AgentStep[]; stageLabel: (id: string) => string }) {
   const t = useT();
-  const account = runAccount(run, steps, stageLabel);
+  const locale = useLocale();
+  const account = runAccount(run, steps, stageLabel, locale);
   if (!account || (!account.did && account.kind === 'working')) return null;
   return (
     <section aria-label={t('acc.label')} data-kind={account.kind} className="rounded-xl bg-[var(--surface-container-low)] px-5 py-4">
