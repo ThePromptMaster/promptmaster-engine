@@ -7,6 +7,8 @@ import { projectTimeline, type TimelineEntry } from '@/lib/workflow/timeline';
 import type { WorkflowEvent, WorkflowTemplate } from '@/lib/workflow/types';
 import type { ArtifactVersion } from '@/types/project';
 import { useLocale, useT } from '@/lib/i18n/i18n-provider';
+import { stageText, templateWord } from '@/lib/i18n/templates';
+import { shownOperationLabel } from '@/lib/i18n/stage';
 
 const DATE_LOCALE: Record<string, string> = { en: 'en-GB', es: 'es-ES', fr: 'fr-FR', pt: 'pt-BR' };
 
@@ -22,7 +24,7 @@ export function ProjectTimeline({
   stages,
   onOpen,
 }: {
-  template: Pick<WorkflowTemplate, 'stages'>;
+  template: Pick<WorkflowTemplate, 'stages'> & { key?: string };
   events: readonly WorkflowEvent[];
   stages: Record<string, { versions: ArtifactVersion[] } | undefined>;
   onOpen: (stageId: string, versionId: string) => void;
@@ -33,6 +35,11 @@ export function ProjectTimeline({
   const tag = DATE_LOCALE[locale] ?? 'en-GB';
   const TIME = new Intl.DateTimeFormat(tag, { hour: '2-digit', minute: '2-digit' });
   const entries = useMemo(() => projectTimeline(template, events, stages), [template, events, stages]);
+  // A system stage's name in the interface's language; a custom one as written.
+  const shownStage = (e: TimelineEntry) => {
+    const stage = template.stages.find((s) => s.id === e.stageId);
+    return stage ? stageText(locale, template.key, stage, 'label') : e.stageLabel;
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -88,8 +95,8 @@ export function ProjectTimeline({
                       )}
                       <div className="min-w-0 flex-1">
                         <p className="text-label text-[var(--on-surface)]">
-                          {e.stageLabel && <span className="font-semibold">{e.stageLabel} · </span>}
-                          {e.title}
+                          {e.stageLabel && <span className="font-semibold">{shownStage(e)} · </span>}
+                          {e.kind === 'version' ? `v${e.versionNumber ?? 1} · ${shownOperationLabel(e.operation)}` : templateWord(locale, e.title)}
                           {e.current && <span className="ml-1 text-[var(--on-surface-variant)]">{t('timeline.current')}</span>}
                         </p>
                         {e.detail && <p className="mt-0.5 line-clamp-2 text-label text-[var(--on-surface-variant)]">{e.detail}</p>}
@@ -101,7 +108,7 @@ export function ProjectTimeline({
                             onOpen(e.stageId, e.versionId!);
                             setOpen(false);
                           }}
-                          aria-label={t('timeline.openLabel', { stage: e.stageLabel ?? '', n: e.versionNumber ?? 1 })}
+                          aria-label={t('timeline.openLabel', { stage: shownStage(e), n: e.versionNumber ?? 1 })}
                           className="shrink-0 rounded-md bg-[var(--surface-container-high)] px-2 py-0.5 text-label text-[var(--on-surface)]"
                         >
                           {t('timeline.open')}

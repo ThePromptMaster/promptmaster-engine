@@ -1,7 +1,9 @@
 'use client';
 
 import type { MessageKey } from '@/lib/i18n/messages/en';
-import { useT } from '@/lib/i18n/i18n-provider';
+import { useLocale, useT } from '@/lib/i18n/i18n-provider';
+import { shownCheckText } from '@/lib/i18n/check-text';
+import { templateWord } from '@/lib/i18n/templates';
 import { useState } from 'react';
 
 import type { StageDefinition, StageEvaluation } from '@/lib/workflow/types';
@@ -126,6 +128,7 @@ export function StageTransitionBar({
   const [menuOpen, setMenuOpen] = useState(false);
   const [whyOpen, setWhyOpen] = useState(false);
   const t = useT();
+  const locale = useLocale();
   const [pending, setPending] = useState<TransitionOption | null>(null);
   const [note, setNote] = useState('');
   const [showReturns, setShowReturns] = useState(false);
@@ -173,7 +176,7 @@ export function StageTransitionBar({
         {!isSkip && evaluation.unmet.length > 0 && (
           <ul className="mt-2 space-y-1 text-label text-[var(--on-surface-variant)]">
             {evaluation.unmet.map((c) => (
-              <li key={c.id}>· {c.label}{c.detail ? ` — ${c.detail}` : ''}</li>
+              <li key={c.id}>· {shownCheckText(locale, c.label)}{c.detail ? ` — ${shownCheckText(locale, c.detail)}` : ''}</li>
             ))}
           </ul>
         )}
@@ -190,7 +193,7 @@ export function StageTransitionBar({
                     : 'bg-[var(--surface-container-highest)] text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]'
                 }`}
               >
-                {reason}
+                {templateWord(locale, reason)}
               </button>
             ))}
           </div>

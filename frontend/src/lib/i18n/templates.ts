@@ -1,6 +1,7 @@
 import type { Locale } from './locales';
 import { DICTIONARIES } from './translate';
 import type { StageDefinition, StageGroup } from '@/lib/workflow/types';
+import type { StageItemSchema } from '@/lib/workflow/stage-artifact';
 
 /**
  * A system workflow's words in the interface's language (client, 21 Oct:
@@ -52,4 +53,41 @@ export function unitsText(locale: Locale, unit: string): string {
 /** A system workflow's name ("Book", "Livre"); a custom one as written. */
 export function workflowName(locale: Locale, templateKey: string | null | undefined, own: string): string {
   return (templateKey && look(locale, `workflow.name.${templateKey}`)) || own;
+}
+
+/**
+ * A system workflow's own words in the interface's language — an exit
+ * criterion, a hint, a skip reason, a table column, a status and its legend, a
+ * mode tagline — looked up by the English itself (`messages/areas/words.ts`).
+ * Anything not in the table (a custom workflow's words, text the user wrote)
+ * comes back as written. The English stays what is stored and sent to the model.
+ */
+export function templateWord(locale: Locale, english: string): string;
+export function templateWord(locale: Locale, english: string | undefined): string | undefined;
+export function templateWord(locale: Locale, english: string | undefined): string | undefined {
+  if (!english) return english;
+  return look(locale, `tw:${english}`) ?? english;
+}
+
+/** A table's item noun in the plural ("claims", "afirmaciones"); English adds an "s", as it always has. */
+export function itemPlural(locale: Locale, noun: string): string {
+  return look(locale, `twp:${noun}`) ?? `${noun}s`;
+}
+
+/**
+ * A table's schema as the screen shows it: item noun, column names and hints,
+ * the decision question, the default-state note, status names and legends in
+ * the interface's language. Keys, values and limits are untouched, so a row
+ * saved through it is the row the English schema describes.
+ */
+export function shownSchema<T extends StageItemSchema>(locale: Locale, schema: T): T {
+  if (locale === 'en') return schema;
+  return {
+    ...schema,
+    itemLabel: templateWord(locale, schema.itemLabel),
+    decisionQuestion: templateWord(locale, schema.decisionQuestion),
+    defaultStateNote: templateWord(locale, schema.defaultStateNote),
+    fields: schema.fields.map((f) => ({ ...f, label: templateWord(locale, f.label), hint: templateWord(locale, f.hint) })),
+    statuses: schema.statuses?.map((s) => ({ ...s, label: templateWord(locale, s.label), explain: templateWord(locale, s.explain) })),
+  };
 }

@@ -1,6 +1,8 @@
 'use client';
 
-import { useT } from '@/lib/i18n/i18n-provider';
+import { useLocale, useT } from '@/lib/i18n/i18n-provider';
+import { shownCheckText } from '@/lib/i18n/check-text';
+import { templateWord } from '@/lib/i18n/templates';
 import { useState } from 'react';
 
 import { approvalPending as isApprovalPending } from '@/lib/workflow/engine';
@@ -79,6 +81,7 @@ export function ExitCriteriaChecklist({
 }: Props) {
   // A box only the user can tick is never folded away, ticked or not.
   const t = useT();
+  const locale = useLocale();
   const needsYou = criteria.some((c) => c.manual ?? manualIds.has(c.id));
   const [open, setOpen] = useState<boolean | null>(null);
   if (criteria.length === 0) return null;
@@ -122,10 +125,10 @@ export function ExitCriteriaChecklist({
           )}
 
           <span className={c.satisfied ? 'text-[var(--on-surface-variant)]' : 'text-[var(--on-surface)]'}>
-            {c.label}
+            {shownCheckText(locale, c.label)}
             {/* Say what is actually missing — "3 of 5" beats a red cross. */}
             {!c.satisfied && c.detail && (
-              <span className="ml-2 text-label text-[var(--on-surface-variant)]">{c.detail}</span>
+              <span className="ml-2 text-label text-[var(--on-surface-variant)]">{shownCheckText(locale, c.detail)}</span>
             )}
             {!c.satisfied && (
               <span
@@ -155,7 +158,7 @@ export function ExitCriteriaChecklist({
               </span>
             )}
             {!c.satisfied && c.hint && (
-              <span className="mt-0.5 block text-label leading-snug text-[var(--on-surface-variant)]">{c.hint}</span>
+              <span className="mt-0.5 block text-label leading-snug text-[var(--on-surface-variant)]">{templateWord(locale, c.hint)}</span>
             )}
           </span>
         </Row>

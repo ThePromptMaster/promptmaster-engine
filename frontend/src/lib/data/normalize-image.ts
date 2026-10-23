@@ -13,6 +13,7 @@
  */
 
 import { MAX_FILE_BYTES, extensionOf } from './preview';
+import { tr } from '@/lib/i18n/store';
 
 /** Longest side kept: far more than any page or export shows. */
 export const MAX_IMAGE_SIDE = 4096;
@@ -108,10 +109,10 @@ export async function normalizeImage(file: File): Promise<NormalizedImage | { er
     try {
       bitmap = await decode(await heicToJpeg(file));
     } catch {
-      return { error: `${file.name} is an iPhone photo (HEIC) this browser could not convert. In the Photos app, share it as JPEG ("Most Compatible") and attach that.` };
+      return { error: tr('file.heic', { name: file.name }) };
     }
   }
-  if (!bitmap) return { error: `${file.name} could not be read as an image.` };
+  if (!bitmap) return { error: tr('file.notImage', { name: file.name }) };
 
   const { width, height } = fitWithin(bitmap.width, bitmap.height);
   try {
@@ -120,15 +121,15 @@ export async function normalizeImage(file: File): Promise<NormalizedImage | { er
       if (blob && blob.size <= MAX_FILE_BYTES) {
         const out = new File([blob], `${baseName(file.name)}.jpg`, { type: 'image/jpeg' });
         const what = [
-          heic ? 'converted from HEIC to JPEG' : '',
-          width < bitmap.width ? `scaled to ${width}×${height}` : '',
-          file.size > MAX_FILE_BYTES ? `reduced from ${(file.size / 1_000_000).toFixed(1)} MB to ${(blob.size / 1_000_000).toFixed(1)} MB` : '',
+          heic ? tr('file.fromHeic') : '',
+          width < bitmap.width ? tr('file.scaled', { w: width, h: height }) : '',
+          file.size > MAX_FILE_BYTES ? tr('file.reduced', { from: (file.size / 1_000_000).toFixed(1), to: (blob.size / 1_000_000).toFixed(1) }) : '',
         ].filter(Boolean);
-        return { file: out, note: `${file.name} was ${what.join(', ') || 'saved as JPEG'}.` };
+        return { file: out, note: tr('file.imageNote', { name: file.name, what: what.join(', ') || tr('file.savedJpeg') }) };
       }
     }
   } finally {
     bitmap.close();
   }
-  return { error: `${file.name} is too large to store even when scaled down.` };
+  return { error: tr('file.imageTooLarge', { name: file.name }) };
 }

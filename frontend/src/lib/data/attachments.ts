@@ -13,6 +13,7 @@
 import { contextFromDocuments, extractText, isDocument } from './extract-text';
 import { MAX_FILE_BYTES, describePreview, isImage, isSpreadsheet, previewOf, rejectReason, type DataPreview } from './preview';
 import { spreadsheetToCsvFiles } from './spreadsheet';
+import { tr } from '@/lib/i18n/store';
 
 export interface PreparedFile {
   file: File;
@@ -32,29 +33,26 @@ export async function prepareFiles(picked: readonly File[], existing: readonly s
   const names = [...existing];
   for (const original of picked) {
     if (isImage(original.name)) {
-      out.errors.push(`${original.name} is an image — add it with "Add images" so it gets a caption.`);
+      out.errors.push(tr('file.isImage', { name: original.name }));
       continue;
     }
     let parts = [original];
     if (isSpreadsheet(original.name)) {
       if (original.size > MAX_FILE_BYTES) {
-        out.errors.push(`${original.name} is larger than ${MAX_FILE_BYTES / 1_000_000} MB.`);
+        out.errors.push(tr('file.tooLarge', { name: original.name, mb: MAX_FILE_BYTES / 1_000_000 }));
         continue;
       }
       try {
         parts = await spreadsheetToCsvFiles(original);
       } catch {
-        out.errors.push(`${original.name} could not be read as a spreadsheet. Save it as CSV and attach that.`);
+        out.errors.push(tr('file.notSpreadsheet', { name: original.name }));
         continue;
       }
       if (!parts.length) {
-        out.errors.push(`${original.name} has no sheet with anything in it.`);
+        out.errors.push(tr('file.noSheet', { name: original.name }));
         continue;
       }
-      out.notes.push(
-        `${original.name} was converted to CSV — ${parts.length === 1 ? 'one file' : `${parts.length} files, one per sheet`}. ` +
-          'Values are kept; formulas arrive as their results, and formatting and charts are left behind.'
-      );
+      out.notes.push(parts.length === 1 ? tr('file.convertedOne', { name: original.name }) : tr('file.convertedMany', { name: original.name, n: parts.length }));
     }
     for (const file of parts) {
       const reason = rejectReason(file.name, file.size, names);
