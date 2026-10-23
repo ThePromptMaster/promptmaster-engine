@@ -16,6 +16,9 @@ import { pt as chat2Area } from './areas/chat2';
 import { pt as goArea } from './areas/go';
 import { pt as stageArea } from './areas/stage';
 import { pt as modesArea } from './areas/modes';
+import { pt as authArea } from './areas/auth';
+import { pt as landingArea } from './areas/landing';
+import { pt as loaderArea } from './areas/loader';
 import { pt as wordsArea } from './areas/words';
 import { pt as checksArea } from './areas/checks';
 import { pt as filesArea } from './areas/files';
@@ -294,6 +297,9 @@ export const pt: Messages = {
   ...goArea,
   ...stageArea,
   ...modesArea,
+  ...authArea,
+  ...landingArea,
+  ...loaderArea,
   ...wordsArea,
   ...checksArea,
   ...filesArea,

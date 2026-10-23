@@ -2094,9 +2094,15 @@ is the screen, the second is the work.
   - A measured requirement's subject is the user's own word ("Memo"), shown as written.
   - Words stored with the work stay as written: version change summaries, a fact's source
     chip in prompts, the authorization's recorded terms (shown translated, stored English).
-- **Pages outside a project render English first.** Signed-in pages read the choice from a
-  cookie and render in it at once. The sign-in pages and the landing page are static, so they
-  switch after the page loads.
+- **Pages outside a project (2026-10-23).** Signing in, signing up, resetting a password, the
+  sign-in callback, the landing page, page-not-found, the print view and the project page's own
+  states are translated. Sign-in and landing carry a language switch, so someone not yet signed
+  in can choose. The auth pages, the landing page (in its own `(marketing)` route group) and
+  every signed-in page read the choice from a cookie and render in it from the first byte;
+  page-not-found switches once it has loaded. Supabase's sign-in errors are matched by code
+  (`lib/auth/auth-errors.ts`); an unknown one shows the page's own sentence with Supabase's
+  English words after it. `/compact` (the Compact's ten principles, the author's own text, not
+  linked from the app) and `/preview` (an internal design page) stay English.
 
 ### L-104 — Using another project: text and facts, read when the project opens (2026-10-23)
 
