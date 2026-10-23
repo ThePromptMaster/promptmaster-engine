@@ -58,8 +58,18 @@ export function GoPanel({
   stageModes,
   latestChange = null,
   onApplyAnyway,
+  stageName,
+  stageByEnglish,
 }: {
   go: ReturnType<typeof useGoLoop>;
+  /**
+   * A stage's name as the page says it, by id (client, 22 Oct: "Hasta ahora:
+   * … Question, Literature" under Español). Go's own `stageLabelFor` is the
+   * English it records and is told; this is only for showing.
+   */
+  stageName?: (id: string) => string;
+  /** A stage's English name, as the page says it: for the names inside Go's recorded reasons. */
+  stageByEnglish?: (english: string) => string;
   stageLabel: string;
   mode: string;
   /** The mode the current stage recommends. */
@@ -83,6 +93,8 @@ export function GoPanel({
   /** L-93: ask which takes priority about a record Go kept under the routine-decision policy. */
   onApplyAnyway?: (step: AgentStep) => void;
 }) {
+  // Stage names for showing; Go's own `stageLabelFor` stays what it records.
+  const shownStage = stageName ?? go.stageLabelFor;
   const t = useT();
   const locale = useLocale();
   const [open, setOpen] = useState(false);
@@ -217,14 +229,14 @@ export function GoPanel({
     disabled: go.phase === 'watching' || Boolean(go.pendingStep) || Boolean(go.authorizing),
     // A suggestion to skip has two answers: the card's button, or Resume to do the stage.
     // A table's button only shows the way, so Resume stays beside it.
-    hideResume: Boolean(need && need.kind !== 'skip_stage' && need.kind !== 'next_round' && !needIsDecidedOnStage(need) && needsActions && describeNeed(need, go.stageLabelFor, needContext, locale).action),
+    hideResume: Boolean(need && need.kind !== 'skip_stage' && need.kind !== 'next_round' && !needIsDecidedOnStage(need) && needsActions && describeNeed(need, shownStage, needContext, locale).action),
   };
   // Something on the panel is waiting for the user: the pinned copy says so and takes them there.
   const waiting = Boolean(go.pendingStep || need || askingUser || go.authorizing);
   // The pinned copy carries the button Go is waiting for, not only a way to
   // find it (14 Oct, Sean: "the new go button for revisions doesn't show up
   // sometimes" — it was on the card, scrolled out of view, with Resume hidden).
-  const needed = need ? describeNeed(need, go.stageLabelFor, needContext, locale) : null;
+  const needed = need ? describeNeed(need, shownStage, needContext, locale) : null;
   const dockAction: { label: string; option?: StuckOption; acts: boolean } | null =
     needed && needsActions && !needIsDecidedOnStage(need!) && (needed.options?.[0] || needed.action)
       ? { label: needed.options?.[0]?.label ?? needed.action!, option: needed.options?.[0]?.id, acts: true }
@@ -322,7 +334,7 @@ export function GoPanel({
           )}
           {need && (
             <NeedsYouCard
-              key={`${need.kind}:${go.run?.id}`} need={need} stageLabel={go.stageLabelFor} onAction={act} context={needContext}
+              key={`${need.kind}:${go.run?.id}`} need={need} stageLabel={shownStage} onAction={act} context={needContext}
               onCarryOn={need.kind === 'tick_criterion' && canResume ? () => void go.go() : undefined}
             />
           )}
@@ -351,7 +363,7 @@ export function GoPanel({
           {askingUser && !need && !cleared && go.run?.stop_reason && (
             <QuestionPrompt
               key={go.run.stop_reason}
-              question={shownStopReason(locale, go.run.stop_reason)}
+              question={shownStopReason(locale, go.run.stop_reason, stageByEnglish)}
               expertPackage={go.run.needs?.kind === 'answer_question' ? go.run.needs.expertPackage : undefined}
               choices={go.run.needs?.kind === 'answer_question' ? go.run.needs.choices : undefined}
               change={latestChange ?? undefined}
@@ -378,7 +390,7 @@ export function GoPanel({
               {t('go.useMyMode', { mode: shownModeName(mode, MODE_DISPLAY[mode as ModeType]?.display_name ?? mode) })}
             </label>
           )}
-          <RunAccountCard run={go.run} steps={go.steps} stageLabel={go.stageLabelFor} />
+          <RunAccountCard run={go.run} steps={go.steps} stageLabel={shownStage} stageByEnglish={stageByEnglish} />
           {(go.run || go.steps.length > 0) && (
             <TransparencyPanel
               run={go.run}
@@ -389,10 +401,11 @@ export function GoPanel({
               stageMode={stageMode}
               stageModes={stageModes?.value}
               thinking={go.phase === 'thinking'}
-              stageName={go.stageLabelFor}
+              stageName={shownStage}
+              stageByEnglish={stageByEnglish}
             />
           )}
-          <StepTimeline steps={go.steps} stageName={go.stageLabelFor} onApplyAnyway={onApplyAnyway} />
+          <StepTimeline steps={go.steps} stageName={shownStage} onApplyAnyway={onApplyAnyway} />
         </div>
       )}
     </section>

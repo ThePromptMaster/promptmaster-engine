@@ -2097,6 +2097,12 @@ is the screen, the second is the work.
     and the remaining notices and errors the workspace shows.
   - Answers are read in every interface language: "sí / oui / sim", "no / non / não", "vuelve a
     Revisión", "tal como está" count as the English ones do.
+- **Suggestions, stage names and Go's request (2026-10-23).** "What to do next" says its derived
+  suggestions from data each one carries (`recommendation.shown`, `lib/i18n/recommend-text.ts`, with a
+  test that the English through the keys is exactly what the builder stores). Stage names in "So far",
+  the needs card, the step record, the finish dialog and the "still open" lines go through the page's
+  own names. Go's request recorded as its stop reason ("Needs your approval: …") is said from the run's
+  structured request, or recognised by its shape (`shownStopReason`).
 - **Still English.**
   - Admin, `/compact` and `/preview`.
   - The server's own message under technical details.

@@ -35,6 +35,7 @@ import { en as checksArea } from './areas/checks';
 import { en as filesArea } from './areas/files';
 import { en as needArea } from './areas/need';
 import { en as stopArea } from './areas/stop';
+import { en as recsArea } from './areas/recs';
 import { en as acctArea } from './areas/acct';
 import { en as recArea } from './areas/rec';
 import { en as panelsArea } from './areas/panels';
@@ -326,6 +327,7 @@ export const en = {
   ...filesArea,
   ...needArea,
   ...stopArea,
+  ...recsArea,
   ...acctArea,
   ...recArea,
   ...panelsArea,

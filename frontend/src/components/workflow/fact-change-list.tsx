@@ -74,13 +74,17 @@ export function toggled(prev: ReadonlySet<string>, factId: string, update: boole
 export function FactReconcileNotice({
   project,
   stageLabel,
+  stageTitle,
   how,
   changes,
   onDone,
   onChanged,
 }: {
   project: Pick<Project, 'id' | 'user_id'>;
+  /** The stage's English name, as the fact's source records it. */
   stageLabel: string;
+  /** The stage's name as the page says it; the English when absent. */
+  stageTitle?: string;
   /** "The version you restored", "Your edit". */
   how: string;
   changes: readonly FactChange[];
@@ -111,7 +115,7 @@ export function FactReconcileNotice({
   return (
     <section aria-label={t('fcl.label')} className="mb-4 rounded-xl bg-[var(--surface-container-high)] px-4 py-3">
       <p className="text-body text-[var(--on-surface)]">
-        {t('fcl.differs', { count: changes.length, how, stage: stageLabel })}
+        {t('fcl.differs', { count: changes.length, how, stage: stageTitle ?? stageLabel })}
       </p>
       <FactChangeList changes={changes} kept={kept} onToggle={(id, on) => setKept((prev) => toggled(prev, id, on))} />
       {error && <p className="mt-2 text-label text-[var(--pm-error,var(--on-surface))]">{error}</p>}

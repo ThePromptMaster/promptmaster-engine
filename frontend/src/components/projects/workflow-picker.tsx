@@ -1,6 +1,7 @@
 'use client';
 
-import { useT } from '@/lib/i18n/i18n-provider';
+import { useLocale, useT } from '@/lib/i18n/i18n-provider';
+import { stageText } from '@/lib/i18n/templates';
 import type { MessageKey } from '@/lib/i18n/messages/en';
 
 import type { WorkflowTemplate } from '@/lib/workflow/types';
@@ -44,13 +45,14 @@ export function useWorkflowWords(): { name: (t: Pick<WorkflowTemplate, 'key' | '
 export function WorkflowPicker({ templates, selectedId, onSelect }: Props) {
   const t = useT();
   const words = useWorkflowWords();
+  const locale = useLocale();
   return (
     <div role="radiogroup" aria-label={t('picker.label')} className="grid gap-3 sm:grid-cols-3">
       {templates.map((template) => {
         const selected = template.id === selectedId;
         // Show the shape of the work, not just its name: three stages is
         // enough to tell a book workflow from a research one at a glance.
-        const preview = template.stages.slice(0, 3).map((s) => s.short_label);
+        const preview = template.stages.slice(0, 3).map((s) => stageText(locale, template.key, s, 'short') || s.short_label);
 
         return (
           <button

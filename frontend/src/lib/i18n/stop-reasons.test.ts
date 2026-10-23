@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { NEED_CLEARED, NEED_MOVED_ON } from '@/lib/agent/needs';
+import { describeNeed, NEED_CLEARED, NEED_MOVED_ON, type NeedsUser } from '@/lib/agent/needs';
 import { preempt } from '@/lib/agent/policy';
 import { en as stopEn } from './messages/areas/stop';
 import { shownGoWaiting, shownStopReason } from './stop-reasons';
@@ -64,5 +64,47 @@ describe('stop reasons on screen (client, 21 Oct: "pick your language")', () => 
     expect(shownGoWaiting('es', 'a decision from you')).toBe('una decisión tuya');
     expect(shownGoWaiting('fr', 'resume Go to check the objective again')).toBe('relancez Go pour vérifier à nouveau l’objectif');
     expect(shownGoWaiting('en', 'a decision from you')).toBe('a decision from you');
+  });
+});
+
+describe("Go's request, as its stop reason recorded it (client, 22 Oct, Research project)", () => {
+  const stageLabel = (id: string) => ({ method: 'Method', question: 'Question', literature: 'Literature' })[id] ?? id;
+  const shownLabel = (id: string) => ({ method: 'Método', question: 'Pregunta', literature: 'Bibliografía' })[id] ?? id;
+  const byEnglish = (en: string) => ({ Method: 'Método', Question: 'Pregunta', Literature: 'Bibliografía' })[en] ?? en;
+
+  const needs: NeedsUser[] = [
+    {
+      kind: 'tick_criterion', stageId: 'method', criterionId: 'meth.analysisplan', authority: 'reserved',
+      label: 'I approve this analysis plan for execution',
+      hint: 'Fixed now, before anything runs, so the data cannot choose the analysis.',
+    },
+    { kind: 'tick_criterion', stageId: 'method', criterionId: 'x', label: 'I approve this analysis plan for execution', authority: 'policy_ask' },
+    { kind: 'tick_criterion', stageId: 'method', criterionId: 'x', label: 'I approve this analysis plan for execution' },
+    { kind: 'set_objective' },
+    { kind: 'approve_outline', stageId: 'question', versionNumber: 3, unsavedDraft: false },
+    { kind: 'approve_outline', stageId: 'question', versionNumber: null, unsavedDraft: true },
+    { kind: 'skip_stage', stageId: 'literature', reason: 'The question needs no prior work.' },
+    { kind: 'wait_for_jobs', stageId: 'question', pending: 2, complete: 3, total: 5 },
+    { kind: 'continue_budget', budgetSteps: 12 },
+    { kind: 'large_job', stageId: 'question', sections: 14 },
+    { kind: 'triage_findings', stageId: 'question', count: 1 },
+    { kind: 'triage_findings', stageId: 'question', count: 4 },
+  ];
+
+  it('each recorded request reads as the card says it in Spanish', () => {
+    for (const need of needs) {
+      const recorded = describeNeed(need, stageLabel).message;
+      const card = describeNeed(need, shownLabel, {}, 'es').message;
+      expect(shownStopReason('es', recorded, byEnglish), recorded).toBe(card);
+      // English is left exactly as Go wrote it.
+      expect(shownStopReason('en', recorded, byEnglish)).toBe(recorded);
+    }
+  });
+
+  it('the outstanding line says Go waits in the interface language', () => {
+    const recorded = describeNeed(needs[0], stageLabel).message;
+    const shown = shownGoWaiting('es', recorded, byEnglish)!;
+    expect(shown).not.toMatch(/Needs your approval|yours alone|Fixed now/);
+    expect(shown).toBe(describeNeed(needs[0], shownLabel, {}, 'es').message);
   });
 });

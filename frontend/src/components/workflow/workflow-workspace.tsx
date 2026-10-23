@@ -65,6 +65,8 @@ import {
   deliverableStage,
   describeOutstanding,
   outstandingBeyondCriteria,
+  shownOutstanding,
+  type OutstandingShow,
   openFindingsByStage,
   outstandingWork,
   tickClosesStage,
@@ -1590,6 +1592,28 @@ export function WorkflowWorkspace({
   // reason still said it. The objective's own item says it while it holds;
   // once a change has made it out of date, Go only needs resuming.
   const goWaiting = goWaitingLine(goStopped, Boolean(objectiveAssessment));
+  // Names as the screen says them (client, 22 Oct: stage names and Go's
+  // request still in English under Español). What is stored stays English.
+  const stageNameShown = (id: string, field: 'label' | 'short' = 'label'): string => {
+    const s = template.stages.find((x) => x.id === id);
+    if (!s) return id;
+    return (field === 'short' && stageText(locale, template.key, s, 'short')) || stageText(locale, template.key, s, 'label');
+  };
+  const shownStageByEnglish = (english: string): string => {
+    const s = template.stages.find((x) => x.label === english || x.short_label === english);
+    return s ? stageNameShown(s.id, s.label === english ? 'label' : 'short') : english;
+  };
+  // What Go waits for: its request in this language when the run still holds
+  // it (the stop reason is that request's English), else the reason by shape.
+  const shownGoWaitingLine = (line: string): string => {
+    const need = go.run?.needs ?? null;
+    if (need && line === describeNeed(need, go.stageLabelFor).message) {
+      return describeNeed(need, (id) => stageNameShown(id, 'short'), {}, locale).message;
+    }
+    return shownGoWaiting(locale, line, shownStageByEnglish) ?? line;
+  };
+  const outstandingShow: OutstandingShow = { stage: (id) => stageNameShown(id, 'short'), waiting: shownGoWaitingLine };
+  const outstandingOtherShown = outstandingBeyondCriteria(outstanding, stageId).map((item) => shownOutstanding(item, locale, outstandingShow));
   // Go stopped on the objective check: the pause notice offers Go's own action.
   const objectiveNeed =
     go.run && !go.run.ended_at && go.run.status === 'awaiting_decision' && go.run.needs?.kind === 'objective_check' ? go.run.needs : null;
@@ -2093,7 +2117,9 @@ export function WorkflowWorkspace({
           {isCurrent && appendStageVersion && project.status !== 'finalized' && (
             <GoPanel
               go={go}
-              stageLabel={stage.label}
+              stageLabel={stageNameShown(stage.id)}
+              stageName={(id) => stageNameShown(id, 'short')}
+              stageByEnglish={shownStageByEnglish}
               mode={project.mode}
               stageMode={stage?.recommended_modes?.[0]?.mode}
               needsActions={goNeedsActions}
@@ -2159,7 +2185,7 @@ export function WorkflowWorkspace({
                         ? () => void go.fixObjective(objectiveNeed.items)
                         : () => void go.go()
                   }
-                  resumeLabel={objectiveNeed ? (describeNeed(objectiveNeed, go.stageLabelFor, {}, locale).action ?? undefined) : undefined}
+                  resumeLabel={objectiveNeed ? (describeNeed(objectiveNeed, (id) => stageNameShown(id, 'short'), {}, locale).action ?? undefined) : undefined}
                   resumeDisabled={go.active}
                   onAnswer={
                     appendStageVersion && go.run && !go.run.ended_at && go.run.status === 'awaiting_decision' && go.run.needs?.kind === 'answer_question'
@@ -2194,6 +2220,7 @@ export function WorkflowWorkspace({
               <FactReconcileNotice
                 project={project}
                 stageLabel={stage.label}
+                stageTitle={stageNameShown(stage.id)}
                 how={factReconcile.how}
                 changes={factReconcile.changes}
                 onChanged={() => onReload?.()}
@@ -2388,7 +2415,17 @@ export function WorkflowWorkspace({
             />
 
             <RecommendationsPanel
-              stageLabel={stage.short_label}
+              stageLabel={stageNameShown(stage.id, 'short')}
+              names={{
+                stage: (id) => stageNameShown(id),
+                guidance: (id) => {
+                  const s = template.stages.find((x) => x.id === id);
+                  const g = s?.entry_guidance ? stageText(locale, template.key, s, 'guidance') : '';
+                  return g ? g.split('. ')[0] : '';
+                },
+                elsewhere: outstandingOtherShown,
+                templateKey: template.key,
+              }}
               rows={recommendations.rows}
               selected={recommendations.selected}
               onToggleSelect={recommendations.toggleSelect}
@@ -2458,7 +2495,7 @@ export function WorkflowWorkspace({
             {isCurrent && project.status === 'finalized' && (
               <ProjectFinishedBanner
                 onReopen={() => void reopenProject()}
-                leftOpen={completion.leftOpenStages.map((s) => ({ id: s.id, label: s.short_label }))}
+                leftOpen={completion.leftOpenStages.map((s) => ({ id: s.id, label: stageNameShown(s.id, 'short') }))}
                 onViewStage={setViewingStageId}
               />
             )}
@@ -2471,6 +2508,7 @@ export function WorkflowWorkspace({
             {isCurrent && finishing && (
               <CompletionDialog
                 summary={completion}
+                show={outstandingShow}
                 busy={busy}
                 check={objectiveCheck}
                 onCheck={() => void checkAgainstObjective()}
@@ -2539,7 +2577,7 @@ export function WorkflowWorkspace({
                 stageName={shownStageName}
                 // Go waiting for an answer is open work too (6 Oct, email 1:
                 // "nothing was outstanding while … Go was waiting for me").
-                elsewhere={goWaiting ? [...outstandingOther, t('wsa.goWaitingFor', { what: shownGoWaiting(locale, goWaiting) ?? goWaiting })] : outstandingOther}
+                elsewhere={goWaiting ? [...outstandingOtherShown, t('wsa.goWaitingFor', { what: shownGoWaitingLine(goWaiting) })] : outstandingOtherShown}
                 working={
                   stageEvaluation.evaluating ? t('wsa.checking')
                     : generation.generating ? t('wsa.drafting')

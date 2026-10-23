@@ -149,7 +149,10 @@ export function TransparencyPanel({
   stageModes = 'stage',
   thinking,
   stageName = (id) => id,
+  stageByEnglish,
 }: {
+  /** A stage's English name, as the screen says it: for the names inside a recorded reason. */
+  stageByEnglish?: (english: string) => string;
   run: AgentRun | null;
   step: AgentStep | null;
   next: string;
@@ -224,7 +227,7 @@ export function TransparencyPanel({
       </details>
       {run?.stop_reason && run.status !== 'running' && (
         <p role="status" className="mt-3 text-body text-[var(--on-surface)]">
-          {shownStopReason(getLocale(), run.stop_reason)}
+          {shownStopReason(getLocale(), run.stop_reason, stageByEnglish)}
         </p>
       )}
     </section>

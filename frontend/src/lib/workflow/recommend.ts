@@ -176,7 +176,20 @@ export interface ProposedRecommendation {
   /** FR-15 conflict axes. Only applyable recommendations carry any. */
   tags: string[];
   severity: RecommendationSeverity;
+  /**
+   * What a derived recommendation says, as data, so the panel can say it in
+   * the interface's language (`lib/i18n/recommend-text.ts`). The English in
+   * `title`/`summary`/`rationale` is what a row stores; this is never stored.
+   * Absent on evaluation-driven rows, whose words a model wrote.
+   */
+  shown?: RecommendationShown;
 }
+
+export type RecommendationShown =
+  | { rule: 'setup'; stageId: string; field: string; criterion: string }
+  | { rule: 'blocked'; stageId: string; criterion: string; detail?: string }
+  | { rule: 'advance'; stageId: string; nextId: string; open: string[]; elsewhere: number }
+  | { rule: 'finish'; stageId: string; open: string[]; elsewhere: number };
 
 // --- evaluation signals -----------------------------------------------------
 
@@ -553,6 +566,7 @@ export function deriveWorkflowRecommendations({
       },
       scope: { kind: 'document', described_as: "This project's setup fields." },
       tags: [],
+      shown: { rule: 'setup', stageId: stage.id, field: rule.field, criterion: criterion.label },
       // Blocking or not is a property of the criterion, and it is the one
       // honest input available — a setup gate the template did not mark
       // blocking is genuinely only advice.
@@ -590,6 +604,7 @@ export function deriveWorkflowRecommendations({
         scope: { kind: 'document', described_as: `${stage.label}'s artifact.` },
         tags: [],
         severity: 'blocking',
+        shown: { rule: 'blocked', stageId: stage.id, criterion: blocker.label, ...(blocker.detail ? { detail: blocker.detail } : {}) },
       });
     }
   }
@@ -640,6 +655,7 @@ export function deriveWorkflowRecommendations({
         scope: { kind: 'document', described_as: `Moves the project to ${targetLabel}.` },
         tags: [],
         severity: 'info',
+        shown: { rule: 'advance', stageId: stage.id, nextId: next, open: open.map((c) => c.label), elsewhere: elsewhere.length },
       });
     } else {
       out.push({
@@ -665,6 +681,7 @@ export function deriveWorkflowRecommendations({
         scope: { kind: 'document', described_as: 'Closes the project.' },
         tags: [],
         severity: 'info',
+        shown: { rule: 'finish', stageId: stage.id, open: open.map((c) => c.label), elsewhere: elsewhere.length },
       });
     }
   }

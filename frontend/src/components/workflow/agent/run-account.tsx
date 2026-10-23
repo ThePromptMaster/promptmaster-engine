@@ -12,10 +12,20 @@ const ICON: Record<string, string> = {
  * Q3c — what Go did, what it is doing, or exactly why it paused, in three
  * lines above the detailed record (Sean, 9 Oct). Derived from the steps.
  */
-export function RunAccountCard({ run, steps, stageLabel }: { run: AgentRun | null; steps: readonly AgentStep[]; stageLabel: (id: string) => string }) {
+export function RunAccountCard({
+  run,
+  steps,
+  stageLabel,
+  stageByEnglish,
+}: {
+  run: AgentRun | null;
+  steps: readonly AgentStep[];
+  stageLabel: (id: string) => string;
+  stageByEnglish?: (english: string) => string;
+}) {
   const t = useT();
   const locale = useLocale();
-  const account = runAccount(run, steps, stageLabel, locale);
+  const account = runAccount(run, steps, stageLabel, locale, stageByEnglish);
   if (!account || (!account.did && account.kind === 'working')) return null;
   return (
     <section aria-label={t('acc.label')} data-kind={account.kind} className="rounded-xl bg-[var(--surface-container-low)] px-5 py-4">

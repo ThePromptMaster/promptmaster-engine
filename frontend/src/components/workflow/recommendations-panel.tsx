@@ -39,7 +39,8 @@
  */
 
 import { useState } from 'react';
-import { useT } from '@/lib/i18n/i18n-provider';
+import { useLocale, useT } from '@/lib/i18n/i18n-provider';
+import { shownRecommendation, type RecommendationNames } from '@/lib/i18n/recommend-text';
 import type { MessageKey } from '@/lib/i18n/messages/en';
 
 import { CustomSelect } from '@/components/shared/custom-select';
@@ -111,6 +112,8 @@ interface Props {
   onApply: (categories: string[]) => void;
   busy?: boolean;
   readOnly?: boolean;
+  /** Names in the interface's language, for the derived suggestions' words. Without them, the words as stored. */
+  names?: RecommendationNames;
 }
 
 export function RecommendationsPanel({
@@ -122,6 +125,7 @@ export function RecommendationsPanel({
   onApply,
   busy = false,
   readOnly = false,
+  names,
 }: Props) {
   const t = useT();
   if (rows.length === 0) return null;
@@ -153,6 +157,7 @@ export function RecommendationsPanel({
             onApply={onApply}
             busy={busy}
             readOnly={readOnly}
+            names={names}
           />
         ))}
       </ul>
@@ -185,6 +190,7 @@ interface RowProps {
   onApply: (categories: string[]) => void;
   busy: boolean;
   readOnly: boolean;
+  names?: RecommendationNames;
 }
 
 function RecommendationRow({
@@ -196,10 +202,14 @@ function RecommendationRow({
   onApply,
   busy,
   readOnly,
+  names,
 }: RowProps) {
   const [status, setStatus] = useState('');
   const [reason, setReason] = useState('');
   const t = useT();
+  const locale = useLocale();
+  // The words as the screen says them; the row keeps the English it stores.
+  const said = names ? shownRecommendation(rec, locale, names) : { title: rec.title, summary: rec.summary, rationale: rec.rationale };
   const hintKey = rec.kind === 'setup' ? 'rcm.hintSetup' : rec.kind === 'workflow' ? 'rcm.hintWorkflow' : null;
   const scopeText = (scope: typeof rec.scope): string => {
     if (scope.kind === 'selection') {
@@ -241,7 +251,7 @@ function RecommendationRow({
             type="checkbox"
             checked={selected}
             onChange={(e) => onToggleSelect(rec.category, e.target.checked)}
-            aria-label={t('rcm.include', { title: rec.title })}
+            aria-label={t('rcm.include', { title: said.title })}
             className="mt-1 h-4 w-4 shrink-0 accent-[var(--pm-primary)]"
           />
         )}
@@ -253,10 +263,10 @@ function RecommendationRow({
             >
               {t(`rcm.sev.${rec.severity}` as MessageKey)}
             </span>
-            <p className="text-body text-[var(--on-surface)]">{rec.title}</p>
+            <p className="text-body text-[var(--on-surface)]">{said.title}</p>
           </div>
 
-          <p className="mt-0.5 text-label text-[var(--on-surface-variant)]">{rec.summary}</p>
+          <p className="mt-0.5 text-label text-[var(--on-surface-variant)]">{said.summary}</p>
 
           {/* --- FR-14: the rationale, all four slots, none of them empty --- */}
           <button
@@ -275,10 +285,10 @@ function RecommendationRow({
               data-testid={`rationale-${rec.category}`}
               className="mt-2 space-y-1.5 rounded-lg bg-[var(--surface-container-low)] px-3 py-2.5"
             >
-              <Slot label={t('rcm.triggered')} value={rec.rationale.triggering_issue} />
-              <Slot label={t('rcm.stage')} value={rec.rationale.relevant_stage} />
-              <Slot label={t('rcm.benefit')} value={rec.rationale.expected_benefit} />
-              <Slot label={t('rcm.affects')} value={rec.rationale.scope} />
+              <Slot label={t('rcm.triggered')} value={said.rationale.triggering_issue} />
+              <Slot label={t('rcm.stage')} value={said.rationale.relevant_stage} />
+              <Slot label={t('rcm.benefit')} value={said.rationale.expected_benefit} />
+              <Slot label={t('rcm.affects')} value={said.rationale.scope} />
             </dl>
           )}
 
@@ -309,7 +319,7 @@ function RecommendationRow({
               options={statuses.map((s) => ({ value: s.value, label: t(`rcm.triage.${s.value}` as MessageKey) }))}
               placeholder={t('rcm.decide')}
               disabled={busy}
-              ariaLabel={t('rcm.whatToDo', { title: rec.title })}
+              ariaLabel={t('rcm.whatToDo', { title: said.title })}
               onChange={(value) => {
                 setStatus(value);
                 setReason('');

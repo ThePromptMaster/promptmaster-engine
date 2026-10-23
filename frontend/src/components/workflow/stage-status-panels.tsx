@@ -6,7 +6,7 @@ import type { MessageKey } from '@/lib/i18n/messages/en';
 
 import type { EvaluationResult } from '@/types';
 
-import { blocksCompletion, shownOutstanding, type CompletionSummary } from '@/lib/workflow/engine';
+import { blocksCompletion, shownOutstanding, type CompletionSummary, type OutstandingShow } from '@/lib/workflow/engine';
 import type { ObjectiveAssessment } from '@/lib/workflow/objective';
 import { readablePerformed } from '@/lib/agent/labels';
 import type { BlockKind } from '@/lib/workflow/types';
@@ -231,8 +231,11 @@ export function CompletionDialog({
   onConfirm,
   onCancel,
   onViewStage,
+  show,
 }: {
   summary: CompletionSummary;
+  /** How stage names and Go's request are said here; without it, the English the items hold. */
+  show?: OutstandingShow;
   busy: boolean;
   /** The deliverable scored against the objective, when the user asks (PM-14). */
   check?: { running: boolean; result: EvaluationResult | null; error: string | null };
@@ -279,7 +282,7 @@ export function CompletionDialog({
       {summary.leftOpenStages.length > 0 && (
         <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-label text-[var(--on-surface-variant)]">
           <span>
-            {t('ssp.leftOpenList', { count: summary.leftOpenStages.length, stages: summary.leftOpenStages.map((s) => s.short_label).join(', ') })}
+            {t('ssp.leftOpenList', { count: summary.leftOpenStages.length, stages: summary.leftOpenStages.map((s) => (show?.stage ? show.stage(s.id, s.short_label) : s.short_label)).join(', ') })}
           </span>
           {onViewStage &&
             summary.leftOpenStages.map((s) => (
@@ -289,7 +292,7 @@ export function CompletionDialog({
                 onClick={() => onViewStage(s.id)}
                 className="rounded px-1.5 py-0.5 text-label font-semibold text-[var(--pm-primary)] hover:bg-[var(--surface-container-low)]"
               >
-                {t('pnl.closeStage', { stage: s.short_label })}
+                {t('pnl.closeStage', { stage: show?.stage ? show.stage(s.id, s.short_label) : s.short_label })}
               </button>
             ))}
         </p>
@@ -305,7 +308,7 @@ export function CompletionDialog({
           <p className="text-label font-semibold text-[var(--on-surface)]">{t('ssp.optionalTitle')}</p>
           <ul className="mt-1 list-disc pl-5 text-label text-[var(--on-surface-variant)]">
             {open.map((item, i) => (
-              <li key={i}>{shownOutstanding(item, locale)}</li>
+              <li key={i}>{shownOutstanding(item, locale, show)}</li>
             ))}
           </ul>
         </div>
@@ -318,14 +321,14 @@ export function CompletionDialog({
           <ul className="mt-1 list-disc pl-5 text-label text-[var(--on-surface-variant)]">
             {open.map((item, i) => (
               <li key={i}>
-                {shownOutstanding(item, locale)}
+                {shownOutstanding(item, locale, show)}
                 {onViewStage && 'stageId' in item && (
                   <button
                     type="button"
                     onClick={() => onViewStage(item.stageId)}
                     className="ml-2 rounded px-1.5 py-0.5 font-semibold text-[var(--pm-primary)] hover:bg-[var(--surface-container-high)]"
                   >
-                    {t('ssp.goTo', { stage: item.label })}
+                    {t('ssp.goTo', { stage: show?.stage ? show.stage(item.stageId, item.label) : item.label })}
                   </button>
                 )}
               </li>
