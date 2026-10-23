@@ -3,7 +3,7 @@ import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 
 // Material Symbols are written as their ligature names; they are icons, not words.
-const ICONS = ["person", "expand_more", "expand_less", "palette", "translate", "logout", "science", "arrow_back", "attach_file", "close", "check", "add", "arrow_upward", "arrow_forward", "description", "image", "delete", "edit", "refresh", "info", "lightbulb", "help", "chat", "auto_awesome", "menu_book", "bolt", "tune", "undo"];
+const ICONS = ["person", "expand_more", "expand_less", "palette", "translate", "logout", "science", "arrow_back", "attach_file", "close", "check", "add", "arrow_upward", "arrow_forward", "description", "image", "delete", "edit", "refresh", "info", "lightbulb", "help", "chat", "auto_awesome", "menu_book", "bolt", "tune", "undo", "link_off", "travel_explore", "public_off", "content_copy", "recommend", "edit_note", "compress"];
 
 const eslintConfig = defineConfig([
   ...nextVitals,
@@ -17,9 +17,16 @@ const eslintConfig = defineConfig([
       "src/components/shared/colour-preferences.tsx",
       "src/components/shared/beta-notice.tsx",
       "src/components/shared/feedback-form.tsx",
+      "src/app/projects/new/page.tsx",
+      "src/components/projects/front-door.tsx",
+      "src/components/projects/guide-interview.tsx",
+      "src/components/projects/setup-card.tsx",
+      "src/components/projects/workflow-picker.tsx",
+      "src/components/projects/start-attachments.tsx",
+      "src/components/projects/draft-status.tsx",
     ],
     rules: {
-      "react/jsx-no-literals": ["error", { noStrings: false, ignoreProps: true, allowedStrings: ["PromptMaster", "·", "—", "…", ...ICONS] }],
+      "react/jsx-no-literals": ["error", { noStrings: false, ignoreProps: true, allowedStrings: ["PromptMaster", "·", "—", "…", ".", "/", "+", "[S", "]", ...ICONS] }],
     },
   },
   // Override default ignores of eslint-config-next.

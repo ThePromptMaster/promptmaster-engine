@@ -34,3 +34,12 @@ export function languageLabel(code: string | null | undefined): string {
   const l = LANGUAGES.find((x) => x.code === resolveLanguage(code))!;
   return l.code === 'en' ? l.name : `${l.own} (${l.name})`;
 }
+
+/**
+ * What a new project writes in before anyone chooses: the interface language
+ * when it is not English (someone reading the app in Spanish writes in
+ * Spanish), else the browser's own language when offered, else English.
+ */
+export function startLanguage(interfaceLocale: string): LanguageCode {
+  return interfaceLocale && interfaceLocale !== 'en' ? resolveLanguage(interfaceLocale) : browserLanguage();
+}

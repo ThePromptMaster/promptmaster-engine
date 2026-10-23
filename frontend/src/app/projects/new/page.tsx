@@ -7,7 +7,10 @@ import { useRouter } from 'next/navigation';
 
 import { useAuth } from '@/hooks/use-auth';
 import { GuideInterview } from '@/components/projects/guide-interview';
-import { DOES_THE_WORK, SetupCard, type SetupDraft } from '@/components/projects/setup-card';
+import { SetupCard, type SetupDraft } from '@/components/projects/setup-card';
+import { useWorkflowWords } from '@/components/projects/workflow-picker';
+import { useT } from '@/lib/i18n/i18n-provider';
+import { getLocale, tr } from '@/lib/i18n/store';
 import { CustomWorkflowDesigner } from '@/components/projects/custom-workflow-designer';
 import { FrontDoor, type DraftBrief, type Turn } from '@/components/projects/front-door';
 import { saveStageChatMessage } from '@/lib/supabase/conversation';
@@ -21,7 +24,7 @@ import { AutoGrowTextarea } from '@/components/shared/auto-grow-textarea';
 import { api } from '@/lib/api/client';
 import { createProject, hardDeleteProject } from '@/lib/supabase/projects';
 import { setRequestLanguage } from '@/lib/api/language';
-import { browserLanguage, LANGUAGES, resolveLanguage, type LanguageCode } from '@/lib/workflow/languages';
+import { LANGUAGES, resolveLanguage, startLanguage, type LanguageCode } from '@/lib/workflow/languages';
 import { appendWorkflowEvent, listTemplates } from '@/lib/supabase/workflow';
 import { createArtifact } from '@/lib/supabase/versions';
 import type { WorkflowTemplate } from '@/lib/workflow/types';
@@ -75,15 +78,19 @@ export default function NewProjectPage() {
   // Simple unless the user chose advanced (Sean, 18 Oct, email 7).
   const [experience, setExperience] = useExperience();
   const simple = experience === 'simple';
+  const t = useT();
+  const words = useWorkflowWords();
 
   const [templates, setTemplates] = useState<(WorkflowTemplate & { id: string })[]>([]);
   const [step, setStep] = useState<Step>('ask');
   const [objective, setObjective] = useState('');
   // Client, 21 Oct ("pick your language"): the start screen's conversation and
-  // the new project write in this. The browser's own language when offered.
+  // the new project write in this. Someone reading the interface in Spanish
+  // writes in Spanish unless they choose otherwise; else the browser's own
+  // language when offered.
   const [language, setLanguage] = useState<LanguageCode>('en');
   useEffect(() => {
-    setLanguage(browserLanguage());
+    setLanguage(startLanguage(getLocale()));
   }, []);
   useEffect(() => {
     setRequestLanguage(language);
@@ -143,7 +150,7 @@ export default function NewProjectPage() {
     setTemplatesError(null);
     listTemplates()
       .then(setTemplates)
-      .catch((e) => setTemplatesError(e instanceof Error && e.message ? e.message : 'Could not load workflows.'))
+      .catch((e) => setTemplatesError(e instanceof Error && e.message ? e.message : tr('start.loadWorkflowsFailed')))
       .finally(() => setLoadingTemplates(false));
   }, []);
 
@@ -270,7 +277,7 @@ export default function NewProjectPage() {
       setStep('setup');
     } catch (e) {
       setError(
-        `Could not recommend a setup${e instanceof Error && e.message ? `: ${e.message}` : ''}. You can choose the workflow yourself.`
+        t('start.recommendFailed', { why: e instanceof Error && e.message ? `: ${e.message}` : '' })
       );
     } finally {
       setWorking(null);
@@ -328,7 +335,7 @@ export default function NewProjectPage() {
       setWorking(null);
       await create({ template: recommended, draft: suggested, facts: factsFromBrief(brief, said), chat: turns });
     } catch (e) {
-      setError(`Could not set the project up${e instanceof Error && e.message ? `: ${e.message}` : ''}. Try again, or review the setup first.`);
+      setError(t('start.setUpFailed', { why: e instanceof Error && e.message ? `: ${e.message}` : '' }));
       setWorking(null);
     }
   }
@@ -473,15 +480,15 @@ export default function NewProjectPage() {
       // with no workflow pinned and no history, and pressing Start again made
       // a second one. Take the half-made one back out, so a retry starts clean.
       if (createdId) await hardDeleteProject(createdId).catch(() => undefined);
-      const reason = e instanceof Error && e.message ? e.message : 'Could not create the project.';
-      setError(`${reason} Nothing was created — try again.`);
+      const reason = e instanceof Error && e.message ? e.message : t('start.createFailed');
+      setError(t('start.nothingCreated', { reason }));
       setWorking(null);
     }
   }
 
 
   const busyLabel =
-    working === 'questions' ? 'Thinking of questions…' : working === 'setup' ? 'Working out a setup…' : null;
+    working === 'questions' ? t('start.thinkingQuestions') : working === 'setup' ? t('start.workingSetup') : null;
 
   // With a recommendation the user can start from the top; choosing the
   // workflow yourself still ends the form with Start (Harold, via Sean, 9 Oct).
@@ -493,7 +500,7 @@ export default function NewProjectPage() {
       onClick={() => setExperience(simple ? 'advanced' : 'simple')}
       className="text-body text-[var(--on-surface-variant)] underline-offset-4 hover:text-[var(--on-surface)] hover:underline"
     >
-      {simple ? 'Advanced setup — choose the workflow, talk it through, see every field' : 'Simple setup'}
+      {simple ? t('start.advanced') : t('start.simple')}
     </button>
   );
   const startButton = (
@@ -502,7 +509,7 @@ export default function NewProjectPage() {
       disabled={!selected || working !== null || !user || !draft.objective.trim() || createdWithFailures !== null}
       className="rounded-xl bg-[var(--pm-primary)] px-6 py-3 text-title text-[var(--on-primary)] transition-opacity hover:opacity-90 disabled:opacity-40"
     >
-      {working === 'creating' ? 'Creating…' : `Start ${selected?.name ?? 'project'}`}
+      {working === 'creating' ? t('start.creating') : selected ? t('start.startNamed', { name: words.name(selected) }) : t('start.startProject')}
     </button>
   );
 
@@ -514,13 +521,13 @@ export default function NewProjectPage() {
           className="inline-flex items-center gap-1.5 text-body text-[var(--on-surface-variant)] transition-colors hover:text-[var(--on-surface)]"
         >
           <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-          Projects
+          {t('start.projects')}
         </Link>
         <label className="inline-flex items-center gap-2 text-label text-[var(--on-surface-variant)]">
           <span className="material-symbols-outlined text-[18px]" aria-hidden>translate</span>
-          Writes in
+          {t('start.writesIn')}
           <select
-            aria-label="The language the project is written in"
+            aria-label={t('start.writesInLabel')}
             value={language}
             onChange={(e) => setLanguage(resolveLanguage(e.target.value))}
             className="rounded-lg bg-[var(--surface-container-low)] px-3 py-1.5 text-label text-[var(--on-surface)] outline-none focus:ring-2 focus:ring-[var(--pm-primary)]/40"
@@ -536,19 +543,19 @@ export default function NewProjectPage() {
           loaded pushed the goal box down under the user's click. On the first
           step it sits below the start buttons, where it moves nothing. */}
       {kept && step !== 'ask' && (
-        <div role="region" aria-label="Unfinished setup" className="mb-6 rounded-xl bg-[var(--surface-container-high)] px-5 py-4 text-body text-[var(--on-surface)]">
+        <div role="region" aria-label={t('start.unfinished')} className="mb-6 rounded-xl bg-[var(--surface-container-high)] px-5 py-4 text-body text-[var(--on-surface)]">
           <p>{describeDraft(kept.data, kept.updated_at)}</p>
           {(kept.data.attachedNames?.length ?? 0) > 0 && (
             <p className="mt-1 text-label text-[var(--on-surface-variant)]">
-              Files are not kept in a draft — attach {kept.data.attachedNames!.length === 1 ? 'it' : 'them'} again: {kept.data.attachedNames!.join(', ')}.
+              {t('start.filesNotKept', { count: kept.data.attachedNames!.length, names: kept.data.attachedNames!.join(', ') })}
             </p>
           )}
           <div className="mt-3 flex flex-wrap gap-2">
             <button onClick={restoreKept} className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label font-semibold text-[var(--on-primary)]">
-              Continue where I left off
+              {t('start.continueDraft')}
             </button>
             <button onClick={discardKept} className="rounded-lg px-4 py-2 text-label text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-highest)]">
-              Discard the draft
+              {t('start.discardDraft')}
             </button>
           </div>
         </div>
@@ -565,37 +572,35 @@ export default function NewProjectPage() {
       {createdWithFailures && (
         <div role="alert" className="mb-6 rounded-xl bg-[var(--error-container)] px-4 py-3 text-body text-[var(--on-error-container)]">
           <p>
-            The project was created, but {createdWithFailures.failed.length === 1 ? 'this file' : 'these files'} could
-            not be stored: {createdWithFailures.failed.join('; ')}. Any text in them is already in the project context;
-            add the file again on the first stage if you need it there.
+            {t('start.createdWithFailures', { count: createdWithFailures.failed.length, files: createdWithFailures.failed.join('; ') })}
           </p>
           <Link href={`/projects/${createdWithFailures.id}`} className="mt-2 inline-block font-medium underline">
-            Open the project
+            {t('start.openProject')}
           </Link>
         </div>
       )}
 
       {templatesError && (
         <div role="alert" className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[var(--error-container)] px-4 py-3 text-body text-[var(--on-error-container)]">
-          <span>The workflows could not be loaded, so a project can&apos;t be started yet. ({templatesError})</span>
+          <span>{t('start.templatesFailed', { reason: templatesError })}</span>
           <button
             type="button"
             onClick={loadTemplates}
             disabled={loadingTemplates}
             className="rounded-lg bg-[var(--surface-container-lowest)] px-3 py-1.5 text-label text-[var(--on-surface)] disabled:opacity-60"
           >
-            {loadingTemplates ? 'Retrying…' : 'Retry'}
+            {loadingTemplates ? t('start.retrying') : t('start.retry')}
           </button>
         </div>
       )}
 
       {step === 'ask' && (
         <>
-          <h1 className="text-display text-[var(--on-surface)]">{simple ? 'What do you want done?' : 'What do you want to do or figure out?'}</h1>
+          <h1 className="text-display text-[var(--on-surface)]">{simple ? t('start.titleSimple') : t('start.title')}</h1>
           <p className="mt-3 text-body text-[var(--on-surface-variant)]">
             {simple
-              ? `Say it in a sentence or two. ${DOES_THE_WORK}`
-              : 'Say it in your own words. PromptMaster will suggest how to set it up — which workflow, how to think about it, who it is for — and you can change any of it.'}
+              ? `${t('start.introSimple')} ${t('setup.doesTheWork')}`
+              : t('start.intro')}
           </p>
 
           <div className="mt-8 rounded-2xl bg-[var(--surface-container-lowest)] px-6 py-5 shadow-[0_1px_2px_rgba(25,28,30,0.04)]">
@@ -612,8 +617,8 @@ export default function NewProjectPage() {
               }}
               rows={3}
               autoFocus
-              aria-label={simple ? 'What do you want done?' : 'What do you want to do or figure out?'}
-              placeholder="e.g. Write a short book about giraffes for curious ten-year-olds"
+              aria-label={simple ? t('start.titleSimple') : t('start.title')}
+              placeholder={t('start.placeholder')}
               className="w-full bg-transparent text-title leading-relaxed text-[var(--on-surface)] outline-none placeholder:text-[var(--outline)]"
             />
             <LimitCounter length={objective.length} limit={INPUT_LIMITS.objective} />
@@ -626,7 +631,7 @@ export default function NewProjectPage() {
             />
             {/* The backend opens no link; say so before any work rests on one (email 7). */}
             {linkNote && (
-              <p role="note" aria-label="Links" className="mt-3 flex gap-1.5 text-label text-[var(--pm-tertiary)]">
+              <p role="note" aria-label={t('start.links')} className="mt-3 flex gap-1.5 text-label text-[var(--pm-tertiary)]">
                 <span aria-hidden className="material-symbols-outlined text-[16px]">link_off</span>
                 {linkNote}
               </p>
@@ -641,32 +646,32 @@ export default function NewProjectPage() {
               disabled={!hasObjective || working !== null}
               className="inline-flex items-center gap-2 rounded-xl bg-[var(--pm-primary)] px-6 py-3 text-title text-[var(--on-primary)] transition-opacity hover:opacity-90 disabled:opacity-40"
             >
-              Start the conversation
+              {t('start.startConversation')}
               <span aria-hidden className="material-symbols-outlined text-[20px]">arrow_upward</span>
             </button>
           </div>
           <p className="mt-2 text-right text-label text-[var(--on-surface-variant)]">
-            Chat as you normally would; an outline builds up beside it. It becomes a project when you say so.
+            {t('start.conversationNote')}
           </p>
 
-          <p className="mt-8 text-label uppercase tracking-wider text-[var(--on-surface-variant)]">Or skip the conversation</p>
+          <p className="mt-8 text-label uppercase tracking-wider text-[var(--on-surface-variant)]">{t('start.skip')}</p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <button
               onClick={() => void recommend()}
               disabled={!hasObjective || working !== null}
               className="rounded-2xl bg-[var(--surface-container-high)] px-6 py-4 text-left text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-highest)] disabled:opacity-40"
             >
-              <span className="block text-title">{simple ? 'Set it up for me' : 'I know what I want to do'}</span>
-              <span className="mt-1 block text-label text-[var(--on-surface-variant)]">{simple ? 'One screen to check, then Start' : 'Recommend a setup from what I wrote'}</span>
+              <span className="block text-title">{simple ? t('start.setItUp') : t('start.know')}</span>
+              <span className="mt-1 block text-label text-[var(--on-surface-variant)]">{simple ? t('start.setItUpNote') : t('start.knowNote')}</span>
             </button>
             <button
               onClick={() => void guideMe()}
               disabled={!hasObjective || working !== null}
               className="rounded-2xl bg-[var(--surface-container-high)] px-6 py-4 text-left text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-highest)] disabled:opacity-40"
             >
-              <span className="block text-title">{simple ? 'Ask me a few questions' : 'Guide me — ask me questions'}</span>
+              <span className="block text-title">{simple ? t('start.askFew') : t('start.guide')}</span>
               <span className="mt-1 block text-label text-[var(--on-surface-variant)]">
-                {simple ? `At most ${SIMPLE_GUIDE_QUESTIONS}, then the same one screen` : 'One question at a time, then a setup'}
+                {simple ? t('start.askFewNote', { count: SIMPLE_GUIDE_QUESTIONS }) : t('start.guideNote')}
               </span>
             </button>
           </div>
@@ -678,19 +683,19 @@ export default function NewProjectPage() {
           )}
 
           {kept && (
-        <div role="region" aria-label="Unfinished setup" className="mt-6 rounded-xl bg-[var(--surface-container-high)] px-5 py-4 text-body text-[var(--on-surface)]">
+        <div role="region" aria-label={t('start.unfinished')} className="mt-6 rounded-xl bg-[var(--surface-container-high)] px-5 py-4 text-body text-[var(--on-surface)]">
           <p>{describeDraft(kept.data, kept.updated_at)}</p>
           {(kept.data.attachedNames?.length ?? 0) > 0 && (
             <p className="mt-1 text-label text-[var(--on-surface-variant)]">
-              Files are not kept in a draft — attach {kept.data.attachedNames!.length === 1 ? 'it' : 'them'} again: {kept.data.attachedNames!.join(', ')}.
+              {t('start.filesNotKept', { count: kept.data.attachedNames!.length, names: kept.data.attachedNames!.join(', ') })}
             </p>
           )}
           <div className="mt-3 flex flex-wrap gap-2">
             <button onClick={restoreKept} className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label font-semibold text-[var(--on-primary)]">
-              Continue where I left off
+              {t('start.continueDraft')}
             </button>
             <button onClick={discardKept} className="rounded-lg px-4 py-2 text-label text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-highest)]">
-              Discard the draft
+              {t('start.discardDraft')}
             </button>
           </div>
         </div>
@@ -703,7 +708,7 @@ export default function NewProjectPage() {
                 disabled={templates.length === 0}
                 className="text-body text-[var(--on-surface-variant)] underline-offset-4 hover:text-[var(--on-surface)] hover:underline"
               >
-                Or choose the workflow yourself
+                {t('start.chooseYourself')}
               </button>
             )}
             {experienceSwitch}
@@ -713,10 +718,10 @@ export default function NewProjectPage() {
 
       {step === 'questions' && (
         <>
-          <h1 className="text-display text-[var(--on-surface)]">A few questions</h1>
+          <h1 className="text-display text-[var(--on-surface)]">{t('start.questionsTitle')}</h1>
           <p className="mt-3 mb-8 text-body text-[var(--on-surface-variant)]">
-            About: <span className="text-[var(--on-surface)]">{objective.trim()}</span>. Answer what
-            you can — one at a time, and you can stop whenever you like.
+            {t('start.about')} <span className="text-[var(--on-surface)]">{objective.trim()}</span>.{' '}
+            {t('start.answerWhatYouCan')}
           </p>
           <GuideInterview
             objective={objective.trim()}
@@ -732,7 +737,7 @@ export default function NewProjectPage() {
 
       {step === 'talk' && (
         <>
-          <h1 className="sr-only">Talk it through</h1>
+          <h1 className="sr-only">{t('start.talkTitle')}</h1>
           <FrontDoor
             key={`fd-${restoredAt}`}
             opening={objective}
@@ -742,7 +747,7 @@ export default function NewProjectPage() {
             initialState={frontDoorState}
             onStateChange={setFrontDoorState}
             material={material}
-            busyLabel={working === 'setup' ? 'Working out the setup…' : working === 'creating' ? 'Creating the project…' : null}
+            busyLabel={working === 'setup' ? t('start.workingTheSetup') : working === 'creating' ? t('start.creatingProject') : null}
             attach={
               <StartAttachments
                 files={startFiles}
@@ -758,13 +763,13 @@ export default function NewProjectPage() {
 
       {step === 'setup' && (
         <>
-          <h1 className="text-display text-[var(--on-surface)]">Your setup</h1>
+          <h1 className="text-display text-[var(--on-surface)]">{t('start.setupTitle')}</h1>
           <p className="mt-3 mb-8 text-body text-[var(--on-surface-variant)]">
             {simple
-              ? 'Check this, then press Start.'
+              ? t('start.setupSimple')
               : recommendedKey
-              ? 'Recommended from what you told us. Start now, or change anything first — all of it stays editable later.'
-              : 'Pick a workflow and fill in what you know. All of it stays editable later.'}
+              ? t('start.setupRecommended')
+              : t('start.setupChoose')}
           </p>
           <SetupCard
             simple={simple}
@@ -787,7 +792,7 @@ export default function NewProjectPage() {
                     className="mt-3 mr-4 inline-flex items-center gap-1.5 text-body text-[var(--pm-primary)] hover:underline"
                   >
                     <span aria-hidden className="material-symbols-outlined text-[18px]">edit</span>
-                    Edit a copy of {selected.name}
+                    {t('start.editCopy', { name: selected.name })}
                   </button>
                 )}
                 <CustomWorkflowDesigner
@@ -807,15 +812,15 @@ export default function NewProjectPage() {
             }
           />
           {initialFacts.length > 0 && (
-            <section aria-label="Initial facts" className="mt-8 rounded-2xl bg-[var(--surface-container-low)] px-5 py-4">
-              <p className="text-title text-[var(--on-surface)]">These become the project&apos;s accepted facts</p>
-              <p className="mt-1 text-label text-[var(--on-surface-variant)]">From your conversation; every stage reads them. You can change or take out any of them later.</p>
+            <section aria-label={t('start.initialFacts')} className="mt-8 rounded-2xl bg-[var(--surface-container-low)] px-5 py-4">
+              <p className="text-title text-[var(--on-surface)]">{t('start.factsTitle')}</p>
+              <p className="mt-1 text-label text-[var(--on-surface-variant)]">{t('start.factsNote')}</p>
               <ul className="mt-2 list-disc pl-5 text-label text-[var(--on-surface)]">
                 {initialFacts.map((f) => (
                   <li key={f.statement}>
-                    {f.kind === 'requirement' ? <span className="font-semibold">Requirement: </span> : null}
+                    {f.kind === 'requirement' ? <span className="font-semibold">{t('start.requirement')} </span> : null}
                     {f.statement}
-                    {f.origin === 'model_assumed' && <span className="ml-1 text-[var(--on-surface-variant)]">(assumed — you did not say this)</span>}
+                    {f.origin === 'model_assumed' && <span className="ml-1 text-[var(--on-surface-variant)]">{t('start.assumed')}</span>}
                   </li>
                 ))}
               </ul>
@@ -827,7 +832,7 @@ export default function NewProjectPage() {
               onClick={() => setStep('ask')}
               className="px-3 py-3 text-body text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
             >
-              Back
+              {t('start.back')}
             </button>
             {experienceSwitch}
           </div>

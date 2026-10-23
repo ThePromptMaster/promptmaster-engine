@@ -2055,6 +2055,11 @@ is the screen, the second is the work.
   code; the server's own message, shown under technical details, is English.
 - **Custom workflows are not translated.** System workflows' stage names come from a display map
   keyed by template and stage; a workflow a user designed keeps the words it was written in.
+- **The start screen (2026-10-23).** Its own words, system workflow names and pitches are translated,
+  and a new project's Writes in defaults to the interface language. Still English there: the
+  thinking-mode names and taglines (`MODE_DISPLAY`), messages from file reading
+  (`lib/data/*`, such as "could not be read"), and anything the model wrote (the setup's reasons,
+  the conversation), which follows Writes in instead.
 - **Pages outside a project render English first.** Signed-in pages read the choice from a
   cookie and render in it at once. The sign-in pages and the landing page are static, so they
   switch after the page loads.

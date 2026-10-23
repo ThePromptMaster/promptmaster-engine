@@ -6,6 +6,8 @@ import { api } from '@/lib/api/client';
 import type { GuideQuestion } from '@/types';
 import { AutoGrowTextarea } from '@/components/shared/auto-grow-textarea';
 import { INPUT_LIMITS } from '@/lib/projects/input-limits';
+import { useT } from '@/lib/i18n/i18n-provider';
+import { tr } from '@/lib/i18n/store';
 
 export interface GuideAnswered {
   question: GuideQuestion;
@@ -69,7 +71,7 @@ export function GuideInterview({
       if (maxQuestions !== undefined && soFar.length >= maxQuestions) {
         // No call: the cap is the answer.
         setCurrent(null);
-        setEnough('That is enough to set this up.');
+        setEnough(tr('guide.enough'));
         onDone(answersForSetup(soFar));
         setLoading(false);
         return;
@@ -83,7 +85,7 @@ export function GuideInterview({
         });
         if (res.enough || !res.question) {
           setCurrent(null);
-          setEnough(res.reason || 'That is enough to set this up.');
+          setEnough(res.reason || tr('guide.enough'));
           onDone(answersForSetup(soFar));
         } else setCurrent(res.question);
       } catch (e) {
@@ -91,7 +93,7 @@ export function GuideInterview({
         // but the reason is said: a refused answer is not "no more questions".
         setCurrent(null);
         const why = e instanceof Error && e.message ? ` (${e.message})` : '';
-        setEnough(`I could not get another question${why}, so I will go on with what you have told me.`);
+        setEnough(tr('guide.couldNot', { why }));
         onDone(answersForSetup(soFar));
       } finally {
         setLoading(false);
@@ -126,6 +128,7 @@ export function GuideInterview({
   const removeEarlier = (index: number, answer: string) =>
     setAnswered((prev) => prev.map((a, i) => (i === index ? { ...a, answers: a.answers.filter((x) => x !== answer) } : a)));
 
+  const t = useT();
   const chip = 'inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-label transition-colors';
   const chipOn = `${chip} bg-[var(--pm-primary)] text-[var(--on-primary)]`;
   const chipOff = `${chip} bg-[var(--surface-container-high)] text-[var(--on-surface)] hover:bg-[var(--surface-container-highest)]`;
@@ -135,19 +138,19 @@ export function GuideInterview({
   return (
     <div>
       {answered.length > 0 && (
-        <ol aria-label="Your answers so far" className="mb-5 space-y-3">
+        <ol aria-label={t('guide.answersSoFar')} className="mb-5 space-y-3">
           {answered.map((a, index) => (
             <li key={a.question.id} className="rounded-xl bg-[var(--surface-container-low)] px-5 py-3">
               <p className="text-label text-[var(--on-surface-variant)]">{index + 1}. {a.question.question}</p>
               <div className="mt-1.5 flex flex-wrap gap-2">
-                {a.answers.length === 0 && <span className="text-label text-[var(--on-surface-variant)]">Skipped</span>}
+                {a.answers.length === 0 && <span className="text-label text-[var(--on-surface-variant)]">{t('guide.skipped')}</span>}
                 {a.answers.map((answer) => (
                   <span key={answer} className={chipOn}>
                     {answer}
                     {!stopping && (
                       <button
                         type="button"
-                        aria-label={`Remove "${answer}"`}
+                        aria-label={t('guide.removeAnswer', { answer })}
                         onClick={() => removeEarlier(index, answer)}
                         className="material-symbols-outlined text-[14px] opacity-80 hover:opacity-100"
                       >
@@ -164,21 +167,21 @@ export function GuideInterview({
 
       {loading && (
         <p role="status" className="rounded-2xl bg-[var(--surface-container-lowest)] px-6 py-5 text-body text-[var(--on-surface-variant)]">
-          {answered.length === 0 ? 'Thinking of the first question…' : 'Thinking of the next question…'}
+          {answered.length === 0 ? t('guide.thinkingFirst') : t('guide.thinkingNext')}
         </p>
       )}
 
       {!loading && current && (
-        <section aria-label="Question" className="rounded-2xl bg-[var(--surface-container-lowest)] px-6 py-5">
+        <section aria-label={t('guide.question')} className="rounded-2xl bg-[var(--surface-container-lowest)] px-6 py-5">
           {maxQuestions !== undefined && (
-            <p className="mb-1 text-label text-[var(--on-surface-variant)]">Question {answered.length + 1} of up to {maxQuestions}</p>
+            <p className="mb-1 text-label text-[var(--on-surface-variant)]">{t('guide.questionOf', { number: answered.length + 1, max: maxQuestions })}</p>
           )}
           <h2 className="text-title text-[var(--on-surface)]">{answered.length + 1}. {current.question}</h2>
           {current.why && !foldWhy && <p className="mt-1 text-label text-[var(--on-surface-variant)]">{current.why}</p>}
           {current.why && foldWhy && (
             <p className="mt-1 text-label text-[var(--on-surface-variant)]">
               <button type="button" aria-expanded={whyOpen} onClick={() => setWhyOpen((o) => !o)} className="underline-offset-4 hover:underline">
-                Why this question?
+                {t('guide.why')}
               </button>
               {whyOpen && <span className="ml-2">{current.why}</span>}
             </p>
@@ -187,9 +190,9 @@ export function GuideInterview({
           {current.options.length > 0 && (
             <>
               <p className="mt-3 text-label text-[var(--on-surface-variant)]">
-                {current.multi ? 'Choose any that apply.' : 'Choose one.'}
+                {current.multi ? t('guide.chooseAny') : t('guide.chooseOne')}
               </p>
-              <div role="group" aria-label="Suggested answers" className="mt-1.5 flex flex-wrap gap-2">
+              <div role="group" aria-label={t('guide.suggested')} className="mt-1.5 flex flex-wrap gap-2">
                 {current.options.map((option) => (
                   <button
                     key={option}
@@ -206,13 +209,13 @@ export function GuideInterview({
           )}
 
           {typedOnly.length > 0 && (
-            <div aria-label="Your own answers" className="mt-3 flex flex-wrap gap-2">
+            <div aria-label={t('guide.ownAnswers')} className="mt-3 flex flex-wrap gap-2">
               {typedOnly.map((answer) => (
                 <span key={answer} className={chipOn}>
                   {answer}
                   <button
                     type="button"
-                    aria-label={`Remove "${answer}"`}
+                    aria-label={t('guide.removeAnswer', { answer })}
                     onClick={() => setPicked((prev) => prev.filter((p) => p !== answer))}
                     className="material-symbols-outlined text-[14px] opacity-80 hover:opacity-100"
                   >
@@ -235,8 +238,8 @@ export function GuideInterview({
                   addTyped();
                 }
               }}
-              aria-label="Your own answer"
-              placeholder={current.options.length ? 'Or type your own answer' : 'Type your answer'}
+              aria-label={t('guide.ownAnswer')}
+              placeholder={current.options.length ? t('guide.orType') : t('guide.type')}
               className="min-w-0 flex-1 rounded-lg bg-[var(--surface-container-low)] px-3 py-2 text-body text-[var(--on-surface)] outline-none placeholder:text-[var(--on-surface-variant)]/70 focus:ring-2 focus:ring-[var(--pm-primary)]/40"
             />
             <button
@@ -245,7 +248,7 @@ export function GuideInterview({
               disabled={!typed.trim()}
               className="rounded-lg bg-[var(--surface-container-high)] px-3 py-2 text-label text-[var(--on-surface)] disabled:opacity-40"
             >
-              Add
+              {t('guide.add')}
             </button>
           </div>
 
@@ -256,10 +259,10 @@ export function GuideInterview({
               disabled={picked.length === 0 && !typed.trim()}
               className="rounded-xl bg-[var(--pm-primary)] px-5 py-2.5 text-title text-[var(--on-primary)] transition-opacity hover:opacity-90 disabled:opacity-40"
             >
-              Next question
+              {t('guide.next')}
             </button>
             <button type="button" onClick={() => next([])} className="px-2 py-2.5 text-body text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]">
-              Skip this one
+              {t('guide.skip')}
             </button>
           </div>
         </section>
@@ -267,7 +270,7 @@ export function GuideInterview({
 
       {enough && (
         <p role="status" className="rounded-2xl bg-[var(--surface-container-lowest)] px-6 py-5 text-body text-[var(--on-surface)]">
-          {enough} {busy ? 'Working out a setup…' : ''}
+          {enough} {busy ? t('start.workingSetup') : ''}
         </p>
       )}
 
@@ -277,18 +280,18 @@ export function GuideInterview({
             type="button"
             onClick={() => {
               const withCurrent = current && picked.length ? [...answered, { question: current, answers: picked }] : answered;
-              setEnough('Going on with what you have told me.');
+              setEnough(t('guide.goingOn'));
               setCurrent(null);
               onDone(answersForSetup(withCurrent));
             }}
             disabled={busy || loading}
             className="rounded-xl bg-[var(--surface-container-highest)] px-5 py-2.5 text-title text-[var(--on-surface)] hover:opacity-90 disabled:opacity-40"
           >
-            That&apos;s enough — recommend a setup
+            {t('guide.enoughRecommend')}
           </button>
         )}
         <button type="button" onClick={onBack} disabled={busy} className="px-3 py-2.5 text-body text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]">
-          Back
+          {t('start.back')}
         </button>
       </div>
     </div>
