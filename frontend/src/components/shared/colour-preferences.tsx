@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import {
   ACCENTS,
   applyColours,
+  BACKGROUNDS,
   DEFAULT_COLOURS,
   loadColours,
   PALETTES,
@@ -25,7 +26,7 @@ export function ApplyColourPreferences() {
   return null;
 }
 
-/** Accent, starting-version colour and version palette, from the account menu (Sean, 18 Oct). */
+/** Background, accent, starting-version colour and version palette, from the account menu (Sean, 18 and 21 Oct). */
 export function ColourPicker() {
   const [prefs, setPrefs] = useState<ColourPreferences>(() => (typeof window === 'undefined' ? DEFAULT_COLOURS : loadColours()));
 
@@ -51,6 +52,12 @@ export function ColourPicker() {
 
   return (
     <div aria-label="Colours" className="space-y-3 px-4 py-2">
+      <fieldset>
+        <legend className="text-label text-[var(--on-surface-variant)]">Background</legend>
+        <div className="mt-1.5 flex flex-wrap gap-2">
+          {BACKGROUNDS.map((b) => swatch(prefs.background === b.id, b.colour, `Background: ${b.label}`, () => choose({ background: b.id })))}
+        </div>
+      </fieldset>
       <fieldset>
         <legend className="text-label text-[var(--on-surface-variant)]">Accent</legend>
         <div className="mt-1.5 flex flex-wrap gap-2">
