@@ -2075,16 +2075,23 @@ is the screen, the second is the work.
   chrome, mode names and why a mode suits each system stage, and the project list's stage badge.
   A stage's noun ("segments") follows a colon in the other languages, so a template noun that is
   only English never needs an article.
+- **Checklists, tables and workflow words (2026-10-23).** Translated as they are shown, looked up
+  by the template's own English (`templateWord`, `messages/areas/words.ts`): exit-criteria labels
+  and hints, skip-reason buttons, every table schema's item noun (with real plurals), columns,
+  hints, decision question, status names and legends (`shownSchema`), mode taglines, and the
+  timeline's decision titles. The engine's own lines — "3 of 5", "nothing drafted yet", a measured
+  requirement ("Memo: at most 400 words"), why a stage needs rechecking — are read back by their
+  shape (`lib/i18n/check-text.ts`), because Go stores and re-reads that English. Attachment
+  messages (`lib/data`) and fact-change notes go through `tr`. The template and anything stored
+  or sent to the model stay English; `template-words.test.ts` fails when a system workflow gains
+  a word with no translation.
 - **Still English in the workspace.**
-  - Template data a table is built from: item nouns, column names, status names and their
-    explanations (`lib/workflow/stage-artifact` schemas), and each timeline entry's own title.
   - Sentences Go composes in code, because they are stored and compared as written:
     `describeNeed` (the body of "I need you to…"), `runAccount` ("So far"), the execution
     record's Saved / Checked / Workflow changes lines, and run stop reasons.
-  - Template data: exit-criteria labels ("I approve this analysis plan…") and skip reasons;
-    mode taglines on the start screen.
-  - Text from `lib`: file summaries and rejection reasons (`lib/data`), fact-change
-    descriptions, "and N more" lists, stage labels inside a check's reason.
+  - Sentences built in `lib` around a list ("… and N more"): commit-check refusals,
+    preservation notes, the outstanding-work summary, figure support.
+  - A measured requirement's subject is the user's own word ("Memo"), shown as written.
   - Words stored with the work stay as written: version change summaries, a fact's source
     chip in prompts, the authorization's recorded terms (shown translated, stored English).
 - **Pages outside a project (2026-10-23).** Signing in, signing up, resetting a password, the

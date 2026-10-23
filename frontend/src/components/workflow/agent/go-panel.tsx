@@ -1,6 +1,7 @@
 'use client';
 
 import { useT } from '@/lib/i18n/i18n-provider';
+import { shownModeName } from '@/lib/i18n/stage';
 import { MODE_DISPLAY } from '@/lib/constants';
 import type { ModeType } from '@/types';
 import { useEffect, useRef, useState } from 'react';
@@ -372,7 +373,7 @@ export function GoPanel({
                 checked={stageModes.value === 'project'}
                 onChange={(e) => stageModes.onChange(e.target.checked ? 'project' : 'stage')}
               />
-              {t('go.useMyMode', { mode: MODE_DISPLAY[mode as ModeType]?.display_name ?? mode })}
+              {t('go.useMyMode', { mode: shownModeName(mode, MODE_DISPLAY[mode as ModeType]?.display_name ?? mode) })}
             </label>
           )}
           <RunAccountCard run={go.run} steps={go.steps} stageLabel={go.stageLabelFor} />

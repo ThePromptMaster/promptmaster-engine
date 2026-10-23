@@ -19,6 +19,8 @@ export interface TimelineEntry {
   kind: 'version' | 'decision';
   /** One line: "v3 · Revised in chat", "Stage approved". */
   title: string;
+  /** A version's source operation, so the screen can name it in its own language. */
+  operation?: string;
   /** What changed, when it was recorded. */
   detail?: string;
   /** Set on a version: opening it shows that version on its stage. */
@@ -29,7 +31,7 @@ export interface TimelineEntry {
 }
 
 /** Events that say something to a reader; the rest (jobs, cursor moves) are bookkeeping. */
-const DECISIONS: Partial<Record<WorkflowEvent['type'], string>> = {
+export const DECISIONS: Partial<Record<WorkflowEvent['type'], string>> = {
   project_created: 'Project started',
   stage_marked_complete: 'Stage marked complete',
   stage_completed: 'Stage completed',
@@ -64,6 +66,7 @@ export function projectTimeline(
         stageLabel: s.label,
         kind: 'version',
         title: `v${v.version_number} · ${operationLabel(v.source_operation)}`,
+        operation: v.source_operation,
         ...(v.change_summary ? { detail: v.change_summary } : {}),
         versionId: v.id,
         versionNumber: v.version_number,

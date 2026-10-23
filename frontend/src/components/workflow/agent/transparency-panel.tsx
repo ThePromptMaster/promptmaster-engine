@@ -3,6 +3,7 @@
 import type { MessageKey } from '@/lib/i18n/messages/en';
 import { shownActionLabel } from '@/lib/i18n/go';
 import { tr } from '@/lib/i18n/store';
+import { shownModeName } from '@/lib/i18n/stage';
 import { MODE_DISPLAY } from '@/lib/constants';
 import type { AgentRun, AgentStep } from '@/types/agent';
 import type { ModeType } from '@/types';
@@ -162,7 +163,7 @@ export function TransparencyPanel({
   /** A stage's name, for a step that worked on another stage than the one the run is on. */
   stageName?: (id: string) => string;
 }) {
-  const modeName = (m: string) => MODE_DISPLAY[m as ModeType]?.display_name ?? m;
+  const modeName = (m: string) => shownModeName(m, MODE_DISPLAY[m as ModeType]?.display_name ?? m);
   const changedNow = step && step.status !== 'running' ? changes(step, run) : null;
   const outcome = step ? outcomeLines(step, run) : null;
   const target = step ? targetOf(step) : null;

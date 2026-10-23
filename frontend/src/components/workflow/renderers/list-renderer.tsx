@@ -25,7 +25,7 @@ import { ConfirmOverwrite, EmptyStage, GenerationBar, VersionBar } from './stage
 import type { StageRendererProps } from './types';
 import { lookupLabel } from '@/lib/workflow/stage-controls';
 import { useLocale, useT } from '@/lib/i18n/i18n-provider';
-import { stageText } from '@/lib/i18n/templates';
+import { shownSchema, stageText } from '@/lib/i18n/templates';
 import { AutoGrowTextarea } from '@/components/shared/auto-grow-textarea';
 
 export function ListRenderer({
@@ -33,7 +33,7 @@ export function ListRenderer({
   templateKey,
   hideStageActions = false,
   onDirtyChange,
-  schema,
+  schema: ownSchema,
   versions,
   evaluation,
   activeVersionId,
@@ -55,6 +55,9 @@ export function ListRenderer({
   evaluationError,
   readOnly,
 }: StageRendererProps) {
+  // The table's own words in the interface's language; keys and values unchanged.
+  const schemaLocale = useLocale();
+  const schema = useMemo(() => shownSchema(schemaLocale, ownSchema), [schemaLocale, ownSchema]);
   const active = useMemo(
     () => versions.find((v) => v.id === activeVersionId) ?? versions.at(-1) ?? null,
     [versions, activeVersionId]

@@ -19,6 +19,9 @@ import { es as modesArea } from './areas/modes';
 import { es as authArea } from './areas/auth';
 import { es as landingArea } from './areas/landing';
 import { es as loaderArea } from './areas/loader';
+import { es as wordsArea } from './areas/words';
+import { es as checksArea } from './areas/checks';
+import { es as filesArea } from './areas/files';
 
 export const es: Messages = {
   'header.account': 'Cuenta',
@@ -297,4 +300,7 @@ export const es: Messages = {
   ...authArea,
   ...landingArea,
   ...loaderArea,
+  ...wordsArea,
+  ...checksArea,
+  ...filesArea,
 };

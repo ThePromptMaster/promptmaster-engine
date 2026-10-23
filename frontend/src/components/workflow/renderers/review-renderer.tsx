@@ -47,7 +47,7 @@ import { confirmProposalsLabel, lookupLabel } from '@/lib/workflow/stage-control
 import { proposeTargets } from '@/lib/workflow/proposals';
 import { rowsRequired } from '@/lib/workflow/engine';
 import { useLocale, useT } from '@/lib/i18n/i18n-provider';
-import { stageText } from '@/lib/i18n/templates';
+import { itemPlural, shownSchema, stageText } from '@/lib/i18n/templates';
 
 const TONE_CLASS: Record<string, string> = {
   done: 'text-[var(--pm-secondary)]',
@@ -60,7 +60,7 @@ export function ReviewRenderer({
   templateKey,
   hideStageActions = false,
   onDirtyChange,
-  schema,
+  schema: ownSchema,
   versions,
   evaluation,
   activeVersionId,
@@ -84,6 +84,9 @@ export function ReviewRenderer({
   readOnly,
   canConfirmWhenReadOnly,
 }: StageRendererProps) {
+  // The table's own words in the interface's language; keys and values unchanged.
+  const schemaLocale = useLocale();
+  const schema = useMemo(() => shownSchema(schemaLocale, ownSchema), [schemaLocale, ownSchema]);
   const active = useMemo(
     () => versions.find((v) => v.id === activeVersionId) ?? versions.at(-1) ?? null,
     [versions, activeVersionId]
@@ -261,7 +264,7 @@ export function ReviewRenderer({
     <section aria-label={t('stage.work', { stage: shownLabel })}>
       {confirming && (
         <ConfirmOverwrite
-          label={`${schema.itemLabel}s`}
+          label={itemPlural(schemaLocale, ownSchema.itemLabel)}
           onConfirm={() => {
             setConfirming(false);
             onGenerate({ force: true });
@@ -272,7 +275,7 @@ export function ReviewRenderer({
 
       <GenerationBar
         compact={hideStageActions}
-        label={`${schema.itemLabel}s`}
+        label={itemPlural(schemaLocale, ownSchema.itemLabel)}
         generating={generating}
         error={generationError}
         hasContent={rows.length > 0}
@@ -300,12 +303,12 @@ export function ReviewRenderer({
       />
 
       {rows.length === 0 && !generating ? (
-        <EmptyStage label={`${schema.itemLabel}s`} />
+        <EmptyStage label={itemPlural(schemaLocale, ownSchema.itemLabel)} />
       ) : (
         <>
           <div className="mb-3 flex flex-wrap items-baseline gap-2">
             <h3 className="text-title text-[var(--on-surface)]">
-              {rows.length} {rows.length === 1 ? schema.itemLabel : `${schema.itemLabel}s`}
+              {rows.length} {rows.length === 1 ? schema.itemLabel : itemPlural(schemaLocale, ownSchema.itemLabel)}
             </h3>
             <span
               className={`text-label ${
