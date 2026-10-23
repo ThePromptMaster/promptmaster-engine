@@ -1,6 +1,7 @@
 'use client';
 
-import { useT } from '@/lib/i18n/i18n-provider';
+import { useLocale, useT } from '@/lib/i18n/i18n-provider';
+import { shownStopReason } from '@/lib/i18n/stop-reasons';
 import { shownModeName } from '@/lib/i18n/stage';
 import { MODE_DISPLAY } from '@/lib/constants';
 import type { ModeType } from '@/types';
@@ -83,6 +84,7 @@ export function GoPanel({
   onApplyAnyway?: (step: AgentStep) => void;
 }) {
   const t = useT();
+  const locale = useLocale();
   const [open, setOpen] = useState(false);
   const sectionRef = useRef<HTMLElement>(null);
   const controlsRef = useRef<HTMLDivElement>(null);
@@ -215,14 +217,14 @@ export function GoPanel({
     disabled: go.phase === 'watching' || Boolean(go.pendingStep) || Boolean(go.authorizing),
     // A suggestion to skip has two answers: the card's button, or Resume to do the stage.
     // A table's button only shows the way, so Resume stays beside it.
-    hideResume: Boolean(need && need.kind !== 'skip_stage' && need.kind !== 'next_round' && !needIsDecidedOnStage(need) && needsActions && describeNeed(need, go.stageLabelFor, needContext).action),
+    hideResume: Boolean(need && need.kind !== 'skip_stage' && need.kind !== 'next_round' && !needIsDecidedOnStage(need) && needsActions && describeNeed(need, go.stageLabelFor, needContext, locale).action),
   };
   // Something on the panel is waiting for the user: the pinned copy says so and takes them there.
   const waiting = Boolean(go.pendingStep || need || askingUser || go.authorizing);
   // The pinned copy carries the button Go is waiting for, not only a way to
   // find it (14 Oct, Sean: "the new go button for revisions doesn't show up
   // sometimes" — it was on the card, scrolled out of view, with Resume hidden).
-  const needed = need ? describeNeed(need, go.stageLabelFor, needContext) : null;
+  const needed = need ? describeNeed(need, go.stageLabelFor, needContext, locale) : null;
   const dockAction: { label: string; option?: StuckOption; acts: boolean } | null =
     needed && needsActions && !needIsDecidedOnStage(need!) && (needed.options?.[0] || needed.action)
       ? { label: needed.options?.[0]?.label ?? needed.action!, option: needed.options?.[0]?.id, acts: true }
@@ -349,7 +351,7 @@ export function GoPanel({
           {askingUser && !need && !cleared && go.run?.stop_reason && (
             <QuestionPrompt
               key={go.run.stop_reason}
-              question={go.run.stop_reason}
+              question={shownStopReason(locale, go.run.stop_reason)}
               expertPackage={go.run.needs?.kind === 'answer_question' ? go.run.needs.expertPackage : undefined}
               choices={go.run.needs?.kind === 'answer_question' ? go.run.needs.choices : undefined}
               change={latestChange ?? undefined}

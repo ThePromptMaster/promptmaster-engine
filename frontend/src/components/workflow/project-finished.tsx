@@ -1,6 +1,9 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useLocale, useT } from '@/lib/i18n/i18n-provider';
+import { tr } from '@/lib/i18n/store';
+import { nounText, unitsText } from '@/lib/i18n/templates';
 
 import { MarkdownOutput } from '@/components/shared/markdown-output';
 import { downloadBlob, downloadFile } from '@/lib/utils';
@@ -29,10 +32,14 @@ interface Props {
  * keep improving it. The stage-by-stage record stays below, as it was.
  */
 export function ProjectFinished({ bundle, completion, evaluation, onReopen, onEdit, onNewVersion }: Props) {
+  const t = useT();
+  const locale = useLocale();
   const { project, template } = bundle;
   const stage = deliverableStage(template);
   const inSections = stage?.renderer === 'long_form';
-  const { deliverable: noun, unit } = deliverableNouns(template, project);
+  const nouns = deliverableNouns(template, project);
+  const noun = nounText(locale, nouns.deliverable);
+  const unit = nouns.unit;
   const markdown = useMemo(() => toManuscriptMarkdown(bundle), [bundle]);
   const body = markdown.replace(/^# .*\n+/, '');
   const carried = useMemo(() => carriedForward(bundle), [bundle]);
@@ -55,7 +62,7 @@ export function ProjectFinished({ bundle, completion, evaluation, onReopen, onEd
       await navigator.clipboard.writeText(await markdownWithImageLinks(markdown, project.data_files));
       setNote(copiedNote(head));
     } catch {
-      setNote('Could not copy — select the text and copy it yourself.');
+      setNote(t('pnl.couldNotCopy'));
     }
   };
   const word = async () => {
@@ -66,7 +73,7 @@ export function ProjectFinished({ bundle, completion, evaluation, onReopen, onEd
       const { imagesForDocx } = await import('@/lib/export/images-export');
       downloadBlob(await manuscriptToDocx(markdown, project.title || 'Untitled project', await imagesForDocx(markdown, project.data_files)), `${stem()}.docx`);
     } catch (e) {
-      setNote(e instanceof Error && e.message ? e.message : 'The Word file could not be built.');
+      setNote(e instanceof Error && e.message ? e.message : t('pnl.wordFailed'));
     } finally {
       setBusy(false);
     }
@@ -77,23 +84,23 @@ export function ProjectFinished({ bundle, completion, evaluation, onReopen, onEd
   const secondary = `${action} bg-[var(--surface-container-highest)] text-[var(--on-surface)] hover:opacity-90 disabled:opacity-50`;
 
   return (
-    <section aria-label="Your finished work" className="mb-8 rounded-2xl bg-[var(--surface-container)] px-6 py-6">
-      <p className="text-label uppercase tracking-wide text-[var(--on-surface-variant)]">Finished</p>
+    <section aria-label={t('pnl.finishedLabel')} className="mb-8 rounded-2xl bg-[var(--surface-container)] px-6 py-6">
+      <p className="text-label uppercase tracking-wide text-[var(--on-surface-variant)]">{t('pnl.finishedEyebrow')}</p>
       <h2 className="mt-1 text-[1.75rem] font-semibold leading-tight text-[var(--on-surface)]">
-        {markdown ? `Your ${noun} is complete` : 'This project is finished'}
+        {markdown ? t('pnl.complete', { noun }) : t('pnl.finished')}
       </h2>
       <p className="mt-2 text-body text-[var(--on-surface-variant)]">
         {markdown
           ? [
-              inSections ? `${chapters} ${unit}${chapters === 1 ? '' : 's'}` : null,
-              `${words.toLocaleString()} words`,
-              `${completion.completed} stage${completion.completed === 1 ? '' : 's'} done`,
-              completion.skipped ? `${completion.skipped} skipped` : null,
-              completion.leftOpen ? `${completion.leftOpen} left open` : null,
+              inSections ? (locale === 'en' ? `${chapters} ${unit}${chapters === 1 ? '' : 's'}` : t('pnl.units', { n: chapters, units: unitsText(locale, unit) })) : null,
+              t('pnl.words', { n: words.toLocaleString(locale) }),
+              t('pnl.stagesDone', { count: completion.completed }),
+              completion.skipped ? t('pnl.skippedN', { n: completion.skipped }) : null,
+              completion.leftOpen ? t('pnl.leftOpenN', { n: completion.leftOpen }) : null,
             ]
               .filter(Boolean)
               .join(' · ')
-          : `Nothing was written on ${stage?.label ?? 'the deliverable stage'}, so there is no ${noun} to read or export yet.`}
+          : t('pnl.nothingWritten', { stage: stage?.label ?? t('pnl.theDeliverable'), noun })}
       </p>
       {evaluation && (
         <div className="mt-2">
@@ -105,19 +112,19 @@ export function ProjectFinished({ bundle, completion, evaluation, onReopen, onEd
         {markdown && (
           <>
             <button onClick={() => setReading((v) => !v)} aria-expanded={reading} className={primary}>
-              {reading ? `Hide the ${noun}` : `Read the full ${noun}`}
+              {reading ? t('pnl.hideNoun', { noun }) : t('pnl.readNoun', { noun })}
             </button>
             <button onClick={() => void copy()} className={secondary}>
-              Copy
+              {t('pnl.copy')}
             </button>
             <button
               onClick={() => downloadFile(markdown, `${stem()}.md`, 'text/markdown;charset=utf-8')}
               className={secondary}
             >
-              Export Markdown
+              {t('pnl.exportMd')}
             </button>
             <button onClick={() => void word()} disabled={busy} className={secondary}>
-              {busy ? 'Building…' : 'Export Word'}
+              {busy ? t('pnl.building') : t('pnl.exportWord')}
             </button>
             <a
               href={`/projects/${project.id}/print`}
@@ -125,13 +132,13 @@ export function ProjectFinished({ bundle, completion, evaluation, onReopen, onEd
               rel="noreferrer"
               className={secondary}
             >
-              Export PDF
+              {t('pnl.exportPdf')}
             </a>
           </>
         )}
         {markdown && onEdit && (
           <button onClick={onEdit} className={secondary}>
-            Edit the {noun}
+            {t('pnl.editNoun', { noun })}
           </button>
         )}
         {markdown && onNewVersion && (
@@ -140,24 +147,24 @@ export function ProjectFinished({ bundle, completion, evaluation, onReopen, onEd
               setBusy(true);
               setNote(null);
               onNewVersion()
-                .catch((e: unknown) => setNote(e instanceof Error && e.message ? e.message : 'A new version could not be started.'))
+                .catch((e: unknown) => setNote(e instanceof Error && e.message ? e.message : t('pnl.newVersionFailed')))
                 .finally(() => setBusy(false));
             }}
             disabled={busy}
             className={secondary}
           >
-            Start a new version
+            {t('pnl.startNewVersion')}
           </button>
         )}
         <button onClick={onReopen} className={secondary}>
-          Continue improving
+          {t('pnl.continueImproving')}
         </button>
       </div>
       {carried.length > 0 && (
         <div data-carried-forward className="mt-5 rounded-xl bg-[var(--surface-container-low)] px-5 py-4">
           <h3 className="text-title text-[var(--on-surface)]">{CARRIED_HEADING}</h3>
           <p className="mt-1 text-label text-[var(--on-surface-variant)]">
-            What you carried forward on the final review. It goes out with the {noun}, at the end of every export.
+            {t('pnl.carriedNote', { noun })}
           </p>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-body text-[var(--on-surface)]">
             {carried.map((c, i) => (
@@ -175,9 +182,8 @@ export function ProjectFinished({ bundle, completion, evaluation, onReopen, onEd
         </p>
       )}
       <p className="mt-2 text-label text-[var(--on-surface-variant)]">
-        Export PDF opens a print view — choose “Save as PDF” in the print dialog. Word keeps headings, paragraphs and
-        bullets; tables and code arrive as plain text.
-        {markdown && onNewVersion ? ` Start a new version keeps this ${noun} in the version history as it is and reopens it for the next one.` : ''}
+        {t('pnl.exportNote')}
+        {markdown && onNewVersion ? t('pnl.newVersionNote', { noun }) : ''}
       </p>
 
       {reading && markdown && (
@@ -194,10 +200,10 @@ export function ProjectFinished({ bundle, completion, evaluation, onReopen, onEd
  * new version, a bare "Copied." read as if the new version were the copied one).
  */
 export function copiedNote(head?: { version_number: number; created_at: string }): string {
-  if (!head) return 'Copied.';
+  if (!head) return tr('pnl.copied');
   const when = new Date(head.created_at);
   const date = Number.isNaN(when.getTime())
     ? ''
     : ` (${when.toLocaleString(undefined, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })})`;
-  return `Copied version ${head.version_number}${date} to the clipboard.`;
+  return tr('pnl.copiedVersion', { n: head.version_number, date });
 }

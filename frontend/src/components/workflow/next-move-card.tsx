@@ -1,6 +1,7 @@
 'use client';
 
-import { actionLabel } from '@/lib/agent/actions';
+import { useT } from '@/lib/i18n/i18n-provider';
+import { shownActionLabel } from '@/lib/i18n/go';
 import type { AgentStep } from '@/types/agent';
 
 /**
@@ -27,34 +28,35 @@ export function NextMoveCard({
   onReplan?: () => void;
   onDismiss: () => void;
 }) {
+  const t = useT();
   return (
-    <section aria-label="Suggested next move" className="rounded-xl bg-[var(--surface-container-high)] px-5 py-4">
+    <section aria-label={t('pnl.suggestedLabel')} className="rounded-xl bg-[var(--surface-container-high)] px-5 py-4">
       <p className="flex items-center gap-1 text-label uppercase tracking-wide text-[var(--pm-primary)]">
         <span aria-hidden className="material-symbols-outlined text-[16px]">lightbulb</span>
-        PromptMaster suggests
+        {t('pnl.suggests')}
       </p>
-      <p className="mt-1 text-title text-[var(--on-surface)]">{label ?? actionLabel(step.action_key)}</p>
-      {effect && <p data-effect className="mt-1 text-body text-[var(--on-surface)]">What it does: {effect}</p>}
+      <p className="mt-1 text-title text-[var(--on-surface)]">{label ?? shownActionLabel(step.action_key)}</p>
+      {effect && <p data-effect className="mt-1 text-body text-[var(--on-surface)]">{t('pnl.whatItDoes', { effect })}</p>}
       {step.decision_question && <p className="mt-1 text-body text-[var(--on-surface)]">{step.decision_question}</p>}
-      {step.rationale && <p className="mt-1 text-body text-[var(--on-surface)]">Why: {step.rationale}</p>}
-      {step.expected_outcome && <p className="mt-0.5 text-label text-[var(--on-surface-variant)]">Go expects: {step.expected_outcome}</p>}
+      {step.rationale && <p className="mt-1 text-body text-[var(--on-surface)]">{t('pnl.why', { why: step.rationale })}</p>}
+      {step.expected_outcome && <p className="mt-0.5 text-label text-[var(--on-surface-variant)]">{t('pnl.goExpects', { what: step.expected_outcome })}</p>}
       {stale && (
         <p role="status" className="mt-2 text-label text-[var(--pm-tertiary)]">
-          Suggested before your latest change to this stage, so this reasoning may no longer hold.
+          {t('pnl.staleSuggestion')}
         </p>
       )}
       <div className="mt-3 flex gap-2">
         {stale && onReplan ? (
           <button onClick={onReplan} className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-title text-[var(--on-primary)]">
-            Suggest again
+            {t('pnl.suggestAgain')}
           </button>
         ) : (
           <button onClick={onDo} className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-title text-[var(--on-primary)]">
-            Do it
+            {t('pnl.doIt')}
           </button>
         )}
         <button onClick={onDismiss} className="rounded-lg px-4 py-2 text-title text-[var(--on-surface-variant)]">
-          Not now
+          {t('pnl.notNow')}
         </button>
       </div>
     </section>

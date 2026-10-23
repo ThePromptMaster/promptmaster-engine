@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useT } from '@/lib/i18n/i18n-provider';
 
 import type { OutlineItem } from '@/types/outline';
 import { AutoGrowTextarea } from '@/components/shared/auto-grow-textarea';
@@ -44,8 +45,9 @@ export function OutlineRow({
   onRegenerate,
   onRemove,
 }: OutlineRowProps) {
+  const t = useT();
   const [confirming, setConfirming] = useState(false);
-  const name = item.title.trim() || `Section ${index + 1}`;
+  const name = item.title.trim() || t('ol.sectionN', { n: index + 1 });
 
   function handleKeyDown(event: React.KeyboardEvent) {
     // Alt+Arrow is the accelerator, not the mechanism. Alt, because plain
@@ -87,7 +89,7 @@ export function OutlineRow({
                 onClick={() => onMove(-1)}
                 disabled={index === 0}
                 data-outline-focus={`${item.id}:up`}
-                aria-label={`Move “${name}” up to position ${index}`}
+                aria-label={t('ol.moveUp', { name, n: index })}
                 className={ICON_BUTTON}
               >
                 <span aria-hidden className="material-symbols-outlined text-[18px]">
@@ -99,7 +101,7 @@ export function OutlineRow({
                 onClick={() => onMove(1)}
                 disabled={index === total - 1}
                 data-outline-focus={`${item.id}:down`}
-                aria-label={`Move “${name}” down to position ${index + 2}`}
+                aria-label={t('ol.moveDown', { name, n: index + 2 })}
                 className={ICON_BUTTON}
               >
                 <span aria-hidden className="material-symbols-outlined text-[18px]">
@@ -116,8 +118,8 @@ export function OutlineRow({
             value={item.title}
             onChange={(e) => onChange({ title: e.target.value })}
             disabled={readOnly}
-            aria-label={`Title of section ${index + 1}`}
-            placeholder="Section title"
+            aria-label={t('ol.titleOf', { n: index + 1 })}
+            placeholder={t('ol.titlePh')}
             className="w-full rounded-lg bg-[var(--surface-container-low)] px-3 py-2 text-title text-[var(--on-surface)] outline-none placeholder:font-normal placeholder:text-[var(--on-surface-variant)] disabled:opacity-70"
           />
           <AutoGrowTextarea
@@ -125,14 +127,14 @@ export function OutlineRow({
             onChange={(e) => onChange({ abstract: e.target.value })}
             disabled={readOnly}
             rows={2}
-            aria-label={`What section ${index + 1} covers`}
-            placeholder="What this section covers, in a sentence"
+            aria-label={t('ol.coversOf', { n: index + 1 })}
+            placeholder={t('ol.coversPh')}
             className="w-full rounded-lg bg-[var(--surface-container-low)] px-3 py-2 text-body text-[var(--on-surface)] outline-none placeholder:text-[var(--on-surface-variant)] disabled:opacity-70"
           />
 
           {words > 0 && (
             <p className="text-label text-[var(--on-surface-variant)]">
-              {words.toLocaleString()} words written
+              {t('ol.wordsWritten', { n: words.toLocaleString() })}
             </p>
           )}
         </div>
@@ -144,7 +146,7 @@ export function OutlineRow({
                 type="button"
                 onClick={onRegenerate}
                 disabled={regenerating}
-                aria-label={`Regenerate “${name}”`}
+                aria-label={t('ol.regenerateLabel', { name })}
                 className={ICON_BUTTON}
               >
                 <span
@@ -158,7 +160,7 @@ export function OutlineRow({
             <button
               type="button"
               onClick={onInsertBelow}
-              aria-label={`Insert a section after “${name}”`}
+              aria-label={t('ol.insertAfter', { name })}
               className={ICON_BUTTON}
             >
               <span aria-hidden className="material-symbols-outlined text-[18px]">
@@ -168,7 +170,7 @@ export function OutlineRow({
             <button
               type="button"
               onClick={requestRemove}
-              aria-label={`Remove “${name}”`}
+              aria-label={t('ol.removeLabel', { name })}
               className={ICON_BUTTON}
             >
               <span aria-hidden className="material-symbols-outlined text-[18px]">
@@ -182,8 +184,7 @@ export function OutlineRow({
       {confirming && (
         <div className="mt-3 rounded-lg bg-[var(--surface-container-high)] px-4 py-3">
           <p className="text-body text-[var(--on-surface)]">
-            “{name}” has {words.toLocaleString()} words written against it. Removing the section
-            does not have to remove the writing.
+            {t('ol.hasWords', { name, n: words.toLocaleString() })}
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <button
@@ -194,7 +195,7 @@ export function OutlineRow({
               }}
               className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-body text-[var(--on-primary)] transition-opacity hover:opacity-90"
             >
-              Keep the draft
+              {t('ol.keepDraft')}
             </button>
             <button
               type="button"
@@ -204,18 +205,18 @@ export function OutlineRow({
               }}
               className="rounded-lg px-4 py-2 text-body text-[var(--pm-error)] hover:bg-[var(--surface-container-highest)]"
             >
-              Delete the draft too
+              {t('ol.deleteDraft')}
             </button>
             <button
               type="button"
               onClick={() => setConfirming(false)}
               className="rounded-lg px-4 py-2 text-body text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
             >
-              Cancel
+              {t('pnl.cancel')}
             </button>
           </div>
           <p className="mt-2 text-label text-[var(--on-surface-variant)]">
-            Keeping it moves the writing to Detached sections, where you can put it back.
+            {t('ol.keepingMoves')}
           </p>
         </div>
       )}

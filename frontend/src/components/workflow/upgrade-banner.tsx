@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 
+import { useT } from '@/lib/i18n/i18n-provider';
+
 import type { TemplateDiff } from '@/lib/workflow/upgrade';
 
 interface Props {
@@ -25,22 +27,22 @@ interface Props {
  * refers to stages by id, and stages that still exist keep everything.
  */
 export function UpgradeBanner({ name, fromVersion, toVersion, diff, busy, onUpgrade, onDismiss }: Props) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const lines = [
-    ...diff.changed.map((label) => `${label}: requirements or layout updated`),
-    ...diff.added.map((label) => `New stage: ${label}`),
-    ...diff.removed.map((label) => `Removed stage: ${label} (anything written there is kept)`),
+    ...diff.changed.map((label) => t('pnl.upChanged', { stage: label })),
+    ...diff.added.map((label) => t('pnl.upAdded', { stage: label })),
+    ...diff.removed.map((label) => t('pnl.upRemoved', { stage: label })),
   ];
 
   return (
-    <section aria-label="Workflow update" className="mb-6 rounded-xl bg-[var(--surface-container-low)] px-5 py-4">
+    <section aria-label={t('pnl.upLabel')} className="mb-6 rounded-xl bg-[var(--surface-container-low)] px-5 py-4">
       <div className="flex flex-wrap items-center gap-3">
         <span aria-hidden className="material-symbols-outlined text-[var(--pm-primary)]">upgrade</span>
         <p className="mr-auto text-body text-[var(--on-surface)]">
-          A newer version of the {name} workflow is available.
+          {t('pnl.upAvailable', { name })}
           <span className="ml-1 text-label text-[var(--on-surface-variant)]">
-            (You are on v{fromVersion}; v{toVersion} is current.) This project keeps the older checks and wording until
-            you upgrade. Everything you have written is kept.
+            {t('pnl.upNote', { from: fromVersion, to: toVersion })}
           </span>
         </p>
         <button
@@ -48,27 +50,27 @@ export function UpgradeBanner({ name, fromVersion, toVersion, diff, busy, onUpgr
           disabled={busy}
           className="rounded-lg bg-[var(--pm-primary)] px-4 py-1.5 text-label font-semibold text-[var(--on-primary)] disabled:opacity-50"
         >
-          {busy ? 'Upgrading…' : `Upgrade to v${toVersion}`}
+          {busy ? t('pnl.upgrading') : t('pnl.upgradeTo', { n: toVersion })}
         </button>
         <button
           onClick={() => setOpen((v) => !v)}
           className="rounded-lg px-3 py-1.5 text-label text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)] hover:text-[var(--on-surface)]"
         >
-          {open ? 'Hide changes' : 'What changes?'}
+          {open ? t('pnl.hideChanges') : t('pnl.whatChanges')}
         </button>
         <button onClick={onDismiss} className="rounded-lg px-3 py-1.5 text-label text-[var(--on-surface-variant)]">
-          Not now
+          {t('pnl.notNow')}
         </button>
       </div>
       {open && (
         <div className="mt-3">
           <ul className="list-disc space-y-1 pl-6 text-label text-[var(--on-surface-variant)]">
-            {(lines.length ? lines : ['Wording and guidance updates']).map((line) => (
+            {(lines.length ? lines : [t('pnl.upWording')]).map((line) => (
               <li key={line}>{line}</li>
             ))}
           </ul>
           <p className="mt-2 text-label text-[var(--on-surface-variant)]">
-            Everything you have written, every version and every decision is kept.
+            {t('pnl.upKept')}
           </p>
         </div>
       )}

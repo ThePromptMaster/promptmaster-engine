@@ -1,5 +1,6 @@
 'use client';
 
+import { useT } from '@/lib/i18n/i18n-provider';
 import type { DerivedOutlineDrift } from '@/lib/workflow/derived-outline';
 
 /**
@@ -20,10 +21,11 @@ interface Props {
 }
 
 export function DerivedOutlineNotice({ drift, onRederive, busy = false }: Props) {
+  const t = useT();
   const lines: Array<{ key: string; label: string; titles: string[] }> = [
-    { key: 'changed', label: 'Now briefed differently', titles: drift.changed.map((i) => i.title) },
-    { key: 'added', label: 'New, from a stage since completed', titles: drift.added.map((i) => i.title) },
-    { key: 'removed', label: 'No stage feeds these any more', titles: drift.removed.map((i) => i.title) },
+    { key: 'changed', label: t('ol.briefedDiff'), titles: drift.changed.map((i) => i.title) },
+    { key: 'added', label: t('ol.newFromStage'), titles: drift.added.map((i) => i.title) },
+    { key: 'removed', label: t('ol.noStageFeeds'), titles: drift.removed.map((i) => i.title) },
   ].filter((l) => l.titles.length > 0);
 
   if (lines.length === 0) return null;
@@ -39,11 +41,10 @@ export function DerivedOutlineNotice({ drift, onRederive, busy = false }: Props)
         </span>
         <div className="min-w-0 flex-1">
           <h3 id="derived-outline-drift-heading" className="text-title text-[var(--on-surface)]">
-            An earlier stage changed after this outline was approved
+            {t('ol.earlierChanged')}
           </h3>
           <p className="mt-1 text-body text-[var(--on-surface-variant)]">
-            The approved outline still stands and nothing written has been touched. Re-derive only
-            if the change actually affects the shape of the write-up.
+            {t('ol.earlierNote')}
           </p>
 
           <dl className="mt-3 space-y-2">
@@ -67,7 +68,7 @@ export function DerivedOutlineNotice({ drift, onRederive, busy = false }: Props)
               disabled={busy}
               className="mt-3 rounded-lg bg-[var(--surface-container-high)] px-4 py-2 text-label font-semibold text-[var(--on-surface)] disabled:opacity-50"
             >
-              Re-derive from the stages
+              {t('ol.rederive')}
             </button>
           )}
         </div>

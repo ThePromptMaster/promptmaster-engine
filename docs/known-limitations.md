@@ -2085,15 +2085,27 @@ is the screen, the second is the work.
   messages (`lib/data`) and fact-change notes go through `tr`. The template and anything stored
   or sent to the model stay English; `template-words.test.ts` fails when a system workflow gains
   a word with no translation.
-- **Still English in the workspace.**
-  - Sentences Go composes in code, because they are stored and compared as written:
-    `describeNeed` (the body of "I need you to…"), `runAccount` ("So far"), the execution
-    record's Saved / Checked / Workflow changes lines, and run stop reasons.
-  - Sentences built in `lib` around a list ("… and N more"): commit-check refusals,
-    preservation notes, the outstanding-work summary, figure support.
-  - A measured requirement's subject is the user's own word ("Memo"), shown as written.
-  - Words stored with the work stay as written: version change summaries, a fact's source
-    chip in prompts, the authorization's recorded terms (shown translated, stored English).
+- **Go's words and the last panels (2026-10-23).** Translated as they are shown:
+  - Go's needs card ("I need you to…"), "So far", the execution record (Saved / Checked /
+    Changed) and Go's stop reasons. `describeNeed` and `runAccount` take a locale that defaults to
+    English; what a run records (`stop_reason`), what is compared as text and what the model is
+    told stay the English Go always wrote. Stop reasons Go writes in code are recognised by their
+    shape and shown translated (`lib/i18n/stop-reasons.ts`, with a test that fails when the code's
+    wording drifts from the map); a question the model asked follows Writes in.
+  - The outline editor and its notices, evaluation ratings, recommendations, the finish dialog and
+    finished screen, critique actions, the custom workflow designer, the outstanding-work list,
+    and the remaining notices and errors the workspace shows.
+  - Answers are read in every interface language: "sí / oui / sim", "no / non / não", "vuelve a
+    Revisión", "tal como está" count as the English ones do.
+- **Still English.**
+  - Admin, `/compact` and `/preview`.
+  - The server's own message under technical details.
+  - Text stored with the work, in whatever language it was written: version change summaries,
+    step outputs in Go's record (beyond the stop reasons recognised above), recommendation and
+    finding text, commit-check refusals, lookup and verification summaries, fact notes and
+    sources, users' own notes.
+  - What the model writes follows the project's Writes in language (L-101), not the screen's.
+  - Custom workflows keep the words they were written in.
 - **Pages outside a project (2026-10-23).** Signing in, signing up, resetting a password, the
   sign-in callback, the landing page, page-not-found, the print view and the project page's own
   states are translated. Sign-in and landing carry a language switch, so someone not yet signed

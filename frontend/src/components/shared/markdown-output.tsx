@@ -14,6 +14,7 @@ import { CodeBlock, MathDisplay } from './code-block';
 
 import { IMAGE_SCHEME } from '@/lib/data/images';
 import { useProjectImageUrls } from './project-images';
+import { useT } from '@/lib/i18n/i18n-provider';
 
 interface MarkdownOutputProps {
   content: string;
@@ -25,6 +26,7 @@ interface MarkdownOutputProps {
  * on an iPad with the side chat open: the dates ran past the document pane).
  */
 function TableScroll({ children }: { children: ReactNode }) {
+  const t = useT();
   const ref = useRef<HTMLDivElement>(null);
   const [edges, setEdges] = useState({ left: false, right: false });
   useEffect(() => {
@@ -62,7 +64,7 @@ function TableScroll({ children }: { children: ReactNode }) {
         <span aria-hidden className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-[var(--surface-container-lowest)] to-transparent" />
       )}
       {edges.right && (
-        <p className="mt-1 px-2 text-label text-[var(--on-surface-variant)] lg:hidden">Scroll the table sideways for more columns.</p>
+        <p className="mt-1 px-2 text-label text-[var(--on-surface-variant)] lg:hidden">{t('pnl.scrollTable')}</p>
       )}
     </div>
   );
@@ -90,6 +92,7 @@ function urlTransform(url: string): string {
 }
 
 export function MarkdownOutput({ content }: MarkdownOutputProps) {
+  const t = useT();
   const imageUrls = useProjectImageUrls();
   const withImages: Components = {
     ...components,
@@ -104,7 +107,7 @@ export function MarkdownOutput({ content }: MarkdownOutputProps) {
               <img src={url} alt={alt ?? ''} className="block max-h-[420px] rounded-lg" />
             ) : (
               <span className="block rounded-lg bg-[var(--surface-container-low)] px-4 py-6 text-center text-label text-[var(--on-surface-variant)]">
-                Image: {alt}
+                {t('pnl.image', { alt: alt ?? '' })}
               </span>
             )}
             {alt && <span className="mt-1 block text-label text-[var(--on-surface-variant)]">{alt}</span>}

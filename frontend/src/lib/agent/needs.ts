@@ -18,7 +18,9 @@ import type { StageFacts } from './facts';
 import type { InputsChange } from '@/lib/workflow/stage-inputs';
 import { awaitsAttempt, confirmableProposals } from '@/lib/workflow/stage-artifact';
 import { rowsRequired } from '@/lib/workflow/engine';
-import { confirmProposalsLabel } from '@/lib/workflow/stage-controls';
+import { translate, type Vars } from '@/lib/i18n/translate';
+import { itemPlural, templateWord } from '@/lib/i18n/templates';
+import type { Locale } from '@/lib/i18n/locales';
 
 type Need =
   | { kind: 'set_objective' }
@@ -134,7 +136,11 @@ export function onlyApprovalLeft(stageEvaluation: StageEvaluation): boolean {
 }
 
 /** "Approve it as it stands", "approve as is", "no further changes". */
-const AS_IT_STANDS = /\b(?:as it stands|as is|without (?:further |more )?(?:changes|checks|checking)|no (?:further|more) changes)\b/i;
+const AS_IT_STANDS_EN = /\b(?:as it stands|as is|without (?:further |more )?(?:changes|checks|checking)|no (?:further|more) changes)\b/i;
+/** …and "tal como está", "tel quel", "como está", "sin más cambios" (client, 21 Oct: "pick your language"). */
+const AS_IT_STANDS_X = /(?<![\p{L}])(?:tal (?:como|cual) est[aá]|como est[aá]|sin (?:m[aá]s )?(?:cambios|comprobaciones)|tel(?:le)? quel(?:le)?|en l['’][ée]tat|sans (?:autres? )?(?:changements?|modifications?|v[ée]rifications?)|sem (?:mais )?(?:altera[cç][õo]es|mudan[cç]as|verifica[cç][õo]es))(?![\p{L}])/iu;
+const APPROVES_EN = /\b(?:approv|accept|keep)/i;
+const APPROVES_X = /(?<![\p{L}])(?:aprob|aprue|acept|mant[eé]n|manten|approuv|accept|gard|aprov|aceit|mant)/iu;
 
 /**
  * The user's latest answer on this stage, given since its latest saved
@@ -149,7 +155,9 @@ export function approvedAsItStands(steps: readonly AgentStep[], stageId: string)
     const s = steps[i];
     if (s.stage_id !== stageId) continue;
     if (s.changes?.version_ids?.length) return false;
-    if (s.action_key === 'user_answer') return AS_IT_STANDS.test(s.output) && /\b(?:approv|accept|keep)/i.test(s.output);
+    if (s.action_key === 'user_answer') {
+      return (AS_IT_STANDS_EN.test(s.output) || AS_IT_STANDS_X.test(s.output)) && (APPROVES_EN.test(s.output) || APPROVES_X.test(s.output));
+    }
   }
   return false;
 }
@@ -726,114 +734,120 @@ export function approvalsAskedFor(
 function describeStuck(
   need: Extract<NeedsUser, { kind: 'unblock_stage' }>,
   stage: string,
-  ctx: NeedContext
+  ctx: NeedContext,
+  locale: Locale
 ): { message: string; action: string; options: { id: StuckOption; label: string }[]; footer?: string } {
-  const why = `${stage} is marked stuck${need.reason ? `: ${need.reason.replace(/[.\s]+$/, '')}` : ''}.`;
-  const skip = ctx.canSkip ? [{ id: 'skip' as const, label: `Skip ${stage} for now` }] : [];
-  const clear = { id: 'clear' as const, label: 'Continue this stage by hand' };
-  const footer = ctx.advanceControl
-    ? `To move on with this still open, use “${ctx.advanceControl}” under More at the bottom of the stage; it asks for your reason.`
-    : undefined;
+  const t = (key: string, vars?: Vars) => translate(locale, key, vars);
+  const why = need.reason
+    ? t('need.stuckWhyReason', { stage, reason: templateWord(locale, need.reason.replace(/[.\s]+$/, '')) })
+    : t('need.stuckWhy', { stage });
+  const skip = ctx.canSkip ? [{ id: 'skip' as const, label: t('need.skipForNow', { stage }) }] : [];
+  const clear = { id: 'clear' as const, label: t('need.byHand') };
+  const footer = ctx.advanceControl ? t('need.stuckFooter', { control: ctx.advanceControl }) : undefined;
   const lead = ctx.blockInputs?.changed
-    ? { id: 'resume' as const, label: 'Resume with what has changed' }
+    ? { id: 'resume' as const, label: t('need.resumeChanged') }
     : need.blockKind === 'data_missing'
-      ? { id: 'add_data' as const, label: 'Add the missing data' }
-      : { id: 'retry' as const, label: 'Try again' };
+      ? { id: 'add_data' as const, label: t('need.addData') }
+      : { id: 'retry' as const, label: t('need.tryAgain') };
   const options = [lead, ...skip, clear].slice(0, STUCK_OPTIONS_MAX);
   const since = ctx.blockInputs?.changed
-    ? ` Since then, ${ctx.blockInputs.what.join(' and ')}.`
+    ? t('need.since', { what: ctx.blockInputs.what.join(t('need.and')) })
     : ctx.blockInputs
-      ? ' Nothing in the project has changed since, so trying again will most likely stop at the same place.'
-      : ' I need that cleared before I can continue.';
-  return { message: `${why}${since}`, action: options[0].label, options, footer };
+      ? t('need.unchanged')
+      : t('need.clearFirst');
+  return { message: `${why} ${since}`, action: options[0].label, options, footer };
+}
+
+/** A table's item noun, one or many, as `describeNeed` has always said it in English. */
+function items(locale: Locale, noun: string, n: number): string {
+  if (locale === 'en') return n === 1 ? noun : `${noun}s`;
+  return n === 1 ? templateWord(locale, noun) : itemPlural(locale, noun);
 }
 
 /**
  * The sentence the card shows, and the label of the one button that clears it
  * (null: no button, just Resume). A stuck stage has several `options`; the
  * first is the one `action` names.
+ *
+ * In English (the default) this is the sentence a run's stop reason records
+ * and the model is told; the card asks for it in the interface's language
+ * (client, 21 Oct: "pick your language").
  */
 export function describeNeed(
   need: NeedsUser,
   stageLabel: (id: string) => string,
-  ctx: NeedContext = {}
+  ctx: NeedContext = {},
+  locale: Locale = 'en'
 ): { message: string; action: string | null; options?: { id: StuckOption; label: string }[]; footer?: string } {
+  const t = (key: string, vars?: Vars) => translate(locale, key, vars);
+  const word = (text: string) => templateWord(locale, text);
   switch (need.kind) {
     case 'set_objective':
-      return { message: 'I need an objective before I can choose a move. Set one above.', action: null };
+      return { message: t('need.setObjective'), action: null };
     case 'unblock_stage':
-      return describeStuck(need, stageLabel(need.stageId), ctx);
+      return describeStuck(need, stageLabel(need.stageId), ctx, locale);
     case 'approve_outline':
       return need.unsavedDraft
-        ? { message: `I need your approval of the outline on ${stageLabel(need.stageId)} before I can continue. It has edits that are not saved yet.`, action: 'Save and approve the outline' }
+        ? { message: t('need.outlineUnsaved', { stage: stageLabel(need.stageId) }), action: t('need.saveApproveOutline') }
         : {
-            message: `I need your approval of ${need.versionNumber ? `outline version ${need.versionNumber}` : 'the outline'} before I can continue.`,
-            action: 'Approve the outline',
+            message: need.versionNumber ? t('need.outlineVersion', { n: need.versionNumber }) : t('need.outlinePlain'),
+            action: t('need.approveOutline'),
           };
     case 'tick_criterion': {
       // What is needed, why the policy cannot cover it, and what answering unlocks (5 Oct).
       const why =
-        need.authority === 'reserved'
-          ? ' This one is yours alone: it records your own judgment, not something I can check.'
-          : need.authority === 'policy_ask'
-            ? ' It is a routine approval, but your routine decisions are set to "Ask me".'
-            : '';
+        need.authority === 'reserved' ? t('need.reserved') : need.authority === 'policy_ask' ? t('need.policyAsk') : '';
       return {
-        message: `Needs your approval: "${need.label}".${why}${need.hint ? ` ${need.hint}` : ''}`,
-        action: 'Approve and resume',
+        message: [t('need.approval', { label: word(need.label) }), why, need.hint ? word(need.hint) : ''].filter(Boolean).join(' '),
+        action: t('need.approveResume'),
       };
     }
     case 'answer_question':
       return { message: need.question, action: null };
     case 'skip_stage':
       return {
-        message: `I suggest skipping ${stageLabel(need.stageId)}: ${need.reason.replace(/\s+$/, '')} You can reopen it later.`,
-        action: `Skip ${stageLabel(need.stageId)} for now`,
+        message: t('need.suggestSkip', { stage: stageLabel(need.stageId), reason: word(need.reason.replace(/\s+$/, '')) }),
+        action: t('need.skipForNow', { stage: stageLabel(need.stageId) }),
       };
     case 'next_round':
       return {
-        message: `This round is done. ${need.reason.replace(/\s+$/, '')} Start the next round from ${stageLabel(need.toStageId)}, or stop here.`,
-        action: `Start the next round from ${stageLabel(need.toStageId)}`,
+        message: t('need.roundDone', { reason: need.reason.replace(/\s+$/, ''), stage: stageLabel(need.toStageId) }),
+        action: t('need.nextRound', { stage: stageLabel(need.toStageId) }),
       };
     case 'wait_for_jobs':
       return {
-        message: `${need.pending} section${need.pending === 1 ? ' is' : 's are'} still being written (${need.complete} of ${need.total} done). I can keep waiting.`,
-        action: 'Keep waiting',
+        message: t('need.waiting', { count: need.pending, complete: need.complete, total: need.total }),
+        action: t('need.keepWaiting'),
       };
     case 'continue_budget':
-      return {
-        message: `This window of ${need.budgetSteps} steps is used up and the work is not done.`,
-        action: `Continue for ${need.budgetSteps} more steps`,
-      };
+      return { message: t('need.budget', { n: need.budgetSteps }), action: t('need.budgetMore', { n: need.budgetSteps }) };
     case 'large_job':
-      return {
-        message: `Drafting ${need.sections} sections is a large run. I need your say-so before spending that.`,
-        action: `Draft ${need.sections} sections anyway`,
-      };
+      return { message: t('need.large', { n: need.sections }), action: t('need.largeAnyway', { n: need.sections }) };
     case 'decide_rows':
       if (need.proposed) {
         const rest = need.count - need.proposed;
+        const button = need.proposed === 1 ? t('controls.confirmOne') : t('controls.confirmMany', { count: need.proposed });
         return {
-          message: `I proposed a status for ${need.proposed} ${need.proposed === 1 ? need.itemLabel : `${need.itemLabel}s`}. Press "${confirmProposalsLabel(need.proposed)}" above the table, or change any that read wrong.${rest > 0 ? ` ${rest} more ${rest === 1 ? 'needs' : 'need'} a status from you.` : ''}`,
-          action: SHOW_TABLE,
+          message: [
+            t('need.proposed', { n: need.proposed, items: items(locale, need.itemLabel, need.proposed), button }),
+            rest > 0 ? t('need.restStatus', { count: rest }) : '',
+          ].filter(Boolean).join(' '),
+          action: t('need.showTable'),
         };
       }
       return {
-        message: `${need.count} ${need.count === 1 ? need.itemLabel : `${need.itemLabel}s`} ${need.count === 1 ? 'needs' : 'need'} your decision: set a status on each in the table below.`,
-        action: SHOW_TABLE,
+        message: t('need.decideRows', { count: need.count, items: items(locale, need.itemLabel, need.count) }),
+        action: t('need.showTable'),
       };
     case 'objective_check':
-      return describeObjectiveCheck(need, stageLabel);
+      return describeObjectiveCheck(need, stageLabel, locale);
     case 'repair_stuck':
-      return describeRepairStuck(need, stageLabel(need.stageId));
+      return describeRepairStuck(need, stageLabel(need.stageId), locale);
     case 'triage_findings':
-      return {
-        // Why these were not handled under "Handle them for me" (Sean, 10 Oct,
-        // email 7.1): the setting covers minor and moderate findings; these are
-        // major, or have no severity, and change what the work says.
-        message: `${need.count} major or unrated finding${need.count === 1 ? '' : 's'} ${need.count === 1 ? 'is' : 'are'} yours to decide: accept, reject or defer each in the table below.`,
-        action: SHOW_TABLE,
-      };
+      // Why these were not handled under "Handle them for me" (Sean, 10 Oct,
+      // email 7.1): the setting covers minor and moderate findings; these are
+      // major, or have no severity, and change what the work says.
+      return { message: t('need.triage', { count: need.count }), action: t('need.showTable') };
   }
 }
 
@@ -844,27 +858,30 @@ export function describeNeed(
  */
 function describeRepairStuck(
   need: Extract<NeedsUser, { kind: 'repair_stuck' }>,
-  stage: string
+  stage: string,
+  locale: Locale
 ): { message: string; action: string; options: { id: StuckOption; label: string }[] } {
+  const t = (key: string, vars?: Vars) => translate(locale, key, vars);
   const why = need.why.replace(/[.\s]+$/, '');
   const last = need.last.replace(/\s+/g, ' ').trim().replace(/[.\s]+$/, '');
-  const attempts = `${need.tries} repair${need.tries === 1 ? '' : 's'} of ${stage}`;
+  const attempts = t('need.repairs', { count: need.tries, stage });
   const saved = need.saved === 0
-    ? 'none of them was saved'
+    ? t('need.savedNone')
     : need.saved === need.tries
-      ? `each was saved as a new version (the earlier ones are kept)`
-      : `${need.saved} ${need.saved === 1 ? 'was' : 'were'} saved as a new version, the rest were not`;
+      ? t('need.savedAll')
+      : t('need.savedSome', { count: need.saved });
   const options = [
-    { id: 'retry' as const, label: `Try once more from the current version` },
-    { id: 'keep' as const, label: `Keep ${stage} as it is now` },
-    { id: 'open' as const, label: `Open ${stage}` },
+    { id: 'retry' as const, label: t('need.tryOnceMore') },
+    { id: 'keep' as const, label: t('need.keepAsIs', { stage }) },
+    { id: 'open' as const, label: t('need.openStage', { stage }) },
   ];
   return {
-    message:
-      `I stopped repairing ${stage}: ${attempts} did not settle it, and ${saved}. ` +
-      `What is still unresolved: ${why}. ` +
-      (last ? `The last attempt: ${last.length > 400 ? `${last.slice(0, 400)}…` : last}. ` : '') +
-      `Choose how to go on: try once more (it starts from the current version and keeps every decided row), keep ${stage} as it is now and carry on, or open it and change it yourself.`,
+    message: [
+      t('need.repairHead', { stage, attempts, saved }),
+      t('need.repairWhy', { why }),
+      last ? t('need.repairLast', { last: last.length > 400 ? `${last.slice(0, 400)}…` : last }) : '',
+      t('need.repairChoose', { stage }),
+    ].filter(Boolean).join(' '),
     action: options[0].label,
     options,
   };
@@ -873,52 +890,45 @@ function describeRepairStuck(
 /** The objective check's stop, with what it found and what each button does (11 Oct). */
 function describeObjectiveCheck(
   need: Extract<NeedsUser, { kind: 'objective_check' }>,
-  stageLabel: (id: string) => string
+  stageLabel: (id: string) => string,
+  locale: Locale
 ): { message: string; action: string; options: { id: StuckOption; label: string }[] } {
+  const t = (key: string, vars?: Vars) => translate(locale, key, vars);
   const stage = stageLabel(need.stageId);
   const list = need.items.map((i) => i.replace(/[.\s]+$/, '')).join('; ');
   switch (need.finding) {
     case 'unmet': {
       const options = [
-        { id: 'fix' as const, label: `Have Go fix ${stage} and check again` },
-        { id: 'stop' as const, label: 'I will fix it myself' },
+        { id: 'fix' as const, label: t('need.fixAndCheck', { stage }) },
+        { id: 'stop' as const, label: t('need.fixMyself') },
       ];
-      return {
-        message: `The objective is not met yet — not met: ${list || 'see the check in the record below'}. I can fix ${stage} and check again.`,
-        action: options[0].label, options,
-      };
+      return { message: t('need.unmet', { list: list || t('need.seeRecord'), stage }), action: options[0].label, options };
     }
     case 'no_evidence': {
       const options = [
-        { id: 'resume' as const, label: 'Carry on' },
-        { id: 'stop' as const, label: 'Stop here' },
+        { id: 'resume' as const, label: t('need.carryOn') },
+        { id: 'stop' as const, label: t('need.stopHere') },
       ];
-      return {
-        message: `The check found nothing unmet in ${stage}, but no passage shows the objective is met, so I have not recorded it as met. Carry on, or stop here.`,
-        action: options[0].label, options,
-      };
+      return { message: t('need.noEvidence', { stage }), action: options[0].label, options };
     }
     case 'stages_left': {
-      const next = need.next ?? need.items[0] ?? 'the next stage';
+      const next = need.next ?? need.items[0] ?? t('need.theNextStage');
       // Still on the stage the objective was met on: finishing it is the next move.
       const options = [
-        { id: 'resume' as const, label: next === stage ? `Finish ${stage} and carry on` : `Carry on to ${next}` },
-        { id: 'stop' as const, label: 'Stop here' },
+        { id: 'resume' as const, label: next === stage ? t('need.finishAndCarry', { stage }) : t('need.carryTo', { next }) },
+        { id: 'stop' as const, label: t('need.stopHere') },
       ];
       return {
-        message: `The objective is met on ${need.metOn ?? stage}, but the workflow is not finished: ${list}. ${next === stage ? `Carrying on marks ${stage} complete and moves to what is left.` : `Carrying on takes me to ${next}.`}`,
+        message: `${t('need.metOn', { stage: need.metOn ?? stage, list })} ${next === stage ? t('need.marksComplete', { stage }) : t('need.takesMeTo', { next })}`,
         action: options[0].label, options,
       };
     }
     case 'work_open': {
       const options = [
-        { id: 'resume' as const, label: 'Carry on with the open work' },
-        { id: 'stop' as const, label: 'Stop here' },
+        { id: 'resume' as const, label: t('need.carryOpen') },
+        { id: 'stop' as const, label: t('need.stopHere') },
       ];
-      return {
-        message: `${stage} is written, but the work is not finished: ${list}. I will not call the objective met while any of it is open.`,
-        action: options[0].label, options,
-      };
+      return { message: t('need.workOpen', { stage, list }), action: options[0].label, options };
     }
   }
 }

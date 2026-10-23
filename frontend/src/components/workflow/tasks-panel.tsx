@@ -31,6 +31,7 @@
  * complete.
  */
 
+import { useT } from '@/lib/i18n/i18n-provider';
 import type { ProjectTask } from '@/lib/supabase/tasks';
 
 interface Props {
@@ -41,18 +42,19 @@ interface Props {
 }
 
 export function TasksPanel({ tasks, onResolve, busy = false, readOnly = false }: Props) {
-  const open = tasks.filter((t) => t.status === 'open');
+  const t = useT();
+  const open = tasks.filter((task) => task.status === 'open');
   if (open.length === 0) return null;
 
   return (
     <section
-      aria-label="Open tasks"
+      aria-label={t('pnl.tasksLabel')}
       className="rounded-xl bg-[var(--surface-container-low)] px-5 py-4"
     >
       <header className="mb-3 flex items-baseline justify-between gap-3">
-        <h3 className="text-title text-[var(--on-surface)]">Carried forward</h3>
+        <h3 className="text-title text-[var(--on-surface)]">{t('pnl.carried')}</h3>
         <span className="text-label text-[var(--on-surface-variant)]">
-          {open.length} open {open.length === 1 ? 'task' : 'tasks'}
+          {t('pnl.openTasks', { count: open.length })}
         </span>
       </header>
 
@@ -69,7 +71,7 @@ export function TasksPanel({ tasks, onResolve, busy = false, readOnly = false }:
               )}
               {task.stage && (
                 <p className="mt-0.5 text-label text-[var(--on-surface-variant)]">
-                  From {task.stage}
+                  {t('pnl.from', { stage: task.stage })}
                 </p>
               )}
             </div>
@@ -81,14 +83,14 @@ export function TasksPanel({ tasks, onResolve, busy = false, readOnly = false }:
                   disabled={busy}
                   className="rounded-lg px-3 py-1.5 text-label text-[var(--pm-secondary)] hover:bg-[var(--surface-container-high)] disabled:opacity-40"
                 >
-                  Done
+                  {t('pnl.done')}
                 </button>
                 <button
                   onClick={() => onResolve(task.id, 'dismissed')}
                   disabled={busy}
                   className="rounded-lg px-3 py-1.5 text-label text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)] hover:text-[var(--on-surface)] disabled:opacity-40"
                 >
-                  Drop
+                  {t('pnl.drop')}
                 </button>
               </div>
             )}

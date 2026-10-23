@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 
+import { useT } from '@/lib/i18n/i18n-provider';
+
 interface Props {
   onReopen: () => void;
   /** Stages moved past with requirements still open. They can be closed from here. */
@@ -17,6 +19,7 @@ interface Props {
  * finishing is a status, not a lock, and everything stays readable.
  */
 export function ProjectFinishedBanner({ onReopen, leftOpen = [], onViewStage }: Props) {
+  const t = useT();
   return (
     <div
       role="status"
@@ -26,13 +29,13 @@ export function ProjectFinishedBanner({ onReopen, leftOpen = [], onViewStage }: 
         task_alt
       </span>
       <div className="mr-auto">
-        <p className="text-title text-[var(--on-surface)]">This project is finished</p>
+        <p className="text-title text-[var(--on-surface)]">{t('pnl.finished')}</p>
         <p className="text-label text-[var(--on-surface-variant)]">
-          It now appears under Finished on your projects page. Every stage and version is still here.
+          {t('pnl.finishedNote')}
         </p>
         {leftOpen.length > 0 && (
           <p className="mt-1 flex flex-wrap items-center gap-x-2 text-label text-[var(--on-surface-variant)]">
-            <span>Left open: {leftOpen.map((s) => s.label).join(', ')}.</span>
+            <span>{t('pnl.leftOpen', { stages: leftOpen.map((s) => s.label).join(', ') })}</span>
             {onViewStage &&
               leftOpen.map((s) => (
                 <button
@@ -41,7 +44,7 @@ export function ProjectFinishedBanner({ onReopen, leftOpen = [], onViewStage }: 
                   onClick={() => onViewStage(s.id)}
                   className="rounded px-1.5 py-0.5 text-label font-semibold text-[var(--pm-primary)] hover:bg-[var(--surface-container-high)]"
                 >
-                  Close {s.label}
+                  {t('pnl.closeStage', { stage: s.label })}
                 </button>
               ))}
           </p>
@@ -52,13 +55,13 @@ export function ProjectFinishedBanner({ onReopen, leftOpen = [], onViewStage }: 
         href="/projects"
         className="rounded-lg px-3 py-2 text-title text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)] hover:text-[var(--on-surface)]"
       >
-        All projects
+        {t('pnl.allProjects')}
       </Link>
       <button
         onClick={onReopen}
         className="rounded-lg bg-[var(--surface-container-highest)] px-4 py-2 text-title text-[var(--on-surface)] hover:opacity-90"
       >
-        Reopen
+        {t('pnl.reopen')}
       </button>
       </div>
     </div>

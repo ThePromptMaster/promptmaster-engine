@@ -1,5 +1,6 @@
 import { actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, ROUTINE_DEFAULT_STEP, USER_ANSWER_STEP, type StepStage } from '@/lib/agent/actions';
-import { DICTIONARIES } from './translate';
+import { DICTIONARIES, translate } from './translate';
+import type { Locale } from './locales';
 import { getLocale, tr } from './store';
 import type { MessageKey } from './messages/en';
 
@@ -15,9 +16,9 @@ const SPECIAL: Record<string, MessageKey> = {
   [ROUTINE_DEFAULT_STEP]: 'goAction.routineDefault',
 };
 
-export function shownActionLabel(key: string): string {
+export function shownActionLabel(key: string, locale: Locale = getLocale()): string {
   const k = SPECIAL[key] ?? `goAction.${key}`;
-  return k in DICTIONARIES[getLocale()] ? tr(k as MessageKey) : actionLabel(key);
+  return k in DICTIONARIES[locale] ? translate(locale, k) : actionLabel(key);
 }
 
 /** As `stepLabel`: a recheck of a measured requirement says so. */

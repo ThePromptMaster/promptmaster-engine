@@ -1,5 +1,6 @@
 'use client';
 
+import { useT } from '@/lib/i18n/i18n-provider';
 import type { OutlineVersionView } from '@/lib/outline/model';
 
 /**
@@ -26,6 +27,7 @@ function when(iso: string): string {
 }
 
 export function OutlineHistory({ history, approvedVersionId, onRestore }: Props) {
+  const t = useT();
   if (history.length === 0) return null;
 
   return (
@@ -34,7 +36,7 @@ export function OutlineHistory({ history, approvedVersionId, onRestore }: Props)
       className="rounded-xl bg-[var(--surface-container-low)] px-5 py-4"
     >
       <h3 id="outline-history-heading" className="text-title text-[var(--on-surface)]">
-        Outline history
+        {t('ol.history')}
       </h3>
 
       <ul className="mt-3 space-y-1.5">
@@ -46,11 +48,10 @@ export function OutlineHistory({ history, approvedVersionId, onRestore }: Props)
               className="flex flex-wrap items-center gap-3 rounded-lg bg-[var(--surface-container-lowest)] px-4 py-2.5"
             >
               <span className="text-label text-[var(--on-surface-variant)]">
-                v{entry.version.version_number}
+                {`v${entry.version.version_number}`}
               </span>
               <span className="min-w-0 flex-1 truncate text-body text-[var(--on-surface)]">
-                {entry.document.items.length} section
-                {entry.document.items.length === 1 ? '' : 's'}
+                {t('ol.sections', { count: entry.document.items.length })}
                 {entry.version.change_summary ? ` · ${entry.version.change_summary}` : ''}
               </span>
 
@@ -65,7 +66,7 @@ export function OutlineHistory({ history, approvedVersionId, onRestore }: Props)
                   <span aria-hidden className="material-symbols-outlined text-[14px]">
                     check_circle
                   </span>
-                  {isBound ? 'Approved · drafting uses this' : 'Approved earlier'}
+                  {isBound ? t('ol.approvedBound') : t('ol.approvedEarlier')}
                 </span>
               )}
 
@@ -77,10 +78,10 @@ export function OutlineHistory({ history, approvedVersionId, onRestore }: Props)
                 <button
                   type="button"
                   onClick={() => onRestore(entry.version.id)}
-                  aria-label={`Restore outline v${entry.version.version_number}`}
+                  aria-label={t('ol.restoreLabel', { n: entry.version.version_number })}
                   className="rounded-lg px-3 py-1.5 text-body text-[var(--pm-primary)] hover:bg-[var(--surface-container-high)]"
                 >
-                  Restore
+                  {t('ol.restore')}
                 </button>
               )}
             </li>

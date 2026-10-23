@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import { useT } from '@/lib/i18n/i18n-provider';
 
 import { documentsOf, prepareFiles } from '@/lib/data/attachments';
 import { normalizeImage } from '@/lib/data/normalize-image';
@@ -30,6 +31,7 @@ export function ChatAttach({
   onAddToContext?: (documents: { name: string; text: string }[]) => void;
   disabled?: boolean;
 }) {
+  const t = useT();
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -51,7 +53,7 @@ export function ChatAttach({
           await attachProjectFile(project, p.file, p.preview);
           stored.push(p.file.name);
         } catch (e) {
-          failed.push(`${p.file.name} could not be stored${e instanceof Error && e.message ? ` (${e.message})` : ''}.`);
+          failed.push(t('pnl.couldNotStore', { name: p.file.name, why: e instanceof Error && e.message ? ` (${e.message})` : '' }));
         }
       }
       // Photos from the chat are stored too (U1, 8 Oct: Sean attached from his
@@ -76,15 +78,15 @@ export function ChatAttach({
           added.push(normal.file.name);
           if (normal.note) prepared.notes.push(normal.note);
         } catch (e) {
-          failed.push(`${normal.file.name} could not be stored${e instanceof Error && e.message ? ` (${e.message})` : ''}.`);
+          failed.push(t('pnl.couldNotStore', { name: normal.file.name, why: e instanceof Error && e.message ? ` (${e.message})` : '' }));
         }
       }
       if (added.length) {
-        prepared.notes.push(`Added as ${added.length === 1 ? 'an image' : 'images'}: ${added.join(', ')}. Change ${added.length === 1 ? 'its caption' : 'their captions'} under the project's images.`);
+        prepared.notes.push(t('pnl.addedImages', { count: added.length, names: added.join(', ') }));
       }
       setReadable(documentsOf(prepared.ready.filter((p) => stored.includes(p.file.name))));
       setMessage(
-        [stored.length ? `Attached to the project: ${stored.join(', ')}.` : '', ...prepared.notes, ...failed]
+        [stored.length ? t('pnl.attachedTo', { names: stored.join(', ') }) : '', ...prepared.notes, ...failed]
           .filter(Boolean)
           .join(' ')
       );
@@ -107,18 +109,18 @@ export function ChatAttach({
         multiple
         accept={PICKABLE_EXTENSIONS.join(',')}
         className="hidden"
-        aria-label="Attach a file to the project"
+        aria-label={t('pnl.attachFile')}
         onChange={(e) => void attach(e.target.files)}
       />
       <button
         type="button"
         onClick={() => input.current?.click()}
         disabled={disabled || busy}
-        title="Attach a file to the project"
+        title={t('pnl.attachFile')}
         className="inline-flex items-center gap-1 self-start rounded-lg px-2 py-1 text-label text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)] disabled:opacity-40"
       >
         <span className="material-symbols-outlined text-[18px]">attach_file</span>
-        {busy ? 'Attaching…' : 'Attach'}
+        {busy ? t('pnl.attaching') : t('pnl.attach')}
       </button>
       {message && (
         <p role="status" className="break-words text-label text-[var(--on-surface-variant)]">
@@ -131,11 +133,11 @@ export function ChatAttach({
           onClick={() => {
             onAddToContext(readable);
             setReadable([]);
-            setMessage('Added to the project context — every stage can quote it.');
+            setMessage(t('pnl.addedToContext'));
           }}
           className="self-start rounded-lg bg-[var(--surface-container-high)] px-3 py-1 text-label text-[var(--on-surface)]"
         >
-          Add its text to the project context
+          {t('pnl.addText')}
         </button>
       )}
     </div>
