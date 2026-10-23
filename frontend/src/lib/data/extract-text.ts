@@ -10,6 +10,7 @@
  * is attached.
  */
 
+import { installPdfShims } from './browser-shims';
 import { extensionOf } from './preview';
 
 /** Attachments whose words, not rows, are what matters. */
@@ -20,6 +21,8 @@ export function isDocument(name: string): boolean {
 }
 
 async function pdfText(data: ArrayBuffer): Promise<string> {
+  // Safari (iPhone included) cannot iterate a stream; pdfjs does (22 Oct).
+  installPdfShims();
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
   if (typeof window !== 'undefined' && !pdfjs.GlobalWorkerOptions.workerSrc) {
     pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/legacy/build/pdf.worker.min.mjs', import.meta.url).toString();
