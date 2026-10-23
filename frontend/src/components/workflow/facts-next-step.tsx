@@ -1,5 +1,6 @@
 'use client';
 
+import { useT } from '@/lib/i18n/i18n-provider';
 import { NEXT_STEP_LABELS } from '@/lib/workflow/stage-controls';
 
 /**
@@ -25,13 +26,13 @@ export function FactsNextStep({
   /** The stages the last change reopened, once each is finished again. */
   updated?: readonly string[];
 }) {
+  const t = useT();
   const text = 'text-label text-[var(--on-surface-variant)]';
   if (waiting.length) {
     return (
       <div>
         <p className={text}>
-          Next: {waiting.length === 1 ? `${waiting[0]} relied on` : `${waiting.join(', ')} relied on`} the old facts and{' '}
-          {waiting.length === 1 ? 'is' : 'are'} awaiting an update.
+          {t('fns.relied', { count: waiting.length, names: waiting.join(', ') })}
         </p>
         {onUpdate && (
           <button
@@ -39,7 +40,7 @@ export function FactsNextStep({
             disabled={updating}
             className="mt-1.5 rounded-lg bg-[var(--pm-primary)] px-3 py-1.5 text-label text-[var(--on-primary)] hover:opacity-90 disabled:opacity-50"
           >
-            {updating ? 'Updating affected work…' : NEXT_STEP_LABELS.applyContinue}
+            {updating ? t('fns.updating') : NEXT_STEP_LABELS.applyContinue}
           </button>
         )}
       </div>
@@ -48,7 +49,7 @@ export function FactsNextStep({
   if (judging) {
     return (
       <p role="status" className={text}>
-        Checking what these facts affect…
+        {t('fns.checking')}
       </p>
     );
   }
@@ -56,9 +57,9 @@ export function FactsNextStep({
     return (
       <p role="status" className={text}>
         <span aria-hidden className="material-symbols-outlined mr-1 align-[-3px] text-[16px] text-[var(--pm-success)]">check_circle</span>
-        Updated and checked: {updated.join(', ')}.
+        {t('fns.updated', { names: updated.join(', ') })}
       </p>
     );
   }
-  return <p className={text}>Nothing finished relied on these, so nothing needs updating.</p>;
+  return <p className={text}>{t('fns.nothing')}</p>;
 }

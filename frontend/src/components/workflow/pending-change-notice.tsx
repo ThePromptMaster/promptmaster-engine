@@ -1,5 +1,6 @@
 'use client';
 
+import { useT } from '@/lib/i18n/i18n-provider';
 import { gist } from '@/lib/workflow/instruction-conflicts';
 import type { PendingChange } from '@/lib/workflow/conflict-trail';
 
@@ -20,6 +21,7 @@ export function PendingChangeNotice({
   onChoose: (change: PendingChange) => void;
   onDiscard: (change: PendingChange) => void;
 }) {
+  const t = useT();
   if (!changes.length) return null;
   return (
     <div className="mb-6 flex flex-col gap-2">
@@ -27,14 +29,14 @@ export function PendingChangeNotice({
         <div
           key={c.id}
           role="status"
-          aria-label="Change not applied yet"
+          aria-label={t('pcn.label')}
           className="flex flex-wrap items-center gap-3 rounded-xl bg-[var(--surface-container-low)] px-5 py-3"
         >
           <span aria-hidden className="material-symbols-outlined text-[20px] text-[var(--pm-tertiary)]">
             pending_actions
           </span>
           <p className="min-w-0 flex-[1_1_16rem] text-body text-[var(--on-surface)]">
-            Not applied yet — choose which takes priority.
+            {t('pcn.notApplied')}
             <span className="block text-label text-[var(--on-surface-variant)]">
               {stageLabel(c.stageId)}: {gist(c.instruction, 140)}
             </span>
@@ -45,14 +47,14 @@ export function PendingChangeNotice({
               onClick={() => onChoose(c)}
               className="rounded-lg bg-[var(--pm-primary)] px-3 py-1.5 text-label font-semibold text-[var(--on-primary)]"
             >
-              Choose and apply
+              {t('pcn.choose')}
             </button>
             <button
               type="button"
               onClick={() => onDiscard(c)}
               className="rounded-lg px-3 py-1.5 text-label text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)]"
             >
-              Discard
+              {t('pcn.discard')}
             </button>
           </div>
         </div>

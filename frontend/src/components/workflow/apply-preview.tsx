@@ -26,6 +26,7 @@
  * the whole behaviour.
  */
 
+import { useT } from '@/lib/i18n/i18n-provider';
 import { useState } from 'react';
 
 import { buildCombinedInstruction, detectConflicts } from '@/lib/workflow/combine';
@@ -67,6 +68,7 @@ export function ApplyPreview({
   onApply,
   onCancel,
 }: Props) {
+  const t = useT();
   const [showFirst, setShowFirst] = useState(true);
   const conflicts = detectConflicts(selected);
   // Per conflict: the category that controls, or '' to let the model balance them.
@@ -87,8 +89,8 @@ export function ApplyPreview({
   const current = headVersionNumber ?? 0;
   const versionNote =
     current > 0
-      ? `v${current} stays in history — this appends v${current + 1}.`
-      : 'This creates the first version of this stage.';
+      ? t('ap.versionNote', { current, next: current + 1 })
+      : t('ap.firstVersion');
 
   return (
     <div
@@ -99,8 +101,7 @@ export function ApplyPreview({
     >
       <div className="w-full max-w-[680px] rounded-2xl bg-[var(--surface-container)] px-7 py-6 shadow-2xl">
         <h2 id="apply-preview-title" className="text-title text-[var(--on-surface)]">
-          Apply {selected.length === 1 ? 'this recommendation' : `these ${selected.length}`} to{' '}
-          {stageLabel}
+          {selected.length === 1 ? t('ap.titleOne', { stage: stageLabel }) : t('ap.titleMany', { count: selected.length, stage: stageLabel })}
         </h2>
 
         {/* --- FR-15: selected actions, visible and removable --- */}
@@ -119,10 +120,10 @@ export function ApplyPreview({
               <button
                 onClick={() => onRemove(rec.category)}
                 disabled={applying}
-                aria-label={`Remove "${rec.title}" from this revision`}
+                aria-label={t('ap.removeNamed', { title: rec.title })}
                 className="shrink-0 rounded-lg px-2 py-1 text-label text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-highest)] hover:text-[var(--on-surface)] disabled:opacity-40"
               >
-                Remove
+                {t('ap.remove')}
               </button>
             </li>
           ))}
@@ -135,14 +136,14 @@ export function ApplyPreview({
             className="mt-4 rounded-lg bg-[var(--surface-container-high)] px-4 py-3"
           >
             <p className="text-label uppercase tracking-wider text-[var(--pm-tertiary)]">
-              {conflicts.length === 1 ? 'One of these pulls against another' : 'These pull against each other'}
+              {conflicts.length === 1 ? t('ap.oneConflict') : t('ap.manyConflicts')}
             </p>
             <ul className="mt-1.5 space-y-3">
               {conflicts.map((conflict, i) => (
                 <li key={i}>
                   <p className="text-body text-[var(--pm-tertiary)]">{conflict.message}</p>
                   {/* PM-24: ask which should control, rather than leave it to the model. */}
-                  <div role="radiogroup" aria-label={`Which takes priority (${i + 1})`} className="mt-1.5 flex flex-wrap gap-2">
+                  <div role="radiogroup" aria-label={t('ap.priorityGroup', { n: i + 1 })} className="mt-1.5 flex flex-wrap gap-2">
                     {[...conflict.between, ''].map((category) => (
                       <button
                         key={category || 'balance'}
@@ -155,7 +156,7 @@ export function ApplyPreview({
                             : 'bg-[var(--surface-container-highest)] text-[var(--on-surface)]'
                         }`}
                       >
-                        {category ? `"${titleOf(category)}" takes priority` : 'Let PromptMaster balance them'}
+                        {category ? t('ap.takesPriority', { title: titleOf(category) }) : t('ap.balance')}
                       </button>
                     ))}
                   </div>
@@ -165,7 +166,7 @@ export function ApplyPreview({
             {/* Said out loud, because a warning beside an enabled button
                 otherwise reads as a bug. */}
             <p className="mt-2 text-label text-[var(--on-surface-variant)]">
-              You can still apply them. Pick which one takes priority, or let PromptMaster balance them.
+              {t('ap.stillApply')}
             </p>
           </div>
         )}
@@ -173,7 +174,7 @@ export function ApplyPreview({
         {/* --- FR-15: the combined instruction, verbatim --- */}
         <div className="mt-5">
           <p className="text-label uppercase tracking-wider text-[var(--on-surface-variant)]">
-            The instruction that will be sent
+            {t('ap.instruction')}
           </p>
           <pre
             data-testid="combined-instruction"
@@ -182,19 +183,19 @@ export function ApplyPreview({
             {combined}
           </pre>
           <p className="mt-1.5 text-label text-[var(--on-surface-variant)]">
-            This is the text itself, not a summary of it.
+            {t('ap.itself')}
           </p>
         </div>
 
         {/* --- FR-09: the affected scope, and what survives --- */}
         <div className="mt-5 rounded-lg bg-[var(--surface-container-low)] px-4 py-3">
           <p className="text-label uppercase tracking-wider text-[var(--on-surface-variant)]">
-            Affected scope
+            {t('ap.scope')}
           </p>
           <p className="mt-1 text-body text-[var(--on-surface)]" data-testid="affected-scope">
             {selected.length === 1
               ? describeScope(selected[0].scope)
-              : `The whole document — ${selected.length} recommendations applied together`}
+              : t('ap.wholeDoc', { count: selected.length })}
           </p>
           <p className="mt-2 text-body text-[var(--on-surface-variant)]" data-testid="version-note">
             {versionNote}
@@ -210,7 +211,7 @@ export function ApplyPreview({
             onChange={(e) => setShowFirst(e.target.checked)}
             className="h-4 w-4 accent-[var(--pm-primary)]"
           />
-          Show the revised version before saving it
+          {t('ap.showFirst')}
         </label>
 
         <div className="mt-4 flex items-center justify-end gap-2">
@@ -219,7 +220,7 @@ export function ApplyPreview({
             disabled={applying}
             className="rounded-lg px-4 py-2 text-label text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] disabled:opacity-40"
           >
-            Cancel
+            {t('ap.cancel')}
           </button>
           <button
             onClick={() => onApply({ showFirst, precedence })}
@@ -228,12 +229,12 @@ export function ApplyPreview({
             disabled={applying || selected.length === 0}
             className="rounded-lg bg-[var(--pm-primary)] px-5 py-2 text-label font-medium text-[var(--on-primary)] disabled:opacity-40"
           >
-            {applying ? 'Applying…' : selected.length > 1 ? 'Combine and apply' : 'Apply'}
+            {applying ? t('ap.applying') : selected.length > 1 ? t('ap.combine') : t('ap.apply')}
           </button>
         </div>
 
         <p className="mt-3 text-right text-label text-[var(--on-surface-variant)]">
-          One AI pass. Nothing has been sent yet.
+          {t('ap.onePass')}
         </p>
       </div>
     </div>

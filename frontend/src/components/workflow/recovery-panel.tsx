@@ -24,12 +24,13 @@
  * something the moment they are pressed.
  */
 
+import { useT } from '@/lib/i18n/i18n-provider';
 import { useEffect, useState } from 'react';
 
 import { api } from '@/lib/api/client';
 import { RETIRED_MODELS } from '@/lib/constants';
 import { CustomSelect } from '@/components/shared/custom-select';
-import { ACTION_ICON, ACTION_LABEL, type StageFailure } from '@/lib/errors/recovery';
+import { ACTION_ICON, actionLabel, type StageFailure } from '@/lib/errors/recovery';
 
 interface Props {
   failure: StageFailure;
@@ -49,6 +50,7 @@ export function RecoveryPanel({
   onSwitchModel,
   currentModel = '',
 }: Props) {
+  const t = useT();
   const [showDetails, setShowDetails] = useState(false);
   const [switching, setSwitching] = useState(false);
 
@@ -87,7 +89,7 @@ export function RecoveryPanel({
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
         {actions.map((action) => {
-          const label = ACTION_LABEL[action];
+          const label = actionLabel(action);
           const icon = ACTION_ICON[action];
 
           if (action === 'details') {
@@ -138,7 +140,7 @@ export function RecoveryPanel({
               </span>
               {label}
               {action === 'retry' && failure.retryAfter ? (
-                <span className="opacity-70"> · in ~{Math.round(failure.retryAfter)}s</span>
+                <span className="opacity-70">{t('err.inSeconds', { seconds: Math.round(failure.retryAfter) })}</span>
               ) : null}
             </button>
           );
@@ -157,7 +159,7 @@ export function RecoveryPanel({
 
       {showDetails && (
         <pre className="mt-3 overflow-x-auto rounded-lg bg-[var(--surface-container-lowest)] px-4 py-3 text-label text-[var(--on-surface-variant)]">
-          {[`code: ${failure.code}`, failure.technical ?? 'No further detail was returned.'].join(
+          {[`code: ${failure.code}`, failure.technical ?? t('err.noDetail')].join(
             '\n'
           )}
         </pre>
@@ -182,6 +184,7 @@ function ModelSwitcher({
   current: string;
   onPick: (model: string) => void;
 }) {
+  const t = useT();
   const [models, setModels] = useState<Array<{ id: string; name: string }> | null>(null);
   const [failed, setFailed] = useState(false);
   const [typed, setTyped] = useState(current);
@@ -202,7 +205,7 @@ function ModelSwitcher({
       <div className="mt-3 flex flex-wrap items-end gap-2">
         <label className="min-w-[240px] flex-1">
           <span className="mb-1 block text-label uppercase tracking-wider text-[var(--on-surface-variant)]">
-            Model
+            {t('err.model')}
           </span>
           <input
             value={typed}
@@ -215,7 +218,7 @@ function ModelSwitcher({
           onClick={() => typed.trim() && onPick(typed.trim())}
           className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label text-[var(--on-primary)]"
         >
-          Use this model
+          {t('err.useModel')}
         </button>
       </div>
     );
@@ -223,7 +226,7 @@ function ModelSwitcher({
 
   if (!models) {
     return (
-      <p className="mt-3 text-label text-[var(--on-surface-variant)]">Loading models…</p>
+      <p className="mt-3 text-label text-[var(--on-surface-variant)]">{t('err.loadingModels')}</p>
     );
   }
 

@@ -26,6 +26,8 @@
  * exist. Redoing them is the rational response, and it is the wrong one.
  */
 
+import type { MessageKey } from '@/lib/i18n/messages/en';
+import { getLocale, tr } from '@/lib/i18n/store';
 import { classifyDrainError, type ClassifiedError, type ErrorCode } from '@/lib/jobs/errors';
 
 export type RecoveryAction =
@@ -104,13 +106,13 @@ export interface PreservedContext {
 export function preservationClause({ savedVersions, label }: PreservedContext): string {
   if (savedVersions > 0) {
     return savedVersions === 1
-      ? `the saved version of the ${label} is still there`
-      : `all ${savedVersions} saved versions of the ${label} are still there`;
+      ? tr('err.savedOne', { label })
+      : tr('err.savedMany', { count: savedVersions, label });
   }
   // Nothing on this stage yet, so the honest claim is about the project. This
   // is still worth saying: the question a failed draft raises is "did I just
   // lose something", and the answer is no.
-  return 'nothing was written, and the rest of the project is untouched';
+  return tr('err.nothingWritten');
 }
 
 const PRESERVED_MARKER = 'Nothing was lost —';
@@ -138,6 +140,21 @@ export function stageFailure(error: unknown, preserved: PreservedContext): Stage
       : null;
 
   const base = serverMessage ?? classified.message;
+  const technical = typeof carried?.technical === 'string' ? carried.technical : undefined;
+  // In another interface language (client, 21 Oct) the copy is chosen by
+  // the code; what the server said stays, in English, under the details.
+  if (getLocale() !== 'en') {
+    return {
+      code: classified.code,
+      title: tr(`err.${classified.code}.title`),
+      message: `${tr(`err.${classified.code}.message`)} ${tr('err.lost', { what: preservationClause(preserved) })}`,
+      retryable: classified.retryable,
+      actions: ACTIONS_FOR[classified.code],
+      guidance: GUIDANCE[classified.code] ? tr(`err.guide.${classified.code}` as MessageKey) : undefined,
+      technical: technical ?? base,
+      retryAfter: typeof carried?.retryAfter === 'number' ? carried.retryAfter : null,
+    };
+  }
   const message = base.includes(PRESERVED_MARKER)
     ? base
     : `${base} ${PRESERVED_MARKER} ${preservationClause(preserved)}.`;
@@ -149,7 +166,7 @@ export function stageFailure(error: unknown, preserved: PreservedContext): Stage
     retryable: classified.retryable,
     actions: ACTIONS_FOR[classified.code],
     guidance: GUIDANCE[classified.code],
-    technical: typeof carried?.technical === 'string' ? carried.technical : undefined,
+    technical,
     retryAfter: typeof carried?.retryAfter === 'number' ? carried.retryAfter : null,
   };
 }
@@ -169,7 +186,7 @@ export function localFailure(
   return {
     code: 'unknown',
     title,
-    message: `${message} ${PRESERVED_MARKER} ${preservationClause(preserved)}.`,
+    message: getLocale() !== 'en' ? `${message} ${tr('err.lost', { what: preservationClause(preserved) })}` : `${message} ${PRESERVED_MARKER} ${preservationClause(preserved)}.`,
     retryable: true,
     actions,
   };
@@ -184,6 +201,11 @@ export const ACTION_LABEL: Record<RecoveryAction, string> = {
   pause: 'Stop for now',
   details: 'Technical details',
 };
+
+/** A recovery button's words in the interface's language. */
+export function actionLabel(action: RecoveryAction): string {
+  return tr(`err.action.${action}`);
+}
 
 export const ACTION_ICON: Record<RecoveryAction, string> = {
   retry: 'refresh',

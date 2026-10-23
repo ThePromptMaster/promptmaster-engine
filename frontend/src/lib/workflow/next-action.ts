@@ -1,3 +1,4 @@
+import { tr } from '@/lib/i18n/store';
 /**
  * The one thing to do next on a stage (PM-06, PM-08).
  *
@@ -135,40 +136,40 @@ export function nextStageAction(input: NextActionInput): StageAction {
 
 function because(kind: StageActionKind, input: NextActionInput): string[] {
   const open = input.unmetRequired ?? [];
-  const openLine = open.length ? `Still open: ${open.join('; ')}.` : 'Every required item on this stage is met.';
+  const openLine = open.length ? tr('na.stillOpen', { items: open.join('; ') }) : tr('na.allMet');
   switch (kind) {
     case 'save':
-      return ['You have edits that are not saved as a version yet.', 'Checks, fixes and moving on all work from the saved version.'];
+      return [tr('na.save1'), tr('na.save2')];
     case 'panel':
-      return [input.panelStep?.reason ?? 'This stage works through its own panel.'];
+      return [input.panelStep?.reason ?? tr('na.panel')];
     case 'draft':
-      return ['This stage has nothing written yet.', 'A draft gives you something to react to — edit it, or write your own instead.'];
+      return [tr('na.draft1'), tr('na.draft2')];
     case 'continue_writing':
-      return ['The current draft stopped before it was finished (length limit, or the check found it incomplete).', 'Finishing it comes before judging it.'];
+      return [tr('na.cont1'), tr('na.cont2')];
     case 'evaluate':
       return [
-        'The current version has not been checked.',
-        'A check scores it against your objective and this stage’s requirements, and suggests specific fixes.',
+        tr('na.eval1'),
+        tr('na.eval2'),
         openLine,
       ];
     case 'apply_fixes':
       return [
-        `${input.applyableFixes} suggested fix${input.applyableFixes === 1 ? ' is' : 'es are'} waiting from the last check.`,
-        'The check found problems worth fixing before moving on.',
-        'You see the change before anything is replaced.',
+        tr('na.fixesWaiting', { count: input.applyableFixes }),
+        tr('na.fixes2'),
+        tr('na.fixes3'),
       ];
     case 'continue':
     case 'finish':
       return [
         openLine,
         input.noFurtherPassReason
-          ? `The check says no further AI pass is needed: ${input.noFurtherPassReason}`
+          ? tr('na.noPass', { reason: input.noFurtherPassReason })
           : input.evaluated && input.evaluationClean
-            ? 'The last check found nothing that needs another pass.'
+            ? tr('na.lastClean')
             : input.evaluated
-              ? 'The last check has been dealt with.'
-              : 'This stage has not been checked; you can still check it from More.',
-        ...(input.canAdvance ? [] : ['You can override and move on: it needs your reason, and the stage stays open.']),
+              ? tr('na.lastDealt')
+              : tr('na.notChecked'),
+        ...(input.canAdvance ? [] : [tr('na.overrideNote')]),
       ];
     default:
       return [];
@@ -177,17 +178,17 @@ function because(kind: StageActionKind, input: NextActionInput): string[] {
 
 function chooseAction(input: NextActionInput): StageAction {
   if (input.finished) return { kind: 'none', label: '', reason: '' };
-  if (input.busy) return { kind: 'none', label: '', reason: 'Working…' };
+  if (input.busy) return { kind: 'none', label: '', reason: tr('na.working') };
 
   if (input.dirty) {
     return {
       kind: 'save',
-      label: 'Save changes',
-      reason: 'Your edits count once they are saved as a new version.',
+      label: tr('na.saveChanges'),
+      reason: tr('na.saveWhy'),
     };
   }
 
-  if (input.panelStep?.busy) return { kind: 'none', label: '', reason: 'Working…' };
+  if (input.panelStep?.busy) return { kind: 'none', label: '', reason: tr('na.working') };
   if (input.panelStep) {
     return { kind: 'panel', label: input.panelStep.label, reason: input.panelStep.reason };
   }
@@ -195,61 +196,61 @@ function chooseAction(input: NextActionInput): StageAction {
   if (input.draftable && !input.hasContent) {
     return {
       kind: 'draft',
-      label: 'Draft this stage',
-      reason: 'Start from a draft you can edit, or write it yourself from More.',
+      label: tr('na.draftStage'),
+      reason: tr('na.draftWhy'),
     };
   }
 
   if (input.draftable && input.hasContent && input.truncated) {
     return {
       kind: 'continue_writing',
-      label: 'Continue writing',
-      reason: 'The draft stopped before it was finished. This picks up where it left off.',
+      label: tr('na.continueWriting'),
+      reason: tr('na.continueWhy'),
     };
   }
 
   if (input.evaluable && input.hasContent && !input.evaluated && !(input.framing && input.canAdvance)) {
     return {
       kind: 'evaluate',
-      label: 'Check this stage',
-      reason: 'One AI check scores it against your objective and suggests fixes.',
+      label: tr('na.check'),
+      reason: tr('na.checkWhy'),
     };
   }
 
   if (input.applyableFixes > 0 && !input.evaluationClean) {
     return {
       kind: 'apply_fixes',
-      label: input.applyableFixes === 1 ? 'Apply the suggested fix' : `Apply the ${input.applyableFixes} suggested fixes`,
-      reason: 'You see the changes before anything is replaced.',
+      label: input.applyableFixes === 1 ? tr('na.applyFix') : tr('na.applyFixes', { count: input.applyableFixes }),
+      reason: tr('na.applyWhy'),
     };
   }
 
   const clean = input.evaluated && input.evaluationClean;
   const done = input.noFurtherPassReason
-    ? `No further AI pass needed — ${input.noFurtherPassReason.replace(/\.$/, '')}.`
-    : 'Looks good — nothing here needs another pass.';
+    ? tr('na.noPassDone', { reason: input.noFurtherPassReason.replace(/\.$/, '') })
+    : tr('na.looksGood');
   if (input.isLast) {
     return {
       kind: 'finish',
-      label: input.canAdvance ? 'Finish project' : 'Override and finish',
+      label: input.canAdvance ? tr('na.finish') : tr('na.overrideFinish'),
       reason: input.canAdvance
         ? clean
           ? done
-          : 'This is the last stage.'
-        : 'Some required items are still open — overriding them needs a reason.',
+          : tr('na.lastStage')
+        : tr('na.requiredOpen'),
     };
   }
 
-  const to = input.nextLabel ?? 'the next stage';
+  const to = input.nextLabel ?? tr('na.theNextStage');
   return {
     kind: 'continue',
-    label: input.canAdvance ? `Continue to ${to}` : `Override and continue to ${to}`,
+    label: input.canAdvance ? tr('na.continueTo', { stage: to }) : tr('na.overrideTo', { stage: to }),
     reason: input.canAdvance
       ? input.checkSays
-        ? `The checklist is met, but the latest check says ${input.checkSays}. Go will not move on until that is fixed; you can still continue yourself.`
+        ? tr('na.checkSays', { says: input.checkSays })
         : clean
         ? done
-        : 'Everything this stage needs is done.'
-      : 'Some required items are still open — overriding them needs a reason.',
+        : tr('na.allDone')
+      : tr('na.requiredOpen'),
   };
 }

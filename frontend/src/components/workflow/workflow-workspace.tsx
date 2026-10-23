@@ -717,8 +717,8 @@ export function WorkflowWorkspace({
         if (recorded) {
           setTransitionError(
             option.kind === 'finish' && !(e instanceof EventRecordedError)
-              ? "This stage was recorded, but finishing the project didn't go through. The page is reloading; finish the project from there."
-              : "That was recorded, but the page couldn't catch up. Don't do it again — reloading shows where the project stands."
+              ? t('wsa.recordedNotFinished')
+              : t('wsa.recordedNoCatchUp')
           );
           onReload?.();
           return;
@@ -727,14 +727,14 @@ export function WorkflowWorkspace({
         // an unhandled rejection and the click looked like it did nothing.
         setTransitionError(
           e instanceof Error && e.message
-            ? `That didn't go through: ${e.message}. Nothing was changed, so you can try again.`
-            : "That didn't go through. Nothing was changed, so you can try again."
+            ? t('wsa.failedRetryWhy', { message: e.message })
+            : t('wsa.failedRetry')
         );
       } finally {
         setBusy(false);
       }
     },
-    [stage, busy, project, template, onPatchProject, setStageSummary, setStageFigures, stageBundles, evaluation, appendEvent, appendStageVersion, onReload]
+    [stage, busy, project, template, onPatchProject, setStageSummary, setStageFigures, stageBundles, evaluation, appendEvent, appendStageVersion, onReload, t]
   );
 
   /** PM-13: mark the current stage blocked, or lift the block. */
@@ -751,10 +751,10 @@ export function WorkflowWorkspace({
           : { type: 'stage_unblocked', stage_id: stage.id });
         setBlocking(false);
       } catch (e) {
-        setTransitionError(`That didn't go through${e instanceof Error && e.message ? `: ${e.message}` : ''}. Nothing was changed.`);
+        setTransitionError(e instanceof Error && e.message ? t('wsa.failedWhy', { message: e.message }) : t('wsa.failed'));
       }
     },
-    [stage, appendEvent, project, stageBundles]
+    [stage, appendEvent, project, stageBundles, t]
   );
 
   /**
@@ -770,9 +770,9 @@ export function WorkflowWorkspace({
     try {
       await appendEvent({ type: 'stage_reopened', stage_id: stage.id });
     } catch (e) {
-      setTransitionError(`That didn't go through${e instanceof Error && e.message ? `: ${e.message}` : ''}. Nothing was changed.`);
+      setTransitionError(e instanceof Error && e.message ? t('wsa.failedWhy', { message: e.message }) : t('wsa.failed'));
     }
-  }, [stage, appendEvent]);
+  }, [stage, appendEvent, t]);
 
   const markComplete = useCallback(async () => {
     if (!stage) return;
@@ -785,9 +785,9 @@ export function WorkflowWorkspace({
         ...(evidenceId ? { payload: { evidence_version_id: evidenceId } } : {}),
       });
     } catch (e) {
-      setTransitionError(`That didn't go through${e instanceof Error && e.message ? `: ${e.message}` : ''}. Nothing was changed.`);
+      setTransitionError(e instanceof Error && e.message ? t('wsa.failedWhy', { message: e.message }) : t('wsa.failed'));
     }
-  }, [stage, template, stageBundles, project, appendStageVersion, appendEvent]);
+  }, [stage, template, stageBundles, project, appendStageVersion, appendEvent, t]);
 
   useEffect(() => {
     let live = true;
@@ -820,11 +820,11 @@ export function WorkflowWorkspace({
       });
       onPatchProject({ workflow_template_id: latestTemplate.id });
     } catch (e) {
-      setTransitionError(`The upgrade didn't go through${e instanceof Error && e.message ? `: ${e.message}` : ''}. Nothing was changed.`);
+      setTransitionError(e instanceof Error && e.message ? t('wsa.upgradeWhy', { message: e.message }) : t('wsa.upgrade'));
     } finally {
       setUpgrading(false);
     }
-  }, [latestTemplate, stage, project.workflow_template_id, template.version, onPatchProject, appendEvent]);
+  }, [latestTemplate, stage, project.workflow_template_id, template.version, onPatchProject, appendEvent, t]);
 
   const reopenProject = useCallback(async () => {
     if (!stage) return;
@@ -1038,10 +1038,10 @@ export function WorkflowWorkspace({
           ...(evidenceId ? { payload: { evidence_version_id: evidenceId } } : {}),
         });
       } catch (e) {
-        setTransitionError(`The box is ticked, but the stage could not be closed${e instanceof Error && e.message ? `: ${e.message}` : ''}.`);
+        setTransitionError(e instanceof Error && e.message ? t('wsa.notClosedWhy', { message: e.message }) : t('wsa.notClosed'));
       }
     },
-    [project, onPatchProject, template, state, stageId, stage, context, flushProject, stageBundles, appendEvent, appendStageVersion]
+    [project, onPatchProject, template, state, stageId, stage, context, flushProject, stageBundles, appendEvent, appendStageVersion, t]
   );
 
   // "Routine decisions" (5 Oct). Written through before the event, because the
@@ -1053,10 +1053,10 @@ export function WorkflowWorkspace({
         await flushProject();
         await appendEvent({ type: 'routine_policy_changed', stage_id: stageId, payload: { routine_decisions: value } });
       } catch (e) {
-        setTransitionError(`Routine decisions could not be saved${e instanceof Error && e.message ? `: ${e.message}` : ''}.`);
+        setTransitionError(e instanceof Error && e.message ? t('wsa.routineWhy', { message: e.message }) : t('wsa.routine'));
       }
     },
-    [onPatchProject, flushProject, appendEvent, stageId]
+    [onPatchProject, flushProject, appendEvent, stageId, t]
   );
 
   // "Web access" (20 Oct): the project's switch, written through before the
@@ -1068,10 +1068,10 @@ export function WorkflowWorkspace({
         await flushProject();
         await appendEvent({ type: 'web_access_changed', stage_id: stageId, payload: { web_access: value } });
       } catch (e) {
-        setTransitionError(`Web access could not be saved${e instanceof Error && e.message ? `: ${e.message}` : ''}.`);
+        setTransitionError(e instanceof Error && e.message ? t('wsa.webWhy', { message: e.message }) : t('wsa.web'));
       }
     },
-    [onPatchProject, flushProject, appendEvent, stageId]
+    [onPatchProject, flushProject, appendEvent, stageId, t]
   );
 
   // Approvals committed under the routine-decision policy on this stage, while
@@ -1338,9 +1338,9 @@ export function WorkflowWorkspace({
       // the button promises the work is carried on, which Guided would not do.
       await go.applyAndContinue();
     } catch (e) {
-      setTransitionError(`That didn't go through${e instanceof Error && e.message ? `: ${e.message}` : ''}. Nothing was changed.`);
+      setTransitionError(e instanceof Error && e.message ? t('wsa.failedWhy', { message: e.message }) : t('wsa.failed'));
     }
-  }, [template, state, context, stageBundles, project, appendStageVersion, appendEvent, go]);
+  }, [template, state, context, stageBundles, project, appendStageVersion, appendEvent, go, t]);
 
   /** Stages a change left waiting for an update, by label: the next-step bar and the "Revision applied" note both say it. */
   const awaitingLabels = [...(briefChange?.stageIds ?? []), ...(briefChange?.alsoWaiting ?? [])].map(
@@ -1490,6 +1490,11 @@ export function WorkflowWorkspace({
   const hasContent = (headVersion?.content ?? '').trim().length > 0;
   const applyable = recommendations.rows.filter((r) => r.kind !== 'stage_transition' && isApplyable(r));
   const nextStage = stage.transitions.default_next ? getStage(template, stage.transitions.default_next) : null;
+  /** A stage's short name as the page shows it (client, 21 Oct): the bar and Go's list of buttons say the same. */
+  const shownStageName = (id: string) => {
+    const s = getStage(template, id);
+    return s ? stageText(locale, template.key, s, 'short') : undefined;
+  };
   // Cut off means the model stopped at its length limit. A check's
   // "incomplete" is a judgement — on 6 Oct it meant "overshoots this stage" —
   // and comes with findings to apply; offering Continue writing for it added
@@ -1522,7 +1527,7 @@ export function WorkflowWorkspace({
     canAdvance: evaluation.canAdvance,
     checkSays: isCurrent ? currentCheckSays : null,
     isLast: !stage.transitions.default_next,
-    nextLabel: nextStage?.short_label ?? null,
+    nextLabel: nextStage ? stageText(locale, template.key, nextStage, 'short') : null,
     panelStep: isCurrent ? (panelSteps[stage.id] ?? null) : null,
     unmetRequired: evaluation.unmet.filter((c) => c.blocking).map((c) => c.label),
   });
@@ -1603,7 +1608,7 @@ export function WorkflowWorkspace({
         ? formatManuscript(deliverableSections)
         : (deliverableBundle?.versions.at(-1)?.content ?? '');
     if (!content.trim()) {
-      setObjectiveCheck({ running: false, result: null, error: 'There is nothing written to check yet.' });
+      setObjectiveCheck({ running: false, result: null, error: t('wsa.nothingToCheck') });
       return;
     }
     setObjectiveCheck({ running: true, result: null, error: null });
@@ -1627,7 +1632,7 @@ export function WorkflowWorkspace({
       setObjectiveCheck({
         running: false,
         result: null,
-        error: `The check did not run${e instanceof Error && e.message ? `: ${e.message}` : ''}. You can still finish.`,
+        error: e instanceof Error && e.message ? t('wsa.checkDidNotRunWhy', { message: e.message }) : t('wsa.checkDidNotRun'),
       });
     }
   };
@@ -1641,35 +1646,35 @@ export function WorkflowWorkspace({
 
   const moreActions: MoreAction[] = [
     ...(canMarkComplete
-      ? [{ id: 'mark-complete', label: 'Mark this stage complete', icon: 'task_alt', group: MORE_GROUPS.stage, hint: 'Records it as done; you can reopen it later.', onSelect: () => void markComplete() }]
+      ? [{ id: 'mark-complete', label: t('ws.markComplete'), icon: 'task_alt', group: MORE_GROUPS.stage, hint: t('wsa.markCompleteHint'), onSelect: () => void markComplete() }]
       : []),
     isBlocked
-      ? { id: 'unblock', label: 'Continue this stage', icon: 'lock_open', group: MORE_GROUPS.stage, hint: 'Clears the stuck mark.', onSelect: () => void setBlocked(null) }
-      : { id: 'block', label: 'Mark as stuck…', icon: 'block', group: MORE_GROUPS.stage, hint: 'Say what is in the way; Go stops here.', onSelect: () => setBlocking(true) },
+      ? { id: 'unblock', label: t('wsa.continueStage'), icon: 'lock_open', group: MORE_GROUPS.stage, hint: t('wsa.continueStageHint'), onSelect: () => void setBlocked(null) }
+      : { id: 'block', label: t('wsa.markStuck'), icon: 'block', group: MORE_GROUPS.stage, hint: t('wsa.markStuckHint'), onSelect: () => setBlocking(true) },
     ...(draftable && hasContent
-      ? [{ id: 'regenerate', label: 'Regenerate this stage', icon: 'refresh', group: MORE_GROUPS.stage, hint: 'Writes a fresh draft as a new version; this one is kept.', onSelect: () => setConfirmingRegenerate(true) }]
+      ? [{ id: 'regenerate', label: t('wsa.regenerate'), icon: 'refresh', group: MORE_GROUPS.stage, hint: t('wsa.regenerateHint'), onSelect: () => setConfirmingRegenerate(true) }]
       : []),
     ...(draftable && !hasContent && primaryAction.kind !== 'draft'
-      ? [{ id: 'draft', label: 'Draft this stage', icon: 'auto_awesome', group: MORE_GROUPS.stage, hint: 'Writes the first draft.', onSelect: () => generation.generate() }]
+      ? [{ id: 'draft', label: t('na.draftStage'), icon: 'auto_awesome', group: MORE_GROUPS.stage, hint: t('wsa.draftHint'), onSelect: () => generation.generate() }]
       : []),
     ...(toolsAvailable
       ? [
           ...(truncated && primaryAction.kind !== 'continue_writing'
-            ? [{ id: 'continue', label: 'Continue writing', icon: 'play_arrow', group: MORE_GROUPS.stage, hint: 'Finishes a draft that was cut off.', onSelect: () => void tools.run('continue') }]
+            ? [{ id: 'continue', label: t('na.continueWriting'), icon: 'play_arrow', group: MORE_GROUPS.stage, hint: t('wsa.continueHint'), onSelect: () => void tools.run('continue') }]
             : []),
-          ...REWRITE_TOOLS.map((t) => ({ id: t.kind, label: t.label, icon: t.icon, group: MORE_GROUPS.rewrite, onSelect: () => void tools.run(t.kind) })),
-          ...CRITIQUE_TOOLS.map((t) => ({ id: t.kind, label: t.label, icon: t.icon, group: MORE_GROUPS.critique, onSelect: () => void tools.run(t.kind) })),
+          ...REWRITE_TOOLS.map((tool) => ({ id: tool.kind, label: t(`tool.${tool.kind}`), icon: tool.icon, group: MORE_GROUPS.rewrite, onSelect: () => void tools.run(tool.kind) })),
+          ...CRITIQUE_TOOLS.map((tool) => ({ id: tool.kind, label: t(`tool.${tool.kind}`), icon: tool.icon, group: MORE_GROUPS.critique, onSelect: () => void tools.run(tool.kind) })),
         ]
       : critiqueOnly
-        ? CRITIQUE_TOOLS.map((t) => ({ id: t.kind, label: t.label, icon: t.icon, group: MORE_GROUPS.critique, onSelect: () => void tools.run(t.kind) }))
+        ? CRITIQUE_TOOLS.map((tool) => ({ id: tool.kind, label: t(`tool.${tool.kind}`), icon: tool.icon, group: MORE_GROUPS.critique, onSelect: () => void tools.run(tool.kind) }))
         : []),
     ...(draftable && hasContent && Boolean(stageEvaluation.evaluate) && primaryAction.kind !== 'evaluate'
       ? [{
           id: 'evaluate',
-          label: headEvaluation ? 'Check this stage again · one AI check' : 'Check this stage · one AI check',
+          label: headEvaluation ? t('wsa.checkAgain') : t('wsa.checkOnce'),
           icon: 'rule',
           group: MORE_GROUPS.stage,
-          hint: 'Scores this version against the objective; changes nothing.',
+          hint: t('wsa.checkHint'),
           onSelect: () => stageEvaluation.evaluate?.(),
         }]
       : []),
@@ -1683,7 +1688,8 @@ export function WorkflowWorkspace({
         primary: primaryAction,
         more: moreActions,
         options: transitions,
-        nextStageLabel: nextStage?.short_label ?? null,
+        nextStageLabel: nextStage ? stageText(locale, template.key, nextStage, 'short') : null,
+        stageName: shownStageName,
         openApprovals: evaluation.criteria.filter((c) => c.manual && !c.satisfied),
         lookupNoun: rendererHoldsItems(stage.renderer) && hasContent ? (itemSchemaFor(stage).lookup?.noun ?? null) : null,
         dataPanel: true,
@@ -1790,7 +1796,7 @@ export function WorkflowWorkspace({
         <ApplyPreview
           selected={recommendations.previewRows}
           headVersionNumber={headVersion?.version_number ?? null}
-          stageLabel={stage.short_label}
+          stageLabel={stageText(locale, template.key, stage, 'short')}
           applying={recommendations.busy}
           error={recommendations.error}
           onRemove={recommendations.removeFromPreview}
@@ -2156,7 +2162,7 @@ export function WorkflowWorkspace({
             )}
             <PendingChangeNotice
               changes={project.status === 'finalized' ? [] : heldChanges.filter((c) => c.id !== pendingShown)}
-              stageLabel={(id) => template.stages.find((s) => s.id === id)?.label ?? id}
+              stageLabel={(id) => { const s = template.stages.find((x) => x.id === id); return s ? stageText(locale, template.key, s, 'label') : id; }}
               onChoose={(c) => {
                 setViewingStageId(c.stageId === state.current_stage_id ? null : c.stageId);
                 setChatOpen(true);
@@ -2166,7 +2172,7 @@ export function WorkflowWorkspace({
             />
             <BriefChangeNotice
               change={briefChange}
-              stageLabel={(id) => template.stages.find((s) => s.id === id)?.label ?? id}
+              stageLabel={(id) => { const s = template.stages.find((x) => x.id === id); return s ? stageText(locale, template.key, s, 'label') : id; }}
               onKeep={(changeAt) => void appendEvent({ type: 'brief_change_dismissed', stage_id: stageId, payload: { change_at: changeAt } })}
               // The button is the next-step bar's, at the top of every stage.
               onUpdate={undefined}
@@ -2515,22 +2521,23 @@ export function WorkflowWorkspace({
                 busy={busy}
                 // A check that failed says so here, beside the button pressed:
                 // a long-form stage had nowhere to show it (14 Oct).
-                error={transitionError ?? (stageEvaluation.error ? `The check did not finish: ${stageEvaluation.error}` : null)}
+                error={transitionError ?? (stageEvaluation.error ? t('wsa.checkNotFinished', { error: stageEvaluation.error }) : null)}
                 primary={primaryAction}
                 onPrimary={runPrimary}
                 more={moreActions}
-                nextStageLabel={nextStage?.short_label ?? null}
+                nextStageLabel={nextStage ? stageText(locale, template.key, nextStage, 'short') : null}
+                stageName={shownStageName}
                 // Go waiting for an answer is open work too (6 Oct, email 1:
                 // "nothing was outstanding while … Go was waiting for me").
-                elsewhere={goWaiting ? [...outstandingOther, `Go is waiting for you: ${goWaiting}`] : outstandingOther}
+                elsewhere={goWaiting ? [...outstandingOther, t('wsa.goWaitingFor', { what: goWaiting })] : outstandingOther}
                 working={
-                  stageEvaluation.evaluating ? 'Checking this stage…'
-                    : generation.generating ? 'Drafting…'
-                      : tools.running !== null ? 'Working…'
-                        : go.active ? 'Go is working…'
+                  stageEvaluation.evaluating ? t('wsa.checking')
+                    : generation.generating ? t('wsa.drafting')
+                      : tools.running !== null ? t('na.working')
+                        : go.active ? t('wsa.goWorking')
                           : null
                 }
-                done={stageEvaluation.checked && stageEvaluation.checked === headVersion?.id ? 'Checked — the results are shown with the stage above.' : null}
+                done={stageEvaluation.checked && stageEvaluation.checked === headVersion?.id ? t('wsa.checked') : null}
                 projectOpen={projectOpenOn === stage.id}
                 checkSays={currentCheckSays}
                 onSuggest={appendStageVersion && !go.active && !go.pendingStep ? () => void go.suggest() : undefined}
@@ -2620,6 +2627,7 @@ export function WorkflowWorkspace({
               project={project}
               stageId={stage.id}
               stageLabel={stage.label}
+              stageTitle={stageText(locale, template.key, stage, 'label')}
               onFactsChanged={() => onReload?.()}
               onSourcesChanged={() => onReload?.()}
               // 13 Oct (Sean, email 6): the revision's saved text is checked
@@ -2654,6 +2662,7 @@ export function WorkflowWorkspace({
               getChatContext={() =>
                 buildChatContext({
                   template, state, project, stage, bundles: stageBundles, controls: pageControls,
+                  display: { stageName: (s) => stageText(locale, template.key, s, 'label'), workflowName: shownTemplateName },
                   goRun: {
                     run: go.run ? { status: go.run.status, policy: go.run.policy, stop_reason: go.run.stop_reason ?? null } : null,
                     steps: go.steps,

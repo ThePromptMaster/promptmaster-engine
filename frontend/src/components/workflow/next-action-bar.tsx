@@ -1,5 +1,7 @@
 'use client';
 
+import { tr } from '@/lib/i18n/store';
+import { useT } from '@/lib/i18n/i18n-provider';
 import { useEffect, useState } from 'react';
 import type { NextAction } from '@/lib/workflow/next-step';
 
@@ -19,8 +21,8 @@ export interface GoControlState {
  */
 export function blockedReason(go: GoControlState | undefined): string | null {
   if (!go) return null;
-  if (go.phase === 'watching') return 'Go is running in another tab. Stop it there, or wait for it to finish.';
-  if (go.pendingStep) return 'Go is waiting for your decision on its proposed step first.';
+  if (go.phase === 'watching') return tr('bar.otherTab');
+  if (go.pendingStep) return tr('bar.pending');
   return null;
 }
 
@@ -44,6 +46,7 @@ export function NextActionBar({
   onShowGo?: () => void;
 }) {
   // The Go phase at the moment of the press, or null when not pressed.
+  const t = useT();
   const [pressedAt, setPressedAt] = useState<string | null>(null);
   const pressed = pressedAt !== null;
   // A press shows "Starting…" until Go reports it is working (the bar then
@@ -61,7 +64,7 @@ export function NextActionBar({
   if (!action) return null;
   if (action.kind === 'working') {
     return (
-      <div role="status" aria-label="Next step" className="mb-4 flex items-center gap-2 rounded-xl bg-[var(--surface-container-low)] px-4 py-2.5 text-label text-[var(--on-surface-variant)]">
+      <div role="status" aria-label={t('bar.label')} className="mb-4 flex items-center gap-2 rounded-xl bg-[var(--surface-container-low)] px-4 py-2.5 text-label text-[var(--on-surface-variant)]">
         <span aria-hidden className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
         {action.label}
       </div>
@@ -70,10 +73,10 @@ export function NextActionBar({
   const blocked = blockedReason(go);
   const busy = (pressed && !go?.error) || Boolean(go?.authorizing);
   return (
-    <section aria-label="Next step" className="mb-4 flex flex-wrap items-center gap-3 rounded-xl bg-[var(--surface-container-low)] px-4 py-2.5">
+    <section aria-label={t('bar.label')} className="mb-4 flex flex-wrap items-center gap-3 rounded-xl bg-[var(--surface-container-low)] px-4 py-2.5">
       {/* A real starting width, so the button drops below on a phone instead of squeezing the text (20 Oct). */}
       <p className="min-w-0 flex-[1_1_16rem] text-label text-[var(--on-surface)]">
-        <span className="font-semibold">Next: </span>
+        <span className="font-semibold">{t('bar.next')}</span>
         {action.why}
       </p>
       <button
@@ -86,7 +89,7 @@ export function NextActionBar({
         className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label font-semibold text-[var(--on-primary)] hover:opacity-90 disabled:opacity-50"
       >
         <span aria-hidden className={`material-symbols-outlined text-[16px]${busy ? ' animate-spin' : ''}`}>{busy ? 'progress_activity' : 'play_arrow'}</span>
-        {busy ? 'Starting Go…' : action.label}
+        {busy ? t('bar.starting') : action.label}
       </button>
       {(blocked || go?.error) && (
         <p role="alert" className="basis-full text-label text-[var(--pm-error)]">
@@ -95,7 +98,7 @@ export function NextActionBar({
               button and a sentence were all the bar offered (14 Oct call). */}
           {go?.pendingStep && onShowGo && (
             <button type="button" onClick={onShowGo} className="ml-2 font-semibold text-[var(--pm-primary)] underline">
-              Show Go&apos;s proposal
+              {t('bar.showProposal')}
             </button>
           )}
         </p>

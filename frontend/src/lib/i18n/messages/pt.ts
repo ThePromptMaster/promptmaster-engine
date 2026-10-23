@@ -10,6 +10,9 @@ import { pt as webArea } from './areas/web';
 import { pt as dataArea } from './areas/data';
 import { pt as docArea } from './areas/doc';
 import { pt as wsArea } from './areas/ws';
+import { pt as actArea } from './areas/act';
+import { pt as chatArea } from './areas/chat';
+import { pt as chat2Area } from './areas/chat2';
 
 export const pt: Messages = {
   'header.account': 'Conta',
@@ -279,4 +282,7 @@ export const pt: Messages = {
   ...dataArea,
   ...docArea,
   ...wsArea,
+  ...actArea,
+  ...chatArea,
+  ...chat2Area,
 };

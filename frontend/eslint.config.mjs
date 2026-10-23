@@ -3,7 +3,7 @@ import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 
 // Material Symbols are written as their ligature names; they are icons, not words.
-const ICONS = ["person", "expand_more", "expand_less", "palette", "translate", "logout", "science", "arrow_back", "attach_file", "close", "check", "add", "arrow_upward", "arrow_forward", "description", "image", "delete", "edit", "refresh", "info", "lightbulb", "help", "chat", "auto_awesome", "menu_book", "bolt", "tune", "undo", "link_off", "travel_explore", "public_off", "content_copy", "recommend", "edit_note", "compress", "folder_open", "workspaces", "chevron_right", "restore_from_trash", "create_new_folder", "drive_file_move", "link", "download", "table_view", "fact_check", "check_circle", "forum", "lock", "list_alt", "splitscreen_right", "task_alt"];
+const ICONS = ["person", "expand_more", "expand_less", "palette", "translate", "logout", "science", "arrow_back", "attach_file", "close", "check", "add", "arrow_upward", "arrow_forward", "description", "image", "delete", "edit", "refresh", "info", "lightbulb", "help", "chat", "auto_awesome", "menu_book", "bolt", "tune", "undo", "link_off", "travel_explore", "public_off", "content_copy", "recommend", "edit_note", "compress", "folder_open", "workspaces", "chevron_right", "restore_from_trash", "create_new_folder", "drive_file_move", "link", "download", "table_view", "fact_check", "check_circle", "forum", "lock", "list_alt", "splitscreen_right", "task_alt", "history", "note_add", "progress_activity", "pending_actions"];
 
 const eslintConfig = defineConfig([
   ...nextVitals,
@@ -40,9 +40,24 @@ const eslintConfig = defineConfig([
       "src/components/workflow/project-data.tsx",
       "src/components/workflow/full-document-reader.tsx",
       "src/components/workflow/export-menu.tsx",
+      "src/components/workflow/next-action-bar.tsx",
+      "src/components/workflow/facts-next-step.tsx",
+      "src/components/workflow/stage-transition-bar.tsx",
+      "src/components/workflow/exit-criteria-checklist.tsx",
+      "src/components/workflow/recovery-panel.tsx",
+      "src/components/workflow/chat-panel.tsx",
+      "src/components/workflow/reply-actions.tsx",
+      "src/components/workflow/apply-preview.tsx",
+      "src/components/workflow/fact-change-list.tsx",
+      "src/components/workflow/stage-tool-result.tsx",
+      "src/components/workflow/conflict-prompt.tsx",
+      "src/components/workflow/pending-change-notice.tsx",
+      "src/components/workflow/web-found-notice.tsx",
+      "src/components/workflow/critique-follow-up.tsx",
+      "src/components/workflow/brief-change-notice.tsx",
     ],
     rules: {
-      "react/jsx-no-literals": ["error", { noStrings: false, ignoreProps: true, allowedStrings: ["PromptMaster", "·", "—", "…", ".", "/", "+", "[S", "[R", "]", ";", ...ICONS] }],
+      "react/jsx-no-literals": ["error", { noStrings: false, ignoreProps: true, allowedStrings: ["PromptMaster", "·", "—", "…", ".", "/", "+", "[S", "[R", "]", ";", ":", "“", "”", "&ldquo;", "&rdquo;", ...ICONS] }],
     },
   },
   // Override default ignores of eslint-config-next.

@@ -1,5 +1,6 @@
 'use client';
 
+import { useT } from '@/lib/i18n/i18n-provider';
 import { useRef, useState, type ReactNode } from 'react';
 
 import type { RowChange } from '@/lib/workflow/row-actions';
@@ -26,7 +27,7 @@ export function ReplyActions({
   onRequest,
   isDone,
   afterDone,
-  label = 'Act on this reply',
+  label,
 }: {
   /** What these actions are about, for assistive technology. */
   label?: string;
@@ -50,6 +51,7 @@ export function ReplyActions({
   /** Under a done action: what to do next. */
   afterDone?: ReactNode;
 }) {
+  const t = useT();
   const [confirming, setConfirming] = useState<ReplyAction | null>(null);
   const [working, setWorking] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
@@ -66,7 +68,7 @@ export function ReplyActions({
       await onRun(action);
       setConfirming(null);
     } catch (e) {
-      setFailed(e instanceof Error && e.message ? e.message : 'That did not work. Nothing was changed.');
+      setFailed(e instanceof Error && e.message ? e.message : t('ra.failed'));
     } finally {
       inFlight.current = false;
       setWorking(false);
@@ -81,14 +83,14 @@ export function ReplyActions({
   if (loading) {
     return (
       <p role="status" className="text-label text-[var(--on-surface-variant)]">
-        Working out what you could do about this…
+        {t('ra.working')}
       </p>
     );
   }
   if (actions === null) {
     return onRequest ? (
       <button onClick={onRequest} className={quiet}>
-        Suggest actions for this reply
+        {t('ra.suggest')}
       </button>
     ) : null;
   }
@@ -98,15 +100,15 @@ export function ReplyActions({
     // 8): what will be recorded is shown, and only "Record" writes it.
     const facts = confirming.facts ?? [];
     return (
-      <section aria-label="Record facts" className="rounded-xl bg-[var(--surface-container-low)] px-4 py-3">
-        <p className="text-title text-[var(--on-surface)]">These become accepted project facts</p>
+      <section aria-label={t('ra.recordLabel')} className="rounded-xl bg-[var(--surface-container-low)] px-4 py-3">
+        <p className="text-title text-[var(--on-surface)]">{t('ra.becomeFacts')}</p>
         <p className="mt-1 text-label text-[var(--on-surface-variant)]">
-          Every stage, check and chat reads them from now on. Finished work that relied on what changed is reopened for a recheck.
+          {t('ra.becomeFactsWhy')}
         </p>
         <ul className="mt-2 list-disc space-y-1 pl-5 text-label text-[var(--on-surface)]">
           {facts.map((f, i) => (
             <li key={i}>
-              {f.kind === 'requirement' ? <span className="font-semibold">Requirement: </span> : null}
+              {f.kind === 'requirement' ? <span className="font-semibold">{t('ra.requirement')}</span> : null}
               {f.subject ? `${f.subject}: ` : ''}
               {f.statement}
             </li>
@@ -117,10 +119,10 @@ export function ReplyActions({
         )}
         <div className="mt-3 flex flex-wrap gap-2">
           <button onClick={() => void run(confirming)} disabled={working || busy || !facts.length} className={primary}>
-            {working ? 'Recording…' : `Record ${facts.length === 1 ? 'this fact' : `these ${facts.length} facts`}`}
+            {working ? t('ra.recording') : facts.length === 1 ? t('ra.recordThis') : t('ra.recordThese', { count: facts.length })}
           </button>
           <button onClick={() => setConfirming(null)} disabled={working} className={quiet}>
-            Back
+            {t('ra.back')}
           </button>
         </div>
       </section>
@@ -130,17 +132,17 @@ export function ReplyActions({
   if (confirming) {
     const changes = previewRows?.(confirming) ?? [];
     return (
-      <section aria-label="Review the change" className="rounded-xl bg-[var(--surface-container-low)] px-4 py-3">
+      <section aria-label={t('ra.reviewLabel')} className="rounded-xl bg-[var(--surface-container-low)] px-4 py-3">
         <p className="text-title text-[var(--on-surface)]">{confirming.label}</p>
         {changes.length === 0 ? (
           <p className="mt-1 text-label text-[var(--on-surface-variant)]">
-            Nothing in the table would change — the rows this names are not there, or already say this.
+            {t('ra.nothingInTable')}
           </p>
         ) : (
           <ul className="mt-2 space-y-2">
             {changes.map((c) => (
               <li key={c.id} className="text-label text-[var(--on-surface)]">
-                <span className="font-semibold">{c.added ? 'New row' : c.title}</span>
+                <span className="font-semibold">{c.added ? t('ra.newRow') : c.title}</span>
                 <ul className="mt-0.5 space-y-0.5 text-[var(--on-surface-variant)]">
                   {c.lines.map((line) => (
                     <li key={line}>{line}</li>
@@ -156,11 +158,11 @@ export function ReplyActions({
         <div className="mt-3 flex flex-wrap gap-2">
           {changes.length > 0 && (
             <button onClick={() => void run(confirming)} disabled={working || busy} className={primary}>
-              {working ? 'Saving…' : `Save as a new version (${changes.length} row${changes.length === 1 ? '' : 's'})`}
+              {working ? t('ra.saving') : t('ra.saveRows', { count: changes.length })}
             </button>
           )}
           <button onClick={() => setConfirming(null)} disabled={working} className={quiet}>
-            Back
+            {t('ra.back')}
           </button>
         </div>
       </section>
@@ -168,9 +170,9 @@ export function ReplyActions({
   }
 
   return (
-    <section aria-label={label} className="rounded-xl bg-[var(--surface-container-low)] px-4 py-3">
+    <section aria-label={label ?? t('ra.label')} className="rounded-xl bg-[var(--surface-container-low)] px-4 py-3">
       <p className="text-label uppercase tracking-wide text-[var(--on-surface-variant)]">
-        {actions.length ? 'What next?' : 'Nothing here needs changing'}
+        {actions.length ? t('ra.whatNext') : t('ra.nothingNeeded')}
       </p>
       {error && <p className="mt-1 text-label text-[var(--on-surface-variant)]">{error}</p>}
       {failed && (
@@ -185,7 +187,7 @@ export function ReplyActions({
               className="inline-flex items-center gap-1 rounded-lg bg-[var(--surface-container-high)] px-3 py-1.5 text-label text-[var(--on-surface)]"
             >
               <span aria-hidden className="material-symbols-outlined text-[16px] text-[var(--pm-success)]">check_circle</span>
-              {action.facts?.length === 1 ? 'Fact recorded' : `${action.facts?.length ?? ''} facts recorded`}
+              {action.facts?.length === 1 ? t('ra.factRecorded') : t('ra.factsRecorded', { count: action.facts?.length ?? 0 })}
             </span>
           ) : (
           <button
@@ -199,13 +201,13 @@ export function ReplyActions({
           )
         )}
         <button onClick={onDismiss} disabled={working} className={quiet}>
-          Do nothing
+          {t('ra.doNothing')}
         </button>
       </div>
       {anyDone && afterDone && <div className="mt-2">{afterDone}</div>}
       {actions.some((a) => a.kind === 'revise') && (
         <p className="mt-2 text-label text-[var(--on-surface-variant)]">
-          You see the revised version before it is saved.
+          {t('ra.seeFirst')}
         </p>
       )}
     </section>

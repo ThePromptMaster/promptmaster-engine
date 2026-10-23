@@ -1,5 +1,7 @@
 'use client';
 
+import type { MessageKey } from '@/lib/i18n/messages/en';
+import { useT } from '@/lib/i18n/i18n-provider';
 import { useState } from 'react';
 
 import type { StageDefinition, StageEvaluation } from '@/lib/workflow/types';
@@ -32,6 +34,14 @@ export const MORE_GROUPS = {
 
 const GROUP_ORDER: readonly string[] = Object.values(MORE_GROUPS);
 
+/** A group's heading in the interface's language; the English names above order the menu. */
+const GROUP_KEY: Record<string, MessageKey> = {
+  [MORE_GROUPS.stage]: 'more.stage',
+  [MORE_GROUPS.rewrite]: 'more.rewrite',
+  [MORE_GROUPS.critique]: 'more.critique',
+  [MORE_GROUPS.move]: 'more.move',
+};
+
 /** Entries in group order, each group's own order kept, so a heading appears once. */
 export function byGroup(items: readonly MoreAction[]): MoreAction[] {
   const rank = (a: MoreAction) => (a.group ? GROUP_ORDER.indexOf(a.group) : -1);
@@ -47,6 +57,8 @@ interface Props {
   busy?: boolean;
   /** Why the last transition failed, in words the user can act on. */
   error?: string | null;
+  /** A stage's name as the page shows it, for "Go back to …" under More. */
+  stageName?: (stageId: string) => string | undefined;
   /**
    * PM-06: the one thing to do next. When given, the bar shows a single
    * primary button and puts every other action — including the transitions
@@ -98,6 +110,7 @@ export function StageTransitionBar({
   onTransition,
   busy = false,
   error = null,
+  stageName,
   primary,
   onSuggest,
   suggesting = false,
@@ -112,6 +125,7 @@ export function StageTransitionBar({
 }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [whyOpen, setWhyOpen] = useState(false);
+  const t = useT();
   const [pending, setPending] = useState<TransitionOption | null>(null);
   const [note, setNote] = useState('');
   const [showReturns, setShowReturns] = useState(false);
@@ -150,10 +164,10 @@ export function StageTransitionBar({
       <div className="rounded-xl bg-[var(--surface-container-high)] px-5 py-4">
         <p className="text-body text-[var(--on-surface)]">
           {isSkip
-            ? `Skipping ${stage.short_label}. Why?`
+            ? t('tb.skipping', { stage: stage.short_label })
             : overriding
-              ? 'You are overriding something this stage requires. Say why — the reason is kept on the record, and the stage stays open.'
-              : 'Moving on with unfinished items. Why?'}
+              ? t('tb.overriding')
+              : t('tb.movingOn')}
         </p>
 
         {!isSkip && evaluation.unmet.length > 0 && (
@@ -187,8 +201,8 @@ export function StageTransitionBar({
           onChange={(e) => setNote(e.target.value)}
           rows={2}
           autoFocus
-          placeholder={isSkip ? 'Or write your own reason' : overriding ? 'Reason for the override (required)' : 'Optional note'}
-          aria-label={overriding ? 'Reason for the override' : undefined}
+          placeholder={isSkip ? t('tb.ownReason') : overriding ? t('tb.reasonRequired') : t('tb.optionalNote')}
+          aria-label={overriding ? t('tb.reason') : undefined}
           className="mt-3 w-full resize-none rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2 text-body text-[var(--on-surface)] outline-none"
         />
 
@@ -198,13 +212,13 @@ export function StageTransitionBar({
             disabled={!canConfirm}
             className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-title text-[var(--on-primary)] disabled:opacity-40"
           >
-            {isSkip ? 'Skip stage' : overriding ? 'Override and continue' : 'Move on'}
+            {isSkip ? t('tb.skipStage') : overriding ? t('tb.overrideContinue') : t('tb.moveOn')}
           </button>
           <button
             onClick={() => setPending(null)}
             className="rounded-lg px-4 py-2 text-title text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
           >
-            Cancel
+            {t('tb.cancel')}
           </button>
         </div>
       </div>
@@ -212,20 +226,20 @@ export function StageTransitionBar({
   }
 
   const elsewhereNote = elsewhere.length
-    ? ` · ${elsewhere.length} still open: ${elsewhere.join('; ')}`
+    ? t('tb.stillOpen', { count: elsewhere.length, items: elsewhere.join('; ') })
     : '';
   // 13 Oct (Sean's regression list, "contradictory readiness"): "Ready to
   // move on" beside open work read as two answers. With work open elsewhere it
   // says this stage is done, and where the rest is.
   const statusLine = evaluation.canAdvance
     ? checkSays
-      ? `Not ready for Go to move on: the latest check says ${checkSays}`
+      ? t('tb.notReady', { says: checkSays })
       : projectOpen
-      ? `This stage's work is done; the project is not finished · ${elsewhere.length || 1} open: ${elsewhere.join('; ') || 'the objective is not met'}. Respond in the notice at the top of this stage.`
+      ? t('tb.projectOpen', { count: elsewhere.length || 1, items: elsewhere.join('; ') || t('tb.objectiveNotMet') })
       : elsewhere.length
-      ? `This stage is done · ${elsewhere.length} still open elsewhere: ${elsewhere.join('; ')}`
-      : 'Ready to move on'
-    : `${evaluation.unmet.length} item${evaluation.unmet.length === 1 ? '' : 's'} outstanding${elsewhereNote}`;
+      ? t('tb.doneElsewhere', { count: elsewhere.length, items: elsewhere.join('; ') })
+      : t('tb.ready')
+    : `${t('tb.outstanding', { count: evaluation.unmet.length })}${elsewhereNote}`;
 
   if (primary) {
     const primaryIsTransition = primary.kind === 'continue' || primary.kind === 'finish';
@@ -233,12 +247,12 @@ export function StageTransitionBar({
       // PM-23: the planner's best move, with its reasons — behind More, so the
       // bar keeps one primary action (PM-06).
       ...(onSuggest
-        ? [{ id: 'suggest', label: suggesting ? 'Thinking…' : 'Suggest a move', icon: 'lightbulb', onSelect: onSuggest, disabled: suggesting }]
+        ? [{ id: 'suggest', label: suggesting ? t('tb.thinking') : t('tb.suggest'), icon: 'lightbulb', onSelect: onSuggest, disabled: suggesting }]
         : []),
       ...byGroup(more),
       // The transitions come from the same function Go's list of this page's
       // buttons is built from (lib/workflow/stage-controls.ts).
-      ...transitionEntries({ primary, options, nextStageLabel }).map((entry) => ({
+      ...transitionEntries({ primary, options, nextStageLabel, stageName }).map((entry) => ({
         ...entry,
         group: MORE_GROUPS.move,
         onSelect: () => {
@@ -257,7 +271,7 @@ export function StageTransitionBar({
         )}
         <div
           role="group"
-          aria-label="Stage actions"
+          aria-label={t('tb.actions')}
           className="flex flex-wrap items-center gap-3 rounded-xl bg-[var(--surface-container-low)] px-5 py-4"
         >
           <div className="mr-auto min-w-0">
@@ -280,12 +294,12 @@ export function StageTransitionBar({
                 aria-expanded={whyOpen}
                 className="mt-1 inline-flex items-center gap-1 text-label text-[var(--pm-primary)]"
               >
-                {whyOpen ? 'Hide why' : 'Why this?'}
+                {whyOpen ? t('tb.hideWhy') : t('tb.why')}
                 <span aria-hidden className="material-symbols-outlined text-[14px]">{whyOpen ? 'expand_less' : 'expand_more'}</span>
               </button>
             )}
             {whyOpen && primary.because && (
-              <ul aria-label="Why this is the next step" className="mt-1 list-disc space-y-0.5 pl-5 text-label text-[var(--on-surface)]">
+              <ul aria-label={t('tb.whyLabel')} className="mt-1 list-disc space-y-0.5 pl-5 text-label text-[var(--on-surface)]">
                 {primary.because.map((line) => (
                   <li key={line}>{line}</li>
                 ))}
@@ -302,7 +316,7 @@ export function StageTransitionBar({
                 aria-expanded={menuOpen}
                 className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-title text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)] hover:text-[var(--on-surface)]"
               >
-                More
+                {t('tb.more')}
                 <span aria-hidden className="material-symbols-outlined text-[18px]">expand_more</span>
               </button>
               {menuOpen && (
@@ -314,7 +328,7 @@ export function StageTransitionBar({
                     <div key={item.id}>
                       {item.group && item.group !== menu[i - 1]?.group && (
                         <p role="presentation" className="px-4 pb-1 pt-2 text-label uppercase tracking-wide text-[var(--on-surface-variant)]">
-                          {item.group}
+                          {GROUP_KEY[item.group] ? t(GROUP_KEY[item.group]) : item.group}
                         </p>
                       )}
                       <button
@@ -342,7 +356,7 @@ export function StageTransitionBar({
                   ))}
                   {returns.length > 0 && (
                     <p className="px-4 py-2 text-label leading-snug text-[var(--on-surface-variant)]">
-                      Going back keeps later work and flags it, never deletes it.
+                      {t('tb.goingBack')}
                     </p>
                   )}
                 </div>
@@ -372,7 +386,7 @@ export function StageTransitionBar({
               disabled={busy}
               className="rounded-lg bg-[var(--pm-primary)] px-5 py-2 text-title text-[var(--on-primary)] transition-opacity hover:opacity-90 disabled:opacity-50"
             >
-              {busy ? 'Saving…' : primary.label}
+              {busy ? t('tb.saving') : primary.label}
             </button>
           )}
         </div>
@@ -389,7 +403,7 @@ export function StageTransitionBar({
     )}
     <div
       role="group"
-      aria-label="Stage actions"
+      aria-label={t('tb.actions')}
       className="flex flex-wrap items-center gap-2 rounded-xl bg-[var(--surface-container-low)] px-5 py-4"
     >
       <span className="mr-auto text-label text-[var(--on-surface-variant)]">
@@ -402,7 +416,7 @@ export function StageTransitionBar({
             onClick={() => setShowReturns((v) => !v)}
             className="rounded-lg px-3 py-2 text-title text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)] hover:text-[var(--on-surface)]"
           >
-            Go back
+            {t('tb.goBack')}
           </button>
           {showReturns && (
             <div className="absolute bottom-full right-0 z-10 mb-1 min-w-[200px] rounded-lg bg-[var(--surface-container-highest)] py-1 shadow-lg">
@@ -420,7 +434,7 @@ export function StageTransitionBar({
               ))}
               {/* Returning never deletes later work; it marks it stale. */}
               <p className="px-4 py-2 text-label leading-snug text-[var(--on-surface-variant)]">
-                Later work is kept and flagged, not deleted.
+                {t('tb.keptFlagged')}
               </p>
             </div>
           )}
@@ -432,7 +446,7 @@ export function StageTransitionBar({
           onClick={() => start(skip)}
           className="rounded-lg px-3 py-2 text-title text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)] hover:text-[var(--on-surface)]"
         >
-          Skip
+          {t('tb.skip')}
         </button>
       )}
 
@@ -442,7 +456,7 @@ export function StageTransitionBar({
           disabled={busy}
           className="rounded-lg bg-[var(--pm-primary)] px-5 py-2 text-title text-[var(--on-primary)] transition-opacity hover:opacity-90 disabled:opacity-50"
         >
-          {busy ? 'Saving…' : advance.label}
+          {busy ? t('tb.saving') : advance.label}
         </button>
       )}
     </div>

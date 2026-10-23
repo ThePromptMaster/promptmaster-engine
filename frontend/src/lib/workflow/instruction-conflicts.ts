@@ -20,6 +20,7 @@
  * instruction so the model knows too.
  */
 
+import { tr } from '@/lib/i18n/store';
 import { CONFLICT_AXES, type ConflictAxis } from './combine';
 
 export type ConflictKind = 'objective' | 'constraint' | 'decision' | 'fact' | 'instruction';
@@ -212,8 +213,8 @@ export function nameOf(c: InstructionConflict): string {
 /** The two buttons: the model's short labels, or plain ones of our own. */
 export function choiceLabels(c: InstructionConflict): { keep: string; override: string } {
   return {
-    keep: c.keep_label?.trim() || (c.protects_approval ? 'Keep the approved value' : `Keep ${nameOf(c)}`),
-    override: c.override_label?.trim() || (c.protects_approval ? 'Override the recorded approval' : 'Follow the new instruction'),
+    keep: c.keep_label?.trim() || (c.protects_approval ? tr('cp.keepApproved') : tr('cp.keepNamed', { name: nameOf(c) })),
+    override: c.override_label?.trim() || (c.protects_approval ? tr('cp.overrideApproval') : tr('cp.followNew')),
   };
 }
 

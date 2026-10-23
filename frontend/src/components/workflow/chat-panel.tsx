@@ -29,6 +29,7 @@
  * boundary itself live in `use-stage-chat.ts`.
  */
 
+import { useT } from '@/lib/i18n/i18n-provider';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { describeLines } from '@/lib/workflow/preservation';
 import { removeClaimsInstruction, type AddedClaim } from '@/lib/workflow/fact-boundary';
@@ -57,7 +58,7 @@ import { documentSections, type ScopeKind } from './chat-scope';
 import type { StageChatMessage } from '@/lib/supabase/conversation';
 import type { NewVersion } from '@/lib/supabase/versions';
 import type { ArtifactVersion, Project } from '@/types/project';
-import { applyChangesLabel, factChangeGroup, type FactChange } from '@/lib/workflow/fact-reconcile';
+import { factChangeGroup, type FactChange } from '@/lib/workflow/fact-reconcile';
 import { FactChangeList, toggled } from './fact-change-list';
 import { LimitCounter } from '@/components/shared/limit-counter';
 import { INPUT_LIMITS } from '@/lib/projects/input-limits';
@@ -93,10 +94,19 @@ const MODES: Array<{
   },
 ];
 
+/** A mode's words in the interface's language; `MODES` keeps its key and icon. */
+function modeText(t: ReturnType<typeof useT>, key: Mode) {
+  return key === 'discuss'
+    ? { label: t('chat.askLabel'), promise: t('chat.askPromise'), send: t('chat.askLabel'), placeholder: t('chat.askPlaceholder') }
+    : { label: t('chat.changeLabel'), promise: t('chat.changePromise'), send: t('chat.changeSend'), placeholder: t('chat.changePlaceholder') };
+}
+
 interface Props {
   project: Project;
   stageId: string;
   stageLabel: string;
+  /** The stage's name as the page shows it (the interface's language); `stageLabel` is what prompts and records use. */
+  stageTitle?: string;
   /** The content a scope resolves against — the version on screen. */
   content: string;
   headVersion: ArtifactVersion | null;
@@ -204,6 +214,7 @@ export function ChatPanel({
   project,
   stageId,
   stageLabel,
+  stageTitle,
   content,
   headVersion,
   appendStageVersion,
@@ -234,6 +245,7 @@ export function ChatPanel({
   onPendingShown,
   awaitingUpdate,
 }: Props) {
+  const t = useT();
   const [offerActions, setOfferActions] = useState(true);
   useEffect(() => setOfferActions(readOfferActions()), []);
   const chat = useStageChat({
@@ -264,7 +276,7 @@ export function ChatPanel({
   const threadRef = useRef<HTMLDivElement>(null);
 
   const sections = useMemo(() => documentSections(content), [content]);
-  const spec = MODES.find((m) => m.key === mode)!;
+  const spec = modeText(t, mode);
 
   /**
    * The section actually targeted.
@@ -429,10 +441,10 @@ export function ChatPanel({
         () =>
           !controller.signal.aborted &&
           // Not being able to suggest actions is not a failed answer.
-          setActions({ forId: replyId, list: [], loading: false, error: 'Could not work out actions for this reply.' })
+          setActions({ forId: replyId, list: [], loading: false, error: t('chat.actionsError') })
       );
     },
-    [chat.messages, suggestActions]
+    [chat.messages, suggestActions, t]
   );
   useEffect(() => {
     if (!suggestActions || !offerActions || readOnly || chat.loading) return;
@@ -557,12 +569,12 @@ export function ChatPanel({
   return (
     <section
       ref={panelRef}
-      aria-label="Side chat"
+      aria-label={t('chat.label')}
       className="flex h-full min-h-0 flex-col rounded-xl bg-[var(--surface-container-lowest)]"
     >
       <header className="px-5 pt-5">
-        <h2 className="text-title text-[var(--on-surface)]">Side chat</h2>
-        <p className="mt-0.5 text-label text-[var(--on-surface-variant)]">{stageLabel}</p>
+        <h2 className="text-title text-[var(--on-surface)]">{t('chat.label')}</h2>
+        <p className="mt-0.5 text-label text-[var(--on-surface-variant)]">{stageTitle ?? stageLabel}</p>
         {suggestActions && (
           <label className="mt-1.5 flex cursor-pointer items-center gap-2 text-label text-[var(--on-surface-variant)]">
             <input
@@ -574,7 +586,7 @@ export function ChatPanel({
               }}
               className="h-3.5 w-3.5 accent-[var(--pm-primary)]"
             />
-            Offer actions from replies
+            {t('chat.offerActions')}
           </label>
         )}
       </header>
@@ -586,19 +598,19 @@ export function ChatPanel({
         instructDisabledReason={
           canInstruct
             ? null
-            : (cannotChangeBecause ?? 'Ask only — open the latest version to change it.')
+            : (cannotChangeBecause ?? t('chat.openLatest'))
         }
         webAccess={project.web_access === 'on'}
       />
       {editElsewhere && (
         <p className="flex flex-wrap items-center gap-2 px-5 pt-2 text-label text-[var(--on-surface-variant)]">
-          To change the {editElsewhere.label}, open it and press Edit this stage.
+          {t('chat.editElsewhere', { label: editElsewhere.label })}
           <button
             type="button"
             onClick={editElsewhere.onOpen}
             className="rounded-lg bg-[var(--surface-container-high)] px-2.5 py-1 font-semibold text-[var(--pm-primary)] hover:bg-[var(--surface-container-highest)]"
           >
-            Open {editElsewhere.label}
+            {t('chat.openNamed', { label: editElsewhere.label })}
           </button>
         </p>
       )}
@@ -609,7 +621,7 @@ export function ChatPanel({
         aria-live="polite"
       >
         {chat.loading ? (
-          <p className="text-label text-[var(--on-surface-variant)]">Loading the thread…</p>
+          <p className="text-label text-[var(--on-surface-variant)]">{t('chat.loading')}</p>
         ) : chat.messages.length === 0 ? (
           <>
             <EmptyThread mode={mode} hasContent={content.trim().length > 0} />
@@ -617,7 +629,7 @@ export function ChatPanel({
                 pushed it below the fold (17 Oct, Sean: "you have to kind of
                 scroll down to find it"). */}
             {mode === 'discuss' && !readOnly && !chat.busy && !conflicting && starters.length > 0 && (
-              <div role="group" aria-label="Suggested questions" className="mt-4 flex flex-col gap-1.5">
+              <div role="group" aria-label={t('chat.suggested')} className="mt-4 flex flex-col gap-1.5">
                 {starters.map((q) => (
                   <button
                     key={q}
@@ -659,18 +671,18 @@ export function ChatPanel({
 
         {chat.busy && (
           <p className="mt-4 text-label text-[var(--on-surface-variant)]">
-            {mode === 'discuss' ? 'Thinking…' : 'Drafting the revision…'}
+            {mode === 'discuss' ? t('chat.thinking') : t('chat.drafting')}
           </p>
         )}
 
         {checking && (
-          <p role="status" className="mt-3 text-label text-[var(--on-surface-variant)]">Checking it against your objective and earlier decisions…</p>
+          <p role="status" className="mt-3 text-label text-[var(--on-surface-variant)]">{t('chat.checking')}</p>
         )}
         {autoKept && !conflicting && (
-          <div role="note" aria-label="Kept the record" className="mt-3 rounded-xl bg-[var(--surface-container-high)] px-4 py-3">
-            <p className="text-label uppercase tracking-wide text-[var(--on-surface-variant)]">Kept the record</p>
+          <div role="note" aria-label={t('chat.keptRecord')} className="mt-3 rounded-xl bg-[var(--surface-container-high)] px-4 py-3">
+            <p className="text-label uppercase tracking-wide text-[var(--on-surface-variant)]">{t('chat.keptRecord')}</p>
             <p className="mt-1 text-body text-[var(--on-surface)]">{autoKept.note}</p>
-            <p className="mt-1 text-label text-[var(--on-surface-variant)]">Decided under your routine-decision policy, without asking you.</p>
+            <p className="mt-1 text-label text-[var(--on-surface-variant)]">{t('chat.keptPolicy')}</p>
             <div className="mt-2 flex flex-wrap gap-2">
               <button
                 onClick={() => {
@@ -682,10 +694,10 @@ export function ChatPanel({
                 disabled={chat.busy}
                 className="rounded-lg bg-[var(--surface-container-highest)] px-3 py-1.5 text-label text-[var(--on-surface)] disabled:opacity-40"
               >
-                Apply it anyway
+                {t('chat.applyAnyway')}
               </button>
               <button onClick={() => setAutoKept(null)} className="rounded-lg px-3 py-1.5 text-label text-[var(--on-surface-variant)]">
-                Dismiss
+                {t('chat.dismiss')}
               </button>
             </div>
           </div>
@@ -769,7 +781,7 @@ export function ChatPanel({
             disabled={chat.busy}
             className="rounded-lg bg-[var(--pm-primary)] px-3 py-1.5 text-label font-semibold text-[var(--on-primary)] disabled:opacity-40"
           >
-            Apply my change to the new version{headVersion ? ` (v${headVersion.version_number})` : ''}
+            {headVersion ? t('chat.redraftV', { version: headVersion.version_number }) : t('chat.redraft')}
           </button>
         </div>
       )}
@@ -786,7 +798,7 @@ export function ChatPanel({
               className="mb-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-[var(--surface-container-high)] px-3 py-2 text-label text-[var(--on-surface)] hover:bg-[var(--surface-container-highest)] disabled:opacity-50"
             >
               <span aria-hidden className="material-symbols-outlined text-[16px]">note_add</span>
-              Save this discussion as a new version
+              {t('chat.saveDiscussion')}
             </button>
           )}
           {mode === 'instruct' && (
@@ -818,7 +830,7 @@ export function ChatPanel({
                 }
               }}
               rows={3}
-              aria-label={mode === 'discuss' ? 'Ask a question' : 'Give a revision instruction'}
+              aria-label={mode === 'discuss' ? t('chat.askAria') : t('chat.changeAria')}
               placeholder={spec.placeholder}
               className="w-full resize-y rounded-lg bg-[var(--surface-container-lowest)] px-2 py-1.5 text-body text-[var(--on-surface)] outline-none ring-1 ring-[var(--outline-variant)] placeholder:text-[var(--on-surface-variant)] focus:ring-2 focus:ring-[var(--pm-primary)]/50"
              
@@ -863,9 +875,10 @@ function ModeSwitch({
   /** The project's Web access switch: whether Ask may search the web (22 Oct). */
   webAccess: boolean;
 }) {
+  const t = useT();
   return (
     <div className="px-5 pt-4">
-      <div role="tablist" aria-label="Chat mode" className="flex gap-1.5">
+      <div role="tablist" aria-label={t('chat.modeLabel')} className="flex gap-1.5">
         {MODES.map((m) => {
           const active = m.key === mode;
           return (
@@ -885,7 +898,7 @@ function ModeSwitch({
               <span aria-hidden className="material-symbols-outlined text-[18px]">
                 {m.icon}
               </span>
-              {m.label}
+              {modeText(t, m.key).label}
             </button>
           );
         })}
@@ -898,15 +911,15 @@ function ModeSwitch({
         <span aria-hidden className="material-symbols-outlined text-[16px]">
           {mode === 'discuss' ? 'lock' : 'rate_review'}
         </span>
-        <span>{mode === 'discuss' && instructDisabledReason ? instructDisabledReason : MODES.find((m) => m.key === mode)!.promise}</span>
+        <span>{mode === 'discuss' && instructDisabledReason ? instructDisabledReason : modeText(t, mode).promise}</span>
       </p>
       {mode === 'discuss' && (
         <p className="mt-1 flex items-start gap-1.5 text-label text-[var(--on-surface-variant)]">
           <span aria-hidden className="material-symbols-outlined text-[16px]">{webAccess ? 'travel_explore' : 'public_off'}</span>
           <span>
             {webAccess
-              ? 'Web access is on: the chat searches the web when a question needs it, and saves what it cites.'
-              : 'Web access is off: the chat answers from the project only.'}
+              ? t('chat.webOn')
+              : t('chat.webOff')}
           </span>
         </p>
       )}
@@ -915,19 +928,21 @@ function ModeSwitch({
 }
 
 function EmptyThread({ mode, hasContent }: { mode: Mode; hasContent: boolean }) {
+  const t = useT();
   return (
     <p className="text-body text-[var(--on-surface-variant)]">
       {mode === 'discuss'
         ? hasContent
-          ? 'Ask anything about this draft — what it assumes, what it leaves out, whether it suits the audience. Nothing here edits it.'
+          ? t('chat.emptyDraft')
           // No draft yet (Sean, 10 Oct, email 6.11: "this draft" before one existed).
-          : 'Ask anything about this stage — what it is for, what it needs from you, what to put in it. There is no draft here yet.'
-        : 'Describe a change and choose what it should apply to. You will see the exact passage before anything is written.'}
+          : t('chat.emptyStage')
+        : t('chat.emptyChange')}
     </p>
   );
 }
 
 function Bubble({ message }: { message: StageChatMessage }) {
+  const t = useT();
   const mine = message.role === 'user';
   const instruct = message.mode === 'instruct';
 
@@ -935,7 +950,7 @@ function Bubble({ message }: { message: StageChatMessage }) {
     <div className={mine ? 'pl-6' : 'pr-6'}>
       <div className="mb-1 flex items-center gap-1.5">
         <span className="text-label uppercase tracking-wider text-[var(--on-surface-variant)]">
-          {mine ? 'You' : 'Assistant'}
+          {mine ? t('chat.you') : t('chat.assistant')}
         </span>
         {/* The badge is on the message, not only on the composer, so a thread
             read a week later still says which turns could have changed the
@@ -947,7 +962,7 @@ function Bubble({ message }: { message: StageChatMessage }) {
               : 'bg-[var(--surface-container)] text-[var(--on-surface-variant)]'
           }`}
         >
-          {instruct ? 'Change it' : 'Ask'}
+          {instruct ? t('chat.changeLabel') : t('chat.askLabel')}
         </span>
         {message.scope && (
           <span className="truncate text-label text-[var(--on-surface-variant)]">
@@ -969,9 +984,7 @@ function Bubble({ message }: { message: StageChatMessage }) {
           <span aria-hidden className="material-symbols-outlined text-[16px]">{message.web.note ? 'public_off' : 'travel_explore'}</span>
           <span>
             {message.web.note ||
-              `Searched the web for “${message.web.query}” · ${
-                message.web.saved ? `${message.web.saved} new source${message.web.saved === 1 ? '' : 's'} saved` : 'no new sources'
-              }`}
+              t('door.searched', { query: message.web.query, found: message.web.saved ? t('web.newSaved', { count: message.web.saved }) : t('door.noSources') })}
           </span>
         </p>
       )}
@@ -996,24 +1009,25 @@ function ScopePicker({
   selection: string;
   hasContent: boolean;
 }) {
+  const t = useT();
   const options: Array<{ key: ScopeKind; label: string; ready: boolean; why: string }> = [
     {
       key: 'selection',
-      label: 'Selection',
+      label: t('chat.scope.selection'),
       ready: selection.length > 0,
-      why: 'Select text in the draft first.',
+      why: t('chat.scope.selectionWhy'),
     },
     {
       key: 'section',
-      label: 'Section',
+      label: t('chat.scope.section'),
       ready: sections.length > 0,
-      why: 'This draft has no headings to split on.',
+      why: t('chat.scope.sectionWhy'),
     },
     {
       key: 'document',
-      label: 'Whole document',
+      label: t('chat.scope.document'),
       ready: hasContent,
-      why: 'There is nothing written yet.',
+      why: t('chat.scope.documentWhy'),
     },
   ];
   const chosen = options.find((o) => o.key === scope)!;
@@ -1021,7 +1035,7 @@ function ScopePicker({
   return (
     <div className="mb-2">
       <p className="mb-1.5 text-label uppercase tracking-wider text-[var(--on-surface-variant)]">
-        Apply to
+        {t('chat.applyTo')}
       </p>
       <div className="flex gap-1.5">
         {options.map((option) => (
@@ -1046,7 +1060,7 @@ function ScopePicker({
         <select
           value={sectionId}
           onChange={(e) => onSection(e.target.value)}
-          aria-label="Section to revise"
+          aria-label={t('chat.sectionAria')}
           className="mt-1.5 w-full rounded-lg bg-[var(--surface-container-low)] px-3 py-1.5 text-label text-[var(--on-surface)] outline-none"
         >
           {sections.map((section) => (
@@ -1059,7 +1073,7 @@ function ScopePicker({
 
       {scope === 'selection' && selection.length > 0 && (
         <p className="mt-1.5 truncate text-label text-[var(--on-surface-variant)]">
-          Selected: “{selection.slice(0, 80)}
+          {t('chat.selected')} “{selection.slice(0, 80)}
           {selection.length > 80 ? '…' : ''}”
         </p>
       )}
@@ -1125,79 +1139,79 @@ export function ProposalCard({
   onAccept: (updateFactIds: string[]) => void;
   onDiscard: () => void;
 }) {
+  const t = useT();
   const [kept, setKept] = useState<ReadonlySet<string>>(() => new Set());
   const updating = factChanges.filter((c) => !kept.has(c.fact.id)).map((c) => c.fact.id);
   return (
     <section
-      aria-label="Proposed revision"
+      aria-label={t('chat.proposedLabel')}
       className="mt-4 rounded-xl bg-[var(--surface-container-high)] px-4 py-3"
     >
       <p className="text-label uppercase tracking-wider text-[var(--on-surface-variant)]">
-        Proposed — not saved yet
+        {t('chat.proposed')}
       </p>
       <p className="mt-0.5 text-body text-[var(--on-surface)]">{scopeLabel}</p>
       {revisedFrom && (
-        <p aria-label="Revised from an older version" className="mt-1 text-label text-[var(--on-surface)]">
-          Your revision started from version {revisedFrom.version}; this stage is now at version {revisedFrom.head}. Only your{' '}
-          {revisedFrom.edits === 1 ? 'edit was' : `${revisedFrom.edits} edits were`} applied, so the changes made here since are kept.
+        <p aria-label={t('chat.revisedFromLabel')} className="mt-1 text-label text-[var(--on-surface)]">
+          {t('chat.revisedFrom', { count: revisedFrom.edits, version: revisedFrom.version, head: revisedFrom.head })}
         </p>
       )}
       {summary && (
-        <p aria-label="What changed" className="mt-1 text-label text-[var(--on-surface)]">
-          <span className="text-[var(--on-surface-variant)]">What changed: </span>
+        <p aria-label={t('chat.whatChangedLabel')} className="mt-1 text-label text-[var(--on-surface)]">
+          <span className="text-[var(--on-surface-variant)]">{t('chat.whatChanged')}</span>
           {summary}
         </p>
       )}
 
       <div className="mt-3">
-        <p className="text-label text-[var(--on-surface-variant)]">Now</p>
+        <p className="text-label text-[var(--on-surface-variant)]">{t('chat.now')}</p>
         <blockquote className="mt-1 max-h-32 overflow-y-auto rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2 text-label text-[var(--on-surface-variant)]">
           {before}
         </blockquote>
       </div>
 
       <div className="mt-3">
-        <p className="text-label text-[var(--on-surface-variant)]">After</p>
+        <p className="text-label text-[var(--on-surface-variant)]">{t('chat.after')}</p>
         <div className="mt-1 max-h-64 overflow-y-auto rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2">
           <MarkdownOutput content={after} />
         </div>
       </div>
 
       {factChanges.length > 0 && (
-        <div className="mt-3 rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2" aria-label="Facts this changes">
+        <div className="mt-3 rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2" aria-label={t('chat.factsLabel')}>
           <p className="text-label text-[var(--on-surface)]">
-            {factChangesHeading(factChanges)}
+            {factChangesHeading(factChanges, t)}
           </p>
           <FactChangeList changes={factChanges} kept={kept} onToggle={(id, on) => setKept((prev) => toggled(prev, id, on))} />
         </div>
       )}
 
       {(putBack.length > 0 || removedUnasked.length > 0) && (
-        <div className="mt-3 rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2" aria-label="Kept from before">
+        <div className="mt-3 rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2" aria-label={t('chat.keptLabel')}>
           {putBack.length > 0 && (
             <p className="text-label text-[var(--on-surface)]">
               {putBackKept
-                ? `Kept ${describeLines(putBack)}: the revision dropped ${putBack.length === 1 ? 'it' : 'them'}, and your instruction did not ask for that.`
-                : `${describeLines(putBack)} will be removed, as the revision proposed.`}
+                ? t('chat.keptLines', { count: putBack.length, lines: describeLines(putBack) })
+                : t('chat.willRemove', { lines: describeLines(putBack) })}
               {onTogglePutBack && (
                 <button onClick={onTogglePutBack} disabled={busy} className="ml-2 text-[var(--pm-primary)] underline-offset-2 hover:underline">
-                  {putBackKept ? 'Remove them anyway' : 'Keep them'}
+                  {putBackKept ? t('chat.removeAnyway') : t('chat.keepThem')}
                 </button>
               )}
             </p>
           )}
           {removedUnasked.length > 0 && (
             <p className="mt-1 text-label text-[var(--on-surface-variant)]">
-              Also no longer there: {describeLines(removedUnasked, 2)}. If that was not intended, choose Adjust.
+              {t('chat.alsoGone', { lines: describeLines(removedUnasked, 2) })}
             </p>
           )}
         </div>
       )}
 
       {addedClaims.length > 0 && (
-        <div className="mt-3 rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2" aria-label="Details you did not supply">
+        <div className="mt-3 rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2" aria-label={t('chat.inventedLabel')}>
           <p className="text-label text-[var(--on-surface)]">
-            This adds details you did not supply. You asked not to invent any:
+            {t('chat.invented')}
           </p>
           <ul className="mt-1 list-disc pl-5 text-label text-[var(--on-surface-variant)]">
             {addedClaims.map((c) => (
@@ -1207,7 +1221,7 @@ export function ProposalCard({
             ))}
           </ul>
           <p className="mt-1 text-label text-[var(--on-surface-variant)]">
-            If a detail would help, tell me the real one in the chat.
+            {t('chat.inventedHelp')}
           </p>
           {onRemoveClaims && (
             <button
@@ -1215,14 +1229,14 @@ export function ProposalCard({
               disabled={busy}
               className="mt-2 rounded-lg bg-[var(--surface-container-highest)] px-3 py-1.5 text-label text-[var(--on-surface)] disabled:opacity-40"
             >
-              Take these out
+              {t('chat.takeOut')}
             </button>
           )}
         </div>
       )}
 
       <p className="mt-3 text-label text-[var(--on-surface-variant)]">
-        Applying appends a new version. The one you are reading is kept and can be restored.
+        {t('chat.appending')}
       </p>
 
       <div className="mt-2 flex items-center gap-2">
@@ -1232,15 +1246,15 @@ export function ProposalCard({
           className="rounded-lg bg-[var(--pm-primary)] px-4 py-1.5 text-label text-[var(--on-primary)] disabled:opacity-40"
         >
           {updating.length
-            ? applyChangesLabel(updating.length)
-            : 'Apply as new version'}
+            ? t('chat.applyRecord', { count: updating.length })
+            : t('chat.applyNew')}
         </button>
         <button
           onClick={onDiscard}
           disabled={busy}
           className="rounded-lg px-3 py-1.5 text-label text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-highest)] hover:text-[var(--on-surface)]"
         >
-          Discard
+          {t('chat.discard')}
         </button>
         {onAdjust && (
           <button
@@ -1248,7 +1262,7 @@ export function ProposalCard({
             disabled={busy}
             className="rounded-lg px-3 py-1.5 text-label text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-highest)] hover:text-[var(--on-surface)]"
           >
-            Adjust
+            {t('chat.adjust')}
           </button>
         )}
       </div>
@@ -1283,17 +1297,18 @@ export function AppliedNotice({
    */
   awaitingUpdate?: readonly string[];
 }) {
+  const t = useT();
   return (
     <section
-      aria-label="Revision applied"
+      aria-label={t('chat.appliedLabel')}
       className="mt-4 rounded-xl bg-[var(--success-container)] px-4 py-3"
     >
       <p className="text-body text-[var(--on-success-container)]">
-        Applied to {scope.toLowerCase()}{auto ? ' under your routine-decision authority' : ''}.
+        {t(auto ? 'chat.appliedToAuto' : 'chat.appliedTo', { scope: scope.toLowerCase() })}
       </p>
-      {summary && <p className="mt-0.5 text-label text-[var(--on-success-container)]">What changed: {summary}</p>}
+      {summary && <p className="mt-0.5 text-label text-[var(--on-success-container)]">{t('chat.whatChangedLine', { summary })}</p>}
       {checks.length > 0 && (
-        <ul aria-label="Checked on the saved text" className="mt-1 space-y-0.5 text-label text-[var(--on-success-container)]">
+        <ul aria-label={t('chat.checkedLabel')} className="mt-1 space-y-0.5 text-label text-[var(--on-success-container)]">
           {checks.map((c) => (
             <li key={c.label}>
               <span aria-hidden className="material-symbols-outlined mr-1 align-[-3px] text-[14px]">{c.ok ? 'check' : 'close'}</span>
@@ -1305,12 +1320,12 @@ export function AppliedNotice({
       {awaitingUpdate && (
         <p className="mt-0.5 text-label text-[var(--on-success-container)]">
           {awaitingUpdate.length
-            ? `Later work built on this — ${awaitingUpdate.join(', ')} — needs updating. Press Apply and continue at the top of the page and Go updates it.`
-            : 'Nothing finished after this stage depends on it, so nothing else needs updating.'}
+            ? t('chat.laterNeeds', { names: awaitingUpdate.join(', ') })
+            : t('chat.nothingDepends')}
         </p>
       )}
       <p className="mt-0.5 text-label text-[var(--on-success-container)]">
-        The previous version is still in this stage&rsquo;s history.
+        {t('chat.prevInHistory')}
       </p>
       <div className="mt-2 flex items-center gap-2">
         {canUndo && (
@@ -1319,15 +1334,15 @@ export function AppliedNotice({
             disabled={busy}
             className="rounded-lg bg-[var(--surface-container-lowest)] px-3 py-1.5 text-label text-[var(--on-surface)] disabled:opacity-40"
           >
-            Restore the previous version
+            {t('chat.restorePrev')}
           </button>
         )}
         <button
           onClick={onDismiss}
-          title="Close this note. The change is already saved as the newest version."
+          title={t('chat.keepTitle')}
           className="rounded-lg px-3 py-1.5 text-label text-[var(--on-success-container)]"
         >
-          Keep this version
+          {t('chat.keepVersion')}
         </button>
       </div>
     </section>
@@ -1335,18 +1350,18 @@ export function AppliedNotice({
 }
 
 /** "This changes an accepted fact", "This states 2 new facts", "records an approval", "notes a request", or a mix. */
-function factChangesHeading(changes: readonly FactChange[]): string {
+function factChangesHeading(changes: readonly FactChange[], t: ReturnType<typeof useT>): string {
   const count = (g: ReturnType<typeof factChangeGroup>) => changes.filter((c) => factChangeGroup(c) === g).length;
   const changed = count('changed');
   const added = count('new');
   const approvals = count('approval');
   const requests = count('request');
   const parts = [
-    changed ? `changes ${changed === 1 ? 'an accepted fact' : `${changed} accepted facts`}` : '',
-    added ? `states ${added === 1 ? 'a new fact' : `${added} new facts`}` : '',
-    approvals ? `records ${approvals === 1 ? 'an approval' : `${approvals} approvals`}` : '',
-    requests ? `notes ${requests === 1 ? 'a request' : `${requests} requests`} nobody has approved` : '',
+    changed ? t('chat.fact.changed', { count: changed }) : '',
+    added ? t('chat.fact.added', { count: added }) : '',
+    approvals ? t('chat.fact.approvals', { count: approvals }) : '',
+    requests ? t('chat.fact.requests', { count: requests }) : '',
   ].filter(Boolean);
-  const list = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}` : parts[0];
-  return `This ${list}. Record ${changes.length === 1 ? 'it' : 'them'} so every later stage and check uses ${changes.length === 1 ? 'it' : 'them'}?`;
+  const list = parts.length > 1 ? `${parts.slice(0, -1).join(', ')}${t('chat.fact.and')}${parts.at(-1)}` : parts[0];
+  return t('chat.fact.heading', { count: changes.length, list });
 }

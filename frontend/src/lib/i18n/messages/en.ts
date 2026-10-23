@@ -21,6 +21,9 @@ import { en as webArea } from './areas/web';
 import { en as dataArea } from './areas/data';
 import { en as docArea } from './areas/doc';
 import { en as wsArea } from './areas/ws';
+import { en as actArea } from './areas/act';
+import { en as chatArea } from './areas/chat';
+import { en as chat2Area } from './areas/chat2';
 
 export const en = {
   // The account menu (components/shared/app-header.tsx)
@@ -295,6 +298,9 @@ export const en = {
   ...dataArea,
   ...docArea,
   ...wsArea,
+  ...actArea,
+  ...chatArea,
+  ...chat2Area,
 } as const;
 
 /** A key as the dictionaries hold it. */

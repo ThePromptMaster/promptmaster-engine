@@ -1,5 +1,6 @@
 'use client';
 
+import { useT } from '@/lib/i18n/i18n-provider';
 import { useState } from 'react';
 
 import { choiceLabels, gist, type Controls, type InstructionConflict } from '@/lib/workflow/instruction-conflicts';
@@ -32,6 +33,7 @@ export function ConflictPrompt({
   onCancel: () => void;
 }) {
   const recommended = conflicts.map((c) => recommendedControl(c.kind, c.protects_approval, c.instruction_authorised));
+  const t = useT();
   const [others, setOthers] = useState<(Controls | null)[]>(recommended);
   // Folded choices the user set by hand; the rest follow the answer above.
   const [touched, setTouched] = useState<ReadonlySet<number>>(new Set());
@@ -71,17 +73,17 @@ export function ConflictPrompt({
   const rest = conflicts.slice(1);
 
   return (
-    <section aria-label="Which takes priority?" className="rounded-xl bg-[var(--surface-container-high)] px-4 py-3">
-      <p className="text-label uppercase tracking-wide text-[var(--pm-tertiary)]">Before I change this</p>
+    <section aria-label={t('cp.label')} className="rounded-xl bg-[var(--surface-container-high)] px-4 py-3">
+      <p className="text-label uppercase tracking-wide text-[var(--pm-tertiary)]">{t('cp.before')}</p>
       <p className="mt-1 text-body text-[var(--on-surface)]">
         {lead.resolution && leadRecommended !== 'new' ? `${lead.explanation.trim()} ${lead.resolution.trim()}` : lead.explanation}
       </p>
-      <p className="mt-1 text-label text-[var(--on-surface-variant)]">Your instruction: {gist(instruction, 160)}</p>
+      <p className="mt-1 text-label text-[var(--on-surface-variant)]">{t('cp.yourInstruction', { text: gist(instruction, 160) })}</p>
 
       {confirmingOverride ? (
-        <div role="alertdialog" aria-label="Override the recorded approval?" className="mt-3 rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2">
+        <div role="alertdialog" aria-label={t('cp.overrideLabel')} className="mt-3 rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2">
           <p className="text-body text-[var(--on-surface)]">
-            {lead.explanation.trim()} Overriding the recorded approval treats the change as approved. Do this only if that approval has actually been given.
+            {lead.explanation.trim()} {t('cp.overrideWarn')}
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             <button
@@ -95,7 +97,7 @@ export function ConflictPrompt({
               onClick={() => setConfirmingOverride(false)}
               className="rounded-lg px-3 py-1.5 text-label text-[var(--on-surface-variant)]"
             >
-              Back
+              {t('cp.back')}
             </button>
           </div>
         </div>
@@ -113,11 +115,11 @@ export function ConflictPrompt({
               }`}
             >
               {o.label}
-              {leadRecommended === o.value && ' (recommended)'}
+              {leadRecommended === o.value && t('cp.recommended')}
             </button>
           ))}
           <button onClick={onCancel} className="rounded-lg px-3 py-1.5 text-label text-[var(--on-surface-variant)]">
-            Cancel
+            {t('cp.cancel')}
           </button>
         </div>
       )}
@@ -125,7 +127,7 @@ export function ConflictPrompt({
       {rest.length > 0 && (
         <details className="mt-3">
           <summary className="cursor-pointer text-label text-[var(--on-surface-variant)]">
-            Also affected ({rest.length}) — applying your change updates these too, unless you choose here
+            {t('cp.alsoAffected', { count: rest.length })}
           </summary>
           <ul className="mt-2 space-y-2">
             {rest.map((c, j) => {
@@ -134,7 +136,7 @@ export function ConflictPrompt({
               return (
                 <li key={`${c.kind}-${c.with_id}-${i}`}>
                   <p className="text-label text-[var(--on-surface)]">{c.explanation}</p>
-                  <div role="radiogroup" aria-label={`Also affected (${i})`} className="mt-1 flex flex-wrap gap-2">
+                  <div role="radiogroup" aria-label={t('cp.alsoGroup', { n: i })} className="mt-1 flex flex-wrap gap-2">
                     {(['existing', 'new'] as const).map((value) => (
                       <button
                         key={value}
@@ -160,7 +162,7 @@ export function ConflictPrompt({
           </ul>
         </details>
       )}
-      <p className="mt-2 text-label text-[var(--on-surface-variant)]">Your choice is recorded, and PromptMaster is told which one takes priority.</p>
+      <p className="mt-2 text-label text-[var(--on-surface-variant)]">{t('cp.recorded')}</p>
     </section>
   );
 }
