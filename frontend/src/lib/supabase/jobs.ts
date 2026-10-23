@@ -7,6 +7,7 @@
  * SECURITY DEFINER function that re-checks ownership for itself.
  */
 
+import { referencePayload } from '@/lib/workflow/references';
 import { hintWithImages } from '@/lib/data/images';
 import { createClient } from '@/lib/supabase/client';
 import { DRAFT_SECTION, type DraftSectionPayload, type SectionRevisePayload } from '@/lib/jobs/types';
@@ -42,6 +43,8 @@ export function inputsFromProject(project: Project): PMInput {
     session_facts: project.session_facts,
     // The drain sends it as the language header: a chapter is written in the project's language.
     language: project.language ?? 'en',
+    // A chapter written in the background draws on the same other projects.
+    ...(project.references?.some((r) => !r.deleted) ? { references: referencePayload(project.references) } : {}),
   };
 }
 

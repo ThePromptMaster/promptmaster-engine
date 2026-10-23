@@ -112,6 +112,12 @@ export interface Project {
    * generation, the Go planner, the code writer — knows what data exists.
    */
   data_files?: ProjectFile[];
+  /**
+   * The user's other projects this one draws on, as read when it opened
+   * (client, 21 Oct, email 5). Not a column: joined on in the browser like
+   * `facts`; prompts cite them as [R1], [R2], ….
+   */
+  references?: import('@/lib/workflow/references').ReferenceMaterial[];
 
   title: string;
   objective: string;
@@ -198,6 +204,17 @@ export interface ProjectSummary {
   /** The folder it is filed in, or none (Unfiled). */
   folder_id?: string | null;
   updated_at: string;
+  created_at: string;
+}
+
+/** Another of the user's projects that a project draws on (client, 21 Oct, email 5). */
+export interface ProjectReference {
+  id: string;
+  project_id: string;
+  user_id: string;
+  referenced_project_id: string;
+  include_facts: boolean;
+  position: number;
   created_at: string;
 }
 

@@ -10,7 +10,7 @@
 import type { Controls, InstructionConflict } from './instruction-conflicts';
 
 /** Highest first. */
-export const PRECEDENCE = ['objective', 'decision', 'instruction', 'stage', 'constraint', 'mode', 'generated'] as const;
+export const PRECEDENCE = ['objective', 'decision', 'instruction', 'stage', 'constraint', 'mode', 'reference', 'generated'] as const;
 export type PrecedenceKey = (typeof PRECEDENCE)[number];
 
 const rank = (key: PrecedenceKey) => PRECEDENCE.indexOf(key);

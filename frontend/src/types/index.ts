@@ -16,6 +16,8 @@ export interface PMInput {
   sources?: { url: string; title: string; excerpt: string; retrieved: string }[];
   /** Instructions the user applied with "Change it", oldest first (12 Oct): their later word. */
   user_instructions?: { stage: string; version: number; instruction: string }[];
+  /** The user's other projects this one draws on, cited as [R1]… (client, 21 Oct, email 5). */
+  references?: ReferencedProject[];
   mode: ModeType;
   custom_name?: string;
   custom_preamble?: string;
@@ -26,6 +28,15 @@ export interface PMInput {
   critique_tone?: CritiqueTone;
   /** The language the work is written in (client, 21 Oct); also sent as a header. Saved with background jobs. */
   language?: string;
+}
+
+/** Another project's material as a prompt receives it; mirrors `ReferencedProject` in schemas.py. */
+export interface ReferencedProject {
+  title: string;
+  objective: string;
+  deliverable: string;
+  excerpt: string;
+  facts: string[];
 }
 
 export type CritiqueIntensity = 'light' | 'standard' | 'rigorous';

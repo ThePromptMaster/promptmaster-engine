@@ -9,6 +9,7 @@ import { listProjects, moveProject, softDeleteProject } from '@/lib/supabase/pro
 import { createFolder, deleteFolder, folderCounts, listFolders, renameFolder } from '@/lib/supabase/folders';
 import { FoldersSidebar, PROJECT_DRAG_TYPE, type FolderSelection } from '@/components/projects/folders-sidebar';
 import { MoveToMenu } from '@/components/projects/move-to-menu';
+import { UseInProjectMenu } from '@/components/projects/use-in-project-menu';
 import { pausedProjectIds } from '@/lib/supabase/workflow';
 import { useProjectStore } from '@/stores/project-store';
 import type { ProjectFolder, ProjectSummary } from '@/types/project';
@@ -381,6 +382,9 @@ export default function ProjectsPage() {
                     </Link>
 
                     <div className="flex shrink-0 items-center pr-4">
+                      {pendingDelete !== p.id && user && (
+                        <UseInProjectMenu source={p} userId={user.id} projects={projects ?? []} folders={folders} />
+                      )}
                       {pendingDelete !== p.id && (
                         <MoveToMenu projectTitle={p.title} folderId={p.folder_id} folders={folders} onMove={(folderId) => void handleMove(p.id, folderId)} />
                       )}

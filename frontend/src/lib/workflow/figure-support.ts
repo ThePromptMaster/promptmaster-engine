@@ -21,6 +21,7 @@
  * source ($41.2m against $41,200,000) is reported; the register says so.
  */
 
+import { referenceText } from './references';
 import type { AuditFinding } from '@/types';
 import type { Project } from '@/types/project';
 import type { StageArtifactBundle } from './digest';
@@ -162,7 +163,7 @@ export function unsupportedFigures(content: string, sources: readonly string[]):
 
 /** Everything a stage's figures may legitimately come from: the project, its data and the other stages. */
 export function figureSources(
-  project: Pick<Project, 'objective' | 'constraints' | 'audience' | 'output_format' | 'context' | 'data_files' | 'facts'>,
+  project: Pick<Project, 'objective' | 'constraints' | 'audience' | 'output_format' | 'context' | 'data_files' | 'facts'> & Partial<Pick<Project, 'references'>>,
   bundles: Record<string, StageArtifactBundle>,
   stageId: string
 ): string[] {
@@ -171,6 +172,8 @@ export function figureSources(
   // gave were flagged "unsupported" by the final check).
   for (const f of currentFacts(project.facts)) sources.push(f.statement);
   for (const f of project.data_files ?? []) sources.push(JSON.stringify(f.preview ?? {}));
+  // A figure quoted from a project this one draws on is sourced (client, 21 Oct, email 5).
+  sources.push(...referenceText(project.references));
   for (const [id, bundle] of Object.entries(bundles)) {
     if (id === stageId) continue;
     sources.push(bundle?.versions.at(-1)?.content ?? '');

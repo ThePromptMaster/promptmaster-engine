@@ -25,6 +25,7 @@ future change does not undo a guarantee without noticing.
 | `jobs` | The background queue. See [`jobs.md`](jobs.md). |
 | `section_records` | Per-section continuity records (summary, glossary, decisions, TODOs). |
 | `project_folders` | A user's folders for projects, nested at most three deep (a trigger refuses cycles and deeper trees). `projects.folder_id` files a project in one; deleting a folder sets its projects' `folder_id` and its subfolders' `parent_id` to null, never deleting work. Owner-only RLS. |
+| `project_references` | Another of the user's projects a project draws on (at most five). Composite `(id, user_id)` FKs on both sides, so only the owner's own projects. The browser reads the referenced project's deliverable and facts and sends them as `PMInput.references`; `project_context.references_block` puts them last in every prompt's context, cited [R1]…. |
 | `beta_feedback` | FR-22 feedback capture. Users see only their own rows; the product owner reads all of them on `/admin` (Beta feedback), through `/api/admin/overview`. |
 
 ### Stage statuses (PM-13) and project completion (PM-14)

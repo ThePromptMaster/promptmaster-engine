@@ -2044,3 +2044,28 @@ button anywhere).
 - **The list still shows 50 at a time.** The folder filter runs on the server, so a
   folder's projects are found even when they are older than the newest 50 overall.
 
+### L-104 — Using another project: text and facts, read when the project opens (2026-10-23)
+
+"The project you are working on can use that information from those other chosen files or
+projects." A project can draw on up to five of the user's other projects (Other projects,
+on every stage; or "Use in another project" on a card in the list). Each brings its
+deliverable as it stands, meaning the head version or the manuscript's written chapters,
+plus its current facts unless that is turned off. Every stage, check, chat and Go step is
+sent them as [R1]…, ranked below this project's own objective, facts, instructions and
+constraints (`precedence.py`).
+- **Text, not files.** A referenced project's data files and images are not copied across.
+  Code this project runs sees only its own `/data`.
+- **Read when the project opens.** An edit to the referenced project in another tab reaches
+  this one on the next open or reload.
+- **One hop.** A referenced project's own references are not followed.
+- **Capped.** 16,000 characters of each and 40,000 in all, shared evenly and marked where
+  cut. Go's planner and the checks that take a short context see the title and the first
+  500 characters only.
+- **Its facts are not this project's.** They are cited with [R n] and are never treated as
+  accepted here. A figure or detail quoted from a reference counts as supplied in the
+  figure and new-claim checks.
+- **In the trash means unused.** A soft-deleted project is shown as in the trash and sent
+  nowhere until restored. Purging it removes the reference.
+- **The list's "Use in another project" offers the projects shown.** When a folder is
+  selected, only that folder's projects are offered as targets.
+

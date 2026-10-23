@@ -65,6 +65,21 @@ class SavedSource(BaseModel):
     retrieved: str = Field(default="", max_length=40)
 
 
+class ReferencedProject(BaseModel):
+    """Another of the user's projects this one draws on (client, 21 Oct, email 5:
+    "the project you are working on can use that information from those other
+    chosen files or projects"). The browser reads it under RLS and sends it;
+    nothing is stored here. Cited as [R1], [R2], … in the order sent."""
+    title: str = Field(default="", max_length=300)
+    objective: str = Field(default="", max_length=4_000)
+    #: What the excerpt is: the referenced project's deliverable stage.
+    deliverable: str = Field(default="", max_length=80)
+    #: Its deliverable's text, capped by the browser (`lib/workflow/references.ts`).
+    excerpt: str = Field(default="", max_length=16_000)
+    #: Its current accepted facts and requirements, as statements.
+    facts: list[str] = Field(default_factory=list, max_length=30)
+
+
 class UserInstruction(BaseModel):
     """An instruction the user applied to a stage, as the version it made records it."""
     stage: str = Field(default="", max_length=200)
@@ -99,6 +114,8 @@ class PMInput(BaseModel):
     # "Change it", oldest first. Saved only on their versions, they reached no
     # later prompt, so a review held the work to the brief they had changed.
     user_instructions: list[UserInstruction] = Field(default_factory=list, max_length=20)
+    # Client, 21 Oct (email 5): the user's other projects this one draws on.
+    references: list[ReferencedProject] = Field(default_factory=list, max_length=5)
     mode: ModeType = Field(..., description="Selected operational mode")
     # Custom mode fields (only used when mode == 'custom')
     custom_name: str = Field(default="", max_length=MAX_SHORT_TEXT_CHARS, description="Custom mode persona name")

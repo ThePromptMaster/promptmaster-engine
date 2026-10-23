@@ -161,7 +161,7 @@ A separate LLM call scores three dimensions plus two optional fields (`Evaluatio
 
 ## Supabase Schema
 
-**Phase 2 (current):** `projects`, `artifacts`, `artifact_versions`, `evaluations`, `workflow_templates`, `workflow_events`, `project_stage_events`, `recommendations`, `decisions`, `project_tasks`, `jobs`, `model_usage`, `error_events`, `project_files`, `project_facts`, `project_sources` (saved web sources, append-only like facts; cited as [S1]… through `PMInput.sources`), `project_folders` (a user's folders, `projects.folder_id`; a folder move does not bump `revision`).
+**Phase 2 (current):** `projects`, `artifacts`, `artifact_versions`, `evaluations`, `workflow_templates`, `workflow_events`, `project_stage_events`, `recommendations`, `decisions`, `project_tasks`, `jobs`, `model_usage`, `error_events`, `project_files`, `project_facts`, `project_sources` (saved web sources, append-only like facts; cited as [S1]… through `PMInput.sources`), `project_folders` (a user's folders, `projects.folder_id`; a folder move does not bump `revision`), `project_references` (other projects a project draws on; read in the browser, sent as `PMInput.references`, cited as [R1]…).
 
 `project_facts` is the accepted facts and requirements, **append-only** like `artifact_versions` (a change is a new row that supersedes the old; the trigger allows only retiring). Every request carries the current rows as `PMInput.facts`, and `project_context.context_block` puts them in every prompt — add facts to a prompt through that block, never by hand. What is still open anywhere is `outstandingWork()` in `engine.ts`; a readiness message that does not read it will contradict the others.
 
