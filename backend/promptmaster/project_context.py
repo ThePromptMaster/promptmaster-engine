@@ -144,6 +144,38 @@ def sources_block(inputs: PMInput) -> str:
     return f"{SOURCES_HEADER}\n" + "\n".join(lines) if lines else ""
 
 
+REFERENCES_HEADER = (
+    "REFERENCE MATERIAL FROM THE USER'S OTHER PROJECTS — chosen by the user to draw on, cited as "
+    "[R1], [R2], …. Read-only, and lower in precedence than this project's objective, accepted facts, "
+    "instructions and constraints: where they disagree, this project wins. A fact listed here is the "
+    "other project's, not one of this project's accepted facts; use it with its [R n] and never present "
+    "it as decided here."
+)
+
+#: How much of each reference Go's planner sees: it needs to know they exist, not to read them.
+REFERENCE_GIST_CHARS = 500
+
+
+def references_block(inputs: PMInput, limit: int | None = None) -> str:
+    """The referenced projects, numbered, or "" when there are none (client, 21 Oct, email 5)."""
+    parts = []
+    for i, r in enumerate(inputs.references or [], start=1):
+        title = " ".join(r.title.split()) or "Untitled project"
+        lines = [f"[R{i}] {title}"]
+        if r.objective.strip():
+            lines.append(f"  Objective: {' '.join(r.objective.split())}")
+        excerpt = r.excerpt.strip()
+        if limit is not None and len(excerpt) > REFERENCE_GIST_CHARS:
+            excerpt = excerpt[:REFERENCE_GIST_CHARS].rstrip() + " […]"
+        if excerpt:
+            label = r.deliverable.strip() or "Its work"
+            lines.append(f"  {label}:\n<<<\n{excerpt}\n>>>")
+        if r.facts and limit is None:
+            lines.append("  Its facts: " + "; ".join(" ".join(f.split()) for f in r.facts if f.strip()))
+        parts.append("\n".join(lines))
+    return f"{REFERENCES_HEADER}\n" + "\n\n".join(parts) if parts else ""
+
+
 INSTRUCTIONS_HEADER = (
     "INSTRUCTIONS THE USER APPLIED SINCE THE BRIEF — their own words, oldest first, each with the "
     "version it made. Each is the user's later word: where one changes the brief, the objective's "
@@ -268,7 +300,9 @@ def context_block(inputs: PMInput, limit: int | None = None) -> str:
         text = cut.rstrip() + f"\n{CONTEXT_SHORTENED}"
     context = f"{_HEADER}\n<<<\n{text}\n>>>" if text else ""
     boundary = FACT_BOUNDARY if no_invented_details(inputs) else ""
-    return "\n\n".join(b for b in (facts, sources, said, boundary, context) if b)
+    # Last: the other projects inform, and everything above outranks them.
+    references = references_block(inputs, limit)
+    return "\n\n".join(b for b in (facts, sources, said, boundary, context, references) if b)
 
 
 def context_line(inputs: PMInput) -> str:

@@ -2026,3 +2026,46 @@ the language saved with the job).
 - **Only languages with spaces between words.** Word counts and section measures count words
   by spaces, so Chinese, Japanese and Thai are not offered.
 - **The interface's own words are English** until the interface translation (Phase 5) ships.
+
+### L-102 — Folders: one owner, three levels, one folder per project (2026-10-23)
+
+"Organizing projects and folders ... however someone wants to freely organize." Projects
+can be filed in folders from the list's sidebar (drag on a computer, or the card's folder
+button anywhere).
+- **Folders are the user's own.** There is no sharing and no team folder; that waits for
+  organization accounts (Exhibit B, Stage 3).
+- **At most three levels deep.** The database refuses a deeper or circular tree.
+- **One folder per project.** A project is filed in one folder or none (Unfiled), not
+  tagged into several.
+- **Order is by name.** Folders sort by name; there is no hand ordering yet, although
+  the table has a `position` for it.
+- **Deleting a folder deletes no project.** Its projects become Unfiled and the folders
+  inside it move to the top level (not into its own parent).
+- **The list still shows 50 at a time.** The folder filter runs on the server, so a
+  folder's projects are found even when they are older than the newest 50 overall.
+
+### L-104 — Using another project: text and facts, read when the project opens (2026-10-23)
+
+"The project you are working on can use that information from those other chosen files or
+projects." A project can draw on up to five of the user's other projects (Other projects,
+on every stage; or "Use in another project" on a card in the list). Each brings its
+deliverable as it stands, meaning the head version or the manuscript's written chapters,
+plus its current facts unless that is turned off. Every stage, check, chat and Go step is
+sent them as [R1]…, ranked below this project's own objective, facts, instructions and
+constraints (`precedence.py`).
+- **Text, not files.** A referenced project's data files and images are not copied across.
+  Code this project runs sees only its own `/data`.
+- **Read when the project opens.** An edit to the referenced project in another tab reaches
+  this one on the next open or reload.
+- **One hop.** A referenced project's own references are not followed.
+- **Capped.** 16,000 characters of each and 40,000 in all, shared evenly and marked where
+  cut. Go's planner and the checks that take a short context see the title and the first
+  500 characters only.
+- **Its facts are not this project's.** They are cited with [R n] and are never treated as
+  accepted here. A figure or detail quoted from a reference counts as supplied in the
+  figure and new-claim checks.
+- **In the trash means unused.** A soft-deleted project is shown as in the trash and sent
+  nowhere until restored. Purging it removes the reference.
+- **The list's "Use in another project" offers the projects shown.** When a folder is
+  selected, only that folder's projects are offered as targets.
+

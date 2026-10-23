@@ -26,6 +26,9 @@ PRECEDENCE: tuple[tuple[str, str], ...] = (
     ("stage", "the current stage's instruction: what to produce now"),
     ("constraint", "the project's constraints and output format"),
     ("mode", "the mode — voice and emphasis only"),
+    # Client, 21 Oct (email 5): another project the user chose to draw on.
+    # Their own material, but not this project's: it informs, it never overrides.
+    ("reference", "material from the user's other projects, chosen as references [R1]…"),
     ("generated", "anything a model wrote earlier: summaries, drafts, suggestions"),
 )
 

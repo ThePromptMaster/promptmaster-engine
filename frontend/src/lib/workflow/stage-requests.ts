@@ -1,4 +1,5 @@
 import { factsForRequest } from './facts';
+import { referencePayload } from './references';
 import { sourcesForRequest } from './sources';
 /**
  * The requests a stage's draft and evaluation send, and what is stored from
@@ -53,6 +54,8 @@ export function inputsFrom(project: Project): PMInput {
     ...(project.applied_instructions?.length
       ? { user_instructions: project.applied_instructions.map(({ stage, version, instruction }) => ({ stage, version, instruction })) }
       : {}),
+    // The user's other projects this one draws on (client, 21 Oct, email 5).
+    ...(project.references?.some((r) => !r.deleted) ? { references: referencePayload(project.references) } : {}),
     mode: project.mode,
     custom_name: project.custom_name,
     custom_preamble: project.custom_preamble,

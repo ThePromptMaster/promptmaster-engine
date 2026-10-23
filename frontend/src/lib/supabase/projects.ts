@@ -10,28 +10,45 @@ import {
 import { currentModel } from '@/lib/constants';
 
 const LIST_COLUMNS =
-  'id, title, objective, mode, workflow, stage, status, accent, updated_at, created_at';
+  'id, title, objective, mode, workflow, stage, status, accent, folder_id, updated_at, created_at';
 
 const FULL_COLUMNS = `
   id, user_id, title, objective, audience, constraints, output_format, context,
   mode, custom_name, custom_preamble, custom_tone,
   model, session_facts, active_stack_id, constraint_presets, format_presets,
-  workflow, workflow_template_id, stage, status, manual_checks, manual_check_versions, routine_decisions, web_access, thinking, language, accent, stage_modes, revision,
+  workflow, workflow_template_id, stage, status, manual_checks, manual_check_versions, routine_decisions, web_access, thinking, language, accent, folder_id, stage_modes, revision,
   critique_intensity, critique_tone,
   archived_at, deleted_at, legacy_session_id, created_at, updated_at
 `;
 
-export async function listProjects(limit = 50): Promise<ProjectSummary[]> {
+/**
+ * The live projects, newest first. `folder` narrows them on the server (a
+ * folder's id, or 'unfiled'), so a folder past the first page is not empty.
+ */
+export async function listProjects(limit = 50, folder?: string | null): Promise<ProjectSummary[]> {
   const supabase = createClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from('projects')
     .select(LIST_COLUMNS)
-    .is('deleted_at', null)
+    .is('deleted_at', null);
+  if (folder === 'unfiled') query = query.is('folder_id', null);
+  else if (folder) query = query.eq('folder_id', folder);
+  const { data, error } = await query
     .order('updated_at', { ascending: false })
     .limit(limit);
 
   if (error) throw error;
   return (data ?? []) as unknown as ProjectSummary[];
+}
+
+/**
+ * File a project in a folder, or none (Unfiled). Not an edit of the project:
+ * the database leaves its revision alone, so an open tab of it is not told it
+ * changed elsewhere (client, 21 Oct, email 5).
+ */
+export async function moveProject(id: string, folderId: string | null): Promise<void> {
+  const { error } = await createClient().from('projects').update({ folder_id: folderId }).eq('id', id);
+  if (error) throw error;
 }
 
 export async function getProject(id: string): Promise<Project | null> {

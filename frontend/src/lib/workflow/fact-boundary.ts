@@ -12,6 +12,7 @@
 
 import { api } from '@/lib/api/client';
 import { currentFacts } from './facts';
+import { referenceText } from './references';
 import type { Project } from '@/types/project';
 
 const NO_INVENTION =
@@ -41,13 +42,15 @@ export function noInventedDetails(project: Pick<Project, 'objective' | 'constrai
 }
 
 /** Everything the user supplied: the brief, the facts, and their own messages. */
-export function suppliedText(project: Pick<Project, 'objective' | 'constraints' | 'context'> & Partial<Pick<Project, 'facts'>>, said: readonly string[] = []): string {
+export function suppliedText(project: Pick<Project, 'objective' | 'constraints' | 'context'> & Partial<Pick<Project, 'facts' | 'references'>>, said: readonly string[] = []): string {
   return [
     project.objective,
     project.constraints,
     project.context,
     ...currentFacts(project.facts).map((f) => f.statement),
     ...said,
+    // The user's other projects this one draws on are theirs too (client, 21 Oct, email 5).
+    ...referenceText(project.references),
   ]
     .filter((t): t is string => Boolean(t?.trim()))
     .join('\n')

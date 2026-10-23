@@ -4,6 +4,8 @@ import { create } from 'zustand';
 import { listProjectFiles } from '@/lib/supabase/project-files';
 import { listProjectFacts } from '@/lib/supabase/facts';
 import { listProjectSources } from '@/lib/supabase/sources';
+import { listReferences, loadReferenceMaterial } from '@/lib/supabase/references';
+import type { ReferenceMaterial } from '@/lib/workflow/references';
 import type { WebFound } from '@/lib/workflow/web-found';
 import type { StageFigures } from '@/lib/workflow/figures';
 
@@ -45,6 +47,7 @@ import {
   type Project,
   type ProjectFact,
   type ProjectSource,
+  type ProjectReference,
   type ProjectFile,
   type ProjectPatch,
 } from '@/types/project';
@@ -133,6 +136,11 @@ interface ProjectState {
   facts: ProjectFact[];
   /** Saved web sources, current and retired (20 Oct). */
   sources: ProjectSource[];
+  /** The user's other projects this one draws on, and what was read of them (client, 21 Oct, email 5). */
+  references: ProjectReference[];
+  referenceMaterial: ReferenceMaterial[];
+  /** Re-read the references and their material, after one is added or removed. */
+  reloadReferences: () => Promise<void>;
   /** The latest web search a writer made on this project (22 Oct), for the stage it was made from. */
   lastWeb: WebFound | null;
 
@@ -284,6 +292,25 @@ function clearTimer() {
   }
 }
 
+/**
+ * The references and what each brings (client, 21 Oct, email 5). One that
+ * cannot be read is kept, said as unread, rather than dropped without notice.
+ */
+async function readReferences(projectId: string): Promise<{ references: ProjectReference[]; referenceMaterial: ReferenceMaterial[] }> {
+  const references = await listReferences(projectId);
+  const referenceMaterial = await Promise.all(
+    references.map((r) =>
+      loadReferenceMaterial(r).catch(
+        (): ReferenceMaterial => ({
+          referenceId: r.id, projectId: r.referenced_project_id, title: 'A project that could not be read', objective: '',
+          deliverable: '', text: '', facts: [], deleted: false, updatedAt: '',
+        })
+      )
+    )
+  );
+  return { references, referenceMaterial };
+}
+
 export const useProjectStore = create<ProjectState>()((set, get) => ({
   projectId: null,
   project: null,
@@ -299,6 +326,8 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
   files: [],
   facts: [],
   sources: [],
+  references: [],
+  referenceMaterial: [],
   lastWeb: null,
   activeVersionId: null,
   loading: false,
@@ -329,7 +358,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       // down: the derived half of the panel still works. Events do not fail to
       // an empty log — that reads as a reset project (4 Oct). They stay null,
       // or keep the log already on hand on a background reload, and say so.
-      const [artifacts, loadedEvents, recommendations, tasks, files, facts, sources] = await Promise.all([
+      const [artifacts, loadedEvents, recommendations, tasks, files, facts, sources, referenced] = await Promise.all([
         listArtifacts(id),
         listWorkflowEvents(id).catch(() => null),
         listRecommendations(id).catch(() => [] as Recommendation[]),
@@ -339,6 +368,10 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         // the facts having been withdrawn. Keep what was last read.
         listProjectFacts(id).catch(() => (get().projectId === id ? get().facts : [])),
         listProjectSources(id).catch(() => (get().projectId === id ? get().sources : [])),
+        // Like facts: a failed read keeps what was last read, never "no references".
+        readReferences(id).catch(() =>
+          get().projectId === id ? { references: get().references, referenceMaterial: get().referenceMaterial } : { references: [], referenceMaterial: [] }
+        ),
       ]);
 
       // A Book project has thirteen artifacts, not one. Load them all and index
@@ -408,6 +441,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         files,
         facts,
         sources,
+        ...referenced,
         activeVersionId: head?.id ?? null,
         loading: false,
         // A reload that worked clears a refresh failure; a save failure keeps
@@ -437,6 +471,8 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       files: [],
       facts: [],
   sources: [],
+      references: [],
+      referenceMaterial: [],
       lastWeb: null,
       activeVersionId: null,
       saveState: 'idle',
@@ -496,6 +532,13 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
   async refresh() {
     const { projectId } = get();
     if (projectId) await get().loadProject(projectId, { background: true });
+  },
+
+  async reloadReferences() {
+    const id = get().projectId;
+    if (!id) return;
+    const referenced = await readReferences(id);
+    if (get().projectId === id) set(referenced);
   },
 
   async reloadRecommendations() {

@@ -69,6 +69,7 @@ import { buildStageDigest, formatManuscript, summariseStageContent } from '@/lib
 import { goWaitingLine, objectiveUnmet } from '@/lib/workflow/objective';
 import { recordFacts, supersedeFact } from '@/lib/supabase/facts';
 import { factsAlreadyRecorded, planFactRecording } from '@/lib/workflow/record-facts';
+import { ProjectReferences } from './project-references';
 import { ProjectFacts } from './project-facts';
 import { buildChatContext, chatContentFor } from '@/lib/workflow/chat-context';
 import { starterQuestions } from '@/lib/workflow/chat-starters';
@@ -2124,6 +2125,8 @@ export function WorkflowWorkspace({
             <FiguresOnRecord template={template} state={state} bundles={stageBundles} />
             {/* On every stage: the accepted facts are the project's record (F3, 7 Oct). */}
             <ProjectFacts project={project} onChanged={() => onReload?.()} readOnly={!isEditable || project.status === 'finalized'} />
+            {/* On every stage: the other projects this one draws on (client, 21 Oct, email 5). */}
+            <ProjectReferences project={project} readOnly={!isEditable || project.status === 'finalized'} />
             {/* On every stage: the switch and the sources every stage cites (20 Oct). */}
             <WebSources
               project={project}
