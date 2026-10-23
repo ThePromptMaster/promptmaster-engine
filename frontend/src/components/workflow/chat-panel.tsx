@@ -166,6 +166,13 @@ interface Props {
    */
   resumeChange?: PendingChange | null;
   onResumeTaken?: () => void;
+  /**
+   * Text to put in the composer, unsent: a section quoted from the project read
+   * beside this one (client feedback, 21 Oct, email 4). A new `nonce` puts it
+   * in again; `onPrefillTaken` is called once it is there.
+   */
+  prefill?: { text: string; nonce: number } | null;
+  onPrefillTaken?: () => void;
   /** The held change whose question is open here now, so the notice does not repeat it. */
   onPendingShown?: (id: string | null) => void;
   /** Later stages waiting for an update after a change, by label (shown once a revision is applied). */
@@ -222,6 +229,8 @@ export function ChatPanel({
   autoApply,
   resumeChange = null,
   onResumeTaken,
+  prefill = null,
+  onPrefillTaken,
   onPendingShown,
   awaitingUpdate,
 }: Props) {
@@ -369,6 +378,14 @@ export function ChatPanel({
     }
     onResumeTaken?.();
   }, [resumeChange, conflicting, readOnly, stageId, onResumeTaken, settle]);
+
+  // A quoted section from the other project: added to whatever is being typed,
+  // never sent on its own.
+  useEffect(() => {
+    if (!prefill || readOnly) return;
+    setDraft((d) => `${d.trim() ? `${d.trimEnd()}\n\n` : ''}${prefill.text}`.slice(0, INPUT_LIMITS.message));
+    onPrefillTaken?.();
+  }, [prefill, readOnly, onPrefillTaken]);
 
   useEffect(() => {
     onPendingShown?.(conflicting?.pendingId ?? null);

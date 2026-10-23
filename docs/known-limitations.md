@@ -2069,3 +2069,22 @@ constraints (`precedence.py`).
 - **The list's "Use in another project" offers the projects shown.** When a folder is
   selected, only that folder's projects are offered as targets.
 
+
+### L-105 — Another project beside this one: what the split view does (2026-10-23)
+
+"Dual projects at the same time side-by-side like split screen and you can integrate with each
+other." **Open another project** (in the workspace header, or **Open beside** on a project in
+*Other projects*) shows a second project in the side chat's slot, as a **Reading** tab beside
+**Side chat**.
+- **Read-only.** The pane loads its own copy of the other project (each stage's head version
+  only) and writes nothing to it. To change that project, open it.
+- **Two ways across, both the user's choice.** **Send this section to the side chat** puts the
+  section, quoted and with its source, into this project's chat composer, unsent.
+  **Use as reference in this project** adds it to *Other projects* (L-104), so every stage,
+  check and chat here draws on it.
+- **One other project at a time, on a tablet or wider.** The slot holds the chat or the reader,
+  not both at once: three columns do not fit beside a 720px page. On a phone the entry points
+  are hidden and the slot is the chat only.
+- **As of when it was opened.** Edits made to the other project in another tab show after it is
+  closed and opened again (or the page reloads).
+- The choice is kept for this browser tab (session storage), per project.

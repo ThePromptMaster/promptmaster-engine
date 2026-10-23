@@ -70,6 +70,9 @@ import { goWaitingLine, objectiveUnmet } from '@/lib/workflow/objective';
 import { recordFacts, supersedeFact } from '@/lib/supabase/facts';
 import { factsAlreadyRecorded, planFactRecording } from '@/lib/workflow/record-facts';
 import { ProjectReferences } from './project-references';
+import { ProjectReaderPane } from './project-reader-pane';
+import { addReference } from '@/lib/supabase/references';
+import { MAX_REFERENCES } from '@/lib/workflow/references';
 import { ProjectFacts } from './project-facts';
 import { buildChatContext, chatContentFor } from '@/lib/workflow/chat-context';
 import { starterQuestions } from '@/lib/workflow/chat-starters';
@@ -258,6 +261,46 @@ export function WorkflowWorkspace({
       return value;
     });
   }, []);
+  // Another project read beside this one, in the side chat's slot (client
+  // feedback, 21 Oct, email 4: "dual projects at the same time side-by-side").
+  // Kept for this tab's session, per project.
+  const readerKey = `pm.reader.${project.id}`;
+  const [reader, setReaderState] = useState<{ id: string | null; open: boolean; tab: 'chat' | 'reader' }>({ id: null, open: false, tab: 'chat' });
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(window.sessionStorage.getItem(readerKey) ?? 'null') as typeof reader | null;
+      if (saved && typeof saved === 'object') setReaderState({ id: saved.id ?? null, open: Boolean(saved.open), tab: saved.tab === 'reader' ? 'reader' : 'chat' });
+    } catch {
+      // Nothing remembered: start on the chat.
+    }
+  }, [readerKey]);
+  const setReader = useCallback((next: typeof reader) => {
+    setReaderState(next);
+    try {
+      window.sessionStorage.setItem(readerKey, JSON.stringify(next));
+    } catch {
+      // Not remembering is fine.
+    }
+  }, [readerKey]);
+  const openBeside = useCallback((id: string | null) => {
+    setReader({ id, open: true, tab: 'reader' });
+    setChatOpen(true);
+  }, [setReader, setChatOpen]);
+  const [chatPrefill, setChatPrefill] = useState<{ text: string; nonce: number } | null>(null);
+  const takePrefill = useCallback(() => setChatPrefill(null), []);
+  const referenceRows = useProjectStore((s) => s.references);
+  const reloadReferences = useProjectStore((s) => s.reloadReferences);
+  // Phones get the chat only: the reader needs room beside the work.
+  const [roomBeside, setRoomBeside] = useState(true);
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return;
+    const query = window.matchMedia('(min-width: 768px)');
+    setRoomBeside(query.matches);
+    const onChange = () => setRoomBeside(query.matches);
+    query.addEventListener?.('change', onChange);
+    return () => query.removeEventListener?.('change', onChange);
+  }, []);
+  const readingTab = roomBeside && reader.open && reader.tab === 'reader';
   const [busy, setBusy] = useState(false);
   const [transitionError, setTransitionError] = useState<string | null>(null);
   // PM-06: unsaved edits in the renderer, so "Save changes" can lead.
@@ -1864,7 +1907,17 @@ export function WorkflowWorkspace({
             </span>
           </button>
 
-          <div className="mb-4 flex items-center justify-end">
+          <div className="mb-4 flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => openBeside(reader.id)}
+              className="hidden items-center gap-1.5 rounded-lg bg-[var(--surface-container-low)] px-3 py-1.5 text-label text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] md:inline-flex"
+            >
+              <span aria-hidden className="material-symbols-outlined text-[16px]">
+                splitscreen_right
+              </span>
+              {reader.id ? 'Other project' : 'Open another project'}
+            </button>
             <button
               onClick={() => setChatOpen((open) => !open)}
               aria-expanded={chatOpen}
@@ -2126,7 +2179,7 @@ export function WorkflowWorkspace({
             {/* On every stage: the accepted facts are the project's record (F3, 7 Oct). */}
             <ProjectFacts project={project} onChanged={() => onReload?.()} readOnly={!isEditable || project.status === 'finalized'} />
             {/* On every stage: the other projects this one draws on (client, 21 Oct, email 5). */}
-            <ProjectReferences project={project} readOnly={!isEditable || project.status === 'finalized'} />
+            <ProjectReferences project={project} readOnly={!isEditable || project.status === 'finalized'} onOpenBeside={openBeside} />
             {/* On every stage: the switch and the sources every stage cites (20 Oct). */}
             <WebSources
               project={project}
@@ -2489,7 +2542,7 @@ export function WorkflowWorkspace({
       {chatOpen && (
         <aside
           id="stage-side-chat"
-          className="fixed inset-0 z-40 flex flex-col bg-[var(--surface)] p-4 lg:sticky lg:inset-auto lg:top-0 lg:z-auto lg:h-[100dvh] lg:max-h-[100dvh] lg:w-[380px] lg:shrink-0 lg:self-start lg:bg-transparent lg:py-6 lg:pl-0 lg:pr-6"
+          className={`fixed inset-0 z-40 flex flex-col bg-[var(--surface)] p-4 lg:sticky lg:inset-auto lg:top-0 lg:z-auto lg:h-[100dvh] lg:max-h-[100dvh] lg:w-[380px] lg:shrink-0 lg:self-start lg:bg-transparent lg:py-6 lg:pl-0 lg:pr-6 ${readingTab ? 'xl:w-[480px]' : ''}`}
         >
           <button
             onClick={() => setChatOpen(false)}
@@ -2501,7 +2554,58 @@ export function WorkflowWorkspace({
             Close
           </button>
 
-          <div className="min-h-0 flex-1">
+          {/* Two tabs in one slot when another project is open beside: the
+              chat stays mounted under the reader, so its draft and thread
+              survive a look at the other project. */}
+          {reader.open && roomBeside && (
+            <div role="tablist" aria-label="Beside the work" className="mb-2 hidden gap-1 md:flex">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={!readingTab}
+                onClick={() => setReader({ ...reader, tab: 'chat' })}
+                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-label ${!readingTab ? 'bg-[var(--surface-container-high)] text-[var(--on-surface)]' : 'text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-low)]'}`}
+              >
+                <span aria-hidden className="material-symbols-outlined text-[16px]">forum</span>
+                Side chat
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={readingTab}
+                onClick={() => setReader({ ...reader, tab: 'reader' })}
+                className={`inline-flex min-w-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-label ${readingTab ? 'bg-[var(--surface-container-high)] text-[var(--on-surface)]' : 'text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-low)]'}`}
+              >
+                <span aria-hidden className="material-symbols-outlined text-[16px]">menu_book</span>
+                <span className="truncate">Reading</span>
+              </button>
+            </div>
+          )}
+          {reader.open && roomBeside && (
+            <div data-testid="reader-slot" className={readingTab ? 'min-h-0 flex-1' : 'hidden'}>
+              <ProjectReaderPane
+                currentProjectId={project.id}
+                readingId={reader.id}
+                onChoose={(id) => setReader({ id, open: true, tab: 'reader' })}
+                onClose={() => setReader({ id: null, open: false, tab: 'chat' })}
+                onSendToChat={(text) => {
+                  setChatPrefill({ text, nonce: Date.now() });
+                  setReader({ ...reader, tab: 'chat' });
+                }}
+                onUseAsReference={
+                  project.status === 'finalized'
+                    ? undefined
+                    : async (id) => {
+                        await addReference(project.user_id, project.id, id);
+                        await reloadReferences();
+                      }
+                }
+                referenced={Boolean(reader.id && referenceRows.some((r) => r.referenced_project_id === reader.id))}
+                referencesFull={referenceRows.length >= MAX_REFERENCES}
+              />
+            </div>
+          )}
+          <div data-testid="chat-slot" className={readingTab ? 'hidden' : 'min-h-0 flex-1'}>
             <ChatPanel
               project={project}
               stageId={stage.id}
@@ -2596,6 +2700,8 @@ export function WorkflowWorkspace({
               applying={applyFindings.running}
               resumeChange={resumeChange}
               onResumeTaken={takeResume}
+              prefill={chatPrefill}
+              onPrefillTaken={takePrefill}
               onPendingShown={setPendingShown}
             />
           </div>
