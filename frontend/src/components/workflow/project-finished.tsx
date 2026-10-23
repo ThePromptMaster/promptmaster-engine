@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import { tr } from '@/lib/i18n/store';
-import { nounText, unitsText } from '@/lib/i18n/templates';
+import { nounText, stageText, unitsText } from '@/lib/i18n/templates';
 
 import { MarkdownOutput } from '@/components/shared/markdown-output';
 import { downloadBlob, downloadFile } from '@/lib/utils';
@@ -100,7 +100,7 @@ export function ProjectFinished({ bundle, completion, evaluation, onReopen, onEd
             ]
               .filter(Boolean)
               .join(' · ')
-          : t('pnl.nothingWritten', { stage: stage?.label ?? t('pnl.theDeliverable'), noun })}
+          : t('pnl.nothingWritten', { stage: stage ? stageText(locale, template.key, stage, 'label') : t('pnl.theDeliverable'), noun })}
       </p>
       {evaluation && (
         <div className="mt-2">

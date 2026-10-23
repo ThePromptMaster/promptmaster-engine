@@ -24,6 +24,7 @@ import { pt as checksArea } from './areas/checks';
 import { pt as filesArea } from './areas/files';
 import { pt as needArea } from './areas/need';
 import { pt as stopArea } from './areas/stop';
+import { pt as recsArea } from './areas/recs';
 import { pt as acctArea } from './areas/acct';
 import { pt as recArea } from './areas/rec';
 import { pt as panelsArea } from './areas/panels';
@@ -310,6 +311,7 @@ export const pt: Messages = {
   ...filesArea,
   ...needArea,
   ...stopArea,
+  ...recsArea,
   ...acctArea,
   ...recArea,
   ...panelsArea,

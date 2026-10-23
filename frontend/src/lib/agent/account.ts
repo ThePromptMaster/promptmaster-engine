@@ -46,7 +46,9 @@ export function runAccount(
   run: AgentRun | null,
   steps: readonly AgentStep[],
   stageLabel: (id: string) => string,
-  locale: Locale = 'en'
+  locale: Locale = 'en',
+  /** A stage's English name, as the screen says it: for the names inside a recorded reason. */
+  stageByEnglish?: (english: string) => string
 ): RunAccount | null {
   if (!run) return null;
   const t = (key: string, vars?: Vars) => translate(locale, key, vars);
@@ -82,7 +84,7 @@ export function runAccount(
 
   // Read as recorded (English); said as shown.
   const reason = run.stop_reason?.trim() ?? '';
-  const shown = shownStopReason(locale, reason);
+  const shown = shownStopReason(locale, reason, stageByEnglish);
   const current = steps.at(-1);
   switch (run.status) {
     case 'running':

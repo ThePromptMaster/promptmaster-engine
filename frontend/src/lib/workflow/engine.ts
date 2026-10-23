@@ -917,9 +917,19 @@ export function describeOutstanding(item: OutstandingItem): string {
   return shownOutstanding(item, 'en');
 }
 
+/**
+ * How a surface shows the names inside an item: a stage by its id, and what
+ * Go is waiting for. Without one, the English the item was built with shows.
+ */
+export interface OutstandingShow {
+  stage?: (stageId: string, english: string) => string;
+  waiting?: (english: string) => string;
+}
+
 /** As `describeOutstanding`, in `locale`. */
-export function shownOutstanding(item: OutstandingItem, locale: Locale): string {
+export function shownOutstanding(raw: OutstandingItem, locale: Locale, show: OutstandingShow = {}): string {
   const t = (key: string, vars?: Record<string, string | number>) => translate(locale, key, vars);
+  const item = 'stageId' in raw && show.stage ? { ...raw, label: show.stage(raw.stageId, raw.label) } : raw;
   switch (item.kind) {
     case 'stale_stage':
       return t('out.stale', { label: item.label, reason: shownCheckText(locale, item.reason) });
@@ -939,7 +949,7 @@ export function shownOutstanding(item: OutstandingItem, locale: Locale): string 
     case 'check_says':
       return t('out.checkSays', { label: item.label, says: shownCheckText(locale, item.says) });
     case 'go_waiting':
-      return t('out.goWaiting', { need: item.need });
+      return t('out.goWaiting', { need: show.waiting ? show.waiting(item.need) : item.need });
     case 'objective_unmet':
       return item.blockers.length ? t('out.objWaiting', { list: item.blockers.join('; ') }) : t('out.objNotMet');
   }
