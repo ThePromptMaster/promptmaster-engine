@@ -105,6 +105,12 @@ current server state. It is thrown in exactly one place and caught in exactly on
 place. On success the store adopts the returned row — including its new `revision` —
 so the next write is not stale.
 
+**Filing a project in a folder is not an edit.** `moveProject` changes only
+`projects.folder_id`, and `projects_touch_and_bump()` leaves `revision` and
+`updated_at` alone for an update that changes nothing else. So moving a project from
+the list never makes an open tab of it report "changed elsewhere", and the list does
+not reorder it as if it had just been worked on.
+
 **The guard covers `updateProject` only.** `softDeleteProject`, `restoreProject` and
 `hardDeleteProject` issue unguarded updates, and the append path sends no revision at
 all.

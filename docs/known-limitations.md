@@ -2026,3 +2026,21 @@ the language saved with the job).
 - **Only languages with spaces between words.** Word counts and section measures count words
   by spaces, so Chinese, Japanese and Thai are not offered.
 - **The interface's own words are English** until the interface translation (Phase 5) ships.
+
+### L-102 — Folders: one owner, three levels, one folder per project (2026-10-23)
+
+"Organizing projects and folders ... however someone wants to freely organize." Projects
+can be filed in folders from the list's sidebar (drag on a computer, or the card's folder
+button anywhere).
+- **Folders are the user's own.** There is no sharing and no team folder; that waits for
+  organization accounts (Exhibit B, Stage 3).
+- **At most three levels deep.** The database refuses a deeper or circular tree.
+- **One folder per project.** A project is filed in one folder or none (Unfiled), not
+  tagged into several.
+- **Order is by name.** Folders sort by name; there is no hand ordering yet, although
+  the table has a `position` for it.
+- **Deleting a folder deletes no project.** Its projects become Unfiled and the folders
+  inside it move to the top level (not into its own parent).
+- **The list still shows 50 at a time.** The folder filter runs on the server, so a
+  folder's projects are found even when they are older than the newest 50 overall.
+

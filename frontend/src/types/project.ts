@@ -157,6 +157,8 @@ export interface Project {
   language?: string;
   /** 14 Oct call: the project's own accent colour (an `ACCENTS` id); null follows the user's choice. */
   accent?: string | null;
+  /** The folder it is filed in (client, 21 Oct, email 5); none is Unfiled. */
+  folder_id?: string | null;
   /**
    * The stage version each ticked approval was given on, by criterion id
    * (19 Oct). Display only — "approved v3 · current v4".
@@ -193,8 +195,21 @@ export interface ProjectSummary {
   status: ProjectStatus;
   /** The project's own accent colour, shown on its card. */
   accent?: string | null;
+  /** The folder it is filed in, or none (Unfiled). */
+  folder_id?: string | null;
   updated_at: string;
   created_at: string;
+}
+
+/** One of a user's folders for projects (client, 21 Oct, email 5). */
+export interface ProjectFolder {
+  id: string;
+  user_id: string;
+  parent_id: string | null;
+  name: string;
+  position: number;
+  created_at: string;
+  updated_at: string;
 }
 
 /**

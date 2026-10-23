@@ -5,10 +5,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 import { useAuth } from '@/hooks/use-auth';
-import { listProjects, softDeleteProject } from '@/lib/supabase/projects';
+import { listProjects, moveProject, softDeleteProject } from '@/lib/supabase/projects';
+import { createFolder, deleteFolder, folderCounts, listFolders, renameFolder } from '@/lib/supabase/folders';
+import { FoldersSidebar, PROJECT_DRAG_TYPE, type FolderSelection } from '@/components/projects/folders-sidebar';
+import { MoveToMenu } from '@/components/projects/move-to-menu';
 import { pausedProjectIds } from '@/lib/supabase/workflow';
 import { useProjectStore } from '@/stores/project-store';
-import type { ProjectSummary } from '@/types/project';
+import type { ProjectFolder, ProjectSummary } from '@/types/project';
 import { accentVariables } from '@/lib/appearance/colours';
 import { GuestBanner } from '@/components/projects/guest-banner';
 import { DeletedProjects } from '@/components/projects/deleted-projects';
@@ -25,6 +28,17 @@ const WORKFLOW_LABEL: Record<string, string> = {
   research: 'Research',
   single_output: 'Single output',
 };
+
+/** The folder last chosen on this browser; a convenience, not project data. */
+const FOLDER_KEY = 'pm.projectsFolder';
+
+function storedSelection(): FolderSelection {
+  try {
+    return window.localStorage.getItem(FOLDER_KEY) || 'all';
+  } catch {
+    return 'all';
+  }
+}
 
 function relativeTime(iso: string): string {
   const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
@@ -48,6 +62,24 @@ export default function ProjectsPage() {
   const [listFailed, setListFailed] = useState(false);
   const [paused, setPaused] = useState<Set<string>>(new Set());
 
+  // Folders (client, 21 Oct, email 5): the tree beside the list, and which one is shown.
+  const [folders, setFolders] = useState<ProjectFolder[]>([]);
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  const [selection, setSelection] = useState<FolderSelection>(() => (typeof window === 'undefined' ? 'all' : storedSelection()));
+  const [foldersOpen, setFoldersOpen] = useState(false);
+
+  const loadFolders = useCallback(() => {
+    Promise.all([listFolders(), folderCounts()])
+      .then(([rows, byFolder]) => {
+        setFolders(rows);
+        setCounts(byFolder);
+        // A remembered folder that is gone (deleted elsewhere) shows everything.
+        setSelection((s) => (s !== 'all' && s !== 'unfiled' && !rows.some((f) => f.id === s) ? 'all' : s));
+      })
+      // Before the migration, or offline: the list still works without folders.
+      .catch(() => undefined);
+  }, []);
+
   const load = useCallback(() => {
     // A project just left may still have a debounced edit on its way — the
     // status Finish set, the stage it moved to. Leaving by a link does not wait
@@ -57,7 +89,7 @@ export default function ProjectsPage() {
       .getState()
       .flush()
       .catch(() => undefined)
-      .then(() => listProjects())
+      .then(() => listProjects(50, selection === 'all' ? undefined : selection))
       .then((rows) => {
         setProjects(rows);
         // Paused on an unmet objective: said on the list, not only on the project.
@@ -69,12 +101,72 @@ export default function ProjectsPage() {
         setListFailed(true);
         setError(e instanceof Error ? e.message : 'Could not load projects.');
       });
-  }, []);
+  }, [selection]);
 
   useEffect(() => {
     if (!user) return;
     load();
   }, [user, load]);
+
+  useEffect(() => {
+    if (!user) return;
+    loadFolders();
+  }, [user, loadFolders]);
+
+  function select(next: FolderSelection) {
+    setSelection(next);
+    setFoldersOpen(false);
+    setProjects(null);
+    try {
+      window.localStorage.setItem(FOLDER_KEY, next);
+    } catch {
+      // Private windows: the choice lasts for this page only.
+    }
+  }
+
+  async function handleMove(id: string, folderId: string | null) {
+    const previous = projects;
+    const shown = (fid: string | null) => selection === 'all' || (selection === 'unfiled' ? fid === null : fid === selection);
+    setProjects((rows) => (rows ?? []).map((p) => (p.id === id ? { ...p, folder_id: folderId } : p)).filter((p) => p.id !== id || shown(folderId)));
+    try {
+      await moveProject(id, folderId);
+      loadFolders();
+    } catch (e) {
+      setProjects(previous);
+      setError(e instanceof Error ? e.message : ((e as { message?: string })?.message ?? 'Could not move the project.'));
+    }
+  }
+
+  const createAndShow = async (name: string, parentId: string | null) => {
+    if (!user) return;
+    await createFolder(user.id, name, parentId);
+    loadFolders();
+  };
+  const rename = async (id: string, name: string) => {
+    await renameFolder(id, name);
+    loadFolders();
+  };
+  const remove = async (id: string) => {
+    await deleteFolder(id);
+    loadFolders();
+    load();
+  };
+
+  const selectedLabel =
+    selection === 'all' ? null : selection === 'unfiled' ? 'Unfiled' : folders.find((f) => f.id === selection)?.name ?? null;
+
+  const sidebar = (
+    <FoldersSidebar
+      folders={folders}
+      counts={counts}
+      selected={selection}
+      onSelect={select}
+      onCreate={createAndShow}
+      onRename={rename}
+      onDelete={remove}
+      onDropProject={(id, folderId) => void handleMove(id, folderId)}
+    />
+  );
 
   // Signed out by the time the page ran (an expired session the server had
   // not yet noticed): the list would otherwise be a skeleton forever.
@@ -101,10 +193,37 @@ export default function ProjectsPage() {
   const finalized = projects?.filter((p) => p.status === 'finalized') ?? [];
 
   return (
-    <main className="mx-auto max-w-[960px] px-6 py-14">
+    <main className="mx-auto max-w-[1240px] px-6 py-14 md:grid md:grid-cols-[232px_minmax(0,1fr)] md:gap-10">
+      {/* The folder tree: a column on a computer or tablet, a sheet on a phone. */}
+      <aside className="hidden md:block">
+        <div className="sticky top-6 max-h-[calc(100vh-3rem)] overflow-y-auto rounded-2xl bg-[var(--surface-container-low)] p-3">{sidebar}</div>
+      </aside>
+      {foldersOpen && (
+        <div className="fixed inset-0 z-40 md:hidden" role="dialog" aria-modal="true" aria-label="Folders">
+          <button type="button" aria-label="Close folders" onClick={() => setFoldersOpen(false)} className="absolute inset-0 bg-black/30" />
+          <div className="absolute inset-y-0 left-0 w-[86vw] max-w-[320px] overflow-y-auto bg-[var(--surface-container-low)] p-4 shadow-xl">
+            <div className="mb-3 flex items-center justify-between">
+              <span className="text-title text-[var(--on-surface)]">Folders</span>
+              <button type="button" onClick={() => setFoldersOpen(false)} aria-label="Close folders" className="rounded-lg p-1.5 text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)]">
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+            {sidebar}
+          </div>
+        </div>
+      )}
+      <div className="min-w-0">
       <header className="mb-12 flex flex-wrap items-end justify-between gap-6">
         <div>
-          <h1 className="text-display text-[var(--on-surface)]">Projects</h1>
+          <button
+            type="button"
+            onClick={() => setFoldersOpen(true)}
+            className="mb-4 inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-low)] px-3 py-1.5 text-label text-[var(--on-surface-variant)] md:hidden"
+          >
+            <span aria-hidden className="material-symbols-outlined text-[18px]">folder_open</span>
+            Folders{selectedLabel ? `: ${selectedLabel}` : ''}
+          </button>
+          <h1 className="text-display text-[var(--on-surface)]">{selectedLabel ?? 'Projects'}</h1>
           <p className="mt-3 text-body text-[var(--on-surface-variant)]">
             Each one keeps its objective, every version, and what it was judged on.
           </p>
@@ -150,7 +269,19 @@ export default function ProjectsPage() {
         </div>
       )}
 
-      {projects?.length === 0 && (
+      {projects?.length === 0 && selection !== 'all' && (
+        <div className="rounded-2xl bg-[var(--surface-container-low)] px-8 py-12 text-center text-body text-[var(--on-surface-variant)]">
+          <span aria-hidden className="material-symbols-outlined text-[32px] opacity-50">folder_open</span>
+          <p className="mt-3">
+            Nothing in {selectedLabel ?? 'this folder'} yet. Drag a project here, or use the folder button on its card.
+          </p>
+          <button type="button" onClick={() => select('all')} className="mt-4 text-label text-[var(--pm-primary)] hover:underline">
+            Show all projects
+          </button>
+        </div>
+      )}
+
+      {projects?.length === 0 && selection === 'all' && (
         <div className="rounded-2xl bg-[var(--surface-container-low)] px-8 py-16 text-center">
           <span
             aria-hidden
@@ -201,7 +332,14 @@ export default function ProjectsPage() {
 
             <ul className="space-y-2">
               {rows.map((p) => (
-                <li key={p.id}>
+                <li
+                  key={p.id}
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData(PROJECT_DRAG_TYPE, p.id);
+                    e.dataTransfer.effectAllowed = 'move';
+                  }}
+                >
                   <div style={accentVariables(p.accent) as React.CSSProperties} className="group relative flex items-center gap-4 rounded-2xl bg-[var(--surface-container-low)] transition-all duration-200 hover:bg-[var(--surface-container-lowest)] hover:shadow-[0_1px_2px_rgba(25,28,30,0.04),0_8px_20px_-10px_rgba(25,28,30,0.2)]">
                     {/* The project's own colour, as a bar and a tinted icon: the icon alone was easy to miss (21 Oct). */}
                     {p.accent && <span aria-hidden className="absolute inset-y-3 left-0 w-1 rounded-r-full bg-[var(--pm-primary)]" />}
@@ -242,7 +380,10 @@ export default function ProjectsPage() {
                       </span>
                     </Link>
 
-                    <div className="shrink-0 pr-4">
+                    <div className="flex shrink-0 items-center pr-4">
+                      {pendingDelete !== p.id && (
+                        <MoveToMenu projectTitle={p.title} folderId={p.folder_id} folders={folders} onMove={(folderId) => void handleMove(p.id, folderId)} />
+                      )}
                       {pendingDelete === p.id ? (
                         <div className="flex items-center gap-1.5">
                           <button
@@ -279,6 +420,7 @@ export default function ProjectsPage() {
       {/* FR-20. Last on the page and closed by default: trash is somewhere you
           go looking for, not something that competes with the work. */}
       {projects !== null && <DeletedProjects onRestored={load} />}
+      </div>
     </main>
   );
 }
