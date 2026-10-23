@@ -63,3 +63,18 @@ describe('the bar does not say "Ready to move on" while Go will not (18 Oct)', (
     expect(blocksCompletion(item)).toBe(false);
   });
 });
+
+describe('a check written in another language (client, 21 Oct)', () => {
+  it('reads a format-only reason in Spanish, French and German', () => {
+    expect(formatOnly(TABLE, 'Los resultados no están presentados como una tabla.')).toBe(true);
+    expect(formatOnly(TABLE, "Le résultat n'est pas présenté sous forme de tableau.")).toBe(true);
+    expect(formatOnly(TABLE, 'Die Ergebnisse stehen nicht in einer Tabelle.')).toBe(true);
+  });
+
+  it('still holds a reason that says something is missing', () => {
+    expect(formatOnly(TABLE, 'Falta el segmento de jubilados en la tabla.')).toBe(false);
+    expect(formatOnly(TABLE, 'Il manque le segment des retraités dans le tableau.')).toBe(false);
+    expect(formatOnly(TABLE, 'In der Tabelle fehlt das Segment der Rentner.')).toBe(false);
+  });
+});
+

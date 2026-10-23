@@ -153,6 +153,8 @@ export interface Project {
   web_access?: 'off' | 'on';
   /** 14 Oct call ("increase the thinking level"): Deep asks the model to reason at high effort on every call. */
   thinking?: Thinking;
+  /** Client, 21 Oct ("pick your language"): the language the work is written in, a two-letter code; English when unset. */
+  language?: string;
   /** 14 Oct call: the project's own accent colour (an `ACCENTS` id); null follows the user's choice. */
   accent?: string | null;
   /**
@@ -317,6 +319,8 @@ export interface ProjectInput {
   mode?: ModeType;
   model?: string;
   workflow?: string;
+  /** Client, 21 Oct: the language the work is written in. */
+  language?: string;
 }
 
 /**
@@ -353,6 +357,7 @@ export type ProjectPatch = Partial<
     | 'routine_decisions'
     | 'web_access'
     | 'thinking'
+    | 'language'
     | 'accent'
     | 'stage_modes'
     | 'critique_intensity'

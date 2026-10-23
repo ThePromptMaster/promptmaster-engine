@@ -108,6 +108,10 @@ class PMInput(BaseModel):
     # it. Read only by evaluation and critique prompts (critique_style.py).
     critique_intensity: Literal["light", "standard", "rigorous"] = Field(default="standard")
     critique_tone: Literal["gentle", "neutral", "direct"] = Field(default="neutral")
+    # Client, 21 Oct ("pick your language"). The request header is what the
+    # model calls read (`promptmaster/language.py`); this copy rides with a
+    # background job's saved inputs so the drain can send that header.
+    language: str = Field(default="en", max_length=16)
     # Session Facts (Information Anchors, Ch5 S5) — pinned facts that anchor
     # the conversation's knowledge and get injected into every prompt.
     session_facts: list[str] = Field(

@@ -55,6 +55,7 @@ import {
   recordErrorEvent,
   recordModelUsage,
 } from '@/lib/supabase/model-usage';
+import { languageHeaders } from './language';
 import { thinkingHeaders } from './thinking';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -217,6 +218,7 @@ async function rawFetch(
       ...(projectId ? { 'X-PromptMaster-Project': projectId } : {}),
       // How hard the model thinks for this project (Standard sends nothing).
       ...thinkingHeaders(),
+      ...languageHeaders(),
       ...(await authHeader()),
       ...options?.headers,
     },

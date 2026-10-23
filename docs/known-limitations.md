@@ -2004,3 +2004,25 @@ the same way the side chat's sources are.
   request carried, as `saveSources` appends them. Two writers searching on the same project at
   once (a stage draft and the side chat, say) can number a source differently from where it is
   saved. A project sends at most 40 current sources, so the same holds past 40.
+
+### L-101 — Output language: what follows it and what does not (2026-10-23)
+
+"Can we do pick your language?" A project has a **Writes in** language (`projects.language`;
+English, Spanish, French, Portuguese, German, Italian or Dutch), chosen on the start screen
+and in the project setup. The browser sends it as `X-PromptMaster-Language`, and
+`llm_client._with_language` adds one directive to the system message of **every** model call
+that request makes: drafts, checks, the side chat, Go, and background chapters (the drain sends
+the language saved with the job).
+- **Work already written stays as it is.** Changing the language mid-project changes what is
+  written next. Earlier stages, saved facts and sources keep their language, and are quoted as
+  written.
+- **Quotes, figures and fixed values are not translated.** Figures and quotations are copied
+  verbatim, so a check's figure match still works. JSON keys and enumerated values (High/Low,
+  statuses) stay English, which the code reads.
+- **Some rules read the user's own words in English only.** The "don't invent details" rule and
+  the format-only check reason are read in all seven languages. Word limits ("at most 500
+  words"), the as-of date rule, and measurable requirements are read in English only; said in
+  another language, they are left to the model rather than enforced.
+- **Only languages with spaces between words.** Word counts and section measures count words
+  by spaces, so Chinese, Japanese and Thai are not offered.
+- **The interface's own words are English** until the interface translation (Phase 5) ships.

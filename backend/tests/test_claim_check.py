@@ -67,3 +67,15 @@ def test_the_endpoint_returns_parsed_claims():
         assert r.json() == {"claims": [{"quote": "make me do it properly", "why": "x"}]}
     finally:
         app.dependency_overrides.pop(get_client, None)
+
+
+def test_a_quote_in_guillemets_is_kept():
+    """Client, 21 Oct ("pick your language"): a French check quotes « like this »."""
+    req = NewClaimsRequest(
+        before="Emma corrigeait mon texte.",
+        after="Emma corrigeait mon texte. « Elle a toujours été la plus organisée de la famille. »",
+        supplied="Emma corrigeait mon texte.",
+        instruction="",
+    )
+    out = parse({"claims": [{"quote": "« Elle a toujours été la plus organisée de la famille. »", "why": "pas fourni"}]}, req)
+    assert [c.quote for c in out.claims] == ["Elle a toujours été la plus organisée de la famille."]

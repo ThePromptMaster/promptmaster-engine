@@ -116,6 +116,7 @@ import { isDone } from '@/lib/workflow/types';
 import { getLatestTemplate } from '@/lib/supabase/workflow';
 import { setUsageProject } from '@/lib/supabase/model-usage';
 import { setRequestThinking } from '@/lib/api/thinking';
+import { setRequestLanguage } from '@/lib/api/language';
 import type { NewEvaluation, NewVersion } from '@/lib/supabase/versions';
 import { EventRecordedError, useProjectStore, type StageBundle } from '@/stores/project-store';
 import { withAppliedInstructions } from '@/lib/workflow/applied-instructions';
@@ -308,6 +309,11 @@ export function WorkflowWorkspace({
     setRequestThinking(project.thinking);
     return () => setRequestThinking('standard');
   }, [project.thinking]);
+  // ...and the language its work is written in (client, 21 Oct).
+  useEffect(() => {
+    setRequestLanguage(project.language);
+    return () => setRequestLanguage('en');
+  }, [project.language]);
 
   // State is derived from the event log in exactly one place, so it cannot
   // drift from the record.

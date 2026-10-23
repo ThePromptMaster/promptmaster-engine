@@ -60,6 +60,7 @@ export function inputsFrom(project: Project): PMInput {
     session_facts: project.session_facts,
     critique_intensity: project.critique_intensity ?? 'standard',
     critique_tone: project.critique_tone ?? 'neutral',
+    language: project.language ?? 'en',
   };
 }
 

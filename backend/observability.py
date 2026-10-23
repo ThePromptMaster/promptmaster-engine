@@ -69,6 +69,12 @@ THINKING_HEADER = "X-PromptMaster-Thinking"
 thinking_var: ContextVar[str] = ContextVar("thinking", default="standard")
 
 
+#: The language the project's work is written in (client, 21 Oct: "pick your
+#: language"). Set the same way; `llm_client` adds the directive to every call.
+LANGUAGE_HEADER = "X-PromptMaster-Language"
+language_var: ContextVar[str] = ContextVar("language", default="en")
+
+
 def parse_thinking(raw: str | None) -> str:
     """`deep`, or `standard` for anything else — an unknown level never raises the bill."""
     return "deep" if (raw or "").strip().lower() == "deep" else "standard"
@@ -292,6 +298,10 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
         route_var.set(request.url.path)
         # The project's thinking level, for every model call this request makes.
         thinking_var.set(parse_thinking(request.headers.get(THINKING_HEADER)))
+        # ...and the language it writes in.
+        from promptmaster.language import resolve as resolve_language  # late: promptmaster imports this module
+
+        language_var.set(resolve_language(request.headers.get(LANGUAGE_HEADER)))
         user_id_var.set("")
         accumulator = UsageAccumulator()
         usage_var.set(accumulator)

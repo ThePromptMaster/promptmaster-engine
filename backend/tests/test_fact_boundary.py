@@ -54,3 +54,25 @@ def test_apply_keeps_what_the_chat_did_not_ask_to_change():
 def test_an_accepted_requirement_sets_it_too():
     inputs = PMInput(objective="A wedding speech.", facts=[AcceptedFact(statement="Add no new personal details.", kind="requirement")])
     assert no_invented_details(inputs)
+
+
+# Client, 21 Oct ("pick your language"): the same rule, said in another language.
+# `frontend/src/lib/workflow/fact-boundary.test.ts` uses the same sentences.
+@pytest.mark.parametrize("text", [
+    "No inventes detalles personales.",
+    "N'invente pas de souvenirs ni d'anecdotes.",
+    "Não invente histórias sobre os noivos.",
+    "Keine Details erfinden.",
+    "Non inventare dettagli sugli ospiti.",
+    "Verzin geen details over de gasten.",
+])
+def test_the_rule_is_read_in_the_offered_languages(text):
+    assert no_invented_details(PMInput(objective=text))
+
+
+@pytest.mark.parametrize("text", [
+    "Inventa una historia sobre un dragón.",  # no negation: asking for invention
+    "No uses jerga. Inventa detalles divertidos.",  # the negation is in another sentence
+])
+def test_an_invitation_to_invent_is_not_the_rule(text):
+    assert not no_invented_details(PMInput(objective=text))

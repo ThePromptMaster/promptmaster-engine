@@ -29,6 +29,7 @@ import { useMemo } from 'react';
 
 import type { StageDefinition } from '@/lib/workflow/types';
 import type { Project, ProjectPatch, Thinking } from '@/types/project';
+import { LANGUAGES, resolveLanguage, type LanguageCode } from '@/lib/workflow/languages';
 import { ACCENTS } from '@/lib/appearance/colours';
 import { AutoGrowTextarea } from '@/components/shared/auto-grow-textarea';
 import { LimitCounter } from '@/components/shared/limit-counter';
@@ -161,6 +162,7 @@ export function ProjectSetup({ project, stage, onPatch, readOnly }: Props) {
         {/* The first stage shows this instead of the brief, so the model is set here too (18 Oct, pilot). */}
         <ModelChoice model={project.model} readOnly={readOnly} onPick={(model) => onPatch({ model })} />
         <ThinkingChoice thinking={project.thinking} readOnly={readOnly} onPick={(thinking) => onPatch({ thinking })} />
+        <LanguageChoice language={project.language} readOnly={readOnly} onPick={(language) => onPatch({ language })} />
         <AccentChoice accent={project.accent} readOnly={readOnly} onPick={(accent) => onPatch({ accent })} />
       </div>
     </section>
@@ -230,6 +232,7 @@ export function ProjectBrief({ project, onPatch, readOnly }: Omit<Props, 'stage'
         })}
         <ModelChoice model={project.model} readOnly={readOnly} onPick={(model) => onPatch({ model })} />
         <ThinkingChoice thinking={project.thinking} readOnly={readOnly} onPick={(thinking) => onPatch({ thinking })} />
+        <LanguageChoice language={project.language} readOnly={readOnly} onPick={(language) => onPatch({ language })} />
         <AccentChoice accent={project.accent} readOnly={readOnly} onPick={(accent) => onPatch({ accent })} />
       </div>
     </details>
@@ -297,6 +300,34 @@ function ThinkingChoice({ thinking, readOnly, onPick }: { thinking: Thinking | u
       </select>
       <p className="mt-1 text-label text-[var(--on-surface-variant)]">
         Deep takes longer and costs more per answer. Try it when answers feel shallow or miss a constraint.
+      </p>
+    </div>
+  );
+}
+
+/**
+ * The language the work is written in (client, 21 Oct: "Can we do pick your
+ * language?"): every draft, check, chat answer and Go step from here on.
+ */
+export function LanguageChoice({ language, readOnly, onPick, id = 'brief-language' }: { language: string | undefined; readOnly?: boolean; onPick: (language: LanguageCode) => void; id?: string }) {
+  return (
+    <div>
+      <label htmlFor={id} className="mb-1.5 block text-label text-[var(--on-surface-variant)]">
+        Writes in
+      </label>
+      <select
+        id={id}
+        value={resolveLanguage(language)}
+        disabled={readOnly}
+        onChange={(e) => onPick(resolveLanguage(e.target.value))}
+        className="rounded-lg bg-[var(--surface-container-low)] px-4 py-2.5 text-body text-[var(--on-surface)] outline-none focus:ring-2 focus:ring-[var(--pm-primary)]/40 disabled:opacity-70"
+      >
+        {LANGUAGES.map((l) => (
+          <option key={l.code} value={l.code}>{l.code === 'en' ? l.name : `${l.own} — ${l.name}`}</option>
+        ))}
+      </select>
+      <p className="mt-1 text-label text-[var(--on-surface-variant)]">
+        Drafts, checks, the side chat and Go write in this language. Work already written stays as it is.
       </p>
     </div>
   );

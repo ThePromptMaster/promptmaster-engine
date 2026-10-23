@@ -22,6 +22,7 @@ import type {
 import type { PMInput } from '@/types';
 import { USAGE_HEADER, parseUsageHeader } from '@/lib/observability/usage';
 import { stepRequestId } from './log';
+import { resolveLanguage } from '@/lib/workflow/languages';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -154,6 +155,8 @@ export class HttpSectionGenerator implements SectionGenerator {
           'X-PromptMaster-User': userId,
           'X-Request-Id': requestId,
           ...(this.projectId ? { 'X-PromptMaster-Project': this.projectId } : {}),
+          // The project's language, saved with the job (client, 21 Oct).
+          ...languageHeaderFor(body),
         },
         body: JSON.stringify({ ...(body as object), budget_seconds: budgetSeconds }),
         signal: controller.signal,
@@ -250,4 +253,10 @@ export class HttpSectionGenerator implements SectionGenerator {
       req.userId
     );
   }
+}
+
+/** The language header for a job step, from the inputs saved with the job; none for English. */
+export function languageHeaderFor(body: unknown): Record<string, string> {
+  const code = resolveLanguage((body as { inputs?: { language?: string } } | null)?.inputs?.language);
+  return code === 'en' ? {} : { 'X-PromptMaster-Language': code };
 }

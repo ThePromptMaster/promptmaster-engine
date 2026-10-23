@@ -218,6 +218,25 @@ def _thinking() -> str:
     return thinking_var.get()
 
 
+def _with_language(messages: list[dict[str, str]]) -> list[dict[str, str]]:
+    """The project's output language, as the last word of the system message.
+
+    Every call a request makes passes through here — the draft, its checks, the
+    side chat, Go — so a Spanish project is answered in Spanish everywhere.
+    A JSON repair is left alone: it only fixes syntax.
+    """
+    from observability import language_var  # late, as `_thinking` above
+
+    from .language import language_directive
+
+    directive = "" if _REPAIRING.get() else language_directive(language_var.get())
+    if not directive:
+        return messages
+    if messages and messages[0]["role"] == "system":
+        return [{"role": "system", "content": f"{messages[0]['content']}\n\n{directive}"}, *messages[1:]]
+    return [{"role": "system", "content": directive}, *messages]
+
+
 def _token_budget(model: str, max_tokens: int) -> dict[str, Any]:
     """The answer keeps `max_tokens`; a reasoning model's reasoning gets its own budget.
 
@@ -294,7 +313,7 @@ class OpenRouterClient:
         runs_on = resolve_model(model or self.model)
         payload: dict[str, Any] = {
             "model": runs_on,
-            "messages": messages,
+            "messages": _with_language(messages),
             "temperature": temperature,
             **_token_budget(runs_on, max_tokens),
         }
@@ -339,7 +358,7 @@ class OpenRouterClient:
         runs_on = resolve_model(model or self.model)
         payload: dict[str, Any] = {
             "model": runs_on,
-            "messages": messages,
+            "messages": _with_language(messages),
             "temperature": temperature,
             **_token_budget(runs_on, max_tokens),
         }
@@ -379,7 +398,7 @@ class OpenRouterClient:
         runs_on = resolve_model(model or self.model)
         payload: dict[str, Any] = {
             "model": runs_on,
-            "messages": messages,
+            "messages": _with_language(messages),
             "temperature": 0.2,
             **_token_budget(runs_on, 2_000),
             "plugins": [{"id": "web", "engine": "exa", "max_results": max(1, min(max_results, 10))}],

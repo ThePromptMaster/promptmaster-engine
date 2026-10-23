@@ -12,9 +12,16 @@ import type { StageDefinition } from './types';
 const FORMAT = /\b(?:table|tabular|json|list|bullets?|format(?:ted|ting)?|layout|laid out|present(?:ed|s|ation)?)\b/i;
 const CONTENT = /\b(?:missing|lacks?|lacking|omit(?:s|ted)?|leaves? out|does not (?:cover|include|address|state|name|give)|no (?:mention|coverage)|absent|incomplete coverage)\b/i;
 
+// The same words in the other offered languages (client, 21 Oct: "pick your
+// language"): a Spanish check's reason is in Spanish.
+const FORMAT_X = /(?<![\p{L}])(?:tabla|tableau|tabela|tabelle|tabella|tabel|formato|format\p{L}*|lista|liste|lijst|elenco|viñeta\p{L}*|puces|marcadores|aufzählung\p{L}*|opsomming|presentaci\p{L}*|présentation|présenté\p{L}*|apresenta\p{L}*|darstellung|presentazione|presentatie|opmaak|mise en forme)(?![\p{L}])/iu;
+const CONTENT_X = /(?<![\p{L}])(?:falta\p{L}*|omit\p{L}*|omet\p{L}*|omis|omess\p{L}*|ausente|assente|absent\p{L}*|manque\p{L}*|manca\p{L}*|fehl\p{L}*|ausgelassen|auslässt|ontbr\p{L}*|weggelaten|laat weg|niet opgenomen|nicht enthalten|no (?:incluye|cubre|menciona)|não (?:inclui|cobre|menciona)|ne (?:couvre|mentionne) pas|n['’]inclut pas|non (?:include|copre|menziona))(?![\p{L}])/iu;
+
 export function formatOnly(stage: StageDefinition, reason: string | null | undefined): boolean {
   const text = (reason ?? '').trim();
-  return rendererHoldsItems(effectiveRenderer(stage)) && FORMAT.test(text) && !CONTENT.test(text);
+  const aboutFormat = FORMAT.test(text) || FORMAT_X.test(text);
+  const aboutContent = CONTENT.test(text) || CONTENT_X.test(text);
+  return rendererHoldsItems(effectiveRenderer(stage)) && aboutFormat && !aboutContent;
 }
 
 /**

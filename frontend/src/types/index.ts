@@ -24,6 +24,8 @@ export interface PMInput {
   /** PM-21: how hard critique looks, and how it is worded — independent. */
   critique_intensity?: CritiqueIntensity;
   critique_tone?: CritiqueTone;
+  /** The language the work is written in (client, 21 Oct); also sent as a header. Saved with background jobs. */
+  language?: string;
 }
 
 export type CritiqueIntensity = 'light' | 'standard' | 'rigorous';
