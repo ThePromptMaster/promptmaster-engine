@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google';
 import { Toaster } from '@/components/ui/sonner';
 import { BetaNotice } from '@/components/shared/beta-notice';
 import { ApplyColourPreferences } from '@/components/shared/colour-preferences';
+import { I18nProvider } from '@/lib/i18n/i18n-provider';
 import './globals.css';
 
 const inter = Inter({
@@ -67,11 +68,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="font-sans antialiased bg-[var(--surface)] text-[var(--on-surface)] min-h-screen">
-        {/* FR-22: the beta notice is global — every route has to carry it. */}
-        <BetaNotice />
-        <ApplyColourPreferences />
-        {children}
-        <Toaster />
+        {/* The interface language (client, 21 Oct). The root stays static, so
+            it renders English and the browser's choice takes over; signed-in
+            pages read the cookie in their own layout and render it at once. */}
+        <I18nProvider>
+          {/* FR-22: the beta notice is global — every route has to carry it. */}
+          <BetaNotice />
+          <ApplyColourPreferences />
+          {children}
+          <Toaster />
+        </I18nProvider>
       </body>
     </html>
   );

@@ -7,6 +7,10 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { SAVE_ACCOUNT_EVENT } from '@/components/projects/guest-banner';
 import { ColourPicker } from './colour-preferences';
+import { useLocale, useT } from '@/lib/i18n/i18n-provider';
+import { LOCALES } from '@/lib/i18n/locales';
+import { setLocale } from '@/lib/i18n/store';
+import type { MessageKey } from '@/lib/i18n/messages/en';
 
 /**
  * The application header.
@@ -23,9 +27,42 @@ import { ColourPicker } from './colour-preferences';
  */
 
 /** A guest has no email, so it is the label that has to say what they are. */
-function accountLabel(email: string | undefined, isGuest: boolean): string {
-  if (isGuest) return 'Guest';
-  return email ?? 'Signed in';
+function accountLabel(email: string | undefined, isGuest: boolean, t: (key: MessageKey) => string): string {
+  if (isGuest) return t('header.guest');
+  return email ?? t('header.signedIn');
+}
+
+/**
+ * The interface language (client, 21 Oct: "Can we do pick your language?").
+ * Each language by its own name, so someone who cannot read the current one
+ * can still find theirs.
+ */
+function LanguagePicker() {
+  const t = useT();
+  const locale = useLocale();
+  return (
+    <div className="px-4 py-2">
+      <div className="flex flex-wrap gap-1.5" role="group" aria-label={t('header.language')}>
+        {LOCALES.map((l) => (
+          <button
+            key={l.code}
+            type="button"
+            lang={l.code}
+            aria-pressed={locale === l.code}
+            onClick={() => setLocale(l.code)}
+            className={`rounded-lg px-2.5 py-1 text-label transition-colors ${
+              locale === l.code
+                ? 'bg-[var(--pm-primary)] text-[var(--on-primary)]'
+                : 'bg-[var(--surface-container-low)] text-[var(--on-surface)] hover:bg-[var(--surface-container-high)]'
+            }`}
+          >
+            {l.own}
+          </button>
+        ))}
+      </div>
+      <p className="mt-2 text-label leading-snug text-[var(--on-surface-variant)]">{t('header.languageNote')}</p>
+    </div>
+  );
 }
 
 /** One glyph for the avatar disc — the first letter, or a person icon. */
@@ -38,10 +75,12 @@ function accountInitial(email: string | undefined, isGuest: boolean): string | n
 export function AppHeader() {
   const router = useRouter();
   const { user, loading, isGuest, signOut } = useAuth();
+  const t = useT();
 
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [colours, setColours] = useState(false);
+  const [language, setLanguage] = useState(false);
   // A guest's sign-out is asked twice (14 Oct call): it ends the only identity
   // their projects belong to, and there is no signing back in to it.
   const [confirmGuestOut, setConfirmGuestOut] = useState(false);
@@ -87,7 +126,7 @@ export function AppHeader() {
     }
   }
 
-  const label = accountLabel(user?.email, isGuest);
+  const label = accountLabel(user?.email, isGuest, t);
   const initial = accountInitial(user?.email, isGuest);
 
   return (
@@ -115,7 +154,7 @@ export function AppHeader() {
               onClick={() => setOpen((v) => !v)}
               aria-expanded={open}
               aria-haspopup="menu"
-              aria-label="Account"
+              aria-label={t('header.account')}
               className="flex items-center gap-2 rounded-full bg-[var(--surface-container-low)] py-1.5 pl-1.5 pr-3 text-label text-[var(--on-surface-variant)] transition-colors hover:bg-[var(--surface-container-high)] hover:text-[var(--on-surface)]"
             >
               <span
@@ -136,15 +175,13 @@ export function AppHeader() {
           {open && (
             <div
               role="menu"
-              aria-label="Account"
+              aria-label={t('header.account')}
               className="absolute right-0 z-50 mt-2 w-[248px] rounded-xl bg-[var(--surface-container-lowest)] py-2 shadow-lg shadow-black/10"
             >
               <div className="px-4 py-2">
                 <p className="truncate text-body text-[var(--on-surface)]">{label}</p>
                 <p className="mt-0.5 text-label text-[var(--on-surface-variant)]">
-                  {isGuest
-                    ? 'Work stays in this browser'
-                    : 'Signed in'}
+                  {isGuest ? t('header.guestNote') : t('header.signedIn')}
                 </p>
               </div>
 
@@ -160,18 +197,34 @@ export function AppHeader() {
                 <span aria-hidden className="material-symbols-outlined text-[18px]">
                   palette
                 </span>
-                Colours
+                {t('header.colours')}
                 <span aria-hidden className="material-symbols-outlined ml-auto text-[18px] text-[var(--on-surface-variant)]">
                   {colours ? 'expand_less' : 'expand_more'}
                 </span>
               </button>
               {colours && <ColourPicker />}
 
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => setLanguage((v) => !v)}
+                aria-expanded={language}
+                className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-body text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-low)]"
+              >
+                <span aria-hidden className="material-symbols-outlined text-[18px]">
+                  translate
+                </span>
+                {t('header.language')}
+                <span aria-hidden className="material-symbols-outlined ml-auto text-[18px] text-[var(--on-surface-variant)]">
+                  {language ? 'expand_less' : 'expand_more'}
+                </span>
+              </button>
+              {language && <LanguagePicker />}
+
               {confirmGuestOut && (
                 <div role="alert" className="mx-2 mt-1 rounded-lg bg-[var(--surface-container-low)] px-3 py-2.5">
                   <p className="text-label text-[var(--on-surface)]">
-                    A guest can&apos;t sign back in. Signing out loses this browser&apos;s projects for good
-                    unless you create an account first.
+                    {t('header.guestWarning')}
                   </p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     <button
@@ -183,7 +236,7 @@ export function AppHeader() {
                       }}
                       className="rounded-lg bg-[var(--pm-primary)] px-3 py-1 text-label text-[var(--on-primary)]"
                     >
-                      Create an account
+                      {t('header.createAccount')}
                     </button>
                   </div>
                 </div>
@@ -202,7 +255,7 @@ export function AppHeader() {
                 <span aria-hidden className="material-symbols-outlined text-[18px]">
                   logout
                 </span>
-                {busy ? 'Signing out…' : confirmGuestOut ? 'Sign out anyway' : 'Sign out'}
+                {busy ? t('header.signingOut') : confirmGuestOut ? t('header.signOutAnyway') : t('header.signOut')}
               </button>
             </div>
           )}

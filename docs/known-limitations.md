@@ -466,7 +466,6 @@ stage is short of the works its own requirement asks for; after that, Check lite
 looks up what is listed. Relevance is the user's to judge (they remove rows that do not
 belong); filtering by the index's relevance score or by reading abstracts is not built.
 
-
 ### L-36 · The commit check guards shape, not quality · `accepted`
 
 Since 2026-10-05 every new stage version passes `checkCommit` (`lib/workflow/commit-check.ts`)
@@ -1090,7 +1089,6 @@ chapter to checking a routine approval. The small calls — conflict checks, fig
 extraction, criterion checks, change impact, source verification — would likely run as
 well on a smaller model at a fraction of the cost. Per-operation cost and time are now
 recorded (E1); routing should follow measurement on matched tasks, not precede it.
-
 
 ### L-51 — Accepted facts are recorded by the user; Go does not extract them (2026-10-07) — resolved 2026-10-07
 
@@ -1944,7 +1942,6 @@ while it is on. Limits:
   until a source is saved, so the switch is one click further away than the heading's "web
   access on".
 
-
 ### L-98 — The full-work reader shows the deliverable only; Apply and continue runs with checkpoints (2026-10-21)
 
 From the 14 Oct call ("does read the full work change automatically when I change it?", "I
@@ -2043,6 +2040,24 @@ button anywhere).
   inside it move to the top level (not into its own parent).
 - **The list still shows 50 at a time.** The folder filter runs on the server, so a
   folder's projects are found even when they are older than the newest 50 overall.
+
+
+### L-103 — Interface language: what is translated (2026-10-23)
+
+The account menu's **Language** row switches the app's own words between English, Español,
+Français and Português. It is separate from a project's **Writes in** language (L-101): the first
+is the screen, the second is the work.
+- **Translated surface by surface.** Each area moves to `lib/i18n/messages` in its own change,
+  and an ESLint rule (`react/jsx-no-literals`) guards the areas already moved. Until an area
+  is moved, its words are English.
+- **Admin stays English.** The operations page is for the people running the beta.
+- **Server messages stay English.** An error's friendly copy is chosen in the browser by its
+  code; the server's own message, shown under technical details, is English.
+- **Custom workflows are not translated.** System workflows' stage names come from a display map
+  keyed by template and stage; a workflow a user designed keeps the words it was written in.
+- **Pages outside a project render English first.** Signed-in pages read the choice from a
+  cookie and render in it at once. The sign-in pages and the landing page are static, so they
+  switch after the page loads.
 
 ### L-104 — Using another project: text and facts, read when the project opens (2026-10-23)
 
