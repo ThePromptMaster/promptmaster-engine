@@ -83,8 +83,15 @@ export function buildChatContext(input: {
     steps: readonly { action_key: string; status: string; execution_label: string | null; block_kind?: string | null; output: string }[];
     objective?: string;
   };
+  /**
+   * Names as the page shows them, in the interface's language (client, 21
+   * Oct): the chat and Go then name the stage and its buttons in the words
+   * the user can see. The template's own words otherwise.
+   */
+  display?: { stageName: (s: StageDefinition) => string; workflowName: string };
 }): ChatContext {
-  const { template, state, project, stage, bundles, controls, goRun } = input;
+  const { template, state, project, stage, bundles, controls, goRun, display } = input;
+  const nameOf = display?.stageName ?? ((s: StageDefinition) => s.label);
   const digest = buildStageDigest(template, state, project, bundles, stage.id);
   // A chapter stage's own text already is the manuscript; sending it twice
   // would double the cost of every message.
@@ -92,10 +99,10 @@ export function buildChatContext(input: {
     ? ''
     : formatManuscript(sectionsOf(template, bundles), CHAT_MANUSCRIPT_MAX);
   return {
-    stage_label: stage.label,
+    stage_label: nameOf(stage),
     stage_instruction: (stage.entry_prompt_hint ?? '').slice(0, 4_000),
-    workflow_label: template.name,
-    workflow_stages: template.stages.map((s) => s.label),
+    workflow_label: display?.workflowName ?? template.name,
+    workflow_stages: template.stages.map(nameOf),
     prior_stages: digest.prior_stages,
     outline: stage.renderer === 'outline' ? '' : outlineOf(template, bundles),
     manuscript,

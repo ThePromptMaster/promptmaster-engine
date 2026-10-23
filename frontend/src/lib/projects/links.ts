@@ -1,3 +1,4 @@
+import { tr } from '@/lib/i18n/store';
 /**
  * Links in what the user asked for (Sean, 18 Oct, email 7): a beta user's
  * cookbook depended on an Instagram account's videos, and nothing told him
@@ -28,7 +29,5 @@ export function linksIn(text: string): LinksFound {
 export function sourceAccessNote(text: string): string | null {
   const { urls, video } = linksIn(text);
   if (!urls.length && !video) return null;
-  return video
-    ? "PromptMaster can't open links or watch videos. Paste the text — a transcript, captions, a description — or upload files (PDF, Word, CSV, images)."
-    : "PromptMaster can't open links. Paste the text you want it to use, or upload files (PDF, Word, CSV, images).";
+  return video ? tr('links.video') : tr('links.plain');
 }

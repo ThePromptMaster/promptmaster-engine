@@ -7,6 +7,8 @@ import { AutoGrowTextarea } from '@/components/shared/auto-grow-textarea';
 import { INPUT_LIMITS } from '@/lib/projects/input-limits';
 import { MarkdownOutput } from '@/components/shared/markdown-output';
 import type { NewSource } from '@/lib/supabase/sources';
+import { useT } from '@/lib/i18n/i18n-provider';
+import type { MessageKey } from '@/lib/i18n/messages/en';
 
 export interface DraftBrief {
   objective: string;
@@ -50,12 +52,12 @@ export interface FrontDoorState {
   edited?: BriefField[];
 }
 
-const LISTS: { field: Exclude<BriefField, 'objective' | 'audience'>; title: string; add: string }[] = [
-  { field: 'requirements', title: 'Requirements', add: 'Add a requirement' },
-  { field: 'evidence', title: 'Facts you gave', add: 'Add a fact' },
-  { field: 'deliverables', title: 'Deliverables', add: 'Add a deliverable' },
-  { field: 'stages', title: 'Stages', add: 'Add a stage' },
-  { field: 'approvals', title: 'Your approvals', add: 'Add an approval' },
+const LISTS: { field: Exclude<BriefField, 'objective' | 'audience'>; title: MessageKey; add: MessageKey }[] = [
+  { field: 'requirements', title: 'door.requirements', add: 'door.addRequirement' },
+  { field: 'evidence', title: 'door.evidence', add: 'door.addFact' },
+  { field: 'deliverables', title: 'door.deliverables', add: 'door.addDeliverable' },
+  { field: 'stages', title: 'door.stages', add: 'door.addStage' },
+  { field: 'approvals', title: 'door.approvals', add: 'door.addApproval' },
 ];
 
 /**
@@ -98,6 +100,7 @@ export function FrontDoor({
   /** Set while the page is making the project: the button says so and nothing else can be pressed. */
   busyLabel?: string | null;
 }) {
+  const t = useT();
   const [turns, setTurns] = useState<Turn[]>(initialState?.turns ?? []);
   const [brief, setBrief] = useState<DraftBrief>(initialState?.brief ?? EMPTY_BRIEF);
   const [ready, setReady] = useState(initialState?.ready ?? false);
@@ -138,7 +141,7 @@ export function FrontDoor({
       setBrief(res.brief);
       setReady(res.ready);
     } catch (e) {
-      setError(e instanceof Error && e.message ? e.message : 'That did not go through. Try again.');
+      setError(e instanceof Error && e.message ? e.message : t('door.failed'));
     } finally {
       setBusy(false);
     }
@@ -171,11 +174,11 @@ export function FrontDoor({
 
   return (
     <div className="grid gap-6 md:grid-cols-[1fr_300px]">
-      <section aria-label="Conversation" className="rounded-2xl bg-[var(--surface-container-lowest)] px-5 py-4">
+      <section aria-label={t('door.conversation')} className="rounded-2xl bg-[var(--surface-container-lowest)] px-5 py-4">
         <div className="space-y-3">
           {turns.length === 0 && !busy && (
             <p className="text-body text-[var(--on-surface-variant)]">
-              Say what you have in mind, as you would in any chat. The outline beside it builds up as you talk.
+              {t('door.intro')}
             </p>
           )}
           {turns.map((t, i) =>
@@ -193,7 +196,7 @@ export function FrontDoor({
               </div>
             )
           )}
-          {busy && <p role="status" className="text-label text-[var(--on-surface-variant)]">Thinking…</p>}
+          {busy && <p role="status" className="text-label text-[var(--on-surface-variant)]">{t('door.thinking')}</p>}
         </div>
         <div className="mt-4 flex items-end gap-2">
           <AutoGrowTextarea
@@ -206,45 +209,45 @@ export function FrontDoor({
               }
             }}
             rows={2}
-            aria-label="Your message"
+            aria-label={t('door.message')}
             className="min-w-0 flex-1 resize-none rounded-lg bg-[var(--surface-container-low)] px-3 py-2 text-body text-[var(--on-surface)] outline-none focus:ring-2 focus:ring-[var(--pm-primary)]/40"
           />
           <button onClick={() => void send()} disabled={!draft.trim() || busy || making} className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label text-[var(--on-primary)] disabled:opacity-40">
-            Send
+            {t('door.send')}
           </button>
         </div>
         <p className="mt-2 flex items-start gap-1.5 text-label text-[var(--on-surface-variant)]">
           <span aria-hidden className="material-symbols-outlined text-[16px]">travel_explore</span>
-          <span>Web access is on: PromptMaster searches the web when a question needs it, and what it cites is saved with the project.</span>
+          <span>{t('door.web')}</span>
         </p>
         {attach && <div className="mt-2">{attach}</div>}
         {error && <p role="alert" className="mt-2 text-label text-[var(--pm-error)]">{error}</p>}
-        <button onClick={onBack} className="mt-4 text-label text-[var(--on-surface-variant)] hover:underline">Back</button>
+        <button onClick={onBack} className="mt-4 text-label text-[var(--on-surface-variant)] hover:underline">{t('start.back')}</button>
       </section>
 
-      <aside aria-label="Draft brief" className="h-fit rounded-2xl bg-[var(--surface-container-low)] px-5 py-4">
-        <p className="text-label uppercase tracking-wider text-[var(--on-surface-variant)]">Outline — not a project yet</p>
-        <p className="mt-1 text-label text-[var(--on-surface-variant)]">Builds up as you talk. Change anything here; what you change stays as you wrote it.</p>
+      <aside aria-label={t('door.briefLabel')} className="h-fit rounded-2xl bg-[var(--surface-container-low)] px-5 py-4">
+        <p className="text-label uppercase tracking-wider text-[var(--on-surface-variant)]">{t('door.outlineTitle')}</p>
+        <p className="mt-1 text-label text-[var(--on-surface-variant)]">{t('door.outlineNote')}</p>
 
-        <label className="mt-3 block text-label font-semibold text-[var(--on-surface)]" htmlFor="outline-objective">Objective</label>
+        <label className="mt-3 block text-label font-semibold text-[var(--on-surface)]" htmlFor="outline-objective">{t('door.objective')}</label>
         <AutoGrowTextarea
           id="outline-objective"
           value={brief.objective}
           onChange={(e) => edit('objective', e.target.value.slice(0, INPUT_LIMITS.objective))}
           rows={2}
-          placeholder="What you want done"
+          placeholder={t('door.objectivePlaceholder')}
           className="mt-1 w-full resize-none rounded-lg bg-[var(--surface-container-lowest)] px-2.5 py-1.5 text-body text-[var(--on-surface)] outline-none focus:ring-2 focus:ring-[var(--pm-primary)]/40"
         />
-        <label className="mt-2 block text-label font-semibold text-[var(--on-surface)]" htmlFor="outline-audience">For</label>
+        <label className="mt-2 block text-label font-semibold text-[var(--on-surface)]" htmlFor="outline-audience">{t('door.for')}</label>
         <input
           id="outline-audience"
           value={brief.audience}
           onChange={(e) => edit('audience', e.target.value.slice(0, 1000))}
-          placeholder="Who it is for"
+          placeholder={t('door.forPlaceholder')}
           className="mt-1 w-full rounded-lg bg-[var(--surface-container-lowest)] px-2.5 py-1.5 text-label text-[var(--on-surface)] outline-none focus:ring-2 focus:ring-[var(--pm-primary)]/40"
         />
         {LISTS.map(({ field, title, add }) => (
-          <OutlineList key={field} title={title} addLabel={add} items={brief[field]} onChange={(items) => edit(field, items)} />
+          <OutlineList key={field} title={t(title)} addLabel={t(add)} items={brief[field]} onChange={(items) => edit(field, items)} />
         ))}
 
         {brief.objective.trim() && (
@@ -254,10 +257,10 @@ export function FrontDoor({
               disabled={busy || making}
               className={`mt-4 w-full rounded-lg px-4 py-2 text-label font-semibold disabled:opacity-60 ${ready ? 'bg-[var(--pm-primary)] text-[var(--on-primary)]' : 'bg-[var(--surface-container-high)] text-[var(--on-surface)]'}`}
             >
-              {busyLabel ?? 'Make it a project'}
+              {busyLabel ?? t('door.make')}
             </button>
             <p className="mt-1.5 text-label text-[var(--on-surface-variant)]">
-              {ready ? 'There is enough to set it up. ' : ''}The requirements and facts here become the project&apos;s starting record, and this conversation comes with it. All of it stays editable.
+              {ready ? `${t('door.enough')} ` : ''}{t('door.record')}
             </p>
             {onReview && (
               <button
@@ -265,7 +268,7 @@ export function FrontDoor({
                 disabled={busy || making}
                 className="mt-2 text-label text-[var(--on-surface-variant)] underline-offset-4 hover:underline disabled:opacity-60"
               >
-                Review the setup first
+                {t('door.review')}
               </button>
             )}
           </>
@@ -278,6 +281,7 @@ export function FrontDoor({
 /** One list in the outline: each item editable in place, removable, and one more to add. */
 function OutlineList({ title, addLabel, items, onChange }: { title: string; addLabel: string; items: string[]; onChange: (items: string[]) => void }) {
   const [adding, setAdding] = useState('');
+  const t = useT();
   const add = () => {
     const text = adding.trim();
     if (!text) return;
@@ -299,7 +303,7 @@ function OutlineList({ title, addLabel, items, onChange }: { title: string; addL
             />
             <button
               type="button"
-              aria-label={`Remove: ${item}`}
+              aria-label={t('door.removeItem', { item })}
               onClick={() => onChange(items.filter((_, j) => j !== i))}
               className="rounded p-0.5 text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)]"
             >
@@ -328,15 +332,17 @@ function OutlineList({ title, addLabel, items, onChange }: { title: string; addL
 
 /** What a reply searched for, and the sources it found, numbered as the reply cites them. */
 function SearchNote({ search, first }: { search: FrontDoorSearch; first: number }) {
+  const t = useT();
   return (
     <div className="text-label text-[var(--on-surface-variant)]">
       <p className="flex items-start gap-1.5">
         <span aria-hidden className="material-symbols-outlined text-[16px]">{search.note ? 'public_off' : 'travel_explore'}</span>
         <span>
           {search.note ||
-            `Searched the web for “${search.query}” · ${
-              search.sources.length ? `${search.sources.length} new source${search.sources.length === 1 ? '' : 's'}` : 'no new sources'
-            }`}
+            t('door.searched', {
+              query: search.query,
+              found: search.sources.length ? t('door.newSources', { count: search.sources.length }) : t('door.noSources'),
+            })}
         </span>
       </p>
       {search.sources.length > 0 && (
@@ -358,17 +364,18 @@ function SearchNote({ search, first }: { search: FrontDoorSearch; first: number 
 /** A piece of writing to use as it stands, apart from the explanation, with a copy button. */
 function DraftBlock({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
+  const t = useT();
   return (
-    <section aria-label="Draft" className="rounded-xl bg-[var(--surface-container-lowest)] px-4 py-3 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+    <section aria-label={t('door.draft')} className="rounded-xl bg-[var(--surface-container-lowest)] px-4 py-3 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-label uppercase tracking-wider text-[var(--on-surface-variant)]">Draft</p>
+        <p className="text-label uppercase tracking-wider text-[var(--on-surface-variant)]">{t('door.draft')}</p>
         <button
           type="button"
           onClick={() => void navigator.clipboard?.writeText(text).then(() => setCopied(true)).catch(() => undefined)}
           className="flex items-center gap-1 rounded-lg bg-[var(--surface-container-high)] px-3 py-1 text-label text-[var(--on-surface)]"
         >
           <span aria-hidden className="material-symbols-outlined text-[16px]">content_copy</span>
-          {copied ? 'Copied' : 'Copy'}
+          {copied ? t('door.copied') : t('door.copy')}
         </button>
       </div>
       <div className="mt-2 text-body text-[var(--on-surface)]">

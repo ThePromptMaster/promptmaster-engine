@@ -16,7 +16,9 @@ import type { ProjectFolder, ProjectSummary } from '@/types/project';
 import { accentVariables } from '@/lib/appearance/colours';
 import { GuestBanner } from '@/components/projects/guest-banner';
 import { DeletedProjects } from '@/components/projects/deleted-projects';
-import { EXAMPLE_GOALS, newProjectHref } from '@/lib/projects/example-goals';
+import { newProjectHref } from '@/lib/projects/example-goals';
+import { useLocale, useT } from '@/lib/i18n/i18n-provider';
+import { relativeTime } from '@/lib/i18n/format';
 
 const WORKFLOW_ICON: Record<string, string> = {
   book: 'menu_book',
@@ -24,11 +26,6 @@ const WORKFLOW_ICON: Record<string, string> = {
   single_output: 'bolt',
 };
 
-const WORKFLOW_LABEL: Record<string, string> = {
-  book: 'Book',
-  research: 'Research',
-  single_output: 'Single output',
-};
 
 /** The folder last chosen on this browser; a convenience, not project data. */
 const FOLDER_KEY = 'pm.projectsFolder';
@@ -41,20 +38,16 @@ function storedSelection(): FolderSelection {
   }
 }
 
-function relativeTime(iso: string): string {
-  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.round(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.round(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-}
+/** The example goals on the empty list, in the interface's language (`lib/projects/example-goals.ts` holds the English). */
+const EXAMPLES = ['memo', 'briefing', 'plan'] as const;
 
 export default function ProjectsPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const t = useT();
+  const locale = useLocale();
+  const workflowLabel = (key: string) =>
+    key === 'book' || key === 'research' || key === 'single_output' ? t(`workflow.name.${key}`) : key;
 
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -100,9 +93,9 @@ export default function ProjectsPage() {
       })
       .catch((e) => {
         setListFailed(true);
-        setError(e instanceof Error ? e.message : 'Could not load projects.');
+        setError(e instanceof Error ? e.message : t('list.loadError'));
       });
-  }, [selection]);
+  }, [selection, t]);
 
   useEffect(() => {
     if (!user) return;
@@ -134,7 +127,7 @@ export default function ProjectsPage() {
       loadFolders();
     } catch (e) {
       setProjects(previous);
-      setError(e instanceof Error ? e.message : ((e as { message?: string })?.message ?? 'Could not move the project.'));
+      setError(e instanceof Error ? e.message : ((e as { message?: string })?.message ?? t('list.moveError')));
     }
   }
 
@@ -154,7 +147,7 @@ export default function ProjectsPage() {
   };
 
   const selectedLabel =
-    selection === 'all' ? null : selection === 'unfiled' ? 'Unfiled' : folders.find((f) => f.id === selection)?.name ?? null;
+    selection === 'all' ? null : selection === 'unfiled' ? t('folders.unfiled') : folders.find((f) => f.id === selection)?.name ?? null;
 
   const sidebar = (
     <FoldersSidebar
@@ -184,7 +177,7 @@ export default function ProjectsPage() {
     } catch (e) {
       // Put it back rather than leaving the list lying about what exists.
       setProjects(previous);
-      setError(e instanceof Error ? e.message : 'Could not delete the project.');
+      setError(e instanceof Error ? e.message : t('list.deleteError'));
     }
   }
 
@@ -200,12 +193,12 @@ export default function ProjectsPage() {
         <div className="sticky top-6 max-h-[calc(100vh-3rem)] overflow-y-auto rounded-2xl bg-[var(--surface-container-low)] p-3">{sidebar}</div>
       </aside>
       {foldersOpen && (
-        <div className="fixed inset-0 z-40 md:hidden" role="dialog" aria-modal="true" aria-label="Folders">
-          <button type="button" aria-label="Close folders" onClick={() => setFoldersOpen(false)} className="absolute inset-0 bg-black/30" />
+        <div className="fixed inset-0 z-40 md:hidden" role="dialog" aria-modal="true" aria-label={t('list.folders')}>
+          <button type="button" aria-label={t('list.closeFolders')} onClick={() => setFoldersOpen(false)} className="absolute inset-0 bg-black/30" />
           <div className="absolute inset-y-0 left-0 w-[86vw] max-w-[320px] overflow-y-auto bg-[var(--surface-container-low)] p-4 shadow-xl">
             <div className="mb-3 flex items-center justify-between">
-              <span className="text-title text-[var(--on-surface)]">Folders</span>
-              <button type="button" onClick={() => setFoldersOpen(false)} aria-label="Close folders" className="rounded-lg p-1.5 text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)]">
+              <span className="text-title text-[var(--on-surface)]">{t('list.folders')}</span>
+              <button type="button" onClick={() => setFoldersOpen(false)} aria-label={t('list.closeFolders')} className="rounded-lg p-1.5 text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)]">
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </div>
@@ -222,19 +215,17 @@ export default function ProjectsPage() {
             className="mb-4 inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-low)] px-3 py-1.5 text-label text-[var(--on-surface-variant)] md:hidden"
           >
             <span aria-hidden className="material-symbols-outlined text-[18px]">folder_open</span>
-            Folders{selectedLabel ? `: ${selectedLabel}` : ''}
+            {selectedLabel ? t('list.foldersWith', { name: selectedLabel }) : t('list.folders')}
           </button>
-          <h1 className="text-display text-[var(--on-surface)]">{selectedLabel ?? 'Projects'}</h1>
-          <p className="mt-3 text-body text-[var(--on-surface-variant)]">
-            Each one keeps its objective, every version, and what it was judged on.
-          </p>
+          <h1 className="text-display text-[var(--on-surface)]">{selectedLabel ?? t('list.title')}</h1>
+          <p className="mt-3 text-body text-[var(--on-surface-variant)]">{t('list.subtitle')}</p>
         </div>
         <Link
           href="/projects/new"
           className="flex shrink-0 items-center gap-2 rounded-xl bg-[var(--pm-primary)] px-5 py-3 text-title text-[var(--on-primary)] transition-opacity hover:opacity-90"
         >
           <span className="material-symbols-outlined text-[20px]">add</span>
-          New project
+          {t('list.newProject')}
         </Link>
       </header>
 
@@ -242,7 +233,7 @@ export default function ProjectsPage() {
 
       {error && (
         <div role="alert" className="mb-8 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[var(--error-container)] px-4 py-3 text-body text-[var(--on-error-container)]">
-          <span>{listFailed ? `Your projects could not be loaded. Nothing has been lost. (${error})` : error}</span>
+          <span>{listFailed ? t('list.loadFailed', { error }) : error}</span>
           {listFailed && (
             <button
               type="button"
@@ -253,7 +244,7 @@ export default function ProjectsPage() {
               }}
               className="rounded-lg bg-[var(--surface-container-lowest)] px-3 py-1.5 text-label text-[var(--on-surface)]"
             >
-              Retry
+              {t('list.retry')}
             </button>
           )}
         </div>
@@ -273,11 +264,9 @@ export default function ProjectsPage() {
       {projects?.length === 0 && selection !== 'all' && (
         <div className="rounded-2xl bg-[var(--surface-container-low)] px-8 py-12 text-center text-body text-[var(--on-surface-variant)]">
           <span aria-hidden className="material-symbols-outlined text-[32px] opacity-50">folder_open</span>
-          <p className="mt-3">
-            Nothing in {selectedLabel ?? 'this folder'} yet. Drag a project here, or use the folder button on its card.
-          </p>
+          <p className="mt-3">{t('list.emptyFolder', { name: selectedLabel ?? t('list.thisFolder') })}</p>
           <button type="button" onClick={() => select('all')} className="mt-4 text-label text-[var(--pm-primary)] hover:underline">
-            Show all projects
+            {t('list.showAll')}
           </button>
         </div>
       )}
@@ -290,14 +279,10 @@ export default function ProjectsPage() {
           >
             workspaces
           </span>
-          <p className="mt-3 text-headline text-[var(--on-surface)]">Nothing here yet</p>
-          <p className="mx-auto mt-2 max-w-[460px] text-body text-[var(--on-surface-variant)]">
-            A project takes one goal to a finished deliverable — drafted, checked against what
-            you asked for, and kept with every version. Say what you need in a sentence, or
-            start from one of these:
-          </p>
+          <p className="mt-3 text-headline text-[var(--on-surface)]">{t('list.emptyTitle')}</p>
+          <p className="mx-auto mt-2 max-w-[460px] text-body text-[var(--on-surface-variant)]">{t('list.emptyBody')}</p>
           <ul className="mx-auto mt-5 flex max-w-[560px] flex-col gap-2 text-left">
-            {EXAMPLE_GOALS.map((example) => (
+            {EXAMPLES.map((key) => ({ label: t(`examples.${key}.label`), goal: t(`examples.${key}.goal`) })).map((example) => (
               <li key={example.label}>
                 <Link
                   href={newProjectHref(example.goal)}
@@ -316,14 +301,14 @@ export default function ProjectsPage() {
             className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[var(--pm-primary)] px-5 py-3 text-title text-[var(--on-primary)]"
           >
             <span className="material-symbols-outlined text-[20px]">add</span>
-            New project
+            {t('list.newProject')}
           </Link>
         </div>
       )}
 
       {[
-        { key: 'active', label: 'In progress', rows: active },
-        { key: 'finalized', label: 'Finished', rows: finalized },
+        { key: 'active', label: t('list.inProgress'), rows: active },
+        { key: 'finalized', label: t('list.finished'), rows: finalized },
       ].map(({ key, label, rows }) =>
         rows.length === 0 ? null : (
           <section key={key} className="mb-10">
@@ -354,20 +339,20 @@ export default function ProjectsPage() {
 
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-title text-[var(--on-surface)]">
-                          {p.title || 'Untitled project'}
+                          {p.title || t('list.untitled')}
                         </span>
                         <span className="mt-1 block truncate text-body text-[var(--on-surface-variant)]">
-                          {p.objective || 'No objective yet'}
+                          {p.objective || t('list.noObjective')}
                         </span>
                       </span>
 
                       <span className="hidden shrink-0 items-center gap-2 text-label text-[var(--on-surface-variant)] sm:flex">
                         <span className="rounded-md bg-[var(--surface-container-high)] px-2 py-1">
-                          {WORKFLOW_LABEL[p.workflow] ?? p.workflow}
+                          {workflowLabel(p.workflow)}
                         </span>
                         {p.status !== 'finalized' && paused.has(p.id) && (
-                          <span className="rounded-md bg-[var(--surface-container-high)] px-2 py-1 font-semibold text-[var(--pm-tertiary)]" title="The objective is not met; waiting for missing inputs">
-                            Paused
+                          <span className="rounded-md bg-[var(--surface-container-high)] px-2 py-1 font-semibold text-[var(--pm-tertiary)]" title={t('list.pausedWhy')}>
+                            {t('list.paused')}
                           </span>
                         )}
                         {p.status !== 'finalized' && p.stage && (
@@ -376,7 +361,7 @@ export default function ProjectsPage() {
                           </span>
                         )}
                         <span className="w-[64px] text-right tabular-nums">
-                          {relativeTime(p.updated_at)}
+                          {relativeTime(p.updated_at, locale)}
                         </span>
                       </span>
                     </Link>
@@ -394,19 +379,19 @@ export default function ProjectsPage() {
                             onClick={() => handleDelete(p.id)}
                             className="rounded-lg bg-[var(--pm-error)] px-3 py-1.5 text-label text-[var(--on-error)]"
                           >
-                            Delete
+                            {t('list.delete')}
                           </button>
                           <button
                             onClick={() => setPendingDelete(null)}
                             className="rounded-lg px-2 py-1.5 text-label text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
                           >
-                            Keep
+                            {t('list.keep')}
                           </button>
                         </div>
                       ) : (
                         <button
                           onClick={() => setPendingDelete(p.id)}
-                          aria-label={`Delete ${p.title || 'project'}`}
+                          aria-label={t('list.deleteNamed', { name: p.title || t('list.aProject') })}
                           className="rounded-lg p-2 text-[var(--on-surface-variant)] opacity-0 transition-opacity hover:bg-[var(--surface-container-high)] focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
                         >
                           <span className="material-symbols-outlined text-[20px]">delete</span>

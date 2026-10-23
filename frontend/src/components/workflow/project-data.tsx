@@ -1,5 +1,6 @@
 'use client';
 
+import { useT } from '@/lib/i18n/i18n-provider';
 import { useRef, useState } from 'react';
 
 import { IMAGE_EXTENSIONS, MAX_FILE_BYTES, MAX_FILES, PICKABLE_EXTENSIONS, describePreview, imagePreview, rejectReason } from '@/lib/data/preview';
@@ -7,7 +8,6 @@ import { prepareFiles } from '@/lib/data/attachments';
 import { normalizeImage } from '@/lib/data/normalize-image';
 import { useProjectImageUrls } from '@/components/shared/project-images';
 import { attachProjectFile, removeProjectFile } from '@/lib/supabase/project-files';
-import { ADD_IMAGES_LABEL, ATTACH_DATA_LABEL } from '@/lib/workflow/stage-controls';
 import type { Project, ProjectFile } from '@/types/project';
 
 /**
@@ -33,6 +33,7 @@ export function ProjectData({
   onAddToContext?: (documents: { name: string; text: string }[]) => void;
   readOnly?: boolean;
 }) {
+  const t = useT();
   const input = useRef<HTMLInputElement>(null);
   const imageInput = useRef<HTMLInputElement>(null);
   const imageUrls = useProjectImageUrls();
@@ -59,7 +60,7 @@ export function ProjectData({
       setReadable(prepared.ready.flatMap((p) => (p.text ? [{ name: p.file.name, text: p.text }] : [])));
       await onChanged();
     } catch (e) {
-      setError(e instanceof Error && e.message ? `Could not attach the file: ${e.message}` : 'Could not attach the file.');
+      setError(e instanceof Error && e.message ? t('data.attachErrorWhy', { message: e.message }) : t('data.attachError'));
     } finally {
       setBusy(false);
       if (input.current) input.current.value = '';
@@ -120,7 +121,7 @@ export function ProjectData({
       setPending([]);
       await onChanged();
     } catch (e) {
-      setError(e instanceof Error && e.message ? `Could not add the image: ${e.message}` : 'Could not add the image.');
+      setError(e instanceof Error && e.message ? t('data.imageErrorWhy', { message: e.message }) : t('data.imageError'));
     } finally {
       setBusy(false);
     }
@@ -136,18 +137,18 @@ export function ProjectData({
       await removeProjectFile(file);
       await onChanged();
     } catch {
-      setError(`Could not remove ${file.name}.`);
+      setError(t('data.removeError', { name: file.name }));
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <section aria-label="Project data" className="mb-6 rounded-xl bg-[var(--surface-container-lowest)] px-7 py-4">
+    <section data-panel="project-data" aria-label={t('data.label')} className="mb-6 rounded-xl bg-[var(--surface-container-lowest)] px-7 py-4">
       <div className="flex flex-wrap items-center gap-3">
         <span aria-hidden className="material-symbols-outlined text-[18px] text-[var(--on-surface-variant)]">table_view</span>
         <h3 className="mr-auto text-label uppercase tracking-wider text-[var(--on-surface-variant)]">
-          Data and images{files.length ? ` · ${files.length} file${files.length === 1 ? '' : 's'}` : ''}
+          {t('data.title')}{files.length ? t('data.files', { count: files.length }) : ''}
         </h3>
         {!readOnly && files.length < MAX_FILES && (
           <>
@@ -156,7 +157,7 @@ export function ProjectData({
               type="file"
               multiple
               accept={PICKABLE_EXTENSIONS.filter((e) => !(IMAGE_EXTENSIONS as readonly string[]).includes(e)).join(',')}
-              aria-label="Attach data files"
+              aria-label={t('data.attachDataLabel')}
               className="sr-only"
               onChange={(e) => void attach(e.target.files)}
             />
@@ -165,14 +166,14 @@ export function ProjectData({
               disabled={busy}
               className="rounded-lg bg-[var(--surface-container-high)] px-3 py-1.5 text-label text-[var(--on-surface)] hover:opacity-90 disabled:opacity-50"
             >
-              {busy ? 'Working…' : ATTACH_DATA_LABEL}
+              {busy ? t('data.working') : t('data.attachData')}
             </button>
             <input
               ref={imageInput}
               type="file"
               multiple
               accept={IMAGE_EXTENSIONS.join(',')}
-              aria-label="Add images"
+              aria-label={t('data.addImages')}
               className="sr-only"
               onChange={(e) => pickImages(e.target.files)}
             />
@@ -181,16 +182,16 @@ export function ProjectData({
               disabled={busy}
               className="rounded-lg bg-[var(--surface-container-high)] px-3 py-1.5 text-label text-[var(--on-surface)] hover:opacity-90 disabled:opacity-50"
             >
-              {ADD_IMAGES_LABEL}
+              {t('data.addImages')}
             </button>
           </>
         )}
       </div>
 
       {pending.length > 0 && (
-        <div aria-label="Images to add" role="group" className="mt-3 space-y-2 rounded-lg bg-[var(--surface-container-low)] px-4 py-3">
+        <div aria-label={t('data.toAdd')} role="group" className="mt-3 space-y-2 rounded-lg bg-[var(--surface-container-low)] px-4 py-3">
           <p className="text-label text-[var(--on-surface-variant)]">
-            Say what each image shows. PromptMaster cannot see images; it places them in your work by what the caption says.
+            {t('data.captionHint')}
           </p>
           {pending.map((p, i) => (
             <label key={`${p.file.name}-${i}`} className="flex flex-wrap items-center gap-2 text-body">
@@ -198,7 +199,7 @@ export function ProjectData({
               <input
                 value={p.caption}
                 maxLength={200}
-                aria-label={`Caption for ${p.file.name}`}
+                aria-label={t('data.captionFor', { name: p.file.name })}
                 onChange={(e) => setPending((prior) => prior.map((q, j) => (j === i ? { ...q, caption: e.target.value } : q)))}
                 className="min-w-0 flex-1 rounded-md bg-[var(--surface-container-lowest)] px-3 py-1.5 text-body text-[var(--on-surface)] outline-none"
               />
@@ -210,17 +211,17 @@ export function ProjectData({
               disabled={busy}
               className="rounded-lg bg-[var(--pm-primary)] px-3 py-1.5 text-label text-[var(--on-primary)] disabled:opacity-50"
             >
-              {busy ? 'Adding…' : `Add ${pending.length === 1 ? 'this image' : `these ${pending.length} images`}`}
+              {busy ? t('data.adding') : pending.length === 1 ? t('data.addThis') : t('data.addThese', { count: pending.length })}
             </button>
             <button onClick={() => setPending([])} disabled={busy} className="px-2 text-label text-[var(--on-surface-variant)]">
-              Cancel
+              {t('data.cancel')}
             </button>
           </div>
         </div>
       )}
 
       {images.length > 0 && (
-        <ul aria-label="Images" className="mt-3 flex flex-wrap gap-3">
+        <ul aria-label={t('data.images')} className="mt-3 flex flex-wrap gap-3">
           {images.map((file) => (
             <li key={file.id} className="w-[148px] text-label">
               {imageUrls[file.id] ? (
@@ -236,10 +237,10 @@ export function ProjectData({
                 <button
                   onClick={() => void remove(file)}
                   disabled={busy}
-                  aria-label={`Remove ${file.name}`}
+                  aria-label={t('data.removeNamed', { name: file.name })}
                   className="text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] disabled:opacity-50"
                 >
-                  Remove
+                  {t('data.remove')}
                 </button>
               )}
             </li>
@@ -248,17 +249,14 @@ export function ProjectData({
       )}
       {images.length > 0 && (
         <p className="mt-2 text-label text-[var(--on-surface-variant)]">
-          Drafts can place these where they help; in an edit, “Insert image” puts one where your cursor is.
+          {t('data.imagesHint')}
         </p>
       )}
 
       {dataFiles.length === 0 ? (
         images.length === 0 && (
           <p className="mt-2 text-label text-[var(--on-surface-variant)]">
-            No data or images attached. Without data, analyses can be planned but not run, and PromptMaster will say so.
-            Attach CSV, TSV, JSON or text files, or an Excel workbook (.xlsx, converted to CSV), and Go can run code
-            against them. Attach a PDF or Word brief and its text can go into the project context. Add photos or figures (PNG, JPEG, WebP, GIF) to place them in your work. Up to{' '}
-            {MAX_FILE_BYTES / 1_000_000} MB each.
+            {t('data.empty', { mb: MAX_FILE_BYTES / 1_000_000 })}
           </p>
         )
       ) : (
@@ -272,38 +270,38 @@ export function ProjectData({
                   <button
                     onClick={() => void remove(file)}
                     disabled={busy}
-                    aria-label={`Remove ${file.name}`}
+                    aria-label={t('data.removeNamed', { name: file.name })}
                     className="text-label text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] disabled:opacity-50"
                   >
-                    Remove
+                    {t('data.remove')}
                   </button>
                 )}
               </li>
             ))}
           </ul>
           <p className="mt-2 text-label text-[var(--on-surface-variant)]">
-            Code that Go runs can read these. PromptMaster is shown each file&apos;s columns and first rows, not the file.
+            {t('data.codeReads')}
           </p>
         </>
       )}
 
       {readable.length > 0 && onAddToContext && !readOnly && (
-        <div role="group" aria-label="Add document text" className="mt-3 flex flex-wrap items-center gap-3 rounded-lg bg-[var(--surface-container-low)] px-4 py-2.5">
+        <div role="group" aria-label={t('data.addText')} className="mt-3 flex flex-wrap items-center gap-3 rounded-lg bg-[var(--surface-container-low)] px-4 py-2.5">
           <span className="mr-auto text-label text-[var(--on-surface-variant)]">
-            {readable.length === 1 ? `${readable[0].name} has text` : `${readable.length} documents have text`} every stage could quote.
+            {readable.length === 1 ? t('data.oneHasText', { name: readable[0].name }) : t('data.manyHaveText', { count: readable.length })}
           </span>
           <button
             onClick={() => {
               onAddToContext(readable);
-              setNote(`Added to the project context: ${readable.map((r) => r.name).join(', ')}.`);
+              setNote(t('data.added', { names: readable.map((r) => r.name).join(', ') }));
               setReadable([]);
             }}
             className="rounded-lg bg-[var(--pm-primary)] px-3 py-1.5 text-label text-[var(--on-primary)]"
           >
-            Add its text to the project context
+            {t('data.addToContext')}
           </button>
           <button onClick={() => setReadable([])} className="px-2 text-label text-[var(--on-surface-variant)]">
-            Not now
+            {t('data.notNow')}
           </button>
         </div>
       )}

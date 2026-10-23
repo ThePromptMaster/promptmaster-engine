@@ -8,6 +8,7 @@
  * it at the top of whichever stage is open. Pure.
  */
 
+import { tr } from '@/lib/i18n/store';
 import { NEXT_STEP_LABELS } from './stage-controls';
 
 export type NextActionKind = 'apply_continue_reopened' | 'apply_continue' | 'answer_go' | 'resume' | 'working';
@@ -41,12 +42,12 @@ export interface NextActionInput {
 
 export function nextAction(i: NextActionInput): NextAction | null {
   if (i.finalized || !i.canAct || i.heldChanges > 0) return null;
-  if (i.goActive) return { kind: 'working', label: `Go is working${i.goWorkingOn ? ` on ${i.goWorkingOn}` : ''}…`, why: '' };
+  if (i.goActive) return { kind: 'working', label: i.goWorkingOn ? tr('ns.goWorkingOn', { what: i.goWorkingOn }) : tr('ns.goWorking'), why: '' };
   if (i.reopenedHere) {
     return {
       kind: 'apply_continue_reopened',
       label: NEXT_STEP_LABELS.applyContinue,
-      why: `Keeps your changes to ${i.reopenedLabel ?? 'this stage'} and has Go recheck what came after it.`,
+      why: tr('ns.keeps', { stage: i.reopenedLabel ?? tr('ns.thisStage') }),
     };
   }
   // While Go waits, Go's own controls are the next step, and only they (18 Oct,
@@ -57,11 +58,11 @@ export function nextAction(i: NextActionInput): NextAction | null {
   const asking = paused && Boolean(i.run!.hasNeed || i.run!.asking);
   // On the current stage Go's own panel carries its card and Resume: not twice.
   if (paused && i.onCurrentStage) return null;
-  if (asking) return { kind: 'answer_go', label: NEXT_STEP_LABELS.answerGo, why: 'Go is waiting for you on the current stage.' };
+  if (asking) return { kind: 'answer_go', label: NEXT_STEP_LABELS.answerGo, why: tr('ns.goWaiting') };
   if (i.awaitingUpdate.length) {
-    const names = i.awaitingUpdate.length <= 3 ? i.awaitingUpdate.join(', ') : `${i.awaitingUpdate.length} stages`;
-    return { kind: 'apply_continue', label: NEXT_STEP_LABELS.applyContinue, why: `${names} ${i.awaitingUpdate.length === 1 ? 'needs' : 'need'} updating after your change; Go does it and carries on.` };
+    const names = i.awaitingUpdate.length <= 3 ? i.awaitingUpdate.join(', ') : tr('ns.stages', { count: i.awaitingUpdate.length });
+    return { kind: 'apply_continue', label: NEXT_STEP_LABELS.applyContinue, why: tr('ns.needUpdate', { count: i.awaitingUpdate.length, names }) };
   }
   if (!paused) return null;
-  return { kind: 'resume', label: NEXT_STEP_LABELS.resume, why: 'Go is paused and can carry on from here.' };
+  return { kind: 'resume', label: NEXT_STEP_LABELS.resume, why: tr('ns.paused') };
 }

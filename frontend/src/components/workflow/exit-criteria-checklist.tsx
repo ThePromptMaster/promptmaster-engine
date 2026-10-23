@@ -1,5 +1,6 @@
 'use client';
 
+import { useT } from '@/lib/i18n/i18n-provider';
 import { useState } from 'react';
 
 import { approvalPending as isApprovalPending } from '@/lib/workflow/engine';
@@ -77,6 +78,7 @@ export function ExitCriteriaChecklist({
   approvedVersions: olderApprovals = {},
 }: Props) {
   // A box only the user can tick is never folded away, ticked or not.
+  const t = useT();
   const needsYou = criteria.some((c) => c.manual ?? manualIds.has(c.id));
   const [open, setOpen] = useState<boolean | null>(null);
   if (criteria.length === 0) return null;
@@ -131,25 +133,25 @@ export function ExitCriteriaChecklist({
                   c.blocking ? 'text-[var(--pm-tertiary)]' : 'text-[var(--on-surface-variant)]'
                 }`}
               >
-                {c.blocking ? 'required' : 'optional'}
+                {c.blocking ? t('cl.required') : t('cl.optional')}
               </span>
             )}
             {c.degraded && !c.satisfied && (
               <span className="mt-0.5 block text-label leading-snug text-[var(--on-surface-variant)]">
-                PromptMaster can&apos;t check this one here — it&apos;s yours to confirm.
+                {t('cl.cantCheck')}
               </span>
             )}
             {manual && c.authority === 'delegable' && !c.satisfied && (
-              <span className="ml-2 text-label uppercase tracking-wide text-[var(--on-surface-variant)]">routine</span>
+              <span className="ml-2 text-label uppercase tracking-wide text-[var(--on-surface-variant)]">{t('cl.routine')}</span>
             )}
             {c.satisfied && olderApprovals[c.id] && (
               <span data-approved-version className="ml-2 text-label text-[var(--pm-tertiary)]">
-                approved v{olderApprovals[c.id].approved} · current v{olderApprovals[c.id].current}
+                {t('cl.approvedVersion', { approved: olderApprovals[c.id].approved, current: olderApprovals[c.id].current })}
               </span>
             )}
             {c.satisfied && committedByPolicy[c.id] !== undefined && (
               <span className="mt-0.5 block text-label leading-snug text-[var(--on-surface-variant)]">
-                Committed under your routine-decision policy, after checking: {committedByPolicy[c.id]}
+                {t('cl.committed', { what: committedByPolicy[c.id] })}
               </span>
             )}
             {!c.satisfied && c.hint && (
@@ -186,40 +188,40 @@ export function ExitCriteriaChecklist({
               <span aria-hidden className="material-symbols-outlined text-[20px] text-[var(--on-surface-variant)]">
                 {expanded ? 'expand_less' : 'expand_more'}
               </span>
-              To finish this stage
+              {t('cl.title')}
             </button>
           ) : (
-            'To finish this stage'
+            t('cl.title')
           )}
         </h3>
         <span className="text-label text-[var(--on-surface-variant)]">
-          {met} of {criteria.length} done
-          {requiredOpen && !expanded && ' · required items open'}
-          {readOnly && ' · viewing only'}
+          {t('cl.done', { met, total: criteria.length })}
+          {requiredOpen && !expanded && t('cl.requiredOpen')}
+          {readOnly && t('cl.viewingOnly')}
         </span>
       </header>
       <div hidden={!expanded}>
       <p className="mb-3 text-label text-[var(--on-surface-variant)]">
-        {required} required{optional > 0 ? `, ${optional} optional` : ''}
+        {t('cl.counts', { required })}{optional > 0 ? t('cl.countsOptional', { optional }) : ''}
         {approvalPending
-          ? '. PromptMaster has verified what it can; this stage is waiting for your approval. You can still move on, but it stays open until you give it.'
+          ? t('cl.approvalPending')
           : requiredOpen
-          ? '. You can still move on, but the stage stays open until the required items are done.'
+          ? t('cl.canMoveOn')
           : optional > 0 && met < criteria.length
-            ? '. The required items are done; the rest are yours to take or leave.'
+            ? t('cl.restYours')
             : '.'}
       </p>
 
       <div className="space-y-4">
-        {checked.length > 0 && group('PromptMaster verified', 'checked for you as you work', checked, 'Checked by PromptMaster')}
+        {checked.length > 0 && group(t('cl.verified'), t('cl.verifiedCaption'), checked, t('cl.verifiedLabel'))}
         {yours.length > 0 &&
           group(
-            'You approve',
+            t('cl.youApprove'),
             yours.some((r) => r.c.authority === 'delegable')
-              ? 'yours to give; a routine one PromptMaster can check and commit for you, if you let it handle routine decisions'
-              : 'only you can give these',
+              ? t('cl.youApproveRoutine')
+              : t('cl.youApproveOnly'),
             yours,
-            'For you to decide'
+            t('cl.forYou')
           )}
       </div>
       </div>

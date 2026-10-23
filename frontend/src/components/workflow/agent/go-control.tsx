@@ -1,5 +1,6 @@
 'use client';
 
+import { useT } from '@/lib/i18n/i18n-provider';
 import type { AgentRun } from '@/types/agent';
 
 const BUDGETS = [5, 12, 25];
@@ -38,6 +39,7 @@ export function GoControl({
   // "3 / 25" beside a selector reading 12 (1 Oct, item 21). While a window is
   // live the selector is locked and shows that window's size: a window
   // continued from the card keeps the old size whatever was picked since.
+  const t = useT();
   const used = run?.steps_used ?? 0;
   const cap = run?.budget_steps ?? budget;
   const live = Boolean(run && !run.ended_at);
@@ -51,7 +53,7 @@ export function GoControl({
           className="inline-flex items-center gap-2 rounded-lg bg-[var(--pm-tertiary)] px-5 py-2 text-title text-white"
         >
           <span aria-hidden className="material-symbols-outlined">stop_circle</span>
-          Stop
+          {t('gc.stop')}
         </button>
       ) : hideResume && canResume ? null : (
         <button
@@ -60,41 +62,41 @@ export function GoControl({
           className="inline-flex items-center gap-2 rounded-lg bg-[var(--pm-primary)] px-5 py-2 text-title text-[var(--on-primary)] disabled:opacity-50"
         >
           <span aria-hidden className="material-symbols-outlined">play_arrow</span>
-          {canResume ? 'Resume' : canContinue ? 'Continue' : 'Go'}
+          {canResume ? t('go.resume') : canContinue ? t('go.continue') : t('go.go')}
         </button>
       )}
       <label className="flex items-center gap-2 text-label text-[var(--on-surface-variant)]">
         {/* After a run ends the selector is the size of the *next* window, and says so
             beside a count that is about the last one (2 Oct, screenshot 8). */}
-        {live || !run ? 'Window' : 'Next window'}
+        {live || !run ? t('gc.window') : t('gc.nextWindow')}
         <select
           value={live ? cap : budget}
           onChange={(e) => onBudget(Number(e.target.value))}
           disabled={running || live}
-          aria-label="Step budget"
+          aria-label={t('gc.budget')}
           className="rounded-md bg-[var(--surface-container-highest)] px-2 py-1 text-label text-[var(--on-surface)]"
         >
           {BUDGETS.map((b) => (
             <option key={b} value={b}>
-              {b} steps
+              {t('gc.steps', { count: b })}
             </option>
           ))}
         </select>
       </label>
       {run && (
-        <div className="flex min-w-40 flex-1 items-center gap-2" aria-label="Budget used">
+        <div className="flex min-w-40 flex-1 items-center gap-2" aria-label={t('gc.used')}>
           <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--surface-container-highest)]">
             <div className="h-full rounded-full bg-[var(--pm-primary)]" style={{ width: `${pct}%` }} />
           </div>
           <span className="text-label text-[var(--on-surface-variant)]">
-            {live ? `${used} / ${cap} steps this window` : `${used} of ${cap} steps used in the last window`}
+            {live ? t('gc.thisWindow', { used, cap }) : t('gc.lastWindow', { used, cap })}
           </span>
         </div>
       )}
     </div>
     {!compact && (
     <p className="mt-2 text-label text-[var(--on-surface-variant)]">
-      A step is one thing PromptMaster does, like drafting or checking a stage. Running code counts as two.
+      {t('gc.explain')}
     </p>
     )}
     </div>

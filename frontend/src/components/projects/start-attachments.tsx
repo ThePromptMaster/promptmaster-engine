@@ -4,6 +4,8 @@ import { useRef, useState } from 'react';
 
 import { prepareFiles, type PreparedFile } from '@/lib/data/attachments';
 import { normalizeImage } from '@/lib/data/normalize-image';
+import { useLocale, useT } from '@/lib/i18n/i18n-provider';
+import { formatNumber } from '@/lib/i18n/format';
 import { MAX_FILES, PICKABLE_EXTENSIONS, describePreview, imagePreview, isImage, rejectReason } from '@/lib/data/preview';
 
 /** An image waiting to be stored, with what the user says it shows. */
@@ -35,6 +37,8 @@ export function StartAttachments({
   disabled?: boolean;
 }) {
   const input = useRef<HTMLInputElement>(null);
+  const t = useT();
+  const locale = useLocale();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -82,14 +86,14 @@ export function StartAttachments({
   const count = files.length + images.length;
 
   return (
-    <div aria-label="Attachments" role="group" className="mt-4">
+    <div aria-label={t('attach.group')} role="group" className="mt-4">
       <div className="flex flex-wrap items-center gap-3">
         <input
           ref={input}
           type="file"
           multiple
           accept={[...PICKABLE_EXTENSIONS].join(',')}
-          aria-label="Attach files"
+          aria-label={t('attach.input')}
           className="sr-only"
           onChange={(e) => void pick(e.target.files)}
         />
@@ -100,28 +104,28 @@ export function StartAttachments({
           className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-high)] px-3 py-1.5 text-label text-[var(--on-surface)] hover:opacity-90 disabled:opacity-50"
         >
           <span aria-hidden className="material-symbols-outlined text-[18px]">attach_file</span>
-          {busy ? 'Reading…' : 'Attach a brief, data or images'}
+          {busy ? t('attach.reading') : t('attach.button')}
         </button>
         <span className="text-label text-[var(--on-surface-variant)]">
-          PDF, Word, text, spreadsheets, CSV or images. A brief&apos;s text is read before the setup is suggested.
+          {t('attach.hint')}
         </span>
       </div>
 
       {count > 0 && (
-        <ul aria-label="Attached" className="mt-3 space-y-2">
+        <ul aria-label={t('attach.attached')} className="mt-3 space-y-2">
           {files.map((f, i) => (
             <li key={`${f.file.name}-${i}`} className="flex flex-wrap items-baseline gap-x-3 text-body">
               <span className="font-semibold text-[var(--on-surface)]">{f.file.name}</span>
               <span className="mr-auto text-label text-[var(--on-surface-variant)]">
-                {f.text ? `${f.text.length.toLocaleString('en-US')} characters of text · goes into the project context` : describePreview(f.preview)}
+                {f.text ? t('attach.chars', { count: formatNumber(f.text.length, locale) }) : describePreview(f.preview)}
               </span>
               <button
                 type="button"
                 onClick={() => onFiles(files.filter((_, j) => j !== i))}
-                aria-label={`Remove ${f.file.name}`}
+                aria-label={t('attach.removeNamed', { name: f.file.name })}
                 className="text-label text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
               >
-                Remove
+                {t('attach.remove')}
               </button>
             </li>
           ))}
@@ -132,18 +136,18 @@ export function StartAttachments({
               <input
                 value={img.caption}
                 maxLength={200}
-                aria-label={`Caption for ${img.file.name}`}
-                placeholder="What it shows"
+                aria-label={t('attach.caption', { name: img.file.name })}
+                placeholder={t('attach.captionPlaceholder')}
                 onChange={(e) => onImages(images.map((q, j) => (j === i ? { ...q, caption: e.target.value } : q)))}
                 className="min-w-0 flex-1 rounded-md bg-[var(--surface-container-low)] px-3 py-1 text-body text-[var(--on-surface)] outline-none"
               />
               <button
                 type="button"
                 onClick={() => onImages(images.filter((_, j) => j !== i))}
-                aria-label={`Remove ${img.file.name}`}
+                aria-label={t('attach.removeNamed', { name: img.file.name })}
                 className="text-label text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
               >
-                Remove
+                {t('attach.remove')}
               </button>
             </li>
           ))}
@@ -151,7 +155,7 @@ export function StartAttachments({
       )}
       {images.length > 0 && (
         <p className="mt-1 text-label text-[var(--on-surface-variant)]">
-          PromptMaster cannot see images; it places them by what the caption says.
+          {t('attach.imagesNote')}
         </p>
       )}
       {note && <p role="status" className="mt-2 text-label text-[var(--on-surface-variant)]">{note}</p>}

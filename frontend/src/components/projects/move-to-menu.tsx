@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useT } from '@/lib/i18n/i18n-provider';
 
 import { flattenTree, folderTree } from '@/lib/supabase/folders';
 import type { ProjectFolder } from '@/types/project';
@@ -18,6 +19,7 @@ interface Props {
  * card onto the sidebar is the shortcut on a computer.
  */
 export function MoveToMenu({ projectTitle, folderId, folders, onMove }: Props) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -70,21 +72,21 @@ export function MoveToMenu({ projectTitle, folderId, folders, onMove }: Props) {
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={`Move ${projectTitle || 'project'} to a folder`}
-        title="Move to a folder"
+        aria-label={t('move.button', { name: projectTitle || t('list.aProject') })}
+        title={t('move.title')}
         className="rounded-lg p-2 text-[var(--on-surface-variant)] opacity-0 transition-opacity hover:bg-[var(--surface-container-high)] focus-visible:opacity-100 group-hover:opacity-100 aria-expanded:opacity-100 [@media(hover:none)]:opacity-100"
       >
         <span className="material-symbols-outlined text-[20px]">drive_file_move</span>
       </button>
       {open && (
-        <div role="menu" aria-label="Move to" className="absolute right-0 top-full z-20 mt-1 w-[240px] rounded-xl bg-[var(--surface-container-lowest)] p-1.5 shadow-[0_1px_2px_rgba(25,28,30,0.06),0_12px_28px_-12px_rgba(25,28,30,0.3)]">
-          <p className="px-2.5 pb-1 pt-0.5 text-label uppercase tracking-wider text-[var(--on-surface-variant)]">Move to</p>
+        <div role="menu" aria-label={t('move.menu')} className="absolute right-0 top-full z-20 mt-1 w-[240px] rounded-xl bg-[var(--surface-container-lowest)] p-1.5 shadow-[0_1px_2px_rgba(25,28,30,0.06),0_12px_28px_-12px_rgba(25,28,30,0.3)]">
+          <p className="px-2.5 pb-1 pt-0.5 text-label uppercase tracking-wider text-[var(--on-surface-variant)]">{t('move.menu')}</p>
           <ul className="max-h-[280px] overflow-y-auto">
-            {item(null, 'Unfiled', 0)}
+            {item(null, t('folders.unfiled'), 0)}
             {options.map((f) => item(f.id, f.name, f.depth))}
           </ul>
           {options.length === 0 && (
-            <p className="px-2.5 py-1.5 text-label text-[var(--on-surface-variant)]">No folders yet — make one in the sidebar.</p>
+            <p className="px-2.5 py-1.5 text-label text-[var(--on-surface-variant)]">{t('move.none')}</p>
           )}
         </div>
       )}

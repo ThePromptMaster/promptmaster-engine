@@ -1,5 +1,6 @@
 'use client';
 
+import { useT } from '@/lib/i18n/i18n-provider';
 import { MODE_DISPLAY } from '@/lib/constants';
 import type { ModeType } from '@/types';
 import { useEffect, useRef, useState } from 'react';
@@ -80,6 +81,7 @@ export function GoPanel({
   /** L-93: ask which takes priority about a record Go kept under the routine-decision policy. */
   onApplyAnyway?: (step: AgentStep) => void;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const sectionRef = useRef<HTMLElement>(null);
   const controlsRef = useRef<HTMLDivElement>(null);
@@ -110,14 +112,14 @@ export function GoPanel({
   );
   // The button's own word (Sean, 10 Oct, email 6.3: the record said "press Go"
   // while the button read "Resume").
-  const button = canResume ? 'Resume' : canContinue ? 'Continue' : 'Go';
+  const button = canResume ? t('go.resume') : canContinue ? t('go.continue') : t('go.go');
   const next = go.pendingStep
-    ? `${go.stepLabel(go.pendingStep)} — waiting for your approval`
+    ? t('go.nextWaiting', { step: go.stepLabel(go.pendingStep) })
     : go.phase === 'thinking' || go.phase === 'performing'
-      ? 'Chosen after this step finishes'
+      ? t('go.nextAfter')
       : go.run?.status === 'completed'
-        ? 'Nothing — the objective is met'
-        : `Press ${button} to choose the next move`;
+        ? t('go.nextNothing')
+        : t('go.nextPress', { button });
   const act = async (option?: StuckOption) => {
     if (!need) return;
     switch (need.kind) {
@@ -224,12 +226,12 @@ export function GoPanel({
     needed && needsActions && !needIsDecidedOnStage(need!) && (needed.options?.[0] || needed.action)
       ? { label: needed.options?.[0]?.label ?? needed.action!, option: needed.options?.[0]?.id, acts: true }
       : askingUser
-        ? { label: "Answer Go's question", acts: false }
+        ? { label: t('controls.answerGo'), acts: false }
         : null;
   const dock =
     expanded && dockHost && !controlsInView
       ? createPortal(
-          <section aria-label="Go buttons" className="max-lg:pointer-events-none max-lg:flex max-lg:justify-end lg:rounded-xl lg:bg-[var(--surface-container)] lg:px-4 lg:py-2 lg:shadow-[0_8px_24px_rgba(0,0,0,0.12)]">
+          <section aria-label={t('go.buttons')} className="max-lg:pointer-events-none max-lg:flex max-lg:justify-end lg:rounded-xl lg:bg-[var(--surface-container)] lg:px-4 lg:py-2 lg:shadow-[0_8px_24px_rgba(0,0,0,0.12)]">
             {/* On a phone or an iPad the pinned copy is one small button, not a
                 bar over the text (Sean, 10 Oct, emails 6.11 and 8). */}
             <button
@@ -239,7 +241,7 @@ export function GoPanel({
               }`}
             >
               <span aria-hidden className="material-symbols-outlined text-[16px]">{go.active ? 'progress_activity' : 'play_arrow'}</span>
-              <span className="truncate">{dockAction ? dockAction.label : waiting ? 'Go needs you' : go.active ? 'Go is working' : 'Go'}</span>
+              <span className="truncate">{dockAction ? dockAction.label : waiting ? t('go.needsYou') : go.active ? t('go.working') : t('go.go')}</span>
             </button>
             <div className="hidden flex-wrap items-center gap-3 lg:flex">
               <div className="min-w-0 flex-1">
@@ -259,7 +261,7 @@ export function GoPanel({
                   waiting ? 'bg-[var(--pm-tertiary)] text-white' : 'bg-[var(--surface-container-highest)] text-[var(--on-surface)]'
                 }`}
               >
-                {dockAction ? 'Show why' : waiting ? 'Go needs you — show' : go.active ? 'Show what Go is doing' : 'Show Go'}
+                {dockAction ? t('go.showWhy') : waiting ? t('go.needsYouShow') : go.active ? t('go.showDoing') : t('go.show')}
               </button>
             </div>
           </section>,
@@ -268,21 +270,21 @@ export function GoPanel({
       : null;
 
   return (
-    <section ref={sectionRef} aria-label="Go mode" className="mb-6 scroll-mt-20 rounded-2xl bg-[var(--surface-container)] px-5 py-4">
+    <section ref={sectionRef} data-panel="go" aria-label="Go mode" className="mb-6 scroll-mt-20 rounded-2xl bg-[var(--surface-container)] px-5 py-4">
       {dock}
       <div className="flex flex-wrap items-center gap-3">
         <span aria-hidden className="material-symbols-outlined text-[var(--pm-primary)]">rocket_launch</span>
         <div className="mr-auto">
-          <h2 className="text-title text-[var(--on-surface)]">Go mode</h2>
+          <h2 className="text-title text-[var(--on-surface)]">{t('go.title')}</h2>
           <p className="text-label text-[var(--on-surface-variant)]">
-            Does the next steps for you, one at a time, and tells you what it did. It asks you only when a decision is yours.
+            {t('go.intro')}
           </p>
         </div>
         {!expanded && (
           <>
             {/* One clear action; the settings stay one click away (12 Oct, Colette: too many buttons). */}
             <button onClick={() => setOpen(true)} className="rounded-lg px-2 py-2 text-label text-[var(--on-surface-variant)] underline-offset-2 hover:text-[var(--on-surface)] hover:underline">
-              Set up Go
+              {t('go.setUp')}
             </button>
             {/* One click to delegate: Autonomous, routine decisions handled, then the authorization to confirm. */}
             <button
@@ -293,7 +295,7 @@ export function GoPanel({
               }}
               className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-title text-[var(--on-primary)]"
             >
-              Let Go run this
+              {t('go.letRun')}
             </button>
           </>
         )}
@@ -323,13 +325,13 @@ export function GoPanel({
           )}
           {go.phase === 'watching' && (
             <p role="status" className="text-body text-[var(--on-surface-variant)]">
-              This run is being driven from another tab. It will continue here if that tab closes.
+              {t('go.otherTab')}
             </p>
           )}
           {go.error && (
             <div role="alert" className="flex items-start gap-3 rounded-xl bg-[var(--pm-tertiary)]/10 px-4 py-3 text-body text-[var(--on-surface)]">
               <span className="mr-auto">{go.error}</span>
-              <button onClick={go.dismissError} className="text-label text-[var(--on-surface-variant)]">Dismiss</button>
+              <button onClick={go.dismissError} className="text-label text-[var(--on-surface-variant)]">{t('go.dismiss')}</button>
             </div>
           )}
           {go.pendingStep && (
@@ -370,7 +372,7 @@ export function GoPanel({
                 checked={stageModes.value === 'project'}
                 onChange={(e) => stageModes.onChange(e.target.checked ? 'project' : 'stage')}
               />
-              Use my mode ({MODE_DISPLAY[mode as ModeType]?.display_name ?? mode}) on every stage, instead of each stage&apos;s own
+              {t('go.useMyMode', { mode: MODE_DISPLAY[mode as ModeType]?.display_name ?? mode })}
             </label>
           )}
           <RunAccountCard run={go.run} steps={go.steps} stageLabel={go.stageLabelFor} />

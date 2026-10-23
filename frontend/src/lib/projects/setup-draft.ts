@@ -12,6 +12,7 @@ import type { FrontDoorState } from '@/components/projects/front-door';
 import type { NewFact } from '@/lib/supabase/facts';
 import type { DesignedWorkflow } from '@/lib/workflow/custom';
 import type { SetupRationale } from '@/types';
+import { getLocale, tr } from '@/lib/i18n/store';
 
 export type { FrontDoorState } from '@/components/projects/front-door';
 
@@ -52,16 +53,22 @@ export function worthKeeping(s: SetupDraftState | null | undefined): boolean {
 /** "your setup from 7 Oct, 23:40" — what the return banner names. */
 export function describeDraft(s: SetupDraftState, updatedAt: string): string {
   const when = new Date(updatedAt);
+  // In the interface language (client, 21 Oct); English keeps its day-month order.
+  const locale = getLocale();
+  const dates = locale === 'en' ? 'en-GB' : locale;
   const at = Number.isNaN(when.getTime())
     ? ''
-    : ` from ${when.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}, ${when.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`;
+    : tr('draft.from', {
+        date: when.toLocaleDateString(dates, { day: 'numeric', month: 'short' }),
+        time: when.toLocaleTimeString(dates, { hour: '2-digit', minute: '2-digit' }),
+      });
   const what = s.designer?.design
-    ? `a workflow being designed (${s.designer.design.stages.length} stages)`
+    ? tr('draft.whatDesigner', { count: s.designer.design.stages.length })
     : s.frontDoor?.turns.length
-      ? 'a conversation about what you want to do'
+      ? tr('draft.whatConversation')
       : s.step === 'setup'
-        ? 'a setup ready to start'
-        : 'what you were asking';
+        ? tr('draft.whatSetup')
+        : tr('draft.whatAsking');
   const first = (s.draft?.objective || s.objective).trim().split('\n')[0] ?? '';
-  return `You have an unfinished setup${at}: ${what}${first ? ` — "${first.length > 80 ? `${first.slice(0, 77)}…` : first}"` : ''}.`;
+  return tr('draft.unfinished', { at, what, first: first ? ` — "${first.length > 80 ? `${first.slice(0, 77)}…` : first}"` : '' });
 }

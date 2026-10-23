@@ -1,5 +1,6 @@
 'use client';
 
+import { tr } from '@/lib/i18n/store';
 import { LABEL_TEXT } from '@/lib/agent/labels';
 import type { ExecutionLabel } from '@/types/agent';
 
@@ -10,7 +11,8 @@ import type { ExecutionLabel } from '@/types/agent';
  */
 export function ExecutionBadge({ label }: { label: ExecutionLabel | null }) {
   if (!label) return null;
-  const { text, executed } = LABEL_TEXT[label];
+  const { executed } = LABEL_TEXT[label];
+  const text = tr(`exec.${label}`);
   const blocked = label === 'blocked';
   return (
     <span

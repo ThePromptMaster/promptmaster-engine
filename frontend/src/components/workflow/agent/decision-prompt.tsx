@@ -1,8 +1,9 @@
 'use client';
 
+import { shownActionLabel } from '@/lib/i18n/go';
+import { useT } from '@/lib/i18n/i18n-provider';
 import { useState } from 'react';
 
-import { actionLabel } from '@/lib/agent/actions';
 import { MarkdownOutput } from '@/components/shared/markdown-output';
 import { DiffText, useWordDiff } from '@/components/workflow/revised-preview';
 import type { AgentStep } from '@/types/agent';
@@ -29,33 +30,34 @@ export function DecisionPrompt({
   onReplan?: () => void;
   onDecline: () => void;
 }) {
+  const t = useT();
   return (
-    <section aria-label="Go mode needs your approval" className="rounded-xl bg-[var(--surface-container-highest)] px-5 py-4">
-      <p className="text-label uppercase tracking-wide text-[var(--on-surface-variant)]">Next move — needs your approval</p>
-      <p className="mt-1 text-title text-[var(--on-surface)]">{label ?? actionLabel(step.action_key)}</p>
-      {effect && <p data-effect className="mt-1 text-body text-[var(--on-surface)]">What it does: {effect}</p>}
+    <section aria-label={t('dp.label')} className="rounded-xl bg-[var(--surface-container-highest)] px-5 py-4">
+      <p className="text-label uppercase tracking-wide text-[var(--on-surface-variant)]">{t('dp.next')}</p>
+      <p className="mt-1 text-title text-[var(--on-surface)]">{label ?? shownActionLabel(step.action_key)}</p>
+      {effect && <p data-effect className="mt-1 text-body text-[var(--on-surface)]">{t('dp.does')}{effect}</p>}
       {step.decision_question && <p className="mt-1 text-body text-[var(--on-surface)]">{step.decision_question}</p>}
-      {step.rationale && <p className="mt-1 text-body text-[var(--on-surface-variant)]">Why: {step.rationale}</p>}
+      {step.rationale && <p className="mt-1 text-body text-[var(--on-surface-variant)]">{t('dp.why')}{step.rationale}</p>}
       {step.expected_outcome && (
-        <p className="mt-1 text-label text-[var(--on-surface-variant)]">Go expects: {step.expected_outcome}</p>
+        <p className="mt-1 text-label text-[var(--on-surface-variant)]">{t('dp.expects')}{step.expected_outcome}</p>
       )}
       {stale && (
         <p role="status" className="mt-2 text-label text-[var(--pm-tertiary)]">
-          Proposed before your latest change to this stage, so this reasoning may no longer hold.
+          {t('dp.stale')}
         </p>
       )}
       <div className="mt-3 flex gap-2">
         {stale && onReplan ? (
           <button onClick={onReplan} className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-title text-[var(--on-primary)]">
-            Propose again
+            {t('dp.proposeAgain')}
           </button>
         ) : (
           <button onClick={onApprove} className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-title text-[var(--on-primary)]">
-            Approve
+            {t('dp.approve')}
           </button>
         )}
         <button onClick={onDecline} className="rounded-lg px-4 py-2 text-title text-[var(--on-surface-variant)]">
-          Decline
+          {t('dp.decline')}
         </button>
       </div>
     </section>
@@ -96,6 +98,7 @@ export function QuestionPrompt({
   approvals?: { id: string; label: string }[];
   onTick?: (approval: { id: string; label: string }) => Promise<void>;
 }) {
+  const t = useT();
   const [text, setText] = useState('');
   const [checking, setChecking] = useState(false);
   const [contradiction, setContradiction] = useState<AnswerContradiction | null>(null);
@@ -113,13 +116,13 @@ export function QuestionPrompt({
   }
   const [tickError, setTickError] = useState<string | null>(null);
   return (
-    <section aria-label="Go mode asks you" className="rounded-xl bg-[var(--surface-container-highest)] px-5 py-4">
-      <p className="text-label uppercase tracking-wide text-[var(--on-surface-variant)]">Go mode asks</p>
+    <section aria-label={t('qp.label')} className="rounded-xl bg-[var(--surface-container-highest)] px-5 py-4">
+      <p className="text-label uppercase tracking-wide text-[var(--on-surface-variant)]">{t('qp.asks')}</p>
       <p className="mt-1 text-body text-[var(--on-surface)]">{question}</p>
       {change && <WhatChanged change={change} />}
       {expertPackage && <ExpertPackageCard markdown={expertPackage} />}
       {choices.length > 0 && (
-        <div aria-label="Answers" className="mt-3 flex flex-wrap gap-2">
+        <div aria-label={t('qp.answers')} className="mt-3 flex flex-wrap gap-2">
           {choices.map((c) => (
             <button
               key={c}
@@ -144,31 +147,31 @@ export function QuestionPrompt({
                 setTicking(a.id);
                 setTickError(null);
                 void onTick(a)
-                  .catch((e) => setTickError(e instanceof Error && e.message ? e.message : 'That did not go through.'))
+                  .catch((e) => setTickError(e instanceof Error && e.message ? e.message : t('qp.tickFailed')))
                   .finally(() => setTicking(null));
               }}
               className="flex items-center gap-2 rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-left text-title text-[var(--on-primary)] disabled:opacity-60"
             >
               <span aria-hidden className="material-symbols-outlined text-[20px]">check_box</span>
-              {ticking === a.id ? 'Recording…' : `Tick: “${a.label}”`}
+              {ticking === a.id ? t('qp.recording') : t('qp.tick', { label: a.label })}
             </button>
           ))}
           <span className="text-label text-[var(--on-surface-variant)]">
-            Ticking records your approval and Go carries on. If it is not right yet, say what to change below.
+            {t('qp.tickNote')}
           </span>
           {tickError && <span role="alert" className="text-label text-[var(--pm-error)]">{tickError}</span>}
         </div>
       )}
       {contradiction && (
-        <div role="alert" aria-label="Your answer and the record disagree" className="mt-3 rounded-lg bg-[var(--surface-container-lowest)] px-4 py-3">
-          <p className="text-label uppercase tracking-wide text-[var(--on-surface-variant)]">Your answer and the record disagree</p>
-          {contradiction.claim && <p className="mt-1 text-body text-[var(--on-surface)]">Your answer says: {contradiction.claim}</p>}
+        <div role="alert" aria-label={t('qp.disagree')} className="mt-3 rounded-lg bg-[var(--surface-container-lowest)] px-4 py-3">
+          <p className="text-label uppercase tracking-wide text-[var(--on-surface-variant)]">{t('qp.disagree')}</p>
+          {contradiction.claim && <p className="mt-1 text-body text-[var(--on-surface)]">{t('qp.yourAnswerSays')}{contradiction.claim}</p>}
           <p className="mt-1 text-body text-[var(--on-surface)]">
-            {contradiction.document}{contradiction.version ? ` (v${contradiction.version})` : ''} says: <q>{contradiction.quote}</q>
+            {contradiction.document}{contradiction.version ? ` (v${contradiction.version})` : ''}{t('qp.says')}<q>{contradiction.quote}</q>
           </p>
           {contradiction.explanation && <p className="mt-1 text-label text-[var(--on-surface-variant)]">{contradiction.explanation}</p>}
           <p className="mt-2 text-label text-[var(--on-surface-variant)]">
-            Your answer becomes a fact every stage follows. If the record is wrong, record it anyway; otherwise change your answer.
+            {t('qp.becomesFact')}
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             <button
@@ -176,14 +179,14 @@ export function QuestionPrompt({
               onClick={() => onAnswer(text, contradiction)}
               className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label text-[var(--on-primary)]"
             >
-              Record my answer anyway
+              {t('qp.recordAnyway')}
             </button>
             <button
               type="button"
               onClick={() => setContradiction(null)}
               className="rounded-lg bg-[var(--surface-container-high)] px-4 py-2 text-label text-[var(--on-surface)]"
             >
-              Edit my answer
+              {t('qp.edit')}
             </button>
           </div>
         </div>
@@ -195,8 +198,8 @@ export function QuestionPrompt({
           setContradiction(null);
         }}
         rows={2}
-        aria-label="Your answer"
-        placeholder={choices.length ? 'Or say something else…' : 'Your answer…'}
+        aria-label={t('qp.answerLabel')}
+        placeholder={choices.length ? t('qp.orElse') : t('qp.answerHint')}
         className="mt-3 w-full resize-none rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2 text-body text-[var(--on-surface)] outline-none"
       />
       <div className="mt-2 flex flex-wrap items-center gap-3">
@@ -205,10 +208,10 @@ export function QuestionPrompt({
           disabled={!text.trim() || checking || contradiction !== null}
           className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-title text-[var(--on-primary)] disabled:opacity-40"
         >
-          {checking ? 'Checking against the record…' : 'Answer and continue'}
+          {checking ? t('qp.checking') : t('qp.answerContinue')}
         </button>
         <span className="text-label text-[var(--on-surface-variant)]">
-          Or change the project yourself — tick a requirement, edit the draft — and press Resume.
+          {t('qp.orChange')}
         </span>
       </div>
     </section>
@@ -222,6 +225,7 @@ export function QuestionPrompt({
  * or download and send to whoever can judge it.
  */
 function ExpertPackageCard({ markdown }: { markdown: string }) {
+  const t = useT();
   const [copied, setCopied] = useState(false);
   const download = () => {
     const url = URL.createObjectURL(new Blob([markdown], { type: 'text/markdown' }));
@@ -234,9 +238,9 @@ function ExpertPackageCard({ markdown }: { markdown: string }) {
   return (
     // Closed and rendered (Sean, 10 Oct, email 7.3: raw "## Question" and
     // "## Assumptions" in the main view). The copy and download keep the markdown.
-    <details aria-label="Expert review package" className="mt-3 rounded-lg bg-[var(--surface-container-lowest)] px-4 py-3">
+    <details aria-label={t('qp.packageLabel')} className="mt-3 rounded-lg bg-[var(--surface-container-lowest)] px-4 py-3">
       <summary className="cursor-pointer text-label text-[var(--on-surface-variant)]">
-        A summary of this question for a specialist, to copy or send — show
+        {t('qp.package')}
       </summary>
       <div className="mt-2 max-h-80 overflow-auto">
         <MarkdownOutput content={markdown} />
@@ -248,7 +252,7 @@ function ExpertPackageCard({ markdown }: { markdown: string }) {
           className="flex items-center gap-1 rounded-lg bg-[var(--surface-container-high)] px-3 py-1.5 text-label text-[var(--on-surface)]"
         >
           <span aria-hidden className="material-symbols-outlined text-[18px]">content_copy</span>
-          {copied ? 'Copied' : 'Copy'}
+          {copied ? t('qp.copied') : t('qp.copy')}
         </button>
         <button
           type="button"
@@ -256,7 +260,7 @@ function ExpertPackageCard({ markdown }: { markdown: string }) {
           className="flex items-center gap-1 rounded-lg bg-[var(--surface-container-high)] px-3 py-1.5 text-label text-[var(--on-surface)]"
         >
           <span aria-hidden className="material-symbols-outlined text-[18px]">download</span>
-          Download (.md)
+          {t('qp.download')}
         </button>
       </div>
     </details>
@@ -274,10 +278,11 @@ export interface LatestChange {
 
 /** What the newest version changed against the one before, in place. */
 function WhatChanged({ change }: { change: LatestChange }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const { parts, added, removed } = useWordDiff(change.before, change.after);
   return (
-    <div aria-label="What changed" className="mt-3 rounded-lg bg-[var(--surface-container)] px-4 py-3">
+    <div aria-label={t('qp.changedLabel')} className="mt-3 rounded-lg bg-[var(--surface-container)] px-4 py-3">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -285,9 +290,9 @@ function WhatChanged({ change }: { change: LatestChange }) {
         className="flex w-full items-center justify-between gap-2 text-left text-title text-[var(--on-surface)]"
       >
         <span>
-          What changed in {change.stageLabel} v{change.version} (against v{change.previous}) ·{' '}
-          <span className="text-[var(--pm-success)]">+{added} words</span> ·{' '}
-          <span className="text-[var(--pm-error)]">−{removed} words</span>
+          {t('qp.changed', { stage: change.stageLabel, version: change.version, previous: change.previous })} ·{' '}
+          <span className="text-[var(--pm-success)]">{t('qp.added', { count: added })}</span> ·{' '}
+          <span className="text-[var(--pm-error)]">{t('qp.removed', { count: removed })}</span>
         </span>
         <span aria-hidden className="material-symbols-outlined text-[20px]">{open ? 'expand_less' : 'expand_more'}</span>
       </button>

@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { useAuth } from '@/hooks/use-auth';
 import { submitFeedback } from '@/lib/supabase/feedback';
+import { useT } from '@/lib/i18n/i18n-provider';
 
 const REUSE_SCALE = [1, 2, 3, 4, 5] as const;
 
@@ -23,6 +24,7 @@ interface FeedbackFormProps {
  */
 export function FeedbackForm({ projectId = null, onClose }: FeedbackFormProps) {
   const { user, loading } = useAuth();
+  const t = useT();
 
   const [useCase, setUseCase] = useState('');
   const [value, setValue] = useState('');
@@ -50,7 +52,7 @@ export function FeedbackForm({ projectId = null, onClose }: FeedbackFormProps) {
       );
       setDone(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not send that feedback.');
+      setError(err instanceof Error ? err.message : t('feedback.failed'));
     } finally {
       setBusy(false);
     }
@@ -59,10 +61,9 @@ export function FeedbackForm({ projectId = null, onClose }: FeedbackFormProps) {
   if (done) {
     return (
       <div className="rounded-2xl bg-[var(--surface-container-low)] px-6 py-5">
-        <p className="text-title text-[var(--on-surface)]">Thank you — that is genuinely useful.</p>
+        <p className="text-title text-[var(--on-surface)]">{t('feedback.thanks')}</p>
         <p className="mt-1 text-body text-[var(--on-surface-variant)]">
-          Beta feedback goes straight to the people building this, and it shapes what gets
-          fixed next.
+          {t('feedback.thanksBody')}
         </p>
         {onClose && (
           <button
@@ -70,7 +71,7 @@ export function FeedbackForm({ projectId = null, onClose }: FeedbackFormProps) {
             onClick={onClose}
             className="mt-4 rounded-xl bg-[var(--pm-primary)] px-5 py-2.5 text-title text-[var(--on-primary)] transition-opacity hover:opacity-90"
           >
-            Close
+            {t('feedback.close')}
           </button>
         )}
       </div>
@@ -81,8 +82,7 @@ export function FeedbackForm({ projectId = null, onClose }: FeedbackFormProps) {
     return (
       <div className="rounded-2xl bg-[var(--surface-container-low)] px-6 py-5">
         <p className="text-body text-[var(--on-surface-variant)]">
-          Feedback needs a signed-in session — sign in or continue as a guest, then tell us how
-          it went.
+          {t('feedback.signIn')}
         </p>
         {onClose && (
           <button
@@ -90,7 +90,7 @@ export function FeedbackForm({ projectId = null, onClose }: FeedbackFormProps) {
             onClick={onClose}
             className="mt-4 px-1 py-1 text-body text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
           >
-            Close
+            {t('feedback.close')}
           </button>
         )}
       </div>
@@ -102,15 +102,14 @@ export function FeedbackForm({ projectId = null, onClose }: FeedbackFormProps) {
       onSubmit={handleSubmit}
       className="rounded-2xl bg-[var(--surface-container-low)] px-6 py-5"
     >
-      <p className="text-title text-[var(--on-surface)]">Tell us how it went</p>
+      <p className="text-title text-[var(--on-surface)]">{t('feedback.title')}</p>
       <p className="mt-1 max-w-[62ch] text-body text-[var(--on-surface-variant)]">
-        Four short questions. Real usage is the only thing that tells us whether this works
-        outside a demo.
+        {t('feedback.intro')}
       </p>
 
       <label className="mt-5 block">
         <span className="mb-1 block text-label uppercase tracking-wider text-[var(--on-surface-variant)]">
-          What were you trying to do?
+          {t('feedback.useCase')}
         </span>
         <textarea
           required
@@ -123,7 +122,7 @@ export function FeedbackForm({ projectId = null, onClose }: FeedbackFormProps) {
 
       <label className="mt-4 block">
         <span className="mb-1 block text-label uppercase tracking-wider text-[var(--on-surface-variant)]">
-          What was valuable?
+          {t('feedback.value')}
         </span>
         <textarea
           rows={2}
@@ -135,7 +134,7 @@ export function FeedbackForm({ projectId = null, onClose }: FeedbackFormProps) {
 
       <label className="mt-4 block">
         <span className="mb-1 block text-label uppercase tracking-wider text-[var(--on-surface-variant)]">
-          Where did you get confused or blocked?
+          {t('feedback.blockage')}
         </span>
         <textarea
           rows={2}
@@ -147,10 +146,10 @@ export function FeedbackForm({ projectId = null, onClose }: FeedbackFormProps) {
 
       <fieldset className="mt-5">
         <legend className="mb-2 block text-label uppercase tracking-wider text-[var(--on-surface-variant)]">
-          How likely are you to use it again?
+          {t('feedback.reuse')}
         </legend>
         <div className="flex items-center gap-3">
-          <span className="text-body text-[var(--on-surface-variant)]">Not likely</span>
+          <span className="text-body text-[var(--on-surface-variant)]">{t('feedback.notLikely')}</span>
           <div className="flex gap-2">
             {REUSE_SCALE.map((n) => (
               <button
@@ -168,7 +167,7 @@ export function FeedbackForm({ projectId = null, onClose }: FeedbackFormProps) {
               </button>
             ))}
           </div>
-          <span className="text-body text-[var(--on-surface-variant)]">Very likely</span>
+          <span className="text-body text-[var(--on-surface-variant)]">{t('feedback.veryLikely')}</span>
         </div>
       </fieldset>
 
@@ -184,7 +183,7 @@ export function FeedbackForm({ projectId = null, onClose }: FeedbackFormProps) {
           disabled={busy}
           className="rounded-xl bg-[var(--pm-primary)] px-5 py-2.5 text-title text-[var(--on-primary)] transition-opacity hover:opacity-90 disabled:opacity-50"
         >
-          {busy ? 'Sending…' : 'Send feedback'}
+          {busy ? t('feedback.sending') : t('feedback.send')}
         </button>
         {onClose && (
           <button
@@ -192,7 +191,7 @@ export function FeedbackForm({ projectId = null, onClose }: FeedbackFormProps) {
             onClick={onClose}
             className="px-3 py-2.5 text-body text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
           >
-            Not now
+            {t('feedback.notNow')}
           </button>
         )}
       </div>

@@ -18,6 +18,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import { useT } from '@/lib/i18n/i18n-provider';
 
 import {
   hardDeleteProject,
@@ -34,14 +35,15 @@ export function daysLeft(deletedAt: string, now: number = Date.now()): number {
   return Math.max(0, Math.ceil(RETENTION_DAYS - elapsed));
 }
 
-function retentionLabel(deletedAt: string): string {
+function retentionLabel(deletedAt: string, t: ReturnType<typeof useT>): string {
   const left = daysLeft(deletedAt);
-  if (left <= 0) return 'Due to be removed';
-  if (left === 1) return 'Removed for good tomorrow';
-  return `Removed for good in ${left} days`;
+  if (left <= 0) return t('trash.due');
+  if (left === 1) return t('trash.tomorrow');
+  return t('trash.inDays', { days: left });
 }
 
 export function DeletedProjects({ onRestored }: { onRestored?: () => void }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<DeletedProjectSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -52,9 +54,9 @@ export function DeletedProjects({ onRestored }: { onRestored?: () => void }) {
     listDeletedProjects()
       .then(setRows)
       .catch((e) =>
-        setError(e instanceof Error ? e.message : 'Could not load deleted projects.')
+        setError(e instanceof Error ? e.message : t('trash.loadError'))
       );
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (open && rows === null) load();
@@ -68,7 +70,7 @@ export function DeletedProjects({ onRestored }: { onRestored?: () => void }) {
       setRows((r) => (r ?? []).filter((x) => x.id !== id));
       onRestored?.();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not restore the project.');
+      setError(e instanceof Error ? e.message : t('trash.restoreError'));
     } finally {
       setBusy(false);
     }
@@ -82,7 +84,7 @@ export function DeletedProjects({ onRestored }: { onRestored?: () => void }) {
       await hardDeleteProject(id);
       setRows((r) => (r ?? []).filter((x) => x.id !== id));
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not delete the project.');
+      setError(e instanceof Error ? e.message : t('trash.deleteError'));
     } finally {
       setBusy(false);
     }
@@ -102,16 +104,14 @@ export function DeletedProjects({ onRestored }: { onRestored?: () => void }) {
         >
           chevron_right
         </span>
-        Recently deleted
+        {t('trash.heading')}
         {rows && rows.length > 0 && <span> · {rows.length}</span>}
       </button>
 
       {open && (
         <div className="mt-3">
           <p className="mb-3 max-w-[70ch] text-label text-[var(--on-surface-variant)]">
-            Deleted projects are kept for {RETENTION_DAYS} days so a mistake can be undone,
-            then removed permanently along with their artifacts, versions and evaluations.
-            Delete now if you would rather not wait.
+            {t('trash.explain', { days: RETENTION_DAYS })}
           </p>
 
           {error && (
@@ -126,7 +126,7 @@ export function DeletedProjects({ onRestored }: { onRestored?: () => void }) {
 
           {rows?.length === 0 && (
             <p className="rounded-2xl bg-[var(--surface-container-low)] px-6 py-5 text-body text-[var(--on-surface-variant)]">
-              Nothing deleted.
+              {t('trash.nothing')}
             </p>
           )}
 
@@ -138,30 +138,30 @@ export function DeletedProjects({ onRestored }: { onRestored?: () => void }) {
               >
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-title text-[var(--on-surface)]">
-                    {p.title || 'Untitled project'}
+                    {p.title || t('list.untitled')}
                   </span>
                   <span className="mt-0.5 block text-label text-[var(--on-surface-variant)]">
-                    {retentionLabel(p.deleted_at)}
+                    {retentionLabel(p.deleted_at, t)}
                   </span>
                 </span>
 
                 {confirming === p.id ? (
                   <div className="flex items-center gap-2">
                     <span className="text-label text-[var(--on-surface-variant)]">
-                      Delete permanently? This cannot be undone.
+                      {t('trash.confirm')}
                     </span>
                     <button
                       onClick={() => handlePurge(p.id)}
                       disabled={busy}
                       className="rounded-lg bg-[var(--pm-error)] px-3 py-1.5 text-label text-[var(--on-error)] disabled:opacity-50"
                     >
-                      Delete permanently
+                      {t('trash.deletePermanently')}
                     </button>
                     <button
                       onClick={() => setConfirming(null)}
                       className="rounded-lg px-2 py-1.5 text-label text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
                     >
-                      Keep
+                      {t('trash.keep')}
                     </button>
                   </div>
                 ) : (
@@ -174,13 +174,13 @@ export function DeletedProjects({ onRestored }: { onRestored?: () => void }) {
                       <span aria-hidden className="material-symbols-outlined text-[16px]">
                         restore_from_trash
                       </span>
-                      Restore
+                      {t('trash.restore')}
                     </button>
                     <button
                       onClick={() => setConfirming(p.id)}
                       className="rounded-lg px-3 py-1.5 text-label text-[var(--on-surface-variant)] transition-colors hover:bg-[var(--surface-container-high)] hover:text-[var(--on-surface)]"
                     >
-                      Delete now
+                      {t('trash.deleteNow')}
                     </button>
                   </div>
                 )}

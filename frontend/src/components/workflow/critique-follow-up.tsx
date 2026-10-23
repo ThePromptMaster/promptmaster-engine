@@ -1,5 +1,7 @@
 'use client';
 
+import { useT } from '@/lib/i18n/i18n-provider';
+import { tr } from '@/lib/i18n/store';
 import { useEffect, useRef, useState } from 'react';
 
 import type { CritiquePoint } from '@/lib/workflow/critique-points';
@@ -37,6 +39,7 @@ export function CritiqueFollowUp({
   onRun: (action: ReplyAction) => Promise<void> | void;
   onApplyPoints: (ids: string[], showFirst: boolean) => void;
 }) {
+  const t = useT();
   const [state, setState] = useState<{ list: ReplyAction[] | null; loading: boolean; error: string | null }>({ list: null, loading: true, error: null });
   const [dismissed, setDismissed] = useState(false);
   const suggestRef = useRef(suggest);
@@ -53,7 +56,7 @@ export function CritiqueFollowUp({
       () =>
         !controller.signal.aborted &&
         // Not being able to compress the critique is not a failed critique: the points are below.
-        setState({ list: [], loading: false, error: 'Could not work out actions for this. The points are below.' })
+        setState({ list: [], loading: false, error: tr('cfu.error') })
     );
     return () => controller.abort();
   }, [commentary.title, commentary.text]);
@@ -62,7 +65,7 @@ export function CritiqueFollowUp({
     <div className="space-y-3">
       {!dismissed && (
         <ReplyActions
-          label="Act on this critique"
+          label={t('cfu.label')}
           actions={state.list}
           loading={state.loading}
           error={state.error}
@@ -75,10 +78,10 @@ export function CritiqueFollowUp({
       {points.length > 0 && (
         <details>
           <summary className="cursor-pointer select-none text-label text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]">
-            Review the {points.length === 1 ? 'point' : `${points.length} points`} one by one
+            {t('cfu.review', { count: points.length })}
           </summary>
           <div className="mt-3">
-            <CritiqueActions title="Each point of this critique" points={points} busy={busy} onApply={onApplyPoints} />
+            <CritiqueActions title={t('cfu.points')} points={points} busy={busy} onApply={onApplyPoints} />
           </div>
         </details>
       )}

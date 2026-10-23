@@ -6,6 +6,7 @@
  * a network call timed out is a gate users learn to resent.
  */
 
+import { tr } from '@/lib/i18n/store';
 import type {
   CriterionResult,
   ExitCriterion,
@@ -609,14 +610,15 @@ export function progressCaptionText(
   const waiting = outstanding.some((o) => o.kind === 'go_waiting');
   // A stale stage is already counted "to go"; the rest is open on top of the stages.
   const open = outstanding.filter((o) => blocksCompletion(o) && o.kind !== 'stale_stage' && o.kind !== 'go_waiting').length;
+  // In the interface's language (client, 21 Oct): the rail's caption is read, not parsed.
   return [
-    finished ? 'Finished' : null,
-    `${progress.complete} done`,
-    progress.skipped > 0 ? `${progress.skipped} skipped` : null,
-    progress.leftOpen > 0 ? `${progress.leftOpen} left open` : null,
-    progress.remaining > 0 || !finished ? `${progress.remaining} to go` : null,
-    open > 0 ? `${open} still open` : null,
-    waiting ? 'Go is waiting for you' : null,
+    finished ? tr('progress.finished') : null,
+    tr('progress.done', { count: progress.complete }),
+    progress.skipped > 0 ? tr('progress.skipped', { count: progress.skipped }) : null,
+    progress.leftOpen > 0 ? tr('progress.leftOpen', { count: progress.leftOpen }) : null,
+    progress.remaining > 0 || !finished ? tr('progress.toGo', { count: progress.remaining }) : null,
+    open > 0 ? tr('progress.stillOpen', { count: open }) : null,
+    waiting ? tr('progress.goWaiting') : null,
   ]
     .filter(Boolean)
     .join(' · ');

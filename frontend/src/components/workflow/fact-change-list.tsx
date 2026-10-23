@@ -6,6 +6,7 @@
  * facts saying Thursday, and Go changed the draft back to match them).
  */
 
+import { useT } from '@/lib/i18n/i18n-provider';
 import { useState } from 'react';
 
 import { recordFacts, supersedeFact } from '@/lib/supabase/facts';
@@ -24,12 +25,13 @@ export function FactChangeList({
 }) {
   // Grouped by kind, so a changed value, a new fact and someone's request are
   // never read as the same thing (17 Oct, Sean, HARBOR).
+  const t = useT();
   const groups = FACT_CHANGE_GROUPS.map((g) => ({ ...g, items: changes.filter((c) => factChangeGroup(c) === g.group) })).filter((g) => g.items.length);
   return (
     <>
       {groups.map((g) => (
-        <div key={g.group} role="group" aria-label={g.label} className="mt-2">
-          <p className="text-label uppercase tracking-wide text-[var(--on-surface-variant)]">{g.label}</p>
+        <div key={g.group} role="group" aria-label={t(`fcl.group.${g.group}`)} className="mt-2">
+          <p className="text-label uppercase tracking-wide text-[var(--on-surface-variant)]">{t(`fcl.group.${g.group}`)}</p>
           <ul className="mt-1 space-y-2">
             {g.items.map((c) => (
               <li key={c.fact.id}>
@@ -40,7 +42,7 @@ export function FactChangeList({
                     <span className="block text-[var(--on-surface-variant)]">
                       {isNewFact(c)
                         ? newFactNote(c)
-                        : <>{describeFactChange(c)} · was &ldquo;{c.fact.statement}&rdquo;</>}
+                        : <>{describeFactChange(c)} · {t('fcl.was')} &ldquo;{c.fact.statement}&rdquo;</>}
                     </span>
                   </span>
                 </label>
@@ -51,7 +53,7 @@ export function FactChangeList({
       ))}
       {kept.size > 0 && (
         <p className="mt-2 text-label text-[var(--on-surface-variant)]">
-          A fact left unticked keeps its old value, and a new one unticked is not recorded. Go treats accepted facts as authoritative, so it may change the draft back to match.
+          {t('fcl.keptNote')}
         </p>
       )}
     </>
@@ -85,6 +87,7 @@ export function FactReconcileNotice({
   onDone: (outcome: 'updated' | 'kept') => void;
   onChanged?: () => Promise<unknown> | void;
 }) {
+  const t = useT();
   const [kept, setKept] = useState<ReadonlySet<string>>(() => new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -100,16 +103,15 @@ export function FactReconcileNotice({
       await onChanged?.();
       onDone('updated');
     } catch {
-      setError('Could not update the facts. Change them in Facts and requirements.');
+      setError(t('fcl.error'));
     } finally {
       setBusy(false);
     }
   };
   return (
-    <section aria-label="Facts this version changes" className="mb-4 rounded-xl bg-[var(--surface-container-high)] px-4 py-3">
+    <section aria-label={t('fcl.label')} className="mb-4 rounded-xl bg-[var(--surface-container-high)] px-4 py-3">
       <p className="text-body text-[var(--on-surface)]">
-        {how} on {stageLabel} says something different from {changes.length === 1 ? 'an accepted fact' : `${changes.length} accepted facts`}.
-        Update {changes.length === 1 ? 'it' : 'them'} to match?
+        {t('fcl.differs', { count: changes.length, how, stage: stageLabel })}
       </p>
       <FactChangeList changes={changes} kept={kept} onToggle={(id, on) => setKept((prev) => toggled(prev, id, on))} />
       {error && <p className="mt-2 text-label text-[var(--pm-error,var(--on-surface))]">{error}</p>}
@@ -119,14 +121,14 @@ export function FactReconcileNotice({
           disabled={busy || updating.length === 0}
           className="rounded-lg bg-[var(--pm-primary)] px-4 py-1.5 text-label text-[var(--on-primary)] disabled:opacity-40"
         >
-          {updating.length === 1 ? 'Update the fact' : `Update ${updating.length} facts`}
+          {updating.length === 1 ? t('fcl.updateOne') : t('fcl.updateMany', { count: updating.length })}
         </button>
         <button
           onClick={() => onDone('kept')}
           disabled={busy}
           className="rounded-lg px-3 py-1.5 text-label text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-highest)] hover:text-[var(--on-surface)]"
         >
-          Keep the facts as they are
+          {t('fcl.keep')}
         </button>
       </div>
     </section>

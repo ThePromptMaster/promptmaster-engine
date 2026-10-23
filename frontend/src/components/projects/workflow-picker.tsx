@@ -1,5 +1,8 @@
 'use client';
 
+import { useT } from '@/lib/i18n/i18n-provider';
+import type { MessageKey } from '@/lib/i18n/messages/en';
+
 import type { WorkflowTemplate } from '@/lib/workflow/types';
 
 const ICON: Record<string, string> = {
@@ -26,9 +29,23 @@ interface Props {
   onSelect: (id: string) => void;
 }
 
+/**
+ * A system workflow's name and pitch in the interface language (client, 21 Oct);
+ * a workflow the user designed keeps its own words.
+ */
+export function useWorkflowWords(): { name: (t: Pick<WorkflowTemplate, 'key' | 'name'>) => string; pitch: (t: Pick<WorkflowTemplate, 'key' | 'description'>) => string } {
+  const t = useT();
+  return {
+    name: (template) => (template.key in PITCH ? t(`workflow.name.${template.key}` as MessageKey) : template.name),
+    pitch: (template) => (template.key in PITCH ? t(`workflow.pitch.${template.key}` as MessageKey) : template.description),
+  };
+}
+
 export function WorkflowPicker({ templates, selectedId, onSelect }: Props) {
+  const t = useT();
+  const words = useWorkflowWords();
   return (
-    <div role="radiogroup" aria-label="Workflow" className="grid gap-3 sm:grid-cols-3">
+    <div role="radiogroup" aria-label={t('picker.label')} className="grid gap-3 sm:grid-cols-3">
       {templates.map((template) => {
         const selected = template.id === selectedId;
         // Show the shape of the work, not just its name: three stages is
@@ -57,14 +74,14 @@ export function WorkflowPicker({ templates, selectedId, onSelect }: Props) {
             </span>
 
             <span className="text-title text-[var(--on-surface)]">
-              {template.name}
+              {words.name(template)}
               {template.key.startsWith('custom_') && (
-                <span className="ml-2 rounded-md bg-[var(--surface-container-high)] px-1.5 py-0.5 align-middle text-label text-[var(--on-surface-variant)]">Yours</span>
+                <span className="ml-2 rounded-md bg-[var(--surface-container-high)] px-1.5 py-0.5 align-middle text-label text-[var(--on-surface-variant)]">{t('picker.yours')}</span>
               )}
             </span>
 
             <span className="mt-1.5 text-body text-[var(--on-surface-variant)]">
-              {PITCH[template.key] ?? template.description}
+              {words.pitch(template)}
             </span>
 
             <span className="mt-4 flex flex-wrap items-center gap-1.5">
@@ -84,7 +101,7 @@ export function WorkflowPicker({ templates, selectedId, onSelect }: Props) {
             </span>
 
             <span className="mt-3 text-label uppercase tracking-wider text-[var(--on-surface-variant)] opacity-70">
-              {template.stages.length} stage{template.stages.length === 1 ? '' : 's'}
+              {t('picker.stages', { count: template.stages.length })}
             </span>
           </button>
         );

@@ -13,6 +13,8 @@ import {
   STARTING,
   type ColourPreferences,
 } from '@/lib/appearance/colours';
+import { useT } from '@/lib/i18n/i18n-provider';
+import type { MessageKey } from '@/lib/i18n/messages/en';
 
 /**
  * Applies the colours this browser chose, after the first render: the server
@@ -29,6 +31,9 @@ export function ApplyColourPreferences() {
 /** Background, accent, starting-version colour and version palette, from the account menu (Sean, 18 and 21 Oct). */
 export function ColourPicker() {
   const [prefs, setPrefs] = useState<ColourPreferences>(() => (typeof window === 'undefined' ? DEFAULT_COLOURS : loadColours()));
+  const t = useT();
+  // Every swatch has its name in each language; the id is the key.
+  const name = (id: string) => t(`colour.${id === 'default' ? 'grey' : id}` as MessageKey);
 
   const choose = (next: Partial<ColourPreferences>) => {
     const merged = { ...prefs, ...next };
@@ -51,27 +56,27 @@ export function ColourPicker() {
   );
 
   return (
-    <div aria-label="Colours" className="space-y-3 px-4 py-2">
+    <div aria-label={t('header.colours')} className="space-y-3 px-4 py-2">
       <fieldset>
-        <legend className="text-label text-[var(--on-surface-variant)]">Background</legend>
+        <legend className="text-label text-[var(--on-surface-variant)]">{t('colours.background')}</legend>
         <div className="mt-1.5 flex flex-wrap gap-2">
-          {BACKGROUNDS.map((b) => swatch(prefs.background === b.id, b.colour, `Background: ${b.label}`, () => choose({ background: b.id })))}
+          {BACKGROUNDS.map((b) => swatch(prefs.background === b.id, b.colour, t('colours.swatch.background', { name: name(b.id) }), () => choose({ background: b.id })))}
         </div>
       </fieldset>
       <fieldset>
-        <legend className="text-label text-[var(--on-surface-variant)]">Accent</legend>
+        <legend className="text-label text-[var(--on-surface-variant)]">{t('colours.accent')}</legend>
         <div className="mt-1.5 flex flex-wrap gap-2">
-          {ACCENTS.map((a) => swatch(prefs.accent === a.id, a.colour, `Accent: ${a.label}`, () => choose({ accent: a.id })))}
+          {ACCENTS.map((a) => swatch(prefs.accent === a.id, a.colour, t('colours.swatch.accent', { name: name(a.id) }), () => choose({ accent: a.id })))}
         </div>
       </fieldset>
       <fieldset>
-        <legend className="text-label text-[var(--on-surface-variant)]">Starting version (v1)</legend>
+        <legend className="text-label text-[var(--on-surface-variant)]">{t('colours.starting')}</legend>
         <div className="mt-1.5 flex flex-wrap gap-2">
-          {STARTING.map((s) => swatch(prefs.starting === s.id, s.colour, `Starting version: ${s.label}`, () => choose({ starting: s.id })))}
+          {STARTING.map((s) => swatch(prefs.starting === s.id, s.colour, t('colours.swatch.starting', { name: name(s.id) }), () => choose({ starting: s.id })))}
         </div>
       </fieldset>
       <fieldset>
-        <legend className="text-label text-[var(--on-surface-variant)]">Later versions</legend>
+        <legend className="text-label text-[var(--on-surface-variant)]">{t('colours.later')}</legend>
         <div className="mt-1.5 space-y-1.5">
           {PALETTES.map((p) => (
             <button
@@ -88,7 +93,7 @@ export function ColourPicker() {
                   <span key={c} className="h-3 w-3 rounded-full" style={{ background: c }} />
                 ))}
               </span>
-              {p.label}
+              {name(p.id)}
             </button>
           ))}
         </div>
@@ -98,9 +103,9 @@ export function ColourPicker() {
         onClick={() => choose(DEFAULT_COLOURS)}
         className="text-label text-[var(--pm-primary)] hover:underline"
       >
-        Reset to the defaults
+        {t('colours.reset')}
       </button>
-      <p className="text-label leading-snug text-[var(--on-surface-variant)]">Kept in this browser only.</p>
+      <p className="text-label leading-snug text-[var(--on-surface-variant)]">{t('colours.keptHere')}</p>
     </div>
   );
 }

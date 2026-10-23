@@ -4,6 +4,7 @@ import { useState, useSyncExternalStore } from 'react';
 import { usePathname } from 'next/navigation';
 
 import { FeedbackForm } from './feedback-form';
+import { useT } from '@/lib/i18n/i18n-provider';
 
 /**
  * Versioned on purpose: bumping the suffix reissues the notice to everyone who
@@ -73,6 +74,7 @@ export function BetaNotice() {
   const state = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   const pathname = usePathname();
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const t = useT();
 
   function dismiss() {
     setFeedbackOpen(false);
@@ -98,11 +100,11 @@ export function BetaNotice() {
         <button
           type="button"
           onClick={reopen}
-          aria-label="Show the beta notice"
+          aria-label={t('beta.show')}
           className="pointer-events-auto flex items-center gap-2 rounded-full bg-[var(--surface-container-high)] p-2 text-label uppercase tracking-wider text-[var(--on-surface-variant)] shadow-lg transition-opacity hover:opacity-90 sm:px-4 sm:py-2"
         >
           <span aria-hidden className="material-symbols-outlined text-[18px] sm:text-[20px]">science</span>
-          <span className="hidden sm:inline">Beta</span>
+          <span className="hidden sm:inline">{t('beta.chip')}</span>
         </button>
       </div>
     );
@@ -116,12 +118,9 @@ export function BetaNotice() {
             science
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-title text-[var(--on-surface)]">This is an early beta</p>
+            <p className="text-title text-[var(--on-surface)]">{t('beta.title')}</p>
             <p className="mt-1 text-body text-[var(--on-surface-variant)]">
-              PromptMaster is an early beta, so outputs require review before you act on
-              them — production-critical reliance is not intended, and nothing here replaces
-              your own professional judgement. Please do not enter sensitive information:
-              no confidential client material, personal data, or credentials.
+              {t('beta.body')}
             </p>
 
             <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -130,14 +129,14 @@ export function BetaNotice() {
                 onClick={dismiss}
                 className="rounded-xl bg-[var(--pm-primary)] px-5 py-2.5 text-title text-[var(--on-primary)] transition-opacity hover:opacity-90"
               >
-                Got it
+                {t('beta.gotIt')}
               </button>
               <button
                 type="button"
                 onClick={() => setFeedbackOpen((open) => !open)}
                 className="rounded-xl bg-[var(--surface-container-high)] px-5 py-2.5 text-title text-[var(--on-surface)] transition-opacity hover:opacity-90"
               >
-                {feedbackOpen ? 'Hide feedback form' : 'Tell us how it went'}
+                {feedbackOpen ? t('beta.hideFeedback') : t('beta.feedback')}
               </button>
             </div>
           </div>

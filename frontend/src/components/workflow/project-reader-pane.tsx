@@ -1,5 +1,7 @@
 'use client';
 
+import { stageText } from '@/lib/i18n/templates';
+import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import { useEffect, useMemo, useState } from 'react';
 
 import { MarkdownOutput } from '@/components/shared/markdown-output';
@@ -39,6 +41,8 @@ export function ProjectReaderPane({
   referenced?: boolean;
   referencesFull?: boolean;
 }) {
+  const t = useT();
+  const locale = useLocale();
   const [loaded, setLoaded] = useState<{ id: string; data: ProjectForReading | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [stageId, setStageId] = useState<string | null>(null);
@@ -57,19 +61,19 @@ export function ProjectReaderPane({
         setLoaded({ id: readingId, data });
         setStageId(null);
       })
-      .catch((e) => live && setError((e as { message?: string })?.message || 'The project could not be read.'));
+      .catch((e) => live && setError((e as { message?: string })?.message || t('reader.readError')));
     return () => {
       live = false;
     };
-  }, [readingId]);
+  }, [readingId, t]);
 
   const showPicker = picking || !readingId;
   useEffect(() => {
     if (!showPicker || choices) return;
     Promise.all([listProjects(200), listFolders().catch(() => [] as ProjectFolder[])])
       .then(([projects, folders]) => setChoices({ projects, folders }))
-      .catch((e) => setError((e as { message?: string })?.message || 'Your projects could not be loaded.'));
-  }, [showPicker, choices]);
+      .catch((e) => setError((e as { message?: string })?.message || t('refs.loadError')));
+  }, [showPicker, choices, t]);
 
   const data = loaded && loaded.id === readingId ? loaded.data : null;
   const stage = useMemo(() => {
@@ -83,20 +87,20 @@ export function ProjectReaderPane({
   const quiet = 'rounded px-1.5 py-0.5 text-label font-semibold text-[var(--pm-primary)] hover:bg-[var(--surface-container-high)] disabled:opacity-40';
 
   return (
-    <div aria-label="Another project, read beside this one" className="flex h-full min-h-0 flex-col rounded-2xl bg-[var(--surface-container-low)]">
+    <div aria-label={t('reader.label')} className="flex h-full min-h-0 flex-col rounded-2xl bg-[var(--surface-container-low)]">
       <div className="flex flex-wrap items-center gap-2 px-4 pt-4">
         <span aria-hidden className="material-symbols-outlined text-[18px] text-[var(--on-surface-variant)]">menu_book</span>
         <span className="min-w-0 flex-1 truncate text-title text-[var(--on-surface)]">
-          {data ? data.project.title || 'Untitled project' : readingId && !error ? 'Opening…' : 'Read another project'}
+          {data ? data.project.title || t('list.untitled') : readingId && !error ? t('reader.opening') : t('reader.readAnother')}
         </span>
         <button type="button" onClick={() => setPicking((p) => !p)} className={quiet}>
-          {showPicker && readingId ? 'Cancel' : 'Change'}
+          {showPicker && readingId ? t('reader.cancel') : t('reader.change')}
         </button>
-        <button type="button" onClick={onClose} aria-label="Close the other project" className="rounded p-1 text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)]">
+        <button type="button" onClick={onClose} aria-label={t('reader.close')} className="rounded p-1 text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)]">
           <span aria-hidden className="material-symbols-outlined text-[18px]">close</span>
         </button>
       </div>
-      <p className="px-4 pt-1 text-label text-[var(--on-surface-variant)]">Read-only. Quote a section into the side chat, or use the whole project as a reference.</p>
+      <p className="px-4 pt-1 text-label text-[var(--on-surface-variant)]">{t('reader.note')}</p>
 
       {error && <p role="alert" className="px-4 pt-2 text-label text-[var(--pm-error)]">{error}</p>}
 
@@ -112,10 +116,10 @@ export function ProjectReaderPane({
               }}
             />
           ) : (
-            !error && <p className="text-label text-[var(--on-surface-variant)]">Loading your projects…</p>
+            !error && <p className="text-label text-[var(--on-surface-variant)]">{t('refs.loading')}</p>
           )
         ) : loaded && loaded.id === readingId && !data ? (
-          <p className="text-body text-[var(--on-surface-variant)]">That project is in the trash or no longer exists.</p>
+          <p className="text-body text-[var(--on-surface-variant)]">{t('reader.gone')}</p>
         ) : data && stage ? (
           <>
             {onUseAsReference && (
@@ -125,17 +129,17 @@ export function ProjectReaderPane({
                 onClick={() => {
                   setAdding(true);
                   onUseAsReference(data.project.id)
-                    .catch((e) => setError((e as { message?: string })?.message || 'The project could not be added.'))
+                    .catch((e) => setError((e as { message?: string })?.message || t('refs.addError')))
                     .finally(() => setAdding(false));
                 }}
                 className="mb-3 inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-lowest)] px-3 py-1.5 text-label font-semibold text-[var(--pm-primary)] disabled:opacity-50"
               >
                 <span aria-hidden className="material-symbols-outlined text-[16px]">link</span>
-                {referenced ? 'Used as a reference here' : referencesFull ? 'At most 5 references' : adding ? 'Adding…' : 'Use as reference in this project'}
+                {referenced ? t('reader.used') : referencesFull ? t('reader.full') : adding ? t('reader.adding') : t('reader.use')}
               </button>
             )}
 
-            <nav aria-label="Its stages" className="mb-3 flex flex-wrap gap-1">
+            <nav aria-label={t('reader.stages')} className="mb-3 flex flex-wrap gap-1">
               {data.template.stages.map((s) => {
                 const status = data.state.stages[s.id]?.status;
                 const selected = s.id === stage.id;
@@ -147,18 +151,18 @@ export function ProjectReaderPane({
                     onClick={() => setStageId(s.id)}
                     className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-label ${selected ? 'bg-[var(--surface-container-highest)] text-[var(--on-surface)]' : 'text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)]'}`}
                   >
-                    {isDone(status) && <span aria-label="done" className="material-symbols-outlined text-[14px] text-[var(--pm-success)]">check_circle</span>}
-                    {s.id === data.state.current_stage_id && !isDone(status) && <span aria-label="current" className="h-1.5 w-1.5 rounded-full bg-[var(--pm-primary)]" />}
-                    {s.short_label || s.label}
+                    {isDone(status) && <span aria-label={t('reader.done')} className="material-symbols-outlined text-[14px] text-[var(--pm-success)]">check_circle</span>}
+                    {s.id === data.state.current_stage_id && !isDone(status) && <span aria-label={t('reader.current')} className="h-1.5 w-1.5 rounded-full bg-[var(--pm-primary)]" />}
+                    {stageText(locale, data.template.key, s, 'short') || stageText(locale, data.template.key, s, 'label')}
                   </button>
                 );
               })}
             </nav>
 
             {sections.length === 0 ? (
-              <p className="text-body text-[var(--on-surface-variant)]">Nothing written on {stage.label} yet.</p>
+              <p className="text-body text-[var(--on-surface-variant)]">{t('reader.nothing', { stage: stageText(locale, data.template.key, stage, 'label') })}</p>
             ) : (
-              <ol aria-label={`${stage.label} sections`} className="space-y-3">
+              <ol aria-label={t('reader.sections', { stage: stageText(locale, data.template.key, stage, 'label') })} className="space-y-3">
                 {sections.map((sec, i) => (
                   <li key={i} className="rounded-xl bg-[var(--surface-container-lowest)] px-4 py-3">
                     {sec.heading && <p className="mb-1 text-title text-[var(--on-surface)]">{sec.heading}</p>}
@@ -172,7 +176,7 @@ export function ProjectReaderPane({
                       className={`${quiet} mt-2 inline-flex items-center gap-1`}
                     >
                       <span aria-hidden className="material-symbols-outlined text-[16px]">forum</span>
-                      {sent === i ? 'In the side chat — not sent' : 'Send this section to the side chat'}
+                      {sent === i ? t('reader.sent') : t('reader.send')}
                     </button>
                   </li>
                 ))}
@@ -180,7 +184,7 @@ export function ProjectReaderPane({
             )}
           </>
         ) : (
-          !error && <p className="text-label text-[var(--on-surface-variant)]">Opening…</p>
+          !error && <p className="text-label text-[var(--on-surface-variant)]">{t('reader.opening')}</p>
         )}
       </div>
     </div>

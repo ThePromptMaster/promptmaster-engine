@@ -1,10 +1,11 @@
 'use client';
 
+import { tr } from '@/lib/i18n/store';
 import { useEffect, useState } from 'react';
 
 import { MarkdownOutput } from '@/components/shared/markdown-output';
-import { stepLabel } from '@/lib/agent/actions';
-import { collapseSteps, STEP_STATUS_TEXT } from '@/lib/agent/labels';
+import { shownStepLabel as stepLabel } from '@/lib/i18n/go';
+import { collapseSteps } from '@/lib/agent/labels';
 import { createClient } from '@/lib/supabase/client';
 import { getSandboxRun } from '@/lib/supabase/agent';
 import { keptConflictsOf } from '@/lib/workflow/routine-conflicts';
@@ -47,7 +48,7 @@ function SandboxFiles({ runId }: { runId: string }) {
       {files.map((f) =>
         f.name.endsWith('.png') ? (
           // eslint-disable-next-line @next/next/no-img-element -- a signed, short-lived URL; next/image cannot optimise it
-          <img key={f.name} src={f.url} alt={`Output: ${f.name}`} className="w-full rounded-lg bg-white" />
+          <img key={f.name} src={f.url} alt={tr('tl.output', { name: f.name })} className="w-full rounded-lg bg-white" />
         ) : (
           <a key={f.name} href={f.url} className="text-label text-[var(--pm-primary)] underline">
             {f.name}
@@ -72,7 +73,7 @@ export function StepTimeline({
   // Repeated identical steps are one row with a count (2 Oct, screenshot 7).
   const rows = collapseSteps(steps);
   return (
-    <ol aria-label="Go mode steps" className="space-y-2">
+    <ol aria-label={tr('tl.label')} className="space-y-2">
       {rows.map(({ step: s, repeats }) => (
         <li key={s.id} data-step-status={s.status} data-repeats={repeats > 1 ? repeats : undefined} className="rounded-xl bg-[var(--surface-container-low)] px-4 py-3">
           <details open={s.status === 'running' || s.idx === steps.at(-1)?.idx}>
@@ -93,10 +94,10 @@ export function StepTimeline({
               </span>
               {repeats > 1 && <span className="text-label text-[var(--on-surface-variant)]">×{repeats}</span>}
               <ExecutionBadge label={s.execution_label} />
-              <span className="ml-auto text-label text-[var(--on-surface-variant)]">{STEP_STATUS_TEXT[s.status]}</span>
+              <span className="ml-auto text-label text-[var(--on-surface-variant)]">{tr(`stepStatus.${s.status}`)}</span>
             </summary>
             <div className="mt-2 space-y-2 pl-7">
-              {s.rationale && <p className="text-label text-[var(--on-surface-variant)]">Why: {s.rationale}</p>}
+              {s.rationale && <p className="text-label text-[var(--on-surface-variant)]">{tr('tl.why')}{s.rationale}</p>}
               {s.output && <MarkdownOutput content={s.output} />}
               {s.changes?.sandbox_run_id && <SandboxFiles runId={s.changes.sandbox_run_id} />}
               {onApplyAnyway && keptConflictsOf(s.params) && (
@@ -104,7 +105,7 @@ export function StepTimeline({
                   onClick={() => onApplyAnyway(s)}
                   className="rounded-lg bg-[var(--surface-container-highest)] px-3 py-1.5 text-label text-[var(--on-surface)]"
                 >
-                  Apply it anyway
+                  {tr('tl.applyAnyway')}
                 </button>
               )}
             </div>

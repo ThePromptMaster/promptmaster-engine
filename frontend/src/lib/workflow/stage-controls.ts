@@ -12,9 +12,9 @@
  * These are the user's controls. Go's own moves are in `lib/agent/actions.ts`.
  */
 
+import { tr } from '@/lib/i18n/store';
 import type { StageAction } from './next-action';
 import type { TransitionOption } from './engine';
-import { PROPOSE_LABEL } from './proposals';
 
 export type ControlPlace = 'stage_bar' | 'more_menu' | 'checklist' | 'data_panel' | 'table';
 
@@ -31,10 +31,17 @@ export interface StageControl {
  * here like every other page button, so Go and the page use the same words.
  */
 export const NEXT_STEP_LABELS = {
-  applyContinue: 'Apply and continue',
-  answerGo: "Answer Go's question",
-  resume: 'Resume',
-} as const;
+  // Read when used, in the interface's language (client, 21 Oct): the page and Go name the same words.
+  get applyContinue() {
+    return tr('controls.applyContinue');
+  },
+  get answerGo() {
+    return tr('controls.answerGo');
+  },
+  get resume() {
+    return tr('controls.resume');
+  },
+};
 
 export const PLACE_WORDS: Record<ControlPlace, string> = {
   stage_bar: 'the main button at the bottom of the stage',
@@ -46,9 +53,9 @@ export const PLACE_WORDS: Record<ControlPlace, string> = {
 
 export const ATTACH_DATA_LABEL = 'Attach a data file';
 export const ADD_IMAGES_LABEL = 'Add images';
-export const lookupLabel = (noun: string) => `Look up these ${noun}`;
+export const lookupLabel = (noun: string) => tr('controls.lookup', { noun });
 /** The one click that makes PromptMaster's proposed statuses the user's (3 Oct). */
-export const confirmProposalsLabel = (n: number) => (n === 1 ? 'Confirm the proposal' : `Confirm the ${n} proposals`);
+export const confirmProposalsLabel = (n: number) => (n === 1 ? tr('controls.confirmOne') : tr('controls.confirmMany', { count: n }));
 
 export interface MenuEntry {
   id: string;
@@ -63,11 +70,13 @@ export function transitionEntries(input: {
   primary?: StageAction;
   options: readonly TransitionOption[];
   nextStageLabel?: string | null;
+  /** A stage's name as the page shows it, for "Go back to …"; the option's own label otherwise. */
+  stageName?: (stageId: string) => string | undefined;
 }): MenuEntry[] {
   const advance = input.options.find((o) => o.kind === 'advance' || o.kind === 'finish');
   const skip = input.options.find((o) => o.kind === 'skip');
   const returns = input.options.filter((o) => o.kind === 'return');
-  const to = input.nextStageLabel ?? 'the next stage';
+  const to = input.nextStageLabel ?? tr('na.theNextStage');
   return [
     // The transition, when something else leads: moving on is always one
     // click away, never hidden, just not the suggestion.
@@ -75,15 +84,15 @@ export function transitionEntries(input: {
       ? [{
           id: 'advance',
           label: advance.kind === 'finish'
-            ? (advance.requiresNote ? 'Override and finish' : 'Finish project')
-            : advance.requiresNote ? `Override and continue to ${to}` : `Continue to ${to}`,
+            ? (advance.requiresNote ? tr('na.overrideFinish') : tr('na.finish'))
+            : advance.requiresNote ? tr('na.overrideTo', { stage: to }) : tr('na.continueTo', { stage: to }),
           icon: 'arrow_forward',
         }]
       : []),
-    ...(skip ? [{ id: 'skip', label: 'Skip this stage', icon: 'redo' }] : []),
+    ...(skip ? [{ id: 'skip', label: tr('controls.skip'), icon: 'redo' }] : []),
     ...returns.map((option) => ({
       id: `return-${option.toStageId}`,
-      label: option.label.replace(/^Return to/, 'Go back to'),
+      label: tr('controls.goBackTo', { stage: (option.toStageId ? input.stageName?.(option.toStageId) : undefined) ?? option.label.replace(/^Return to /, '') }),
       icon: 'undo',
     })),
   ];
@@ -95,6 +104,7 @@ export function stageControls(input: {
   more: readonly { id: string; label: string; disabled?: boolean }[];
   options: readonly TransitionOption[];
   nextStageLabel?: string | null;
+  stageName?: (stageId: string) => string | undefined;
   /** Approvals the user has not given yet: each is a box they can tick. */
   openApprovals?: readonly { id: string; label: string }[];
   /** The stage's table can look its rows up (`schema.lookup.noun`). */
@@ -115,10 +125,10 @@ export function stageControls(input: {
   }
   for (const t of transitionEntries(input)) controls.push({ id: t.id, label: t.label, place: 'more_menu' });
   for (const c of input.openApprovals ?? []) controls.push({ id: `tick-${c.id}`, label: c.label, place: 'checklist' });
-  if (input.proposeRows) controls.push({ id: 'propose-statuses', label: PROPOSE_LABEL, place: 'table' });
+  if (input.proposeRows) controls.push({ id: 'propose-statuses', label: tr('controls.propose'), place: 'table' });
   if (input.proposals) controls.push({ id: 'confirm-proposals', label: confirmProposalsLabel(input.proposals), place: 'table' });
   if (input.lookupNoun) controls.push({ id: 'lookup', label: lookupLabel(input.lookupNoun), place: 'table' });
-  if (input.dataPanel) controls.push({ id: 'attach-data', label: ATTACH_DATA_LABEL, place: 'data_panel' });
+  if (input.dataPanel) controls.push({ id: 'attach-data', label: tr('data.attachData'), place: 'data_panel' });
   // One label, one entry: the planner names a button by its words.
   const seen = new Set<string>();
   return controls.filter((c) => (seen.has(c.label) ? false : (seen.add(c.label), true)));

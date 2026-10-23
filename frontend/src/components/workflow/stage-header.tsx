@@ -1,17 +1,19 @@
 'use client';
 
+import type { MessageKey } from '@/lib/i18n/messages/en';
+import { useT } from '@/lib/i18n/i18n-provider';
 import { useState } from 'react';
 
 import { MODE_DISPLAY } from '@/lib/constants';
 import type { StageDefinition, StageStatus } from '@/lib/workflow/types';
 
-const STATUS_LABEL: Partial<Record<StageStatus, string>> = {
-  complete: 'Complete',
-  completed_with_artifact: 'Complete',
-  blocked: 'Stuck',
-  skipped: 'Skipped',
+const STATUS_LABEL: Partial<Record<StageStatus, MessageKey>> = {
+  complete: 'stageHead.complete',
+  completed_with_artifact: 'stageHead.complete',
+  blocked: 'stageHead.stuck',
+  skipped: 'stageHead.skipped',
   // 12 Oct (Sean): one name for one state, everywhere — rail, header, notice.
-  stale: 'Awaiting recheck',
+  stale: 'stageHead.stale',
 };
 
 interface Props {
@@ -36,22 +38,23 @@ interface Props {
 }
 
 export function StageHeader({ stage, status, skippedReason, position, onPickMode, currentMode, leftOpen, isCurrent = true, approvalPending = false, hasDraft = false }: Props) {
+  const t = useT();
   const [showGuidance, setShowGuidance] = useState(true);
   // The header said nothing for an open stage, so the rail's "open" tag was
   // the only place a left-open stage was named (1 Oct, item 1).
   const statusLabel =
-    status === 'in_progress' && !isCurrent ? (leftOpen ? 'Left open' : 'Reopened') : STATUS_LABEL[status];
+    status === 'in_progress' && !isCurrent ? t(leftOpen ? 'stageHead.leftOpen' : 'stageHead.reopened') : STATUS_LABEL[status] ? t(STATUS_LABEL[status]!) : undefined;
 
   // The check said "Draft completeness: complete" while the stage stayed open,
   // and only the checklist's caption said why (2 Oct, item 3).
   const approvalLabel =
-    approvalPending && status === 'in_progress' ? (hasDraft ? 'Draft complete · Your approval pending' : 'Your approval pending') : null;
+    approvalPending && status === 'in_progress' ? t(hasDraft ? 'stageHead.draftApproval' : 'stageHead.approval') : null;
 
   return (
     <header className="mb-8">
       {position && (
         <div className="mb-1.5 text-label uppercase tracking-wider text-[var(--on-surface-variant)]">
-          Stage {position.index} of {position.total}
+          {t('stageHead.position', { index: position.index, total: position.total })}
         </div>
       )}
 
@@ -64,7 +67,7 @@ export function StageHeader({ stage, status, skippedReason, position, onPickMode
         )}
         {approvalLabel && (
           <span
-            title="PromptMaster has verified what it can. This stage stays open until you give the approval in the checklist below."
+            title={t('stageHead.approvalWhy')}
             className="rounded-full bg-[var(--surface-container-high)] px-2.5 py-0.5 text-label uppercase tracking-wide text-[var(--pm-tertiary)]"
           >
             {approvalLabel}
@@ -72,13 +75,13 @@ export function StageHeader({ stage, status, skippedReason, position, onPickMode
         )}
         {!stage.required && status !== 'skipped' && (
           <span className="text-label uppercase tracking-wide text-[var(--on-surface-variant)] opacity-70">
-            optional
+            {t('stageHead.optional')}
           </span>
         )}
       </div>
 
       {status === 'skipped' && skippedReason && (
-        <p className="mt-2 text-body text-[var(--on-surface-variant)]">Skipped — {skippedReason}</p>
+        <p className="mt-2 text-body text-[var(--on-surface-variant)]">{t('stageHead.skippedWhy', { reason: skippedReason })}</p>
       )}
 
       {showGuidance && stage.entry_guidance && (
@@ -90,7 +93,7 @@ export function StageHeader({ stage, status, skippedReason, position, onPickMode
           </p>
           <button
             onClick={() => setShowGuidance(false)}
-            aria-label="Hide guidance"
+            aria-label={t('stageHead.hideGuidance')}
             className="-mt-1 shrink-0 rounded-md p-1 text-[var(--on-surface-variant)] transition-colors hover:bg-[var(--surface-container-high)] hover:text-[var(--on-surface)]"
           >
             <span className="material-symbols-outlined text-[18px]">close</span>
@@ -103,7 +106,7 @@ export function StageHeader({ stage, status, skippedReason, position, onPickMode
           {/* Label above rather than beside: alongside a two-line chip it sat
               at the chip's vertical centre and read as misaligned. */}
           <div className="mb-2 text-label uppercase tracking-wider text-[var(--on-surface-variant)]">
-            {onPickMode ? 'How to think about this stage — pick a mode' : 'Suited to this stage'}
+            {onPickMode ? t('stageHead.pickMode') : t('stageHead.suited')}
           </div>
           <div className="flex flex-wrap gap-2">
             {stage.recommended_modes.map((rec) => {
@@ -126,7 +129,7 @@ export function StageHeader({ stage, status, skippedReason, position, onPickMode
                 <span className="flex items-center justify-between gap-2 text-title text-[var(--on-surface)]">
                   {MODE_DISPLAY[rec.mode]?.display_name ?? rec.mode}
                   {inUse && (
-                    <span className="text-label font-normal text-[var(--pm-primary)]">In use</span>
+                    <span className="text-label font-normal text-[var(--pm-primary)]">{t('stageHead.inUse')}</span>
                   )}
                 </span>
                 {/* The reason matters more than the label — a recommendation
