@@ -5,6 +5,7 @@ import { useT } from '@/lib/i18n/i18n-provider';
 import { useState } from 'react';
 
 import { MODE_DISPLAY } from '@/lib/constants';
+import { shownModeName } from '@/lib/i18n/stage';
 import type { StageDefinition, StageStatus } from '@/lib/workflow/types';
 
 const STATUS_LABEL: Partial<Record<StageStatus, MessageKey>> = {
@@ -127,7 +128,7 @@ export function StageHeader({ stage, status, skippedReason, position, onPickMode
                 }`}
               >
                 <span className="flex items-center justify-between gap-2 text-title text-[var(--on-surface)]">
-                  {MODE_DISPLAY[rec.mode]?.display_name ?? rec.mode}
+                  {shownModeName(rec.mode, MODE_DISPLAY[rec.mode]?.display_name ?? rec.mode)}
                   {inUse && (
                     <span className="text-label font-normal text-[var(--pm-primary)]">{t('stageHead.inUse')}</span>
                   )}

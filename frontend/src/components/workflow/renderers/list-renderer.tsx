@@ -24,10 +24,13 @@ import { parseItems } from '@/lib/workflow/stage-artifact';
 import { ConfirmOverwrite, EmptyStage, GenerationBar, VersionBar } from './stage-chrome';
 import type { StageRendererProps } from './types';
 import { lookupLabel } from '@/lib/workflow/stage-controls';
+import { useLocale, useT } from '@/lib/i18n/i18n-provider';
+import { stageText } from '@/lib/i18n/templates';
 import { AutoGrowTextarea } from '@/components/shared/auto-grow-textarea';
 
 export function ListRenderer({
   stage,
+  templateKey,
   hideStageActions = false,
   onDirtyChange,
   schema,
@@ -63,6 +66,8 @@ export function ListRenderer({
   const [confirming, setConfirming] = useState(false);
   const [lookingUp, setLookingUp] = useState(false);
   const [lookupNote, setLookupNote] = useState<string | null>(null);
+  const t = useT();
+  const locale = useLocale();
 
   async function lookUp() {
     if (!onLookupItems || lookingUp) return;
@@ -73,7 +78,7 @@ export function ListRenderer({
       setItems(result.items);
       setLookupNote(result.message);
     } catch (e) {
-      setLookupNote(e instanceof Error && e.message ? `The lookup did not work: ${e.message}` : 'The lookup did not work. Nothing was changed.');
+      setLookupNote(e instanceof Error && e.message ? t('stage.lookupFailedWhy', { why: e.message }) : t('stage.lookupFailed'));
     } finally {
       setLookingUp(false);
     }
@@ -164,7 +169,7 @@ export function ListRenderer({
     : undefined;
 
   return (
-    <section aria-label={`${stage.label} work`}>
+    <section aria-label={t('stage.work', { stage: stageText(locale, templateKey, stage, 'label') })}>
       {confirming && (
         <ConfirmOverwrite
           label={`${label}s`}
@@ -224,10 +229,10 @@ export function ListRenderer({
               <span aria-hidden className={`material-symbols-outlined text-[16px] ${lookingUp ? 'animate-spin' : ''}`}>
                 {lookingUp ? 'progress_activity' : 'travel_explore'}
               </span>
-              {lookingUp ? 'Looking them up…' : lookupLabel(schema.lookup.noun)}
+              {lookingUp ? t('stage.lookingUp') : lookupLabel(schema.lookup.noun)}
             </button>
             <span className="text-label text-[var(--on-surface-variant)]">
-              Searches OpenAlex for each title and reads the abstract of each one it finds. Nothing is saved until you save.
+              {t('stage.lookupExplainList')}
             </span>
           </div>
         )}
@@ -252,7 +257,7 @@ export function ListRenderer({
           ))}
         </ul>
         {schema.statuses?.some((s) => s.explain) && (
-          <dl aria-label="What the statuses mean" className="mt-3 grid gap-x-4 gap-y-1 text-label sm:grid-cols-[max-content_1fr]">
+          <dl aria-label={t('stage.statusesMean')} className="mt-3 grid gap-x-4 gap-y-1 text-label sm:grid-cols-[max-content_1fr]">
             {schema.statuses.filter((s) => s.explain).map((s) => (
               <div key={s.value} className="contents">
                 <dt className="text-[var(--on-surface)]">{s.label}</dt>
@@ -273,19 +278,19 @@ export function ListRenderer({
             <span aria-hidden className="material-symbols-outlined text-[16px]">
               add
             </span>
-            Add another {label}
+            {t('stage.addAnother', { label })}
           </button>
 
           <span className="text-label text-[var(--on-surface-variant)]">
             {items.length} {items.length === 1 ? label : `${label}s`}
             {/* Say what the stage still expects rather than only marking it
                 unmet in the checklist below. */}
-            {items.length < schema.minItems && ` · ${schema.minItems} expected`}
+            {items.length < schema.minItems && t('stage.expected', { count: schema.minItems })}
           </span>
 
           {onSaveItems && overField && (
             <span role="status" className="ml-auto text-label text-[var(--pm-error)]">
-              Shorten “{overField.label}” to {overField.max} characters to save.
+              {t('stage.shorten', { field: overField.label, max: overField.max ?? 0 })}
             </span>
           )}
           {onSaveItems && (
@@ -294,7 +299,7 @@ export function ListRenderer({
               disabled={!dirty || saving || overLimit}
               className="ml-auto rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label text-[var(--on-primary)] disabled:opacity-40"
             >
-              {saving ? 'Saving…' : 'Save as new version'}
+              {saving ? t('stage.saving') : t('stage.saveVersion')}
             </button>
           )}
         </div>
@@ -325,25 +330,26 @@ function ItemCard({
   onMove,
 }: ItemCardProps) {
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const t = useT();
 
   if (confirmDelete) {
     return (
       <li className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[var(--surface-container-high)] px-5 py-4">
         <span className="text-body text-[var(--on-surface)]">
-          Delete this {schema.itemLabel}?
+          {t('stage.deleteThis', { label: schema.itemLabel })}
         </span>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setConfirmDelete(false)}
             className="rounded-lg px-3 py-1.5 text-label text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
           >
-            Keep it
+            {t('stage.keepIt')}
           </button>
           <button
             onClick={() => onRemove(item.id)}
             className="rounded-lg bg-[var(--pm-tertiary)] px-3 py-1.5 text-label text-[var(--on-primary)]"
           >
-            Delete
+            {t('stage.delete')}
           </button>
         </div>
       </li>
@@ -359,16 +365,16 @@ function ItemCard({
         {schema.statuses && (
           readOnly ? (
             <span className="text-label text-[var(--on-surface-variant)]">
-              {statusOption(schema, item.status)?.label ?? 'Added by me — not verified'}
+              {statusOption(schema, item.status)?.label ?? t('stage.addedByMe')}
             </span>
           ) : (
-            <div className="w-[300px] max-w-full" aria-label={`Status of ${schema.itemLabel} ${index + 1}`}>
+            <div className="w-[300px] max-w-full" aria-label={t('stage.statusOf', { label: schema.itemLabel, n: index + 1 })}>
               <CustomSelect
                 value={item.status ?? ''}
                 options={schema.statuses
                   .filter((s) => s.settable !== false || s.value === item.status)
                   .map((s) => ({ value: s.value, label: s.label }))}
-                placeholder="Added by me — not verified"
+                placeholder={t('stage.addedByMe')}
                 onChange={(value) => onPatch(item.id, 'status', value)}
               />
             </div>
@@ -379,7 +385,7 @@ function ItemCard({
             <button
               onClick={() => onMove(item.id, -1)}
               disabled={index === 0}
-              aria-label={`Move ${schema.itemLabel} ${index + 1} up`}
+              aria-label={t('stage.moveUp', { label: schema.itemLabel, n: index + 1 })}
               className="rounded-md p-1 text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)] hover:text-[var(--on-surface)] disabled:opacity-30"
             >
               <span aria-hidden className="material-symbols-outlined text-[18px]">
@@ -389,7 +395,7 @@ function ItemCard({
             <button
               onClick={() => onMove(item.id, 1)}
               disabled={index === count - 1}
-              aria-label={`Move ${schema.itemLabel} ${index + 1} down`}
+              aria-label={t('stage.moveDown', { label: schema.itemLabel, n: index + 1 })}
               className="rounded-md p-1 text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)] hover:text-[var(--on-surface)] disabled:opacity-30"
             >
               <span aria-hidden className="material-symbols-outlined text-[18px]">
@@ -398,7 +404,7 @@ function ItemCard({
             </button>
             <button
               onClick={() => setConfirmDelete(true)}
-              aria-label={`Delete ${schema.itemLabel} ${index + 1}`}
+              aria-label={t('stage.deleteRow', { label: schema.itemLabel, n: index + 1 })}
               className="rounded-md p-1 text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)] hover:text-[var(--on-surface)]"
             >
               <span aria-hidden className="material-symbols-outlined text-[18px]">

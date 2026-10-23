@@ -39,19 +39,21 @@ import type { OutlineSection } from '@/types';
 import type { Artifact } from '@/types/project';
 import type { StageRendererProps } from './types';
 import { VersionBar } from './stage-chrome';
-import { operationLabel } from '@/lib/workflow/labels';
+import { useT } from '@/lib/i18n/i18n-provider';
+import { shownOperationLabel } from '@/lib/i18n/stage';
 import { MarkdownOutput } from '@/components/shared/markdown-output';
 import { LargeJobWarning, isLargeJob } from '@/components/workflow/large-job-warning';
 import { useReportPanelStep } from '@/components/workflow/use-report-panel-step';
 
 export function LongFormRenderer(props: StageRendererProps) {
   const { longForm: ctx, readOnly } = props;
+  const t = useT();
 
   if (!ctx) {
     return (
       <Panel>
         <p className="text-body text-[var(--on-surface)]">
-          This stage is not wired to a project yet.
+          {t('stage.notWired')}
         </p>
       </Panel>
     );
@@ -72,11 +74,12 @@ export function LongFormRenderer(props: StageRendererProps) {
  * a snapshot is read here, not restored into them (known limitation L-25).
  */
 function ManuscriptSnapshots({ versions, activeVersionId, onSelectVersion, evaluation }: StageRendererProps) {
+  const t = useT();
   if (versions.length === 0) return null;
   const head = versions.at(-1)!;
   const viewing = activeVersionId && activeVersionId !== head.id ? versions.find((v) => v.id === activeVersionId) : undefined;
   return (
-    <section aria-label="Manuscript snapshots" className="mb-4">
+    <section aria-label={t('stage.snapshots')} className="mb-4">
       <VersionBar
         evaluation={evaluation}
         versions={versions}
@@ -90,14 +93,13 @@ function ManuscriptSnapshots({ versions, activeVersionId, onSelectVersion, evalu
         <div className="mb-6 rounded-xl bg-[var(--surface-container-lowest)] px-5 py-4">
           <div className="mb-2 flex flex-wrap items-center gap-3">
             <p className="text-label text-[var(--on-surface-variant)]">
-              Reading v{viewing.version_number} — {operationLabel(viewing.source_operation)}. The sections below are the live text; a
-              snapshot is for reading and copying, not restoring.
+              {t('stage.readingSnapshot', { n: viewing.version_number, what: shownOperationLabel(viewing.source_operation) })}
             </p>
             <button
               onClick={() => onSelectVersion(null)}
               className="ml-auto rounded-lg bg-[var(--surface-container-high)] px-3 py-1.5 text-label text-[var(--on-surface)]"
             >
-              Back to the sections
+              {t('stage.backToSections')}
             </button>
           </div>
           <MarkdownOutput content={viewing.content} />
@@ -115,6 +117,7 @@ interface DraftingProps {
 function Drafting({ ctx, readOnly }: DraftingProps) {
   const { project, artifactId, state, approvedOutlineVersionId, stageId, onRefresh, appendManuscriptVersion, stageHint } = ctx;
   const revise = ctx.revise ?? null;
+  const t = useT();
 
   const [jobs, setJobs] = useState<ProjectJob[]>([]);
   const [busy, setBusy] = useState(false);
@@ -267,8 +270,8 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
   const findingCount = revise?.findings.length ?? 0;
   const reviseLabel =
     findingCount > 0
-      ? `Apply ${findingCount} finding${findingCount === 1 ? '' : 's'} to every section`
-      : `Run ${(revise?.stageLabel ?? '').toLowerCase()} on every section`;
+      ? t('stage.applyFindings', { count: findingCount })
+      : t('stage.runOnEvery', { stage: (revise?.stageLabel ?? '').toLowerCase() });
 
   // PM-06: the stage bar's one primary button takes this panel's step.
   useReportPanelStep(
@@ -282,14 +285,14 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
           ? complete > 0 && revisedCount === 0
             ? {
                 label: reviseLabel,
-                reason: 'Rewrites each section as it stands. The full draft is saved as a version first.',
+                reason: t('stage.reviseReason'),
                 run: reviseAll,
               }
             : null
           : complete < outline.length
             ? {
-                label: complete === 0 ? 'Start drafting' : 'Resume drafting',
-                reason: 'Writes each section against the approved outline. You can pause at any time.',
+                label: complete === 0 ? t('stage.startDrafting') : t('stage.resumeDrafting'),
+                reason: t('stage.draftReason'),
                 run: requestDrafting,
               }
             : null
@@ -307,10 +310,10 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
     return (
       <Panel>
         <p className="text-body text-[var(--on-surface)]">
-          There is no approved outline to draft from yet.
+          {t('stage.noOutline')}
         </p>
         <p className="mt-1 text-label text-[var(--on-surface-variant)]">
-          {ctx.emptyHint ?? 'Approve an outline and drafting will follow it.'}
+          {ctx.emptyHint ?? t('stage.noOutlineHint')}
         </p>
       </Panel>
     );
@@ -345,15 +348,14 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
       <Panel>
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <p className="text-label text-[var(--on-surface-variant)]">Drafting</p>
+            <p className="text-label text-[var(--on-surface-variant)]">{t('stage.draftingTitle')}</p>
             <p className="mt-1 text-body text-[var(--on-surface)]">
-              {complete} of {outline.length} sections written
-              {running ? ` · ${pendingJobs.length} queued` : ''}
+              {t('stage.sectionsWritten', { done: complete, total: outline.length })}
+              {running ? t('stage.queued', { count: pendingJobs.length }) : ''}
             </p>
             {!approvedOutlineVersionId && (
               <p className="mt-1 text-label text-[var(--on-surface-variant)]">
-                No approved outline version — sections will not record what they were written
-                against.
+                {t('stage.noApprovedVersion')}
               </p>
             )}
           </div>
@@ -367,13 +369,13 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
                   disabled={busy}
                   className="rounded-lg bg-[var(--surface-container-high)] px-4 py-2 text-label font-semibold text-[var(--on-surface)] disabled:opacity-50"
                 >
-                  Pause
+                  {t('stage.pause')}
                 </button>
               ) : complete === outline.length ? (
                 // Nothing left to draft. A disabled "Resume drafting" read as a
                 // next step that could not be taken.
                 <span className="text-label text-[var(--on-surface-variant)]">
-                  Every section is written
+                  {t('stage.everyWritten')}
                 </span>
               ) : (
                 <button
@@ -382,7 +384,7 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
                   disabled={busy}
                   className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label font-semibold text-[var(--on-primary)] disabled:opacity-50"
                 >
-                  {complete === 0 ? 'Start drafting' : 'Resume drafting'}
+                  {complete === 0 ? t('stage.startDrafting') : t('stage.resumeDrafting')}
                 </button>
               )}
             </div>
@@ -414,7 +416,7 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
       {failures.map(({ job, section, index }) => (
         <Notice key={job.id} tone="error">
           <span className="font-semibold">
-            Section {index + 1}, “{section.title}”:{' '}
+            {t('stage.sectionFailed', { n: index + 1, title: section.title })}{' '}
             {classified((job.error_code as ErrorCode) ?? 'unknown').title}.
           </span>{' '}
           {/* Counted now, not when the job failed: the stored message said "1
@@ -426,7 +428,7 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
       ))}
 
       <Panel>
-        <h3 className="text-label font-semibold text-[var(--on-surface)]">Sections</h3>
+        <h3 className="text-label font-semibold text-[var(--on-surface)]">{t('stage.sections')}</h3>
         <ol className="mt-4 space-y-3">
           {outline.map((section, index) => (
             <SectionRow
@@ -443,7 +445,7 @@ function Drafting({ ctx, readOnly }: DraftingProps) {
                     ? () => void reviseSections([{ section, index }])
                     : () => regenerate(section, index)
               }
-              regenerateLabel={revise ? 'Revise' : 'Regenerate'}
+              regenerateLabel={revise ? t('stage.revise') : t('stage.regenerate')}
               onRetry={readOnly ? undefined : () => retry(section, index)}
               busy={busy}
             />
@@ -473,10 +475,11 @@ function SectionRow({
   expanded,
   onToggle,
   onRegenerate,
-  regenerateLabel = 'Regenerate',
+  regenerateLabel,
   onRetry,
   busy,
 }: SectionRowProps) {
+  const t = useT();
   // The job row is the authority on "in flight"; the artifact is the authority
   // on "written". Neither is inferred from the other.
   const inFlight = job !== null && PENDING_JOB_STATUSES.has(job.status);
@@ -506,7 +509,7 @@ function SectionRow({
                 disabled={busy}
                 className="shrink-0 rounded-lg bg-[var(--pm-primary)] px-3 py-1.5 text-label font-semibold text-[var(--on-primary)] disabled:opacity-50"
               >
-                Retry section
+                {t('stage.retrySection')}
               </button>
             )}
 
@@ -517,7 +520,7 @@ function SectionRow({
                 disabled={busy || inFlight}
                 className="shrink-0 text-label font-semibold text-[var(--pm-primary)] disabled:opacity-50"
               >
-                {regenerateLabel}
+                {regenerateLabel ?? t('stage.regenerate')}
               </button>
             )}
           </div>
@@ -525,21 +528,20 @@ function SectionRow({
           <p className="mt-1 text-label text-[var(--on-surface-variant)]">{section.abstract}</p>
           {done && section.content && (
             <p className="mt-1 text-label text-[var(--on-surface-variant)]">
-              {wordCount(section.content).toLocaleString()} words
+              {t('stage.words', { count: wordCount(section.content).toLocaleString() })}
             </p>
           )}
 
           {inFlight && (
             <p className="mt-2 text-label text-[var(--on-surface-variant)]">
-              {job?.status === 'leased' ? 'Writing…' : 'Queued'}
-              {job && job.attempts > 1 ? ` · attempt ${job.attempts} of ${job.max_attempts}` : ''}
+              {job?.status === 'leased' ? t('stage.writing') : t('stage.queuedOne')}
+              {job && job.attempts > 1 ? t('stage.attempt', { n: job.attempts, max: job.max_attempts }) : ''}
             </p>
           )}
 
           {section.finish_reason === 'length' && done && (
             <p className="mt-2 text-label text-[var(--on-surface-variant)]">
-              This section reached the model&apos;s output limit and may stop mid-thought.
-              Regenerating usually completes it.
+              {t('stage.outputLimit')}
             </p>
           )}
 
@@ -635,8 +637,11 @@ function RevisionPanel({
   onReviseAll,
   onPause,
 }: RevisionPanelProps) {
+  const t = useT();
   const n = revise.findings.length;
-  const from = revise.sources.length ? revise.sources.join(' and ') : 'the stages before this one';
+  const from = revise.sources.length
+    ? revise.sources.reduce((a, b) => t('stage.sourcesAnd', { a, b }))
+    : t('stage.beforeThis');
   const unwritten = written < total;
 
   return (
@@ -646,19 +651,18 @@ function RevisionPanel({
           <p className="text-label text-[var(--on-surface-variant)]">{revise.stageLabel}</p>
           <p className="mt-1 text-body text-[var(--on-surface)]">
             {revised > 0
-              ? `${revised} of ${written} sections revised`
+              ? t('stage.sectionsRevised', { revised, written })
               : n > 0
-                ? `${n} accepted finding${n === 1 ? '' : 's'} from ${from} will be applied to each section as it stands.`
-                : `No accepted findings from ${from}. Each section still gets this stage's own pass.`}
+                ? t('stage.findingsWillApply', { count: n, from })
+                : t('stage.noFindings', { from })}
           </p>
           {unwritten && (
             <p className="mt-1 text-label text-[var(--on-surface-variant)]">
-              {total - written} section{total - written === 1 ? ' is' : 's are'} not written yet — finish
-              drafting first, or they will be left out.
+              {t('stage.notWrittenYet', { count: total - written })}
             </p>
           )}
           <p className="mt-1 text-label text-[var(--on-surface-variant)]">
-            The full draft as it stands is saved as a version first. Findings you rejected are not applied.
+            {t('stage.snapshotFirst')}
           </p>
         </div>
         {!readOnly && (
@@ -669,7 +673,7 @@ function RevisionPanel({
               disabled={busy}
               className="rounded-lg bg-[var(--surface-container-high)] px-4 py-2 text-label font-semibold text-[var(--on-surface)] disabled:opacity-50"
             >
-              Pause
+              {t('stage.pause')}
             </button>
           ) : (
             <button
@@ -679,10 +683,10 @@ function RevisionPanel({
               className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label font-semibold text-[var(--on-primary)] disabled:opacity-50"
             >
               {revised > 0
-                ? 'Revise every section again'
+                ? t('stage.reviseAgain')
                 : n > 0
-                  ? `Apply ${n} finding${n === 1 ? '' : 's'} to every section`
-                  : `Run ${revise.stageLabel.toLowerCase()} on every section`}
+                  ? t('stage.applyFindings', { count: n })
+                  : t('stage.runOnEvery', { stage: revise.stageLabel.toLowerCase() })}
             </button>
           )
         )}
@@ -690,7 +694,7 @@ function RevisionPanel({
       {n > 0 && (
         <details className="mt-4">
           <summary className="cursor-pointer text-label font-semibold text-[var(--pm-primary)]">
-            Show the findings
+            {t('stage.showFindings')}
           </summary>
           <ul className="mt-2 space-y-1">
             {revise.findings.map((f, i) => (

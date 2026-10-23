@@ -17,7 +17,10 @@ import { EvaluationScores } from '../evaluation-scores';
 import { RecoveryPanel } from '../recovery-panel';
 import type { StageFailure } from '@/lib/errors/recovery';
 import type { ArtifactVersion, Evaluation } from '@/types/project';
-import { isSaved, operationLabel, versionTitle } from '@/lib/workflow/labels';
+import { isSaved, versionTitle } from '@/lib/workflow/labels';
+import { useT } from '@/lib/i18n/i18n-provider';
+import { tr } from '@/lib/i18n/store';
+import { shownOperationLabel } from '@/lib/i18n/stage';
 import { versionColour } from '@/lib/appearance/colours';
 
 interface VersionBarProps {
@@ -43,6 +46,7 @@ export function VersionBar({
   // C6 (Sean, 28 Sep, item 19): the current version, the ones the user
   // chose to keep, and the full history behind a toggle — not eleven pills.
   const [showAll, setShowAll] = useState(false);
+  const t = useT();
   if (versions.length === 0) return null;
 
   const headId = headVersionId ?? versions.at(-1)!.id;
@@ -54,7 +58,7 @@ export function VersionBar({
 
   return (
     <div className="mb-4 flex flex-wrap items-center gap-2">
-      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Version history">
+      <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t('stage.versionHistory')}>
         {visible.map((v) => (
           <button
             key={v.id}
@@ -76,7 +80,7 @@ export function VersionBar({
             />
             {versionPillLabel(v, v.id === headId)}
             {v.restored_from_version_id && (
-              <span aria-label=" (restored)" title="Restored"> ↩</span>
+              <span aria-label={` (${t('stage.restored')})`} title={t('stage.restored')}> ↩</span>
             )}
           </button>
         ))}
@@ -86,14 +90,14 @@ export function VersionBar({
             aria-expanded={showAll}
             className="rounded-lg px-2 py-1.5 text-label text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-low)]"
           >
-            {showAll ? 'Hide history' : `Full history (${versions.length})`}
+            {showAll ? t('stage.hideHistory') : t('stage.fullHistory', { count: versions.length })}
           </button>
         )}
       </div>
 
       {/* PM-07: say what the pill is, rather than leaving "v1" to be decoded. */}
       <span className="text-label text-[var(--on-surface-variant)]">
-        {operationLabel(active.source_operation)}
+        {shownOperationLabel(active.source_operation)}
       </span>
 
       {/* Scores belong beside the version they describe: selecting an older
@@ -107,7 +111,7 @@ export function VersionBar({
           onClick={() => void onRestore(active.id)}
           className="ml-auto rounded-lg bg-[var(--surface-container-high)] px-3 py-1.5 text-label text-[var(--on-surface)] hover:bg-[var(--surface-container-highest)]"
         >
-          Restore v{active.version_number}
+          {t('stage.restoreV', { n: active.version_number })}
         </button>
       )}
     </div>
@@ -171,6 +175,7 @@ export function GenerationBar({
   currentModel,
   compact = false,
 }: GenerationBarProps) {
+  const t = useT();
   if (readOnly) return null;
 
   if (generating) {
@@ -183,12 +188,12 @@ export function GenerationBar({
           aria-hidden
           className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--pm-primary)] border-t-transparent"
         />
-        <span className="text-body text-[var(--on-surface-variant)]">Drafting the {label}…</span>
+        <span className="text-body text-[var(--on-surface-variant)]">{t('stage.drafting', { label })}</span>
         <button
           onClick={onCancel}
           className="ml-auto rounded-lg px-3 py-1.5 text-label text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)] hover:text-[var(--on-surface)]"
         >
-          Stop
+          {t('stage.stop')}
         </button>
       </div>
     );
@@ -253,8 +258,8 @@ export function GenerationBar({
               rule
             </span>
           )}
-          {evaluating ? 'Evaluating…' : 'Evaluate this stage'}
-          <span className="text-[var(--on-surface-variant)] opacity-70">· one AI check</span>
+          {evaluating ? t('stage.evaluating') : t('stage.evaluate')}
+          <span className="text-[var(--on-surface-variant)] opacity-70">{t('stage.oneCheck')}</span>
         </button>
       )}
 
@@ -266,7 +271,7 @@ export function GenerationBar({
           <span aria-hidden className="material-symbols-outlined text-[16px]">
             {hasContent ? 'refresh' : 'auto_awesome'}
           </span>
-          {hasContent ? 'Regenerate' : `Draft the ${label}`}
+          {hasContent ? t('stage.regenerate') : t('stage.draftThe', { label })}
         </button>
       )}
     </div>
@@ -275,10 +280,11 @@ export function GenerationBar({
 
 /** Shown while a stage has nothing and nothing is running. */
 export function EmptyStage({ label, onWrite }: { label: string; onWrite?: () => void }) {
+  const t = useT();
   return (
     <div className="rounded-xl bg-[var(--surface-container-low)] px-8 py-12 text-center">
       <p className="text-body text-[var(--on-surface-variant)]">
-        No {label} yet. Draft one, or write it yourself.
+        {t('stage.empty', { label })}
       </p>
       {onWrite && (
         <button
@@ -286,7 +292,7 @@ export function EmptyStage({ label, onWrite }: { label: string; onWrite?: () => 
           className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-high)] px-4 py-2 text-label text-[var(--on-surface)] hover:opacity-90"
         >
           <span aria-hidden className="material-symbols-outlined text-[16px]">edit</span>
-          Write it yourself
+          {t('stage.writeYourself')}
         </button>
       )}
     </div>
@@ -300,23 +306,24 @@ interface ConfirmOverwriteProps {
 }
 
 export function ConfirmOverwrite({ label, onConfirm, onCancel }: ConfirmOverwriteProps) {
+  const t = useT();
   return (
     <div className="mb-4 rounded-xl bg-[var(--surface-container-high)] px-5 py-4">
       <p className="text-body text-[var(--on-surface)]">
-        Regenerating replaces the {label} on the page. Your current version stays in the history.
+        {t('stage.replaces', { label })}
       </p>
       <div className="mt-3 flex gap-2">
         <button
           onClick={onConfirm}
           className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label text-[var(--on-primary)]"
         >
-          Regenerate
+          {t('stage.regenerate')}
         </button>
         <button
           onClick={onCancel}
           className="rounded-lg px-4 py-2 text-label text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
         >
-          Keep what I have
+          {t('stage.keepWhatIHave')}
         </button>
       </div>
     </div>
@@ -331,9 +338,9 @@ export function ConfirmOverwrite({ label, onConfirm, onCancel }: ConfirmOverwrit
  * because every version is saved.
  */
 export function versionPillLabel(v: Pick<ArtifactVersion, 'version_number' | 'source_operation'>, isHead: boolean): string {
-  const n = `v${v.version_number}`;
-  if (isHead) return GO_MADE.has(v.source_operation) ? `${n} · current · saved by Go` : `${n} · current`;
-  return isSaved(v.source_operation) ? `${n} · earlier, kept` : `${n} · earlier`;
+  const n = v.version_number;
+  if (isHead) return GO_MADE.has(v.source_operation) ? tr('stage.pillCurrentGo', { n }) : tr('stage.pillCurrent', { n });
+  return isSaved(v.source_operation) ? tr('stage.pillEarlierKept', { n }) : tr('stage.pillEarlier', { n });
 }
 
 const GO_MADE: ReadonlySet<string> = new Set(['agent_draft', 'agent_revise', 'agent_apply', 'agent_triage', 'agent_outline']);

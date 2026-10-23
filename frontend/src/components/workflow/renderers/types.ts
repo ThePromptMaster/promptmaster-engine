@@ -69,6 +69,8 @@ export interface LongFormContext {
  */
 export interface StageRendererProps {
   stage: StageDefinition;
+  /** The workflow's key, so a system stage's name shows in the interface's language. */
+  templateKey?: string;
   /**
    * The workspace draws the stage's actions in one bar with a single primary
    * button (PM-06). When set, renderers keep drafting status and errors but

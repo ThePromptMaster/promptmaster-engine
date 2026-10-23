@@ -6,9 +6,9 @@ import { versionColour } from '@/lib/appearance/colours';
 import { projectTimeline, type TimelineEntry } from '@/lib/workflow/timeline';
 import type { WorkflowEvent, WorkflowTemplate } from '@/lib/workflow/types';
 import type { ArtifactVersion } from '@/types/project';
+import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 
-const DAY = new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
-const TIME = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' });
+const DATE_LOCALE: Record<string, string> = { en: 'en-GB', es: 'es-ES', fr: 'fr-FR', pt: 'pt-BR' };
 
 /**
  * The project's history, to look back at and reopen (14 Oct call: "can you
@@ -28,6 +28,10 @@ export function ProjectTimeline({
   onOpen: (stageId: string, versionId: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const t = useT();
+  const locale = useLocale();
+  const tag = DATE_LOCALE[locale] ?? 'en-GB';
+  const TIME = new Intl.DateTimeFormat(tag, { hour: '2-digit', minute: '2-digit' });
   const entries = useMemo(() => projectTimeline(template, events, stages), [template, events, stages]);
 
   useEffect(() => {
@@ -38,7 +42,7 @@ export function ProjectTimeline({
   }, [open]);
 
   if (!entries.length) return null;
-  const days = groupByDay(entries);
+  const days = groupByDay(entries, new Intl.DateTimeFormat(tag, { weekday: 'short', day: 'numeric', month: 'short' }));
 
   return (
     <>
@@ -47,29 +51,29 @@ export function ProjectTimeline({
         className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-low)] px-3 py-1.5 text-label text-[var(--on-surface-variant)] transition-colors hover:bg-[var(--surface-container-high)] hover:text-[var(--on-surface)]"
       >
         <span aria-hidden className="material-symbols-outlined text-[16px]">history</span>
-        Timeline
+        {t('timeline.button')}
       </button>
 
       {open && (
         <div
           role="dialog"
           aria-modal="true"
-          aria-label="Project timeline"
+          aria-label={t('timeline.dialog')}
           className="fixed inset-0 z-40 flex justify-end bg-[rgba(25,28,30,0.35)]"
           onClick={(e) => e.target === e.currentTarget && setOpen(false)}
         >
           <div className="h-full w-full max-w-[460px] overflow-y-auto bg-[var(--surface-container-lowest)] px-6 py-5 shadow-[0_0_40px_rgba(25,28,30,0.12)]">
             <div className="mb-4 flex items-center gap-3">
-              <h2 className="mr-auto text-title text-[var(--on-surface)]">Timeline</h2>
+              <h2 className="mr-auto text-title text-[var(--on-surface)]">{t('timeline.button')}</h2>
               <button
                 onClick={() => setOpen(false)}
                 className="rounded-lg bg-[var(--surface-container-high)] px-3 py-1.5 text-label text-[var(--on-surface)]"
               >
-                Close
+                {t('timeline.close')}
               </button>
             </div>
             <p className="mb-4 text-label text-[var(--on-surface-variant)]">
-              Every version and decision, newest first. Open a version to read it on its stage; Restore is there. Nothing here changes the work.
+              {t('timeline.explain')}
             </p>
             {days.map(([day, items]) => (
               <section key={day} aria-label={day} className="mb-5">
@@ -86,7 +90,7 @@ export function ProjectTimeline({
                         <p className="text-label text-[var(--on-surface)]">
                           {e.stageLabel && <span className="font-semibold">{e.stageLabel} · </span>}
                           {e.title}
-                          {e.current && <span className="ml-1 text-[var(--on-surface-variant)]">(current)</span>}
+                          {e.current && <span className="ml-1 text-[var(--on-surface-variant)]">{t('timeline.current')}</span>}
                         </p>
                         {e.detail && <p className="mt-0.5 line-clamp-2 text-label text-[var(--on-surface-variant)]">{e.detail}</p>}
                       </div>
@@ -97,10 +101,10 @@ export function ProjectTimeline({
                             onOpen(e.stageId, e.versionId!);
                             setOpen(false);
                           }}
-                          aria-label={`Open ${e.stageLabel} v${e.versionNumber}`}
+                          aria-label={t('timeline.openLabel', { stage: e.stageLabel ?? '', n: e.versionNumber ?? 1 })}
                           className="shrink-0 rounded-md bg-[var(--surface-container-high)] px-2 py-0.5 text-label text-[var(--on-surface)]"
                         >
-                          Open
+                          {t('timeline.open')}
                         </button>
                       )}
                     </li>
@@ -115,7 +119,7 @@ export function ProjectTimeline({
   );
 }
 
-function groupByDay(entries: TimelineEntry[]): [string, TimelineEntry[]][] {
+function groupByDay(entries: TimelineEntry[], DAY: Intl.DateTimeFormat): [string, TimelineEntry[]][] {
   const out: [string, TimelineEntry[]][] = [];
   for (const e of entries) {
     const day = DAY.format(new Date(e.at));

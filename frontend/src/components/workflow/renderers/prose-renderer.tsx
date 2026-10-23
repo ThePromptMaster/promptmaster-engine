@@ -22,10 +22,13 @@ import { useProjectImageList } from '@/components/shared/project-images';
 import { imageMarkdown } from '@/lib/data/images';
 import { ConfirmOverwrite, EmptyStage, GenerationBar, VersionBar } from './stage-chrome';
 import type { StageRendererProps } from './types';
-import { operationLabel } from '@/lib/workflow/labels';
+import { useLocale, useT } from '@/lib/i18n/i18n-provider';
+import { shownOperationLabel } from '@/lib/i18n/stage';
+import { stageText } from '@/lib/i18n/templates';
 
 export function ProseRenderer({
   stage,
+  templateKey,
   hideStageActions = false,
   onDirtyChange,
   versions,
@@ -93,7 +96,10 @@ export function ProseRenderer({
 
   const content = active?.content ?? '';
   const dirty = editing && draft !== content;
-  const label = stage.short_label.toLowerCase();
+  const t = useT();
+  const locale = useLocale();
+  const shownLabel = stageText(locale, templateKey, stage, 'label');
+  const label = stageText(locale, templateKey, stage, 'short').toLowerCase();
 
   // PM-06: tell the workspace about unsaved edits, so "Save changes" can lead.
   const saveRef = useRef<() => Promise<void>>(async () => {});
@@ -122,7 +128,7 @@ export function ProseRenderer({
       // Used to fail silently, leaving the editor open with no word of why.
       // The draft stays in the editor, so nothing typed is lost.
       setSaveError(
-        `Not saved${e instanceof Error && e.message ? `: ${e.message}` : ''}. Your text is still here — try again.`
+        e instanceof Error && e.message ? t('stage.notSavedWhy', { why: e.message }) : t('stage.notSaved')
       );
     } finally {
       setSaving(false);
@@ -137,7 +143,7 @@ export function ProseRenderer({
   }
 
   return (
-    <section aria-label={`${stage.label} work`}>
+    <section aria-label={t('stage.work', { stage: shownLabel })}>
       {confirming && (
         <ConfirmOverwrite
           label={label}
@@ -192,7 +198,7 @@ export function ProseRenderer({
         <article className="rounded-xl bg-[var(--surface-container-lowest)] px-7 py-6">
           <div className="mb-4 flex flex-wrap items-center gap-3">
             <span className="text-label text-[var(--on-surface-variant)]">
-              {active ? operationLabel(active.source_operation) : 'Your draft'}
+              {active ? shownOperationLabel(active.source_operation) : t('stage.yourDraft')}
             </span>
             {active?.model && (
               <>
@@ -215,10 +221,10 @@ export function ProseRenderer({
                           className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-label text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)] hover:text-[var(--on-surface)]"
                         >
                           <span aria-hidden className="material-symbols-outlined text-[16px]">image</span>
-                          Insert image
+                          {t('stage.insertImage')}
                         </button>
                         {choosingImage && (
-                          <ul role="menu" aria-label="Images" className="absolute right-0 z-10 mt-1 w-64 rounded-lg bg-[var(--surface-container-lowest)] py-1 shadow-[0_8px_24px_rgba(0,0,0,0.12)]">
+                          <ul role="menu" aria-label={t('stage.images')} className="absolute right-0 z-10 mt-1 w-64 rounded-lg bg-[var(--surface-container-lowest)] py-1 shadow-[0_8px_24px_rgba(0,0,0,0.12)]">
                             {images.map((image) => (
                               <li key={image.id}>
                                 <button
@@ -239,20 +245,20 @@ export function ProseRenderer({
                       aria-pressed={preview}
                       className="rounded-lg px-3 py-1.5 text-label text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)] hover:text-[var(--on-surface)]"
                     >
-                      {preview ? 'Write' : 'Preview'}
+                      {preview ? t('stage.write') : t('stage.preview')}
                     </button>
                     <button
                       onClick={() => void save()}
                       disabled={!dirty || saving}
                       className="rounded-lg bg-[var(--pm-primary)] px-4 py-1.5 text-label text-[var(--on-primary)] disabled:opacity-40"
                     >
-                      {saving ? 'Saving…' : 'Save as new version'}
+                      {saving ? t('stage.saving') : t('stage.saveVersion')}
                     </button>
                     <button
                       onClick={() => setEditing(false)}
                       className="rounded-lg px-3 py-1.5 text-label text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
                     >
-                      Cancel
+                      {t('stage.cancel')}
                     </button>
                   </>
                 ) : (
@@ -263,7 +269,7 @@ export function ProseRenderer({
                     <span aria-hidden className="material-symbols-outlined text-[16px]">
                       edit
                     </span>
-                    Edit
+                    {t('stage.edit')}
                   </button>
                 )}
               </div>
@@ -276,7 +282,7 @@ export function ProseRenderer({
             <p data-version-note className="mb-5 flex items-start gap-1.5 rounded-lg bg-[var(--surface-container-low)] px-3 py-2 text-label text-[var(--on-surface-variant)]">
               <span aria-hidden className="material-symbols-outlined text-[16px]">history</span>
               <span>
-                <span className="sr-only">About this version: </span>
+                <span className="sr-only">{t('stage.aboutVersion')}</span>
                 {active.change_summary}
               </span>
             </p>
@@ -294,12 +300,12 @@ export function ProseRenderer({
                 ref={textareaRef}
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
-                aria-label={`Edit ${stage.label}`}
+                aria-label={t('stage.editLabel', { stage: shownLabel })}
                 rows={18}
                 className="w-full resize-y rounded-lg bg-[var(--surface-container-low)] px-4 py-3 font-mono text-[13px] leading-relaxed text-[var(--on-surface)] outline-none focus:ring-2 focus:ring-[var(--pm-primary)]/40"
               />
               <p className="mt-2 text-label text-[var(--on-surface-variant)]">
-                Markdown. {dirty ? 'Unsaved changes.' : 'No changes yet.'}
+                {t('stage.markdown')} {dirty ? t('stage.unsaved') : t('stage.noChanges')}
               </p>
             </>
           ) : (

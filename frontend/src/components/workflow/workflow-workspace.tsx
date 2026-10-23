@@ -1,5 +1,6 @@
 'use client';
 
+import { shownModeReason } from '@/lib/i18n/stage';
 import { stageText, workflowName as workflowNameText } from '@/lib/i18n/templates';
 import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import { WebFoundNotice } from './web-found-notice';
@@ -2067,7 +2068,13 @@ export function WorkflowWorkspace({
           )}
 
           <StageHeader
-            stage={{ ...stage, label: inFormWords(stageText(locale, template.key, stage, 'label'), workForm), entry_guidance: inFormWords(stageText(locale, template.key, stage, 'guidance'), workForm) }}
+            stage={{
+              ...stage,
+              label: inFormWords(stageText(locale, template.key, stage, 'label'), workForm),
+              entry_guidance: inFormWords(stageText(locale, template.key, stage, 'guidance'), workForm),
+              // Why each mode suits the stage, in the interface's language (client, 21 Oct).
+              recommended_modes: stage.recommended_modes.map((r) => ({ ...r, reason: shownModeReason(template.key, stage.id, r.mode, r.reason) })),
+            }}
             status={state.stages[stage.id]?.status ?? 'not_started'}
             skippedReason={state.stages[stage.id]?.skipped_reason}
             position={{ index: stageIndex + 1, total: template.stages.length }}
@@ -2270,6 +2277,7 @@ export function WorkflowWorkspace({
                 onKeyDownCapture={canReopen ? () => setFinishedHint(stageId) : undefined}
               >
               <StageRenderer
+                templateKey={template.key}
                 hideStageActions={isCurrent}
                 onDirtyChange={setDirtyState}
                 stage={stage}
