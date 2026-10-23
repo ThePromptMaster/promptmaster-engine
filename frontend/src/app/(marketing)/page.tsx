@@ -6,6 +6,9 @@ import Image from 'next/image';
 import { Spotlight } from '@/components/ui/spotlight';
 import { ContainerScroll } from '@/components/ui/container-scroll-animation';
 import { Card } from '@/components/ui/card';
+import { useT } from '@/lib/i18n/i18n-provider';
+import type { MessageKey } from '@/lib/i18n/messages/en';
+import { LocaleSwitch } from '@/components/shared/locale-switch';
 
 /**
  * What the product is for, in the words a first-time visitor asks in (Harold,
@@ -20,30 +23,29 @@ import { Card } from '@/components/ui/card';
  * project is managed, and each card says only what the build does; see
  * docs/assessments/2026-10-14-revision-preservation-and-conflicts.md.
  */
-const STEPS = [
-  { step: '01', name: 'Say what you need', desc: 'One sentence is enough. PromptMaster suggests how to set the work up; nothing to fill in first.', icon: 'edit_note' },
-  { step: '02', name: 'It picks the workflow', desc: 'A memo, a report, a research study, a book — each has stages suited to it, and you can change any of them.', icon: 'account_tree' },
-  { step: '03', name: 'Go does the stages', desc: 'Drafts and checks each stage against your objective, repairs what a check finds, and tells you what it did.', icon: 'rocket_launch' },
-  { step: '04', name: 'You approve what is yours', desc: 'Routine decisions it can take for you; the ones that matter stop for you. Then export to Word or PDF.', icon: 'verified_user' },
+const STEPS: { step: string; key: 'step1' | 'step2' | 'step3' | 'step4'; icon: string }[] = [
+  { step: '01', key: 'step1', icon: 'edit_note' },
+  { step: '02', key: 'step2', icon: 'account_tree' },
+  { step: '03', key: 'step3', icon: 'rocket_launch' },
+  { step: '04', key: 'step4', icon: 'verified_user' },
 ];
 
-const AUDIENCE = ['Analysts', 'Auditors', 'Lawyers', 'Strategists', 'Researchers', 'Consultants'];
+const AUDIENCE = ['analysts', 'auditors', 'lawyers', 'strategists', 'researchers', 'consultants'] as const;
 
 const MANAGED = [
-  { icon: 'account_tree', title: 'A workflow, not a thread', desc: 'The work moves through stages suited to it — outline, draft, review, final — and each stage has its own checks before it counts as done.' },
-  { icon: 'fact_check', title: 'Saved facts and requirements', desc: 'Figures and requirements you accept go into every stage. Change one, and the stages that used it are reopened for a recheck.' },
-  { icon: 'rule', title: 'Checked against your objective', desc: 'A separate pass scores the work for alignment, clarity and drift, and suggests fixes. Word limits and section counts are counted in code, not estimated.' },
-  { icon: 'gavel', title: 'Approval rules that hold', desc: 'Sign-offs that are yours wait for you. When a request runs into a recorded approval, PromptMaster asks one plain question instead of quietly changing the record.' },
-  { icon: 'history', title: 'Revision history', desc: 'Every version is kept and can be restored. A revision is compared with the one before, so a line it drops without being asked is put back.' },
-  { icon: 'rocket_launch', title: 'Go does the stages', desc: 'Go moves the work forward stage by stage, runs calculations where they are needed, and says plainly what was run and what was only written.' },
-];
+  { icon: 'account_tree', key: 'workflow' },
+  { icon: 'fact_check', key: 'facts' },
+  { icon: 'rule', key: 'checked' },
+  { icon: 'gavel', key: 'approval' },
+  { icon: 'history', key: 'history' },
+  { icon: 'rocket_launch', key: 'go' },
+] as const;
 
 /** A change, handled: what the workshop test showed, as it now works (14 Oct). */
 const EXAMPLE = {
-  asked: 'Start the workshop at 10 a.m. instead of 9. Everything else stays the same.',
-  changed: ['Invitation, agenda and checklist now say 10 a.m. to 1 p.m.', 'All five agenda times shift by an hour; every duration is unchanged'],
-  kept: ['The greeting and sign-off', '“Confirm 12 attendees” on the checklist'],
-};
+  changed: ['land.ex.changed1', 'land.ex.changed2'],
+  kept: ['land.ex.kept1', 'land.ex.kept2'],
+} as const satisfies Record<string, readonly MessageKey[]>;
 
 /** Load Spline when visible, UNLOAD when scrolled away to free GPU for scroll animations */
 function LazySpline() {
@@ -89,6 +91,8 @@ function LazySpline() {
 }
 
 export default function LandingPage() {
+  // The whole site in the chosen language (23 Oct); the layout reads the cookie.
+  const t = useT();
   // Sync body background with landing page dark theme
   useEffect(() => {
     const body = document.body;
@@ -112,13 +116,14 @@ export default function LandingPage() {
           </div>
           <div className="flex items-center gap-4">
             <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-white/80">
-              Beta
+              {t('land.beta')}
             </span>
+            <LocaleSwitch tone="dark" className="hidden sm:flex" />
             <Link
               href="/auth/login"
               className="text-sm text-white/80 hover:text-white transition-colors"
             >
-              Sign In
+              {t('land.signIn')}
             </Link>
           </div>
         </div>
@@ -131,15 +136,13 @@ export default function LandingPage() {
         <div className="relative z-10 max-w-7xl mx-auto px-6 pt-28 pb-10 md:pt-32 md:pb-20 flex flex-col lg:flex-row items-center lg:min-h-screen">
           <div className="flex-1 space-y-8 text-center lg:text-left">
             <h1 className="text-5xl md:text-7xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-b from-white via-white to-white/40 leading-[1.1]">
-              Work you can
+              {t('land.heroA')}
               <br />
-              stand behind.
+              {t('land.heroB')}
             </h1>
 
             <p className="text-lg md:text-xl text-white/75 max-w-xl leading-relaxed">
-              Give PromptMaster a goal. It takes the work through the stages a
-              careful professional would — drafting, checking, repairing — and
-              hands you a finished deliverable with the record of how it got there.
+              {t('land.heroLead')}
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
@@ -148,13 +151,13 @@ export default function LandingPage() {
                 className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-[var(--pm-primary)] text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all"
               >
                 <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
-                Start a project
+                {t('land.start')}
               </Link>
               <a
                 href="#how-it-works"
                 className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-white/5 text-white/80 text-sm font-semibold rounded-xl border border-white/10 hover:bg-white/10 transition-all"
               >
-                See How It Works
+                {t('land.seeHow')}
               </a>
             </div>
           </div>
@@ -171,19 +174,19 @@ export default function LandingPage() {
           titleComponent={
             <div className="space-y-4 mb-8">
               <p className="text-sm font-bold uppercase tracking-[0.2em] text-blue-400">
-                The Interface
+                {t('land.interface')}
               </p>
               <h2 className="text-4xl md:text-[3.5rem] font-bold text-white leading-tight tracking-tight">
-                Not another chatbox.
+                {t('land.notChatA')}
                 <br />
-                <span className="text-blue-400">A structured workflow.</span>
+                <span className="text-blue-400">{t('land.notChatB')}</span>
               </h2>
             </div>
           }
         >
           <Image
             src="/app-screenshot.png"
-            alt="A PromptMaster project: the stages on the left, the deliverable in the middle"
+            alt={t('land.screenshotAlt')}
             height={720}
             width={1400}
             className="mx-auto rounded-2xl object-cover h-full object-left-top"
@@ -198,14 +201,13 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto px-6">
           <div className="text-center mb-10 md:mb-20 space-y-4">
             <p className="text-sm font-bold uppercase tracking-[0.2em] text-blue-400">
-              How It Works
+              {t('land.howKicker')}
             </p>
             <h2 className="text-4xl md:text-5xl font-semibold text-white tracking-tight">
-              From a goal to a finished deliverable.
+              {t('land.howTitle')}
             </h2>
             <p className="text-base text-white/75 max-w-2xl mx-auto leading-relaxed">
-              No prompt engineering, no blank form. Say what you need, and the
-              structure is set up for you.
+              {t('land.howLead')}
             </p>
           </div>
 
@@ -222,10 +224,10 @@ export default function LandingPage() {
                     </span>
                   </div>
                   <h3 className="text-lg font-bold text-white">
-                    {phase.name}
+                    {t(`land.${phase.key}.name`)}
                   </h3>
                   <p className="text-sm md:text-[15px] text-white/75 leading-relaxed">
-                    {phase.desc}
+                    {t(`land.${phase.key}.desc`)}
                   </p>
                 </div>
               </div>
@@ -239,14 +241,13 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto px-6">
           <div className="text-center mb-10 md:mb-20 space-y-4">
             <p className="text-sm font-bold uppercase tracking-[0.2em] text-blue-400">
-              Who it is for
+              {t('land.whoKicker')}
             </p>
             <h2 className="text-4xl md:text-5xl font-semibold text-white tracking-tight">
-              For people who answer for their work.
+              {t('land.whoTitle')}
             </h2>
             <p className="text-base text-white/75 max-w-2xl mx-auto leading-relaxed">
-              If you need a quick answer, a chat is faster. PromptMaster is for the
-              memo, report or study you will have to defend afterwards.
+              {t('land.whoLead')}
             </p>
           </div>
 
@@ -256,7 +257,7 @@ export default function LandingPage() {
                 key={who}
                 className="px-6 py-3 bg-white/[0.03] border-white/[0.06] cursor-default"
               >
-                <span className="text-sm font-semibold text-white">{who}</span>
+                <span className="text-sm font-semibold text-white">{t(`land.who.${who}`)}</span>
               </Card>
             ))}
           </div>
@@ -268,15 +269,13 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto px-6">
           <div className="text-center mb-10 md:mb-20 space-y-4">
             <p className="text-sm font-bold uppercase tracking-[0.2em] text-blue-400">
-              Beyond the reply
+              {t('land.beyondKicker')}
             </p>
             <h2 className="text-4xl md:text-5xl font-semibold text-white tracking-tight">
-              How PromptMaster manages your project.
+              {t('land.beyondTitle')}
             </h2>
             <p className="text-base text-white/75 max-w-2xl mx-auto leading-relaxed">
-              A good chat can write a good first draft. PromptMaster keeps the project
-              around it: the workflow, the saved state, the approval rules and the
-              revision history.
+              {t('land.beyondLead')}
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
@@ -285,43 +284,42 @@ export default function LandingPage() {
                 <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center">
                   <span className="material-symbols-outlined text-blue-400">{item.icon}</span>
                 </div>
-                <h3 className="text-lg font-bold text-white">{item.title}</h3>
-                <p className="text-sm md:text-[15px] text-white/75 leading-relaxed">{item.desc}</p>
+                <h3 className="text-lg font-bold text-white">{t(`land.m.${item.key}.title`)}</h3>
+                <p className="text-sm md:text-[15px] text-white/75 leading-relaxed">{t(`land.m.${item.key}.desc`)}</p>
               </div>
             ))}
           </div>
 
           {/* A change, handled */}
-          <div aria-label="A change, handled" className="mt-10 md:mt-16 bg-white/[0.04] border border-white/[0.08] rounded-2xl p-6 md:p-8">
-            <p className="text-sm font-bold uppercase tracking-[0.2em] text-blue-400">A change, handled</p>
-            <p className="mt-3 text-lg text-white">&ldquo;{EXAMPLE.asked}&rdquo;</p>
+          <div aria-label={t('land.change')} className="mt-10 md:mt-16 bg-white/[0.04] border border-white/[0.08] rounded-2xl p-6 md:p-8">
+            <p className="text-sm font-bold uppercase tracking-[0.2em] text-blue-400">{t('land.change')}</p>
+            <p className="mt-3 text-lg text-white">&ldquo;{t('land.ex.asked')}&rdquo;</p>
             <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
-                <p className="text-sm font-semibold text-white">Changed</p>
+                <p className="text-sm font-semibold text-white">{t('land.ex.changedTitle')}</p>
                 <ul className="mt-2 space-y-1.5">
                   {EXAMPLE.changed.map((line) => (
                     <li key={line} className="flex gap-2 text-sm md:text-[15px] text-white/75">
                       <span className="material-symbols-outlined text-[18px] text-blue-400">edit</span>
-                      {line}
+                      {t(line)}
                     </li>
                   ))}
                 </ul>
               </div>
               <div>
-                <p className="text-sm font-semibold text-white">Kept, and checked in code</p>
+                <p className="text-sm font-semibold text-white">{t('land.ex.keptTitle')}</p>
                 <ul className="mt-2 space-y-1.5">
                   {EXAMPLE.kept.map((line) => (
                     <li key={line} className="flex gap-2 text-sm md:text-[15px] text-white/75">
                       <span className="material-symbols-outlined text-[18px] text-emerald-400">check_circle</span>
-                      {line}
+                      {t(line)}
                     </li>
                   ))}
                 </ul>
               </div>
             </div>
             <p className="mt-5 text-sm text-white/65">
-              The new version is compared with the one before it. Anything it dropped without being
-              asked is put back, and the earlier version stays one click away.
+              {t('land.ex.note')}
             </p>
           </div>
         </div>
@@ -332,18 +330,17 @@ export default function LandingPage() {
         <Spotlight className="-top-40 right-0 md:right-60 md:-top-20" fill="#2563eb" />
         <div className="relative z-10 max-w-3xl mx-auto px-6 text-center space-y-8">
           <h2 className="text-4xl md:text-5xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-b from-white to-white/60">
-            What do you need to get done?
+            {t('land.ctaTitle')}
           </h2>
           <p className="text-lg text-white/75 max-w-xl mx-auto">
-            Say it in a sentence. You will have a first draft in a couple of
-            minutes, and you decide how far Go takes it.
+            {t('land.ctaLead')}
           </p>
           <Link
             href="/projects"
             className="inline-flex items-center justify-center gap-2 px-10 py-4 bg-[var(--pm-primary)] text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all"
           >
             <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
-            Start your first project
+            {t('land.ctaButton')}
           </Link>
         </div>
       </section>
@@ -356,8 +353,9 @@ export default function LandingPage() {
             <span className="text-sm text-white/70">PromptMaster</span>
           </div>
           <p className="text-xs text-white/60">
-            From a goal to work you can stand behind
+            {t('land.footer')}
           </p>
+          <LocaleSwitch tone="dark" />
         </div>
       </footer>
     </div>

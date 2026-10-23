@@ -9,6 +9,7 @@ import { getLatestTemplate, getTemplateById } from '@/lib/supabase/workflow';
 import { initialState } from '@/lib/workflow/engine';
 import type { WorkflowTemplate } from '@/lib/workflow/types';
 import { useProjectStore } from '@/stores/project-store';
+import { useT } from '@/lib/i18n/i18n-provider';
 
 /**
  * The manuscript alone, on a page made to print (C4): the browser's own
@@ -17,6 +18,7 @@ import { useProjectStore } from '@/stores/project-store';
  */
 export default function PrintPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const t = useT();
   const project = useProjectStore((s) => s.project);
   const files = useProjectStore((s) => s.files);
   const stages = useProjectStore((s) => s.stages);
@@ -41,8 +43,8 @@ export default function PrintPage({ params }: { params: Promise<{ id: string }> 
     return stampedManuscript({ project, template, state: initialState(template), events: [], stages, evaluations: {} });
   }, [project, template, stages]);
 
-  if (loading || (!project && !error)) return <p className="p-8 text-body">Loading…</p>;
-  if (error || !project) return <p className="p-8 text-body">This project could not be loaded.</p>;
+  if (loading || (!project && !error)) return <p className="p-8 text-body">{t('print.loading')}</p>;
+  if (error || !project) return <p className="p-8 text-body">{t('print.notFound')}</p>;
 
   return (
     <main className="mx-auto max-w-[720px] px-6 py-10 print:max-w-none print:px-0 print:py-0">
@@ -53,16 +55,16 @@ export default function PrintPage({ params }: { params: Promise<{ id: string }> 
           onClick={() => window.print()}
           className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-title text-[var(--on-primary)]"
         >
-          Print or save as PDF
+          {t('print.print')}
         </button>
-        <span className="text-label text-[var(--on-surface-variant)]">Choose “Save as PDF” as the printer.</span>
+        <span className="text-label text-[var(--on-surface-variant)]">{t('print.hint')}</span>
       </div>
       {markdown ? (
         <ProjectImagesProvider files={files}>
           <MarkdownOutput content={markdown} />
         </ProjectImagesProvider>
       ) : (
-        <p className="text-body text-[var(--on-surface-variant)]">Nothing has been written yet.</p>
+        <p className="text-body text-[var(--on-surface-variant)]">{t('print.empty')}</p>
       )}
     </main>
   );

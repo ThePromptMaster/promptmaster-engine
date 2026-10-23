@@ -7,6 +7,9 @@ import { useAuth } from '@/hooks/use-auth';
 import { createClient } from '@/lib/supabase/client';
 import { guestErrorMessage } from '@/lib/auth/guest';
 import { forgetResetRequest, nextFromLocation, rememberResetRequest } from '@/lib/auth/next-path';
+import { authErrorMessage } from '@/lib/auth/auth-errors';
+import { useT } from '@/lib/i18n/i18n-provider';
+import { LocaleSwitch } from '@/components/shared/locale-switch';
 
 /**
  * The field and label treatments are shared with the sign-up page, which was
@@ -21,6 +24,7 @@ const LABEL_CLASS =
 
 export default function LoginPage() {
   const router = useRouter();
+  const t = useT();
   const { signIn, signInWithGoogle, continueAsGuest } = useAuth();
 
   const [email, setEmail] = useState('');
@@ -57,7 +61,7 @@ export default function LoginPage() {
       forgetResetRequest();
       router.push(nextFromLocation() ?? '/projects');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Invalid email or password.');
+      setError(authErrorMessage(err, 'auth.err.invalid'));
     } finally {
       setIsLoading(false);
     }
@@ -71,7 +75,7 @@ export default function LoginPage() {
     try {
       await signInWithGoogle();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Google sign in failed.');
+      setError(authErrorMessage(err, 'auth.err.google'));
       setIsGoogleLoading(false);
     }
   };
@@ -79,7 +83,7 @@ export default function LoginPage() {
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) {
-      setError('Please enter your email address.');
+      setError(t('auth.err.noEmail'));
       return;
     }
     setError(null);
@@ -98,7 +102,7 @@ export default function LoginPage() {
       if (resetError) throw resetError;
       setResetSent(true);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to send reset email.');
+      setError(authErrorMessage(err, 'auth.err.reset'));
     } finally {
       setResetLoading(false);
     }
@@ -112,7 +116,7 @@ export default function LoginPage() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.svg" alt="PromptMaster" className="w-12 h-12 rounded-xl mx-auto mb-6" />
           <h1 className="text-[var(--on-surface)] text-headline tracking-tight">PromptMaster</h1>
-          <p className="text-[var(--on-surface-variant)] text-body">A system for thinking with AI</p>
+          <p className="text-[var(--on-surface-variant)] text-body">{t('auth.tagline')}</p>
         </header>
 
         {/* Login Container Well */}
@@ -133,25 +137,25 @@ export default function LoginPage() {
                 <div className="space-y-4 text-center py-4">
                   <span className="material-symbols-outlined text-[var(--pm-primary)] text-[40px]">mark_email_read</span>
                   <p className="text-body text-[var(--on-surface)]">
-                    Password reset link sent to <strong>{email}</strong>
+                    {t('auth.resetSentTo')} <strong>{email}</strong>
                   </p>
                   <p className="text-label text-[var(--on-surface-variant)]">
-                    Check your inbox and follow the link to reset your password.
+                    {t('auth.resetSentHint')}
                   </p>
                   <button
                     type="button"
                     onClick={() => { setForgotMode(false); setResetSent(false); setError(null); }}
                     className="text-body text-[var(--pm-primary)] font-medium hover:underline"
                   >
-                    Back to Sign In
+                    {t('auth.backToSignIn')}
                   </button>
                 </div>
               ) : (
                 <>
                   <div className="space-y-1">
-                    <h3 className="text-title text-[var(--on-surface)]">Reset your password</h3>
+                    <h3 className="text-title text-[var(--on-surface)]">{t('auth.resetTitle')}</h3>
                     <p className="text-label text-[var(--on-surface-variant)]">
-                      Enter your email and we&apos;ll send you a link to reset your password.
+                      {t('auth.resetIntro')}
                     </p>
                   </div>
 
@@ -160,7 +164,7 @@ export default function LoginPage() {
                       className={LABEL_CLASS}
                       htmlFor="reset-email"
                     >
-                      Email Address
+                      {t('auth.emailAddress')}
                     </label>
                     <input
                       id="reset-email"
@@ -179,7 +183,7 @@ export default function LoginPage() {
                     disabled={resetLoading}
                     className="w-full py-3 px-4 bg-[var(--pm-primary)] text-[var(--on-primary)] font-semibold rounded-lg hover:bg-[var(--pm-primary-container)] active:scale-[0.98] transition-all duration-200 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
                   >
-                    {resetLoading ? 'Sending...' : 'Send Reset Link'}
+                    {resetLoading ? t('auth.sending') : t('auth.sendReset')}
                   </button>
 
                   <button
@@ -187,7 +191,7 @@ export default function LoginPage() {
                     onClick={() => { setForgotMode(false); setError(null); }}
                     className="w-full text-center text-body text-[var(--on-surface-variant)] hover:text-[var(--pm-primary)] transition-colors"
                   >
-                    Back to Sign In
+                    {t('auth.backToSignIn')}
                   </button>
                 </>
               )}
@@ -206,7 +210,7 @@ export default function LoginPage() {
                   className={LABEL_CLASS}
                   htmlFor="email"
                 >
-                  Email Address
+                  {t('auth.emailAddress')}
                 </label>
                 <input
                   id="email"
@@ -227,14 +231,14 @@ export default function LoginPage() {
                     className={LABEL_CLASS}
                     htmlFor="password"
                   >
-                    Password
+                    {t('auth.password')}
                   </label>
                   <button
                     type="button"
                     onClick={() => { setForgotMode(true); setError(null); }}
                     className="text-label text-[var(--pm-primary)] hover:underline transition-all"
                   >
-                    Forgot password?
+                    {t('auth.forgot')}
                   </button>
                 </div>
                 <div className="relative">
@@ -253,7 +257,7 @@ export default function LoginPage() {
                     type="button"
                     onClick={() => setShowPassword((v) => !v)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--outline)] hover:text-[var(--on-surface-variant)]"
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
                   >
                     <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
                       {showPassword ? 'visibility_off' : 'visibility'}
@@ -267,7 +271,7 @@ export default function LoginPage() {
                 disabled={isLoading}
                 className="w-full py-3 px-4 bg-[var(--pm-primary)] text-[var(--on-primary)] font-semibold rounded-lg hover:bg-[var(--pm-primary-container)] active:scale-[0.98] transition-all duration-200 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {isLoading ? 'Signing in...' : 'Sign In'}
+                {isLoading ? t('auth.signingIn') : t('auth.signIn')}
               </button>
             </form>
           )}
@@ -277,7 +281,7 @@ export default function LoginPage() {
               {/* Divider */}
               <div className="relative py-2 flex items-center gap-4">
                 <div className="flex-grow h-[1px] bg-[var(--surface-container-high)]" />
-                <span className="text-label font-bold text-[var(--outline)] uppercase tracking-widest">OR</span>
+                <span className="text-label font-bold text-[var(--outline)] uppercase tracking-widest">{t('auth.orUpper')}</span>
                 <div className="flex-grow h-[1px] bg-[var(--surface-container-high)]" />
               </div>
 
@@ -306,7 +310,7 @@ export default function LoginPage() {
                 fill="#EA4335"
               />
             </svg>
-            {isGoogleLoading ? 'Redirecting...' : 'Sign in with Google'}
+            {isGoogleLoading ? t('auth.redirecting') : t('auth.google')}
               </button>
             </>
           )}
@@ -320,7 +324,7 @@ export default function LoginPage() {
             <div className="mb-4 flex items-center gap-3">
               <span className="h-px flex-1 bg-[var(--surface-container-high)]" />
               <span className="text-label uppercase tracking-wider text-[var(--on-surface-variant)]">
-                or
+                {t('auth.or')}
               </span>
               <span className="h-px flex-1 bg-[var(--surface-container-high)]" />
             </div>
@@ -331,10 +335,10 @@ export default function LoginPage() {
               disabled={guestLoading}
               className="w-full rounded-lg bg-[var(--surface-container-low)] px-4 py-3 text-body font-medium text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-high)] disabled:opacity-60"
             >
-              {guestLoading ? 'Starting…' : 'Continue without an account'}
+              {guestLoading ? t('auth.guestStarting') : t('auth.guest')}
             </button>
             <p className="mt-2 text-center text-label text-[var(--on-surface-variant)]">
-              Your work stays in this browser until you create an account.
+              {t('auth.guestNote')}
             </p>
           </div>
         )}
@@ -342,15 +346,16 @@ export default function LoginPage() {
         {/* Footer */}
         <footer className="mt-6 text-center">
           <p className="text-body text-[var(--on-surface-variant)]">
-            Don&apos;t have an account?{' '}
+            {t('auth.noAccount')}{' '}
             <Link
               href="/auth/signup"
               className="text-[var(--pm-primary)] font-medium hover:underline ml-1"
             >
-              Sign up
+              {t('auth.signUp')}
             </Link>
           </p>
         </footer>
+        <LocaleSwitch />
       </main>
 
       {/* Decorative Structural Element */}

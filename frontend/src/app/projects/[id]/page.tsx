@@ -10,17 +10,20 @@ import { ProjectImagesProvider } from '@/components/shared/project-images';
 import { WorkflowWorkspace } from '@/components/workflow/workflow-workspace';
 import { getLatestTemplate, getTemplateById } from '@/lib/supabase/workflow';
 import type { WorkflowTemplate } from '@/lib/workflow/types';
+import { useT } from '@/lib/i18n/i18n-provider';
+import type { MessageKey } from '@/lib/i18n/messages/en';
 
-const SAVE_LABEL: Record<string, string> = {
-  idle: '',
-  saving: 'Saving…',
-  saved: 'Saved',
-  conflict: 'Changed elsewhere',
-  error: 'Not saved',
+const SAVE_LABEL: Record<string, MessageKey | null> = {
+  idle: null,
+  saving: 'proj.saving',
+  saved: 'proj.saved',
+  conflict: 'proj.conflict',
+  error: 'proj.notSaved',
 };
 
 export default function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const t = useT();
 
   const storedProject = useProjectStore((s) => s.project);
   const files = useProjectStore((s) => s.files);
@@ -140,7 +143,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
       <main className="mx-auto max-w-[900px] px-6 py-16">
         <p className="text-body text-[var(--pm-error)]">{error}</p>
         <Link href="/projects" className="mt-4 inline-block text-body text-[var(--pm-primary)]">
-          Back to projects
+          {t('proj.backToProjects')}
         </Link>
       </main>
     );
@@ -157,33 +160,33 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     error && saveState !== 'error' && !conflict ? (
       <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[var(--surface-container-high)] px-5 py-3 text-body">
         <span className="text-[var(--on-surface)]">
-          The latest changes could not be loaded, so this page may be out of date. Nothing has been lost.
+          {t('proj.stale')}
         </span>
         <button
           type="button"
           onClick={() => void loadProject(id, { background: true })}
           className="rounded-lg bg-[var(--pm-primary)] px-3 py-1.5 text-label text-[var(--on-primary)]"
         >
-          Reload
+          {t('proj.reload')}
         </button>
       </div>
     ) : null;
 
   const conflictBanner = conflict ? (
     <div className="rounded-xl bg-[var(--surface-container-high)] px-5 py-4 text-body">
-      <p className="text-[var(--on-surface)]">This project was changed in another tab.</p>
+      <p className="text-[var(--on-surface)]">{t('proj.otherTab')}</p>
       <div className="mt-3 flex gap-2">
         <button
           onClick={() => void resolveConflict('reload')}
           className="rounded-lg bg-[var(--surface-container-highest)] px-3 py-2 text-label"
         >
-          Reload theirs
+          {t('proj.reloadTheirs')}
         </button>
         <button
           onClick={() => void resolveConflict('keep-mine')}
           className="rounded-lg bg-[var(--pm-primary)] px-3 py-2 text-label text-[var(--on-primary)]"
         >
-          Keep my changes
+          {t('proj.keepMine')}
         </button>
       </div>
     </div>
@@ -194,11 +197,11 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
       <input
         value={project.title}
         onChange={(e) => patchProject({ title: e.target.value })}
-        aria-label="Project title"
+        aria-label={t('proj.titleLabel')}
         className="min-w-0 flex-1 bg-transparent text-headline text-[var(--on-surface)] outline-none"
       />
       <span className="flex shrink-0 items-center gap-2 text-label text-[var(--on-surface-variant)]">
-        {SAVE_LABEL[saveState]}
+        {SAVE_LABEL[saveState] ? t(SAVE_LABEL[saveState]!) : ''}
         {saveState === 'error' && (
           // Retries itself a few times; this is for not waiting.
           <button
@@ -206,7 +209,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
             onClick={() => void retrySave()}
             className="rounded-md bg-[var(--surface-container-high)] px-2 py-1 text-label text-[var(--on-surface)]"
           >
-            Retry now
+            {t('proj.retryNow')}
           </button>
         )}
       </span>
@@ -231,20 +234,20 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           className="mb-8 inline-flex items-center gap-1 text-body text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
         >
           <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-          Projects
+          {t('proj.projects')}
         </Link>
         {header}
         <div role="alert" className="mt-6 rounded-2xl bg-[var(--surface-container-low)] px-8 py-7">
-          <p className="text-title text-[var(--on-surface)]">Couldn&apos;t load this project&apos;s workflow.</p>
+          <p className="text-title text-[var(--on-surface)]">{t('proj.noWorkflow')}</p>
           <p className="mt-2 text-body text-[var(--on-surface-variant)]">
-            Nothing has been lost — this is a loading problem, not a missing project.
+            {t('proj.noWorkflowHint')}
           </p>
           <button
             type="button"
             onClick={() => setTemplateAttempt((n) => n + 1)}
             className="mt-5 rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label text-[var(--on-primary)]"
           >
-            Retry
+            {t('proj.retry')}
           </button>
         </div>
       </main>
@@ -260,13 +263,12 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           className="mb-8 inline-flex items-center gap-1 text-body text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
         >
           <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-          Projects
+          {t('proj.projects')}
         </Link>
         {header}
         {conflictBanner && <div className="mb-6 mt-6">{conflictBanner}</div>}
         <p className="mb-6 mt-6 text-body text-[var(--on-surface-variant)]">
-          This project&apos;s workflow could not be loaded, so its stages are unavailable. The
-          latest version of its work is below.
+          {t('proj.noStages')}
         </p>
         {head ? (
           <article className="rounded-xl bg-[var(--surface-container-lowest)] px-8 py-7">
@@ -274,7 +276,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           </article>
         ) : (
           <div className="rounded-xl bg-[var(--surface-container-low)] px-8 py-14 text-center text-body text-[var(--on-surface-variant)]">
-            Nothing generated in this project yet.
+            {t('proj.nothingYet')}
           </div>
         )}
       </main>
@@ -299,7 +301,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
               <div className="flex items-center gap-4">
                 <Link
                   href="/projects"
-                  aria-label="Back to projects"
+                  aria-label={t('proj.backToProjects')}
                   className="shrink-0 text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
                 >
                   <span className="material-symbols-outlined text-[20px]">arrow_back</span>
@@ -322,11 +324,10 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           <div className="min-w-0 flex-1 px-6 py-10 md:px-10">
             <div role="alert" className="max-w-[820px] rounded-2xl bg-[var(--surface-container-low)] px-8 py-7">
               <p className="text-title text-[var(--on-surface)]">
-                Couldn&apos;t load where this project stands.
+                {t('proj.noHistory')}
               </p>
               <p className="mt-2 text-body text-[var(--on-surface-variant)]">
-                Its history did not load, so its stages can&apos;t be shown yet. Nothing has been lost:
-                your work and every stage&apos;s progress are saved.
+                {t('proj.noHistoryHint')}
               </p>
               <button
                 type="button"
@@ -339,7 +340,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                 }}
                 className="mt-5 rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label text-[var(--on-primary)] disabled:opacity-60"
               >
-                {retryingEvents ? 'Retrying…' : 'Retry'}
+                {retryingEvents ? t('proj.retrying') : t('proj.retry')}
               </button>
             </div>
           </div>
