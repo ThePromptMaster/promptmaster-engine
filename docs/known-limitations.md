@@ -2060,6 +2060,26 @@ is the screen, the second is the work.
   thinking-mode names and taglines (`MODE_DISPLAY`), messages from file reading
   (`lib/data/*`, such as "could not be read"), and anything the model wrote (the setup's reasons,
   the conversation), which follows Writes in instead.
+- **The projects list and the workspace (2026-10-23).** Translated: the list, folders, trash and
+  guest banner; the stage rail, stage header, project setup, facts, other projects, the reader
+  beside, web sources, data panel, full-work reader and export menu; the next-step bar, stage bar,
+  checklist and recovery panel; the side chat and its proposals and notices; and Go's panel
+  (controls, policies, steps, the needs card's own words, questions, the execution record, the
+  terms). System stage names, short names and entry guidance come from `lib/i18n/templates.ts`.
+  Button labels are translated where they are made (`next-action`, `next-step`,
+  `stage-controls`), so Go and the chat are told the buttons in the words on the screen.
+- **Still English in the workspace.**
+  - The stage renderers (prose, list, review, long-form, stage chrome): their own words, such as
+    table headings, row actions and chapter controls.
+  - Sentences Go composes in code, because they are stored and compared as written:
+    `describeNeed` (the body of "I need you to…"), `runAccount` ("So far"), the execution
+    record's Saved / Checked / Workflow changes lines, and run stop reasons.
+  - Template data: exit-criteria labels ("I approve this analysis plan…"), recommended-mode
+    reasons, skip reasons; mode names (`MODE_DISPLAY`).
+  - Text from `lib`: file summaries and rejection reasons (`lib/data`), fact-change
+    descriptions, "and N more" lists, stage labels inside a check's reason.
+  - Words stored with the work stay as written: version change summaries, a fact's source
+    chip in prompts, the authorization's recorded terms (shown translated, stored English).
 - **Pages outside a project render English first.** Signed-in pages read the choice from a
   cookie and render in it at once. The sign-in pages and the landing page are static, so they
   switch after the page loads.

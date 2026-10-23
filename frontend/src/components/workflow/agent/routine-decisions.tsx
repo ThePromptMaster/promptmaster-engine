@@ -1,15 +1,9 @@
 'use client';
 
+import { useT } from '@/lib/i18n/i18n-provider';
 import type { RoutineDecisions as Policy } from '@/types/project';
 
-const OPTIONS: { value: Policy; label: string; hint: string }[] = [
-  {
-    value: 'handle',
-    label: 'Handle them for me',
-    hint: 'Checks routine work, accepts justified revisions and continues within your objective. Asks when a decision needs your judgment.',
-  },
-  { value: 'ask', label: 'Ask me', hint: 'Every approval waits for you.' },
-];
+const OPTIONS: Policy[] = ['handle', 'ask'];
 
 /**
  * Who may decide a routine approval (Sean, 5 Oct). Separate from how
@@ -19,13 +13,14 @@ const OPTIONS: { value: Policy; label: string; hint: string }[] = [
  * yours. Changing it applies at once, to work already under way too.
  */
 export function RoutineDecisions({ value, onChange, disabled = false }: { value: Policy; onChange: (v: Policy) => void; disabled?: boolean }) {
+  const t = useT();
   return (
     <div>
       <p id="routine-decisions-label" className="mb-1.5 text-label uppercase tracking-wider text-[var(--on-surface-variant)]">
-        Routine decisions
+        {t('rd.title')}
       </p>
       <div role="radiogroup" aria-labelledby="routine-decisions-label" className="grid gap-2 sm:grid-cols-2">
-        {OPTIONS.map((o) => (
+        {OPTIONS.map((value) => ({ value, label: t(`rd.${value}`), hint: t(`rd.${value}Hint`) })).map((o) => (
           <button
             key={o.value}
             role="radio"

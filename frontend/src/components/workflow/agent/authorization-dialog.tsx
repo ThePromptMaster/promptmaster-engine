@@ -1,5 +1,8 @@
 'use client';
 
+import type { MessageKey } from '@/lib/i18n/messages/en';
+import { tr } from '@/lib/i18n/store';
+import { useT } from '@/lib/i18n/i18n-provider';
 import { KEEP_GOING_WINDOWS, POLICY_TERMS } from '@/lib/agent/authorize';
 import type { ExecutionPolicy } from '@/types/agent';
 
@@ -25,39 +28,41 @@ export function GoTerms({
   onAutoWindows?: (n: number) => void;
   disabled?: boolean;
 }) {
+  const t = useT();
   return (
-    <div aria-label="What Go may do" className="space-y-2 text-label text-[var(--on-surface-variant)]">
+    <div aria-label={t('gt.label')} className="space-y-2 text-label text-[var(--on-surface-variant)]">
       <p>
         {policy === 'autonomous'
-          ? 'Go works through the stages and stops when it needs you. Finishing the project is always your click.'
-          : 'Go works on its own and stops for your approval before important moves.'}{' '}
-        Pressing Go is recorded on the decision trail.
+          ? t('gt.auto')
+          : t('gt.checkpoint')}{' '}
+        {t('gt.recorded')}
       </p>
       {policy === 'autonomous' && onAutoWindows && (
         <label className="flex flex-wrap items-center gap-2">
-          When a window of {budget} steps is used up, carry on for
+          {t('gt.carryOn', { budget })}
           <select
             value={autoWindows}
             disabled={disabled}
             onChange={(e) => onAutoWindows(Number(e.target.value))}
-            aria-label="Further windows without asking"
+            aria-label={t('gt.further')}
             className="rounded-md bg-[var(--surface-container-highest)] px-2 py-1 text-label text-[var(--on-surface)] disabled:opacity-60"
           >
-            <option value={0}>no more windows</option>
-            <option value={1}>1 more window</option>
-            <option value={2}>2 more windows</option>
-            <option value={3}>3 more windows</option>
-            <option value={KEEP_GOING_WINDOWS}>up to {KEEP_GOING_WINDOWS} more windows</option>
+            <option value={0}>{t('gt.none')}</option>
+            <option value={1}>{t('gt.one')}</option>
+            <option value={2}>{t('gt.two')}</option>
+            <option value={3}>{t('gt.three')}</option>
+            <option value={KEEP_GOING_WINDOWS}>{t('gt.upTo', { count: KEEP_GOING_WINDOWS })}</option>
           </select>
         </label>
       )}
       <details>
-        <summary className="cursor-pointer">Everything Go may and may not do</summary>
+        <summary className="cursor-pointer">{t('gt.everything')}</summary>
         <ul className="mt-1 list-disc space-y-1 pl-5">
-          {POLICY_TERMS[policy].map((t) => (
-            <li key={t}>{t}</li>
+          {/* The recorded terms stay in English on the authorization; these are the same words, shown. */}
+          {POLICY_TERMS[policy].map((term, i) => (
+            <li key={term}>{t(`gt.term.${policy}.${i}` as MessageKey)}</li>
           ))}
-          <li>{windowsLine(policy, budget, autoWindows)} You can press Stop at any time.</li>
+          <li>{windowsLine(policy, budget, autoWindows)} {t('gt.stopAnytime')}</li>
         </ul>
       </details>
     </div>
@@ -67,8 +72,8 @@ export function GoTerms({
 /** What happens when a window of steps is used up, as the choice below sets it. */
 export function windowsLine(policy: Exclude<ExecutionPolicy, 'guided'>, budget: number, autoWindows: number): string {
   if (policy !== 'autonomous' || autoWindows <= 0) {
-    return `It works in windows of ${budget} steps. When one is used up, Go stops and offers another; each further window is your click, and is recorded.`;
+    return tr('gt.windowsAsk', { budget });
   }
-  const n = autoWindows >= KEEP_GOING_WINDOWS ? `up to ${KEEP_GOING_WINDOWS}` : String(autoWindows);
-  return `It works in windows of ${budget} steps, and you are authorising ${n} more window${autoWindows === 1 ? '' : 's'} now: when one is used up it starts the next without asking, each recorded. After that, a further window is your click.`;
+  const n = autoWindows >= KEEP_GOING_WINDOWS ? tr('gt.upToN', { count: KEEP_GOING_WINDOWS }) : String(autoWindows);
+  return tr('gt.windowsAuto', { count: autoWindows, budget, n });
 }

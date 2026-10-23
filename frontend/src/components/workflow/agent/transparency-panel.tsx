@@ -1,7 +1,8 @@
 'use client';
 
-import { actionLabel } from '@/lib/agent/actions';
-import { RUN_STATUS_TEXT as RUN_STATUS, STEP_STATUS_TEXT as STEP_STATUS } from '@/lib/agent/labels';
+import type { MessageKey } from '@/lib/i18n/messages/en';
+import { shownActionLabel } from '@/lib/i18n/go';
+import { tr } from '@/lib/i18n/store';
 import { MODE_DISPLAY } from '@/lib/constants';
 import type { AgentRun, AgentStep } from '@/types/agent';
 import type { ModeType } from '@/types';
@@ -102,33 +103,33 @@ function changed(step: AgentStep, run: AgentRun | null): string {
  * machine is too visible"). The record below keeps every exact label.
  */
 function narrative(run: AgentRun | null, step: AgentStep | null, next: string, thinking: boolean, stageName: (id: string) => string): string {
-  if (!run) return 'Go mode has not started.';
-  if (thinking) return 'Choosing the next move…';
-  if (!step) return `${RUN_STATUS[run.status]}.`;
+  if (!run) return tr('tp.notStarted');
+  if (thinking) return tr('tp.choosing');
+  if (!step) return `${tr(`runStatus.${run.status}`)}.`;
   const target = targetOf(step);
-  const label = `${actionLabel(step.action_key)}${target ? ` (${stageName(target)})` : ''}`;
+  const label = `${shownActionLabel(step.action_key)}${target ? ` (${stageName(target)})` : ''}`;
   switch (step.status) {
     case 'running':
-      return `${label} — in progress.`;
+      return tr('tp.n.running', { label });
     case 'awaiting_decision':
-      return `Proposed: ${label}. Waiting for your approval.`;
+      return tr('tp.n.awaiting', { label });
     case 'succeeded': {
       const what = changed(step, run);
-      const tail = what.startsWith('Nothing in the project') ? 'No change to the project.' : `Changed: ${what}.`;
-      return `${label} — done. ${tail}${run.status === 'awaiting_decision' ? ' Waiting for you.' : run.status === 'running' ? ` Next: ${next}.` : ''}`;
+      const tail = what.startsWith('Nothing in the project') ? tr('tp.n.noChange') : tr('tp.n.changed', { what });
+      return `${tr('tp.n.done', { label })}${tail}${run.status === 'awaiting_decision' ? tr('tp.n.waiting') : run.status === 'running' ? tr('tp.n.next', { next }) : ''}`;
     }
     case 'blocked':
-      return `${label} — could not continue.`;
+      return tr('tp.n.blocked', { label });
     case 'failed': {
       const { saved } = outcomeLines(step, run);
       return saved.startsWith('Yes')
-        ? `${label} — saved, but it did not pass its check: ${firstSentence(step.output)}.`
-        : `${label} — not saved: ${firstSentence(step.output) || 'it failed'}.`;
+        ? tr('tp.n.savedNotPassed', { label, why: firstSentence(step.output) })
+        : tr('tp.n.notSaved', { label, why: firstSentence(step.output) || tr('tp.n.itFailed') });
     }
     case 'cancelled':
-      return `${label} — cancelled.`;
+      return tr('tp.n.cancelled', { label });
     case 'interrupted':
-      return `${label} — interrupted; it will pick up where it left off.`;
+      return tr('tp.n.interrupted', { label });
   }
 }
 
@@ -166,9 +167,9 @@ export function TransparencyPanel({
   const outcome = step ? outcomeLines(step, run) : null;
   const target = step ? targetOf(step) : null;
   // What was used, in the user's words rather than the record's.
-  const TOOL_NAME: Record<string, string> = { sandbox: 'code sandbox', model: 'AI model', jobs: 'background writing queue', search: 'literature search (OpenAlex)' };
+  const TOOL_NAME: Record<string, string> = { sandbox: tr('tp.tool.sandbox'), model: tr('tp.tool.model'), jobs: tr('tp.tool.jobs'), search: tr('tp.tool.search') };
   const rows: [string, React.ReactNode][] = [
-    ['Stage', target ? `${stageLabel} · this step worked on ${stageName(target)}` : stageLabel],
+    ['Stage', target ? tr('tp.workedOn', { stage: stageLabel, other: stageName(target) }) : stageLabel],
     // The project's mode is what every step uses; the stage only recommends one (Sean, 10 Oct:
     // "The execution record lists Clarity, while the stage displays Critic").
     // Which mode this stage's work used, and why (13 Oct, Sean 12.7).
@@ -178,41 +179,41 @@ export function TransparencyPanel({
         ? '—'
         : stageMode && stageMode !== mode && mode !== 'custom'
           ? stageModes === 'project'
-            ? `${modeName(mode)} — your mode, on every stage as you chose; this stage's own is ${modeName(stageMode)}`
-            : `${modeName(stageMode)} — this stage's mode; your project mode is ${modeName(mode)}`
+            ? tr('tp.modeYours', { mode: modeName(mode), stageMode: modeName(stageMode) })
+            : tr('tp.modeStage', { stageMode: modeName(stageMode), mode: modeName(mode) })
           : modeName(mode),
     ],
-    ['Action', thinking ? 'Choosing the next move…' : step ? actionLabel(step.action_key) : '—'],
+    ['Action', thinking ? tr('tp.choosing') : step ? shownActionLabel(step.action_key) : '—'],
     [
       'Analyzed or performed',
       step?.execution_label ? (
         <ExecutionBadge label={step.execution_label} />
       ) : step?.status === 'running' ? (
-        'In progress'
+        tr('tp.inProgress')
       ) : (
         '—'
       ),
     ],
     ['Tools', step?.tools_used?.length ? step.tools_used.map((t) => TOOL_NAME[t] ?? t).join(', ') : '—'],
     // The run and the step apart (13 Oct: "Could not continue · step done").
-    ['Run', run ? RUN_STATUS[run.status] : 'Not started'],
-    ['This step', step ? STEP_STATUS[step.status] : '—'],
+    ['Run', run ? tr(`runStatus.${run.status}`) : tr('tp.runNotStarted')],
+    ['This step', step ? tr(`stepStatus.${step.status}`) : '—'],
     ['Saved', outcome ? outcome.saved : '—'],
     ['Checked', outcome ? outcome.checked : '—'],
-    ['Workflow changes', changedNow ? (changedNow.workflow.join('; ') || 'None') : '—'],
+    ['Workflow changes', changedNow ? (changedNow.workflow.join('; ') || tr('tp.none')) : '—'],
     ['Next', next],
   ];
   return (
-    <section aria-label="What Go mode is doing" className="rounded-xl bg-[var(--surface-container-low)] px-5 py-4">
+    <section aria-label={tr('tp.label')} className="rounded-xl bg-[var(--surface-container-low)] px-5 py-4">
       <p role="status" data-narrative className="text-body text-[var(--on-surface)]">
         {narrative(run, step, next, thinking, stageName)}
       </p>
       <details className="mt-2">
-        <summary className="cursor-pointer text-label text-[var(--on-surface-variant)]">Execution record</summary>
+        <summary className="cursor-pointer text-label text-[var(--on-surface-variant)]">{tr('tp.record')}</summary>
       <dl className="mt-2 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1.5">
         {rows.map(([k, v]) => (
           <div key={k} className="contents">
-            <dt className="text-label text-[var(--on-surface-variant)]">{k}</dt>
+            <dt className="text-label text-[var(--on-surface-variant)]">{tr(`tp.row.${k}` as MessageKey)}</dt>
             <dd className="text-body text-[var(--on-surface)]" data-field={k}>
               {v}
             </dd>

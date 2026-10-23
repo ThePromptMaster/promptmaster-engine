@@ -1,12 +1,9 @@
 'use client';
 
+import { useT } from '@/lib/i18n/i18n-provider';
 import type { ExecutionPolicy } from '@/types/agent';
 
-const POLICIES: { value: ExecutionPolicy; label: string; hint: string }[] = [
-  { value: 'guided', label: 'Guided', hint: 'Proposes one move at a time; you approve each' },
-  { value: 'checkpoint', label: 'Checkpoint', hint: 'Works on its own, stops at important decisions' },
-  { value: 'autonomous', label: 'Autonomous', hint: 'Works through the stages until they are done, it is stuck, or it needs you' },
-];
+const POLICIES: ExecutionPolicy[] = ['guided', 'checkpoint', 'autonomous'];
 
 /** PM-18: how autonomously Go continues — chosen, not implied. */
 export function PolicySelector({
@@ -18,9 +15,10 @@ export function PolicySelector({
   onChange: (p: ExecutionPolicy) => void;
   disabled: boolean;
 }) {
+  const t = useT();
   return (
-    <div role="radiogroup" aria-label="How autonomously Go runs" className="grid gap-2 sm:grid-cols-3">
-      {POLICIES.map((p) => (
+    <div role="radiogroup" aria-label={t('pol.label')} className="grid gap-2 sm:grid-cols-3">
+      {POLICIES.map((value) => ({ value, label: t(`pol.${value}`), hint: t(`pol.${value}Hint`) })).map((p) => (
         <button
           key={p.value}
           role="radio"

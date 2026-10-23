@@ -13,6 +13,7 @@ import { pt as wsArea } from './areas/ws';
 import { pt as actArea } from './areas/act';
 import { pt as chatArea } from './areas/chat';
 import { pt as chat2Area } from './areas/chat2';
+import { pt as goArea } from './areas/go';
 
 export const pt: Messages = {
   'header.account': 'Conta',
@@ -285,4 +286,5 @@ export const pt: Messages = {
   ...actArea,
   ...chatArea,
   ...chat2Area,
+  ...goArea,
 };

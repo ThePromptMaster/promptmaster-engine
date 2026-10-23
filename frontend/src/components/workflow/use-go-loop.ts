@@ -1,5 +1,6 @@
 'use client';
 
+import { shownStepActionLabel } from '@/lib/i18n/go';
 import { keepFound, webAccessOf } from '@/lib/workflow/web-found';
 import { sourcesToCheck } from '@/lib/workflow/lookup';
 
@@ -37,7 +38,7 @@ import { RefusedRevision } from '@/lib/workflow/commit-check';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { api, type AnswerContradiction } from '@/lib/api/client';
-import { actionFor, actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, ROUTINE_DEFAULT_STEP, stepActionLabel, USER_ANSWER_STEP, whatApprovalDoes } from '@/lib/agent/actions';
+import { actionFor, actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, ROUTINE_DEFAULT_STEP, USER_ANSWER_STEP, whatApprovalDoes } from '@/lib/agent/actions';
 import { contextWithFacts, readOutcomeProof, readStageFacts, type StageFacts } from '@/lib/agent/facts';
 import { serializeItems, stageDrafts } from '@/lib/workflow/stage-artifact';
 import { carryNewerFixes, describeCarried, reasksCarried } from '@/lib/agent/review-rounds';
@@ -292,7 +293,8 @@ export function useGoLoop(opts: Options) {
   const stageLabelFor = useCallback((id: string) => getStage(latest.current.template, id)?.short_label ?? id, []);
   // A step's name and what approving it does, on its own stage (10 Oct, email 6.3).
   const stepLabel = useCallback(
-    (s: Pick<AgentStep, 'action_key' | 'stage_id'>) => stepActionLabel(s.action_key, s.stage_id ? getStage(latest.current.template, s.stage_id) : null),
+    // Shown on the page only: in the interface's language (client, 21 Oct).
+    (s: Pick<AgentStep, 'action_key' | 'stage_id'>) => shownStepActionLabel(s.action_key, s.stage_id ? getStage(latest.current.template, s.stage_id) : null),
     []
   );
   const stepEffect = useCallback((s: Pick<AgentStep, 'action_key' | 'stage_id'>) => {

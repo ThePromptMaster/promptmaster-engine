@@ -24,6 +24,7 @@ import { en as wsArea } from './areas/ws';
 import { en as actArea } from './areas/act';
 import { en as chatArea } from './areas/chat';
 import { en as chat2Area } from './areas/chat2';
+import { en as goArea } from './areas/go';
 
 export const en = {
   // The account menu (components/shared/app-header.tsx)
@@ -301,6 +302,7 @@ export const en = {
   ...actArea,
   ...chatArea,
   ...chat2Area,
+  ...goArea,
 } as const;
 
 /** A key as the dictionaries hold it. */
