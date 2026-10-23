@@ -44,8 +44,10 @@ import type { StageRendererProps } from './types';
 /** A table longer than this folds the rows already decided. */
 const FOLD_AFTER = 6;
 import { confirmProposalsLabel, lookupLabel } from '@/lib/workflow/stage-controls';
-import { PROPOSE_LABEL, proposeTargets } from '@/lib/workflow/proposals';
+import { proposeTargets } from '@/lib/workflow/proposals';
 import { rowsRequired } from '@/lib/workflow/engine';
+import { useLocale, useT } from '@/lib/i18n/i18n-provider';
+import { stageText } from '@/lib/i18n/templates';
 
 const TONE_CLASS: Record<string, string> = {
   done: 'text-[var(--pm-secondary)]',
@@ -55,6 +57,7 @@ const TONE_CLASS: Record<string, string> = {
 
 export function ReviewRenderer({
   stage,
+  templateKey,
   hideStageActions = false,
   onDirtyChange,
   schema,
@@ -94,6 +97,9 @@ export function ReviewRenderer({
   const [lookupNote, setLookupNote] = useState<string | null>(null);
   const [showSettled, setShowSettled] = useState(false);
   const [showSuperseded, setShowSuperseded] = useState(false);
+  const t = useT();
+  const locale = useLocale();
+  const shownLabel = stageText(locale, templateKey, stage, 'label');
 
   // The named sources, searched for in a public index. What comes back is
   // unsaved: the user reads what was found, then saves.
@@ -106,7 +112,7 @@ export function ReviewRenderer({
       setRows(result.items);
       setLookupNote(result.message);
     } catch (e) {
-      setLookupNote(e instanceof Error && e.message ? `The lookup did not work: ${e.message}` : 'The lookup did not work. Nothing was changed.');
+      setLookupNote(e instanceof Error && e.message ? t('stage.lookupFailedWhy', { why: e.message }) : t('stage.lookupFailed'));
     } finally {
       setLookingUp(false);
     }
@@ -124,7 +130,7 @@ export function ReviewRenderer({
       setRows(result.items);
       setLookupNote(result.message);
     } catch (e) {
-      setLookupNote(e instanceof Error && e.message ? `No proposals: ${e.message}` : 'No proposals could be made. Nothing was changed.');
+      setLookupNote(e instanceof Error && e.message ? t('stage.noProposalsWhy', { why: e.message }) : t('stage.noProposals'));
     } finally {
       setProposing(false);
     }
@@ -252,7 +258,7 @@ export function ReviewRenderer({
   const columns = schema.fields.filter((f) => !f.userOnly || rows.some((r) => (r[f.key] ?? '').trim()));
 
   return (
-    <section aria-label={`${stage.label} work`}>
+    <section aria-label={t('stage.work', { stage: shownLabel })}>
       {confirming && (
         <ConfirmOverwrite
           label={`${schema.itemLabel}s`}
@@ -310,30 +316,30 @@ export function ReviewRenderer({
                 ? deferred > 0
                   // Deferred is decided, not resolved (Sean, 10 Oct, email 8:
                   // "'All resolved' includes deferred concerns").
-                  ? `all decided · ${deferred} deferred, still open in the work`
-                  : 'all decided'
+                  ? t('stage.allDecidedDeferred', { count: deferred })
+                  : t('stage.allDecided')
                 : statusRequired
-                  ? `${outstanding} still to resolve`
-                  : `${outstanding} not yet marked — optional, does not block finishing`}
+                  ? t('stage.stillToResolve', { count: outstanding })
+                  : t('stage.notYetMarked', { count: outstanding })}
             </span>
             {proposed > 0 && (
               <span data-proposals className="text-label text-[var(--on-surface-variant)]">
-                · {proposed} proposed by PromptMaster — confirm or change
+                {t('stage.proposedCount', { count: proposed })}
               </span>
             )}
             {setByModel > 0 && (
               <span className="text-label text-[var(--on-surface-variant)]">
-                · {setByModel} set by PromptMaster from what it already knew — review or change
+                {t('stage.setByModelCount', { count: setByModel })}
               </span>
             )}
             {setByRun > 0 && (
               <span className="text-label text-[var(--on-surface-variant)]">
-                · {setByRun} recorded from code that ran in the sandbox
+                {t('stage.setByRunCount', { count: setByRun })}
               </span>
             )}
             {blockedRuns > 0 && (
               <span className="text-label text-[var(--on-surface-variant)]">
-                · {blockedRuns} could not be run — PromptMaster recorded why; review or change
+                {t('stage.blockedRunsCount', { count: blockedRuns })}
               </span>
             )}
           </div>
@@ -348,11 +354,10 @@ export function ReviewRenderer({
                 <span aria-hidden className={`material-symbols-outlined text-[16px] ${lookingUp ? 'animate-spin' : ''}`}>
                   {lookingUp ? 'progress_activity' : 'travel_explore'}
                 </span>
-                {lookingUp ? 'Looking them up…' : lookupLabel(schema.lookup.noun)}
+                {lookingUp ? t('stage.lookingUp') : lookupLabel(schema.lookup.noun)}
               </button>
               <span className="text-label text-[var(--on-surface-variant)]">
-                Searches OpenAlex for each named source and reads the abstract of each one it finds: one that states the
-                claim becomes AI verified, with the sentence it relied on. Nothing is saved until you save.
+                {t('stage.lookupExplainReview')}
               </span>
             </div>
           )}
@@ -367,10 +372,10 @@ export function ReviewRenderer({
                 <span aria-hidden className={`material-symbols-outlined text-[16px] ${proposing ? 'animate-spin' : ''}`}>
                   {proposing ? 'progress_activity' : 'auto_awesome'}
                 </span>
-                {proposing ? 'Reading the rows…' : PROPOSE_LABEL}
+                {proposing ? t('stage.readingRows') : t('stage.propose')}
               </button>
               <span className="text-label text-[var(--on-surface-variant)]">
-                PromptMaster reads each row without a status and proposes the one its text supports, with the reason. You confirm.
+                {t('stage.proposeExplain')}
               </span>
             </div>
           )}
@@ -392,8 +397,7 @@ export function ReviewRenderer({
                 {confirmProposalsLabel(confirmable)}
               </button>
               <span className="max-w-[60ch] text-label text-[var(--on-surface-variant)]">
-                PromptMaster read each row and proposed the status it supports, with its reason. Confirming makes
-                them your decisions; change any row first if it reads wrong.
+                {t('stage.confirmExplain')}
               </span>
             </div>
           )}
@@ -407,11 +411,8 @@ export function ReviewRenderer({
               nowhere ("where do I go?", 3 Oct call). */}
           {!readOnly && outstanding > 0 && (
             <p data-check-stage-note className="mb-3 max-w-[70ch] text-label text-[var(--on-surface-variant)]">
-              This is a check stage: PromptMaster lists what it found, and you decide on each row with its
-              status. Nothing in your work changes here
-              {stage.transitions.default_next
-                ? ' — later stages act on what you decide.'
-                : '. This is the last stage: what you decide is recorded with the finished work.'}
+              {t('stage.checkStageNote')}
+              {stage.transitions.default_next ? t('stage.checkStageLater') : t('stage.checkStageLast')}
             </p>
           )}
 
@@ -427,8 +428,7 @@ export function ReviewRenderer({
           <div data-stage-table tabIndex={-1} className="@container scroll-mt-24 overflow-x-auto rounded-xl bg-[var(--surface-container-lowest)] outline-none">
             <table className="w-full border-collapse @max-2xl:block">
               <caption className="sr-only">
-                {stage.label}: one row per {schema.itemLabel}, each with a status and, where the
-                status requires it, a reason.
+                {t('stage.caption', { stage: shownLabel, label: schema.itemLabel })}
               </caption>
               <thead>
                 <tr className="bg-[var(--surface-container-low)] @max-2xl:hidden">
@@ -445,7 +445,7 @@ export function ReviewRenderer({
                     scope="col"
                     className="w-[180px] px-4 py-3 text-left text-label uppercase tracking-wider text-[var(--on-surface-variant)]"
                   >
-                    Status
+                    {t('stage.status')}
                   </th>
                 </tr>
               </thead>
@@ -476,8 +476,8 @@ export function ReviewRenderer({
                           {showSettled ? 'expand_less' : 'expand_more'}
                         </span>
                         {showSettled
-                          ? `Hide the ${foldedRows.length} already decided`
-                          : `${foldedRows.length} already decided — show`}
+                          ? t('stage.hideDecided', { count: foldedRows.length })
+                          : t('stage.showDecided', { count: foldedRows.length })}
                       </button>
                     </td>
                   </tr>
@@ -509,8 +509,8 @@ export function ReviewRenderer({
                           {showSuperseded ? 'expand_less' : 'expand_more'}
                         </span>
                         {showSuperseded
-                          ? `Hide the ${supersededRows.length} earlier findings`
-                          : `Earlier findings (superseded) — ${supersededRows.length}, show`}
+                          ? t('stage.hideEarlier', { count: supersededRows.length })
+                          : t('stage.showEarlier', { count: supersededRows.length })}
                       </button>
                     </td>
                   </tr>
@@ -534,8 +534,8 @@ export function ReviewRenderer({
           </div>
           {statuses.some((s) => s.explain) && (
             <details className="mt-3">
-            <summary className="cursor-pointer text-label text-[var(--on-surface-variant)]">What the statuses mean</summary>
-            <dl aria-label="What the statuses mean" className="mt-2 grid gap-x-4 gap-y-1 text-label sm:grid-cols-[max-content_1fr]">
+            <summary className="cursor-pointer text-label text-[var(--on-surface-variant)]">{t('stage.statusesMean')}</summary>
+            <dl aria-label={t('stage.statusesMean')} className="mt-2 grid gap-x-4 gap-y-1 text-label sm:grid-cols-[max-content_1fr]">
               {statuses.filter((s) => s.explain && (!s.legacy || rows.some((r) => r.status === s.value))).map((s) => (
                 <div key={s.value} className="contents">
                   <dt className={TONE_CLASS[s.tone]}>{s.label}</dt>
@@ -555,7 +555,7 @@ export function ReviewRenderer({
             disabled={!dirty || saving}
             className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label text-[var(--on-primary)] disabled:opacity-40"
           >
-            {saving ? 'Saving…' : 'Save as new version'}
+            {saving ? t('stage.saving') : t('stage.saveVersion')}
           </button>
         </div>
       )}
@@ -579,6 +579,7 @@ function ReviewRow({ row, columns, statuses, schema, readOnly, onPatch, sameMiss
   const option = statusOption(schema, row.status);
   const needsReason = Boolean(option?.requiresReason);
   const reasonMissing = needsReason && !(row.reason ?? '').trim();
+  const t = useT();
 
   return (
     <>
@@ -591,26 +592,26 @@ function ReviewRow({ row, columns, statuses, schema, readOnly, onPatch, sameMiss
           >
             {row[c.key] || <span className="text-[var(--on-surface-variant)]">—</span>}
             {c === columns[0] && isSuperseded(row) && (
-              <span className="mt-1 block text-label text-[var(--on-surface-variant)]">Superseded by: {row.superseded_by}</span>
+              <span className="mt-1 block text-label text-[var(--on-surface-variant)]">{t('stage.supersededBy', { by: row.superseded_by ?? '' })}</span>
             )}
           </td>
         ))}
-        <td data-label="Status" className="px-4 py-3 @max-2xl:block @max-2xl:py-1 @max-2xl:before:block @max-2xl:before:text-label @max-2xl:before:uppercase @max-2xl:before:tracking-wider @max-2xl:before:text-[var(--on-surface-variant)] @max-2xl:before:content-[attr(data-label)]">
+        <td data-label={t('stage.status')} className="px-4 py-3 @max-2xl:block @max-2xl:py-1 @max-2xl:before:block @max-2xl:before:text-label @max-2xl:before:uppercase @max-2xl:before:tracking-wider @max-2xl:before:text-[var(--on-surface-variant)] @max-2xl:before:content-[attr(data-label)]">
           {readOnly ? (
             <span className={`text-body ${TONE_CLASS[option?.tone ?? 'neutral']}`}>
-              {option?.label ?? 'Not looked at'}
+              {option?.label ?? t('stage.notLookedAt')}
             </span>
           ) : (
             <CustomSelect
               value={row.status ?? ''}
               options={statuses.filter((s) => (s.settable !== false && !s.legacy) || s.value === row.status).map((s) => ({ value: s.value, label: s.label }))}
-              placeholder="Not looked at"
+              placeholder={t('stage.notLookedAt')}
               onChange={(value) => onPatch(row.id, 'status', value)}
             />
           )}
           {isProposed(row) && option && (
             <span data-proposed className="mt-1 block text-label text-[var(--pm-primary)]">
-              Proposed by PromptMaster
+              {t('stage.proposedBy')}
               {!needsReason && (row.reason ?? '').trim() ? (
                 <span className="block text-[var(--on-surface-variant)]">{row.reason}</span>
               ) : null}
@@ -619,23 +620,23 @@ function ReviewRow({ row, columns, statuses, schema, readOnly, onPatch, sameMiss
           {awaitsAttempt(row, schema) ? (
             // Q1a (9 Oct): work PromptMaster can do is not left as "not run".
             <span data-awaits-run className="mt-1 block text-label text-[var(--pm-primary)]">
-              PromptMaster can carry this out — Go runs it before this row is yours to settle. Choose a status to settle it now.
+              {t('stage.awaitsRun')}
             </span>
           ) : row.status_source === 'model' && option && option.decided !== false && (
-            <span className="mt-1 block text-label text-[var(--on-surface-variant)]">Set by PromptMaster</span>
+            <span className="mt-1 block text-label text-[var(--on-surface-variant)]">{t('stage.setByModel')}</span>
           )}
           {/* 13 Oct (Sean, 12.6): a finding "Handle them for me" left undecided says why. */}
           {!row.status && isTriageTable(schema) && findingRisk(row, schema) === 'material' && (
             <span data-left-for-you className="mt-1 block text-label text-[var(--on-surface-variant)]">
-              Left for you: {(row.severity ?? '').trim() ? `${row.severity} — ` : 'unrated — '}it changes what the work says, so routine decisions do not cover it.
+              {t('stage.leftForYou', { severity: (row.severity ?? '').trim() || t('stage.unrated') })}
             </span>
           )}
           {row.status_source === 'policy' && option && (
-            <span className="mt-1 block text-label text-[var(--on-surface-variant)]">Confirmed under your routine-decision policy</span>
+            <span className="mt-1 block text-label text-[var(--on-surface-variant)]">{t('stage.byPolicy')}</span>
           )}
           {row.status_source === 'sandbox' && option && (
             <span className="mt-1 block text-label text-[var(--on-surface-variant)]">
-              {row.status === schema.execution?.blocked ? 'Recorded by PromptMaster: the run could not be made' : 'Recorded from a sandbox run'}
+              {row.status === schema.execution?.blocked ? t('stage.runBlocked') : t('stage.fromRun')}
             </span>
           )}
           {statusContradictsRow(row) && (
@@ -657,21 +658,21 @@ function ReviewRow({ row, columns, statuses, schema, readOnly, onPatch, sameMiss
           <td colSpan={columns.length + 1} className="px-4 pb-4 @max-2xl:block">
             <ReasonField
               id={`${row.id}-reason`}
-              label={`Why ${option?.label.toLowerCase()}?`}
+              label={t('stage.why', { status: option?.label.toLowerCase() ?? '' })}
               value={row.reason ?? ''}
               disabled={readOnly}
               missing={reasonMissing}
-              missingMessage="This one still counts as unresolved until you say why."
+              missingMessage={t('stage.reasonMissing')}
               onChange={(value) => onPatch(row.id, 'reason', value)}
             />
             {row.reason_source === 'row' && !reasonMissing && (
               <span className="mt-1 block text-label text-[var(--on-surface-variant)]">
-                Filled in from what this row already says — edit it if that is not the reason.
+                {t('stage.reasonFromRow')}
               </span>
             )}
             {row.reason_source === 'same' && !reasonMissing && (
               <span className="mt-1 block text-label text-[var(--on-surface-variant)]">
-                The reason you gave for another row marked {option?.label.toLowerCase()} — edit it if this one differs.
+                {t('stage.reasonFromSame', { status: option?.label.toLowerCase() ?? '' })}
               </span>
             )}
             {!readOnly && !reasonMissing && sameMissing > 0 && onApplyReasonToSame && (
@@ -680,7 +681,7 @@ function ReviewRow({ row, columns, statuses, schema, readOnly, onPatch, sameMiss
                 onClick={onApplyReasonToSame}
                 className="mt-1 block text-label text-[var(--pm-primary)] hover:underline"
               >
-                Use this reason for the {sameMissing} other row{sameMissing === 1 ? '' : 's'} marked {option?.label.toLowerCase()} without one
+                {t('stage.useReason', { count: sameMissing, status: option?.label.toLowerCase() ?? '' })}
               </button>
             )}
           </td>

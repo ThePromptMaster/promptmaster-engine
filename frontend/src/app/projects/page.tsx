@@ -18,6 +18,7 @@ import { GuestBanner } from '@/components/projects/guest-banner';
 import { DeletedProjects } from '@/components/projects/deleted-projects';
 import { newProjectHref } from '@/lib/projects/example-goals';
 import { useLocale, useT } from '@/lib/i18n/i18n-provider';
+import { shownStageId } from '@/lib/i18n/stage';
 import { relativeTime } from '@/lib/i18n/format';
 
 const WORKFLOW_ICON: Record<string, string> = {
@@ -357,7 +358,7 @@ export default function ProjectsPage() {
                         )}
                         {p.status !== 'finalized' && p.stage && (
                           <span className="rounded-md bg-[var(--surface-container-high)] px-2 py-1">
-                            {p.stage.replace(/_/g, ' ')}
+                            {shownStageId(p.workflow, p.stage)}
                           </span>
                         )}
                         <span className="w-[64px] text-right tabular-nums">

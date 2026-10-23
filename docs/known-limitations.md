@@ -2068,14 +2068,21 @@ is the screen, the second is the work.
   terms). System stage names, short names and entry guidance come from `lib/i18n/templates.ts`.
   Button labels are translated where they are made (`next-action`, `next-step`,
   `stage-controls`), so Go and the chat are told the buttons in the words on the screen.
+- **The stage renderers (2026-10-23).** Translated: version pills and history, the drafting bar,
+  the prose editor, the list and review tables' own words (counts, proposals, reasons, folding,
+  statuses legend), the long-form drafting and revision panels, what made a version
+  (`lib/i18n/stage.ts`, display only; `operationLabel` stays English), the project timeline's
+  chrome, mode names and why a mode suits each system stage, and the project list's stage badge.
+  A stage's noun ("segments") follows a colon in the other languages, so a template noun that is
+  only English never needs an article.
 - **Still English in the workspace.**
-  - The stage renderers (prose, list, review, long-form, stage chrome): their own words, such as
-    table headings, row actions and chapter controls.
+  - Template data a table is built from: item nouns, column names, status names and their
+    explanations (`lib/workflow/stage-artifact` schemas), and each timeline entry's own title.
   - Sentences Go composes in code, because they are stored and compared as written:
     `describeNeed` (the body of "I need you to…"), `runAccount` ("So far"), the execution
     record's Saved / Checked / Workflow changes lines, and run stop reasons.
-  - Template data: exit-criteria labels ("I approve this analysis plan…"), recommended-mode
-    reasons, skip reasons; mode names (`MODE_DISPLAY`).
+  - Template data: exit-criteria labels ("I approve this analysis plan…") and skip reasons;
+    mode taglines on the start screen.
   - Text from `lib`: file summaries and rejection reasons (`lib/data`), fact-change
     descriptions, "and N more" lists, stage labels inside a check's reason.
   - Words stored with the work stay as written: version change summaries, a fact's source

@@ -24,6 +24,7 @@ import { ProseRenderer } from './prose-renderer';
 import { ReviewRenderer } from './review-renderer';
 import type { StageRendererProps } from './types';
 import { effectiveRenderer } from '@/lib/workflow/stage-artifact';
+import { useT } from '@/lib/i18n/i18n-provider';
 
 export function StageRenderer(props: StageRendererProps) {
   const { stage } = props;
@@ -55,18 +56,16 @@ export function StageRenderer(props: StageRendererProps) {
   return <ErrorBoundary key={stage.id}>{body}</ErrorBoundary>;
 }
 
-const PENDING_LABEL: Record<string, string> = {
-  outline: 'The outline editor',
-};
-
 function NotYetRenderer({ renderer }: { renderer: string }) {
+  const t = useT();
+  const what = renderer === 'outline' ? t('stage.notBuiltOutline') : t('stage.notBuiltView', { renderer });
   return (
     <div className="rounded-xl bg-[var(--surface-container-low)] px-8 py-12 text-center">
       <p className="text-body text-[var(--on-surface)]">
-        {PENDING_LABEL[renderer] ?? `The ${renderer} view`} is not built yet.
+        {t('stage.notBuilt', { what })}
       </p>
       <p className="mt-1 text-label text-[var(--on-surface-variant)]">
-        You can still move past this stage, or skip it with a reason.
+        {t('stage.notBuiltHint')}
       </p>
     </div>
   );

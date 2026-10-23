@@ -14,6 +14,8 @@ import { es as actArea } from './areas/act';
 import { es as chatArea } from './areas/chat';
 import { es as chat2Area } from './areas/chat2';
 import { es as goArea } from './areas/go';
+import { es as stageArea } from './areas/stage';
+import { es as modesArea } from './areas/modes';
 
 export const es: Messages = {
   'header.account': 'Cuenta',
@@ -287,4 +289,6 @@ export const es: Messages = {
   ...chatArea,
   ...chat2Area,
   ...goArea,
+  ...stageArea,
+  ...modesArea,
 };
