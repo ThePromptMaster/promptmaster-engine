@@ -40,6 +40,8 @@ export function inputsFromProject(project: Project): PMInput {
     custom_preamble: project.custom_preamble,
     custom_tone: project.custom_tone,
     session_facts: project.session_facts,
+    // The drain sends it as the language header: a chapter is written in the project's language.
+    language: project.language ?? 'en',
   };
 }
 

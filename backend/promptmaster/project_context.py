@@ -200,6 +200,32 @@ _NO_INVENTION = re.compile(
     re.IGNORECASE,
 )
 
+# The same in the other offered languages (client, 21 Oct: "pick your
+# language"). Word order differs ("Keine Details erfinden"), so a sentence says
+# it when it holds a negation, an inventing verb and a detail noun, in any order.
+# `frontend/src/lib/workflow/fact-boundary.ts` reads the same way.
+_NEG_X = re.compile(
+    r"(?<!\w)(?:no|sin|nunca|ne|pas|sans|jamais|não|nao|sem|nicht|kein\w*|ohne|nie|non|senza|mai|niet|geen|zonder|nooit)(?!\w)"
+    r"|(?<!\w)n['’](?=\w)",
+    re.IGNORECASE,
+)
+_VERB_X = re.compile(r"(?<!\w)(?:invent|erfind|erfund|verzin|verzon|fabric)\w*", re.IGNORECASE)
+_NOUN_X = re.compile(
+    r"(?<!\w)(?:detall|recuerd|histori|históri|anécdot|anecdot|hecho|détail|detail|souvenir|fait|pormenor|memória|memoria|"
+    r"lembran|erinnerung|geschicht|anekdot|fakt|dettagl|ricord|stori|aneddot|fatt|herinnering|verhal|feit)\w*",
+    re.IGNORECASE,
+)
+
+
+def _says_no_invention(text: str) -> bool:
+    if _NO_INVENTION.search(text):
+        return True
+    return any(
+        _NEG_X.search(s) and _VERB_X.search(s) and _NOUN_X.search(s)
+        for s in re.split(r"[.!?;\n]", text)
+    )
+
+
 FACT_BOUNDARY = (
     "FACT BOUNDARY — the user said not to invent details. About any real person, state only what "
     "the user supplied: their answers, the brief, the accepted facts, the current text. Restyle, "
@@ -218,7 +244,7 @@ def no_invented_details(inputs: PMInput) -> bool:
         *(i.instruction for i in (inputs.user_instructions or [])),
         *(f.statement for f in (inputs.facts or []) if f.kind == "requirement"),
     ]
-    return any(_NO_INVENTION.search(t or "") for t in texts)
+    return any(_says_no_invention(t or "") for t in texts)
 
 
 def context_block(inputs: PMInput, limit: int | None = None) -> str:

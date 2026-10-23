@@ -69,7 +69,7 @@ _INSTRUCTION = (
 
 
 def _norm(text: str) -> str:
-    return re.sub(r"\s+", " ", re.sub(r"[*_`#>“”\"’']", "", text.replace("\\", ""))).strip().lower()
+    return re.sub(r"\s+", " ", re.sub(r"[*_`#>“”\"’'«»„‚‹›]", "", text.replace("\\", ""))).strip().lower()
 
 
 def build_prompt(req: NewClaimsRequest) -> tuple[str, str]:
@@ -92,7 +92,7 @@ def parse(raw: object, req: NewClaimsRequest) -> NewClaimsResponse:
     for item in raw["claims"][:MAX_CLAIMS * 2]:
         if not isinstance(item, dict):
             continue
-        quote = " ".join(str(item.get("quote") or "").split()).strip("\"“”'")[:400]
+        quote = " ".join(str(item.get("quote") or "").split()).strip("\"“”'«»„‚‹› ")[:400]
         q = _norm(quote)
         if len(q) < 8 or q not in after or q in before or q in supplied:
             continue

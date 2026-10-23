@@ -20,6 +20,8 @@ import { designFromTemplate } from '@/lib/workflow/custom';
 import { AutoGrowTextarea } from '@/components/shared/auto-grow-textarea';
 import { api } from '@/lib/api/client';
 import { createProject, hardDeleteProject } from '@/lib/supabase/projects';
+import { setRequestLanguage } from '@/lib/api/language';
+import { browserLanguage, LANGUAGES, resolveLanguage, type LanguageCode } from '@/lib/workflow/languages';
 import { appendWorkflowEvent, listTemplates } from '@/lib/supabase/workflow';
 import { createArtifact } from '@/lib/supabase/versions';
 import type { WorkflowTemplate } from '@/lib/workflow/types';
@@ -77,6 +79,16 @@ export default function NewProjectPage() {
   const [templates, setTemplates] = useState<(WorkflowTemplate & { id: string })[]>([]);
   const [step, setStep] = useState<Step>('ask');
   const [objective, setObjective] = useState('');
+  // Client, 21 Oct ("pick your language"): the start screen's conversation and
+  // the new project write in this. The browser's own language when offered.
+  const [language, setLanguage] = useState<LanguageCode>('en');
+  useEffect(() => {
+    setLanguage(browserLanguage());
+  }, []);
+  useEffect(() => {
+    setRequestLanguage(language);
+    return () => setRequestLanguage('en');
+  }, [language]);
   const [templateId, setTemplateId] = useState<string | null>(null);
   /**
    * Facts and requirements the user gave in the front-door conversation and
@@ -367,6 +379,7 @@ export default function NewProjectPage() {
           output_format: draft.output_format.trim() || (selected.key === 'book' && !formOf({ objective: draft.objective, constraints: draft.constraints }) ? BOOK_OUTPUT_FORMAT : ''),
           mode: draft.mode,
           workflow: selected.key,
+          language,
         },
         user.id
       );
@@ -496,13 +509,29 @@ export default function NewProjectPage() {
 
   return (
     <main className="mx-auto max-w-[860px] px-6 py-14">
-      <Link
-        href="/projects"
-        className="mb-10 inline-flex items-center gap-1.5 text-body text-[var(--on-surface-variant)] transition-colors hover:text-[var(--on-surface)]"
-      >
-        <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-        Projects
-      </Link>
+      <div className="mb-10 flex flex-wrap items-center justify-between gap-3">
+        <Link
+          href="/projects"
+          className="inline-flex items-center gap-1.5 text-body text-[var(--on-surface-variant)] transition-colors hover:text-[var(--on-surface)]"
+        >
+          <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+          Projects
+        </Link>
+        <label className="inline-flex items-center gap-2 text-label text-[var(--on-surface-variant)]">
+          <span className="material-symbols-outlined text-[18px]" aria-hidden>translate</span>
+          Writes in
+          <select
+            aria-label="The language the project is written in"
+            value={language}
+            onChange={(e) => setLanguage(resolveLanguage(e.target.value))}
+            className="rounded-lg bg-[var(--surface-container-low)] px-3 py-1.5 text-label text-[var(--on-surface)] outline-none focus:ring-2 focus:ring-[var(--pm-primary)]/40"
+          >
+            {LANGUAGES.map((l) => (
+              <option key={l.code} value={l.code}>{l.code === 'en' ? l.name : l.own}</option>
+            ))}
+          </select>
+        </label>
+      </div>
 
       {/* 13 Oct (production pass): an unfinished setup found after the page
           loaded pushed the goal box down under the user's click. On the first
