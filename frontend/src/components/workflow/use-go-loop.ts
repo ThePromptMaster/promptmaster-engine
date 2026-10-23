@@ -31,7 +31,8 @@ import { sourcesToCheck } from '@/lib/workflow/lookup';
  * open. Closing it pauses the run, and reopening the project resumes it.
  */
 
-import { setUsageOperation, takeStepCost } from '@/lib/supabase/model-usage';
+import { recordErrorEvent, setUsageOperation, takeStepCost } from '@/lib/supabase/model-usage';
+import { asError, retryOnce } from '@/lib/supabase/errors';
 import { RefusedRevision } from '@/lib/workflow/commit-check';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -90,6 +91,18 @@ export const HEARTBEAT_MS = 10_000;
 export const LEASE_STALE_MS = 25_000;
 
 export type GoPhase = 'idle' | 'thinking' | 'performing' | 'awaiting' | 'ended' | 'watching';
+
+/**
+ * The step did its work, but its own record could not be saved, twice. The
+ * work is in the project (a stage move is an event, a draft a version), so the
+ * step must not be closed as if it had failed (client, 21 Oct: "Move to the
+ * next stage — Failed" on a move that was recorded).
+ */
+class StepNotRecorded extends Error {
+  constructor(readonly outcome: StepOutcome, cause: unknown) {
+    super(asError(cause, 'the record could not be saved').message);
+  }
+}
 
 interface Options {
   project: Project;
@@ -345,7 +358,7 @@ export function useGoLoop(opts: Options) {
           // second failure in a row stops the run (MAX_CONSECUTIVE_FAILURES).
           output: e instanceof RefusedRevision
             ? `${e.message}. A retry must start from the current version and keep every row the user decided.`
-            : e instanceof Error && e.message ? e.message : 'The step failed.',
+            : asError(e, 'The step failed.').message,
         };
       }
       if (signal.aborted) throw new Stopped();
@@ -367,10 +380,16 @@ export function useGoLoop(opts: Options) {
       }
 
       setUsageOperation(null);
-      const finished = await finishAgentStep(step.id, {
-        status: outcome.status, label: outcome.label, output: outcome.output, blockKind: outcome.blockKind ?? null,
-        toolsUsed: outcome.toolsUsed, changes: outcome.setAside ? { ...outcome.changes, set_aside: outcome.setAside } : outcome.changes, params: outcome.params,
-        costUsd: takeStepCost(step.id),
+      const costUsd = takeStepCost(step.id);
+      const done = outcome;
+      // A phone that drops its connection for a moment must not turn a move
+      // that happened into a failed one: try the record twice.
+      const finished = await retryOnce(() => finishAgentStep(step.id, {
+        status: done.status, label: done.label, output: done.output, blockKind: done.blockKind ?? null,
+        toolsUsed: done.toolsUsed, changes: done.setAside ? { ...done.changes, set_aside: done.setAside } : done.changes, params: done.params,
+        costUsd,
+      })).catch((e) => {
+        throw new StepNotRecorded(done, e);
       });
       upsertStep(finished);
       setProgress(null);
@@ -829,12 +848,25 @@ export function useGoLoop(opts: Options) {
       }
     } catch (e) {
       if (e instanceof Stopped || signal.aborted) return;
-      const message = e instanceof Error && e.message ? e.message : 'Go mode hit an error.';
+      // Postgrest throws plain objects; say what actually went wrong (client, 21 Oct).
+      const err = asError(e, 'Go mode hit an error.');
+      const message = err.message;
       setError(message);
+      const running = stepsRef.current.filter((x) => x.status === 'running');
+      void recordErrorEvent({
+        code: err.code ? `go_${err.code}` : 'go_error', title: 'Go stopped', message,
+        technical: [err.details, err.hint, running.map((s) => s.action_key).join(', ')].filter(Boolean).join(' · '),
+        route: 'go', projectId: latest.current.project.id,
+      });
       // A step whose close-out was refused (e.g. the database rejected a
-      // label) must not sit "in progress" forever.
-      for (const s of stepsRef.current.filter((x) => x.status === 'running')) {
-        const closed = await finishAgentStep(s.id, { status: 'failed', label: null, output: `Could not record this step: ${message}` }).catch(() => null);
+      // label) must not sit "in progress" forever. One whose work happened
+      // keeps its outcome, with the missing record said.
+      for (const s of running) {
+        const kept = e instanceof StepNotRecorded ? e.outcome : null;
+        const closed = await finishAgentStep(s.id, kept
+          ? { status: kept.status, label: kept.label, output: `${kept.output}\n\nThis step's own record could not be saved (${message}); what it did is in the project.`, blockKind: kept.blockKind ?? null, toolsUsed: kept.toolsUsed, changes: kept.changes }
+          : { status: 'failed', label: null, output: `Could not record this step: ${message}` }
+        ).catch(() => null);
         if (closed) upsertStep(closed);
       }
       // A planner or bookkeeping failure: record it rather than leave the run "running".
@@ -926,7 +958,7 @@ export function useGoLoop(opts: Options) {
       // A window the loop tried to start itself and the database refused is
       // not an error to show: the used-up window's own card asks for the click.
       if (auto) autoLeftRef.current = 0;
-      else setError(e instanceof Error ? e.message : 'Could not continue Go mode.');
+      else setError(asError(e, 'Could not continue Go mode.').message);
     }
   }, [commitRun, commitSteps, loop]);
   continueRef.current = continueRun;
@@ -994,7 +1026,7 @@ export function useGoLoop(opts: Options) {
       if (policy === 'guided') await startRun('guided', null);
       else await authorizeAndStart(policy);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not start Go mode.');
+      setError(asError(e, 'Could not start Go mode.').message);
     }
   }, [policy, budget, pendingStepId, commitRun, loop, startRun, continueRun, authorizeAndStart]);
 
@@ -1014,7 +1046,7 @@ export function useGoLoop(opts: Options) {
         await continueRun();
         return;
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Could not start updating the affected work.');
+        setError(asError(e, 'Could not start updating the affected work.').message);
         return;
       }
     }
@@ -1024,7 +1056,7 @@ export function useGoLoop(opts: Options) {
       try {
         await authorizeAndStart(chosen as Exclude<ExecutionPolicy, 'guided'>);
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Could not start updating the affected work.');
+        setError(asError(e, 'Could not start updating the affected work.').message);
       }
       return;
     }
@@ -1061,7 +1093,7 @@ export function useGoLoop(opts: Options) {
     try {
       await startRun('guided', null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not suggest a move.');
+      setError(asError(e, 'Could not suggest a move.').message);
     }
   }, [pendingStepId, startRun]);
 
@@ -1074,7 +1106,7 @@ export function useGoLoop(opts: Options) {
     if (runRef.current && !runRef.current.ended_at) return;
     setError(null);
     setPolicy('autonomous');
-    void authorizeAndStart('autonomous').catch((e) => setError(e instanceof Error ? e.message : 'Could not start Go mode.'));
+    void authorizeAndStart('autonomous').catch((e) => setError(asError(e, 'Could not start Go mode.').message));
   }, [authorizeAndStart]);
 
   const approve = useCallback(async () => {
@@ -1127,7 +1159,7 @@ export function useGoLoop(opts: Options) {
       void loop();
     } catch (e) {
       if (e instanceof Stopped) return;
-      setError(e instanceof Error ? e.message : 'That step failed.');
+      setError(asError(e, 'That step failed.').message);
     }
   }, [pendingStepId, perform, loop, setRunStatus, upsertStep]);
 
@@ -1208,7 +1240,7 @@ export function useGoLoop(opts: Options) {
         if (unmet) await Promise.all([o.onRefresh?.(), o.reloadEvents()]);
         await go();
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Could not reopen the deliverable.');
+        setError(asError(e, 'Could not reopen the deliverable.').message);
       }
     },
     [go, reopenJudged]
@@ -1255,7 +1287,7 @@ export function useGoLoop(opts: Options) {
         }
         await go();
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Could not record your answer.');
+        setError(asError(e, 'Could not record your answer.').message);
       }
     },
     [go, upsertStep, reopenJudged]
@@ -1462,7 +1494,7 @@ export function useGoLoop(opts: Options) {
       setPolicy('guided');
       await startRun('guided', null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not suggest a move.');
+      setError(asError(e, 'Could not suggest a move.').message);
     }
   }, [pendingStepId, setRunStatus, upsertStep, startRun]);
 
