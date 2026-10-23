@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useT } from '@/lib/i18n/i18n-provider';
 
 import { FOLDER_NAME_MAX, flattenTree, folderTree, type FolderNode } from '@/lib/supabase/folders';
 import type { ProjectFolder } from '@/types/project';
@@ -33,6 +34,7 @@ interface Props {
  * folder button does the same everywhere, keyboard and touch included.
  */
 export function FoldersSidebar({ folders, counts, selected, onSelect, onCreate, onRename, onDelete, onDropProject }: Props) {
+  const t = useT();
   const tree = flattenTree(folderTree(folders));
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   // Which row is being named: a new folder (under a parent, or at the top), or a rename.
@@ -61,7 +63,7 @@ export function FoldersSidebar({ folders, counts, selected, onSelect, onCreate, 
       else await onRename(naming.id, name);
       setNaming(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : ((e as { message?: string })?.message ?? 'That did not save.'));
+      setError(e instanceof Error ? e.message : ((e as { message?: string })?.message ?? t('folders.saveError')));
     } finally {
       setBusy(false);
     }
@@ -75,7 +77,7 @@ export function FoldersSidebar({ folders, counts, selected, onSelect, onCreate, 
       setConfirmDelete(null);
       if (selected === id) onSelect('all');
     } catch (e) {
-      setError(e instanceof Error ? e.message : ((e as { message?: string })?.message ?? 'The folder could not be deleted.'));
+      setError(e instanceof Error ? e.message : ((e as { message?: string })?.message ?? t('folders.deleteError')));
     } finally {
       setBusy(false);
     }
@@ -117,8 +119,8 @@ export function FoldersSidebar({ folders, counts, selected, onSelect, onCreate, 
         onKeyDown={(e) => {
           if (e.key === 'Escape') setNaming(null);
         }}
-        aria-label="Folder name"
-        placeholder="Folder name"
+        aria-label={t('folders.name')}
+        placeholder={t('folders.name')}
         className="w-full rounded-lg bg-[var(--surface-container-lowest)] px-2.5 py-1.5 text-body text-[var(--on-surface)] outline-none focus:ring-2 focus:ring-[var(--pm-primary)]/40"
       />
     </form>
@@ -160,14 +162,14 @@ export function FoldersSidebar({ folders, counts, selected, onSelect, onCreate, 
           <div className="min-w-0 flex-1">{row(f.id, f.name, selected === f.id ? 'folder_open' : 'folder', counts[f.id] ?? 0, f.id, f.depth)}</div>
           <div className="absolute right-0 top-1/2 hidden -translate-y-1/2 rounded-md bg-[var(--surface-container-high)] group-focus-within:flex group-hover:flex [@media(hover:none)]:static [@media(hover:none)]:flex [@media(hover:none)]:shrink-0 [@media(hover:none)]:translate-y-0 [@media(hover:none)]:bg-transparent">
             {f.depth + 1 < MAX_DEPTH && (
-              <button type="button" onClick={() => startNaming({ kind: 'new', parentId: f.id })} aria-label={`New folder in ${f.name}`} title="New folder inside" className="rounded-md p-1 text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)]">
+              <button type="button" onClick={() => startNaming({ kind: 'new', parentId: f.id })} aria-label={t('folders.newIn', { name: f.name })} title={t('folders.newInside')} className="rounded-md p-1 text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)]">
                 <span className="material-symbols-outlined text-[16px]">create_new_folder</span>
               </button>
             )}
-            <button type="button" onClick={() => startNaming({ kind: 'rename', id: f.id }, f.name)} aria-label={`Rename ${f.name}`} title="Rename" className="rounded-md p-1 text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)]">
+            <button type="button" onClick={() => startNaming({ kind: 'rename', id: f.id }, f.name)} aria-label={t('folders.renameNamed', { name: f.name })} title={t('folders.rename')} className="rounded-md p-1 text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)]">
               <span className="material-symbols-outlined text-[16px]">edit</span>
             </button>
-            <button type="button" onClick={() => setConfirmDelete(f.id)} aria-label={`Delete ${f.name}`} title="Delete" className="rounded-md p-1 text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)]">
+            <button type="button" onClick={() => setConfirmDelete(f.id)} aria-label={t('folders.deleteNamed', { name: f.name })} title={t('folders.delete')} className="rounded-md p-1 text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)]">
               <span className="material-symbols-outlined text-[16px]">delete</span>
             </button>
           </div>
@@ -175,10 +177,10 @@ export function FoldersSidebar({ folders, counts, selected, onSelect, onCreate, 
       )}
       {confirmDelete === f.id && (
         <div role="alert" className="my-1 rounded-lg bg-[var(--surface-container-high)] px-3 py-2 text-label text-[var(--on-surface)]" style={{ marginLeft: `${f.depth * 14}px` }}>
-          <p>Delete “{f.name}”? Its projects go to Unfiled and the folders inside it move to the top level. No project is deleted.</p>
+          <p>{t('folders.confirmDelete', { name: f.name })}</p>
           <div className="mt-2 flex gap-2">
-            <button type="button" disabled={busy} onClick={() => void remove(f.id)} className="rounded-lg bg-[var(--pm-error)] px-3 py-1 text-[var(--on-error)] disabled:opacity-60">Delete folder</button>
-            <button type="button" onClick={() => setConfirmDelete(null)} className="rounded-lg px-2 py-1 text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]">Keep</button>
+            <button type="button" disabled={busy} onClick={() => void remove(f.id)} className="rounded-lg bg-[var(--pm-error)] px-3 py-1 text-[var(--on-error)] disabled:opacity-60">{t('folders.deleteFolder')}</button>
+            <button type="button" onClick={() => setConfirmDelete(null)} className="rounded-lg px-2 py-1 text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]">{t('folders.keep')}</button>
           </div>
         </div>
       )}
@@ -187,16 +189,16 @@ export function FoldersSidebar({ folders, counts, selected, onSelect, onCreate, 
   );
 
   return (
-    <nav aria-label="Folders" className="space-y-1">
-      {row('all', 'All projects', 'workspaces', total, null)}
-      {row('unfiled', 'Unfiled', 'inbox', counts[''] ?? 0, null)}
+    <nav aria-label={t('folders.label')} className="space-y-1">
+      {row('all', t('folders.all'), 'workspaces', total, null)}
+      {row('unfiled', t('folders.unfiled'), 'inbox', counts[''] ?? 0, null)}
       <div className="flex items-center justify-between pt-4 pb-1 pl-2">
-        <h2 className="text-label uppercase tracking-wider text-[var(--on-surface-variant)]">Folders</h2>
+        <h2 className="text-label uppercase tracking-wider text-[var(--on-surface-variant)]">{t('folders.heading')}</h2>
         <button
           type="button"
           onClick={() => startNaming({ kind: 'new', parentId: null })}
-          aria-label="New folder"
-          title="New folder"
+          aria-label={t('folders.new')}
+          title={t('folders.new')}
           className="rounded-md p-1 text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)] hover:text-[var(--on-surface)]"
         >
           <span className="material-symbols-outlined text-[18px]">create_new_folder</span>
@@ -208,7 +210,7 @@ export function FoldersSidebar({ folders, counts, selected, onSelect, onCreate, 
       </ul>
       {tree.length === 0 && naming === null && (
         <p className="px-2 text-label leading-snug text-[var(--on-surface-variant)]">
-          Make a folder, then drag a project onto it or use the folder button on its card.
+          {t('folders.emptyHint')}
         </p>
       )}
       {error && <p role="alert" className="px-2 text-label text-[var(--pm-error)]">{error}</p>}

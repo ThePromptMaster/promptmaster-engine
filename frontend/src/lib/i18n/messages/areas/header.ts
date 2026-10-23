@@ -1,0 +1,78 @@
+/** The stage's own header (components/workflow/stage-header.tsx). */
+export const en = {
+  'stageHead.complete': 'Complete',
+  'stageHead.stuck': 'Stuck',
+  'stageHead.skipped': 'Skipped',
+  'stageHead.stale': 'Awaiting recheck',
+  'stageHead.leftOpen': 'Left open',
+  'stageHead.reopened': 'Reopened',
+  'stageHead.draftApproval': 'Draft complete · Your approval pending',
+  'stageHead.approval': 'Your approval pending',
+  'stageHead.approvalWhy': 'PromptMaster has verified what it can. This stage stays open until you give the approval in the checklist below.',
+  'stageHead.position': 'Stage {index} of {total}',
+  'stageHead.optional': 'optional',
+  'stageHead.skippedWhy': 'Skipped — {reason}',
+  'stageHead.hideGuidance': 'Hide guidance',
+  'stageHead.pickMode': 'How to think about this stage — pick a mode',
+  'stageHead.suited': 'Suited to this stage',
+  'stageHead.inUse': 'In use',
+} as const;
+
+type Keys = Record<keyof typeof en, string>;
+
+export const es: Keys = {
+  'stageHead.complete': 'Completa',
+  'stageHead.stuck': 'Atascada',
+  'stageHead.skipped': 'Omitida',
+  'stageHead.stale': 'Por revisar',
+  'stageHead.leftOpen': 'Dejada abierta',
+  'stageHead.reopened': 'Reabierta',
+  'stageHead.draftApproval': 'Borrador completo · Falta tu aprobación',
+  'stageHead.approval': 'Falta tu aprobación',
+  'stageHead.approvalWhy': 'PromptMaster ha verificado lo que puede. Esta etapa sigue abierta hasta que des tu aprobación en la lista de abajo.',
+  'stageHead.position': 'Etapa {index} de {total}',
+  'stageHead.optional': 'opcional',
+  'stageHead.skippedWhy': 'Omitida: {reason}',
+  'stageHead.hideGuidance': 'Ocultar la guía',
+  'stageHead.pickMode': 'Cómo abordar esta etapa: elige un modo',
+  'stageHead.suited': 'Adecuado para esta etapa',
+  'stageHead.inUse': 'En uso',
+};
+
+export const fr: Keys = {
+  'stageHead.complete': 'Terminée',
+  'stageHead.stuck': 'Bloquée',
+  'stageHead.skipped': 'Ignorée',
+  'stageHead.stale': 'À revérifier',
+  'stageHead.leftOpen': 'Laissée ouverte',
+  'stageHead.reopened': 'Rouverte',
+  'stageHead.draftApproval': 'Brouillon terminé · Votre validation est attendue',
+  'stageHead.approval': 'Votre validation est attendue',
+  'stageHead.approvalWhy': 'PromptMaster a vérifié ce qu’il pouvait. Cette étape reste ouverte jusqu’à votre validation dans la liste ci-dessous.',
+  'stageHead.position': 'Étape {index} sur {total}',
+  'stageHead.optional': 'facultative',
+  'stageHead.skippedWhy': 'Ignorée — {reason}',
+  'stageHead.hideGuidance': 'Masquer le conseil',
+  'stageHead.pickMode': 'Comment aborder cette étape — choisissez un mode',
+  'stageHead.suited': 'Adapté à cette étape',
+  'stageHead.inUse': 'Utilisé',
+};
+
+export const pt: Keys = {
+  'stageHead.complete': 'Concluída',
+  'stageHead.stuck': 'Travada',
+  'stageHead.skipped': 'Pulada',
+  'stageHead.stale': 'Aguardando nova checagem',
+  'stageHead.leftOpen': 'Deixada aberta',
+  'stageHead.reopened': 'Reaberta',
+  'stageHead.draftApproval': 'Rascunho concluído · Falta a sua aprovação',
+  'stageHead.approval': 'Falta a sua aprovação',
+  'stageHead.approvalWhy': 'O PromptMaster verificou o que podia. Esta etapa fica aberta até você dar a aprovação na lista abaixo.',
+  'stageHead.position': 'Etapa {index} de {total}',
+  'stageHead.optional': 'opcional',
+  'stageHead.skippedWhy': 'Pulada — {reason}',
+  'stageHead.hideGuidance': 'Ocultar orientação',
+  'stageHead.pickMode': 'Como pensar nesta etapa — escolha um modo',
+  'stageHead.suited': 'Indicado para esta etapa',
+  'stageHead.inUse': 'Em uso',
+};

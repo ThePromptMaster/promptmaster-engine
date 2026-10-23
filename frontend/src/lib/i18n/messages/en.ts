@@ -10,6 +10,18 @@
  * instructions) stays English in the code that sends it: the project's
  * "Writes in" language, not the interface, decides what the model writes.
  */
+import { en as projectsArea } from './areas/projects';
+import { en as templatesArea } from './areas/templates';
+import { en as railArea } from './areas/rail';
+import { en as refsArea } from './areas/refs';
+import { en as headerArea } from './areas/header';
+import { en as briefArea } from './areas/brief';
+import { en as factsArea } from './areas/facts';
+import { en as webArea } from './areas/web';
+import { en as dataArea } from './areas/data';
+import { en as docArea } from './areas/doc';
+import { en as wsArea } from './areas/ws';
+
 export const en = {
   // The account menu (components/shared/app-header.tsx)
   'header.account': 'Account',
@@ -272,6 +284,17 @@ export const en = {
   "guide.questionOf": "Question {number} of up to {max}",
   "guide.suggested": "Suggested answers",
   "guide.ownAnswers": "Your own answers",
+  ...projectsArea,
+  ...templatesArea,
+  ...railArea,
+  ...refsArea,
+  ...headerArea,
+  ...briefArea,
+  ...factsArea,
+  ...webArea,
+  ...dataArea,
+  ...docArea,
+  ...wsArea,
 } as const;
 
 /** A key as the dictionaries hold it. */

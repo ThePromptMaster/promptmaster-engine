@@ -1,6 +1,9 @@
 'use client';
 
 import { isDone } from '@/lib/workflow/types';
+import { useLocale, useT } from '@/lib/i18n/i18n-provider';
+import { groupLabel, stageText } from '@/lib/i18n/templates';
+import type { MessageKey } from '@/lib/i18n/messages/en';
 import type {
   StageDefinition,
   StageGroup,
@@ -82,6 +85,8 @@ export function StageRail({ template, state, nextSuggestedId, onSelect, approval
   // Group consecutive stages so the rail reads as phases rather than a flat
   // list of 13. Consecutive, not sorted: a template may legitimately revisit a
   // group later (Research returns to planning for Mechanism).
+  const t = useT();
+  const locale = useLocale();
   const groups: { group: StageGroup; stages: StageDefinition[] }[] = [];
   for (const stage of template.stages) {
     const last = groups.at(-1);
@@ -90,11 +95,11 @@ export function StageRail({ template, state, nextSuggestedId, onSelect, approval
   }
 
   return (
-    <nav aria-label="Workflow stages" className="py-2">
+    <nav aria-label={t('rail.label')} className="py-2">
       {groups.map((group, gi) => (
         <div key={`${group.group}-${gi}`} className="mb-3 last:mb-0">
           <div className="mb-1 px-3 text-label uppercase tracking-[0.08em] text-[var(--on-surface-variant)] opacity-70">
-            {GROUP_LABEL[group.group]}
+            {groupLabel(locale, group.group, GROUP_LABEL[group.group])}
           </div>
 
           <ul className="space-y-0.5">
@@ -117,7 +122,7 @@ export function StageRail({ template, state, nextSuggestedId, onSelect, approval
                   <button
                     onClick={() => onSelect(stage.id)}
                     aria-current={isCurrent ? 'step' : undefined}
-                    title={skipReason ? `Skipped — ${skipReason}` : stage.label}
+                    title={skipReason ? t('rail.skippedTitle', { reason: skipReason }) : stageText(locale, template.key, stage, 'label')}
                     className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-body transition-colors ${
                       isCurrent
                         ? 'bg-[var(--surface-container-high)] text-[var(--on-surface)]'
@@ -136,68 +141,66 @@ export function StageRail({ template, state, nextSuggestedId, onSelect, approval
                         status === 'skipped' ? 'line-through opacity-70' : ''
                       }`}
                     >
-                      {stage.short_label}
+                      {stageText(locale, template.key, stage, 'short')}
                     </span>
 
                     {/* Optional stages are marked so a user can tell what they
                         are allowed to leave out before they open it. */}
                     {!stage.required && status === 'not_started' && !isNext && (
                       <span className="shrink-0 text-label uppercase tracking-wide opacity-60">
-                        optional
+                        {t('rail.optional')}
                       </span>
                     )}
 
                     {isNext && (
                       <span className="shrink-0 rounded px-1.5 py-0.5 text-label uppercase tracking-wide text-[var(--pm-primary)]">
-                        next
+                        {t('rail.next')}
                       </span>
                     )}
 
                     {/* PM-13: moved past, not finished. */}
                     {leftOpen && (
                       <span
-                        title={`You moved on with something required still open — this stage is not complete.${
-                          awaitingApproval ? ' The only thing it is waiting for is your approval.' : ''
-                        }${
-                          state.stages[stage.id]?.left_reason ? ` Your reason: ${state.stages[stage.id]!.left_reason}` : ''
+                        title={`${t('rail.leftOpenWhy')}${awaitingApproval ? t('rail.leftOpenApproval') : ''}${
+                          state.stages[stage.id]?.left_reason ? t('rail.leftOpenReason', { reason: state.stages[stage.id]!.left_reason! }) : ''
                         }`}
                         className="shrink-0 text-label uppercase tracking-wide text-[var(--pm-tertiary)]"
                       >
-                        left open
+                        {t('rail.leftOpen')}
                       </span>
                     )}
                     {awaitingApproval && isCurrent && (
                       <span
-                        title="PromptMaster has verified what it can — this stage is waiting for your approval"
+                        title={t('rail.yourApprovalWhy')}
                         className="shrink-0 text-label uppercase tracking-wide text-[var(--pm-tertiary)]"
                       >
-                        your approval
+                        {t('rail.yourApproval')}
                       </span>
                     )}
                     {openElsewhere && !leftOpen && (
                       <span
-                        title="Reopened to edit — mark it complete again when you are done"
+                        title={t('rail.reopenedWhy')}
                         className="shrink-0 text-label uppercase tracking-wide text-[var(--pm-tertiary)]"
                       >
-                        reopened
+                        {t('rail.reopened')}
                       </span>
                     )}
 
                     {openCount > 0 && (
                       <span
-                        title={`Done, with ${openCount} finding${openCount === 1 ? '' : 's'} still open — open the stage to see ${openCount === 1 ? 'it' : 'them'}`}
+                        title={t('rail.doneOpenWhy', { count: openCount })}
                         className="shrink-0 text-label uppercase tracking-wide text-[var(--pm-tertiary)]"
                       >
-                        done · {openCount} open
+                        {t('rail.doneOpen', { count: openCount })}
                       </span>
                     )}
 
                     {projectOpen && (
                       <span
-                        title="This stage's work is done, but the project's objective is not met yet — see what it is waiting for on the stage"
+                        title={t('rail.waitingWhy')}
                         className="shrink-0 text-label uppercase tracking-wide text-[var(--pm-tertiary)]"
                       >
-                        waiting on you
+                        {t('rail.waiting')}
                       </span>
                     )}
 
@@ -205,12 +208,12 @@ export function StageRail({ template, state, nextSuggestedId, onSelect, approval
                       <span
                         title={
                           state.stages[stage.id]?.stale?.reason
-                            ? `Your brief changed, and this may no longer hold: ${state.stages[stage.id]!.stale!.reason}`
-                            : 'Work here predates a change you made earlier'
+                            ? t('rail.recheckWhy', { reason: state.stages[stage.id]!.stale!.reason })
+                            : t('rail.recheckEarlier')
                         }
                         className="shrink-0 text-label uppercase tracking-wide text-[var(--pm-tertiary)]"
                       >
-                        awaiting recheck
+                        {t('rail.recheck')}
                       </span>
                     )}
                   </button>
@@ -224,7 +227,7 @@ export function StageRail({ template, state, nextSuggestedId, onSelect, approval
       {/* PM-07: the glyphs, in words. */}
       <details className="mt-4 px-3 text-label text-[var(--on-surface-variant)]">
         <summary className="cursor-pointer select-none opacity-80 hover:opacity-100">
-          What the icons mean
+          {t('rail.legend')}
         </summary>
         <ul className="mt-2 space-y-1.5">
           {LEGEND.map(([icon, words]) => (
@@ -232,7 +235,7 @@ export function StageRail({ template, state, nextSuggestedId, onSelect, approval
               <span aria-hidden className="material-symbols-outlined text-[16px]">
                 {icon}
               </span>
-              {words}
+              {t(words)}
             </li>
           ))}
         </ul>
@@ -241,13 +244,13 @@ export function StageRail({ template, state, nextSuggestedId, onSelect, approval
   );
 }
 
-const LEGEND: [string, string][] = [
-  [STATUS_ICON.completed_with_artifact, 'Done, with its work saved'],
-  [STATUS_ICON.complete, 'Done'],
-  [STATUS_ICON.in_progress, 'You are here'],
-  [OPEN_ELSEWHERE_ICON, 'Left open or reopened — something required is still pending'],
-  [STATUS_ICON.not_started, 'Not started yet'],
-  [STATUS_ICON.skipped, 'Skipped on purpose, with a reason'],
-  [STATUS_ICON.blocked, 'Stuck — waiting on something'],
-  [STATUS_ICON.stale, 'Recheck — something before it changed'],
+const LEGEND: [string, MessageKey][] = [
+  [STATUS_ICON.completed_with_artifact, 'rail.legend.saved'],
+  [STATUS_ICON.complete, 'rail.legend.done'],
+  [STATUS_ICON.in_progress, 'rail.legend.here'],
+  [OPEN_ELSEWHERE_ICON, 'rail.legend.open'],
+  [STATUS_ICON.not_started, 'rail.legend.notStarted'],
+  [STATUS_ICON.skipped, 'rail.legend.skipped'],
+  [STATUS_ICON.blocked, 'rail.legend.blocked'],
+  [STATUS_ICON.stale, 'rail.legend.stale'],
 ];

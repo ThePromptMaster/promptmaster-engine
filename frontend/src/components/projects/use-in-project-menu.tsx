@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useT } from '@/lib/i18n/i18n-provider';
 
 import { ProjectPicker } from '@/components/workflow/project-references';
 import { addReference } from '@/lib/supabase/references';
@@ -22,6 +23,7 @@ export function UseInProjectMenu({
   projects: readonly ProjectSummary[];
   folders: readonly ProjectFolder[];
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [said, setSaid] = useState<{ ok: boolean; text: string } | null>(null);
@@ -49,16 +51,16 @@ export function UseInProjectMenu({
     const target = projects.find((p) => p.id === targetId);
     try {
       await addReference(userId, targetId, source.id);
-      setSaid({ ok: true, text: `“${target?.title || 'That project'}” now draws on this one.` });
+      setSaid({ ok: true, text: t('useIn.done', { name: target?.title || t('useIn.thatProject') }) });
     } catch (e) {
       const message = e instanceof Error ? e.message : ((e as { message?: string })?.message ?? '');
       setSaid({
         ok: false,
         text: /duplicate|unique/i.test(message)
-          ? 'That project already uses this one.'
+          ? t('useIn.already')
           : /at most five/i.test(message)
-          ? 'That project already uses five others, the most it can.'
-          : message || 'It could not be added.',
+          ? t('useIn.full')
+          : message || t('useIn.failed'),
       });
     } finally {
       setBusy(false);
@@ -75,16 +77,16 @@ export function UseInProjectMenu({
         }}
         aria-haspopup="dialog"
         aria-expanded={open}
-        aria-label={`Use ${source.title || 'this project'} in another project`}
-        title="Use in another project"
+        aria-label={t('useIn.button', { name: source.title || t('useIn.thisProject') })}
+        title={t('useIn.title')}
         className="rounded-lg p-2 text-[var(--on-surface-variant)] opacity-0 transition-opacity hover:bg-[var(--surface-container-high)] focus-visible:opacity-100 group-hover:opacity-100 aria-expanded:opacity-100 [@media(hover:none)]:opacity-100"
       >
         <span className="material-symbols-outlined text-[20px]">link</span>
       </button>
       {open && (
-        <div role="dialog" aria-label="Use in a project" className="absolute right-0 top-full z-20 mt-1 w-[300px] rounded-xl bg-[var(--surface-container-lowest)] p-3 shadow-[0_1px_2px_rgba(25,28,30,0.06),0_12px_28px_-12px_rgba(25,28,30,0.3)]">
+        <div role="dialog" aria-label={t('useIn.dialog')} className="absolute right-0 top-full z-20 mt-1 w-[300px] rounded-xl bg-[var(--surface-container-lowest)] p-3 shadow-[0_1px_2px_rgba(25,28,30,0.06),0_12px_28px_-12px_rgba(25,28,30,0.3)]">
           <p className="mb-2 text-label text-[var(--on-surface-variant)]">
-            Which project should draw on “{source.title || 'this project'}”? Its finished work and facts go with that project&apos;s prompts.
+            {t('useIn.prompt', { name: source.title || t('useIn.thisProject') })}
           </p>
           <ProjectPicker projects={projects.filter((p) => p.id !== source.id)} folders={folders} disabled={busy} onPick={(id) => void pick(id)} />
           {said && (

@@ -25,6 +25,8 @@
  * append-only.
  */
 
+import type { MessageKey } from '@/lib/i18n/messages/en';
+import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import { useMemo } from 'react';
 
 import type { StageDefinition } from '@/lib/workflow/types';
@@ -105,26 +107,33 @@ interface Props {
   readOnly: boolean;
 }
 
+/** A field's label and placeholder in the interface's language. */
+function useFieldText() {
+  const t = useT();
+  return (key: FieldKey) => ({ label: t(`brief.field.${key}`), placeholder: t(`brief.field.${key}Hint`) });
+}
+
 export function ProjectSetup({ project, stage, onPatch, readOnly }: Props) {
+  const t = useT();
+  const text = useFieldText();
   const required = useMemo(() => requiredFields(stage), [stage]);
   if (required.length === 0) return null;
 
   return (
     <section
-      aria-label="Project setup"
+      aria-label={t('brief.setupLabel')}
       className="mb-6 rounded-xl bg-[var(--surface-container-lowest)] px-7 py-6"
     >
       <h3 className="text-label uppercase tracking-wider text-[var(--on-surface-variant)]">
-        Project setup
+        {t('brief.setupLabel')}
       </h3>
       <p className="mt-1 mb-5 text-label text-[var(--on-surface-variant)]">
-        Carried into every stage of this project, not just this one. Your objective is what every stage is
-        written against: what PromptMaster drafts below sharpens it and never replaces it.
+        {t('brief.setupExplain')}
       </p>
 
       <div className="space-y-5">
         {ORDER.map((key) => {
-          const field = FIELDS[key];
+          const field = { ...FIELDS[key], ...text(key) };
           const isRequired = required.includes(key);
           const value = project[key] ?? '';
 
@@ -142,7 +151,7 @@ export function ProjectSetup({ project, stage, onPatch, readOnly }: Props) {
                 </label>
                 {isRequired && (
                   <span aria-hidden className="text-label text-[var(--pm-tertiary)]">
-                    {value.trim() ? 'required' : 'required — this stage is waiting on it'}
+                    {value.trim() ? t('brief.required') : t('brief.requiredWaiting')}
                   </span>
                 )}
               </div>
@@ -178,6 +187,8 @@ export function ProjectSetup({ project, stage, onPatch, readOnly }: Props) {
  * costs one line; open, it is the same four fields.
  */
 export function ProjectBrief({ project, onPatch, readOnly }: Omit<Props, 'stage'>) {
+  const t = useT();
+  const text = useFieldText();
   const objective = project.objective.trim();
   return (
     <details className="group mb-6 rounded-xl bg-[var(--surface-container-lowest)] px-7 py-4">
@@ -185,21 +196,20 @@ export function ProjectBrief({ project, onPatch, readOnly }: Omit<Props, 'stage'
         <span aria-hidden className="material-symbols-outlined text-[18px] transition-transform group-open:rotate-90">
           chevron_right
         </span>
-        <span className="shrink-0 text-label uppercase tracking-wider">Project brief</span>
+        <span className="shrink-0 text-label uppercase tracking-wider">{t('brief.title')}</span>
         <span className="min-w-0 truncate text-[var(--on-surface)]">
-          {objective || 'No objective yet'}
+          {objective || t('brief.noObjective')}
         </span>
         {project.audience && (
-          <span className="hidden shrink-0 text-label sm:inline">· for {project.audience}</span>
+          <span className="hidden shrink-0 text-label sm:inline">{t('brief.for', { audience: project.audience })}</span>
         )}
       </summary>
       <p className="mt-3 mb-4 text-label text-[var(--on-surface-variant)]">
-        Every stage is written against this — your words, not any stage&apos;s restatement of them. Change it here
-        and the next draft follows.
+        {t('brief.explain')}
       </p>
       <div className="space-y-4">
         {ORDER.map((key) => {
-          const field = FIELDS[key];
+          const field = { ...FIELDS[key], ...text(key) };
           return (
             <div key={key}>
               <label htmlFor={`brief-${key}`} className="mb-1.5 block text-label text-[var(--on-surface-variant)]">
@@ -246,10 +256,11 @@ export function ProjectBrief({ project, onPatch, readOnly }: Omit<Props, 'stage'
  * card take it; "Mine" follows the colours chosen in the account menu.
  */
 function AccentChoice({ accent, readOnly, onPick }: { accent: string | null | undefined; readOnly?: boolean; onPick: (accent: string | null) => void }) {
+  const t = useT();
   const current = ACCENTS.some((a) => a.id === accent) ? accent : null;
   return (
     <fieldset disabled={readOnly}>
-      <legend className="mb-1.5 block text-label text-[var(--on-surface-variant)]">Project colour</legend>
+      <legend className="mb-1.5 block text-label text-[var(--on-surface-variant)]">{t('brief.colour')}</legend>
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
@@ -257,7 +268,7 @@ function AccentChoice({ accent, readOnly, onPick }: { accent: string | null | un
           aria-pressed={current === null}
           className={`rounded-full px-3 py-1 text-label ${current === null ? 'bg-[var(--surface-container-highest)] text-[var(--on-surface)]' : 'bg-[var(--surface-container-low)] text-[var(--on-surface-variant)]'}`}
         >
-          Mine
+          {t('brief.colourMine')}
         </button>
         {ACCENTS.map((a) => (
           <button
@@ -265,14 +276,14 @@ function AccentChoice({ accent, readOnly, onPick }: { accent: string | null | un
             type="button"
             onClick={() => onPick(a.id)}
             aria-pressed={current === a.id}
-            aria-label={`Project colour: ${a.label}`}
-            title={a.label}
+            aria-label={t('brief.colourNamed', { name: t(`colour.${a.id}` as MessageKey) })}
+            title={t(`colour.${a.id}` as MessageKey)}
             className={`h-7 w-7 rounded-full transition-transform hover:scale-110 ${current === a.id ? 'ring-2 ring-[var(--on-surface)] ring-offset-2 ring-offset-[var(--surface-container-lowest)]' : ''}`}
             style={{ background: a.colour }}
           />
         ))}
       </div>
-      <p className="mt-1 text-label text-[var(--on-surface-variant)]">Tells your projects apart at a glance, here and on the project list.</p>
+      <p className="mt-1 text-label text-[var(--on-surface-variant)]">{t('brief.colourHint')}</p>
     </fieldset>
   );
 }
@@ -283,10 +294,11 @@ function AccentChoice({ accent, readOnly, onPick }: { accent: string | null | un
  * slower and dearer, and the usage page shows by how much.
  */
 function ThinkingChoice({ thinking, readOnly, onPick }: { thinking: Thinking | undefined; readOnly?: boolean; onPick: (thinking: Thinking) => void }) {
+  const t = useT();
   return (
     <div>
       <label htmlFor="brief-thinking" className="mb-1.5 block text-label text-[var(--on-surface-variant)]">
-        Thinking
+        {t('brief.thinking')}
       </label>
       <select
         id="brief-thinking"
@@ -295,11 +307,11 @@ function ThinkingChoice({ thinking, readOnly, onPick }: { thinking: Thinking | u
         onChange={(e) => onPick(e.target.value === 'deep' ? 'deep' : 'standard')}
         className="rounded-lg bg-[var(--surface-container-low)] px-4 py-2.5 text-body text-[var(--on-surface)] outline-none focus:ring-2 focus:ring-[var(--pm-primary)]/40 disabled:opacity-70"
       >
-        <option value="standard">Standard</option>
-        <option value="deep">Deep — reasons longer before answering</option>
+        <option value="standard">{t('brief.thinkingStandard')}</option>
+        <option value="deep">{t('brief.thinkingDeep')}</option>
       </select>
       <p className="mt-1 text-label text-[var(--on-surface-variant)]">
-        Deep takes longer and costs more per answer. Try it when answers feel shallow or miss a constraint.
+        {t('brief.thinkingHint')}
       </p>
     </div>
   );
@@ -310,10 +322,20 @@ function ThinkingChoice({ thinking, readOnly, onPick }: { thinking: Thinking | u
  * language?"): every draft, check, chat answer and Go step from here on.
  */
 export function LanguageChoice({ language, readOnly, onPick, id = 'brief-language' }: { language: string | undefined; readOnly?: boolean; onPick: (language: LanguageCode) => void; id?: string }) {
+  const t = useT();
+  const locale = useLocale();
+  // Each language by its own name, then by the interface's name for it.
+  const named = (code: string, fallback: string) => {
+    try {
+      return new Intl.DisplayNames([locale], { type: 'language' }).of(code) ?? fallback;
+    } catch {
+      return fallback;
+    }
+  };
   return (
     <div>
       <label htmlFor={id} className="mb-1.5 block text-label text-[var(--on-surface-variant)]">
-        Writes in
+        {t('brief.writesIn')}
       </label>
       <select
         id={id}
@@ -323,23 +345,24 @@ export function LanguageChoice({ language, readOnly, onPick, id = 'brief-languag
         className="rounded-lg bg-[var(--surface-container-low)] px-4 py-2.5 text-body text-[var(--on-surface)] outline-none focus:ring-2 focus:ring-[var(--pm-primary)]/40 disabled:opacity-70"
       >
         {LANGUAGES.map((l) => (
-          <option key={l.code} value={l.code}>{l.code === 'en' ? l.name : `${l.own} — ${l.name}`}</option>
+          <option key={l.code} value={l.code}>{l.code === locale ? l.own : `${l.own} — ${named(l.code, l.name)}`}</option>
         ))}
       </select>
       <p className="mt-1 text-label text-[var(--on-surface-variant)]">
-        Drafts, checks, the side chat and Go write in this language. Work already written stays as it is.
+        {t('brief.writesInHint')}
       </p>
     </div>
   );
 }
 
 function ModelChoice({ model, readOnly, onPick }: { model: string | null | undefined; readOnly?: boolean; onPick: (model: string) => void }) {
+  const t = useT();
   const current = currentModel(model) || DEFAULT_MODEL;
   const choices = MODEL_CHOICES.some((c) => c.id === current) ? MODEL_CHOICES : [...MODEL_CHOICES, { id: current, label: current }];
   return (
     <div>
       <label htmlFor="brief-model" className="mb-1.5 block text-label text-[var(--on-surface-variant)]">
-        Model
+        {t('brief.model')}
       </label>
       <select
         id="brief-model"
@@ -354,7 +377,7 @@ function ModelChoice({ model, readOnly, onPick }: { model: string | null | undef
           </option>
         ))}
       </select>
-      <p className="mt-1 text-label text-[var(--on-surface-variant)]">Used for every draft, check and chat from now on. Earlier versions keep the model that wrote them.</p>
+      <p className="mt-1 text-label text-[var(--on-surface-variant)]">{t('brief.modelHint')}</p>
     </div>
   );
 }

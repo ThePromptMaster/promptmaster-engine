@@ -1,5 +1,6 @@
 'use client';
 
+import { useT } from '@/lib/i18n/i18n-provider';
 import { useState } from 'react';
 
 import { api } from '@/lib/api/client';
@@ -32,6 +33,7 @@ export function WebSources({
   onChanged: () => void | Promise<void>;
   readOnly?: boolean;
 }) {
+  const t = useT();
   const on = project.web_access === 'on';
   const sources = currentSources(project.sources);
   const [toggled, setToggled] = useState<boolean | null>(null);
@@ -56,11 +58,11 @@ export function WebSources({
       setQuery('');
       setNote(
         found.sources.length
-          ? `${saved.length} new source${saved.length === 1 ? '' : 's'} saved${found.sources.length > saved.length ? `; ${found.sources.length - saved.length} already on record` : ''}.`
-          : 'The search returned no sources. Nothing was saved.'
+          ? `${t('web.newSaved', { count: saved.length })}${found.sources.length > saved.length ? t('web.alreadyOnRecord', { count: found.sources.length - saved.length }) : ''}.`
+          : t('web.noResults')
       );
     } catch (e) {
-      setError(e instanceof Error && e.message ? e.message : 'The search failed. Nothing was saved.');
+      setError(e instanceof Error && e.message ? e.message : t('web.failed'));
     } finally {
       setBusy(false);
     }
@@ -69,7 +71,7 @@ export function WebSources({
   const quiet = 'rounded px-1.5 py-0.5 text-label font-semibold text-[var(--pm-primary)] hover:bg-[var(--surface-container-high)] disabled:opacity-40';
 
   return (
-    <section aria-label="Web access and sources" className="mb-6 rounded-xl bg-[var(--surface-container-low)] px-5 py-3">
+    <section aria-label={t('web.label')} className="mb-6 rounded-xl bg-[var(--surface-container-low)] px-5 py-3">
       <button
         type="button"
         onClick={() => setToggled(!open)}
@@ -77,10 +79,10 @@ export function WebSources({
         className="flex w-full items-center gap-2 text-left text-title text-[var(--on-surface)]"
       >
         <span aria-hidden className="material-symbols-outlined text-[18px]">travel_explore</span>
-        Web sources
+        {t('web.title')}
         <span className="text-label text-[var(--on-surface-variant)]">
-          {on ? 'web access on' : 'web access off'}
-          {sources.length ? ` · ${sources.length} saved` : ''}
+          {on ? t('web.on') : t('web.off')}
+          {sources.length ? t('web.saved', { count: sources.length }) : ''}
         </span>
         <span aria-hidden className="material-symbols-outlined ml-auto text-[18px]">{open ? 'expand_less' : 'expand_more'}</span>
       </button>
@@ -91,23 +93,20 @@ export function WebSources({
             <input
               type="checkbox"
               role="switch"
-              aria-label="Web access"
+              aria-label={t('web.switch')}
               checked={on}
               disabled={readOnly || busy}
               onChange={(e) => void onToggle(e.target.checked ? 'on' : 'off')}
               className="mt-1 h-4 w-4 accent-[var(--pm-primary)]"
             />
             <span className="text-label text-[var(--on-surface-variant)]">
-              <span className="font-semibold text-[var(--on-surface)]">Web access</span> — when on, PromptMaster may search the
-              public web for this project, from here or in Go. Each search is saved as sources with their links and the date,
-              stages cite them as [S1], [S2], …, and each search costs a little extra. Off keeps the project to what you
-              supply.
+              <span className="font-semibold text-[var(--on-surface)]">{t('web.switch')}</span> {t('web.explain')}
             </span>
           </label>
 
           {on && !readOnly && (
             <form
-              aria-label="Search the web"
+              aria-label={t('web.form')}
               className="mt-3 flex flex-wrap gap-2"
               onSubmit={(e) => {
                 e.preventDefault();
@@ -117,8 +116,8 @@ export function WebSources({
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value.slice(0, 400))}
-                placeholder="What to look up, e.g. Harbor Industrial Services revenue 2025"
-                aria-label="What to search the web for"
+                placeholder={t('web.queryHint')}
+                aria-label={t('web.queryLabel')}
                 className="min-w-0 flex-[1_1_14rem] rounded-lg bg-[var(--surface-container-lowest)] px-3 py-1.5 text-body text-[var(--on-surface)] outline-none focus:ring-2 focus:ring-[var(--pm-primary)]/40"
               />
               <button
@@ -126,7 +125,7 @@ export function WebSources({
                 disabled={busy || query.trim().length < 2}
                 className="rounded-lg bg-[var(--pm-primary)] px-3 py-1.5 text-label font-semibold text-[var(--on-primary)] disabled:opacity-40"
               >
-                {busy ? 'Searching…' : 'Search the web'}
+                {busy ? t('web.searching') : t('web.search')}
               </button>
             </form>
           )}
@@ -134,7 +133,7 @@ export function WebSources({
           {error && <p role="alert" className="mt-2 text-label text-[var(--pm-error)]">{error}</p>}
 
           {sources.length > 0 && (
-            <ol aria-label="Saved sources" className="mt-3 space-y-2">
+            <ol aria-label={t('web.list')} className="mt-3 space-y-2">
               {sources.map((s, i) => (
                 <li key={s.id} className="text-body text-[var(--on-surface)]">
                   <span className="font-semibold">[S{i + 1}] </span>
@@ -142,7 +141,7 @@ export function WebSources({
                     {s.title || s.url}
                   </a>
                   <span className="ml-2 text-label text-[var(--on-surface-variant)]">
-                    retrieved {s.retrieved_at.slice(0, 10)}{s.origin === 'agent' ? ' by Go' : ''} · searched “{s.query}”
+                    {t('web.retrieved', { date: s.retrieved_at.slice(0, 10) })}{s.origin === 'agent' ? t('web.byGo') : ''}{t('web.searched', { query: s.query })}
                   </span>
                   {s.excerpt && <span className="block text-label text-[var(--on-surface-variant)]">{s.excerpt}</span>}
                   {!readOnly && (
@@ -151,11 +150,11 @@ export function WebSources({
                       disabled={busy}
                       onClick={() => {
                         setBusy(true);
-                        void retireSource(s.id).then(() => onChanged()).catch((e) => setError(e instanceof Error ? e.message : 'That did not save.')).finally(() => setBusy(false));
+                        void retireSource(s.id).then(() => onChanged()).catch((e) => setError(e instanceof Error ? e.message : t('web.saveError'))).finally(() => setBusy(false));
                       }}
                       className={quiet}
                     >
-                      Take out
+                      {t('web.takeOut')}
                     </button>
                   )}
                 </li>
@@ -163,7 +162,7 @@ export function WebSources({
             </ol>
           )}
           {!sources.length && on && (
-            <p className="mt-2 text-label text-[var(--on-surface-variant)]">No sources saved yet.</p>
+            <p className="mt-2 text-label text-[var(--on-surface-variant)]">{t('web.none')}</p>
           )}
         </div>
       )}

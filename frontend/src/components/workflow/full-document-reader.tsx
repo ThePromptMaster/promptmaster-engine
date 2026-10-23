@@ -1,11 +1,13 @@
 'use client';
 
+import { nounText } from '@/lib/i18n/templates';
+import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import { useEffect, useMemo, useState } from 'react';
 
 import { MarkdownOutput } from '@/components/shared/markdown-output';
 import { toManuscriptMarkdown, type ExportBundle } from '@/lib/export/project-export';
 import { deliverableNouns } from '@/lib/workflow/labels';
-import { readerLag, readerLagNote } from '@/lib/workflow/reader-lag';
+import { readerLag } from '@/lib/workflow/reader-lag';
 
 /**
  * The whole thing being made, readable at any point — not only after Finish.
@@ -17,10 +19,12 @@ import { readerLag, readerLagNote } from '@/lib/workflow/reader-lag';
  * This shows what is written so far, as one document, and changes nothing.
  */
 export function FullDocumentReader({ bundle }: { bundle: ExportBundle }) {
+  const t = useT();
+  const locale = useLocale();
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const markdown = useMemo(() => toManuscriptMarkdown(bundle), [bundle]);
-  const { deliverable: noun } = deliverableNouns(bundle.template, bundle.project);
+  const noun = nounText(locale, deliverableNouns(bundle.template, bundle.project).deliverable);
   const lag = useMemo(() => readerLag(bundle.template, bundle.stages), [bundle]);
   const words = useMemo(() => markdown.replace(/^# .*\n+/, '').split(/\s+/).filter(Boolean).length, [markdown]);
 
@@ -40,21 +44,21 @@ export function FullDocumentReader({ bundle }: { bundle: ExportBundle }) {
         className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-low)] px-3 py-1.5 text-label text-[var(--on-surface-variant)] transition-colors hover:bg-[var(--surface-container-high)] hover:text-[var(--on-surface)]"
       >
         <span aria-hidden className="material-symbols-outlined text-[16px]">menu_book</span>
-        Read the full {noun}
+        {t('fullwork.full', { noun })}
       </button>
 
       {open && (
         <div
           role="dialog"
           aria-modal="true"
-          aria-label={`The full ${noun}`}
+          aria-label={t('fullwork.fullLabel', { noun })}
           className="fixed inset-0 z-40 flex justify-center overflow-y-auto bg-[rgba(25,28,30,0.45)] px-4 py-8"
           onClick={(e) => e.target === e.currentTarget && setOpen(false)}
         >
           <div className="h-fit w-full max-w-[780px] rounded-2xl bg-[var(--surface-container-lowest)] px-8 py-6">
             <div className="mb-4 flex flex-wrap items-center gap-3">
               <p className="mr-auto text-label text-[var(--on-surface-variant)]">
-                The {noun} as it stands · {words.toLocaleString()} words · reading only, nothing here changes it
+                {t('fullwork.asItStands', { noun, words: words.toLocaleString(locale) })}
               </p>
               <button
                 onClick={() => {
@@ -62,18 +66,18 @@ export function FullDocumentReader({ bundle }: { bundle: ExportBundle }) {
                 }}
                 className="rounded-lg bg-[var(--surface-container-high)] px-3 py-1.5 text-label text-[var(--on-surface)]"
               >
-                {copied ? 'Copied' : 'Copy'}
+                {copied ? t('fullwork.copied') : t('fullwork.copy')}
               </button>
               <button
                 onClick={() => setOpen(false)}
                 className="rounded-lg bg-[var(--pm-primary)] px-3 py-1.5 text-label text-[var(--on-primary)]"
               >
-                Close
+                {t('fullwork.closeFull')}
               </button>
             </div>
             {lag && (
               <p role="note" className="mb-4 rounded-lg bg-[var(--surface-container-low)] px-3 py-2 text-label text-[var(--on-surface)]">
-                {readerLagNote(lag)}
+                {t(lag.feedsIt ? 'fullwork.lagFeeds' : 'fullwork.lagOwn', { shows: lag.shows, changed: lag.changed })}
               </p>
             )}
             <MarkdownOutput content={markdown} />

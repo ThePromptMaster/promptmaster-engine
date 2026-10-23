@@ -1,4 +1,15 @@
 import type { Messages } from './en';
+import { fr as projectsArea } from './areas/projects';
+import { fr as templatesArea } from './areas/templates';
+import { fr as railArea } from './areas/rail';
+import { fr as refsArea } from './areas/refs';
+import { fr as headerArea } from './areas/header';
+import { fr as briefArea } from './areas/brief';
+import { fr as factsArea } from './areas/facts';
+import { fr as webArea } from './areas/web';
+import { fr as dataArea } from './areas/data';
+import { fr as docArea } from './areas/doc';
+import { fr as wsArea } from './areas/ws';
 
 export const fr: Messages = {
   'header.account': 'Compte',
@@ -257,4 +268,15 @@ export const fr: Messages = {
   "guide.questionOf": "Question {number} sur {max} au plus",
   "guide.suggested": "Réponses proposées",
   "guide.ownAnswers": "Vos propres réponses",
+  ...projectsArea,
+  ...templatesArea,
+  ...railArea,
+  ...refsArea,
+  ...headerArea,
+  ...briefArea,
+  ...factsArea,
+  ...webArea,
+  ...dataArea,
+  ...docArea,
+  ...wsArea,
 };

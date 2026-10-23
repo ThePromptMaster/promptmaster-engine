@@ -1,5 +1,7 @@
 'use client';
 
+import { stageText, workflowName as workflowNameText } from '@/lib/i18n/templates';
+import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import { WebFoundNotice } from './web-found-notice';
 import { formOf, inFormWords } from '@/lib/workflow/work-form';
 import { modeForStage } from '@/lib/workflow/stage-mode';
@@ -214,6 +216,9 @@ export function WorkflowWorkspace({
   // Every request built from the project carries the instructions the user
   // applied, beside its facts (12 Oct, Atlas and Meridian).
   const project = useMemo(() => withAppliedInstructions(projectProp, template, bundles), [projectProp, template, bundles]);
+  // The interface's language (client, 21 Oct); the work's own language is the project's.
+  const t = useT();
+  const locale = useLocale();
   // The event log lives in the project store, with the artifacts it is read
   // alongside; writing goes through `appendEvent`, which re-reads the log, so
   // no surface can hold a copy the others have moved past.
@@ -377,7 +382,8 @@ export function WorkflowWorkspace({
   // 13 Oct (Sean, 12.1): a screenplay on the Book workflow says so, and the
   // stage's words follow the form ("sequence", not "chapter").
   const workForm = useMemo(() => formOf(project), [project]);
-  const workflowName = workForm && template.key === 'book' ? `${template.name} workflow · ${workForm.label}` : template.name;
+  const shownTemplateName = workflowNameText(locale, template.key, template.name);
+  const workflowName = workForm && template.key === 'book' ? t('ws.workflowForm', { name: shownTemplateName, form: workForm.label }) : shownTemplateName;
   const isCurrent = stageId === state.current_stage_id;
   // A stage moved past with requirements still open can be worked on when
   // viewed: that is how its box gets ticked and the stage closed (PM-13,
@@ -1344,7 +1350,7 @@ export function WorkflowWorkspace({
   /** Go's panel lives on the current stage: open that and bring the panel into view. */
   const showGo = useCallback(() => {
     setViewingStageId(null);
-    setTimeout(() => document.querySelector('[aria-label="Go mode"]')?.scrollIntoView({ block: 'start' }), 100);
+    setTimeout(() => document.querySelector('[data-panel="go"]')?.scrollIntoView({ block: 'start' }), 100);
   }, []);
 
   // The one next action, at the top of whichever stage is open (17 Oct, Sean).
@@ -1421,7 +1427,7 @@ export function WorkflowWorkspace({
         table.scrollIntoView({ block: 'start' });
       },
       showData: () => {
-        const panel = document.querySelector<HTMLElement>('section[aria-label="Project data"]');
+        const panel = document.querySelector<HTMLElement>('[data-panel="project-data"]');
         if (!panel) return;
         panel.querySelector<HTMLElement>('button')?.focus({ preventScroll: true });
         panel.scrollIntoView({ block: 'center' });
@@ -1832,7 +1838,7 @@ export function WorkflowWorkspace({
             aria-hidden
           />
           <nav
-            aria-label="Workflow stages"
+            aria-label={t('rail.label')}
             className="relative flex h-full w-[280px] max-w-[85vw] flex-col overflow-y-auto bg-[var(--surface-container-lowest)] px-2 py-5 sidebar-scroll"
           >
             <div className="mb-5 flex items-start gap-2 px-3">
@@ -1842,7 +1848,7 @@ export function WorkflowWorkspace({
               </div>
               <button
                 onClick={() => setMobileRailOpen(false)}
-                aria-label="Close stages"
+                aria-label={t('ws.closeStages')}
                 className="-mt-1 shrink-0 rounded-lg p-1.5 text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-low)] hover:text-[var(--on-surface)]"
               >
                 <span aria-hidden className="material-symbols-outlined text-[20px]">
@@ -1892,11 +1898,11 @@ export function WorkflowWorkspace({
             </span>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-title text-[var(--on-surface)]">
-                {stage.short_label}
+                {stageText(locale, template.key, stage, 'short')}
               </span>
               <span className="block text-label text-[var(--on-surface-variant)]">
-                Stage {stageIndex + 1} of {template.stages.length}
-                {progress.leftOpen > 0 && ` · ${progress.leftOpen} left open`} · {progress.remaining} to go
+                {t('stageHead.position', { index: stageIndex + 1, total: template.stages.length })}
+                {progress.leftOpen > 0 && t('ws.leftOpenCount', { count: progress.leftOpen })}{t('ws.toGo', { count: progress.remaining })}
               </span>
             </span>
             <span
@@ -1916,7 +1922,7 @@ export function WorkflowWorkspace({
               <span aria-hidden className="material-symbols-outlined text-[16px]">
                 splitscreen_right
               </span>
-              {reader.id ? 'Other project' : 'Open another project'}
+              {reader.id ? t('ws.otherProject') : t('ws.openAnother')}
             </button>
             <button
               onClick={() => setChatOpen((open) => !open)}
@@ -1927,7 +1933,7 @@ export function WorkflowWorkspace({
               <span aria-hidden className="material-symbols-outlined text-[16px]">
                 forum
               </span>
-              {chatOpen ? 'Hide side chat' : 'Side chat'}
+              {chatOpen ? t('ws.hideChat') : t('ws.sideChat')}
             </button>
           </div>
 
@@ -1938,8 +1944,12 @@ export function WorkflowWorkspace({
                 className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-low)] px-3 py-1.5 text-label text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
               >
                 <span className="material-symbols-outlined text-[16px]">arrow_back</span>
-                Viewing {stageIndex > template.stages.findIndex((s) => s.id === state.current_stage_id) ? 'a later' : 'an earlier'}{' '}
-                stage — back to {getStage(template, state.current_stage_id)?.short_label}
+                {t(stageIndex > template.stages.findIndex((s) => s.id === state.current_stage_id) ? 'ws.viewingLater' : 'ws.viewingEarlier', {
+                  stage: (() => {
+                    const here = getStage(template, state.current_stage_id);
+                    return here ? stageText(locale, template.key, here, 'short') : '';
+                  })(),
+                })}
               </button>
               {/* PM-13: moved past, not finished — and closable from here, which
                   is the only place it could be once the cursor has moved on. */}
@@ -1950,20 +1960,20 @@ export function WorkflowWorkspace({
               {!isEditable && (
                 <span className="text-label text-[var(--on-surface-variant)]">
                   {state.stages[stage.id]?.status === 'not_started' || !state.stages[stage.id]
-                    ? 'Viewing only — the project has not reached this stage yet.'
-                    : 'Viewing only — nothing changes here.'}
+                    ? t('ws.notReached')
+                    : t('ws.viewOnly')}
                 </span>
               )}
               {isEditable && !reopenedHere && (
                 <span className="text-label text-[var(--on-surface-variant)]">
-                  Left open — you moved on with requirements still unticked. Tick them here, or mark it complete.
+                  {t('ws.leftOpenNote')}
                 </span>
               )}
               {/* C5: view, reopen, close again — and the work after it is
                   marked for a recheck if what it was built on changed. */}
               {reopenedHere && (
                 <span className="text-label text-[var(--on-surface-variant)]">
-                  Reopened — change it here (edit it, or use the side chat), then press Apply and continue. Or mark it complete yourself.
+                  {t('ws.reopenedNote')}
                 </span>
               )}
               {/* 16 Oct (Sean): "Reopen and edit button should be more
@@ -1977,9 +1987,9 @@ export function WorkflowWorkspace({
                     className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--pm-primary)] px-3.5 py-1.5 text-label font-semibold text-[var(--on-primary)] hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[var(--pm-primary)]/50 focus:ring-offset-2"
                   >
                     <span className="material-symbols-outlined text-[16px]">edit</span>
-                    Edit this stage
+                    {t('ws.editStage')}
                   </button>
-                  <span className="text-label text-[var(--on-surface-variant)]">Later stages will be rechecked after you change it.</span>
+                  <span className="text-label text-[var(--on-surface-variant)]">{t('ws.recheckNote')}</span>
                 </>
               )}
               {canMarkComplete && !isCurrent && (
@@ -1988,7 +1998,7 @@ export function WorkflowWorkspace({
                   className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-highest)] px-3 py-1.5 text-label font-semibold text-[var(--on-surface)] hover:opacity-90"
                 >
                   <span className="material-symbols-outlined text-[16px]">task_alt</span>
-                  Mark this stage complete
+                  {t('ws.markComplete')}
                 </button>
               )}
             </div>
@@ -2051,7 +2061,7 @@ export function WorkflowWorkspace({
           )}
 
           <StageHeader
-            stage={{ ...stage, label: inFormWords(stage.label, workForm), entry_guidance: inFormWords(stage.entry_guidance ?? '', workForm) }}
+            stage={{ ...stage, label: inFormWords(stageText(locale, template.key, stage, 'label'), workForm), entry_guidance: inFormWords(stageText(locale, template.key, stage, 'guidance'), workForm) }}
             status={state.stages[stage.id]?.status ?? 'not_started'}
             skippedReason={state.stages[stage.id]?.skipped_reason}
             position={{ index: stageIndex + 1, total: template.stages.length }}
@@ -2235,13 +2245,13 @@ export function WorkflowWorkspace({
               <div role="status" className="mb-3 flex flex-wrap items-center gap-2 rounded-lg bg-[var(--surface-container-high)] px-4 py-2.5">
                 <span className="material-symbols-outlined text-[18px] text-[var(--on-surface-variant)]" aria-hidden>lock</span>
                 <span className="text-label text-[var(--on-surface)]">
-                  This stage is finished. Press Edit this stage to change it — later stages will be rechecked.
+                  {t('ws.finishedHint')}
                 </span>
                 <button
                   onClick={() => void reopenStage()}
                   className="rounded-lg bg-[var(--pm-primary)] px-3 py-1 text-label font-semibold text-[var(--on-primary)] hover:opacity-90"
                 >
-                  Edit this stage
+                  {t('ws.editStage')}
                 </button>
               </div>
             )}
@@ -2381,7 +2391,7 @@ export function WorkflowWorkspace({
               (showDials || shownEvaluation) && (
                 <details data-stage-extras className="rounded-xl bg-[var(--surface-container-low)] px-5 py-3">
                   <summary className="cursor-pointer text-label text-[var(--on-surface-variant)]">
-                    {shownEvaluation ? 'The stage check, and how tough feedback is' : 'How tough feedback is'}
+                    {shownEvaluation ? t('ws.checkAndDials') : t('ws.dials')}
                   </summary>
                   <div className="mt-3 space-y-4">
                     {showDials && dials}
@@ -2399,7 +2409,7 @@ export function WorkflowWorkspace({
             {/* PM-22: the easy actions after a check, on the version it checked. */}
             {isCurrent && draftable && headVersion && (evaluations?.[headVersion.id]?.findings ?? []).length > 0 && (
               <CritiqueActions
-                title="Act on this check"
+                title={t('ws.actOnCheck')}
                 points={(evaluations?.[headVersion.id]?.findings ?? []).map((f) => ({ id: f.id, text: f.summary, change: f.suggested_change }))}
                 busy={applyFindings.running}
                 onApply={(ids, showFirst) =>
@@ -2411,12 +2421,12 @@ export function WorkflowWorkspace({
               />
             )}
             {applyFindings.running && !applyFindings.pending && (
-              <p role="status" className="text-label text-[var(--on-surface-variant)]">Applying the fixes…</p>
+              <p role="status" className="text-label text-[var(--on-surface-variant)]">{t('ws.applying')}</p>
             )}
             {applyFindings.error && (
               <div role="alert" className="flex items-start gap-3 rounded-xl bg-[var(--error-container)] px-5 py-3">
                 <p className="flex-1 text-body text-[var(--on-error-container)]">{applyFindings.error}</p>
-                <button onClick={applyFindings.dismissError} className="text-label text-[var(--on-error-container)] underline">Dismiss</button>
+                <button onClick={applyFindings.dismissError} className="text-label text-[var(--on-error-container)] underline">{t('ws.dismiss')}</button>
               </div>
             )}
 
@@ -2551,14 +2561,14 @@ export function WorkflowWorkspace({
             <span aria-hidden className="material-symbols-outlined text-[18px]">
               close
             </span>
-            Close
+            {t('ws.close')}
           </button>
 
           {/* Two tabs in one slot when another project is open beside: the
               chat stays mounted under the reader, so its draft and thread
               survive a look at the other project. */}
           {reader.open && roomBeside && (
-            <div role="tablist" aria-label="Beside the work" className="mb-2 hidden gap-1 md:flex">
+            <div role="tablist" aria-label={t('ws.beside')} className="mb-2 hidden gap-1 md:flex">
               <button
                 type="button"
                 role="tab"
@@ -2567,7 +2577,7 @@ export function WorkflowWorkspace({
                 className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-label ${!readingTab ? 'bg-[var(--surface-container-high)] text-[var(--on-surface)]' : 'text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-low)]'}`}
               >
                 <span aria-hidden className="material-symbols-outlined text-[16px]">forum</span>
-                Side chat
+                {t('ws.sideChat')}
               </button>
               <button
                 type="button"
@@ -2577,7 +2587,7 @@ export function WorkflowWorkspace({
                 className={`inline-flex min-w-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-label ${readingTab ? 'bg-[var(--surface-container-high)] text-[var(--on-surface)]' : 'text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-low)]'}`}
               >
                 <span aria-hidden className="material-symbols-outlined text-[16px]">menu_book</span>
-                <span className="truncate">Reading</span>
+                <span className="truncate">{t('ws.reading')}</span>
               </button>
             </div>
           )}
@@ -2675,11 +2685,11 @@ export function WorkflowWorkspace({
               }
               cannotChangeBecause={
                 rendererHoldsItems(stage.renderer)
-                  ? 'Ask only — answers offer row changes for you to review.'
+                  ? t('ws.askRows')
                   : stage.renderer === 'outline'
-                    ? 'Ask only — edit the outline on the page.'
+                    ? t('ws.askOutline')
                     : stage.renderer === 'long_form'
-                      ? 'Ask only — rewrite a chapter from its own section.'
+                      ? t('ws.askChapter')
                       : undefined
               }
               isTable={!chatEditsProse}

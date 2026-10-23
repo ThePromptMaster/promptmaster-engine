@@ -14,6 +14,8 @@
  * no callers since /session was retired. This is what it was for.
  */
 
+import { nounText, unitsText } from '@/lib/i18n/templates';
+import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import { deliverableNouns } from '@/lib/workflow/labels';
 import { useEffect, useRef, useState } from 'react';
 
@@ -28,6 +30,8 @@ import {
 } from '@/lib/export/project-export';
 
 export function ExportMenu({ bundle }: { bundle: ExportBundle }) {
+  const t = useT();
+  const locale = useLocale();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -52,7 +56,9 @@ export function ExportMenu({ bundle }: { bundle: ExportBundle }) {
   const manuscript = toManuscriptMarkdown(bundle);
   // What leaves PromptMaster carries the version stamp; the menu's own checks read the bare text.
   const outgoing = stampedManuscript(bundle, manuscript);
-  const { deliverable: noun, unit } = deliverableNouns(bundle.template, bundle.project);
+  const nouns = deliverableNouns(bundle.template, bundle.project);
+  const noun = nounText(locale, nouns.deliverable);
+  const units = unitsText(locale, nouns.unit);
   async function exportWord() {
     const { manuscriptToDocx } = await import('@/lib/export/docx-export');
     const { imagesForDocx } = await import('@/lib/export/images-export');
@@ -97,7 +103,7 @@ export function ExportMenu({ bundle }: { bundle: ExportBundle }) {
         <span aria-hidden className="material-symbols-outlined text-[16px]">
           download
         </span>
-        Export
+        {t('export.button')}
       </button>
 
       {open && (
@@ -110,9 +116,9 @@ export function ExportMenu({ bundle }: { bundle: ExportBundle }) {
             onClick={() => void exportMarkdown()}
             className="block w-full px-4 py-3 text-left transition-colors hover:bg-[var(--surface-container-low)]"
           >
-            <span className="block text-body text-[var(--on-surface)]">Markdown document</span>
+            <span className="block text-body text-[var(--on-surface)]">{t('export.markdown')}</span>
             <span className="mt-0.5 block text-label text-[var(--on-surface-variant)]">
-              Every stage you reached, in order, ready to paste.
+              {t('export.markdownHint')}
             </span>
           </button>
           <button
@@ -120,9 +126,9 @@ export function ExportMenu({ bundle }: { bundle: ExportBundle }) {
             onClick={() => void exportLatex()}
             className="block w-full px-4 py-3 text-left transition-colors hover:bg-[var(--surface-container-low)]"
           >
-            <span className="block text-body text-[var(--on-surface)]">LaTeX (.tex)</span>
+            <span className="block text-body text-[var(--on-surface)]">{t('export.latex')}</span>
             <span className="mt-0.5 block text-label text-[var(--on-surface-variant)]">
-              {manuscript ? `The ${noun}` : 'Every stage you reached'}, equations as written and code verbatim.
+              {manuscript ? t('export.latexWork', { noun }) : t('export.latexStages')}
             </span>
           </button>
           <button
@@ -130,9 +136,9 @@ export function ExportMenu({ bundle }: { bundle: ExportBundle }) {
             onClick={() => void exportNotebook()}
             className="block w-full px-4 py-3 text-left transition-colors hover:bg-[var(--surface-container-low)]"
           >
-            <span className="block text-body text-[var(--on-surface)]">Jupyter notebook (.ipynb)</span>
+            <span className="block text-body text-[var(--on-surface)]">{t('export.notebook')}</span>
             <span className="mt-0.5 block text-label text-[var(--on-surface-variant)]">
-              Python blocks as cells you can run; prose and equations as Markdown.
+              {t('export.notebookHint')}
             </span>
           </button>
           {manuscript && (
@@ -142,9 +148,9 @@ export function ExportMenu({ bundle }: { bundle: ExportBundle }) {
                 onClick={() => void exportWord()}
                 className="block w-full px-4 py-3 text-left transition-colors hover:bg-[var(--surface-container-low)]"
               >
-                <span className="block text-body text-[var(--on-surface)]">Word document (.docx)</span>
+                <span className="block text-body text-[var(--on-surface)]">{t('export.word')}</span>
                 <span className="mt-0.5 block text-label text-[var(--on-surface-variant)]">
-                  The {noun} alone — title and {unit}s.
+                  {t('export.wordHint', { noun, units })}
                 </span>
               </button>
               <a
@@ -155,9 +161,9 @@ export function ExportMenu({ bundle }: { bundle: ExportBundle }) {
                 onClick={() => setOpen(false)}
                 className="block w-full px-4 py-3 text-left transition-colors hover:bg-[var(--surface-container-low)]"
               >
-                <span className="block text-body text-[var(--on-surface)]">PDF (print view)</span>
+                <span className="block text-body text-[var(--on-surface)]">{t('export.pdf')}</span>
                 <span className="mt-0.5 block text-label text-[var(--on-surface-variant)]">
-                  Opens the {noun} to print; choose “Save as PDF”.
+                  {t('export.pdfHint', { noun })}
                 </span>
               </a>
             </>
@@ -167,9 +173,9 @@ export function ExportMenu({ bundle }: { bundle: ExportBundle }) {
             onClick={exportJson}
             className="block w-full px-4 py-3 text-left transition-colors hover:bg-[var(--surface-container-low)]"
           >
-            <span className="block text-body text-[var(--on-surface)]">Full record (JSON)</span>
+            <span className="block text-body text-[var(--on-surface)]">{t('export.json')}</span>
             <span className="mt-0.5 block text-label text-[var(--on-surface-variant)]">
-              Project, stage history, every version and every evaluation.
+              {t('export.jsonHint')}
             </span>
           </button>
         </div>

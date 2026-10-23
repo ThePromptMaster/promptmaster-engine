@@ -1,4 +1,15 @@
 import type { Messages } from './en';
+import { es as projectsArea } from './areas/projects';
+import { es as templatesArea } from './areas/templates';
+import { es as railArea } from './areas/rail';
+import { es as refsArea } from './areas/refs';
+import { es as headerArea } from './areas/header';
+import { es as briefArea } from './areas/brief';
+import { es as factsArea } from './areas/facts';
+import { es as webArea } from './areas/web';
+import { es as dataArea } from './areas/data';
+import { es as docArea } from './areas/doc';
+import { es as wsArea } from './areas/ws';
 
 export const es: Messages = {
   'header.account': 'Cuenta',
@@ -257,4 +268,15 @@ export const es: Messages = {
   "guide.questionOf": "Pregunta {number} de {max} como máximo",
   "guide.suggested": "Respuestas sugeridas",
   "guide.ownAnswers": "Tus propias respuestas",
+  ...projectsArea,
+  ...templatesArea,
+  ...railArea,
+  ...refsArea,
+  ...headerArea,
+  ...briefArea,
+  ...factsArea,
+  ...webArea,
+  ...dataArea,
+  ...docArea,
+  ...wsArea,
 };

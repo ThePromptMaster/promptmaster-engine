@@ -268,7 +268,7 @@ export function GoPanel({
       : null;
 
   return (
-    <section ref={sectionRef} aria-label="Go mode" className="mb-6 scroll-mt-20 rounded-2xl bg-[var(--surface-container)] px-5 py-4">
+    <section ref={sectionRef} data-panel="go" aria-label="Go mode" className="mb-6 scroll-mt-20 rounded-2xl bg-[var(--surface-container)] px-5 py-4">
       {dock}
       <div className="flex flex-wrap items-center gap-3">
         <span aria-hidden className="material-symbols-outlined text-[var(--pm-primary)]">rocket_launch</span>
