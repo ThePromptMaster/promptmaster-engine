@@ -83,6 +83,14 @@ export const en = {
   'useIn.full': 'That project already uses five others, the most it can.',
   'useIn.failed': 'It could not be added.',
 
+  // components/projects/project-card-menu.tsx — one menu on a phone (Sean, 24 Oct)
+  'card.more': 'More for {name}',
+  'card.useIn': 'Use in another project…',
+  'card.move': 'Move to a folder…',
+  'card.delete': 'Delete…',
+  'card.close': 'Close',
+  'card.back': 'Back',
+
   // components/projects/deleted-projects.tsx
   'trash.heading': 'Recently deleted',
   'trash.explain':
@@ -192,6 +200,13 @@ export const es: Keys = {
   'useIn.full': 'Ese proyecto ya usa otros cinco, el máximo.',
   'useIn.failed': 'No se pudo añadir.',
 
+  'card.more': 'Más opciones para {name}',
+  'card.useIn': 'Usar en otro proyecto…',
+  'card.move': 'Mover a una carpeta…',
+  'card.delete': 'Eliminar…',
+  'card.close': 'Cerrar',
+  'card.back': 'Atrás',
+
   'trash.heading': 'Eliminados recientemente',
   'trash.explain':
     'Los proyectos eliminados se guardan {days} días por si quieres deshacer un error; después se borran para siempre junto con sus artefactos, versiones y evaluaciones. Elimínalos ahora si no quieres esperar.',
@@ -297,6 +312,13 @@ export const fr: Keys = {
   'useIn.full': 'Ce projet en utilise déjà cinq autres, le maximum.',
   'useIn.failed': 'Impossible de l’ajouter.',
 
+  'card.more': 'Plus d’options pour {name}',
+  'card.useIn': 'Utiliser dans un autre projet…',
+  'card.move': 'Déplacer dans un dossier…',
+  'card.delete': 'Supprimer…',
+  'card.close': 'Fermer',
+  'card.back': 'Retour',
+
   'trash.heading': 'Supprimés récemment',
   'trash.explain':
     'Les projets supprimés sont conservés {days} jours pour pouvoir annuler une erreur, puis effacés définitivement avec leurs artefacts, versions et évaluations. Supprimez-les maintenant si vous ne voulez pas attendre.',
@@ -401,6 +423,13 @@ export const pt: Keys = {
   'useIn.already': 'Esse projeto já usa este.',
   'useIn.full': 'Esse projeto já usa outros cinco, o máximo.',
   'useIn.failed': 'Não foi possível adicionar.',
+
+  'card.more': 'Mais opções para {name}',
+  'card.useIn': 'Usar em outro projeto…',
+  'card.move': 'Mover para uma pasta…',
+  'card.delete': 'Excluir…',
+  'card.close': 'Fechar',
+  'card.back': 'Voltar',
 
   'trash.heading': 'Excluídos recentemente',
   'trash.explain':
