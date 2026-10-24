@@ -324,7 +324,9 @@ export default function NewProjectPage() {
       setRecommendedKey(design ? design.key : suggestion.workflow);
       setWorkflowReason(
         design
-          ? t('start.designedReason', { closest: standard ? words.name(standard) : suggestion.workflow })
+          // Named from the key, which needs no loaded list: pressed before the
+          // workflows had loaded, the raw key "single_output" was shown (24 Oct, CI).
+          ? t('start.designedReason', { closest: words.name(standard ?? { key: suggestion.workflow, name: suggestion.workflow }) })
           : suggestion.workflow_reason
       );
       setRationale(suggestion.rationale);
@@ -633,7 +635,8 @@ export default function NewProjectPage() {
   );
 
   return (
-    <main className="mx-auto max-w-[860px] px-6 py-14">
+    <main className="mx-auto max-w-[860px] px-6 pt-14 pb-40">
+      {/* pb-40: room below the last options, so they scroll clear of the beta notice on a short screen (24 Oct). */}
       <div className="mb-10 flex flex-wrap items-center justify-between gap-3">
         <Link
           href="/projects"

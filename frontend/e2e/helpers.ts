@@ -7,6 +7,8 @@ import { supabaseEnv } from './env';
 
 /** The first-visit beta notice covers the bottom of the page until acknowledged. */
 export async function dismissBetaNotice(page: Page) {
+  // Signed-in specs start with it dismissed (auth.setup.ts): it appears only
+  // after hydration, so a check made straight away could miss it (24 Oct).
   const gotIt = page.getByRole('button', { name: 'Got it' });
   if (await gotIt.isVisible().catch(() => false)) await gotIt.click();
 }
