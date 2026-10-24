@@ -76,7 +76,8 @@ export function CustomWorkflowDesigner({
     setErrors([]);
     setRevision(null);
     try {
-      const { workflow } = await api.generateWorkflow({ description: description.trim(), objective });
+      // Designed before the project exists, which starts with Web access on (24 Oct).
+      const { workflow } = await api.generateWorkflow({ description: description.trim(), objective, web_access: 'on' });
       setDesign(workflow);
       setEditing(null);
     } catch (e) {

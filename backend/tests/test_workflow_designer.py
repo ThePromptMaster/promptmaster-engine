@@ -77,3 +77,35 @@ def test_each_approval_says_whether_it_is_routine_and_new_commitments_are_kept_a
     assert extract.decision == "I accept the new commitments it proposes"
     # Anything but an explicit "routine" stays the user's.
     assert recommend.approval_kind == "decision"
+
+
+def test_with_web_access_on_stages_are_told_to_search_and_cite_not_to_leave_facts_unverified():
+    """24 Oct, prod pass: a designed stage said "mark each price as 'to verify on
+    vendor site'" with Web access on, and its draft searched nothing."""
+    _, on = build_workflow_prompt("a vendor comparison", "Compare Claude Pro and Copilot within $60", web_access="on")
+    assert "WEB ACCESS: on" in on and "Never tell a stage to leave such facts unverified" in on
+    _, off = build_workflow_prompt("a vendor comparison", "Compare", web_access="off")
+    assert "WEB ACCESS: off" in off and "mark anything else as unverified" in off
+    _, unsaid = build_workflow_prompt("a vendor comparison", "Compare")
+    assert "WEB ACCESS" not in unsaid
+
+
+def test_the_route_passes_web_access_to_the_designer():
+    from unittest.mock import AsyncMock
+    from fastapi.testclient import TestClient
+    from deps import get_client
+    from main import app
+
+    stub = AsyncMock()
+    stub.generate_json = AsyncMock(return_value=({"name": "X", "description": "", "deliverable": "memo", "stages": [
+        {"label": "Brief", "kind": "write", "purpose": "p", "instruction": "i", "required": True, "approval": ""},
+        {"label": "Compare", "kind": "write", "purpose": "p", "instruction": "i", "required": True, "approval": ""},
+        {"label": "Memo", "kind": "write", "purpose": "p", "instruction": "i", "required": True, "approval": ""},
+    ]}, {}))
+    app.dependency_overrides[get_client] = lambda: stub
+    try:
+        r = TestClient(app).post("/api/generate-workflow", json={"description": "a vendor comparison", "web_access": "on"})
+    finally:
+        app.dependency_overrides.pop(get_client, None)
+    assert r.status_code == 200, r.text
+    assert "WEB ACCESS: on" in stub.generate_json.call_args.kwargs["prompt"]

@@ -85,12 +85,31 @@ _SYSTEM = (
 )
 
 
-def build_workflow_prompt(description: str, objective: str) -> tuple[str, str]:
+#: What the stages may rely on for outside facts (24 Oct, prod pass: with
+#: Web access on, a designed stage said "Do not state prices as current fact:
+#: mark each as 'to verify on vendor site'", and its draft searched nothing).
+WEB_ON_RULE = (
+    "WEB ACCESS: on. PromptMaster searches the public web while a stage is written and cites "
+    "what it finds. Where a stage needs current outside facts — prices, plans, terms, figures, "
+    "published rules — its instruction says to take them from the web sources found, cite each "
+    "one and give the date checked. Never tell a stage to leave such facts unverified, to mark "
+    "them for the user to look up, or to rely only on what the user pastes."
+)
+WEB_OFF_RULE = (
+    "WEB ACCESS: off. PromptMaster cannot search the web for this work. Where a stage needs "
+    "current outside facts, its instruction says to use what the user supplied and to mark "
+    "anything else as unverified, with what is left to check."
+)
+
+
+def build_workflow_prompt(description: str, objective: str, web_access: str | None = None) -> tuple[str, str]:
     kinds = "\n".join(f'- "{k}": {v}' for k, v in KINDS.items())
+    web = {"on": WEB_ON_RULE, "off": WEB_OFF_RULE}.get(web_access or "", "")
     user = (
         f"THE KIND OF WORK: {description.strip()}\n"
         f"THE USER'S OBJECTIVE: {objective.strip() or '(not given yet)'}\n\n"
-        f"Design {MIN_STAGES} to {MAX_STAGES - 2} stages for this kind of work.\n"
+        + (f"{web}\n\n" if web else "")
+        + f"Design {MIN_STAGES} to {MAX_STAGES - 2} stages for this kind of work.\n"
         "The first stage states the objective and what success looks like. The last "
         "stage produces the finished deliverable, ready to use. Put a check stage after "
         "the work it checks, never first — after EVERY stage whose output it checks: a final "
@@ -223,9 +242,9 @@ def fix_loops(stages: list[DesignedStage], execution: Execution) -> list[Designe
 
 
 async def design_workflow(
-    client: OpenRouterClient, model: str | None, description: str, objective: str
+    client: OpenRouterClient, model: str | None, description: str, objective: str, web_access: str | None = None
 ) -> DesignedWorkflow:
-    system, user = build_workflow_prompt(description, objective)
+    system, user = build_workflow_prompt(description, objective, web_access)
     result, _usage = await client.generate_json(prompt=user, system=system, temperature=0.4, max_tokens=3_000, model=model)
     return parse_workflow(result)
 
