@@ -29,7 +29,7 @@ test('with a recommendation, Start is at the top and the rest is optional', asyn
 test('the Single output card no longer says it has no stages', async ({ page }) => {
   await page.goto('/projects/new');
   await dismissBetaNotice(page);
-  await page.getByRole('button', { name: 'Or choose the workflow yourself' }).click();
+  await page.getByRole('button', { name: /Choose the workflow yourself/ }).click();
   const card = page.getByRole('radio', { name: /^Single output/ });
   await expect(card).toContainText('drafted, checked and finished in minutes');
   await expect(card).not.toContainText('No stages');
