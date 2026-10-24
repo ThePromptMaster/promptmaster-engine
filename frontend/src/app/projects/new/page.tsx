@@ -324,7 +324,9 @@ export default function NewProjectPage() {
       setRecommendedKey(design ? design.key : suggestion.workflow);
       setWorkflowReason(
         design
-          ? t('start.designedReason', { closest: standard ? words.name(standard) : suggestion.workflow })
+          // Named from the key, which needs no loaded list: pressed before the
+          // workflows had loaded, the raw key "single_output" was shown (24 Oct, CI).
+          ? t('start.designedReason', { closest: words.name(standard ?? { key: suggestion.workflow, name: suggestion.workflow }) })
           : suggestion.workflow_reason
       );
       setRationale(suggestion.rationale);
