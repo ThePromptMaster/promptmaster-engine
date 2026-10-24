@@ -233,7 +233,7 @@ export function ApplyPreview({
           </button>
         </div>
 
-        <p className="mt-3 text-right text-label text-[var(--on-surface-variant)]">
+        <p className="mt-3 text-end text-label text-[var(--on-surface-variant)]">
           {t('ap.onePass')}
         </p>
       </div>

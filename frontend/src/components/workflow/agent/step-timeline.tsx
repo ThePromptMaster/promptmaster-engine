@@ -94,9 +94,9 @@ export function StepTimeline({
               </span>
               {repeats > 1 && <span className="text-label text-[var(--on-surface-variant)]">×{repeats}</span>}
               <ExecutionBadge label={s.execution_label} />
-              <span className="ml-auto text-label text-[var(--on-surface-variant)]">{tr(`stepStatus.${s.status}`)}</span>
+              <span className="ms-auto text-label text-[var(--on-surface-variant)]">{tr(`stepStatus.${s.status}`)}</span>
             </summary>
-            <div className="mt-2 space-y-2 pl-7">
+            <div className="mt-2 space-y-2 ps-7">
               {s.rationale && <p className="text-label text-[var(--on-surface-variant)]">{tr('tl.why')}{s.rationale}</p>}
               {s.output && <MarkdownOutput content={s.output} />}
               {s.changes?.sandbox_run_id && <SandboxFiles runId={s.changes.sandbox_run_id} />}

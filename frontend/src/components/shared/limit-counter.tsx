@@ -10,7 +10,7 @@ export function LimitCounter({ length, limit }: { length: number; limit: number 
   return (
     <p
       role={full ? 'status' : undefined}
-      className={`mt-1 text-right text-label ${full ? 'text-[var(--pm-error)]' : 'text-[var(--outline)]'}`}
+      className={`mt-1 text-end text-label ${full ? 'text-[var(--pm-error)]' : 'text-[var(--outline)]'}`}
     >
       {text}
     </p>

@@ -76,7 +76,7 @@ export function WebSources({
         type="button"
         onClick={() => setToggled(!open)}
         aria-expanded={open}
-        className="flex w-full items-center gap-2 text-left text-title text-[var(--on-surface)]"
+        className="flex w-full items-center gap-2 text-start text-title text-[var(--on-surface)]"
       >
         <span aria-hidden className="material-symbols-outlined text-[18px]">travel_explore</span>
         {t('web.title')}
@@ -84,7 +84,7 @@ export function WebSources({
           {on ? t('web.on') : t('web.off')}
           {sources.length ? t('web.saved', { count: sources.length }) : ''}
         </span>
-        <span aria-hidden className="material-symbols-outlined ml-auto text-[18px]">{open ? 'expand_less' : 'expand_more'}</span>
+        <span aria-hidden className="material-symbols-outlined ms-auto text-[18px]">{open ? 'expand_less' : 'expand_more'}</span>
       </button>
 
       {open && (
@@ -140,7 +140,7 @@ export function WebSources({
                   <a href={s.url} target="_blank" rel="noopener noreferrer" className="text-[var(--pm-primary)] underline">
                     {s.title || s.url}
                   </a>
-                  <span className="ml-2 text-label text-[var(--on-surface-variant)]">
+                  <span className="ms-2 text-label text-[var(--on-surface-variant)]">
                     {t('web.retrieved', { date: s.retrieved_at.slice(0, 10) })}{s.origin === 'agent' ? t('web.byGo') : ''}{t('web.searched', { query: s.query })}
                   </span>
                   {s.excerpt && <span className="block text-label text-[var(--on-surface-variant)]">{s.excerpt}</span>}

@@ -1,0 +1,38 @@
+import type { en } from '../areas/data';
+
+/** Chinese for `areas/data.ts` (Sean, 24 Oct: "…and then Mandarin"). */
+export const zh: Record<keyof typeof en, string> = {
+  'data.label': '项目数据',
+  'data.title': '数据和图片',
+  'data.files_one': ' · {count} 个文件',
+  'data.files_other': ' · {count} 个文件',
+  'data.attachData': '附加数据文件',
+  'data.addImages': '添加图片',
+  'data.attachDataLabel': '附加数据文件',
+  'data.working': '正在处理…',
+  'data.attachError': '无法附加该文件。',
+  'data.attachErrorWhy': '无法附加该文件：{message}',
+  'data.imageError': '无法添加该图片。',
+  'data.imageErrorWhy': '无法添加该图片：{message}',
+  'data.removeError': '无法移除 {name}。',
+  'data.toAdd': '要添加的图片',
+  'data.captionHint': '说明每张图片显示的内容。PromptMaster 看不到图片；它会根据说明文字把图片放到你的工作中。',
+  'data.captionFor': '{name} 的说明',
+  'data.adding': '正在添加…',
+  'data.addThis': '添加此图片',
+  'data.addThese': '添加这 {count} 张图片',
+  'data.cancel': '取消',
+  'data.images': '图片',
+  'data.remove': '移除',
+  'data.removeNamed': '移除 {name}',
+  'data.imagesHint': '草稿可以把它们放在有帮助的位置；编辑时，“插入图片”会在光标处插入一张。',
+  'data.empty':
+    '尚未附加任何数据或图片。没有数据时，分析可以规划但无法运行，PromptMaster 会如实说明。附加 CSV、TSV、JSON 或文本文件，或 Excel 工作簿（.xlsx，会转换为 CSV），Go 就能针对它们运行代码。附加 PDF 或 Word 格式的简介，其文本可以加入项目背景。添加照片或图表（PNG、JPEG、WebP、GIF），即可将它们放入你的工作中。每个文件最大 {mb} MB。',
+  'data.codeReads': 'Go 运行的代码可以读取这些文件。PromptMaster 看到的是每个文件的列和前几行，而不是文件本身。',
+  'data.addText': '添加文档文本',
+  'data.oneHasText': '{name} 中有可供每个阶段引用的文本。',
+  'data.manyHaveText': '{count} 个文档中有可供每个阶段引用的文本。',
+  'data.added': '已添加到项目背景：{names}。',
+  'data.addToContext': '将其文本添加到项目背景',
+  'data.notNow': '暂不',
+};

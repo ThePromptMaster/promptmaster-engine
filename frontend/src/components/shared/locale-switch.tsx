@@ -15,7 +15,7 @@ export function LocaleSwitch({ className = '', tone = 'light' }: { className?: s
   const locale = useLocale();
   return (
     <div className={`flex flex-wrap items-center justify-center gap-1 ${className}`} role="group" aria-label={t('auth.language')}>
-      <span aria-hidden className={`material-symbols-outlined mr-1 text-[16px] ${tone === 'dark' ? 'text-white/60' : 'text-[var(--on-surface-variant)]'}`}>
+      <span aria-hidden className={`material-symbols-outlined me-1 text-[16px] ${tone === 'dark' ? 'text-white/60' : 'text-[var(--on-surface-variant)]'}`}>
         translate
       </span>
       {LOCALES.map((l) => (

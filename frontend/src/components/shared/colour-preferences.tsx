@@ -84,7 +84,7 @@ export function ColourPicker() {
               type="button"
               onClick={() => choose({ palette: p.id })}
               aria-pressed={prefs.palette === p.id}
-              className={`flex w-full items-center gap-2 rounded-lg px-2 py-1 text-left text-label transition-colors ${
+              className={`flex w-full items-center gap-2 rounded-lg px-2 py-1 text-start text-label transition-colors ${
                 prefs.palette === p.id ? 'bg-[var(--surface-container-high)] text-[var(--on-surface)]' : 'text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-low)]'
               }`}
             >
@@ -128,7 +128,7 @@ export function ColourMenu({ tone = 'light' }: { tone?: 'light' | 'dark' }) {
         <span aria-hidden className="material-symbols-outlined text-[18px]">palette</span>
         {t('header.colours')}
       </summary>
-      <div className="absolute right-0 z-50 mt-2 w-72 rounded-xl bg-[var(--surface-container-lowest)] py-2 text-[var(--on-surface)] shadow-[0_12px_32px_-12px_rgba(25,28,30,0.35)]">
+      <div className="absolute end-0 z-50 mt-2 w-72 rounded-xl bg-[var(--surface-container-lowest)] py-2 text-[var(--on-surface)] shadow-[0_12px_32px_-12px_rgba(25,28,30,0.35)]">
         <ColourPicker />
       </div>
     </details>

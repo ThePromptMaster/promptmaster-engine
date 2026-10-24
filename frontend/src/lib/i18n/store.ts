@@ -1,4 +1,4 @@
-import { DEFAULT_LOCALE, LOCALE_KEY, resolveLocale, type Locale } from './locales';
+import { DEFAULT_LOCALE, LOCALE_KEY, localeDirection, resolveLocale, type Locale } from './locales';
 import { translate, type Vars } from './translate';
 import type { MessageKey } from './messages/en';
 
@@ -54,6 +54,7 @@ export function setLocale(code: string): void {
   if (typeof document !== 'undefined') {
     document.cookie = `${LOCALE_KEY}=${next}; path=/; max-age=31536000; samesite=lax`;
     document.documentElement.lang = next;
+    document.documentElement.dir = localeDirection(next);
   }
   listeners.forEach((l) => l());
 }

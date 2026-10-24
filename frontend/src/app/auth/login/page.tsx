@@ -256,7 +256,7 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={() => setShowPassword((v) => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--outline)] hover:text-[var(--on-surface-variant)]"
+                    className="absolute end-3 top-1/2 -translate-y-1/2 text-[var(--outline)] hover:text-[var(--on-surface-variant)]"
                     aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
                   >
                     <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
@@ -349,7 +349,7 @@ export default function LoginPage() {
             {t('auth.noAccount')}{' '}
             <Link
               href="/auth/signup"
-              className="text-[var(--pm-primary)] font-medium hover:underline ml-1"
+              className="text-[var(--pm-primary)] font-medium hover:underline ms-1"
             >
               {t('auth.signUp')}
             </Link>
@@ -359,7 +359,7 @@ export default function LoginPage() {
       </main>
 
       {/* Decorative Structural Element */}
-      <div className="fixed top-0 right-0 p-12 opacity-5 pointer-events-none">
+      <div className="fixed top-0 end-0 p-12 opacity-5 pointer-events-none">
         <span className="material-symbols-outlined" style={{ fontSize: '320px' }}>
           architecture
         </span>

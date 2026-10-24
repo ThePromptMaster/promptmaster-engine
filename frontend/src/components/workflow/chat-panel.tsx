@@ -635,7 +635,7 @@ export function ChatPanel({
                     key={q}
                     type="button"
                     onClick={() => void chat.discuss(q)}
-                    className="rounded-lg bg-[var(--surface-container-low)] px-3 py-1.5 text-left text-label text-[var(--on-surface)] hover:bg-[var(--surface-container-high)]"
+                    className="rounded-lg bg-[var(--surface-container-low)] px-3 py-1.5 text-start text-label text-[var(--on-surface)] hover:bg-[var(--surface-container-high)]"
                   >
                     {q}
                   </button>
@@ -842,7 +842,7 @@ export function ChatPanel({
               <button
                 onClick={() => void send()}
                 disabled={!canSend}
-                className="ml-auto shrink-0 rounded-lg bg-[var(--pm-primary)] px-4 py-1.5 text-label text-[var(--on-primary)] disabled:opacity-40"
+                className="ms-auto shrink-0 rounded-lg bg-[var(--pm-primary)] px-4 py-1.5 text-label text-[var(--on-primary)] disabled:opacity-40"
               >
                 {spec.send}
               </button>
@@ -948,7 +948,7 @@ function Bubble({ message }: { message: StageChatMessage }) {
   const instruct = message.mode === 'instruct';
 
   return (
-    <div className={mine ? 'pl-6' : 'pr-6'}>
+    <div className={mine ? 'ps-6' : 'pe-6'}>
       <div className="mb-1 flex items-center gap-1.5">
         <span className="text-label uppercase tracking-wider text-[var(--on-surface-variant)]">
           {mine ? t('chat.you') : t('chat.assistant')}
@@ -1195,7 +1195,7 @@ export function ProposalCard({
                 ? t('chat.keptLines', { count: putBack.length, lines: describeLines(putBack) })
                 : t('chat.willRemove', { lines: describeLines(putBack) })}
               {onTogglePutBack && (
-                <button onClick={onTogglePutBack} disabled={busy} className="ml-2 text-[var(--pm-primary)] underline-offset-2 hover:underline">
+                <button onClick={onTogglePutBack} disabled={busy} className="ms-2 text-[var(--pm-primary)] underline-offset-2 hover:underline">
                   {putBackKept ? t('chat.removeAnyway') : t('chat.keepThem')}
                 </button>
               )}
@@ -1214,7 +1214,7 @@ export function ProposalCard({
           <p className="text-label text-[var(--on-surface)]">
             {t('chat.invented')}
           </p>
-          <ul className="mt-1 list-disc pl-5 text-label text-[var(--on-surface-variant)]">
+          <ul className="mt-1 list-disc ps-5 text-label text-[var(--on-surface-variant)]">
             {addedClaims.map((c) => (
               <li key={c.quote}>
                 “{c.quote}”{c.why ? ` — ${c.why}` : ''}
@@ -1312,7 +1312,7 @@ export function AppliedNotice({
         <ul aria-label={t('chat.checkedLabel')} className="mt-1 space-y-0.5 text-label text-[var(--on-success-container)]">
           {checks.map((c) => (
             <li key={c.label}>
-              <span aria-hidden className="material-symbols-outlined mr-1 align-[-3px] text-[14px]">{c.ok ? 'check' : 'close'}</span>
+              <span aria-hidden className="material-symbols-outlined me-1 align-[-3px] text-[14px]">{c.ok ? 'check' : 'close'}</span>
               {c.label}
             </li>
           ))}

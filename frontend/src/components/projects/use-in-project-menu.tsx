@@ -40,7 +40,7 @@ export function UseInProjectMenu(props: Props) {
         <span className="material-symbols-outlined text-[20px]">link</span>
       </button>
       {open && (
-        <div role="dialog" aria-label={t('useIn.dialog')} className="absolute right-0 top-full z-20 mt-1 w-[300px] rounded-xl bg-[var(--surface-container-lowest)] p-3 shadow-[0_1px_2px_rgba(25,28,30,0.06),0_12px_28px_-12px_rgba(25,28,30,0.3)]">
+        <div role="dialog" aria-label={t('useIn.dialog')} className="absolute end-0 top-full z-20 mt-1 w-[300px] rounded-xl bg-[var(--surface-container-lowest)] p-3 shadow-[0_1px_2px_rgba(25,28,30,0.06),0_12px_28px_-12px_rgba(25,28,30,0.3)]">
           <div className="flex items-start gap-2">
             <div className="min-w-0 flex-1">
               <UseInProjectPanel {...props} />
@@ -49,7 +49,7 @@ export function UseInProjectMenu(props: Props) {
               type="button"
               onClick={() => setOpen(false)}
               aria-label={t('card.close')}
-              className="-mr-1 -mt-1 rounded-lg p-1 text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)]"
+              className="-me-1 -mt-1 rounded-lg p-1 text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)]"
             >
               <span aria-hidden className="material-symbols-outlined text-[18px]">close</span>
             </button>

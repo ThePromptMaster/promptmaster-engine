@@ -1168,7 +1168,7 @@ function SingleOutputSlice() {
             }`}
           >
             {s.short_label}
-            <span className="ml-2 opacity-60">{s.renderer}</span>
+            <span className="ms-2 opacity-60">{s.renderer}</span>
           </button>
         ))}
       </div>

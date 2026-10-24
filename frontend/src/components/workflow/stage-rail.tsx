@@ -124,7 +124,7 @@ export function StageRail({ template, state, nextSuggestedId, onSelect, approval
                     onClick={() => onSelect(stage.id)}
                     aria-current={isCurrent ? 'step' : undefined}
                     title={skipReason ? t('rail.skippedTitle', { reason: skipReason }) : stageText(locale, template.key, stage, 'label')}
-                    className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-body transition-colors ${
+                    className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-start text-body transition-colors ${
                       isCurrent
                         ? 'bg-[var(--surface-container-high)] text-[var(--on-surface)]'
                         : 'text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-low)]'

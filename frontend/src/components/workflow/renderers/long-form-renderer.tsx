@@ -97,7 +97,7 @@ function ManuscriptSnapshots({ versions, activeVersionId, onSelectVersion, evalu
             </p>
             <button
               onClick={() => onSelectVersion(null)}
-              className="ml-auto rounded-lg bg-[var(--surface-container-high)] px-3 py-1.5 text-label text-[var(--on-surface)]"
+              className="ms-auto rounded-lg bg-[var(--surface-container-high)] px-3 py-1.5 text-label text-[var(--on-surface)]"
             >
               {t('stage.backToSections')}
             </button>
@@ -497,7 +497,7 @@ function SectionRow({
               type="button"
               onClick={onToggle}
               disabled={!section.content}
-              className="text-left text-body font-semibold text-[var(--on-surface)] disabled:cursor-default"
+              className="text-start text-body font-semibold text-[var(--on-surface)] disabled:cursor-default"
             >
               {index + 1}. {section.title}
             </button>

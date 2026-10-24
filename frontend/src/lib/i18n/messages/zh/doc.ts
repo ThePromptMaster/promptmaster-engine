@@ -1,0 +1,40 @@
+import type { en } from '../areas/doc';
+
+/** Chinese for `areas/doc.ts` (Sean, 24 Oct: "…and then Mandarin"). */
+export const zh: Record<keyof typeof en, string> = {
+  'noun.book': '书稿',
+  'noun.exploration': '探索',
+  'noun.research report': '研究报告',
+  'noun.work': '作品',
+  'noun.screenplay': '剧本',
+  'noun.play': '舞台剧本',
+  'units.chapter': '各章',
+  'units.section': '各小节',
+  'units.round': '各轮',
+  'units.sequence': '各段落',
+  'units.scene': '各场景',
+
+  'fullwork.full': '阅读完整的{noun}',
+  'fullwork.fullLabel': '完整的{noun}',
+  'fullwork.asItStands': '{noun}的当前状态 · {words} 字 · 仅供阅读，此处不会更改任何内容',
+  'fullwork.copy': '复制',
+  'fullwork.copied': '已复制',
+  'fullwork.closeFull': '关闭',
+  'fullwork.lagFeeds': '此处显示的是{shows}。你最近对{changed}的更改，会在{shows}更新后体现在这里——请按页面顶部的“应用并继续”。',
+  'fullwork.lagOwn': '此处显示的是{shows}。你最近的更改针对的是{changed}，它作为独立阶段保存——请在那里打开阅读。',
+
+  'export.button': '导出',
+  'export.markdown': 'Markdown 文档',
+  'export.markdownHint': '你到达过的每个阶段，按顺序排列，可直接粘贴。',
+  'export.latex': 'LaTeX (.tex)',
+  'export.latexWork': '{noun}，公式保持原样，代码逐字保留。',
+  'export.latexStages': '你到达过的每个阶段，公式保持原样，代码逐字保留。',
+  'export.notebook': 'Jupyter 笔记本 (.ipynb)',
+  'export.notebookHint': 'Python 代码块作为可运行的单元格；正文和公式作为 Markdown。',
+  'export.word': 'Word 文档 (.docx)',
+  'export.wordHint': '仅含{noun}——标题和{units}。',
+  'export.pdf': 'PDF（打印视图）',
+  'export.pdfHint': '打开{noun}以便打印；选择“另存为 PDF”。',
+  'export.json': '完整记录 (JSON)',
+  'export.jsonHint': '项目、阶段历史、每个版本以及每次评估。',
+};

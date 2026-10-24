@@ -38,7 +38,7 @@ export function BlockForm({
             role="radio"
             aria-checked={kind === option.kind}
             onClick={() => setKind(option.kind)}
-            className={`rounded-lg px-3 py-2 text-left transition-colors ${
+            className={`rounded-lg px-3 py-2 text-start transition-colors ${
               kind === option.kind
                 ? 'bg-[var(--pm-primary)] text-[var(--on-primary)]'
                 : 'bg-[var(--surface-container-highest)] text-[var(--on-surface)]'
@@ -79,7 +79,7 @@ export function BlockedNotice({ kind, reason, onUnblock }: { kind: BlockKind; re
   return (
     <div role="status" className="flex flex-wrap items-center gap-3 rounded-xl bg-[var(--surface-container-high)] px-5 py-4">
       <span aria-hidden className="material-symbols-outlined text-[var(--pm-tertiary)]">block</span>
-      <div className="mr-auto">
+      <div className="me-auto">
         <p className="text-title text-[var(--on-surface)]">{t('ssp.stuckLabel', { label: label.toLowerCase() })}</p>
         <p className="text-label text-[var(--on-surface-variant)]">{reason}</p>
       </div>
@@ -137,7 +137,7 @@ export function ObjectivePausedNotice({
           {assessment.blockers.length > 0 && (
             <>
               <p className="mt-2 text-label font-semibold text-[var(--on-surface)]">{t('ssp.waitingFor')}</p>
-              <ul className="list-disc pl-5 text-label text-[var(--on-surface-variant)]">
+              <ul className="list-disc ps-5 text-label text-[var(--on-surface-variant)]">
                 {assessment.blockers.map((b, i) => (
                   <li key={i}>{b.need}</li>
                 ))}
@@ -148,7 +148,7 @@ export function ObjectivePausedNotice({
           {(assessment.limitations?.length ?? 0) > 0 && (
             <>
               <p className="mt-2 text-label font-semibold text-[var(--on-surface)]">{t('ssp.limitations')}</p>
-              <ul aria-label={t('ssp.limitationsLabel')} className="list-disc pl-5 text-label text-[var(--on-surface-variant)]">
+              <ul aria-label={t('ssp.limitationsLabel')} className="list-disc ps-5 text-label text-[var(--on-surface-variant)]">
                 {assessment.limitations!.map((l, i) => (
                   <li key={i}>{l.item}</li>
                 ))}
@@ -306,7 +306,7 @@ export function CompletionDialog({
         // Optional rows only: named, and finishing needs no reason (C3, 8 Oct).
         <div role="group" aria-label={t('ssp.optional')} className="mt-3 rounded-lg bg-[var(--surface-container-low)] px-4 py-3">
           <p className="text-label font-semibold text-[var(--on-surface)]">{t('ssp.optionalTitle')}</p>
-          <ul className="mt-1 list-disc pl-5 text-label text-[var(--on-surface-variant)]">
+          <ul className="mt-1 list-disc ps-5 text-label text-[var(--on-surface-variant)]">
             {open.map((item, i) => (
               <li key={i}>{shownOutstanding(item, locale, show)}</li>
             ))}
@@ -318,7 +318,7 @@ export function CompletionDialog({
           <p className="text-label font-semibold text-[var(--on-surface)]">
             {t('ssp.stillOpen', { count: open.length })}
           </p>
-          <ul className="mt-1 list-disc pl-5 text-label text-[var(--on-surface-variant)]">
+          <ul className="mt-1 list-disc ps-5 text-label text-[var(--on-surface-variant)]">
             {open.map((item, i) => (
               <li key={i}>
                 {shownOutstanding(item, locale, show)}
@@ -326,7 +326,7 @@ export function CompletionDialog({
                   <button
                     type="button"
                     onClick={() => onViewStage(item.stageId)}
-                    className="ml-2 rounded px-1.5 py-0.5 font-semibold text-[var(--pm-primary)] hover:bg-[var(--surface-container-high)]"
+                    className="ms-2 rounded px-1.5 py-0.5 font-semibold text-[var(--pm-primary)] hover:bg-[var(--surface-container-high)]"
                   >
                     {t('ssp.goTo', { stage: show?.stage ? show.stage(item.stageId, item.label) : item.label })}
                   </button>

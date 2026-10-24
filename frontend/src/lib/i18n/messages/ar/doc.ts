@@ -1,0 +1,40 @@
+import type { en } from '../areas/doc';
+
+/** Arabic for `areas/doc.ts` (Sean, 24 Oct: "Arabic and Swahili"). */
+export const ar: Record<keyof typeof en, string> = {
+  'noun.book': 'الكتاب',
+  'noun.exploration': 'الاستكشاف',
+  'noun.research report': 'التقرير البحثي',
+  'noun.work': 'العمل',
+  'noun.screenplay': 'السيناريو',
+  'noun.play': 'المسرحية',
+  'units.chapter': 'الفصول',
+  'units.section': 'الأقسام',
+  'units.round': 'الجولات',
+  'units.sequence': 'المتتاليات',
+  'units.scene': 'المشاهد',
+
+  'fullwork.full': 'اقرأ {noun} كاملًا',
+  'fullwork.fullLabel': '{noun} كاملًا',
+  'fullwork.asItStands': '{noun} بوضعه الحالي · {words} كلمة · للقراءة فقط، لا شيء هنا يغيّره',
+  'fullwork.copy': 'نسخ',
+  'fullwork.copied': 'تم النسخ',
+  'fullwork.closeFull': 'إغلاق',
+  'fullwork.lagFeeds': 'يعرض هذا {shows}. آخر تغيير أجريته، على {changed}، يصل إليه عند تحديث {shows} — اضغط «تطبيق ومتابعة» أعلى الصفحة.',
+  'fullwork.lagOwn': 'يعرض هذا {shows}. آخر تغيير أجريته كان على {changed}، وهو محفوظ مرحلةً مستقلة — افتحه هناك لقراءته.',
+
+  'export.button': 'تصدير',
+  'export.markdown': 'مستند Markdown',
+  'export.markdownHint': 'كل مرحلة وصلت إليها، بالترتيب، جاهزة للصق.',
+  'export.latex': 'LaTeX (.tex)',
+  'export.latexWork': '{noun}، والمعادلات كما كُتبت، والتعليمات البرمجية حرفيًا.',
+  'export.latexStages': 'كل مرحلة وصلت إليها، والمعادلات كما كُتبت، والتعليمات البرمجية حرفيًا.',
+  'export.notebook': 'دفتر Jupyter (.ipynb)',
+  'export.notebookHint': 'كتل Python خلايا يمكنك تشغيلها؛ والنثر والمعادلات بصيغة Markdown.',
+  'export.word': 'مستند Word (.docx)',
+  'export.wordHint': '{noun} وحده — العنوان و{units}.',
+  'export.pdf': 'PDF (عرض الطباعة)',
+  'export.pdfHint': 'يفتح {noun} للطباعة؛ اختر «حفظ بصيغة PDF».',
+  'export.json': 'السجل الكامل (JSON)',
+  'export.jsonHint': 'المشروع، وسجل المراحل، وكل نسخة، وكل تقييم.',
+};

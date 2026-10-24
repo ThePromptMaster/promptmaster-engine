@@ -8,6 +8,7 @@ import { prePaintScript } from '@/lib/appearance/colours';
 
 /** The user's colours, set before the first paint (22 Oct). */
 const PRE_PAINT = prePaintScript();
+const LOCALE_PRE_PAINT = `try{var m=document.cookie.match(/(?:^|; )pm\\.locale=([a-z]{2})/);if(m){document.documentElement.lang=m[1];document.documentElement.dir=m[1]==='ar'?'rtl':'ltr'}}catch(e){}`;
 import './globals.css';
 
 const inter = Inter({
@@ -63,6 +64,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={inter.variable} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: PRE_PAINT }} />
+        {/* The interface language's direction before first paint, so an Arabic page never flashes left to right (24 Oct). */}
+        <script dangerouslySetInnerHTML={{ __html: LOCALE_PRE_PAINT }} />
         {/* display=block, not swap: an icon font's fallback is its ligature
             names, so "swap" flashed "arrow_back" and "science" as text on
             every first load. Next's lint rule targets text fonts, where swap

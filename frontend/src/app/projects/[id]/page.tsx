@@ -233,7 +233,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           href="/projects"
           className="mb-8 inline-flex items-center gap-1 text-body text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
         >
-          <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+          <span className="material-symbols-outlined rtl:-scale-x-100 text-[18px]">arrow_back</span>
           {t('proj.projects')}
         </Link>
         {header}
@@ -262,7 +262,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           href="/projects"
           className="mb-8 inline-flex items-center gap-1 text-body text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
         >
-          <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+          <span className="material-symbols-outlined rtl:-scale-x-100 text-[18px]">arrow_back</span>
           {t('proj.projects')}
         </Link>
         {header}
@@ -304,7 +304,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                   aria-label={t('proj.backToProjects')}
                   className="shrink-0 text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
                 >
-                  <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+                  <span className="material-symbols-outlined rtl:-scale-x-100 text-[20px]">arrow_back</span>
                 </Link>
                 <div className="min-w-0 flex-1">{header}</div>
               </div>

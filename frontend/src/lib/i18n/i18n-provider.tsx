@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useSyncExternalStore } from 'react';
 
-import { DEFAULT_LOCALE, type Locale } from './locales';
+import { DEFAULT_LOCALE, localeDirection, type Locale } from './locales';
 import type { MessageKey } from './messages/en';
 import { getLocale, subscribeLocale } from './store';
 import { translate, type Vars } from './translate';
@@ -24,6 +24,7 @@ export function I18nProvider({ initialLocale, children }: { initialLocale?: Loca
   const locale = useSyncExternalStore(subscribeLocale, getLocale, () => server);
   useEffect(() => {
     document.documentElement.lang = locale;
+    document.documentElement.dir = localeDirection(locale);
   }, [locale]);
   return <ServerLocale.Provider value={server}>{children}</ServerLocale.Provider>;
 }

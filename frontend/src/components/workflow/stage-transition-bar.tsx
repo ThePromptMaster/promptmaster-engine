@@ -277,7 +277,7 @@ export function StageTransitionBar({
           aria-label={t('tb.actions')}
           className="flex flex-wrap items-center gap-3 rounded-xl bg-[var(--surface-container-low)] px-5 py-4"
         >
-          <div className="mr-auto min-w-0">
+          <div className="me-auto min-w-0">
             <span className="block text-label text-[var(--on-surface-variant)]">{statusLine}</span>
             {done && !working && (
               <span role="status" className="mt-0.5 flex items-center gap-1 text-label text-[var(--on-surface)]">
@@ -302,7 +302,7 @@ export function StageTransitionBar({
               </button>
             )}
             {whyOpen && primary.because && (
-              <ul aria-label={t('tb.whyLabel')} className="mt-1 list-disc space-y-0.5 pl-5 text-label text-[var(--on-surface)]">
+              <ul aria-label={t('tb.whyLabel')} className="mt-1 list-disc space-y-0.5 ps-5 text-label text-[var(--on-surface)]">
                 {primary.because.map((line) => (
                   <li key={line}>{line}</li>
                 ))}
@@ -325,7 +325,7 @@ export function StageTransitionBar({
               {menuOpen && (
                 <div
                   role="menu"
-                  className="absolute bottom-full right-0 z-10 mb-1 max-h-[70vh] min-w-[240px] max-w-[min(360px,calc(100vw-2rem))] overflow-y-auto rounded-lg bg-[var(--surface-container-highest)] py-1 shadow-lg"
+                  className="absolute bottom-full end-0 z-10 mb-1 max-h-[70vh] min-w-[240px] max-w-[min(360px,calc(100vw-2rem))] overflow-y-auto rounded-lg bg-[var(--surface-container-highest)] py-1 shadow-lg"
                 >
                   {menu.map((item, i) => (
                     <div key={item.id}>
@@ -345,7 +345,7 @@ export function StageTransitionBar({
                           setMenuOpen(false);
                           item.onSelect();
                         }}
-                        className="flex w-full items-start gap-2 px-4 py-2 text-left text-body text-[var(--on-surface)] hover:bg-[var(--surface-container-high)] disabled:opacity-40"
+                        className="flex w-full items-start gap-2 px-4 py-2 text-start text-body text-[var(--on-surface)] hover:bg-[var(--surface-container-high)] disabled:opacity-40"
                       >
                         <span aria-hidden className="material-symbols-outlined mt-0.5 text-[18px] text-[var(--on-surface-variant)]">
                           {item.icon}
@@ -409,7 +409,7 @@ export function StageTransitionBar({
       aria-label={t('tb.actions')}
       className="flex flex-wrap items-center gap-2 rounded-xl bg-[var(--surface-container-low)] px-5 py-4"
     >
-      <span className="mr-auto text-label text-[var(--on-surface-variant)]">
+      <span className="me-auto text-label text-[var(--on-surface-variant)]">
         {statusLine}
       </span>
 
@@ -422,7 +422,7 @@ export function StageTransitionBar({
             {t('tb.goBack')}
           </button>
           {showReturns && (
-            <div className="absolute bottom-full right-0 z-10 mb-1 min-w-[200px] rounded-lg bg-[var(--surface-container-highest)] py-1 shadow-lg">
+            <div className="absolute bottom-full end-0 z-10 mb-1 min-w-[200px] rounded-lg bg-[var(--surface-container-highest)] py-1 shadow-lg">
               {returns.map((option) => (
                 <button
                   key={option.toStageId}
@@ -430,7 +430,7 @@ export function StageTransitionBar({
                     setShowReturns(false);
                     start(option);
                   }}
-                  className="block w-full px-4 py-2 text-left text-body text-[var(--on-surface)] hover:bg-[var(--surface-container-high)]"
+                  className="block w-full px-4 py-2 text-start text-body text-[var(--on-surface)] hover:bg-[var(--surface-container-high)]"
                 >
                   {option.label}
                 </button>

@@ -62,7 +62,7 @@ export default function CompactPage() {
       <header className="bg-[var(--surface-container-lowest)]">
         <div className="max-w-3xl mx-auto px-6 py-6 flex items-center">
           <Link href="/projects" className="flex items-center gap-2 text-body text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] transition-colors">
-            <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+            <span className="material-symbols-outlined rtl:-scale-x-100 text-[18px]">arrow_back</span>
             Back to session
           </Link>
         </div>
@@ -110,7 +110,7 @@ export default function CompactPage() {
                 {p.title}
               </h2>
             </div>
-            <p className="text-body leading-relaxed text-[var(--on-surface-variant)] pl-14">
+            <p className="text-body leading-relaxed text-[var(--on-surface-variant)] ps-14">
               {p.body}
             </p>
           </article>
@@ -129,7 +129,7 @@ export default function CompactPage() {
             href="/projects"
             className="inline-flex items-center gap-2 px-6 py-3 bg-[var(--pm-primary)] text-[var(--on-primary)] text-title font-semibold rounded-xl hover:opacity-90 transition-all"
           >
-            <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+            <span className="material-symbols-outlined rtl:-scale-x-100 text-[18px]">arrow_forward</span>
             Return to session
           </Link>
         </div>

@@ -25,7 +25,7 @@ export function PolicySelector({
           aria-checked={value === p.value}
           disabled={disabled}
           onClick={() => onChange(p.value)}
-          className={`rounded-lg px-3 py-2 text-left transition-colors disabled:opacity-60 ${
+          className={`rounded-lg px-3 py-2 text-start transition-colors disabled:opacity-60 ${
             value === p.value
               ? 'bg-[var(--pm-primary)] text-[var(--on-primary)]'
               : 'bg-[var(--surface-container-highest)] text-[var(--on-surface)] hover:bg-[var(--surface-container-high)]'

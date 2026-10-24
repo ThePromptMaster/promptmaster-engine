@@ -134,7 +134,7 @@ export function FoldersSidebar({ folders, counts, selected, onSelect, onCreate, 
         onClick={() => onSelect(key)}
         aria-current={active ? 'true' : undefined}
         {...(key === 'all' ? {} : dropProps(String(key), folderId))}
-        className={`flex w-full min-w-0 items-center gap-2 rounded-lg py-1.5 pr-2 text-left text-body transition-colors ${
+        className={`flex w-full min-w-0 items-center gap-2 rounded-lg py-1.5 pe-2 text-start text-body transition-colors ${
           dropTarget === key
             ? 'bg-[color-mix(in_srgb,var(--pm-primary)_16%,transparent)] text-[var(--on-surface)]'
             : active
@@ -160,7 +160,7 @@ export function FoldersSidebar({ folders, counts, selected, onSelect, onCreate, 
         // short name). On a touch screen, with no hover, they stay in the row.
         <div className="group relative flex items-center">
           <div className="min-w-0 flex-1">{row(f.id, f.name, selected === f.id ? 'folder_open' : 'folder', counts[f.id] ?? 0, f.id, f.depth)}</div>
-          <div className="absolute right-0 top-1/2 hidden -translate-y-1/2 rounded-md bg-[var(--surface-container-high)] group-focus-within:flex group-hover:flex [@media(hover:none)]:static [@media(hover:none)]:flex [@media(hover:none)]:shrink-0 [@media(hover:none)]:translate-y-0 [@media(hover:none)]:bg-transparent">
+          <div className="absolute end-0 top-1/2 hidden -translate-y-1/2 rounded-md bg-[var(--surface-container-high)] group-focus-within:flex group-hover:flex [@media(hover:none)]:static [@media(hover:none)]:flex [@media(hover:none)]:shrink-0 [@media(hover:none)]:translate-y-0 [@media(hover:none)]:bg-transparent">
             {f.depth + 1 < MAX_DEPTH && (
               <button type="button" onClick={() => startNaming({ kind: 'new', parentId: f.id })} aria-label={t('folders.newIn', { name: f.name })} title={t('folders.newInside')} className="rounded-md p-1 text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)]">
                 <span className="material-symbols-outlined text-[16px]">create_new_folder</span>
@@ -192,7 +192,7 @@ export function FoldersSidebar({ folders, counts, selected, onSelect, onCreate, 
     <nav aria-label={t('folders.label')} className="space-y-1">
       {row('all', t('folders.all'), 'workspaces', total, null)}
       {row('unfiled', t('folders.unfiled'), 'inbox', counts[''] ?? 0, null)}
-      <div className="flex items-center justify-between pt-4 pb-1 pl-2">
+      <div className="flex items-center justify-between pt-4 pb-1 ps-2">
         <h2 className="text-label uppercase tracking-wider text-[var(--on-surface-variant)]">{t('folders.heading')}</h2>
         <button
           type="button"

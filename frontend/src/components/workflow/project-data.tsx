@@ -147,7 +147,7 @@ export function ProjectData({
     <section data-panel="project-data" aria-label={t('data.label')} className="mb-6 rounded-xl bg-[var(--surface-container-lowest)] px-7 py-4">
       <div className="flex flex-wrap items-center gap-3">
         <span aria-hidden className="material-symbols-outlined text-[18px] text-[var(--on-surface-variant)]">table_view</span>
-        <h3 className="mr-auto text-label uppercase tracking-wider text-[var(--on-surface-variant)]">
+        <h3 className="me-auto text-label uppercase tracking-wider text-[var(--on-surface-variant)]">
           {t('data.title')}{files.length ? t('data.files', { count: files.length }) : ''}
         </h3>
         {!readOnly && files.length < MAX_FILES && (
@@ -265,7 +265,7 @@ export function ProjectData({
             {dataFiles.map((file) => (
               <li key={file.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-body">
                 <span className="font-semibold text-[var(--on-surface)]">{file.name}</span>
-                <span className="mr-auto text-label text-[var(--on-surface-variant)]">{describePreview(file.preview)}</span>
+                <span className="me-auto text-label text-[var(--on-surface-variant)]">{describePreview(file.preview)}</span>
                 {!readOnly && (
                   <button
                     onClick={() => void remove(file)}
@@ -287,7 +287,7 @@ export function ProjectData({
 
       {readable.length > 0 && onAddToContext && !readOnly && (
         <div role="group" aria-label={t('data.addText')} className="mt-3 flex flex-wrap items-center gap-3 rounded-lg bg-[var(--surface-container-low)] px-4 py-2.5">
-          <span className="mr-auto text-label text-[var(--on-surface-variant)]">
+          <span className="me-auto text-label text-[var(--on-surface-variant)]">
             {readable.length === 1 ? t('data.oneHasText', { name: readable[0].name }) : t('data.manyHaveText', { count: readable.length })}
           </span>
           <button

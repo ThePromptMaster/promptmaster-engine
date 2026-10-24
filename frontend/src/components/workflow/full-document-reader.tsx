@@ -57,7 +57,7 @@ export function FullDocumentReader({ bundle }: { bundle: ExportBundle }) {
         >
           <div className="h-fit w-full max-w-[780px] rounded-2xl bg-[var(--surface-container-lowest)] px-8 py-6">
             <div className="mb-4 flex flex-wrap items-center gap-3">
-              <p className="mr-auto text-label text-[var(--on-surface-variant)]">
+              <p className="me-auto text-label text-[var(--on-surface-variant)]">
                 {t('fullwork.asItStands', { noun, words: words.toLocaleString(locale) })}
               </p>
               <button

@@ -28,7 +28,7 @@ export function FiguresOnRecord({
   return (
     <details aria-label={t('pnl.figuresLabel')} className="group mb-6 rounded-xl bg-[var(--surface-container-lowest)] px-7 py-4">
       <summary className="flex cursor-pointer list-none items-center gap-2 text-body text-[var(--on-surface-variant)]">
-        <span aria-hidden className="material-symbols-outlined text-[18px] transition-transform group-open:rotate-90">chevron_right</span>
+        <span aria-hidden className="material-symbols-outlined rtl:-scale-x-100 text-[18px] transition-transform group-open:rotate-90">chevron_right</span>
         <span className="text-label uppercase tracking-wider">{t('pnl.figuresTitle', { n: figures.length })}</span>
       </summary>
       <p className="mt-3 text-label text-[var(--on-surface-variant)]">

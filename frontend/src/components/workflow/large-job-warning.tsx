@@ -131,7 +131,7 @@ function Figure({ label, value, note }: { label: string; value: string; note?: s
       <dd className="text-title text-[var(--on-surface)]">
         {value}
         {note && (
-          <span className="ml-1 text-label font-normal text-[var(--on-surface-variant)]">
+          <span className="ms-1 text-label font-normal text-[var(--on-surface-variant)]">
             {note}
           </span>
         )}

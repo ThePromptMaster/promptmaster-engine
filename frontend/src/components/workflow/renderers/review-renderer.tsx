@@ -439,14 +439,14 @@ export function ReviewRenderer({
                     <th
                       key={c.key}
                       scope="col"
-                      className="px-4 py-3 text-left text-label uppercase tracking-wider text-[var(--on-surface-variant)]"
+                      className="px-4 py-3 text-start text-label uppercase tracking-wider text-[var(--on-surface-variant)]"
                     >
                       {c.label}
                     </th>
                   ))}
                   <th
                     scope="col"
-                    className="w-[180px] px-4 py-3 text-left text-label uppercase tracking-wider text-[var(--on-surface-variant)]"
+                    className="w-[180px] px-4 py-3 text-start text-label uppercase tracking-wider text-[var(--on-surface-variant)]"
                   >
                     {t('stage.status')}
                   </th>

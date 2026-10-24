@@ -80,7 +80,7 @@ export default function SignupPage() {
   );
 
   const decoration = (
-    <div className="fixed top-0 right-0 p-12 opacity-5 pointer-events-none">
+    <div className="fixed top-0 end-0 p-12 opacity-5 pointer-events-none">
       <span className="material-symbols-outlined" style={{ fontSize: '320px' }}>
         architecture
       </span>
@@ -224,7 +224,7 @@ export default function SignupPage() {
             {t('auth.haveAccount')}{' '}
             <Link
               href="/auth/login"
-              className="text-[var(--pm-primary)] font-medium hover:underline ml-1"
+              className="text-[var(--pm-primary)] font-medium hover:underline ms-1"
             >
               {t('auth.signInLower')}
             </Link>

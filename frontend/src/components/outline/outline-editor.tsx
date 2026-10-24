@@ -276,7 +276,7 @@ export function OutlineEditor({
 
       {showActions && (
         <div className="flex flex-wrap items-center gap-2 rounded-xl bg-[var(--surface-container-low)] px-5 py-4">
-          <span className="mr-auto text-label text-[var(--on-surface-variant)]">
+          <span className="me-auto text-label text-[var(--on-surface-variant)]">
             {isDraft
               ? t('ol.unsaved')
               : approvedVersionNumber !== null

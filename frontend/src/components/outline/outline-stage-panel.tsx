@@ -480,7 +480,7 @@ export function OutlineStagePanel({
                 role="radio"
                 aria-checked={form === f.id}
                 onClick={() => setForm(f.id)}
-                className={`min-w-[220px] flex-1 rounded-lg px-4 py-2.5 text-left transition-colors ${
+                className={`min-w-[220px] flex-1 rounded-lg px-4 py-2.5 text-start transition-colors ${
                   form === f.id
                     ? 'bg-[var(--pm-primary)] text-[var(--on-primary)]'
                     : 'bg-[var(--surface-container-highest)] text-[var(--on-surface)] hover:opacity-90'

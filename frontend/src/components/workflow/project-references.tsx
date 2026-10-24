@@ -75,12 +75,12 @@ export function ProjectReferences({
         type="button"
         onClick={() => setToggled(!open)}
         aria-expanded={open}
-        className="flex w-full items-center gap-2 text-left text-title text-[var(--on-surface)]"
+        className="flex w-full items-center gap-2 text-start text-title text-[var(--on-surface)]"
       >
         <span aria-hidden className="material-symbols-outlined text-[18px]">link</span>
         {t('refs.title')}
         <span className="text-label text-[var(--on-surface-variant)]">{rows.length ? t('refs.used', { count: rows.length }) : t('refs.noneUsed')}</span>
-        <span aria-hidden className="material-symbols-outlined ml-auto text-[18px]">{open ? 'expand_less' : 'expand_more'}</span>
+        <span aria-hidden className="material-symbols-outlined ms-auto text-[18px]">{open ? 'expand_less' : 'expand_more'}</span>
       </button>
 
       {open && (
@@ -242,7 +242,7 @@ export function ProjectPicker({
                   type="button"
                   disabled={disabled}
                   onClick={() => onPick(p.id)}
-                  className="w-full rounded-lg px-2 py-1.5 text-left text-body text-[var(--on-surface)] hover:bg-[var(--surface-container-high)] disabled:opacity-50"
+                  className="w-full rounded-lg px-2 py-1.5 text-start text-body text-[var(--on-surface)] hover:bg-[var(--surface-container-high)] disabled:opacity-50"
                 >
                   <span className="block truncate">{p.title || t('list.untitled')}</span>
                   {p.objective && <span className="block truncate text-label text-[var(--on-surface-variant)]">{p.objective}</span>}

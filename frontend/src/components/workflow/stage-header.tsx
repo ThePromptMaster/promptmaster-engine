@@ -88,7 +88,7 @@ export function StageHeader({ stage, status, skippedReason, position, onPickMode
       {showGuidance && stage.entry_guidance && (
         // A left rule rather than another grey card: the guidance and the exit
         // criteria were the same tone, so the eye had nothing to rank them by.
-        <div className="mt-4 flex items-start gap-3 border-l-2 border-[var(--pm-primary)] pl-4">
+        <div className="mt-4 flex items-start gap-3 border-s-2 border-[var(--pm-primary)] ps-4">
           <p className="max-w-[60ch] flex-1 text-body leading-relaxed text-[var(--on-surface-variant)]">
             {stage.entry_guidance}
           </p>
@@ -121,7 +121,7 @@ export function StageHeader({ stage, status, skippedReason, position, onPickMode
                 onClick={() => onPickMode?.(rec.mode)}
                 disabled={!onPickMode}
                 aria-pressed={onPickMode ? inUse : undefined}
-                className={`min-w-[220px] max-w-[380px] flex-1 rounded-xl px-4 py-3 text-left transition-colors disabled:cursor-default ${
+                className={`min-w-[220px] max-w-[380px] flex-1 rounded-xl px-4 py-3 text-start transition-colors disabled:cursor-default ${
                   inUse
                     ? 'bg-[var(--surface-container-high)] ring-2 ring-[var(--pm-primary)]/50'
                     : 'bg-[var(--surface-container-low)] hover:bg-[var(--surface-container-high)]'

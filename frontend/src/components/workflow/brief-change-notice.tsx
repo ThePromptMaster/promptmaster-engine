@@ -63,7 +63,7 @@ export function BriefChangeNotice({
       <div role="status" aria-label={t('bcn.label')} className="mb-6 flex flex-wrap items-center gap-3 rounded-xl bg-[var(--surface-container-low)] px-5 py-3 text-body text-[var(--on-surface-variant)]">
         <Steps first={firstStep(settled.event)} second={t('bcn.namesUpdated', { names: listOf(names) })} third={t('bcn.checkedAgain')} at={3} />
         {onDismissSettled && (
-          <button onClick={onDismissSettled} className="ml-auto text-label text-[var(--pm-primary)] hover:underline">
+          <button onClick={onDismissSettled} className="ms-auto text-label text-[var(--pm-primary)] hover:underline">
             {t('bcn.dismiss')}
           </button>
         )}
@@ -85,10 +85,10 @@ export function BriefChangeNotice({
       <div role="status" aria-label={t('bcn.label')} className="mb-6 rounded-xl bg-[var(--surface-container-low)] px-5 py-3 text-body text-[var(--on-surface-variant)]">
         {waiting}
         <p className="mt-2">
-          <span aria-hidden className="material-symbols-outlined mr-1 align-[-4px] text-[18px] text-[var(--pm-tertiary)]">history</span>
+          <span aria-hidden className="material-symbols-outlined me-1 align-[-4px] text-[18px] text-[var(--pm-tertiary)]">history</span>
           {t('bcn.needsRecheck', { count: stageIds.length, names: listOf(names) })}
         </p>
-        <ul className="mt-1 list-disc pl-6 text-label">
+        <ul className="mt-1 list-disc ps-6 text-label">
           {stageIds.map((id) => (
             <li key={id}>
               {stageLabel(id)}: {change.reasons![id]}
@@ -107,7 +107,7 @@ export function BriefChangeNotice({
       <div role="status" aria-label="Brief change" className="mb-6 rounded-xl bg-[var(--surface-container-low)] px-5 py-3 text-body text-[var(--on-surface-variant)]">
         {waiting}
         <p className="mt-2">
-          <span aria-hidden className="material-symbols-outlined mr-1 align-[-4px] text-[18px] text-[var(--pm-tertiary)]">history</span>
+          <span aria-hidden className="material-symbols-outlined me-1 align-[-4px] text-[18px] text-[var(--pm-tertiary)]">history</span>
           {typeof n === 'number' ? t('bcn.stageChangedV', { count: stageIds.length, stage: stageLabel(event.stage_id), version: n, names: list }) : t('bcn.stageChanged', { count: stageIds.length, stage: stageLabel(event.stage_id), names: list })}
         </p>
         <Actions onUpdate={onUpdate} updating={updating} onKeep={() => onKeep(event.created_at)} />
@@ -120,7 +120,7 @@ export function BriefChangeNotice({
       <div role="status" aria-label="Brief change" className="mb-6 rounded-xl bg-[var(--surface-container-low)] px-5 py-3 text-body text-[var(--on-surface-variant)]">
         {waiting}
         <p className="mt-2">
-          <span aria-hidden className="material-symbols-outlined mr-1 align-[-4px] text-[18px] text-[var(--pm-tertiary)]">history</span>
+          <span aria-hidden className="material-symbols-outlined me-1 align-[-4px] text-[18px] text-[var(--pm-tertiary)]">history</span>
           {t('bcn.reopened', { stage: stageLabel(event.stage_id) })}
         </p>
         <Actions onUpdate={onUpdate} updating={updating} onKeep={() => onKeep(event.created_at)} />
@@ -139,7 +139,7 @@ export function BriefChangeNotice({
     <div role="status" aria-label="Brief change" className="mb-6 rounded-xl bg-[var(--surface-container-low)] px-5 py-3 text-body text-[var(--on-surface-variant)]">
       {waiting}
       <p className="mt-2">
-        <span aria-hidden className="material-symbols-outlined mr-1 align-[-4px] text-[18px] text-[var(--pm-tertiary)]">history</span>
+        <span aria-hidden className="material-symbols-outlined me-1 align-[-4px] text-[18px] text-[var(--pm-tertiary)]">history</span>
         {t('bcn.fieldChange', { count: stageIds.length, field, names: list })}{' '}
         {holds ? `${t('bcn.holds')} ` : ''}
         {t('bcn.rest')}
@@ -147,7 +147,7 @@ export function BriefChangeNotice({
       {partialUpdate(affected.map((a) => a.stage_id), stageIds, stageLabel) && (
         <p className="mt-1 text-label text-[var(--on-surface)]">{partialUpdate(affected.map((a) => a.stage_id), stageIds, stageLabel)}</p>
       )}
-      <ul className="mt-1 list-disc pl-6 text-label">
+      <ul className="mt-1 list-disc ps-6 text-label">
         {affected.filter((a) => stageIds.includes(a.stage_id)).map((a) => (
           <li key={a.stage_id}>
             {stageLabel(a.stage_id)}: {a.reason}
@@ -228,7 +228,7 @@ function Steps({ first, second, third, at }: { first: string; second: string; th
         const current = n === at && !done;
         return (
           <li key={text} className={`flex items-center gap-1 ${done || current ? 'text-[var(--on-surface)]' : ''}`} aria-current={current ? 'step' : undefined}>
-            {i > 0 && <span aria-hidden className="material-symbols-outlined text-[16px] text-[var(--outline)]">chevron_right</span>}
+            {i > 0 && <span aria-hidden className="material-symbols-outlined rtl:-scale-x-100 text-[16px] text-[var(--outline)]">chevron_right</span>}
             <span aria-hidden className={`material-symbols-outlined text-[16px] ${done ? 'text-[var(--pm-success)]' : current ? 'text-[var(--pm-tertiary)]' : 'text-[var(--outline)]'}`}>
               {done ? 'check_circle' : current ? 'pending' : 'radio_button_unchecked'}
             </span>

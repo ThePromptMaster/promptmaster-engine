@@ -112,7 +112,7 @@ export default function LandingPage() {
   return (
     <div className="landing min-h-screen bg-[#0a0a1a]">
       {/* ===== NAVIGATION ===== */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-[#0a0a1a]/80 backdrop-blur-xl border-b border-white/5">
+      <nav className="fixed top-0 start-0 end-0 z-50 bg-[#0a0a1a]/80 backdrop-blur-xl border-b border-white/5">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <img src="/logo.svg" alt="PromptMaster" className="w-8 h-8 rounded-lg" />
@@ -136,10 +136,10 @@ export default function LandingPage() {
 
       {/* ===== HERO SECTION (only section with Spotlight) ===== */}
       <section className="relative lg:min-h-screen overflow-hidden">
-        <Spotlight className="-top-40 left-0 md:left-60 md:-top-20" fill="#2563eb" />
+        <Spotlight className="-top-40 start-0 md:start-60 md:-top-20" fill="#2563eb" />
 
         <div className="relative z-10 max-w-7xl mx-auto px-6 pt-28 pb-10 md:pt-32 md:pb-20 flex flex-col lg:flex-row items-center lg:min-h-screen">
-          <div className="flex-1 space-y-8 text-center lg:text-left">
+          <div className="flex-1 space-y-8 text-center lg:text-start">
             <h1 className="text-5xl md:text-7xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-b from-white via-white to-white/40 leading-[1.1]">
               {t('land.heroA')}
               <br />
@@ -155,7 +155,7 @@ export default function LandingPage() {
                 href="/projects"
                 className="inline-flex items-center justify-center gap-2 px-8 py-4 on-primary bg-[var(--pm-primary)] text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all"
               >
-                <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+                <span className="material-symbols-outlined rtl:-scale-x-100 text-[18px]">arrow_forward</span>
                 {t('land.start')}
               </Link>
               <a
@@ -332,7 +332,7 @@ export default function LandingPage() {
 
       {/* ===== CTA ===== */}
       <section className="py-16 md:py-32 relative overflow-hidden">
-        <Spotlight className="-top-40 right-0 md:right-60 md:-top-20" fill="#2563eb" />
+        <Spotlight className="-top-40 end-0 md:end-60 md:-top-20" fill="#2563eb" />
         <div className="relative z-10 max-w-3xl mx-auto px-6 text-center space-y-8">
           <h2 className="text-4xl md:text-5xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-b from-white to-white/60">
             {t('land.ctaTitle')}
@@ -344,7 +344,7 @@ export default function LandingPage() {
             href="/projects"
             className="inline-flex items-center justify-center gap-2 px-10 py-4 on-primary bg-[var(--pm-primary)] text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all"
           >
-            <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+            <span className="material-symbols-outlined rtl:-scale-x-100 text-[18px]">arrow_forward</span>
             {t('land.ctaButton')}
           </Link>
         </div>
