@@ -376,3 +376,11 @@ describe('Chinese is counted in characters (Sean, 24 Oct: Mandarin)', () => {
     expect(limit('200-300字')).toMatchObject({ min: 200, max: 300 });
   });
 });
+
+describe('questions end in any of the question marks (24 Oct)', () => {
+  it('counts Chinese and Arabic questions', () => {
+    expect(countQuestions('1. 你的预算是多少？\n2. 谁来批准？').total).toBe(2);
+    expect(countQuestions('1. ما هي الميزانية؟').total).toBe(1);
+    expect(countQuestions('1. What is the budget?').total).toBe(1);
+  });
+});
