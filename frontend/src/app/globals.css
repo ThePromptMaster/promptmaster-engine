@@ -289,3 +289,18 @@
 
 /* A long derivation scrolls inside its own line rather than the page. */
 .pm-math-display .katex-display { overflow-x: auto; overflow-y: hidden; padding: 0.25rem 0; }
+
+/*
+ * The landing page in the chosen background (Sean, 22 Oct: "if they are
+ * demo'ing, they can change it to pink and the background and stuff is pink
+ * too"). `data-tint` is set on <html> by the colour preferences; without one
+ * the landing page keeps its dark look.
+ */
+html[data-tint] .landing { background: var(--surface); }
+html[data-tint] .landing nav { background: color-mix(in srgb, var(--surface) 85%, transparent); border-color: var(--surface-container-high); }
+html[data-tint] .landing .text-white:not(.on-primary) { color: var(--on-surface); }
+html[data-tint] .landing :is(.text-white\/80, .text-white\/75, .text-white\/70, .text-white\/65, .text-white\/60) { color: var(--on-surface-variant); }
+html[data-tint] .landing :is(.text-blue-400, .text-emerald-400) { color: var(--pm-primary); }
+html[data-tint] .landing :is(.bg-white\/\[0\.03\], .bg-white\/\[0\.04\], .bg-white\/5, .bg-white\/10) { background: var(--surface-container-lowest); }
+html[data-tint] .landing :is(.border-white\/\[0\.06\], .border-white\/\[0\.08\], .border-white\/5, .border-white\/10) { border-color: var(--surface-container-high); }
+html[data-tint] .landing .bg-clip-text { background-image: none; color: var(--on-surface); -webkit-text-fill-color: var(--on-surface); }

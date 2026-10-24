@@ -4,6 +4,10 @@ import { Toaster } from '@/components/ui/sonner';
 import { BetaNotice } from '@/components/shared/beta-notice';
 import { ApplyColourPreferences } from '@/components/shared/colour-preferences';
 import { I18nProvider } from '@/lib/i18n/i18n-provider';
+import { prePaintScript } from '@/lib/appearance/colours';
+
+/** The user's colours, set before the first paint (22 Oct). */
+const PRE_PAINT = prePaintScript();
 import './globals.css';
 
 const inter = Inter({
@@ -55,8 +59,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={inter.variable}>
+    // The colour script below sets styles on <html> before React hydrates.
+    <html lang="en" className={inter.variable} suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: PRE_PAINT }} />
         {/* display=block, not swap: an icon font's fallback is its ligature
             names, so "swap" flashed "arrow_back" and "science" as text on
             every first load. Next's lint rule targets text fonts, where swap

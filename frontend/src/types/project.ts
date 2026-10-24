@@ -298,6 +298,8 @@ export interface ArtifactVersion {
   finish_reason: string | null;
   user_rating: 'positive' | 'negative' | null;
   continuity_snapshot: ContinuitySnapshot | null;
+  /** The colour palette in force when it was made, "<starting>/<palette>"; null follows the current one. */
+  colour_scheme?: string | null;
 
   created_at: string;
 }
