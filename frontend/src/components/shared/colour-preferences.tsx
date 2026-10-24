@@ -126,7 +126,8 @@ export function ColourMenu({ tone = 'light' }: { tone?: 'light' | 'dark' }) {
         }`}
       >
         <span aria-hidden className="material-symbols-outlined text-[18px]">palette</span>
-        {t('header.colours')}
+        {/* The word only where there is room: on a phone the landing header held the logo, beta, this and Sign in (24 Oct). */}
+        <span className="max-sm:sr-only whitespace-nowrap">{t('header.colours')}</span>
       </summary>
       <div className="absolute end-0 z-50 mt-2 w-72 rounded-xl bg-[var(--surface-container-lowest)] py-2 text-[var(--on-surface)] shadow-[0_12px_32px_-12px_rgba(25,28,30,0.35)]">
         <ColourPicker />

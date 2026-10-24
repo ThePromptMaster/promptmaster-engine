@@ -2,6 +2,7 @@
 
 import { shownModeReason } from '@/lib/i18n/stage';
 import { stageText, workflowName as workflowNameText, templateWord } from '@/lib/i18n/templates';
+import { translate } from '@/lib/i18n/translate';
 import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import { tr } from '@/lib/i18n/store';
 import { shownGoWaiting } from '@/lib/i18n/stop-reasons';
@@ -2729,12 +2730,12 @@ export function WorkflowWorkspace({
               }
               starters={isCurrent ? starterQuestions({
                 renderer: stage.renderer,
-                stageLabel: stage.short_label,
+                stageLabel: stageText(locale, template.key, stage, 'short'),
                 hasContent: hasContent || (stage.renderer === 'long_form' && (stageBundles[draftingStageId(template) ?? '']?.artifact?.long_form?.outline ?? []).some((sec) => (sec.content ?? '').trim())),
                 openRows: rendererHoldsItems(stage.renderer) ? headItems.filter((i) => !isTriaged(i, itemSchemaFor(stage))).length : 0,
                 requiredOpen: evaluation.criteria.filter((c) => c.blocking && !c.satisfied).map((c) => templateWord(locale, c.label)),
-                nextStageLabel: nextStage?.short_label ?? null,
-              }) : []}
+                nextStageLabel: nextStage ? stageText(locale, template.key, nextStage, 'short') : null,
+              }, locale === 'en' ? undefined : (key, vars) => translate(locale, key, vars)) : []}
               headVersion={stageVersions.at(-1) ?? null}
               appendStageVersion={appendStageVersion}
               restoreStageVersion={restoreStageVersion}

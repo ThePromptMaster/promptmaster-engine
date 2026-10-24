@@ -8,6 +8,11 @@
  */
 
 import type { StageRenderer } from './types';
+import { translate, type Vars } from '@/lib/i18n/translate';
+
+/** The words for a key in the interface's language; English unless the caller says otherwise. */
+export type Say = (key: string, vars?: Vars) => string;
+const english: Say = (key, vars) => translate('en', key, vars);
 
 export interface StarterInput {
   renderer: StageRenderer;
@@ -22,28 +27,29 @@ export interface StarterInput {
 
 export const STARTERS_MAX = 3;
 
-export function starterQuestions(input: StarterInput): string[] {
+/** In the interface's language (24 Oct: they were the one part of the side chat left in English). */
+export function starterQuestions(input: StarterInput, t: Say = english): string[] {
   const { renderer, stageLabel, hasContent, openRows, requiredOpen, nextStageLabel } = input;
   const out: string[] = [];
 
   if (!hasContent) {
-    out.push(`What should the ${stageLabel} stage produce for this project?`);
+    out.push(t('starter.produce', { stage: stageLabel }));
   } else if (renderer === 'review' || renderer === 'list') {
     if (openRows > 0) {
-      out.push(`Which of the ${openRows} open ${openRows === 1 ? 'row matters' : 'rows matter'} most, and why?`);
-      out.push('Summarise what still needs my decision here.');
+      out.push(t('starter.openRows', { count: openRows }));
+      out.push(t('starter.summarise'));
     } else {
-      out.push('Is anything in this table missing or wrong?');
+      out.push(t('starter.tableWrong'));
     }
   } else if (renderer === 'outline') {
-    out.push('Does this outline cover everything the objective promises?');
-    out.push('Which section is weakest or most out of place?');
+    out.push(t('starter.outlineCovers'));
+    out.push(t('starter.outlineWeakest'));
   } else if (renderer === 'long_form') {
-    out.push('Which chapter needs the most work, and why?');
-    out.push('Do the chapters contradict each other anywhere?');
+    out.push(t('starter.chapterWork'));
+    out.push(t('starter.chaptersContradict'));
   } else {
-    out.push('What is the weakest part of this draft?');
-    out.push('Does this still serve the objective?');
+    out.push(t('starter.weakest'));
+    out.push(t('starter.objective'));
   }
 
   // The open criterion is said as not met: "(An output exists)" beside a chat
@@ -51,9 +57,11 @@ export function starterQuestions(input: StarterInput): string[] {
   // With nothing drafted, the first question already asks what it should hold.
   const open = hasContent ? requiredOpen : requiredOpen.filter((l) => !/(?:output|draft|artifact|text).*exists?/i.test(l));
   if (open.length > 0) {
-    out.push(`What does this stage still need from me? (Not yet: ${/^I\b/.test(open[0]) ? open[0] : open[0][0].toLowerCase() + open[0].slice(1)})`);
+    // Lower-cased to run on in English ("Not yet: an output exists"); other languages keep the label as it is.
+    const criterion = t === english && !/^I\b/.test(open[0]) ? open[0][0].toLowerCase() + open[0].slice(1) : open[0];
+    out.push(t('starter.stillNeeds', { criterion }));
   } else if (nextStageLabel) {
-    out.push(`Is this ready for ${nextStageLabel}?`);
+    out.push(t('starter.ready', { stage: nextStageLabel }));
   }
 
   return out.slice(0, STARTERS_MAX);

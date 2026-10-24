@@ -39,6 +39,7 @@ import { en as recsArea } from './areas/recs';
 import { en as acctArea } from './areas/acct';
 import { en as recArea } from './areas/rec';
 import { en as panelsArea } from './areas/panels';
+import { en as startersArea } from './areas/starters';
 
 export const en = {
   // The account menu (components/shared/app-header.tsx)
@@ -345,6 +346,7 @@ export const en = {
   ...acctArea,
   ...recArea,
   ...panelsArea,
+  ...startersArea,
 } as const;
 
 /** A key as the dictionaries hold it. */

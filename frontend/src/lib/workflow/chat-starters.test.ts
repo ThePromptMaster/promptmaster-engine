@@ -42,3 +42,14 @@ describe('the chips agree with the chat about what exists (14 Oct, Sean: wedding
     expect(chips).toContain('What does this stage still need from me? (Not yet: the deliverable: at most 100 words)');
   });
 });
+
+describe('in the interface language (24 Oct)', () => {
+  it('asks in Arabic and Chinese, with the stage named as the page names it', async () => {
+    const { translate } = await import('@/lib/i18n/translate');
+    const input = { renderer: 'prose' as const, stageLabel: 'مراجعة', hasContent: true, openRows: 0, requiredOpen: [], nextStageLabel: 'المُخرَج' };
+    const ar = starterQuestions(input, (k, v) => translate('ar', k, v));
+    expect(ar).toEqual(['ما أضعف جزء في هذه المسودة؟', 'هل لا يزال هذا يخدم الهدف؟', 'هل هذا جاهز لمرحلة المُخرَج؟']);
+    const zh = starterQuestions({ ...input, renderer: 'review', openRows: 2 }, (k, v) => translate('zh', k, v));
+    expect(zh[0]).toBe('这 2 行待定内容中，哪些最重要？为什么？');
+  });
+});

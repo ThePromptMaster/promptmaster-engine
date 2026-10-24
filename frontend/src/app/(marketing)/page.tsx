@@ -110,23 +110,23 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div className="landing min-h-screen bg-[#0a0a1a]">
+    <div className="landing min-h-screen overflow-x-clip bg-[#0a0a1a]">
       {/* ===== NAVIGATION ===== */}
       <nav className="fixed top-0 start-0 end-0 z-50 bg-[#0a0a1a]/80 backdrop-blur-xl border-b border-white/5">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
             <img src="/logo.svg" alt="PromptMaster" className="w-8 h-8 rounded-lg" />
             <span className="text-white font-semibold tracking-tight">PromptMaster</span>
           </div>
-          <div className="flex items-center gap-4">
-            <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-white/80">
+          <div className="flex shrink-0 items-center gap-2 sm:gap-4">
+            <span className="whitespace-nowrap rounded-full bg-white/10 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-white/80">
               {t('land.beta')}
             </span>
             <LocaleSwitch tone="dark" className="hidden sm:flex" />
             <ColourMenu tone="dark" />
             <Link
               href="/auth/login"
-              className="text-sm text-white/80 hover:text-white transition-colors"
+              className="whitespace-nowrap text-sm text-white/80 hover:text-white transition-colors"
             >
               {t('land.signIn')}
             </Link>
@@ -353,7 +353,7 @@ export default function LandingPage() {
       {/* ===== FOOTER ===== */}
       <footer className="pt-10 pb-24 md:py-12 border-t border-white/5">
         <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-center gap-3">
             <img src="/logo.svg" alt="PromptMaster" className="w-6 h-6 rounded" />
             <span className="text-sm text-white/70">PromptMaster</span>
           </div>
