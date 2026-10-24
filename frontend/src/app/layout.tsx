@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { Inter, Noto_Sans_Arabic, Noto_Sans_Devanagari } from 'next/font/google';
 import { Toaster } from '@/components/ui/sonner';
 import { BetaNotice } from '@/components/shared/beta-notice';
 import { ApplyColourPreferences } from '@/components/shared/colour-preferences';
@@ -13,9 +13,14 @@ import './globals.css';
 
 const inter = Inter({
   subsets: ['latin'],
-  variable: '--font-sans',
+  variable: '--font-inter',
   display: 'swap',
 });
+// Inter has no Arabic or Devanagari: these follow it in the font stack, so the
+// interface in Arabic or Hindi is drawn in a face made for it rather than in a
+// small system fallback (24 Oct). Only the files for the letters on the page load.
+const arabic = Noto_Sans_Arabic({ subsets: ['arabic'], variable: '--font-arabic', display: 'swap', preload: false });
+const devanagari = Noto_Sans_Devanagari({ subsets: ['devanagari'], variable: '--font-devanagari', display: 'swap', preload: false });
 
 export const metadata: Metadata = {
   title: {
@@ -61,7 +66,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     // The colour script below sets styles on <html> before React hydrates.
-    <html lang="en" className={inter.variable} suppressHydrationWarning>
+    <html lang="en" className={`${inter.variable} ${arabic.variable} ${devanagari.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: PRE_PAINT }} />
         {/* The interface language's direction before first paint, so an Arabic page never flashes left to right (24 Oct). */}

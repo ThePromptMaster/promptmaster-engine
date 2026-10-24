@@ -13,9 +13,9 @@
    ======================================== */
 
 @theme inline {
-  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-sans: var(--font-inter), "Inter", var(--font-arabic), var(--font-devanagari), system-ui, -apple-system, sans-serif;
   --font-mono: ui-monospace, "Geist Mono", monospace;
-  --font-heading: "Inter", system-ui, sans-serif;
+  --font-heading: var(--font-inter), "Inter", var(--font-arabic), var(--font-devanagari), system-ui, sans-serif;
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);

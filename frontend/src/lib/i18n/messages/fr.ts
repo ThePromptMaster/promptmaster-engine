@@ -28,6 +28,7 @@ import { fr as recsArea } from './areas/recs';
 import { fr as acctArea } from './areas/acct';
 import { fr as recArea } from './areas/rec';
 import { fr as panelsArea } from './areas/panels';
+import { fr as startersArea } from './areas/starters';
 
 export const fr: Messages = {
   'header.account': 'Compte',
@@ -329,4 +330,5 @@ export const fr: Messages = {
   ...acctArea,
   ...recArea,
   ...panelsArea,
+  ...startersArea,
 };

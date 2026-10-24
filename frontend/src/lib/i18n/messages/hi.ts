@@ -29,6 +29,7 @@ import { hi as recsArea } from './hi/recs';
 import { hi as acctArea } from './hi/acct';
 import { hi as recArea } from './hi/rec';
 import { hi as panelsArea } from './hi/panels';
+import { hi as startersArea } from './hi/starters';
 
 export const hi: Messages = {
   'header.account': 'खाता',
@@ -329,4 +330,5 @@ export const hi: Messages = {
   ...acctArea,
   ...recArea,
   ...panelsArea,
+  ...startersArea,
 };

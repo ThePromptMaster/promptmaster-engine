@@ -28,6 +28,7 @@ import { zh as recsArea } from './zh/recs';
 import { zh as acctArea } from './zh/acct';
 import { zh as recArea } from './zh/rec';
 import { zh as panelsArea } from './zh/panels';
+import { zh as startersArea } from './zh/starters';
 
 /** Chinese (Simplified) for the base keys in `en.ts` (Sean, 24 Oct: "…and then Mandarin"). */
 export const zh: Messages = {
@@ -329,4 +330,5 @@ export const zh: Messages = {
   ...acctArea,
   ...recArea,
   ...panelsArea,
+  ...startersArea,
 };
