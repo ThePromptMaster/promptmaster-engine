@@ -1989,9 +1989,11 @@ the same way the side chat's sources are.
 - **Checks never search.** Evaluations, conflict and claim checks, fact and figure extraction,
   dependent-claim checks, objective assessment and reply-action parsing judge what the project
   holds. A check that pulls in outside facts no longer checks the project.
-- **Setup does not search.** Guide me, the workflow designer and the setup suggestion run
-  before a project exists and design the work rather than state facts. The start-screen
-  conversation does search, and its sources come with the project.
+- **Setup does not search — except Ask me questions (24 Oct).** The workflow designer and
+  the setup suggestion run before a project exists and design the work rather than state
+  facts. The start-screen conversation and Ask me questions do search, and their sources
+  come with the project. With Web access on, the setup suggestion is told PromptMaster can
+  search, so its constraints never say there is no web (L-106).
 - **Chapters do not search yet.** Long-form sections are written by the server-side job
   (`lib/jobs/generator.ts`), which has no path to save sources. They cite the sources already
   saved.
@@ -2166,3 +2168,58 @@ other." **Open another project** (in the workspace header, or **Open beside** on
 - **As of when it was opened.** Edits made to the other project in another tab show after it is
   closed and opened again (or the page reloads).
 - The choice is kept for this browser tab (session storage), per project.
+
+
+### L-106 — Searching for the query; web in setup; Go's progress (2026-10-24)
+
+Sean, 22–23 Oct: a start-chat search for Claude Pro pricing returned childcare tools; the
+recommended setup then said "PromptMaster cannot browse the web"; the Nancy Go run stopped at
+5/25 steps.
+- **The search engine is sent the query alone.** OpenRouter's web plugin searches the user
+  message. Ours began with the whole project objective, so a long brief was what got searched.
+  The project and the reason now ride, clipped to 300 characters each, in the system message.
+  That decides which pages come back, not only how the summary reads.
+- **What a pasted link holds is still unread (L-95).** Web access is a search, not a fetch:
+  a particular video, social post or private page is not opened. The prompts with Web access
+  on say that, and no longer say PromptMaster cannot browse.
+- **A search counts as progress only when it saved something new.** A search whose sources
+  were all saved already changes nothing, and three idle moves still stop Go. Since 24 Oct,
+  "three moves" means three: the read before the first move is the baseline.
+- **The planner's reason is cut at 600 characters** where it becomes a search's purpose.
+
+### L-107 — Presets: removed from the list, never deleted (2026-10-24)
+
+"The number of my workflow presets are getting outrageous." A workflow the user designed can be
+taken off the start screen's list (**Remove … from this list**) and put back. It is archived,
+not deleted: projects pin the exact version they started on, and a project without its
+workflow has no stages.
+- **Only status and listing change.** The owner may change `status` (published ↔ archived)
+  and `listed` on their own rows, and nothing else; a trigger refuses any other change, so a
+  template's content is still immutable. System workflows cannot be removed.
+- **All versions of the key go together**, so an older version does not take its place.
+
+### L-108 — A workflow designed for each new project (2026-10-24)
+
+"The default is a custom workflow after answering what you want to do or a conversation."
+Set it up for me (I know what I want to do), Ask me questions and the conversation design a
+workflow from what the user said, and preselect it. The standard workflow the setup suggests is
+named as the closest, one click away.
+- **One more model call per setup**, made alongside the setup call, so it adds no wait
+  beyond the slower of the two. It is metered as usual.
+- **Falls back without a word of error.** A design that fails, or does not pass the checks
+  every workflow must (`validateTemplate`), leaves the standard recommendation in its place.
+- **Saved when the project is made, off the list.** It is published with `listed = false`;
+  **Also keep this workflow in my list** puts it on the list. "Make it a project" never does.
+- **Choose the workflow yourself** designs nothing.
+
+### L-109 — Colours: per version, per browser (2026-10-24)
+
+- **A version keeps the palette it was made with.** Each version records the palette in
+  force (`artifact_versions.colour_scheme`); a later change colours only new versions.
+  Versions made before 24 Oct, or written outside the browser, follow the current palette.
+- **Still this browser's choice.** The palette and background live in local storage. Another
+  device, or another person viewing the project, sees their own colours, and a version's
+  recorded palette shows in their colours only if it is one of the same named palettes.
+- **The landing page follows a background colour** chosen in this browser; with none, it
+  keeps its dark look.
+
