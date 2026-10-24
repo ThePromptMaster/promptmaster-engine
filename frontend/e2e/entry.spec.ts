@@ -18,13 +18,16 @@ test('"I know what I want to do": the setup is recommended, editable, and carrie
   await page.getByRole('button', { name: /I know what I want to do/ }).click();
 
   await expect(page.getByRole('heading', { name: 'Your setup' })).toBeVisible();
-  // Recommended workflow, with the reason.
-  await expect(page.getByText(/Recommended: Book/)).toBeVisible();
+  // A workflow designed for this work is recommended (Sean, 23 Oct), with the
+  // closest standard one named; the scripted designer always designs a magazine feature.
+  await expect(page.getByText(/Recommended: Magazine feature/)).toBeVisible();
+  await expect(page.getByText(/closest standard workflow is Book/)).toBeVisible();
   // 2 Oct: "people won't read the generated objective, constraints, output" —
   // the suggested fields are marked as suggestions to be read and corrected.
   await expect(page.getByText(/Suggested from your brief — read these and change anything that is wrong/)).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('00-setup-suggested-fields-marked.png'), fullPage: true });
-  await expect(page.getByRole('radio', { name: /^Book/ })).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByRole('radio', { name: /^Magazine feature.*Designed for this project/ })).toHaveAttribute('aria-checked', 'true');
+  await page.getByRole('radio', { name: /^Book/ }).click();
   // Mode, audience, constraints and format are pre-filled and editable.
   await expect(page.getByLabel('How PromptMaster should think')).toHaveValue('architect');
   await expect(page.getByLabel('Constraints')).toHaveValue(/giraffes/);
@@ -83,7 +86,8 @@ test('"Guide me" asks one question at a time, takes several answers, and stops w
   await question.getByRole('button', { name: 'Next question' }).click();
 
   // Two answers are enough for the scripted model: it says so and recommends.
-  await expect(page.getByText(/Recommended: Research/)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/closest standard workflow is Research/)).toBeVisible({ timeout: 30_000 });
+  await page.getByRole('radio', { name: /^Research/ }).click();
   await page.getByRole('button', { name: 'Start Research' }).click();
   await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}$/);
 });

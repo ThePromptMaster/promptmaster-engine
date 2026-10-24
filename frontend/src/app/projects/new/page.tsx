@@ -20,13 +20,14 @@ import type { ProjectSource } from '@/types/project';
 import { DraftStatus, type DraftSaveState } from '@/components/projects/draft-status';
 import { recordFacts, type NewFact } from '@/lib/supabase/facts';
 import { assumedByModel } from '@/lib/workflow/facts';
-import { designFromTemplate } from '@/lib/workflow/custom';
+import { designFromTemplate, templateFromDesign } from '@/lib/workflow/custom';
+import { validateTemplate } from '@/lib/workflow/validate';
 import { AutoGrowTextarea } from '@/components/shared/auto-grow-textarea';
 import { api } from '@/lib/api/client';
 import { createProject, hardDeleteProject } from '@/lib/supabase/projects';
 import { setRequestLanguage } from '@/lib/api/language';
 import { LANGUAGES, resolveLanguage, startLanguage, type LanguageCode } from '@/lib/workflow/languages';
-import { appendWorkflowEvent, listRemovedTemplates, listTemplates, setTemplateRemoved } from '@/lib/supabase/workflow';
+import { appendWorkflowEvent, listRemovedTemplates, listTemplates, publishUserTemplate, setTemplateRemoved } from '@/lib/supabase/workflow';
 import { createArtifact } from '@/lib/supabase/versions';
 import type { WorkflowTemplate } from '@/lib/workflow/types';
 import type { SetupRationale } from '@/types';
@@ -69,6 +70,11 @@ function titleFrom(objective: string): string {
   const firstLine = objective.trim().split('\n')[0] ?? '';
   return firstLine.length <= 60 ? firstLine : `${firstLine.slice(0, 57).trimEnd()}…`;
 }
+
+/** The id of a workflow designed for this project and not yet saved (24 Oct). */
+const DESIGNED = 'designed:';
+/** How much of the ask and the conversation goes to the workflow designer. */
+const DESIGN_BRIEF_MAX = 8_000;
 
 export default function NewProjectPage() {
   // Not gated on the session check: that is a network round trip, and the page
@@ -113,6 +119,8 @@ export default function NewProjectPage() {
   const [copying, setCopying] = useState<(WorkflowTemplate & { id: string }) | null>(null);
   const [recommendedKey, setRecommendedKey] = useState<string | null>(null);
   const [workflowReason, setWorkflowReason] = useState('');
+  // Keep the workflow designed for this project in the user's list as well (24 Oct).
+  const [keepDesigned, setKeepDesigned] = useState(false);
   const [rationale, setRationale] = useState<SetupRationale | null>(null);
   const [draft, setDraft] = useState<SetupDraft>({
     title: '',
@@ -154,7 +162,8 @@ export default function NewProjectPage() {
     setLoadingTemplates(true);
     setTemplatesError(null);
     listTemplates()
-      .then(setTemplates)
+      // A workflow designed for this project is not in the list yet: it stays.
+      .then((list) => setTemplates((prior) => [...prior.filter((x) => x.id.startsWith(DESIGNED)), ...list]))
       .catch((e) => setTemplatesError(e instanceof Error && e.message ? e.message : tr('start.loadWorkflowsFailed')))
       .finally(() => setLoadingTemplates(false));
     // Only the "put back" list; the start screen works without it.
@@ -250,14 +259,22 @@ export default function NewProjectPage() {
   async function suggestSetup(given?: { question: string; answer: string }[], from?: { objective: string; material: string; audience?: string }) {
     const ask = from?.objective ?? objective;
     const brought = [material, from?.material ?? ''].filter(Boolean).join('\n\n');
-    const { suggestion } = await api.generateSetup({
-      objective: ask.trim(),
-      answers: given?.length ? given.slice(0, 8) : undefined,
-      ...(brought ? { material: brought } : {}),
-      // A new project has Web access on: its setup may not say there is no web (22 Oct).
-      web_access: 'on',
-    });
-    const recommended = templateFor(suggestion.workflow) ?? templateFor('single_output');
+    // A workflow designed for this work is the default (Sean, 23 Oct: "the
+    // default is a custom workflow after answering what you want to do or a
+    // conversation"), worked out beside the usual setup. The standard
+    // workflow the setup picks stays the fallback and an alternative.
+    const [{ suggestion }, design] = await Promise.all([
+      api.generateSetup({
+        objective: ask.trim(),
+        answers: given?.length ? given.slice(0, 8) : undefined,
+        ...(brought ? { material: brought } : {}),
+        // A new project has Web access on: its setup may not say there is no web (22 Oct).
+        web_access: 'on',
+      }),
+      designFor(ask, brought, given),
+    ]);
+    const standard = templateFor(suggestion.workflow) ?? templateFor('single_output');
+    const recommended = design ?? standard;
     const split = withDocuments(ask);
     const suggested: SetupDraft = {
       title: titleFrom(ask),
@@ -270,17 +287,45 @@ export default function NewProjectPage() {
       output_format: suggestion.output_format,
       mode: suggestion.mode,
     };
-    return { suggestion, recommended, draft: suggested };
+    return { suggestion, recommended, standard, design, draft: suggested };
+  }
+
+  /**
+   * A workflow designed for this piece of work, ready to start but not yet
+   * saved: it is published when the project is made, and only joins the
+   * user's list if they ask (Sean, 23 Oct: the presets were "getting
+   * outrageous"). Null when the design fails or does not pass the checks
+   * every workflow must — the standard recommendation stands then.
+   */
+  async function designFor(ask: string, brought: string, given?: { question: string; answer: string }[]) {
+    try {
+      const answers = (given ?? []).map((a) => `${a.question} ${a.answer}`).join('\n');
+      const description = [ask.trim(), answers, brought].filter(Boolean).join('\n\n').slice(0, DESIGN_BRIEF_MAX);
+      const { workflow } = await api.generateWorkflow({ description, objective: ask.trim().slice(0, DESIGN_BRIEF_MAX) });
+      const suffix = crypto.randomUUID().replace(/-/g, '').slice(0, 10);
+      const template = templateFromDesign(workflow, suffix);
+      if (validateTemplate(template).length) return null;
+      return { ...template, id: `${DESIGNED}${suffix}` };
+    } catch {
+      return null;
+    }
   }
 
   async function recommend(given?: { question: string; answer: string }[], from?: { objective: string; material: string; audience?: string }) {
     setWorking('setup');
     setError(null);
     try {
-      const { suggestion, recommended, draft: suggested } = await suggestSetup(given, from);
+      const { suggestion, recommended, standard, design, draft: suggested } = await suggestSetup(given, from);
+      // One designed workflow at a time: a new recommendation replaces the last.
+      setTemplates((prior) => [...(design ? [design] : []), ...prior.filter((x) => !x.id.startsWith(DESIGNED))]);
+      setKeepDesigned(false);
       setTemplateId(recommended?.id ?? null);
-      setRecommendedKey(suggestion.workflow);
-      setWorkflowReason(suggestion.workflow_reason);
+      setRecommendedKey(design ? design.key : suggestion.workflow);
+      setWorkflowReason(
+        design
+          ? t('start.designedReason', { closest: standard ? words.name(standard) : suggestion.workflow })
+          : suggestion.workflow_reason
+      );
       setRationale(suggestion.rationale);
       setDraft(suggested);
       setStep('setup');
@@ -358,6 +403,15 @@ export default function NewProjectPage() {
   /** Take a preset off the list; projects that use it keep it (Sean, 23 Oct). */
   async function removePreset(template: WorkflowTemplate & { id: string }) {
     setError(null);
+    if (template.id.startsWith(DESIGNED)) {
+      // Not saved anywhere yet: it just goes, and a standard workflow is selected.
+      const left = templates.filter((x) => x.id !== template.id);
+      setTemplates(left);
+      setRecommendedKey(null);
+      setWorkflowReason('');
+      if (templateId === template.id) setTemplateId((left.find((x) => x.key === 'single_output') ?? left[0])?.id ?? null);
+      return;
+    }
     try {
       await setTemplateRemoved(template.key, true);
       const left = templates.filter((x) => x.key !== template.key);
@@ -398,7 +452,7 @@ export default function NewProjectPage() {
 
   /** Make the project: from the setup screen, or with what the conversation produced. */
   async function create(given?: { template: WorkflowTemplate & { id: string }; draft: SetupDraft; facts: NewFact[]; chat: Turn[] }) {
-    const selected = given?.template ?? selectedTemplate;
+    let selected = given?.template ?? selectedTemplate;
     const draft = given?.draft ?? setupDraft;
     const initialFacts = given?.facts ?? factsSoFar;
     const chat = given?.chat ?? openingChat;
@@ -407,6 +461,13 @@ export default function NewProjectPage() {
     setError(null);
     let createdId: string | null = null;
     try {
+      // A workflow designed for this project is saved now, for the project to
+      // pin — off the user's list unless they chose to keep it there.
+      if (selected.id.startsWith(DESIGNED)) {
+        const { id: _unsaved, ...template } = selected;
+        void _unsaved;
+        selected = await publishUserTemplate(template, user.id, { listed: !given && keepDesigned });
+      }
       const project = await createProject(
         {
           title: draft.title.trim() || titleFrom(draft.objective) || 'Untitled project',
@@ -847,6 +908,17 @@ export default function NewProjectPage() {
             designer={
               <>
                 <RemovedWorkflows templates={removedTemplates} onRestore={(x) => void restorePreset(x)} />
+                {selected?.id.startsWith(DESIGNED) && (
+                  <label className="mt-3 flex items-center gap-2 text-body text-[var(--on-surface)]">
+                    <input
+                      type="checkbox"
+                      checked={keepDesigned}
+                      onChange={(e) => setKeepDesigned(e.target.checked)}
+                      className="h-4 w-4 accent-[var(--pm-primary)]"
+                    />
+                    {t('start.keepDesigned')}
+                  </label>
+                )}
                 {/* A saved workflow of the user's own can be edited as a copy (6 Oct, email 11). */}
                 {selected?.key.startsWith('custom_') && copying?.id !== selected.id && (
                   <button
@@ -866,7 +938,8 @@ export default function NewProjectPage() {
                   ownerId={user?.id ?? null}
                   initial={copying ? designFromTemplate(copying) : null}
                   onPublished={(t) => {
-                    setTemplates((prior) => [...prior, t]);
+                    // Saved from the designer: it replaces the unsaved design it may have started from.
+                    setTemplates((prior) => [...prior.filter((x) => !x.id.startsWith(DESIGNED)), t]);
                     setTemplateId(t.id);
                     setCopying(null);
                   }}
