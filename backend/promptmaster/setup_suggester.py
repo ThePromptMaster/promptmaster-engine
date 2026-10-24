@@ -12,7 +12,7 @@ import logging
 
 from .llm_client import OpenRouterClient
 from .schemas import GuideAnswer, GuideQuestion, ModeType, SetupRationale, SetupSuggestion
-from .source_access import LINKS_RULE
+from .source_access import LINKS_RULE, links_rule
 
 logger = logging.getLogger(__name__)
 
@@ -66,8 +66,14 @@ SETUP_SUGGESTER_SYSTEM = (
     "Workflow: which PromptMaster workflow fits the objective.\n"
     "- book: long-form writing that has to hold together across chapters or "
     "sections — a book, a long report, a guide.\n"
-    "- research: an investigation where the method matters as much as the "
-    "result — a question to answer, a hypothesis to test, evidence to weigh.\n"
+    "- research: a scholarly or empirical investigation where the method "
+    "matters as much as the result — a research question, a literature "
+    "review, a hypothesis to test, an experiment or analysis to run. A "
+    "practical decision is not research, however much comparing it needs: "
+    "choosing between products or vendors, a recommendation, a pilot plan, a "
+    "memo, a comparison table or a decision log is single_output (23 Oct: a "
+    "vendor comparison memo, table, pilot plan and decision log was given the "
+    "13-stage research workflow).\n"
     "- single_output: one thing, done well, in one sitting — a memo, an email, "
     "an analysis, a plan, an answer, a speech, a talk, a letter, a poem, a short "
     "story. A short piece is never a book, however it is worded (12 Oct: a "
@@ -78,11 +84,30 @@ SETUP_SUGGESTER_SYSTEM = (
     "Pick the smallest workflow that fits; most everyday objectives are "
     "single_output. Give workflow_reason as one line (≤100 chars).\n\n"
     # Sean, 18 Oct (email 7): a cookbook from an Instagram account's videos.
-    + LINKS_RULE + " Here, that means: when the objective rests on content behind a link "
-    "or in a video, the constraints say the work uses only text and files the user supplies, "
-    "and the constraints rationale says what to paste or upload.\n\n"
+    "{links}\n\n"
     "Return JSON only."
 )
+
+_LINKS_WEB_OFF = (
+    LINKS_RULE + " Here, that means: when the objective rests on content behind a link "
+    "or in a video, the constraints say the work uses only text and files the user supplies, "
+    "and the constraints rationale says what to paste or upload."
+)
+# Sean, 22 Oct: with Web access on, a setup said "PromptMaster cannot browse the
+# web … pricing claims rely only on text the user pastes" and "No live browsing:
+# paste the official pricing pages" — and the constraint bound every stage.
+_LINKS_WEB_ON = (
+    links_rule("on") + " Here, that means: the constraints never say PromptMaster cannot search, "
+    "browse or reach the web, and never ask the user to paste what a web search can find. When "
+    "the work needs current outside facts — prices, plans, terms, figures — the constraints may "
+    "say they are taken from sources the web search finds, cited, with the date checked. Only "
+    "when it rests on a particular link or video does the rationale say what to paste or upload."
+)
+
+
+def setup_system(web_access: str | None = "off") -> str:
+    """Smart Setup's instructions for the project's Web access."""
+    return SETUP_SUGGESTER_SYSTEM.replace("{links}", _LINKS_WEB_ON if web_access == "on" else _LINKS_WEB_OFF, 1)
 
 
 def _format_answers(answers: list[GuideAnswer] | None) -> str:
@@ -143,6 +168,7 @@ async def suggest_setup(
     objective: str,
     answers: list[GuideAnswer] | None = None,
     material: str = "",
+    web_access: str | None = "off",
 ) -> SetupSuggestion:
     """Run the Smart Setup LLM call. Defensive on missing/invalid fields."""
     prompt = build_setup_prompt(objective, answers, material)
@@ -150,7 +176,7 @@ async def suggest_setup(
     try:
         result, _usage = await client.generate_json(
             prompt=prompt,
-            system=SETUP_SUGGESTER_SYSTEM,
+            system=setup_system(web_access),
             temperature=0.3,
             max_tokens=640,
             model=model,
@@ -298,7 +324,7 @@ GUIDE_NEXT_SYSTEM = (
 
 
 def build_guide_next_prompt(
-    objective: str, answered: list[dict[str, str]], material: str = "", limit: int = MAX_GUIDE_QUESTIONS
+    objective: str, answered: list[dict[str, str]], material: str = "", limit: int = MAX_GUIDE_QUESTIONS, found: str = ""
 ) -> str:
     so_far = "\n".join(
         f"- Q: {a.get('question', '').strip()}\n  A: {a.get('answer', '').strip() or '(skipped)'}" for a in answered
@@ -307,6 +333,8 @@ def build_guide_next_prompt(
         f"Objective: {objective}\n\n"
         f"{material_block(material)}"
         f"ASKED AND ANSWERED SO FAR:\n{so_far}\n\n"
+        + (f"{found}\nUse what they say to make the question and its example answers current; "
+           "do not ask what they already settle.\n\n" if found else "")
         # The simple start (Sean, 18 Oct, email 7): a short intake asks only what matters most.
         + (f"At most {limit} questions in all; {len(answered)} asked. Ask only what most changes the setup.\n\n"
            if limit < MAX_GUIDE_QUESTIONS else "")
@@ -342,6 +370,7 @@ async def suggest_next_guide_question(
     answered: list[dict[str, str]],
     material: str = "",
     limit: int = MAX_GUIDE_QUESTIONS,
+    found: str = "",
 ) -> tuple[bool, GuideQuestion | None, str]:
     """The next question, or that there is enough. One small call.
 
@@ -353,7 +382,7 @@ async def suggest_next_guide_question(
         return True, None, "That is enough to set this up."
     try:
         result, _usage = await client.generate_json(
-            prompt=build_guide_next_prompt(objective, answered, material, limit),
+            prompt=build_guide_next_prompt(objective, answered, material, limit, found),
             system=GUIDE_NEXT_SYSTEM,
             temperature=0.3,
             max_tokens=400,

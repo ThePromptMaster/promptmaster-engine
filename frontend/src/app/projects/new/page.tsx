@@ -12,7 +12,7 @@ import { useWorkflowWords } from '@/components/projects/workflow-picker';
 import { useT } from '@/lib/i18n/i18n-provider';
 import { getLocale, tr } from '@/lib/i18n/store';
 import { CustomWorkflowDesigner } from '@/components/projects/custom-workflow-designer';
-import { FrontDoor, type DraftBrief, type Turn } from '@/components/projects/front-door';
+import { FrontDoor, type DraftBrief, type FrontDoorSearch, type Turn } from '@/components/projects/front-door';
 import { saveStageChatMessage } from '@/lib/supabase/conversation';
 import { saveSources } from '@/lib/supabase/sources';
 import type { ProjectSource } from '@/types/project';
@@ -104,6 +104,8 @@ export default function NewProjectPage() {
   const [initialFacts, setInitialFacts] = useState<NewFact[]>([]);
   /** The conversation the project starts from, kept as its first stage's chat. */
   const [openingChat, setOpeningChat] = useState<Turn[]>([]);
+  // What "Ask me questions" searched the web for, saved with the project (22 Oct).
+  const [intakeSearches, setIntakeSearches] = useState<FrontDoorSearch[]>([]);
   /** A saved workflow being edited as a copy. */
   const [copying, setCopying] = useState<(WorkflowTemplate & { id: string }) | null>(null);
   const [recommendedKey, setRecommendedKey] = useState<string | null>(null);
@@ -247,6 +249,8 @@ export default function NewProjectPage() {
       objective: ask.trim(),
       answers: given?.length ? given.slice(0, 8) : undefined,
       ...(brought ? { material: brought } : {}),
+      // A new project has Web access on: its setup may not say there is no web (22 Oct).
+      web_access: 'on',
     });
     const recommended = templateFor(suggestion.workflow) ?? templateFor('single_output');
     const split = withDocuments(ask);
@@ -441,12 +445,14 @@ export default function NewProjectPage() {
       // What its searches found (22 Oct), saved in the order the conversation
       // cited it, so [S1] in the carried-over chat is [S1] under Web sources.
       let found: ProjectSource[] = [];
-      for (const t of chat) {
-        if (!t.web?.sources.length) continue;
+      // The questions' searches too (22 Oct), when the setup came from them.
+      const searches = [...chat.flatMap((t) => (t.web ? [t.web] : [])), ...(given ? [] : intakeSearches)];
+      for (const web of searches) {
+        if (!web.sources.length) continue;
         try {
-          found = [...found, ...(await saveSources({ ...project, sources: found }, t.web.sources, { query: t.web.query, stageId: selected.stages[0]?.id ?? null }))];
+          found = [...found, ...(await saveSources({ ...project, sources: found }, web.sources, { query: web.query, stageId: selected.stages[0]?.id ?? null }))];
         } catch (e) {
-          failed.push(`web sources found for “${t.web.query}” (${e instanceof Error && e.message ? e.message : 'not stored'})`);
+          failed.push(`web sources found for “${web.query}” (${e instanceof Error && e.message ? e.message : 'not stored'})`);
         }
       }
       if (failed.length) {
@@ -727,7 +733,10 @@ export default function NewProjectPage() {
             objective={objective.trim()}
             material={material}
             busy={working === 'setup'}
-            onDone={(given) => void recommend(given)}
+            onDone={(given, searches) => {
+              setIntakeSearches(searches);
+              void recommend(given);
+            }}
             onBack={() => setStep('ask')}
             maxQuestions={simple ? SIMPLE_GUIDE_QUESTIONS : undefined}
             foldWhy={simple}

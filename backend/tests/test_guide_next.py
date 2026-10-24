@@ -66,4 +66,46 @@ def test_the_route_returns_the_next_question_or_enough():
     finally:
         app.dependency_overrides.pop(get_client, None)
     assert res.status_code == 200
-    assert res.json() == {"enough": True, "question": None, "reason": "Known."}
+    assert res.json() == {"enough": True, "question": None, "reason": "Known.", "web_query": "", "web_sources": [], "web_note": ""}
+
+
+def test_ask_me_questions_searches_the_web_when_it_is_on():
+    """Sean, 22 Oct: web search "probably needs to be added to the 'ask me questions' button too"."""
+    from unittest.mock import AsyncMock as _AM
+    from fastapi.testclient import TestClient as _TC
+    from deps import get_client as _gc
+    from main import app as _app
+
+    stub = _AM()
+    stub.generate_json = _AM(side_effect=[
+        ({"search": True, "query": "Claude Pro price per month"}, {}),
+        ({"enough": False, "question": {"question": "Which plan fits the budget?", "why": "Price decides", "options": ["Pro", "Max"]}}, {}),
+    ])
+    stub.generate_with_web = _AM(return_value=("Pro is $20.", [{"url_citation": {"url": "https://claude.com/pricing", "title": "Plans & Pricing", "content": "Pro $20/month"}}]))
+    _app.dependency_overrides[_gc] = lambda: stub
+    try:
+        r = _TC(_app).post("/api/guide-next-question", json={"objective": "Pick an AI tool under $60 a month", "web_access": "on"})
+    finally:
+        _app.dependency_overrides.pop(_gc, None)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["web_query"] == "Claude Pro price per month"
+    assert [s["url"] for s in body["web_sources"]] == ["https://claude.com/pricing"]
+    assert "Plans & Pricing" in stub.generate_json.call_args_list[1].kwargs["prompt"]
+
+
+def test_ask_me_questions_does_not_search_with_web_off():
+    from unittest.mock import AsyncMock as _AM
+    from fastapi.testclient import TestClient as _TC
+    from deps import get_client as _gc
+    from main import app as _app
+
+    stub = _AM()
+    stub.generate_json = _AM(return_value=({"enough": True, "reason": "ok"}, {}))
+    _app.dependency_overrides[_gc] = lambda: stub
+    try:
+        r = _TC(_app).post("/api/guide-next-question", json={"objective": "Pick an AI tool"})
+    finally:
+        _app.dependency_overrides.pop(_gc, None)
+    assert r.status_code == 200 and r.json()["web_sources"] == []
+    stub.generate_with_web.assert_not_called()

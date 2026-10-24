@@ -12,7 +12,8 @@ from promptmaster.errors import PRESERVED_NOTHING_WRITTEN
 from promptmaster.limits import MAX_CHAT_MESSAGE_CHARS, MAX_CONTEXT_CHARS, MAX_OBJECTIVE_CHARS
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError
 from routers._errors import llm_http_error
-from promptmaster.schemas import GuideAnswer, GuideQuestion, SavedSource, SetupSuggestion
+from promptmaster.schemas import GuideAnswer, GuideQuestion, PMInput, SavedSource, SetupSuggestion, WebUse
+from promptmaster import web_search
 from promptmaster.workflow_designer import DesignedWorkflow, design_workflow
 from promptmaster.workflow_revision import RevisedWorkflow, revise_workflow
 from promptmaster.front_door import BRIEF_FIELDS, DraftBrief, FrontDoorTurn, Turn, front_door_turn
@@ -28,6 +29,8 @@ class GenerateSetupRequest(BaseModel):
     answers: list[GuideAnswer] = Field(default=[], max_length=8)
     #: What the user attached on the start screen, as text (5 Oct, email 8).
     material: str = Field(default="", max_length=MAX_CONTEXT_CHARS)
+    #: The new project's Web access (22 Oct): on, the setup may not say there is no web.
+    web_access: Literal["on", "off"] = "off"
 
 
 class GenerateSetupResponse(BaseModel):
@@ -47,6 +50,7 @@ async def api_generate_setup(
             objective=req.objective,
             answers=req.answers or None,
             material=req.material,
+            web_access=req.web_access,
         )
         return GenerateSetupResponse(suggestion=suggestion)
     except OpenRouterError as e:
@@ -87,13 +91,26 @@ class GuideNextRequest(BaseModel):
     material: str = Field(default="", max_length=MAX_CONTEXT_CHARS)
     #: The simple start asks fewer (Sean, 18 Oct, email 7); never more than the server's own limit.
     max_questions: int = Field(default=MAX_GUIDE_QUESTIONS, ge=1, le=MAX_GUIDE_QUESTIONS)
+    #: The new project's Web access (Sean, 22 Oct: "it probably needs to be
+    #: added to the 'ask me questions' button too").
+    web_access: Literal["on", "off"] = "off"
+    #: What this intake's searches have found so far; a new search's sources follow them.
+    sources: list[SavedSource] = Field(default=[], max_length=60)
 
 
-class GuideNextResponse(BaseModel):
+class GuideNextResponse(WebUse):
     #: True when no further question is worth asking; `question` is then null.
     enough: bool
     question: GuideQuestion | None = None
     reason: str = ""
+
+
+def _guide_task(req: GuideNextRequest) -> str:
+    answers = "; ".join(f"{a.question} — {a.answer or '(skipped)'}" for a in req.answered)
+    return (
+        "Ask the user the next question for setting this work up, with example answers that reflect "
+        f"current options and facts. The work: {req.objective}" + (f"\nAnswered so far: {answers}" if answers else "")
+    )
 
 
 @router.post("/guide-next-question")
@@ -102,14 +119,27 @@ async def api_guide_next_question(
     client: OpenRouterClient = Depends(get_client),
 ) -> GuideNextResponse:
     """"Guide me", one question at a time: the next question given the answers
-    so far, or that there is enough. 1 small LLM call; none past six answers."""
+    so far, or that there is enough. 1 small LLM call; none past six answers.
+    With Web access on, a question that needs current outside facts is
+    searched first (as every writer is, L-100); the browser keeps what was found."""
+    web = WebUse()
+    found = ""
+    if req.web_access == "on" and len(req.answered) < req.max_questions:
+        inputs = PMInput(objective=req.objective[:4_000], mode="analyst", sources=req.sources)
+        inputs, web = await web_search.with_web(client, req.model or None, inputs, "on", _guide_task(req))
+        if web.web_sources:
+            found = "\n".join(
+                [web_search.FOUND_HEADER, f"SEARCHED FOR: {web.web_query}"]
+                + [f"- {s.title or s.url} — {s.url}" + (f"\n  {s.excerpt}" if s.excerpt else "") for s in web.web_sources]
+            )
     enough, question, reason = await suggest_next_guide_question(
         client=client, model=req.model or None, objective=req.objective,
         answered=[a.model_dump() for a in req.answered],
         material=req.material,
         limit=req.max_questions,
+        found=found,
     )
-    return GuideNextResponse(enough=enough, question=question, reason=reason)
+    return GuideNextResponse(enough=enough, question=question, reason=reason, **web.model_dump())
 
 
 class GenerateWorkflowRequest(BaseModel):
