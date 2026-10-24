@@ -319,7 +319,12 @@ function lines(text: string): Line[] {
 }
 
 const plain = (s: string) => s.replace(/[*_`#>|]/g, ' ').replace(QUESTION_PREFIX, '').trim();
-const isQuestion = (l: Line) => /[?？؟]$/.test(plain(l.text));
+/** Ends in a question mark: Latin, full-width (Chinese) or Arabic. */
+const QUESTION_MARKS = ['?', '\uFF1F', '\u061F'];
+const isQuestion = (l: Line) => {
+  const t = plain(l.text);
+  return QUESTION_MARKS.some((q) => t.endsWith(q));
+};
 /**
  * Lines a count leaves out: notes about the text rather than the text.
  * Assumptions are not among them (11 Oct, survey brief): a brief asked to
