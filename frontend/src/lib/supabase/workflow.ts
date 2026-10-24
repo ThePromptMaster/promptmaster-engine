@@ -96,7 +96,9 @@ export function latestPerKey<T extends { key: string; version: number }>(rows: T
  */
 export async function publishUserTemplate(
   template: WorkflowTemplate,
-  ownerId: string
+  ownerId: string,
+  /** `listed: false` — designed for one project, not offered on the start screen (24 Oct). */
+  { listed = true }: { listed?: boolean } = {}
 ): Promise<WorkflowTemplate & { id: string }> {
   const supabase = createClient();
   const { data, error } = await supabase
@@ -113,6 +115,7 @@ export async function publishUserTemplate(
         stages: template.stages,
       },
       status: 'published',
+      listed,
       is_system: false,
       owner_id: ownerId,
       published_at: new Date().toISOString(),

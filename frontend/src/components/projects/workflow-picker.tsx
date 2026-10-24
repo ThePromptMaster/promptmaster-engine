@@ -80,7 +80,10 @@ export function WorkflowPicker({ templates, selectedId, onSelect, onRemove }: Pr
             <span className="text-title text-[var(--on-surface)]">
               {words.name(template)}
               {template.key.startsWith('custom_') && (
-                <span className="ml-2 rounded-md bg-[var(--surface-container-high)] px-1.5 py-0.5 align-middle text-label text-[var(--on-surface-variant)]">{t('picker.yours')}</span>
+                <span className="ml-2 rounded-md bg-[var(--surface-container-high)] px-1.5 py-0.5 align-middle text-label text-[var(--on-surface-variant)]">
+                  {/* Designed for this project and not saved yet (24 Oct), or one of the user's own. */}
+                  {template.id.startsWith('designed:') ? t('picker.designed') : t('picker.yours')}
+                </span>
               )}
             </span>
 

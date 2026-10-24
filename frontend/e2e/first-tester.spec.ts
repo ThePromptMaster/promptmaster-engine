@@ -21,12 +21,13 @@ test('a goal alone reaches a finished, checked deliverable on the primary button
   await expect(page.getByLabel('What do you want to do or figure out?')).toHaveValue(/Slack to Teams/);
   await page.getByRole('button', { name: /I know what I want to do/ }).click();
 
-  // No questions: a recommendation with Start under it.
-  await expect(page.getByText(/Recommended: Single output/)).toBeVisible();
-  const start = page.getByRole('button', { name: 'Start Single output' });
-  await expect(start).toBeInViewport();
+  // No questions: a recommendation with Start under it — a workflow designed
+  // for the work (Sean, 23 Oct), the standard one named beside it.
+  await expect(page.getByText(/closest standard workflow is Single output/)).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Start Magazine feature/ })).toBeInViewport();
   await shot('01-recommended-start.png');
-  await start.click();
+  await page.getByRole('radio', { name: /^Single output/ }).click();
+  await page.getByRole('button', { name: 'Start Single output' }).click();
   await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}$/);
   const id = page.url().split('/').at(-1)!;
 
