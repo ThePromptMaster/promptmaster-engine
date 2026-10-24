@@ -8,24 +8,26 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { GuideInterview } from '@/components/projects/guide-interview';
 import { SetupCard, type SetupDraft } from '@/components/projects/setup-card';
-import { useWorkflowWords } from '@/components/projects/workflow-picker';
+import { RemovedWorkflows, useWorkflowWords } from '@/components/projects/workflow-picker';
 import { useT } from '@/lib/i18n/i18n-provider';
 import { getLocale, tr } from '@/lib/i18n/store';
 import { CustomWorkflowDesigner } from '@/components/projects/custom-workflow-designer';
-import { FrontDoor, type DraftBrief, type Turn } from '@/components/projects/front-door';
+import { ColourMenu } from '@/components/shared/colour-preferences';
+import { FrontDoor, type DraftBrief, type FrontDoorSearch, type Turn } from '@/components/projects/front-door';
 import { saveStageChatMessage } from '@/lib/supabase/conversation';
 import { saveSources } from '@/lib/supabase/sources';
 import type { ProjectSource } from '@/types/project';
 import { DraftStatus, type DraftSaveState } from '@/components/projects/draft-status';
 import { recordFacts, type NewFact } from '@/lib/supabase/facts';
 import { assumedByModel } from '@/lib/workflow/facts';
-import { designFromTemplate } from '@/lib/workflow/custom';
+import { designFromTemplate, templateFromDesign } from '@/lib/workflow/custom';
+import { validateTemplate } from '@/lib/workflow/validate';
 import { AutoGrowTextarea } from '@/components/shared/auto-grow-textarea';
 import { api } from '@/lib/api/client';
 import { createProject, hardDeleteProject } from '@/lib/supabase/projects';
 import { setRequestLanguage } from '@/lib/api/language';
 import { LANGUAGES, resolveLanguage, startLanguage, type LanguageCode } from '@/lib/workflow/languages';
-import { appendWorkflowEvent, listTemplates } from '@/lib/supabase/workflow';
+import { appendWorkflowEvent, listRemovedTemplates, listTemplates, publishUserTemplate, setTemplateRemoved } from '@/lib/supabase/workflow';
 import { createArtifact } from '@/lib/supabase/versions';
 import type { WorkflowTemplate } from '@/lib/workflow/types';
 import type { SetupRationale } from '@/types';
@@ -69,6 +71,11 @@ function titleFrom(objective: string): string {
   return firstLine.length <= 60 ? firstLine : `${firstLine.slice(0, 57).trimEnd()}…`;
 }
 
+/** The id of a workflow designed for this project and not yet saved (24 Oct). */
+const DESIGNED = 'designed:';
+/** How much of the ask and the conversation goes to the workflow designer. */
+const DESIGN_BRIEF_MAX = 8_000;
+
 export default function NewProjectPage() {
   // Not gated on the session check: that is a network round trip, and the page
   // used to be blank for it — on production long enough to type into nothing
@@ -82,6 +89,8 @@ export default function NewProjectPage() {
   const words = useWorkflowWords();
 
   const [templates, setTemplates] = useState<(WorkflowTemplate & { id: string })[]>([]);
+  // The user's presets taken off the list, to put back (Sean, 23 Oct).
+  const [removedTemplates, setRemovedTemplates] = useState<(WorkflowTemplate & { id: string })[]>([]);
   const [step, setStep] = useState<Step>('ask');
   const [objective, setObjective] = useState('');
   // Client, 21 Oct ("pick your language"): the start screen's conversation and
@@ -104,10 +113,14 @@ export default function NewProjectPage() {
   const [initialFacts, setInitialFacts] = useState<NewFact[]>([]);
   /** The conversation the project starts from, kept as its first stage's chat. */
   const [openingChat, setOpeningChat] = useState<Turn[]>([]);
+  // What "Ask me questions" searched the web for, saved with the project (22 Oct).
+  const [intakeSearches, setIntakeSearches] = useState<FrontDoorSearch[]>([]);
   /** A saved workflow being edited as a copy. */
   const [copying, setCopying] = useState<(WorkflowTemplate & { id: string }) | null>(null);
   const [recommendedKey, setRecommendedKey] = useState<string | null>(null);
   const [workflowReason, setWorkflowReason] = useState('');
+  // Keep the workflow designed for this project in the user's list as well (24 Oct).
+  const [keepDesigned, setKeepDesigned] = useState(false);
   const [rationale, setRationale] = useState<SetupRationale | null>(null);
   const [draft, setDraft] = useState<SetupDraft>({
     title: '',
@@ -149,9 +162,12 @@ export default function NewProjectPage() {
     setLoadingTemplates(true);
     setTemplatesError(null);
     listTemplates()
-      .then(setTemplates)
+      // A workflow designed for this project is not in the list yet: it stays.
+      .then((list) => setTemplates((prior) => [...prior.filter((x) => x.id.startsWith(DESIGNED)), ...list]))
       .catch((e) => setTemplatesError(e instanceof Error && e.message ? e.message : tr('start.loadWorkflowsFailed')))
       .finally(() => setLoadingTemplates(false));
+    // Only the "put back" list; the start screen works without it.
+    listRemovedTemplates().then(setRemovedTemplates).catch(() => setRemovedTemplates([]));
   }, []);
 
   useEffect(() => {
@@ -243,12 +259,22 @@ export default function NewProjectPage() {
   async function suggestSetup(given?: { question: string; answer: string }[], from?: { objective: string; material: string; audience?: string }) {
     const ask = from?.objective ?? objective;
     const brought = [material, from?.material ?? ''].filter(Boolean).join('\n\n');
-    const { suggestion } = await api.generateSetup({
-      objective: ask.trim(),
-      answers: given?.length ? given.slice(0, 8) : undefined,
-      ...(brought ? { material: brought } : {}),
-    });
-    const recommended = templateFor(suggestion.workflow) ?? templateFor('single_output');
+    // A workflow designed for this work is the default (Sean, 23 Oct: "the
+    // default is a custom workflow after answering what you want to do or a
+    // conversation"), worked out beside the usual setup. The standard
+    // workflow the setup picks stays the fallback and an alternative.
+    const [{ suggestion }, design] = await Promise.all([
+      api.generateSetup({
+        objective: ask.trim(),
+        answers: given?.length ? given.slice(0, 8) : undefined,
+        ...(brought ? { material: brought } : {}),
+        // A new project has Web access on: its setup may not say there is no web (22 Oct).
+        web_access: 'on',
+      }),
+      designFor(ask, brought, given),
+    ]);
+    const standard = templateFor(suggestion.workflow) ?? templateFor('single_output');
+    const recommended = design ?? standard;
     const split = withDocuments(ask);
     const suggested: SetupDraft = {
       title: titleFrom(ask),
@@ -261,17 +287,45 @@ export default function NewProjectPage() {
       output_format: suggestion.output_format,
       mode: suggestion.mode,
     };
-    return { suggestion, recommended, draft: suggested };
+    return { suggestion, recommended, standard, design, draft: suggested };
+  }
+
+  /**
+   * A workflow designed for this piece of work, ready to start but not yet
+   * saved: it is published when the project is made, and only joins the
+   * user's list if they ask (Sean, 23 Oct: the presets were "getting
+   * outrageous"). Null when the design fails or does not pass the checks
+   * every workflow must — the standard recommendation stands then.
+   */
+  async function designFor(ask: string, brought: string, given?: { question: string; answer: string }[]) {
+    try {
+      const answers = (given ?? []).map((a) => `${a.question} ${a.answer}`).join('\n');
+      const description = [ask.trim(), answers, brought].filter(Boolean).join('\n\n').slice(0, DESIGN_BRIEF_MAX);
+      const { workflow } = await api.generateWorkflow({ description, objective: ask.trim().slice(0, DESIGN_BRIEF_MAX) });
+      const suffix = crypto.randomUUID().replace(/-/g, '').slice(0, 10);
+      const template = templateFromDesign(workflow, suffix);
+      if (validateTemplate(template).length) return null;
+      return { ...template, id: `${DESIGNED}${suffix}` };
+    } catch {
+      return null;
+    }
   }
 
   async function recommend(given?: { question: string; answer: string }[], from?: { objective: string; material: string; audience?: string }) {
     setWorking('setup');
     setError(null);
     try {
-      const { suggestion, recommended, draft: suggested } = await suggestSetup(given, from);
+      const { suggestion, recommended, standard, design, draft: suggested } = await suggestSetup(given, from);
+      // One designed workflow at a time: a new recommendation replaces the last.
+      setTemplates((prior) => [...(design ? [design] : []), ...prior.filter((x) => !x.id.startsWith(DESIGNED))]);
+      setKeepDesigned(false);
       setTemplateId(recommended?.id ?? null);
-      setRecommendedKey(suggestion.workflow);
-      setWorkflowReason(suggestion.workflow_reason);
+      setRecommendedKey(design ? design.key : suggestion.workflow);
+      setWorkflowReason(
+        design
+          ? t('start.designedReason', { closest: standard ? words.name(standard) : suggestion.workflow })
+          : suggestion.workflow_reason
+      );
       setRationale(suggestion.rationale);
       setDraft(suggested);
       setStep('setup');
@@ -346,6 +400,42 @@ export default function NewProjectPage() {
     setStep('questions');
   }
 
+  /** Take a preset off the list; projects that use it keep it (Sean, 23 Oct). */
+  async function removePreset(template: WorkflowTemplate & { id: string }) {
+    setError(null);
+    if (template.id.startsWith(DESIGNED)) {
+      // Not saved anywhere yet: it just goes, and a standard workflow is selected.
+      const left = templates.filter((x) => x.id !== template.id);
+      setTemplates(left);
+      setRecommendedKey(null);
+      setWorkflowReason('');
+      if (templateId === template.id) setTemplateId((left.find((x) => x.key === 'single_output') ?? left[0])?.id ?? null);
+      return;
+    }
+    try {
+      await setTemplateRemoved(template.key, true);
+      const left = templates.filter((x) => x.key !== template.key);
+      setTemplates(left);
+      setRemovedTemplates((prior) => [template, ...prior.filter((x) => x.key !== template.key)]);
+      if (templateId === template.id) {
+        setTemplateId((left.find((x) => x.key === (recommendedKey ?? 'single_output')) ?? left.find((x) => x.key === 'single_output') ?? left[0])?.id ?? null);
+      }
+    } catch (e) {
+      setError(t('start.removePresetFailed', { why: e instanceof Error && e.message ? `: ${e.message}` : '' }));
+    }
+  }
+
+  async function restorePreset(template: WorkflowTemplate & { id: string }) {
+    setError(null);
+    try {
+      await setTemplateRemoved(template.key, false);
+      setRemovedTemplates((prior) => prior.filter((x) => x.key !== template.key));
+      setTemplates((prior) => [...prior.filter((x) => x.key !== template.key), template]);
+    } catch (e) {
+      setError(t('start.removePresetFailed', { why: e instanceof Error && e.message ? `: ${e.message}` : '' }));
+    }
+  }
+
   function chooseYourself() {
     setTemplateId(templateFor('book')?.id ?? templates[0]?.id ?? null);
     setRecommendedKey(null);
@@ -362,7 +452,7 @@ export default function NewProjectPage() {
 
   /** Make the project: from the setup screen, or with what the conversation produced. */
   async function create(given?: { template: WorkflowTemplate & { id: string }; draft: SetupDraft; facts: NewFact[]; chat: Turn[] }) {
-    const selected = given?.template ?? selectedTemplate;
+    let selected = given?.template ?? selectedTemplate;
     const draft = given?.draft ?? setupDraft;
     const initialFacts = given?.facts ?? factsSoFar;
     const chat = given?.chat ?? openingChat;
@@ -371,6 +461,13 @@ export default function NewProjectPage() {
     setError(null);
     let createdId: string | null = null;
     try {
+      // A workflow designed for this project is saved now, for the project to
+      // pin — off the user's list unless they chose to keep it there.
+      if (selected.id.startsWith(DESIGNED)) {
+        const { id: _unsaved, ...template } = selected;
+        void _unsaved;
+        selected = await publishUserTemplate(template, user.id, { listed: !given && keepDesigned });
+      }
       const project = await createProject(
         {
           title: draft.title.trim() || titleFrom(draft.objective) || 'Untitled project',
@@ -441,12 +538,14 @@ export default function NewProjectPage() {
       // What its searches found (22 Oct), saved in the order the conversation
       // cited it, so [S1] in the carried-over chat is [S1] under Web sources.
       let found: ProjectSource[] = [];
-      for (const t of chat) {
-        if (!t.web?.sources.length) continue;
+      // The questions' searches too (22 Oct), when the setup came from them.
+      const searches = [...chat.flatMap((t) => (t.web ? [t.web] : [])), ...(given ? [] : intakeSearches)];
+      for (const web of searches) {
+        if (!web.sources.length) continue;
         try {
-          found = [...found, ...(await saveSources({ ...project, sources: found }, t.web.sources, { query: t.web.query, stageId: selected.stages[0]?.id ?? null }))];
+          found = [...found, ...(await saveSources({ ...project, sources: found }, web.sources, { query: web.query, stageId: selected.stages[0]?.id ?? null }))];
         } catch (e) {
-          failed.push(`web sources found for “${t.web.query}” (${e instanceof Error && e.message ? e.message : 'not stored'})`);
+          failed.push(`web sources found for “${web.query}” (${e instanceof Error && e.message ? e.message : 'not stored'})`);
         }
       }
       if (failed.length) {
@@ -494,14 +593,33 @@ export default function NewProjectPage() {
   // workflow yourself still ends the form with Start (Harold, via Sean, 9 Oct).
   const startAtTop = simple || (Boolean(recommendedKey) && selected?.key === recommendedKey);
   const linkNote = sourceAccessNote(objective);
+  // Which setup is on, said as a switch with both sides showing (Sean, 23 Oct,
+  // email 8: "I cannot tell if I am on simple setup or advanced setup … the
+  // simple setup next to the choose the workflow yourself seems like it's part
+  // of the same thing"). It was a link that named the other mode.
   const experienceSwitch = (
-    <button
-      type="button"
-      onClick={() => setExperience(simple ? 'advanced' : 'simple')}
-      className="text-body text-[var(--on-surface-variant)] underline-offset-4 hover:text-[var(--on-surface)] hover:underline"
-    >
-      {simple ? t('start.advanced') : t('start.simple')}
-    </button>
+    <div role="radiogroup" aria-label={t('start.setupMode')} className="inline-flex items-center gap-2 text-label text-[var(--on-surface-variant)]">
+      <span>{t('start.setupMode')}</span>
+      <span className="inline-flex rounded-lg bg-[var(--surface-container-high)] p-0.5">
+        {(['simple', 'advanced'] as const).map((mode) => (
+          <button
+            key={mode}
+            type="button"
+            role="radio"
+            aria-checked={experience === mode}
+            title={mode === 'simple' ? t('start.modeSimpleNote') : t('start.modeAdvancedNote')}
+            onClick={() => setExperience(mode)}
+            className={`rounded-md px-3 py-1 transition-colors ${
+              experience === mode
+                ? 'bg-[var(--surface-container-lowest)] font-semibold text-[var(--on-surface)] shadow-[0_1px_2px_rgba(25,28,30,0.08)]'
+                : 'hover:text-[var(--on-surface)]'
+            }`}
+          >
+            {mode === 'simple' ? t('start.modeSimple') : t('start.modeAdvanced')}
+          </button>
+        ))}
+      </span>
+    </div>
   );
   const startButton = (
     <button
@@ -537,6 +655,8 @@ export default function NewProjectPage() {
             ))}
           </select>
         </label>
+        {/* For a demo in pink, without opening the account menu (Sean, 22 Oct). */}
+        <ColourMenu />
       </div>
 
       {/* 13 Oct (production pass): an unfinished setup found after the page
@@ -596,7 +716,9 @@ export default function NewProjectPage() {
 
       {step === 'ask' && (
         <>
-          <h1 className="text-display text-[var(--on-surface)]">{simple ? t('start.titleSimple') : t('start.title')}</h1>
+          <div className="mb-4 flex justify-end">{experienceSwitch}</div>
+          {/* One question in both setups: it is the same question (email 8). */}
+          <h1 className="text-display text-[var(--on-surface)]">{t('start.title')}</h1>
           <p className="mt-3 text-body text-[var(--on-surface-variant)]">
             {simple
               ? `${t('start.introSimple')} ${t('setup.doesTheWork')}`
@@ -617,7 +739,7 @@ export default function NewProjectPage() {
               }}
               rows={3}
               autoFocus
-              aria-label={simple ? t('start.titleSimple') : t('start.title')}
+              aria-label={t('start.title')}
               placeholder={t('start.placeholder')}
               className="w-full bg-transparent text-title leading-relaxed text-[var(--on-surface)] outline-none placeholder:text-[var(--outline)]"
             />
@@ -655,7 +777,7 @@ export default function NewProjectPage() {
           </p>
 
           <p className="mt-8 text-label uppercase tracking-wider text-[var(--on-surface-variant)]">{t('start.skip')}</p>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <div className="mt-3 grid gap-3 sm:grid-cols-3">
             <button
               onClick={() => void recommend()}
               disabled={!hasObjective || working !== null}
@@ -673,6 +795,15 @@ export default function NewProjectPage() {
               <span className="mt-1 block text-label text-[var(--on-surface-variant)]">
                 {simple ? t('start.askFewNote', { count: SIMPLE_GUIDE_QUESTIONS }) : t('start.guideNote')}
               </span>
+            </button>
+            {/* A way in of its own, in both setups — not a link beside the setup switch (email 8). */}
+            <button
+              onClick={chooseYourself}
+              disabled={templates.length === 0 || working !== null}
+              className="rounded-2xl bg-[var(--surface-container-high)] px-6 py-4 text-left text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-highest)] disabled:opacity-40"
+            >
+              <span className="block text-title">{t('start.chooseYourself')}</span>
+              <span className="mt-1 block text-label text-[var(--on-surface-variant)]">{t('start.chooseNote')}</span>
             </button>
           </div>
 
@@ -701,18 +832,6 @@ export default function NewProjectPage() {
         </div>
           )}
 
-          <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2">
-            {!simple && (
-              <button
-                onClick={chooseYourself}
-                disabled={templates.length === 0}
-                className="text-body text-[var(--on-surface-variant)] underline-offset-4 hover:text-[var(--on-surface)] hover:underline"
-              >
-                {t('start.chooseYourself')}
-              </button>
-            )}
-            {experienceSwitch}
-          </div>
         </>
       )}
 
@@ -727,7 +846,10 @@ export default function NewProjectPage() {
             objective={objective.trim()}
             material={material}
             busy={working === 'setup'}
-            onDone={(given) => void recommend(given)}
+            onDone={(given, searches) => {
+              setIntakeSearches(searches);
+              void recommend(given);
+            }}
             onBack={() => setStep('ask')}
             maxQuestions={simple ? SIMPLE_GUIDE_QUESTIONS : undefined}
             foldWhy={simple}
@@ -782,8 +904,21 @@ export default function NewProjectPage() {
             draft={draft}
             rationale={rationale}
             onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))}
+            onRemoveTemplate={(x) => void removePreset(x)}
             designer={
               <>
+                <RemovedWorkflows templates={removedTemplates} onRestore={(x) => void restorePreset(x)} />
+                {selected?.id.startsWith(DESIGNED) && (
+                  <label className="mt-3 flex items-center gap-2 text-body text-[var(--on-surface)]">
+                    <input
+                      type="checkbox"
+                      checked={keepDesigned}
+                      onChange={(e) => setKeepDesigned(e.target.checked)}
+                      className="h-4 w-4 accent-[var(--pm-primary)]"
+                    />
+                    {t('start.keepDesigned')}
+                  </label>
+                )}
                 {/* A saved workflow of the user's own can be edited as a copy (6 Oct, email 11). */}
                 {selected?.key.startsWith('custom_') && copying?.id !== selected.id && (
                   <button
@@ -803,7 +938,8 @@ export default function NewProjectPage() {
                   ownerId={user?.id ?? null}
                   initial={copying ? designFromTemplate(copying) : null}
                   onPublished={(t) => {
-                    setTemplates((prior) => [...prior, t]);
+                    // Saved from the designer: it replaces the unsaved design it may have started from.
+                    setTemplates((prior) => [...prior.filter((x) => !x.id.startsWith(DESIGNED)), t]);
                     setTemplateId(t.id);
                     setCopying(null);
                   }}
@@ -834,7 +970,7 @@ export default function NewProjectPage() {
             >
               {t('start.back')}
             </button>
-            {experienceSwitch}
+            <span className="ml-auto">{experienceSwitch}</span>
           </div>
         </>
       )}

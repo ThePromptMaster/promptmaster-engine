@@ -21,7 +21,7 @@ import { isSaved, versionTitle } from '@/lib/workflow/labels';
 import { useT } from '@/lib/i18n/i18n-provider';
 import { tr } from '@/lib/i18n/store';
 import { shownOperationLabel } from '@/lib/i18n/stage';
-import { versionColour } from '@/lib/appearance/colours';
+import { colourOfVersion } from '@/lib/appearance/colours';
 
 interface VersionBarProps {
   versions: ArtifactVersion[];
@@ -59,31 +59,39 @@ export function VersionBar({
   return (
     <div className="mb-4 flex flex-wrap items-center gap-2">
       <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t('stage.versionHistory')}>
-        {visible.map((v) => (
+        {visible.map((v) => {
+          // Each version is shown in its own colour, kept from when it was
+          // made — not the accent, which painted every version alike (Sean,
+          // 22 Oct: "when i change it, it changes for all versions").
+          const colour = colourOfVersion(v.version_number, v.colour_scheme);
+          const selected = v.id === active.id;
+          return (
           <button
             key={v.id}
             onClick={() => onSelect(v.id)}
-            aria-pressed={v.id === active.id}
+            aria-pressed={selected}
             title={v.change_summary ?? versionTitle(v.version_number, v.source_operation)}
+            data-version-pill
             className={`rounded-lg px-3 py-1.5 text-label transition-colors ${
-              v.id === active.id
-                ? 'bg-[var(--pm-primary)] text-[var(--on-primary)]'
+              selected
+                ? 'font-semibold text-[var(--on-surface)] ring-2'
                 : 'bg-[var(--surface-container-low)] text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)]'
             }`}
+            style={selected ? { background: `color-mix(in srgb, ${colour} 16%, var(--surface-container-lowest))`, ['--tw-ring-color' as string]: colour } : undefined}
           >
-            {/* Each version keeps its colour, the user's choice (Sean, 18 Oct). */}
             <span
               aria-hidden
               data-version-colour
-              className="mr-1.5 inline-block h-2 w-2 rounded-full align-middle"
-              style={{ background: versionColour(v.version_number) }}
+              className="mr-1.5 inline-block h-2.5 w-2.5 rounded-full align-middle"
+              style={{ background: colour }}
             />
             {versionPillLabel(v, v.id === headId)}
             {v.restored_from_version_id && (
               <span aria-label={` (${t('stage.restored')})`} title={t('stage.restored')}> ↩</span>
             )}
           </button>
-        ))}
+          );
+        })}
         {hidden > 0 && (
           <button
             onClick={() => setShowAll((s) => !s)}

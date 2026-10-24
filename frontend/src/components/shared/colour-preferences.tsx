@@ -98,6 +98,7 @@ export function ColourPicker() {
           ))}
         </div>
       </fieldset>
+      <p className="text-label text-[var(--on-surface-variant)]">{t('colours.keepNote')}</p>
       <button
         type="button"
         onClick={() => choose(DEFAULT_COLOURS)}
@@ -107,5 +108,29 @@ export function ColourPicker() {
       </button>
       <p className="text-label leading-snug text-[var(--on-surface-variant)]">{t('colours.keptHere')}</p>
     </div>
+  );
+}
+
+/**
+ * The colours, one click from the page itself — the start screen and the
+ * landing page — and not only from the account menu (Sean, 22 Oct: "if they
+ * are demo'ing, they can change it to pink").
+ */
+export function ColourMenu({ tone = 'light' }: { tone?: 'light' | 'dark' }) {
+  const t = useT();
+  return (
+    <details className="relative">
+      <summary
+        className={`flex cursor-pointer list-none items-center gap-1 rounded-lg px-2 py-1 text-label ${
+          tone === 'dark' ? 'text-white/70 hover:text-white' : 'text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]'
+        }`}
+      >
+        <span aria-hidden className="material-symbols-outlined text-[18px]">palette</span>
+        {t('header.colours')}
+      </summary>
+      <div className="absolute right-0 z-50 mt-2 w-72 rounded-xl bg-[var(--surface-container-lowest)] py-2 text-[var(--on-surface)] shadow-[0_12px_32px_-12px_rgba(25,28,30,0.35)]">
+        <ColourPicker />
+      </div>
+    </details>
   );
 }

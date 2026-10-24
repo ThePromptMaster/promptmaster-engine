@@ -666,7 +666,23 @@ export const api = {
 
   /** PM-09 "Guide me": a few questions before recommending a setup. 1 LLM call. */
   /** "Guide me", one question at a time: the next question given the answers so far, or that there is enough. */
-  async guideNextQuestion(req: { objective: string; answered: { question: string; answer: string }[]; material?: string; max_questions?: number }): Promise<{ enough: boolean; question: GuideQuestion | null; reason: string }> {
+  async guideNextQuestion(req: {
+    objective: string;
+    answered: { question: string; answer: string }[];
+    material?: string;
+    max_questions?: number;
+    /** On, a question that needs current outside facts is searched first (22 Oct). */
+    web_access?: 'on' | 'off';
+    /** What this intake's searches found so far; a new search's sources follow them. */
+    sources?: { url: string; title: string; excerpt: string }[];
+  }): Promise<{
+    enough: boolean;
+    question: GuideQuestion | null;
+    reason: string;
+    web_query?: string;
+    web_sources?: { url: string; title: string; excerpt: string }[];
+    web_note?: string;
+  }> {
     return apiFetch('/api/guide-next-question', { method: 'POST', body: JSON.stringify(req) });
   },
 

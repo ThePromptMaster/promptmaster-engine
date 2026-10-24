@@ -179,6 +179,27 @@ export function versionColour(versionNumber: number): string {
   return `var(--version-${((versionNumber - 2) % 5) + 2})`;
 }
 
+/**
+ * The palette in force, as recorded on a version when it is made:
+ * "<starting>/<palette>" (Sean, 22 Oct: a new palette should colour new
+ * versions, not repaint old ones).
+ */
+export function colourScheme(prefs: ColourPreferences): string {
+  return `${prefs.starting}/${prefs.palette}`;
+}
+
+/**
+ * A version's colour: from the palette recorded on it, for good; a version
+ * with none recorded (or an unknown one) follows the current palette.
+ */
+export function colourOfVersion(versionNumber: number, scheme?: string | null): string {
+  const [startingId, paletteId] = (scheme ?? '').split('/');
+  const starting = STARTING.find((s) => s.id === startingId);
+  const palette = PALETTES.find((p) => p.id === paletteId);
+  if (!starting || !palette) return versionColour(versionNumber);
+  return versionNumber <= 1 ? starting.colour : palette.colours[(versionNumber - 2) % palette.colours.length];
+}
+
 /** Sets the variables on :root, or clears them to the stylesheet's own for the defaults. */
 export function applyColours(prefs: ColourPreferences, root: HTMLElement = document.documentElement): void {
   const isDefault = prefs.accent === DEFAULT_COLOURS.accent && prefs.starting === DEFAULT_COLOURS.starting && prefs.palette === DEFAULT_COLOURS.palette;
@@ -194,6 +215,35 @@ export function applyColours(prefs: ColourPreferences, root: HTMLElement = docum
     if (tint[name]) root.style.setProperty(name, tint[name]);
     else root.style.removeProperty(name);
   }
+  // Pages with a look of their own (the landing page) follow a tint by this.
+  if (prefs.background === DEFAULT_COLOURS.background) root.removeAttribute('data-tint');
+  else root.setAttribute('data-tint', prefs.background);
+}
+
+/**
+ * The colours applied before the first paint, as an inline script for the
+ * root layout (Sean, 22 Oct: a demo in pink should open pink, not flash grey
+ * while the page loads). Every variable each choice sets is worked out here,
+ * so the script only looks them up; a stored id it does not know is skipped.
+ */
+export function prePaintScript(): string {
+  const table = (ids: readonly string[], vars: (id: string) => Record<string, string>, fallback: string) =>
+    Object.fromEntries(ids.filter((id) => id !== fallback).map((id) => [id, vars(id)]));
+  const only = (keep: (name: string) => boolean) => (prefs: ColourPreferences) =>
+    Object.fromEntries(Object.entries(colourVariables(prefs)).filter(([n]) => keep(n)));
+  const surfaces: readonly string[] = BACKGROUND_VARIABLES;
+  const vars = {
+    accent: table(ACCENTS.map((a) => a.id), (id) => only((n) => n.startsWith('--pm-primary'))({ ...DEFAULT_COLOURS, accent: id }), DEFAULT_COLOURS.accent),
+    starting: table(STARTING.map((s) => s.id), (id) => only((n) => n === '--version-1')({ ...DEFAULT_COLOURS, starting: id }), DEFAULT_COLOURS.starting),
+    palette: table(PALETTES.map((p) => p.id), (id) => only((n) => n.startsWith('--version-') && n !== '--version-1')({ ...DEFAULT_COLOURS, palette: id }), DEFAULT_COLOURS.palette),
+    background: table(BACKGROUNDS.map((b) => b.id), (id) => only((n) => surfaces.includes(n))({ ...DEFAULT_COLOURS, background: id }), DEFAULT_COLOURS.background),
+  };
+  return (
+    `(function(){try{var p=JSON.parse(localStorage.getItem(${JSON.stringify(COLOURS_KEY)})||'{}')||{};` +
+    `var V=${JSON.stringify(vars)};var d=document.documentElement;` +
+    `for(var k in V){var m=V[k][p[k]];if(m){for(var n in m){d.style.setProperty(n,m[n]);}}}` +
+    `if(V.background[p.background]){d.setAttribute('data-tint',p.background);}}catch(e){}})();`
+  );
 }
 
 export function loadColours(): ColourPreferences {

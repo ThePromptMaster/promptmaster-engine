@@ -128,6 +128,18 @@ class OpenRouterError(Exception):
         self.retry_after = retry_after
 
 
+class NotJSONError(OpenRouterError):
+    """The model answered in prose where JSON was asked for, and the repair
+    pass could not make JSON of it (Sean, 23 Oct: the start chat answered a
+    full brief with search results in prose; the repair returned
+    {"error": "Input was not JSON…"}, read as a reply that said nothing).
+    `content` is the prose, for a caller that can use it as it stands."""
+
+    def __init__(self, message: str, content: str = ""):
+        super().__init__(message)
+        self.content = content
+
+
 class OpenRouterDeadlineError(OpenRouterError):
     """Ran out of wall-clock budget before the request could be retried.
 
@@ -476,8 +488,12 @@ class OpenRouterClient:
                 "tokens_in": usage.get("tokens_in", 0) + repair_usage.get("tokens_in", 0),
                 "tokens_out": usage.get("tokens_out", 0) + repair_usage.get("tokens_out", 0),
             }
-            return json.loads(self._clean_json_response(repaired)), total_usage
-        except OpenRouterDeadlineError:
+            fixed = json.loads(self._clean_json_response(repaired))
+            # The repair saying it found no JSON is not the answer asked for.
+            if isinstance(fixed, dict) and set(fixed) <= {"error", "message", "original", "text"} and "error" in fixed:
+                raise NotJSONError("The model answered in prose, not JSON", content=content)
+            return fixed, total_usage
+        except (OpenRouterDeadlineError, NotJSONError):
             raise
         except (json.JSONDecodeError, OpenRouterError) as repair_error:
             raise OpenRouterError(

@@ -364,6 +364,8 @@ export interface GenerateSetupRequest {
   answers?: GuideAnswer[];
   /** What was attached on the start screen, as text. */
   material?: string;
+  /** The new project's Web access: on, the setup never says there is no web (22 Oct). */
+  web_access?: 'on' | 'off';
 }
 
 export interface GuideQuestionsResponse {

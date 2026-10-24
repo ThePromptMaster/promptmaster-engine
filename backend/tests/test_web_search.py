@@ -19,8 +19,8 @@ ANNOTATIONS = [
 ]
 
 
-def _inputs() -> PMInput:
-    return PMInput(objective="Screen Harbor Industrial Services for Northbridge.", mode="analyst")
+def _inputs(objective: str = "Screen Harbor Industrial Services for Northbridge.") -> PMInput:
+    return PMInput(objective=objective, mode="analyst")
 
 
 def _post(body: dict, stub: AsyncMock):
@@ -51,9 +51,11 @@ def test_web_search_returns_the_searchs_own_sources_and_unlinks_any_other():
     assert body["sources"] == [{"url": "https://example.org/a", "title": "A report", "excerpt": "Growth was 4%."}]
     assert "[example.org](https://example.org/a)" in body["summary"]
     assert "invented.example" not in body["summary"] and "made up" in body["summary"]
-    prompt = stub.generate_with_web.call_args.args[0]
-    assert "SEARCH FOR: Harbor revenue growth" in prompt and "WHAT THIS SEARCH IS FOR: the growth row" in prompt
-    assert "Never invent a source" in stub.generate_with_web.call_args.kwargs["system"]
+    # The engine searches the user message, so it is the query alone; the
+    # project and the reason ride in the system message (23 Oct).
+    assert stub.generate_with_web.call_args.args[0] == "Harbor revenue growth"
+    system = stub.generate_with_web.call_args.kwargs["system"]
+    assert "Never invent a source" in system and "WHAT THIS SEARCH IS FOR: the growth row" in system
 
 
 def test_sources_and_links_helpers():
@@ -61,7 +63,17 @@ def test_sources_and_links_helpers():
     assert [s.url for s in sources] == ["https://example.org/a"]
     assert keep_found_links("See https://example.org/a and https://other.example/b.", [WebSource(url="https://example.org/a")]) == "See https://example.org/a and ."
     system, user = build_search_prompt(_inputs(), "q")
-    assert "PROJECT OBJECTIVE: Screen Harbor" in user
+    assert user == "q" and "THE PROJECT: Screen Harbor" in system
+
+
+def test_a_long_brief_is_never_what_is_searched():
+    """Sean, 23 Oct: "Claude Pro plan pricing … official Anthropic" returned
+    childcare tools — the search had been sent the whole early-intervention brief."""
+    brief = "Little Steps Learning LLC serves families with children from birth to age three. " * 40
+    system, user = build_search_prompt(_inputs(objective=brief), "Claude Pro plan pricing official", purpose=brief)
+    assert user == "Claude Pro plan pricing official"
+    assert "Little Steps" not in user
+    assert len(system) < 1_200
 
 
 async def test_the_client_asks_for_the_web_plugin_and_reads_the_annotations(monkeypatch):

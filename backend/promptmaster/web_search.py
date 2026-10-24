@@ -42,15 +42,32 @@ class WebSearchResult(BaseModel):
     sources: list[WebSource] = Field(default_factory=list)
 
 
+#: How much of the project and the reason goes beside a search (24 Oct).
+SEARCH_CONTEXT_MAX = 300
+
+
+def _short(text: str, limit: int = SEARCH_CONTEXT_MAX) -> str:
+    text = " ".join((text or "").split())
+    return text if len(text) <= limit else f"{text[:limit - 1].rstrip()}…"
+
+
 def build_search_prompt(inputs: PMInput, query: str, purpose: str = "") -> tuple[str, str]:
-    user = (
-        f"PROJECT OBJECTIVE: {inputs.objective}\n"
-        + (f"WHAT THIS SEARCH IS FOR: {purpose}\n" if purpose.strip() else "")
-        + f"SEARCH FOR: {query}\n\n"
-        "Write a short summary, at most 200 words, of what the results say that bears on this. "
-        "Put each result's link after the claim it supports."
+    """The search's prompt: the query alone as the user message.
+
+    OpenRouter's web plugin searches the user message, not a separate query
+    (Sean, 23 Oct: "Claude Pro plan pricing … official Anthropic" returned
+    childcare tools — the message began with a long brief about an
+    early-intervention business, and that is what was searched). What the
+    project is and why it searches go in the system message, kept short.
+    """
+    system = (
+        f"{_SEARCH_SYSTEM}\n\n"
+        f"THE PROJECT: {_short(inputs.objective)}\n"
+        + (f"WHAT THIS SEARCH IS FOR: {_short(purpose)}\n" if purpose.strip() else "")
+        + "Write a short summary, at most 200 words, of what the results say that bears on the "
+        "search. Put each result's link after the claim it supports."
     )
-    return _SEARCH_SYSTEM, user
+    return system, " ".join(query.split())[:400]
 
 
 def sources_from(annotations: list[dict[str, Any]]) -> list[WebSource]:
@@ -149,6 +166,8 @@ async def decide_chat_search(
     """The words to search for, or None when the question needs no search."""
     system, user = build_chat_decision_prompt(inputs, chat_history, user_message, current)
     data, _usage = await client.generate_json(user, system=system, temperature=0.0, max_tokens=200, model=model)
+    if not isinstance(data, dict):
+        return None
     query = " ".join(str(data.get("query") or "").split())[:400]
     return query if data.get("search") is True and len(query) >= 2 else None
 

@@ -18,13 +18,15 @@ test.beforeEach(async ({ page }) => {
 test('a new user gets one box, a link warning, one screen and Start', async ({ page }) => {
   await page.goto('/projects/new');
   await dismissBetaNotice(page);
-  await expect(page.getByRole('heading', { name: 'What do you want done?' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'What do you want to do or figure out?' })).toBeVisible();
   await expect(page.getByText(/PromptMaster writes the result itself; you review and approve/)).toBeVisible();
   // 14 Oct call: the conversation is the way in for everyone; the workflow list is the advanced setup's.
   await expect(page.getByRole('button', { name: /Start the conversation/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /choose the workflow yourself/ })).toHaveCount(0);
+  // 23 Oct (email 8): choosing the workflow is a way in of its own, in both setups, and the setup in use is shown.
+  await expect(page.getByRole('button', { name: /Choose the workflow yourself/ })).toBeVisible();
+  await expect(page.getByRole('radio', { name: 'Simple' })).toHaveAttribute('aria-checked', 'true');
 
-  await page.getByLabel('What do you want done?').fill('Turn the recipes at https://www.instagram.com/somecook/ into a cookbook, one page per recipe');
+  await page.getByLabel('What do you want to do or figure out?').fill('Turn the recipes at https://www.instagram.com/somecook/ into a cookbook, one page per recipe');
   await expect(page.getByRole('note', { name: 'Links' })).toContainText("can't open links or watch videos");
 
   await page.getByRole('button', { name: /Set it up for me/ }).click();
@@ -43,11 +45,13 @@ test('a new user gets one box, a link warning, one screen and Start', async ({ p
 test('the advanced setup is one click away and remembered', async ({ page }) => {
   await page.goto('/projects/new');
   await dismissBetaNotice(page);
-  await page.getByRole('button', { name: /^Advanced setup/ }).click();
+  await page.getByRole('radio', { name: 'Advanced' }).click();
+  await expect(page.getByRole('radio', { name: 'Advanced' })).toHaveAttribute('aria-checked', 'true');
   await expect(page.getByRole('heading', { name: 'What do you want to do or figure out?' })).toBeVisible();
-  await expect(page.getByRole('button', { name: /choose the workflow yourself/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Guide me — ask me questions/ })).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem('pm.experience.v1'))).toBe('advanced');
 
-  await page.getByRole('button', { name: 'Simple setup' }).click();
-  await expect(page.getByRole('heading', { name: 'What do you want done?' })).toBeVisible();
+  await page.getByRole('radio', { name: 'Simple' }).click();
+  await expect(page.getByRole('radio', { name: 'Simple' })).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByRole('button', { name: /Ask me a few questions/ })).toBeVisible();
 });

@@ -108,6 +108,12 @@ export interface NextActionInput {
   checkSays?: string | null;
   /** This is the workflow's last stage. */
   isLast: boolean;
+  /**
+   * Every box on this stage that only the user can tick is ticked: on the
+   * last stage, the user has accepted the work (Sean, 22 Oct: "tick the
+   * accept box … then scroll to the bottom and dropdown for 'accept'").
+   */
+  accepted?: boolean;
   /** Short label of the stage after this one, for the button. */
   nextLabel: string | null;
   /** The step the stage's own panel is waiting on, if it has one. */
@@ -191,6 +197,16 @@ function chooseAction(input: NextActionInput): StageAction {
   if (input.panelStep?.busy) return { kind: 'none', label: '', reason: tr('na.working') };
   if (input.panelStep) {
     return { kind: 'panel', label: input.panelStep.label, reason: input.panelStep.reason };
+  }
+
+  // Accepted on the last stage: finishing is what is left, whatever a check
+  // would still say — the user's acceptance is the decision (22 Oct).
+  if (input.isLast && input.accepted && input.hasContent) {
+    return {
+      kind: 'finish',
+      label: input.canAdvance ? tr('na.finish') : tr('na.overrideFinish'),
+      reason: input.canAdvance ? tr('na.acceptedFinish') : tr('na.requiredOpen'),
+    };
   }
 
   if (input.draftable && !input.hasContent) {

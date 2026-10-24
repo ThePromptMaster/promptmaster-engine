@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -46,5 +46,23 @@ describe('an approval says which version it was given on (19 Oct)', () => {
       />
     );
     expect(screen.getByText('approved v3 · current v4')).toBeInTheDocument();
+  });
+});
+
+describe('finishing from the acceptance box (Sean, 22 Oct)', () => {
+  const accept = { id: 'summary.accepted', label: 'I accept this output as finished', satisfied: false, blocking: false, manual: true };
+
+  it('offers Finish beside the box once it is ticked, and not before', async () => {
+    const onFinish = vi.fn();
+    const { rerender } = render(<ExitCriteriaChecklist criteria={[accept]} onToggleManual={() => {}} onFinish={onFinish} />);
+    expect(screen.queryByRole('button', { name: /Finish — see your finished work/ })).not.toBeInTheDocument();
+    rerender(<ExitCriteriaChecklist criteria={[{ ...accept, satisfied: true }]} onToggleManual={() => {}} onFinish={onFinish} />);
+    await userEvent.click(screen.getByRole('button', { name: /Finish — see your finished work/ }));
+    expect(onFinish).toHaveBeenCalledOnce();
+  });
+
+  it('is not offered where the stage cannot be worked on', () => {
+    render(<ExitCriteriaChecklist criteria={[{ ...accept, satisfied: true }]} onToggleManual={() => {}} onFinish={() => {}} readOnly />);
+    expect(screen.queryByRole('button', { name: /Finish/ })).not.toBeInTheDocument();
   });
 });

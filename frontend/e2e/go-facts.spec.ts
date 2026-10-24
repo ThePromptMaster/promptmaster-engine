@@ -18,7 +18,7 @@ test('Go records the facts an attached brief states, citing the file, under the 
   await page.getByLabel('What do you want to do or figure out?').fill('Explain the margin decline to the board [[mock:plan=declare_objective_complete]]');
   await page.getByLabel('Attach files').setInputFiles(path.join(FIXTURES, 'brief.pdf'));
   await expect(page.getByRole('list', { name: 'Attached' })).toContainText('brief.pdf');
-  await page.getByRole('button', { name: /Or choose the workflow yourself/ }).click();
+  await page.getByRole('button', { name: /Choose the workflow yourself/ }).click();
   await page.getByRole('radio', { name: /^Single output/ }).click();
   await page.getByLabel('Project name').fill('E2E go facts');
   await page.getByRole('button', { name: /^Start / }).click();

@@ -61,6 +61,17 @@ describe('nextStageAction — one primary action per stage (PM-06)', () => {
     expect(nextStageAction({ ...base, isLast: true })).toMatchObject({ kind: 'finish', label: 'Finish project' });
   });
 
+  // Sean, 22 Oct: tick accept, then scroll down and find "Finish" under More.
+  it('once the work is accepted on the last stage, Finish comes before checking or fixing it', () => {
+    const unchecked = { ...base, isLast: true, evaluable: true, evaluated: false };
+    expect(kind(unchecked)).toBe('evaluate');
+    expect(nextStageAction({ ...unchecked, accepted: true })).toMatchObject({ kind: 'finish', label: 'Finish project', reason: expect.stringMatching(/You accepted it/) });
+    expect(kind({ ...base, isLast: true, applyableFixes: 2, evaluationClean: false, accepted: true })).toBe('finish');
+    // Not on a stage before the last, and not on an empty stage.
+    expect(kind({ ...unchecked, isLast: false, accepted: true })).toBe('evaluate');
+    expect(kind({ ...unchecked, accepted: true, draftable: true, hasContent: false })).toBe('draft');
+  });
+
   it('names the next stage, and calls it an override when required items are open', () => {
     expect(nextStageAction(base).label).toBe('Continue to Audience');
     expect(nextStageAction({ ...base, canAdvance: false }).label).toBe('Override and continue to Audience');
