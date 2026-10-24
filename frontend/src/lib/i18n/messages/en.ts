@@ -61,6 +61,7 @@ export const en = {
   'colours.accent': 'Accent',
   'colours.starting': 'Starting version (v1)',
   'colours.later': 'Later versions',
+  'colours.keepNote': "New versions take these colours; versions already made keep theirs.",
   'colours.reset': 'Reset to the defaults',
   'colours.keptHere': 'Kept in this browser only.',
   'colours.swatch.background': 'Background: {name}',

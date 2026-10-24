@@ -48,6 +48,7 @@ export const fr: Messages = {
   'colours.accent': 'Couleur principale',
   'colours.starting': 'Version de départ (v1)',
   'colours.later': 'Versions suivantes',
+  'colours.keepNote': "Les nouvelles versions prennent ces couleurs ; celles déjà faites gardent les leurs.",
   'colours.reset': 'Rétablir les valeurs par défaut',
   'colours.keptHere': 'Enregistré dans ce navigateur uniquement.',
   'colours.swatch.background': 'Arrière-plan : {name}',

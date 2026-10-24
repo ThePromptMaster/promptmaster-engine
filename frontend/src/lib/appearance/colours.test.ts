@@ -1,17 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import {
-  applyColours,
-  backgroundVariables,
-  BACKGROUNDS,
-  colourVariables,
-  COLOURS_KEY,
-  DEFAULT_COLOURS,
-  loadColours,
-  parseColours,
-  saveColours,
-  versionColour,
-} from './colours';
+import { applyColours, backgroundVariables, BACKGROUNDS, colourVariables, COLOURS_KEY, DEFAULT_COLOURS, loadColours, parseColours, saveColours, versionColour, colourOfVersion, colourScheme, prePaintScript } from './colours';
 
 describe('the user\'s colours (Sean, 18 Oct)', () => {
   beforeEach(() => {
@@ -75,5 +64,59 @@ describe('the user\'s colours (Sean, 18 Oct)', () => {
       expect(Object.keys(backgroundVariables(b.id)).length).toBeGreaterThan(10);
     }
     expect(backgroundVariables('default')).toEqual({});
+  });
+});
+
+describe('a version keeps the colour it was made with (Sean, 22 Oct)', () => {
+  it('records the palette in force', () => {
+    expect(colourScheme({ ...DEFAULT_COLOURS, starting: 'rose', palette: 'bright' })).toBe('rose/bright');
+  });
+
+  it('draws a version from its recorded palette, whatever the current one is', () => {
+    expect(colourOfVersion(1, 'rose/bright')).toBe('#b3264f');
+    expect(colourOfVersion(2, 'rose/bright')).toBe('#e0452b');
+    expect(colourOfVersion(3, 'grey/calm')).toBe('#0f8a8c');
+    // Past the palette's end it cycles, as the live tokens do.
+    expect(colourOfVersion(7, 'grey/calm')).toBe('#2563eb');
+  });
+
+  it('a version with none recorded follows the current palette', () => {
+    expect(colourOfVersion(1, null)).toBe('var(--version-1)');
+    expect(colourOfVersion(3, 'unknown/scheme')).toBe('var(--version-3)');
+  });
+});
+
+describe('the colours before the first paint (Sean, 22 Oct)', () => {
+  function run(stored: string | null) {
+    window.localStorage.clear();
+    if (stored !== null) window.localStorage.setItem(COLOURS_KEY, stored);
+    const root = document.documentElement;
+    root.removeAttribute('data-tint');
+    root.removeAttribute('style');
+    new Function(prePaintScript())();
+    return root;
+  }
+
+  it('paints a chosen pink, accent and palette at once, and marks the tint', () => {
+    const root = run(JSON.stringify({ background: 'pink', accent: 'plum', palette: 'bright' }));
+    expect(root.getAttribute('data-tint')).toBe('pink');
+    expect(root.style.getPropertyValue('--surface')).toBe('#fdf3f6');
+    expect(root.style.getPropertyValue('--pm-primary')).toBe('#6a3d9a');
+    expect(root.style.getPropertyValue('--version-2')).toBe('#e0452b');
+  });
+
+  it('leaves the stylesheet alone for the defaults, nothing stored or something broken', () => {
+    for (const stored of [null, '{}', 'not json', JSON.stringify({ background: 'nope' })]) {
+      const root = run(stored);
+      expect(root.getAttribute('data-tint')).toBeNull();
+      expect(root.style.length).toBe(0);
+    }
+  });
+
+  it('applyColours marks and clears the tint', () => {
+    applyColours({ ...DEFAULT_COLOURS, background: 'pink' });
+    expect(document.documentElement.getAttribute('data-tint')).toBe('pink');
+    applyColours(DEFAULT_COLOURS);
+    expect(document.documentElement.hasAttribute('data-tint')).toBe(false);
   });
 });

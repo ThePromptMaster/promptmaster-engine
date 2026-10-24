@@ -26,6 +26,8 @@ export interface TimelineEntry {
   /** Set on a version: opening it shows that version on its stage. */
   versionId?: string;
   versionNumber?: number;
+  /** The palette recorded on the version, for its colour. */
+  colourScheme?: string | null;
   /** The newest version of its stage. */
   current?: boolean;
 }
@@ -51,7 +53,7 @@ export const DECISIONS: Partial<Record<WorkflowEvent['type'], string>> = {
 export function projectTimeline(
   template: Pick<WorkflowTemplate, 'stages'>,
   events: readonly WorkflowEvent[],
-  stages: Record<string, { versions: readonly { id: string; version_number: number; source_operation: string; change_summary: string | null; created_at: string }[] } | undefined>
+  stages: Record<string, { versions: readonly { id: string; version_number: number; source_operation: string; change_summary: string | null; created_at: string; colour_scheme?: string | null }[] } | undefined>
 ): TimelineEntry[] {
   const label = (id: string) => template.stages.find((s) => s.id === id)?.label ?? id;
   const out: TimelineEntry[] = [];
@@ -70,6 +72,7 @@ export function projectTimeline(
         ...(v.change_summary ? { detail: v.change_summary } : {}),
         versionId: v.id,
         versionNumber: v.version_number,
+        colourScheme: v.colour_scheme ?? null,
         current: v.id === head,
       });
     }

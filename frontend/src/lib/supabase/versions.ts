@@ -1,6 +1,7 @@
 import { createClient } from './client';
 import type { Artifact, ArtifactVersion, Evaluation } from '@/types/project';
 import type { AuditFinding } from '@/types';
+import { colourScheme, loadColours } from '@/lib/appearance/colours';
 
 const ARTIFACT_COLUMNS = `
   id, user_id, project_id, kind, name, stage_id, summary, key_figures, current_version_id,
@@ -11,7 +12,7 @@ const VERSION_COLUMNS = `
   id, user_id, project_id, artifact_id, version_number, parent_version_id,
   source_operation, instruction, system_prompt, content, model, mode,
   change_summary, restored_from_version_id, finish_reason, user_rating,
-  continuity_snapshot, created_at
+  continuity_snapshot, colour_scheme, created_at
 `;
 
 const EVAL_COLUMNS = `
@@ -187,6 +188,8 @@ export async function appendVersion(
       finish_reason: version.finish_reason ?? null,
       continuity_snapshot: version.continuity_snapshot ?? null,
       restored_from_version_id: version.restored_from_version_id ?? null,
+      // The palette in force: this version keeps its colour when the palette changes (22 Oct).
+      colour_scheme: typeof window === 'undefined' ? null : colourScheme(loadColours()),
     })
     .select(VERSION_COLUMNS)
     .single();
