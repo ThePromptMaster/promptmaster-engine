@@ -16,7 +16,7 @@ import re
 
 from pydantic import BaseModel, Field
 
-from .llm_client import OpenRouterClient, OpenRouterError
+from .llm_client import NotJSONError, OpenRouterClient, OpenRouterError
 from .schemas import ChatMessage, PMInput, SavedSource
 from .self_model import PROMPTMASTER_SELF_MODEL
 from .source_access import links_rule
@@ -225,6 +225,52 @@ def _plain(reply: str) -> str:
     return re.sub(r"[ \t]{2,}", " ", cleaned).strip() or reply
 
 
+async def _answer(
+    client: OpenRouterClient,
+    model: str | None,
+    turns: list[Turn],
+    brief: DraftBrief,
+    edited: list[str] | None,
+    material: str,
+    web_access: str,
+    found: str,
+) -> tuple[dict, str, bool]:
+    """The turn's JSON, asked for again rather than lost (Sean, 23 Oct: a full
+    brief with pricing results came back as "Tell me more about what you want
+    to get done").
+
+    With search results in the prompt the model sometimes answered in prose,
+    and sometimes the provider's content filter returned nothing. So: the
+    turn; again, insisting on JSON; then once more without the results. The
+    result, the last prose answer (used as the reply when no JSON came), and
+    whether the results had to be left out.
+    """
+    strict = "\n\nAnswer with the JSON object only — no prose before or after it, even when citing sources."
+    tries = [(found, ""), (found, strict)] + ([("", strict)] if found else [])
+    prose, last_error = "", None
+    for i, (results, extra) in enumerate(tries):
+        system, user = build_front_door_prompt(
+            turns, brief, edited, material, web=chat_web_line(web_access), found=results, web_access=web_access
+        )
+        try:
+            # A long brief plus a block of results did not fit 2,000 tokens (23 Oct).
+            result, _usage = await client.generate_json(prompt=user, system=system + extra, temperature=0.4, max_tokens=4_000, model=model)
+        except NotJSONError as e:
+            prose, last_error = e.content or prose, e
+            continue
+        except OpenRouterError as e:
+            last_error = e
+            continue
+        if isinstance(result, dict) and (str(result.get("reply") or "").strip() or isinstance(result.get("brief"), dict)):
+            return result, prose, bool(found) and not results
+        last_error = None
+    if prose:
+        return {}, prose, False
+    if last_error:
+        raise last_error
+    return {}, "", False
+
+
 async def front_door_turn(
     client: OpenRouterClient,
     model: str | None,
@@ -258,13 +304,13 @@ async def front_door_turn(
         except (OpenRouterError, ValueError, AttributeError) as e:
             logger.warning("front door web search failed: %s", e)
             web_note = "The web search failed, so this reply uses only what you have said."
-    system, user = build_front_door_prompt(
-        turns, brief, edited, material, web=chat_web_line(web_access), found=found, web_access=web_access
-    )
-    # A long brief plus a block of results did not fit 2,000 tokens: the reply
-    # came back empty (23 Oct).
-    result, _usage = await client.generate_json(prompt=user, system=system, temperature=0.4, max_tokens=4_000, model=model)
+    result, prose, dropped = await _answer(client, model, turns, brief, edited, material, web_access, found)
+    if dropped:
+        new_sources, web_note = [], "The search results could not be used in this reply, so it uses only what you have said."
     turn = parse_front_door(result, turns, given=brief, edited=edited, material=material)
+    if prose and not str((result or {}).get("reply") or "").strip():
+        # The model answered in prose: the answer stands, the outline as it was.
+        turn.reply, turn.brief, turn.ready = _plain(prose.strip())[:8_000], brief, False
     if web_query:
         turn.reply = strip_unknown_citations(turn.reply, len(saved) + len(new_sources))
     turn.web_query, turn.web_sources, turn.web_note = web_query, new_sources, web_note
