@@ -10,6 +10,7 @@ import { createFolder, deleteFolder, folderCounts, listFolders, renameFolder } f
 import { FoldersSidebar, PROJECT_DRAG_TYPE, type FolderSelection } from '@/components/projects/folders-sidebar';
 import { MoveToMenu } from '@/components/projects/move-to-menu';
 import { UseInProjectMenu } from '@/components/projects/use-in-project-menu';
+import { ProjectCardMenu } from '@/components/projects/project-card-menu';
 import { pausedProjectIds } from '@/lib/supabase/workflow';
 import { useProjectStore } from '@/stores/project-store';
 import type { ProjectFolder, ProjectSummary } from '@/types/project';
@@ -42,11 +43,29 @@ function storedSelection(): FolderSelection {
 /** The example goals on the empty list, in the interface's language (`lib/projects/example-goals.ts` holds the English). */
 const EXAMPLES = ['memo', 'briefing', 'plan'] as const;
 
+/**
+ * Whether the pointer is a mouse. Only then is a card draggable onto a folder:
+ * on a phone a tap is for opening the project, and filing goes through the
+ * card's menu (Sean, 24 Oct).
+ */
+function useFinePointer(): boolean {
+  const [fine, setFine] = useState(false);
+  useEffect(() => {
+    const q = window.matchMedia('(pointer: fine)');
+    const update = () => setFine(q.matches);
+    update();
+    q.addEventListener('change', update);
+    return () => q.removeEventListener('change', update);
+  }, []);
+  return fine;
+}
+
 export default function ProjectsPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const t = useT();
   const locale = useLocale();
+  const finePointer = useFinePointer();
   const workflowLabel = (key: string) =>
     key === 'book' || key === 'research' || key === 'single_output' ? t(`workflow.name.${key}`) : key;
 
@@ -321,16 +340,16 @@ export default function ProjectsPage() {
               {rows.map((p) => (
                 <li
                   key={p.id}
-                  draggable
+                  draggable={finePointer}
                   onDragStart={(e) => {
                     e.dataTransfer.setData(PROJECT_DRAG_TYPE, p.id);
                     e.dataTransfer.effectAllowed = 'move';
                   }}
                 >
-                  <div style={accentVariables(p.accent) as React.CSSProperties} className="group relative flex items-center gap-4 rounded-2xl bg-[var(--surface-container-low)] transition-all duration-200 hover:bg-[var(--surface-container-lowest)] hover:shadow-[0_1px_2px_rgba(25,28,30,0.04),0_8px_20px_-10px_rgba(25,28,30,0.2)]">
+                  <div style={accentVariables(p.accent) as React.CSSProperties} className="group relative flex items-center gap-1 rounded-2xl bg-[var(--surface-container-low)] sm:gap-4 transition-all duration-200 hover:bg-[var(--surface-container-lowest)] hover:shadow-[0_1px_2px_rgba(25,28,30,0.04),0_8px_20px_-10px_rgba(25,28,30,0.2)]">
                     {/* The project's own colour, as a bar and a tinted icon: the icon alone was easy to miss (21 Oct). */}
                     {p.accent && <span aria-hidden className="absolute inset-y-3 left-0 w-1 rounded-r-full bg-[var(--pm-primary)]" />}
-                    <Link href={`/projects/${p.id}`} className="flex min-w-0 flex-1 items-center gap-4 px-6 py-5">
+                    <Link href={`/projects/${p.id}`} className="flex min-w-0 flex-1 items-center gap-3 py-4 pl-5 pr-1 sm:gap-4 sm:px-6 sm:py-5">
                       <span
                         aria-hidden
                         className={`material-symbols-outlined shrink-0 text-[22px] ${p.accent ? 'rounded-lg bg-[color-mix(in_srgb,var(--pm-primary)_14%,transparent)] p-1.5 text-[var(--pm-primary)]' : 'text-[var(--on-surface-variant)]'}`}
@@ -367,13 +386,7 @@ export default function ProjectsPage() {
                       </span>
                     </Link>
 
-                    <div className="flex shrink-0 items-center pr-4">
-                      {pendingDelete !== p.id && user && (
-                        <UseInProjectMenu source={p} userId={user.id} projects={projects ?? []} folders={folders} />
-                      )}
-                      {pendingDelete !== p.id && (
-                        <MoveToMenu projectTitle={p.title} folderId={p.folder_id} folders={folders} onMove={(folderId) => void handleMove(p.id, folderId)} />
-                      )}
+                    <div className="flex shrink-0 items-center pr-2 sm:pr-4">
                       {pendingDelete === p.id ? (
                         <div className="flex items-center gap-1.5">
                           <button
@@ -390,13 +403,31 @@ export default function ProjectsPage() {
                           </button>
                         </div>
                       ) : (
-                        <button
-                          onClick={() => setPendingDelete(p.id)}
-                          aria-label={t('list.deleteNamed', { name: p.title || t('list.aProject') })}
-                          className="rounded-lg p-2 text-[var(--on-surface-variant)] opacity-0 transition-opacity hover:bg-[var(--surface-container-high)] focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
-                        >
-                          <span className="material-symbols-outlined text-[20px]">delete</span>
-                        </button>
+                        <>
+                          {/* A computer with a mouse: the three icons, shown on hover. */}
+                          <div className="hidden items-center [@media(hover:hover)_and_(min-width:640px)]:flex">
+                            {user && <UseInProjectMenu source={p} userId={user.id} projects={projects ?? []} folders={folders} />}
+                            <MoveToMenu projectTitle={p.title} folderId={p.folder_id} folders={folders} onMove={(folderId) => void handleMove(p.id, folderId)} />
+                            <button
+                              onClick={() => setPendingDelete(p.id)}
+                              aria-label={t('list.deleteNamed', { name: p.title || t('list.aProject') })}
+                              className="rounded-lg p-2 text-[var(--on-surface-variant)] opacity-0 transition-opacity hover:bg-[var(--surface-container-high)] focus-visible:opacity-100 group-hover:opacity-100"
+                            >
+                              <span className="material-symbols-outlined text-[20px]">delete</span>
+                            </button>
+                          </div>
+                          {/* A phone or a tablet: one button, so the card itself is what a tap opens (Sean, 24 Oct). */}
+                          <div className="[@media(hover:hover)_and_(min-width:640px)]:hidden">
+                            <ProjectCardMenu
+                              project={p}
+                              userId={user?.id}
+                              projects={projects ?? []}
+                              folders={folders}
+                              onMove={(folderId) => void handleMove(p.id, folderId)}
+                              onDelete={() => setPendingDelete(p.id)}
+                            />
+                          </div>
+                        </>
                       )}
                     </div>
                   </div>
