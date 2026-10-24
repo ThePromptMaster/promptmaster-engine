@@ -154,6 +154,12 @@ export interface StepOutcome {
 const MAX_OUTPUT = 6_000;
 /** WriteCodeRequest.goal's cap in routers/agent.py. The goal can come from the model, so it is clipped rather than trusted. */
 const MAX_GOAL = 2_000;
+/**
+ * WebSearchRequest.purpose's cap. The purpose is the planner's reason, which
+ * can run long: a 700-character one was refused before it reached the model
+ * and cost the run a step (Sean, 23 Oct).
+ */
+const MAX_PURPOSE = 600;
 
 function clip(text: string): string {
   return text.length > MAX_OUTPUT ? text.slice(0, MAX_OUTPUT) + '\n[… trimmed …]' : text;
@@ -593,7 +599,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       const asked = typeof params.query === 'string' ? params.query.trim().slice(0, 400) : '';
       const query = asked.length >= 2 ? asked : `${ctx.stage.label}: ${ctx.project.objective}`.slice(0, 400);
       const found = await api.agentWebSearch(
-        { inputs: inputsFrom(ctx.project), query, purpose: ctx.step.rationale || ctx.stage.label, web_access: 'on', model: ctx.project.model },
+        { inputs: inputsFrom(ctx.project), query, purpose: (ctx.step.rationale || ctx.stage.label).slice(0, MAX_PURPOSE), web_access: 'on', model: ctx.project.model },
         ctx.signal
       );
       if (!found.sources.length) {
@@ -602,8 +608,11 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       const saved = await saveSources(ctx.project, found.sources, { query, stageId: ctx.stage.id, agentRunId: ctx.run.id });
       await ctx.refresh?.();
       const names = found.sources.map((s) => s.title || s.url).join('; ');
+      // Sources saved are a change to the project: the record says so, and
+      // the no-progress guard counts them (Sean, 23 Oct: "Search the web —
+      // done. No change to the project" after five sources were saved).
       return done(key, {
-        status: 'succeeded', toolsUsed: ['web'], changes: {},
+        status: 'succeeded', toolsUsed: ['web'], changes: saved.length ? { source_ids: saved.map((s) => s.id) } : {},
         output: `Searched the web for "${query}". ${saved.length ? `Saved ${saved.length} new source${saved.length === 1 ? '' : 's'}` : 'Every source found was already saved'}: ${names}.\n\n${found.summary}`.slice(0, MAX_OUTPUT),
       });
     }

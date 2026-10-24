@@ -27,7 +27,7 @@ const MUTATING = new Set(['draft', 'revise', 'continue', 'outline', 'sections', 
 export function changedSomething(changes: StepOutcome['changes'] | undefined): boolean {
   if (!changes) return false;
   return Boolean(
-    changes.version_ids?.length || changes.sections_written?.length || changes.items_triaged?.length || changes.event_types?.length || changes.sandbox_run_id
+    changes.version_ids?.length || changes.sections_written?.length || changes.items_triaged?.length || changes.event_types?.length || changes.sandbox_run_id || changes.source_ids?.length
   );
 }
 

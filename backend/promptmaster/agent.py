@@ -195,6 +195,14 @@ class AgentState(BaseModel):
     latest_change: AgentLatestChange | None = None
 
 
+#: How long a move's rationale may be: what a web search's purpose accepts.
+MAX_RATIONALE = 600
+
+
+def _at_most(text: str, limit: int) -> str:
+    return text if len(text) <= limit else f"{text[:limit - 1].rstrip()}…"
+
+
 class NextAction(BaseModel):
     action_key: str
     params: dict = Field(default_factory=dict)
@@ -527,7 +535,10 @@ def parse_next_action(result: object, allowed: list[str], controls: list[AgentCo
     return NextAction(
         action_key=key,
         params=params,
-        rationale=shown(result.get("rationale")),
+        # Asked for in one or two sentences; a longer one is cut where a
+        # request that carries it can still be accepted (Sean, 23 Oct: a web
+        # search refused because its purpose, the rationale, ran past 600).
+        rationale=_at_most(shown(result.get("rationale")), MAX_RATIONALE),
         expected_outcome=shown(result.get("expected_outcome")),
         needs_user_decision=bool(result.get("needs_user_decision")) or key == "request_user_decision",
         decision_question=shown(question) if question else None,
