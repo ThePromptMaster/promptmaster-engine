@@ -111,3 +111,42 @@ async def test_a_repair_that_finds_no_json_is_an_error_not_an_answer(monkeypatch
     with pytest.raises(NotJSONError) as caught:
         await client.generate_json("q")
     assert caught.value.content == "Claude Pro is $20 a month."
+
+
+async def test_prose_with_no_object_is_not_sent_for_repair(monkeypatch):
+    """Sean, 24 Oct: the start chat answered in prose, the repair pass was
+    answered by the content filter, and the prose was lost to a 502."""
+    import pytest
+    from promptmaster.llm_client import NotJSONError, OpenRouterClient
+
+    client = OpenRouterClient(api_key="k")
+    calls = []
+
+    async def fake_generate(**kw):
+        calls.append(kw)
+        return "Here are three screening criteria to start from.", {}
+
+    monkeypatch.setattr(client, "generate", fake_generate)
+    with pytest.raises(NotJSONError) as caught:
+        await client.generate_json("q")
+    assert caught.value.content == "Here are three screening criteria to start from."
+    assert len(calls) == 1
+
+
+async def test_a_filtered_repair_keeps_the_first_answer(monkeypatch):
+    import pytest
+    from promptmaster.llm_client import NotJSONError, OpenRouterClient, OpenRouterError
+
+    client = OpenRouterClient(api_key="k")
+    replies = iter([('{"reply": "Half an obj', {}), OpenRouterError("No content in response (finish_reason='content_filter')")])
+
+    async def fake_generate(**_kw):
+        r = next(replies)
+        if isinstance(r, Exception):
+            raise r
+        return r
+
+    monkeypatch.setattr(client, "generate", fake_generate)
+    with pytest.raises(NotJSONError) as caught:
+        await client.generate_json("q")
+    assert caught.value.content == '{"reply": "Half an obj'

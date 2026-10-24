@@ -462,6 +462,12 @@ class OpenRouterClient:
         except json.JSONDecodeError as parse_error:
             pass
 
+        # Prose with no object in it at all is not malformed JSON: a repair
+        # has nothing to fix, and with search results quoted back to it the
+        # provider's content filter answered it with nothing (Sean, 24 Oct).
+        if "{" not in cleaned and content.strip():
+            raise NotJSONError("The model answered in prose, not JSON", content=content)
+
         # Repair pass
         logger.warning(f"JSON parse failed, attempting repair pass")
         repair_prompt = (
@@ -496,8 +502,10 @@ class OpenRouterClient:
         except (OpenRouterDeadlineError, NotJSONError):
             raise
         except (json.JSONDecodeError, OpenRouterError) as repair_error:
-            raise OpenRouterError(
-                f"Failed to parse JSON after repair attempt: {repair_error}"
+            # The first answer is still there for a caller that can use it as
+            # it stands: a filtered or failed repair must not lose it (24 Oct).
+            raise NotJSONError(
+                f"Failed to parse JSON after repair attempt: {repair_error}", content=content
             )
         finally:
             _REPAIRING.reset(token)
