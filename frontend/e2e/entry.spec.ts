@@ -105,7 +105,7 @@ test('choosing the workflow yourself is still one click away', async ({ page }) 
   await page.goto('/projects/new');
   await dismissBetaNotice(page);
   await page.getByLabel('What do you want to do or figure out?').fill('A board memo on the migration');
-  await page.getByRole('button', { name: 'Or choose the workflow yourself' }).click();
+  await page.getByRole('button', { name: /Choose the workflow yourself/ }).click();
   await expect(page.getByRole('heading', { name: 'Your setup' })).toBeVisible();
   await expect(page.getByText(/Recommended:/)).toHaveCount(0);
   await page.getByRole('radio', { name: /^Single output/ }).click();
