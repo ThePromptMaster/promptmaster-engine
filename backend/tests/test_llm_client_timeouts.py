@@ -128,7 +128,9 @@ async def test_a_deadline_error_is_not_masked_as_a_json_parse_failure(client, mo
         return httpx.Response(
             200,
             json={
-                "choices": [{"message": {"content": "not json"}, "finish_reason": "stop"}],
+                # Malformed JSON, so a repair is wanted: prose with no object
+                # in it is not repaired at all (24 Oct).
+                "choices": [{"message": {"content": '{"a": '}, "finish_reason": "stop"}],
                 "usage": {},
             },
             request=httpx.Request("POST", "https://openrouter.ai"),
