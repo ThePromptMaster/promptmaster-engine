@@ -821,6 +821,7 @@ export function ChatPanel({
             }`}
           >
             <textarea
+              dir="auto"
               value={draft}
               onChange={(e) => setDraft(e.target.value.slice(0, INPUT_LIMITS.message))}
               onKeyDown={(e) => {

@@ -210,6 +210,11 @@ export function parseRequirements(texts: readonly string[]): MeasurableRequireme
       // "200 words max", "200 words or fewer", "a 200-word limit".
       [new RegExp(`\\b${NUM}[\\s-]*words?\\s+(?:max(?:imum)?|or (?:less|fewer)|at most|limit|cap)\\b`, 'gi'), (m) => ({ max: num(m[1]) })],
       [new RegExp(`\\b(?:at least|a minimum of|minimum of|no fewer than|no less than)\\s+${NUM}[\\s-]*words?\\b`, 'gi'), (m) => ({ min: num(m[1]) })],
+      // Chinese limits are in characters (Sean, 24 Oct: Mandarin): "200-300字",
+      // "不超过200字", "200字以内", "字数不超过200", "至少500字", "500字以上".
+      [/(\d{1,5})\s*(?:-|–|—|~|～|到|至)\s*(\d{1,5})\s*个?字/g, (m) => ({ min: Number(m[1]), max: Number(m[2]) })],
+      [/(?:不超过|不多于|不超出|最多|少于|控制在|限)\s*(\d{1,5})\s*个?字|(\d{1,5})\s*个?字\s*(?:以内|以下|之内)|字数\s*(?:不超过|不多于|最多|少于|控制在|限)\s*(\d{1,5})/g, (m) => ({ max: Number(m[1] ?? m[2] ?? m[3]) })],
+      [/(?:至少|不少于|不低于)\s*(\d{1,5})\s*个?字|(\d{1,5})\s*个?字\s*以上/g, (m) => ({ min: Number(m[1] ?? m[2]) })],
     ];
     for (const [re, read] of patterns) {
       for (const m of t.matchAll(re)) {
@@ -314,7 +319,7 @@ function lines(text: string): Line[] {
 }
 
 const plain = (s: string) => s.replace(/[*_`#>|]/g, ' ').replace(QUESTION_PREFIX, '').trim();
-const isQuestion = (l: Line) => plain(l.text).endsWith('?');
+const isQuestion = (l: Line) => /[?？؟]$/.test(plain(l.text));
 /**
  * Lines a count leaves out: notes about the text rather than the text.
  * Assumptions are not among them (11 Oct, survey brief): a brief asked to
@@ -461,14 +466,28 @@ export function quoteSpan(text: string): string {
   return `from “${words.slice(0, 5).join(' ')}” to “${words.slice(-5).join(' ')}”`;
 }
 
-/** Words of prose, by whitespace, leaving out headings and notes about the text. */
+/** Chinese, Japanese and Korean script: written without spaces, so each character is a unit (字). */
+const CJK = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu;
+
+/**
+ * The units in one space-separated token: a word, or — in Chinese — each
+ * character, plus any Latin words or figures run in among them (Sean, 24 Oct:
+ * Mandarin; a Chinese limit of 200 is 200 characters).
+ */
+function units(token: string): number {
+  const cjk = token.match(CJK)?.length ?? 0;
+  if (!cjk) return /[\p{L}\p{N}]/u.test(token) ? 1 : 0;
+  return cjk + token.split(CJK).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
+}
+
+/** Words of prose, by whitespace (characters in Chinese), leaving out headings and notes about the text. */
 export function countWords(text: string): number {
   return lines(text)
     .filter((l) => l.level === 0 && !NOTE.test(l.text))
     .map((l) => plain(l.text.replace(/^[-*+]\s+/, '')))
     .join(' ')
     .split(/\s+/)
-    .filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
+    .reduce((n, w) => n + units(w), 0);
 }
 
 /**

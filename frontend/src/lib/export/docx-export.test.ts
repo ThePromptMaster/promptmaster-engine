@@ -56,3 +56,13 @@ describe('placed images (3 Oct call)', () => {
     expect(blob.size).toBeGreaterThan(0);
   });
 });
+
+describe('right-to-left lines (Sean, 24 Oct: Arabic)', () => {
+  it('is read from the first letter', async () => {
+    const { rightToLeft } = await import('./docx-export');
+    expect(rightToLeft('مرحبا بالعالم')).toBe(true);
+    expect(rightToLeft('1. مرحبا')).toBe(true);
+    expect(rightToLeft('Hello مرحبا')).toBe(false);
+    expect(rightToLeft('你好')).toBe(false);
+  });
+});

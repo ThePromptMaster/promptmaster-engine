@@ -94,3 +94,20 @@ def test_the_header_sets_the_language_for_the_request():
     assert client.get("/lang", headers={LANGUAGE_HEADER: "es"}).json() == {"language": "es"}
     assert client.get("/lang", headers={LANGUAGE_HEADER: "klingon"}).json() == {"language": "en"}
     assert client.get("/lang").json() == {"language": "en"}
+
+
+def test_the_new_languages_and_the_english_variety_resolve_exactly():
+    """Sean, 24 Oct: Hindi, Mandarin, Arabic, Swahili, "maybe even Ebonics"."""
+    for code in ("hi", "zh", "ar", "sw", "en-aave"):
+        assert resolve(code) == code
+    assert resolve("zh-CN") == "zh"
+    assert resolve("en-GB") == "en"
+    assert resolve("EN-AAVE") == "en-aave"
+
+
+def test_chinese_limits_are_characters_and_aae_is_written_with_respect():
+    assert "字" in language_directive("zh") and "Simplified" in language_directive("zh")
+    d = language_directive("en-aave")
+    assert "African American English" in d
+    assert "caricature" in d and "[S1]" in d and "High/Medium/Low" in d
+    assert "हिन्दी" in language_directive("hi")

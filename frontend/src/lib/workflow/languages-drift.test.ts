@@ -7,7 +7,7 @@ const PY = readFileSync(join(process.cwd(), '..', 'backend', 'promptmaster', 'la
 
 describe('the offered languages', () => {
   it('match the backend list exactly', () => {
-    const py = [...PY.matchAll(/^\s+"([a-z]{2})": \("([^"]+)", "([^"]+)"\),$/gm)].map((m) => ({ code: m[1], name: m[2], own: m[3] }));
+    const py = [...PY.matchAll(/^\s+"([a-z]{2}(?:-[a-z]+)?)": \("([^"]+)", "([^"]+)"\),$/gm)].map((m) => ({ code: m[1], name: m[2], own: m[3] }));
     expect(py).toEqual(LANGUAGES.map((l) => ({ ...l })));
   });
 
@@ -15,5 +15,8 @@ describe('the offered languages', () => {
     expect(resolveLanguage('es-MX')).toBe('es');
     expect(resolveLanguage('ja')).toBe('en');
     expect(resolveLanguage(undefined)).toBe('en');
+    expect(resolveLanguage('en-aave')).toBe('en-aave');
+    expect(resolveLanguage('en-GB')).toBe('en');
+    expect(resolveLanguage('zh-CN')).toBe('zh');
   });
 });
