@@ -120,6 +120,12 @@ export function markdownToBlocks(markdown: string): DocBlock[] {
  * code and inline maths are set aside first and put back exactly: "a_i b_j"
  * and "__init__" lost their underscores to the emphasis rules (M2, 8 Oct).
  */
+/** Whether a line's first letter is in a right-to-left script (Arabic, Hebrew). */
+export function rightToLeft(text: string): boolean {
+  const first = text.match(/\p{L}/u)?.[0] ?? '';
+  return /[\p{Script=Arabic}\p{Script=Hebrew}]/u.test(first);
+}
+
 function inline(text: string): string {
   const kept: string[] = [];
   const keep = (s: string) => `\u0000${kept.push(s) - 1}\u0000`;
@@ -144,6 +150,9 @@ export async function manuscriptToDocx(
   const docx = await import('docx');
   const { Document, HeadingLevel, ImageRun, Packer, Paragraph, TextRun } = docx;
   const blocks = markdownToBlocks(markdown);
+  // Arabic reads right to left in Word too (Sean, 24 Oct): the paragraph and its run.
+  const bidi = (text: string) => (rightToLeft(text) ? { bidirectional: true } : {});
+  const run = (text: string) => new TextRun({ text, ...(rightToLeft(text) ? { rightToLeft: true } : {}) });
   const children = blocks.flatMap((b) => {
     switch (b.kind) {
       case 'image': {
@@ -166,15 +175,15 @@ export async function manuscriptToDocx(
         ];
       }
       case 'title':
-        return new Paragraph({ text: b.text, heading: HeadingLevel.TITLE });
+        return new Paragraph({ text: b.text, heading: HeadingLevel.TITLE, ...bidi(b.text) });
       case 'h1':
-        return new Paragraph({ text: b.text, heading: HeadingLevel.HEADING_1, pageBreakBefore: true });
+        return new Paragraph({ text: b.text, heading: HeadingLevel.HEADING_1, pageBreakBefore: true, ...bidi(b.text) });
       case 'h2':
-        return new Paragraph({ text: b.text, heading: HeadingLevel.HEADING_2 });
+        return new Paragraph({ text: b.text, heading: HeadingLevel.HEADING_2, ...bidi(b.text) });
       case 'h3':
-        return new Paragraph({ text: b.text, heading: HeadingLevel.HEADING_3 });
+        return new Paragraph({ text: b.text, heading: HeadingLevel.HEADING_3, ...bidi(b.text) });
       case 'bullet':
-        return new Paragraph({ children: [new TextRun(b.text)], bullet: { level: 0 } });
+        return new Paragraph({ children: [run(b.text)], bullet: { level: 0 }, ...bidi(b.text) });
       case 'code':
       case 'math':
         // One run per line, in a fixed-width font, so indentation and every
@@ -185,7 +194,7 @@ export async function manuscriptToDocx(
           ...(b.kind === 'math' ? { alignment: docx.AlignmentType.CENTER } : {}),
         });
       default:
-        return new Paragraph({ children: [new TextRun(b.text)], spacing: { after: 200 } });
+        return new Paragraph({ children: [run(b.text)], spacing: { after: 200 }, ...bidi(b.text) });
     }
   }) as InstanceType<typeof Paragraph>[];
   const doc = new Document({

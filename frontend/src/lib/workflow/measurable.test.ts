@@ -359,3 +359,20 @@ describe('limits written into a list of deliverables (17 Oct, Sean: FIELDGUIDE)'
     expect(parseRequirements(['A memo (≤400 words). The package is at most 1500 words in total.']).map((r) => r.subject).sort()).toEqual(['', 'memo']);
   });
 });
+
+describe('Chinese is counted in characters (Sean, 24 Oct: Mandarin)', () => {
+  it('counts each character, and Latin words or figures run in among them', () => {
+    expect(countWords('茶是一种饮料。')).toBe(6);
+    expect(countWords('我们用 AI 写了 3 份报告')).toBe(10);
+    expect(countWords('Tea is a drink.')).toBe(4);
+  });
+
+  it('reads a Chinese character limit', () => {
+    const limit = (t: string) => parseRequirements([t]).find((r) => r.kind === 'words');
+    expect(limit('写一篇不超过200字的说明')).toMatchObject({ max: 200 });
+    expect(limit('全文200字以内')).toMatchObject({ max: 200 });
+    expect(limit('字数不超过300')).toMatchObject({ max: 300 });
+    expect(limit('至少500字')).toMatchObject({ min: 500 });
+    expect(limit('200-300字')).toMatchObject({ min: 200, max: 300 });
+  });
+});
