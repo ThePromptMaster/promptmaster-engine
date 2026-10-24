@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/card';
 import { useT } from '@/lib/i18n/i18n-provider';
 import type { MessageKey } from '@/lib/i18n/messages/en';
 import { LocaleSwitch } from '@/components/shared/locale-switch';
+import { ColourMenu } from '@/components/shared/colour-preferences';
 
 /**
  * What the product is for, in the words a first-time visitor asks in (Harold,
@@ -93,10 +94,13 @@ function LazySpline() {
 export default function LandingPage() {
   // The whole site in the chosen language (23 Oct); the layout reads the cookie.
   const t = useT();
-  // Sync body background with landing page dark theme
+  // Sync body background with landing page dark theme — or, with a background
+  // colour chosen, its tint (Sean, 22 Oct: "if they are demo'ing, they can
+  // change it to pink and the background and stuff is pink too").
   useEffect(() => {
     const body = document.body;
     const html = document.documentElement;
+    if (html.hasAttribute('data-tint')) return;
     body.style.backgroundColor = '#0a0a1a';
     html.style.backgroundColor = '#0a0a1a';
     return () => {
@@ -106,7 +110,7 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#0a0a1a]">
+    <div className="landing min-h-screen bg-[#0a0a1a]">
       {/* ===== NAVIGATION ===== */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-[#0a0a1a]/80 backdrop-blur-xl border-b border-white/5">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
@@ -119,6 +123,7 @@ export default function LandingPage() {
               {t('land.beta')}
             </span>
             <LocaleSwitch tone="dark" className="hidden sm:flex" />
+            <ColourMenu tone="dark" />
             <Link
               href="/auth/login"
               className="text-sm text-white/80 hover:text-white transition-colors"
@@ -148,7 +153,7 @@ export default function LandingPage() {
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
               <Link
                 href="/projects"
-                className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-[var(--pm-primary)] text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                className="inline-flex items-center justify-center gap-2 px-8 py-4 on-primary bg-[var(--pm-primary)] text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all"
               >
                 <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
                 {t('land.start')}
@@ -337,7 +342,7 @@ export default function LandingPage() {
           </p>
           <Link
             href="/projects"
-            className="inline-flex items-center justify-center gap-2 px-10 py-4 bg-[var(--pm-primary)] text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all"
+            className="inline-flex items-center justify-center gap-2 px-10 py-4 on-primary bg-[var(--pm-primary)] text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all"
           >
             <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
             {t('land.ctaButton')}

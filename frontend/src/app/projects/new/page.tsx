@@ -12,6 +12,7 @@ import { useWorkflowWords } from '@/components/projects/workflow-picker';
 import { useT } from '@/lib/i18n/i18n-provider';
 import { getLocale, tr } from '@/lib/i18n/store';
 import { CustomWorkflowDesigner } from '@/components/projects/custom-workflow-designer';
+import { ColourMenu } from '@/components/shared/colour-preferences';
 import { FrontDoor, type DraftBrief, type Turn } from '@/components/projects/front-door';
 import { saveStageChatMessage } from '@/lib/supabase/conversation';
 import { saveSources } from '@/lib/supabase/sources';
@@ -537,6 +538,8 @@ export default function NewProjectPage() {
             ))}
           </select>
         </label>
+        {/* For a demo in pink, without opening the account menu (Sean, 22 Oct). */}
+        <ColourMenu />
       </div>
 
       {/* 13 Oct (production pass): an unfinished setup found after the page

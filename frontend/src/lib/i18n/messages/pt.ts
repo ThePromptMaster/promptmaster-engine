@@ -48,6 +48,7 @@ export const pt: Messages = {
   'colours.accent': 'Cor principal',
   'colours.starting': 'Versão inicial (v1)',
   'colours.later': 'Versões seguintes',
+  'colours.keepNote': "As novas versões usam estas cores; as já feitas mantêm as suas.",
   'colours.reset': 'Restaurar os padrões',
   'colours.keptHere': 'Salvo apenas neste navegador.',
   'colours.swatch.background': 'Fundo: {name}',
