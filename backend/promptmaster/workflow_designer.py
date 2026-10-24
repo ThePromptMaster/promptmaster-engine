@@ -245,7 +245,9 @@ async def design_workflow(
     client: OpenRouterClient, model: str | None, description: str, objective: str, web_access: str | None = None
 ) -> DesignedWorkflow:
     system, user = build_workflow_prompt(description, objective, web_access)
-    result, _usage = await client.generate_json(prompt=user, system=system, temperature=0.4, max_tokens=3_000, model=model)
+    # 3,000 tokens cut a seven-stage design short on 24 Oct; the repair pass
+    # rescued it, but a design should not depend on that.
+    result, _usage = await client.generate_json(prompt=user, system=system, temperature=0.4, max_tokens=6_000, model=model)
     return parse_workflow(result)
 
 
