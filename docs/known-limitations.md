@@ -2227,3 +2227,52 @@ named as the closest, one click away.
 - **The landing page follows a background colour** chosen in this browser; with none, it
   keeps its dark look.
 
+### L-110 — More languages to write in; African American English; Chinese counts characters (2026-10-24)
+
+Sean, 24 Oct: "the next language should be Hindi and then Mandarin. Arabic and Swahili. Maybe
+even Ebonics too." Writes in now also offers Hindi, Chinese (Mandarin, Simplified), Arabic,
+Swahili and African American English.
+- **African American English is a variety of English**, so it is offered as one (`en-aave`) and
+  named as linguists name it, not "Ebonics". It is a Writes in choice only, not an interface
+  language. Its directive asks for the grammar, vocabulary and rhythm a fluent speaker uses, in
+  the register the work needs, and rules out exaggeration and caricature; a model can still
+  overdo it, so a reader who speaks it should judge the result.
+- **Chinese limits are in characters (字).** In a Chinese project "200 words" is 200 characters,
+  as Chinese limits are usually given; the limit parser also reads 不超过200字, 200字以内,
+  至少500字 and 200-300字. Latin words and figures among the characters count one each.
+- **Right-to-left output.** Model text renders `dir="auto"` with each paragraph finding its own
+  direction, so Arabic reads right to left even in an English interface; the DOCX export marks
+  Arabic paragraphs bidirectional. Mixed-direction lines inside one paragraph follow the browser's
+  bidi rules and can place punctuation unexpectedly.
+- Word and section measures in Hindi, Arabic and Swahili count words by spaces, as before.
+
+### L-111 — The interface in Hindi, Chinese, Arabic and Swahili (2026-10-24)
+
+- **Machine-drafted, not yet reviewed by native speakers.** Every key is present and every
+  placeholder kept (`messages.test.ts`), but wording has not been checked by a fluent reader.
+  Known compromises: Hindi first-person strings give both gendered forms (करता/करती); sentences
+  that slot in a noun at runtime (`{noun}`, `{units}`) are worded to avoid gender and noun-class
+  agreement, and some still read stiffly.
+- **Arabic mirrors the page** through logical CSS properties and `<html dir="rtl">`. Inline
+  `style` offsets (folder indentation in the move menu), charts and the outline's drag handles
+  were not reworked and may sit on the left. Directional icons named literally are flipped; ones
+  chosen in code at runtime may not be.
+- As for es/fr/pt (L-103): admin, server error details, stored model text and custom workflow
+  templates stay as they were written.
+
+### L-112 — The front door keeps a prose answer (2026-10-24)
+
+When the model answers the start chat in prose instead of JSON, the prose is the reply and the
+draft brief stays as it was. Before, the JSON repair pass sometimes met the provider's content
+filter, the prose was lost and the user waited about 50 seconds for an error (Sean, 24 Oct). An
+answer with no `{` in it is no longer sent for repair at all, in any caller of `generate_json`;
+it raises `NotJSONError` carrying the text, which callers that cannot use prose treat as before.
+
+### L-113 — The projects list on a phone (2026-10-24)
+
+On a phone or tablet a card has one ⋮ button; its actions (use in another project, move to a
+folder, delete) open in a sheet from the bottom, and the rest of the card opens the project. A
+card can be dragged onto a folder only with a mouse. Sean's "I'm having trouble getting this to
+do anything" (24 Oct) was this list: three icons left the title a few letters wide, a tap meant
+for the project opened a popover, and a tap outside did not close it.
+
