@@ -39,6 +39,8 @@ interface Props {
   onChange: (patch: Partial<SetupDraft>) => void;
   /** Shown under the workflow picker: designing one of your own. */
   designer?: React.ReactNode;
+  /** Take one of the user's own workflows off the list (Sean, 23 Oct). */
+  onRemoveTemplate?: (template: WorkflowTemplate & { id: string }) => void;
   /**
    * The Start button, placed under the recommendation when there is one: a
    * first-time user can start from the top without reading a form (Harold, via
@@ -72,6 +74,7 @@ export function SetupCard({
   rationale,
   onChange,
   designer,
+  onRemoveTemplate,
   start,
   simple = false,
 }: Props) {
@@ -109,7 +112,7 @@ export function SetupCard({
             </p>
           </div>
         )}
-        <WorkflowPicker templates={templates} selectedId={templateId} onSelect={onSelectTemplate} />
+        <WorkflowPicker templates={templates} selectedId={templateId} onSelect={onSelectTemplate} onRemove={onRemoveTemplate} />
         {designer}
       </section>
 
