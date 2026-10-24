@@ -297,6 +297,7 @@ export function ProseRenderer({
           {editing && !preview ? (
             <>
               <textarea
+                dir="auto"
                 ref={textareaRef}
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
