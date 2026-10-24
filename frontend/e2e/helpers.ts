@@ -7,8 +7,11 @@ import { supabaseEnv } from './env';
 
 /** The first-visit beta notice covers the bottom of the page until acknowledged. */
 export async function dismissBetaNotice(page: Page) {
+  // The notice appears after the page hydrates; checked once, straight away,
+  // it was often not there yet, stayed up, and covered the start screen's
+  // options (main CI, 24 Oct). Wait a moment for it.
   const gotIt = page.getByRole('button', { name: 'Got it' });
-  if (await gotIt.isVisible().catch(() => false)) await gotIt.click();
+  if (await gotIt.waitFor({ state: 'visible', timeout: 3_000 }).then(() => true, () => false)) await gotIt.click();
 }
 
 /** The user this run signed in as (created by global-setup). */

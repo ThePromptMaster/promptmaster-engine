@@ -633,7 +633,8 @@ export default function NewProjectPage() {
   );
 
   return (
-    <main className="mx-auto max-w-[860px] px-6 py-14">
+    <main className="mx-auto max-w-[860px] px-6 pt-14 pb-40">
+      {/* pb-40: room below the last options, so they scroll clear of the beta notice on a short screen (24 Oct). */}
       <div className="mb-10 flex flex-wrap items-center justify-between gap-3">
         <Link
           href="/projects"
