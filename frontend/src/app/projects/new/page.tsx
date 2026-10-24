@@ -531,14 +531,33 @@ export default function NewProjectPage() {
   // workflow yourself still ends the form with Start (Harold, via Sean, 9 Oct).
   const startAtTop = simple || (Boolean(recommendedKey) && selected?.key === recommendedKey);
   const linkNote = sourceAccessNote(objective);
+  // Which setup is on, said as a switch with both sides showing (Sean, 23 Oct,
+  // email 8: "I cannot tell if I am on simple setup or advanced setup … the
+  // simple setup next to the choose the workflow yourself seems like it's part
+  // of the same thing"). It was a link that named the other mode.
   const experienceSwitch = (
-    <button
-      type="button"
-      onClick={() => setExperience(simple ? 'advanced' : 'simple')}
-      className="text-body text-[var(--on-surface-variant)] underline-offset-4 hover:text-[var(--on-surface)] hover:underline"
-    >
-      {simple ? t('start.advanced') : t('start.simple')}
-    </button>
+    <div role="radiogroup" aria-label={t('start.setupMode')} className="inline-flex items-center gap-2 text-label text-[var(--on-surface-variant)]">
+      <span>{t('start.setupMode')}</span>
+      <span className="inline-flex rounded-lg bg-[var(--surface-container-high)] p-0.5">
+        {(['simple', 'advanced'] as const).map((mode) => (
+          <button
+            key={mode}
+            type="button"
+            role="radio"
+            aria-checked={experience === mode}
+            title={mode === 'simple' ? t('start.modeSimpleNote') : t('start.modeAdvancedNote')}
+            onClick={() => setExperience(mode)}
+            className={`rounded-md px-3 py-1 transition-colors ${
+              experience === mode
+                ? 'bg-[var(--surface-container-lowest)] font-semibold text-[var(--on-surface)] shadow-[0_1px_2px_rgba(25,28,30,0.08)]'
+                : 'hover:text-[var(--on-surface)]'
+            }`}
+          >
+            {mode === 'simple' ? t('start.modeSimple') : t('start.modeAdvanced')}
+          </button>
+        ))}
+      </span>
+    </div>
   );
   const startButton = (
     <button
@@ -633,7 +652,9 @@ export default function NewProjectPage() {
 
       {step === 'ask' && (
         <>
-          <h1 className="text-display text-[var(--on-surface)]">{simple ? t('start.titleSimple') : t('start.title')}</h1>
+          <div className="mb-4 flex justify-end">{experienceSwitch}</div>
+          {/* One question in both setups: it is the same question (email 8). */}
+          <h1 className="text-display text-[var(--on-surface)]">{t('start.title')}</h1>
           <p className="mt-3 text-body text-[var(--on-surface-variant)]">
             {simple
               ? `${t('start.introSimple')} ${t('setup.doesTheWork')}`
@@ -654,7 +675,7 @@ export default function NewProjectPage() {
               }}
               rows={3}
               autoFocus
-              aria-label={simple ? t('start.titleSimple') : t('start.title')}
+              aria-label={t('start.title')}
               placeholder={t('start.placeholder')}
               className="w-full bg-transparent text-title leading-relaxed text-[var(--on-surface)] outline-none placeholder:text-[var(--outline)]"
             />
@@ -692,7 +713,7 @@ export default function NewProjectPage() {
           </p>
 
           <p className="mt-8 text-label uppercase tracking-wider text-[var(--on-surface-variant)]">{t('start.skip')}</p>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <div className="mt-3 grid gap-3 sm:grid-cols-3">
             <button
               onClick={() => void recommend()}
               disabled={!hasObjective || working !== null}
@@ -710,6 +731,15 @@ export default function NewProjectPage() {
               <span className="mt-1 block text-label text-[var(--on-surface-variant)]">
                 {simple ? t('start.askFewNote', { count: SIMPLE_GUIDE_QUESTIONS }) : t('start.guideNote')}
               </span>
+            </button>
+            {/* A way in of its own, in both setups — not a link beside the setup switch (email 8). */}
+            <button
+              onClick={chooseYourself}
+              disabled={templates.length === 0 || working !== null}
+              className="rounded-2xl bg-[var(--surface-container-high)] px-6 py-4 text-left text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-highest)] disabled:opacity-40"
+            >
+              <span className="block text-title">{t('start.chooseYourself')}</span>
+              <span className="mt-1 block text-label text-[var(--on-surface-variant)]">{t('start.chooseNote')}</span>
             </button>
           </div>
 
@@ -738,18 +768,6 @@ export default function NewProjectPage() {
         </div>
           )}
 
-          <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2">
-            {!simple && (
-              <button
-                onClick={chooseYourself}
-                disabled={templates.length === 0}
-                className="text-body text-[var(--on-surface-variant)] underline-offset-4 hover:text-[var(--on-surface)] hover:underline"
-              >
-                {t('start.chooseYourself')}
-              </button>
-            )}
-            {experienceSwitch}
-          </div>
         </>
       )}
 
@@ -876,7 +894,7 @@ export default function NewProjectPage() {
             >
               {t('start.back')}
             </button>
-            {experienceSwitch}
+            <span className="ml-auto">{experienceSwitch}</span>
           </div>
         </>
       )}
