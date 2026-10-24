@@ -143,7 +143,7 @@ export function AppHeader() {
           </span>
         </Link>
 
-        <div ref={wrapRef} className="relative ml-auto shrink-0">
+        <div ref={wrapRef} className="relative ms-auto shrink-0">
           {/* Nothing is rendered while the session is still resolving, rather
               than an account control that says "Signed in" and then changes
               its mind a tick later. */}
@@ -155,7 +155,7 @@ export function AppHeader() {
               aria-expanded={open}
               aria-haspopup="menu"
               aria-label={t('header.account')}
-              className="flex items-center gap-2 rounded-full bg-[var(--surface-container-low)] py-1.5 pl-1.5 pr-3 text-label text-[var(--on-surface-variant)] transition-colors hover:bg-[var(--surface-container-high)] hover:text-[var(--on-surface)]"
+              className="flex items-center gap-2 rounded-full bg-[var(--surface-container-low)] py-1.5 ps-1.5 pe-3 text-label text-[var(--on-surface-variant)] transition-colors hover:bg-[var(--surface-container-high)] hover:text-[var(--on-surface)]"
             >
               <span
                 aria-hidden
@@ -176,7 +176,7 @@ export function AppHeader() {
             <div
               role="menu"
               aria-label={t('header.account')}
-              className="absolute right-0 z-50 mt-2 w-[248px] rounded-xl bg-[var(--surface-container-lowest)] py-2 shadow-lg shadow-black/10"
+              className="absolute end-0 z-50 mt-2 w-[248px] rounded-xl bg-[var(--surface-container-lowest)] py-2 shadow-lg shadow-black/10"
             >
               <div className="px-4 py-2">
                 <p className="truncate text-body text-[var(--on-surface)]">{label}</p>
@@ -192,13 +192,13 @@ export function AppHeader() {
                 role="menuitem"
                 onClick={() => setColours((v) => !v)}
                 aria-expanded={colours}
-                className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-body text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-low)]"
+                className="flex w-full items-center gap-2.5 px-4 py-2.5 text-start text-body text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-low)]"
               >
                 <span aria-hidden className="material-symbols-outlined text-[18px]">
                   palette
                 </span>
                 {t('header.colours')}
-                <span aria-hidden className="material-symbols-outlined ml-auto text-[18px] text-[var(--on-surface-variant)]">
+                <span aria-hidden className="material-symbols-outlined ms-auto text-[18px] text-[var(--on-surface-variant)]">
                   {colours ? 'expand_less' : 'expand_more'}
                 </span>
               </button>
@@ -209,13 +209,13 @@ export function AppHeader() {
                 role="menuitem"
                 onClick={() => setLanguage((v) => !v)}
                 aria-expanded={language}
-                className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-body text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-low)]"
+                className="flex w-full items-center gap-2.5 px-4 py-2.5 text-start text-body text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-low)]"
               >
                 <span aria-hidden className="material-symbols-outlined text-[18px]">
                   translate
                 </span>
                 {t('header.language')}
-                <span aria-hidden className="material-symbols-outlined ml-auto text-[18px] text-[var(--on-surface-variant)]">
+                <span aria-hidden className="material-symbols-outlined ms-auto text-[18px] text-[var(--on-surface-variant)]">
                   {language ? 'expand_less' : 'expand_more'}
                 </span>
               </button>
@@ -250,7 +250,7 @@ export function AppHeader() {
                   else void handleSignOut();
                 }}
                 disabled={busy}
-                className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-body text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-low)] disabled:opacity-60"
+                className="flex w-full items-center gap-2.5 px-4 py-2.5 text-start text-body text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-low)] disabled:opacity-60"
               >
                 <span aria-hidden className="material-symbols-outlined text-[18px]">
                   logout

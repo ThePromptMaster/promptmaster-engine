@@ -96,7 +96,7 @@ export function SetupCard({
         <h2 className={label}>{t('setup.workflow')}</h2>
         {recommendedKey && workflowReason && (
           <p className="mb-3 text-body text-[var(--on-surface)]">
-            <span className="material-symbols-outlined mr-1 align-[-4px] text-[18px] text-[var(--pm-primary)]" aria-hidden>
+            <span className="material-symbols-outlined me-1 align-[-4px] text-[18px] text-[var(--pm-primary)]" aria-hidden>
               recommend
             </span>
             {t('setup.recommended')} <strong>{recommendedTemplate ? words.name(recommendedTemplate) : recommendedKey}</strong>
@@ -168,14 +168,14 @@ export function SetupCard({
           placeholder={t('setup.contextPlaceholder')}
           onChange={(e) => onChange({ context: withinLimit('context', e.target.value) })}
           className={`${field} max-h-96 resize-y overflow-y-auto`} />
-        <p className="mt-1 text-right text-label text-[var(--outline)]">
+        <p className="mt-1 text-end text-label text-[var(--outline)]">
           {draft.context.length.toLocaleString()} / {INPUT_LIMITS.context.toLocaleString()}
         </p>
       </section>
 
       {rationale && (
         <p className="text-body text-[var(--on-surface-variant)]">
-          <span className="material-symbols-outlined mr-1 align-[-4px] text-[18px] text-[var(--pm-primary)]" aria-hidden>
+          <span className="material-symbols-outlined me-1 align-[-4px] text-[18px] text-[var(--pm-primary)]" aria-hidden>
             edit_note
           </span>
           {t('setup.suggested')}
@@ -264,7 +264,7 @@ export function SetupCard({
       <details data-more-options className="rounded-2xl bg-[var(--surface-container-low)] px-6 py-4">
         <summary className="cursor-pointer text-body text-[var(--on-surface)]">
           {t('setup.more')}
-          <span className="ml-2 text-label text-[var(--on-surface-variant)]">{t('setup.moreHint')}</span>
+          <span className="ms-2 text-label text-[var(--on-surface-variant)]">{t('setup.moreHint')}</span>
         </summary>
         <div className="mt-6">{full}</div>
       </details>

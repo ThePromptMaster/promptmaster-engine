@@ -166,7 +166,7 @@ export function ProjectFinished({ bundle, completion, evaluation, onReopen, onEd
           <p className="mt-1 text-label text-[var(--on-surface-variant)]">
             {t('pnl.carriedNote', { noun })}
           </p>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-body text-[var(--on-surface)]">
+          <ul className="mt-2 list-disc space-y-1 ps-5 text-body text-[var(--on-surface)]">
             {carried.map((c, i) => (
               <li key={i}>
                 {c.item}

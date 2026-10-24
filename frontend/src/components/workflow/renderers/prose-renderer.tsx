@@ -210,7 +210,7 @@ export function ProseRenderer({
             )}
 
             {!readOnly && onSaveContent && (
-              <div className="ml-auto flex items-center gap-2">
+              <div className="ms-auto flex items-center gap-2">
                 {editing ? (
                   <>
                     {images.length > 0 && !preview && (
@@ -224,13 +224,13 @@ export function ProseRenderer({
                           {t('stage.insertImage')}
                         </button>
                         {choosingImage && (
-                          <ul role="menu" aria-label={t('stage.images')} className="absolute right-0 z-10 mt-1 w-64 rounded-lg bg-[var(--surface-container-lowest)] py-1 shadow-[0_8px_24px_rgba(0,0,0,0.12)]">
+                          <ul role="menu" aria-label={t('stage.images')} className="absolute end-0 z-10 mt-1 w-64 rounded-lg bg-[var(--surface-container-lowest)] py-1 shadow-[0_8px_24px_rgba(0,0,0,0.12)]">
                             {images.map((image) => (
                               <li key={image.id}>
                                 <button
                                   role="menuitem"
                                   onClick={() => insertImage(image)}
-                                  className="block w-full truncate px-3 py-2 text-left text-label text-[var(--on-surface)] hover:bg-[var(--surface-container-high)]"
+                                  className="block w-full truncate px-3 py-2 text-start text-label text-[var(--on-surface)] hover:bg-[var(--surface-container-high)]"
                                 >
                                   {image.caption}
                                 </button>

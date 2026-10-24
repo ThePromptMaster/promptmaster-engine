@@ -105,7 +105,7 @@ export function ReplyActions({
         <p className="mt-1 text-label text-[var(--on-surface-variant)]">
           {t('ra.becomeFactsWhy')}
         </p>
-        <ul className="mt-2 list-disc space-y-1 pl-5 text-label text-[var(--on-surface)]">
+        <ul className="mt-2 list-disc space-y-1 ps-5 text-label text-[var(--on-surface)]">
           {facts.map((f, i) => (
             <li key={i}>
               {f.kind === 'requirement' ? <span className="font-semibold">{t('ra.requirement')}</span> : null}

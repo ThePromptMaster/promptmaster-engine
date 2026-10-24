@@ -265,10 +265,10 @@ export function CustomWorkflowDesigner({
                   <button onClick={() => remove(i)} disabled={design.stages.length <= 2} aria-label={t('cwd.removeStage', { n: i + 1 })} className="material-symbols-outlined text-[18px] text-[var(--on-surface-variant)] disabled:opacity-30">close</button>
                 </div>
                 {editing === i ? (
-                  <div role="group" aria-label={t('cwd.details', { n: i + 1 })} className="ml-7 mt-2 grid gap-2">
+                  <div role="group" aria-label={t('cwd.details', { n: i + 1 })} className="ms-7 mt-2 grid gap-2">
                     <label className="text-label text-[var(--on-surface-variant)]">
                       {t('cwd.kind')}
-                      <select value={s.kind} onChange={(e) => edit(i, { kind: e.target.value as DesignedKind })} aria-label={t('cwd.kindOf', { n: i + 1 })} className={`${small} ml-2`}>
+                      <select value={s.kind} onChange={(e) => edit(i, { kind: e.target.value as DesignedKind })} aria-label={t('cwd.kindOf', { n: i + 1 })} className={`${small} ms-2`}>
                         <option value="write">{t('cwd.kindWrite')}</option>
                         <option value="list">{t('cwd.kindList')}</option>
                         <option value="check">{t('cwd.kindCheck')}</option>
@@ -299,7 +299,7 @@ export function CustomWorkflowDesigner({
                     {s.approval.trim() && (
                       <label className="text-label text-[var(--on-surface-variant)]">
                         {t('cwd.whoMay')}
-                        <select value={s.approval_kind ?? 'decision'} onChange={(e) => edit(i, { approval_kind: e.target.value as 'routine' | 'decision' })} aria-label={t('cwd.whoSigns', { n: i + 1 })} className={`${small} ml-2`}>
+                        <select value={s.approval_kind ?? 'decision'} onChange={(e) => edit(i, { approval_kind: e.target.value as 'routine' | 'decision' })} aria-label={t('cwd.whoSigns', { n: i + 1 })} className={`${small} ms-2`}>
                           <option value="decision">{t('cwd.onlyMe')}</option>
                           <option value="routine">{t('cwd.routine')}</option>
                         </select>
@@ -312,7 +312,7 @@ export function CustomWorkflowDesigner({
                     {execution.kind === 'ongoing' && i > 0 && i < design.stages.length - 1 && (
                       <label className="text-label text-[var(--on-surface-variant)]">
                         {t('cwd.closesRound')}
-                        <select value={s.loop_back_to ?? ''} onChange={(e) => edit(i, { loop_back_to: e.target.value })} aria-label={t('cwd.nextRoundOf', { n: i + 1 })} className={`${small} ml-2`}>
+                        <select value={s.loop_back_to ?? ''} onChange={(e) => edit(i, { loop_back_to: e.target.value })} aria-label={t('cwd.nextRoundOf', { n: i + 1 })} className={`${small} ms-2`}>
                           <option value="">{t('cwd.noRound')}</option>
                           {design.stages.slice(0, i).map((t) => (
                             <option key={t.label} value={t.label}>{t.label}</option>
@@ -323,19 +323,19 @@ export function CustomWorkflowDesigner({
                   </div>
                 ) : (
                   <>
-                    {s.purpose && <p className="ml-7 mt-1 text-label text-[var(--on-surface-variant)]">{s.purpose}</p>}
+                    {s.purpose && <p className="ms-7 mt-1 text-label text-[var(--on-surface-variant)]">{s.purpose}</p>}
                     {s.approval && (
-                      <p className="ml-7 mt-1 text-label text-[var(--on-surface-variant)]">
+                      <p className="ms-7 mt-1 text-label text-[var(--on-surface-variant)]">
                         {s.approval_kind === 'routine' ? t('cwd.checkedRoutine') : t('cwd.youApprove')}“{s.approval}”
                       </p>
                     )}
-                    {s.decision && <p className="ml-7 mt-1 text-label text-[var(--on-surface-variant)]">{t('cwd.youDecide', { d: s.decision })}</p>}
+                    {s.decision && <p className="ms-7 mt-1 text-label text-[var(--on-surface-variant)]">{t('cwd.youDecide', { d: s.decision })}</p>}
                     {s.loop_back_to && execution.kind === 'ongoing' && (
-                      <p className="ml-7 mt-1 text-label text-[var(--on-surface-variant)]">{t('cwd.closesNext', { s: s.loop_back_to })}</p>
+                      <p className="ms-7 mt-1 text-label text-[var(--on-surface-variant)]">{t('cwd.closesNext', { s: s.loop_back_to })}</p>
                     )}
                   </>
                 )}
-                <button onClick={() => add(i + 1)} disabled={design.stages.length >= MAX_STAGES} className={`${quiet} ml-6 mt-1`} aria-label={t('cwd.addAfter', { n: i + 1 })}>
+                <button onClick={() => add(i + 1)} disabled={design.stages.length >= MAX_STAGES} className={`${quiet} ms-6 mt-1`} aria-label={t('cwd.addAfter', { n: i + 1 })}>
                   <span aria-hidden className="material-symbols-outlined text-[16px]">add</span>
                   {t('cwd.addStage')}
                 </button>

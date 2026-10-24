@@ -204,7 +204,7 @@ export function GuideInterview({
               <button type="button" aria-expanded={whyOpen} onClick={() => setWhyOpen((o) => !o)} className="underline-offset-4 hover:underline">
                 {t('guide.why')}
               </button>
-              {whyOpen && <span className="ml-2">{current.why}</span>}
+              {whyOpen && <span className="ms-2">{current.why}</span>}
             </p>
           )}
 

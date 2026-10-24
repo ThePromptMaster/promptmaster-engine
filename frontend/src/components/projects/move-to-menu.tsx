@@ -38,7 +38,7 @@ export function MoveToMenu({ projectTitle, folderId, folders, onMove }: Props) {
         <span className="material-symbols-outlined text-[20px]">drive_file_move</span>
       </button>
       {open && (
-        <div role="menu" aria-label={t('move.menu')} className="absolute right-0 top-full z-20 mt-1 w-[240px] rounded-xl bg-[var(--surface-container-lowest)] p-1.5 shadow-[0_1px_2px_rgba(25,28,30,0.06),0_12px_28px_-12px_rgba(25,28,30,0.3)]">
+        <div role="menu" aria-label={t('move.menu')} className="absolute end-0 top-full z-20 mt-1 w-[240px] rounded-xl bg-[var(--surface-container-lowest)] p-1.5 shadow-[0_1px_2px_rgba(25,28,30,0.06),0_12px_28px_-12px_rgba(25,28,30,0.3)]">
           <p className="px-2.5 pb-1 pt-0.5 text-label uppercase tracking-wider text-[var(--on-surface-variant)]">{t('move.menu')}</p>
           <FolderChoices
             folderId={folderId}
@@ -75,7 +75,7 @@ export function FolderChoices({
           role="menuitemradio"
           aria-checked={current}
           onClick={() => onChoose(id)}
-          className={`flex w-full items-center gap-2 rounded-lg py-1.5 pr-3 text-left text-body ${current ? 'font-medium text-[var(--on-surface)]' : 'text-[var(--on-surface-variant)]'} hover:bg-[var(--surface-container-high)]`}
+          className={`flex w-full items-center gap-2 rounded-lg py-1.5 pe-3 text-start text-body ${current ? 'font-medium text-[var(--on-surface)]' : 'text-[var(--on-surface-variant)]'} hover:bg-[var(--surface-container-high)]`}
           style={{ paddingLeft: `${depth * 14 + 10}px` }}
         >
           <span aria-hidden className="material-symbols-outlined text-[18px]">{id ? 'folder' : 'inbox'}</span>

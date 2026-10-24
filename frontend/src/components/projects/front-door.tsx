@@ -183,11 +183,11 @@ export function FrontDoor({
           )}
           {turns.map((t, i) =>
             t.role === 'user' ? (
-              <p key={i} className="ml-8 whitespace-pre-wrap rounded-xl bg-[var(--surface-container-high)] px-4 py-2 text-body text-[var(--on-surface)]">
+              <p key={i} className="ms-8 whitespace-pre-wrap rounded-xl bg-[var(--surface-container-high)] px-4 py-2 text-body text-[var(--on-surface)]">
                 {t.content}
               </p>
             ) : (
-              <div key={i} className="mr-8 space-y-2">
+              <div key={i} className="me-8 space-y-2">
                 <div className="rounded-xl bg-[var(--surface-container-low)] px-4 py-2 text-body text-[var(--on-surface)]">
                   <MarkdownOutput content={t.content} />
                 </div>
@@ -346,7 +346,7 @@ export function SearchNote({ search, first }: { search: FrontDoorSearch; first: 
         </span>
       </p>
       {search.sources.length > 0 && (
-        <ol className="mt-1 space-y-0.5 pl-6">
+        <ol className="mt-1 space-y-0.5 ps-6">
           {search.sources.map((s, i) => (
             <li key={s.url} className="break-words">
               [S{first + i}]{' '}

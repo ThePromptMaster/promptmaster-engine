@@ -129,7 +129,7 @@ export function CustomSelect({
         disabled={disabled}
         onClick={() => (open ? setOpen(false) : openList())}
         onKeyDown={handleKeyDown}
-        className={`w-full flex items-center justify-between gap-2 px-4 py-3 bg-[var(--surface-container-low)] rounded-lg text-body text-left transition-all duration-200 outline-none ${
+        className={`w-full flex items-center justify-between gap-2 px-4 py-3 bg-[var(--surface-container-low)] rounded-lg text-body text-start transition-all duration-200 outline-none ${
           open
             ? 'ring-2 ring-[var(--pm-primary)]/40 bg-[var(--surface-container-lowest)]'
             : 'hover:bg-[var(--surface-container-high)]'

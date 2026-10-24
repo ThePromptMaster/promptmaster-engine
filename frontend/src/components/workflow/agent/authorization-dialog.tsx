@@ -57,7 +57,7 @@ export function GoTerms({
       )}
       <details>
         <summary className="cursor-pointer">{t('gt.everything')}</summary>
-        <ul className="mt-1 list-disc space-y-1 pl-5">
+        <ul className="mt-1 list-disc space-y-1 ps-5">
           {/* The recorded terms stay in English on the authorization; these are the same words, shown. */}
           {POLICY_TERMS[policy].map((term, i) => (
             <li key={term}>{t(`gt.term.${policy}.${i}` as MessageKey)}</li>

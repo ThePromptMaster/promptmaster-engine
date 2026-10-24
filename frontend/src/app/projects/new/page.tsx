@@ -642,7 +642,7 @@ export default function NewProjectPage() {
           href="/projects"
           className="inline-flex items-center gap-1.5 text-body text-[var(--on-surface-variant)] transition-colors hover:text-[var(--on-surface)]"
         >
-          <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+          <span className="material-symbols-outlined rtl:-scale-x-100 text-[18px]">arrow_back</span>
           {t('start.projects')}
         </Link>
         <label className="inline-flex items-center gap-2 text-label text-[var(--on-surface-variant)]">
@@ -776,7 +776,7 @@ export default function NewProjectPage() {
               <span aria-hidden className="material-symbols-outlined text-[20px]">arrow_upward</span>
             </button>
           </div>
-          <p className="mt-2 text-right text-label text-[var(--on-surface-variant)]">
+          <p className="mt-2 text-end text-label text-[var(--on-surface-variant)]">
             {t('start.conversationNote')}
           </p>
 
@@ -785,7 +785,7 @@ export default function NewProjectPage() {
             <button
               onClick={() => void recommend()}
               disabled={!hasObjective || working !== null}
-              className="rounded-2xl bg-[var(--surface-container-high)] px-6 py-4 text-left text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-highest)] disabled:opacity-40"
+              className="rounded-2xl bg-[var(--surface-container-high)] px-6 py-4 text-start text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-highest)] disabled:opacity-40"
             >
               <span className="block text-title">{simple ? t('start.setItUp') : t('start.know')}</span>
               <span className="mt-1 block text-label text-[var(--on-surface-variant)]">{simple ? t('start.setItUpNote') : t('start.knowNote')}</span>
@@ -793,7 +793,7 @@ export default function NewProjectPage() {
             <button
               onClick={() => void guideMe()}
               disabled={!hasObjective || working !== null}
-              className="rounded-2xl bg-[var(--surface-container-high)] px-6 py-4 text-left text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-highest)] disabled:opacity-40"
+              className="rounded-2xl bg-[var(--surface-container-high)] px-6 py-4 text-start text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-highest)] disabled:opacity-40"
             >
               <span className="block text-title">{simple ? t('start.askFew') : t('start.guide')}</span>
               <span className="mt-1 block text-label text-[var(--on-surface-variant)]">
@@ -804,7 +804,7 @@ export default function NewProjectPage() {
             <button
               onClick={chooseYourself}
               disabled={templates.length === 0 || working !== null}
-              className="rounded-2xl bg-[var(--surface-container-high)] px-6 py-4 text-left text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-highest)] disabled:opacity-40"
+              className="rounded-2xl bg-[var(--surface-container-high)] px-6 py-4 text-start text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-highest)] disabled:opacity-40"
             >
               <span className="block text-title">{t('start.chooseYourself')}</span>
               <span className="mt-1 block text-label text-[var(--on-surface-variant)]">{t('start.chooseNote')}</span>
@@ -928,7 +928,7 @@ export default function NewProjectPage() {
                   <button
                     type="button"
                     onClick={() => setCopying(selected)}
-                    className="mt-3 mr-4 inline-flex items-center gap-1.5 text-body text-[var(--pm-primary)] hover:underline"
+                    className="mt-3 me-4 inline-flex items-center gap-1.5 text-body text-[var(--pm-primary)] hover:underline"
                   >
                     <span aria-hidden className="material-symbols-outlined text-[18px]">edit</span>
                     {t('start.editCopy', { name: selected.name })}
@@ -955,12 +955,12 @@ export default function NewProjectPage() {
             <section aria-label={t('start.initialFacts')} className="mt-8 rounded-2xl bg-[var(--surface-container-low)] px-5 py-4">
               <p className="text-title text-[var(--on-surface)]">{t('start.factsTitle')}</p>
               <p className="mt-1 text-label text-[var(--on-surface-variant)]">{t('start.factsNote')}</p>
-              <ul className="mt-2 list-disc pl-5 text-label text-[var(--on-surface)]">
+              <ul className="mt-2 list-disc ps-5 text-label text-[var(--on-surface)]">
                 {initialFacts.map((f) => (
                   <li key={f.statement}>
                     {f.kind === 'requirement' ? <span className="font-semibold">{t('start.requirement')} </span> : null}
                     {f.statement}
-                    {f.origin === 'model_assumed' && <span className="ml-1 text-[var(--on-surface-variant)]">{t('start.assumed')}</span>}
+                    {f.origin === 'model_assumed' && <span className="ms-1 text-[var(--on-surface-variant)]">{t('start.assumed')}</span>}
                   </li>
                 ))}
               </ul>
@@ -974,7 +974,7 @@ export default function NewProjectPage() {
             >
               {t('start.back')}
             </button>
-            <span className="ml-auto">{experienceSwitch}</span>
+            <span className="ms-auto">{experienceSwitch}</span>
           </div>
         </>
       )}

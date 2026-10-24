@@ -62,7 +62,7 @@ export function WorkflowPicker({ templates, selectedId, onSelect, onRemove }: Pr
             role="radio"
             aria-checked={selected}
             onClick={() => onSelect(template.id)}
-            className={`group relative flex w-full flex-col rounded-2xl px-5 py-5 text-left transition-all duration-200 ${
+            className={`group relative flex w-full flex-col rounded-2xl px-5 py-5 text-start transition-all duration-200 ${
               selected
                 ? 'bg-[var(--surface-container-lowest)] shadow-[0_1px_2px_rgba(25,28,30,0.06),0_8px_24px_-8px_rgba(0,74,198,0.28)] ring-2 ring-[var(--pm-primary)]'
                 : 'bg-[var(--surface-container-low)] hover:bg-[var(--surface-container)] hover:shadow-[0_1px_2px_rgba(25,28,30,0.04),0_6px_16px_-8px_rgba(25,28,30,0.16)]'
@@ -80,7 +80,7 @@ export function WorkflowPicker({ templates, selectedId, onSelect, onRemove }: Pr
             <span className="text-title text-[var(--on-surface)]">
               {words.name(template)}
               {template.key.startsWith('custom_') && (
-                <span className="ml-2 rounded-md bg-[var(--surface-container-high)] px-1.5 py-0.5 align-middle text-label text-[var(--on-surface-variant)]">
+                <span className="ms-2 rounded-md bg-[var(--surface-container-high)] px-1.5 py-0.5 align-middle text-label text-[var(--on-surface-variant)]">
                   {/* Designed for this project and not saved yet (24 Oct), or one of the user's own. */}
                   {template.id.startsWith('designed:') ? t('picker.designed') : t('picker.yours')}
                 </span>
@@ -117,7 +117,7 @@ export function WorkflowPicker({ templates, selectedId, onSelect, onRemove }: Pr
               aria-label={t('picker.remove', { name: words.name(template) })}
               title={t('picker.removeTitle')}
               onClick={() => onRemove(template)}
-              className="absolute right-2 top-2 rounded-lg p-1 text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-highest)] hover:text-[var(--on-surface)]"
+              className="absolute end-2 top-2 rounded-lg p-1 text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-highest)] hover:text-[var(--on-surface)]"
             >
               <span aria-hidden className="material-symbols-outlined text-[18px]">close</span>
             </button>

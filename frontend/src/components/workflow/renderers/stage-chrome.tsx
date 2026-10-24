@@ -82,7 +82,7 @@ export function VersionBar({
             <span
               aria-hidden
               data-version-colour
-              className="mr-1.5 inline-block h-2.5 w-2.5 rounded-full align-middle"
+              className="me-1.5 inline-block h-2.5 w-2.5 rounded-full align-middle"
               style={{ background: colour }}
             />
             {versionPillLabel(v, v.id === headId)}
@@ -117,7 +117,7 @@ export function VersionBar({
       {!isHead && !readOnly && (
         <button
           onClick={() => void onRestore(active.id)}
-          className="ml-auto rounded-lg bg-[var(--surface-container-high)] px-3 py-1.5 text-label text-[var(--on-surface)] hover:bg-[var(--surface-container-highest)]"
+          className="ms-auto rounded-lg bg-[var(--surface-container-high)] px-3 py-1.5 text-label text-[var(--on-surface)] hover:bg-[var(--surface-container-highest)]"
         >
           {t('stage.restoreV', { n: active.version_number })}
         </button>
@@ -199,7 +199,7 @@ export function GenerationBar({
         <span className="text-body text-[var(--on-surface-variant)]">{t('stage.drafting', { label })}</span>
         <button
           onClick={onCancel}
-          className="ml-auto rounded-lg px-3 py-1.5 text-label text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)] hover:text-[var(--on-surface)]"
+          className="ms-auto rounded-lg px-3 py-1.5 text-label text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)] hover:text-[var(--on-surface)]"
         >
           {t('stage.stop')}
         </button>
@@ -254,7 +254,7 @@ export function GenerationBar({
         <button
           onClick={onEvaluate}
           disabled={evaluating}
-          className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-low)] px-3 py-1.5 text-label text-[var(--on-surface-variant)] transition-colors hover:bg-[var(--surface-container-high)] hover:text-[var(--on-surface)] disabled:opacity-50"
+          className="ms-auto inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-low)] px-3 py-1.5 text-label text-[var(--on-surface-variant)] transition-colors hover:bg-[var(--surface-container-high)] hover:text-[var(--on-surface)] disabled:opacity-50"
         >
           {evaluating ? (
             <span
@@ -274,7 +274,7 @@ export function GenerationBar({
       {!compact && (
         <button
           onClick={() => onGenerate()}
-          className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-low)] px-3 py-1.5 text-label text-[var(--on-surface-variant)] transition-colors hover:bg-[var(--surface-container-high)] hover:text-[var(--on-surface)]"
+          className="ms-auto inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-low)] px-3 py-1.5 text-label text-[var(--on-surface-variant)] transition-colors hover:bg-[var(--surface-container-high)] hover:text-[var(--on-surface)]"
         >
           <span aria-hidden className="material-symbols-outlined text-[16px]">
             {hasContent ? 'refresh' : 'auto_awesome'}

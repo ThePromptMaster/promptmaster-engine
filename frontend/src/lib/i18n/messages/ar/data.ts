@@ -1,0 +1,38 @@
+import type { en } from '../areas/data';
+
+/** Arabic for `areas/data.ts` (Sean, 24 Oct: "Arabic and Swahili"). */
+export const ar: Record<keyof typeof en, string> = {
+  'data.label': 'بيانات المشروع',
+  'data.title': 'البيانات والصور',
+  'data.files_one': ' · {count} ملف',
+  'data.files_other': ' · الملفات: {count}',
+  'data.attachData': 'إرفاق ملف بيانات',
+  'data.addImages': 'إضافة صور',
+  'data.attachDataLabel': 'إرفاق ملفات بيانات',
+  'data.working': 'جارٍ العمل…',
+  'data.attachError': 'تعذّر إرفاق الملف.',
+  'data.attachErrorWhy': 'تعذّر إرفاق الملف: {message}',
+  'data.imageError': 'تعذّرت إضافة الصورة.',
+  'data.imageErrorWhy': 'تعذّرت إضافة الصورة: {message}',
+  'data.removeError': 'تعذّرت إزالة {name}.',
+  'data.toAdd': 'صور للإضافة',
+  'data.captionHint': 'اذكر ما تُظهره كل صورة. لا يستطيع PromptMaster رؤية الصور؛ بل يضعها في عملك وفق ما يقوله التعليق.',
+  'data.captionFor': 'تعليق لـ {name}',
+  'data.adding': 'جارٍ الإضافة…',
+  'data.addThis': 'إضافة هذه الصورة',
+  'data.addThese': 'إضافة هذه الصور ({count})',
+  'data.cancel': 'إلغاء',
+  'data.images': 'الصور',
+  'data.remove': 'إزالة',
+  'data.removeNamed': 'إزالة {name}',
+  'data.imagesHint': 'يمكن للمسودات وضع هذه الصور حيث تفيد؛ وفي التحرير، يضع «إدراج صورة» صورةً في موضع المؤشر.',
+  'data.empty':
+    'لا توجد بيانات أو صور مرفقة. من دون بيانات يمكن التخطيط للتحليلات لا تنفيذها، وسيقول PromptMaster ذلك. أرفق ملفات CSV أو TSV أو JSON أو ملفات نصية، أو مصنف Excel (.xlsx، يُحوَّل إلى CSV)، ويمكن لـ Go تشغيل التعليمات البرمجية عليها. أرفق موجزًا بصيغة PDF أو Word ليُضاف نصه إلى سياق المشروع. أضف صورًا أو أشكالًا (PNG أو JPEG أو WebP أو GIF) لوضعها في عملك. الحد {mb} MB لكل ملف.',
+  'data.codeReads': 'يمكن للتعليمات البرمجية التي يشغّلها Go قراءة هذه الملفات. يُعرض على PromptMaster أعمدة كل ملف وصفوفه الأولى، لا الملف نفسه.',
+  'data.addText': 'إضافة نص المستند',
+  'data.oneHasText': 'في {name} نص يمكن لكل مرحلة الاقتباس منه.',
+  'data.manyHaveText': 'في {count} مستندات نص يمكن لكل مرحلة الاقتباس منه.',
+  'data.added': 'أُضيف إلى سياق المشروع: {names}.',
+  'data.addToContext': 'إضافة نصه إلى سياق المشروع',
+  'data.notNow': 'ليس الآن',
+};

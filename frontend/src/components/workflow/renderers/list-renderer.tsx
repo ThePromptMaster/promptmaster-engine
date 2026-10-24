@@ -292,7 +292,7 @@ export function ListRenderer({
           </span>
 
           {onSaveItems && overField && (
-            <span role="status" className="ml-auto text-label text-[var(--pm-error)]">
+            <span role="status" className="ms-auto text-label text-[var(--pm-error)]">
               {t('stage.shorten', { field: overField.label, max: overField.max ?? 0 })}
             </span>
           )}
@@ -300,7 +300,7 @@ export function ListRenderer({
             <button
               onClick={() => void save()}
               disabled={!dirty || saving || overLimit}
-              className="ml-auto rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label text-[var(--on-primary)] disabled:opacity-40"
+              className="ms-auto rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label text-[var(--on-primary)] disabled:opacity-40"
             >
               {saving ? t('stage.saving') : t('stage.saveVersion')}
             </button>
@@ -384,7 +384,7 @@ function ItemCard({
           )
         )}
         {!readOnly && (
-          <div className="ml-auto flex items-center gap-0.5">
+          <div className="ms-auto flex items-center gap-0.5">
             <button
               onClick={() => onMove(item.id, -1)}
               disabled={index === 0}
@@ -487,7 +487,7 @@ export function ItemField({ id, field, value, readOnly, onChange }: ItemFieldPro
       )}
       {field.max && (
         <p
-          className={`mt-1 text-right text-label ${
+          className={`mt-1 text-end text-label ${
             over
               ? 'text-[var(--pm-tertiary)]'
               : near

@@ -12,11 +12,21 @@ export const LOCALES = [
   { code: 'es', own: 'Español' },
   { code: 'fr', own: 'Français' },
   { code: 'pt', own: 'Português' },
+  // Sean, 24 Oct: "the next language should be Hindi and then Mandarin. Arabic and Swahili."
+  { code: 'hi', own: 'हिन्दी' },
+  { code: 'zh', own: '中文' },
+  { code: 'ar', own: 'العربية' },
+  { code: 'sw', own: 'Kiswahili' },
 ] as const;
 
 export type Locale = (typeof LOCALES)[number]['code'];
 
 export const DEFAULT_LOCALE: Locale = 'en';
+
+/** Arabic is read right to left: the whole page mirrors (Sean, 24 Oct). */
+export function localeDirection(code: string | null | undefined): 'rtl' | 'ltr' {
+  return resolveLocale(code) === 'ar' ? 'rtl' : 'ltr';
+}
 
 /** Where the choice is kept: localStorage for the browser, a cookie so the server renders it too. */
 export const LOCALE_KEY = 'pm.locale';

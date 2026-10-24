@@ -1,0 +1,40 @@
+import type { en } from '../areas/doc';
+
+/** Hindi for `areas/doc.ts` (Sean, 24 Oct: "the next language should be Hindi"). */
+export const hi: Record<keyof typeof en, string> = {
+  'noun.book': 'पुस्तक',
+  'noun.exploration': 'अन्वेषण',
+  'noun.research report': 'शोध रिपोर्ट',
+  'noun.work': 'काम',
+  'noun.screenplay': 'पटकथा',
+  'noun.play': 'नाटक',
+  'units.chapter': 'अध्याय',
+  'units.section': 'खंड',
+  'units.round': 'राउंड',
+  'units.sequence': 'सीक्वेंस',
+  'units.scene': 'दृश्य',
+
+  'fullwork.full': '{noun} शुरू से अंत तक पढ़ें',
+  'fullwork.fullLabel': '{noun}: पूरा पाठ',
+  'fullwork.asItStands': '{noun} अभी की स्थिति में · {words} शब्द · केवल पढ़ने के लिए, यहाँ कुछ नहीं बदलता',
+  'fullwork.copy': 'कॉपी करें',
+  'fullwork.copied': 'कॉपी हो गया',
+  'fullwork.closeFull': 'बंद करें',
+  'fullwork.lagFeeds': 'यह {shows} दिखाता है। {changed} में आपका नवीनतम बदलाव इसमें तब आएगा जब {shows} अपडेट होगा — पेज के ऊपर लागू करें और जारी रखें दबाएँ।',
+  'fullwork.lagOwn': 'यह {shows} दिखाता है। आपका नवीनतम बदलाव {changed} में था, जो अपने अलग चरण के रूप में रखा गया है — उसे पढ़ने के लिए वहीं खोलें।',
+
+  'export.button': 'एक्सपोर्ट',
+  'export.markdown': 'Markdown दस्तावेज़',
+  'export.markdownHint': 'आप जिन चरणों तक पहुँचे, वे सब क्रम में, पेस्ट करने के लिए तैयार।',
+  'export.latex': 'LaTeX (.tex)',
+  'export.latexWork': '{noun}, समीकरण जैसे लिखे गए और कोड बिना बदलाव के।',
+  'export.latexStages': 'आप जिन चरणों तक पहुँचे, वे सब, समीकरण जैसे लिखे गए और कोड बिना बदलाव के।',
+  'export.notebook': 'Jupyter नोटबुक (.ipynb)',
+  'export.notebookHint': 'Python ब्लॉक ऐसे सेल के रूप में जिन्हें आप चला सकते हैं; गद्य और समीकरण Markdown के रूप में।',
+  'export.word': 'Word दस्तावेज़ (.docx)',
+  'export.wordHint': 'केवल {noun} — शीर्षक और {units}।',
+  'export.pdf': 'PDF (प्रिंट व्यू)',
+  'export.pdfHint': 'प्रिंट करने के लिए {noun} खोलता है; “Save as PDF” चुनें।',
+  'export.json': 'पूरा रिकॉर्ड (JSON)',
+  'export.jsonHint': 'प्रोजेक्ट, चरणों का इतिहास, हर संस्करण और हर मूल्यांकन।',
+};

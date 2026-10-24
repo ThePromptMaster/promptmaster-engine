@@ -56,7 +56,7 @@ export function FactsNextStep({
   if (updated?.length) {
     return (
       <p role="status" className={text}>
-        <span aria-hidden className="material-symbols-outlined mr-1 align-[-3px] text-[16px] text-[var(--pm-success)]">check_circle</span>
+        <span aria-hidden className="material-symbols-outlined me-1 align-[-3px] text-[16px] text-[var(--pm-success)]">check_circle</span>
         {t('fns.updated', { names: updated.join(', ') })}
       </p>
     );

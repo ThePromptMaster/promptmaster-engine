@@ -97,7 +97,7 @@ export function NextActionBar({
           {/* The proposal is in Go's panel, often off screen: a disabled
               button and a sentence were all the bar offered (14 Oct call). */}
           {go?.pendingStep && onShowGo && (
-            <button type="button" onClick={onShowGo} className="ml-2 font-semibold text-[var(--pm-primary)] underline">
+            <button type="button" onClick={onShowGo} className="ms-2 font-semibold text-[var(--pm-primary)] underline">
               {t('bar.showProposal')}
             </button>
           )}

@@ -215,7 +215,7 @@ export default function ProjectsPage() {
       {foldersOpen && (
         <div className="fixed inset-0 z-40 md:hidden" role="dialog" aria-modal="true" aria-label={t('list.folders')}>
           <button type="button" aria-label={t('list.closeFolders')} onClick={() => setFoldersOpen(false)} className="absolute inset-0 bg-black/30" />
-          <div className="absolute inset-y-0 left-0 w-[86vw] max-w-[320px] overflow-y-auto bg-[var(--surface-container-low)] p-4 shadow-xl">
+          <div className="absolute inset-y-0 start-0 w-[86vw] max-w-[320px] overflow-y-auto bg-[var(--surface-container-low)] p-4 shadow-xl">
             <div className="mb-3 flex items-center justify-between">
               <span className="text-title text-[var(--on-surface)]">{t('list.folders')}</span>
               <button type="button" onClick={() => setFoldersOpen(false)} aria-label={t('list.closeFolders')} className="rounded-lg p-1.5 text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)]">
@@ -301,7 +301,7 @@ export default function ProjectsPage() {
           </span>
           <p className="mt-3 text-headline text-[var(--on-surface)]">{t('list.emptyTitle')}</p>
           <p className="mx-auto mt-2 max-w-[460px] text-body text-[var(--on-surface-variant)]">{t('list.emptyBody')}</p>
-          <ul className="mx-auto mt-5 flex max-w-[560px] flex-col gap-2 text-left">
+          <ul className="mx-auto mt-5 flex max-w-[560px] flex-col gap-2 text-start">
             {EXAMPLES.map((key) => ({ label: t(`examples.${key}.label`), goal: t(`examples.${key}.goal`) })).map((example) => (
               <li key={example.label}>
                 <Link
@@ -348,8 +348,8 @@ export default function ProjectsPage() {
                 >
                   <div style={accentVariables(p.accent) as React.CSSProperties} className="group relative flex items-center gap-1 rounded-2xl bg-[var(--surface-container-low)] sm:gap-4 transition-all duration-200 hover:bg-[var(--surface-container-lowest)] hover:shadow-[0_1px_2px_rgba(25,28,30,0.04),0_8px_20px_-10px_rgba(25,28,30,0.2)]">
                     {/* The project's own colour, as a bar and a tinted icon: the icon alone was easy to miss (21 Oct). */}
-                    {p.accent && <span aria-hidden className="absolute inset-y-3 left-0 w-1 rounded-r-full bg-[var(--pm-primary)]" />}
-                    <Link href={`/projects/${p.id}`} className="flex min-w-0 flex-1 items-center gap-3 py-4 pl-5 pr-1 sm:gap-4 sm:px-6 sm:py-5">
+                    {p.accent && <span aria-hidden className="absolute inset-y-3 start-0 w-1 rounded-e-full bg-[var(--pm-primary)]" />}
+                    <Link href={`/projects/${p.id}`} className="flex min-w-0 flex-1 items-center gap-3 py-4 ps-5 pe-1 sm:gap-4 sm:px-6 sm:py-5">
                       <span
                         aria-hidden
                         className={`material-symbols-outlined shrink-0 text-[22px] ${p.accent ? 'rounded-lg bg-[color-mix(in_srgb,var(--pm-primary)_14%,transparent)] p-1.5 text-[var(--pm-primary)]' : 'text-[var(--on-surface-variant)]'}`}
@@ -380,13 +380,13 @@ export default function ProjectsPage() {
                             {shownStageId(p.workflow, p.stage)}
                           </span>
                         )}
-                        <span className="w-[64px] text-right tabular-nums">
+                        <span className="w-[64px] text-end tabular-nums">
                           {relativeTime(p.updated_at, locale)}
                         </span>
                       </span>
                     </Link>
 
-                    <div className="flex shrink-0 items-center pr-2 sm:pr-4">
+                    <div className="flex shrink-0 items-center pe-2 sm:pe-4">
                       {pendingDelete === p.id ? (
                         <div className="flex items-center gap-1.5">
                           <button

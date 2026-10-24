@@ -85,14 +85,14 @@ export function ProjectFacts({
         type="button"
         onClick={() => setToggled(!open)}
         aria-expanded={open}
-        className="flex w-full items-center gap-2 text-left text-title text-[var(--on-surface)]"
+        className="flex w-full items-center gap-2 text-start text-title text-[var(--on-surface)]"
       >
         <span aria-hidden className="material-symbols-outlined text-[18px]">fact_check</span>
         {t('facts.title')}
         <span className="text-label text-[var(--on-surface-variant)]">
           {current.length ? t('facts.count', { count: current.length }) : t('facts.none')}
         </span>
-        <span aria-hidden className="material-symbols-outlined ml-auto text-[18px]">{open ? 'expand_less' : 'expand_more'}</span>
+        <span aria-hidden className="material-symbols-outlined ms-auto text-[18px]">{open ? 'expand_less' : 'expand_more'}</span>
       </button>
 
       {open && (
@@ -130,15 +130,15 @@ export function ProjectFacts({
                   ) : (
                     <>
                       {f.origin === 'model_assumed' && (
-                        <span className="mr-1 rounded bg-[var(--surface-container-highest)] px-1.5 py-0.5 text-label text-[var(--on-surface-variant)]">{t('facts.assumed')}</span>
+                        <span className="me-1 rounded bg-[var(--surface-container-highest)] px-1.5 py-0.5 text-label text-[var(--on-surface-variant)]">{t('facts.assumed')}</span>
                       )}
                       {f.kind === 'requirement' && <span className="font-semibold">{t('facts.requirement')}</span>}
                       {f.subject ? `${f.subject}: ` : ''}
                       {f.statement}
-                      <span className="ml-2 text-label text-[var(--on-surface-variant)]">{factSource(f)}</span>
+                      <span className="ms-2 text-label text-[var(--on-surface-variant)]">{factSource(f)}</span>
                       {!readOnly && (
                         <>
-                          <button type="button" disabled={busy} onClick={() => setEditing({ id: f.id, text: f.statement })} className={`ml-2 ${quiet}`}>
+                          <button type="button" disabled={busy} onClick={() => setEditing({ id: f.id, text: f.statement })} className={`ms-2 ${quiet}`}>
                             {t('facts.change')}
                           </button>
                           <button

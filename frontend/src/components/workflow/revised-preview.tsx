@@ -34,7 +34,7 @@ export function RevisedPreview({
           <span className="text-[var(--pm-success)]">{t('pnl.wordsAdded', { n: added })}</span> ·{' '}
           <span className="text-[var(--pm-error)]">{t('pnl.wordsRemoved', { n: removed })}</span>
         </p>
-        <ul className="mt-3 list-disc space-y-0.5 pl-5 text-label text-[var(--on-surface-variant)]">
+        <ul className="mt-3 list-disc space-y-0.5 ps-5 text-label text-[var(--on-surface-variant)]">
           {revision.findings.map((f) => (
             <li key={f.id}>{f.summary}</li>
           ))}

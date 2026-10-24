@@ -296,7 +296,7 @@ function Td({
 }) {
   return (
     <td
-      className={`px-3 py-2.5 text-body ${align === 'right' ? 'text-right tabular-nums' : ''} ${
+      className={`px-3 py-2.5 text-body ${align === 'right' ? 'text-end tabular-nums' : ''} ${
         muted ? 'text-[var(--on-surface-variant)]' : 'text-[var(--on-surface)]'
       }`}
     >
@@ -483,7 +483,7 @@ function UsagePanel({ overview }: { overview: AdminOverview }) {
                     {formatUsd(row.costUsd)}
                     {row.unpricedCalls > 0 && (
                       <span
-                        className="ml-1 text-label text-[var(--on-surface-variant)]"
+                        className="ms-1 text-label text-[var(--on-surface-variant)]"
                         title={`${row.unpricedCalls} calls used a model whose price was not known, so this figure understates.`}
                       >
                         +{row.unpricedCalls}?
@@ -551,7 +551,7 @@ function OperationsPanel({ overview }: { overview: AdminOverview }) {
                   <Td>{r.operation}</Td>
                   <Td align="right">
                     {formatUsd(r.costUsd)}
-                    {r.unpricedCalls > 0 && <span className="ml-1 text-label text-[var(--on-surface-variant)]">+{r.unpricedCalls}?</span>}
+                    {r.unpricedCalls > 0 && <span className="ms-1 text-label text-[var(--on-surface-variant)]">+{r.unpricedCalls}?</span>}
                   </Td>
                   <Td align="right" muted>{formatTokens(r.calls)}</Td>
                   <Td align="right" muted>{seconds(r.p50Ms)}</Td>

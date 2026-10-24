@@ -96,7 +96,7 @@ export function BetaNotice() {
     return (
       // Icon only on a phone: the labelled chip covered the primary button of
       // the new-project page at 390px (19 Oct, production pass).
-      <div className="pointer-events-none fixed bottom-2 left-2 z-50 sm:bottom-4 sm:left-4">
+      <div className="pointer-events-none fixed bottom-2 start-2 z-50 sm:bottom-4 sm:start-4">
         <button
           type="button"
           onClick={reopen}

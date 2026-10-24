@@ -71,7 +71,7 @@ export function MathDisplay({ tex, children }: { tex: string; children: ReactNod
         <button
           type="button"
           onClick={() => void copy()}
-          className="absolute right-0 top-0 rounded px-2 py-0.5 text-[0.75rem] text-[var(--on-surface-variant)] opacity-0 hover:bg-[var(--surface-container-high)] focus:opacity-100 group-hover:opacity-100 print:hidden"
+          className="absolute end-0 top-0 rounded px-2 py-0.5 text-[0.75rem] text-[var(--on-surface-variant)] opacity-0 hover:bg-[var(--surface-container-high)] focus:opacity-100 group-hover:opacity-100 print:hidden"
         >
           {copied ? 'Copied' : 'Copy LaTeX'}
         </button>

@@ -39,9 +39,9 @@ export function UpgradeBanner({ name, fromVersion, toVersion, diff, busy, onUpgr
     <section aria-label={t('pnl.upLabel')} className="mb-6 rounded-xl bg-[var(--surface-container-low)] px-5 py-4">
       <div className="flex flex-wrap items-center gap-3">
         <span aria-hidden className="material-symbols-outlined text-[var(--pm-primary)]">upgrade</span>
-        <p className="mr-auto text-body text-[var(--on-surface)]">
+        <p className="me-auto text-body text-[var(--on-surface)]">
           {t('pnl.upAvailable', { name })}
-          <span className="ml-1 text-label text-[var(--on-surface-variant)]">
+          <span className="ms-1 text-label text-[var(--on-surface-variant)]">
             {t('pnl.upNote', { from: fromVersion, to: toVersion })}
           </span>
         </p>
@@ -64,7 +64,7 @@ export function UpgradeBanner({ name, fromVersion, toVersion, diff, busy, onUpgr
       </div>
       {open && (
         <div className="mt-3">
-          <ul className="list-disc space-y-1 pl-6 text-label text-[var(--on-surface-variant)]">
+          <ul className="list-disc space-y-1 ps-6 text-label text-[var(--on-surface-variant)]">
             {(lines.length ? lines : [t('pnl.upWording')]).map((line) => (
               <li key={line}>{line}</li>
             ))}

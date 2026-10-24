@@ -28,7 +28,7 @@ export function ProjectFinishedBanner({ onReopen, leftOpen = [], onViewStage }: 
       <span aria-hidden className="material-symbols-outlined text-[var(--pm-primary)]">
         task_alt
       </span>
-      <div className="mr-auto">
+      <div className="me-auto">
         <p className="text-title text-[var(--on-surface)]">{t('pnl.finished')}</p>
         <p className="text-label text-[var(--on-surface-variant)]">
           {t('pnl.finishedNote')}

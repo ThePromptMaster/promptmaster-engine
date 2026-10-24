@@ -71,7 +71,7 @@ export function ProjectTimeline({
         >
           <div className="h-full w-full max-w-[460px] overflow-y-auto bg-[var(--surface-container-lowest)] px-6 py-5 shadow-[0_0_40px_rgba(25,28,30,0.12)]">
             <div className="mb-4 flex items-center gap-3">
-              <h2 className="mr-auto text-title text-[var(--on-surface)]">{t('timeline.button')}</h2>
+              <h2 className="me-auto text-title text-[var(--on-surface)]">{t('timeline.button')}</h2>
               <button
                 onClick={() => setOpen(false)}
                 className="rounded-lg bg-[var(--surface-container-high)] px-3 py-1.5 text-label text-[var(--on-surface)]"
@@ -97,7 +97,7 @@ export function ProjectTimeline({
                         <p className="text-label text-[var(--on-surface)]">
                           {e.stageLabel && <span className="font-semibold">{shownStage(e)} · </span>}
                           {e.kind === 'version' ? `v${e.versionNumber ?? 1} · ${shownOperationLabel(e.operation)}` : templateWord(locale, e.title)}
-                          {e.current && <span className="ml-1 text-[var(--on-surface-variant)]">{t('timeline.current')}</span>}
+                          {e.current && <span className="ms-1 text-[var(--on-surface-variant)]">{t('timeline.current')}</span>}
                         </p>
                         {e.detail && <p className="mt-0.5 line-clamp-2 text-label text-[var(--on-surface-variant)]">{e.detail}</p>}
                       </div>

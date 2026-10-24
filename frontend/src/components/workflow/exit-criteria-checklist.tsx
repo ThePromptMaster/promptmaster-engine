@@ -135,11 +135,11 @@ export function ExitCriteriaChecklist({
             {shownCheckText(locale, c.label)}
             {/* Say what is actually missing — "3 of 5" beats a red cross. */}
             {!c.satisfied && c.detail && (
-              <span className="ml-2 text-label text-[var(--on-surface-variant)]">{shownCheckText(locale, c.detail)}</span>
+              <span className="ms-2 text-label text-[var(--on-surface-variant)]">{shownCheckText(locale, c.detail)}</span>
             )}
             {!c.satisfied && (
               <span
-                className={`ml-2 text-label uppercase tracking-wide ${
+                className={`ms-2 text-label uppercase tracking-wide ${
                   c.blocking ? 'text-[var(--pm-tertiary)]' : 'text-[var(--on-surface-variant)]'
                 }`}
               >
@@ -152,10 +152,10 @@ export function ExitCriteriaChecklist({
               </span>
             )}
             {manual && c.authority === 'delegable' && !c.satisfied && (
-              <span className="ml-2 text-label uppercase tracking-wide text-[var(--on-surface-variant)]">{t('cl.routine')}</span>
+              <span className="ms-2 text-label uppercase tracking-wide text-[var(--on-surface-variant)]">{t('cl.routine')}</span>
             )}
             {c.satisfied && olderApprovals[c.id] && (
-              <span data-approved-version className="ml-2 text-label text-[var(--pm-tertiary)]">
+              <span data-approved-version className="ms-2 text-label text-[var(--pm-tertiary)]">
                 {t('cl.approvedVersion', { approved: olderApprovals[c.id].approved, current: olderApprovals[c.id].current })}
               </span>
             )}

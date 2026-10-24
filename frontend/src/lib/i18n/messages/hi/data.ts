@@ -1,0 +1,38 @@
+import type { en } from '../areas/data';
+
+/** Hindi for `areas/data.ts` (Sean, 24 Oct: "the next language should be Hindi"). */
+export const hi: Record<keyof typeof en, string> = {
+  'data.label': 'प्रोजेक्ट डेटा',
+  'data.title': 'डेटा और इमेज',
+  'data.files_one': ' · {count} फ़ाइल',
+  'data.files_other': ' · {count} फ़ाइलें',
+  'data.attachData': 'डेटा फ़ाइल जोड़ें',
+  'data.addImages': 'इमेज जोड़ें',
+  'data.attachDataLabel': 'डेटा फ़ाइलें जोड़ें',
+  'data.working': 'काम चल रहा है…',
+  'data.attachError': 'फ़ाइल जोड़ी नहीं जा सकी।',
+  'data.attachErrorWhy': 'फ़ाइल जोड़ी नहीं जा सकी: {message}',
+  'data.imageError': 'इमेज जोड़ी नहीं जा सकी।',
+  'data.imageErrorWhy': 'इमेज जोड़ी नहीं जा सकी: {message}',
+  'data.removeError': '{name} हटाई नहीं जा सकी।',
+  'data.toAdd': 'जोड़ने के लिए इमेज',
+  'data.captionHint': 'बताइए कि हर इमेज में क्या दिखता है। PromptMaster इमेज नहीं देख सकता; वह कैप्शन में लिखी बात के आधार पर उन्हें आपके काम में रखता है।',
+  'data.captionFor': '{name} का कैप्शन',
+  'data.adding': 'जोड़ा जा रहा है…',
+  'data.addThis': 'यह इमेज जोड़ें',
+  'data.addThese': 'ये {count} इमेज जोड़ें',
+  'data.cancel': 'रद्द करें',
+  'data.images': 'इमेज',
+  'data.remove': 'हटाएँ',
+  'data.removeNamed': '{name} हटाएँ',
+  'data.imagesHint': 'ड्राफ़्ट इन्हें वहाँ रख सकते हैं जहाँ ये मददगार हों; संपादन में, “इमेज डालें” एक इमेज वहाँ रखता है जहाँ आपका कर्सर है।',
+  'data.empty':
+    'कोई डेटा या इमेज नहीं जुड़ी है। डेटा के बिना विश्लेषण की योजना बनाई जा सकती है पर उसे चलाया नहीं जा सकता, और PromptMaster यह बताएगा। CSV, TSV, JSON या टेक्स्ट फ़ाइलें, या Excel वर्कबुक (.xlsx, CSV में बदली गई) जोड़ें, और Go उन पर कोड चला सकता है। PDF या Word ब्रीफ़ जोड़ें और उसका टेक्स्ट प्रोजेक्ट संदर्भ में जा सकता है। अपने काम में रखने के लिए फ़ोटो या चित्र (PNG, JPEG, WebP, GIF) जोड़ें। हर एक अधिकतम {mb} MB।',
+  'data.codeReads': 'Go जो कोड चलाता है, वह इन्हें पढ़ सकता है। PromptMaster को फ़ाइल नहीं, बल्कि हर फ़ाइल के कॉलम और पहली पंक्तियाँ दिखाई जाती हैं।',
+  'data.addText': 'दस्तावेज़ का टेक्स्ट जोड़ें',
+  'data.oneHasText': '{name} में ऐसा टेक्स्ट है जिसे हर चरण उद्धृत कर सकता है।',
+  'data.manyHaveText': '{count} दस्तावेज़ों में ऐसा टेक्स्ट है जिसे हर चरण उद्धृत कर सकता है।',
+  'data.added': 'प्रोजेक्ट संदर्भ में जोड़ा गया: {names}।',
+  'data.addToContext': 'इसका टेक्स्ट प्रोजेक्ट संदर्भ में जोड़ें',
+  'data.notNow': 'अभी नहीं',
+};

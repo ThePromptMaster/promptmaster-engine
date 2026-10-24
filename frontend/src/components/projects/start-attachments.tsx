@@ -116,7 +116,7 @@ export function StartAttachments({
           {files.map((f, i) => (
             <li key={`${f.file.name}-${i}`} className="flex flex-wrap items-baseline gap-x-3 text-body">
               <span className="font-semibold text-[var(--on-surface)]">{f.file.name}</span>
-              <span className="mr-auto text-label text-[var(--on-surface-variant)]">
+              <span className="me-auto text-label text-[var(--on-surface-variant)]">
                 {f.text ? t('attach.chars', { count: formatNumber(f.text.length, locale) }) : describePreview(f.preview)}
               </span>
               <button

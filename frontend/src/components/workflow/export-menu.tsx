@@ -109,12 +109,12 @@ export function ExportMenu({ bundle }: { bundle: ExportBundle }) {
       {open && (
         <div
           role="menu"
-          className="absolute right-0 z-20 mt-2 w-[300px] overflow-hidden rounded-xl bg-[var(--surface-container-lowest)] py-1 shadow-[0_2px_4px_rgba(25,28,30,0.06),0_12px_28px_-12px_rgba(25,28,30,0.28)]"
+          className="absolute end-0 z-20 mt-2 w-[300px] overflow-hidden rounded-xl bg-[var(--surface-container-lowest)] py-1 shadow-[0_2px_4px_rgba(25,28,30,0.06),0_12px_28px_-12px_rgba(25,28,30,0.28)]"
         >
           <button
             role="menuitem"
             onClick={() => void exportMarkdown()}
-            className="block w-full px-4 py-3 text-left transition-colors hover:bg-[var(--surface-container-low)]"
+            className="block w-full px-4 py-3 text-start transition-colors hover:bg-[var(--surface-container-low)]"
           >
             <span className="block text-body text-[var(--on-surface)]">{t('export.markdown')}</span>
             <span className="mt-0.5 block text-label text-[var(--on-surface-variant)]">
@@ -124,7 +124,7 @@ export function ExportMenu({ bundle }: { bundle: ExportBundle }) {
           <button
             role="menuitem"
             onClick={() => void exportLatex()}
-            className="block w-full px-4 py-3 text-left transition-colors hover:bg-[var(--surface-container-low)]"
+            className="block w-full px-4 py-3 text-start transition-colors hover:bg-[var(--surface-container-low)]"
           >
             <span className="block text-body text-[var(--on-surface)]">{t('export.latex')}</span>
             <span className="mt-0.5 block text-label text-[var(--on-surface-variant)]">
@@ -134,7 +134,7 @@ export function ExportMenu({ bundle }: { bundle: ExportBundle }) {
           <button
             role="menuitem"
             onClick={() => void exportNotebook()}
-            className="block w-full px-4 py-3 text-left transition-colors hover:bg-[var(--surface-container-low)]"
+            className="block w-full px-4 py-3 text-start transition-colors hover:bg-[var(--surface-container-low)]"
           >
             <span className="block text-body text-[var(--on-surface)]">{t('export.notebook')}</span>
             <span className="mt-0.5 block text-label text-[var(--on-surface-variant)]">
@@ -146,7 +146,7 @@ export function ExportMenu({ bundle }: { bundle: ExportBundle }) {
               <button
                 role="menuitem"
                 onClick={() => void exportWord()}
-                className="block w-full px-4 py-3 text-left transition-colors hover:bg-[var(--surface-container-low)]"
+                className="block w-full px-4 py-3 text-start transition-colors hover:bg-[var(--surface-container-low)]"
               >
                 <span className="block text-body text-[var(--on-surface)]">{t('export.word')}</span>
                 <span className="mt-0.5 block text-label text-[var(--on-surface-variant)]">
@@ -159,7 +159,7 @@ export function ExportMenu({ bundle }: { bundle: ExportBundle }) {
                 target="_blank"
                 rel="noreferrer"
                 onClick={() => setOpen(false)}
-                className="block w-full px-4 py-3 text-left transition-colors hover:bg-[var(--surface-container-low)]"
+                className="block w-full px-4 py-3 text-start transition-colors hover:bg-[var(--surface-container-low)]"
               >
                 <span className="block text-body text-[var(--on-surface)]">{t('export.pdf')}</span>
                 <span className="mt-0.5 block text-label text-[var(--on-surface-variant)]">
@@ -171,7 +171,7 @@ export function ExportMenu({ bundle }: { bundle: ExportBundle }) {
           <button
             role="menuitem"
             onClick={exportJson}
-            className="block w-full px-4 py-3 text-left transition-colors hover:bg-[var(--surface-container-low)]"
+            className="block w-full px-4 py-3 text-start transition-colors hover:bg-[var(--surface-container-low)]"
           >
             <span className="block text-body text-[var(--on-surface)]">{t('export.json')}</span>
             <span className="mt-0.5 block text-label text-[var(--on-surface-variant)]">

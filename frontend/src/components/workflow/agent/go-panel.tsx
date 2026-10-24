@@ -289,7 +289,7 @@ export function GoPanel({
       {dock}
       <div className="flex flex-wrap items-center gap-3">
         <span aria-hidden className="material-symbols-outlined text-[var(--pm-primary)]">rocket_launch</span>
-        <div className="mr-auto">
+        <div className="me-auto">
           <h2 className="text-title text-[var(--on-surface)]">{t('go.title')}</h2>
           <p className="text-label text-[var(--on-surface-variant)]">
             {t('go.intro')}
@@ -345,7 +345,7 @@ export function GoPanel({
           )}
           {go.error && (
             <div role="alert" className="flex items-start gap-3 rounded-xl bg-[var(--pm-tertiary)]/10 px-4 py-3 text-body text-[var(--on-surface)]">
-              <span className="mr-auto">{go.error}</span>
+              <span className="me-auto">{go.error}</span>
               <button onClick={go.dismissError} className="text-label text-[var(--on-surface-variant)]">{t('go.dismiss')}</button>
             </div>
           )}

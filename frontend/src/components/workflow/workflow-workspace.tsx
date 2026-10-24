@@ -1927,7 +1927,7 @@ export function WorkflowWorkspace({
           <button
             onClick={() => setMobileRailOpen(true)}
             aria-expanded={mobileRailOpen}
-            className="mb-4 flex w-full items-center gap-3 rounded-xl bg-[var(--surface-container-lowest)] px-4 py-3 text-left transition-colors hover:bg-[var(--surface-container-low)] md:hidden"
+            className="mb-4 flex w-full items-center gap-3 rounded-xl bg-[var(--surface-container-lowest)] px-4 py-3 text-start transition-colors hover:bg-[var(--surface-container-low)] md:hidden"
           >
             <span
               aria-hidden
@@ -1982,7 +1982,7 @@ export function WorkflowWorkspace({
                 onClick={() => setViewingStageId(null)}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-low)] px-3 py-1.5 text-label text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]"
               >
-                <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+                <span className="material-symbols-outlined rtl:-scale-x-100 text-[16px]">arrow_back</span>
                 {t(stageIndex > template.stages.findIndex((s) => s.id === state.current_stage_id) ? 'ws.viewingLater' : 'ws.viewingEarlier', {
                   stage: (() => {
                     const here = getStage(template, state.current_stage_id);
@@ -2614,11 +2614,11 @@ export function WorkflowWorkspace({
       {chatOpen && (
         <aside
           id="stage-side-chat"
-          className={`fixed inset-0 z-40 flex flex-col bg-[var(--surface)] p-4 lg:sticky lg:inset-auto lg:top-0 lg:z-auto lg:h-[100dvh] lg:max-h-[100dvh] lg:w-[380px] lg:shrink-0 lg:self-start lg:bg-transparent lg:py-6 lg:pl-0 lg:pr-6 ${readingTab ? 'xl:w-[480px]' : ''}`}
+          className={`fixed inset-0 z-40 flex flex-col bg-[var(--surface)] p-4 lg:sticky lg:inset-auto lg:top-0 lg:z-auto lg:h-[100dvh] lg:max-h-[100dvh] lg:w-[380px] lg:shrink-0 lg:self-start lg:bg-transparent lg:py-6 lg:ps-0 lg:pe-6 ${readingTab ? 'xl:w-[480px]' : ''}`}
         >
           <button
             onClick={() => setChatOpen(false)}
-            className="mb-2 ml-auto flex items-center gap-1 rounded-lg px-2 py-1 text-label text-[var(--on-surface-variant)] lg:hidden"
+            className="mb-2 ms-auto flex items-center gap-1 rounded-lg px-2 py-1 text-label text-[var(--on-surface-variant)] lg:hidden"
           >
             <span aria-hidden className="material-symbols-outlined text-[18px]">
               close

@@ -37,7 +37,7 @@ export function DraftStatus({ state }: { state: DraftSaveState }) {
     >
       {state && (
         <>
-          <span aria-hidden className="material-symbols-outlined mr-1 align-[-3px] text-[16px]">
+          <span aria-hidden className="material-symbols-outlined me-1 align-[-3px] text-[16px]">
             {state === 'failed' ? 'cloud_off' : 'cloud_done'}
           </span>
           {t(SHORT[state])}

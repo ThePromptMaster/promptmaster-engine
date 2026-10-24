@@ -175,7 +175,7 @@ function ReviewOneByOne({
                   {t('pnl.back')}
                 </button>
               )}
-              <button onClick={onCancel} className="ml-auto rounded-lg px-3 py-2 text-title text-[var(--on-surface-variant)]">
+              <button onClick={onCancel} className="ms-auto rounded-lg px-3 py-2 text-title text-[var(--on-surface-variant)]">
                 {t('pnl.cancel')}
               </button>
             </div>
@@ -185,7 +185,7 @@ function ReviewOneByOne({
             <p className="text-title text-[var(--on-surface)]">
               {kept.length === 0 ? t('pnl.nothingKept') : t('pnl.nOfToApply', { n: kept.length, total: points.length })}
             </p>
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-body text-[var(--on-surface)]">
+            <ul className="mt-2 list-disc space-y-1 ps-5 text-body text-[var(--on-surface)]">
               {points.filter((p) => kept.includes(p.id)).map((p) => (
                 <li key={p.id}>{p.text}</li>
               ))}
@@ -201,7 +201,7 @@ function ReviewOneByOne({
               <button onClick={() => setIndex(0)} className="rounded-lg px-3 py-2 text-title text-[var(--on-surface-variant)]">
                 {t('pnl.startOver')}
               </button>
-              <button onClick={onCancel} className="ml-auto rounded-lg px-3 py-2 text-title text-[var(--on-surface-variant)]">
+              <button onClick={onCancel} className="ms-auto rounded-lg px-3 py-2 text-title text-[var(--on-surface-variant)]">
                 {t('pnl.cancel')}
               </button>
             </div>

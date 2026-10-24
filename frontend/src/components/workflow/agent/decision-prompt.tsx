@@ -129,7 +129,7 @@ export function QuestionPrompt({
               type="button"
               disabled={checking}
               onClick={() => onAnswer(c)}
-              className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-left text-title text-[var(--on-primary)] disabled:opacity-60"
+              className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-start text-title text-[var(--on-primary)] disabled:opacity-60"
             >
               {c}
             </button>
@@ -150,7 +150,7 @@ export function QuestionPrompt({
                   .catch((e) => setTickError(e instanceof Error && e.message ? e.message : t('qp.tickFailed')))
                   .finally(() => setTicking(null));
               }}
-              className="flex items-center gap-2 rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-left text-title text-[var(--on-primary)] disabled:opacity-60"
+              className="flex items-center gap-2 rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-start text-title text-[var(--on-primary)] disabled:opacity-60"
             >
               <span aria-hidden className="material-symbols-outlined text-[20px]">check_box</span>
               {ticking === a.id ? t('qp.recording') : t('qp.tick', { label: a.label })}
@@ -287,7 +287,7 @@ function WhatChanged({ change }: { change: LatestChange }) {
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex w-full items-center justify-between gap-2 text-left text-title text-[var(--on-surface)]"
+        className="flex w-full items-center justify-between gap-2 text-start text-title text-[var(--on-surface)]"
       >
         <span>
           {t('qp.changed', { stage: change.stageLabel, version: change.version, previous: change.previous })} ·{' '}

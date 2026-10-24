@@ -68,7 +68,7 @@ export function ProjectCardMenu({
               <div className="mb-2 flex items-center gap-2">
                 {view !== 'menu' && (
                   <button type="button" onClick={() => setView('menu')} aria-label={t('card.back')} className="rounded-lg p-1.5 text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)]">
-                    <span aria-hidden className="material-symbols-outlined text-[20px]">arrow_back</span>
+                    <span aria-hidden className="material-symbols-outlined rtl:-scale-x-100 text-[20px]">arrow_back</span>
                   </button>
                 )}
                 <p className="min-w-0 flex-1 truncate text-title text-[var(--on-surface)]">

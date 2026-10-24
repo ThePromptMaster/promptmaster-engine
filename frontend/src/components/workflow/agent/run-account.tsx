@@ -35,7 +35,7 @@ export function RunAccountCard({
       </p>
       {account.did && <p className="mt-2 text-body text-[var(--on-surface)]"><span className="text-[var(--on-surface-variant)]">{t('acc.soFar')}</span>{account.did}</p>}
       {account.setAside.length > 0 && (
-        <ul className="mt-2 list-disc pl-5 text-body text-[var(--on-surface-variant)]">
+        <ul className="mt-2 list-disc ps-5 text-body text-[var(--on-surface-variant)]">
           {account.setAside.map((line) => <li key={line}>{line}</li>)}
         </ul>
       )}
