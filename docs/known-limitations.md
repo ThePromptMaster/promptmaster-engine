@@ -2186,6 +2186,10 @@ recommended setup then said "PromptMaster cannot browse the web"; the Nancy Go r
   were all saved already changes nothing, and three idle moves still stop Go. Since 24 Oct,
   "three moves" means three: the read before the first move is the baseline.
 - **The planner's reason is cut at 600 characters** where it becomes a search's purpose.
+- **The start chat asks again for a reply it lost.** With search results in its prompt the model
+  sometimes answered in prose or was stopped by the provider's content filter. The front door
+  asks once more for JSON, then once more without the results (and says so); if only prose
+  comes, the prose is the reply and the outline is left as it was. Each retry is another call.
 
 ### L-107 — Presets: removed from the list, never deleted (2026-10-24)
 
