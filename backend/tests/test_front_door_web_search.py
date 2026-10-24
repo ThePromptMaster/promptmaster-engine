@@ -117,3 +117,46 @@ def test_a_decision_that_is_not_an_object_is_no_search():
     r = _post(_body(web_access="on"), stub)
     assert r.status_code == 200, r.text
     stub.generate_with_web.assert_not_called()
+
+
+def test_a_prose_answer_is_asked_again_as_json():
+    """Sean, 23 Oct: with pricing results in the prompt the model answered in
+    prose; the repair returned {"error": ...}, shown as "Tell me more"."""
+    from promptmaster.llm_client import NotJSONError
+
+    stub = _stub({"search": True, "query": "Claude Pro price"})
+    stub.generate_json = AsyncMock(side_effect=[
+        ({"search": True, "query": "Claude Pro price"}, {}),
+        NotJSONError("prose", content="Claude Pro is $20 a month [S2]."),
+        (REPLY, {}),
+    ])
+    r = _post(_body(web_access="on"), stub)
+    assert r.status_code == 200, r.text
+    assert r.json()["reply"].startswith("Portugal has about 10.7 million")
+    assert "JSON object only" in stub.generate_json.call_args_list[2].kwargs["system"]
+
+
+def test_when_no_json_comes_the_prose_is_the_reply_and_the_outline_stays():
+    from promptmaster.llm_client import NotJSONError
+
+    stub = _stub({"search": True, "query": "Claude Pro price"})
+    prose = NotJSONError("prose", content="Claude Pro is $20 a month [S2].")
+    stub.generate_json = AsyncMock(side_effect=[({"search": True, "query": "Claude Pro price"}, {}), prose, prose, prose])
+    r = _post(_body(web_access="on", brief={"objective": "Pick a tool"}), stub)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["reply"] == "Claude Pro is $20 a month [S2]."
+    assert body["brief"]["objective"] == "Pick a tool" and body["ready"] is False
+
+
+def test_a_filtered_answer_is_tried_once_more_without_the_results():
+    from promptmaster.llm_client import OpenRouterError
+
+    stub = _stub({"search": True, "query": "Claude Pro price"})
+    blocked = OpenRouterError("No content in response (finish_reason='content_filter')")
+    stub.generate_json = AsyncMock(side_effect=[({"search": True, "query": "Claude Pro price"}, {}), blocked, blocked, (REPLY, {})])
+    r = _post(_body(web_access="on"), stub)
+    assert r.status_code == 200, r.text
+    assert "NEW WEB RESULTS" not in stub.generate_json.call_args_list[3].kwargs["prompt"]
+    body = r.json()
+    assert body["web_sources"] == [] and "could not be used" in body["web_note"]

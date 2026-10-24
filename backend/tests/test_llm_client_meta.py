@@ -93,3 +93,21 @@ async def test_existing_generate_still_returns_two_tuple():
     assert content == "Hello"
 
     await client.close()
+
+
+async def test_a_repair_that_finds_no_json_is_an_error_not_an_answer(monkeypatch):
+    """23 Oct: prose came back where JSON was asked for, and the repair pass
+    answered {"error": "Input was not JSON…"} — passed on as if it were the reply."""
+    import pytest
+    from promptmaster.llm_client import NotJSONError, OpenRouterClient
+
+    client = OpenRouterClient(api_key="k")
+    replies = iter([("Claude Pro is $20 a month.", {}), ('{"error": "Input was not JSON."}', {})])
+
+    async def fake_generate(**_kw):
+        return next(replies)
+
+    monkeypatch.setattr(client, "generate", fake_generate)
+    with pytest.raises(NotJSONError) as caught:
+        await client.generate_json("q")
+    assert caught.value.content == "Claude Pro is $20 a month."
