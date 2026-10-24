@@ -35,10 +35,19 @@ async function bookWithChapters(page: Page) {
   await expect(page.getByText('2 of 2 sections written')).toBeVisible({ timeout: 60_000 });
 }
 
-async function ask(page: Page, question: string) {
+async function ask(page: Page, question: string, stage: RegExp) {
   const chat = page.getByRole('region', { name: 'Side chat' });
-  await chat.getByRole('textbox', { name: 'Ask a question' }).fill(question);
+  // The chat follows the stage: a question typed while it was still switching
+  // over was cleared, and nothing was asked (main CI, 24 Oct). Wait for it to
+  // be on this stage, and for the words to be in the box, before asking.
+  await expect(chat).toContainText(stage, { timeout: 30_000 });
+  const box = chat.getByRole('textbox', { name: 'Ask a question' });
+  await expect(async () => {
+    await box.fill(question);
+    await expect(box).toHaveValue(question, { timeout: 1_000 });
+  }).toPass({ timeout: 15_000 });
   await chat.getByRole('button', { name: 'Ask' }).click();
+  await expect(chat).toContainText(question, { timeout: 10_000 });
   return chat;
 }
 
@@ -47,14 +56,14 @@ test('the chat on the chapters and on a review stage has the outline and the cha
   await bookWithChapters(page);
 
   // On Drafting: the chapters are the stage's own text.
-  let chat = await ask(page, 'What is chapter 2 about?');
+  let chat = await ask(page, 'What is chapter 2 about?', /Draft/);
   await expect(chat.getByText(/Mock: I can see the Draft\w* stage, the outline, the chapters; nothing needs pasting\./)).toBeVisible({ timeout: 30_000 });
   await page.screenshot({ path: test.info().outputPath('01-chat-on-drafting.png'), fullPage: true });
 
   // On the next stage, a review: the chapters come from Drafting.
   await pressTransition(page);
   await expect(page.getByRole('heading', { name: /Continuity/ })).toBeVisible({ timeout: 30_000 });
-  chat = await ask(page, 'Does chapter 2 contradict chapter 1?');
+  chat = await ask(page, 'Does chapter 2 contradict chapter 1?', /Continuity/);
   await expect(chat.getByText(/Mock: I can see the Continuity.* stage, the outline, the chapters; nothing needs pasting\./)).toBeVisible({ timeout: 30_000 });
   await page.screenshot({ path: test.info().outputPath('02-chat-on-continuity.png'), fullPage: true });
 });

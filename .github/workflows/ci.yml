@@ -68,6 +68,12 @@ jobs:
           # there failed a run before any test started (PR #17).
           version: 2.118.0
       - name: Start Supabase (applies every migration to an empty database)
+        # Under GitHub Actions the CLI pulls from ghcr.io, which refused with
+        # "Data limit exceeded" on 24 Oct; services that did not start left
+        # every test waiting out its timeout. Amazon's public registry carries
+        # the same images.
+        env:
+          SUPABASE_INTERNAL_IMAGE_REGISTRY: public.ecr.aws
         run: supabase start -x studio,imgproxy,realtime,edge-runtime,logflare,vector,supavisor,mailpit
       - name: SQL tests (supabase/tests/*.sql against the migrated database)
         run: |
