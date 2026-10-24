@@ -28,6 +28,7 @@ function changes(step: AgentStep, run: AgentRun | null): { document: string[]; w
     document.push(tr(step.action_key === 'revise_sections' ? 'rec.sectionsRevised' : 'rec.sectionsDrafted', { count: c.sections_written.length }));
   }
   if (c.items_triaged?.length) workflow.push(tr('rec.findingsDecided', { count: c.items_triaged.length }));
+  if (c.source_ids?.length) document.push(tr('rec.sourcesSaved', { count: c.source_ids.length }));
   if (c.version_ids?.length) {
     if (step.action_key === 'evaluate_stage') workflow.push(tr('rec.evaluation'));
     else if (step.action_key === 'generate_outline') document.push(tr('rec.outline'));

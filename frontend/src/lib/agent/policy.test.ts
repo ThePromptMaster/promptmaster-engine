@@ -485,12 +485,24 @@ describe('a run going round in circles stops (2 Oct, screenshot 7)', () => {
     expect(stateFingerprint({ ...base, bundles: { experiment: { artifact: null, versions: [{ id: 'v2' }] } } as never })).not.toBe(same);
     expect(stateFingerprint({ ...base, stageEvaluation: { ...evaluation, criteria: [{ id: 'a', label: 'A', satisfied: true, blocking: true }] } })).not.toBe(same);
     expect(stateFingerprint({ ...base, state: { ...research, current_stage_id: 'literature' } })).not.toBe(same);
+    // A saved web source is a change (Sean, 23 Oct).
+    expect(stateFingerprint({ ...base, sources: 5 })).not.toBe(stateFingerprint({ ...base, sources: 0 }));
   });
 
   it('three performed moves that left the project as it was is a stop, said as what to do', () => {
+    // The first read is the project before the moves: three idle moves are four equal reads.
     expect(noChange(['x', 'x'])).toBeNull();
-    expect(noChange(['y', 'x', 'x', 'x'])).toMatch(/^The last 3 moves changed nothing on this stage/);
+    expect(noChange(['x', 'x', 'x'])).toBeNull();
+    expect(noChange(['y', 'x', 'x', 'x', 'x'])).toMatch(/^The last 3 moves changed nothing on this stage/);
     expect(noChange(['x', 'x', 'y'])).toBeNull();
+  });
+
+  it('a move, a refused search and a search that saved sources is not a stop (Sean, 23 Oct)', () => {
+    // Before; after moving to Literature; after the refused search; after five sources were saved.
+    expect(noChange(['question', 'literature', 'literature'])).toBeNull();
+    expect(noChange(['question', 'literature', 'literature', 'literature|sources:5'])).toBeNull();
+    // Even had the search saved nothing, two idle moves are not three.
+    expect(noChange(['question', 'literature', 'literature', 'literature'])).toBeNull();
   });
 });
 

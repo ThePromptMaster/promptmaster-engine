@@ -525,10 +525,13 @@ export function useGoLoop(opts: Options) {
         // left it exactly as it was is a run going round in circles — the
         // client's log of repeated "Check this stage" / "Apply the findings"
         // (2 Oct, screenshot 7) — and stops here, before another model call.
-        if (performedRef.current) {
+        // The first read since Go/Resume is the baseline the moves are compared with.
+        if (performedRef.current || fingerprintsRef.current.length === 0) {
+          const moved = performedRef.current;
           performedRef.current = false;
-          fingerprintsRef.current.push(stateFingerprint({ state: o.state, bundles: o.bundles, events: freshEvents, facts, stageEvaluation }));
-          const circling = noChange(fingerprintsRef.current);
+          const sources = (o.project.sources ?? []).filter((s) => !s.retired_at).length;
+          fingerprintsRef.current.push(stateFingerprint({ state: o.state, bundles: o.bundles, events: freshEvents, facts, stageEvaluation, sources }));
+          const circling = moved ? noChange(fingerprintsRef.current) : null;
           if (circling) {
             await setRunStatus('blocked', circling);
             break;

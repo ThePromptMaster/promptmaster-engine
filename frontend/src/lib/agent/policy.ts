@@ -664,7 +664,8 @@ export function alternating(finished: readonly AgentStep[]): [string, string] | 
  * What the project is, in one string, so two reads can be compared (2 Oct,
  * screenshot 7). Pure. Changes when a stage moves, a version lands, an event
  * is recorded, a blocking requirement is met, a chapter is written, a row is
- * decided or the outline is approved — and not otherwise.
+ * decided, the outline is approved or a web source is saved (23 Oct) — and
+ * not otherwise.
  */
 export function stateFingerprint(input: {
   state: WorkflowState;
@@ -672,6 +673,8 @@ export function stateFingerprint(input: {
   events: readonly unknown[];
   facts: StageFacts;
   stageEvaluation: StageEvaluation;
+  /** The project's live (unretired) web sources. */
+  sources?: number;
 }): string {
   const { state, bundles, events, facts, stageEvaluation } = input;
   const heads = Object.keys(bundles)
@@ -687,6 +690,7 @@ export function stateFingerprint(input: {
     `chapters:${facts.manuscript?.complete ?? ''}`,
     `decided:${facts.review ? facts.review.items.length - facts.review.routine.length - facts.review.material.length : ''}`,
     `outline:${facts.outline?.approved ?? ''}`,
+    `sources:${input.sources ?? ''}`,
   ].join('|');
 }
 
@@ -694,10 +698,16 @@ export function stateFingerprint(input: {
  * The last NO_CHANGE_STEPS performed moves left the project exactly as it
  * was: the stop, said as what the user can do about it. Null while the run
  * is changing something.
+ *
+ * `fingerprints` starts with the project as it was before the first move,
+ * then one after each move, so N moves that changed nothing are N + 1 equal
+ * reads. Comparing only N stopped after two idle moves — the third "move"
+ * was the one that had last changed something (Sean, 23 Oct: a move to
+ * Literature, a refused search, a search that saved five sources).
  */
 export function noChange(fingerprints: readonly string[]): string | null {
-  const tail = fingerprints.slice(-NO_CHANGE_STEPS);
-  if (tail.length < NO_CHANGE_STEPS || !tail.every((f) => f === tail[0])) return null;
+  const tail = fingerprints.slice(-(NO_CHANGE_STEPS + 1));
+  if (tail.length < NO_CHANGE_STEPS + 1 || !tail.every((f) => f === tail[0])) return null;
   return (
     `The last ${NO_CHANGE_STEPS} moves changed nothing on this stage — no new version, no decision recorded, ` +
     'no requirement met. Tell me what to do differently, or do the next part yourself and press Resume.'
