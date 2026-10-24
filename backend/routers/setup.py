@@ -147,6 +147,9 @@ class GenerateWorkflowRequest(BaseModel):
     description: str = Field(..., min_length=3, max_length=MAX_CHAT_MESSAGE_CHARS)
     objective: str = Field(default="", max_length=MAX_OBJECTIVE_CHARS)
     model: str = ""
+    #: The project's Web access: on, a stage that needs current facts is told to search
+    #: and cite, not to leave them unverified (24 Oct).
+    web_access: Literal["on", "off"] | None = None
 
 
 class GenerateWorkflowResponse(BaseModel):
@@ -160,7 +163,7 @@ async def api_generate_workflow(
 ) -> GenerateWorkflowResponse:
     """Propose the stages of a workflow for this kind of work. 1 LLM call; saves nothing."""
     try:
-        workflow = await design_workflow(client, req.model or None, req.description, req.objective)
+        workflow = await design_workflow(client, req.model or None, req.description, req.objective, req.web_access)
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
     except ValueError as e:

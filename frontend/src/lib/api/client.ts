@@ -591,7 +591,7 @@ export const api = {
   },
 
   /** Propose the stages of a workflow for this kind of work (3 Oct call). 1 LLM call; saves nothing. */
-  async generateWorkflow(req: { description: string; objective?: string }): Promise<{ workflow: import('@/lib/workflow/custom').DesignedWorkflow }> {
+  async generateWorkflow(req: { description: string; objective?: string; web_access?: 'on' | 'off' }): Promise<{ workflow: import('@/lib/workflow/custom').DesignedWorkflow }> {
     return apiFetch('/api/generate-workflow', { method: 'POST', body: JSON.stringify(req) });
   },
 

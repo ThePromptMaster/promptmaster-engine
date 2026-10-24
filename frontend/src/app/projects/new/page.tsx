@@ -301,7 +301,8 @@ export default function NewProjectPage() {
     try {
       const answers = (given ?? []).map((a) => `${a.question} ${a.answer}`).join('\n');
       const description = [ask.trim(), answers, brought].filter(Boolean).join('\n\n').slice(0, DESIGN_BRIEF_MAX);
-      const { workflow } = await api.generateWorkflow({ description, objective: ask.trim().slice(0, DESIGN_BRIEF_MAX) });
+      // A new project has Web access on: stages that need current facts search and cite (24 Oct).
+      const { workflow } = await api.generateWorkflow({ description, objective: ask.trim().slice(0, DESIGN_BRIEF_MAX), web_access: 'on' });
       const suffix = crypto.randomUUID().replace(/-/g, '').slice(0, 10);
       const template = templateFromDesign(workflow, suffix);
       if (validateTemplate(template).length) return null;
