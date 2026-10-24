@@ -123,18 +123,56 @@ export async function publishUserTemplate(
   return toTemplate(data as unknown as TemplateRow);
 }
 
-/** The latest published version of every template. Used by the new-project picker. */
+/**
+ * The latest published version of every template the start screen offers.
+ * A preset the user removed from the list (archived) or a workflow designed
+ * for one project and not saved as a preset (`listed = false`) is not offered
+ * (Sean, 23 Oct: "the number of my workflow presets are getting outrageous").
+ */
 export async function listTemplates(): Promise<(WorkflowTemplate & { id: string })[]> {
   const supabase = createClient();
   const { data, error } = await supabase
     .from('workflow_templates')
     .select(TEMPLATE_COLUMNS)
     .eq('status', 'published')
+    .eq('listed', true)
     .order('key')
     .order('version', { ascending: false });
 
   if (error) throw error;
   return latestPerKey(((data ?? []) as unknown as TemplateRow[]).map(toTemplate));
+}
+
+/** The user's presets removed from the list, latest version of each, to put back. */
+export async function listRemovedTemplates(): Promise<(WorkflowTemplate & { id: string })[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('workflow_templates')
+    .select(TEMPLATE_COLUMNS)
+    .eq('status', 'archived')
+    .eq('is_system', false)
+    .order('key')
+    .order('version', { ascending: false });
+
+  if (error) throw error;
+  return latestPerKey(((data ?? []) as unknown as TemplateRow[]).map(toTemplate));
+}
+
+/**
+ * Remove a preset from the start screen, or put it back: every version of
+ * the key, so an older one does not surface in its place. Nothing is deleted
+ * — a project pinned to it keeps its workflow — and the database lets the
+ * owner change only this (`20261113000000_workflow_template_listing.sql`).
+ */
+export async function setTemplateRemoved(key: string, removed: boolean): Promise<void> {
+  if (!key.startsWith('custom_')) throw new Error('Only a workflow you designed can be removed from the list.');
+  const supabase = createClient();
+  const { error } = await supabase
+    .from('workflow_templates')
+    .update({ status: removed ? 'archived' : 'published', ...(removed ? {} : { listed: true }) })
+    .eq('key', key)
+    .eq('is_system', false);
+  if (error) throw error;
 }
 
 // --- events -----------------------------------------------------------------

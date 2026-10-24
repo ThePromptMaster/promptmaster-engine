@@ -238,7 +238,7 @@ def test_simple_start_stops_at_its_cap_without_a_call():
 
 def test_setup_and_front_door_say_links_cannot_be_opened():
     from promptmaster.front_door import build_front_door_prompt, DraftBrief, Turn
-    from promptmaster.setup_suggester import SETUP_SUGGESTER_SYSTEM
+    from promptmaster.setup_suggester import setup_system
 
     fake_client = AsyncMock()
     fake_client.generate_json = AsyncMock(return_value=(
@@ -250,10 +250,37 @@ def test_setup_and_front_door_say_links_cannot_be_opened():
     finally:
         app.dependency_overrides.pop(get_client, None)
     system = fake_client.generate_json.call_args.kwargs["system"]
-    assert system == SETUP_SUGGESTER_SYSTEM
+    assert system == setup_system("off")
     assert "cannot open links, web pages or videos" in system
     assert "uses only text and files the user supplies" in system
 
     front_system, _ = build_front_door_prompt([Turn(role="user", content="Use the videos on my YouTube channel")], DraftBrief())
     assert "cannot open links, web pages or videos" in front_system
     assert "never write as if you had seen it" in front_system
+
+
+def test_with_web_access_on_setup_and_front_door_never_say_there_is_no_web():
+    """Sean, 22 Oct: with Web access on, a setup said "PromptMaster cannot
+    browse the web … pricing claims rely only on text the user pastes"."""
+    from promptmaster.front_door import build_front_door_prompt, DraftBrief, Turn
+
+    fake_client = AsyncMock()
+    fake_client.generate_json = AsyncMock(return_value=(
+        {"mode": "analyst", "audience": "General", "constraints": "", "output_format": "", "rationale": {}}, {}
+    ))
+    app.dependency_overrides[get_client] = lambda: fake_client
+    try:
+        r = TestClient(app).post("/api/generate-setup", json={"objective": "Compare Claude Pro and Copilot pricing", "web_access": "on"})
+    finally:
+        app.dependency_overrides.pop(get_client, None)
+    assert r.status_code == 200, r.text
+    system = fake_client.generate_json.call_args.kwargs["system"]
+    assert "cannot open links, web pages" not in system
+    assert "can search the public web" in system
+    assert "never say PromptMaster cannot search, browse or reach the web" in system
+    assert "uses only text and files the user supplies" not in system
+
+    on, _ = build_front_door_prompt([Turn(role="user", content="Compare plans")], DraftBrief(), web_access="on")
+    assert "can search the public web" in on and "cannot open links, web pages" not in on
+    off, _ = build_front_door_prompt([Turn(role="user", content="Compare plans")], DraftBrief())
+    assert "cannot open links, web pages or videos" in off

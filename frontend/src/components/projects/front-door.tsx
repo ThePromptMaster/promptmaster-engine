@@ -331,7 +331,7 @@ function OutlineList({ title, addLabel, items, onChange }: { title: string; addL
 }
 
 /** What a reply searched for, and the sources it found, numbered as the reply cites them. */
-function SearchNote({ search, first }: { search: FrontDoorSearch; first: number }) {
+export function SearchNote({ search, first }: { search: FrontDoorSearch; first: number }) {
   const t = useT();
   return (
     <div className="text-label text-[var(--on-surface-variant)]">
