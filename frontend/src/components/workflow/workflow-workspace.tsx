@@ -1505,6 +1505,11 @@ export function WorkflowWorkspace({
   // and comes with findings to apply; offering Continue writing for it added
   // more of what was already too much (same rule as Go's, lib/agent/facts).
   const truncated = headVersion?.finish_reason === 'length';
+  // The last stage's Finish, beside the acceptance box as well as in the bar (22 Oct).
+  const finishHere =
+    isCurrent && project.status !== 'finalized' && !stage.transitions.default_next
+      ? transitions.find((o) => o.kind === 'finish')
+      : undefined;
   const primaryAction = nextStageAction({
     finished: project.status === 'finalized',
     // Go working the project is busy too: a check pressed while Go appends a
@@ -1532,6 +1537,7 @@ export function WorkflowWorkspace({
     canAdvance: evaluation.canAdvance,
     checkSays: isCurrent ? currentCheckSays : null,
     isLast: !stage.transitions.default_next,
+    accepted: evaluation.criteria.some((c) => c.manual) && evaluation.criteria.filter((c) => c.manual).every((c) => c.satisfied),
     nextLabel: nextStage ? stageText(locale, template.key, nextStage, 'short') : null,
     panelStep: isCurrent ? (panelSteps[stage.id] ?? null) : null,
     unmetRequired: evaluation.unmet.filter((c) => c.blocking).map((c) => c.label),
@@ -2412,6 +2418,7 @@ export function WorkflowWorkspace({
               onToggleManual={(id, checked) => void handleToggleManual(id, checked)}
               readOnly={!isEditable}
               collapsible={foldStageExtras}
+              onFinish={finishHere ? () => setFinishing({ option: finishHere }) : undefined}
             />
 
             <RecommendationsPanel

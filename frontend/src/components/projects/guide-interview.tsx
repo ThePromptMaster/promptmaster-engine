@@ -8,6 +8,7 @@ import { AutoGrowTextarea } from '@/components/shared/auto-grow-textarea';
 import { INPUT_LIMITS } from '@/lib/projects/input-limits';
 import { useT } from '@/lib/i18n/i18n-provider';
 import { tr } from '@/lib/i18n/store';
+import { SearchNote, type FrontDoorSearch } from './front-door';
 
 export interface GuideAnswered {
   question: GuideQuestion;
@@ -46,7 +47,8 @@ export function GuideInterview({
   material?: string;
   /** The setup is being worked out from the answers. */
   busy?: boolean;
-  onDone: (answers: { question: string; answer: string }[]) => void;
+  /** The answers, and what the intake's web searches found — saved to the project when it is made. */
+  onDone: (answers: { question: string; answer: string }[], searches: FrontDoorSearch[]) => void;
   onBack: () => void;
   /** The simple start asks at most this many (Sean, 18 Oct, email 7); unset, the server's own limit. */
   maxQuestions?: number;
@@ -61,6 +63,10 @@ export function GuideInterview({
   const [enough, setEnough] = useState<string | null>(null);
   const [whyOpen, setWhyOpen] = useState(false);
   const started = useRef(false);
+  // What the questions searched the web for (Sean, 22 Oct: web search "needs
+  // to be added to the 'ask me questions' button too"), in the order found.
+  const searches = useRef<FrontDoorSearch[]>([]);
+  const [lastSearch, setLastSearch] = useState<{ search: FrontDoorSearch; first: number } | null>(null);
 
   const ask = useCallback(
     async (soFar: GuideAnswered[]) => {
@@ -72,7 +78,7 @@ export function GuideInterview({
         // No call: the cap is the answer.
         setCurrent(null);
         setEnough(tr('guide.enough'));
-        onDone(answersForSetup(soFar));
+        onDone(answersForSetup(soFar), searches.current);
         setLoading(false);
         return;
       }
@@ -82,11 +88,20 @@ export function GuideInterview({
           ...(material ? { material } : {}),
           ...(maxQuestions !== undefined ? { max_questions: maxQuestions } : {}),
           answered: soFar.map((a) => ({ question: a.question.question, answer: a.answers.join('; ') })),
+          // A new project has Web access on, as the conversation does.
+          web_access: 'on',
+          sources: searches.current.flatMap((f) => f.sources),
         });
+        if (res.web_query || res.web_note) {
+          const first = searches.current.reduce((n, f) => n + f.sources.length, 0) + 1;
+          const search = { query: res.web_query ?? '', sources: res.web_sources ?? [], ...(res.web_note ? { note: res.web_note } : {}) };
+          if (search.sources.length) searches.current = [...searches.current, search];
+          setLastSearch({ search, first });
+        } else setLastSearch(null);
         if (res.enough || !res.question) {
           setCurrent(null);
           setEnough(res.reason || tr('guide.enough'));
-          onDone(answersForSetup(soFar));
+          onDone(answersForSetup(soFar), searches.current);
         } else setCurrent(res.question);
       } catch (e) {
         // Not being able to ask more is a reason to go on with what there is —
@@ -94,7 +109,7 @@ export function GuideInterview({
         setCurrent(null);
         const why = e instanceof Error && e.message ? ` (${e.message})` : '';
         setEnough(tr('guide.couldNot', { why }));
-        onDone(answersForSetup(soFar));
+        onDone(answersForSetup(soFar), searches.current);
       } finally {
         setLoading(false);
       }
@@ -169,6 +184,12 @@ export function GuideInterview({
         <p role="status" className="rounded-2xl bg-[var(--surface-container-lowest)] px-6 py-5 text-body text-[var(--on-surface-variant)]">
           {answered.length === 0 ? t('guide.thinkingFirst') : t('guide.thinkingNext')}
         </p>
+      )}
+
+      {!loading && lastSearch && (
+        <div className="mb-3">
+          <SearchNote search={lastSearch.search} first={lastSearch.first} />
+        </div>
       )}
 
       {!loading && current && (
@@ -282,7 +303,7 @@ export function GuideInterview({
               const withCurrent = current && picked.length ? [...answered, { question: current, answers: picked }] : answered;
               setEnough(t('guide.goingOn'));
               setCurrent(null);
-              onDone(answersForSetup(withCurrent));
+              onDone(answersForSetup(withCurrent), searches.current);
             }}
             disabled={busy || loading}
             className="rounded-xl bg-[var(--surface-container-highest)] px-5 py-2.5 text-title text-[var(--on-surface)] hover:opacity-90 disabled:opacity-40"

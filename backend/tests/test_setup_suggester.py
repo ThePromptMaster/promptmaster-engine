@@ -195,3 +195,10 @@ def test_a_stated_audience_is_kept_in_the_users_words():
     prompts = " ".join(v for v in vars(setup_suggester).values() if isinstance(v, str))
     assert "when the user says who the work is for or who delivers it, keep their words" in prompts
     assert "Only when they say nothing about it, pick the closest of" in prompts
+
+
+def test_a_practical_decision_is_not_research():
+    """23 Oct: a vendor comparison memo, table, pilot plan and decision log got the 13-stage research workflow."""
+    lower = SETUP_SUGGESTER_SYSTEM.lower()
+    assert "a practical decision is not research" in lower
+    assert "decision log is single_output" in lower

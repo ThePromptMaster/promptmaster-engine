@@ -35,6 +35,12 @@ interface Props {
    * criterion id (`approvedVersions`): "approved v3 · current v4".
    */
   approvedVersions?: Record<string, { approved: number; current: number }>;
+  /**
+   * On the workflow's last stage: finish from here once every box that is the
+   * user's is ticked, rather than at the foot of the page under More (Sean,
+   * 22 Oct: "it's hard to know that that is the last step to get to this page").
+   */
+  onFinish?: () => void;
 }
 
 /**
@@ -78,6 +84,7 @@ export function ExitCriteriaChecklist({
   collapsible = false,
   committedByPolicy = {},
   approvedVersions: olderApprovals = {},
+  onFinish,
 }: Props) {
   // A box only the user can tick is never folded away, ticked or not.
   const t = useT();
@@ -226,6 +233,16 @@ export function ExitCriteriaChecklist({
             yours,
             t('cl.forYou')
           )}
+        {onFinish && !readOnly && yours.length > 0 && yours.every((r) => r.c.satisfied) && (
+          <button
+            type="button"
+            onClick={onFinish}
+            className="inline-flex items-center gap-2 rounded-xl bg-[var(--pm-primary)] px-5 py-2.5 text-title text-[var(--on-primary)] transition-opacity hover:opacity-90"
+          >
+            <span aria-hidden className="material-symbols-outlined text-[20px]">task_alt</span>
+            {t('cl.finishNow')}
+          </button>
+        )}
       </div>
       </div>
     </section>

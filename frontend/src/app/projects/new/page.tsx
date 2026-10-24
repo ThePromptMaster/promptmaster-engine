@@ -8,11 +8,11 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { GuideInterview } from '@/components/projects/guide-interview';
 import { SetupCard, type SetupDraft } from '@/components/projects/setup-card';
-import { useWorkflowWords } from '@/components/projects/workflow-picker';
+import { RemovedWorkflows, useWorkflowWords } from '@/components/projects/workflow-picker';
 import { useT } from '@/lib/i18n/i18n-provider';
 import { getLocale, tr } from '@/lib/i18n/store';
 import { CustomWorkflowDesigner } from '@/components/projects/custom-workflow-designer';
-import { FrontDoor, type DraftBrief, type Turn } from '@/components/projects/front-door';
+import { FrontDoor, type DraftBrief, type FrontDoorSearch, type Turn } from '@/components/projects/front-door';
 import { saveStageChatMessage } from '@/lib/supabase/conversation';
 import { saveSources } from '@/lib/supabase/sources';
 import type { ProjectSource } from '@/types/project';
@@ -25,7 +25,7 @@ import { api } from '@/lib/api/client';
 import { createProject, hardDeleteProject } from '@/lib/supabase/projects';
 import { setRequestLanguage } from '@/lib/api/language';
 import { LANGUAGES, resolveLanguage, startLanguage, type LanguageCode } from '@/lib/workflow/languages';
-import { appendWorkflowEvent, listTemplates } from '@/lib/supabase/workflow';
+import { appendWorkflowEvent, listRemovedTemplates, listTemplates, setTemplateRemoved } from '@/lib/supabase/workflow';
 import { createArtifact } from '@/lib/supabase/versions';
 import type { WorkflowTemplate } from '@/lib/workflow/types';
 import type { SetupRationale } from '@/types';
@@ -82,6 +82,8 @@ export default function NewProjectPage() {
   const words = useWorkflowWords();
 
   const [templates, setTemplates] = useState<(WorkflowTemplate & { id: string })[]>([]);
+  // The user's presets taken off the list, to put back (Sean, 23 Oct).
+  const [removedTemplates, setRemovedTemplates] = useState<(WorkflowTemplate & { id: string })[]>([]);
   const [step, setStep] = useState<Step>('ask');
   const [objective, setObjective] = useState('');
   // Client, 21 Oct ("pick your language"): the start screen's conversation and
@@ -104,6 +106,8 @@ export default function NewProjectPage() {
   const [initialFacts, setInitialFacts] = useState<NewFact[]>([]);
   /** The conversation the project starts from, kept as its first stage's chat. */
   const [openingChat, setOpeningChat] = useState<Turn[]>([]);
+  // What "Ask me questions" searched the web for, saved with the project (22 Oct).
+  const [intakeSearches, setIntakeSearches] = useState<FrontDoorSearch[]>([]);
   /** A saved workflow being edited as a copy. */
   const [copying, setCopying] = useState<(WorkflowTemplate & { id: string }) | null>(null);
   const [recommendedKey, setRecommendedKey] = useState<string | null>(null);
@@ -152,6 +156,8 @@ export default function NewProjectPage() {
       .then(setTemplates)
       .catch((e) => setTemplatesError(e instanceof Error && e.message ? e.message : tr('start.loadWorkflowsFailed')))
       .finally(() => setLoadingTemplates(false));
+    // Only the "put back" list; the start screen works without it.
+    listRemovedTemplates().then(setRemovedTemplates).catch(() => setRemovedTemplates([]));
   }, []);
 
   useEffect(() => {
@@ -247,6 +253,8 @@ export default function NewProjectPage() {
       objective: ask.trim(),
       answers: given?.length ? given.slice(0, 8) : undefined,
       ...(brought ? { material: brought } : {}),
+      // A new project has Web access on: its setup may not say there is no web (22 Oct).
+      web_access: 'on',
     });
     const recommended = templateFor(suggestion.workflow) ?? templateFor('single_output');
     const split = withDocuments(ask);
@@ -346,6 +354,33 @@ export default function NewProjectPage() {
     setStep('questions');
   }
 
+  /** Take a preset off the list; projects that use it keep it (Sean, 23 Oct). */
+  async function removePreset(template: WorkflowTemplate & { id: string }) {
+    setError(null);
+    try {
+      await setTemplateRemoved(template.key, true);
+      const left = templates.filter((x) => x.key !== template.key);
+      setTemplates(left);
+      setRemovedTemplates((prior) => [template, ...prior.filter((x) => x.key !== template.key)]);
+      if (templateId === template.id) {
+        setTemplateId((left.find((x) => x.key === (recommendedKey ?? 'single_output')) ?? left.find((x) => x.key === 'single_output') ?? left[0])?.id ?? null);
+      }
+    } catch (e) {
+      setError(t('start.removePresetFailed', { why: e instanceof Error && e.message ? `: ${e.message}` : '' }));
+    }
+  }
+
+  async function restorePreset(template: WorkflowTemplate & { id: string }) {
+    setError(null);
+    try {
+      await setTemplateRemoved(template.key, false);
+      setRemovedTemplates((prior) => prior.filter((x) => x.key !== template.key));
+      setTemplates((prior) => [...prior.filter((x) => x.key !== template.key), template]);
+    } catch (e) {
+      setError(t('start.removePresetFailed', { why: e instanceof Error && e.message ? `: ${e.message}` : '' }));
+    }
+  }
+
   function chooseYourself() {
     setTemplateId(templateFor('book')?.id ?? templates[0]?.id ?? null);
     setRecommendedKey(null);
@@ -441,12 +476,14 @@ export default function NewProjectPage() {
       // What its searches found (22 Oct), saved in the order the conversation
       // cited it, so [S1] in the carried-over chat is [S1] under Web sources.
       let found: ProjectSource[] = [];
-      for (const t of chat) {
-        if (!t.web?.sources.length) continue;
+      // The questions' searches too (22 Oct), when the setup came from them.
+      const searches = [...chat.flatMap((t) => (t.web ? [t.web] : [])), ...(given ? [] : intakeSearches)];
+      for (const web of searches) {
+        if (!web.sources.length) continue;
         try {
-          found = [...found, ...(await saveSources({ ...project, sources: found }, t.web.sources, { query: t.web.query, stageId: selected.stages[0]?.id ?? null }))];
+          found = [...found, ...(await saveSources({ ...project, sources: found }, web.sources, { query: web.query, stageId: selected.stages[0]?.id ?? null }))];
         } catch (e) {
-          failed.push(`web sources found for “${t.web.query}” (${e instanceof Error && e.message ? e.message : 'not stored'})`);
+          failed.push(`web sources found for “${web.query}” (${e instanceof Error && e.message ? e.message : 'not stored'})`);
         }
       }
       if (failed.length) {
@@ -745,7 +782,10 @@ export default function NewProjectPage() {
             objective={objective.trim()}
             material={material}
             busy={working === 'setup'}
-            onDone={(given) => void recommend(given)}
+            onDone={(given, searches) => {
+              setIntakeSearches(searches);
+              void recommend(given);
+            }}
             onBack={() => setStep('ask')}
             maxQuestions={simple ? SIMPLE_GUIDE_QUESTIONS : undefined}
             foldWhy={simple}
@@ -800,8 +840,10 @@ export default function NewProjectPage() {
             draft={draft}
             rationale={rationale}
             onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))}
+            onRemoveTemplate={(x) => void removePreset(x)}
             designer={
               <>
+                <RemovedWorkflows templates={removedTemplates} onRestore={(x) => void restorePreset(x)} />
                 {/* A saved workflow of the user's own can be edited as a copy (6 Oct, email 11). */}
                 {selected?.key.startsWith('custom_') && copying?.id !== selected.id && (
                   <button

@@ -86,3 +86,34 @@ def test_a_failed_search_still_gets_a_reply_and_says_so():
     body = r.json()
     assert body["reply"].startswith("Portugal has about")
     assert body["web_sources"] == [] and "web search failed" in body["web_note"]
+
+
+def test_the_search_is_sent_the_query_not_the_brief():
+    """Sean, 23 Oct: a pricing query returned childcare tools because the whole
+    brief, twice, was what the engine searched."""
+    brief = "Help me choose an AI documentation workflow for Little Steps Learning, an early-intervention business. " * 30
+    stub = _stub({"search": True, "query": "Claude Pro plan pricing official Anthropic"})
+    r = _post({"turns": [{"role": "user", "content": brief}], "web_access": "on"}, stub)
+    assert r.status_code == 200, r.text
+    assert stub.generate_with_web.call_args.args[0] == "Claude Pro plan pricing official Anthropic"
+    assert len(stub.generate_with_web.call_args.kwargs["system"]) < 1_500
+    # Room for a long brief and its results: the reply no longer comes back empty.
+    assert stub.generate_json.call_args_list[1].kwargs["max_tokens"] >= 4_000
+
+
+def test_a_brief_with_no_reply_says_what_happened_rather_than_asking_again():
+    from promptmaster.front_door import Turn, parse_front_door
+
+    turns = [Turn(role="user", content="A memo comparing Claude and Copilot for Nancy, under $60 a month")]
+    done = parse_front_door({"reply": "", "brief": {"objective": "Compare AI tools for Nancy"}, "enough": True}, turns)
+    assert done.ready and "enough to set the project up" in done.reply
+    partway = parse_front_door({"brief": {"objective": "Compare AI tools for Nancy"}}, turns)
+    assert "Tell me more" not in partway.reply
+
+
+def test_a_decision_that_is_not_an_object_is_no_search():
+    stub = _stub()
+    stub.generate_json = AsyncMock(side_effect=[(["search"], {}), (REPLY, {})])
+    r = _post(_body(web_access="on"), stub)
+    assert r.status_code == 200, r.text
+    stub.generate_with_web.assert_not_called()

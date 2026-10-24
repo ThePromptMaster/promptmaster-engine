@@ -89,7 +89,8 @@ def test_a_question_about_the_world_is_searched_and_cited_by_the_numbers_it_will
     saved = [SavedSource(url="https://example.org/saved", title="Already saved")]
     r = _post(body(web_access="on", inputs=_inputs(sources=saved)), stub)
     assert r.status_code == 200, r.text
-    assert "SEARCH FOR: Harbor Industrial Services revenue growth 2025" in stub.generate_with_web.call_args.args[0]
+    # What the engine searches is the query alone (23 Oct).
+    assert stub.generate_with_web.call_args.args[0] == "Harbor Industrial Services revenue growth 2025"
     prompt = _reply_prompt(stub)
     found = prompt.split("NEW WEB RESULTS", 1)[1]
     # The saved link keeps [S1]; the new one follows it.

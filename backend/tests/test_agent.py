@@ -715,3 +715,10 @@ def test_the_latest_change_reaches_the_planner():
     assert "+ Effect size (to be estimated from the pilot)" in user
     _, without = build_next_action_prompt(INPUTS, STATE, RESEARCH, "guided")
     assert "LATEST CHANGE" not in without
+
+
+def test_a_long_rationale_is_cut_to_what_a_web_search_accepts():
+    """Sean, 23 Oct: a web search was refused because its purpose — the
+    planner's rationale — ran past 600 characters."""
+    choice = parse_next_action({"action_key": "derive", "rationale": "Because. " * 200}, RESEARCH)
+    assert len(choice.rationale) <= 600
