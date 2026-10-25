@@ -55,6 +55,20 @@ function transformInline(prose: string, transform: (p: string) => string): strin
 }
 
 const LATEX_HINT = /[\\^_{}=]/;
+/**
+ * A short formula with no LaTeX in it — "$n+1$", "$x<y$", "$(a-b)/2$" (25 Oct,
+ * Sean: maths shown with its dollars). It starts with a letter or a bracket,
+ * holds an operator, and has no run of ordinary words: "$Apple-branded$" is not one.
+ */
+const SHORT_FORMULA = /^[A-Za-z(][^$]{0,38}$/;
+const OPERATOR = /[+\-*/<>|]/;
+const PROSE_WORDS = /[A-Za-z]{4,}\W+[A-Za-z]{4,}|[A-Za-z]{4,}-[A-Za-z]{4,}/;
+
+function plainlyMaths(body: string): boolean {
+  const b = body.trim();
+  if (LATEX_HINT.test(b) || /^[A-Za-z]$/.test(b)) return true;
+  return SHORT_FORMULA.test(b) && OPERATOR.test(b) && !PROSE_WORDS.test(b);
+}
 
 export function normalizeMath(text: string): string {
   if (!text) return text;
@@ -66,7 +80,7 @@ export function normalizeMath(text: string): string {
       .replace(/\\\(([\s\S]+?)\\\)/g, (_m, body: string) => `$$${body.trim()}$$`)
       // $ … $ that is plainly LaTeX → inline maths. Never money: "$8,000 and $9,000".
       .replace(/(?<![$\\\d])\$(?!\$)(?=\S)([^$\n]{1,400}?)(?<=\S)\$(?![$\d])/g, (m, body: string) =>
-        LATEX_HINT.test(body) || /^[A-Za-z]$/.test(body.trim()) ? `$$${body}$$` : m
+        plainlyMaths(body) ? `$$${body}$$` : m
       )
   );
 }
