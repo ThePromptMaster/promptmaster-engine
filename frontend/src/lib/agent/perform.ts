@@ -18,7 +18,7 @@ import { countNamedSections, parseOutlineDocument } from '@/lib/outline/model';
 import { approvedOutlineVersionId, commitOutlineVersion } from '@/lib/supabase/outline';
 import { appendWorkflowEvent, listWorkflowEvents } from '@/lib/supabase/workflow';
 import { getArtifact } from '@/lib/supabase/versions';
-import { manuscriptArtifactFor, measureStageContent, stageRequirements } from '@/lib/workflow/context';
+import { manuscriptArtifactFor, manuscriptSourceFor, measureStageContent, stageRequirements } from '@/lib/workflow/context';
 import { COUNTING_RULE, isPart, measure, replaceSection, sectionFor, type MeasurableRequirement } from '@/lib/workflow/measurable';
 import { describeLines, isChangeNote, keepUnasked, structureDropped } from '@/lib/workflow/preservation';
 import { addedClaims, noInventedDetails, suppliedText } from '@/lib/workflow/fact-boundary';
@@ -230,7 +230,7 @@ async function waitForSections(
 /** The bundles with the chapters re-read for a stage that reads them; null when none has text. */
 async function readManuscript(ctx: PerformContext, target: StageDefinition): Promise<Record<string, StageArtifactBundle> | null> {
   try {
-    return await withFreshManuscript(ctx.template, target, ctx.bundles);
+    return await withFreshManuscript(ctx.template, target, ctx.bundles, ctx.project.id);
   } catch (e) {
     if (e instanceof ManuscriptMissing) return null;
     throw e;
@@ -905,7 +905,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         source: 'the stage check', signal: ctx.signal, stageId: ctx.stage.id, agentRunId: ctx.run.id,
         // A table is revised as rows, by the generator that drafted it.
         ...(rendererHoldsItems(ctx.stage.renderer)
-          ? { table: { stage: ctx.stage, request: (instruction: string) => generationRequest(ctx.project, ctx.template, ctx.state, ctx.bundles, ctx.stage, head.content, instruction) } }
+          ? { table: { stage: ctx.stage, request: async (instruction: string) => generationRequest(ctx.project, ctx.template, ctx.state, (await readManuscript(ctx, ctx.stage)) ?? ctx.bundles, ctx.stage, head.content, instruction) } }
           : {}),
       });
       // Go's own apply, told apart from the user's Apply button in the history.
@@ -1323,7 +1323,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       }
       if (!ctx.recordStageEvaluation) throw new Error('This view cannot save evaluations.');
       const res = await api.evaluateStageArtifact(
-        evaluationRequest(ctx.project, ctx.template, ctx.state, ctx.bundles, ctx.stage, version.content, ctx.approvedOutline),
+        evaluationRequest(ctx.project, ctx.template, ctx.state, (await readManuscript(ctx, ctx.stage)) ?? ctx.bundles, ctx.stage, version.content, ctx.approvedOutline),
         ctx.signal
       );
       await ctx.recordStageEvaluation(
@@ -1595,7 +1595,10 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       if (ctx.appendStageVersion && head.trim() && target.renderer !== 'long_form' && target.renderer !== 'outline') {
         const instruction = returnInstruction(ctx.stage, ctx.bundles[ctx.stage.id]?.versions.at(-1)?.content, target, work);
         try {
-          const fresh = await withFreshManuscript(ctx.template, target, ctx.bundles).catch(() => ctx.bundles);
+          // Never rewritten without the chapters it reviews (25 Oct): the
+          // missing text was swallowed here, and the review said "no draft".
+          const fresh = await readManuscript(ctx, target);
+          if (!fresh) throw new ManuscriptMissing(manuscriptSourceFor(ctx.template, target)?.label ?? 'the drafting stage');
           const res = await api.generateStageArtifact(generationRequest(ctx.project, ctx.template, ctx.state, fresh, target, head, instruction), ctx.signal);
           await keepWeb(ctx, res, target);
           const generated = generationContent(target, res);

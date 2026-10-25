@@ -92,6 +92,27 @@ afterEach(() => {
 });
 
 describe('loadProject', () => {
+  it('a late reload of a project the user has left does not replace the open one (25 Oct, side chat from another subject)', async () => {
+    await loadFixture();
+    getProject.mockClear();
+    await useProjectStore.getState().loadProject('p-old', { background: true });
+    expect(getProject).not.toHaveBeenCalled();
+    expect(useProjectStore.getState().projectId).toBe('p1');
+  });
+
+  it('a slow load of the previous project lands after the next one opened and is dropped', async () => {
+    let release: (p: Project) => void = () => undefined;
+    getProject.mockImplementationOnce(() => new Promise<Project>((r) => { release = r; }));
+    listArtifacts.mockResolvedValue([]);
+    const slow = useProjectStore.getState().loadProject('pA');
+    getProject.mockResolvedValueOnce(project({ id: 'pB', title: 'B' }));
+    await useProjectStore.getState().loadProject('pB');
+    release(project({ id: 'pA', title: 'A' }));
+    await slow;
+    expect(useProjectStore.getState().projectId).toBe('pB');
+    expect(useProjectStore.getState().project?.title).toBe('B');
+  });
+
   it('hydrates project, artifact and versions', async () => {
     await loadFixture();
     const s = useProjectStore.getState();

@@ -150,7 +150,7 @@ export function useStageGeneration({
 
       try {
         // The chapters as saved, not this page's copy (10 Oct, email 6.2).
-        const fresh = manuscriptSourceFor(t, target) ? await withFreshManuscript(t, target, b) : b;
+        const fresh = manuscriptSourceFor(t, target) ? await withFreshManuscript(t, target, b, p.id) : b;
         const response = await api.generateStageArtifact(
           generationRequest(p, t, s, fresh, target, options?.force ? head : ''),
           controller.signal
