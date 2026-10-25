@@ -335,6 +335,14 @@ pause for approval if the policy says so → `performStep` → close the step wi
 derived from what happened (`lib/agent/labels.ts`). `run_computation` is followed by an
 automatic `interpret_result` step that cites the sandbox run.
 
+**Stages added while it runs (2026-10-25).** A project's template is the pinned version plus
+its `stage_added` events (`lib/workflow/added-stages.ts::effectiveTemplate`), computed once at
+the top of `WorkflowWorkspace`. Every reader gets that one template, and `projectState` enters
+an added stage. Go records `stage_added` with the `add_stage` move, or from the objective
+check's executable `next_task`. The trigger `workflow_events_agent_authorized` admits it only
+for a running, authorized autonomous run under the routine-decision policy, with a reason,
+three per run. The user's own Add is an ordinary user event. See L-115 and L-116.
+
 **One read per pass (2026-10-01).** `readStageFacts` (`lib/agent/facts.ts`) reads the
 outline, the manuscript and the event log from the database, and that one read decides
 the allowed moves, the requirements (`contextWithFacts` → `evaluateStage`), whether the

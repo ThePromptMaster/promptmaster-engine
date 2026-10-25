@@ -2287,3 +2287,38 @@ instead, and forbids judging on protected characteristics or their proxies, but 
 checks a verdict against the source afterwards. Go cannot paste for the user, so on an
 Assess stage it waits; drafting and stage checks do not apply there. The client asked for
 this on 25 Oct (screening LinkedIn profiles); nothing in it names candidates or search.
+
+### L-115 — Stages added while a project runs (2026-10-25)
+
+A project can gain a stage after it starts: a `stage_added` event carries the stage's design, and
+`effectiveTemplate` puts it into the pinned template, which is otherwise unchanged. Go adds one
+on its own only in an investigation (research or a designed inquiry), under Autonomous with
+routine decisions handed to it. It may add at most three in a run, and the database enforces
+that. Under "Ask me" it proposes the stage and the user adds it. An added stage is a page,
+a table or a check with no approval of its own; it cannot be skipped by Go, returned to, or
+removed. A writing workflow's unmet objective is still fixed in its own stages ("Have Go fix
+it"), not by adding new ones. Sean's quantum-gravity run (25 Oct) is what prompted this.
+
+### L-116 — What is missing blocks only the task that needs it (2026-10-25)
+
+The objective check names the next task PromptMaster can do now and which of its blockers that
+task needs. A blocker the task does not need no longer pauses the run, but it stays on the
+record ("Missing, but not needed for it"). Whether a task needs something is still the
+model's reading of the saved text, so a task it wrongly calls executable is attempted, and its
+own stage then says what it lacked.
+
+### L-117 — Approvals reach prompts; "re-confirm" is shown, not enforced (2026-10-25)
+
+Every prompt now lists the approvals the user ticked, each with the version it was given on.
+An approval given on an older version is still an approval of that version: prompts are told
+the current version number. The checklist shows "approved vN, now vM", but nothing unticks the
+approval automatically and Go does not re-confirm it.
+
+### L-118 — How a result stands is the model's own label (2026-10-25)
+
+Stage prompts ask each result to be called reasoned, calculated, externally verified,
+conditional or speculative, and forbid "calculated" or "verified" without the evidence. This is
+a prompt rule, not a code check of the text. What code does label is each Go step's
+execution label, which is derived from what ran (`lib/agent/labels.ts`). A literature row is
+"Retrieved" only when OpenAlex or a saved web source [S#] names it; otherwise it stays
+"Suggested by PromptMaster — not retrieved".
