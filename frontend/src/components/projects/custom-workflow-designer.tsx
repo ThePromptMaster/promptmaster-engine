@@ -8,6 +8,7 @@ import type { MessageKey } from '@/lib/i18n/messages/en';
 import { api } from '@/lib/api/client';
 import { publishUserTemplate } from '@/lib/supabase/workflow';
 import { templateFromDesign, type DesignedKind, type DesignedStage, type DesignedWorkflow } from '@/lib/workflow/custom';
+import { SCALE_PRESETS } from '@/lib/workflow/assess';
 import { validateTemplate } from '@/lib/workflow/validate';
 import type { WorkflowExecution, WorkflowTemplate } from '@/lib/workflow/types';
 import { AutoGrowTextarea } from '@/components/shared/auto-grow-textarea';
@@ -272,8 +273,25 @@ export function CustomWorkflowDesigner({
                         <option value="write">{t('cwd.kindWrite')}</option>
                         <option value="list">{t('cwd.kindList')}</option>
                         <option value="check">{t('cwd.kindCheck')}</option>
+                        <option value="assess">{t('cwd.kindAssess')}</option>
                       </select>
                     </label>
+                    {s.kind === 'assess' && (
+                      <label className="text-label text-[var(--on-surface-variant)]">
+                        {t('assess.scale')}
+                        <select
+                          value={s.scale_levels && s.scale_levels.length >= 2 ? 'custom' : (s.scale || 'traffic')}
+                          onChange={(e) => edit(i, e.target.value === 'custom' ? { scale: '' } : { scale: e.target.value, scale_levels: [] })}
+                          aria-label={t('cwd.scaleOf', { n: i + 1 })}
+                          className={`${small} ms-2`}
+                        >
+                          {SCALE_PRESETS.map((p) => (
+                            <option key={p.id} value={p.id}>{t(`assess.preset.${p.id}` as MessageKey)}</option>
+                          ))}
+                          {s.scale_levels && s.scale_levels.length >= 2 && <option value="custom">{s.scale_levels.join(' / ')}</option>}
+                        </select>
+                      </label>
+                    )}
                     <label className="text-label text-[var(--on-surface-variant)]">
                       {t('cwd.purpose')}
                       <input value={s.purpose} onChange={(e) => edit(i, { purpose: e.target.value.slice(0, 2_000) })} aria-label={t('cwd.purposeOf', { n: i + 1 })} className={`${field} mt-1 bg-[var(--surface-container-lowest)]`} />

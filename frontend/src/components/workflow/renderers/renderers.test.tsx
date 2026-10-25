@@ -147,8 +147,8 @@ describe('renderers are workflow-agnostic', () => {
     // fields only the workspace is allowed to route on. A prose comment saying
     // "research claims" is not a branch.
     const banned: Array<[RegExp, string]> = [
-      [/['"`](book|research|single_output)['"`]/, 'a workflow key as a string literal'],
-      [/\b(BOOK_V1|RESEARCH_V1|SINGLE_OUTPUT_V1)\b/, 'a template import'],
+      [/['"`](book|research|single_output|exploration|assessment)['"`]/, 'a workflow key as a string literal'],
+      [/\b(BOOK_V1|RESEARCH_V1|SINGLE_OUTPUT_V1|EXPLORATION_V1|ASSESSMENT_V1)\b/, 'a template import'],
       [/\b(template|workflow)\s*[.?]\s*(key|outline_stage|derived_outline)\b/, 'the workflow identity'],
     ];
 

@@ -9,9 +9,10 @@
 
 import { getStage } from './engine';
 import { ITEM_SCHEMAS, rendererHoldsItems } from './stage-artifact';
+import { SCALE_LIMITS, presetScale, validScale } from './assess';
 import type { StageRenderer, WorkflowTemplate } from './types';
 
-const RENDERERS: readonly StageRenderer[] = ['prose', 'list', 'outline', 'long_form', 'review'];
+const RENDERERS: readonly StageRenderer[] = ['prose', 'list', 'outline', 'long_form', 'review', 'assess'];
 const GROUPS = ['planning', 'outlining', 'drafting', 'expansion', 'evaluation', 'revision', 'final_review'];
 
 /**
@@ -60,6 +61,14 @@ export function validateTemplate(
     }
     for (const m of s.recommended_modes) {
       if (m.reason.length > 80) errors.push(`"${s.label}": a mode's reason is longer than 80 characters.`);
+    }
+    // An Assess stage judges against what came before it, on a scale it can hold (25 Oct).
+    if (s.renderer === 'assess') {
+      if (stages.indexOf(s) === 0) errors.push(`"${s.label}" assesses against criteria, so a stage before it must set them.`);
+      const scale = s.assess?.scale;
+      if (typeof scale === 'string' ? !presetScale(scale) : scale && !validScale({ id: 'custom', levels: scale })) {
+        errors.push(`"${s.label}" has a scale that cannot be used: name a preset, or give ${SCALE_LIMITS.minLevels} to ${SCALE_LIMITS.maxLevels} levels.`);
+      }
     }
     if (rendererHoldsItems(s.renderer) && s.exit_criteria.some((c) => c.rule?.type === 'every_item_has_status')) {
       const kind = s.expected_artifacts[0]?.kind;

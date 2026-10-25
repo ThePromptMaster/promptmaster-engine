@@ -164,12 +164,21 @@ the stage the user is viewing read the same facts.
 ### Renderers
 
 `stage.renderer` is dispatched by `components/workflow/renderers/stage-renderer.tsx`.
-Four renderers — `prose`, `list`, `review`, `long_form` — cover 33 stages across the
-three workflows (book 15, research 13, single_output 5), plus the outline stage, which
+Five renderers — `prose`, `list`, `review`, `long_form`, `assess` — cover every stage
+of the system workflows and of designed ones, plus the outline stage, which
 is served by `OutlineStagePanel` mounted directly by the workspace rather than through
 the renderer switch. (`CLAUDE.md` said "five renderers cover 26 stages across both
 workflows"; that was true when written, before `single_output` and the later template
 versions. Corrected there in the same change that added these documents.)
+
+**Assess (2026-10-25).** An `assess` stage is filled by what the user pastes, a batch at a
+time, rather than drafted: `POST /api/assess-batch` finds each item in the paste and judges
+it against the earlier stages (the digest) on the scale the stage offers, and the browser
+appends the rows to the stage's table as one version (`assess_batch`). The version content
+is the ordinary `stage_items` document plus `scale`, so counts, digests and the chat read
+it like any table. The scale is fixed once the table has rows; a verdict the user changes
+keeps the model's on `model_verdict`. `stageDrafts` is false for it, so neither the Draft
+button nor Go drafts it, and Go cannot paste for the user.
 
 **A chapter takes the mode as a voice, not as a scaffold (2026-10-03).** Every stage
 prompt goes through `_shared_system` (`backend/promptmaster/conversation.py`): the

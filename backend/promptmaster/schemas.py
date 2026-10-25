@@ -645,7 +645,7 @@ class StageDescriptor(BaseModel):
     """The stage being generated for, lifted straight from the template."""
     id: str
     label: str = Field(default="")
-    renderer: Literal["prose", "list", "outline", "long_form", "review"] = "prose"
+    renderer: Literal["prose", "list", "outline", "long_form", "review", "assess"] = "prose"
     entry_prompt_hint: str = Field(default="", description="The stage's authored instruction.")
     artifact_kind: str = Field(default="", description="Primary expected artifact kind.")
     exit_criteria: list[StageExitCriterion] = Field(

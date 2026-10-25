@@ -3,6 +3,7 @@ import type { RevisionBrief } from '@/lib/workflow/revision';
 import type { StageFailure } from '@/lib/errors/recovery';
 import type { StageDefinition } from '@/lib/workflow/types';
 import type { StageItem, StageItemSchema } from '@/lib/workflow/stage-artifact';
+import type { AssessScale } from '@/lib/workflow/assess';
 import type { Evaluation, ArtifactVersion, Project } from '@/types/project';
 import type { NewVersion } from '@/lib/supabase/versions';
 import type { LongFormState } from '@/types';
@@ -107,6 +108,13 @@ export interface StageRendererProps {
   onLookupItems?: (items: StageItem[]) => Promise<{ items: StageItem[]; message: string }>;
   /** Proposals for the rows still without a status, from their own text (3 Oct). Nothing is saved. */
   onProposeStatuses?: (items: StageItem[]) => Promise<{ items: StageItem[]; message: string }>;
+
+  /**
+   * Assess stages: judge a pasted batch on the scale and save the table with
+   * the new rows appended, as one version. Resolves to a sentence saying what
+   * was added; rejects with the reason it was not.
+   */
+  onAssessBatch?: (input: { text: string; scale: AssessScale; existing: StageItem[] }) => Promise<string>;
 
   /** True while a draft is being generated for this stage. */
   generating: boolean;

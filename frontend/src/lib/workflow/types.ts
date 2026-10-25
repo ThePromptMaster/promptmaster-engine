@@ -32,7 +32,19 @@ export type StageGroup =
  * the same component with different columns, which is the sharpest evidence
  * that the engine is genuinely shared.
  */
-export type StageRenderer = 'prose' | 'list' | 'outline' | 'long_form' | 'review';
+export type StageRenderer = 'prose' | 'list' | 'outline' | 'long_form' | 'review' | 'assess';
+
+/**
+ * An Assess stage (25 Oct, client: screening pasted profiles in batches): the
+ * user pastes items, each is judged against what the earlier stages
+ * established, on a scale. Data, so a designed workflow carries its own.
+ */
+export interface AssessSpec {
+  /** The scale offered before the first batch: a preset id (`lib/workflow/assess.ts`), or levels best first. */
+  scale: string | { label: string; tone: 'good' | 'caution' | 'bad' | 'neutral'; meaning?: string }[];
+  /** What is pasted, plural, as the paste box names it ("profiles"); absent says "items". */
+  item_noun?: string;
+}
 
 /**
  * Exit criteria are declarative predicates, never functions.
@@ -136,6 +148,8 @@ export interface StageDefinition {
   /** Offered as radio options when skipping; free text is also allowed. */
   skip_reasons: string[];
   transitions: StageTransitions;
+  /** Present on `assess` stages. */
+  assess?: AssessSpec;
 }
 
 /**

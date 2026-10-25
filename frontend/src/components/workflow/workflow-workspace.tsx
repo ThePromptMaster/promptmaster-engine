@@ -74,6 +74,8 @@ import {
 } from '@/lib/workflow/engine';
 import { checkVerdict } from '@/lib/workflow/check-verdict';
 import { buildStageDigest, formatManuscript, summariseStageContent } from '@/lib/workflow/digest';
+import { appendBatch, scaleForRequest, serializeAssessment, type AssessScale } from '@/lib/workflow/assess';
+import { keepFound, webAccessOf } from '@/lib/workflow/web-found';
 import { goWaitingLine, objectiveUnmet } from '@/lib/workflow/objective';
 import { recordFacts, supersedeFact } from '@/lib/supabase/facts';
 import { factsAlreadyRecorded, planFactRecording } from '@/lib/workflow/record-facts';
@@ -1224,6 +1226,43 @@ export function WorkflowWorkspace({
     [stage, project]
   );
 
+  // An Assess stage's batch (25 Oct): judged on the scale, then saved as the
+  // table with the new rows appended. The rows are the record; nothing else moves.
+  const assessBatch = useCallback(
+    async ({ text, scale, existing }: { text: string; scale: AssessScale; existing: StageItem[] }) => {
+      if (!stage || !appendStageVersion) throw new Error(t('assess.failedUnknown'));
+      const head = headVersion?.content ?? '';
+      const res = await api.assessBatch({
+        inputs: inputsFrom(project),
+        digest: buildStageDigest(template, state, project, stageBundles, stage.id),
+        scale: scaleForRequest(scale),
+        text,
+        stage_hint: stage.entry_prompt_hint ?? '',
+        already: existing.map((i) => i.subject ?? '').filter(Boolean),
+        model: project.model,
+        web_access: webAccessOf(project),
+      });
+      await keepFound(project, res, { stageId: stage.id });
+      const said: string[] = [];
+      if (res.web_query) said.push(t('assess.searched', { query: res.web_query }));
+      if (!res.items.length) return [t('assess.none'), ...said].join(' ');
+      await appendStageVersion(stage.id, stage.label, {
+        content: serializeAssessment(scale, appendBatch(existing, res.items, new Date().toISOString())),
+        source_operation: 'assess_batch',
+        model: res.model_used || project.model,
+        mode: project.mode,
+        change_summary: `Assessed ${res.items.length} item${res.items.length === 1 ? '' : 's'}.`,
+        base_content: head,
+      });
+      setActiveVersionId(null);
+      said.unshift(t('assess.added', { n: res.items.length }));
+      if (res.ungraded) said.push(t('assess.ungraded', { n: res.ungraded }));
+      if (res.not_assessed) said.push(t('assess.notAssessed', { n: res.not_assessed }));
+      return said.join(' ');
+    },
+    [stage, appendStageVersion, headVersion?.content, project, template, state, stageBundles, t]
+  );
+
   const restore = useCallback(
     async (versionId: string) => {
       if (!stage || !restoreStageVersion) return;
@@ -2363,7 +2402,7 @@ export function WorkflowWorkspace({
               </div>
             )}
             {explicitOutlineHere ? null : !stageDrafts(stage) &&
-              stage.renderer !== 'long_form' ? (
+              stage.renderer !== 'long_form' && stage.renderer !== 'assess' ? (
               <CheckpointPanel />
             ) : (
               <div
@@ -2384,6 +2423,7 @@ export function WorkflowWorkspace({
                 onSaveItems={appendStageVersion ? saveItems : undefined}
                 onLookupItems={itemSchemaFor(stage).lookup ? lookupItems : undefined}
                 onProposeStatuses={(itemSchemaFor(stage).statuses ?? []).some((s) => s.modelMayPropose) ? proposeItems : undefined}
+                onAssessBatch={stage.renderer === 'assess' && appendStageVersion ? assessBatch : undefined}
                 generating={generation.generating}
                 generationError={generation.error}
                 onGenerate={generation.generate}

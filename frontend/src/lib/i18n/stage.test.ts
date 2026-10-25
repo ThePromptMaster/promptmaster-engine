@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { BOOK_V1 } from '@/lib/workflow/templates/book.v1';
 import { EXPLORATION_V1 } from '@/lib/workflow/templates/exploration.v1';
+import { ASSESSMENT_V1 } from '@/lib/workflow/templates/assessment.v1';
 import { RESEARCH_V1 } from '@/lib/workflow/templates/research.v1';
 import { SINGLE_OUTPUT_V1 } from '@/lib/workflow/templates/single-output.v1';
 import { operationLabel } from '@/lib/workflow/labels';
@@ -11,7 +12,7 @@ import { resetLocaleForTests, setLocale } from './store';
 import { shownModeName, shownModeReason, shownOperationLabel, shownStageId } from './stage';
 import { versionPillLabel } from '@/components/workflow/renderers/stage-chrome';
 
-const SYSTEM = [BOOK_V1, RESEARCH_V1, SINGLE_OUTPUT_V1, EXPLORATION_V1];
+const SYSTEM = [BOOK_V1, RESEARCH_V1, SINGLE_OUTPUT_V1, EXPLORATION_V1, ASSESSMENT_V1];
 
 describe('the stage renderers in the interface language (client, 21 Oct)', () => {
   afterEach(() => {

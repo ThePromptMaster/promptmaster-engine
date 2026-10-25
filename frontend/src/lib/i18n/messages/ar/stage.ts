@@ -57,6 +57,7 @@ export const ar: Record<keyof typeof en, string> = {
   'op.agent_outline': 'مخطط من وضع Go',
   'op.agent_triage': 'وضع Go: حُسمت الملاحظات الروتينية',
   'op.agent_apply': 'وضع Go: طُبّقت الملاحظات',
+  'op.assess_batch': 'تم تقييم دفعة',
   'op.manuscript_snapshot': 'المسودة الكاملة قبل المراجعة',
   'op.finished_version': 'النسخة النهائية',
   // Prose (prose-renderer.tsx)

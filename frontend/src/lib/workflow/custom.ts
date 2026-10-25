@@ -8,9 +8,10 @@
  * `validateTemplate` is the check before it is saved.
  */
 
-import type { ExitCriterion, StageDefinition, StageGroup, WorkflowExecution, WorkflowTemplate } from './types';
+import type { AssessSpec, ExitCriterion, StageDefinition, StageGroup, WorkflowExecution, WorkflowTemplate } from './types';
+import { presetScale, toneAt } from './assess';
 
-export type DesignedKind = 'write' | 'list' | 'check';
+export type DesignedKind = 'write' | 'list' | 'check' | 'assess';
 
 export interface DesignedStage {
   label: string;
@@ -26,6 +27,11 @@ export interface DesignedStage {
   decision?: string;
   /** Ongoing work: this stage closes a round, and the next starts from the stage with this label. */
   loop_back_to?: string;
+  /** Assess stages (25 Oct): a preset scale's id, or the user's own levels best first. */
+  scale?: string;
+  scale_levels?: string[];
+  /** Assess stages: what is pasted, plural. */
+  item_noun?: string;
 }
 
 export interface DesignedWorkflow {
@@ -37,10 +43,11 @@ export interface DesignedWorkflow {
   stages: DesignedStage[];
 }
 
-const RENDERER = { write: 'prose', list: 'list', check: 'review' } as const;
+const RENDERER = { write: 'prose', list: 'list', check: 'review', assess: 'assess' } as const;
 /** Kinds the item registry already knows, so a table has real columns and statuses. */
 const LIST_KIND = 'research_notes';
 const CHECK_KIND = 'critique_report';
+const ASSESS_KIND = 'assessments';
 
 export function slug(text: string): string {
   const s = text.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 30);
@@ -50,7 +57,7 @@ export function slug(text: string): string {
 function groupFor(index: number, count: number, kind: DesignedKind): StageGroup {
   if (index === 0) return 'planning';
   if (index === count - 1) return 'final_review';
-  return kind === 'check' ? 'evaluation' : 'drafting';
+  return kind === 'check' || kind === 'assess' ? 'evaluation' : 'drafting';
 }
 
 function criteriaFor(stage: DesignedStage, id: string, first: boolean): ExitCriterion[] {
@@ -58,6 +65,7 @@ function criteriaFor(stage: DesignedStage, id: string, first: boolean): ExitCrit
   if (first) out.push({ id: `${id}.objective`, label: 'Objective is stated', check: 'auto', rule: { type: 'field_non_empty', field: 'objective' }, blocking: true });
   if (stage.kind === 'write') out.push({ id: `${id}.written`, label: `${stage.label} is written`, check: 'auto', rule: { type: 'artifact_non_empty' }, blocking: true });
   if (stage.kind === 'list') out.push({ id: `${id}.items`, label: 'At least one item', check: 'auto', rule: { type: 'min_items', n: 1 }, blocking: true });
+  if (stage.kind === 'assess') out.push({ id: `${id}.assessed`, label: 'At least one item is assessed', check: 'auto', rule: { type: 'min_items', n: 1 }, blocking: true });
   if (stage.kind === 'check') out.push({ id: `${id}.triaged`, label: 'Every finding accepted or rejected', check: 'auto', rule: { type: 'all_findings_triaged' }, blocking: false });
   if (stage.approval.trim()) {
     // Only an explicit "routine" is delegable; a design from before 6 Oct has
@@ -92,7 +100,7 @@ export function templateFromDesign(design: DesignedWorkflow, suffix: string): Wo
     entry_prompt_hint: s.instruction.trim() || `Produce the ${s.label.trim().toLowerCase() || 'stage'}.`,
     exit_criteria: criteriaFor(s, ids[i], i === 0),
     expected_artifacts: [{
-      kind: s.kind === 'list' ? LIST_KIND : s.kind === 'check' ? CHECK_KIND : `${ids[i]}_text`,
+      kind: s.kind === 'list' ? LIST_KIND : s.kind === 'check' ? CHECK_KIND : s.kind === 'assess' ? ASSESS_KIND : `${ids[i]}_text`,
       cardinality: 'one',
       primary: true,
     }],
@@ -106,6 +114,7 @@ export function templateFromDesign(design: DesignedWorkflow, suffix: string): Wo
       // from an earlier stage. Only in an ongoing workflow, only backwards.
       ...(loopTarget(design, i, ids) ? { loop_to: loopTarget(design, i, ids)! } : {}),
     },
+    ...(s.kind === 'assess' ? { assess: assessSpec(s) } : {}),
   }));
   return {
     key: `custom_${suffix}`,
@@ -120,6 +129,14 @@ export function templateFromDesign(design: DesignedWorkflow, suffix: string): Wo
   };
 }
 
+/** The scale a designed assess stage offers: the user's own levels, a preset, or the traffic light. */
+function assessSpec(s: DesignedStage): AssessSpec {
+  const levels = (s.scale_levels ?? []).map((l) => l.trim()).filter(Boolean).slice(0, 7);
+  const scale: AssessSpec['scale'] =
+    levels.length >= 2 ? levels.map((label, i) => ({ label, tone: toneAt(i, levels.length) })) : presetScale(s.scale) ? s.scale! : 'traffic';
+  return { scale, ...(s.item_noun?.trim() ? { item_noun: s.item_noun.trim() } : {}) };
+}
+
 function loopTarget(design: DesignedWorkflow, i: number, ids: readonly string[]): string | null {
   if (design.execution?.kind !== 'ongoing') return null;
   const target = design.stages[i].loop_back_to?.trim();
@@ -128,7 +145,7 @@ function loopTarget(design: DesignedWorkflow, i: number, ids: readonly string[])
   return at >= 0 && at < i ? ids[at] : null;
 }
 
-const KIND_OF: Record<string, DesignedKind> = { prose: 'write', list: 'list', review: 'check' };
+const KIND_OF: Record<string, DesignedKind> = { prose: 'write', list: 'list', review: 'check', assess: 'assess' };
 
 /**
  * A saved workflow back as a design, to edit a copy of it (7 Oct; Sean, 6 Oct,
@@ -157,6 +174,11 @@ export function designFromTemplate(template: WorkflowTemplate): DesignedWorkflow
         approval_kind: approval?.authority === 'delegable' ? 'routine' : 'decision',
         decision: decision?.label ?? '',
         loop_back_to: s.transitions.loop_to ? (byId.get(s.transitions.loop_to) ?? '') : '',
+        ...(s.assess
+          ? typeof s.assess.scale === 'string'
+            ? { scale: s.assess.scale, item_noun: s.assess.item_noun ?? '' }
+            : { scale_levels: s.assess.scale.map((l) => l.label), item_noun: s.assess.item_noun ?? '' }
+          : {}),
       };
     }),
   };

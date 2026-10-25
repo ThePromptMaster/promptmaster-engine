@@ -43,6 +43,7 @@ const OPERATION_LABEL: Record<string, string> = {
   agent_outline: 'Go mode outline',
   agent_triage: 'Go mode: routine findings decided',
   agent_apply: 'Go mode: findings applied',
+  assess_batch: 'Batch assessed',
   manuscript_snapshot: 'Full draft before revision',
   finished_version: 'Finished version',
 };
@@ -57,6 +58,7 @@ const OPERATION_LABEL: Record<string, string> = {
 const SAVED_OPERATIONS = new Set([
   'stage_edit', 'chat_instruct', 'applied_recommendations', 'applied_findings', 'restore', 'outline_edit', 'initial',
   'chat_save', 'chat_rows', 'literature_lookup', 'literature_search', 'sandbox_result', 'long_form_complete', 'manuscript_snapshot', 'finished_version',
+  'assess_batch',
 ]);
 
 export function isSaved(operation: string | null | undefined): boolean {

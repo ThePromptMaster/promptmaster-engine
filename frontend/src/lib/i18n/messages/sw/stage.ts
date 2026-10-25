@@ -55,6 +55,7 @@ export const sw: Record<keyof typeof en, string> = {
   'op.agent_outline': 'Muhtasari wa Hali ya Go',
   'op.agent_triage': 'Hali ya Go: matokeo ya kawaida yameamuliwa',
   'op.agent_apply': 'Hali ya Go: matokeo yametumika',
+  'op.assess_batch': 'Kundi limetathminiwa',
   'op.manuscript_snapshot': 'Rasimu kamili kabla ya marekebisho',
   'op.finished_version': 'Toleo lililokamilika',
   'stage.work': 'Kazi ya {stage}',

@@ -57,6 +57,7 @@ export const hi: Record<keyof typeof en, string> = {
   'op.agent_outline': 'Go मोड रूपरेखा',
   'op.agent_triage': 'Go मोड: सामान्य निष्कर्षों पर निर्णय लिया गया',
   'op.agent_apply': 'Go मोड: निष्कर्ष लागू किए गए',
+  'op.assess_batch': 'बैच का आकलन किया गया',
   'op.manuscript_snapshot': 'संशोधन से पहले का पूरा मसौदा',
   'op.finished_version': 'अंतिम संस्करण',
   // Prose (prose-renderer.tsx)

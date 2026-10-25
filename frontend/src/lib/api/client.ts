@@ -777,6 +777,29 @@ export const api = {
     return apiFetch('/api/agent/next-action', { method: 'POST', body: JSON.stringify(req), signal });
   },
 
+  /** Judge each item in a pasted batch against the criteria, on the scale (25 Oct). Saves nothing. */
+  async assessBatch(
+    req: {
+      inputs: PMInput;
+      digest: import('@/lib/workflow/digest').StageDigest;
+      scale: { levels: { value: string; label: string; meaning: string }[] };
+      text: string;
+      stage_hint?: string;
+      already?: string[];
+      model?: string;
+      web_access?: 'on' | 'off';
+    },
+    signal?: AbortSignal
+  ): Promise<import('@/lib/workflow/web-found').WebUse & {
+    items: { id: string; subject: string; verdict: string; rationale: string; evidence: string; gaps: string }[];
+    ungraded: number;
+    not_assessed: number;
+    finish_reason: string;
+    model_used: string;
+  }> {
+    return apiFetch('/api/assess-batch', { method: 'POST', body: JSON.stringify(req), signal });
+  },
+
   async agentTriage(
     req: {
       inputs: PMInput;

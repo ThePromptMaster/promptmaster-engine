@@ -335,6 +335,20 @@ def _json_reply(system: str, prompt: str) -> dict:
     from promptmaster.stage_evaluation import _STAGE_EVAL_INSTRUCTION
 
     from promptmaster import conflicts
+    from promptmaster import assessment
+
+    if assessment._ASSESS_INSTRUCTION[:60] in system:
+        # One row per blank-line-separated block of the paste, verdicts taken
+        # from the scale in turn, so a browser test sees each level once.
+        values = re.findall(r'^- "([^"]+)" —', system, re.M)
+        pasted = prompt.split("--- BEGIN PASTED ITEMS ---", 1)[-1].split("--- END PASTED ITEMS ---", 1)[0]
+        blocks = [b.strip() for b in re.split(r"\n\s*\n", pasted) if b.strip()]
+        return {"items": [
+            {"subject": b.splitlines()[0][:120], "verdict": values[i % len(values)] if values else "",
+             "rationale": f"- Mock: item {i + 1} judged against the criteria.", "evidence": f'"{b.splitlines()[0][:60]}"',
+             "gaps": "Mock: no salary expectations stated." if i == 0 else ""}
+            for i, b in enumerate(blocks)
+        ], "not_assessed": 0}
 
     if system.startswith("You help someone work out a project before PromptMaster creates it"):
         # The brief takes the user's first message as the objective and every
@@ -377,6 +391,21 @@ def _json_reply(system: str, prompt: str) -> dict:
                 "instruction": "Mock: list each claim of the analysis and whether it holds.", "required": True, "approval": ""}})
         unsupported = [{"request": "Repeat only the analysis automatically", "reason": "Mock: a loop repeats a whole round."}] if "only the analysis" in asked else []
         return {"operations": ops, "unsupported": unsupported, "note": ""}
+    if "You design workflows for PromptMaster" in system and "[[mock:assess]]" in prompt:
+        # Screening in batches (25 Oct): criteria, then an assess stage on a
+        # 1–5 scale, then a summary.
+        return {
+            "name": "Candidate screen", "description": "Mock: screen pasted profiles against the brief.",
+            "deliverable": "shortlist", "inquiry": False,
+            "stages": [
+                {"label": "Search criteria", "short_label": "Criteria", "kind": "write", "purpose": "Mock: what a fit looks like.",
+                 "instruction": "Mock: list must-haves and deal-breakers.", "required": True, "approval": "I approve these criteria"},
+                {"label": "Screen profiles", "short_label": "Screen", "kind": "assess", "purpose": "Mock: paste profiles.",
+                 "instruction": "Mock: judge each profile.", "required": True, "approval": "", "scale": "score5", "item_noun": "profiles"},
+                {"label": "Shortlist", "short_label": "Shortlist", "kind": "write", "purpose": "Mock: who to call.",
+                 "instruction": "Mock: summarise the table.", "required": True, "approval": ""},
+            ],
+        }
     if "You design workflows for PromptMaster" in system and "[[mock:ongoing]]" in prompt:
         # An investigation that goes on until a supported result: a round closes
         # on "Next round", which loops back to "Investigate".

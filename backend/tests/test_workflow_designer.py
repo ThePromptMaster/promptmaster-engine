@@ -109,3 +109,22 @@ def test_the_route_passes_web_access_to_the_designer():
         app.dependency_overrides.pop(get_client, None)
     assert r.status_code == 200, r.text
     assert "WEB ACCESS: on" in stub.generate_json.call_args.kwargs["prompt"]
+
+
+def test_an_assess_stage_carries_its_scale_and_never_opens_the_work():
+    """25 Oct (client): screening pasted profiles in batches, on a scale."""
+    _system, user = build_workflow_prompt("screening executive candidates from pasted profiles", "Screen VP Finance candidates")
+    assert '"assess"' in user and "scale_levels" in user and "protected characteristic" in user
+    wf = parse_workflow({"name": "Screen", "stages": [
+        _stage("Screen first", "assess"), _stage("Criteria"),
+        _stage("Screen", "assess", scale="score5", item_noun="profiles"),
+        _stage("Own words", "assess", scale_levels=["Strong yes", "Yes", "yes", "No"]),
+        _stage("Odd", "assess", scale="emoji"), _stage("Shortlist"),
+    ]})
+    assert [s.label for s in wf.stages] == ["Criteria", "Screen", "Own words", "Odd", "Shortlist"]
+    screen, own, odd = wf.stages[1:4]
+    assert (screen.scale, screen.item_noun) == ("score5", "profiles")
+    assert (own.scale, own.scale_levels) == ("", ["Strong yes", "Yes", "No"])
+    assert odd.scale == "traffic"
+    # Other kinds carry no scale.
+    assert wf.stages[0].scale == "" and wf.stages[0].scale_levels == []

@@ -330,7 +330,7 @@ export interface SetupRationale {
   output_format: string;
 }
 
-export type WorkflowKey = 'book' | 'research' | 'single_output' | 'exploration';
+export type WorkflowKey = 'book' | 'research' | 'single_output' | 'exploration' | 'assessment';
 
 export interface SetupSuggestion {
   mode: ModeType;
@@ -487,7 +487,7 @@ export interface StageDigestRequest {
 export interface StageDescriptorRequest {
   id: string;
   label: string;
-  renderer: 'prose' | 'list' | 'outline' | 'long_form' | 'review';
+  renderer: 'prose' | 'list' | 'outline' | 'long_form' | 'review' | 'assess';
   entry_prompt_hint: string;
   artifact_kind: string;
   /**

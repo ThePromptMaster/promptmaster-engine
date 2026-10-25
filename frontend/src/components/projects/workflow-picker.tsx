@@ -11,6 +11,7 @@ const ICON: Record<string, string> = {
   research: 'science',
   single_output: 'bolt',
   exploration: 'explore',
+  assessment: 'fact_check',
 };
 
 /**
@@ -22,6 +23,7 @@ export const PITCH: Record<string, string> = {
   research: 'An investigation where the method matters as much as the result.',
   single_output: 'One deliverable — a memo, a brief, a report — drafted, checked and finished in minutes.',
   exploration: 'An idea taken as far as it goes — round after round, tested as you go.',
+  assessment: 'Criteria set once, then items judged against them in batches — on a traffic light, a score or your own scale.',
 };
 
 interface Props {

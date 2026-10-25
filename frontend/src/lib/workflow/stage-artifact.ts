@@ -564,6 +564,22 @@ export const ITEM_SCHEMAS: Record<string, StageItemSchema> = {
     decisionQuestion: 'For each open item: is it settled, or should it be carried forward as an open issue with the finished work? Marking them is optional and does not block finishing.',
     reasonFrom: ['where'],
   },
+
+  // An Assess stage's table (25 Oct): each pasted item, judged. The verdict is
+  // a level of the scale the document carries (`lib/workflow/assess.ts`); no
+  // statuses, so nothing here is triage and nothing blocks on deciding rows.
+  assessments: {
+    itemLabel: 'item',
+    minItems: 0,
+    maxItems: 1000,
+    fields: [
+      { key: 'subject', label: 'Item', max: 120 },
+      { key: 'verdict', label: 'Verdict', max: 40 },
+      { key: 'rationale', label: 'Why', long: true, max: 800 },
+      { key: 'evidence', label: 'Evidence', long: true, max: 600 },
+      { key: 'gaps', label: 'Not stated', long: true, max: 400 },
+    ],
+  },
 };
 
 /** The primary artifact kind a stage produces, if it declares one. */
@@ -903,13 +919,14 @@ export function stageContentForChat(schema: StageItemSchema, content: string | n
 }
 
 export function stageDrafts(stage: StageDefinition): boolean {
-  if (stage.renderer === 'outline' || stage.renderer === 'long_form') return false;
+  // An Assess stage is filled by what the user pastes, a batch at a time.
+  if (stage.renderer === 'outline' || stage.renderer === 'long_form' || stage.renderer === 'assess') return false;
   return stage.expected_artifacts.length > 0;
 }
 
 /** Which renderers store their artifact as items rather than as prose. */
 export function rendererHoldsItems(renderer: StageRenderer): boolean {
-  return renderer === 'list' || renderer === 'review';
+  return renderer === 'list' || renderer === 'review' || renderer === 'assess';
 }
 
 const SAYS_NOT_REPRODUCED = /\b(?:not|never)\s+(?:been\s+)?(?:independently\s+)?(?:reproduced|replicated|re-?run|recalculated|re-?computed)\b|\bcould\s+not\s+(?:be\s+)?(?:reproduc|replicat)\w*|\bwithout\s+(?:reproducing|re-?running|recalculating)\b/i;
