@@ -10,6 +10,7 @@ import { inputsFrom } from '@/lib/workflow/stage-requests';
 import type { Project } from '@/types/project';
 import {
   applyLookup,
+  applySavedSources,
   applyVerification,
   lookupQueries,
   lookupSummary,
@@ -36,7 +37,10 @@ export async function lookupAndVerify(
   const works = lookupQueries(items, schema);
   if (!works.length) return null;
   const { matches } = await api.agentLiterature(works, signal);
-  const looked = applyLookup(items, matches, schema);
+  const indexed = applyLookup(items, matches, schema);
+  // What the index did not hold may be a work a web search already found and saved (25 Oct).
+  const web = applySavedSources(indexed.items, project.sources ?? [], schema);
+  const looked: LookupResult = { ...indexed, items: web.items };
   const toRead = verifyQueries(looked.items, schema);
   let verify: VerifyResult | null = null;
   if (toRead.length) {
@@ -49,6 +53,9 @@ export async function lookupAndVerify(
     items: verify?.items ?? looked.items,
     lookup: looked,
     verify,
-    message: [found.replace(/ A found record means[^.]*\./, ''), read || (looked.found ? 'A found record means the work exists, not that it says what the row claims.' : '')].filter(Boolean).join(' '),
+    message: [
+      found.replace(/ A found record means[^.]*\./, ''),
+      web.found ? `${web.found} more found in a saved web source.` : '',
+      read || (looked.found ? 'A found record means the work exists, not that it says what the row claims.' : '')].filter(Boolean).join(' '),
   };
 }

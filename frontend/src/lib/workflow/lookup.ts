@@ -257,3 +257,47 @@ export function clipAtWord(text: string, max: number): string {
   const end = cut.lastIndexOf(' ');
   return `${(end > max * 0.6 ? cut.slice(0, end) : cut).replace(/[\s,;:]+$/, '')}…`;
 }
+
+/**
+ * Rows a saved web source names (25 Oct, Sean: "The literature stage should
+ * also distinguish AI-generated candidate references from sources that have
+ * actually been retrieved and checked" — a work found by a web search stayed
+ * "Suggested by PromptMaster — not retrieved" unless OpenAlex had it too).
+ *
+ * A row is matched when the source's title, as saved, is in the row's own
+ * words (at least four words of it, nine in ten of them). The user's own
+ * decision is never overwritten; a row a lookup already found is left alone.
+ * Pure.
+ */
+export function applySavedSources(
+  items: readonly StageItem[],
+  sources: readonly { seq: number; url: string; title: string; retrieved_at: string; retired_at?: string | null }[],
+  schema: StageItemSchema
+): { items: StageItem[]; found: number } {
+  const lookup = schema.lookup;
+  if (!lookup) return { items: [...items], found: 0 };
+  const live = sources.filter((s) => !s.retired_at && s.title.trim());
+  let found = 0;
+  const next = items.map((item) => {
+    if (item.status_source === 'user' || item.status_source === 'tool') return item;
+    const option = schema.statuses?.find((o) => o.value === item.status);
+    if (!item.status_source && option !== undefined && option.decided !== false) return item;
+    const row = new Set(words(`${item[lookup.field] ?? ''} ${item[lookup.linkField] ?? ''}`).split(' '));
+    const source = live.find((s) => {
+      const title = words(s.title).split(' ').filter((w) => w.length > 2);
+      if (title.length < 4) return false;
+      return title.filter((w) => row.has(w)).length / title.length >= 0.9;
+    });
+    if (!source) return item;
+    found += 1;
+    const out: StageItem = {
+      ...item,
+      [lookup.recordField]: `Found in a saved web source [S${source.seq}], ${source.retrieved_at.slice(0, 10)}: ${source.title} — ${source.url}`.slice(0, 500),
+      status: lookup.status,
+      status_source: 'tool',
+    };
+    if (!(item[lookup.linkField] ?? '').trim()) out[lookup.linkField] = source.url;
+    return out;
+  });
+  return { items: next, found };
+}
