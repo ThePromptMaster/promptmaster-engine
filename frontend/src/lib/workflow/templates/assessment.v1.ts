@@ -19,7 +19,12 @@ import type { WorkflowTemplate } from '../types';
  */
 export const ASSESSMENT_V1: WorkflowTemplate = {
   key: 'assessment',
-  version: 1,
+  // v2 (2026-10-25, production pass): the criteria no longer name verdict
+  // levels of their own. v1 asked for "best, close, not a fit", the user then
+  // chose a traffic light, and the Shortlist had to explain the mismatch. The
+  // scale is the user's, chosen on Assess; the criteria say what puts an item
+  // at its top, middle and bottom. Stage and criterion ids are unchanged.
+  version: 2,
   name: 'Assessment',
   description: 'Set the criteria once, then paste items in batches and get a verdict on each, on the scale you choose.',
   outline_stage: 'none',
@@ -34,7 +39,7 @@ export const ASSESSMENT_V1: WorkflowTemplate = {
       renderer: 'prose',
       entry_guidance: 'Say what you are assessing and what a good one looks like. The criteria are drafted for you to approve; every item is judged against them.',
       entry_prompt_hint:
-        'Write the criteria every item will be judged against, from the objective and what the user has said: the must-haves (an item missing one cannot get the best verdict), the strong positives, the deal-breakers, and what would be nice but does not decide anything. Make each criterion something the text of a single item could show or fail to show. Then say, for this work, what each level of a verdict scale should mean (best, close, not a fit). Never a criterion about age, gender, ethnicity, religion, disability, family status or any other protected characteristic, nor a stand-in for one. A list of generic qualities ("strong communicator") with no way to tell from the text is not criteria.',
+        'Write the criteria every item will be judged against, from the objective and what the user has said: the must-haves (an item missing one cannot get the best verdict), the strong positives, the deal-breakers, and what would be nice but does not decide anything. Make each criterion something the text of a single item could show or fail to show. Then say what would put an item at the top of a verdict scale, what makes a close call, and what rules an item out, without naming the levels: the user chooses the scale (a traffic light, a score, their own words) when they assess. Never a criterion about age, gender, ethnicity, religion, disability, family status or any other protected characteristic, nor a stand-in for one. A list of generic qualities ("strong communicator") with no way to tell from the text is not criteria.',
       exit_criteria: [
         { id: 'criteria.objective', label: 'Objective is stated', check: 'auto', rule: { type: 'field_non_empty', field: 'objective' }, blocking: true },
         { id: 'criteria.written', label: 'The criteria are written', check: 'auto', rule: { type: 'artifact_non_empty' }, blocking: true },
