@@ -19,9 +19,11 @@ test('criteria once, then pasted batches judged on a chosen scale, each adding t
   await pressTransition(page); // → Assess
   await expect(page.getByRole('heading', { name: 'Assess' })).toBeVisible();
 
+  // The paste area, not the rail's "Assess" stage.
+  const batch = page.getByRole('region', { name: 'New batch' });
   await page.getByRole('radio', { name: '1–5' }).click();
   await page.getByLabel('What to assess').fill('Jane Doe — CFO at Acme, led 40 people\n\nJohn Roe — Controller at Beta');
-  await page.getByRole('button', { name: 'Assess', exact: true }).click();
+  await batch.getByRole('button', { name: 'Assess', exact: true }).click();
   await expect(page.getByText('2 assessed and added to the table.')).toBeVisible({ timeout: 30_000 });
   const table = page.getByRole('table');
   await expect(table).toContainText('Jane Doe — CFO at Acme, led 40 people');
@@ -31,7 +33,7 @@ test('criteria once, then pasted batches judged on a chosen scale, each adding t
   // The scale is fixed now; a second batch adds to the table.
   await expect(page.getByRole('radiogroup', { name: 'Scale' })).toHaveCount(0);
   await page.getByLabel('What to assess').fill('Ann Poe — Finance Director at Gamma');
-  await page.getByRole('button', { name: 'Assess', exact: true }).click();
+  await batch.getByRole('button', { name: 'Assess', exact: true }).click();
   await expect(page.getByText('1 assessed and added to the table.')).toBeVisible({ timeout: 30_000 });
   await expect(table.getByRole('row')).toHaveCount(4); // header + 3
   await expect(table).toContainText('Batch 2');

@@ -37,6 +37,7 @@ export const sw: Record<keyof typeof en, string> = {
   'ws.beside': 'Pembeni ya kazi',
   'ws.reading': 'Kusoma',
   'ws.askRows': 'Uliza tu — majibu yanapendekeza mabadiliko ya safu ili uyapitie.',
+  'ws.askAssess': 'Uliza tu — badilisha uamuzi kwenye jedwali, au bandika zaidi juu yake.',
   'ws.askOutline': 'Uliza tu — hariri muhtasari kwenye ukurasa.',
   'ws.askChapter': 'Uliza tu — andika upya sura kutoka kwenye sehemu yake.',
 };

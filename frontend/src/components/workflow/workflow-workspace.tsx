@@ -2898,7 +2898,9 @@ export function WorkflowWorkspace({
                 (activeVersionId === null || activeVersionId === stageVersions.at(-1)?.id) && chatEditsProse
               }
               cannotChangeBecause={
-                rendererHoldsItems(stage.renderer)
+                stage.renderer === 'assess'
+                  ? t('ws.askAssess')
+                  : rendererHoldsItems(stage.renderer)
                   ? t('ws.askRows')
                   : stage.renderer === 'outline'
                     ? t('ws.askOutline')

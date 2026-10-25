@@ -38,6 +38,7 @@ export const zh: Record<keyof typeof en, string> = {
   'ws.beside': '在工作旁边',
   'ws.reading': '阅读',
   'ws.askRows': '仅提问——回答会提出行的更改供你审阅。',
+  'ws.askAssess': '仅提问——在表格中更改结论，或在上方粘贴更多。',
   'ws.askOutline': '仅提问——请在页面上编辑大纲。',
   'ws.askChapter': '仅提问——请在章节自己的部分中重写该章。',
 };
