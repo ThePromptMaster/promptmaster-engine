@@ -202,3 +202,11 @@ def test_a_practical_decision_is_not_research():
     lower = SETUP_SUGGESTER_SYSTEM.lower()
     assert "a practical decision is not research" in lower
     assert "decision log is single_output" in lower
+
+
+def test_screening_in_batches_is_offered_the_assessment_workflow():
+    """25 Oct (client): pasting profiles in batches for a verdict on each."""
+    from promptmaster.setup_suggester import _VALID_WORKFLOWS, build_setup_prompt
+    text = SETUP_SUGGESTER_SYSTEM + build_setup_prompt("Screen candidates")
+    assert "- assessment:" in text and "assessment" in _VALID_WORKFLOWS
+    assert SetupSuggestion.model_fields["workflow"].annotation is not None
