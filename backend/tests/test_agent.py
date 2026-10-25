@@ -730,3 +730,39 @@ def test_add_stage_is_a_workflow_move_the_planner_can_name():
     action = ACTIONS_BY_KEY["add_stage"]
     assert action.family == "workflow" and action.important
     assert "Never write a proposed stage into a document" in action.when
+
+
+# --- 25 Oct: a script cut off at the token limit is rewritten, not run three times
+
+def test_syntax_error_names_an_unfinished_script_and_passes_a_whole_one():
+    from promptmaster.agent import syntax_error
+
+    assert syntax_error('print("done")\n') is None
+    assert "line 2" in syntax_error('x = 1\nprint(f"elapsed: {x -\n')
+
+
+async def test_write_code_rewrites_a_cut_off_script_once_saying_why(mock_client):
+    from unittest.mock import AsyncMock
+
+    from promptmaster.agent import WRITE_CODE_MAX_TOKENS, write_code
+
+    mock_client.generate = AsyncMock(side_effect=[
+        ('import math\nprint("sigma: %.3e" % math.pi)\nprint("', {"tokens_in": 100, "tokens_out": 4000}),
+        ('import math\nprint("sigma: %.3e" % math.pi)\n', {"tokens_in": 120, "tokens_out": 30}),
+    ])
+    code, usage = await write_code(mock_client, None, INPUTS, STATE, "estimate mu", "computation")
+    assert code.endswith('math.pi)')
+    assert usage == {"tokens_in": 220, "tokens_out": 4030}
+    first, second = mock_client.generate.await_args_list
+    assert first.kwargs["max_tokens"] == WRITE_CODE_MAX_TOKENS >= 12_000
+    assert "could not run" in second.kwargs["prompt"] and "unterminated string literal" in second.kwargs["prompt"]
+
+
+async def test_write_code_runs_a_whole_script_with_one_call(mock_client):
+    from unittest.mock import AsyncMock
+
+    from promptmaster.agent import write_code
+
+    mock_client.generate = AsyncMock(return_value=("```python\nprint(4)\n```", {}))
+    code, _ = await write_code(mock_client, None, INPUTS, STATE, "2+2", "computation")
+    assert code == "print(4)" and mock_client.generate.await_count == 1
