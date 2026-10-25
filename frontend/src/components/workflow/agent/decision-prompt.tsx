@@ -8,6 +8,7 @@ import { MarkdownOutput } from '@/components/shared/markdown-output';
 import { DiffText, useWordDiff } from '@/components/workflow/revised-preview';
 import type { AgentStep } from '@/types/agent';
 import type { AnswerContradiction } from '@/lib/api/client';
+import { DELEGATED_ANSWER } from '@/lib/workflow/answers';
 
 /** The run is waiting on the user: approve this move, or decline it. */
 export function DecisionPrompt({
@@ -121,8 +122,7 @@ export function QuestionPrompt({
       <p className="mt-1 text-body text-[var(--on-surface)]">{question}</p>
       {change && <WhatChanged change={change} />}
       {expertPackage && <ExpertPackageCard markdown={expertPackage} />}
-      {choices.length > 0 && (
-        <div aria-label={t('qp.answers')} className="mt-3 flex flex-wrap gap-2">
+      <div aria-label={t('qp.answers')} className="mt-3 flex flex-wrap gap-2">
           {choices.map((c) => (
             <button
               key={c}
@@ -134,8 +134,16 @@ export function QuestionPrompt({
               {c}
             </button>
           ))}
+          <button
+            type="button"
+            disabled={checking}
+            onClick={() => onAnswer(DELEGATED_ANSWER)}
+            title={t('qp.bestHint')}
+            className="rounded-lg bg-[var(--surface-container-low)] px-4 py-2 text-start text-title text-[var(--pm-primary)] disabled:opacity-60"
+          >
+            {t('qp.best')}
+          </button>
         </div>
-      )}
       {onTick && approvals.length > 0 && (
         <div className="mt-3 flex flex-col items-start gap-2">
           {approvals.map((a) => (
