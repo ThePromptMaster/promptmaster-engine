@@ -16,7 +16,7 @@ import { tr } from '@/lib/i18n/store';
 import type { StageAction } from './next-action';
 import type { TransitionOption } from './engine';
 
-export type ControlPlace = 'stage_bar' | 'more_menu' | 'checklist' | 'data_panel' | 'table';
+export type ControlPlace = 'stage_bar' | 'more_menu' | 'checklist' | 'data_panel' | 'table' | 'go_panel' | 'next_step';
 
 export interface StageControl {
   id: string;
@@ -49,7 +49,37 @@ export const PLACE_WORDS: Record<ControlPlace, string> = {
   checklist: 'in the "To finish this stage" checklist',
   data_panel: 'in the Data panel',
   table: 'above the table',
+  go_panel: 'in the Go mode panel',
+  next_step: 'in the bar at the top of the stage',
 };
+
+/**
+ * Go's own panel, as it reads now (25 Oct, Sean: "the system has sometimes
+ * referenced buttons that don't actually exist", and the chat's "press Resume"
+ * was rewritten as "no button" although Resume was on the screen). The main
+ * button's word follows the same rule the panel uses.
+ */
+export function goPanelControls(run: {
+  status: string;
+  ended_at: string | null;
+  pending: boolean;
+  /** The used-up window can be continued as it was (same policy and size). */
+  continuable: boolean;
+  /** Go's question card is shown. */
+  asking: boolean;
+} | null): StageControl[] {
+  const live = Boolean(run && !run.ended_at);
+  const canResume = live && (run!.status === 'blocked' || run!.status === 'awaiting_decision') && !run!.pending;
+  const canContinue = Boolean(run && run.status === 'budget_exhausted' && run.continuable);
+  const main = canResume ? tr('go.resume') : canContinue ? tr('go.continue') : tr('go.go');
+  return [
+    { id: 'go-main', label: main, place: 'go_panel' },
+    ...(run?.asking ? [
+      { id: 'go-answer', label: tr('qp.answerContinue'), place: 'go_panel' as const },
+      { id: 'go-best', label: tr('qp.best'), place: 'go_panel' as const },
+    ] : []),
+  ];
+}
 
 export const ATTACH_DATA_LABEL = 'Attach a data file';
 export const ADD_IMAGES_LABEL = 'Add images';
@@ -115,6 +145,10 @@ export function stageControls(input: {
   proposals?: number;
   /** Rows with no status or proposal yet, on a table that takes proposals. */
   proposeRows?: boolean;
+  /** The next-step bar's button, when it shows one. */
+  nextStep?: string | null;
+  /** Go's panel, from `goPanelControls`. */
+  go?: readonly StageControl[];
 }): StageControl[] {
   const controls: StageControl[] = [];
   if (input.primary && input.primary.kind !== 'none' && input.primary.label) {
@@ -129,6 +163,8 @@ export function stageControls(input: {
   if (input.proposals) controls.push({ id: 'confirm-proposals', label: confirmProposalsLabel(input.proposals), place: 'table' });
   if (input.lookupNoun) controls.push({ id: 'lookup', label: lookupLabel(input.lookupNoun), place: 'table' });
   if (input.dataPanel) controls.push({ id: 'attach-data', label: tr('data.attachData'), place: 'data_panel' });
+  if (input.nextStep) controls.push({ id: 'next-step', label: input.nextStep, place: 'next_step' });
+  for (const c of input.go ?? []) controls.push(c);
   // One label, one entry: the planner names a button by its words.
   const seen = new Set<string>();
   return controls.filter((c) => (seen.has(c.label) ? false : (seen.add(c.label), true)));

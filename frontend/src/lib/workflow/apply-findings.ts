@@ -16,7 +16,7 @@
 import { api } from '@/lib/api/client';
 import type { NewVersion } from '@/lib/supabase/versions';
 import { generationContent, inputsFrom } from '@/lib/workflow/stage-requests';
-import { itemSchemaFor, parseItems, serializeItems, type StageItem, type StageItemSchema } from '@/lib/workflow/stage-artifact';
+import { itemSchemaFor, parseItems, saysNotReproduced, serializeItems, type StageItem, type StageItemSchema } from '@/lib/workflow/stage-artifact';
 import type { StageDefinition } from '@/lib/workflow/types';
 import type { AuditFinding, GenerateStageArtifactRequest } from '@/types';
 import type { Project } from '@/types/project';
@@ -73,7 +73,14 @@ export function carryUserFields(before: readonly StageItem[], after: StageItem[]
     // …and so does what a sandbox run settled: the regenerating model may
     // not claim "completed", so without this the row would lose it.
     // …and what a lookup found (its record and link are user-only fields, carried above).
-    if (was.status_source === 'user' || was.status_source === 'sandbox' || was.status_source === 'tool' || (was.status && !was.status_source)) {
+    // A "reproduced" the revised row's own words now deny is not carried —
+    // unless a run settled it (25 Oct, Sean: the dropdown said Reproduced,
+    // the explanation said it was not).
+    const denied = (was.status === 'reproduced' || was.status === 'independently_reproduced') && was.status_source !== 'sandbox' && saysNotReproduced(row);
+    if (denied) {
+      kept.reason = [`Status not kept: the revised row says it was not reproduced (it was "${was.status}").`, row.reason ?? ''].join(' ').trim();
+    }
+    if (!denied && (was.status_source === 'user' || was.status_source === 'sandbox' || was.status_source === 'tool' || (was.status && !was.status_source))) {
       kept.status = was.status;
       kept.reason = was.reason;
       kept.status_source = was.status_source;
