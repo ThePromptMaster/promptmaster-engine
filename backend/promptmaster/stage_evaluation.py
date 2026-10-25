@@ -53,6 +53,7 @@ from .schemas import (
     WhyThisWorks,
 )
 from .project_context import context_block
+from .work_form import FICTION_CHECK_RULE, form_of
 from .saved_documents import format_prior_documents
 from .saved_text_checks import VERIFY_RULE, disproved_missing
 
@@ -198,7 +199,9 @@ def build_stage_evaluation_prompt(
         f"{_STAGE_EVAL_INSTRUCTION}\n\n"
         + critique_style_block(inputs.critique_intensity, inputs.critique_tone)
         + "\nThe tone applies to the explanations, interpretation and findings you "
-        "write; the scores and the further-pass answer follow the intensity alone.",
+        "write; the scores and the further-pass answer follow the intensity alone."
+        # 25 Oct (Sean): a screenplay's story events were checked as history.
+        + (f"\n\n{FICTION_CHECK_RULE}" if (form := form_of(inputs)) and form.fiction else ""),
     )
 
     stage_label = stage.label or stage.id

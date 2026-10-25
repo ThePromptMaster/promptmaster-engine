@@ -806,3 +806,27 @@ def test_a_stage_never_proposes_a_workflow_stage_in_its_text(basic_inputs, prose
     # 25 Oct (Sean): the report kept proposing "creating a new stage called …".
     system, _user = build_stage_prompt(basic_inputs, prose_stage, digest)
     assert "NEXT WORK IS A NEXT STEP, NOT A NEW STAGE" in system
+
+
+def test_a_short_film_or_pilot_brief_is_a_screenplay_and_its_checks_do_not_verify_the_story():
+    # 25 Oct (Sean): a screenplay workflow used book words and asked for
+    # historical verification of invented story events.
+    from promptmaster.schemas import PMInput, StageDescriptor
+    from promptmaster.stage_evaluation import build_stage_evaluation_prompt
+    from promptmaster.work_form import form_of
+    for objective in ("Write a 12-minute short film about a lighthouse keeper", "Write the TV pilot script for a heist series"):
+        assert form_of(PMInput(objective=objective, mode="architect")).key == "screenplay"
+    assert form_of(PMInput(objective="Write a Python script that cleans the CSV", mode="architect")) is None
+    inputs = PMInput(objective="Write a 12-minute short film about a lighthouse keeper", mode="architect")
+    review = StageDescriptor(id="critique", label="Critique", renderer="review", entry_prompt_hint="Critique the draft.", artifact_kind="critique_report")
+    system, _ = build_stage_prompt(inputs, review, StageDigest(objective=inputs.objective))
+    assert "THIS WORK IS FICTION" in system and "never ask for a source" in system
+    eval_system, _ = build_stage_evaluation_prompt(inputs, review, "INT. LIGHTHOUSE — NIGHT", StageDigest(objective=inputs.objective))
+    assert "never ask for a source" in eval_system
+
+
+def test_every_stage_says_how_each_result_stands(basic_inputs, prose_stage, digest):
+    # 25 Oct (Sean): "verified" with no computation or source check behind it.
+    system, _user = build_stage_prompt(basic_inputs, prose_stage, digest)
+    assert "SAY HOW EACH RESULT STANDS" in system
+    assert "Never call a result calculated, computed, verified" in system

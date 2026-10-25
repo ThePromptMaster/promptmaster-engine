@@ -30,7 +30,7 @@ import logging
 import re
 import uuid
 
-from .work_form import FICTION_CLAIMS_RULE, form_of
+from .work_form import FICTION_CHECK_RULE, FICTION_CLAIMS_RULE, form_of
 from .conversation import _shared_system
 from .llm_client import OpenRouterClient, OpenRouterDeadlineError, OpenRouterError
 from .schemas import (
@@ -279,6 +279,19 @@ NEXT_STEP_RULE = (
 )
 
 
+#: 25 Oct (Sean): "It sometimes describes something as verified or completed even
+#: though no actual computation, source verification, or required calculation
+#: was performed." Five words for how a result stands, used as they mean.
+EVIDENCE_WORDS_RULE = (
+    "SAY HOW EACH RESULT STANDS, IN ONE OF FIVE WAYS. Reasoned — argued or derived in the text, not computed. "
+    "Calculated — only when the earlier stages or the run record show code or a computation actually ran and "
+    "produced it. Externally verified — only when a saved source [S#], a looked-up record or the user confirms it. "
+    "Conditional — it rests on an assumption that is not verified; name the assumption. Speculative — a "
+    "possibility, not yet supported. Never call a result calculated, computed, verified, confirmed or reproduced "
+    "without that evidence; and a stage whose key results are conditional is ready only on that condition — say so."
+)
+
+
 def build_stage_prompt(
     inputs: PMInput,
     stage: StageDescriptor,
@@ -305,6 +318,7 @@ def build_stage_prompt(
     if hint:
         instruction_parts.append(f"THIS STAGE — {stage.label or stage.id}:\n{hint}")
     instruction_parts.append(NEXT_STEP_RULE)
+    instruction_parts.append(EVIDENCE_WORDS_RULE)
     if stage.renderer == "review":
         instruction_parts.append(VERIFY_RULE)
         if inputs.facts:
@@ -314,6 +328,8 @@ def build_stage_prompt(
     form = form_of(inputs)
     if form and form.fiction and stage.artifact_kind == "claim_table":
         instruction_parts.append(FICTION_CLAIMS_RULE)
+    elif form and form.fiction and stage.renderer == "review":
+        instruction_parts.append(FICTION_CHECK_RULE)
     if schema_block:
         instruction_parts.append(schema_block)
         instruction_parts.append('Return JSON only, with shape: { "items": [ ... ] }.')

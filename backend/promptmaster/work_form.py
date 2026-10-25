@@ -32,7 +32,13 @@ class WorkForm:
 
 _FORMS: list[tuple[re.Pattern[str], WorkForm]] = [
     (
-        re.compile(r"\b(screen\s?play|screen-play|film script|movie script|teleplay|feature[- ]length script)s?\b", re.I),
+        # 25 Oct (Sean): "short film", "pilot" and "episode" briefs were read as a book.
+        re.compile(
+            r"\b(screen\s?play|screen-play|film script|movie script|teleplay|feature[- ]length script|shooting script"
+            r"|(?:tv|television) (?:script|pilot|episode)|pilot (?:script|episode)|episode script|short film|feature film"
+            r"|sitcom)s?\b",
+            re.I,
+        ),
         WorkForm(
             "screenplay", "a screenplay", "sequence", True,
             "Write it as a screenplay: scene headings (INT./EXT. PLACE — TIME), action lines in the present "
@@ -71,13 +77,25 @@ def form_block(inputs: PMInput) -> str:
     if not form:
         return ""
     lines = [
-        f"THE FORM OF THE WORK: {form.name}. The workflow's stage instructions are written for a book; "
+        f"THE FORM OF THE WORK: {form.name}. Where the workflow's stage instructions are written for a book, "
         f"wherever they say book, read {form.key}; wherever they say chapter, read {form.unit}; "
         f"wherever they say manuscript, read the {form.key}'s text. Say {form.key} and {form.unit} "
         "yourself — never book or chapter.",
         form.format_rule,
     ]
     return "\n".join(lines)
+
+
+#: For any check of a work of fiction that is not the claim table (25 Oct, Sean:
+#: "A screenplay workflow ... treated fictional story events as if they required
+#: historical verification" — a designed workflow's check stage never got the
+#: fact-check's rule).
+FICTION_CHECK_RULE = (
+    "THIS WORK IS FICTION. Its characters, scenes, conversations, documents and story events are invented: "
+    "never ask for a source, a citation or historical verification of them, and never call them unverified. "
+    "Only a claim about the real world — a real date, place, institution, person or what a period was like — "
+    "can need checking, and only when a reader could get it wrong."
+)
 
 
 #: For the fact-check of a work of fiction (13 Oct, Sean: 20 rows asking for a

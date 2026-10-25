@@ -17,7 +17,8 @@ export interface WorkForm {
 }
 
 const FORMS: [RegExp, WorkForm][] = [
-  [/\b(screen\s?play|screen-play|film script|movie script|teleplay|feature[- ]length script)s?\b/i, { key: 'screenplay', label: 'Screenplay', unit: 'sequence', fiction: true }],
+  // 25 Oct (Sean): "short film", "pilot" and "episode" briefs were read as a book.
+  [/\b(screen\s?play|screen-play|film script|movie script|teleplay|feature[- ]length script|shooting script|(?:tv|television) (?:script|pilot|episode)|pilot (?:script|episode)|episode script|short film|feature film|sitcom)s?\b/i, { key: 'screenplay', label: 'Screenplay', unit: 'sequence', fiction: true }],
   [/\b(stage play|stageplay|play script|theatre script|theater script|one-act play|two-act play|three-act play)s?\b/i, { key: 'play', label: 'Stage play', unit: 'scene', fiction: true }],
   [/(?<![-\w])(novel|novella|short story|short stories|fiction|fictional story)\b/i, { key: 'novel', label: 'Fiction', unit: 'chapter', fiction: true }],
 ];
