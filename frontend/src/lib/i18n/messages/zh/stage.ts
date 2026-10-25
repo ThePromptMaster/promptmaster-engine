@@ -55,6 +55,7 @@ export const zh: Record<keyof typeof en, string> = {
   'op.agent_outline': 'Go 模式大纲',
   'op.agent_triage': 'Go 模式：已定夺常规发现项',
   'op.agent_apply': 'Go 模式：已应用发现项',
+  'op.assess_batch': '已评估一批',
   'op.manuscript_snapshot': '修订前的完整草稿',
   'op.finished_version': '最终版本',
   'stage.work': '{stage}工作',

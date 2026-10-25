@@ -98,3 +98,32 @@ describe('ongoing work and editing a copy (7 Oct)', () => {
     ]);
   });
 });
+
+describe('a designed screening workflow (client, 25 Oct)', () => {
+  const stage = (label: string, kind: 'write' | 'assess', extra = {}) => ({
+    label, short_label: label, kind, purpose: 'p', instruction: 'i', required: true, approval: '', ...extra,
+  });
+  const design: DesignedWorkflow = {
+    name: 'Candidate screen', description: '', deliverable: 'shortlist', inquiry: false,
+    stages: [
+      stage('Criteria', 'write', { approval: 'I approve these criteria' }),
+      stage('Screen profiles', 'assess', { scale: 'score5', item_noun: 'profiles' }),
+      stage('Own scale', 'assess', { scale_levels: ['Strong yes', 'Yes', 'No'] }),
+      stage('Shortlist', 'write'),
+    ],
+  };
+
+  it('becomes assess stages with their scale, and walks', () => {
+    const t = templateFromDesign(design, 'x1');
+    expect(validateTemplate(t)).toEqual([]);
+    const [, screen, own] = t.stages;
+    expect(screen).toMatchObject({ renderer: 'assess', assess: { scale: 'score5', item_noun: 'profiles' }, expected_artifacts: [{ kind: 'assessments' }] });
+    expect(own.assess?.scale).toEqual([
+      { label: 'Strong yes', tone: 'good' }, { label: 'Yes', tone: 'caution' }, { label: 'No', tone: 'bad' },
+    ]);
+    // Edited as a copy, the scale comes back.
+    expect(designFromTemplate(t).stages.slice(1, 3).map((s) => [s.kind, s.scale ?? '', s.scale_levels ?? []])).toEqual([
+      ['assess', 'score5', []], ['assess', '', ['Strong yes', 'Yes', 'No']],
+    ]);
+  });
+});

@@ -29,7 +29,17 @@ KINDS = {
     "write": "a page of prose the user reads and edits (a brief, a draft, a plan, the finished piece)",
     "list": "a short table of items (sources, people, options, requirements)",
     "check": "a table of findings about earlier work, each one accepted or rejected by the user",
+    # 25 Oct (client: screening pasted LinkedIn profiles in batches, colour-coded).
+    "assess": (
+        "a table the user fills by pasting many similar items a batch at a time (profiles, "
+        "applications, proposals, suppliers); each is judged against criteria an earlier stage "
+        "set, with a verdict on a scale"
+    ),
 }
+
+#: The scales an assess stage may name (`lib/workflow/assess.ts` SCALE_PRESETS).
+SCALES = ("traffic", "score5", "pass_fail", "grade", "fit")
+MAX_SCALE_LEVELS = 7
 
 
 class DesignedStage(BaseModel):
@@ -53,6 +63,11 @@ class DesignedStage(BaseModel):
     #: Ongoing work (7 Oct): this stage closes a round and the next round
     #: starts again from the stage with this label (an earlier one), or "".
     loop_back_to: str = Field(default="", max_length=60)
+    #: Assess stages: a preset scale, or the user's own levels best first.
+    scale: str = Field(default="", max_length=20)
+    scale_levels: list[str] = Field(default_factory=list, max_length=MAX_SCALE_LEVELS)
+    #: Assess stages: what is pasted, plural ("profiles").
+    item_noun: str = Field(default="", max_length=40)
 
 
 class Execution(BaseModel):
@@ -117,6 +132,18 @@ def build_workflow_prompt(description: str, objective: str, web_access: str | No
         "them (Sean, 7 Oct: verification was placed before the invitation it had to verify). "
         "Every stage's kind is one of:\n"
         f"{kinds}\n\n"
+        "Use \"assess\" only when the user will judge many similar items against fixed criteria, "
+        "again and again — screening, triage, grading, shortlisting — not for checking the work "
+        "itself. Then a write stage before it sets the criteria (must-haves, positives, "
+        "deal-breakers) with the user's approval, the assess stage judges the pasted items, and a "
+        "last write stage summarises the results to share; nothing drafts or reviews a deliverable "
+        "in between. On an assess stage also give: scale, one of "
+        + ", ".join(f'\"{x}\"' for x in SCALES)
+        + " (traffic light, 1 to 5, pass/fail, A to F, strong/possible/not a fit), or "
+        "scale_levels: the user's own levels best first when they named them (\"strong yes, "
+        "yes, no\"), else []; and item_noun: what the user pastes, plural (\"profiles\"). Never "
+        "a criterion about a protected characteristic (age, gender, ethnicity, religion, "
+        "disability, family status).\n\n"
         "For each stage write:\n"
         "- label: a plain name (≤40 chars), and short_label (≤20 chars) for the side rail\n"
         "- purpose: one sentence the user reads on arrival — what this stage is for\n"
@@ -153,9 +180,9 @@ def build_workflow_prompt(description: str, objective: str, web_access: str | No
         "Return JSON only:\n"
         '{"name": "...", "description": "one sentence", "deliverable": "noun for the '
         'finished thing, e.g. article", "inquiry": false, "stages": [{"label": "...", '
-        '"short_label": "...", "kind": "write|list|check", "purpose": "...", '
+        '"short_label": "...", "kind": "write|list|check|assess", "purpose": "...", '
         '"instruction": "...", "required": true, "approval": "", "approval_kind": "decision", '
-        '"decision": "", "loop_back_to": ""}], "execution": {"kind": "finite|ongoing", '
+        '"decision": "", "loop_back_to": "", "scale": "", "scale_levels": [], "item_noun": ""}], "execution": {"kind": "finite|ongoing", '
         '"success_criterion": "...", "stop_conditions": ["..."]}}'
     )
     return _SYSTEM, user
@@ -190,9 +217,13 @@ def parse_workflow(result: object) -> DesignedWorkflow:
                 approval_kind="routine" if str(raw.get("approval_kind") or "").strip().lower() == "routine" else "decision",
                 decision=_clip(raw.get("decision"), 120),
                 loop_back_to=_clip(raw.get("loop_back_to"), 60),
+                **(_assess_fields(raw) if kind == "assess" else {}),
             )
         )
     stages = stages[:MAX_STAGES]
+    # Nor can an assessment: it judges against criteria a stage before it sets.
+    while stages and stages[0].kind == "assess":
+        stages.pop(0)
     # A check cannot open the work. One that closes it — a final verification
     # — is kept, with a stage after it that produces the finished work (9 Oct:
     # Sean's verification of four deliverables was silently dropped here).
@@ -212,6 +243,23 @@ def parse_workflow(result: object) -> DesignedWorkflow:
         execution=execution,
         stages=fix_loops(stages, execution),
     )
+
+
+def _assess_fields(raw: dict) -> dict:
+    """The scale and the noun of an assess stage; a scale nobody can use becomes the traffic light."""
+    levels: list[str] = []
+    for item in raw.get("scale_levels") or []:
+        label = _clip(item, 40)
+        if label and label.casefold() not in (x.casefold() for x in levels):
+            levels.append(label)
+    levels = levels[:MAX_SCALE_LEVELS]
+    scale = str(raw.get("scale") or "").strip().lower()
+    if len(levels) >= 2:
+        scale = ""
+    else:
+        levels = []
+        scale = scale if scale in SCALES else "traffic"
+    return {"scale": scale, "scale_levels": levels, "item_noun": _clip(raw.get("item_noun"), 40)}
 
 
 def parse_execution(raw: object) -> Execution:

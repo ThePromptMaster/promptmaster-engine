@@ -18,6 +18,7 @@
  */
 
 import { ErrorBoundary } from '@/components/shared/error-boundary';
+import { AssessRenderer } from './assess-renderer';
 import { ListRenderer } from './list-renderer';
 import { LongFormRenderer } from './long-form-renderer';
 import { ProseRenderer } from './prose-renderer';
@@ -42,6 +43,9 @@ export function StageRenderer(props: StageRendererProps) {
       break;
     case 'long_form':
       body = <LongFormRenderer {...props} />;
+      break;
+    case 'assess':
+      body = <AssessRenderer {...props} />;
       break;
     // The outline editor lands in its own stream. A named placeholder is honest
     // about that; falling through to prose would silently render an outline as a

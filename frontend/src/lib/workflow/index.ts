@@ -2,6 +2,7 @@ import { BOOK_V1 } from './templates/book.v1';
 import { RESEARCH_V1 } from './templates/research.v1';
 import { SINGLE_OUTPUT_V1 } from './templates/single-output.v1';
 import { EXPLORATION_V1 } from './templates/exploration.v1';
+import { ASSESSMENT_V1 } from './templates/assessment.v1';
 import type { WorkflowTemplate } from './types';
 
 export * from './types';
@@ -19,10 +20,11 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
   RESEARCH_V1,
   SINGLE_OUTPUT_V1,
   EXPLORATION_V1,
+  ASSESSMENT_V1,
 ];
 
 export function getTemplate(key: string): WorkflowTemplate | undefined {
   return WORKFLOW_TEMPLATES.find((t) => t.key === key);
 }
 
-export { BOOK_V1, RESEARCH_V1, SINGLE_OUTPUT_V1, EXPLORATION_V1 };
+export { BOOK_V1, RESEARCH_V1, SINGLE_OUTPUT_V1, EXPLORATION_V1, ASSESSMENT_V1 };

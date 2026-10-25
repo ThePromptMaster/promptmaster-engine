@@ -4,6 +4,7 @@ import { MODE_DISPLAY } from '@/lib/constants';
 import { ITEM_SCHEMAS, itemSchemaFor, type StageItemSchema } from '@/lib/workflow/stage-artifact';
 import { BOOK_V1 } from '@/lib/workflow/templates/book.v1';
 import { EXPLORATION_V1 } from '@/lib/workflow/templates/exploration.v1';
+import { ASSESSMENT_V1 } from '@/lib/workflow/templates/assessment.v1';
 import { RESEARCH_V1 } from '@/lib/workflow/templates/research.v1';
 import { SINGLE_OUTPUT_V1 } from '@/lib/workflow/templates/single-output.v1';
 import { DECISIONS } from '@/lib/workflow/timeline';
@@ -13,7 +14,7 @@ import { LOCALES } from './locales';
 import { DICTIONARIES } from './translate';
 import { itemPlural, shownSchema, templateWord } from './templates';
 
-const SYSTEM = [BOOK_V1, RESEARCH_V1, SINGLE_OUTPUT_V1, EXPLORATION_V1];
+const SYSTEM = [BOOK_V1, RESEARCH_V1, SINGLE_OUTPUT_V1, EXPLORATION_V1, ASSESSMENT_V1];
 const CODES = LOCALES.map((l) => l.code);
 
 /** Every English word a system workflow puts on screen through `templateWord`. */

@@ -2276,3 +2276,14 @@ card can be dragged onto a folder only with a mouse. Sean's "I'm having trouble 
 do anything" (24 Oct) was this list: three icons left the title a few letters wide, a tap meant
 for the project opened a popover, and a tap outside did not close it.
 
+### L-114 — Assess: batches, scales and what Go does there (2026-10-25)
+
+An Assess stage judges what is pasted, a batch at a time: at most 40,000 characters and 12
+items per batch (the rest of a longer paste is counted and said, not judged). The scale is
+chosen before the first batch and fixed once the table has rows, so every row on one table
+is judged alike; a different scale means another project. Verdicts are only as good as the
+pasted text: the prompt forbids inventing what an item does not state and lists the gaps
+instead, and forbids judging on protected characteristics or their proxies, but nothing
+checks a verdict against the source afterwards. Go cannot paste for the user, so on an
+Assess stage it waits; drafting and stage checks do not apply there. The client asked for
+this on 25 Oct (screening LinkedIn profiles); nothing in it names candidates or search.

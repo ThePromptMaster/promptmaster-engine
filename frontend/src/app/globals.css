@@ -90,6 +90,9 @@
   --pm-success: #0f6b45;
   --success-container: #b7f0cf;
   --on-success-container: #00301c;
+  /* === Caution === The middle of a verdict scale (Assess, 25 Oct): amber, between success and error. */
+  --caution-container: #ffe08a;
+  --on-caution-container: #3d2e00;
   /* Words a newer version added or removed, wherever two versions are compared. */
   --diff-added: var(--success-container);
   --diff-removed: var(--error-container);
