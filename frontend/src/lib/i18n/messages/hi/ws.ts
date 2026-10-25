@@ -17,6 +17,7 @@ export const hi: Record<keyof typeof en, string> = {
   'ws.otherProject': 'दूसरा प्रोजेक्ट',
   'ws.openAnother': 'एक दूसरा प्रोजेक्ट खोलें',
   'ws.hideChat': 'साइड चैट छिपाएँ',
+  'ws.resizeChat': 'साइड चैट की चौड़ाई बदलने के लिए खींचें',
   'ws.sideChat': 'साइड चैट',
   'ws.viewingLater': 'बाद का चरण देख रहे हैं — {stage} पर वापस जाएँ',
   'ws.viewingEarlier': 'पहले का चरण देख रहे हैं — {stage} पर वापस जाएँ',

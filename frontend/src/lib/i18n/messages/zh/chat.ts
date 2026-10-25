@@ -32,6 +32,7 @@ export const zh: Record<keyof typeof en, string> = {
   'chat.modeLabel': '对话模式',
   'chat.webOn': '联网访问已开启：问题需要时，对话会搜索网络，并保存其引用的内容。',
   'chat.webOff': '联网访问已关闭：对话仅根据项目内容回答。',
+  'chat.webOnShort': '联网访问已开启',
   'chat.emptyDraft': '关于这份草稿，尽管提问——它有哪些假设、遗漏了什么、是否适合目标读者。这里的任何内容都不会修改草稿。',
   'chat.emptyStage': '关于这个阶段，尽管提问——它的用途、需要你提供什么、应该写些什么。这里还没有草稿。',
   'chat.emptyChange': '描述一处修改，并选择要应用的范围。写入任何内容之前，你会先看到确切的段落。',

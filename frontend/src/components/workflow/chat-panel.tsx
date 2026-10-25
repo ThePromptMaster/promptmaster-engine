@@ -65,40 +65,18 @@ import { INPUT_LIMITS } from '@/lib/projects/input-limits';
 
 type Mode = 'discuss' | 'instruct';
 
-const MODES: Array<{
-  key: Mode;
-  label: string;
-  icon: string;
-  /** The consequence, stated. This is the whole point of the control. */
-  promise: string;
-  send: string;
-  placeholder: string;
-}> = [
-  // C7 (Sean, 28 Sep, item 17): the two tabs are two different requests, and
-  // their names say which — talk it through, or change the text.
-  {
-    key: 'discuss',
-    label: 'Ask',
-    icon: 'forum',
-    promise: 'Ask only — this cannot change your document.',
-    send: 'Ask',
-    placeholder: 'Type your question here…',
-  },
-  {
-    key: 'instruct',
-    label: 'Change it',
-    icon: 'edit_note',
-    promise: 'You see the change before anything is saved.',
-    send: 'Draft revision',
-    placeholder: 'Type the change you want — e.g. “cut the second paragraph in half”',
-  },
+// C7 (Sean, 28 Sep, item 17): the two tabs are two different requests, and
+// their names say which — talk it through, or change the text.
+const MODES: Array<{ key: Mode; icon: string }> = [
+  { key: 'discuss', icon: 'forum' },
+  { key: 'instruct', icon: 'edit_note' },
 ];
 
 /** A mode's words in the interface's language; `MODES` keeps its key and icon. */
 function modeText(t: ReturnType<typeof useT>, key: Mode) {
   return key === 'discuss'
-    ? { label: t('chat.askLabel'), promise: t('chat.askPromise'), send: t('chat.askLabel'), placeholder: t('chat.askPlaceholder') }
-    : { label: t('chat.changeLabel'), promise: t('chat.changePromise'), send: t('chat.changeSend'), placeholder: t('chat.changePlaceholder') };
+    ? { label: t('chat.askLabel'), send: t('chat.askLabel'), placeholder: t('chat.askPlaceholder') }
+    : { label: t('chat.changeLabel'), send: t('chat.changeSend'), placeholder: t('chat.changePlaceholder') };
 }
 
 interface Props {
@@ -572,11 +550,18 @@ export function ChatPanel({
       aria-label={t('chat.label')}
       className="flex h-full min-h-0 flex-col rounded-xl bg-[var(--surface-container-lowest)]"
     >
-      <header className="px-5 pt-5">
-        <h2 className="text-title text-[var(--on-surface)]">{t('chat.label')}</h2>
-        <p className="mt-0.5 text-label text-[var(--on-surface-variant)]">{stageTitle ?? stageLabel}</p>
+      {/* One row (25 Oct: on a laptop the chrome above the thread left little
+          room for the answer). */}
+      <header className="flex items-start justify-between gap-3 px-5 pt-4">
+        <div className="min-w-0">
+          <h2 className="text-title text-[var(--on-surface)]">{t('chat.label')}</h2>
+          <p className="mt-0.5 truncate text-label text-[var(--on-surface-variant)]">{stageTitle ?? stageLabel}</p>
+        </div>
         {suggestActions && (
-          <label className="mt-1.5 flex cursor-pointer items-center gap-2 text-label text-[var(--on-surface-variant)]">
+          <label
+            title={t('chat.offerActions')}
+            className="mt-1 flex shrink-0 cursor-pointer items-center gap-1.5 text-label text-[var(--on-surface-variant)]"
+          >
             <input
               type="checkbox"
               checked={offerActions}
@@ -584,9 +569,10 @@ export function ChatPanel({
                 setOfferActions(e.target.checked);
                 writeOfferActions(e.target.checked);
               }}
+              aria-label={t('chat.offerActions')}
               className="h-3.5 w-3.5 accent-[var(--pm-primary)]"
             />
-            {t('chat.offerActions')}
+            <span aria-hidden className="material-symbols-outlined text-[18px]">bolt</span>
           </label>
         )}
       </header>
@@ -858,8 +844,7 @@ export function ChatPanel({
  * The mode control.
  *
  * A segmented pair, not a toggle: a toggle shows one state and hides the
- * other, so the user has to already know what the alternative was. Both
- * consequences are on screen the whole time.
+ * other, so the user has to already know what the alternative was.
  */
 function ModeSwitch({
   mode,
@@ -878,7 +863,7 @@ function ModeSwitch({
 }) {
   const t = useT();
   return (
-    <div className="px-5 pt-4">
+    <div className="px-5 pt-3">
       <div role="tablist" aria-label={t('chat.modeLabel')} className="flex gap-1.5">
         {MODES.map((m) => {
           const active = m.key === mode;
@@ -900,28 +885,35 @@ function ModeSwitch({
                 {m.icon}
               </span>
               {modeText(t, m.key).label}
+              {m.key === 'discuss' && webAccess && (
+                <span
+                  role="img"
+                  aria-label={t('chat.webOnShort')}
+                  title={t('chat.webOnShort')}
+                  className="material-symbols-outlined text-[16px] opacity-80"
+                >
+                  travel_explore
+                </span>
+              )}
             </button>
           );
         })}
       </div>
 
-      {/* Stated, not implied, and once (17 Oct, Sean: the lock line and a red
-          note under it read as more instructions than the task). Where the
-          change tab is unavailable, the reason is the line. */}
-      <p className="mt-2 flex items-start gap-1.5 text-label text-[var(--on-surface-variant)]">
-        <span aria-hidden className="material-symbols-outlined text-[16px]">
-          {mode === 'discuss' ? 'lock' : 'rate_review'}
-        </span>
-        <span>{mode === 'discuss' && instructDisabledReason ? instructDisabledReason : modeText(t, mode).promise}</span>
-      </p>
-      {mode === 'discuss' && (
+      {/* 25 Oct (client): the lock line and the "web access is on" line came
+          out — the tab names say what each does, and the Ask tab carries a globe
+          while the web is on. What stays is what the user could not assume: why
+          Change it is unavailable, and that the web is off. */}
+      {mode === 'discuss' && instructDisabledReason && (
+        <p className="mt-2 flex items-start gap-1.5 text-label text-[var(--on-surface-variant)]">
+          <span aria-hidden className="material-symbols-outlined text-[16px]">lock</span>
+          <span>{instructDisabledReason}</span>
+        </p>
+      )}
+      {mode === 'discuss' && !webAccess && (
         <p className="mt-1 flex items-start gap-1.5 text-label text-[var(--on-surface-variant)]">
-          <span aria-hidden className="material-symbols-outlined text-[16px]">{webAccess ? 'travel_explore' : 'public_off'}</span>
-          <span>
-            {webAccess
-              ? t('chat.webOn')
-              : t('chat.webOff')}
-          </span>
+          <span aria-hidden className="material-symbols-outlined text-[16px]">public_off</span>
+          <span>{t('chat.webOff')}</span>
         </p>
       )}
     </div>

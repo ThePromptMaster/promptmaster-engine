@@ -17,6 +17,7 @@ export const ar: Record<keyof typeof en, string> = {
   'ws.otherProject': 'مشروع آخر',
   'ws.openAnother': 'فتح مشروع آخر',
   'ws.hideChat': 'إخفاء المحادثة الجانبية',
+  'ws.resizeChat': 'اسحب لتغيير عرض المحادثة الجانبية',
   'ws.sideChat': 'المحادثة الجانبية',
   'ws.viewingLater': 'تعرض مرحلة لاحقة — العودة إلى {stage}',
   'ws.viewingEarlier': 'تعرض مرحلة سابقة — العودة إلى {stage}',

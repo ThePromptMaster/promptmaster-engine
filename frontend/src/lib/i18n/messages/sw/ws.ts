@@ -16,6 +16,7 @@ export const sw: Record<keyof typeof en, string> = {
   'ws.otherProject': 'Mradi mwingine',
   'ws.openAnother': 'Fungua mradi mwingine',
   'ws.hideChat': 'Ficha gumzo la pembeni',
+  'ws.resizeChat': 'Buruta kubadilisha upana wa gumzo la pembeni',
   'ws.sideChat': 'Gumzo la pembeni',
   'ws.viewingLater': 'Unaangalia hatua ya baadaye — rudi kwenye {stage}',
   'ws.viewingEarlier': 'Unaangalia hatua ya awali — rudi kwenye {stage}',
