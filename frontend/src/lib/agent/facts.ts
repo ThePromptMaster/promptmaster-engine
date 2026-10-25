@@ -20,6 +20,7 @@ import { listProjectJobs, type ProjectJob } from '@/lib/supabase/jobs';
 import { approvedOutlineVersionId, outlineApprovals } from '@/lib/supabase/outline';
 import { checkVersions, getArtifact, getEvaluation } from '@/lib/supabase/versions';
 import { manuscriptArtifactFor, manuscriptSourceFor } from '@/lib/workflow/context';
+import { withFreshManuscript } from '@/lib/workflow/fresh-manuscript';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import { revisionBrief, type RevisionBrief } from '@/lib/workflow/revision';
 import { effectiveRenderer, itemSchemaFor, parseItems, rendererHoldsItems, stageDrafts, type StageItem, type StageItemSchema, isTriaged } from '@/lib/workflow/stage-artifact';
@@ -203,9 +204,10 @@ export async function readStageFacts(input: {
   // existed (2 Oct screenshots).
   const source = manuscriptSourceFor(template, stage);
   if (source) {
-    const holder = bundles[source.id]?.artifact ?? null;
-    const fresh = holder ? await getArtifact(holder.id).catch(() => null) : null;
-    const outline = (fresh ?? holder)?.long_form?.outline ?? [];
+    // The same read the generator uses, holder found in the database when
+    // the page has none (25 Oct).
+    const read = await withFreshManuscript(template, stage, bundles, project.id).catch(() => bundles);
+    const outline = read[source.id]?.artifact?.long_form?.outline ?? [];
     if (outline.length) {
       const written = outline.filter((s) => (s.content ?? '').trim().length > 0);
       facts.reads_manuscript = {

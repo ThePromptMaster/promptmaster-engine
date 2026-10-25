@@ -37,7 +37,8 @@ export interface PendingRevision {
 /** How to revise a stage whose draft is a table: the stage, and the generator request for an instruction. */
 export interface TableRevision {
   stage: StageDefinition;
-  request: (instruction: string) => GenerateStageArtifactRequest;
+  /** May read the chapters fresh first, so it can be async. */
+  request: (instruction: string) => GenerateStageArtifactRequest | Promise<GenerateStageArtifactRequest>;
 }
 
 /** The findings as one instruction for the table generator. */
@@ -102,7 +103,7 @@ export async function reviseWithFindings(args: {
   const where = { stageId: args.stageId ?? table?.stage.id ?? null, agentRunId: args.agentRunId ?? null };
   if (table) {
     const instruction = findingsInstruction(findings);
-    const res = await api.generateStageArtifact(table.request(instruction), signal);
+    const res = await api.generateStageArtifact(await table.request(instruction), signal);
     const web = await keepFound(project, res, where);
     const rows = parseItems(generationContent(table.stage, res));
     if (!rows || rows.length === 0) {

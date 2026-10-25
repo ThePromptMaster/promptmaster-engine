@@ -336,6 +336,11 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
   conflict: null,
 
   async loadProject(id, options) {
+    // A background reload asked for by a project the user has since left (a
+    // late chat or Go callback) is dropped: it switched the store back to the
+    // old project under the new one's page, and the side chat showed another
+    // subject (25 Oct, Sean).
+    if (options?.background && get().projectId !== null && get().projectId !== id) return;
     const background = Boolean(options?.background) && get().projectId === id && get().project !== null;
     if (background) {
       // Let an in-progress save land first, so what loads includes it.
@@ -349,6 +354,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
 
     try {
       const project = await getProject(id);
+      if (get().projectId !== id) return;
       if (!project) {
         set({ loading: false, error: 'Project not found.', project: null });
         return;
@@ -425,6 +431,8 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       }
       const head = projectHead;
       const events = loadedEvents ?? (background ? get().events : null);
+      // Another project was opened while this one loaded: its load wins.
+      if (get().projectId !== id) return;
 
       set({
         // Unsaved local edits stay on screen over the freshly loaded row; the
@@ -449,6 +457,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         ...(get().saveState === 'error' ? {} : { error: null }),
       });
     } catch (err) {
+      if (get().projectId !== id) return;
       set({ loading: false, error: err instanceof Error ? err.message : 'Failed to load project.' });
     }
   },

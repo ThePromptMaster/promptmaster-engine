@@ -135,6 +135,7 @@ import { withAppliedInstructions } from '@/lib/workflow/applied-instructions';
 import { commitOutlineVersion, approvedOutlineVersionId, ensureOutlineArtifact } from '@/lib/supabase/outline';
 import type { Artifact, ArtifactVersion, Evaluation, Project, ProjectPatch, RoutineDecisions } from '@/types/project';
 import { useExperience } from '@/lib/projects/experience';
+import { freshOrPage } from '@/lib/workflow/fresh-manuscript';
 
 interface Props {
   project: Project;
@@ -954,8 +955,9 @@ export function WorkflowWorkspace({
       stage && rendererHoldsItems(stage.renderer)
         ? {
             stage,
-            request: (instruction: string) =>
-              generationRequest(project, template, state, stageBundles, stage, headVersion?.content ?? '', instruction),
+            // The chapters as saved, not this page's copy (25 Oct).
+            request: async (instruction: string) =>
+              generationRequest(project, template, state, await freshOrPage(template, stage, stageBundles, project.id), stage, headVersion?.content ?? '', instruction),
           }
         : undefined,
     [stage, project, template, state, stageBundles, headVersion]

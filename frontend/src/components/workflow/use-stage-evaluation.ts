@@ -39,6 +39,7 @@ import { approverFindings, approverSources } from '@/lib/workflow/approver-suppo
 import { figureFindings, figureSources } from '@/lib/workflow/figure-support';
 import { dependentClaimFindings, dependentClaimsFor } from '@/lib/workflow/dependent-claims';
 import { rendererHoldsItems } from '@/lib/workflow/stage-artifact';
+import { freshOrPage } from '@/lib/workflow/fresh-manuscript';
 
 interface Options {
   project: Project;
@@ -142,7 +143,7 @@ export function useStageEvaluation({
 
     try {
       const response = await api.evaluateStageArtifact(
-        evaluationRequest(p, t, s, b, stage, version.content, outline),
+        evaluationRequest(p, t, s, await freshOrPage(t, stage, b, p.id), stage, version.content, outline),
         controller.signal
       );
 
