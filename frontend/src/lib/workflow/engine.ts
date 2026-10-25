@@ -44,7 +44,7 @@ export function rowsRequired(stage: Pick<StageDefinition, 'exit_criteria'>): boo
 }
 
 /** Renderers whose artifact is a list of items that count rules can count. */
-const COUNTABLE_RENDERERS = new Set(['list', 'review', 'outline']);
+const COUNTABLE_RENDERERS = new Set(['list', 'review', 'outline', 'assess']);
 
 function evaluateCriterion(
   criterion: ExitCriterion,

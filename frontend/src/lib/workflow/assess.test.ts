@@ -69,3 +69,18 @@ describe('assessing items in batches (client, 25 Oct)', () => {
     expect(validateTemplate(badScale, { requireHints: false }).join(' ')).toMatch(/scale that cannot be used/);
   });
 });
+
+describe('the Assess stage\'s count is checked by PromptMaster, not ticked (prod pass, 25 Oct)', () => {
+  it('evaluates "at least one item" from the table', async () => {
+    const { evaluateStage } = await import('./engine');
+    const { ASSESSMENT_V1 } = await import('./templates/assessment.v1');
+    const ctx = {
+      fields: { objective: 'x' }, itemCounts: { assess: 0 }, itemsMissingStatus: {}, artifactNonEmpty: {}, outlineApproved: false,
+      sections: {}, findings: {}, manualChecks: {},
+    };
+    const empty = evaluateStage(ASSESSMENT_V1, 'assess', ctx).criteria[0];
+    expect(empty).toMatchObject({ satisfied: false });
+    expect(empty.manual).toBeFalsy();
+    expect(evaluateStage(ASSESSMENT_V1, 'assess', { ...ctx, itemCounts: { assess: 3 } }).criteria[0].satisfied).toBe(true);
+  });
+});

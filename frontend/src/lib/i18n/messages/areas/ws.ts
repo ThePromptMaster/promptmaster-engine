@@ -36,6 +36,7 @@ export const en = {
   'ws.beside': 'Beside the work',
   'ws.reading': 'Reading',
   'ws.askRows': 'Ask only — answers offer row changes for you to review.',
+  'ws.askAssess': 'Ask only — change a verdict in the table, or paste more above it.',
   'ws.askOutline': 'Ask only — edit the outline on the page.',
   'ws.askChapter': 'Ask only — rewrite a chapter from its own section.',
 } as const;
@@ -79,6 +80,7 @@ export const es: Keys = {
   'ws.beside': 'Junto al trabajo',
   'ws.reading': 'Lectura',
   'ws.askRows': 'Solo preguntar: las respuestas proponen cambios de filas para que los revises.',
+  'ws.askAssess': 'Solo preguntar: cambia un veredicto en la tabla o pega más arriba.',
   'ws.askOutline': 'Solo preguntar: edita el esquema en la página.',
   'ws.askChapter': 'Solo preguntar: reescribe un capítulo desde su propia sección.',
 };
@@ -120,6 +122,7 @@ export const fr: Keys = {
   'ws.beside': 'À côté du travail',
   'ws.reading': 'Lecture',
   'ws.askRows': 'Questions seulement — les réponses proposent des modifications de lignes à vérifier.',
+  'ws.askAssess': 'Questions seulement — changez un verdict dans le tableau, ou collez-en d’autres au-dessus.',
   'ws.askOutline': 'Questions seulement — modifiez le plan sur la page.',
   'ws.askChapter': 'Questions seulement — réécrivez un chapitre depuis sa propre section.',
 };
@@ -161,6 +164,7 @@ export const pt: Keys = {
   'ws.beside': 'Ao lado do trabalho',
   'ws.reading': 'Leitura',
   'ws.askRows': 'Só perguntar — as respostas propõem alterações de linhas para você revisar.',
+  'ws.askAssess': 'Só perguntar — mude um veredito na tabela ou cole mais acima dela.',
   'ws.askOutline': 'Só perguntar — edite a estrutura na página.',
   'ws.askChapter': 'Só perguntar — reescreva um capítulo a partir da própria seção.',
 };
