@@ -124,7 +124,9 @@ export function StageRail({ template, state, nextSuggestedId, onSelect, approval
                     onClick={() => onSelect(stage.id)}
                     aria-current={isCurrent ? 'step' : undefined}
                     title={skipReason ? t('rail.skippedTitle', { reason: skipReason }) : stageText(locale, template.key, stage, 'label')}
-                    className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-start text-body transition-colors ${
+                    // Wraps: two badges (NEXT and AWAITING RECHECK) used to squeeze the
+                    // stage's name to nothing (25 Oct, Sean's iPad: "Lan… NEXT REOPENED").
+                    className={`flex w-full flex-wrap items-center gap-x-2.5 gap-y-0.5 rounded-lg px-3 py-2 text-start text-body transition-colors ${
                       isCurrent
                         ? 'bg-[var(--surface-container-high)] text-[var(--on-surface)]'
                         : 'text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-low)]'
@@ -138,7 +140,7 @@ export function StageRail({ template, state, nextSuggestedId, onSelect, approval
                     </span>
 
                     <span
-                      className={`min-w-0 flex-1 truncate ${
+                      className={`min-w-[5.5rem] flex-1 truncate ${
                         status === 'skipped' ? 'line-through opacity-70' : ''
                       }`}
                     >
