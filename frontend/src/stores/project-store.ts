@@ -39,6 +39,7 @@ import {
 import type { WorkflowEvent, WorkflowTemplate } from '@/lib/workflow/types';
 import { laterDoneStages, laterOf, projectState } from '@/lib/workflow/engine';
 import { onlyConfirmsProposals } from '@/lib/workflow/stage-artifact';
+import { onlyRewords } from '@/lib/workflow/rewording';
 import {
   ProjectConflictError,
   type Artifact,
@@ -766,8 +767,10 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       // Confirming proposals changes no row a later stage read (L-66): on the
       // sequence-proof replay, confirming 15 statuses on two finished tables
       // would have reopened every stage after them.
+      // Nor does a version that only rewords the last (25 Oct): each repair
+      // Go made reopened the stages after the one it repaired.
       const state = projectState(template, events);
-      const later = onlyConfirmsProposals(head?.content, version.content)
+      const later = onlyConfirmsProposals(head?.content, version.content) || onlyRewords(head?.content, version.content)
         ? []
         : laterDoneStages(template, state, laterOf(template, stageId, options?.writtenFor), drafted);
       // A reopened draft in progress is answered by this version (13 Oct); the

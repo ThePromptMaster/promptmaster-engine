@@ -2322,3 +2322,16 @@ a prompt rule, not a code check of the text. What code does label is each Go ste
 execution label, which is derived from what ran (`lib/agent/labels.ts`). A literature row is
 "Retrieved" only when OpenAlex or a saved web source [S#] names it; otherwise it stays
 "Suggested by PromptMaster — not retrieved".
+
+### L-119 — A wording-only revision reopens nothing; the test is deliberately strict (2026-10-25)
+
+A new version of a stage reopens the done work after it ("Awaiting recheck"), because that work
+was built on the version replaced. A version that only rewords the last reopens nothing
+(`lib/workflow/rewording.ts::onlyRewords`, used in `project-store.ts::appendStageVersion`, as
+confirming proposals already was, L-66). "Only rewords" means every figure, item ID, citation,
+link, heading and status is the same; no negation or hedge ("not", "may", "verified"…) was
+added or removed; and at most 10% of words — never more than 120 — changed. Anything else counts
+as a change and reopens as before, so a genuine rewording that also tidies a number still
+reopens. A restore always reopens. The test reads the text, not its meaning: a sentence
+reworded to say the opposite without any of those words would pass, which is why the word
+budget is small.

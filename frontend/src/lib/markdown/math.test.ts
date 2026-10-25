@@ -13,6 +13,12 @@ describe('maths in model output (M1; Sean, 7 Oct)', () => {
     expect(normalizeMath('Between $5 and $10 per seat.')).toBe('Between $5 and $10 per seat.');
   });
 
+  it('a short formula without LaTeX is maths too (25 Oct); prose and money are not', () => {
+    expect(normalizeMath('Take $n+1$ steps while $x<y$, halving $(a-b)/2$.')).toBe('Take $$n+1$$ steps while $$x<y$$, halving $$(a-b)/2$$.');
+    expect(normalizeMath('The $Apple-branded$ range.')).toBe('The $Apple-branded$ range.');
+    expect(normalizeMath('Plans cost $5 - $10 a month, or $20+ for teams.')).toBe('Plans cost $5 - $10 a month, or $20+ for teams.');
+  });
+
   it('never touches code, fenced or inline', () => {
     const code = '```python\nprice = "$x_1$"\nprint(f"\\(a\\)")\n```\nand `$y^2$` here';
     expect(normalizeMath(code)).toBe(code);
