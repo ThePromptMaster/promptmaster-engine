@@ -76,7 +76,7 @@ import { checkVerdict } from '@/lib/workflow/check-verdict';
 import { buildStageDigest, formatManuscript, summariseStageContent } from '@/lib/workflow/digest';
 import { appendBatch, scaleForRequest, serializeAssessment, type AssessScale } from '@/lib/workflow/assess';
 import { keepFound, webAccessOf } from '@/lib/workflow/web-found';
-import { goWaitingLine, objectiveUnmet } from '@/lib/workflow/objective';
+import { goWaitingLine, objectiveUnmet, executableNext } from '@/lib/workflow/objective';
 import { recordFacts, supersedeFact } from '@/lib/supabase/facts';
 import { factsAlreadyRecorded, planFactRecording } from '@/lib/workflow/record-facts';
 import { ProjectReferences } from './project-references';
@@ -139,6 +139,7 @@ import type { Artifact, ArtifactVersion, Evaluation, Project, ProjectPatch, Rout
 import { useExperience } from '@/lib/projects/experience';
 import { freshOrPage } from '@/lib/workflow/fresh-manuscript';
 import { addedSignature, designAddedStage, effectiveTemplate } from '@/lib/workflow/added-stages';
+import { withApprovals } from '@/lib/workflow/approvals';
 
 interface Props {
   project: Project;
@@ -246,7 +247,8 @@ export function WorkflowWorkspace({
   const template = useMemo(() => effectiveTemplate(pinnedTemplate, storeEvents), [pinnedTemplate, addedSig]);
   // Every request built from the project carries the instructions the user
   // applied, beside its facts (12 Oct, Atlas and Meridian).
-  const project = useMemo(() => withAppliedInstructions(projectProp, template, bundles), [projectProp, template, bundles]);
+  // …and the approvals they gave (25 Oct), so no stage or check calls them unresolved.
+  const project = useMemo(() => withApprovals(withAppliedInstructions(projectProp, template, bundles), template, bundles), [projectProp, template, bundles]);
   // The interface's language (client, 21 Oct); the work's own language is the project's.
   const t = useT();
   const locale = useLocale();
@@ -600,7 +602,7 @@ export function WorkflowWorkspace({
   const outstanding = useMemo(
     () =>
       outstandingWork(template, state, context, {
-        objectiveUnmet: objectiveAssessment ? { blockers: objectiveAssessment.blockers.map((b) => b.need) } : null,
+        objectiveUnmet: objectiveAssessment ? { blockers: objectiveAssessment.blockers.map((b) => b.need), next: executableNext(objectiveAssessment)?.title ?? null } : null,
         checkSays: currentCheckSays ? { stageId: state.current_stage_id, says: currentCheckSays } : null,
       }),
     [template, state, context, objectiveAssessment, currentCheckSays]
@@ -1738,7 +1740,7 @@ export function WorkflowWorkspace({
     go.run && !go.run.ended_at && go.run.status === 'awaiting_decision' && go.run.needs?.kind === 'objective_check' ? go.run.needs : null;
   const completion = completionSummary(template, state, context, {
     goWaiting,
-    objectiveUnmet: objectiveAssessment ? { blockers: objectiveAssessment.blockers.map((b) => b.need) } : null,
+    objectiveUnmet: objectiveAssessment ? { blockers: objectiveAssessment.blockers.map((b) => b.need), next: executableNext(objectiveAssessment)?.title ?? null } : null,
   });
   // The sidebar counts what Go stops on, not only stage statuses (12 Oct).
   const progressCaption = progressCaptionText(progress, state.project_status === 'finalized', completion.outstanding);

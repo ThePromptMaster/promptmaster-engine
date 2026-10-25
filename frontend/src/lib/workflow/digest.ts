@@ -101,7 +101,7 @@ export interface DataFileBrief {
 export function dataFileBriefs(project: Pick<Project, 'data_files'>): DataFileBrief[] {
   // Images are placed in the work, not read by code; they reach prompts as
   // captions (lib/data/images.ts), never as "data the project holds".
-  return (project.data_files ?? []).filter((f) => f.preview.kind !== 'image').map((f) => ({
+  return (project.data_files ?? []).filter((f) => f.preview && f.preview.kind !== 'image').map((f) => ({
     name: f.name, kind: f.preview.kind, columns: f.preview.columns, sample: f.preview.sample, rows: f.preview.rows,
   }));
 }

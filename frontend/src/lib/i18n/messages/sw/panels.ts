@@ -454,6 +454,8 @@ export const sw: Record<keyof typeof en, string> = {
   'out.checkSays': '{label}: ukaguzi wa mwisho unasema {says}',
   'out.goWaiting': 'Go inakusubiri: {need}',
   'out.objWaiting': 'Lengo halijafikiwa — inasubiri: {list}',
+  'out.objOpenNext': 'Lengo bado liko wazi — inayofuata inaweza kufanywa sasa: {next}',
+  'out.objOpenNextWaiting': 'Lengo bado liko wazi — inayofuata inaweza kufanywa sasa: {next}. Kinakosekana kwa kazi nyingine tu: {list}',
   'out.objNotMet': 'Lengo halijafikiwa',
   'wserr.noChange': 'Hakuna kitu kwenye jedwali kingebadilika.',
   'wserr.noDrafting': 'Mtiririko huu wa kazi hauna hatua ya kuandika rasimu.',

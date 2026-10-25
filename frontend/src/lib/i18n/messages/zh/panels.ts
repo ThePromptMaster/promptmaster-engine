@@ -454,6 +454,8 @@ export const zh: Record<keyof typeof en, string> = {
   'out.checkSays': '{label}：最新检查结果为 {says}',
   'out.goWaiting': 'Go 正在等你：{need}',
   'out.objWaiting': '目标未达成，正在等待：{list}',
+  'out.objOpenNext': '目标仍未完成——下一项现在就能做：{next}',
+  'out.objOpenNextWaiting': '目标仍未完成——下一项现在就能做：{next}。仅其他工作缺少：{list}',
   'out.objNotMet': '目标未达成',
   'wserr.noChange': '表格中没有任何内容会改变。',
   'wserr.noDrafting': '此工作流没有起草阶段。',

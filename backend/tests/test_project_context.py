@@ -121,3 +121,23 @@ def test_the_objective_check_reads_the_whole_brief_and_the_applied_instructions(
     assert "Constraints: Two-week timeline" in user
     assert "INSTRUCTIONS THE USER APPLIED SINCE THE BRIEF" in user
     assert "- Output v3: Use November 2, not October 26." in user
+
+
+def test_approvals_reach_every_prompt_with_the_version_they_were_given_on():
+    # 25 Oct (Sean): approved dates and financial constraints were kept in one
+    # section, and the final blocker still called them unresolved.
+    from promptmaster.schemas import PMInput, UserApproval
+    inputs = PMInput(objective="Plan the launch.", mode="analyst", approvals=[
+        UserApproval(stage="Budget", approval="I approve the $18,000 ceiling", version=3, current=3),
+        UserApproval(stage="Schedule", approval="I approve the 10 December date", version=2, current=4),
+    ])
+    block = context_block(inputs)
+    assert "APPROVED BY THE USER" in block
+    assert "never report it as unresolved" in block
+    assert "- Budget: I approve the $18,000 ceiling (on v3, the current version)" in block
+    assert "- Schedule: I approve the 10 December date (given on v2; the current version is v4)" in block
+
+
+def test_no_approvals_adds_nothing():
+    from promptmaster.schemas import PMInput
+    assert "APPROVED BY THE USER" not in context_block(PMInput(objective="x", mode="analyst", context="c"))

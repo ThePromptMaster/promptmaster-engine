@@ -630,3 +630,17 @@ def test_a_met_objective_has_no_next_task():
         "next_task": {"title": "More", "needs": []},
     }, LOG, STEPS)
     assert a.next_task is None
+
+
+def test_data_an_attached_file_holds_is_not_missing():
+    # 25 Oct (Sean, churn research): outcomes already supplied were asked for.
+    from promptmaster.schemas import DataFileBrief
+    files = [DataFileBrief(name="customers.csv", columns=["customer_id", "churned", "tenure_months"], rows=4000)]
+    _s, user = build_assessment_prompt(_inputs(), "Final", LOG, STEPS, data_files=files)
+    assert "DATA FILES THE PROJECT HOLDS" in user and "churned" in user
+    a = parse_assessment({
+        "outcome": "not_met", "reason": "r", "basis_quote": "Success criterion: Not met.",
+        "blockers": [{"need": "the churned outcome for each customer", "kind": "data_missing"},
+                     {"need": "the 2026 pricing sheet", "kind": "data_missing"}],
+    }, LOG, STEPS, data_files=files)
+    assert [b.need for b in a.blockers] == ["the pricing sheet"] or [b.need for b in a.blockers] == ["the 2026 pricing sheet"]

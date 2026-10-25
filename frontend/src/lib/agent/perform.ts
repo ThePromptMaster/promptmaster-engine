@@ -41,7 +41,7 @@ import { checkVerdict as sharedCheckVerdict } from '@/lib/workflow/check-verdict
 import { proposeTargets } from '@/lib/workflow/proposals';
 import { proposeStatuses } from '@/lib/workflow/propose';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
-import { summariseStageContent } from '@/lib/workflow/digest';
+import { dataFileBriefs, summariseStageContent } from '@/lib/workflow/digest';
 import { stageContentForSummary, stageEvidence } from '@/lib/workflow/evidence';
 import { blocksCompletion, deliverableStage, describeOutstanding, evaluateStage, outstandingWork, remainingStages } from '@/lib/workflow/engine';
 import { describeBasis, executableNext, openWithNextLine, pausedLine, stillMet, type ObjectiveAssessment, type ObjectiveBasis } from '@/lib/workflow/objective';
@@ -2289,6 +2289,8 @@ async function judgeObjective(ctx: PerformContext, holder: StageDefinition | nul
       measured,
       // The saved versions, and the earlier ones the text cites (19 Oct, HARBOR).
       known_versions: knownVersions(ctx.template, ctx.bundles),
+      // What the attached files hold is supplied, not missing (25 Oct, churn research).
+      data_files: dataFileBriefs(ctx.project),
       history: referencedVersions(ctx.template, ctx.bundles, content),
       later_stage: laterStage ?? '',
       model: ctx.project.model,

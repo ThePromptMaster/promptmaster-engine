@@ -10,7 +10,7 @@ const project = { objective: 'Why churn rose', audience: 'Executive', constraint
 describe('what a stage had to work with when it was marked stuck (2 Oct, item 9)', () => {
   it('is the data files, the stage\'s head version and the brief', () => {
     expect(stageInputs(project, 'v3')).toMatchObject({ files: ['f1', 'f2'], version: 'v3' });
-    expect(stageInputs({}, undefined)).toEqual({ files: [], version: null, brief: '␟␟␟' });
+    expect(stageInputs({}, undefined)).toMatchObject({ files: [], version: null, brief: '␟␟␟', facts: [] });
   });
 
   it('says nothing changed when nothing did', () => {
