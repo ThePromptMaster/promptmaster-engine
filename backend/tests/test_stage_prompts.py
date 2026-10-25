@@ -800,3 +800,9 @@ def test_a_final_check_reads_conclusions_against_the_current_record(basic_inputs
     assert DEPENDENT_CONCLUSIONS_RULE not in build_stage_prompt(basic_inputs.model_copy(update={"facts": []}), stage, digest)[0]
     prose = StageDescriptor(id="finalise", label="Finalise", renderer="prose", entry_prompt_hint="", artifact_kind="output")
     assert DEPENDENT_CONCLUSIONS_RULE not in build_stage_prompt(summit, prose, digest)[0]
+
+
+def test_a_stage_never_proposes_a_workflow_stage_in_its_text(basic_inputs, prose_stage, digest):
+    # 25 Oct (Sean): the report kept proposing "creating a new stage called …".
+    system, _user = build_stage_prompt(basic_inputs, prose_stage, digest)
+    assert "NEXT WORK IS A NEXT STEP, NOT A NEW STAGE" in system

@@ -268,6 +268,17 @@ DEPENDENT_CONCLUSIONS_RULE = (
 )
 
 
+#: 25 Oct (Sean, quantum gravity): the report proposed "creating a new stage
+#: called 'Two-interval Rényi-2 calculation (P1)'" again and again; a document
+#: cannot add a stage. Go adds it, from the next step the work names.
+NEXT_STEP_RULE = (
+    "NEXT WORK IS A NEXT STEP, NOT A NEW STAGE. Where the work leads to further work, name it as a next step — "
+    "what to do and what it needs. Do not propose creating, adding or activating workflow stages, and do not say "
+    "that a stage exists, was added or is active unless the earlier stages above show it; PromptMaster adds a "
+    "stage for the next step itself."
+)
+
+
 def build_stage_prompt(
     inputs: PMInput,
     stage: StageDescriptor,
@@ -293,6 +304,7 @@ def build_stage_prompt(
         instruction_parts.append(_PROMPT_KIND_RULE)
     if hint:
         instruction_parts.append(f"THIS STAGE — {stage.label or stage.id}:\n{hint}")
+    instruction_parts.append(NEXT_STEP_RULE)
     if stage.renderer == "review":
         instruction_parts.append(VERIFY_RULE)
         if inputs.facts:

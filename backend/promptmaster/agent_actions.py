@@ -134,6 +134,16 @@ AGENT_ACTIONS: list[AgentAction] = [
                      "(one plain sentence: what in the saved work asks for it), work (what is to be done there, "
                      "specifically: the runs, cases, source or change).",
                 important=True),
+    # 25 Oct (Sean, quantum gravity): the next calculation was named, written
+    # into the report as a new stage, and never became one.
+    AgentAction(key="add_stage", family="workflow", label="Add a stage for the next task",
+                when="Only offered under Autonomous with routine decisions handed to Go. The saved work names a "
+                     "next task PromptMaster can carry out now — a calculation, analysis, derivation, draft or check "
+                     "— that no stage of the workflow does. Adds it as a stage and starts it; the deliverable is "
+                     "rechecked from its results. Never write a proposed stage into a document instead. Params: "
+                     "title (a stage title of a few words), kind ('write', 'list' or 'check'), work (what to "
+                     "produce, as an instruction), reason (one plain sentence: what in the saved work names it).",
+                important=True),
     AgentAction(key="commit_delegated", family="workflow", label="Commit a routine approval",
                 when="Only offered when the project's routine decisions are set to 'handle them for me' and an "
                      "approval on this stage is a routine one. Checks the stage against that approval and, if it "

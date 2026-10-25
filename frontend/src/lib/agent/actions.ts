@@ -31,6 +31,7 @@ export type Performer =
   | 'skip' // proposes skipping the stage; the user decides
   | 'loop' // proposes the next round of a looping workflow; the user starts it
   | 'return' // goes back to an earlier stage the analysis says needs more work (Q2, 9 Oct)
+  | 'add_stage' // adds the next task the saved work names as a stage, and starts it (25 Oct)
   | 'block' // stage_blocked
   | 'ask' // stop for the user
   | 'complete'; // end the run, if the objective really is met
@@ -82,6 +83,8 @@ export const AGENT_ACTIONS: readonly AgentAction[] = [
   // 9 Oct (Q2): back to the stage that does the further work the analysis asks for.
   { key: 'return_to_stage', family: 'workflow', label: 'Go back to an earlier stage', performer: 'return', important: true },
   // 5 Oct: a routine approval Go may commit under "Routine decisions: handle them for me", once checked.
+  // 25 Oct (Sean, quantum gravity): the next calculation becomes a stage, not a paragraph.
+  { key: 'add_stage', family: 'workflow', label: 'Add a stage for the next task', performer: 'add_stage', important: true },
   { key: 'commit_delegated', family: 'workflow', label: 'Commit a routine approval', performer: 'commit', important: false },
   { key: 'advance_stage', family: 'workflow', label: 'Move to the next stage', performer: 'advance', important: true },
   { key: 'mark_blocked', family: 'workflow', label: 'Mark this stage stuck', performer: 'block', important: false },

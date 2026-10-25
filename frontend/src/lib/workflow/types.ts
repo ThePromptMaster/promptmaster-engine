@@ -150,6 +150,8 @@ export interface StageDefinition {
   transitions: StageTransitions;
   /** Present on `assess` stages. */
   assess?: AssessSpec;
+  /** Added while the project ran (`stage_added`), not part of the pinned template. */
+  added?: boolean;
 }
 
 /**
@@ -386,7 +388,14 @@ export type WorkflowEventType =
    * done stage for recheck, naming the change; written only when there is
    * such work (`laterDoneStages`).
    */
-  | 'stage_version_saved';
+  | 'stage_version_saved'
+  /**
+   * A stage added while the project runs (25 Oct). payload.stage is its
+   * design (`AddedStage`); `effectiveTemplate` puts it in place and the
+   * projection enters it. By the user, or by an authorized autonomous run
+   * with routine decisions handed to Go.
+   */
+  | 'stage_added';
 
 export interface WorkflowEvent {
   type: WorkflowEventType;
@@ -402,6 +411,8 @@ export interface WorkflowEvent {
    * to a version.
    */
   payload?: Record<string, unknown>;
+  /** The Go run that recorded it, when one did. */
+  agent_run_id?: string;
   created_at: string;
 }
 

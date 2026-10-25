@@ -36,6 +36,8 @@ export interface NeedsActions {
   skip?: (reason: string) => Promise<void>;
   /** Start the next round of a looping workflow: the user's return to its first stage. */
   nextRound?: (toStageId: string, reason: string) => Promise<void>;
+  /** Add the next task as a stage and enter it (25 Oct): the user's own `stage_added`. */
+  addStage?: (wanted: { title: string; kind: string; work: string }) => Promise<void>;
   /** Bring the stage's table into view, at the first row still to decide. */
   showTable?: () => void;
   /** Bring the Data panel into view, where a file is attached. */
@@ -175,6 +177,10 @@ export function GoPanel({
         await needsActions?.nextRound?.(need.toStageId, need.reason);
         await go.go();
         return;
+      case 'add_stage':
+        await needsActions?.addStage?.({ title: need.title, kind: need.stageKind, work: need.work });
+        await go.go();
+        return;
       case 'wait_for_jobs':
         await go.go();
         return;
@@ -229,7 +235,7 @@ export function GoPanel({
     disabled: go.phase === 'watching' || Boolean(go.pendingStep) || Boolean(go.authorizing),
     // A suggestion to skip has two answers: the card's button, or Resume to do the stage.
     // A table's button only shows the way, so Resume stays beside it.
-    hideResume: Boolean(need && need.kind !== 'skip_stage' && need.kind !== 'next_round' && !needIsDecidedOnStage(need) && needsActions && describeNeed(need, shownStage, needContext, locale).action),
+    hideResume: Boolean(need && need.kind !== 'skip_stage' && need.kind !== 'next_round' && need.kind !== 'add_stage' && !needIsDecidedOnStage(need) && needsActions && describeNeed(need, shownStage, needContext, locale).action),
   };
   // Something on the panel is waiting for the user: the pinned copy says so and takes them there.
   const waiting = Boolean(go.pendingStep || need || askingUser || go.authorizing);

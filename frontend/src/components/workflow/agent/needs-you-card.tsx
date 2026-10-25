@@ -44,7 +44,7 @@ export function NeedsYouCard({
   };
   return (
     <section aria-label={t('nyc.label')} className="rounded-xl bg-[var(--surface-container-highest)] px-5 py-4">
-      <p className="text-label uppercase tracking-wide text-[var(--on-surface-variant)]">{need.kind === 'skip_stage' || need.kind === 'next_round' ? t('nyc.suggestion') : t('nyc.needYou')}</p>
+      <p className="text-label uppercase tracking-wide text-[var(--on-surface-variant)]">{need.kind === 'skip_stage' || need.kind === 'next_round' || need.kind === 'add_stage' ? t('nyc.suggestion') : t('nyc.needYou')}</p>
       <p className="mt-1 text-body text-[var(--on-surface)]">{message}</p>
       {options ? (
         <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -76,7 +76,7 @@ export function NeedsYouCard({
           <span className="text-label text-[var(--on-surface-variant)]">
             {need.kind === 'next_round'
               ? t('nyc.orWriteUp')
-              : need.kind === 'skip_stage'
+              : need.kind === 'skip_stage' || need.kind === 'add_stage'
               ? t('nyc.orResume')
               : needIsDecidedOnStage(need)
                 ? t('nyc.decideThere')

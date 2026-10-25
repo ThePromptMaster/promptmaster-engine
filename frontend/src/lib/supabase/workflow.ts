@@ -188,6 +188,7 @@ interface EventRow {
   actor: 'user' | 'system';
   reason: string | null;
   payload: Record<string, unknown> | null;
+  agent_run_id?: string | null;
   created_at: string;
 }
 
@@ -195,7 +196,7 @@ export async function listWorkflowEvents(projectId: string): Promise<WorkflowEve
   const supabase = createClient();
   const { data, error } = await supabase
     .from('workflow_events')
-    .select('seq, type, stage_id, to_stage_id, actor, reason, payload, created_at')
+    .select('seq, type, stage_id, to_stage_id, actor, reason, payload, agent_run_id, created_at')
     .eq('project_id', projectId)
     .order('seq', { ascending: true });
 
@@ -207,6 +208,7 @@ export async function listWorkflowEvents(projectId: string): Promise<WorkflowEve
     actor: r.actor,
     reason: r.reason ?? undefined,
     payload: r.payload ?? undefined,
+    ...(r.agent_run_id ? { agent_run_id: r.agent_run_id } : {}),
     created_at: r.created_at,
   }));
 }

@@ -722,3 +722,11 @@ def test_a_long_rationale_is_cut_to_what_a_web_search_accepts():
     planner's rationale — ran past 600 characters."""
     choice = parse_next_action({"action_key": "derive", "rationale": "Because. " * 200}, RESEARCH)
     assert len(choice.rationale) <= 600
+
+
+def test_add_stage_is_a_workflow_move_the_planner_can_name():
+    # 25 Oct (Sean, quantum gravity): the next calculation becomes a stage, not a paragraph.
+    from promptmaster.agent_actions import ACTIONS_BY_KEY
+    action = ACTIONS_BY_KEY["add_stage"]
+    assert action.family == "workflow" and action.important
+    assert "Never write a proposed stage into a document" in action.when

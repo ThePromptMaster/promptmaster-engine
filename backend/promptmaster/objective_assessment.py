@@ -103,6 +103,22 @@ class Limitation(BaseModel):
     allowed_by: str = Field(default="", max_length=300)
 
 
+class NextTask(BaseModel):
+    """The next piece of work PromptMaster itself can carry out, when the
+    objective is not met (25 Oct, Sean, quantum gravity: the report named the
+    two-interval Rényi-2 calculation as the next executable task, said the
+    missing PDFs did not block it, and the run stopped anyway)."""
+    #: A stage title of a few words.
+    title: str = Field(max_length=80)
+    kind: Literal["write", "list", "check"] = "write"
+    #: What to produce, as the stage's instruction.
+    work: str = Field(default="", max_length=600)
+    #: The blockers (by their `need`) this task cannot be done without; empty
+    #: when it can be done now. A blocker it does not need blocks only the
+    #: work that needs it.
+    needs: list[str] = Field(default_factory=list, max_length=MAX_BLOCKERS)
+
+
 class CriterionResult(BaseModel):
     """One requirement the check considered, with its verdict and basis (Sean,
     10 Oct, email 6.5: "The final verification should identify the saved
@@ -138,6 +154,8 @@ class ObjectiveAssessment(BaseModel):
     #: A round check: nothing in this round is left for the user, and the stage
     #: that writes the deliverable comes next (19 Oct, HARBOR).
     ready_for_later_stage: bool = False
+    #: The next executable task, when the objective is not met; None when there is none.
+    next_task: NextTask | None = None
 
 
 class RunStep(BaseModel):
@@ -224,8 +242,19 @@ def build_assessment_prompt(
         '  "criteria": [{"requirement": "one thing the objective, an accepted requirement or a constraint asks for", '
         '"verdict": "met" | "not_met" | "not_checked", "basis": "for met: a sentence copied exactly from the deliverable that shows it; '
         'otherwise why"}],\n'
-        '  "limitations": [{"item": "a gap the brief allows to remain", "allowed_by": "the brief\'s words that allow it, copied exactly"}]\n'
+        '  "limitations": [{"item": "a gap the brief allows to remain", "allowed_by": "the brief\'s words that allow it, copied exactly"}],\n'
+        '  "next_task": {"title": "a stage title of a few words", "kind": "write|list|check", '
+        '"work": "what to produce, as an instruction", "needs": ["the need of each blocker above this task cannot be done without"]} or null\n'
         "}\n"
+        # 25 Oct (Sean, quantum gravity): "An unfinished overall objective
+        # shouldn't block executable work. Missing dependencies should block only
+        # the tasks that require them."
+        "When the objective is not met and the deliverable or the record names a next step PromptMaster itself can "
+        "carry out — a calculation, an analysis, a derivation, a draft, a check — give the first one as next_task. A "
+        "long-term objective is not met by one step; that is no reason to leave next_task empty. Put in its needs only "
+        "the blockers it truly cannot be done without: a source or file the text says the step does not require is not "
+        "one of its needs. next_task is null when the objective is met, or when every remaining step needs something "
+        "only the user can supply.\n"
         # 10 Oct (Sean, emails 3 and 8): a heading is not evidence; a length you
         # cannot see (pages when printed) is not checked, and saying so is honest.
         # 13 Oct (Sean, workshop): "For 20 lunches within $240, clearly explain
@@ -790,7 +819,35 @@ def parse_assessment(
         proposed_next=proposed[:MAX_ITEMS],
         limitations=limitations[:MAX_ITEMS],
         ready_for_later_stage=ready,
+        next_task=_next_task(result.get("next_task"), blockers) if outcome != "met" else None,
     )
+
+
+def _next_task(raw: object, blockers: list[Blocker]) -> NextTask | None:
+    """The next task, its needs kept only where they name a blocker that still
+    stands: a need that is not a blocker (set aside as saved work, or allowed
+    by the brief) holds nothing up."""
+    if not isinstance(raw, dict):
+        return None
+    title = " ".join(str(raw.get("title") or "").split())[:80]
+    if not title:
+        return None
+    kind = raw.get("kind") if raw.get("kind") in ("write", "list", "check") else "write"
+    work = " ".join(str(raw.get("work") or "").split())[:600]
+    # Compared without figures: a blocker's figures may have been taken out
+    # (`_figures_from_record`) while the need naming it still has them.
+    def bare(t: str) -> str:
+        return " ".join(re.sub(r"[\d.,$%]+", " ", _norm(t)).split())
+
+    needs: list[str] = []
+    for n in raw.get("needs") or []:
+        text = bare(str(n))
+        if not text:
+            continue
+        match = next((b.need for b in blockers if text in bare(b.need) or bare(b.need) in text), None)
+        if match and match not in needs:
+            needs.append(match)
+    return NextTask(title=title, kind=kind, work=work, needs=needs[:MAX_BLOCKERS])
 
 
 async def assess_objective(

@@ -44,7 +44,8 @@ import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import { summariseStageContent } from '@/lib/workflow/digest';
 import { stageContentForSummary, stageEvidence } from '@/lib/workflow/evidence';
 import { blocksCompletion, deliverableStage, describeOutstanding, evaluateStage, outstandingWork, remainingStages } from '@/lib/workflow/engine';
-import { describeBasis, pausedLine, stillMet, type ObjectiveAssessment, type ObjectiveBasis } from '@/lib/workflow/objective';
+import { describeBasis, executableNext, openWithNextLine, pausedLine, stillMet, type ObjectiveAssessment, type ObjectiveBasis } from '@/lib/workflow/objective';
+import { addedByRun, designAddedStage, MAX_ADDED_PER_RUN, type AddedStage } from '@/lib/workflow/added-stages';
 import { attachedDocuments, currentFacts, supersededFactValues } from '@/lib/workflow/facts';
 import { ManuscriptMissing, withFreshManuscript } from '@/lib/workflow/fresh-manuscript';
 import { describeValue, leftoverValues, type SupersededValue } from '@/lib/workflow/fact-values';
@@ -227,6 +228,21 @@ async function waitForSections(
  * made, Go stops and asks which takes priority instead of quietly rewriting
  * the work (1 Oct, item 33).
  */
+/**
+ * Add the next task as a stage and enter it (25 Oct). Recorded by the run,
+ * which the database allows only under an authorized autonomous run with
+ * routine decisions handed to Go, at most three a run.
+ */
+async function addStage(ctx: PerformContext, wanted: { title: string; kind?: string; work?: string }, reason: string): Promise<AddedStage> {
+  const design = designAddedStage(ctx.template, ctx.state.current_stage_id, wanted);
+  await appendWorkflowEvent(ctx.project.id, ctx.project.user_id, {
+    type: 'stage_added', stage_id: design.id, actor: 'system', agent_run_id: ctx.run.id,
+    reason: reason.slice(0, 1_000), payload: { stage: design, activate: true },
+  });
+  await ctx.afterStageEvent();
+  return design;
+}
+
 /** The bundles with the chapters re-read for a stage that reads them; null when none has text. */
 async function readManuscript(ctx: PerformContext, target: StageDefinition): Promise<Record<string, StageArtifactBundle> | null> {
   try {
@@ -1519,7 +1535,9 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
             output: `The objective is met in this round ("${verdict.basis_quote}"), so no further round: moving on to the write-up.`,
           });
         }
-        if (verdict.blockers.length) {
+        // What is missing blocks only the work that needs it (25 Oct): with a
+        // next task that can be done now, the round goes ahead.
+        if (verdict.blockers.length && !(ctx.template.key === 'research' || ctx.template.inquiry ? executableNext(verdict) : null)) {
           const line = pausedLine(verdict);
           return done(key, {
             status: 'succeeded', toolsUsed: ['model'], changes: { event_types: ['objective_assessed'] },
@@ -1627,6 +1645,33 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         }
       }
       return done(key, { status: 'succeeded', toolsUsed: changes.version_ids ? ['model'] : [], changes, output: lines.join('\n\n') });
+    }
+
+    case 'add_stage': {
+      // 25 Oct: the next task the saved work names, as a stage, started now.
+      const title = typeof params.title === 'string' ? params.title.trim() : '';
+      const work = typeof params.work === 'string' ? params.work.trim() : '';
+      const reason = (typeof params.reason === 'string' && params.reason.trim()) || ctx.step.rationale || '';
+      if (!title || !work) {
+        return done(key, { status: 'failed', toolsUsed: [], changes: {}, output: 'A stage is added with a title and the work it is to do.' });
+      }
+      const routine = ctx.run.policy === 'autonomous' && ctx.project.routine_decisions === 'handle';
+      if (!routine) {
+        return done(key, {
+          status: 'succeeded', toolsUsed: [], changes: {},
+          output: `Proposed: a stage "${title}" — ${work}`,
+          stop: { status: 'awaiting_decision', reason: `Add a stage for the next task, "${title}"?` },
+          needs: { kind: 'add_stage', stageId: ctx.stage.id, title, stageKind: typeof params.kind === 'string' ? params.kind : 'write', work },
+        });
+      }
+      if (addedByRun(ctx.loadEvents ? await ctx.loadEvents() : [], ctx.run.id) >= MAX_ADDED_PER_RUN) {
+        return done(key, { status: 'failed', toolsUsed: [], changes: {}, output: `This run has already added ${MAX_ADDED_PER_RUN} stages; adding another is yours.` });
+      }
+      const stage = await addStage(ctx, { title, kind: typeof params.kind === 'string' ? params.kind : 'write', work }, reason || `Next task: ${title}.`);
+      return done(key, {
+        status: 'succeeded', toolsUsed: [], changes: { event_types: ['stage_added'] },
+        output: `Added the stage "${stage.label}" after ${ctx.template.stages.find((s) => s.id === stage.after)?.label ?? stage.after} and started it: ${work}`,
+      });
     }
 
     case 'skip': {
@@ -1811,6 +1856,36 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
             ...judged, status: 'succeeded',
             output: `The objective is met on ${basis.stage_label}${basis.version_number ? ` v${basis.version_number}` : ''}: "${assessment.basis_quote}". ${checked}${deferredNote(ctx)}`,
             stop: { status: 'completed', reason: `Objective met.${deferredNote(ctx)}` },
+          });
+        }
+        // 25 Oct (Sean, quantum gravity): an objective that is still open is
+        // not a stop while there is a next task that can be done now. Under
+        // "handle them for me" Go adds it as a stage and starts it (at most
+        // three a run); otherwise it proposes it, with the button to add it.
+        // Investigations only: a writing workflow's unmet objective is fixed in
+        // its own stages ("Have Go fix it"), not by adding new ones.
+        const next = ctx.template.key === 'research' || ctx.template.inquiry ? executableNext(assessment) : null;
+        if (next) {
+          const open = openWithNextLine(assessment, next);
+          const routine = ctx.run.policy === 'autonomous' && ctx.project.routine_decisions === 'handle';
+          const added = routine ? addedByRun(ctx.loadEvents ? await ctx.loadEvents() : [], ctx.run.id) : 0;
+          if (routine && added < MAX_ADDED_PER_RUN) {
+            const stage = await addStage(ctx, next, `The objective is still open; the next task can be done now: ${next.title}.`);
+            return done(key, {
+              ...judged, status: 'succeeded',
+              changes: { event_types: [...(judged.changes.event_types ?? []), 'stage_added'] },
+              output: `${open} Added it as a stage, "${stage.label}", and started it: ${next.work || stage.instruction}. ` +
+                `${holder ? `${holder.label} is rechecked from its results. ` : ''}${describeBasis(basis)}`,
+            });
+          }
+          const reason = routine
+            ? `${open} This run has already added ${MAX_ADDED_PER_RUN} stages; adding another is yours.`
+            : `${open} Add it as a stage?`;
+          return done(key, {
+            ...judged, status: 'succeeded',
+            output: `${reason} ${describeBasis(basis)}`,
+            stop: { status: 'awaiting_decision', reason },
+            needs: { kind: 'add_stage' as const, stageId: ctx.stage.id, title: next.title, stageKind: next.kind, work: next.work },
           });
         }
         // Not met: the cycle is finished, the objective is not. With a named

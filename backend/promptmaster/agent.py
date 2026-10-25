@@ -360,10 +360,14 @@ def _format_state(inputs: PMInput, state: AgentState) -> str:
         # Told "writing, never mark a stage stuck", Go wrote a research log that
         # said the criterion was not met and then declared the objective met
         # (6 Oct, email 13). Missing inputs are a blocker, named exactly.
+        # 25 Oct (Sean, quantum gravity): missing PDFs marked the work stuck
+        # although the next calculation did not need them. What is missing
+        # blocks the task that needs it, not the project.
         facts.append(
-            "DATA THE PROJECT HOLDS: none. This is an investigation: if meeting the objective needs a "
-            "calculation, a formula, a source or data the project does not hold, and no move listed can "
-            "produce it, choose mark_blocked and name exactly what is missing — do not write around it."
+            "DATA THE PROJECT HOLDS: none. This is an investigation: if the NEXT task needs a calculation, a "
+            "formula, a source or data the project does not hold, and no move listed can produce it, choose "
+            "mark_blocked and name exactly what is missing — do not write around it. Something missing that "
+            "only a later or different task needs is not a reason to stop: do the task that can be done now."
         )
     else:
         # A writing workflow has no stage a computation serves. Told "no data",

@@ -547,6 +547,12 @@ export function projectState(
         break;
       }
 
+      // 25 Oct: a stage added while the project runs is the next work, so it
+      // is entered. `effectiveTemplate` has already put it in the order.
+      case 'stage_added':
+        if (event.payload?.activate !== false) enter(event.stage_id, event.created_at);
+        break;
+
       case 'stage_returned': {
         const target = event.to_stage_id ?? event.stage_id;
         // Work after the point returned to is marked stale, never deleted —
