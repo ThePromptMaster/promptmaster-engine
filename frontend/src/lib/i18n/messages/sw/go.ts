@@ -88,6 +88,8 @@ export const sw: Record<keyof typeof en, string> = {
   'gc.budget': 'Kikomo cha hatua',
   'gc.steps': 'hatua {count}',
   'gc.used': 'Kikomo kilichotumika',
+  'gc.resumeMeans': 'Endelea tena huendeleza uendeshaji huu pale ulipositishwa. Kwenda hatua inayofuata mwenyewe, tumia “Endelea hadi …” chini ya hatua.',
+  'gc.continueMeans': 'Endelea huupa uendeshaji huu dirisha jingine la hatua. Kwenda hatua inayofuata mwenyewe, tumia “Endelea hadi …” chini ya hatua.',
   'gc.thisWindow': 'hatua {used} / {cap} katika dirisha hili',
   'gc.lastWindow': 'Hatua {used} kati ya {cap} zilitumika katika dirisha lililopita',
   'gc.explain': 'Hatua ni jambo moja ambalo PromptMaster hufanya, kama kuandika rasimu au kukagua hatua ya kazi. Kuendesha msimbo huhesabiwa kama mbili.',

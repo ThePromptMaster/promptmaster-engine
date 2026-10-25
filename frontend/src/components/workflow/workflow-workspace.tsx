@@ -654,6 +654,19 @@ export function WorkflowWorkspace({
     [stage, stageBundles]
   );
   const headVersion = useMemo(() => stageVersionList.at(-1) ?? null, [stageVersionList]);
+  // 25 Oct (Sean: "It would help if the screen automatically brought the user
+  // to newly generated content"): a new version on the stage on screen is
+  // brought into view — not while the user is typing, and not on opening.
+  const seenHead = useRef<string | null>(null);
+  useEffect(() => {
+    const key = stage && headVersion ? `${stage.id}:${headVersion.id}` : null;
+    const prev = seenHead.current;
+    seenHead.current = key;
+    if (!key || !prev || prev === key || prev.split(':')[0] !== key.split(':')[0]) return;
+    const typing = document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
+    if (typing) return;
+    document.querySelector<HTMLElement>(`[data-stage-work="${stage!.id}"]`)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }, [stage, headVersion]);
   // A new version on this stage is what the page shows next, not an older
   // pill left selected (13 Oct, Sean's PINE pack: Go read the new 98-word
   // version while the page still showed the 159-word one).

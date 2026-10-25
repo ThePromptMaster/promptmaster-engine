@@ -261,7 +261,7 @@ export function ReviewRenderer({
   const columns = schema.fields.filter((f) => !f.userOnly || rows.some((r) => (r[f.key] ?? '').trim()));
 
   return (
-    <section aria-label={t('stage.work', { stage: shownLabel })}>
+    <section data-stage-work={stage.id} aria-label={t('stage.work', { stage: shownLabel })}>
       {confirming && (
         <ConfirmOverwrite
           label={itemPlural(schemaLocale, ownSchema.itemLabel)}

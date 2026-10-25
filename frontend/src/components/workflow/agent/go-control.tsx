@@ -99,6 +99,13 @@ export function GoControl({
       {t('gc.explain')}
     </p>
     )}
+    {/* 25 Oct (Sean: "Resume, Continue and advancing to the next stage can be
+        confusing"): what the button does now, beside it. */}
+    {!running && (canResume || canContinue) && (
+    <p className="mt-1 text-label text-[var(--on-surface-variant)]">
+      {canResume ? t('gc.resumeMeans') : t('gc.continueMeans')}
+    </p>
+    )}
     </div>
   );
 }
