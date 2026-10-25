@@ -199,6 +199,31 @@ def instructions_block(inputs: PMInput) -> str:
     return f"{INSTRUCTIONS_HEADER}\n" + "\n".join(lines)
 
 
+APPROVALS_HEADER = (
+    "APPROVED BY THE USER — decisions of record. What an approval below covers is settled: never report it as "
+    "unresolved, pending or awaiting the user. One given on an earlier version than the stage's current one "
+    "covers what that version said; where the current version changed it, say what changed rather than calling "
+    "it approved:"
+)
+
+
+def approvals_block(inputs: PMInput) -> str:
+    """The approvals the user gave, or "" when there are none."""
+    given = [a for a in (inputs.approvals or []) if a.approval.strip()]
+    if not given:
+        return ""
+    lines = []
+    for a in given:
+        where = a.stage.strip() or "A stage"
+        when = ""
+        if a.version and a.current and a.version != a.current:
+            when = f" (given on v{a.version}; the current version is v{a.current})"
+        elif a.version:
+            when = f" (on v{a.version}, the current version)"
+        lines.append(f"- {where}: {' '.join(a.approval.split())}{when}")
+    return f"{APPROVALS_HEADER}\n" + "\n".join(lines)
+
+
 #: The most context a check is sent. The checks took 4,000 characters until
 #: 12 Oct, which cut a long brief's requirements in half (Northstar).
 CHECK_CONTEXT_MAX = 40_000
@@ -290,6 +315,7 @@ def context_block(inputs: PMInput, limit: int | None = None) -> str:
     facts = facts_block(inputs)
     sources = sources_block(inputs)
     said = instructions_block(inputs)
+    approved = approvals_block(inputs)
     text = (inputs.context or "").strip()
     if limit is not None and len(text) > limit:
         # At a line, and said plainly: "[…not shown]" read to the objective
@@ -302,7 +328,7 @@ def context_block(inputs: PMInput, limit: int | None = None) -> str:
     boundary = FACT_BOUNDARY if no_invented_details(inputs) else ""
     # Last: the other projects inform, and everything above outranks them.
     references = references_block(inputs, limit)
-    return "\n\n".join(b for b in (facts, sources, said, boundary, context, references) if b)
+    return "\n\n".join(b for b in (facts, approved, sources, said, boundary, context, references) if b)
 
 
 def context_line(inputs: PMInput) -> str:

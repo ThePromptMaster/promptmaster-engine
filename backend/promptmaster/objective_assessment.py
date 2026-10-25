@@ -30,7 +30,7 @@ from pydantic import BaseModel, Field
 from .agent_actions import ACTIONS_BY_KEY
 from .llm_client import OpenRouterClient
 from .project_context import CHECK_CONTEXT_MAX, brief_lines, context_block
-from .schemas import PMInput
+from .schemas import DataFileBrief, PMInput, format_data_files
 
 #: The deliverable text a check reads; the verdict and blockers of a long
 #: log are in its opening and closing, so both ends are kept.
@@ -183,6 +183,7 @@ def build_assessment_prompt(
     history: list[str] | None = None,
     known_versions: dict[str, int] | None = None,
     later_stage: str = "",
+    data_files: list[DataFileBrief] | None = None,
 ) -> tuple[str, str]:
     record = "\n".join(
         f"- S{i + 1}: {s.action_key} — {s.execution_label or 'no execution label'}"
@@ -194,6 +195,13 @@ def build_assessment_prompt(
         + (f"SUCCESS CRITERION, as set when the workflow was designed: {success_criterion}\n" if success_criterion.strip() else "")
         + (f"{brief}\n" if (brief := brief_lines(inputs)) else "")
         + (f"{context_block(inputs, limit=CHECK_CONTEXT_MAX)}\n" if context_block(inputs) else "")
+        + (
+            # 25 Oct (Sean, churn research): outcomes and fields already supplied
+            # in an attached file were asked for again.
+            "DATA FILES THE PROJECT HOLDS (attached; what they contain is supplied — a column listed here is never "
+            "missing data):\n" + format_data_files(data_files) + "\n"
+            if data_files else ""
+        )
         + f"\nRUN RECORD (what the autonomous run actually did; execution labels are derived from what happened):\n{record}\n\n"
         f"--- THE DELIVERABLE: {deliverable_label} ---\n{_clip(content)}\n--- END ---\n\n"
         + (
@@ -615,6 +623,7 @@ def parse_assessment(
     record: str = "",
     known_versions: dict[str, int] | None = None,
     later_stage: str = "",
+    data_files: list[DataFileBrief] | None = None,
 ) -> ObjectiveAssessment:
     if not isinstance(result, dict):
         return ObjectiveAssessment(outcome="partly", reason="The check did not come back in a usable form.")
@@ -674,6 +683,10 @@ def parse_assessment(
             # A round check: what the later stage writes is not missing yet.
             if later_stage and _mentions(f"{need} {ask}", later_stage):
                 for_later = True
+                continue
+            # Data an attached file already holds is not missing (25 Oct, churn).
+            if kind == "data_missing" and _in_data_files(f"{need} {ask}", data_files):
+                in_project.append(need)
                 continue
             # A gap the brief allows to remain is stated, not waited for.
             if allowed and kind in ("data_missing", "source_missing"):
@@ -823,6 +836,20 @@ def parse_assessment(
     )
 
 
+def _in_data_files(text: str, files: list[DataFileBrief] | None) -> bool:
+    """The text names a column or a file the project's data files hold."""
+    if not files:
+        return False
+    said = f" {_norm(text)} "
+    for f in files:
+        names = [f.name, f.name.rsplit(".", 1)[0], *f.columns]
+        for n in names:
+            word = _norm(n.replace("_", " "))
+            if len(word) >= 3 and (f" {word} " in said or f" {_norm(n)} " in said):
+                return True
+    return False
+
+
 def _next_task(raw: object, blockers: list[Blocker]) -> NextTask | None:
     """The next task, its needs kept only where they name a blocker that still
     stands: a need that is not a blocker (set aside as saved work, or allowed
@@ -863,20 +890,22 @@ async def assess_objective(
     history: list[str] | None = None,
     known_versions: dict[str, int] | None = None,
     later_stage: str = "",
+    data_files: list[DataFileBrief] | None = None,
 ) -> ObjectiveAssessment:
     requests = request_facts(inputs)
     # The check is not shown a carried-forward finding that only restates a request.
     failed_checks = set_aside_requests(failed_checks, requests)[0]
     system, user = build_assessment_prompt(
-        inputs, deliverable_label, content, steps, success_criterion, failed_checks, measured, history, known_versions, later_stage
+        inputs, deliverable_label, content, steps, success_criterion, failed_checks, measured, history, known_versions, later_stage,
+        data_files,
     )
     result, _usage = await client.generate_json(prompt=user, system=system, temperature=0, max_tokens=1_600, model=model)
-    parsed = parse_assessment(result, content, steps, failed_checks, measured, requests, record_text(inputs), known_versions, later_stage)
+    parsed = parse_assessment(result, content, steps, failed_checks, measured, requests, record_text(inputs), known_versions, later_stage, data_files)
     # A "met" lost only for want of a quote is asked once more before it can
     # pause a run (11 Oct: the run stopped on "not met" for exactly this).
     if _needs_evidence_retry(result, parsed, failed_checks):
         again, _usage = await client.generate_json(
             prompt=user + EVIDENCE_RETRY, system=system, temperature=0, max_tokens=1_600, model=model
         )
-        parsed = parse_assessment(again, content, steps, failed_checks, measured, requests, record_text(inputs), known_versions, later_stage)
+        parsed = parse_assessment(again, content, steps, failed_checks, measured, requests, record_text(inputs), known_versions, later_stage, data_files)
     return parsed

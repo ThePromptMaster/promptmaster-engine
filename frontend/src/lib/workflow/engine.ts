@@ -813,13 +813,14 @@ export type OutstandingItem =
    */
   | { kind: 'check_says'; stageId: string; label: string; says: string }
   | { kind: 'go_waiting'; label: string; need: string }
-  | { kind: 'objective_unmet'; label: string; blockers: string[] };
+  | { kind: 'objective_unmet'; label: string; blockers: string[]; next?: string | null };
 
 export interface OutstandingExtras {
   /** Go stopped and is waiting on the user: what it needs, in one line. */
   goWaiting?: string | null;
   /** The latest objective assessment said the objective is not met. */
-  objectiveUnmet?: { blockers: string[] } | null;
+  /** `next`: a next task that can be done now (25 Oct): the objective is open, not stuck. */
+  objectiveUnmet?: { blockers: string[]; next?: string | null } | null;
   /** What the latest check of the current stage's draft holds against it (`checkVerdict`). */
   checkSays?: { stageId: string; says: string } | null;
 }
@@ -887,7 +888,7 @@ export function outstandingWork(
     if (stage) out.push({ kind: 'check_says', stageId: stage.id, label: stage.short_label || stage.label, says: extras.checkSays.says });
   }
   if (extras.objectiveUnmet) {
-    out.push({ kind: 'objective_unmet', label: 'Objective', blockers: extras.objectiveUnmet.blockers });
+    out.push({ kind: 'objective_unmet', label: 'Objective', blockers: extras.objectiveUnmet.blockers, ...(extras.objectiveUnmet.next ? { next: extras.objectiveUnmet.next } : {}) });
   }
   if (extras.goWaiting) out.push({ kind: 'go_waiting', label: 'Go', need: extras.goWaiting });
   return out;
@@ -957,6 +958,13 @@ export function shownOutstanding(raw: OutstandingItem, locale: Locale, show: Out
     case 'go_waiting':
       return t('out.goWaiting', { need: show.waiting ? show.waiting(item.need) : item.need });
     case 'objective_unmet':
+      // Four different things, said apart (25 Oct, Sean): a stage done, a task
+      // that can be done now, a dependency, and the objective itself.
+      if (item.next) {
+        return item.blockers.length
+          ? t('out.objOpenNextWaiting', { next: item.next, list: item.blockers.join('; ') })
+          : t('out.objOpenNext', { next: item.next });
+      }
       return item.blockers.length ? t('out.objWaiting', { list: item.blockers.join('; ') }) : t('out.objNotMet');
   }
 }

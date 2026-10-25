@@ -87,6 +87,17 @@ class UserInstruction(BaseModel):
     instruction: str = Field(..., min_length=1, max_length=1_600)
 
 
+class UserApproval(BaseModel):
+    """An approval the user gave on a stage (25 Oct, Sean: "a previous test
+    retained approved dates and financial constraints in one section, but the
+    final blocker still claimed they were unresolved")."""
+    stage: str = Field(default="", max_length=200)
+    approval: str = Field(..., min_length=1, max_length=400)
+    #: The version it was given on, and the stage's current one; equal when current.
+    version: int = 0
+    current: int = 0
+
+
 class PMInput(BaseModel):
     """User inputs for a PromptMaster session.
 
@@ -116,6 +127,9 @@ class PMInput(BaseModel):
     user_instructions: list[UserInstruction] = Field(default_factory=list, max_length=20)
     # Client, 21 Oct (email 5): the user's other projects this one draws on.
     references: list[ReferencedProject] = Field(default_factory=list, max_length=5)
+    # 25 Oct: the approvals the user gave, so no later stage or check treats an
+    # approved decision as unresolved (`project_context.approvals_block`).
+    approvals: list[UserApproval] = Field(default_factory=list, max_length=60)
     mode: ModeType = Field(..., description="Selected operational mode")
     # Custom mode fields (only used when mode == 'custom')
     custom_name: str = Field(default="", max_length=MAX_SHORT_TEXT_CHARS, description="Custom mode persona name")

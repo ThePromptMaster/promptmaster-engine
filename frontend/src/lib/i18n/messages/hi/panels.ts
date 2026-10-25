@@ -454,6 +454,8 @@ export const hi: Record<keyof typeof en, string> = {
   'out.checkSays': '{label}: नवीनतम जाँच के अनुसार {says}',
   'out.goWaiting': 'Go आपकी प्रतीक्षा कर रहा है: {need}',
   'out.objWaiting': 'उद्देश्य पूरा नहीं हुआ — प्रतीक्षा: {list}',
+  'out.objOpenNext': 'उद्देश्य अभी खुला है — अगला काम अभी किया जा सकता है: {next}',
+  'out.objOpenNextWaiting': 'उद्देश्य अभी खुला है — अगला काम अभी किया जा सकता है: {next}। केवल दूसरे काम के लिए कमी: {list}',
   'out.objNotMet': 'उद्देश्य पूरा नहीं हुआ',
   'wserr.noChange': 'तालिका में कुछ भी नहीं बदलेगा।',
   'wserr.noDrafting': 'इस वर्कफ़्लो में कोई ड्राफ़्टिंग चरण नहीं है।',

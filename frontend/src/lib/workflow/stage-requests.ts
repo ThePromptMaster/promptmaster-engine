@@ -54,6 +54,7 @@ export function inputsFrom(project: Project): PMInput {
     ...(project.applied_instructions?.length
       ? { user_instructions: project.applied_instructions.map(({ stage, version, instruction }) => ({ stage, version, instruction })) }
       : {}),
+    ...(project.approvals?.length ? { approvals: project.approvals } : {}),
     // The user's other projects this one draws on (client, 21 Oct, email 5).
     ...(project.references?.some((r) => !r.deleted) ? { references: referencePayload(project.references) } : {}),
     mode: project.mode,

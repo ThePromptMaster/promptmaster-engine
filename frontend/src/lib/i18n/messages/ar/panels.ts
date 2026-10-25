@@ -454,6 +454,8 @@ export const ar: Record<keyof typeof en, string> = {
   'out.checkSays': '{label}: يقول الفحص الأخير {says}',
   'out.goWaiting': 'Go بانتظارك: {need}',
   'out.objWaiting': 'الهدف لم يتحقق — بانتظار: {list}',
+  'out.objOpenNext': 'الهدف لا يزال مفتوحًا — التالي يمكن إنجازه الآن: {next}',
+  'out.objOpenNextWaiting': 'الهدف لا يزال مفتوحًا — التالي يمكن إنجازه الآن: {next}. ناقص فقط لعمل آخر: {list}',
   'out.objNotMet': 'الهدف لم يتحقق',
   'wserr.noChange': 'لن يتغير شيء في الجدول.',
   'wserr.noDrafting': 'لا توجد مرحلة صياغة في سير العمل هذا.',

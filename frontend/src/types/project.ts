@@ -106,6 +106,8 @@ export interface Project {
    * carries the user's later word (12 Oct; `lib/workflow/applied-instructions.ts`).
    */
   applied_instructions?: import('@/lib/workflow/applied-instructions').AppliedInstruction[];
+  /** The approvals the user gave, for prompts (`withApprovals`); not a column. */
+  approvals?: import('@/lib/workflow/approvals').GivenApproval[];
   /**
    * The project's data files. Not a column: joined on in the browser when
    * the project is opened, so everything that is handed the project — stage

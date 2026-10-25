@@ -44,7 +44,7 @@ from promptmaster.fact_extraction import ExtractedFact, SourceDoc, extract_facts
 from promptmaster.agent_actions import ACTION_KEYS, AGENT_ACTIONS, REASONING_ACTIONS, AgentAction
 from promptmaster.errors import PRESERVED_NOTHING_WRITTEN
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError
-from promptmaster.schemas import PMInput
+from promptmaster.schemas import DataFileBrief, PMInput
 from routers._errors import llm_http_error
 from routers.stage import _model_used
 
@@ -342,6 +342,8 @@ class AssessObjectiveRequest(BaseModel):
     known_versions: dict[str, int] = Field(default_factory=dict, max_length=60)
     #: A round check: the stage that writes the deliverable next.
     later_stage: str = Field(default="", max_length=200)
+    #: The project's data files, by name and columns (25 Oct, churn research).
+    data_files: list[DataFileBrief] = Field(default_factory=list, max_length=20)
     model: str = ""
 
 
@@ -368,6 +370,7 @@ async def api_assess_objective(req: AssessObjectiveRequest, client: OpenRouterCl
             [h[:4_000] for h in req.history if h.strip()],
             req.known_versions,
             req.later_stage,
+            req.data_files,
         )
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)

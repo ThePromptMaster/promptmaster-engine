@@ -861,6 +861,8 @@ export const api = {
       known_versions?: Record<string, number>;
       /** A round check: the stage that writes the deliverable next. */
       later_stage?: string;
+      /** The project's data files, by name and columns (25 Oct). */
+      data_files?: import('@/lib/workflow/digest').DataFileBrief[];
       model?: string;
     },
     signal?: AbortSignal
