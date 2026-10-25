@@ -5,6 +5,8 @@ export const zh: Record<keyof typeof en, string> = {
   'need.setObjective': '我需要先有一个目标，才能选择下一步。请在上方设置目标。',
   'need.stuckWhy': '{stage}已被标记为卡住。',
   'need.stuckWhyReason': '{stage}已被标记为卡住：{reason}。',
+  'need.addStage': 'Go 建议一个现在就能做的下一项任务：{title} —— {work}',
+  'need.addStageAction': '将“{title}”添加为一个阶段',
   'need.skipForNow': '暂时跳过{stage}',
   'need.byHand': '手动继续此阶段',
   'need.stuckFooter': '如果要在此阶段仍未完成时继续推进，请使用阶段底部“更多”菜单中的“{control}”；它会要求你说明原因。',

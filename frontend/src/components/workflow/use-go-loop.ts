@@ -77,6 +77,7 @@ import type { StageFigures } from '@/lib/workflow/figures';
 import type { StageControl } from '@/lib/workflow/stage-controls';
 import { deliverableStage, evaluateStage, getStage, nextSuggestedStage } from '@/lib/workflow/engine';
 import { objectiveUnmet } from '@/lib/workflow/objective';
+import { addedByRun, MAX_ADDED_PER_RUN } from '@/lib/workflow/added-stages';
 import { isDone } from '@/lib/workflow/types';
 import { documentsAwaitingFacts } from '@/lib/workflow/facts';
 import { modeForStage } from '@/lib/workflow/stage-mode';
@@ -499,7 +500,13 @@ export function useGoLoop(opts: Options) {
     try {
       for (;;) {
         if (signal.aborted) throw new Stopped();
-        const o = latest.current;
+        let o = latest.current;
+        // A stage just added is entered before the page has drawn it: wait for
+        // the page to catch up rather than call the stage missing (25 Oct).
+        for (let i = 0; !o.stage && i < 30 && !signal.aborted; i += 1) {
+          await new Promise((r) => setTimeout(r, 100));
+          o = latest.current;
+        }
         const current = runRef.current!;
         if (!o.stage) throw new Error(NO_STAGE);
 
@@ -653,6 +660,13 @@ export function useGoLoop(opts: Options) {
         // An answer that names going back is the user's return; Go carries it out (13 Oct).
         const userReturn = answeredReturn(o.template, o.stage, [...priorStepsRef.current, ...stepsRef.current]);
         if (goBackTo.length || userReturn) allowed.push('return_to_stage');
+        // 25 Oct: the next task the saved work names becomes a stage of its own
+        // — in an investigation, with routine decisions handed to Go, at most
+        // three a run (the database holds the same limits).
+        if (
+          current.policy === 'autonomous' && routine === 'handle' && (o.template.key === 'research' || o.template.inquiry) &&
+          addedByRun(o.events, current.id) < MAX_ADDED_PER_RUN
+        ) allowed.push('add_stage');
         // Q2b: after going round in circles, the repeated moves are off the table for the next choice.
         const reconsider = reconsiderRef.current?.pending ? reconsiderRef.current : null;
         if (reconsider) {

@@ -595,3 +595,38 @@ def test_the_router_passes_history_versions_and_the_later_stage():
 def test_a_round_check_that_names_nothing_is_not_ready_for_the_later_stage():
     a = parse_assessment({"outcome": "not_met", "reason": "Mock: not there yet.", "blockers": []}, HARBOR_ROUND, [], later_stage="Write-up")
     assert a.ready_for_later_stage is False
+
+
+# 25 Oct (Sean, quantum gravity): the report named the next calculation and said
+# the missing PDFs did not block it; the run stopped on "the objective is not met".
+def test_the_prompt_asks_for_the_next_task_and_only_what_it_needs():
+    _system, user = build_assessment_prompt(_inputs(), "Final", LOG, STEPS)
+    assert '"next_task"' in user
+    assert "A long-term objective is not met by one step" in user
+    assert "does not require is not one of its needs" in user
+
+
+def test_next_task_needs_keep_only_blockers_that_stand():
+    a = parse_assessment({
+        "outcome": "not_met", "reason": "Not solved.", "basis_quote": "Success criterion: Not met.",
+        "blockers": [{"need": "the PDFs of the 2023 papers", "kind": "source_missing"}],
+        "next_task": {"title": "Two-interval Rényi-2 calculation", "kind": "write", "work": "Compute S2.",
+                      "needs": ["a supercomputer that is not a blocker"]},
+    }, LOG, STEPS)
+    assert a.next_task is not None
+    assert a.next_task.title == "Two-interval Rényi-2 calculation"
+    assert a.next_task.needs == []
+    b = parse_assessment({
+        "outcome": "not_met", "reason": "Not solved.", "basis_quote": "Success criterion: Not met.",
+        "blockers": [{"need": "the PDFs of the 2023 papers", "kind": "source_missing"}],
+        "next_task": {"title": "Compare with the 2023 papers", "needs": ["the PDFs of the 2023 papers"]},
+    }, LOG, STEPS)
+    assert b.next_task is not None and len(b.next_task.needs) == 1 and "PDFs" in b.next_task.needs[0]
+
+
+def test_a_met_objective_has_no_next_task():
+    a = parse_assessment({
+        "outcome": "met", "basis_quote": "Success criterion: Not met.",
+        "next_task": {"title": "More", "needs": []},
+    }, LOG, STEPS)
+    assert a.next_task is None

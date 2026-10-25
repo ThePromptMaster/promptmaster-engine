@@ -138,6 +138,7 @@ import { commitOutlineVersion, approvedOutlineVersionId, ensureOutlineArtifact }
 import type { Artifact, ArtifactVersion, Evaluation, Project, ProjectPatch, RoutineDecisions } from '@/types/project';
 import { useExperience } from '@/lib/projects/experience';
 import { freshOrPage } from '@/lib/workflow/fresh-manuscript';
+import { addedSignature, designAddedStage, effectiveTemplate } from '@/lib/workflow/added-stages';
 
 interface Props {
   project: Project;
@@ -223,7 +224,7 @@ export function WorkflowWorkspace({
   project: projectProp,
   artifact,
   versions,
-  template,
+  template: pinnedTemplate,
   stages: bundles,
   evaluations,
   onPatchProject,
@@ -237,6 +238,12 @@ export function WorkflowWorkspace({
 }: Props) {
   const [experience] = useExperience();
   const simpleExperience = experience === 'simple';
+  // Stages added while the project runs (25 Oct) are part of the template
+  // every reader is given; the pinned version itself never changes.
+  const storeEvents = useProjectStore((s) => s.events);
+  const addedSig = addedSignature(storeEvents);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the added stages, not every event
+  const template = useMemo(() => effectiveTemplate(pinnedTemplate, storeEvents), [pinnedTemplate, addedSig]);
   // Every request built from the project carries the instructions the user
   // applied, beside its facts (12 Oct, Atlas and Meridian).
   const project = useMemo(() => withAppliedInstructions(projectProp, template, bundles), [projectProp, template, bundles]);
@@ -1514,6 +1521,14 @@ export function WorkflowWorkspace({
         if (!option) throw new Error(tr('wserr.cannotSkip'));
         await handleTransition(option, reason.slice(0, 500));
       },
+      // Go's next task, added as a stage by the user and entered (25 Oct).
+      addStage: async (wanted: { title: string; kind: string; work: string }) => {
+        const design = designAddedStage(template, state.current_stage_id, wanted);
+        await appendEvent({
+          type: 'stage_added', stage_id: design.id, actor: 'user',
+          reason: `Added the next task: ${design.label}.`, payload: { stage: design, activate: true },
+        });
+      },
       // The user's return to where the next round starts, with Go's reason.
       nextRound: async (toStageId: string, reason: string) => {
         const option = transitions.find((t) => t.kind === 'return' && t.toStageId === toStageId);
@@ -1536,7 +1551,7 @@ export function WorkflowWorkspace({
         panel.scrollIntoView({ block: 'center' });
       },
     }),
-    [project.id, project.user_id, project.model, project.mode, materialiseOutline, refreshEvents, setBlocked, handleToggleManual, onReload, transitions, handleTransition, state, appendEvent]
+    [project.id, project.user_id, project.model, project.mode, materialiseOutline, refreshEvents, setBlocked, handleToggleManual, onReload, transitions, handleTransition, state, appendEvent, template]
   );
 
   // For Go's card on a stuck stage: has anything changed since it was marked
@@ -2200,7 +2215,7 @@ export function WorkflowWorkspace({
               name={template.name}
               fromVersion={template.version}
               toVersion={latestTemplate.version}
-              diff={templateDiff(template, latestTemplate)}
+              diff={templateDiff(pinnedTemplate, latestTemplate)}
               busy={upgrading}
               onUpgrade={() => void upgradeTemplate()}
               onDismiss={() => setUpgradeDismissed(true)}

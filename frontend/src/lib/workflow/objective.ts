@@ -37,6 +37,37 @@ export interface ObjectiveAssessment {
   limitations?: { item: string; allowed_by: string }[];
   /** A round check: nothing is left for the user; the next stage writes the deliverable. */
   ready_for_later_stage?: boolean;
+  /**
+   * The next task PromptMaster itself can carry out (25 Oct). `needs` names
+   * the blockers it waits on; empty means it can be done now, whatever else
+   * is missing.
+   */
+  next_task?: NextTask | null;
+}
+
+export interface NextTask {
+  title: string;
+  kind: 'write' | 'list' | 'check';
+  work: string;
+  needs: string[];
+}
+
+/**
+ * The next task, when nothing it needs is missing (25 Oct, Sean: "An
+ * unfinished overall objective shouldn't block executable work. Missing
+ * dependencies should block only the tasks that require them").
+ */
+export function executableNext(a: Pick<ObjectiveAssessment, 'outcome' | 'next_task'> | null | undefined): NextTask | null {
+  const t = a?.next_task;
+  if (!a || a.outcome === 'met' || !t || !t.title?.trim()) return null;
+  return t.needs?.length ? null : t;
+}
+
+/** "Objective still open — next: …", with what waits only on other work. */
+export function openWithNextLine(a: Pick<ObjectiveAssessment, 'blockers'>, next: NextTask): string {
+  const waiting = a.blockers.map((b) => b.need);
+  return `The objective is still open; the next task can be done now: ${next.title}.` +
+    (waiting.length ? ` Missing, but not needed for it: ${waiting.join('; ')}.` : '');
 }
 
 /**
@@ -87,6 +118,7 @@ export function latestObjectiveAssessment(events: readonly WorkflowEvent[]): (Ob
       // pause card never showed what was carried as a limitation.
       ...(Array.isArray(p.limitations) ? { limitations: p.limitations } : {}),
       ...(p.ready_for_later_stage ? { ready_for_later_stage: true } : {}),
+      ...(p.next_task && typeof p.next_task === 'object' ? { next_task: p.next_task } : {}),
       at: e.created_at ?? '',
     };
   }
@@ -122,7 +154,7 @@ export function objectiveUnmet(
 }
 
 /** What makes an "objective not met" a thing to check again rather than a standing verdict. */
-export const OBJECTIVE_CHANGES = ['brief_changed', 'stage_version_saved', 'stage_unblocked'] as const satisfies readonly WorkflowEvent['type'][];
+export const OBJECTIVE_CHANGES = ['brief_changed', 'stage_version_saved', 'stage_unblocked', 'stage_added'] as const satisfies readonly WorkflowEvent['type'][];
 const CHANGES_SINCE = new Set<WorkflowEvent['type']>(OBJECTIVE_CHANGES);
 
 /** A Go stop reason that is the objective check's pause (`pausedLine`). */

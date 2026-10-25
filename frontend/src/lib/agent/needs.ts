@@ -54,6 +54,8 @@ type Need =
   | { kind: 'repair_stuck'; stageId: string; why: string; last: string; tries: number; saved: number }
   /** Go thinks this stage is not the best next move; skipping it is the user's call. */
   | { kind: 'skip_stage'; stageId: string; reason: string }
+  /** Go's proposal to add the next task as a stage (25 Oct); the user adds it. */
+  | { kind: 'add_stage'; stageId: string; title: string; stageKind: string; work: string }
   /** Go's proposal to start another round of a looping workflow; the user starts it. */
   | { kind: 'next_round'; stageId: string; toStageId: string; reason: string }
   /** An outcome table's rows (claims, runs…) are all the user's to decide. */
@@ -645,6 +647,7 @@ export function needStillHolds(
     case 'answer_question':
     case 'skip_stage':
     case 'next_round':
+    case 'add_stage':
     case 'objective_check':
       return true;
     case 'unblock_stage':
@@ -808,6 +811,11 @@ export function describeNeed(
       return {
         message: t('need.suggestSkip', { stage: stageLabel(need.stageId), reason: word(need.reason.replace(/\s+$/, '')) }),
         action: t('need.skipForNow', { stage: stageLabel(need.stageId) }),
+      };
+    case 'add_stage':
+      return {
+        message: t('need.addStage', { title: need.title, work: need.work.replace(/\s+$/, '') }),
+        action: t('need.addStageAction', { title: need.title }),
       };
     case 'next_round':
       return {

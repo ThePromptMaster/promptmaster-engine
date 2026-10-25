@@ -5,6 +5,8 @@ export const hi: Record<keyof typeof en, string> = {
   'need.setObjective': 'अगला कदम चुनने से पहले मुझे एक उद्देश्य चाहिए। ऊपर एक उद्देश्य तय करें।',
   'need.stuckWhy': '{stage} को अटका हुआ चिह्नित किया गया है।',
   'need.stuckWhyReason': '{stage} को अटका हुआ चिह्नित किया गया है: {reason}।',
+  'need.addStage': 'Go एक अगला काम सुझाता है जो अभी किया जा सकता है: {title} — {work}',
+  'need.addStageAction': '“{title}” को एक चरण के रूप में जोड़ें',
   'need.skipForNow': 'अभी के लिए {stage} छोड़ें',
   'need.byHand': 'यह चरण स्वयं जारी रखें',
   'need.stuckFooter': 'इसे खुला रखते हुए आगे बढ़ने के लिए, चरण के नीचे और विकल्प में “{control}” का उपयोग करें; यह आपसे कारण पूछता है।',

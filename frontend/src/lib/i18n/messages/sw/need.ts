@@ -5,6 +5,8 @@ export const sw: Record<keyof typeof en, string> = {
   'need.setObjective': 'Ninahitaji lengo kabla sijachagua hatua ya kuchukua. Weka moja hapo juu.',
   'need.stuckWhy': '{stage} imewekwa alama kuwa imekwama.',
   'need.stuckWhyReason': '{stage} imewekwa alama kuwa imekwama: {reason}.',
+  'need.addStage': 'Go anapendekeza kazi inayofuata inayoweza kufanywa sasa: {title} — {work}',
+  'need.addStageAction': 'Ongeza “{title}” kama hatua',
   'need.skipForNow': 'Ruka {stage} kwa sasa',
   'need.byHand': 'Endelea na hatua hii kwa mkono',
   'need.stuckFooter': 'Ili kuendelea huku hili likiwa bado wazi, tumia “{control}” chini ya Zaidi, sehemu ya chini ya hatua; litakuuliza sababu yako.',

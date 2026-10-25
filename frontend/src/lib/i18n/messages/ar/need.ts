@@ -5,6 +5,8 @@ export const ar: Record<keyof typeof en, string> = {
   'need.setObjective': 'أحتاج إلى هدف قبل أن أختار خطوة. حدّد هدفًا أعلاه.',
   'need.stuckWhy': '{stage} معلَّمة بأنها متعثرة.',
   'need.stuckWhyReason': '{stage} معلَّمة بأنها متعثرة: {reason}.',
+  'need.addStage': 'يقترح Go مهمة تالية يمكن إنجازها الآن: {title} — {work}',
+  'need.addStageAction': 'أضف «{title}» كمرحلة',
   'need.skipForNow': 'تخطَّ {stage} الآن',
   'need.byHand': 'تابع هذه المرحلة يدويًا',
   'need.stuckFooter': 'للانتقال مع بقاء هذا مفتوحًا، استخدم «{control}» ضمن «المزيد» أسفل المرحلة؛ وسيطلب منك ذكر السبب.',
