@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 
 from pydantic import BaseModel, Field
 
@@ -701,12 +702,56 @@ async def perform_reason(
     return await client.generate(prompt=user, system=system, temperature=0.4, max_tokens=4000, model=model)
 
 
+#: Room for a whole script. At 4,000 — which a reasoning model's reasoning
+#: shares — a 160-line fitting script was cut off mid-line, and Go ran the
+#: same unfinished script three times (25 Oct, connective constant). At this
+#: ceiling the call also reasons at low effort (`llm_client._token_budget`).
+WRITE_CODE_MAX_TOKENS = 12_000
+
+#: The rewrite is made only if the first call left time for it inside the
+#: function's limit (`llm_client.DEFAULT_TIMEOUT`).
+REWRITE_IF_FIRST_TOOK_UNDER_S = 25.0
+
+_REWRITE_CUT_OFF = (
+    "Your previous script could not run: Python reported {error}. It was most "
+    "likely cut off before it ended. Write the whole script again, complete, and "
+    "shorter: at most about 150 lines, no comments, no repeated blocks — loop "
+    "over cases instead of writing each one out."
+)
+
+
+def syntax_error(code: str) -> str | None:
+    """Why the script would not even start, or None. Compiled, never run."""
+    try:
+        compile(code, "main.py", "exec")
+    except SyntaxError as e:
+        return f"{e.msg} at line {e.lineno}"
+    except ValueError as e:  # a null byte
+        return str(e)
+    return None
+
+
+def _add_usage(a: dict[str, int], b: dict[str, int]) -> dict[str, int]:
+    return {k: a.get(k, 0) + b.get(k, 0) for k in {*a, *b}}
+
+
 async def write_code(
     client: OpenRouterClient, model: str | None, inputs: PMInput, state: AgentState, goal: str, kind: str,
 ) -> tuple[str, dict[str, int]]:
     system, user = build_write_code_prompt(inputs, state, goal, kind)
-    text, usage = await client.generate(prompt=user, system=system, temperature=0.2, max_tokens=4000, model=model)
-    return clean_code(text), usage
+    started = time.monotonic()
+    text, usage = await client.generate(prompt=user, system=system, temperature=0.2, max_tokens=WRITE_CODE_MAX_TOKENS, model=model)
+    code = clean_code(text)
+    error = syntax_error(code)
+    if error is None or time.monotonic() - started > REWRITE_IF_FIRST_TOOK_UNDER_S:
+        return code, usage
+    # One rewrite, told why. If that too fails, it runs as written and the
+    # interpretation says what failed — Go's labels come from what ran.
+    retry, more = await client.generate(
+        prompt=f"{user}\n\n{_REWRITE_CUT_OFF.format(error=error)}", system=system, temperature=0.2,
+        max_tokens=WRITE_CODE_MAX_TOKENS, model=model,
+    )
+    return clean_code(retry), _add_usage(usage, more)
 
 
 async def interpret_result(
