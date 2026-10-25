@@ -24,7 +24,7 @@ import { StageToolResult } from './stage-tool-result';
 import { CRITIQUE_TOOLS, REWRITE_TOOLS, useStageTools } from './use-stage-tools';
 import { FRAMING_KINDS, nextStageAction, type ReportedPanelStep } from '@/lib/workflow/next-action';
 import { describeNeed } from '@/lib/agent/needs';
-import { stageControls, type StageControl } from '@/lib/workflow/stage-controls';
+import { goPanelControls, stageControls, type StageControl } from '@/lib/workflow/stage-controls';
 import { inputsChanged, stageInputs } from '@/lib/workflow/stage-inputs';
 import { isApplyable } from '@/lib/workflow/recommend';
 import { ProjectFinished } from './project-finished';
@@ -1826,6 +1826,14 @@ export function WorkflowWorkspace({
         dataPanel: true,
         proposals: context.itemsProposed?.[stage.id] ?? 0,
         proposeRows: rendererHoldsItems(stage.renderer) && proposeTargets(parseItems(stageBundles[stage.id]?.versions.at(-1)?.content) ?? [], itemSchemaFor(stage)).length > 0,
+        nextStep: nextStep && nextStep.kind !== 'working' ? nextStep.label : null,
+        go: isCurrent
+          ? goPanelControls(go.run ? {
+              status: go.run.status, ended_at: go.run.ended_at, pending: Boolean(go.pendingStep),
+              continuable: go.run.policy === go.policy && go.run.budget_steps === go.budget,
+              asking: go.run.status === 'awaiting_decision' && !go.pendingStep && go.run.needs?.kind === 'answer_question',
+            } : null)
+          : [],
       })
     : null;
   // Read by the Go loop when it plans a move, never during render.

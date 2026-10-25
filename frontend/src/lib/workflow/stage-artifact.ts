@@ -929,7 +929,22 @@ export function rendererHoldsItems(renderer: StageRenderer): boolean {
   return renderer === 'list' || renderer === 'review' || renderer === 'assess';
 }
 
-const SAYS_NOT_REPRODUCED = /\b(?:not|never)\s+(?:been\s+)?(?:independently\s+)?(?:reproduced|replicated|re-?run|recalculated|re-?computed)\b|\bcould\s+not\s+(?:be\s+)?(?:reproduc|replicat)\w*|\bwithout\s+(?:reproducing|re-?running|recalculating)\b/i;
+// 25 Oct (Sean: "Reproduced" in the dropdown, "not reproduced" in the text):
+// "has not yet been reproduced", "no recalculation was performed" and
+// "nothing was recalculated" slipped past the first version of this.
+const SAYS_NOT_REPRODUCED = new RegExp([
+  String.raw`\b(?:not|never)\s+(?:yet\s+)?(?:been\s+)?(?:independently\s+)?(?:reproduced|replicated|re-?run|recalculated|re-?computed|re-?derived)\b`,
+  String.raw`\bcould\s*n[o']t\s+(?:be\s+)?(?:reproduc|replicat)\w*`,
+  String.raw`\bwithout\s+(?:reproducing|re-?running|recalculating)\b`,
+  String.raw`\bno\s+(?:independent\s+)?(?:reproduction|replication|recalculation|re-?computation|re-?run)\b`,
+  String.raw`\bnothing\s+(?:was\s+)?(?:reproduced|replicated|recalculated|re-?run)\b`,
+  String.raw`\b(?:unreproduced|not\s+reproducible|failed\s+to\s+(?:reproduce|replicate))\b`,
+].join('|'), 'i');
+
+/** The row's own text says the result was not reproduced. */
+export function saysNotReproduced(item: StageItem): boolean {
+  return Object.entries(item).some(([k, v]) => k !== 'status' && k !== 'status_source' && typeof v === 'string' && SAYS_NOT_REPRODUCED.test(v));
+}
 
 /**
  * The row's own words contradict its status: "Reproduced" on a row that says
@@ -938,9 +953,5 @@ const SAYS_NOT_REPRODUCED = /\b(?:not|never)\s+(?:been\s+)?(?:independently\s+)?
  */
 export function statusContradictsRow(item: StageItem): string | null {
   if (item.status !== 'independently_reproduced' && item.status !== 'reproduced') return null;
-  const said = Object.entries(item)
-    .filter(([k, v]) => k !== 'status' && k !== 'status_source' && typeof v === 'string')
-    .map(([, v]) => v as string)
-    .find((v) => SAYS_NOT_REPRODUCED.test(v));
-  return said ? 'This row says it was not reproduced, but its status says it was. Check which is right.' : null;
+  return saysNotReproduced(item) ? 'This row says it was not reproduced, but its status says it was. Check which is right.' : null;
 }
