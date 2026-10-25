@@ -32,6 +32,7 @@ export const sw: Record<keyof typeof en, string> = {
   'chat.modeLabel': 'Hali ya gumzo',
   'chat.webOn': 'Ufikiaji wa wavuti umewashwa: gumzo linatafuta kwenye wavuti swali linapohitaji, na kuhifadhi linachonukuu.',
   'chat.webOff': 'Ufikiaji wa wavuti umezimwa: gumzo linajibu kutoka kwenye mradi pekee.',
+  'chat.webOnShort': 'Ufikiaji wa wavuti umewashwa',
   'chat.emptyDraft': 'Uliza chochote kuhusu rasimu hii — inachodhania, inachoacha, kama inawafaa hadhira. Hakuna chochote hapa kinachoihariri.',
   'chat.emptyStage': 'Uliza chochote kuhusu hatua hii — ni ya nini, inahitaji nini kutoka kwako, uweke nini ndani yake. Bado hakuna rasimu hapa.',
   'chat.emptyChange': 'Eleza mabadiliko na uchague yatumike wapi. Utaona kifungu halisi kabla chochote hakijaandikwa.',

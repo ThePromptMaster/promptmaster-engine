@@ -186,12 +186,13 @@ describe('Discuss mode cannot touch the artifact', () => {
     expect(screen.queryByText('Apply to')).not.toBeInTheDocument();
   });
 
-  it('says in words that it cannot change the document', async () => {
+  it('leaves the tab names to say what each does, with no extra lines above the thread (25 Oct)', async () => {
     panel();
     const user = userEvent.setup();
     await user.click(screen.getByRole('tab', { name: /^ask/i }));
-    // A user who has to infer this from the button label will not infer it.
-    expect(screen.getByText(/cannot change your document/i)).toBeInTheDocument();
+    expect(screen.queryByText(/cannot change your document/i)).not.toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: /change it/i }));
+    expect(screen.queryByText(/before anything is saved/i)).not.toBeInTheDocument();
   });
 });
 
@@ -574,7 +575,9 @@ describe('the chat searches the web while Web access is on (22 Oct)', () => {
     });
     const onSourcesChanged = vi.fn();
     const { appendStageVersion } = panel({ project: WEB, onSourcesChanged });
-    expect(screen.getByText(/the chat searches the web when a question needs it/i)).toBeInTheDocument();
+    // A globe on the Ask tab, not a sentence (25 Oct, client: users can assume the web is on).
+    expect(screen.queryByText(/the chat searches the web when a question needs it/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Web access on' })).toBeInTheDocument();
     await ask('What is the latest market growth?');
     await waitFor(() => expect(screen.getByText(/Searched the web for “market growth 2025” · 1 new source saved/)).toBeInTheDocument());
     expect(chatMessage.mock.calls[0][0]).toMatchObject({ web_access: 'on' });

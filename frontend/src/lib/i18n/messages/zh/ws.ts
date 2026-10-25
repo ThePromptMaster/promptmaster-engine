@@ -17,6 +17,7 @@ export const zh: Record<keyof typeof en, string> = {
   'ws.otherProject': '其他项目',
   'ws.openAnother': '打开另一个项目',
   'ws.hideChat': '隐藏侧边对话',
+  'ws.resizeChat': '拖动以调整侧边对话的宽度',
   'ws.sideChat': '侧边对话',
   'ws.viewingLater': '正在查看后面的阶段——返回{stage}',
   'ws.viewingEarlier': '正在查看前面的阶段——返回{stage}',

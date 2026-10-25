@@ -198,6 +198,21 @@ export function initialChatOpen(remembered: string | null, wide: boolean): boole
   return remembered === '0' ? false : true;
 }
 
+/** Per-viewer convenience only: how wide this person last dragged the side chat. */
+const CHAT_WIDTH_KEY = 'pm.sideChatWidth';
+export const CHAT_WIDTH = { min: 320, max: 640, initial: 400, step: 16 } as const;
+
+/**
+ * The side chat's width, from what was stored or dragged (25 Oct, client: on a
+ * laptop the fixed rail left the answer and the work both crunched). Anything
+ * unreadable is the default; anything else is held between the bounds.
+ */
+export function clampChatWidth(value: unknown): number {
+  const n = typeof value === 'string' ? Number.parseInt(value, 10) : typeof value === 'number' ? value : NaN;
+  if (!Number.isFinite(n)) return CHAT_WIDTH.initial;
+  return Math.round(Math.min(CHAT_WIDTH.max, Math.max(CHAT_WIDTH.min, n)));
+}
+
 /** Versions saved by applying a check's findings, by Go or by the user's Apply. */
 const APPLIED_SOURCES = new Set(['agent_apply', 'applied_findings']);
 
@@ -272,6 +287,47 @@ export function WorkflowWorkspace({
       return value;
     });
   }, []);
+  const [chatWidth, setChatWidthState] = useState<number>(CHAT_WIDTH.initial);
+  useEffect(() => {
+    try {
+      setChatWidthState(clampChatWidth(window.localStorage.getItem(CHAT_WIDTH_KEY)));
+    } catch {
+      // Storage unavailable: the default width.
+    }
+  }, []);
+  const setChatWidth = useCallback((next: number, remember: boolean) => {
+    const value = clampChatWidth(next);
+    setChatWidthState(value);
+    if (remember) {
+      try {
+        window.localStorage.setItem(CHAT_WIDTH_KEY, String(value));
+      } catch {
+        // Not remembering is fine; the drag still worked.
+      }
+    }
+  }, []);
+  const startChatResize = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      const startX = e.clientX;
+      const startWidth = chatWidth;
+      // The chat sits at the end of the row: on the right, or on the left in a right-to-left page.
+      const rtl = document.documentElement.dir === 'rtl';
+      let last = startWidth;
+      const move = (ev: PointerEvent) => {
+        last = startWidth + (rtl ? ev.clientX - startX : startX - ev.clientX);
+        setChatWidth(last, false);
+      };
+      const up = () => {
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+        setChatWidth(last, true);
+      };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+    },
+    [chatWidth, setChatWidth]
+  );
   // Another project read beside this one, in the side chat's slot (client
   // feedback, 21 Oct, email 4: "dual projects at the same time side-by-side").
   // Kept for this tab's session, per project.
@@ -2615,8 +2671,32 @@ export function WorkflowWorkspace({
       {chatOpen && (
         <aside
           id="stage-side-chat"
-          className={`fixed inset-0 z-40 flex flex-col bg-[var(--surface)] p-4 lg:sticky lg:inset-auto lg:top-0 lg:z-auto lg:h-[100dvh] lg:max-h-[100dvh] lg:w-[380px] lg:shrink-0 lg:self-start lg:bg-transparent lg:py-6 lg:ps-0 lg:pe-6 ${readingTab ? 'xl:w-[480px]' : ''}`}
+          style={{ '--chat-w': `${chatWidth}px`, '--chat-w-read': `${Math.max(chatWidth, 480)}px` } as React.CSSProperties}
+          className={`fixed inset-0 z-40 flex flex-col bg-[var(--surface)] p-4 lg:sticky lg:inset-auto lg:top-0 lg:z-auto lg:h-[100dvh] lg:max-h-[100dvh] lg:w-[var(--chat-w)] lg:shrink-0 lg:self-start lg:bg-transparent lg:py-6 lg:ps-0 lg:pe-6 ${readingTab ? 'xl:w-[var(--chat-w-read)]' : ''}`}
         >
+          {/* Drag to widen the chat or the work; arrows do the same from the keyboard. */}
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label={t('ws.resizeChat')}
+            aria-valuemin={CHAT_WIDTH.min}
+            aria-valuemax={CHAT_WIDTH.max}
+            aria-valuenow={chatWidth}
+            tabIndex={0}
+            onPointerDown={startChatResize}
+            onKeyDown={(e) => {
+              const rtl = document.documentElement.dir === 'rtl';
+              const wider = rtl ? 'ArrowRight' : 'ArrowLeft';
+              const narrower = rtl ? 'ArrowLeft' : 'ArrowRight';
+              if (e.key === wider) setChatWidth(chatWidth + CHAT_WIDTH.step, true);
+              else if (e.key === narrower) setChatWidth(chatWidth - CHAT_WIDTH.step, true);
+              else return;
+              e.preventDefault();
+            }}
+            className="group absolute inset-y-6 start-0 hidden w-3 -translate-x-full cursor-col-resize items-center justify-center rtl:translate-x-full lg:flex"
+          >
+            <span className="h-10 w-1 rounded-full bg-[var(--surface-container-highest)] group-hover:bg-[var(--pm-primary)] group-focus-visible:bg-[var(--pm-primary)]" />
+          </div>
           <button
             onClick={() => setChatOpen(false)}
             className="mb-2 ms-auto flex items-center gap-1 rounded-lg px-2 py-1 text-label text-[var(--on-surface-variant)] lg:hidden"
