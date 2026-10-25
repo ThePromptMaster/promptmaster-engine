@@ -114,6 +114,18 @@ export function hasIdChanges(c: IdChanges): boolean {
   return c.restored.length > 0 || c.renamed.length > 0 || (c.reused?.length ?? 0) > 0;
 }
 
+/**
+ * The answer "Handle them for me" gives the ID question itself (25 Oct, Sean's
+ * iPad: the run stopped on it, and "Do whatever is best" was typed by hand).
+ * It is the record-keeping rule the question states, so it is routine.
+ */
+export function idChangeDefault(version: number): string {
+  return (
+    `Keep every item ID as v${version} has it: an ID keeps the item it named (closed if it is closed), ` +
+    'a new item gets a new ID, and an item I removed stays removed.'
+  );
+}
+
 /** The question Go asks instead of saving such a revision. */
 export function idChangeQuestion(stageLabel: string, version: number, c: IdChanges): string {
   const parts = [

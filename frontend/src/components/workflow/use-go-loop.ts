@@ -88,10 +88,23 @@ import type { OutlineSection } from '@/types';
 import type { Evaluation, Project } from '@/types/project';
 
 export const HEARTBEAT_MS = 10_000;
+const WATCHING_ELSEWHERE = 'Go is running this project in another tab. It will carry on here if that tab closes; stop it there to start again here.';
 /** A heartbeat older than this means the tab that held the lease is gone. */
 export const LEASE_STALE_MS = 25_000;
 
 export type GoPhase = 'idle' | 'thinking' | 'performing' | 'awaiting' | 'ended' | 'watching';
+
+/** The database's "one running run per project" refused a second one (25 Oct, Sean's phone). */
+export function isDuplicateRun(e: unknown): boolean {
+  const err = e as { code?: string; message?: string } | null;
+  return err?.code === '23505' || /agent_runs_one_running_per_project/.test(err?.message ?? '');
+}
+
+/** A running run another tab holds and is still beating for: this tab watches it, never starts its own. */
+export function drivenElsewhere(run: Pick<AgentRun, 'status' | 'heartbeat_at' | 'lease_holder'> | null, tabId: string, now = Date.now()): boolean {
+  if (!run || run.status !== 'running' || !run.lease_holder || run.lease_holder === tabId) return false;
+  return !!run.heartbeat_at && now - new Date(run.heartbeat_at).getTime() < LEASE_STALE_MS;
+}
 
 /**
  * The step did its work, but its own record could not be saved, twice. The
@@ -173,12 +186,35 @@ function answerToConflict(steps: readonly AgentStep[], stageId: string): string 
   const asked = steps.map((s) => s.stage_id === stageId && s.params?.conflict_question === true).lastIndexOf(true);
   if (asked < 0) return undefined;
   const after = steps.slice(asked + 1);
-  const answer = after.findIndex((s) => s.action_key === USER_ANSWER_STEP);
+  // The user's answer, or the default Go took under "handle them for me".
+  const answer = after.findIndex((s) => s.action_key === USER_ANSWER_STEP || (s.action_key === ROUTINE_DEFAULT_STEP && typeof s.params?.conflict_answer === 'string'));
   if (answer < 0) return undefined;
   const revisedSince = after.slice(answer + 1).some(
     (s) => ['revise', 'apply'].includes(actionFor(s.action_key)?.performer ?? '') && s.status === 'succeeded'
   );
-  return revisedSince ? undefined : after[answer].output.trim() || undefined;
+  const given = after[answer];
+  const text = given.action_key === ROUTINE_DEFAULT_STEP ? String(given.params?.conflict_answer) : given.output;
+  return revisedSince ? undefined : text.trim() || undefined;
+}
+
+/**
+ * Under autonomous + "handle them for me", a guard question that carries its
+ * own record-keeping answer is not put to the user: Go takes that answer once
+ * per stage per window and tries again (25 Oct, Sean: the run stopped on "give
+ * O1 to a different item?" and five stages waited behind it).
+ */
+export function routineConflictAnswer(input: {
+  outcome: Pick<StepOutcome, 'params' | 'stop'>;
+  policy: ExecutionPolicy;
+  routine: string | null | undefined;
+  stageId: string;
+  steps: readonly AgentStep[];
+}): string | null {
+  const answer = input.outcome.params?.routine_answer;
+  if (typeof answer !== 'string' || !answer || !input.outcome.stop) return null;
+  if (input.policy !== 'autonomous' || input.routine !== 'handle') return null;
+  const already = input.steps.some((s) => s.stage_id === input.stageId && s.action_key === ROUTINE_DEFAULT_STEP && typeof s.params?.conflict_answer === 'string');
+  return already ? null : answer;
 }
 
 /**
@@ -221,6 +257,10 @@ export function useGoLoop(opts: Options) {
   const [run, setRun] = useState<AgentRun | null>(null);
   const [steps, setSteps] = useState<AgentStep[]>([]);
   const [phase, setPhase] = useState<GoPhase>('idle');
+  const phaseRef = useRef<GoPhase>('idle');
+  phaseRef.current = phase;
+  /** `adopt`, reachable from the controls declared above it. */
+  const adoptRef = useRef<(found: AgentRun) => Promise<void>>(async () => {});
   const [pendingStepId, setPendingStepId] = useState<string | null>(null);
   /** The policy being authorized and started this moment (one click; no dialog any more). */
   const [authorizing, setAuthorizing] = useState<Exclude<ExecutionPolicy, 'guided'> | null>(null);
@@ -413,6 +453,25 @@ export function useGoLoop(opts: Options) {
         // say "keep waiting" rather than spinning here.
         await setRunStatus('awaiting_decision', outcome.output.split('\n')[0], outcome.needs ?? null);
         return 'stop';
+      }
+      const taken = routineConflictAnswer({
+        outcome, policy: current.policy, routine: o.project.routine_decisions, stageId: o.stage.id, steps: stepsRef.current,
+      });
+      if (taken) {
+        const question = outcome.stop?.reason ?? '';
+        const step = await startAgentStep({
+          runId: current.id, userId: o.project.user_id, projectId: o.project.id, idx: stepsRef.current.length,
+          stageId: o.stage.id, mode: modeForStage(o.project, o.stage), actionKey: ROUTINE_DEFAULT_STEP,
+          params: { question: question.slice(0, 1000), conflict_answer: taken },
+          rationale: 'Routine decisions are mine to handle: taking the answer the question itself gives, and trying again.',
+          expectedOutcome: 'The revision saved with the item IDs kept as they were.', needsDecision: false, decisionQuestion: null,
+        });
+        upsertStep(await finishAgentStep(step.id, {
+          status: 'succeeded', label: null,
+          output: `Answered for you under your routine-decision policy: ${taken} The revision is tried again with that rule.`,
+        }));
+        await settle();
+        return 'continue';
       }
       if (outcome.stop) {
         await setRunStatus(outcome.stop.status, outcome.stop.reason, outcome.needs ?? null);
@@ -896,10 +955,20 @@ export function useGoLoop(opts: Options) {
       // different policy used to start from nothing: the answer was recorded
       // on a run the planner never read again.
       const carried = live && live.status !== 'completed' ? [...priorStepsRef.current, ...stepsRef.current] : [];
-      const created = await createAgentRun({
-        projectId: o.project.id, userId: o.project.user_id, policy: chosen,
-        authorizationId, budgetSteps: budget, leaseHolder: tabId.current,
-      });
+      let created: AgentRun;
+      try {
+        created = await createAgentRun({
+          projectId: o.project.id, userId: o.project.user_id, policy: chosen,
+          authorizationId, budgetSteps: budget, leaseHolder: tabId.current,
+        });
+      } catch (e) {
+        // A run started meanwhile, here or in another tab: follow it rather
+        // than show the database's refusal.
+        const found = isDuplicateRun(e) ? await getLiveAgentRun(o.project.id).catch(() => null) : null;
+        if (!found) throw e;
+        await adoptRef.current(found);
+        return;
+      }
       commitRun(created);
       commitSteps([]);
       priorStepsRef.current = carried;
@@ -932,11 +1001,19 @@ export function useGoLoop(opts: Options) {
     }
     setError(null);
     try {
-      const created = await createAgentRun({
-        projectId: o.project.id, userId: o.project.user_id, policy: prev.policy,
-        authorizationId: prev.authorization_id, budgetSteps: prev.budget_steps, leaseHolder: tabId.current,
-        continuesRunId: prev.id, autoContinued: auto,
-      });
+      let created: AgentRun;
+      try {
+        created = await createAgentRun({
+          projectId: o.project.id, userId: o.project.user_id, policy: prev.policy,
+          authorizationId: prev.authorization_id, budgetSteps: prev.budget_steps, leaseHolder: tabId.current,
+          continuesRunId: prev.id, autoContinued: auto,
+        });
+      } catch (e) {
+        const found = isDuplicateRun(e) ? await getLiveAgentRun(o.project.id).catch(() => null) : null;
+        if (!found) throw e;
+        await adoptRef.current(found);
+        return;
+      }
       if (prev.authorization_id) {
         const windows = priorStepsRef.current.length ? 2 + Math.floor(priorStepsRef.current.length / Math.max(1, prev.budget_steps)) : 2;
         await recordDecision(o.project.id, o.project.user_id, {
@@ -1002,8 +1079,20 @@ export function useGoLoop(opts: Options) {
 
   const go = useCallback(async () => {
     setError(null);
-    const live = runRef.current;
+    if (phaseRef.current === 'watching') {
+      setError(WATCHING_ELSEWHERE);
+      return;
+    }
+    let live = runRef.current;
     try {
+      // What this tab holds may be out of date: another tab can have resumed
+      // or replaced the run since. Follow the run as it is now.
+      const now = await getLiveAgentRun(latest.current.project.id).catch(() => undefined);
+      if (now && (drivenElsewhere(now, tabId.current) || (now.id !== live?.id && now.status === 'running'))) {
+        await adoptRef.current(now);
+        return;
+      }
+      if (now && now.id === live?.id) live = now;
       // Resume a paused run of the same policy rather than starting over:
       // it keeps its budget and its history.
       if (live && !live.ended_at && live.policy === policy && (live.status === 'blocked' || live.status === 'awaiting_decision') && !pendingStepId) {
@@ -1042,6 +1131,10 @@ export function useGoLoop(opts: Options) {
    * a nearly spent window is closed and the next one opened instead.
    */
   const update = useCallback(async (chosen: ExecutionPolicy = policy) => {
+    if (phaseRef.current === 'watching') {
+      setError(WATCHING_ELSEWHERE);
+      return;
+    }
     const live = runRef.current;
     const left = live ? live.budget_steps - stepsRef.current.length : 0;
     if (live && !live.ended_at && live.policy === chosen && (live.status === 'blocked' || live.status === 'awaiting_decision') && left < 4 && !pendingStepId) {
@@ -1237,6 +1330,10 @@ export function useGoLoop(opts: Options) {
   const fixObjective = useCallback(
     async (items: readonly string[]) => {
       const o = latest.current;
+      if (phaseRef.current === 'watching') {
+        setError(WATCHING_ELSEWHERE);
+        return;
+      }
       try {
         const unmet = await reopenJudged(
           'Fix what the objective check found unmet',
@@ -1256,6 +1353,10 @@ export function useGoLoop(opts: Options) {
       const current = runRef.current;
       const o = latest.current;
       if (!current || !o.stage || !text.trim()) return;
+      if (phaseRef.current === 'watching') {
+        setError(WATCHING_ELSEWHERE);
+        return;
+      }
       try {
         const step = await startAgentStep({
           runId: current.id, userId: o.project.user_id, projectId: o.project.id, idx: stepsRef.current.length,
@@ -1374,6 +1475,7 @@ export function useGoLoop(opts: Options) {
     },
     [commitRun, commitSteps, loop]
   );
+  adoptRef.current = adopt;
 
   const resumed = useRef(false);
   useEffect(() => {
@@ -1406,9 +1508,15 @@ export function useGoLoop(opts: Options) {
         if (!current) return;
         const found = await getLiveAgentRun(opts.project.id).catch(() => null);
         commitSteps(await listAgentSteps(current.id).catch(() => stepsRef.current));
-        if (!found || found.id !== current.id || found.status !== 'running') {
-          commitRun(found ?? { ...current, status: 'stopped' });
+        if (!found) {
+          commitRun({ ...current, status: 'stopped' });
           setPhase('ended');
+          return;
+        }
+        // The other tab paused, resumed or started the next window: follow
+        // that run, so a press here acts on it rather than on a stale copy.
+        if (found.id !== current.id || found.status !== 'running') {
+          await adopt(found);
           return;
         }
         // The driving tab went away without stopping: take the run over.
@@ -1418,9 +1526,20 @@ export function useGoLoop(opts: Options) {
       return () => clearInterval(t);
     }
     if (phase !== 'thinking' && phase !== 'performing') return;
-    const t = setInterval(() => {
+    const t = setInterval(async () => {
       const current = runRef.current;
-      if (current) void updateAgentRun(current.id, { heartbeat_at: new Date().toISOString(), lease_holder: tabId.current }).catch(() => undefined);
+      if (!current) return;
+      // Another tab took the run over (this one was throttled in the
+      // background): stand down and watch instead of both driving it.
+      const found = await getLiveAgentRun(opts.project.id).catch(() => null);
+      if (found && found.id === current.id && drivenElsewhere(found, tabId.current)) {
+        abortRef.current?.abort();
+        abortRef.current = null;
+        commitRun(found);
+        setPhase('watching');
+        return;
+      }
+      void updateAgentRun(current.id, { heartbeat_at: new Date().toISOString(), lease_holder: tabId.current }).catch(() => undefined);
     }, HEARTBEAT_MS);
     return () => clearInterval(t);
   }, [phase, opts.project.id, commitRun, commitSteps, adopt]);

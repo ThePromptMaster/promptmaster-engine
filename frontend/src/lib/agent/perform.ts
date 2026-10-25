@@ -49,7 +49,7 @@ import { attachedDocuments, currentFacts, supersededFactValues } from '@/lib/wor
 import { ManuscriptMissing, withFreshManuscript } from '@/lib/workflow/fresh-manuscript';
 import { describeValue, leftoverValues, type SupersededValue } from '@/lib/workflow/fact-values';
 import { revertsUserVersion, USER_CHOSEN_OPERATIONS } from '@/lib/workflow/fact-reconcile';
-import { hasIdChanges, idChangeQuestion, idChanges, removedByUser } from '@/lib/workflow/id-changes';
+import { hasIdChanges, idChangeDefault, idChangeQuestion, idChanges, removedByUser } from '@/lib/workflow/id-changes';
 import { recordPolicyFacts } from '@/lib/supabase/facts';
 import { checkGoal } from './code-check';
 import { unmetHumanRequirements } from '@/lib/workflow/human-requirements';
@@ -723,7 +723,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
           const question = idChangeQuestion(ctx.stage.label, headVersion.version_number, ids);
           return done(key, {
             status: 'blocked', blockKind: 'needs_decision', toolsUsed: ['model'], changes: {},
-            output: question, params: { ...params, conflict_question: true },
+            output: question, params: { ...params, conflict_question: true, routine_answer: idChangeDefault(headVersion.version_number) },
             stop: { status: 'awaiting_decision', reason: question },
             needs: { kind: 'answer_question', question },
           });
@@ -1134,8 +1134,11 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         const ids = idChanges({ head, generated: content, removed: removedByUser(ctx.bundles[target.id]?.versions ?? []) });
         if (hasIdChanges(ids)) {
           const question = idChangeQuestion(target.label, headVersion.version_number, ids);
+          // Marked, so the answer reaches the next repair: it was not, and the
+          // same question came back after every answer (25 Oct).
           return done(key, {
             status: 'blocked', blockKind: 'needs_decision', toolsUsed: ['model'], changes: {},
+            params: { conflict_question: true, routine_answer: idChangeDefault(headVersion.version_number) },
             output: question, stop: { status: 'awaiting_decision', reason: question }, needs: { kind: 'answer_question', question },
           });
         }

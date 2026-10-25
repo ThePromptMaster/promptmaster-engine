@@ -170,6 +170,8 @@ export const ar: Record<keyof typeof en, string> = {
   'qp.orElse': 'أو قل شيئًا آخر…',
   'qp.answerHint': 'إجابتك…',
   'qp.checking': 'جارٍ المطابقة مع السجل…',
+  'qp.best': 'افعل ما هو أفضل',
+  'qp.bestHint': 'يقرر Go ضمن هدفك وحقائقك، ويذكر ما اختاره.',
   'qp.answerContinue': 'الإجابة والمتابعة',
   'qp.orChange': 'أو غيّر المشروع بنفسك — علّم متطلبًا، أو حرّر المسودة — واضغط «استئناف».',
   'qp.packageLabel': 'حزمة مراجعة الخبير',

@@ -170,6 +170,8 @@ export const sw: Record<keyof typeof en, string> = {
   'qp.orElse': 'Au sema jambo jingine…',
   'qp.answerHint': 'Jibu lako…',
   'qp.checking': 'Inalinganisha na kumbukumbu…',
+  'qp.best': 'Fanya lililo bora',
+  'qp.bestHint': 'Go anaamua, ndani ya lengo lako na ukweli wako, na anasema alichochagua.',
   'qp.answerContinue': 'Jibu na uendelee',
   'qp.orChange': 'Au badilisha mradi mwenyewe — weka tiki kwenye hitaji, hariri rasimu — kisha bonyeza Endelea tena.',
   'qp.packageLabel': 'Kifurushi cha mapitio ya mtaalamu',

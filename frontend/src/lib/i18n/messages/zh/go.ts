@@ -170,6 +170,8 @@ export const zh: Record<keyof typeof en, string> = {
   'qp.orElse': '或者说点别的…',
   'qp.answerHint': '你的回答…',
   'qp.checking': '正在与记录核对…',
+  'qp.best': '怎样最好就怎样做',
+  'qp.bestHint': 'Go 在你的目标和事实范围内自行决定，并说明它的选择。',
   'qp.answerContinue': '回答并继续',
   'qp.orChange': '或者自己修改项目——勾选一项要求、编辑草稿——然后按“继续”。',
   'qp.packageLabel': '专家审阅包',

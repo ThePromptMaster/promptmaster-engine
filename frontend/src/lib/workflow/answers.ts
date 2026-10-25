@@ -15,6 +15,19 @@ import { documentText, type StageArtifactBundle } from './digest';
 import type { WorkflowTemplate } from './types';
 
 const QUESTION_MAX = 600;
+
+/**
+ * "Do whatever is best" on Go's question card (25 Oct, Sean: "this would be a
+ * good place for a 'do whatever is best' button"). Sent to the model as the
+ * answer; it decides nothing of record itself, so it never becomes a fact —
+ * what Go then chooses is in the version it saves.
+ */
+export const DELEGATED_ANSWER =
+  'Do whatever is best: use your judgement within the objective, the accepted facts and my latest version, and say in the result what you chose.';
+
+export function isDelegatedAnswer(answer: string): boolean {
+  return answer.trim() === DELEGATED_ANSWER || /^do (?:whatever|what) (?:is|you think is) best\b/i.test(answer.trim());
+}
 const STATEMENT_MAX = 2_000;
 
 /** The question as the fact records it: the first paragraph, without the pointer to a button. */
@@ -35,6 +48,7 @@ export function answerAsFact(
 ): NewFact | null {
   const text = answer.replace(/\s+/g, ' ').trim();
   if (!text || /^(ok(ay)?|yes|no|go( on| ahead)?|continue|proceed|sure|fine|thanks?( you)?)[.!]*$/i.test(text)) return null;
+  if (isDelegatedAnswer(text)) return null;
   const asked = questionOf(question);
   const statement = asked
     ? `Decided by the user — asked "${asked}", answered: ${text}`
