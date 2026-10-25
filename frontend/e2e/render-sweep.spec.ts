@@ -43,7 +43,9 @@ async function check(page: Page, locale: Locale, where: string, width: number) {
       for (let n = walker.nextNode(); n; n = walker.nextNode()) {
         const t = (n.textContent ?? '').replace(/\s+/g, ' ').trim();
         const el = n.parentElement;
-        if (!t || !el || el.closest('script,style,textarea,[data-user-content],article,.material-symbols-outlined')) continue;
+        // The user's own words are not interface: project cards (titles, objectives) in a
+        // list that, in CI, holds every other spec's projects too.
+        if (!t || !el || el.closest('script,style,textarea,[data-user-content],article,.material-symbols-outlined,a[href^="/projects/"]')) continue;
         if (visible(el)) texts.push(t);
       }
       const set = new Set(english);
