@@ -596,7 +596,11 @@ export function useGoLoop(opts: Options) {
           const moved = performedRef.current;
           performedRef.current = false;
           const sources = (o.project.sources ?? []).filter((s) => !s.retired_at).length;
-          fingerprintsRef.current.push(stateFingerprint({ state: o.state, bundles: o.bundles, events: freshEvents, facts, stageEvaluation, sources }));
+          // Exit 0 only: a failed run is labelled "code executed" too; a run that worked says "exit code 0".
+          const runsOk = stepsRef.current.filter((s) =>
+            s.action_key === 'run_computation' && s.status === 'succeeded' && /\bexit code 0\b/.test(s.output ?? '')
+          ).length;
+          fingerprintsRef.current.push(stateFingerprint({ state: o.state, bundles: o.bundles, events: freshEvents, facts, stageEvaluation, sources, runsOk }));
           const circling = moved ? noChange(fingerprintsRef.current) : null;
           if (circling) {
             await setRunStatus('blocked', circling);

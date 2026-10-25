@@ -88,6 +88,8 @@ export const zh: Record<keyof typeof en, string> = {
   'gc.budget': '步数额度',
   'gc.steps': '{count} 步',
   'gc.used': '已用额度',
+  'gc.resumeMeans': '“继续运行”会从暂停处接着本次运行。要自己进入下一阶段，请使用阶段底部的“继续到……”。',
+  'gc.continueMeans': '“继续”会给本次运行再一个步数窗口。要自己进入下一阶段，请使用阶段底部的“继续到……”。',
   'gc.thisWindow': '本轮已用 {used}/{cap} 步',
   'gc.lastWindow': '上一轮已用 {used}/{cap} 步',
   'gc.explain': '一步就是 PromptMaster 做的一件事，比如起草或检查一个阶段。运行代码算作两步。',

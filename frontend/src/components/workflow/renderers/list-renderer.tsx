@@ -172,7 +172,7 @@ export function ListRenderer({
     : undefined;
 
   return (
-    <section aria-label={t('stage.work', { stage: stageText(locale, templateKey, stage, 'label') })}>
+    <section data-stage-work={stage.id} aria-label={t('stage.work', { stage: stageText(locale, templateKey, stage, 'label') })}>
       {confirming && (
         <ConfirmOverwrite
           label={`${label}s`}

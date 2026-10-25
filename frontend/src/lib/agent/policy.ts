@@ -675,6 +675,13 @@ export function stateFingerprint(input: {
   stageEvaluation: StageEvaluation;
   /** The project's live (unretired) web sources. */
   sources?: number;
+  /**
+   * Code runs that executed (exit 0) so far (25 Oct, Sean: "keep trying until
+   * it figures it out … try new things n tweak"). A run that worked is
+   * progress in an investigation even before its results are written up; a
+   * run that failed is not.
+   */
+  runsOk?: number;
 }): string {
   const { state, bundles, events, facts, stageEvaluation } = input;
   const heads = Object.keys(bundles)
@@ -691,6 +698,7 @@ export function stateFingerprint(input: {
     `decided:${facts.review ? facts.review.items.length - facts.review.routine.length - facts.review.material.length : ''}`,
     `outline:${facts.outline?.approved ?? ''}`,
     `sources:${input.sources ?? ''}`,
+    `runs:${input.runsOk ?? ''}`,
   ].join('|');
 }
 
