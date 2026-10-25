@@ -22,7 +22,7 @@ _VALID_MODES = {
     "therapist", "cold_critic", "analyst",
 }
 
-_VALID_WORKFLOWS = {"book", "research", "single_output", "exploration"}
+_VALID_WORKFLOWS = {"book", "research", "single_output", "exploration", "assessment"}
 
 
 
@@ -81,6 +81,11 @@ SETUP_SUGGESTER_SYSTEM = (
     "- exploration: an open-ended idea to take as far as it goes, round after "
     "round — a thought experiment, a speculative theory, a 'what if' with no "
     "fixed end.\n"
+    # 25 Oct (client: screening pasted LinkedIn profiles in batches).
+    "- assessment: many similar items judged again and again against the same "
+    "criteria — screening candidates or profiles, scoring proposals or suppliers, "
+    "triaging applications — where the user pastes items in batches and wants a "
+    "verdict on each. Judging one thing once is single_output.\n"
     "Pick the smallest workflow that fits; most everyday objectives are "
     "single_output. Give workflow_reason as one line (≤100 chars).\n\n"
     # Sean, 18 Oct (email 7): a cookbook from an Instagram account's videos.
@@ -146,7 +151,7 @@ def build_setup_prompt(objective: str, answers: list[GuideAnswer] | None = None,
         f"{_format_answers(answers)}"
         "Recommend a setup. Return JSON in this exact shape:\n"
         "{\n"
-        '  "workflow": "book|research|single_output|exploration",\n'
+        '  "workflow": "book|research|single_output|exploration|assessment",\n'
         '  "workflow_reason": "...",\n'
         '  "mode": "architect|critic|clarity|coach|therapist|cold_critic|analyst",\n'
         '  "audience": "...",\n'
