@@ -1837,7 +1837,9 @@ export function WorkflowWorkspace({
       })
     : null;
   // Read by the Go loop when it plans a move, never during render.
-  controlsRef.current = pageControls;
+  // Not Go's own panel: its buttons change while it runs, and Go names the
+  // page's buttons, not its own (the chat gets them all).
+  controlsRef.current = pageControls?.filter((c) => c.place !== 'go_panel' && c.place !== 'next_step') ?? null;
   // Check and chapter stages: the work is the table or the chapters, so the
   // supporting panels fold to a line each (3 Oct call).
   // The simple setup folds them on every stage (Sean, 18 Oct, email 7): the
