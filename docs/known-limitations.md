@@ -2367,16 +2367,22 @@ reopens. A restore always reopens. The test reads the text, not its meaning: a s
 reworded to say the opposite without any of those words would pass, which is why the word
 budget is small.
 
-### L-120 — A script sees what the project's last six clean runs printed, not every run (2026-10-26)
+### L-120 — A script sees what the project's last ten clean runs printed, not every run (2026-10-26)
 
 Code Go writes reads the project's data files at `/data`, and since 26 Oct it is also shown
-what the project's six most recent clean runs printed (the first 8,000 characters of each).
+what the project's ten most recent clean runs printed (the first 6,000 characters of each) —
+ten being as many as one Go run may make, so a computation split across a run can be put back
+together.
 It is told those values are the project's own results, to carry the ones it needs into the
 script as constants, and never to call them missing data. Before this a production run had
 three scripts print the batch counts a fourth was to sum; the fourth reported
 `MISSING_DATA` and the run stopped.
 
-Not covered: output from an older run, past the first 8,000 characters of a run, or from a run
+A script that stops early on its own time budget is told to print what it finished and exit 0
+with a `reduced:` line: the same day's retest had budget stops exit 2, which made their finished
+batches a failed run that the summing script was never shown.
+
+Not covered: output from an older run, past the first 6,000 characters of a run, or from a run
 that failed or timed out is not shown. A failed run's partial output is left out on purpose;
 nothing it printed is execution truth. Work that needs more than this should be saved as a data
 file.

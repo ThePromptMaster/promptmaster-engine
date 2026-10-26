@@ -812,3 +812,11 @@ async def test_a_reasoning_step_leaves_the_answer_room_after_the_reasoning(mock_
     await perform_reason(mock_client, None, INPUTS, STATE, "derive", {})
     assert mock_client.generate.await_args.kwargs["max_tokens"] == REASON_MAX_TOKENS >= LONG_ANSWER_TOKENS
     assert _token_budget("anthropic/claude-opus-5.5", REASON_MAX_TOKENS)["reasoning"] == {"effort": "low"}
+
+
+def test_a_script_that_stops_on_its_time_budget_exits_cleanly_with_what_it_finished():
+    # 26 Oct (production): budget stops exited 2, so their finished batches
+    # counted as a failed run and were never shown to the script that summed them.
+    system, _ = build_write_code_prompt(INPUTS, STATE, "enumerate batches 10-53", "computation")
+    assert "stops early on its own time budget has a partial result, not a failure" in system
+    assert "exit normally (code 0)" in system
