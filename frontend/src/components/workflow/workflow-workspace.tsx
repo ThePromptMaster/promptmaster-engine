@@ -1887,7 +1887,9 @@ export function WorkflowWorkspace({
   // figure out how". This reopens the outline and takes the user to it.
   const outlineStage = template.outline_stage === 'explicit' ? outlineStageFor(template) : null;
   const addSectionsFrom =
-    outlineStage && outlineStage.id !== stage.id && stage.renderer === 'long_form' && isEditable && project.status !== 'finalized'
+    // Shown on Drafting whether or not it is the stage in hand: a book at
+    // Critique is where a missing chapter is noticed.
+    outlineStage && outlineStage.id !== stage.id && stage.renderer === 'long_form' && project.status !== 'finalized'
       ? outlineStage
       : null;
   const addSections = async () => {
