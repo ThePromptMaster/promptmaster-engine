@@ -578,7 +578,11 @@ export function needsUser(input: {
   // A table that says it does not block finishing never stops Go (C3, 8 Oct):
   // its rows are left as they are, listed as optional. Under "Handle them for
   // me" a required table's rows are Go's to propose and confirm first.
-  const optionalRows = Boolean(facts.review?.outcome) && !rowsRequired(stage);
+  // A status rule marked not blocking says so too (26 Oct, production:
+  // Exploration's "Every test has a verdict" stopped an autonomous run for 8
+  // tests the template itself calls optional).
+  const optionalRows = Boolean(facts.review?.outcome) &&
+    (!rowsRequired(stage) || !stage.exit_criteria.some((c) => c.blocking && c.rule?.type === 'every_item_has_status'));
   if (facts.review && !optionalRows && facts.review.material.length > 0 && facts.review.routine.length === 0 && !canRun && !canPropose && !canLookUp) {
     const proposed = confirmableProposals(facts.review.material, facts.review.schema).length;
     return facts.review.outcome

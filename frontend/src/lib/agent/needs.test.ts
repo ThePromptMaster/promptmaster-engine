@@ -179,6 +179,16 @@ describe('needsUser: an outcome table is the user\'s to decide (production pass,
     })?.kind).not.toBe('decide_rows');
   });
 
+  it('never stops for rows whose status rule is marked not blocking (Exploration, 26 Oct)', () => {
+    const schema = ITEM_SCHEMAS.exploration_tests;
+    const rows = [{ id: 'a', claim: 'x', test: 't', expected: 'e' }, { id: 'b', claim: 'y', test: 't', expected: 'e' }];
+    const tests = { ...stage('fact_check'), exit_criteria: [{ id: 'test.decided', label: 'Every test has a verdict', check: 'auto', rule: { type: 'every_item_has_status' }, blocking: false }] };
+    expect(needsUser({
+      ...base, stage: tests as never, stageEvaluation: evaluation('fact_check'), allowed: ['revise_stage', 'evaluate_stage'],
+      facts: { review: { items: rows, schema, routine: [], material: rows, outcome: true } } as never,
+    })?.kind).not.toBe('decide_rows');
+  });
+
   it('stops for undecided claims instead of letting the planner revise the table', () => {
     const schema = { itemLabel: 'claim', fields: [], minItems: 1, maxItems: 20, statuses: [] };
     const rows = [{ id: 'a', claim: 'x', status: 'candidate_source' }, { id: 'b', claim: 'y', status: 'no_source' }];
