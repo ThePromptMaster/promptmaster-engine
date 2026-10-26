@@ -65,7 +65,7 @@ export function executableNext(a: Pick<ObjectiveAssessment, 'outcome' | 'next_ta
 
 /** "Objective still open — next: …", with what waits only on other work. */
 export function openWithNextLine(a: Pick<ObjectiveAssessment, 'blockers'>, next: NextTask): string {
-  const waiting = a.blockers.map((b) => b.need);
+  const waiting = a.blockers.map((b) => b.need.replace(/[.\s]+$/, ''));
   return `The objective is still open; the next task can be done now: ${next.title}.` +
     (waiting.length ? ` Missing, but not needed for it: ${waiting.join('; ')}.` : '');
 }

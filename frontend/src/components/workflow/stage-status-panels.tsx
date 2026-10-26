@@ -7,7 +7,7 @@ import type { MessageKey } from '@/lib/i18n/messages/en';
 import type { EvaluationResult } from '@/types';
 
 import { blocksCompletion, shownOutstanding, type CompletionSummary, type OutstandingShow } from '@/lib/workflow/engine';
-import type { ObjectiveAssessment } from '@/lib/workflow/objective';
+import { executableNext, type ObjectiveAssessment } from '@/lib/workflow/objective';
 import { readablePerformed } from '@/lib/agent/labels';
 import type { BlockKind } from '@/lib/workflow/types';
 
@@ -121,6 +121,11 @@ export function ObjectivePausedNotice({
 }) {
   const t = useT();
   const ask = assessment.blockers.map((b) => b.ask?.trim()).find(Boolean);
+  // A next task that can be done now: the objective is open, not paused, and
+  // what is missing waits only for other work (26 Oct, production: "Paused —
+  // the objective is not met" beside a Go run carrying on with that task).
+  const next = executableNext(assessment);
+  const missing = assessment.blockers.map((b) => b.need.replace(/[.\s]+$/, ''));
   const [answer, setAnswer] = useState('');
   const [sending, setSending] = useState(false);
   return (
@@ -128,13 +133,15 @@ export function ObjectivePausedNotice({
       {/* The button sits below the text, not beside it: beside it, a phone
           left the text one word wide (20 Oct, Sean, HARBOR screenshots). */}
       <div className="flex items-start gap-3">
-        <span aria-hidden className="material-symbols-outlined text-[var(--pm-tertiary)]">pause_circle</span>
+        <span aria-hidden className="material-symbols-outlined text-[var(--pm-tertiary)]">{next ? 'arrow_forward' : 'pause_circle'}</span>
         <div className="min-w-0 flex-1">
           <p className="text-title text-[var(--on-surface)]">
-            {assessment.blockers.length ? t('ssp.paused') : t('ssp.notMetYet')}
+            {next
+              ? missing.length ? t('out.objOpenNextWaiting', { next: next.title, list: missing.join('; ') }) : t('out.objOpenNext', { next: next.title })
+              : assessment.blockers.length ? t('ssp.paused') : t('ssp.notMetYet')}
           </p>
           <p className="mt-1 text-label text-[var(--on-surface-variant)]">{assessment.reason}</p>
-          {assessment.blockers.length > 0 && (
+          {!next && assessment.blockers.length > 0 && (
             <>
               <p className="mt-2 text-label font-semibold text-[var(--on-surface)]">{t('ssp.waitingFor')}</p>
               <ul className="list-disc ps-5 text-label text-[var(--on-surface-variant)]">
@@ -208,7 +215,7 @@ export function ObjectivePausedNotice({
                 disabled={resumeDisabled}
                 className="rounded-lg bg-[var(--surface-container-highest)] px-4 py-2 text-title text-[var(--on-surface)] disabled:opacity-40"
               >
-                {resumeLabel ?? (assessment.blockers.length ? t('ssp.addedResume') : t('ssp.resumeGo'))}
+                {resumeLabel ?? (assessment.blockers.length && !next ? t('ssp.addedResume') : t('ssp.resumeGo'))}
               </button>
             </div>
           )}

@@ -48,3 +48,37 @@ describe('gaps the brief allows are carried, not waited for (19 Oct, HARBOR)', (
     expect(screen.getByText(/Allowed by: “Missing diligence evidence may remain as limitations.”/)).toBeInTheDocument();
   });
 });
+
+describe('an objective with a next task that can be done now is open, not paused (26 Oct, production)', () => {
+  it('says what can be done now and what waits only for other work, and offers no "I have added it"', () => {
+    render(
+      <ObjectivePausedNotice
+        assessment={{
+          ...assessment,
+          blockers: [{ need: "The lab's benchmark dataset.", kind: 'data_missing' as const }],
+          next_task: { title: 'Upper-row share test', kind: 'check', work: 'Count n per row.', needs: [] },
+        }}
+        onResume={() => undefined}
+      />
+    );
+    expect(screen.getByText("The objective is still open — next, and it can be done now: Upper-row share test. Missing only for other work: The lab's benchmark dataset")).toBeInTheDocument();
+    expect(screen.queryByText('Paused — the objective is not met')).not.toBeInTheDocument();
+    expect(screen.queryByText('Waiting for')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Resume Go' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'I have added it — resume Go' })).not.toBeInTheDocument();
+  });
+
+  it('a next task that itself needs the missing item is still a pause', () => {
+    render(
+      <ObjectivePausedNotice
+        assessment={{
+          ...assessment,
+          blockers: [{ need: "The lab's benchmark dataset.", kind: 'data_missing' as const }],
+          next_task: { title: 'Compare with the benchmark', kind: 'check', work: 'Compare.', needs: ["The lab's benchmark dataset."] },
+        }}
+        onResume={() => undefined}
+      />
+    );
+    expect(screen.getByText('Paused — the objective is not met')).toBeInTheDocument();
+  });
+});
