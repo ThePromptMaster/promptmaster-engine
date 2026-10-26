@@ -308,6 +308,8 @@ export interface ArtifactVersion {
   continuity_snapshot: ContinuitySnapshot | null;
   /** The colour palette in force when it was made, "<starting>/<palette>"; null follows the current one. */
   colour_scheme?: string | null;
+  /** The colour the user chose for this version (an id from VERSION_SWATCHES); null keeps the one it was made with. */
+  colour?: string | null;
 
   created_at: string;
 }

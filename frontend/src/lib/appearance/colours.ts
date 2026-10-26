@@ -189,15 +189,77 @@ export function colourScheme(prefs: ColourPreferences): string {
 }
 
 /**
- * A version's colour: from the palette recorded on it, for good; a version
- * with none recorded (or an unknown one) follows the current palette.
+ * The colours a user may give one version (Sean, 25 Oct: "you should be able
+ * to change each versions colors"): every starting and palette colour, once.
+ * Stored by id in `artifact_versions.colour`, whose check constraint lists the
+ * same ids (`version-colours-drift.test.ts`).
  */
-export function colourOfVersion(versionNumber: number, scheme?: string | null): string {
+export const VERSION_SWATCHES: readonly Swatch[] = [
+  { id: 'grey', label: 'Grey', colour: '#737686' },
+  { id: 'blue', label: 'Blue', colour: '#2563eb' },
+  { id: 'teal', label: 'Teal', colour: '#0f8a8c' },
+  { id: 'plum', label: 'Plum', colour: '#6a3d9a' },
+  { id: 'amber', label: 'Amber', colour: '#b26a00' },
+  { id: 'green', label: 'Green', colour: '#3f8a48' },
+  { id: 'rose', label: 'Rose', colour: '#b3264f' },
+  { id: 'red', label: 'Red', colour: '#e0452b' },
+  { id: 'gold', label: 'Gold', colour: '#f2a900' },
+  { id: 'leaf', label: 'Leaf', colour: '#16a34a' },
+  { id: 'sky', label: 'Sky', colour: '#0284c7' },
+  { id: 'magenta', label: 'Magenta', colour: '#a21caf' },
+  { id: 'navy', label: 'Navy', colour: '#1e3a8a' },
+];
+
+/**
+ * A version's colour: the one the user chose for it, if any; otherwise from
+ * the palette recorded on it, for good; a version with neither (or an unknown
+ * one) follows the current palette.
+ */
+export function colourOfVersion(versionNumber: number, scheme?: string | null, chosen?: string | null): string {
+  const picked = VERSION_SWATCHES.find((s) => s.id === chosen);
+  if (picked) return picked.colour;
   const [startingId, paletteId] = (scheme ?? '').split('/');
   const starting = STARTING.find((s) => s.id === startingId);
   const palette = PALETTES.find((p) => p.id === paletteId);
   if (!starting || !palette) return versionColour(versionNumber);
   return versionNumber <= 1 ? starting.colour : palette.colours[(versionNumber - 2) % palette.colours.length];
+}
+
+/**
+ * How strongly each surface takes the shown version's colour: the page most,
+ * the cards least, so they keep their tonal separation from it.
+ */
+const TINT_STRENGTH: Record<(typeof BACKGROUND_VARIABLES)[number], number> = {
+  '--surface-container-lowest': 4, '--card': 4, '--popover': 4,
+  '--surface': 10, '--surface-bright': 10, '--background': 10,
+  '--surface-container-low': 8, '--secondary': 8, '--accent': 8, '--input': 8, '--sidebar': 8,
+  '--surface-container': 11, '--muted': 11,
+  '--surface-container-high': 13, '--border': 13, '--sidebar-accent': 13,
+  '--surface-container-highest': 15,
+  '--surface-dim': 17,
+};
+
+/**
+ * The stage area in the shown version's colour (Sean, 25 Oct: "the whole
+ * background color should change with that version"): each surface the
+ * background tint sets, mixed with the colour. `base` is each surface as it
+ * stands on :root — the user's own tint included — because a variable cannot
+ * be mixed with itself on the element that sets it. A surface with no base
+ * value is left alone.
+ */
+export function versionTintVariables(colour: string, base: Record<string, string>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const name of BACKGROUND_VARIABLES) {
+    const under = base[name]?.trim();
+    if (under) out[name] = `color-mix(in srgb, ${colour} ${TINT_STRENGTH[name]}%, ${under})`;
+  }
+  return out;
+}
+
+/** Each surface as :root has it now, for `versionTintVariables`. */
+export function rootSurfaces(root: HTMLElement = document.documentElement): Record<string, string> {
+  const style = getComputedStyle(root);
+  return Object.fromEntries(BACKGROUND_VARIABLES.map((n) => [n, style.getPropertyValue(n)]));
 }
 
 /** Sets the variables on :root, or clears them to the stylesheet's own for the defaults. */

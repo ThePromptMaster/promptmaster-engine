@@ -101,7 +101,7 @@ import { BriefChangeNotice } from './brief-change-notice';
 import { PendingChangeNotice } from './pending-change-notice';
 import { NextActionBar } from './next-action-bar';
 import { ProjectTimeline } from './project-timeline';
-import { accentVariables } from '@/lib/appearance/colours';
+import { accentVariables, colourOfVersion, rootSurfaces, versionTintVariables } from '@/lib/appearance/colours';
 import { nextAction } from '@/lib/workflow/next-step';
 import { holdPendingChange, pendingChanges, settlePendingChange, type PendingChange } from '@/lib/workflow/conflict-trail';
 import { keptConflictsOf } from '@/lib/workflow/routine-conflicts';
@@ -402,7 +402,9 @@ export function WorkflowWorkspace({
   useEffect(() => {
     if (project.status === 'finalized' && statusSeen.current !== 'finalized') {
       setFinishing(null);
-      finishedRef.current?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
+      // A jump, not a glide: the page has changed state, and a smooth scroll
+      // never runs in a tab that is not in front (seen on the prod pass, 26 Oct).
+      finishedRef.current?.scrollIntoView?.({ block: 'start' });
     }
     statusSeen.current = project.status;
   }, [project.status]);
@@ -1609,6 +1611,22 @@ export function WorkflowWorkspace({
       .map((c) => ({ id: c.id, label: c.label })),
   };
 
+  // The stage area takes the colour of the version on show (Sean, 25 Oct: "the
+  // whole background color should change with that version"). Only the stage
+  // column: the rail and the side chat keep the page's own colours. A stage
+  // with no version bar (the outline) keeps them too.
+  const shownVersion = stageVersionList.find((v) => v.id === activeVersionId) ?? stageVersionList.at(-1) ?? null;
+  const tintColour =
+    stage && stage.renderer !== 'outline' && shownVersion
+      ? colourOfVersion(shownVersion.version_number, shownVersion.colour_scheme, shownVersion.colour)
+      : null;
+  const [rootTint, setRootTint] = useState<Record<string, string> | null>(null);
+  useEffect(() => {
+    // Read when the colour changes, so a background picked meanwhile is mixed in.
+    if (tintColour) setRootTint(rootSurfaces());
+  }, [tintColour]);
+  const tintStyle = tintColour && rootTint ? versionTintVariables(tintColour, rootTint) : null;
+
   if (!stage) return null;
 
   const stageVersions = stageVersionList;
@@ -1881,6 +1899,21 @@ export function WorkflowWorkspace({
       </button>
     </div>
   );
+  // Approving a reopened outline is what it was reopened for: the outline stage
+  // closes again, and the user is taken to Drafting — reopened if it was done —
+  // where the new chapter is waiting to be written (Sean, 25 Oct).
+  const approveOutlineHere = async (version: ArtifactVersion, doc: OutlineDocument) => {
+    await materialiseOutline(version, doc);
+    if (!(explicitOutlineHere && reopenedHere)) return;
+    await markComplete();
+    if (!draftingStage) return;
+    const drafting = state.stages[draftingStage.id]?.status;
+    if (isDone(drafting) && draftingStage.id !== state.current_stage_id) {
+      await appendEvent({ type: 'stage_reopened', stage_id: draftingStage.id });
+    }
+    setViewingStageId(draftingStage.id === state.current_stage_id ? null : draftingStage.id);
+  };
+
   // Book drafting: the outline is a stage of its own, behind the cursor, and the
   // way back to it was a "Go back to Outline" under More. Sean (25 Oct, on a
   // phone): "can you go back and add sections or chapters? … we couldn't
@@ -2152,7 +2185,11 @@ export function WorkflowWorkspace({
         </div>
       )}
 
-      <main className="min-w-0 flex-1 px-6 py-10 md:px-10">
+      <main
+        data-version-tint={tintStyle ? '' : undefined}
+        className="min-w-0 flex-1 px-6 py-10 transition-colors duration-200 md:px-10"
+        style={tintStyle ? ({ ...tintStyle, background: 'var(--background)' } as React.CSSProperties) : undefined}
+      >
         <div className="mx-auto max-w-[820px]">
           {/* Go's controls, pinned while its panel is scrolled away (2 Oct: "you should see
               [the play button] all the time"). The panel fills this; it is empty otherwise. */}
@@ -2536,7 +2573,7 @@ export function WorkflowWorkspace({
                       : stageArtifact
                     )?.long_form ?? null
                   )}
-                  onApproved={materialiseOutline}
+                  onApproved={approveOutlineHere}
                   onItemCountChange={reportOutlineCount}
                   onPanelStep={reportPanelStep}
                   // Editable on a reopened stage as well as the current one:

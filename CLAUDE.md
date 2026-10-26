@@ -185,7 +185,7 @@ than `$0.00`. `usage_tracking` is superseded by `model_usage`, not extended.
 Four rules the schema enforces, so they cannot be undone by a later code change:
 - **`project_stage_events.actor` is `user | system` — there is no `'model'`.** A model reaches stage state only via `proposal_id` pointing at an accepted recommendation. Auditable from the DDL alone, which matters because this is contract evidence.
 - **Children carry a composite FK on `(project_id, user_id)`**, so an artifact cannot be parented into another user's project even from a service-role client.
-- **`artifact_versions` is append-only**, with a trigger permitting only `user_rating` to change. Restore appends a new version rather than mutating; that is why version history and prompt assembly can trust it.
+- **`artifact_versions` is append-only**, with a trigger permitting only `user_rating` and the display `colour` (the user's choice of a version's colour, 20261119) to change. Restore appends a new version rather than mutating; that is why version history and prompt assembly can trust it.
 - **`revision` is bumped by trigger, never by the client.** A client that could set it would echo its stale value back and defeat the concurrency guard.
 
 **Legacy (still live):** `sessions` (a whole `Session` in a `data` JSONB blob; the per-row columns are only for listing), `templates`, `usage_tracking` (emits `iteration`/`realignment`/`session_finalize` only), `custom_modes`, `conversation_messages`, `user_presets`.
