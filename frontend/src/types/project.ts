@@ -109,6 +109,12 @@ export interface Project {
   /** The approvals the user gave, for prompts (`withApprovals`); not a column. */
   approvals?: import('@/lib/workflow/approvals').GivenApproval[];
   /**
+   * The project's sandbox runs that exited cleanly, by id. Not a column:
+   * joined on in the browser, so a result called "calculated" can be checked
+   * against a run that happened (L-118).
+   */
+  code_runs?: string[];
+  /**
    * The project's data files. Not a column: joined on in the browser when
    * the project is opened, so everything that is handed the project — stage
    * generation, the Go planner, the code writer — knows what data exists.

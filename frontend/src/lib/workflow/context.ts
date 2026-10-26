@@ -23,11 +23,12 @@ import { carriedForwardUnmet, deferredNotBlocking, confirmableProposals, openUnm
 import type { StageContext, StageDefinition, WorkflowEvent, WorkflowTemplate } from './types';
 import { deliverableStage, rowsRequired } from './engine';
 import { currentFacts } from './facts';
+import { describeUnsupported, unsupportedClaims } from './evidence-claims';
 import { measure, parseRequirements, requirementsForStage, type MeasurableRequirement, type Measurement } from './measurable';
 
 export interface BuildContextInput {
   template: WorkflowTemplate;
-  project: Pick<Project, 'objective' | 'audience' | 'constraints' | 'manual_checks'> & Partial<Pick<Project, 'output_format' | 'facts'>>;
+  project: Pick<Project, 'objective' | 'audience' | 'constraints' | 'manual_checks'> & Partial<Pick<Project, 'output_format' | 'facts' | 'code_runs'>>;
   /** Per stage id: that stage's artifact and its versions. */
   bundles: Record<string, StageArtifactBundle>;
   /**
@@ -234,15 +235,40 @@ export function governingRequirements(
  * (C1). Used for the saved head, and by a repair before it saves (L-63).
  */
 export function measureStageContent(
-  project: Pick<Project, 'objective' | 'constraints'> & Partial<Pick<Project, 'output_format' | 'facts'>>,
+  project: Pick<Project, 'objective' | 'constraints'> & Partial<Pick<Project, 'output_format' | 'facts' | 'code_runs'>>,
   template: WorkflowTemplate,
   stage: StageDefinition,
   content: string
 ): Measurement[] {
   if (!content.trim()) return [];
-  return stageRequirements(project, template, stage)
-    .map(({ requirement, whole }) => measure(requirement, content, whole))
-    .filter((m): m is Measurement => m !== null);
+  const evidence = measureEvidence(project, template, stage, content);
+  return [
+    ...stageRequirements(project, template, stage)
+      .map(({ requirement, whole }) => measure(requirement, content, whole))
+      .filter((m): m is Measurement => m !== null),
+    ...(evidence ? [evidence] : []),
+  ];
+}
+
+/**
+ * Results called calculated or verified have something behind them (L-118,
+ * 26 Oct): measured in code on a research project's written stages, so a
+ * finished stage that fails it is open work and Go repairs it like a word
+ * limit. Only research and inquiry work: elsewhere "verified" is as often the
+ * story's word as a claim about the work.
+ */
+export function measureEvidence(
+  project: Partial<Pick<Project, 'code_runs'>>,
+  template: Pick<WorkflowTemplate, 'key' | 'inquiry'>,
+  stage: Pick<StageDefinition, 'renderer'>,
+  content: string
+): Measurement | null {
+  if ((template.key !== 'research' && !template.inquiry) || stage.renderer !== 'prose') return null;
+  const claims = unsupportedClaims(content, { codeRuns: project.code_runs?.length ?? 0 });
+  const label = 'Results called calculated or verified have the evidence';
+  if (!claims.length) return { id: 'measured.evidence', label, satisfied: true, value: 'every such result backed' };
+  const detail = describeUnsupported(claims);
+  return { id: 'measured.evidence', label, satisfied: false, value: detail, detail };
 }
 
 /** The measurable requirements a stage answers for, unmeasured. */

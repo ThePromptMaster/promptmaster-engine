@@ -48,6 +48,7 @@ import { describeBasis, executableNext, openWithNextLine, pausedLine, stillMet, 
 import { addedByRun, designAddedStage, MAX_ADDED_PER_RUN, type AddedStage } from '@/lib/workflow/added-stages';
 import { attachedDocuments, currentFacts, supersededFactValues } from '@/lib/workflow/facts';
 import { ManuscriptMissing, withFreshManuscript } from '@/lib/workflow/fresh-manuscript';
+import { useProjectStore } from '@/stores/project-store';
 import { describeValue, leftoverValues, type SupersededValue } from '@/lib/workflow/fact-values';
 import { revertsUserVersion, USER_CHOSEN_OPERATIONS } from '@/lib/workflow/fact-reconcile';
 import { hasIdChanges, idChangeDefault, idChangeQuestion, idChanges, removedByUser } from '@/lib/workflow/id-changes';
@@ -585,6 +586,8 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         : classification.blockKind === 'tool_missing' ? classification.summary.replace(/^Code could not be run: /, '').replace(/[.\s]+$/, '')
         : failedWith ? `the code ran but failed — ${failedWith}`
         : null;
+      // A clean run is evidence a later "calculated" can stand on (L-118).
+      if (ran && run.status === 'ok' && run.exit_code === 0 && !timedOut) useProjectStore.getState().noteCodeRun(run.id);
       const recorded = ran && classification.stepStatus === 'succeeded' && run.exit_code === 0
         ? await recordRun(ctx, params.row, { id: run.id, stdout: run.stdout })
         : blockedWhy
@@ -1043,7 +1046,10 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // A limit on one part ("Executive update: at most 100 words") is met by
       // revising that part alone; the rest is put back in code, unchanged
       // (14 Oct, ASPEN: the whole pack was cut to fit the update's limit).
-      const parts = measuredFails.length && !before ? failingParts(ctx, target, head) : [];
+      // Only when every failing measurement is such a part: a result called
+      // calculated without a run is fixed wherever it is (L-118).
+      const fittable = measuredFails.length && !before ? failingParts(ctx, target, head) : [];
+      const parts = fittable.length === measuredFails.length ? fittable : [];
       const partNames = parts.map((r) => `"${r.subject}"`).join(' and ');
       const measuredLine = parts.length
         ? ` MEASURED IN CODE AND NOT MET: ${measuredFails.join('; ')}. Revise ONLY the ${partNames} section so it is met — the count is made in code (${COUNTING_RULE}) on that section alone, so count exactly and leave a margin. Keep its heading and every fact it must state. Every other section is put back exactly as it is, so do not change them. Add nothing new.`

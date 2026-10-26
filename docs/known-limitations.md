@@ -2314,14 +2314,30 @@ An approval given on an older version is still an approval of that version: prom
 the current version number. The checklist shows "approved vN, now vM", but nothing unticks the
 approval automatically and Go does not re-confirm it.
 
-### L-118 — How a result stands is the model's own label (2026-10-25)
+### L-118 — How a result stands: "calculated" and "verified" are checked in code, narrowly (2026-10-25, updated 2026-10-26)
 
 Stage prompts ask each result to be called reasoned, calculated, externally verified,
-conditional or speculative, and forbid "calculated" or "verified" without the evidence. This is
-a prompt rule, not a code check of the text. What code does label is each Go step's
-execution label, which is derived from what ran (`lib/agent/labels.ts`). A literature row is
-"Retrieved" only when OpenAlex or a saved web source [S#] names it; otherwise it stays
-"Suggested by PromptMaster — not retrieved".
+conditional or speculative, and forbid "calculated" or "verified" without the evidence. Since
+26 Oct a research or inquiry project's written stages are also measured in code
+(`lib/workflow/evidence-claims.ts`, `measureEvidence` in `context.ts`): a result labelled or
+stated as calculated, computed or reproduced needs a sandbox run in the project that exited
+cleanly, and one called verified or confirmed needs a citation in its sentence ([S#], [R#], a
+DOI or link, OpenAlex, or the user). A stage that fails is open work like a word limit, and Go
+repairs it under "Handle them for me".
+
+The limits, deliberately:
+- Any clean run in the project backs any "calculated": the check does not match a figure to
+  the run that printed it.
+- Only claims are read — a label ("Calculated —", a table cell) or "was computed", "we
+  verified". A sentence that negates or defers ("not yet", "to be", "once", "should") is not
+  a claim, and "is calculated as" describes a method. A miss leaves the prompt rule as the
+  guard; a false alarm costs one repair.
+- Book, single-output and other non-inquiry work is not checked: there "verified" is as often
+  the story's word as a claim about the work.
+
+What code also labels is each Go step's execution label, derived from what ran
+(`lib/agent/labels.ts`). A literature row is "Retrieved" only when OpenAlex or a saved web
+source [S#] names it; otherwise it stays "Suggested by PromptMaster — not retrieved".
 
 ### L-119 — A wording-only revision reopens nothing; the test is deliberately strict (2026-10-25)
 
