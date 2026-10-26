@@ -766,3 +766,10 @@ async def test_write_code_runs_a_whole_script_with_one_call(mock_client):
     mock_client.generate = AsyncMock(return_value=("```python\nprint(4)\n```", {}))
     code, _ = await write_code(mock_client, None, INPUTS, STATE, "2+2", "computation")
     assert code == "print(4)" and mock_client.generate.await_count == 1
+
+
+def test_write_code_is_told_to_compute_in_python_and_never_block_on_a_missing_tool():
+    # 26 Oct (production): a script looked for a C compiler and stopped the run as missing data.
+    system, _ = build_write_code_prompt(INPUTS, STATE, "count walks to n = 27", "computation")
+    assert "no cc, gcc, clang" in system
+    assert "never for a missing tool, library or compiler" in system

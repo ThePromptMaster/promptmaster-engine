@@ -619,7 +619,12 @@ def build_reason_prompt(
 _WRITE_CODE_INSTRUCTION = (
     "GO MODE — WRITE CODE. Write one self-contained Python 3 script that computes "
     "what is asked. Standard library, numpy, scipy, sympy, matplotlib and pandas "
-    "are available; nothing else, and no network access. Print every result the "
+    "are available; nothing else, and no network access. "
+    # 26 Oct (production, connective constant): the script tried to build a C
+    # enumerator, found no compiler, and stopped the run as missing data.
+    "There is no compiler and no other language — no cc, gcc, clang, no "
+    "subprocess builds: write the whole computation in Python itself, smaller "
+    "if it must be (say so with a `reduced:` line). Print every result the "
     "reader needs on its own line as `label: value`, so each can be recorded. "
     "Save any plot to /out/<name>.png. "
     # 9 Oct (production replay): a sweep of 61 long integrations hit the
@@ -636,7 +641,8 @@ _WRITE_CODE_INSTRUCTION = (
     "do not compute on placeholders: write a script that prints one line, "
     "`MISSING_DATA: <exactly what is missing, as one plain sentence>`, and then "
     "calls `raise SystemExit(2)`. That line is recorded as the reason the run "
-    "was not made. Never report a run that could not be made as a `status:` "
+    "was not made. MISSING_DATA is only for the project's data — never for a "
+    "missing tool, library or compiler, which you work around in Python. Never report a run that could not be made as a `status:` "
     "line or as an ordinary result: a clean exit means the analysis was "
     "carried out, and the row is marked Completed. Return "
     "ONLY the code — no prose, no fences, and never any claimed output: the code "
