@@ -729,12 +729,19 @@ def build_interpret_prompt(
 
 # --- the calls --------------------------------------------------------------------
 
+#: Room for a reasoning step's answer, and over `llm_client.LONG_ANSWER_TOKENS`
+#: so a reasoning model reasons at low effort. At 4,000 its reasoning got a
+#: 2,048-token hint, overran it working estimators out by hand from 21 counts,
+#: and returned no text (26 Oct, connective constant: finish_reason='length').
+REASON_MAX_TOKENS = 8_000
+
+
 async def perform_reason(
     client: OpenRouterClient, model: str | None, inputs: PMInput, state: AgentState,
     action_key: str, params: dict,
 ) -> tuple[str, dict[str, int]]:
     system, user = build_reason_prompt(inputs, state, action_key, params)
-    return await client.generate(prompt=user, system=system, temperature=0.4, max_tokens=4000, model=model)
+    return await client.generate(prompt=user, system=system, temperature=0.4, max_tokens=REASON_MAX_TOKENS, model=model)
 
 
 #: Room for a whole script. At 4,000 — which a reasoning model's reasoning
