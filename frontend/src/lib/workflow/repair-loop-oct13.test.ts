@@ -12,7 +12,7 @@ import { BOOK_V1 } from './templates/book.v1';
 import { SINGLE_OUTPUT_V1 } from './templates/single-output.v1';
 import type { StageItem } from './stage-artifact';
 import type { WorkflowEvent } from './types';
-import { exhaustedRepair, repairStuckNeed, describeNeed } from '@/lib/agent/needs';
+import { exhaustedRepair, repairStuckNeed, repairTries, describeNeed } from '@/lib/agent/needs';
 import { splitChangeNote } from '@/lib/agent/perform';
 import { withExtraTries } from '@/components/workflow/use-go-loop';
 import type { AgentStep } from '@/types/agent';
@@ -135,6 +135,18 @@ describe('a repair that did not settle is the user’s decision, with ways on', 
   it('names the stage once its tries are used up', () => {
     expect(exhaustedRepair(BOOK_V1, state, ['continuity'])).toBeNull();
     expect(exhaustedRepair(BOOK_V1, state, ['continuity', 'continuity'])).toBe('continuity');
+  });
+
+  it('a repair the user stopped, or a reload cut off, is not a try (26 Oct, production)', () => {
+    const steps = [
+      step(0, 'cancelled', {}, 'Stopped by you before it finished. Nothing it would have produced was kept.'),
+      step(1, 'interrupted', {}, 'Interrupted: the tab running this step was closed or reloaded before it finished.'),
+      step(2, 'failed', {}, 'The revision dropped 2 rows you had decided.'),
+    ];
+    const tried = repairTries(steps, state, new Set(steps.map((s) => s.id)));
+    expect(tried).toEqual(['continuity']);
+    expect(exhaustedRepair(BOOK_V1, state, tried)).toBeNull();
+    expect(repairStuckNeed(state, 'continuity', steps)).toMatchObject({ tries: 1, last: 'The revision dropped 2 rows you had decided.' });
   });
 
   it('says what is unresolved, what the last attempt did, and offers three ways on', () => {

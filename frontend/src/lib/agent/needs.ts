@@ -226,7 +226,7 @@ export const REPAIR_TRIES = 2;
  */
 export function repairTries(steps: readonly AgentStep[], state: WorkflowState, thisRun: ReadonlySet<string>): string[] {
   return steps
-    .filter((s) => s.action_key === 'recheck_stage')
+    .filter((s) => s.action_key === 'recheck_stage' && triedToTheEnd(s))
     .filter((s) => {
       const since = state.stages[String(s.params?.stage_id ?? '')]?.stale?.since;
       if (!since) return Boolean(s.params?.measured) || Array.isArray(s.params?.carried);
@@ -234,6 +234,15 @@ export function repairTries(steps: readonly AgentStep[], state: WorkflowState, t
       return s.params?.stale_since === since || (!s.params?.stale_since && thisRun.has(s.id));
     })
     .map((s) => String(s.params?.stage_id ?? ''));
+}
+
+/**
+ * A repair the user stopped, or that a closed or reloaded tab cut off, was not
+ * a try that failed (26 Oct, production: a Stop and a reload made two of the
+ * three "tries" that left Findings "stuck" before a third ever ran).
+ */
+function triedToTheEnd(s: Pick<AgentStep, 'status'>): boolean {
+  return s.status !== 'cancelled' && s.status !== 'interrupted';
 }
 
 /**
@@ -252,7 +261,7 @@ export function exhaustedRepair(template: WorkflowTemplate, state: WorkflowState
 
 /** The `repair_stuck` need for a stage, from the repair steps recorded for it. */
 export function repairStuckNeed(state: WorkflowState, stageId: string, steps: readonly AgentStep[], fallbackWhy = ''): Extract<NeedsUser, { kind: 'repair_stuck' }> {
-  const repairs = steps.filter((s) => s.action_key === 'recheck_stage' && String(s.params?.stage_id ?? s.stage_id) === stageId);
+  const repairs = steps.filter((s) => s.action_key === 'recheck_stage' && triedToTheEnd(s) && String(s.params?.stage_id ?? s.stage_id) === stageId);
   const recent = repairs.slice(-Math.max(REPAIR_TRIES, 3));
   const saved = recent.filter((s) => {
     if (s.status !== 'succeeded') return false;
