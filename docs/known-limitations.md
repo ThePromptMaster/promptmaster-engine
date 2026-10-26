@@ -2307,7 +2307,7 @@ record ("Missing, but not needed for it"). Whether a task needs something is sti
 model's reading of the saved text, so a task it wrongly calls executable is attempted, and its
 own stage then says what it lacked.
 
-### L-117 — Approvals reach prompts; Go re-confirms only routine ones, only after its own repair (2026-10-25, updated 2026-10-26)
+### L-117 — Approvals reach prompts; Go re-confirms only routine ones, only on versions it saves (2026-10-25, updated 2026-10-26)
 
 Every prompt lists the approvals the user ticked, each with the version it was given on. An
 approval given on an older version is still an approval of that version: prompts are told the
@@ -2322,8 +2322,12 @@ never ticked again by Go: the step says they were given on an earlier version. G
 approvals now record the version they were checked against — before, they had none and read as
 "version unknown".
 
-Not covered: a new version made any other way (the user's own edit, "Change it", apply
-findings) does not re-confirm anything; the checklist's "approved vN, now vM" is what shows it.
+The same holds for every other version Go saves — a draft, a revision, a continuation, applied
+findings — since a production pass on 26 Oct showed Go re-confirm on its repair and then leave
+the approval a version behind with the findings it applied next.
+
+Not covered: a new version the user makes (their own edit, "Change it", the Apply button) does
+not re-confirm anything; the checklist's "approved vN, now vM" is what shows it.
 
 ### L-118 — How a result stands: "calculated" and "verified" are checked in code, narrowly (2026-10-25, updated 2026-10-26)
 

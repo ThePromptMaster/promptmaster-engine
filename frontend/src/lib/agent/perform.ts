@@ -782,11 +782,13 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
           output: cutOffMessage(ctx.stage.label, content),
         });
       }
+      // Go's own new version leaves the approvals on the one before it (L-117).
+      const reconfirmed = typeof versionId === 'string' ? await reconfirmApprovals(ctx, ctx.stage, versionId, content) : [];
       return done(key, {
         status: 'succeeded', toolsUsed: ['model'],
         // What changed, so the record can be checked against the project (SN-25).
         changes: typeof versionId === 'string' ? { version_ids: [versionId] } : {},
-        output: `${revising ? 'Revised' : 'Drafted'} ${ctx.stage.label} — saved as a new version (${content.length.toLocaleString()} characters).${checked.notes.length ? ` ${checked.notes.join(' ')}` : ''}${routineKept ? ` ${routineKept.note}` : ''}`,
+        output: [`${revising ? 'Revised' : 'Drafted'} ${ctx.stage.label} — saved as a new version (${content.length.toLocaleString()} characters).${checked.notes.length ? ` ${checked.notes.join(' ')}` : ''}${routineKept ? ` ${routineKept.note}` : ''}`, ...reconfirmed].join(' '),
         ...(routineKept ? { params: { ...params, ...routineKept.params } } : {}),
       });
     }
@@ -820,10 +822,11 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         finish_reason: null,
       });
       const versionId = (created as { id?: unknown } | null)?.id;
+      const reconfirmed = typeof versionId === 'string' ? await reconfirmApprovals(ctx, ctx.stage, versionId, iteration.output) : [];
       return done(key, {
         status: 'succeeded', toolsUsed: ['model'],
         changes: typeof versionId === 'string' ? { version_ids: [versionId] } : {},
-        output: `Continued ${ctx.stage.label} from where the draft was cut off — saved as a new version.`,
+        output: [`Continued ${ctx.stage.label} from where the draft was cut off — saved as a new version.`, ...reconfirmed].join(' '),
       });
     }
 
@@ -931,6 +934,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // Go's own apply, told apart from the user's Apply button in the history.
       const created = await ctx.appendStageVersion(ctx.stage.id, ctx.stage.label, { ...appliedFindingsVersion(rev, ctx.project), source_operation: 'agent_apply' });
       const versionId = (created as { id?: unknown } | null)?.id;
+      const reconfirmed = typeof versionId === 'string' ? await reconfirmApprovals(ctx, ctx.stage, versionId, rev.after) : [];
       // What was applied and what it changed, worked out here, so neither the
       // planner nor the user has to guess (19 Oct, Research › Method).
       return done(key, {
@@ -941,6 +945,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
           ...findings.slice(0, 4).map((f) => `Finding: ${f.summary.slice(0, 200)}`),
           `What changed:\n${describeVersionChange(versionChange(rev.before, rev.after, 6))}`,
           ...(routineKept ? [routineKept.note] : []),
+          ...reconfirmed,
         ].join('\n'),
         ...(routineKept ? { params: { ...params, ...routineKept.params } } : {}),
       });
