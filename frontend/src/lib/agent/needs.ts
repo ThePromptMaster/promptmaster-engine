@@ -331,7 +331,7 @@ export function staleRepair(
     if (!['prose', 'list', 'review', 'long_form'].includes(stage.renderer)) continue;
     return {
       key: 'recheck_stage',
-      rationale: `${stage.label} was reopened: ${st.stale?.reason ?? 'something it relied on changed'}. Repairing it keeps the project consistent.`,
+      rationale: `${stage.label} was reopened: ${(st.stale?.reason ?? 'something it relied on changed').replace(/[.\s]+$/, '')}. Repairing it keeps the project consistent.`,
       expected: `A new version of ${stage.label} that keeps what still holds and replaces what the change superseded; then it is marked complete again.`,
       params: { stage_id: stage.id, ...(st.stale?.since ? { stale_since: st.stale.since } : {}) },
     };
