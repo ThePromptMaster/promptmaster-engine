@@ -773,3 +773,30 @@ def test_write_code_is_told_to_compute_in_python_and_never_block_on_a_missing_to
     system, _ = build_write_code_prompt(INPUTS, STATE, "count walks to n = 27", "computation")
     assert "no cc, gcc, clang" in system
     assert "never for a missing tool, library or compiler" in system
+
+
+def test_write_code_is_shown_what_earlier_runs_printed_and_may_not_call_it_missing():
+    # 26 Oct (production): three runs printed the batch counts a fourth was to
+    # sum, and the fourth said MISSING_DATA — it had never been shown them.
+    from promptmaster.agent import EarlierRun
+
+    runs = [EarlierRun(when="2026-10-26 19:56", stdout="csv_row_63: 21,6,63,022222,0.862,3,9,25\n")]
+    system, user = build_write_code_prompt(INPUTS, STATE, "sum the batches into c_21", "computation", runs)
+    assert "MISSING_DATA is never for a value an earlier run printed" in system
+    assert "from_earlier_run:" in system
+    assert "--- EARLIER RUN 1 (2026-10-26 19:56) PRINTED ---\ncsv_row_63: 21,6,63,022222,0.862,3,9,25" in user
+    assert user.index("EARLIER RUN 1") < user.index("Write code for this computation")
+    bare, plain = build_write_code_prompt(INPUTS, STATE, "sum the batches into c_21", "computation")
+    assert "EARLIER RUNS" not in bare and "EARLIER RUN" not in plain
+
+
+def test_write_code_endpoint_passes_the_earlier_runs_to_the_prompt(client_with):
+    stub = AsyncMock()
+    stub.model = "test/model"
+    stub.generate = AsyncMock(return_value=("print(1)", {}))
+    res = client_with(stub).post("/api/agent/write-code", json={
+        "inputs": INPUTS.model_dump(), "state": STATE.model_dump(), "goal": "sum", "kind": "computation",
+        "earlier_runs": [{"when": "19:56", "stdout": "u_21: 3746140"}],
+    })
+    assert res.status_code == 200, res.text
+    assert "u_21: 3746140" in stub.generate.await_args.kwargs["prompt"]

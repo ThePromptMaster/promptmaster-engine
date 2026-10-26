@@ -25,6 +25,7 @@ from deps import get_client, llm_mode
 from promptmaster.literature import MAX_SEARCH_RESULTS, MAX_WORKS, WorkMatch, WorkQuery, lookup_works, search_works
 from promptmaster.agent import (
     AgentState,
+    EarlierRun,
     NextAction,
     TriageDecision,
     TriageStatus,
@@ -140,6 +141,8 @@ class WriteCodeRequest(BaseModel):
     goal: str = Field(default="", max_length=40_000)
     kind: Literal["computation", "simulation"] = "computation"
     model: str = ""
+    #: What the project's recent clean runs printed, newest first.
+    earlier_runs: list[EarlierRun] = Field(default_factory=list, max_length=6)
 
 
 class WriteCodeResponse(BaseModel):
@@ -153,7 +156,7 @@ class WriteCodeResponse(BaseModel):
 async def api_write_code(req: WriteCodeRequest, client: OpenRouterClient = Depends(get_client)) -> WriteCodeResponse:
     """Write code for a computation. It is not run here; label 'code_written'."""
     try:
-        code, usage = await write_code(client, req.model or None, req.inputs, req.state, req.goal, req.kind)
+        code, usage = await write_code(client, req.model or None, req.inputs, req.state, req.goal, req.kind, req.earlier_runs)
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
     if not code.strip():
