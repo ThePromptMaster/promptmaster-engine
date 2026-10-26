@@ -46,3 +46,36 @@ describe('GoControl', () => {
     expect(screen.queryByText(/credits or tokens/)).toBeNull();
   });
 });
+
+describe('GoControl, pinned copy', () => {
+  function pinned(over: Partial<{ canResume: boolean; hideResume: boolean }>, r: AgentRun) {
+    render(
+      <GoControl run={r} running={false} budget={25} onBudget={() => {}} onGo={() => {}} onStop={() => {}}
+        canResume={over.canResume ?? false} hideResume={over.hideResume} disabled={false} compact />
+    );
+  }
+
+  it('keeps to one row: no explanation, and Resume says what it does as its tooltip', () => {
+    // 25 Oct (Sean, iPad): the sentence beside the dock's buttons wrapped one word per line.
+    pinned({ canResume: true }, run({ status: 'awaiting_decision' }));
+    expect(screen.queryByText(/Resume carries on this run/)).toBeNull();
+    expect(screen.queryByText(/A step is one thing/)).toBeNull();
+    expect(screen.getByRole('button', { name: /Resume/ })).toHaveAttribute('title', expect.stringMatching(/Resume carries on this run/));
+  });
+
+  it('leaves a live window\'s locked size to the panel', () => {
+    pinned({}, run({}));
+    expect(screen.queryByLabelText('Step budget')).toBeNull();
+    expect(screen.getByText('14 / 25 steps this window')).toBeInTheDocument();
+  });
+});
+
+describe('GoControl, Resume hidden', () => {
+  it('does not explain a Resume button that is not there', () => {
+    render(
+      <GoControl run={run({ status: 'blocked' })} running={false} budget={25} onBudget={() => {}} onGo={() => {}} onStop={() => {}}
+        canResume hideResume disabled={false} />
+    );
+    expect(screen.queryByText(/Resume carries on this run/)).toBeNull();
+  });
+});

@@ -59,4 +59,10 @@ describe('the buttons on a stage\'s page (2 Oct, item 10)', () => {
     expect(findControl(controls, 'Generate the outline/results artifact')).toBeNull();
     expect(findControl(undefined, 'Mark as stuck…')).toBeNull();
   });
+
+  it('names the drafting stage\'s way back to the outline, where the page draws it (Sean, 25 Oct)', () => {
+    const controls = stageControls({ more: [], options: [], addSections: true });
+    expect(findControl(controls, 'Add a chapter or section')).toMatchObject({ id: 'add-sections', place: 'above_work' });
+    expect(findControl(stageControls({ more: [], options: [] }), 'Add a chapter or section')).toBeNull();
+  });
 });

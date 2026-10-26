@@ -264,14 +264,18 @@ export function GoPanel({
               <span aria-hidden className="material-symbols-outlined text-[16px]">{go.active ? 'progress_activity' : 'play_arrow'}</span>
               <span className="truncate">{dockAction ? dockAction.label : waiting ? t('go.needsYou') : go.active ? t('go.working') : t('go.go')}</span>
             </button>
-            <div className="hidden flex-wrap items-center gap-3 lg:flex">
-              <div className="min-w-0 flex-1">
+            {/* The controls keep a real width and the buttons wrap under them:
+                with a basis of 0 they were squeezed to a word a line between two
+                fixed buttons on an iPad, and the bar grew over the text (Sean, 25 Oct). */}
+            <div className="hidden flex-wrap items-center gap-x-3 gap-y-2 lg:flex">
+              <div className="min-w-[14rem] flex-[1_1_14rem]">
                 <GoControl {...controlProps} compact />
               </div>
               {dockAction && (
                 <button
                   onClick={() => (dockAction.acts ? void act(dockAction.option).catch(() => sectionRef.current?.scrollIntoView({ block: 'start' })) : sectionRef.current?.scrollIntoView({ block: 'start' }))}
-                  className="shrink-0 rounded-lg bg-[var(--pm-primary)] px-3 py-1.5 text-label text-[var(--on-primary)] hover:opacity-90"
+                  title={dockAction.label}
+                  className="min-w-0 max-w-full truncate rounded-lg bg-[var(--pm-primary)] px-3 py-1.5 text-label text-[var(--on-primary)] hover:opacity-90"
                 >
                   {dockAction.label}
                 </button>

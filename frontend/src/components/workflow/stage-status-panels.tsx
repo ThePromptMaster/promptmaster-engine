@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import type { MessageKey } from '@/lib/i18n/messages/en';
 
@@ -232,6 +232,7 @@ export function CompletionDialog({
   onCancel,
   onViewStage,
   show,
+  error,
 }: {
   summary: CompletionSummary;
   /** How stage names and Go's request are said here; without it, the English the items hold. */
@@ -245,10 +246,22 @@ export function CompletionDialog({
   onCancel: () => void;
   /** Go and look at a stage that was left open, to close it before finishing. */
   onViewStage?: (stageId: string) => void;
+  /** Why finishing failed, said here where the user is looking. */
+  error?: string | null;
 }) {
   const t = useT();
   const locale = useLocale();
   const [reason, setReason] = useState('');
+  // Brought into view and focused when it opens: it is not a pop-up, and opened
+  // from the Finish beside the acceptance box it appeared below the fold, so
+  // the press looked like it did nothing (Sean, 25 Oct, iPad).
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    const h = headingRef.current;
+    if (!h) return;
+    h.closest('section')?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+    h.focus({ preventScroll: true });
+  }, []);
   // Left-open stages have their own line above; everything else still open is
   // listed here, and finishing past it asks why (6 Oct: the project "allowed
   // me to finish … despite the unresolved finding").
@@ -264,7 +277,7 @@ export function CompletionDialog({
   ];
   return (
     <section aria-label={t('ssp.finishLabel')} className="rounded-xl bg-[var(--surface-container-high)] px-6 py-5">
-      <h3 className="text-title text-[var(--on-surface)]">{t('ssp.finishQ')}</h3>
+      <h3 ref={headingRef} tabIndex={-1} className="text-title text-[var(--on-surface)] outline-none">{t('ssp.finishQ')}</h3>
       <p className="mt-3 flex items-center gap-2 text-body text-[var(--on-surface)]">
         <span
           aria-hidden
@@ -383,13 +396,18 @@ export function CompletionDialog({
           )}
         </div>
       )}
+      {error && (
+        <p role="alert" className="mt-3 rounded-lg bg-[var(--error-container)] px-3 py-2 text-label text-[var(--on-error-container)]">
+          {error}
+        </p>
+      )}
       <div className="mt-4 flex gap-2">
         <button
           onClick={() => onConfirm(needsReason ? reason.trim() : undefined)}
           disabled={busy || (needsReason && !reason.trim())}
           className="rounded-lg bg-[var(--pm-primary)] px-5 py-2 text-title text-[var(--on-primary)] disabled:opacity-50"
         >
-          {!summary.deliverableDone ? t('ssp.override') : needsReason ? t('ssp.finishAnyway') : t('ssp.finishProject')}
+          {busy ? t('ssp.finishing') : !summary.deliverableDone ? t('ssp.override') : needsReason ? t('ssp.finishAnyway') : t('ssp.finishProject')}
         </button>
         <button onClick={onCancel} className="rounded-lg px-4 py-2 text-title text-[var(--on-surface-variant)]">
           {t('pnl.notYet')}

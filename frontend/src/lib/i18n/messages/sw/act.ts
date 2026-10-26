@@ -64,6 +64,8 @@ export const sw: Record<keyof typeof en, string> = {
   'controls.propose': 'Pendekeza hali',
   'controls.skip': 'Ruka hatua hii',
   'controls.goBackTo': 'Rudi kwenye {stage}',
+  'controls.addSections': 'Ongeza sura au sehemu',
+  'controls.addSectionsWhy': 'Inafungua {stage} ili kuongeza; sura zilizokwisha andikwa zinabaki.',
   'bar.label': 'Hatua inayofuata',
   'bar.next': 'Inayofuata: ',
   'bar.otherTab': 'Go inaendeshwa katika kichupo kingine. Isimamishe huko, au subiri imalize.',
