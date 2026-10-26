@@ -633,6 +633,13 @@ _WRITE_CODE_INSTRUCTION = (
     "vectorise, use fewer points, a coarser grid or a shorter integration — and print one line "
     "`reduced: <what was reduced and why>` whenever you cut the scope, so the record says so. "
     "Prefer a smaller computation that finishes over a complete one that does not. "
+    # 26 Oct (production, connective constant): scripts that stopped on their own
+    # time budget exited 2, so the batches they had finished counted as a failed
+    # run and the next script was never shown them.
+    "A script that stops early on its own time budget has a partial result, not a "
+    "failure: print everything it finished, a `reduced:` line saying where it "
+    "stopped, and exit normally (code 0). A non-zero exit is only for code that "
+    "failed or for MISSING_DATA. "
     "DATA: the project's files, if any, are listed in the state below with their "
     "paths under /data, their columns and a few sample rows. Read them with "
     "pandas, or the csv or json modules. Use only files that "

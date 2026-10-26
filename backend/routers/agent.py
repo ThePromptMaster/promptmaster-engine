@@ -142,7 +142,7 @@ class WriteCodeRequest(BaseModel):
     kind: Literal["computation", "simulation"] = "computation"
     model: str = ""
     #: What the project's recent clean runs printed, newest first.
-    earlier_runs: list[EarlierRun] = Field(default_factory=list, max_length=6)
+    earlier_runs: list[EarlierRun] = Field(default_factory=list, max_length=10)
 
 
 class WriteCodeResponse(BaseModel):
