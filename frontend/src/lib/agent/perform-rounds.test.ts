@@ -75,6 +75,19 @@ describe('Go and the rounds of ongoing work', () => {
     expect(event.payload.next_task).toEqual(next_task);
   });
 
+  it('the round it starts says the objective is still open and what can be done now, with what waits (26 Oct)', async () => {
+    const next_task = { title: 'Merge texture test', kind: 'check', work: 'Count n per row.', needs: [] };
+    agentAssessObjective.mockResolvedValue({
+      outcome: 'not_met', reason: 'Open.', basis_quote: '', performed: [], proposed_next: [], next_task,
+      blockers: [{ need: "the lab's benchmark dataset", kind: 'data_missing' }],
+    });
+    const out = await performStep(ctx([goRound('2026-10-19T10:00:00Z')]));
+    expect(out.output).toBe(
+      "The objective is still open; the next task can be done now: Merge texture test. Missing, but not needed for it: the lab's benchmark dataset. " +
+      'Started the next round under your routine-decision policy: Worth another round.'
+    );
+  });
+
   // 19 Oct (HARBOR): the round check said "not met" only because the package
   // stage after the round had not run yet.
   it('a round whose only gap is the stage after it moves on at once, with the check told which stage that is', async () => {

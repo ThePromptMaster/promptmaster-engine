@@ -1556,7 +1556,8 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         }
         // What is missing blocks only the work that needs it (25 Oct): with a
         // next task that can be done now, the round goes ahead.
-        if (verdict.blockers.length && !(ctx.template.key === 'research' || ctx.template.inquiry ? executableNext(verdict) : null)) {
+        const nextTask = ctx.template.key === 'research' || ctx.template.inquiry ? executableNext(verdict) : null;
+        if (verdict.blockers.length && !nextTask) {
           const line = pausedLine(verdict);
           return done(key, {
             status: 'succeeded', toolsUsed: ['model'], changes: { event_types: ['objective_assessed'] },
@@ -1574,9 +1575,11 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
           payload: { next_round: true, policy: 'routine_decisions' },
         });
         await ctx.afterStageEvent();
+        // What the check found stays in the record: the page's own line goes
+        // once the round saves its first version (26 Oct, production).
         return done(key, {
-          status: 'succeeded', toolsUsed: [], changes: { event_types: ['stage_returned'] },
-          output: `Started the next round under your routine-decision policy: ${reason}`,
+          status: 'succeeded', toolsUsed: ['model'], changes: { event_types: ['objective_assessed', 'stage_returned'] },
+          output: [nextTask ? openWithNextLine(verdict, nextTask) : '', `Started the next round under your routine-decision policy: ${reason}`].filter(Boolean).join(' '),
         });
       }
       const need: NeedsUser = { kind: 'next_round', stageId: ctx.stage.id, toStageId: to, reason };
