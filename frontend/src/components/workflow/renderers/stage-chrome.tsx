@@ -11,7 +11,7 @@
  * claim table.
  */
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { EvaluationScores } from '../evaluation-scores';
 import { RecoveryPanel } from '../recovery-panel';
@@ -21,7 +21,8 @@ import { isSaved, versionTitle } from '@/lib/workflow/labels';
 import { useT } from '@/lib/i18n/i18n-provider';
 import { tr } from '@/lib/i18n/store';
 import { shownOperationLabel } from '@/lib/i18n/stage';
-import { colourOfVersion } from '@/lib/appearance/colours';
+import { colourOfVersion, VERSION_SWATCHES } from '@/lib/appearance/colours';
+import { useProjectStore } from '@/stores/project-store';
 
 interface VersionBarProps {
   versions: ArtifactVersion[];
@@ -63,7 +64,7 @@ export function VersionBar({
           // Each version is shown in its own colour, kept from when it was
           // made — not the accent, which painted every version alike (Sean,
           // 22 Oct: "when i change it, it changes for all versions").
-          const colour = colourOfVersion(v.version_number, v.colour_scheme);
+          const colour = colourOfVersion(v.version_number, v.colour_scheme, v.colour);
           const selected = v.id === active.id;
           return (
           <button
@@ -92,6 +93,7 @@ export function VersionBar({
           </button>
           );
         })}
+        <VersionColourPicker version={active} />
         {hidden > 0 && (
           <button
             onClick={() => setShowAll((s) => !s)}
@@ -122,6 +124,88 @@ export function VersionBar({
           {t('stage.restoreV', { n: active.version_number })}
         </button>
       )}
+    </div>
+  );
+}
+
+/**
+ * Choose the colour of the version on show (Sean, 25 Oct: "you should be able
+ * to change each versions colors"). Saved on the version, so it is the same on
+ * every device; the stage area takes it as its background.
+ */
+function VersionColourPicker({ version }: { version: ArtifactVersion }) {
+  const t = useT();
+  const setVersionColour = useProjectStore((s) => s.setVersionColour);
+  const [open, setOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: PointerEvent) => {
+      if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
+    };
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('pointerdown', away);
+    document.addEventListener('keydown', esc);
+    return () => {
+      document.removeEventListener('pointerdown', away);
+      document.removeEventListener('keydown', esc);
+    };
+  }, [open]);
+  const choose = (colour: string | null) => {
+    setOpen(false);
+    setError(null);
+    setVersionColour(version.id, colour).catch((e: unknown) =>
+      setError(t('stage.colourFailed', { message: e instanceof Error ? e.message : String(e) }))
+    );
+  };
+  const label = t('stage.colourOf', { n: version.version_number });
+  const current = colourOfVersion(version.version_number, version.colour_scheme, version.colour);
+  return (
+    <div ref={box} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-label={label}
+        title={label}
+        className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)]"
+      >
+        <span aria-hidden className="material-symbols-outlined text-[18px]" style={{ color: current }}>palette</span>
+      </button>
+      {open && (
+        <div
+          role="dialog"
+          aria-label={label}
+          className="absolute start-0 top-full z-30 mt-1 w-[min(15rem,calc(100vw-2rem))] rounded-xl bg-[var(--surface-container-lowest)] p-3 shadow-[0_8px_24px_rgba(0,0,0,0.15)]"
+        >
+          <p className="mb-2 text-label text-[var(--on-surface-variant)]">{t('stage.colourHint')}</p>
+          <div className="grid grid-cols-7 gap-1.5">
+            {VERSION_SWATCHES.map((sw) => (
+              <button
+                key={sw.id}
+                type="button"
+                onClick={() => choose(sw.id)}
+                aria-label={sw.label}
+                aria-pressed={version.colour === sw.id}
+                title={sw.label}
+                className={`h-7 w-7 rounded-full ${version.colour === sw.id ? 'ring-2 ring-[var(--on-surface)] ring-offset-2' : ''}`}
+                style={{ background: sw.colour }}
+              />
+            ))}
+          </div>
+          {version.colour && (
+            <button
+              type="button"
+              onClick={() => choose(null)}
+              className="mt-2 text-label text-[var(--pm-primary)] hover:underline"
+            >
+              {t('stage.colourAsMade')}
+            </button>
+          )}
+        </div>
+      )}
+      {error && <p role="alert" className="absolute start-0 top-full z-30 mt-1 w-60 rounded-lg bg-[var(--error-container)] px-3 py-2 text-label text-[var(--on-error-container)]">{error}</p>}
     </div>
   );
 }

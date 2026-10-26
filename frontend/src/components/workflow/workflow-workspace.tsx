@@ -101,7 +101,7 @@ import { BriefChangeNotice } from './brief-change-notice';
 import { PendingChangeNotice } from './pending-change-notice';
 import { NextActionBar } from './next-action-bar';
 import { ProjectTimeline } from './project-timeline';
-import { accentVariables } from '@/lib/appearance/colours';
+import { accentVariables, colourOfVersion, rootSurfaces, versionTintVariables } from '@/lib/appearance/colours';
 import { nextAction } from '@/lib/workflow/next-step';
 import { holdPendingChange, pendingChanges, settlePendingChange, type PendingChange } from '@/lib/workflow/conflict-trail';
 import { keptConflictsOf } from '@/lib/workflow/routine-conflicts';
@@ -1609,6 +1609,22 @@ export function WorkflowWorkspace({
       .map((c) => ({ id: c.id, label: c.label })),
   };
 
+  // The stage area takes the colour of the version on show (Sean, 25 Oct: "the
+  // whole background color should change with that version"). Only the stage
+  // column: the rail and the side chat keep the page's own colours. A stage
+  // with no version bar (the outline) keeps them too.
+  const shownVersion = stageVersionList.find((v) => v.id === activeVersionId) ?? stageVersionList.at(-1) ?? null;
+  const tintColour =
+    stage && stage.renderer !== 'outline' && shownVersion
+      ? colourOfVersion(shownVersion.version_number, shownVersion.colour_scheme, shownVersion.colour)
+      : null;
+  const [rootTint, setRootTint] = useState<Record<string, string> | null>(null);
+  useEffect(() => {
+    // Read when the colour changes, so a background picked meanwhile is mixed in.
+    if (tintColour) setRootTint(rootSurfaces());
+  }, [tintColour]);
+  const tintStyle = tintColour && rootTint ? versionTintVariables(tintColour, rootTint) : null;
+
   if (!stage) return null;
 
   const stageVersions = stageVersionList;
@@ -2152,7 +2168,11 @@ export function WorkflowWorkspace({
         </div>
       )}
 
-      <main className="min-w-0 flex-1 px-6 py-10 md:px-10">
+      <main
+        data-version-tint={tintStyle ? '' : undefined}
+        className="min-w-0 flex-1 px-6 py-10 transition-colors duration-200 md:px-10"
+        style={tintStyle ? ({ ...tintStyle, background: 'var(--background)' } as React.CSSProperties) : undefined}
+      >
         <div className="mx-auto max-w-[820px]">
           {/* Go's controls, pinned while its panel is scrolled away (2 Oct: "you should see
               [the play button] all the time"). The panel fills this; it is empty otherwise. */}

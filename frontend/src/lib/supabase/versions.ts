@@ -12,7 +12,7 @@ const VERSION_COLUMNS = `
   id, user_id, project_id, artifact_id, version_number, parent_version_id,
   source_operation, instruction, system_prompt, content, model, mode,
   change_summary, restored_from_version_id, finish_reason, user_rating,
-  continuity_snapshot, colour_scheme, created_at
+  continuity_snapshot, colour_scheme, colour, created_at
 `;
 
 const EVAL_COLUMNS = `
@@ -258,6 +258,17 @@ export async function rateVersion(
     .from('artifact_versions')
     .update({ user_rating: rating })
     .eq('id', versionId);
+  if (error) throw error;
+}
+
+/**
+ * The colour the user chose for a version, or null for the one it was made
+ * with. Beside `user_rating`, the only column the immutability trigger lets
+ * change (20261119).
+ */
+export async function setVersionColour(versionId: string, colour: string | null): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.from('artifact_versions').update({ colour }).eq('id', versionId);
   if (error) throw error;
 }
 

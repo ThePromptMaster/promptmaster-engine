@@ -89,7 +89,7 @@ export function ProjectTimeline({
                   {items.map((e) => (
                     <li key={e.key} className="flex items-start gap-3 rounded-lg px-2 py-1.5 hover:bg-[var(--surface-container-low)]">
                       {e.kind === 'version' ? (
-                        <span aria-hidden className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: colourOfVersion(e.versionNumber ?? 1, e.colourScheme) }} />
+                        <span aria-hidden className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: colourOfVersion(e.versionNumber ?? 1, e.colourScheme, e.colour) }} />
                       ) : (
                         <span aria-hidden className="material-symbols-outlined mt-0.5 shrink-0 text-[16px] text-[var(--on-surface-variant)]">flag</span>
                       )}
