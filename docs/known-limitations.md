@@ -180,7 +180,7 @@ Fix is a one-line migration adding the value.
 ### L-09 · Append-only is enforced by two different mechanisms · `accepted`
 
 `artifact_versions` immutability is a `BEFORE UPDATE` trigger permitting only
-`user_rating` to change. **It does not block DELETE.** Deletion is prevented instead by
+`user_rating` and the display `colour` (L-122) to change. **It does not block DELETE.** Deletion is prevented instead by
 the *absence* of a DELETE policy under RLS — which means a **service-role client
 bypasses it entirely**. The drain route holds the service-role key.
 
@@ -2386,3 +2386,24 @@ Not covered: output from an older run, past the first 6,000 characters of a run,
 that failed or timed out is not shown. A failed run's partial output is left out on purpose;
 nothing it printed is execution truth. Work that needs more than this should be saved as a data
 file.
+
+### L-121 — Adding a chapter after the outline goes back through the outline (2026-10-26)
+
+A book's chapters come from its approved outline, so a chapter is added there, not on Drafting.
+Drafting's **Add a chapter or section** reopens the Outline stage and takes the user to it;
+approving the outline again merges the new section into the manuscript, keeps every chapter
+already written (`materialiseOutline`), closes the outline, and reopens Drafting so the new
+chapter can be written. Only Book-style workflows (an explicit outline stage) show the button;
+a derived outline (Research) is edited on its drafting stage as before. A new section arrives
+unwritten; it is written on Drafting like any other.
+
+### L-122 — A version's colour can be changed; the stage tint is the stage column only (2026-10-26)
+
+`artifact_versions.colour` (an id from `VERSION_SWATCHES`, checked in SQL) is the one column
+besides `user_rating` the immutability trigger lets change; content, provenance and order are
+still refused (L-09). The stage column takes the shown version's colour by mixing it into
+each surface token as `:root` has them when the colour changes (`versionTintVariables`), so a
+background picked in another tab is mixed in on the next version switch, not at once. The rail
+and side chat keep the page colours, and the outline stage — which has no version bar — keeps
+the plain background. Swatch names are English in every interface language.
+
