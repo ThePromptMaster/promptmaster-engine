@@ -2307,12 +2307,23 @@ record ("Missing, but not needed for it"). Whether a task needs something is sti
 model's reading of the saved text, so a task it wrongly calls executable is attempted, and its
 own stage then says what it lacked.
 
-### L-117 — Approvals reach prompts; "re-confirm" is shown, not enforced (2026-10-25)
+### L-117 — Approvals reach prompts; Go re-confirms only routine ones, only after its own repair (2026-10-25, updated 2026-10-26)
 
-Every prompt now lists the approvals the user ticked, each with the version it was given on.
-An approval given on an older version is still an approval of that version: prompts are told
-the current version number. The checklist shows "approved vN, now vM", but nothing unticks the
-approval automatically and Go does not re-confirm it.
+Every prompt lists the approvals the user ticked, each with the version it was given on. An
+approval given on an older version is still an approval of that version: prompts are told the
+current version number, and the checklist shows "approved vN, now vM". Nothing unticks it
+automatically.
+
+Since 26 Oct, when Go repairs a stage (a reopened stage, or a measured requirement) under
+"Handle them for me", each routine (`delegable`) approval on it is checked against the new
+version and committed on it (`criterion_committed`, `reconfirmed: true`); one that no longer
+holds is said in the step and left as given on its version. Approvals reserved for the user are
+never ticked again by Go: the step says they were given on an earlier version. Go's own
+approvals now record the version they were checked against — before, they had none and read as
+"version unknown".
+
+Not covered: a new version made any other way (the user's own edit, "Change it", apply
+findings) does not re-confirm anything; the checklist's "approved vN, now vM" is what shows it.
 
 ### L-118 — How a result stands: "calculated" and "verified" are checked in code, narrowly (2026-10-25, updated 2026-10-26)
 
