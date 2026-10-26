@@ -29,13 +29,14 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const files = useProjectStore((s) => s.files);
   const facts = useProjectStore((s) => s.facts);
   const sources = useProjectStore((s) => s.sources);
+  const codeRuns = useProjectStore((s) => s.codeRuns);
   const references = useProjectStore((s) => s.referenceMaterial);
   // The data files and the accepted facts ride on the project wherever it is
   // handed on, so every prompt built from it knows what data exists and reads
   // the same current facts.
   const project = useMemo(
-    () => (storedProject ? { ...storedProject, data_files: files, facts, sources, references } : null),
-    [storedProject, files, facts, sources, references]
+    () => (storedProject ? { ...storedProject, data_files: files, facts, sources, references, code_runs: codeRuns } : null),
+    [storedProject, files, facts, sources, references, codeRuns]
   );
   const artifact = useProjectStore((s) => s.artifact);
   const versions = useProjectStore((s) => s.versions);

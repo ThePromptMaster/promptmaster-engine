@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import { listProjectFiles } from '@/lib/supabase/project-files';
 import { listProjectFacts } from '@/lib/supabase/facts';
 import { listProjectSources } from '@/lib/supabase/sources';
+import { listCleanRunIds } from '@/lib/supabase/agent';
 import { listReferences, loadReferenceMaterial } from '@/lib/supabase/references';
 import type { ReferenceMaterial } from '@/lib/workflow/references';
 import type { WebFound } from '@/lib/workflow/web-found';
@@ -137,6 +138,8 @@ interface ProjectState {
   facts: ProjectFact[];
   /** Saved web sources, current and retired (20 Oct). */
   sources: ProjectSource[];
+  /** The project's sandbox runs that exited cleanly, by id (L-118). */
+  codeRuns: string[];
   /** The user's other projects this one draws on, and what was read of them (client, 21 Oct, email 5). */
   references: ProjectReference[];
   referenceMaterial: ReferenceMaterial[];
@@ -229,6 +232,8 @@ interface ProjectState {
   upsertTask: (task: ProjectTask) => void;
   /** Reflect sources just saved, and the search that found them, without a round trip (22 Oct). */
   addSources: (rows: readonly ProjectSource[], search?: WebFound | null) => void;
+  /** Reflect a sandbox run that just exited cleanly (L-118). */
+  noteCodeRun: (runId: string) => void;
 
   /**
    * Attach an evaluation to a stage version that already exists.
@@ -327,6 +332,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
   files: [],
   facts: [],
   sources: [],
+  codeRuns: [],
   references: [],
   referenceMaterial: [],
   lastWeb: null,
@@ -365,7 +371,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       // down: the derived half of the panel still works. Events do not fail to
       // an empty log — that reads as a reset project (4 Oct). They stay null,
       // or keep the log already on hand on a background reload, and say so.
-      const [artifacts, loadedEvents, recommendations, tasks, files, facts, sources, referenced] = await Promise.all([
+      const [artifacts, loadedEvents, recommendations, tasks, files, facts, sources, referenced, codeRuns] = await Promise.all([
         listArtifacts(id),
         listWorkflowEvents(id).catch(() => null),
         listRecommendations(id).catch(() => [] as Recommendation[]),
@@ -379,6 +385,8 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         readReferences(id).catch(() =>
           get().projectId === id ? { references: get().references, referenceMaterial: get().referenceMaterial } : { references: [], referenceMaterial: [] }
         ),
+        // Like facts: a failed read keeps what was last read, never "nothing has run".
+        listCleanRunIds(id).catch(() => (get().projectId === id ? get().codeRuns : [])),
       ]);
 
       // A Book project has thirteen artifacts, not one. Load them all and index
@@ -450,6 +458,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         files,
         facts,
         sources,
+        codeRuns,
         ...referenced,
         activeVersionId: head?.id ?? null,
         loading: false,
@@ -481,6 +490,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       files: [],
       facts: [],
   sources: [],
+      codeRuns: [],
       references: [],
       referenceMaterial: [],
       lastWeb: null,
@@ -571,6 +581,10 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       sources: [...s.sources, ...rows.filter((r) => !s.sources.some((o) => o.id === r.id))],
       ...(search !== undefined ? { lastWeb: search } : {}),
     }));
+  },
+
+  noteCodeRun(runId) {
+    set((s) => (s.codeRuns.includes(runId) ? {} : { codeRuns: [...s.codeRuns, runId] }));
   },
 
   upsertTask(task) {

@@ -173,6 +173,19 @@ export async function getSandboxRun(id: string): Promise<SandboxRun | null> {
   return (data as SandboxRun | null) ?? null;
 }
 
+/** The ids of the project's sandbox runs that ran to a clean exit (L-118). */
+export async function listCleanRunIds(projectId: string): Promise<string[]> {
+  const { data, error } = await createClient()
+    .from('sandbox_runs')
+    .select('id')
+    .eq('project_id', projectId)
+    .eq('status', 'ok')
+    .eq('exit_code', 0)
+    .eq('timed_out', false);
+  if (error) throw error;
+  return ((data ?? []) as { id: string }[]).map((r) => r.id);
+}
+
 /** Park a step for the user's approval, or pick it back up after it. */
 export async function setAgentStepStatus(stepId: string, status: 'awaiting_decision' | 'running'): Promise<void> {
   const { error } = await createClient().from('agent_steps').update({ status }).eq('id', stepId);
