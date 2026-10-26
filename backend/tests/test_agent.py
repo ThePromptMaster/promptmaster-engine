@@ -800,3 +800,15 @@ def test_write_code_endpoint_passes_the_earlier_runs_to_the_prompt(client_with):
     })
     assert res.status_code == 200, res.text
     assert "u_21: 3746140" in stub.generate.await_args.kwargs["prompt"]
+
+
+async def test_a_reasoning_step_leaves_the_answer_room_after_the_reasoning(mock_client):
+    # 26 Oct (production): a derivation by hand returned no text — the reasoning
+    # overran its hint inside a 4,000-token call (finish_reason='length').
+    from promptmaster.agent import REASON_MAX_TOKENS, perform_reason
+    from promptmaster.llm_client import LONG_ANSWER_TOKENS, _token_budget
+
+    mock_client.generate = AsyncMock(return_value=("worked", {}))
+    await perform_reason(mock_client, None, INPUTS, STATE, "derive", {})
+    assert mock_client.generate.await_args.kwargs["max_tokens"] == REASON_MAX_TOKENS >= LONG_ANSWER_TOKENS
+    assert _token_budget("anthropic/claude-opus-5.5", REASON_MAX_TOKENS)["reasoning"] == {"effort": "low"}
