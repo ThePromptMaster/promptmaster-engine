@@ -1899,6 +1899,21 @@ export function WorkflowWorkspace({
       </button>
     </div>
   );
+  // Approving a reopened outline is what it was reopened for: the outline stage
+  // closes again, and the user is taken to Drafting — reopened if it was done —
+  // where the new chapter is waiting to be written (Sean, 25 Oct).
+  const approveOutlineHere = async (version: ArtifactVersion, doc: OutlineDocument) => {
+    await materialiseOutline(version, doc);
+    if (!(explicitOutlineHere && reopenedHere)) return;
+    await markComplete();
+    if (!draftingStage) return;
+    const drafting = state.stages[draftingStage.id]?.status;
+    if (isDone(drafting) && draftingStage.id !== state.current_stage_id) {
+      await appendEvent({ type: 'stage_reopened', stage_id: draftingStage.id });
+    }
+    setViewingStageId(draftingStage.id === state.current_stage_id ? null : draftingStage.id);
+  };
+
   // Book drafting: the outline is a stage of its own, behind the cursor, and the
   // way back to it was a "Go back to Outline" under More. Sean (25 Oct, on a
   // phone): "can you go back and add sections or chapters? … we couldn't
@@ -2558,7 +2573,7 @@ export function WorkflowWorkspace({
                       : stageArtifact
                     )?.long_form ?? null
                   )}
-                  onApproved={materialiseOutline}
+                  onApproved={approveOutlineHere}
                   onItemCountChange={reportOutlineCount}
                   onPanelStep={reportPanelStep}
                   // Editable on a reopened stage as well as the current one:
