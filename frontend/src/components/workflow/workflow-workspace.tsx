@@ -402,7 +402,9 @@ export function WorkflowWorkspace({
   useEffect(() => {
     if (project.status === 'finalized' && statusSeen.current !== 'finalized') {
       setFinishing(null);
-      finishedRef.current?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
+      // A jump, not a glide: the page has changed state, and a smooth scroll
+      // never runs in a tab that is not in front (seen on the prod pass, 26 Oct).
+      finishedRef.current?.scrollIntoView?.({ block: 'start' });
     }
     statusSeen.current = project.status;
   }, [project.status]);
