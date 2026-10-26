@@ -2317,6 +2317,10 @@ async function judgeObjective(ctx: PerformContext, holder: StageDefinition | nul
     ...(assessment.ready_for_later_stage ? { ready_for_later_stage: true } : {}),
     ...(assessment.unmet?.length ? { unmet: assessment.unmet } : {}),
     ...(assessment.model_note ? { model_note: assessment.model_note } : {}),
+    // The next task, with what it needs: read back by the project's "still
+    // open — next" line and Go's add-stage offer (26 Oct: it was never saved,
+    // so neither ever showed on production).
+    ...(assessment.next_task ? { next_task: assessment.next_task } : {}),
   };
   await appendWorkflowEvent(ctx.project.id, ctx.project.user_id, {
     type: 'objective_assessed',

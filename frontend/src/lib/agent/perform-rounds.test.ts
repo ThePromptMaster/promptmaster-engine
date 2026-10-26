@@ -67,6 +67,14 @@ describe('Go and the rounds of ongoing work', () => {
     expect(types).toContain('stage_returned');
   });
 
+  it('records the next task the check named, so the project and Go can read it back (26 Oct)', async () => {
+    const next_task = { title: 'Differential approximants of mu', kind: 'write', work: 'Fit first-order approximants to c_0..c_18.', needs: [] };
+    agentAssessObjective.mockResolvedValue({ outcome: 'not_met', reason: 'Open.', basis_quote: '', blockers: [], performed: [], proposed_next: [], next_task });
+    await performStep(ctx([goRound('2026-10-19T10:00:00Z')]));
+    const event = appendWorkflowEvent.mock.calls.map((c) => c[2] as { type: string; payload: Record<string, unknown> }).find((e) => e.type === 'objective_assessed')!;
+    expect(event.payload.next_task).toEqual(next_task);
+  });
+
   // 19 Oct (HARBOR): the round check said "not met" only because the package
   // stage after the round had not run yet.
   it('a round whose only gap is the stage after it moves on at once, with the check told which stage that is', async () => {
