@@ -18,6 +18,7 @@ import { countNamedSections, parseOutlineDocument } from '@/lib/outline/model';
 import { approvedOutlineVersionId, commitOutlineVersion } from '@/lib/supabase/outline';
 import { appendWorkflowEvent, listWorkflowEvents } from '@/lib/supabase/workflow';
 import { getArtifact } from '@/lib/supabase/versions';
+import { listRecentRunOutputs } from '@/lib/supabase/agent';
 import { manuscriptArtifactFor, manuscriptSourceFor, measureStageContent, stageRequirements } from '@/lib/workflow/context';
 import { COUNTING_RULE, isPart, measure, replaceSection, sectionFor, type MeasurableRequirement } from '@/lib/workflow/measurable';
 import { describeLines, isChangeNote, keepUnasked, structureDropped } from '@/lib/workflow/preservation';
@@ -533,7 +534,9 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       const goal = checking
         ? checkGoal(ctx.facts!.code!, inputs.objective)
         : (typeof params.goal === 'string' ? params.goal : ctx.step.expected_outcome).slice(0, MAX_GOAL);
-      const written = await api.agentWriteCode({ inputs, state: ctx.digest, goal, kind, model }, ctx.signal);
+      // What earlier runs printed is the project's own result, not missing data.
+      const earlier = await listRecentRunOutputs(ctx.project.id).catch(() => []);
+      const written = await api.agentWriteCode({ inputs, state: ctx.digest, goal, kind, model, earlier_runs: earlier }, ctx.signal);
       let result;
       try {
         result = await api.runSandbox(

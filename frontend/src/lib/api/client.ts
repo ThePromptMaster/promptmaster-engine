@@ -920,7 +920,11 @@ export const api = {
   },
 
   async agentWriteCode(
-    req: { inputs: PMInput; state: AgentStateDigest; goal: string; kind: 'computation' | 'simulation'; model?: string },
+    req: {
+      inputs: PMInput; state: AgentStateDigest; goal: string; kind: 'computation' | 'simulation'; model?: string;
+      /** What the project's recent clean runs printed, newest first. */
+      earlier_runs?: { when: string; stdout: string }[];
+    },
     signal?: AbortSignal
   ): Promise<WriteCodeResponse> {
     return apiFetch('/api/agent/write-code', { method: 'POST', body: JSON.stringify(req), signal });

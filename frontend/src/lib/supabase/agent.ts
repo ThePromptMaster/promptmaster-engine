@@ -186,6 +186,27 @@ export async function listCleanRunIds(projectId: string): Promise<string[]> {
   return ((data ?? []) as { id: string }[]).map((r) => r.id);
 }
 
+/**
+ * What the project's latest clean runs printed, newest first, for the next
+ * script to build on: a script sees only /data, so a value an earlier run
+ * printed read as missing data (26 Oct, connective constant).
+ */
+export async function listRecentRunOutputs(projectId: string, limit = 6): Promise<{ when: string; stdout: string }[]> {
+  const { data, error } = await createClient()
+    .from('sandbox_runs')
+    .select('created_at, stdout')
+    .eq('project_id', projectId)
+    .eq('status', 'ok')
+    .eq('exit_code', 0)
+    .eq('timed_out', false)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return ((data ?? []) as { created_at: string; stdout: string }[])
+    .filter((r) => r.stdout.trim())
+    .map((r) => ({ when: r.created_at.slice(0, 16).replace('T', ' '), stdout: r.stdout.slice(0, 8_000) }));
+}
+
 /** Park a step for the user's approval, or pick it back up after it. */
 export async function setAgentStepStatus(stepId: string, status: 'awaiting_decision' | 'running'): Promise<void> {
   const { error } = await createClient().from('agent_steps').update({ status }).eq('id', stepId);

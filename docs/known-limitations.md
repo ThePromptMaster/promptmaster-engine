@@ -2366,3 +2366,17 @@ as a change and reopens as before, so a genuine rewording that also tidies a num
 reopens. A restore always reopens. The test reads the text, not its meaning: a sentence
 reworded to say the opposite without any of those words would pass, which is why the word
 budget is small.
+
+### L-120 — A script sees what the project's last six clean runs printed, not every run (2026-10-26)
+
+Code Go writes reads the project's data files at `/data`, and since 26 Oct it is also shown
+what the project's six most recent clean runs printed (the first 8,000 characters of each).
+It is told those values are the project's own results, to carry the ones it needs into the
+script as constants, and never to call them missing data. Before this a production run had
+three scripts print the batch counts a fourth was to sum; the fourth reported
+`MISSING_DATA` and the run stopped.
+
+Not covered: output from an older run, past the first 8,000 characters of a run, or from a run
+that failed or timed out is not shown. A failed run's partial output is left out on purpose;
+nothing it printed is execution truth. Work that needs more than this should be saved as a data
+file.

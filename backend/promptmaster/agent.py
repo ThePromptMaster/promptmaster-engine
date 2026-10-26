@@ -650,10 +650,39 @@ _WRITE_CODE_INSTRUCTION = (
 )
 
 
-def build_write_code_prompt(inputs: PMInput, state: AgentState, goal: str, kind: str) -> tuple[str, str]:
-    system = _shared_system(inputs, [], _WRITE_CODE_INSTRUCTION)
+class EarlierRun(BaseModel):
+    """What one of the project's earlier clean runs printed, for the next script to build on."""
+    when: str = Field(default="", max_length=40)
+    stdout: str = Field(default="", max_length=8_000)
+
+
+#: 26 Oct (production, connective constant): three runs printed the batch
+#: counts a fourth was to sum, and the fourth said MISSING_DATA — a script
+#: sees only /data, and nothing had told it what the runs before it printed.
+_EARLIER_RUNS_RULE = (
+    "EARLIER RUNS: the output of this project's earlier clean runs is below. "
+    "Those printed values are this project's own results, not missing data: when "
+    "the goal builds on them, write the values you need into the script as "
+    "constants and print one line `from_earlier_run: <which run, which values>`. "
+    "Recompute only what no earlier run printed. MISSING_DATA is never for a "
+    "value an earlier run printed."
+)
+
+
+def _format_earlier_runs(runs: list[EarlierRun]) -> str:
+    if not runs:
+        return ""
+    blocks = [f"--- EARLIER RUN {i} ({r.when or 'time not recorded'}) PRINTED ---\n{r.stdout.strip()}" for i, r in enumerate(runs, 1) if r.stdout.strip()]
+    return ("\n\n" + "\n\n".join(blocks) + "\n--- END OF EARLIER RUNS ---") if blocks else ""
+
+
+def build_write_code_prompt(
+    inputs: PMInput, state: AgentState, goal: str, kind: str, earlier_runs: list[EarlierRun] | None = None,
+) -> tuple[str, str]:
+    runs = earlier_runs or []
+    system = _shared_system(inputs, [], _WRITE_CODE_INSTRUCTION + (" " + _EARLIER_RUNS_RULE if runs else ""))
     user = (
-        f"{_format_state(inputs, state)}\n\n"
+        f"{_format_state(inputs, state)}{_format_earlier_runs(runs)}\n\n"
         f"Write code for this {'simulation' if kind == 'simulation' else 'computation'}: {goal or 'the next computation the work needs'}"
     )
     return system, user
@@ -743,8 +772,9 @@ def _add_usage(a: dict[str, int], b: dict[str, int]) -> dict[str, int]:
 
 async def write_code(
     client: OpenRouterClient, model: str | None, inputs: PMInput, state: AgentState, goal: str, kind: str,
+    earlier_runs: list[EarlierRun] | None = None,
 ) -> tuple[str, dict[str, int]]:
-    system, user = build_write_code_prompt(inputs, state, goal, kind)
+    system, user = build_write_code_prompt(inputs, state, goal, kind, earlier_runs)
     started = time.monotonic()
     text, usage = await client.generate(prompt=user, system=system, temperature=0.2, max_tokens=WRITE_CODE_MAX_TOKENS, model=model)
     code = clean_code(text)
