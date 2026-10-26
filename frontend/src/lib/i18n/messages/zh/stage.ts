@@ -7,7 +7,7 @@ export const zh: Record<keyof typeof en, string> = {
   'stage.hideHistory': '隐藏历史',
   'stage.fullHistory': '完整历史（{count}）',
   'stage.restoreV': '恢复 v{n}',
-  'stage.colourOf': 'v{n} 的颜色',
+  'stage.colourOf': '此版本的颜色',
   'stage.colourAsMade': '恢复原色',
   'stage.colourHint': '阶段会显示你正在查看的版本的颜色。',
   'stage.colourFailed': '颜色未保存：{message}',

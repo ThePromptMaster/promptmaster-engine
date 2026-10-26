@@ -8,7 +8,7 @@ export const hi: Record<keyof typeof en, string> = {
   'stage.hideHistory': 'इतिहास छिपाएँ',
   'stage.fullHistory': 'पूरा इतिहास ({count})',
   'stage.restoreV': 'v{n} पुनर्स्थापित करें',
-  'stage.colourOf': 'v{n} का रंग',
+  'stage.colourOf': 'इस संस्करण का रंग',
   'stage.colourAsMade': 'जैसा बना था',
   'stage.colourHint': 'चरण उसी संस्करण का रंग लेता है जिसे आप देख रहे हैं।',
   'stage.colourFailed': 'रंग सहेजा नहीं गया: {message}',

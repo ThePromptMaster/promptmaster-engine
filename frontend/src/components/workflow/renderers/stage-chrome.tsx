@@ -159,7 +159,7 @@ function VersionColourPicker({ version }: { version: ArtifactVersion }) {
       setError(t('stage.colourFailed', { message: e instanceof Error ? e.message : String(e) }))
     );
   };
-  const label = t('stage.colourOf', { n: version.version_number });
+  const label = t('stage.colourOf');
   const current = colourOfVersion(version.version_number, version.colour_scheme, version.colour);
   return (
     <div ref={box} className="relative">

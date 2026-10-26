@@ -7,7 +7,7 @@ export const sw: Record<keyof typeof en, string> = {
   'stage.hideHistory': 'Ficha historia',
   'stage.fullHistory': 'Historia kamili ({count})',
   'stage.restoreV': 'Rejesha v{n}',
-  'stage.colourOf': 'Rangi ya v{n}',
+  'stage.colourOf': 'Rangi ya toleo hili',
   'stage.colourAsMade': 'Kama ilivyotengenezwa',
   'stage.colourHint': 'Hatua inachukua rangi ya toleo unaloangalia.',
   'stage.colourFailed': 'Rangi haikuhifadhiwa: {message}',

@@ -32,7 +32,7 @@ describe('choosing a version\'s colour (Sean, 25 Oct)', () => {
     const { rerender } = render(
       <VersionBar versions={versions} activeVersionId="v2" headVersionId="v2" onSelect={() => {}} onRestore={async () => {}} readOnly={false} />
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Colour of v2' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Colour of this version' }));
     await userEvent.click(screen.getByRole('button', { name: 'Gold' }));
     expect(setVersionColourRow).toHaveBeenCalledWith('v2', 'gold');
     // The store's copy of the version now carries it, wherever it is shown.
@@ -49,7 +49,7 @@ describe('choosing a version\'s colour (Sean, 25 Oct)', () => {
     render(
       <VersionBar versions={[version(1), version(2, { colour: 'gold' })]} activeVersionId="v2" headVersionId="v2" onSelect={() => {}} onRestore={async () => {}} readOnly={false} />
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Colour of v2' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Colour of this version' }));
     await userEvent.click(screen.getByRole('button', { name: 'As it was made' }));
     expect(setVersionColourRow).toHaveBeenCalledWith('v2', null);
   });
