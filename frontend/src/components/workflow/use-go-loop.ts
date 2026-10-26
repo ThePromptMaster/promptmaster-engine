@@ -138,7 +138,7 @@ interface Options {
   /** Re-read the event log after a stage event; resolves once the page has it. */
   reloadEvents: () => Promise<void>;
   /** Tick an approval committed under the routine-decision policy, saved before it resolves. */
-  commitCriterion?: (stageId: string, criterionId: string) => Promise<void>;
+  commitCriterion?: (stageId: string, criterionId: string, versionId?: string) => Promise<void>;
   /** Untick approvals (Q2e): the reserved ones of a stage Go goes back to. */
   reopenApprovals?: (criterionIds: string[]) => Promise<void>;
   /** The event log, for the facts a stage's own controls need (approvals). */

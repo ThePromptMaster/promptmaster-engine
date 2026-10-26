@@ -1401,9 +1401,14 @@ export function WorkflowWorkspace({
     reloadEvents: reloadAfterAgent,
     // A routine approval Go committed under the policy (5 Oct): the box is
     // ticked from the latest checks, and saved before the next move reads it.
-    commitCriterion: async (_stageId: string, criterionId: string) => {
-      const latest = useProjectStore.getState().project?.manual_checks ?? project.manual_checks ?? {};
-      onPatchProject({ manual_checks: { ...latest, [criterionId]: true } });
+    // The version it was checked against is the one approved (L-117): until
+    // 26 Oct none was recorded, so Go's approvals read as "version unknown".
+    commitCriterion: async (stageId: string, criterionId: string, versionId?: string) => {
+      const current = useProjectStore.getState().project;
+      const latest = current?.manual_checks ?? project.manual_checks ?? {};
+      const on = versionId ?? useProjectStore.getState().stages[stageId]?.versions.at(-1)?.id;
+      const versions = current?.manual_check_versions ?? project.manual_check_versions ?? {};
+      onPatchProject({ manual_checks: { ...latest, [criterionId]: true }, ...(on ? { manual_check_versions: { ...versions, [criterionId]: on } } : {}) });
       await flushProject();
     },
     // Q2e (9 Oct, production replay): Go went back and rewrote Method while

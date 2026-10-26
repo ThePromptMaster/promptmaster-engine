@@ -123,7 +123,8 @@ export interface PerformContext {
   /** The project's events, read fresh: what earlier runs did counts too. */
   loadEvents?: () => Promise<readonly WorkflowEvent[]>;
   /** Tick an approval the routine-decision policy committed; the event is written first, by the performer. */
-  commitCriterion?: (stageId: string, criterionId: string) => Promise<void>;
+  /** `versionId`: the version it was checked against, recorded as the one approved (L-117). */
+  commitCriterion?: (stageId: string, criterionId: string, versionId?: string) => Promise<void>;
   /** Untick approvals: the reserved ones of a stage Go goes back to (Q2e). */
   reopenApprovals?: (criterionIds: string[]) => Promise<void>;
   signal: AbortSignal;
@@ -1259,7 +1260,10 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
             })
           : done(key, {
               status: 'succeeded', toolsUsed: ['model'], changes,
-              output: `Repaired ${target.label} so that ${measuredValues(ctx, target, content).join('; ')} — measured in code on the saved text (${COUNTING_RULE}).${parts.length ? ` Only the ${partNames} section was revised; every other section is unchanged.` : ''} Saved as a new version; the earlier one is kept${isDone(st?.status) ? ', and the stages that read it are reopened for a recheck' : ''}.`,
+              output: [
+                `Repaired ${target.label} so that ${measuredValues(ctx, target, content).join('; ')} — measured in code on the saved text (${COUNTING_RULE}).${parts.length ? ` Only the ${partNames} section was revised; every other section is unchanged.` : ''} Saved as a new version; the earlier one is kept${isDone(st?.status) ? ', and the stages that read it are reopened for a recheck' : ''}.`,
+                ...(typeof versionId === 'string' ? await reconfirmApprovals(ctx, target, versionId, content) : []),
+              ].join(' '),
             });
       }
       if (evaluation.canAdvance && typeof versionId === 'string') {
@@ -1281,12 +1285,13 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         });
         await ctx.afterStageEvent();
       }
+      const reconfirmed = typeof versionId === 'string' ? await reconfirmApprovals(ctx, target, versionId, content) : [];
       return done(key, {
         status: 'succeeded', toolsUsed: ['model'],
         changes: typeof versionId === 'string' ? { version_ids: [versionId] } : {},
-        output: (triaged.length ? `Decided ${triaged.length} routine finding${triaged.length === 1 ? '' : 's'} it raised, under your routine-decision policy. ` : '') + (evaluation.canAdvance
+        output: [(triaged.length ? `Decided ${triaged.length} routine finding${triaged.length === 1 ? '' : 's'} it raised, under your routine-decision policy. ` : '') + (evaluation.canAdvance
           ? `Repaired ${target.label} (${why}) — saved as a new version and marked complete again; the earlier version is kept.`
-          : `Repaired ${target.label} (${why}) — saved as a new version; it stays reopened until: ${evaluation.unmet.filter((c) => c.blocking).map((c) => c.label).join('; ')}.`),
+          : `Repaired ${target.label} (${why}) — saved as a new version; it stays reopened until: ${evaluation.unmet.filter((c) => c.blocking).map((c) => c.label).join('; ')}.`), ...reconfirmed].join(' '),
       });
     }
 
@@ -1406,7 +1411,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         reason: check.reason,
         payload: { criterion_id: criterion.id, policy: 'routine_decisions', evidence_version_id: head.id },
       });
-      await ctx.commitCriterion(ctx.stage.id, criterion.id);
+      await ctx.commitCriterion(ctx.stage.id, criterion.id, head.id);
       await ctx.afterStageEvent();
       return done(key, {
         status: 'succeeded', toolsUsed: ['model'], changes: { event_types: ['criterion_committed'] },
@@ -2055,6 +2060,54 @@ async function keptAndSupplied(
     if (claims.length) notes.push(`It adds details you did not supply: ${describeLines(claims.map((c) => c.quote), 3)} — take them out in the side chat, or tell me the real ones.`);
   }
   return { content: kept.text, notes };
+}
+
+/**
+ * The approvals given on the version a repair just replaced (L-117, 26 Oct;
+ * Sean: an approval on an older version was shown, never asked again). Under
+ * "Handle them for me" a routine one is checked against the new version and
+ * committed on it, as any routine approval is; one that no longer holds is
+ * said, and stays as given on its version. A reserved approval stays the
+ * user's: said, never ticked again by Go. Each finding is a sentence for the
+ * step's record.
+ */
+export async function reconfirmApprovals(
+  ctx: Pick<PerformContext, 'project' | 'run' | 'signal' | 'commitCriterion'>,
+  stage: StageDefinition,
+  versionId: string,
+  content: string
+): Promise<string[]> {
+  const ticked = ctx.project.manual_checks ?? {};
+  const given = ctx.project.manual_check_versions ?? {};
+  const stale = stage.exit_criteria.filter((c) => c.check === 'manual' && ticked[c.id] && given[c.id] !== versionId);
+  if (!stale.length) return [];
+  const lines: string[] = [];
+  const yours = stale.filter((c) => c.authority !== 'delegable' || ctx.project.routine_decisions !== 'handle' || !ctx.commitCriterion);
+  for (const c of stale.filter((x) => !yours.includes(x))) {
+    const check = await api.agentCheckCriterion(
+      { inputs: inputsFrom(ctx.project), stage_label: stage.label, criterion: c.label, content, model: ctx.project.model },
+      ctx.signal
+    );
+    if (!check.met) {
+      lines.push(`"${c.label}" was approved on an earlier version and does not hold on this one — ${check.reason} It stays approved for that version only; I will revise toward it.`);
+      continue;
+    }
+    await appendWorkflowEvent(ctx.project.id, ctx.project.user_id, {
+      type: 'criterion_committed',
+      stage_id: stage.id,
+      actor: 'system',
+      agent_run_id: ctx.run.id,
+      reason: check.reason,
+      payload: { criterion_id: c.id, policy: 'routine_decisions', evidence_version_id: versionId, reconfirmed: true },
+    });
+    await ctx.commitCriterion!(stage.id, c.id, versionId);
+    lines.push(`"${c.label}" re-confirmed on the new version under your routine-decision policy — ${check.reason}`);
+  }
+  if (yours.length) {
+    const one = yours.length === 1;
+    lines.push(`Your approval${one ? '' : 's'} ${yours.map((c) => `"${c.label}"`).join(', ')} ${one ? 'was' : 'were'} given on an earlier version of ${stage.label}; ${one ? 'it stands' : 'they stand'} for that version until you re-confirm in its checklist.`);
+  }
+  return lines;
 }
 
 /** The same requirements measured on new text, before it is saved. */
