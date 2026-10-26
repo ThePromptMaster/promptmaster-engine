@@ -33,12 +33,17 @@ test('under "handle them for me", Go checks a routine approval and commits it, a
 
   // Committed by the policy, after a check — the user was not asked.
   await expect.poll(
-    async () => (await serviceSelect('workflow_events', `project_id=eq.${id}&type=eq.criterion_committed&select=actor,stage_id,payload`)).length,
+    async () => (await serviceSelect('workflow_events', `project_id=eq.${id}&type=eq.criterion_committed&select=id`)).length,
     { timeout: 120_000 }
-  ).toBe(1);
-  const [committed] = await serviceSelect('workflow_events', `project_id=eq.${id}&type=eq.criterion_committed&select=actor,stage_id,agent_run_id,reason,payload`);
+  ).toBeGreaterThanOrEqual(1);
+  const [committed, ...later] = await serviceSelect('workflow_events', `project_id=eq.${id}&type=eq.criterion_committed&select=actor,stage_id,agent_run_id,reason,payload&order=created_at.asc`);
   expect(committed).toMatchObject({ actor: 'system', stage_id: 'positioning', payload: { criterion_id: 'pos.differentiator', policy: 'routine_decisions' } });
+  expect(committed.payload.reconfirmed).toBeUndefined();
   expect(committed.agent_run_id).toBeTruthy();
+  // A version Go saves afterwards has the approval checked again on it (L-117).
+  for (const again of later) {
+    expect(again).toMatchObject({ actor: 'system', stage_id: 'positioning', payload: { criterion_id: 'pos.differentiator', reconfirmed: true } });
+  }
   const [policy] = await serviceSelect('workflow_events', `project_id=eq.${id}&type=eq.routine_policy_changed&select=actor,payload`);
   expect(policy).toMatchObject({ actor: 'user', payload: { routine_decisions: 'handle' } });
   // The event is written before the step is closed; wait for the step too.
