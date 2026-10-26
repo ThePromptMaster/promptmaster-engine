@@ -364,6 +364,7 @@ export const hi: Record<keyof typeof en, string> = {
   'ssp.override': 'अनदेखा करके पूरा करें',
   'ssp.finishAnyway': 'फिर भी पूरा करें',
   'ssp.finishProject': 'प्रोजेक्ट पूरा करें',
+  'ssp.finishing': 'पूरा किया जा रहा है…',
   'cwd.kind.write': 'लेखन',
   'cwd.kind.list': 'सूची',
   'cwd.kind.check': 'जाँच',

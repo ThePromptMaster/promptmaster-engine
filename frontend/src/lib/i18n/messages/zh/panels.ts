@@ -364,6 +364,7 @@ export const zh: Record<keyof typeof en, string> = {
   'ssp.override': '强制完成',
   'ssp.finishAnyway': '仍然完成',
   'ssp.finishProject': '完成项目',
+  'ssp.finishing': '正在完成…',
   'cwd.kind.write': '撰写',
   'cwd.kind.list': '列表',
   'cwd.kind.check': '检查',

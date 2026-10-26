@@ -64,6 +64,8 @@ export const ar: Record<keyof typeof en, string> = {
   'controls.propose': 'اقتراح الحالات',
   'controls.skip': 'تخطي هذه المرحلة',
   'controls.goBackTo': 'العودة إلى {stage}',
+  'controls.addSections': 'إضافة فصل أو قسم',
+  'controls.addSectionsWhy': 'يفتح {stage} للإضافة إليه؛ وتبقى الفصول المكتوبة كما هي.',
   'bar.label': 'الخطوة التالية',
   'bar.next': 'التالي: ',
   'bar.otherTab': 'Go يعمل في علامة تبويب أخرى. أوقفه هناك، أو انتظر حتى ينتهي.',

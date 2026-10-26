@@ -364,6 +364,7 @@ export const ar: Record<keyof typeof en, string> = {
   'ssp.override': 'التجاوز والإنهاء',
   'ssp.finishAnyway': 'الإنهاء على أي حال',
   'ssp.finishProject': 'إنهاء المشروع',
+  'ssp.finishing': 'جارٍ الإنهاء…',
   'cwd.kind.write': 'كتابة',
   'cwd.kind.list': 'قائمة',
   'cwd.kind.check': 'فحص',

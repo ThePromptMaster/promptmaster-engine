@@ -364,6 +364,7 @@ export const sw: Record<keyof typeof en, string> = {
   'ssp.override': 'Puuza na ukamilishe',
   'ssp.finishAnyway': 'Kamilisha hata hivyo',
   'ssp.finishProject': 'Kamilisha mradi',
+  'ssp.finishing': 'Inakamilisha…',
   'cwd.kind.write': 'Uandishi',
   'cwd.kind.list': 'Orodha',
   'cwd.kind.check': 'Ukaguzi',

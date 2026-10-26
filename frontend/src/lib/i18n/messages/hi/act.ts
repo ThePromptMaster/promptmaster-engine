@@ -64,6 +64,8 @@ export const hi: Record<keyof typeof en, string> = {
   "controls.propose": "स्थितियाँ प्रस्तावित करें",
   "controls.skip": "यह चरण छोड़ें",
   "controls.goBackTo": "{stage} पर वापस जाएँ",
+  "controls.addSections": "अध्याय या खंड जोड़ें",
+  "controls.addSectionsWhy": "{stage} खोलता है ताकि उसमें जोड़ा जा सके; पहले से लिखे अध्याय बने रहते हैं।",
   "bar.label": "अगला कदम",
   "bar.next": "अगला: ",
   "bar.otherTab": "Go किसी दूसरे टैब में चल रहा है। उसे वहीं रोकें, या उसके पूरा होने का इंतज़ार करें।",

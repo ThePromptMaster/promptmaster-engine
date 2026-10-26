@@ -24,7 +24,7 @@ import { StageToolResult } from './stage-tool-result';
 import { CRITIQUE_TOOLS, REWRITE_TOOLS, useStageTools } from './use-stage-tools';
 import { FRAMING_KINDS, nextStageAction, type ReportedPanelStep } from '@/lib/workflow/next-action';
 import { describeNeed } from '@/lib/agent/needs';
-import { goPanelControls, stageControls, type StageControl } from '@/lib/workflow/stage-controls';
+import { addSectionsLabel, goPanelControls, stageControls, type StageControl } from '@/lib/workflow/stage-controls';
 import { inputsChanged, stageInputs } from '@/lib/workflow/stage-inputs';
 import { isApplyable } from '@/lib/workflow/recommend';
 import { ProjectFinished } from './project-finished';
@@ -392,7 +392,20 @@ export function WorkflowWorkspace({
   const [upgradeDismissed, setUpgradeDismissed] = useState(false);
   const [goDockHost, setGoDockHost] = useState<HTMLDivElement | null>(null);
   const [upgrading, setUpgrading] = useState(false);
-  const [finishing, setFinishing] = useState<{ option: TransitionOption; note?: string } | null>(null);
+  // `from`: which Finish opened it. The dialog is drawn beside that button, so a
+  // press on the acceptance box's Finish is answered where the user is looking.
+  const [finishing, setFinishing] = useState<{ option: TransitionOption; note?: string; from?: 'checklist' | 'bar' } | null>(null);
+  // Finishing ends here: the dialog closes and the finished view, drawn at the
+  // top, is brought into view — the user pressed Finish further down the page.
+  const finishedRef = useRef<HTMLDivElement>(null);
+  const statusSeen = useRef(project.status);
+  useEffect(() => {
+    if (project.status === 'finalized' && statusSeen.current !== 'finalized') {
+      setFinishing(null);
+      finishedRef.current?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
+    }
+    statusSeen.current = project.status;
+  }, [project.status]);
   // PM-14: the deliverable scored against the objective before finishing.
   const [objectiveCheck, setObjectiveCheck] = useState<{
     running: boolean;
@@ -474,6 +487,14 @@ export function WorkflowWorkspace({
   // into a finished stage's work, until another stage is opened.
   const [finishedHint, setFinishedHint] = useState<string | null>(null);
   const showFinishedHint = finishedHint === stageId;
+  // "Add a chapter or section" lands on the outline it opened.
+  const outlinePanelRef = useRef<HTMLDivElement | null>(null);
+  const [scrollToOutline, setScrollToOutline] = useState(false);
+  useEffect(() => {
+    if (!scrollToOutline || !outlinePanelRef.current) return;
+    outlinePanelRef.current.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    setScrollToOutline(false);
+  }, [scrollToOutline, stageId]);
   // "Open Output" from the chat on a later stage lands on its Edit button.
   const editButtonRef = useRef<HTMLButtonElement | null>(null);
   const [focusEdit, setFocusEdit] = useState(false);
@@ -1846,6 +1867,46 @@ export function WorkflowWorkspace({
       : []),
   ];
 
+  const finishedHintBar = (
+    <div role="status" className="mb-3 flex flex-wrap items-center gap-2 rounded-lg bg-[var(--surface-container-high)] px-4 py-2.5">
+      <span className="material-symbols-outlined text-[18px] text-[var(--on-surface-variant)]" aria-hidden>lock</span>
+      <span className="text-label text-[var(--on-surface)]">
+        {t('ws.finishedHint')}
+      </span>
+      <button
+        onClick={() => void reopenStage()}
+        className="rounded-lg bg-[var(--pm-primary)] px-3 py-1 text-label font-semibold text-[var(--on-primary)] hover:opacity-90"
+      >
+        {t('ws.editStage')}
+      </button>
+    </div>
+  );
+  // Book drafting: the outline is a stage of its own, behind the cursor, and the
+  // way back to it was a "Go back to Outline" under More. Sean (25 Oct, on a
+  // phone): "can you go back and add sections or chapters? … we couldn't
+  // figure out how". This reopens the outline and takes the user to it.
+  const outlineStage = template.outline_stage === 'explicit' ? outlineStageFor(template) : null;
+  const addSectionsFrom =
+    // Shown on Drafting whether or not it is the stage in hand: a book at
+    // Critique is where a missing chapter is noticed.
+    outlineStage && outlineStage.id !== stage.id && stage.renderer === 'long_form' && project.status !== 'finalized'
+      ? outlineStage
+      : null;
+  const addSections = async () => {
+    if (!addSectionsFrom) return;
+    const status = state.stages[addSectionsFrom.id]?.status;
+    if (isDone(status) || status === 'skipped') {
+      try {
+        await appendEvent({ type: 'stage_reopened', stage_id: addSectionsFrom.id });
+      } catch (e) {
+        setTransitionError(e instanceof Error && e.message ? t('wsa.failedWhy', { message: e.message }) : t('wsa.failed'));
+        return;
+      }
+    }
+    setViewingStageId(addSectionsFrom.id === state.current_stage_id ? null : addSectionsFrom.id);
+    setScrollToOutline(true);
+  };
+
   // What Go may name is what the stage bar and the page draw, built from the
   // same values. Only for the stage the project is on: a stage being browsed
   // shows other buttons, and Go does not work there.
@@ -1862,6 +1923,7 @@ export function WorkflowWorkspace({
         proposals: context.itemsProposed?.[stage.id] ?? 0,
         proposeRows: rendererHoldsItems(stage.renderer) && proposeTargets(parseItems(stageBundles[stage.id]?.versions.at(-1)?.content) ?? [], itemSchemaFor(stage)).length > 0,
         nextStep: nextStep && nextStep.kind !== 'working' ? nextStep.label : null,
+        addSections: Boolean(addSectionsFrom),
         go: isCurrent
           ? goPanelControls(go.run ? {
               status: go.run.status, ended_at: go.run.ended_at, pending: Boolean(go.pendingStep),
@@ -1961,6 +2023,39 @@ export function WorkflowWorkspace({
                 } stage, and drafting will follow it.`,
         }
       : undefined;
+
+  const completionDialog = isCurrent && finishing ? (
+    <CompletionDialog
+      summary={completion}
+      show={outstandingShow}
+      busy={busy}
+      error={transitionError}
+      check={objectiveCheck}
+      onCheck={() => void checkAgainstObjective()}
+      onConfirm={(reason) => {
+        const { option, note } = finishing;
+        // Kept open, saying "Finishing…", until the project is
+        // finished (it closes then) or the move fails (it says why).
+        // Finishing past open work is a deviation, so its reason is
+        // recorded on project_finalized with what was still open.
+        const why = reason
+          ? [note, `Finished with ${completion.outstanding.length} item(s) still open: ${completion.outstanding.map(describeOutstanding).join('; ')}. Reason: ${reason}`]
+              .filter(Boolean)
+              .join(' — ')
+          : note;
+        void handleTransition(option, why);
+      }}
+      onCancel={() => {
+        setFinishing(null);
+        setTransitionError(null);
+        setObjectiveCheck({ running: false, result: null, error: null });
+      }}
+      onViewStage={(id) => {
+        setFinishing(null);
+        setViewingStageId(id);
+      }}
+    />
+  ) : null;
 
   return (
     // The project's own accent, if it has one (14 Oct call), for everything on its page.
@@ -2280,6 +2375,7 @@ export function WorkflowWorkspace({
               onApplyAnyway={applyAnyway}
             />
           )}
+          <div ref={finishedRef} className="scroll-mt-20" />
           {isCurrent && project.status === 'finalized' && (
             <ProjectFinished
               bundle={{ project, template, state, events: events ?? [], stages: bundles ?? {}, evaluations: evaluations ?? {} }}
@@ -2400,8 +2496,30 @@ export function WorkflowWorkspace({
               readOnly={project.status === 'finalized'}
             />
 
+            {outlinePanelHere && showFinishedHint && canReopen && finishedHintBar}
+            {addSectionsFrom && (
+              <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1">
+                <button
+                  type="button"
+                  onClick={() => void addSections()}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-high)] px-3 py-1.5 text-label font-semibold text-[var(--pm-primary)] hover:bg-[var(--surface-container-highest)]"
+                >
+                  <span aria-hidden className="material-symbols-outlined text-[18px]">playlist_add</span>
+                  {addSectionsLabel()}
+                </button>
+                <span className="text-label text-[var(--on-surface-variant)]">
+                  {t('controls.addSectionsWhy', { stage: stageNameShown(addSectionsFrom.id, 'short') })}
+                </span>
+              </div>
+            )}
             {outlinePanelHere && (
-              <div className="mb-6">
+              <div
+                ref={outlinePanelRef}
+                className="mb-6 scroll-mt-20"
+                // A finished outline explains how to edit it on the first tap, as other stages do.
+                onPointerDownCapture={canReopen ? () => setFinishedHint(stageId) : undefined}
+                onKeyDownCapture={canReopen ? () => setFinishedHint(stageId) : undefined}
+              >
                 <OutlineStagePanel
                   project={project}
                   stageId={stage.id}
@@ -2421,7 +2539,10 @@ export function WorkflowWorkspace({
                   onApproved={materialiseOutline}
                   onItemCountChange={reportOutlineCount}
                   onPanelStep={reportPanelStep}
-                  readOnly={!isCurrent}
+                  // Editable on a reopened stage as well as the current one:
+                  // "Edit stage" left the outline locked, so a chapter could not
+                  // be added after drafting began (Sean, 25 Oct).
+                  readOnly={!isEditable || project.status === 'finalized'}
                 />
               </div>
             )}
@@ -2432,20 +2553,7 @@ export function WorkflowWorkspace({
                 drafting stage, whose renderer still has work to do, so only the
                 explicit case suppresses it. */}
             <RefusedRevisions refused={refusedSince(events ?? [], stage.id, headVersion)} head={headVersion} />
-            {showFinishedHint && canReopen && (
-              <div role="status" className="mb-3 flex flex-wrap items-center gap-2 rounded-lg bg-[var(--surface-container-high)] px-4 py-2.5">
-                <span className="material-symbols-outlined text-[18px] text-[var(--on-surface-variant)]" aria-hidden>lock</span>
-                <span className="text-label text-[var(--on-surface)]">
-                  {t('ws.finishedHint')}
-                </span>
-                <button
-                  onClick={() => void reopenStage()}
-                  className="rounded-lg bg-[var(--pm-primary)] px-3 py-1 text-label font-semibold text-[var(--on-primary)] hover:opacity-90"
-                >
-                  {t('ws.editStage')}
-                </button>
-              </div>
-            )}
+            {!outlinePanelHere && showFinishedHint && canReopen && finishedHintBar}
             {explicitOutlineHere ? null : !stageDrafts(stage) &&
               stage.renderer !== 'long_form' && stage.renderer !== 'assess' ? (
               <CheckpointPanel />
@@ -2562,8 +2670,9 @@ export function WorkflowWorkspace({
               onToggleManual={(id, checked) => void handleToggleManual(id, checked)}
               readOnly={!isEditable}
               collapsible={foldStageExtras}
-              onFinish={finishHere ? () => setFinishing({ option: finishHere }) : undefined}
+              onFinish={finishHere ? () => setFinishing({ option: finishHere, from: 'checklist' }) : undefined}
             />
+            {finishing?.from === 'checklist' && completionDialog}
 
             <RecommendationsPanel
               stageLabel={stageNameShown(stage.id, 'short')}
@@ -2656,35 +2765,7 @@ export function WorkflowWorkspace({
             {isCurrent && blocking && (
               <BlockForm onSubmit={(block) => void setBlocked(block)} onCancel={() => setBlocking(false)} />
             )}
-            {isCurrent && finishing && (
-              <CompletionDialog
-                summary={completion}
-                show={outstandingShow}
-                busy={busy}
-                check={objectiveCheck}
-                onCheck={() => void checkAgainstObjective()}
-                onConfirm={(reason) => {
-                  const { option, note } = finishing;
-                  setFinishing(null);
-                  // Finishing past open work is a deviation, so its reason is
-                  // recorded on project_finalized with what was still open.
-                  const why = reason
-                    ? [note, `Finished with ${completion.outstanding.length} item(s) still open: ${completion.outstanding.map(describeOutstanding).join('; ')}. Reason: ${reason}`]
-                        .filter(Boolean)
-                        .join(' — ')
-                    : note;
-                  void handleTransition(option, why);
-                }}
-                onCancel={() => {
-                  setFinishing(null);
-                  setObjectiveCheck({ running: false, result: null, error: null });
-                }}
-                onViewStage={(id) => {
-                  setFinishing(null);
-                  setViewingStageId(id);
-                }}
-              />
-            )}
+            {isCurrent && finishing?.from !== 'checklist' && completionDialog}
             {isCurrent && confirmingRegenerate && (
               <ConfirmOverwrite
                 label={stage.short_label.toLowerCase()}

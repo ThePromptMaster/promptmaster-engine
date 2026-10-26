@@ -64,6 +64,8 @@ export const zh: Record<keyof typeof en, string> = {
   'controls.propose': '提议状态',
   'controls.skip': '跳过本阶段',
   'controls.goBackTo': '返回 {stage}',
+  'controls.addSections': '添加章节或部分',
+  'controls.addSectionsWhy': '打开{stage}进行添加；已写好的章节会保留。',
   'bar.label': '下一步',
   'bar.next': '下一步：',
   'bar.otherTab': 'Go 正在另一个标签页中运行。请在那里停止它，或等待它完成。',

@@ -16,7 +16,7 @@ import { tr } from '@/lib/i18n/store';
 import type { StageAction } from './next-action';
 import type { TransitionOption } from './engine';
 
-export type ControlPlace = 'stage_bar' | 'more_menu' | 'checklist' | 'data_panel' | 'table' | 'go_panel' | 'next_step';
+export type ControlPlace = 'stage_bar' | 'more_menu' | 'checklist' | 'data_panel' | 'table' | 'go_panel' | 'next_step' | 'above_work';
 
 export interface StageControl {
   id: string;
@@ -51,6 +51,7 @@ export const PLACE_WORDS: Record<ControlPlace, string> = {
   table: 'above the table',
   go_panel: 'in the Go mode panel',
   next_step: 'in the bar at the top of the stage',
+  above_work: "just above the stage's work",
 };
 
 /**
@@ -80,6 +81,9 @@ export function goPanelControls(run: {
     ] : []),
   ];
 }
+
+/** Drafting's way back into the outline (Sean, 25 Oct: "can you go back and add sections or chapters?"). */
+export const addSectionsLabel = () => tr('controls.addSections');
 
 export const ATTACH_DATA_LABEL = 'Attach a data file';
 export const ADD_IMAGES_LABEL = 'Add images';
@@ -149,6 +153,8 @@ export function stageControls(input: {
   nextStep?: string | null;
   /** Go's panel, from `goPanelControls`. */
   go?: readonly StageControl[];
+  /** A drafting stage whose outline can be reopened to add chapters or sections. */
+  addSections?: boolean;
 }): StageControl[] {
   const controls: StageControl[] = [];
   if (input.primary && input.primary.kind !== 'none' && input.primary.label) {
@@ -163,6 +169,7 @@ export function stageControls(input: {
   if (input.proposals) controls.push({ id: 'confirm-proposals', label: confirmProposalsLabel(input.proposals), place: 'table' });
   if (input.lookupNoun) controls.push({ id: 'lookup', label: lookupLabel(input.lookupNoun), place: 'table' });
   if (input.dataPanel) controls.push({ id: 'attach-data', label: tr('data.attachData'), place: 'data_panel' });
+  if (input.addSections) controls.push({ id: 'add-sections', label: addSectionsLabel(), place: 'above_work' });
   if (input.nextStep) controls.push({ id: 'next-step', label: input.nextStep, place: 'next_step' });
   for (const c of input.go ?? []) controls.push(c);
   // One label, one entry: the planner names a button by its words.

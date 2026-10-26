@@ -335,6 +335,25 @@ describe('left-open stages are named where finishing happens (A3, Sean 28 Sep it
     expect(screen.getByRole('button', { name: /^Finish/ })).toBeInTheDocument();
   });
 
+  it('opens where the user is looking: focused and scrolled into view (Sean, 25 Oct: "the finish button did not work")', () => {
+    const scroll = vi.fn();
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = scroll;
+    try {
+      render(<CompletionDialog summary={summary} busy={false} onConfirm={vi.fn()} onCancel={vi.fn()} />);
+    } finally {
+      Element.prototype.scrollIntoView = original;
+    }
+    expect(scroll).toHaveBeenCalled();
+    expect(screen.getByRole('heading', { level: 3 })).toHaveFocus();
+  });
+
+  it('says it is finishing, and why finishing failed, in the dialog itself', () => {
+    render(<CompletionDialog summary={summary} busy error="It failed: offline" onConfirm={vi.fn()} onCancel={vi.fn()} />);
+    expect(screen.getByRole('button', { name: 'Finishing…' })).toBeDisabled();
+    expect(screen.getByRole('alert')).toHaveTextContent('It failed: offline');
+  });
+
   it('the finished banner still lists what was left open, and links to it', async () => {
     const onViewStage = vi.fn();
     render(
