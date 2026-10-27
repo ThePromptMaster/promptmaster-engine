@@ -104,7 +104,7 @@ import { BriefChangeNotice } from './brief-change-notice';
 import { PendingChangeNotice } from './pending-change-notice';
 import { NextActionBar } from './next-action-bar';
 import { ProjectTimeline } from './project-timeline';
-import { accentVariables, colourOfVersion, rootSurfaces, versionTintVariables } from '@/lib/appearance/colours';
+import { accentVariables, backgroundOfVersion, rootSurfaces, versionTintVariables } from '@/lib/appearance/colours';
 import { nextAction } from '@/lib/workflow/next-step';
 import { holdPendingChange, pendingChanges, settlePendingChange, type PendingChange } from '@/lib/workflow/conflict-trail';
 import { keptConflictsOf } from '@/lib/workflow/routine-conflicts';
@@ -1630,14 +1630,14 @@ export function WorkflowWorkspace({
       .map((c) => ({ id: c.id, label: c.label })),
   };
 
-  // The stage area takes the colour of the version on show (Sean, 25 Oct: "the
-  // whole background color should change with that version"). Only the stage
+  // The stage area takes the background colour of the version on show (Sean,
+  // 25 Oct: "the whole background color should change with that version"). Only the stage
   // column: the rail and the side chat keep the page's own colours. A stage
   // with no version bar (the outline) keeps them too.
   const shownVersion = stageVersionList.find((v) => v.id === activeVersionId) ?? stageVersionList.at(-1) ?? null;
   const tintColour =
     stage && stage.renderer !== 'outline' && shownVersion
-      ? colourOfVersion(shownVersion.version_number, shownVersion.colour_scheme, shownVersion.colour)
+      ? backgroundOfVersion(shownVersion.version_number, shownVersion.colour_scheme, shownVersion.colour, shownVersion.background_colour)
       : null;
   const [rootTint, setRootTint] = useState<Record<string, string> | null>(null);
   useEffect(() => {

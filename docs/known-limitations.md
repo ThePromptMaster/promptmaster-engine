@@ -180,7 +180,7 @@ Fix is a one-line migration adding the value.
 ### L-09 · Append-only is enforced by two different mechanisms · `accepted`
 
 `artifact_versions` immutability is a `BEFORE UPDATE` trigger permitting only
-`user_rating` and the display `colour` (L-122) to change. **It does not block DELETE.** Deletion is prevented instead by
+`user_rating` and the display `colour` and `background_colour` (L-122) to change. **It does not block DELETE.** Deletion is prevented instead by
 the *absence* of a DELETE policy under RLS — which means a **service-role client
 bypasses it entirely**. The drain route holds the service-role key.
 
@@ -2406,6 +2406,12 @@ each surface token as `:root` has them when the colour changes (`versionTintVari
 background picked in another tab is mixed in on the next version switch, not at once. The rail
 and side chat keep the page colours, and the outline stage — which has no version bar — keeps
 the plain background. Swatch names are English in every interface language.
+
+**Two colours per version (2026-10-27, Sean 26 Oct).** `background_colour`
+(`20261120000000_version_background_colour.sql`, same swatch ids) is the second display column
+the trigger exempts. `colour` is the version button's outline; `background_colour` fills the
+button and tints the stage column, and when unset follows `colour`, so a version with one choice
+looks as it did. The timeline's dot still shows the button colour only.
 
 ### L-123 — A quick answer moves into the full process once, and a manuscript does not take it as a version (2026-10-27)
 
