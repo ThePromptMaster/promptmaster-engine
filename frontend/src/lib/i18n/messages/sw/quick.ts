@@ -23,4 +23,11 @@ export const sw: Record<keyof typeof en, string> = {
   "quick.cancel": "Ghairi",
   "quick.recommended": "Imeundwa kwa kazi hii",
   "quick.standard": "Kawaida",
+  "early.finish": "Maliza na nilicho nacho",
+  "early.finishNote": "Maliza sasa na urudi kwa yaliyobaki wakati wowote.",
+  "early.title": "Umalize na ulicho nacho?",
+  "early.intro": "Mradi unakamilishwa kama ulivyo. Kilicho bado wazi kinarekodiwa kama hakijafanywa bado, na unaweza kurudi kwa chochote wakati wowote.",
+  "early.caveats": "Bado hakijafanywa",
+  "early.bannerTitle": "Umekamilishwa mapema — bado haijafanywa:",
+  "early.goBack": "Rudi kwa hiki",
 };

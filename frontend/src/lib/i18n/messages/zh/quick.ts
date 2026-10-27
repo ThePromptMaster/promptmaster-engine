@@ -23,4 +23,11 @@ export const zh: Record<keyof typeof en, string> = {
   "quick.cancel": "取消",
   "quick.recommended": "为这项工作设计",
   "quick.standard": "标准",
+  "early.finish": "就用现有的完成",
+  "early.finishNote": "现在完成，其余的随时回来处理。",
+  "early.title": "就用你现有的完成？",
+  "early.intro": "项目按现状完成。仍未完成的内容会记为尚未完成，你可以随时回来处理任何一项。",
+  "early.caveats": "尚未完成",
+  "early.bannerTitle": "提前完成——尚未完成：",
+  "early.goBack": "回到这里",
 };

@@ -242,6 +242,13 @@ export interface TransitionOption {
   label: string;
   /** True when a criterion is unmet — the UI relabels to "Override and advance". */
   requiresNote: boolean;
+  /**
+   * Finish from any stage with what the project has (a tester via Sean, 26 Oct:
+   * "a check all the boxes and finish option … with potential caveat to come
+   * back"). Writes only `project_finalized`, with what was still open as its
+   * caveats; no stage is marked complete and no approval is given.
+   */
+  early?: boolean;
 }
 
 export function availableTransitions(

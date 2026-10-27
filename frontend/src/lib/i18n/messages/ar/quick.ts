@@ -23,4 +23,11 @@ export const ar: Record<keyof typeof en, string> = {
   "quick.cancel": "إلغاء",
   "quick.recommended": "مصمَّم لهذا العمل",
   "quick.standard": "قياسي",
+  "early.finish": "أنهِ بما لدي",
+  "early.finishNote": "أنهِ الآن وعُد إلى الباقي متى شئت.",
+  "early.title": "الإنهاء بما لديك؟",
+  "early.intro": "يُنهى المشروع كما هو. ما زال مفتوحًا يُسجَّل على أنه لم يُنجز بعد، ويمكنك العودة إلى أي جزء منه في أي وقت.",
+  "early.caveats": "لم يُنجز بعد",
+  "early.bannerTitle": "أُنهي مبكرًا — لم يُنجز بعد:",
+  "early.goBack": "العودة إلى هذا",
 };

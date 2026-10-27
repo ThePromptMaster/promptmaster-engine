@@ -23,4 +23,11 @@ export const hi: Record<keyof typeof en, string> = {
   "quick.cancel": "रद्द करें",
   "quick.recommended": "इस काम के लिए बनाया गया",
   "quick.standard": "मानक",
+  "early.finish": "जो है उसी के साथ पूरा करें",
+  "early.finishNote": "अभी पूरा करें और बाकी पर जब चाहें लौटें।",
+  "early.title": "जो आपके पास है उसी के साथ पूरा करें?",
+  "early.intro": "प्रोजेक्ट जैसा है वैसा ही पूरा होता है। जो अभी खुला है वह बाकी के रूप में दर्ज होता है, और आप कभी भी उस पर लौट सकते हैं।",
+  "early.caveats": "अभी बाकी",
+  "early.bannerTitle": "जल्दी पूरा किया — अभी बाकी:",
+  "early.goBack": "इस पर लौटें",
 };
