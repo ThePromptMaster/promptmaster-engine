@@ -299,6 +299,20 @@ export function availableTransitions(
 // --- projection -------------------------------------------------------------
 
 /**
+ * The events the project's current workflow is projected from: those after
+ * the last `workflow_switched` (Sean, 26 Oct). A Quick answer project taken
+ * into the full process keeps its earlier log as the record, but its stages
+ * were the old workflow's; replaying them against the new one would put the
+ * cursor on a stage that does not exist.
+ */
+export function liveEvents<E extends { type: string }>(events: E[]): E[] {
+  for (let i = events.length - 1; i >= 0; i--) {
+    if (events[i].type === 'workflow_switched') return events.slice(i + 1);
+  }
+  return events;
+}
+
+/**
  * The state a project starts from before any event is replayed.
  *
  * `resumeStageId` exists for a project whose event log is empty but which is
@@ -343,6 +357,7 @@ export function projectState(
    */
   resumeStageId?: string | null
 ): WorkflowState {
+  events = liveEvents(events);
   const state = initialState(template, events.length === 0 ? resumeStageId : undefined);
   const order = template.stages.map((s) => s.id);
 

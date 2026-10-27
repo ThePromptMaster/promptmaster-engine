@@ -3,12 +3,13 @@ import { describe, expect, it } from 'vitest';
 import { BOOK_V1 } from '@/lib/workflow/templates/book.v1';
 import { EXPLORATION_V1 } from '@/lib/workflow/templates/exploration.v1';
 import { ASSESSMENT_V1 } from '@/lib/workflow/templates/assessment.v1';
+import { QUICK_V1 } from '@/lib/workflow/templates/quick.v1';
 import { RESEARCH_V1 } from '@/lib/workflow/templates/research.v1';
 import { SINGLE_OUTPUT_V1 } from '@/lib/workflow/templates/single-output.v1';
 import { en } from './messages/en';
 import { groupLabel, stageText, templateDescription } from './templates';
 
-const SYSTEM = [BOOK_V1, RESEARCH_V1, SINGLE_OUTPUT_V1, EXPLORATION_V1, ASSESSMENT_V1];
+const SYSTEM = [BOOK_V1, RESEARCH_V1, SINGLE_OUTPUT_V1, EXPLORATION_V1, ASSESSMENT_V1, QUICK_V1];
 
 describe('the system workflows in every language (client, 21 Oct)', () => {
   it('has every stage, in the template’s own English', () => {

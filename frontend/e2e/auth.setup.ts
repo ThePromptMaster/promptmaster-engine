@@ -16,6 +16,9 @@ setup('sign in', async ({ page }) => {
   // The specs were written against the full setup; the simple start, which
   // every new user sees, has its own spec (simple-start.spec.ts).
   await page.evaluate(() => localStorage.setItem('pm.experience.v1', 'advanced'));
+  // And with the full workflow's ways in open: the start screen leads with a
+  // quick answer (Sean, 26 Oct), which has its own spec (quick-answer.spec.ts).
+  await page.evaluate(() => localStorage.setItem('pm.start.full.v1', '1'));
   // The beta notice appears after hydration, at the foot of the screen: a
   // spec that clicked before it showed found it over the start screen's
   // options (main CI, 24 Oct). Every signed-in spec starts with it dismissed.

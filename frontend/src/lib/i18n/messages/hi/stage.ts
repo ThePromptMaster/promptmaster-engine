@@ -36,6 +36,7 @@ export const hi: Record<keyof typeof en, string> = {
   'op.stage_draft': 'AI मसौदा',
   'op.stage_regenerate': 'AI द्वारा दोबारा मसौदा',
   'op.stage_edit': 'आपका संपादन',
+  'op.carried_from_quick': 'आपका त्वरित उत्तर',
   'op.chat_instruct': 'चैट से संशोधित',
   'op.applied_recommendations': 'सुझाए गए सुधार लागू किए गए',
   'op.restore': 'पहले का संस्करण पुनर्स्थापित किया गया',

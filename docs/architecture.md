@@ -122,8 +122,17 @@ The full endpoint inventory is in [`api.md`](api.md).
   redirect to `/projects`.
 - `src/lib/workflow/` — the workflow engine. `engine.ts` is **pure functions**:
   evaluate a stage's exit criteria, project state from the event log, list available
-  transitions. `templates/*.v1.ts` are the authoring source for the `book`, `research`
-  and `single_output` workflows.
+  transitions. `templates/*.v1.ts` are the authoring source for the system workflows
+  (`book`, `research`, `single_output`, `exploration`, `assessment`, `quick`).
+- **The start (27 Oct, Sean 26 Oct).** `projects/new` leads with **Get an answer**: a project
+  pinned to `quick` (one prose stage, drafted as it opens), made without a setup screen. The
+  conversation, Guide me and Choose yourself are under "Start with the full workflow instead",
+  which stays open once a user opens it (`pm.start.full.v1`). On a quick project,
+  `components/workflow/take-full-process.tsx` re-pins the same project to a designed or standard
+  workflow: the answer becomes v1 of its deliverable stage (`lib/workflow/quick.ts::carryTarget`),
+  the chat is copied to the first stage, and a `workflow_switched` event marks the cut —
+  `engine.ts::liveEvents` (applied in `projectState` and in `listWorkflowEvents`) projects only
+  what follows it. L-123.
 - `src/components/workflow/` — the workspace, stage rail, header, exit-criteria
   checklist, transition bar, and `renderers/`.
 - `src/lib/supabase/` — one module per table. This is the whole persistence layer.

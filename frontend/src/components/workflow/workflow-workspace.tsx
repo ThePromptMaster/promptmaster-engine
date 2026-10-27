@@ -46,6 +46,8 @@ import { findingFromPoint, pointsFromCommentary } from '@/lib/workflow/critique-
 import { ExportMenu } from './export-menu';
 import { FullDocumentReader } from './full-document-reader';
 import { listWorkflowEvents } from '@/lib/supabase/workflow';
+import { isQuickAnswer } from '@/lib/workflow/quick';
+import { TakeFullProcess } from './take-full-process';
 import { ChatPanel } from './chat-panel';
 import { RecommendationsPanel } from './recommendations-panel';
 import { TasksPanel } from './tasks-panel';
@@ -2396,6 +2398,15 @@ export function WorkflowWorkspace({
             hasDraft={Boolean(context.artifactNonEmpty[stage.id])}
           />
           <WebFoundNotice projectId={project.id} stageId={stage.id} />
+          {/* Sean, 26 Oct: the quick answer, taken into the full process in place. */}
+          {isQuickAnswer(template) && isCurrent && project.status !== 'finalized' && headVersion?.content?.trim() && (
+            <TakeFullProcess
+              project={project}
+              stageId={stage.id}
+              answer={headVersion.content}
+              onSwitched={() => window.location.reload()}
+            />
+          )}
 
           {isCurrent && appendStageVersion && project.status !== 'finalized' && (
             <GoPanel

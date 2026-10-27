@@ -36,6 +36,7 @@ export const ar: Record<keyof typeof en, string> = {
   'op.stage_draft': 'مسودة بالذكاء الاصطناعي',
   'op.stage_regenerate': 'إعادة صياغة بالذكاء الاصطناعي',
   'op.stage_edit': 'تعديلك',
+  'op.carried_from_quick': 'إجابتك السريعة',
   'op.chat_instruct': 'مُراجَعة من المحادثة',
   'op.applied_recommendations': 'طُبّقت الإصلاحات المقترحة',
   'op.restore': 'استُعيدت نسخة سابقة',

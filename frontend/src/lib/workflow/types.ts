@@ -359,6 +359,13 @@ export type WorkflowEventType =
   | 'project_finalized'
   | 'project_reopened'
   | 'template_upgraded'
+  /**
+   * The project moved to another workflow (Sean, 26 Oct: a quick answer taken
+   * into the full process). payload: from_template_id, to_template_id,
+   * deliverable_stage_id. The log before it is kept; stage state is projected
+   * from the events after it (`liveEvents`).
+   */
+  | 'workflow_switched'
   /** C5: a done stage opened for editing without moving the cursor. Closing it again is stage_marked_complete. */
   | 'stage_reopened'
   /** A revision the commit check refused; moves no state (G1, 6 Oct). */

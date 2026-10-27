@@ -1,0 +1,26 @@
+import type { en } from '../areas/quick';
+
+/** Arabic for `areas/quick.ts`. */
+export const ar: Record<keyof typeof en, string> = {
+  "workflow.name.quick": "إجابة سريعة",
+  "workflow.pitch.quick": "إجابة أو مسودة على الفور؛ انقلها إلى العملية الكاملة متى احتاجت إلى المزيد.",
+  "template.quick.description": "إجابة أو مسودة على الفور، دون مراحل تمر بها أولًا.",
+  "stage.quick.answer.label": "الإجابة",
+  "stage.quick.answer.short": "الإجابة",
+  "stage.quick.answer.guidance": "هذا ما طلبته. اسأل سؤالًا آخر في الدردشة، أو حسّنه، أو انقله إلى عملية PromptMaster الكاملة بمراحلها وفحوصها وموافقاتها.",
+  "start.quickAnswer": "احصل على إجابة",
+  "start.quickNote": "إجابة أو مسودة على الفور. انقلها إلى عملية PromptMaster الكاملة في أي وقت — كل ما صنعته ينتقل معها.",
+  "start.fullWorkflow": "ابدأ بسير العمل الكامل بدلًا من ذلك",
+  "start.fullWorkflowHide": "إخفاء خيارات سير العمل الكامل",
+  "start.fullWorkflowNote": "مراحل وفحوص ومراجعات وقرارات من البداية: تحدّث عنه، أو أجب عن بضعة أسئلة، أو اختر سير العمل بنفسك.",
+  "quick.takeFull": "انقل هذا إلى عملية PromptMaster الكاملة",
+  "quick.takeFullNote": "مراحل وفحوص ومراجعات وقرارات، مبنية على ما لديك هنا.",
+  "quick.takeFullTitle": "انقل هذا إلى العملية الكاملة",
+  "quick.takeFullIntro": "يُعدّ PromptMaster سير عمل لهذا العمل. تصبح إجابتك النسخة الأولى من المُخرَج، وتبقى الدردشة والملفات والمصادر والحقائق في المشروع.",
+  "quick.takeFullConfirm": "المتابعة بـ {name}",
+  "quick.takeFullWorking": "جارٍ إعداد العملية الكاملة…",
+  "quick.takeFullFailed": "لم يتغيّر المشروع: {reason}",
+  "quick.cancel": "إلغاء",
+  "quick.recommended": "مصمَّم لهذا العمل",
+  "quick.standard": "قياسي",
+};

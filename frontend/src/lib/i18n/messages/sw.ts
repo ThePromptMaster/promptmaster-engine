@@ -30,6 +30,7 @@ import { sw as recArea } from './sw/rec';
 import { sw as panelsArea } from './sw/panels';
 import { sw as startersArea } from './sw/starters';
 import { sw as assessArea } from './sw/assess';
+import { sw as quickArea } from './sw/quick';
 
 export const sw: Messages = {
   'header.account': 'Akaunti',
@@ -326,4 +327,5 @@ export const sw: Messages = {
   ...panelsArea,
   ...startersArea,
   ...assessArea,
+  ...quickArea,
 };

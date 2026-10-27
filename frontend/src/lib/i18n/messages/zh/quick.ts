@@ -1,0 +1,26 @@
+import type { en } from '../areas/quick';
+
+/** Chinese for `areas/quick.ts`. */
+export const zh: Record<keyof typeof en, string> = {
+  "workflow.name.quick": "快速回答",
+  "workflow.pitch.quick": "立即得到回答或草稿；需要更多时，转入完整流程。",
+  "template.quick.description": "立即得到回答或草稿，无需先经过各个阶段。",
+  "stage.quick.answer.label": "回答",
+  "stage.quick.answer.short": "回答",
+  "stage.quick.answer.guidance": "这是你要的内容。在聊天中继续提问、改进它，或把它转入包含阶段、检查和审批的完整 PromptMaster 流程。",
+  "start.quickAnswer": "获取回答",
+  "start.quickNote": "立即得到回答或草稿。随时可以转入完整的 PromptMaster 流程——你做的一切都会带过去。",
+  "start.fullWorkflow": "改为从完整工作流开始",
+  "start.fullWorkflowHide": "隐藏完整工作流选项",
+  "start.fullWorkflowNote": "从一开始就有阶段、检查、修订和决定：聊一聊、回答几个问题，或自己选择工作流。",
+  "quick.takeFull": "转入完整的 PromptMaster 流程",
+  "quick.takeFullNote": "阶段、检查、修订和决定，基于你在这里已有的内容。",
+  "quick.takeFullTitle": "转入完整流程",
+  "quick.takeFullIntro": "PromptMaster 会为这项工作设置一个工作流。你的回答成为交付物的第一个版本，聊天、文件、来源和事实都保留在项目中。",
+  "quick.takeFullConfirm": "以“{name}”继续",
+  "quick.takeFullWorking": "正在设置完整流程…",
+  "quick.takeFullFailed": "项目未切换：{reason}",
+  "quick.cancel": "取消",
+  "quick.recommended": "为这项工作设计",
+  "quick.standard": "标准",
+};

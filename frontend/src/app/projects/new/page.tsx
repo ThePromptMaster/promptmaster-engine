@@ -73,6 +73,8 @@ function titleFrom(objective: string): string {
 
 /** The id of a workflow designed for this project and not yet saved (24 Oct). */
 const DESIGNED = 'designed:';
+/** Whether this user keeps the full-workflow ways in open on the start screen. */
+const FULL_KEY = 'pm.start.full.v1';
 /** How much of the ask and the conversation goes to the workflow designer. */
 const DESIGN_BRIEF_MAX = 8_000;
 
@@ -141,6 +143,26 @@ export default function NewProjectPage() {
     return { ...ask, context: contextFromDocuments(ask.context, documentsOf(startFiles), INPUT_LIMITS.context).context };
   };
   const [working, setWorking] = useState<null | 'questions' | 'setup' | 'creating'>(null);
+  // Sean, 26 Oct: the start is an answer, as in Claude; the full workflow is
+  // one press away and, once opened, stays open for this user.
+  const [showFull, setShowFull] = useState(false);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(FULL_KEY) === '1') setShowFull(true);
+    } catch {
+      // Storage blocked: the options start folded.
+    }
+  }, []);
+  const toggleFull = () => {
+    setShowFull((open) => {
+      try {
+        localStorage.setItem(FULL_KEY, open ? '0' : '1');
+      } catch {
+        // Not remembered; it still opens.
+      }
+      return !open;
+    });
+  };
   const [error, setError] = useState<string | null>(null);
   const [createdWithFailures, setCreatedWithFailures] = useState<{ id: string; failed: string[] } | null>(null);
   // Kept apart from `error`: every other action clears that, and a failed
@@ -437,6 +459,24 @@ export default function NewProjectPage() {
     } catch (e) {
       setError(t('start.removePresetFailed', { why: e instanceof Error && e.message ? `: ${e.message}` : '' }));
     }
+  }
+
+  /**
+   * The answer first (Sean, 26 Oct: "You type what you want and get an answer
+   * or draft up front, without having to go through all the stages first").
+   * A Quick answer project, made at once; its one stage is drafted as it
+   * opens, and "Take this into the full process" builds on it later.
+   */
+  function quickStart() {
+    const quick = templateFor('quick');
+    if (!quick || !hasObjective || working !== null) return;
+    setError(null);
+    void create({
+      template: quick,
+      draft: { ...draft, title: titleFrom(objective), audience: '', constraints: '', output_format: '', ...withDocuments(objective) },
+      facts: [],
+      chat: [],
+    });
   }
 
   function chooseYourself() {
@@ -737,8 +777,7 @@ export default function NewProjectPage() {
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && hasObjective && working === null) {
                   e.preventDefault();
-                  setError(null);
-                  setStep('talk');
+                  quickStart();
                 }
               }}
               rows={3}
@@ -764,52 +803,84 @@ export default function NewProjectPage() {
             )}
           </div>
 
-          {/* 14 Oct call: start as in any chat — the conversation is the way in,
-              with the outline beside it. The other ways stay, one row below. */}
+          {/* Sean, 26 Oct: an answer first, as in Claude. The full workflow's
+              ways in stay, one press below. */}
           <div className="mt-4 flex justify-end">
             <button
-              onClick={() => { setError(null); setStep('talk'); }}
-              disabled={!hasObjective || working !== null}
+              onClick={quickStart}
+              disabled={!hasObjective || working !== null || !user || !templateFor('quick')}
               className="inline-flex items-center gap-2 rounded-xl bg-[var(--pm-primary)] px-6 py-3 text-title text-[var(--on-primary)] transition-opacity hover:opacity-90 disabled:opacity-40"
             >
-              {t('start.startConversation')}
+              {working === 'creating' ? t('start.creating') : t('start.quickAnswer')}
               <span aria-hidden className="material-symbols-outlined text-[20px]">arrow_upward</span>
             </button>
           </div>
           <p className="mt-2 text-end text-label text-[var(--on-surface-variant)]">
-            {t('start.conversationNote')}
+            {t('start.quickNote')}
           </p>
 
-          <p className="mt-8 text-label uppercase tracking-wider text-[var(--on-surface-variant)]">{t('start.skip')}</p>
-          <div className="mt-3 grid gap-3 sm:grid-cols-3">
-            <button
-              onClick={() => void recommend()}
-              disabled={!hasObjective || working !== null}
-              className="rounded-2xl bg-[var(--surface-container-high)] px-6 py-4 text-start text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-highest)] disabled:opacity-40"
-            >
-              <span className="block text-title">{simple ? t('start.setItUp') : t('start.know')}</span>
-              <span className="mt-1 block text-label text-[var(--on-surface-variant)]">{simple ? t('start.setItUpNote') : t('start.knowNote')}</span>
-            </button>
-            <button
-              onClick={() => void guideMe()}
-              disabled={!hasObjective || working !== null}
-              className="rounded-2xl bg-[var(--surface-container-high)] px-6 py-4 text-start text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-highest)] disabled:opacity-40"
-            >
-              <span className="block text-title">{simple ? t('start.askFew') : t('start.guide')}</span>
-              <span className="mt-1 block text-label text-[var(--on-surface-variant)]">
-                {simple ? t('start.askFewNote', { count: SIMPLE_GUIDE_QUESTIONS }) : t('start.guideNote')}
-              </span>
-            </button>
-            {/* A way in of its own, in both setups — not a link beside the setup switch (email 8). */}
-            <button
-              onClick={chooseYourself}
-              disabled={templates.length === 0 || working !== null}
-              className="rounded-2xl bg-[var(--surface-container-high)] px-6 py-4 text-start text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-highest)] disabled:opacity-40"
-            >
-              <span className="block text-title">{t('start.chooseYourself')}</span>
-              <span className="mt-1 block text-label text-[var(--on-surface-variant)]">{t('start.chooseNote')}</span>
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={toggleFull}
+            aria-expanded={showFull}
+            aria-controls="full-workflow-ways"
+            className="mt-8 inline-flex items-center gap-1.5 text-body font-medium text-[var(--pm-primary)] hover:underline"
+          >
+            <span aria-hidden className="material-symbols-outlined text-[18px]">{showFull ? 'expand_less' : 'expand_more'}</span>
+            {showFull ? t('start.fullWorkflowHide') : t('start.fullWorkflow')}
+          </button>
+          {showFull && (
+            <div id="full-workflow-ways" className="mt-3">
+              <p className="text-label text-[var(--on-surface-variant)]">{t('start.fullWorkflowNote')}</p>
+              {/* 14 Oct call: start as in any chat — the conversation is the way in,
+                  with the outline beside it. The other ways stay, one row below. */}
+              <div className="mt-4 flex justify-end">
+                <button
+                  onClick={() => { setError(null); setStep('talk'); }}
+                  disabled={!hasObjective || working !== null}
+                  className="inline-flex items-center gap-2 rounded-xl bg-[var(--surface-container-high)] px-6 py-3 text-title text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-highest)] disabled:opacity-40"
+                >
+                  {t('start.startConversation')}
+                  <span aria-hidden className="material-symbols-outlined text-[20px]">arrow_upward</span>
+                </button>
+              </div>
+              <p className="mt-2 text-end text-label text-[var(--on-surface-variant)]">
+                {t('start.conversationNote')}
+              </p>
+
+              <p className="mt-8 text-label uppercase tracking-wider text-[var(--on-surface-variant)]">{t('start.skip')}</p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                <button
+                  onClick={() => void recommend()}
+                  disabled={!hasObjective || working !== null}
+                  className="rounded-2xl bg-[var(--surface-container-high)] px-6 py-4 text-start text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-highest)] disabled:opacity-40"
+                >
+                  <span className="block text-title">{simple ? t('start.setItUp') : t('start.know')}</span>
+                  <span className="mt-1 block text-label text-[var(--on-surface-variant)]">{simple ? t('start.setItUpNote') : t('start.knowNote')}</span>
+                </button>
+                <button
+                  onClick={() => void guideMe()}
+                  disabled={!hasObjective || working !== null}
+                  className="rounded-2xl bg-[var(--surface-container-high)] px-6 py-4 text-start text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-highest)] disabled:opacity-40"
+                >
+                  <span className="block text-title">{simple ? t('start.askFew') : t('start.guide')}</span>
+                  <span className="mt-1 block text-label text-[var(--on-surface-variant)]">
+                    {simple ? t('start.askFewNote', { count: SIMPLE_GUIDE_QUESTIONS }) : t('start.guideNote')}
+                  </span>
+                </button>
+                {/* A way in of its own, in both setups — not a link beside the setup switch (email 8). */}
+                <button
+                  onClick={chooseYourself}
+                  disabled={templates.length === 0 || working !== null}
+                  className="rounded-2xl bg-[var(--surface-container-high)] px-6 py-4 text-start text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-highest)] disabled:opacity-40"
+                >
+                  <span className="block text-title">{t('start.chooseYourself')}</span>
+                  <span className="mt-1 block text-label text-[var(--on-surface-variant)]">{t('start.chooseNote')}</span>
+                </button>
+              </div>
+
+            </div>
+          )}
 
           {busyLabel && (
             <p role="status" className="mt-4 text-body text-[var(--on-surface-variant)]">

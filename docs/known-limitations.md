@@ -2407,3 +2407,24 @@ background picked in another tab is mixed in on the next version switch, not at 
 and side chat keep the page colours, and the outline stage — which has no version bar — keeps
 the plain background. Swatch names are English in every interface language.
 
+### L-123 — A quick answer moves into the full process once, and a manuscript does not take it as a version (2026-10-27)
+
+The start screen leads with **Get an answer** (Sean, 26 Oct): a project on the one-stage
+`quick` workflow, drafted as it opens. **Take this into the full PromptMaster process** re-pins
+the same project (`workflow_switched`, `20261122000000_workflow_switched_event.sql`) to a
+workflow designed for the work or the standard one the setup picks. The projection reads only
+the events after the last switch (`liveEvents`); the earlier log stays as the record but no
+reader in the browser sees it, so the project timeline starts again at the switch.
+
+- There is no way back to the quick answer; the switch is one-way.
+- The answer becomes v1 (`carried_from_quick`) of the new workflow's deliverable stage only when
+  that stage is a single draft (`carryTarget`). A Book's manuscript is written section by section,
+  so there it stays on the old Answer stage, which the new workflow does not show; the designer
+  and the setup were given it, so the outline is built with it in mind.
+- The Answer stage's chat is copied to the new first stage; its versions are not shown anywhere
+  after the switch except as the carried v1.
+- The switch is several writes, not one transaction. They are ordered so a failure part-way
+  leaves the quick answer working (template, version and chat first, then the event, then the
+  pin); a failure after the event but before the pin leaves a quick project whose log reads as
+  new, which only matters if it is switched again.
+
