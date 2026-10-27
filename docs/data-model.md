@@ -14,7 +14,7 @@ future change does not undo a guarantee without noticing.
 |---|---|
 | `projects` | One row per project. Setup fields, workflow key, `stage` cursor, `revision`, soft-delete. |
 | `artifacts` | One per stage per project (`kind` + `stage_id`). Holds `current_version_id`, `version_count`, `long_form`, `outline_draft`, `summary`. |
-| `artifact_versions` | Append-only version history. Content, prompt, model, mode, `finish_reason`, `user_rating`, `continuity_snapshot`, `colour_scheme` (palette at creation), `colour` (the user's choice; the one display field besides the rating that may change). |
+| `artifact_versions` | Append-only version history. Content, prompt, model, mode, `finish_reason`, `user_rating`, `continuity_snapshot`, `colour_scheme` (palette at creation), `colour` (the user's choice of button colour) and `background_colour` (the button's fill and the stage tint; null follows `colour`) — the display fields besides the rating that may change. |
 | `evaluations` | Alignment / drift / clarity / completeness per version, with `needs_realignment` as a generated column. |
 | `workflow_templates` | Immutable published template versions (`key` + `version`), definition as JSONB. |
 | `workflow_events` | **The live stage-history log.** Stage state is projected from this. `seq` is assigned by a `BEFORE INSERT` trigger (`workflow_events_assign_seq`, max+1 under a per-project advisory lock); any value a writer supplies is ignored. |
@@ -129,9 +129,10 @@ outlives the project it was left on.
 create or replace function public.artifact_versions_immutable()
 returns trigger language plpgsql as $$
 begin
-  if to_jsonb(new) - 'user_rating' - 'colour' is distinct from to_jsonb(old) - 'user_rating' - 'colour' then
+  if to_jsonb(new) - 'user_rating' - 'colour' - 'background_colour'
+     is distinct from to_jsonb(old) - 'user_rating' - 'colour' - 'background_colour' then
     raise exception
-      'artifact_versions rows are immutable (only user_rating and colour may change); '
+      'artifact_versions rows are immutable (only user_rating and the version colours may change); '
       'to change content, append a new version';
   end if;
   return new;
@@ -144,7 +145,8 @@ create trigger artifact_versions_no_update before update on public.artifact_vers
 
 `colour` was exempted on 2026-10-26 (`20261119000000_version_colour_choice.sql`, L-122): a
 version's colour is how it is shown, not what it says, and the user may now choose it. Every
-content, provenance and ordering column is still refused.
+content, provenance and ordering column is still refused. `background_colour` joined it on
+2026-10-27 (`20261120000000_version_background_colour.sql`).
 
 Restoring a version **appends a new version** with `restored_from_version_id` set,
 rather than mutating history. That is why version history and prompt assembly can
