@@ -2437,7 +2437,9 @@ export function WorkflowWorkspace({
             />
           )}
 
-          {isCurrent && appendStageVersion && project.status !== 'finalized' && (
+          {/* A quick answer reads as an answer (prod pass, 27 Oct): Go and the
+              setup form wait for the full process. */}
+          {isCurrent && appendStageVersion && project.status !== 'finalized' && !isQuickAnswer(template) && (
             <GoPanel
               go={go}
               stageLabel={stageNameShown(stage.id)}
@@ -2486,7 +2488,7 @@ export function WorkflowWorkspace({
             {/* The stage's exit criteria say whether the project's setup fields
                 belong here — no stage in any template asks for them twice, and
                 nothing about this reads the workflow's name. */}
-            {stageWantsSetup(stage) ? (
+            {stageWantsSetup(stage) && !isQuickAnswer(template) ? (
               <ProjectSetup
                 project={project}
                 stage={stage}
