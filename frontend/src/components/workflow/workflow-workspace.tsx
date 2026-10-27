@@ -70,6 +70,7 @@ import {
   outstandingBeyondCriteria,
   shownOutstanding,
   type OutstandingShow,
+  type OutstandingItem,
   openFindingsByStage,
   outstandingWork,
   tickClosesStage,
@@ -725,7 +726,9 @@ export function WorkflowWorkspace({
        * which is correct: nothing proposed that move, and recording a proposal
        * that did not happen would be worse than recording none.
        */
-      proposalId?: string
+      proposalId?: string,
+      /** Finishing early: what was still open, kept on the finish as its caveats. */
+      caveats?: OutstandingItem[]
     ) => {
       if (!stage || busy) return;
       setBusy(true);
@@ -734,6 +737,20 @@ export function WorkflowWorkspace({
       // changed": saying so invited a retry that recorded the move twice.
       let recorded = false;
       try {
+        // Finishing early touches no stage: the stage stays as it is, open
+        // work stays open, and the finish says what was not done (26 Oct).
+        if (option.kind === 'finish' && option.early) {
+          const fresh = await appendEvent({
+            type: 'project_finalized',
+            stage_id: stage.id,
+            reason: note || 'Finished early with what I had.',
+            payload: { early: true, caveats: caveats ?? [] },
+          });
+          recorded = true;
+          setViewingStageId(null);
+          onPatchProject({ status: 'finalized', stage: projectState(template, fresh).current_stage_id });
+          return;
+        }
         // PM-13: moving on with the stage's requirements met completes it;
         // moving on without them ("Continue anyway") leaves it open. The
         // legacy stage_completed is no longer written.
@@ -1684,6 +1701,17 @@ export function WorkflowWorkspace({
     isCurrent && project.status !== 'finalized' && !stage.transitions.default_next
       ? transitions.find((o) => o.kind === 'finish')
       : undefined;
+  // From any stage before the last: finish with what the project has, the rest
+  // recorded as not done yet (26 Oct). The last stage has Finish itself.
+  const finishEarly: TransitionOption | undefined =
+    isCurrent && project.status !== 'finalized' && stage.transitions.default_next
+      ? { kind: 'finish', toStageId: null, label: t('early.finish'), requiresNote: false, early: true }
+      : undefined;
+  // What a finish that came early left undone, for the finished banner.
+  const lastFinish = [...(events ?? [])].reverse().find((e) => e.type === 'project_finalized');
+  const finishedEarly = project.status === 'finalized' && lastFinish?.payload?.early === true
+    ? ((lastFinish.payload.caveats as OutstandingItem[] | undefined) ?? [])
+    : null;
   const primaryAction = nextStageAction({
     finished: project.status === 'finalized',
     // Go working the project is busy too: a check pressed while Go appends a
@@ -2064,6 +2092,7 @@ export function WorkflowWorkspace({
   const completionDialog = isCurrent && finishing ? (
     <CompletionDialog
       summary={completion}
+      early={Boolean(finishing.option.early)}
       show={outstandingShow}
       busy={busy}
       error={transitionError}
@@ -2080,7 +2109,7 @@ export function WorkflowWorkspace({
               .filter(Boolean)
               .join(' — ')
           : note;
-        void handleTransition(option, why);
+        void handleTransition(option, why, undefined, option.early ? completion.outstanding : undefined);
       }}
       onCancel={() => {
         setFinishing(null);
@@ -2408,7 +2437,9 @@ export function WorkflowWorkspace({
             />
           )}
 
-          {isCurrent && appendStageVersion && project.status !== 'finalized' && (
+          {/* A quick answer reads as an answer (prod pass, 27 Oct): Go and the
+              setup form wait for the full process. */}
+          {isCurrent && appendStageVersion && project.status !== 'finalized' && !isQuickAnswer(template) && (
             <GoPanel
               go={go}
               stageLabel={stageNameShown(stage.id)}
@@ -2457,7 +2488,7 @@ export function WorkflowWorkspace({
             {/* The stage's exit criteria say whether the project's setup fields
                 belong here — no stage in any template asks for them twice, and
                 nothing about this reads the workflow's name. */}
-            {stageWantsSetup(stage) ? (
+            {stageWantsSetup(stage) && !isQuickAnswer(template) ? (
               <ProjectSetup
                 project={project}
                 stage={stage}
@@ -2805,6 +2836,8 @@ export function WorkflowWorkspace({
             {isCurrent && project.status === 'finalized' && (
               <ProjectFinishedBanner
                 onReopen={() => void reopenProject()}
+                notDone={finishedEarly?.map((item) => ({ text: shownOutstanding(item, locale, outstandingShow), stageId: 'stageId' in item ? item.stageId : undefined }))}
+                onGoBack={(stageId) => void reopenProject().then(() => setViewingStageId(stageId === state.current_stage_id ? null : stageId))}
                 leftOpen={completion.leftOpenStages.map((s) => ({ id: s.id, label: stageNameShown(s.id, 'short') }))}
                 onViewStage={setViewingStageId}
               />
@@ -2873,6 +2906,20 @@ export function WorkflowWorkspace({
                 onSuggest={appendStageVersion && !go.active && !go.pendingStep ? () => void go.suggest() : undefined}
                 suggesting={go.active && go.run?.policy === 'guided'}
               />
+            )}
+            {finishEarly && !finishing && (
+              <div className="mt-3 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setFinishing({ option: finishEarly })}
+                  disabled={busy || go.active}
+                  title={t('early.finishNote')}
+                  className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-label text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)] hover:text-[var(--on-surface)] disabled:opacity-40"
+                >
+                  <span aria-hidden className="material-symbols-outlined text-[16px]">flag</span>
+                  {t('early.finish')}
+                </button>
+              </div>
             )}
           </div>
         </div>

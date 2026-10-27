@@ -2434,3 +2434,15 @@ reader in the browser sees it, so the project timeline starts again at the switc
   pin); a failure after the event but before the pin leaves a quick project whose log reads as
   new, which only matters if it is switched again.
 
+### L-124 — Finishing early records what was not done; it closes no stage and gives no approval (2026-10-27)
+
+"Finish with what I have" (a tester via Sean, 26 Oct: "a check all the boxes and finish option …
+with potential caveat to come back") sits under the transition bar on every stage before the
+last. It writes `project_finalized` alone, with `payload.early = true` and what
+`outstandingWork` had open as `payload.caveats`; no stage is marked complete and no approval is
+ticked on the user's behalf, so a first-person approval still only ever means the user gave it.
+No reason is asked. The finished banner lists the caveats in the interface language, each with
+"Go back to this", which reopens the project on that stage. The caveats are a snapshot: work
+added to the project afterwards is not added to them, and reopening and finishing again replaces
+them.
+

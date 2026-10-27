@@ -9,6 +9,10 @@ interface Props {
   /** Stages moved past with requirements still open. They can be closed from here. */
   leftOpen?: { id: string; label: string }[];
   onViewStage?: (stageId: string) => void;
+  /** Finished early: what was not done yet, each with the stage to go back to (26 Oct). */
+  notDone?: { text: string; stageId?: string }[];
+  /** Reopen the project on that stage. */
+  onGoBack?: (stageId: string) => void;
 }
 
 /**
@@ -18,7 +22,7 @@ interface Props {
  * the project says it is done, says where it went, and offers the way back —
  * finishing is a status, not a lock, and everything stays readable.
  */
-export function ProjectFinishedBanner({ onReopen, leftOpen = [], onViewStage }: Props) {
+export function ProjectFinishedBanner({ onReopen, leftOpen = [], onViewStage, notDone, onGoBack }: Props) {
   const t = useT();
   return (
     <div
@@ -33,6 +37,27 @@ export function ProjectFinishedBanner({ onReopen, leftOpen = [], onViewStage }: 
         <p className="text-label text-[var(--on-surface-variant)]">
           {t('pnl.finishedNote')}
         </p>
+        {notDone && notDone.length > 0 && (
+          <div role="group" aria-label={t('early.caveats')} className="mt-2">
+            <p className="text-label font-semibold text-[var(--on-surface)]">{t('early.bannerTitle')}</p>
+            <ul className="mt-1 list-disc ps-5 text-label text-[var(--on-surface-variant)]">
+              {notDone.map((item, i) => (
+                <li key={i}>
+                  {item.text}
+                  {onGoBack && item.stageId && (
+                    <button
+                      type="button"
+                      onClick={() => onGoBack(item.stageId!)}
+                      className="ms-2 rounded px-1.5 py-0.5 font-semibold text-[var(--pm-primary)] hover:bg-[var(--surface-container-high)]"
+                    >
+                      {t('early.goBack')}
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         {leftOpen.length > 0 && (
           <p className="mt-1 flex flex-wrap items-center gap-x-2 text-label text-[var(--on-surface-variant)]">
             <span>{t('pnl.leftOpen', { stages: leftOpen.map((s) => s.label).join(', ') })}</span>

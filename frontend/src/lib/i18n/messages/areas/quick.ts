@@ -21,6 +21,13 @@ export const en = {
   "quick.cancel": "Cancel",
   "quick.recommended": "Designed for this work",
   "quick.standard": "Standard",
+  "early.finish": "Finish with what I have",
+  "early.finishNote": "Finish now and come back to the rest whenever you like.",
+  "early.title": "Finish with what you have?",
+  "early.intro": "The project is finished as it stands. What is still open is recorded as not done yet, and you can come back to any of it at any time.",
+  "early.caveats": "Not done yet",
+  "early.bannerTitle": "Finished early — not done yet:",
+  "early.goBack": "Go back to this",
 };
 
 type Keys = Record<keyof typeof en, string>;
@@ -47,6 +54,13 @@ export const es: Keys = {
   "quick.cancel": "Cancelar",
   "quick.recommended": "Diseñado para este trabajo",
   "quick.standard": "Estándar",
+  "early.finish": "Terminar con lo que tengo",
+  "early.finishNote": "Termina ahora y vuelve a lo demás cuando quieras.",
+  "early.title": "¿Terminar con lo que tienes?",
+  "early.intro": "El proyecto se termina tal como está. Lo que sigue abierto queda anotado como pendiente, y puedes volver a cualquier parte cuando quieras.",
+  "early.caveats": "Pendiente",
+  "early.bannerTitle": "Terminado antes de tiempo; pendiente:",
+  "early.goBack": "Volver a esto",
 };
 
 export const fr: Keys = {
@@ -71,6 +85,13 @@ export const fr: Keys = {
   "quick.cancel": "Annuler",
   "quick.recommended": "Conçu pour ce travail",
   "quick.standard": "Standard",
+  "early.finish": "Terminer avec ce que j’ai",
+  "early.finishNote": "Terminez maintenant et revenez au reste quand vous voulez.",
+  "early.title": "Terminer avec ce que vous avez ?",
+  "early.intro": "Le projet est terminé tel quel. Ce qui reste ouvert est noté comme pas encore fait, et vous pouvez y revenir à tout moment.",
+  "early.caveats": "Pas encore fait",
+  "early.bannerTitle": "Terminé plus tôt — pas encore fait :",
+  "early.goBack": "Revenir à ceci",
 };
 
 export const pt: Keys = {
@@ -95,4 +116,11 @@ export const pt: Keys = {
   "quick.cancel": "Cancelar",
   "quick.recommended": "Feito para este trabalho",
   "quick.standard": "Padrão",
+  "early.finish": "Terminar com o que tenho",
+  "early.finishNote": "Termine agora e volte ao resto quando quiser.",
+  "early.title": "Terminar com o que você tem?",
+  "early.intro": "O projeto é terminado como está. O que ainda está aberto fica registrado como pendente, e você pode voltar a qualquer parte a qualquer momento.",
+  "early.caveats": "Pendente",
+  "early.bannerTitle": "Terminado antes — pendente:",
+  "early.goBack": "Voltar a isto",
 };
