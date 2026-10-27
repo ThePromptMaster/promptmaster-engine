@@ -2232,9 +2232,15 @@ named as the closest, one click away.
 Sean, 24 Oct: "the next language should be Hindi and then Mandarin. Arabic and Swahili. Maybe
 even Ebonics too." Writes in now also offers Hindi, Chinese (Mandarin, Simplified), Arabic,
 Swahili and African American English.
-- **African American English is a variety of English**, so it is offered as one (`en-aave`) and
-  named as linguists name it, not "Ebonics". Since 2026-10-27 it is an interface language too
-  (L-125). Its directive asks for the grammar, vocabulary and rhythm a fluent speaker uses, in
+- **Withdrawn 2026-10-27.** Sean: "take off African American language for the time being …
+  there needs to be sensitivity behind that before rolling that out." It is offered neither for
+  Writes in nor for the interface (L-125); a project or browser saved with `en-aave` reads it as
+  English, so the one such project now writes in English. The database still allows `xx-variety`
+  codes. To bring it back after a sensitivity review, restore the entries and the directive from
+  the commits before the withdrawal. What follows is how it worked.
+- **African American English is a variety of English**, so it was offered as one (`en-aave`) and
+  named as linguists name it, not "Ebonics". On 2026-10-27 it was briefly an interface language
+  too (L-125). Its directive asks for the grammar, vocabulary and rhythm a fluent speaker uses, in
   the register the work needs, and rules out exaggeration and caricature; a model can still
   overdo it, so a reader who speaks it should judge the result.
 - **Chinese limits are in characters (字).** In a Chinese project "200 words" is 200 characters,
@@ -2446,7 +2452,12 @@ No reason is asked. The finished banner lists the caveats in the interface langu
 added to the project afterwards is not added to them, and reopening and finishing again replaces
 them.
 
-### L-125 — The interface in African American English is machine-drafted (2026-10-27)
+### L-125 — The interface in African American English is machine-drafted (2026-10-27; withdrawn the same day)
+
+**Withdrawn 2026-10-27 at the client's request, pending a sensitivity review (L-110).** The
+locale and its dictionary were removed; `en-aave` in a saved cookie or localStorage reads as
+English. The dictionary is in git at a6171c2 (`frontend/src/lib/i18n/messages/en-aave*`) and can
+be restored, with the points below still to answer. As it was:
 
 Sean, 26 Oct: AAE "for everything in promptmaster just as if it was a change in language, even
 for the instructions … I'm just thinking about kids who grow up with that vernacular". `en-aave`

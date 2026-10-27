@@ -72,7 +72,7 @@ async function check(page: Page, locale: Locale, where: string, width: number) {
         clipped,
       };
     },
-    { english, latinScript: ['en', 'es', 'fr', 'pt', 'sw', 'en-aave'].includes(locale), languageNames: LOCALES.map((l) => l.own as string) }
+    { english, latinScript: ['en', 'es', 'fr', 'pt', 'sw'].includes(locale), languageNames: LOCALES.map((l) => l.own as string) }
   );
   const label = `${locale} ${where} ${width}px`;
   test.info().annotations.push({ type: 'render', description: `${label}: ${JSON.stringify({ untranslated: report.untranslated, latin: report.latin, clipped: report.clipped })}` });

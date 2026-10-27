@@ -17,10 +17,6 @@ export const LOCALES = [
   { code: 'zh', own: '中文' },
   { code: 'ar', own: 'العربية' },
   { code: 'sw', own: 'Kiswahili' },
-  // Sean, 26 Oct: African American English for everything in PromptMaster, "even
-  // for the instructions", for kids who grow up with it. A variety of English,
-  // so it carries a variety code (`en-aave`), as "Writes in" does.
-  { code: 'en-aave', own: 'African American English' },
 ] as const;
 
 export type Locale = (typeof LOCALES)[number]['code'];
@@ -35,7 +31,7 @@ export function localeDirection(code: string | null | undefined): 'rtl' | 'ltr' 
 /** Where the choice is kept: localStorage for the browser, a cookie so the server renders it too. */
 export const LOCALE_KEY = 'pm.locale';
 
-/** An offered locale, or English for anything else: an exact code first ("en-aave"), then its language ("es-MX" is "es"). */
+/** An offered locale, or English for anything else: an exact code first, then its language ("es-MX" is "es"). */
 export function resolveLocale(code: string | null | undefined): Locale {
   const exact = (code ?? '').trim().toLowerCase();
   if (LOCALES.some((l) => l.code === exact)) return exact as Locale;
