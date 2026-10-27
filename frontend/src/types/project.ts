@@ -310,6 +310,8 @@ export interface ArtifactVersion {
   colour_scheme?: string | null;
   /** The colour the user chose for this version (an id from VERSION_SWATCHES); null keeps the one it was made with. */
   colour?: string | null;
+  /** The background colour the user chose (an id from VERSION_SWATCHES); null follows `colour`. */
+  background_colour?: string | null;
 
   created_at: string;
 }

@@ -22,6 +22,7 @@ import {
   listVersions,
   rateVersion as rateVersionRow,
   setVersionColour as setVersionColourRow,
+  type VersionColourField,
   restoreVersion as restoreVersionRow,
   saveArtifactSummary,
   saveArtifactFigures,
@@ -255,8 +256,8 @@ interface ProjectState {
   setStageFigures: (stageId: string, figures: StageFigures) => Promise<void>;
 
   rateVersion: (versionId: string, rating: 'positive' | 'negative' | null) => Promise<void>;
-  /** The colour the user chose for a version (null: the one it was made with), saved and shown wherever the version is. */
-  setVersionColour: (versionId: string, colour: string | null) => Promise<void>;
+  /** A colour the user chose for a version — its button, or its background (null: the one it was made with), saved and shown wherever the version is. */
+  setVersionColour: (versionId: string, colour: string | null, field?: VersionColourField) => Promise<void>;
   setActiveVersion: (versionId: string | null) => void;
 
   resolveConflict: (choice: 'reload' | 'keep-mine') => Promise<void>;
@@ -926,10 +927,10 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     }));
   },
 
-  async setVersionColour(versionId, colour) {
-    await setVersionColourRow(versionId, colour);
+  async setVersionColour(versionId, colour, field = 'colour') {
+    await setVersionColourRow(versionId, colour, field);
     const paint = (vs: ArtifactVersion[]) =>
-      vs.some((v) => v.id === versionId) ? vs.map((v) => (v.id === versionId ? { ...v, colour } : v)) : vs;
+      vs.some((v) => v.id === versionId) ? vs.map((v) => (v.id === versionId ? { ...v, [field]: colour } : v)) : vs;
     set((s) => ({
       versions: paint(s.versions),
       stages: Object.fromEntries(Object.entries(s.stages).map(([id, b]) => [id, { ...b, versions: paint(b.versions) }])),

@@ -226,6 +226,21 @@ export function colourOfVersion(versionNumber: number, scheme?: string | null, c
 }
 
 /**
+ * A version's background colour (Sean, 26 Oct: "each version you can choose a
+ * different background and button color"): the inside of its version button
+ * and the stage area behind it. The one chosen for it, if any; otherwise its
+ * button colour, so a version with one choice looks as it did before.
+ */
+export function backgroundOfVersion(
+  versionNumber: number,
+  scheme?: string | null,
+  chosen?: string | null,
+  background?: string | null,
+): string {
+  return VERSION_SWATCHES.find((s) => s.id === background)?.colour ?? colourOfVersion(versionNumber, scheme, chosen);
+}
+
+/**
  * How strongly each surface takes the shown version's colour: the page most,
  * the cards least, so they keep their tonal separation from it.
  */
