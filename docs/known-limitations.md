@@ -2412,6 +2412,7 @@ the plain background. Swatch names are English in every interface language.
 the trigger exempts. `colour` is the version button's outline; `background_colour` fills the
 button and tints the stage column, and when unset follows `colour`, so a version with one choice
 looks as it did. The timeline's dot still shows the button colour only.
+
 ### L-123 — A quick answer moves into the full process once, and a manuscript does not take it as a version (2026-10-27)
 
 The start screen leads with **Get an answer** (Sean, 26 Oct): a project on the one-stage
