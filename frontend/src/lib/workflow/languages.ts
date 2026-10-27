@@ -16,15 +16,13 @@ export const LANGUAGES = [
   { code: 'zh', name: 'Chinese (Mandarin, Simplified)', own: '中文' },
   { code: 'ar', name: 'Arabic', own: 'العربية' },
   { code: 'sw', name: 'Swahili', own: 'Kiswahili' },
-  // "Maybe even Ebonics too": a variety of English, so it is offered as one.
-  { code: 'en-aave', name: 'African American English', own: 'African American English' },
 ] as const;
 
 export type LanguageCode = (typeof LANGUAGES)[number]['code'];
 
 export const DEFAULT_LANGUAGE: LanguageCode = 'en';
 
-/** An offered code, or English for anything else: an exact code first ("en-aave"), then its language ("es-MX" is "es"). */
+/** An offered code, or English for anything else: an exact code first, then its language ("es-MX" is "es"). */
 export function resolveLanguage(code: string | null | undefined): LanguageCode {
   const exact = (code ?? '').trim().toLowerCase();
   if (LANGUAGES.some((l) => l.code === exact)) return exact as LanguageCode;
@@ -46,7 +44,7 @@ export function browserLanguage(): LanguageCode {
 /** "español (Spanish)", or "English". */
 export function languageLabel(code: string | null | undefined): string {
   const l = LANGUAGES.find((x) => x.code === resolveLanguage(code))!;
-  return l.code === 'en' || l.own === l.name ? l.name : `${l.own} (${l.name})`;
+  return l.code === 'en' ? l.name : `${l.own} (${l.name})`;
 }
 
 /**

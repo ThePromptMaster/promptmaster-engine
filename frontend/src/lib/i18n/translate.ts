@@ -6,10 +6,9 @@ import { hi } from './messages/hi';
 import { zh } from './messages/zh';
 import { ar } from './messages/ar';
 import { sw } from './messages/sw';
-import { aave } from './messages/en-aave';
 import type { Locale } from './locales';
 
-export const DICTIONARIES: Record<Locale, Messages> = { en, es, fr, pt, hi, zh, ar, sw, 'en-aave': aave };
+export const DICTIONARIES: Record<Locale, Messages> = { en, es, fr, pt, hi, zh, ar, sw };
 
 export type Vars = Record<string, string | number>;
 

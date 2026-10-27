@@ -96,18 +96,21 @@ def test_the_header_sets_the_language_for_the_request():
     assert client.get("/lang").json() == {"language": "en"}
 
 
-def test_the_new_languages_and_the_english_variety_resolve_exactly():
-    """Sean, 24 Oct: Hindi, Mandarin, Arabic, Swahili, "maybe even Ebonics"."""
-    for code in ("hi", "zh", "ar", "sw", "en-aave"):
+def test_the_new_languages_resolve_exactly():
+    """Sean, 24 Oct: Hindi, Mandarin, Arabic, Swahili."""
+    for code in ("hi", "zh", "ar", "sw"):
         assert resolve(code) == code
     assert resolve("zh-CN") == "zh"
     assert resolve("en-GB") == "en"
-    assert resolve("EN-AAVE") == "en-aave"
 
 
-def test_chinese_limits_are_characters_and_aae_is_written_with_respect():
+def test_african_american_english_is_withdrawn():
+    """Sean, 27 Oct: "take off African American language for the time being" (L-110).
+    A project saved with it writes in English."""
+    assert resolve("en-aave") == "en"
+    assert language_directive("en-aave") == ""
+
+
+def test_chinese_limits_are_characters():
     assert "字" in language_directive("zh") and "Simplified" in language_directive("zh")
-    d = language_directive("en-aave")
-    assert "African American English" in d
-    assert "caricature" in d and "[S1]" in d and "High/Medium/Low" in d
     assert "हिन्दी" in language_directive("hi")

@@ -15,7 +15,8 @@ describe('the offered languages', () => {
     expect(resolveLanguage('es-MX')).toBe('es');
     expect(resolveLanguage('ja')).toBe('en');
     expect(resolveLanguage(undefined)).toBe('en');
-    expect(resolveLanguage('en-aave')).toBe('en-aave');
+    // African American English was withdrawn on 27 Oct (L-110): a project saved with it writes in English.
+    expect(resolveLanguage('en-aave')).toBe('en');
     expect(resolveLanguage('en-GB')).toBe('en');
     expect(resolveLanguage('zh-CN')).toBe('zh');
   });
