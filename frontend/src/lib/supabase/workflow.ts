@@ -1,6 +1,7 @@
 import { createClient } from './client';
 import { OBJECTIVE_CHANGES, objectiveUnmet } from '@/lib/workflow/objective';
 import type { StageDefinition, WorkflowEvent, WorkflowTemplate } from '@/lib/workflow/types';
+import { liveEvents } from '@/lib/workflow/engine';
 
 interface TemplateRow {
   id: string;
@@ -192,7 +193,16 @@ interface EventRow {
   created_at: string;
 }
 
+/**
+ * The project's events since it last changed workflow (`liveEvents`): every
+ * reader — the projection, outstanding work, Go — works on the workflow the
+ * project is on now. `listAllWorkflowEvents` is the whole record.
+ */
 export async function listWorkflowEvents(projectId: string): Promise<WorkflowEvent[]> {
+  return liveEvents(await listAllWorkflowEvents(projectId));
+}
+
+export async function listAllWorkflowEvents(projectId: string): Promise<WorkflowEvent[]> {
   const supabase = createClient();
   const { data, error } = await supabase
     .from('workflow_events')

@@ -37,6 +37,7 @@ export const zh: Record<keyof typeof en, string> = {
   'op.stage_draft': 'AI 草稿',
   'op.stage_regenerate': 'AI 重新起草',
   'op.stage_edit': '你的编辑',
+  'op.carried_from_quick': '你的快速回答',
   'op.chat_instruct': '根据对话修改',
   'op.applied_recommendations': '已应用建议的修正',
   'op.restore': '已恢复较早版本',

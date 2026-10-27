@@ -37,6 +37,7 @@ export const sw: Record<keyof typeof en, string> = {
   'op.stage_draft': 'Rasimu ya AI',
   'op.stage_regenerate': 'Rasimu mpya ya AI',
   'op.stage_edit': 'Uhariri wako',
+  'op.carried_from_quick': 'Jibu lako la haraka',
   'op.chat_instruct': 'Imerekebishwa kutoka kwenye gumzo',
   'op.applied_recommendations': 'Marekebisho yaliyopendekezwa yametumika',
   'op.restore': 'Toleo la awali limerejeshwa',

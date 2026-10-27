@@ -1,0 +1,26 @@
+import type { en } from '../areas/quick';
+
+/** Swahili for `areas/quick.ts`. */
+export const sw: Record<keyof typeof en, string> = {
+  "workflow.name.quick": "Jibu la haraka",
+  "workflow.pitch.quick": "Jibu au rasimu papo hapo; lipeleke kwenye mchakato kamili linapohitaji zaidi.",
+  "template.quick.description": "Jibu au rasimu papo hapo, bila hatua za kupitia kwanza.",
+  "stage.quick.answer.label": "Jibu",
+  "stage.quick.answer.short": "Jibu",
+  "stage.quick.answer.guidance": "Hiki ndicho ulichoomba. Uliza swali jingine kwenye gumzo, kiboreshe, au kipeleke kwenye mchakato kamili wa PromptMaster wenye hatua, ukaguzi na idhini.",
+  "start.quickAnswer": "Pata jibu",
+  "start.quickNote": "Jibu au rasimu papo hapo. Lipeleke kwenye mchakato kamili wa PromptMaster wakati wowote — kila ulichotengeneza kinakwenda nalo.",
+  "start.fullWorkflow": "Anza na mtiririko kamili badala yake",
+  "start.fullWorkflowHide": "Ficha chaguo za mtiririko kamili",
+  "start.fullWorkflowNote": "Hatua, ukaguzi, marekebisho na maamuzi tangu mwanzo: lizungumzie, jibu maswali machache, au chagua mtiririko mwenyewe.",
+  "quick.takeFull": "Peleka hiki kwenye mchakato kamili wa PromptMaster",
+  "quick.takeFullNote": "Hatua, ukaguzi, marekebisho na maamuzi, juu ya ulicho nacho hapa.",
+  "quick.takeFullTitle": "Peleka kwenye mchakato kamili",
+  "quick.takeFullIntro": "PromptMaster huandaa mtiririko kwa kazi hii. Jibu lako linakuwa toleo la kwanza la matokeo, na gumzo, faili, vyanzo na ukweli vinabaki kwenye mradi.",
+  "quick.takeFullConfirm": "Endelea na {name}",
+  "quick.takeFullWorking": "Inaandaa mchakato kamili…",
+  "quick.takeFullFailed": "Mradi haukubadilishwa: {reason}",
+  "quick.cancel": "Ghairi",
+  "quick.recommended": "Imeundwa kwa kazi hii",
+  "quick.standard": "Kawaida",
+};

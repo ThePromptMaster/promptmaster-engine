@@ -30,6 +30,7 @@ import { ar as recArea } from './ar/rec';
 import { ar as panelsArea } from './ar/panels';
 import { ar as startersArea } from './ar/starters';
 import { ar as assessArea } from './ar/assess';
+import { ar as quickArea } from './ar/quick';
 
 /** Arabic (Sean, 24 Oct: "Arabic and Swahili"). Shown right-to-left. */
 export const ar: Messages = {
@@ -326,4 +327,5 @@ export const ar: Messages = {
   ...panelsArea,
   ...startersArea,
   ...assessArea,
+  ...quickArea,
 };

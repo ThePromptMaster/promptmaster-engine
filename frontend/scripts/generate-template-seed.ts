@@ -18,8 +18,9 @@ import { RESEARCH_V1 } from '../src/lib/workflow/templates/research.v1.ts';
 import { SINGLE_OUTPUT_V1 } from '../src/lib/workflow/templates/single-output.v1.ts';
 import { EXPLORATION_V1 } from '../src/lib/workflow/templates/exploration.v1.ts';
 import { ASSESSMENT_V1 } from '../src/lib/workflow/templates/assessment.v1.ts';
+import { QUICK_V1 } from '../src/lib/workflow/templates/quick.v1.ts';
 
-const TEMPLATES = [BOOK_V1, RESEARCH_V1, SINGLE_OUTPUT_V1, EXPLORATION_V1, ASSESSMENT_V1];
+const TEMPLATES = [BOOK_V1, RESEARCH_V1, SINGLE_OUTPUT_V1, EXPLORATION_V1, ASSESSMENT_V1, QUICK_V1];
 
 const sqlString = (value: string) => `'${value.replace(/'/g, "''")}'`;
 
