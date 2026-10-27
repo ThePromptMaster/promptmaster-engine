@@ -2,18 +2,32 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { BACKGROUND_VARIABLES, colourOfVersion, VERSION_SWATCHES, versionTintVariables } from './colours';
+import { backgroundOfVersion, BACKGROUND_VARIABLES, colourOfVersion, VERSION_SWATCHES, versionTintVariables } from './colours';
 
 describe('a version\'s own colour (Sean, 25 Oct, email 4)', () => {
   const sql = readFileSync(join(__dirname, '../../../../supabase/migrations/20261119000000_version_colour_choice.sql'), 'utf8');
+  const bgSql = readFileSync(join(__dirname, '../../../../supabase/migrations/20261120000000_version_background_colour.sql'), 'utf8');
 
   it('the database allows exactly the colours the picker offers', () => {
     const allowed = [...(sql.match(/colour in \(([^)]*)\)/)?.[1] ?? '').matchAll(/'([a-z]+)'/g)].map((m) => m[1]);
     expect(allowed).toEqual(VERSION_SWATCHES.map((s) => s.id));
   });
 
-  it('the trigger lets the colour change and nothing else beside the rating', () => {
-    expect(sql).toMatch(/to_jsonb\(new\) - 'user_rating' - 'colour' is distinct from to_jsonb\(old\) - 'user_rating' - 'colour'/);
+  it('the database allows exactly the same colours for the background', () => {
+    const allowed = [...(bgSql.match(/background_colour in \(([^)]*)\)/)?.[1] ?? '').matchAll(/'([a-z]+)'/g)].map((m) => m[1]);
+    expect(allowed).toEqual(VERSION_SWATCHES.map((s) => s.id));
+  });
+
+  it('the trigger lets the two colours change and nothing else beside the rating', () => {
+    expect(bgSql).toMatch(
+      /to_jsonb\(new\) - 'user_rating' - 'colour' - 'background_colour'\s+is distinct from to_jsonb\(old\) - 'user_rating' - 'colour' - 'background_colour'/
+    );
+  });
+
+  it('the background is the one chosen, or else the button colour (Sean, 26 Oct)', () => {
+    expect(backgroundOfVersion(3, 'grey/calm', 'gold', 'navy')).toBe('#1e3a8a');
+    expect(backgroundOfVersion(3, 'grey/calm', 'gold', null)).toBe('#f2a900');
+    expect(backgroundOfVersion(3, 'grey/calm', null, 'neon')).toBe('#0f8a8c');
   });
 
   it('a chosen colour wins over the one the version was made with; an unknown one is ignored', () => {
