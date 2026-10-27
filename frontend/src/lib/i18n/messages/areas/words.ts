@@ -254,7 +254,7 @@ export const en = {
   "twp:audience segment": "audience segments",
   "twp:claim": "claims",
   "twp:work": "works",
-  "twp:hypothesis": "hypothesiss",
+  "twp:hypothesis": "hypotheses",
   "twp:run": "runs",
   "twp:alternative explanation": "alternative explanations",
   "twp:result": "results",
