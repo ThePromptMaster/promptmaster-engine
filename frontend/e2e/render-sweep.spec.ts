@@ -32,7 +32,7 @@ function leaked(locale: Locale): Set<string> {
 async function check(page: Page, locale: Locale, where: string, width: number) {
   const english = [...leaked(locale)];
   const report = await page.evaluate(
-    ({ english, latinScript }) => {
+    ({ english, latinScript, languageNames }) => {
       const visible = (el: Element) => {
         const r = (el as HTMLElement).getBoundingClientRect();
         const s = getComputedStyle(el);
@@ -54,7 +54,7 @@ async function check(page: Page, locale: Locale, where: string, width: number) {
       // In a non-Latin script, Latin phrases of two or more words are interface words left in English,
       // unless they are the project's own (its name and objective, the mock model's text).
       const own = /E2E render sweep|Write a short note on tea|Mock output|scripted|mock model|PromptMaster|^General$/i;
-      const latin = latinScript ? [] : [...new Set(texts.filter((t) => /^[A-Za-z][A-Za-z0-9 ,.'’:;()?!\/&+-]+$/.test(t) && t.split(' ').length >= 2 && !own.test(t)))];
+      const latin = latinScript ? [] : [...new Set(texts.filter((t) => /^[A-Za-z][A-Za-z0-9 ,.'’:;()?!\/&+-]+$/.test(t) && t.split(' ').length >= 2 && !own.test(t) && !languageNames.includes(t)))];
       const clipped = [...document.querySelectorAll('button, a, label, [role=tab], [role=radio]')]
         .filter((el) => visible(el) && (el as HTMLElement).scrollWidth > (el as HTMLElement).clientWidth + 2 && getComputedStyle(el).overflow !== 'visible')
         .map((el) => (el.textContent ?? '').trim().slice(0, 60))
@@ -72,7 +72,7 @@ async function check(page: Page, locale: Locale, where: string, width: number) {
         clipped,
       };
     },
-    { english, latinScript: ['en', 'es', 'fr', 'pt', 'sw'].includes(locale) }
+    { english, latinScript: ['en', 'es', 'fr', 'pt', 'sw', 'en-aave'].includes(locale), languageNames: LOCALES.map((l) => l.own as string) }
   );
   const label = `${locale} ${where} ${width}px`;
   test.info().annotations.push({ type: 'render', description: `${label}: ${JSON.stringify({ untranslated: report.untranslated, latin: report.latin, clipped: report.clipped })}` });
