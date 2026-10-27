@@ -1,0 +1,33 @@
+import type { en } from '../areas/quick';
+
+/** African American English for `areas/quick.ts` (Sean, 26 Oct). */
+export const aave: Record<keyof typeof en, string> = {
+  "workflow.name.quick": "Quick answer",
+  "workflow.pitch.quick": "An answer or a draft right now; take it into the full process whenever it need more.",
+  "template.quick.description": "An answer or a draft right now, with no stages to go through first.",
+  "stage.quick.answer.label": "Answer",
+  "stage.quick.answer.short": "Answer",
+  "stage.quick.answer.guidance": "Here go what you asked for. Ask a follow-up in the chat, tighten it up, or take it into the full PromptMaster process for stages, checks and approvals.",
+  "start.quickAnswer": "Get an answer",
+  "start.quickNote": "An answer or a draft right now. Take it into the full PromptMaster process whenever — everything you made come with it.",
+  "start.fullWorkflow": "Start with the full workflow instead",
+  "start.fullWorkflowHide": "Hide the full workflow options",
+  "start.fullWorkflowNote": "Stages, checks, revisions and decisions from the jump: talk it through, answer a few questions, or pick the workflow yourself.",
+  "quick.takeFull": "Take this into the full PromptMaster process",
+  "quick.takeFullNote": "Stages, checks, revisions and decisions, built on what you got here.",
+  "quick.takeFullTitle": "Take this into the full process",
+  "quick.takeFullIntro": "PromptMaster set up a workflow for this work. Your answer become the first version of the deliverable, and the chat, files, sources and facts stay with the project.",
+  "quick.takeFullConfirm": "Keep going with {name}",
+  "quick.takeFullWorking": "Setting up the full process…",
+  "quick.takeFullFailed": "The project ain't get switched: {reason}",
+  "quick.cancel": "Cancel",
+  "quick.recommended": "Made for this work",
+  "quick.standard": "Standard",
+  "early.finish": "Finish with what I got",
+  "early.finishNote": "Finish now and come back to the rest whenever you want.",
+  "early.title": "Finish with what you got?",
+  "early.intro": "The project get finished how it stand. What's still open get recorded as not done yet, and you can come back to any of it whenever.",
+  "early.caveats": "Not done yet",
+  "early.bannerTitle": "Finished early — not done yet:",
+  "early.goBack": "Go back to this",
+};

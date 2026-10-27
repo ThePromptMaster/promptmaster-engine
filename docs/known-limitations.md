@@ -2233,8 +2233,8 @@ Sean, 24 Oct: "the next language should be Hindi and then Mandarin. Arabic and S
 even Ebonics too." Writes in now also offers Hindi, Chinese (Mandarin, Simplified), Arabic,
 Swahili and African American English.
 - **African American English is a variety of English**, so it is offered as one (`en-aave`) and
-  named as linguists name it, not "Ebonics". It is a Writes in choice only, not an interface
-  language. Its directive asks for the grammar, vocabulary and rhythm a fluent speaker uses, in
+  named as linguists name it, not "Ebonics". Since 2026-10-27 it is an interface language too
+  (L-125). Its directive asks for the grammar, vocabulary and rhythm a fluent speaker uses, in
   the register the work needs, and rules out exaggeration and caricature; a model can still
   overdo it, so a reader who speaks it should judge the result.
 - **Chinese limits are in characters (字).** In a Chinese project "200 words" is 200 characters,
@@ -2445,4 +2445,25 @@ No reason is asked. The finished banner lists the caveats in the interface langu
 "Go back to this", which reopens the project on that stage. The caveats are a snapshot: work
 added to the project afterwards is not added to them, and reopening and finishing again replaces
 them.
+
+### L-125 — The interface in African American English is machine-drafted (2026-10-27)
+
+Sean, 26 Oct: AAE "for everything in promptmaster just as if it was a change in language, even
+for the instructions … I'm just thinking about kids who grow up with that vernacular". `en-aave`
+is now an interface locale (`lib/i18n/locales.ts`, matched by its exact code before the
+two-letter fallback) with a full dictionary (`messages/en-aave.ts`, `messages/en-aave/*.ts`):
+every button, notice, system stage label and stage instruction, held to full coverage by
+`messages.test.ts`. A project started with the interface in AAE writes in AAE.
+
+- **Drafted by machine, not yet read by native speakers.** The register asked for was a
+  knowledgeable mentor talking plainly — AAE grammar used lightly (copula absence, habitual
+  *be*, *ain't*, *finna*), no eye-dialect spelling, no slang pile-up, no caricature — with
+  approvals, costs and errors kept exact. About two in five strings, mostly short labels
+  ("Cancel", "Save", mode and colour names), are the same as in English. It should be read by
+  speakers before it is promoted.
+- Button names that other strings quote ("Apply and continue", "AI verified") were kept in
+  English in both places, so a reference still matches the button it names.
+- What stays English is as in L-103: the admin page, server error details, custom workflows'
+  own words, and anything the model wrote (that follows Writes in, which is AAE by default here).
+- Dates and numbers are formatted as American English (`Intl` reads `en-aave` as `en`).
 
