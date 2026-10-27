@@ -12,7 +12,7 @@ const VERSION_COLUMNS = `
   id, user_id, project_id, artifact_id, version_number, parent_version_id,
   source_operation, instruction, system_prompt, content, model, mode,
   change_summary, restored_from_version_id, finish_reason, user_rating,
-  continuity_snapshot, colour_scheme, colour, created_at
+  continuity_snapshot, colour_scheme, colour, background_colour, created_at
 `;
 
 const EVAL_COLUMNS = `
@@ -261,14 +261,21 @@ export async function rateVersion(
   if (error) throw error;
 }
 
+/** Which of a version's two colours: its button (outline) or its background. */
+export type VersionColourField = 'colour' | 'background_colour';
+
 /**
- * The colour the user chose for a version, or null for the one it was made
- * with. Beside `user_rating`, the only column the immutability trigger lets
- * change (20261119).
+ * A colour the user chose for a version, or null for the one it was made
+ * with. Beside `user_rating`, the only columns the immutability trigger lets
+ * change (20261119, 20261120).
  */
-export async function setVersionColour(versionId: string, colour: string | null): Promise<void> {
+export async function setVersionColour(
+  versionId: string,
+  colour: string | null,
+  field: VersionColourField = 'colour',
+): Promise<void> {
   const supabase = createClient();
-  const { error } = await supabase.from('artifact_versions').update({ colour }).eq('id', versionId);
+  const { error } = await supabase.from('artifact_versions').update({ [field]: colour }).eq('id', versionId);
   if (error) throw error;
 }
 
