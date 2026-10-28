@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ArtifactVersion } from '@/types/project';
 import { keepUnasked } from './preservation';
-import { notRemovedByUser, removedByUser, sentencesRemoved } from './removed-text';
+import { notRemovedByUser, removedByUser, sentencesRemoved, withoutRemoved } from './removed-text';
 import { inputsFrom } from './stage-requests';
 
 /**
@@ -74,5 +74,32 @@ describe('preservation never puts a removed sentence back', () => {
   it('treats "leave out" as asking for a removal', () => {
     const before = `- ${PROMISE}\n- Agents answer chats from 8 a.m. to 8 p.m.`;
     expect(keepUnasked(before, '- Agents answer chats from 8 a.m. to 8 p.m.', 'Leave out the refund line').restored).toEqual([]);
+  });
+});
+
+describe('withoutRemoved: a removed sentence stays out of whatever is saved (28 Oct)', () => {
+  const removed = [{ sentence: PROMISE }];
+
+  it('takes it out of a redraft that wrote it again, keeping the rest of the line', () => {
+    const out = withoutRemoved(`- Welcome to HarborDesk support. ${PROMISE} Agents answer chats all day.`, removed);
+    expect(out.text).toBe('- Welcome to HarborDesk support. Agents answer chats all day.');
+    expect(out.dropped).toEqual([PROMISE]);
+  });
+
+  it('catches it with a word or two changed, and drops a line that held only it', () => {
+    const out = withoutRemoved('Welcome.\n\nRefunds are processed within 24 hours of a request.\n\nBye.', removed);
+    expect(out.text).toBe('Welcome.\n\nBye.');
+  });
+
+  it('keeps it when the instruction asks for it back', () => {
+    const text = `Welcome. ${PROMISE}`;
+    expect(withoutRemoved(text, removed, 'Put the refund processing sentence back.').text).toBe(text);
+  });
+
+  it('leaves tables, headings and JSON alone', () => {
+    const table = `| ${PROMISE} |\n## ${PROMISE}`;
+    expect(withoutRemoved(table, removed).text).toBe(table);
+    const json = JSON.stringify({ items: [{ item: PROMISE }] });
+    expect(withoutRemoved(json, removed).text).toBe(json);
   });
 });

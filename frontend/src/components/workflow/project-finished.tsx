@@ -10,7 +10,8 @@ import { downloadBlob, downloadFile } from '@/lib/utils';
 import { carriedForward, CARRIED_HEADING, exportFilename, toManuscriptMarkdown, type ExportBundle } from '@/lib/export/project-export';
 import { deliverableStage, type CompletionSummary } from '@/lib/workflow/engine';
 import { deliverableNouns } from '@/lib/workflow/labels';
-import { missingParts } from '@/lib/workflow/requested-parts';
+import { asksForChangeLog, missingParts } from '@/lib/workflow/requested-parts';
+import { internalMentions } from '@/lib/workflow/reader-text';
 import type { Evaluation } from '@/types/project';
 import { EvaluationScores } from './evaluation-scores';
 
@@ -47,6 +48,9 @@ export function ProjectFinished({ bundle, completion, evaluation, onReopen, onEd
   // A part the user asked for that the finished text lacks (28 Oct, HarborDesk:
   // a requested change log was missing). Said, never a reason it can't finish.
   const missing = useMemo(() => missingParts(project, body), [project, body]);
+  // Process talk still in the text after the notes were taken out: named, for
+  // the user to decide, never rewritten (28 Oct).
+  const mentions = useMemo(() => internalMentions(body, asksForChangeLog(project)), [project, body]);
   // The carried-forward list closes the document; it is not a chapter.
   const chapters = inSections ? (body.match(/^## /gm) ?? []).length - (carried.length ? 1 : 0) : 0;
   const words = body.split(/\s+/).filter(Boolean).length;
@@ -186,6 +190,19 @@ export function ProjectFinished({ bundle, completion, evaluation, onReopen, onEd
             {t('pnl.missingParts', { parts: missing.join(', '), noun })}
           </p>
           <p className="mt-1 text-label text-[var(--on-surface-variant)]">{t('pnl.missingPartsNote')}</p>
+          {onEdit && (
+            <button onClick={onEdit} className={`mt-3 ${secondary}`}>
+              {t('pnl.editNoun', { noun })}
+            </button>
+          )}
+        </div>
+      )}
+      {mentions.length > 0 && (
+        <div data-internal-mentions className="mt-5 rounded-xl bg-[var(--surface-container-low)] px-5 py-4">
+          <p className="text-body text-[var(--on-surface)]">
+            {t('pnl.internalMentions', { terms: mentions.map((m) => `“${m}”`).join(', ') })}
+          </p>
+          <p className="mt-1 text-label text-[var(--on-surface-variant)]">{t('pnl.internalMentionsNote')}</p>
           {onEdit && (
             <button onClick={onEdit} className={`mt-3 ${secondary}`}>
               {t('pnl.editNoun', { noun })}

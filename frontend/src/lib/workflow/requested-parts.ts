@@ -45,17 +45,11 @@ function requestText(project: Pick<Project, 'objective' | 'constraints' | 'outpu
   ].filter((s): s is string => !!s?.trim());
 }
 
-/**
- * The parts asked for that the finished text does not have, each in the words
- * the request used ("change log"), once each.
- */
-export function missingParts(
-  project: Pick<Project, 'objective' | 'constraints' | 'output_format' | 'facts' | 'applied_instructions'>,
-  finished: string
-): string[] {
-  if (!finished.trim()) return [];
-  const missing: string[] = [];
-  for (const part of PARTS) {
+type Asking = Pick<Project, 'objective' | 'constraints' | 'output_format' | 'facts' | 'applied_instructions'>;
+
+/** What each part was asked for as, in the request's words; null for a part not asked for (or declined later). */
+function asked(project: Asking): (string | null)[] {
+  return PARTS.map((part) => {
     let named: string | null = null;
     for (const text of requestText(project)) {
       for (const m of text.matchAll(new RegExp(part.asked.source, 'gi'))) {
@@ -64,9 +58,22 @@ export function missingParts(
         named = DECLINED.test(text.slice(Math.max(0, (m.index ?? 0) - 40), m.index)) ? null : m[1].toLowerCase();
       }
     }
-    if (!named) continue;
-    if (part.asked.test(finished) || part.shown?.test(finished)) continue;
-    missing.push(named);
-  }
-  return missing;
+    return named;
+  });
+}
+
+/** Whether the user asked for a change log or revision history: then the work may talk about versions. */
+export function asksForChangeLog(project: Asking): boolean {
+  return asked(project)[0] !== null;
+}
+
+/**
+ * The parts asked for that the finished text does not have, each in the words
+ * the request used ("change log"), once each.
+ */
+export function missingParts(project: Asking, finished: string): string[] {
+  if (!finished.trim()) return [];
+  return asked(project).flatMap((named, i) =>
+    named && !PARTS[i].asked.test(finished) && !PARTS[i].shown?.test(finished) ? [named] : []
+  );
 }

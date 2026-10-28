@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from deps import get_client
+from promptmaster.catchphrases import without_repeated_catchphrases
 from promptmaster.errors import PRESERVED_EVALUATION, PRESERVED_STAGE_VERSIONS
 from promptmaster.limits import MAX_INSTRUCTION_CHARS
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError, resolve_model
@@ -100,6 +101,9 @@ async def api_generate_stage_artifact(
     result.model_used = _model_used(req.model, client)
     # A citation to a source not on record points at nothing (20 Oct).
     result.content = strip_unknown_citations(result.content, len(inputs.sources))
+    # 28 Oct: prose only — a list stage's content is a JSON document.
+    if not result.content.lstrip().startswith(("{", "[")):
+        result.content = without_repeated_catchphrases(result.content)
     return result.model_copy(update=dict(web))
 
 
