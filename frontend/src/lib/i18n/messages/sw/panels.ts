@@ -177,6 +177,8 @@ export const sw: Record<keyof typeof en, string> = {
   'pnl.carriedNote': 'Ulichohamisha mbele katika mapitio ya mwisho. Kinaambatana na {noun}, mwishoni mwa kila uhamishaji.',
   'pnl.missingParts': 'Uliomba {parts}, na {noun} iliyokamilika haina.',
   'pnl.missingPartsNote': 'Rudi kwenye kazi ili kuiongeza, au iache ilivyo.',
+  'pnl.internalMentions': 'Maandishi yaliyokamilika bado yanataja {terms}, jambo linalosomeka kama maelezo ya jinsi yalivyotengenezwa.',
+  'pnl.internalMentionsNote': 'Hariri kazi ili kuyaondoa, au yaache kama msomaji wako anayahitaji.',
   'pnl.exportNote': 'Hamisha PDF hufungua mwonekano wa kuchapisha — chagua “Save as PDF” kwenye kidirisha cha kuchapisha. Word huhifadhi vichwa, aya na vitone; majedwali na msimbo huja kama maandishi matupu.',
   'pnl.newVersionNote': ' Anzisha toleo jipya huhifadhi {noun} hii kwenye historia ya matoleo jinsi ilivyo na kuifungua upya kwa toleo linalofuata.',
   'pnl.copied': 'Imenakiliwa.',

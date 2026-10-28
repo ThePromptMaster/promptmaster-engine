@@ -27,6 +27,7 @@ from pydantic import BaseModel, Field
 
 from promptmaster.web_search import WebAccess, with_web
 from deps import get_client
+from promptmaster.catchphrases import without_repeated_catchphrases
 from promptmaster.errors import PRESERVED_NOTHING_WRITTEN, preserved_sections
 from promptmaster.limits import (
     MAX_CONTENT_CHARS,
@@ -313,7 +314,7 @@ async def api_generate_section_prose(
     if req.section_index < 0 or req.section_index >= len(req.outline):
         raise HTTPException(status_code=400, detail=f"section_index {req.section_index} out of range")
     try:
-        return await generate_section_prose(
+        written = await generate_section_prose(
             client=client,
             model=req.model or None,
             inputs=req.inputs,
@@ -330,6 +331,9 @@ async def api_generate_section_prose(
         raise llm_http_error(
             e, preserved_sections(req.section_index, len(req.outline)) or PRESERVED_NOTHING_WRITTEN
         )
+    # 28 Oct: a catchphrase the previous chapter used is not used again here.
+    written.content = without_repeated_catchphrases(written.content, [req.prev_section_content])
+    return written
 
 
 @router.post("/extract-section-record", response_model=ExtractSectionRecordResponse)

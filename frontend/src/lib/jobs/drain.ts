@@ -22,6 +22,7 @@
 
 import { classifyDrainError, classified, withPreserved } from './errors';
 import { drainLog } from './log';
+import { withoutRemoved } from '@/lib/workflow/removed-text';
 import {
   DRAFT_SECTION,
   type DraftCheckpoint,
@@ -269,6 +270,10 @@ async function runProseStep(args: StepArgs, context: SectionContext): Promise<St
       : {}),
   });
 
+  // A sentence the user removed stays out of a chapter too (28 Oct), unless
+  // this revision's instruction asks for it back.
+  const kept = withoutRemoved(prose.content, payload.inputs.removed_text, payload.revise?.instruction ?? '');
+
   // COMMIT. Everything above this line is redoable; everything below is not
   // worth redoing. This ordering is the entire mechanism behind "completed
   // sections are not regenerated".
@@ -276,7 +281,7 @@ async function runProseStep(args: StepArgs, context: SectionContext): Promise<St
     artifactId: payload.artifact_id,
     worker,
     sectionId: payload.section_id,
-    content: prose.content,
+    content: kept.text,
     finishReason: prose.finish_reason,
     outlineVersionId: payload.outline_version_id,
   });

@@ -118,3 +118,60 @@ export function notRemovedByUser(removed: readonly { sentence: string }[] | unde
     return !keys.some((r) => k.includes(r));
   };
 }
+
+/** The words of a sentence worth comparing: four letters or more. */
+const content = (s: string) => key(s).split(' ').filter((w) => w.length > 3);
+
+/** Nearly the same sentence: the same words either way round, give or take one in ten. */
+function same(a: string, b: string): boolean {
+  if (key(a) === key(b)) return true;
+  const wa = content(a);
+  const wb = content(b);
+  if (wa.length < 3 || wb.length < 3) return false;
+  const sb = new Set(wb);
+  const sa = new Set(wa);
+  return wa.filter((w) => sb.has(w)).length / wa.length >= 0.9 && wb.filter((w) => sa.has(w)).length / wb.length >= 0.9;
+}
+
+/** An instruction that asks for this sentence back ("put the refund line back"). */
+const stemmed = (s: string) => content(s).map((w) => w.replace(/(?:ing|ed|es|s)$/, ''));
+
+function askedBack(instruction: string, sentence: string): boolean {
+  if (!/\b(back|restore\w*|reinstat\w*|re-?add\w*|again)\b/i.test(instruction)) return false;
+  const asked = new Set(stemmed(instruction));
+  const w = stemmed(sentence);
+  return w.filter((x) => asked.has(x)).length >= Math.min(2, w.length);
+}
+
+/**
+ * The text with every sentence the user removed taken out again (28 Oct):
+ * whatever wrote it — a redraft, Go, a chapter — the user's removal stands
+ * unless the instruction it was made from asks for that sentence back. A line
+ * left empty goes; the rest of a line keeps its marker and its other sentences.
+ */
+export function withoutRemoved(
+  text: string,
+  removed: readonly { sentence: string }[] | undefined,
+  instruction = ''
+): { text: string; dropped: string[] } {
+  const gone = (removed ?? []).map((r) => r.sentence.replace(/…$/, '')).filter((s) => s.trim() && !askedBack(instruction, s));
+  if (!gone.length || !text.trim() || (/^\s*[{[]/.test(text) && /[}\]]\s*$/.test(text))) return { text, dropped: [] };
+  const dropped: string[] = [];
+  const lines: string[] = [];
+  for (const line of text.split('\n')) {
+    if (/^\s*\|/.test(line) || /^\s*#{1,6}\s/.test(line)) {
+      lines.push(line);
+      continue;
+    }
+    const marker = line.match(/^\s*(?:[-*+]|\d+[.)]|>)\s+/)?.[0] ?? '';
+    const parts = line.slice(marker.length).split(/(?<=[.!?])\s+(?=["“(]?[\p{Lu}\p{N}])/u);
+    const kept = parts.filter((p) => {
+      const hit = gone.find((g) => same(p, g));
+      if (hit) dropped.push(p.trim());
+      return !hit;
+    });
+    if (kept.length === parts.length) lines.push(line);
+    else if (kept.join(' ').trim()) lines.push(marker + kept.join(' '));
+  }
+  return dropped.length ? { text: lines.join('\n').replace(/\n{3,}/g, '\n\n'), dropped } : { text, dropped };
+}

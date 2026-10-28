@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 from .llm_client import NotJSONError, OpenRouterClient, OpenRouterError
 from .schemas import ChatMessage, PMInput, SavedSource
 from .self_model import PROMPTMASTER_SELF_MODEL
+from .catchphrases import without_repeated_catchphrases
 from .source_access import links_rule
 from .web_search import (
     WebSource,
@@ -179,7 +180,12 @@ def parse_front_door(
         brief = _keep_edits(brief, given, edited)
     ready = bool(result.get("enough", result.get("ready"))) and bool(brief.objective)
     return FrontDoorTurn(
-        reply=_plain(str(result.get("reply") or "").strip())[:8_000] or _no_reply(brief, ready),
+        reply=without_repeated_catchphrases(
+            _plain(str(result.get("reply") or "").strip())[:8_000],
+            [t.content for t in turns if t.role == "assistant"],
+            chat=True,
+        )
+        or _no_reply(brief, ready),
         draft=str(result.get("draft") or "").strip()[:20_000],
         brief=brief,
         ready=ready,

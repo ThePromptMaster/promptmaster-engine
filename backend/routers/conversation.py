@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from deps import get_client
+from promptmaster.catchphrases import without_repeated_catchphrases
 from promptmaster.conversation import (
     build_apply_to_answer_prompt,
     build_chat_reply_prompt,
@@ -198,6 +199,10 @@ async def api_chat_message(
         )
         if web_query:
             msg.content = strip_unknown_citations(msg.content, len(saved) + len(new_sources))
+        # 28 Oct: a catchphrase an earlier reply used is not used again.
+        msg.content = without_repeated_catchphrases(
+            msg.content, [m.content for m in req.chat_history if m.role == "assistant"], chat=True
+        ) or msg.content
         return ChatMessageResponse(assistant_message=msg, web_query=web_query, web_sources=new_sources, web_note=web_note)
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)

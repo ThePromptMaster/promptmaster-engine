@@ -29,6 +29,8 @@ import { formatManuscript } from '@/lib/workflow/digest';
 import { deliverableStage } from '@/lib/workflow/engine';
 import { isProposed, parseItems, primaryArtifactKind, statusOption, itemSchemaFor } from '@/lib/workflow/stage-artifact';
 import { STAMP_NOTE, stampFor } from '@/lib/workflow/version-stamp';
+import { forReader } from '@/lib/workflow/reader-text';
+import { asksForChangeLog } from '@/lib/workflow/requested-parts';
 import type { StageDefinition, WorkflowEvent, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
 import type { Artifact, ArtifactVersion, Evaluation, Project } from '@/types/project';
 
@@ -117,13 +119,16 @@ export function toManuscriptMarkdown(bundle: ExportBundle): string {
   const { project, template, stages } = bundle;
   const stage = deliverableStage(template);
   if (!stage) return '';
-  const body =
+  const raw =
     stage.renderer === 'long_form'
       ? formatManuscript(
           manuscriptArtifactFor(template, stage, stages)?.long_form?.outline ?? [],
           Number.POSITIVE_INFINITY
         )
       : (stages[stage.id]?.versions.at(-1)?.content ?? '');
+  // The work for its reader: no notes about the revision (28 Oct), unless the
+  // user asked for a change log. A list stage's document is left as stored.
+  const body = /^\s*[{[]/.test(raw) ? raw : forReader(raw, asksForChangeLog(project));
   if (!body.trim()) return '';
   return `# ${project.title || 'Untitled project'}
 

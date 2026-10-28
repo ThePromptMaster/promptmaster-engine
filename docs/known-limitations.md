@@ -2492,8 +2492,14 @@ requested change log was missing, and the final documents carried internal versi
   text without meaning it is gone for good), a version Go or a stage draft made, and a sentence
   reworded rather than removed (three-quarters of its words still in one sentence). A removed
   phrase inside a sentence that stays is not tracked; the instruction still says it. At most
-  the latest 30 sentences go out. The prompt asks the model not to write them again; nothing
-  strips a sentence a model writes anyway.
+  the latest 30 sentences go out. The prompt asks the model not to write them again, and the
+  code makes sure: every stage version saved by anything but the user's own edit or a restore
+  (`project-store.ts::keptOut`), and every chapter the drafting job writes (`jobs/drain.ts`),
+  has those sentences taken out again (`withoutRemoved`; the same sentence, or nine words in
+  ten the same), with "Kept out a sentence you removed earlier" on the version. An
+  instruction that asks for one back ("put the refund line back") keeps it. A removal made
+  inside one chapter of a long-form manuscript is not recorded: chapters are not stage
+  versions, so only removals from stage versions are kept out.
 - **Requested parts are checked when the work is finished, in English, by name**
   (`lib/workflow/requested-parts.ts`): change log, cover note, executive summary, glossary,
   FAQ, reference list, read from the brief, the accepted requirements and the applied
@@ -2504,4 +2510,13 @@ requested change log was missing, and the final documents carried internal versi
   are the work alone; the Markdown record keeps the per-stage stamps, so a revision made
   elsewhere is pasted back from that export (the 17 Oct round trip). Stage and chapter prompts
   ask the model to keep versions, reviews and instructions out of the work unless a change log
-  or history was asked for.
+  or history was asked for. In code, the finished document (screen, Word, PDF, LaTeX) loses
+  lines narrating the revision ("I removed …", "The summary now includes …") and sections
+  headed as notes on the revision (`reader-text.ts::forReader`), unless a change log was asked
+  for. Process talk left inside a sentence ("unlike the previous draft", "v3", "PromptMaster")
+  is not rewritten: the finished screen names it for the user to edit.
+- **Repeated catchphrases are taken out in code** (`backend/promptmaster/catchphrases.py`): a
+  short exclamation or rhetorical question (six words or fewer) already used in the same text,
+  an earlier chat reply or the previous chapter is dropped, and a chat reply loses a "Great
+  question!" opener. Applied to chat replies, the start conversation, stage drafts and
+  chapters. A catchphrase used once stays, and so does one in a chapter two or more before.

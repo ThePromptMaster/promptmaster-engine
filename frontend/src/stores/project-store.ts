@@ -32,6 +32,7 @@ import {
 } from '@/lib/supabase/versions';
 import { OUTLINE_ARTIFACT_KIND } from '@/lib/supabase/outline';
 import { checkCommit, RefusedRevision } from '@/lib/workflow/commit-check';
+import { removedByUser, withoutRemoved } from '@/lib/workflow/removed-text';
 import { listRecommendations, supersedePending, type Recommendation } from '@/lib/supabase/recommendations';
 import { listTasks, type ProjectTask } from '@/lib/supabase/tasks';
 import {
@@ -319,6 +320,18 @@ async function readReferences(projectId: string): Promise<{ references: ProjectR
     )
   );
   return { references, referenceMaterial };
+}
+
+/** Operations whose text the user wrote or chose themselves: nothing is taken out of those. */
+const USER_TEXT: ReadonlySet<string> = new Set(['stage_edit', 'restore', 'outline_edit']);
+
+export function keptOut(stages: Record<string, StageBundle>, version: NewVersion): NewVersion {
+  if (USER_TEXT.has(version.source_operation)) return version;
+  const removed = removedByUser({ stages: Object.keys(stages).map((id) => ({ id, label: id })) } as never, stages);
+  const out = withoutRemoved(version.content, removed, version.instruction ?? '');
+  if (!out.dropped.length) return version;
+  const note = `Kept out ${out.dropped.length === 1 ? 'a sentence' : `${out.dropped.length} sentences`} you removed earlier.`;
+  return { ...version, content: out.text, change_summary: version.change_summary ? `${version.change_summary} ${note}` : note };
 }
 
 export const useProjectStore = create<ProjectState>()((set, get) => ({
@@ -702,8 +715,12 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     return created;
   },
 
-  async appendStageVersion(stageId, name, version, evaluation, options) {
+  async appendStageVersion(stageId, name, rawVersion, evaluation, options) {
     const artifact = await get().ensureStageArtifact(stageId, name);
+    // What the user removed stays out of every version the user did not write
+    // themselves (28 Oct, HarborDesk: a removed sentence came back). Here, the
+    // one place every stage version is saved, so no path can bring it back.
+    const version = keptOut(get().stages, rawVersion);
     // Read the artifact back out of the store rather than reusing the one
     // above: version_count and revision move with every append, and a stale
     // copy would write version 2 twice.
