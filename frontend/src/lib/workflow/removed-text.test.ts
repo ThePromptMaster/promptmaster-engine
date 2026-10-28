@@ -91,9 +91,11 @@ describe('withoutRemoved: a removed sentence stays out of whatever is saved (28 
     expect(out.text).toBe('Welcome.\n\nBye.');
   });
 
-  it('keeps it when the instruction asks for it back', () => {
+  it('keeps it when the instruction asks for it back, or for it in other words', () => {
     const text = `Welcome. ${PROMISE}`;
     expect(withoutRemoved(text, removed, 'Put the refund processing sentence back.').text).toBe(text);
+    expect(withoutRemoved(text, removed, 'Add a sentence saying refunds are processed within a day.').text).toBe(text);
+    expect(withoutRemoved(text, removed, 'Make the greeting warmer.').text).toBe('Welcome.');
   });
 
   it('leaves tables, headings and JSON alone', () => {
