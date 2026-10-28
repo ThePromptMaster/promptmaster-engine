@@ -18,6 +18,12 @@ describe('keptOut', () => {
     expect(out.change_summary).toBe('Redrafted. Kept out a sentence you removed earlier.');
   });
 
+  it('keeps it for the user’s own instruction that asks for it, never for Go’s', () => {
+    const ask = 'Add a sentence saying refunds are processed within 24 hours.';
+    expect(keptOut(stages, { content: `Welcome. ${PROMISE}`, source_operation: 'chat_instruct', instruction: ask }).content).toContain('Refunds');
+    expect(keptOut(stages, { content: `Welcome. ${PROMISE}`, source_operation: 'agent_revise', instruction: ask }).content).toBe('Welcome.');
+  });
+
   it('leaves the user’s own edit and a restore as they are', () => {
     for (const op of ['stage_edit', 'restore']) {
       const version = { content: `Welcome. ${PROMISE}`, source_operation: op };

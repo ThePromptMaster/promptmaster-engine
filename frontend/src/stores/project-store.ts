@@ -328,7 +328,9 @@ const USER_TEXT: ReadonlySet<string> = new Set(['stage_edit', 'restore', 'outlin
 export function keptOut(stages: Record<string, StageBundle>, version: NewVersion): NewVersion {
   if (USER_TEXT.has(version.source_operation)) return version;
   const removed = removedByUser({ stages: Object.keys(stages).map((id) => ({ id, label: id })) } as never, stages);
-  const out = withoutRemoved(version.content, removed, version.instruction ?? '');
+  // Only the user's own instruction can ask for a removed sentence back.
+  const said = version.source_operation === 'chat_instruct' || version.source_operation === 'chat_save' ? (version.instruction ?? '') : '';
+  const out = withoutRemoved(version.content, removed, said);
   if (!out.dropped.length) return version;
   const note = `Kept out ${out.dropped.length === 1 ? 'a sentence' : `${out.dropped.length} sentences`} you removed earlier.`;
   return { ...version, content: out.text, change_summary: version.change_summary ? `${version.change_summary} ${note}` : note };

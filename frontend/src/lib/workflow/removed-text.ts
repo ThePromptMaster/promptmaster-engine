@@ -133,11 +133,15 @@ function same(a: string, b: string): boolean {
   return wa.filter((w) => sb.has(w)).length / wa.length >= 0.9 && wb.filter((w) => sa.has(w)).length / wb.length >= 0.9;
 }
 
-/** An instruction that asks for this sentence back ("put the refund line back"). */
 const stemmed = (s: string) => content(s).map((w) => w.replace(/(?:ing|ed|es|s)$/, ''));
 
+/**
+ * The user's instruction is about this sentence ("put the refund line back",
+ * "add a sentence saying refunds take 24 hours"): their newer word, so it is
+ * not taken out. Only a user's own instruction is passed here — never Go's or
+ * a redraft's, which would quote the brief that asked for it in the first place.
+ */
 function askedBack(instruction: string, sentence: string): boolean {
-  if (!/\b(back|restore\w*|reinstat\w*|re-?add\w*|again)\b/i.test(instruction)) return false;
   const asked = new Set(stemmed(instruction));
   const w = stemmed(sentence);
   return w.filter((x) => asked.has(x)).length >= Math.min(2, w.length);
