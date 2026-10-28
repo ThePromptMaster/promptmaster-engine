@@ -78,6 +78,14 @@ const FULL_KEY = 'pm.start.full.v1';
 /** How much of the ask and the conversation goes to the workflow designer. */
 const DESIGN_BRIEF_MAX = 8_000;
 
+/**
+ * ": <the error>" for a message that goes on after it. Without its own full
+ * stop: "…when the connection is steady.. You can choose…" (28 Oct, phone).
+ */
+function whyText(e: unknown): string {
+  return e instanceof Error && e.message ? `: ${e.message.replace(/[.\s]+$/, '')}` : '';
+}
+
 export default function NewProjectPage() {
   // Not gated on the session check: that is a network round trip, and the page
   // used to be blank for it — on production long enough to type into nothing
@@ -356,7 +364,7 @@ export default function NewProjectPage() {
       setStep('setup');
     } catch (e) {
       setError(
-        t('start.recommendFailed', { why: e instanceof Error && e.message ? `: ${e.message}` : '' })
+        t('start.recommendFailed', { why: whyText(e) })
       );
     } finally {
       setWorking(null);
@@ -414,7 +422,7 @@ export default function NewProjectPage() {
       setWorking(null);
       await create({ template: recommended, draft: suggested, facts: factsFromBrief(brief, said), chat: turns });
     } catch (e) {
-      setError(t('start.setUpFailed', { why: e instanceof Error && e.message ? `: ${e.message}` : '' }));
+      setError(t('start.setUpFailed', { why: whyText(e) }));
       setWorking(null);
     }
   }
@@ -446,7 +454,7 @@ export default function NewProjectPage() {
         setTemplateId((left.find((x) => x.key === (recommendedKey ?? 'single_output')) ?? left.find((x) => x.key === 'single_output') ?? left[0])?.id ?? null);
       }
     } catch (e) {
-      setError(t('start.removePresetFailed', { why: e instanceof Error && e.message ? `: ${e.message}` : '' }));
+      setError(t('start.removePresetFailed', { why: whyText(e) }));
     }
   }
 
@@ -457,7 +465,7 @@ export default function NewProjectPage() {
       setRemovedTemplates((prior) => prior.filter((x) => x.key !== template.key));
       setTemplates((prior) => [...prior.filter((x) => x.key !== template.key), template]);
     } catch (e) {
-      setError(t('start.removePresetFailed', { why: e instanceof Error && e.message ? `: ${e.message}` : '' }));
+      setError(t('start.removePresetFailed', { why: whyText(e) }));
     }
   }
 
