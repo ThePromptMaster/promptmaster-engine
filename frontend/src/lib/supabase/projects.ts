@@ -10,7 +10,7 @@ import {
 import { currentModel } from '@/lib/constants';
 
 const LIST_COLUMNS =
-  'id, title, objective, mode, workflow, stage, status, accent, folder_id, updated_at, created_at';
+  'id, title, objective, mode, workflow, workflow_template_id, stage, status, accent, folder_id, updated_at, created_at';
 
 const FULL_COLUMNS = `
   id, user_id, title, objective, audience, constraints, output_format, context,

@@ -590,7 +590,7 @@ export function deriveWorkflowRecommendations({
         summary: blocker.detail
           ? `${blocker.detail} — ${stage.label} is not finished.`
           : `${stage.label} is not finished.`,
-        suggested_change: `Complete "${blocker.label}" before moving on.`,
+        suggested_change: `Complete "${blocker.label}" to finish this stage. You can still move on.`,
         instruction: '',
         rationale: {
           triggering_issue: blocker.detail

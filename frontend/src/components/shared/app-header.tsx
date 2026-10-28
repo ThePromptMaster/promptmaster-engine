@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 
 import { useAuth } from '@/hooks/use-auth';
 import { SAVE_ACCOUNT_EVENT } from '@/components/projects/guest-banner';
@@ -74,6 +74,7 @@ function accountInitial(email: string | undefined, isGuest: boolean): string | n
 
 export function AppHeader() {
   const router = useRouter();
+  const pathname = usePathname();
   const { user, loading, isGuest, signOut } = useAuth();
   const t = useT();
 
@@ -126,6 +127,7 @@ export function AppHeader() {
     }
   }
 
+  const showNew = !loading && !!user && pathname !== '/projects' && pathname !== '/projects/new';
   const label = accountLabel(user?.email, isGuest, t);
   const initial = accountInitial(user?.email, isGuest);
 
@@ -143,7 +145,20 @@ export function AppHeader() {
           </span>
         </Link>
 
-        <div ref={wrapRef} className="relative ms-auto shrink-0">
+        {/* From inside a project too (Colette, 28 Oct: there was no way to start
+            another one without going back to the list). Not on the list or the
+            start, which have their own. */}
+        {showNew && (
+          <Link
+            href="/projects/new"
+            className="ms-auto inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--surface-container-low)] px-3 py-1.5 text-label text-[var(--on-surface-variant)] transition-colors hover:bg-[var(--surface-container-high)] hover:text-[var(--on-surface)]"
+          >
+            <span aria-hidden className="material-symbols-outlined text-[18px]">add</span>
+            <span>{t('list.newProject')}</span>
+          </Link>
+        )}
+
+        <div ref={wrapRef} className={`relative shrink-0 ${showNew ? '' : 'ms-auto'}`}>
           {/* Nothing is rendered while the session is still resolving, rather
               than an account control that says "Signed in" and then changes
               its mind a tick later. */}

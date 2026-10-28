@@ -276,7 +276,7 @@ export const ar: Record<keyof typeof en, string> = {
   'rcm.selected': 'المحدد: {n} — ستُطبَّق مراجعةً واحدة.',
   'rcm.combine': 'دمج {n}…',
   'rcm.include': 'تضمين «{title}» في مراجعة مدمجة',
-  'rcm.sev.blocking': 'مانعة',
+  'rcm.sev.blocking': 'مطلوبة للإنهاء',
   'rcm.sev.major': 'كبيرة',
   'rcm.sev.minor': 'طفيفة',
   'rcm.sev.info': 'اقتراح',

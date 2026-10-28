@@ -194,6 +194,10 @@ describe('FR-13: the three rules, in priority order', () => {
     const workflowRec = derived.find((r) => r.kind === 'workflow');
     expect(workflowRec?.summary).toContain(blocker!.detail!);
     expect(workflowRec?.rationale.triggering_issue).toContain(blocker!.detail!);
+    // The checklist beside it says "You can still move on" (28 Oct): the card
+    // must not say the opposite.
+    expect(workflowRec?.suggested_change).not.toMatch(/before moving on/);
+    expect(workflowRec?.suggested_change).toContain('to finish this stage');
   });
 
   it('offers Finish on a terminal stage rather than nothing', () => {

@@ -22,8 +22,10 @@ let authState: {
   isGuest: boolean;
 } = { user: { email: 'analyst@example.com' }, loading: false, isGuest: false };
 
+let pathname = '/projects/abc';
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push }),
+  usePathname: () => pathname,
 }));
 
 vi.mock('@/hooks/use-auth', () => ({
@@ -115,5 +117,22 @@ describe('Colours in the account menu (Sean, 18 Oct)', () => {
     expect(document.documentElement.style.getPropertyValue('--pm-primary')).toBe('#00696b');
     await userEvent.click(screen.getByRole('button', { name: 'Reset to the defaults' }));
     expect(document.documentElement.style.getPropertyValue('--pm-primary')).toBe('');
+  });
+});
+
+describe('New project from anywhere (Colette, 28 Oct)', () => {
+  it('is offered inside a project', () => {
+    pathname = '/projects/abc';
+    render(<AppHeader />);
+    expect(screen.getByRole('link', { name: /New project/ })).toHaveAttribute('href', '/projects/new');
+  });
+
+  it('is not repeated on the list or the start, which have their own', () => {
+    for (const path of ['/projects', '/projects/new']) {
+      pathname = path;
+      const { unmount } = render(<AppHeader />);
+      expect(screen.queryByRole('link', { name: /New project/ })).toBeNull();
+      unmount();
+    }
   });
 });

@@ -11,7 +11,7 @@ import { FoldersSidebar, PROJECT_DRAG_TYPE, type FolderSelection } from '@/compo
 import { MoveToMenu } from '@/components/projects/move-to-menu';
 import { UseInProjectMenu } from '@/components/projects/use-in-project-menu';
 import { ProjectCardMenu } from '@/components/projects/project-card-menu';
-import { pausedProjectIds } from '@/lib/supabase/workflow';
+import { pausedProjectIds, templateNamesById } from '@/lib/supabase/workflow';
 import { useProjectStore } from '@/stores/project-store';
 import type { ProjectFolder, ProjectSummary } from '@/types/project';
 import { accentVariables } from '@/lib/appearance/colours';
@@ -20,6 +20,7 @@ import { DeletedProjects } from '@/components/projects/deleted-projects';
 import { newProjectHref } from '@/lib/projects/example-goals';
 import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import { shownStageId } from '@/lib/i18n/stage';
+import { workflowName } from '@/lib/i18n/templates';
 import { relativeTime } from '@/lib/i18n/format';
 
 const WORKFLOW_ICON: Record<string, string> = {
@@ -66,10 +67,21 @@ export default function ProjectsPage() {
   const t = useT();
   const locale = useLocale();
   const finePointer = useFinePointer();
-  const workflowLabel = (key: string) =>
-    key === 'book' || key === 'research' || key === 'single_output' ? t(`workflow.name.${key}`) : key;
-
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null);
+  // Each pinned template's name and stage labels: a designed workflow showed
+  // its `custom_` key on the list (28 Oct).
+  const [templateNames, setTemplateNames] = useState<
+    Map<string, { name: string; stages: Record<string, string> }>
+  >(new Map());
+  const pinned = (p: ProjectSummary) =>
+    p.workflow_template_id ? templateNames.get(p.workflow_template_id) : undefined;
+  const workflowLabel = (p: ProjectSummary) => workflowName(locale, p.workflow, pinned(p)?.name ?? p.workflow);
+  const stageLabel = (p: ProjectSummary) => {
+    const shown = shownStageId(p.workflow, p.stage);
+    // A system stage translated into the interface's language wins; otherwise
+    // the template's own short label, then the id.
+    return shown !== p.stage.replace(/_/g, ' ') ? shown : pinned(p)?.stages[p.stage] ?? shown;
+  };
   const [error, setError] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
 
@@ -109,6 +121,9 @@ export default function ProjectsPage() {
         // Paused on an unmet objective: said on the list, not only on the project.
         pausedProjectIds(rows.filter((p) => p.status !== 'finalized').map((p) => p.id))
           .then(setPaused)
+          .catch(() => undefined);
+        templateNamesById(rows.flatMap((p) => (p.workflow_template_id ? [p.workflow_template_id] : [])))
+          .then(setTemplateNames)
           .catch(() => undefined);
       })
       .catch((e) => {
@@ -368,7 +383,7 @@ export default function ProjectsPage() {
 
                       <span className="hidden shrink-0 items-center gap-2 text-label text-[var(--on-surface-variant)] sm:flex">
                         <span className="rounded-md bg-[var(--surface-container-high)] px-2 py-1">
-                          {workflowLabel(p.workflow)}
+                          {workflowLabel(p)}
                         </span>
                         {p.status !== 'finalized' && paused.has(p.id) && (
                           <span className="rounded-md bg-[var(--surface-container-high)] px-2 py-1 font-semibold text-[var(--pm-tertiary)]" title={t('list.pausedWhy')}>
@@ -377,7 +392,7 @@ export default function ProjectsPage() {
                         )}
                         {p.status !== 'finalized' && p.stage && (
                           <span className="rounded-md bg-[var(--surface-container-high)] px-2 py-1">
-                            {shownStageId(p.workflow, p.stage)}
+                            {stageLabel(p)}
                           </span>
                         )}
                         <span className="w-[64px] text-end tabular-nums">
