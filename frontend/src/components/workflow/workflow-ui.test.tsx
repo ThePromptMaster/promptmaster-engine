@@ -553,6 +553,14 @@ describe('the finished screen puts the work at the centre (C4, Sean 28 Sep item 
     expect(screen.getByText('One two three four five.')).toBeInTheDocument();
   });
 
+  it('names a part the user asked for that the finished work lacks (28 Oct, HarborDesk)', () => {
+    const asked = (content: string) => ({ ...bundle(content), project: { ...(project as object), constraints: 'Include a change log at the end.' } as never });
+    const { rerender } = render(<ProjectFinished bundle={asked('The playbook.')} completion={summary} onReopen={vi.fn()} />);
+    expect(screen.getByText(/has no change log, which you asked for\./)).toBeInTheDocument();
+    rerender(<ProjectFinished bundle={asked('The playbook.\n\n## Change log\n\n- Hours corrected.')} completion={summary} onReopen={vi.fn()} />);
+    expect(screen.queryByText(/which you asked for/)).toBeNull();
+  });
+
   it('Copy says which version it copied, and the note goes when another version is shown (Sean, 17 Oct)', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });

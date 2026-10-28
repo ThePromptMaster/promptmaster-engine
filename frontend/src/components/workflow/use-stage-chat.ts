@@ -61,6 +61,7 @@ import { factChangesFromRevision, isNewFact, newFactSource, withMeaningChanges, 
 import { recordFacts, supersedeFact } from '@/lib/supabase/facts';
 import type { ChatContext, ChatMessage } from '@/types';
 import { describeLines, keepUnasked } from '@/lib/workflow/preservation';
+import { notRemovedByUser } from '@/lib/workflow/removed-text';
 import { addedClaims, noInventedDetails, suppliedText, type AddedClaim } from '@/lib/workflow/fact-boundary';
 
 /** An instruction as it was sent, ready to be drafted again. */
@@ -358,7 +359,7 @@ export function useStageChat({
    */
   const checkedRevision = useCallback(
     async (before: string, revised: string, instruction: string, said: readonly string[]) => {
-      const kept = keepUnasked(before, revised, instruction);
+      const kept = keepUnasked(before, revised, instruction, notRemovedByUser(project.removed_text));
       const claims = noInventedDetails(project, said)
         ? await addedClaims({ before, after: kept.text, supplied: suppliedText(project, said), instruction, model: project.model })
         : [];
@@ -691,11 +692,11 @@ export function useStageChat({
   const togglePutBack = useCallback(() => {
     setProposal((p) => {
       if (!p?.putBack?.length || p.withoutPutBack === undefined) return p;
-      const kept = keepUnasked(p.baseContent ?? content, p.withoutPutBack, '').text;
+      const kept = keepUnasked(p.baseContent ?? content, p.withoutPutBack, '', notRemovedByUser(project.removed_text)).text;
       const next = p.nextContent === p.withoutPutBack ? kept : p.withoutPutBack;
       return { ...p, nextContent: next, after: p.target.kind === 'document' ? next : p.after };
     });
-  }, [content]);
+  }, [content, project.removed_text]);
 
   /**
    * A proposal discarded or taken back to adjust never changed anything: its

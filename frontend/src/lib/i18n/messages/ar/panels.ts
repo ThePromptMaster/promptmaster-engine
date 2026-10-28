@@ -175,6 +175,8 @@ export const ar: Record<keyof typeof en, string> = {
   'pnl.startNewVersion': 'بدء نسخة جديدة',
   'pnl.continueImproving': 'مواصلة التحسين',
   'pnl.carriedNote': 'ما نقلته إلى ما بعد في المراجعة النهائية. يُرفق مع {noun}، في نهاية كل تصدير.',
+  'pnl.missingParts': 'طلبت {parts}، ولا يتضمنه {noun} المكتمل.',
+  'pnl.missingPartsNote': 'ارجع إلى العمل لإضافته، أو اتركه كما هو.',
   'pnl.exportNote': 'يفتح «تصدير PDF» عرض الطباعة — اختر «حفظ بصيغة PDF» في نافذة الطباعة. يحتفظ Word بالعناوين والفقرات والنقاط؛ وتصل الجداول والتعليمات البرمجية نصًا عاديًا.',
   'pnl.newVersionNote': ' «بدء نسخة جديدة» يحفظ {noun} في سجل النسخ كما هو ويعيد فتحه للنسخة التالية.',
   'pnl.copied': 'تم النسخ.',

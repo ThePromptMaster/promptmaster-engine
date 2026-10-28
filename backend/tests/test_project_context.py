@@ -141,3 +141,21 @@ def test_approvals_reach_every_prompt_with_the_version_they_were_given_on():
 def test_no_approvals_adds_nothing():
     from promptmaster.schemas import PMInput
     assert "APPROVED BY THE USER" not in context_block(PMInput(objective="x", mode="analyst", context="c"))
+
+
+def test_a_sentence_the_user_removed_reaches_every_stage_prompt(basic_inputs):
+    # 28 Oct (Sean, HarborDesk): a sentence explicitly removed came back later.
+    from promptmaster.schemas import RemovedSentence
+
+    inputs = basic_inputs.model_copy(update={
+        "removed_text": [RemovedSentence(stage="Draft", sentence="Refunds are processed within 24 hours.")],
+    })
+    block = context_block(inputs)
+    assert "REMOVED BY THE USER" in block
+    assert '- Draft: "Refunds are processed within 24 hours."' in block
+    system, user = build_stage_prompt(inputs, StageDescriptor(id="final", label="Final", renderer="prose"), StageDigest())
+    assert "Refunds are processed within 24 hours." in system + user
+
+
+def test_no_removed_block_when_nothing_was_removed(basic_inputs):
+    assert "REMOVED BY THE USER" not in context_block(basic_inputs)

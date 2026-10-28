@@ -22,7 +22,7 @@ import { statesValue, valueMentions, type ValueMention } from './fact-values';
 
 /** Instructions that ask for text to go, or for the whole to be rewritten. */
 const REMOVES_OR_REWRITES =
-  /\b(remov\w*|delet\w*|drop\w*|cut\w*|omit\w*|take out|get rid of|shorten\w*|shorter|trim\w*|condens\w*|concise|tighten\w*|rewrit\w*|rephras\w*|restructur\w*|simplif\w*|summari[sz]\w*|replace the (?:draft|text|whole)|start (?:again|over)|from scratch|less polished|more (?:casual|conversational|natural|formal)|tone|voice|reword\w*)\b/i;
+  /\b(remov\w*|delet\w*|drop\w*|cut\w*|omit\w*|strik\w*|take (?:[\w'-]+ ){0,4}out|get rid of|leave (?:[\w'-]+ ){0,4}out|no longer (?:mention|include|say|state)\w*|lose|shorten\w*|shorter|trim\w*|condens\w*|concise|tighten\w*|rewrit\w*|rephras\w*|restructur\w*|simplif\w*|summari[sz]\w*|replace the (?:draft|text|whole)|start (?:again|over)|from scratch|less polished|more (?:casual|conversational|natural|formal)|tone|voice|reword\w*)\b/i;
 
 /** Whether an instruction lets the revision remove what it likes. */
 export function asksForRemovals(instruction: string): boolean {

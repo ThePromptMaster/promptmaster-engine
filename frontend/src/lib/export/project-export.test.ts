@@ -10,7 +10,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { carriedForward, exportFilename, stampedManuscript, toJson, toManuscriptMarkdown, toMarkdown, type ExportBundle } from './project-export';
+import { carriedForward, exportFilename, toJson, toManuscriptMarkdown, toMarkdown, type ExportBundle } from './project-export';
 import { BOOK_V1, SINGLE_OUTPUT_V1, projectState } from '@/lib/workflow';
 import type { WorkflowEvent } from '@/lib/workflow/types';
 import type { Artifact, ArtifactVersion, Evaluation, Project } from '@/types/project';
@@ -389,13 +389,12 @@ describe('what leaves PromptMaster carries the version stamp (17 Oct)', () => {
     evaluations: {},
   };
 
-  it('the Word, PDF and LaTeX text ends with the head version stamp; the screen text has none', () => {
-    expect(stampedManuscript(single)).toMatch(/The status pack, as revised\.[\s\S]*_\[PromptMaster output v2 2f3e4d5c\]_\n$/);
+  // 28 Oct (Sean): the final documents carried internal version terms. The
+  // document a reader gets (screen, Word, PDF, LaTeX) has no stamp; the
+  // Markdown record keeps it, for a revision pasted back.
+  it('the final document carries no version stamp; the Markdown record does', () => {
+    expect(toManuscriptMarkdown(single)).toContain('The status pack, as revised.');
     expect(toManuscriptMarkdown(single)).not.toContain('[PromptMaster');
-  });
-
-  it('a long-form manuscript, revised chapter by chapter, is not stamped', () => {
-    const book = bookWithChapters();
-    expect(stampedManuscript(book)).toBe(toManuscriptMarkdown(book));
+    expect(toMarkdown(single)).toContain('[PromptMaster output v2 2f3e4d5c]');
   });
 });

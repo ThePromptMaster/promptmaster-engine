@@ -22,6 +22,7 @@ import { listRecentRunOutputs } from '@/lib/supabase/agent';
 import { manuscriptArtifactFor, manuscriptSourceFor, measureStageContent, stageRequirements } from '@/lib/workflow/context';
 import { COUNTING_RULE, isPart, measure, replaceSection, sectionFor, type MeasurableRequirement } from '@/lib/workflow/measurable';
 import { describeLines, isChangeNote, keepUnasked, structureDropped } from '@/lib/workflow/preservation';
+import { notRemovedByUser } from '@/lib/workflow/removed-text';
 import { addedClaims, noInventedDetails, suppliedText } from '@/lib/workflow/fact-boundary';
 import { isDone } from '@/lib/workflow/types';
 import { appliedFindingsVersion, carryUserFields, findingsInstruction, reviseWithFindings } from '@/lib/workflow/apply-findings';
@@ -2062,7 +2063,8 @@ async function keptAndSupplied(
   superseded: readonly SupersededValue[]
 ): Promise<{ content: string; notes: string[] }> {
   if (!head.trim() || !content.trim()) return { content, notes: [] };
-  const kept = keepUnasked(head, content, asked, (line) => leftoverValues(line, superseded).length === 0);
+  const removed = notRemovedByUser(ctx.project.removed_text);
+  const kept = keepUnasked(head, content, asked, (line) => leftoverValues(line, superseded).length === 0 && removed(line));
   const notes: string[] = [];
   if (kept.restored.length) notes.push(`Kept ${describeLines(kept.restored)}, which the revision dropped without being asked.`);
   if (kept.reported.length) notes.push(`No longer there: ${describeLines(kept.reported, 2)}.`);

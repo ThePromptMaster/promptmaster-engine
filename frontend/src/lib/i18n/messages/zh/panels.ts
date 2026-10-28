@@ -175,6 +175,8 @@ export const zh: Record<keyof typeof en, string> = {
   'pnl.startNewVersion': '开始新版本',
   'pnl.continueImproving': '继续改进',
   'pnl.carriedNote': '你在最终审阅中结转的内容。它会随{noun}一起提供，附在每次导出的末尾。',
+  'pnl.missingParts': '你要求了{parts}，但完成的{noun}中没有。',
+  'pnl.missingPartsNote': '返回工作添加它，或保持原样。',
   'pnl.exportNote': '“导出 PDF”会打开打印视图，请在打印对话框中选择“另存为 PDF”。Word 会保留标题、段落和项目符号；表格和代码以纯文本形式导出。',
   'pnl.newVersionNote': '“开始新版本”会将此{noun}按原样保留在版本历史中，并重新打开以制作下一版。',
   'pnl.copied': '已复制。',
