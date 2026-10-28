@@ -199,6 +199,23 @@ def instructions_block(inputs: PMInput) -> str:
     return f"{INSTRUCTIONS_HEADER}\n" + "\n".join(lines)
 
 
+REMOVED_HEADER = (
+    "REMOVED BY THE USER — sentences the user took out of the work. Do not write them again, in these or "
+    "other words, in any stage, chapter or revision, even where the brief or the sources would support them. "
+    "Only the user asking for one back, right now, overrides this:"
+)
+
+
+def removed_block(inputs: PMInput) -> str:
+    """The sentences the user removed, or "" when there are none. Never cut:
+    the client bounds them (`removed-text.ts`)."""
+    gone = [r for r in (inputs.removed_text or []) if r.sentence.strip()]
+    if not gone:
+        return ""
+    lines = [f"- {r.stage.strip() or 'A stage'}: \"{' '.join(r.sentence.split())}\"" for r in gone]
+    return f"{REMOVED_HEADER}\n" + "\n".join(lines)
+
+
 APPROVALS_HEADER = (
     "APPROVED BY THE USER — decisions of record. What an approval below covers is settled: never report it as "
     "unresolved, pending or awaiting the user. One given on an earlier version than the stage's current one "
@@ -315,6 +332,7 @@ def context_block(inputs: PMInput, limit: int | None = None) -> str:
     facts = facts_block(inputs)
     sources = sources_block(inputs)
     said = instructions_block(inputs)
+    removed = removed_block(inputs)
     approved = approvals_block(inputs)
     text = (inputs.context or "").strip()
     if limit is not None and len(text) > limit:
@@ -328,7 +346,7 @@ def context_block(inputs: PMInput, limit: int | None = None) -> str:
     boundary = FACT_BOUNDARY if no_invented_details(inputs) else ""
     # Last: the other projects inform, and everything above outranks them.
     references = references_block(inputs, limit)
-    return "\n\n".join(b for b in (facts, approved, sources, said, boundary, context, references) if b)
+    return "\n\n".join(b for b in (facts, approved, sources, said, removed, boundary, context, references) if b)
 
 
 def context_line(inputs: PMInput) -> str:

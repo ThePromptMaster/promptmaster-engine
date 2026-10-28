@@ -132,20 +132,6 @@ ${carriedSection(bundle)}`;
 }
 
 /**
- * The manuscript as it leaves PromptMaster (Word, PDF, LaTeX, notebook): with
- * the deliverable's version stamp at the end, so a revision made elsewhere and
- * pasted back is known by the version it started from (17 Oct). Not on the
- * screen's own reading of it. A long-form manuscript is revised chapter by
- * chapter, never pasted back whole, so it carries none.
- */
-export function stampedManuscript(bundle: ExportBundle, manuscript: string = toManuscriptMarkdown(bundle)): string {
-  const stage = deliverableStage(bundle.template);
-  const head = stage && stage.renderer !== 'long_form' ? bundle.stages[stage.id]?.versions.at(-1) : undefined;
-  if (!manuscript || !stage || !head) return manuscript;
-  return `${manuscript.trimEnd()}\n\n_${stampFor(stage.id, head)}_\n`;
-}
-
-/**
  * The artifact, as a document.
  *
  * Every stage the project actually reached appears in template order, under its

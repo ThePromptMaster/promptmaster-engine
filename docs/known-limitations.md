@@ -2478,3 +2478,30 @@ every button, notice, system stage label and stage instruction, held to full cov
   own words, and anything the model wrote (that follows Writes in, which is AAE by default here).
 - Dates and numbers are formatted as American English (`Intl` reads `en-aave` as `en`).
 
+
+### L-126 — Removed text is kept by sentence; requested parts are found by name (2026-10-28)
+
+Sean, 28 Oct (HarborDesk test): a sentence the user removed came back in a later draft, a
+requested change log was missing, and the final documents carried internal version terms.
+
+- **What the user removed stays out, by the sentence** (`lib/workflow/removed-text.ts`). A
+  sentence in one version of a stage and gone from the next counts when that next version is
+  the user's own edit, or was made from an instruction asking for something to go ("remove",
+  "take … out", "leave … out", "no longer mention"). It goes to every prompt as `removed_text`,
+  and preservation never puts it back. Not counted: a shortening or rewrite (those may drop
+  text without meaning it is gone for good), a version Go or a stage draft made, and a sentence
+  reworded rather than removed (three-quarters of its words still in one sentence). A removed
+  phrase inside a sentence that stays is not tracked; the instruction still says it. At most
+  the latest 30 sentences go out. The prompt asks the model not to write them again; nothing
+  strips a sentence a model writes anyway.
+- **Requested parts are checked when the work is finished, in English, by name**
+  (`lib/workflow/requested-parts.ts`): change log, cover note, executive summary, glossary,
+  FAQ, reference list, read from the brief, the accepted requirements and the applied
+  instructions. A part the finished text does not name (or, for a change log, no heading about
+  changes) is shown on the finished screen. It never stops the finish, and a part asked for in
+  other words is not found.
+- **The document a reader gets has no version stamp.** Word, PDF, LaTeX and notebook exports
+  are the work alone; the Markdown record keeps the per-stage stamps, so a revision made
+  elsewhere is pasted back from that export (the 17 Oct round trip). Stage and chapter prompts
+  ask the model to keep versions, reviews and instructions out of the work unless a change log
+  or history was asked for.

@@ -14,6 +14,7 @@
 import type { ArtifactVersion, Project } from '@/types/project';
 import type { StageArtifactBundle } from './digest';
 import type { WorkflowTemplate } from './types';
+import { removedByUser } from './removed-text';
 
 /** How a version records an instruction the user wrote and applied themselves. */
 const USER_INSTRUCTED: ReadonlySet<string> = new Set(['chat_instruct', 'chat_save']);
@@ -53,12 +54,21 @@ export function appliedInstructions(
   return out.sort((a, b) => a.at.localeCompare(b.at)).slice(-MAX);
 }
 
-/** The project as every request is built from it: with the instructions joined on, like its facts. */
+/**
+ * The project as every request is built from it: with the instructions joined
+ * on, like its facts, and the sentences the user removed (28 Oct).
+ */
 export function withAppliedInstructions<P extends Project>(
   project: P,
   template: Pick<WorkflowTemplate, 'stages'>,
   bundles: Record<string, StageArtifactBundle> | null | undefined
 ): P {
   const applied = appliedInstructions(template, bundles);
-  return applied.length ? { ...project, applied_instructions: applied } : project;
+  const removed = removedByUser(template, bundles);
+  if (!applied.length && !removed.length) return project;
+  return {
+    ...project,
+    ...(applied.length ? { applied_instructions: applied } : {}),
+    ...(removed.length ? { removed_text: removed } : {}),
+  };
 }

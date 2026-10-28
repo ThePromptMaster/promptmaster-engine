@@ -106,6 +106,8 @@ export interface Project {
    * carries the user's later word (12 Oct; `lib/workflow/applied-instructions.ts`).
    */
   applied_instructions?: import('@/lib/workflow/applied-instructions').AppliedInstruction[];
+  /** The sentences the user removed, so they stay out (28 Oct; `removed-text.ts`); not a column. */
+  removed_text?: import('@/lib/workflow/removed-text').RemovedText[];
   /** The approvals the user gave, for prompts (`withApprovals`); not a column. */
   approvals?: import('@/lib/workflow/approvals').GivenApproval[];
   /**

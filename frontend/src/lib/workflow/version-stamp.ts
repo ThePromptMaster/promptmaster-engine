@@ -2,7 +2,8 @@
  * Which version a revision made outside PromptMaster started from (17 Oct,
  * Sean: work alongside Claude or ChatGPT — export, revise there, paste back).
  *
- * Every export carries a stamp per stage, `[PromptMaster output v5 1a2b3c4d]`.
+ * The Markdown export carries a stamp per stage, `[PromptMaster output v5 1a2b3c4d]`
+ * (not the Word, PDF or LaTeX document, which is for its reader: 28 Oct).
  * A revision pasted back into "Change it" that carries an older stamp for the
  * stage was made from an older version: sent as it is, it would quietly undo
  * every change made here since. So only the user's own edits against the

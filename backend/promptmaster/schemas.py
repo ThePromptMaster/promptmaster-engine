@@ -80,6 +80,12 @@ class ReferencedProject(BaseModel):
     facts: list[str] = Field(default_factory=list, max_length=30)
 
 
+class RemovedSentence(BaseModel):
+    """A sentence the user removed from a stage's work (28 Oct): it stays out."""
+    stage: str = Field(default="", max_length=200)
+    sentence: str = Field(..., min_length=1, max_length=400)
+
+
 class UserInstruction(BaseModel):
     """An instruction the user applied to a stage, as the version it made records it."""
     stage: str = Field(default="", max_length=200)
@@ -125,6 +131,9 @@ class PMInput(BaseModel):
     # "Change it", oldest first. Saved only on their versions, they reached no
     # later prompt, so a review held the work to the brief they had changed.
     user_instructions: list[UserInstruction] = Field(default_factory=list, max_length=20)
+    # 28 Oct (Sean, HarborDesk): a sentence the user removed came back in a
+    # later draft. The instruction reached later prompts; the sentence did not.
+    removed_text: list[RemovedSentence] = Field(default_factory=list, max_length=30)
     # Client, 21 Oct (email 5): the user's other projects this one draws on.
     references: list[ReferencedProject] = Field(default_factory=list, max_length=5)
     # 25 Oct: the approvals the user gave, so no later stage or check treats an

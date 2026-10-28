@@ -44,6 +44,7 @@ from .schemas import (
 )
 from .project_context import context_block
 from .notation import NOTATION_RULE
+from .reader_text import READER_TEXT_RULE
 from .saved_documents import format_prior_documents
 from .saved_text_checks import VERIFY_RULE, disproved_missing
 
@@ -75,7 +76,7 @@ _PROSE_INSTRUCTION = (
     "person of that age would — natural, confident and specific — never "
     "simplified or childish. When the user has given the topic or the choice, "
     "write one finished piece on exactly that; do not offer alternatives or "
-    "several versions unless they ask for options.\n\n" + NOTATION_RULE
+    "several versions unless they ask for options.\n\n" + NOTATION_RULE + "\n\n" + READER_TEXT_RULE
 )
 
 _LIST_INSTRUCTION = (

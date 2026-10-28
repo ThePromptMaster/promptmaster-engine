@@ -16,6 +16,8 @@ export interface PMInput {
   sources?: { url: string; title: string; excerpt: string; retrieved: string }[];
   /** Instructions the user applied with "Change it", oldest first (12 Oct): their later word. */
   user_instructions?: { stage: string; version: number; instruction: string }[];
+  /** 28 Oct: sentences the user removed from the work, which must not come back. */
+  removed_text?: { stage: string; sentence: string }[];
   /** 25 Oct: the approvals the user gave, so no stage or check calls them unresolved. */
   approvals?: { stage: string; approval: string; version: number; current: number }[];
   /** The user's other projects this one draws on, cited as [R1]… (client, 21 Oct, email 5). */

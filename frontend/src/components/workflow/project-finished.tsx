@@ -10,6 +10,7 @@ import { downloadBlob, downloadFile } from '@/lib/utils';
 import { carriedForward, CARRIED_HEADING, exportFilename, toManuscriptMarkdown, type ExportBundle } from '@/lib/export/project-export';
 import { deliverableStage, type CompletionSummary } from '@/lib/workflow/engine';
 import { deliverableNouns } from '@/lib/workflow/labels';
+import { missingParts } from '@/lib/workflow/requested-parts';
 import type { Evaluation } from '@/types/project';
 import { EvaluationScores } from './evaluation-scores';
 
@@ -43,6 +44,9 @@ export function ProjectFinished({ bundle, completion, evaluation, onReopen, onEd
   const markdown = useMemo(() => toManuscriptMarkdown(bundle), [bundle]);
   const body = markdown.replace(/^# .*\n+/, '');
   const carried = useMemo(() => carriedForward(bundle), [bundle]);
+  // A part the user asked for that the finished text lacks (28 Oct, HarborDesk:
+  // a requested change log was missing). Said, never a reason it can't finish.
+  const missing = useMemo(() => missingParts(project, body), [project, body]);
   // The carried-forward list closes the document; it is not a chapter.
   const chapters = inSections ? (body.match(/^## /gm) ?? []).length - (carried.length ? 1 : 0) : 0;
   const words = body.split(/\s+/).filter(Boolean).length;
@@ -174,6 +178,19 @@ export function ProjectFinished({ bundle, completion, evaluation, onReopen, onEd
               </li>
             ))}
           </ul>
+        </div>
+      )}
+      {missing.length > 0 && (
+        <div data-missing-parts className="mt-5 rounded-xl bg-[var(--surface-container-low)] px-5 py-4">
+          <p className="text-body text-[var(--on-surface)]">
+            {t('pnl.missingParts', { parts: missing.join(', '), noun })}
+          </p>
+          <p className="mt-1 text-label text-[var(--on-surface-variant)]">{t('pnl.missingPartsNote')}</p>
+          {onEdit && (
+            <button onClick={onEdit} className={`mt-3 ${secondary}`}>
+              {t('pnl.editNoun', { noun })}
+            </button>
+          )}
         </div>
       )}
       {note && (
