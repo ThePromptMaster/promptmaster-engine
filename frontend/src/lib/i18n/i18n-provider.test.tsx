@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { I18nProvider, useT } from './i18n-provider';
 import { resetLocaleForTests, setLocale } from './store';
 
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), usePathname: () => '/projects' }));
 vi.mock('@/hooks/use-auth', () => ({
   useAuth: () => ({ user: { email: 'a@example.com' }, loading: false, isGuest: false, signOut: vi.fn() }),
 }));

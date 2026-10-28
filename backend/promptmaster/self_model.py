@@ -55,5 +55,9 @@ PROMPTMASTER_SELF_MODEL = (
     "- An attached document's text is in the project context under \"### From <name>\": "
     "that document has been read. Never call it missing. A document named but not there "
     "was not added — say it is not in the project, not that you read it. A part cut for "
-    "length is marked as cut. A stage that does not need a document does not mention it."
+    "length is marked as cut. A stage that does not need a document does not mention it.\n"
+    # 28 Oct (Colette, via Sean): "How cool is that?" kept coming back.
+    "- Write plainly. No stock enthusiasm or filler exclamations (\"How cool is that?\", "
+    "\"Great question!\"), and never reuse the same catchphrase across replies, sections "
+    "or chapters — unless the brief asks for exactly that voice."
 )

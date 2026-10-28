@@ -276,7 +276,7 @@ export const hi: Record<keyof typeof en, string> = {
   'rcm.selected': '{n} चुने गए — इन्हें एक ही संशोधन के रूप में लागू किया जाएगा।',
   'rcm.combine': '{n} मिलाएँ…',
   'rcm.include': '"{title}" को संयुक्त संशोधन में शामिल करें',
-  'rcm.sev.blocking': 'अवरोधक',
+  'rcm.sev.blocking': 'पूरा करने के लिए आवश्यक',
   'rcm.sev.major': 'बड़ा',
   'rcm.sev.minor': 'छोटा',
   'rcm.sev.info': 'सुझाव',

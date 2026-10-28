@@ -101,3 +101,9 @@ def test_the_endpoint_passes_edits_and_material_through():
         assert "Attached plan" in stub.generate_json.call_args.kwargs["prompt"]
     finally:
         app.dependency_overrides.pop(get_client, None)
+
+
+def test_the_start_conversation_is_told_not_to_repeat_stock_enthusiasm():
+    # 28 Oct (Colette): "How cool is that?" kept coming back.
+    system, _ = build_front_door_prompt(TURNS, DraftBrief())
+    assert "never reuse the same catchphrase" in system

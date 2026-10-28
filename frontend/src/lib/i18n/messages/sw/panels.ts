@@ -276,7 +276,7 @@ export const sw: Record<keyof typeof en, string> = {
   'rcm.selected': '{n} yamechaguliwa — yatatumika kama marekebisho moja.',
   'rcm.combine': 'Unganisha {n}…',
   'rcm.include': 'Jumuisha “{title}” katika marekebisho ya pamoja',
-  'rcm.sev.blocking': 'Linazuia',
+  'rcm.sev.blocking': 'Inahitajika kumaliza',
   'rcm.sev.major': 'Kubwa',
   'rcm.sev.minor': 'Dogo',
   'rcm.sev.info': 'Pendekezo',

@@ -205,6 +205,8 @@ export interface ProjectSummary {
   objective: string;
   mode: ModeType;
   workflow: string;
+  /** The template version it pins; the list reads the workflow's name from it. */
+  workflow_template_id?: string | null;
   stage: string;
   status: ProjectStatus;
   /** The project's own accent colour, shown on its card. */

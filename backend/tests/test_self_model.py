@@ -24,6 +24,7 @@ KEY_LINES = [
     "Check for drift, and for conflicts",
     "say plainly when no further pass is needed",
     "Never state or imply that something was done",
+    "never reuse the same catchphrase",
 ]
 
 

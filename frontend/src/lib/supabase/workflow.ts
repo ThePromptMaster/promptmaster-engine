@@ -56,6 +56,34 @@ export async function getTemplateById(
   return data ? toTemplate(data as unknown as TemplateRow) : null;
 }
 
+/**
+ * The names the project list shows for the templates its projects pin, with
+ * each stage's short label. By id, with no listed or status filter: a workflow
+ * designed for one project is unlisted, and one may since have been archived,
+ * and both still need a name rather than their `custom_` key (28 Oct).
+ */
+export async function templateNamesById(
+  ids: readonly string[]
+): Promise<Map<string, { name: string; stages: Record<string, string> }>> {
+  const unique = [...new Set(ids)];
+  if (!unique.length) return new Map();
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('workflow_templates')
+    .select('id, name, stages:definition->stages')
+    .in('id', unique);
+  if (error) throw error;
+  return new Map(
+    ((data ?? []) as unknown as { id: string; name: string; stages: StageDefinition[] | null }[]).map((row) => [
+      row.id,
+      {
+        name: row.name,
+        stages: Object.fromEntries((row.stages ?? []).map((s) => [s.id, s.short_label || s.label])),
+      },
+    ])
+  );
+}
+
 /** Latest published version of a template. Used when starting a new project. */
 export async function getLatestTemplate(
   key: string

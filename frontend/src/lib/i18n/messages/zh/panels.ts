@@ -276,7 +276,7 @@ export const zh: Record<keyof typeof en, string> = {
   'rcm.selected': '已选 {n} 条，将合并为一次修改应用。',
   'rcm.combine': '合并 {n} 条…',
   'rcm.include': '将“{title}”纳入合并修改',
-  'rcm.sev.blocking': '阻断',
+  'rcm.sev.blocking': '完成所需',
   'rcm.sev.major': '重要',
   'rcm.sev.minor': '次要',
   'rcm.sev.info': '建议',
