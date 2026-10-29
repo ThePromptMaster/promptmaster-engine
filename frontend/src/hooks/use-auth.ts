@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useProjectStore } from '@/stores/project-store';
+import { SignInTimeout, withTimeout } from '@/lib/auth/sign-in';
 import type { Session, User } from '@supabase/supabase-js';
 
 /**
@@ -50,9 +51,22 @@ export function useAuth() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /**
+   * Bounded: the call waits on supabase-js's auth lock, which a slept tab can
+   * hold indefinitely (28 Oct). A session that arrived anyway is a sign-in.
+   */
   const signIn = useCallback(async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
+    try {
+      const { error } = await withTimeout<{ error: Error | null }>(supabase.auth.signInWithPassword({ email, password }));
+      if (error) throw error;
+    } catch (err) {
+      if (!(err instanceof SignInTimeout)) throw err;
+      const session = await withTimeout<{ data: { session: Session | null } }>(supabase.auth.getSession(), 3000).then(
+        ({ data }) => data.session,
+        () => null,
+      );
+      if (!session) throw err;
+    }
   }, [supabase]);
 
   /** Resolves to whether a session came back — false when the email must be confirmed first. */

@@ -1,13 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { createClient } from '@/lib/supabase/client';
 import { guestErrorMessage } from '@/lib/auth/guest';
 import { forgetResetRequest, nextFromLocation, rememberResetRequest } from '@/lib/auth/next-path';
 import { authErrorMessage } from '@/lib/auth/auth-errors';
+import { goSignedIn, SignInTimeout } from '@/lib/auth/sign-in';
 import { useT } from '@/lib/i18n/i18n-provider';
 import { LocaleSwitch } from '@/components/shared/locale-switch';
 
@@ -23,7 +23,6 @@ const LABEL_CLASS =
   'block text-label uppercase tracking-wider text-[var(--on-surface-variant)]';
 
 export default function LoginPage() {
-  const router = useRouter();
   const t = useT();
   const { signIn, signInWithGoogle, continueAsGuest } = useAuth();
 
@@ -37,6 +36,10 @@ export default function LoginPage() {
   const [resetSent, setResetSent] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
   const [guestLoading, setGuestLoading] = useState(false);
+  // Until the page's script runs, a click would submit the form natively and
+  // nothing would sign in (28 Oct), so Sign in waits for it.
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
 
   const handleGuest = async () => {
     setError(null);
@@ -45,7 +48,7 @@ export default function LoginPage() {
       await continueAsGuest();
       // Where they were going, as a password sign-in does — a guest who
       // followed a link to a project used to land on the project list.
-      router.push(nextFromLocation() ?? '/projects');
+      goSignedIn(nextFromLocation() ?? '/projects');
     } catch (err) {
       setError(guestErrorMessage(err instanceof Error ? err.message : ''));
       setGuestLoading(false);
@@ -59,10 +62,12 @@ export default function LoginPage() {
     try {
       await signIn(email, password);
       forgetResetRequest();
-      router.push(nextFromLocation() ?? '/projects');
+      // A full page load, not router.push: the soft navigation could leave
+      // them on this page, signed in, until they refreshed (28 Oct). The
+      // button stays on "Signing in…" while the next page loads.
+      goSignedIn(nextFromLocation() ?? '/projects');
     } catch (err) {
-      setError(authErrorMessage(err, 'auth.err.invalid'));
-    } finally {
+      setError(err instanceof SignInTimeout ? t('auth.err.timeout') : authErrorMessage(err, 'auth.err.invalid'));
       setIsLoading(false);
     }
   };
@@ -198,7 +203,7 @@ export default function LoginPage() {
             </form>
           ) : (
             /* Login Form */
-            <form onSubmit={handleSignIn} className="space-y-5">
+            <form method="post" onSubmit={handleSignIn} className="space-y-5">
               {error && (
                 <div className="rounded-lg bg-[var(--error-container)] px-3 py-2 text-body text-[var(--on-error-container)]">
                   {error}
@@ -268,7 +273,7 @@ export default function LoginPage() {
 
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || !hydrated}
                 className="w-full py-3 px-4 bg-[var(--pm-primary)] text-[var(--on-primary)] font-semibold rounded-lg hover:bg-[var(--pm-primary-container)] active:scale-[0.98] transition-all duration-200 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {isLoading ? t('auth.signingIn') : t('auth.signIn')}

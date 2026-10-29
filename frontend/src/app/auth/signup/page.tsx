@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { authErrorMessage } from '@/lib/auth/auth-errors';
+import { goSignedIn } from '@/lib/auth/sign-in';
 import { useT } from '@/lib/i18n/i18n-provider';
 import { LocaleSwitch } from '@/components/shared/locale-switch';
 
@@ -33,7 +33,6 @@ const LABEL_CLASS =
 export default function SignupPage() {
   const { signUp } = useAuth();
   const t = useT();
-  const router = useRouter();
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -42,6 +41,9 @@ export default function SignupPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  // As on the sign-in page: a click before the script runs would submit natively.
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,7 +63,8 @@ export default function SignupPage() {
       // Where confirmation is off the account is already signed in: "check
       // your email" would send them looking for a message that never comes.
       const signedIn = await signUp(email, password, fullName);
-      if (signedIn) router.push('/projects');
+      // A full page load, so the proxy sees the new session (28 Oct).
+      if (signedIn) goSignedIn('/projects');
       else setSuccess(true);
     } catch (err) {
       setError(authErrorMessage(err, 'auth.err.create'));
@@ -138,7 +141,7 @@ export default function SignupPage() {
             </p>
           </div>
 
-          <form onSubmit={handleSignUp} className="space-y-5">
+          <form method="post" onSubmit={handleSignUp} className="space-y-5">
             {error && (
               <div className="rounded-lg bg-[var(--error-container)] px-3 py-2 text-body text-[var(--on-error-container)]">
                 {error}
@@ -211,7 +214,7 @@ export default function SignupPage() {
 
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || !hydrated}
               className="w-full py-3 px-4 bg-[var(--pm-primary)] text-[var(--on-primary)] font-semibold rounded-lg hover:bg-[var(--pm-primary-container)] active:scale-[0.98] transition-all duration-200 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {isLoading ? t('auth.creating') : t('auth.createAccount')}
