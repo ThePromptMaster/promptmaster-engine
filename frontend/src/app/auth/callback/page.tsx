@@ -44,7 +44,9 @@ export default function AuthCallbackPage() {
       if (done) return;
       done = true;
       clearTimeout(timeout);
-      router.replace(to);
+      // A full page load, as after a password sign-in, so the proxy sees the
+      // session just stored (28 Oct); replace, so Back skips the callback.
+      window.location.replace(to);
     };
     // A reset this browser asked for goes to the page that sets the password,
     // whichever event (or none, if it fired before this listener) arrives.
@@ -88,7 +90,7 @@ export default function AuthCallbackPage() {
       subscription.unsubscribe();
       clearTimeout(timeout);
     };
-  }, [router, urlError, next, tokenHash, otpType]);
+  }, [urlError, next, tokenHash, otpType]);
 
   if (error) {
     return (
