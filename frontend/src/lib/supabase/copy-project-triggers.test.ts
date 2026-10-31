@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest';
  */
 const DIR = join(__dirname, '../../../../supabase/migrations');
 const TRIGGERS = ['workflow_events_agent_authorized', 'project_facts_on_insert', 'artifact_versions_assign_number', 'agent_steps_label_honest'];
-const WHEN = "when (coalesce(current_setting('promptmaster.copying', true), '') <> 'on')";
+const WHEN = "when (coalesce(current_setting('promptmaster.copying', true), '') <> 'on' or current_user in ('authenticated', 'anon'))";
 
 function latestDefinition(trigger: string): { file: string; statement: string } | null {
   let found: { file: string; statement: string } | null = null;

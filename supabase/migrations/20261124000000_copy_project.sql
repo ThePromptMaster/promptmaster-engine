@@ -26,7 +26,8 @@
 -- the fact it supersedes *now* (project_facts_on_insert), and that a step
 -- labelled "code executed" has its sandbox run already written
 -- (agent_steps_label_honest — the run row cites the step, so one of the two
--- comes first). Each is skipped only while `promptmaster.copying` is 'on',
+-- comes first). Each is skipped only while `promptmaster.copying` is 'on' and
+-- the statement runs as the function's owner — never in a user's own session —
 -- which this function sets for its own transaction and clears; a client
 -- cannot set a database setting through the API.
 --
@@ -41,25 +42,25 @@
 drop trigger if exists workflow_events_agent_authorized on public.workflow_events;
 create trigger workflow_events_agent_authorized
   before insert on public.workflow_events
-  for each row when (coalesce(current_setting('promptmaster.copying', true), '') <> 'on')
+  for each row when (coalesce(current_setting('promptmaster.copying', true), '') <> 'on' or current_user in ('authenticated', 'anon'))
   execute function public.workflow_events_agent_authorized();
 
 drop trigger if exists project_facts_on_insert on public.project_facts;
 create trigger project_facts_on_insert
   after insert on public.project_facts
-  for each row when (coalesce(current_setting('promptmaster.copying', true), '') <> 'on')
+  for each row when (coalesce(current_setting('promptmaster.copying', true), '') <> 'on' or current_user in ('authenticated', 'anon'))
   execute function public.project_facts_on_insert();
 
 drop trigger if exists artifact_versions_assign_number on public.artifact_versions;
 create trigger artifact_versions_assign_number
   before insert on public.artifact_versions
-  for each row when (coalesce(current_setting('promptmaster.copying', true), '') <> 'on')
+  for each row when (coalesce(current_setting('promptmaster.copying', true), '') <> 'on' or current_user in ('authenticated', 'anon'))
   execute function public.artifact_versions_assign_number();
 
 drop trigger if exists agent_steps_label_honest on public.agent_steps;
 create trigger agent_steps_label_honest
   before insert or update on public.agent_steps
-  for each row when (coalesce(current_setting('promptmaster.copying', true), '') <> 'on')
+  for each row when (coalesce(current_setting('promptmaster.copying', true), '') <> 'on' or current_user in ('authenticated', 'anon'))
   execute function public.agent_steps_label_honest();
 
 create or replace function public.copy_project_remap(j jsonb)
