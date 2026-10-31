@@ -401,10 +401,16 @@ export default function ProjectsPage() {
 
                       <span className="min-w-0 flex-1">
                         {/* A copy's title ends " (copy)"; kept outside the truncation so a long copy is not identical to its original (31 Oct). */}
-                        <span className="flex min-w-0 items-baseline gap-1 text-title text-[var(--on-surface)]">
-                          <span className="min-w-0 truncate">{copyTitle(p.title).base || t('list.untitled')}</span>
-                          {copyTitle(p.title).suffix && <span className="shrink-0">{copyTitle(p.title).suffix}</span>}
-                        </span>
+                        {copyTitle(p.title).suffix ? (
+                          <span className="flex min-w-0 items-baseline gap-1 text-title text-[var(--on-surface)]">
+                            <span className="min-w-0 truncate">{copyTitle(p.title).base || t('list.untitled')}</span>
+                            <span className="shrink-0">{copyTitle(p.title).suffix}</span>
+                          </span>
+                        ) : (
+                          <span className="block truncate text-title text-[var(--on-surface)]">
+                            {p.title || t('list.untitled')}
+                          </span>
+                        )}
                         <span className="mt-1 block truncate text-body text-[var(--on-surface-variant)]">
                           {p.objective || t('list.noObjective')}
                         </span>
