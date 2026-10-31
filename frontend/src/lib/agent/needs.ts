@@ -24,7 +24,7 @@ import type { Locale } from '@/lib/i18n/locales';
 
 type Need =
   | { kind: 'set_objective' }
-  | { kind: 'unblock_stage'; stageId: string; reason: string; blockKind: string }
+  | { kind: 'unblock_stage'; stageId: string; reason: string; blockKind: string; blockKinds?: string[] }
   | { kind: 'approve_outline'; stageId: string; versionNumber: number | null; unsavedDraft: boolean }
   | {
       kind: 'tick_criterion'; stageId: string; criterionId: string; label: string; hint?: string;
@@ -550,7 +550,10 @@ export function needsUser(input: {
 
   const current = state.stages[stage.id];
   if (current?.status === 'blocked') {
-    return { kind: 'unblock_stage', stageId: stage.id, reason: current.blocked?.reason ?? '', blockKind: current.blocked?.kind ?? 'needs_decision' };
+    return {
+      kind: 'unblock_stage', stageId: stage.id, reason: current.blocked?.reason ?? '', blockKind: current.blocked?.kind ?? 'needs_decision',
+      ...(current.blocked?.kinds?.length ? { blockKinds: current.blocked.kinds } : {}),
+    };
   }
 
   // An outline exists but drafting is not bound to it: only the user approves.
@@ -762,7 +765,7 @@ function describeStuck(
   const footer = ctx.advanceControl ? t('need.stuckFooter', { control: ctx.advanceControl }) : undefined;
   const lead = ctx.blockInputs?.changed
     ? { id: 'resume' as const, label: t('need.resumeChanged') }
-    : need.blockKind === 'data_missing'
+    : need.blockKind === 'data_missing' || need.blockKinds?.includes('data_missing')
       ? { id: 'add_data' as const, label: t('need.addData') }
       : { id: 'retry' as const, label: t('need.tryAgain') };
   const options = [lead, ...skip, clear].slice(0, STUCK_OPTIONS_MAX);

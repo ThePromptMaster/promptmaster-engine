@@ -868,14 +868,18 @@ export function WorkflowWorkspace({
 
   /** PM-13: mark the current stage blocked, or lift the block. */
   const setBlocked = useCallback(
-    async (block: { kind: BlockKind; reason: string } | null) => {
+    async (block: { kind: BlockKind; kinds?: BlockKind[]; reason: string } | null) => {
       if (!stage) return;
       setTransitionError(null);
       try {
         await appendEvent(block
           ? {
               type: 'stage_blocked', stage_id: stage.id, reason: block.reason,
-              payload: { block_kind: block.kind, inputs_at_block: stageInputs(project, stageBundles[stage.id]?.versions.at(-1)?.id) },
+              payload: {
+                block_kind: block.kind,
+                ...(block.kinds && block.kinds.length > 1 ? { block_kinds: block.kinds } : {}),
+                inputs_at_block: stageInputs(project, stageBundles[stage.id]?.versions.at(-1)?.id),
+              },
             }
           : { type: 'stage_unblocked', stage_id: stage.id });
         setBlocking(false);
@@ -2843,7 +2847,7 @@ export function WorkflowWorkspace({
               />
             )}
             {isCurrent && isBlocked && stageState?.blocked && !goHoldsThisBlock && (
-              <BlockedNotice kind={stageState.blocked.kind} reason={stageState.blocked.reason} onUnblock={() => void setBlocked(null)} />
+              <BlockedNotice kind={stageState.blocked.kind} kinds={stageState.blocked.kinds} reason={stageState.blocked.reason} onUnblock={() => void setBlocked(null)} />
             )}
             {isCurrent && blocking && (
               <BlockForm onSubmit={(block) => void setBlocked(block)} onCancel={() => setBlocking(false)} />

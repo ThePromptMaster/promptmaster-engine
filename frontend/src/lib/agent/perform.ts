@@ -1726,7 +1726,10 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
     }
 
     case 'block': {
-      const kind = (['tool_missing', 'data_missing', 'needs_decision'] as const).find((k) => k === params.block_kind) ?? 'needs_decision';
+      const KINDS = ['tool_missing', 'data_missing', 'needs_decision'] as const;
+      const kind = KINDS.find((k) => k === params.block_kind) ?? 'needs_decision';
+      // More than one may hold (31 Oct, Sean); the first named leads.
+      const kinds = [kind, ...(Array.isArray(params.block_kinds) ? KINDS.filter((k) => k !== kind && (params.block_kinds as unknown[]).includes(k)) : [])];
       const reason = (typeof params.reason === 'string' && params.reason.trim()) || ctx.step.rationale || 'Go mode could not continue.';
       const actor = ctx.approvedByUser || ctx.run.policy === 'guided' ? 'user' : 'system';
       // What the stage has to work with now goes on the record with the
@@ -1736,14 +1739,14 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // since it was last cleared: that was a retry, not progress. It is said
       // in those words and costs no step.
       const last = ctx.state.stages[ctx.stage.id]?.last_block;
-      const repeat = last?.kind === kind && inputsChanged(last.inputs, inputs)?.changed === false;
+      const repeat = last?.kind === kind && sameKinds(last.kinds ?? [last.kind], kinds) && inputsChanged(last.inputs, inputs)?.changed === false;
       await appendWorkflowEvent(ctx.project.id, ctx.project.user_id, {
         type: 'stage_blocked',
         stage_id: ctx.stage.id,
         actor,
         agent_run_id: actor === 'system' ? ctx.run.id : null,
         reason,
-        payload: { block_kind: kind, inputs_at_block: inputs },
+        payload: { block_kind: kind, ...(kinds.length > 1 ? { block_kinds: kinds } : {}), inputs_at_block: inputs },
       });
       await ctx.afterStageEvent();
       const said = repeat ? `Nothing has changed since this stage was last marked stuck, so it stops at the same place: ${reason}` : reason;
@@ -1751,7 +1754,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         status: 'blocked', blockKind: kind, toolsUsed: [], changes: { event_types: ['stage_blocked'] },
         output: `Could not continue: ${said}`, stop: { status: 'blocked', reason: said },
         // The card with its options, at once: it used to take a second press of Resume to appear.
-        needs: { kind: 'unblock_stage', stageId: ctx.stage.id, reason, blockKind: kind },
+        needs: { kind: 'unblock_stage', stageId: ctx.stage.id, reason, blockKind: kind, ...(kinds.length > 1 ? { blockKinds: kinds } : {}) },
         ...(repeat ? { free: true } : {}),
       });
     }
@@ -2491,4 +2494,9 @@ export function failedChecks(ctx: Pick<PerformContext, 'context' | 'template'> &
 /** Save what a Go step's search found, citing the run (22 Oct). */
 function keepWeb(ctx: PerformContext, res: WebUse, stage: StageDefinition) {
   return keepFound(ctx.project, res, { stageId: stage.id, agentRunId: ctx.run.id });
+}
+
+/** The same reasons, in any order. */
+function sameKinds(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((k) => b.includes(k));
 }
