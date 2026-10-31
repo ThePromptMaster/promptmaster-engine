@@ -80,6 +80,7 @@ export const sw: Record<keyof typeof en, string> = {
   'chat.whatChangedLine': 'Kilichobadilika: {summary}',
   'chat.checkedLabel': 'Imekaguliwa kwenye maandishi yaliyohifadhiwa',
   'chat.laterNeeds': 'Kazi ya baadaye iliyojengwa juu ya hili — {names} — inahitaji kusasishwa. Bonyeza Tumia na uendelee juu ya ukurasa na Go itaisasisha.',
+  'chat.pageChanged': 'Ukurasa umebadilika tangu jibu la mwisho (Go, vitufe au matoleo). Ujumbe wako unaofuata unaieleza gumzo kilichobadilika.',
   'chat.nothingDepends': 'Hakuna kilichokamilika baada ya hatua hii kinachoitegemea, kwa hiyo hakuna kingine kinachohitaji kusasishwa.',
   'chat.prevInHistory': 'Toleo lililotangulia bado liko kwenye historia ya hatua hii.',
   'chat.restorePrev': 'Rejesha toleo lililotangulia',

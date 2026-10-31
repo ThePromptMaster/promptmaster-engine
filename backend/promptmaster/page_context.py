@@ -46,6 +46,22 @@ class GoRunTrace(BaseModel):
     steps: list[GoStepTrace] = Field(default_factory=list, max_length=12)
     #: The latest objective assessment, in one line, if any.
     objective: str = Field(default="", max_length=2_000)
+    #: What Go is asking, one question per item, when it stopped on questions (31 Oct).
+    questions: list[str] = Field(default_factory=list, max_length=8)
+
+
+class VersionTrace(BaseModel):
+    """One saved version of the stage (31 Oct, Sean: the chat "gave me wrong
+    version numbers" — it was told only the latest number, even when an older
+    version was on screen)."""
+
+    number: int = Field(ge=0)
+    #: "you", "Go", "the side chat", "PromptMaster" — who made it.
+    made_by: str = Field(default="", max_length=40)
+    #: The model stopped at its length limit; the text is unfinished.
+    cut_off: bool = False
+    #: The version on the user's screen.
+    shown: bool = False
 
 
 class ChatContext(BaseModel):
@@ -66,6 +82,13 @@ class ChatContext(BaseModel):
     buttons: list[PageButton] | None = Field(default=None, max_length=40)
     #: The latest Go run on this project; None when there has been none.
     go_run: GoRunTrace | None = None
+    #: The stage's status as the page shows it ("complete", "reopened: …", "stuck: …").
+    stage_status: str = Field(default="", max_length=600)
+    #: The stage's latest versions, oldest first.
+    versions: list[VersionTrace] = Field(default_factory=list, max_length=12)
+    #: What changed on the page since the chat's last reply (31 Oct, Sean: the
+    #: status and the buttons changed and the chat kept to what it said before).
+    changes: list[str] = Field(default_factory=list, max_length=12)
 
 
 NEVER_PASTE_RULE = (
@@ -108,6 +131,9 @@ def format_go_run(run: GoRunTrace | None) -> str:
         lines.append(f"Recorded stop reason: {run.stop_reason.strip()}")
     if run.objective.strip():
         lines.append(f"Objective check: {run.objective.strip()}")
+    if run.questions:
+        lines.append("What Go is asking the user, each on its own:")
+        lines += [f"{i}. {' '.join(q.split())[:600]}" for i, q in enumerate(run.questions, start=1)]
     if run.steps:
         lines.append("Its last steps (execution labels are derived from what actually ran):")
         for s in run.steps:
@@ -122,6 +148,44 @@ def format_go_run(run: GoRunTrace | None) -> str:
     return "\n".join(lines)
 
 
+MADE_BY_WORDS = {"user": "you", "go": "Go", "chat": "the side chat", "system": "PromptMaster"}
+
+
+def format_versions(versions: list[VersionTrace]) -> str:
+    """The stage's versions, with the one on screen marked, or ''."""
+    if not versions:
+        return ""
+    lines = ["THIS STAGE'S VERSIONS (oldest first; use these numbers, never others):"]
+    for v in versions:
+        notes = [f"by {MADE_BY_WORDS.get(v.made_by, v.made_by)}"] if v.made_by else []
+        if v.cut_off:
+            notes.append("cut off by the length limit, unfinished")
+        if v.shown:
+            notes.append("ON SCREEN NOW")
+        lines.append(f"- v{v.number}" + (f" — {'; '.join(notes)}" if notes else ""))
+    latest = versions[-1]
+    shown = next((v for v in versions if v.shown), None)
+    if shown and shown.number != latest.number:
+        lines.append(
+            f"The user is looking at v{shown.number}, not the latest (v{latest.number}). Say which you mean."
+        )
+    return "\n".join(lines)
+
+
+CHANGES_RULE = (
+    "Your earlier replies in this conversation were written before these changes. Where one named a "
+    "button, a version or a status that has changed, say so plainly and give the current one. What is "
+    "listed here and below is the page as it is now, and it outranks anything said earlier."
+)
+
+
+def format_changes(changes: list[str]) -> str:
+    """What changed since the chat's last reply, or ''."""
+    if not changes:
+        return ""
+    return "SINCE YOUR LAST REPLY:\n" + "\n".join(f"- {' '.join(c.split())[:300]}" for c in changes) + "\n" + CHANGES_RULE
+
+
 def format_chat_context(ctx: ChatContext | None) -> str:
     """The block that tells the chat where the user is. '' when nothing was sent,
     so a caller that predates it gets exactly the old prompt."""
@@ -134,6 +198,8 @@ def format_chat_context(ctx: ChatContext | None) -> str:
         lines.append(f"Workflow: {ctx.workflow_label or 'project'} — " + " › ".join(marked))
     if ctx.stage_label:
         lines.append(f"Current stage: {ctx.stage_label}")
+    if ctx.stage_status.strip():
+        lines.append(f"This stage's status: {ctx.stage_status.strip()}")
     if ctx.stage_instruction.strip():
         lines.append(f"What this stage produces: {ctx.stage_instruction.strip()}")
     if ctx.prior_stages:
@@ -149,8 +215,14 @@ def format_chat_context(ctx: ChatContext | None) -> str:
             ctx.manuscript.strip(),
             "--- END MANUSCRIPT ---",
         ]
+    versions = format_versions(ctx.versions)
+    if versions:
+        lines += ["", versions]
     lines += ["", format_go_run(ctx.go_run), "", WHAT_CHAT_CAN_CHANGE]
     lines += ["", format_buttons(ctx.buttons), "", NEVER_PASTE_RULE]
+    changes = format_changes(ctx.changes)
+    if changes:
+        lines += ["", changes]
     return "\n".join(lines)
 
 

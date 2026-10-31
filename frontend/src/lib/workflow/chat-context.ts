@@ -13,6 +13,7 @@ import { draftingStageId } from './derived-outline';
 import { stageContentForChat, itemSchemaFor } from './stage-artifact';
 import { parseOutlineDocument } from '@/lib/outline/model';
 import { PLACE_WORDS, type StageControl } from './stage-controls';
+import { madeBy } from './chat-changes';
 import type { StageDefinition, WorkflowState, WorkflowTemplate } from './types';
 import type { ChatContext, OutlineSection } from '@/types';
 import type { Project } from '@/types/project';
@@ -68,6 +69,24 @@ export function chatContentFor(
 
 /** Go steps the chat is shown: enough to answer "why did it stop?". */
 const GO_STEPS_MAX = 12;
+/** Versions the chat is shown: the latest, which is what it is asked about. */
+const VERSIONS_MAX = 8;
+
+/** The stage's status in words (31 Oct): done, in progress, reopened and why, stuck and why. */
+export function stageStatusLine(st: WorkflowState['stages'][string] | undefined): string {
+  if (!st) return 'not started';
+  const clip = (s: string) => (s.length > 400 ? `${s.slice(0, 399)}…` : s);
+  switch (st.status) {
+    case 'stale':
+      return `reopened, waiting for a recheck: ${clip(st.stale?.reason ?? 'something it relied on changed')}`;
+    case 'blocked': {
+      const kinds = (st.blocked?.kinds ?? (st.blocked ? [st.blocked.kind] : [])).map((k) => k.replace(/_/g, ' '));
+      return `marked stuck${kinds.length ? ` (${kinds.join(', ')})` : ''}: ${clip(st.blocked?.reason ?? '')}`;
+    }
+    default:
+      return st.status.replace(/_/g, ' ');
+  }
+}
 
 export function buildChatContext(input: {
   template: WorkflowTemplate;
@@ -79,10 +98,12 @@ export function buildChatContext(input: {
   controls: StageControl[] | null;
   /** The latest Go run and its steps, so the chat answers "why did it stop?" from the record. */
   goRun?: {
-    run: { status: string; policy: string; stop_reason: string | null } | null;
+    run: { status: string; policy: string; stop_reason: string | null; questions?: readonly string[] } | null;
     steps: readonly { action_key: string; status: string; execution_label: string | null; block_kind?: string | null; output: string }[];
     objective?: string;
   };
+  /** The version on screen; the latest when not given. */
+  shownVersionId?: string | null;
   /**
    * Names as the page shows them, in the interface's language (client, 21
    * Oct): the chat and Go then name the stage and its buttons in the words
@@ -90,7 +111,9 @@ export function buildChatContext(input: {
    */
   display?: { stageName: (s: StageDefinition) => string; workflowName: string };
 }): ChatContext {
-  const { template, state, project, stage, bundles, controls, goRun, display } = input;
+  const { template, state, project, stage, bundles, controls, goRun, display, shownVersionId } = input;
+  const versions = bundles[stage.id]?.versions ?? [];
+  const shown = (shownVersionId && versions.find((v) => v.id === shownVersionId)) || versions.at(-1);
   const nameOf = display?.stageName ?? ((s: StageDefinition) => s.label);
   const digest = buildStageDigest(template, state, project, bundles, stage.id);
   // A chapter stage's own text already is the manuscript; sending it twice
@@ -125,7 +148,15 @@ export function buildChatContext(input: {
               output: s.output.slice(0, 400),
             })),
           objective: (goRun.objective ?? '').slice(0, 2_000),
+          ...(goRun.run.questions?.length ? { questions: goRun.run.questions.slice(0, 8).map((q) => q.slice(0, 600)) } : {}),
         }
       : null,
+    stage_status: stageStatusLine(state.stages[stage.id]),
+    versions: versions.slice(-VERSIONS_MAX).map((v) => ({
+      number: v.version_number,
+      made_by: madeBy(v.source_operation),
+      cut_off: v.finish_reason === 'length',
+      shown: v.id === shown?.id,
+    })),
   };
 }

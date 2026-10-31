@@ -80,6 +80,7 @@ export const ar: Record<keyof typeof en, string> = {
   'chat.whatChangedLine': 'ما الذي تغيّر: {summary}',
   'chat.checkedLabel': 'تم التحقق على النص المحفوظ',
   'chat.laterNeeds': 'عمل لاحق بُني على هذا — {names} — يحتاج إلى تحديث. اضغط «تطبيق ومتابعة» أعلى الصفحة وسيحدّثه Go.',
+  'chat.pageChanged': 'تغيّرت الصفحة منذ الرد الأخير (Go أو الأزرار أو الإصدارات). رسالتك التالية تخبر المحادثة بما تغيّر.',
   'chat.nothingDepends': 'لا شيء مما اكتمل بعد هذه المرحلة يعتمد عليها، لذا لا شيء آخر يحتاج إلى تحديث.',
   'chat.prevInHistory': 'النسخة السابقة لا تزال في سجل هذه المرحلة.',
   'chat.restorePrev': 'استعادة النسخة السابقة',

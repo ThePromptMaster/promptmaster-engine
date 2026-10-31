@@ -110,3 +110,45 @@ def test_chat_message_without_context_still_works(basic_inputs, basic_iteration)
         app.dependency_overrides.pop(get_client, None)
     assert r.status_code == 200, r.text
     assert "WHERE THE USER IS" not in stub.generate.call_args.kwargs["prompt"]
+
+
+# 31 Oct (Sean): "The chat assistant gave me wrong version numbers and
+# contradictory button advice" after the run's status and buttons changed.
+
+
+def test_versions_are_listed_with_the_one_on_screen_marked():
+    from promptmaster.page_context import ChatContext, VersionTrace, format_chat_context
+
+    text = format_chat_context(ChatContext(stage_label="Book manuscript", versions=[
+        VersionTrace(number=7, made_by="go"),
+        VersionTrace(number=8, made_by="go", cut_off=True, shown=True),
+        VersionTrace(number=9, made_by="user"),
+    ]))
+    assert "THIS STAGE'S VERSIONS" in text
+    assert "- v8 — by Go; cut off by the length limit, unfinished; ON SCREEN NOW" in text
+    assert "- v9 — by you" in text
+    assert "The user is looking at v8, not the latest (v9)" in text
+
+
+def test_stage_status_goes_under_the_stage():
+    from promptmaster.page_context import ChatContext, format_chat_context
+
+    text = format_chat_context(ChatContext(stage_label="Book manuscript", stage_status="reopened: the work went back to Evidence base"))
+    assert "Current stage: Book manuscript\nThis stage's status: reopened: the work went back to Evidence base" in text
+
+
+def test_changes_since_the_last_reply_outrank_earlier_replies():
+    from promptmaster.page_context import ChatContext, format_chat_context
+
+    text = format_chat_context(ChatContext(stage_label="S", changes=["Go: running → awaiting a decision", '"Continue writing" is no longer on the page']))
+    assert "SINCE YOUR LAST REPLY:\n- Go: running → awaiting a decision\n- \"Continue writing\" is no longer on the page" in text
+    assert "outranks anything said earlier" in text
+    # Nothing changed: no block at all.
+    assert "SINCE YOUR LAST REPLY" not in format_chat_context(ChatContext(stage_label="S"))
+
+
+def test_go_questions_are_listed_one_per_line():
+    from promptmaster.page_context import ChatContext, GoRunTrace, format_chat_context
+
+    text = format_chat_context(ChatContext(go_run=GoRunTrace(status="awaiting_decision", questions=["Should the limit change?", "Should I cite a source?"])))
+    assert "What Go is asking the user, each on its own:\n1. Should the limit change?\n2. Should I cite a source?" in text

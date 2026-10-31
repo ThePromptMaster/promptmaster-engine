@@ -88,7 +88,8 @@ import { ProjectReaderPane } from './project-reader-pane';
 import { addReference } from '@/lib/supabase/references';
 import { MAX_REFERENCES } from '@/lib/workflow/references';
 import { ProjectFacts } from './project-facts';
-import { buildChatContext, chatContentFor } from '@/lib/workflow/chat-context';
+import { buildChatContext, chatContentFor, stageStatusLine } from '@/lib/workflow/chat-context';
+import { pageChanges, pageSnapshot, type PageSnapshot } from '@/lib/workflow/chat-changes';
 import { starterQuestions } from '@/lib/workflow/chat-starters';
 import { keepFinishedVersion, stageContentForSummary, stageEvidence } from '@/lib/workflow/evidence';
 import { api } from '@/lib/api/client';
@@ -426,6 +427,8 @@ export function WorkflowWorkspace({
   // unsaved draft (PM-01). Keyed by stage id.
   const [outlineCounts, setOutlineCounts] = useState<Record<string, number>>({});
   const [activeVersionId, setActiveVersionId] = useState<string | null>(null);
+  /** The page as each stage's side chat last answered from (31 Oct, `chat-changes.ts`). */
+  const chatSeen = useRef<Record<string, PageSnapshot>>({});
   // Below md the rail is not on the page; this is the drawer that replaces it.
   const [mobileRailOpen, setMobileRailOpen] = useState(false);
   // Go mode drafts stages itself; the entry auto-draft must not race it.
@@ -2007,6 +2010,16 @@ export function WorkflowWorkspace({
   // Not Go's own panel: its buttons change while it runs, and Go names the
   // page's buttons, not its own (the chat gets them all).
   controlsRef.current = pageControls?.filter((c) => c.place !== 'go_panel' && c.place !== 'next_step') ?? null;
+  // What the side chat's last reply could be wrong about, as it is now (31 Oct).
+  const chatPageNow = {
+    stage_status: stageStatusLine(state.stages[stage.id]),
+    go_run: go.run ? { status: go.run.status } : null,
+    buttons: pageControls ?? null,
+    versions: stageVersions.slice(-8).map((v) => ({
+      number: v.version_number, made_by: '', cut_off: v.finish_reason === 'length',
+      shown: v.id === (activeVersionId ?? stageVersions.at(-1)?.id),
+    })),
+  } as Parameters<typeof pageSnapshot>[0];
   // Check and chapter stages: the work is the table or the chapters, so the
   // supporting panels fold to a line each (3 Oct call).
   // The simple setup folds them on every stage (Sean, 18 Oct, email 7): the
@@ -3067,19 +3080,27 @@ export function WorkflowWorkspace({
                   ''
               )}
               // Built when a message is sent, not on every render: it carries the chapters.
-              getChatContext={() =>
-                buildChatContext({
+              // It carries what changed since the chat's last reply too (31 Oct).
+              getChatContext={() => {
+                const built = buildChatContext({
                   template, state, project, stage, bundles: stageBundles, controls: pageControls,
+                  shownVersionId: activeVersionId,
                   display: { stageName: (s) => stageText(locale, template.key, s, 'label'), workflowName: shownTemplateName },
                   goRun: {
-                    run: go.run ? { status: go.run.status, policy: go.run.policy, stop_reason: go.run.stop_reason ?? null } : null,
+                    run: go.run ? { status: go.run.status, policy: go.run.policy, stop_reason: go.run.stop_reason ?? null, questions: go.run.needs?.kind === 'answer_question' ? go.run.needs.questions : undefined } : null,
                     steps: go.steps,
                     objective: objectiveAssessment
                       ? `${objectiveAssessment.outcome.replace('_', ' ')} — ${objectiveAssessment.reason}${objectiveAssessment.blockers.length ? ` Waiting for: ${objectiveAssessment.blockers.map((b) => b.need).join('; ')}.` : ''}`
                       : '',
                   },
-                })
-              }
+                });
+                return { ...built, changes: pageChanges(chatSeen.current[stage.id], pageSnapshot(built)) };
+              }}
+              onAnswered={(sent) => {
+                if (sent) chatSeen.current[stage.id] = pageSnapshot(sent);
+              }}
+              pageChanged={pageChanges(chatSeen.current[stage.id], pageSnapshot(chatPageNow)).length > 0}
+              shownVersionNumber={activeVersionId ? stageVersions.find((v) => v.id === activeVersionId)?.version_number ?? null : null}
               starters={isCurrent ? starterQuestions({
                 renderer: stage.renderer,
                 stageLabel: stageText(locale, template.key, stage, 'short'),
