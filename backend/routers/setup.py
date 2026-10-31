@@ -26,7 +26,7 @@ class GenerateSetupRequest(BaseModel):
     objective: str = Field(..., min_length=1, max_length=MAX_OBJECTIVE_CHARS)
     model: str = ""
     #: Answers from the "Guide me" path; empty on "I know what I want to do".
-    answers: list[GuideAnswer] = Field(default=[], max_length=8)
+    answers: list[GuideAnswer] = Field(default=[], max_length=16)
     #: What the user attached on the start screen, as text (5 Oct, email 8).
     material: str = Field(default="", max_length=MAX_CONTEXT_CHARS)
     #: The new project's Web access (22 Oct): on, the setup may not say there is no web.
@@ -86,7 +86,7 @@ class GuideAnswered(BaseModel):
 
 class GuideNextRequest(BaseModel):
     objective: str = Field(..., min_length=1, max_length=MAX_OBJECTIVE_CHARS)
-    answered: list[GuideAnswered] = Field(default_factory=list, max_length=12)
+    answered: list[GuideAnswered] = Field(default_factory=list, max_length=24)
     model: str = ""
     material: str = Field(default="", max_length=MAX_CONTEXT_CHARS)
     #: The simple start asks fewer (Sean, 18 Oct, email 7); never more than the server's own limit.
@@ -119,7 +119,7 @@ async def api_guide_next_question(
     client: OpenRouterClient = Depends(get_client),
 ) -> GuideNextResponse:
     """"Guide me", one question at a time: the next question given the answers
-    so far, or that there is enough. 1 small LLM call; none past six answers.
+    so far, or that there is enough. 1 small LLM call; none past MAX_GUIDE_QUESTIONS (12) answers.
     With Web access on, a question that needs current outside facts is
     searched first (as every writer is, L-100); the browser keeps what was found."""
     web = WebUse()

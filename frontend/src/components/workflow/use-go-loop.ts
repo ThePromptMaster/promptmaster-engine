@@ -436,6 +436,13 @@ export function useGoLoop(opts: Options) {
       });
       upsertStep(finished);
       setProgress(null);
+      // The run's cost is the sum of its steps' (31 Oct: shown in the Go
+      // panel). Best-effort: a missed total costs the line, not the step.
+      if (costUsd !== null && costUsd > 0 && runRef.current) {
+        const total = Number(runRef.current.cost_usd ?? 0) + costUsd;
+        commitRun({ ...runRef.current, cost_usd: total });
+        void updateAgentRun(current.id, { cost_usd: total }).catch(() => undefined);
+      }
       // Waiting for sections already queued is not a move; it costs no step.
       // …and neither is a stop that only repeated one already made (2 Oct, item 9).
       if (step.action_key !== AWAIT_SECTIONS_STEP && !outcome.free) {

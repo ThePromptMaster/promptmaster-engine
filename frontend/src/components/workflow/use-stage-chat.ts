@@ -60,6 +60,7 @@ import type { ArtifactVersion, Project } from '@/types/project';
 import { factChangesFromRevision, isNewFact, newFactSource, withMeaningChanges, type FactChange } from '@/lib/workflow/fact-reconcile';
 import { recordFacts, supersedeFact } from '@/lib/supabase/facts';
 import type { ChatContext, ChatMessage } from '@/types';
+import { spentOn, type Spent } from '@/lib/observability/spent';
 import { describeLines, keepUnasked } from '@/lib/workflow/preservation';
 import { notRemovedByUser } from '@/lib/workflow/removed-text';
 import { addedClaims, noInventedDetails, suppliedText, type AddedClaim } from '@/lib/workflow/fact-boundary';
@@ -278,7 +279,8 @@ export function useStageChat({
       text: string,
       mode: 'discuss' | 'instruct',
       scope?: string,
-      web?: ChatWebSearch | null
+      web?: ChatWebSearch | null,
+      spent?: Spent | null
     ): Promise<StageChatMessage> => {
       const own = `${project.id}:${stageId}`;
       const saved = await saveStageChatMessage({
@@ -291,6 +293,7 @@ export function useStageChat({
         mode,
         scope: scope ?? null,
         web: web ?? null,
+        spent: spent ? { cost: spent.cost, unpriced: spent.unpriced } : null,
       });
       if (live.current && thread.current === own) setMessages((prior) => [...prior, saved]);
       return saved;
@@ -340,7 +343,8 @@ export function useStageChat({
           web = { query: '', saved: 0, note: response.web_note };
         }
 
-        await persist('assistant', response.assistant_message.content, 'discuss', undefined, web);
+        // What the reply cost, kept with it (31 Oct, client: "Billing isn't visible").
+        await persist('assistant', response.assistant_message.content, 'discuss', undefined, web, spentOn(response));
       } catch (err) {
         if (live.current) {
           setError(errorText(err, 'Could not reach the model. Try again in a moment.'));

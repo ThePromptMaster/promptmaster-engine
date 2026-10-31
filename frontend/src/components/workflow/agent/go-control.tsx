@@ -1,5 +1,7 @@
 'use client';
 
+import { shownCost } from '@/lib/observability/spent';
+
 import { useT } from '@/lib/i18n/i18n-provider';
 import type { AgentRun } from '@/types/agent';
 
@@ -105,6 +107,12 @@ export function GoControl({
         </div>
       )}
     </div>
+    {/* What the run has cost (31 Oct); shown once a priced step has run. */}
+    {!compact && run && Number(run.cost_usd ?? 0) > 0 && (
+    <p className="mt-2 text-label text-[var(--on-surface-variant)]">
+      {t('cost.run', { cost: shownCost(Number(run.cost_usd)) ?? '' })}
+    </p>
+    )}
     {!compact && (
     <p className="mt-2 text-label text-[var(--on-surface-variant)]">
       {t('gc.explain')}
