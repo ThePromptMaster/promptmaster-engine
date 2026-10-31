@@ -2,6 +2,8 @@
 export const en = {
   "cwd.kind.assess": "Assess",
   "cwd.kindAssess": "Assess — judge pasted items on a scale",
+  "cwd.kind.chapters": "Chapters",
+  "cwd.kindChapters": "Chapters — a plan of chapters, then each chapter written and revised on its own",
   "cwd.scaleOf": "Scale of stage {n}",
   "workflow.name.assessment": "Assessment",
   "workflow.pitch.assessment": "Criteria set once, then items judged against them in batches — on a traffic light, a score or your own scale.",
@@ -87,6 +89,8 @@ type Keys = Record<keyof typeof en, string>;
 export const es: Keys = {
   "cwd.kind.assess": "Evaluar",
   "cwd.kindAssess": "Evaluar — juzgar elementos pegados en una escala",
+  "cwd.kind.chapters": "Capítulos",
+  "cwd.kindChapters": "Capítulos: un plan de capítulos y luego cada capítulo escrito y revisado por separado",
   "cwd.scaleOf": "Escala de la etapa {n}",
   "workflow.name.assessment": "Evaluación",
   "workflow.pitch.assessment": "Criterios fijados una vez y elementos juzgados con ellos por lotes: con semáforo, una puntuación o tu propia escala.",
@@ -170,6 +174,8 @@ export const es: Keys = {
 export const fr: Keys = {
   "cwd.kind.assess": "Évaluer",
   "cwd.kindAssess": "Évaluer — juger des éléments collés sur une échelle",
+  "cwd.kind.chapters": "Chapitres",
+  "cwd.kindChapters": "Chapitres — un plan des chapitres, puis chaque chapitre rédigé et révisé séparément",
   "cwd.scaleOf": "Échelle de l’étape {n}",
   "workflow.name.assessment": "Évaluation",
   "workflow.pitch.assessment": "Des critères fixés une fois, puis des éléments jugés par lots — feu tricolore, note ou votre propre échelle.",
@@ -253,6 +259,8 @@ export const fr: Keys = {
 export const pt: Keys = {
   "cwd.kind.assess": "Avaliar",
   "cwd.kindAssess": "Avaliar — julgar itens colados numa escala",
+  "cwd.kind.chapters": "Capítulos",
+  "cwd.kindChapters": "Capítulos — um plano de capítulos e depois cada capítulo escrito e revisto separadamente",
   "cwd.scaleOf": "Escala da etapa {n}",
   "workflow.name.assessment": "Avaliação",
   "workflow.pitch.assessment": "Critérios definidos uma vez e itens julgados por eles em lotes — num semáforo, numa nota ou na sua própria escala.",

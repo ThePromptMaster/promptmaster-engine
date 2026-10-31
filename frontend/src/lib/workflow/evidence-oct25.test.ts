@@ -16,7 +16,9 @@ const source = { seq: 3, url: 'https://arxiv.org/abs/2301.00001', title: 'Entang
 describe('a work a web search found and saved is retrieved, not suggested', () => {
   it('marks the row from the saved source, with its [S#] and link', () => {
     const rows = [{ id: 'w1', [field]: 'Calabrese, Cardy, Tonni (2009). Entanglement entropy of two disjoint intervals in conformal field theory', status: 'candidate' }];
-    const { items, found } = applySavedSources(rows, [source], schema);
+    // Numbered as the panel numbers it — third current source — not by the table's global seq (31 Oct).
+    const earlier = [1, 2].map((i) => ({ seq: i, url: `https://example.org/${i}`, title: `Other ${i}`, retrieved_at: '2026-10-20T00:00:00Z' }));
+    const { items, found } = applySavedSources(rows, [...earlier, { ...source, seq: 3017 }], schema);
     expect(found).toBe(1);
     expect(items[0].status).toBe(schema.lookup!.status);
     expect(items[0].status_source).toBe('tool');
