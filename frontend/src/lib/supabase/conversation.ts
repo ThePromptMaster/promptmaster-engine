@@ -120,6 +120,8 @@ export interface StageChatMessage extends ChatMessage {
   discarded?: boolean;
   /** Discuss only: the web search this reply was made with (22 Oct). */
   web?: ChatWebSearch | null;
+  /** An assistant reply: what it cost, as `spent.ts` totals it (31 Oct). */
+  spent?: { cost: number | null; unpriced: number } | null;
 }
 
 /** A search the chat made for a reply: what for, and what it saved. */
@@ -137,6 +139,7 @@ interface StageChatMeta {
   applied_version_id?: string | null;
   discarded?: boolean;
   web?: ChatWebSearch | null;
+  spent?: { cost: number | null; unpriced: number } | null;
 }
 
 interface StageRow extends ConversationMessageRow {
@@ -154,6 +157,7 @@ function rowToStageMessage(row: StageRow): StageChatMessage {
     appliedVersionId: meta.applied_version_id ?? null,
     discarded: meta.discarded === true,
     web: meta.web ?? null,
+    spent: meta.spent ?? null,
   };
 }
 
@@ -206,6 +210,7 @@ export async function saveStageChatMessage(msg: {
   scope?: string | null;
   applied_version_id?: string | null;
   web?: ChatWebSearch | null;
+  spent?: { cost: number | null; unpriced: number } | null;
 }): Promise<StageChatMessage> {
   const local = (): StageChatMessage => ({
     id: crypto.randomUUID(),
@@ -217,6 +222,7 @@ export async function saveStageChatMessage(msg: {
     scope: msg.scope ?? null,
     appliedVersionId: msg.applied_version_id ?? null,
     web: msg.web ?? null,
+    spent: msg.spent ?? null,
   });
 
   const supabase = createClient();
@@ -228,6 +234,7 @@ export async function saveStageChatMessage(msg: {
     scope: msg.scope ?? null,
     applied_version_id: msg.applied_version_id ?? null,
     ...(msg.web ? { web: msg.web } : {}),
+    ...(msg.spent ? { spent: msg.spent } : {}),
   };
 
   const { data, error } = await supabase

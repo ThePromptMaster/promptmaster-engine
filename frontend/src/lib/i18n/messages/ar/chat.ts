@@ -96,4 +96,12 @@ export const ar: Record<keyof typeof en, string> = {
   'chat.fact.and': ' و',
   'chat.fact.heading_one': 'هذا {list}. هل تسجّله لتستخدمه كل مرحلة وكل فحص لاحق؟',
   'chat.fact.heading_other': 'هذا {list}. هل تسجّلها لتستخدمها كل مرحلة وكل فحص لاحق؟',
+  "cost.reply": "تكلفة هذا الرد {cost}",
+  "cost.replyUnknown": "سعر هذا الرد غير متاح",
+  "cost.unpriced": "({count} دون سعر معروف)",
+  "cost.step": "التكلفة {cost}",
+  "cost.run": "هذا التشغيل حتى الآن: {cost}",
+  "cost.project": "هذا المشروع حتى الآن: {cost}",
+  "cost.unavailable": "السعر غير متاح",
+  "cost.projectHint": "استدعاءات النموذج لهذا المشروع: المحادثة الجانبية وGo والصياغة والفحوص.",
 };
