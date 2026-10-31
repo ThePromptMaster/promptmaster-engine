@@ -1,4 +1,5 @@
 import { statesValue, valueMentions, type ValueMention } from './fact-values';
+import { isSourceListLine, withoutSourcesList } from './sources';
 
 /**
  * What a revision removed that it was not asked to remove (14 Oct).
@@ -113,6 +114,8 @@ export function removedLines(before: string, after: string): Removal[] {
   for (const raw of before.split('\n')) {
     const line = raw.trim();
     if (!line || /^\|?[\s:|-]+\|?$/.test(line) || /^#{1,6}\s/.test(line) || isChangeNote(line)) continue;
+    // A row of a Sources list is PromptMaster's to show, never put back (31 Oct).
+    if (isSourceListLine(line)) continue;
     if (afterExact.has(norm(line)) || afterMasked.has(masked(line))) continue;
     const w = words(line);
     if (!w.length) continue;
@@ -262,8 +265,9 @@ export function describeLines(lines: readonly string[], max = 4): string {
  */
 export function structureDropped(before: string, after: string): string[] {
   const out: string[] = [];
-  const old = headedSections(before);
-  const now = headedSections(after);
+  // A Sources list the model wrote is not the brief's structure (31 Oct).
+  const old = headedSections(withoutSourcesList(before));
+  const now = headedSections(withoutSourcesList(after));
   for (const [key, s] of old) {
     const kept = now.get(key);
     if (!kept) {

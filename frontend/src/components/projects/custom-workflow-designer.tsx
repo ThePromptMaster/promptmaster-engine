@@ -274,6 +274,7 @@ export function CustomWorkflowDesigner({
                         <option value="list">{t('cwd.kindList')}</option>
                         <option value="check">{t('cwd.kindCheck')}</option>
                         <option value="assess">{t('cwd.kindAssess')}</option>
+                        <option value="chapters">{t('cwd.kindChapters')}</option>
                       </select>
                     </label>
                     {s.kind === 'assess' && (

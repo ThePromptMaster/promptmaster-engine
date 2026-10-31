@@ -68,6 +68,42 @@ describe('results called calculated or verified (L-118)', () => {
   });
 });
 
+describe('definitions are not claims (31 Oct, Sean)', () => {
+  it("Sean's sentence: a definition of a label is not a claim that something was verified", () => {
+    expect(unsupportedClaims('Established means strongly supported by reliable, independently verified evidence.', none)).toEqual([]);
+  });
+
+  it('other ways of defining a word', () => {
+    const text = [
+      '"Verified" refers to a result checked against a cited source.',
+      'Calculated is defined as produced by code that ran in this project.',
+      '- **Established** — strongly supported by independently verified evidence.',
+      'Confirmed stands for a result the user confirmed.',
+    ].join('\n');
+    expect(unsupportedClaims(text, none)).toEqual([]);
+  });
+
+  it('a glossary or evidence-scale section is read as definitions, up to the next heading', () => {
+    const text = [
+      '## Evidence scale',
+      'Verified: checked against a cited source.',
+      'Calculated — produced by a code run.',
+      '## Findings',
+      'We verified the migration figures.',
+    ].join('\n');
+    expect(unsupportedClaims(text, none).map((c) => c.quote)).toEqual(['We verified the migration figures.']);
+  });
+
+  it('"independently verified" describing evidence is not a claim; "was independently verified" is', () => {
+    expect(unsupportedClaims('The study relies on independently verified records.', none)).toEqual([]);
+    expect(unsupportedClaims('The rate was independently verified.', none)).toMatchObject([{ word: 'verified', needs: 'source' }]);
+  });
+
+  it('"this means" introduces a consequence, not a definition', () => {
+    expect(unsupportedClaims('This means we verified the bound.', none)).toMatchObject([{ word: 'verified' }]);
+  });
+});
+
 describe('measureEvidence', () => {
   const prose = { renderer: 'prose' as const };
   it('measures research and inquiry prose only', () => {

@@ -17,7 +17,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from .llm_client import OpenRouterClient
-from .workflow_designer import FINALISE_LABEL, KINDS, MAX_STAGES, MIN_STAGES, DesignedStage, DesignedWorkflow, Execution, _clip, fix_loops, parse_execution, with_closing_stage
+from .workflow_designer import FINALISE_LABEL, KINDS, fix_chapters, MAX_STAGES, MIN_STAGES, DesignedStage, DesignedWorkflow, Execution, _clip, fix_loops, parse_execution, with_closing_stage
 
 #: What the engine can and cannot walk, told to the model so it can say which.
 CAPABILITIES = (
@@ -87,7 +87,7 @@ def build_revision_prompt(design: DesignedWorkflow, request: str) -> tuple[str, 
         f"THE USER ASKS: {request.strip()}\n\n"
         "Return JSON only:\n"
         '{"operations": [\n'
-        '  {"op": "add_stage", "after": 3, "stage": {"label": "...", "short_label": "...", "kind": "write|list|check", '
+        '  {"op": "add_stage", "after": 3, "stage": {"label": "...", "short_label": "...", "kind": "write|list|check|chapters", '
         '"purpose": "...", "instruction": "...", "required": true, "approval": "", "approval_kind": "decision", "decision": ""}},\n'
         '  {"op": "edit_stage", "stage": 2, "fields": {"instruction": "..."}},\n'
         '  {"op": "remove_stage", "stage": 4},\n'
@@ -216,6 +216,7 @@ def apply_operations(design: DesignedWorkflow, result: object) -> RevisedWorkflo
         changes.append(f"Added “{FINALISE_LABEL}” after “{closing}”: the last stage produces the finished work, with the check's accepted corrections applied")
     if len(stages) < MIN_STAGES:
         raise ValueError(f"A workflow needs at least {MIN_STAGES} stages.")
+    stages = fix_chapters(stages)
     stages[0] = stages[0] if stages[0].required else stages[0].model_copy(update={"required": True})
     stages[-1] = stages[-1] if stages[-1].required else stages[-1].model_copy(update={"required": True})
     before_loops = [s.loop_back_to for s in stages]

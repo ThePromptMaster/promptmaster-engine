@@ -21,6 +21,8 @@ export const ar: Record<keyof typeof en, string> = {
   'web.searched': ' · بحث عن «{query}»',
   'web.takeOut': 'إزالة',
   'web.none': 'لم تُحفظ أي مصادر بعد.',
+  'web.cited': 'المصادر المستشهد بها',
+  'web.citedLabel': 'مصادر الويب المحفوظة التي تستشهد بها هذه النسخة',
   'web.newSaved_one': 'حُفظ {count} مصدر جديد',
   'web.newSaved_other': 'عدد المصادر الجديدة المحفوظة: {count}',
   'web.alreadyOnRecord': '؛ {count} مسجّلة من قبل',

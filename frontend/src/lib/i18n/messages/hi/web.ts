@@ -21,6 +21,8 @@ export const hi: Record<keyof typeof en, string> = {
   'web.searched': ' · “{query}” खोजा गया',
   'web.takeOut': 'हटाएँ',
   'web.none': 'अभी तक कोई स्रोत सहेजा नहीं गया।',
+  'web.cited': 'उद्धृत स्रोत',
+  'web.citedLabel': 'इस संस्करण द्वारा उद्धृत सहेजे गए वेब स्रोत',
   'web.newSaved_one': '{count} नया स्रोत सहेजा गया',
   'web.newSaved_other': '{count} नए स्रोत सहेजे गए',
   'web.alreadyOnRecord': '; {count} पहले से रिकॉर्ड में',

@@ -587,6 +587,20 @@ describe('PM-13 statuses and PM-14 completion, projected from the log', () => {
     expect(lifted.stages.objective.blocked).toBeUndefined();
   });
 
+  it('blocked may carry several reasons, the first leading; lifting it remembers them (31 Oct)', () => {
+    const blocked = projectState(BOOK_V1, [
+      event('stage_blocked', 'objective', { reason: 'Credit and a length decision', payload: { block_kind: 'tool_missing', block_kinds: ['tool_missing', 'needs_decision', 'nonsense'] } }),
+    ]);
+    expect(blocked.stages.objective.blocked).toMatchObject({ kind: 'tool_missing', kinds: ['tool_missing', 'needs_decision'] });
+    const one = projectState(BOOK_V1, [event('stage_blocked', 'objective', { reason: 'x', payload: { block_kind: 'data_missing' } })]);
+    expect(one.stages.objective.blocked?.kinds).toBeUndefined();
+    const lifted = projectState(BOOK_V1, [
+      event('stage_blocked', 'objective', { reason: 'x', payload: { block_kind: 'tool_missing', block_kinds: ['tool_missing', 'needs_decision'] } }),
+      event('stage_unblocked', 'objective'),
+    ]);
+    expect(lifted.stages.objective.last_block).toMatchObject({ kind: 'tool_missing', kinds: ['tool_missing', 'needs_decision'] });
+  });
+
   it('the project is finished by an event, and can be reopened', () => {
     expect(projectState(BOOK_V1, [event('project_finalized', 'final_review')]).project_status).toBe('finalized');
     expect(

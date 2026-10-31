@@ -4,6 +4,8 @@ import type { en } from '../areas/assess';
 export const sw: Record<keyof typeof en, string> = {
   "cwd.kind.assess": "Tathmini",
   "cwd.kindAssess": "Tathmini — kupima vitu vilivyobandikwa kwa kipimo",
+  "cwd.kind.chapters": "Sura",
+  "cwd.kindChapters": "Sura — mpango wa sura, kisha kila sura huandikwa na kurekebishwa peke yake",
   "cwd.scaleOf": "Kipimo cha hatua {n}",
   "workflow.name.assessment": "Tathmini",
   "workflow.pitch.assessment": "Vigezo vinawekwa mara moja, kisha vitu vinapimwa navyo kwa makundi — kwa taa za barabarani, alama au kipimo chako mwenyewe.",

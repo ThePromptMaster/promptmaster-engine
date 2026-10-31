@@ -298,9 +298,9 @@ export interface StageState {
   /** The head version when the stage was moved past and left open. */
   left_version_id?: string;
   /** `inputs` is what the stage had to work with when it was marked stuck (lib/workflow/stage-inputs.ts). */
-  blocked?: { kind: BlockKind; reason: string; inputs?: unknown };
+  blocked?: { kind: BlockKind; reason: string; inputs?: unknown; kinds?: BlockKind[] };
   /** The block that was last cleared, so a stage marked stuck again for the same thing can say so. */
-  last_block?: { kind: BlockKind; inputs?: unknown };
+  last_block?: { kind: BlockKind; inputs?: unknown; kinds?: BlockKind[] };
   /**
    * Set when a change to the brief reopened this stage for a recheck (5 Oct):
    * why it may no longer hold, which change did it, and what it was before —

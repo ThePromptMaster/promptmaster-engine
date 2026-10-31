@@ -119,7 +119,8 @@ export function QuestionPrompt({
   return (
     <section aria-label={t('qp.label')} className="rounded-xl bg-[var(--surface-container-highest)] px-5 py-4">
       <p className="text-label uppercase tracking-wide text-[var(--on-surface-variant)]">{t('qp.asks')}</p>
-      <p className="mt-1 text-body text-[var(--on-surface)]">{question}</p>
+      {/* Several things asked are on numbered lines of their own (31 Oct). */}
+      <p className="mt-1 whitespace-pre-line text-body text-[var(--on-surface)]">{question}</p>
       {change && <WhatChanged change={change} />}
       {expertPackage && <ExpertPackageCard markdown={expertPackage} />}
       <div aria-label={t('qp.answers')} className="mt-3 flex flex-wrap gap-2">

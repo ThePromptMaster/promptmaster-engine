@@ -311,7 +311,7 @@ export const sw: Record<keyof typeof en, string> = {
   'ssp.block.needs_decision': 'Inahitaji uamuzi',
   'ssp.block.needs_decision.hint': 'Mtu lazima achague kabla hili halijaendelea',
   'ssp.markStuck': 'Weka alama kuwa imekwama',
-  'ssp.waitingOn': 'Hatua hii inasubiri nini?',
+  'ssp.waitingOn': 'Hatua hii inasubiri nini? Chagua yote yanayohusika.',
   'ssp.whyStuck': 'Kwa nini imekwama',
   'ssp.whatMissing': 'Nini hasa kinakosekana',
   'ssp.whatMissingPh': 'Nini hasa kinakosekana? (inahitajika)',

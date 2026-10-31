@@ -115,3 +115,61 @@ def test_a_stage_draft_loses_citations_to_sources_the_project_does_not_hold():
 
     assert strip_unknown_citations("Growth was 4% [S1]; a rival says 9% [S7].", 2) == "Growth was 4% [S1]; a rival says 9% ."
     assert strip_unknown_citations("Nothing cited [S1].", 0) == "Nothing cited ."
+
+
+def test_the_model_is_told_not_to_write_a_sources_list():
+    """31 Oct (Sean, a book at v8): every writer was told to "end with a Sources
+    list", and the draft carried a 40-row table more than once."""
+    from promptmaster.project_context import context_block
+    from promptmaster.schemas import SavedSource
+
+    block = context_block(_inputs().model_copy(update={"sources": [SavedSource(url="https://example.org/a")]}))
+    assert "end with a" not in block
+    assert "Do not write a Sources, References or Works cited list or table" in block
+    assert "PromptMaster lists the sources a text cites beneath it" in block
+
+
+def test_a_source_sent_with_its_number_keeps_it_past_forty():
+    """31 Oct: past 40 sources the browser sends a selection, each with its number."""
+    from promptmaster.project_context import context_block, highest_source_number
+    from promptmaster.schemas import SavedSource
+
+    sources = [
+        SavedSource(url="https://example.org/old", title="Old", n=3),
+        SavedSource(url="https://example.org/new", title="New", n=52),
+    ]
+    block = context_block(_inputs().model_copy(update={"sources": sources}))
+    assert "[S3] Old — https://example.org/old" in block
+    assert "[S52] New — https://example.org/new" in block
+    assert highest_source_number(sources) == 52
+    assert highest_source_number([SavedSource(url="https://a.org"), SavedSource(url="https://b.org")]) == 2
+    assert highest_source_number([]) == 0
+
+
+def test_new_finds_are_numbered_after_the_highest_number_sent():
+    from promptmaster.schemas import SavedSource
+    from promptmaster.web_search import numbered_found
+
+    saved = [SavedSource(url="https://example.org/old", n=3), SavedSource(url="https://example.org/new", n=52)]
+    found = [WebSource(url="https://example.org/new"), WebSource(url="https://example.org/fresh"), WebSource(url="https://example.org/other")]
+    assert [(n, s.url, new) for n, s, new in numbered_found(saved, found)] == [
+        (52, "https://example.org/new", False),
+        (53, "https://example.org/fresh", True),
+        (54, "https://example.org/other", True),
+    ]
+
+
+async def test_with_web_gives_what_it_found_the_numbers_it_cites_them_by():
+    from promptmaster.schemas import SavedSource
+    from promptmaster.web_search import cite_only_known, with_web
+
+    stub = AsyncMock()
+    stub.generate_json = AsyncMock(return_value=({"search": True, "query": "Illinois credit rating upgrade"}, {}))
+    stub.generate_with_web = AsyncMock(return_value=("Upgraded.", [
+        {"type": "url_citation", "url_citation": {"url": "https://example.org/rating", "title": "Rating"}},
+    ]))
+    inputs = _inputs().model_copy(update={"sources": [SavedSource(url="https://example.org/a", n=40)]})
+    out, web = await with_web(stub, None, inputs, "on", "Write the chapter")
+    assert web.web_query == "Illinois credit rating upgrade"
+    assert out.sources[-1].n == 41 and out.sources[-1].url == "https://example.org/rating"
+    assert cite_only_known("A [S41], B [S42].", out, web) == "A [S41], B ."
