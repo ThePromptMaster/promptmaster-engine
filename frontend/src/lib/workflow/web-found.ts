@@ -1,4 +1,5 @@
 import { saveSources, type NewSource } from '@/lib/supabase/sources';
+import { renumberCitations, savedNumbers } from '@/lib/workflow/sources';
 import { useProjectStore } from '@/stores/project-store';
 import type { ProjectSource } from '@/types/project';
 
@@ -55,6 +56,9 @@ export async function keepFound(
   const query = res.web_query;
   try {
     const saved = res.web_sources?.length ? await saveSources(project, res.web_sources, { query, stageId, agentRunId: where.agentRunId }) : [];
+    // A find the project already held is saved under its own number, and the
+    // ones after it move up; the work cites them as saved (31 Oct, Sean).
+    renumberResponse(res, savedNumbers(project.sources, res.web_sources ?? [], saved));
     const found: WebFound = { projectId: project.id, stageId, query, saved: saved.length };
     tellPage(project.id, saved, found);
     return found;
@@ -64,6 +68,28 @@ export async function keepFound(
     tellPage(project.id, [], found);
     return found;
   }
+}
+
+/**
+ * Every text in a writer's response with its citations renumbered, in place:
+ * the content, a table's rows, a continued iteration, a chat reply. The
+ * response is what its caller saves next, so the version cites what is saved.
+ */
+export function renumberResponse(res: object, map: ReadonlyMap<number, number>): void {
+  if (!map.size) return;
+  const walk = (value: unknown): unknown => {
+    if (typeof value === 'string') return renumberCitations(value, map);
+    if (Array.isArray(value)) {
+      value.forEach((v, i) => { value[i] = walk(v); });
+      return value;
+    }
+    if (value && typeof value === 'object') {
+      const o = value as Record<string, unknown>;
+      for (const k of Object.keys(o)) if (!k.startsWith('web_')) o[k] = walk(o[k]);
+    }
+    return value;
+  };
+  walk(res);
 }
 
 /** The search as a line: on a version's summary, in Go's report, on the page. */

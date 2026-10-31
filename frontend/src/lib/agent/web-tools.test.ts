@@ -32,6 +32,6 @@ describe('saved sources in a request', () => {
 
   it('sends the current ones, oldest first, with the date retrieved; a retired one is not cited', () => {
     expect(currentSources([row('a'), row('b', true), row('c')]).map((s) => s.id)).toEqual(['a', 'c']);
-    expect(sourcesForRequest([row('a')])).toEqual([{ url: 'https://example.org/a', title: 'Title a', excerpt: 'x', retrieved: '2026-10-20' }]);
+    expect(sourcesForRequest([row('a')])).toEqual([{ url: 'https://example.org/a', title: 'Title a', excerpt: 'x', retrieved: '2026-10-20', n: 1 }]);
   });
 });

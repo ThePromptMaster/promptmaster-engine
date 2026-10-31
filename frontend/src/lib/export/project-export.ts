@@ -30,6 +30,7 @@ import { deliverableStage } from '@/lib/workflow/engine';
 import { isProposed, parseItems, primaryArtifactKind, statusOption, itemSchemaFor } from '@/lib/workflow/stage-artifact';
 import { STAMP_NOTE, stampFor } from '@/lib/workflow/version-stamp';
 import { forReader } from '@/lib/workflow/reader-text';
+import { sourcesSection, withoutSourcesList } from '@/lib/workflow/sources';
 import { asksForChangeLog } from '@/lib/workflow/requested-parts';
 import type { StageDefinition, WorkflowEvent, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
 import type { Artifact, ArtifactVersion, Evaluation, Project } from '@/types/project';
@@ -128,12 +129,14 @@ export function toManuscriptMarkdown(bundle: ExportBundle): string {
       : (stages[stage.id]?.versions.at(-1)?.content ?? '');
   // The work for its reader: no notes about the revision (28 Oct), unless the
   // user asked for a change log. A list stage's document is left as stored.
-  const body = /^\s*[{[]/.test(raw) ? raw : forReader(raw, asksForChangeLog(project));
+  const body = /^\s*[{[]/.test(raw) ? raw : withoutSourcesList(forReader(raw, asksForChangeLog(project)));
   if (!body.trim()) return '';
+  // The sources the work cites, listed once at the end (31 Oct).
+  const cited = /^\s*[{[]/.test(raw) ? '' : sourcesSection(body, project.sources);
   return `# ${project.title || 'Untitled project'}
 
 ${body.trim()}
-${carriedSection(bundle)}`;
+${cited ? `\n${cited}` : ''}${carriedSection(bundle)}`;
 }
 
 /**
@@ -253,6 +256,10 @@ export function toMarkdown(bundle: ExportBundle): string {
       }
     }
   }
+
+  // Every saved source the document cites, listed once (31 Oct).
+  const cited = sourcesSection(lines.join('\n'), project.sources, 'Sources cited');
+  if (cited) lines.push(cited);
 
   return lines.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd() + '\n';
 }

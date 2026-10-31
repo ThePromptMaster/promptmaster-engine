@@ -63,6 +63,11 @@ class SavedSource(BaseModel):
     excerpt: str = Field(default="", max_length=600)
     #: When it was retrieved, as a date.
     retrieved: str = Field(default="", max_length=40)
+    #: Its number in the project, [S n]. The browser sends at most 40 of a
+    #: project's sources — those the work already cites, then the newest — so
+    #: position is not the number past 40 (31 Oct, Sean: the draft cited S41–S45
+    #: and the page listed S1–S40). Absent: numbered by position, as before.
+    n: int | None = Field(default=None, ge=1, le=10_000)
 
 
 class ReferencedProject(BaseModel):
