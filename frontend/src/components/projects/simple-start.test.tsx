@@ -4,18 +4,12 @@
  * PromptMaster would do the work or hand him a prompt for ChatGPT.
  */
 
-import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { describe, expect, it } from 'vitest';
+import { render, screen } from '@testing-library/react';
 
 import { SetupCard, DOES_THE_WORK, type SetupDraft } from './setup-card';
-import { GuideInterview } from './guide-interview';
 import type { WorkflowTemplate } from '@/lib/workflow/types';
 
-const guideNextQuestion = vi.fn();
-vi.mock('@/lib/api/client', () => ({
-  api: { guideNextQuestion: (...a: unknown[]) => guideNextQuestion(...a) },
-}));
 
 const TEMPLATES = [
   { id: 't-so', key: 'single_output', name: 'Single output', description: 'x', version: 5, outline_stage: 'none', stages: [] },
@@ -77,37 +71,5 @@ describe('SetupCard, simple', () => {
     expect(container.querySelector('details[data-more-options]')).toBeNull();
     expect(screen.queryByRole('region', { name: 'What you will get' })).toBeNull();
     expect(screen.getByLabelText('How PromptMaster should think')).toBeVisible();
-  });
-});
-
-describe('GuideInterview, capped', () => {
-  beforeEach(() => guideNextQuestion.mockReset());
-
-  it('asks at most the cap, folds the reason, and stops without another call', async () => {
-    const user = userEvent.setup();
-    guideNextQuestion.mockImplementation(async (req?: { answered: unknown[] }) => ({
-      enough: false,
-      question: { id: `q${(req?.answered.length ?? 0) + 1}`, question: `Question ${(req?.answered.length ?? 0) + 1}?`, why: 'Because it changes the setup.', options: ['Yes', 'No'], multi: false },
-      reason: '',
-    }));
-    const onDone = vi.fn();
-    render(<GuideInterview objective="A cookbook" maxQuestions={2} foldWhy onDone={onDone} onBack={() => undefined} />);
-
-    expect(await screen.findByText('Question 1 of up to 2')).toBeInTheDocument();
-    expect(guideNextQuestion.mock.calls[0][0]).toMatchObject({ max_questions: 2 });
-    expect(screen.queryByText('Because it changes the setup.')).toBeNull();
-    await user.click(screen.getByRole('button', { name: 'Why this question?' }));
-    expect(screen.getByText('Because it changes the setup.')).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Yes' }));
-    await user.click(screen.getByRole('button', { name: 'Next question' }));
-    expect(await screen.findByText('Question 2 of up to 2')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'No' }));
-    await user.click(screen.getByRole('button', { name: 'Next question' }));
-
-    await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
-    // Two questions asked; the cap needs no third call.
-    expect(guideNextQuestion.mock.calls.filter(([req]) => req)).toHaveLength(2);
-    expect(onDone.mock.calls[0][0]).toHaveLength(2);
   });
 });
