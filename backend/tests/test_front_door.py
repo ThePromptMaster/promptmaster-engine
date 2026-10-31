@@ -107,3 +107,24 @@ def test_the_start_conversation_is_told_not_to_repeat_stock_enthusiasm():
     # 28 Oct (Colette): "How cool is that?" kept coming back.
     system, _ = build_front_door_prompt(TURNS, DraftBrief())
     assert "never reuse the same catchphrase" in system
+
+
+def test_while_questions_are_asked_the_reply_asks_none():
+    # Sean, 31 Oct: "Ask me questions" asks in the conversation. Its reply asked
+    # the next question in prose, then the card asked it again.
+    _, user = build_front_door_prompt(TURNS, DraftBrief(), questions=True)
+    assert "Do NOT ask a question" in user
+    _, plain = build_front_door_prompt(TURNS, DraftBrief())
+    assert "Do NOT ask a question" not in plain
+
+
+def test_the_router_passes_the_questions_flag_into_the_prompt():
+    stub = AsyncMock()
+    stub.generate_json.return_value = ({"reply": "Noted.", "brief": {"objective": "o"}}, {})
+    app.dependency_overrides[get_client] = lambda: stub
+    try:
+        r = TestClient(app).post("/api/front-door", json={"turns": [t.model_dump() for t in TURNS], "questions": True})
+        assert r.status_code == 200, r.text
+        assert "Do NOT ask a question" in stub.generate_json.call_args.kwargs["prompt"]
+    finally:
+        app.dependency_overrides.pop(get_client, None)

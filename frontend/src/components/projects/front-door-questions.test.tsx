@@ -60,6 +60,9 @@ describe('Ask me questions, in the conversation', () => {
     await user.click(screen.getByRole('button', { name: 'Next question' }));
     // The answer is the user's turn, so the outline takes it in.
     await waitFor(() => expect(frontDoor).toHaveBeenCalledTimes(2));
+    // Its reply acknowledges the answer and asks nothing: the card asks next.
+    expect(frontDoor.mock.calls[1][0].questions).toBe(true);
+    expect(frontDoor.mock.calls[0][0].questions).toBeUndefined();
     expect(frontDoor.mock.calls[1][0].turns.slice(-2)).toEqual([
       { role: 'assistant', content: 'Question 1?' },
       { role: 'user', content: 'Yes' },

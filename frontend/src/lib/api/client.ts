@@ -634,6 +634,8 @@ export const api = {
     web_access?: 'on' | 'off';
     /** What the conversation's searches found so far, in citation order. */
     sources?: { url: string; title: string; excerpt: string }[];
+    /** The last turn answers an "Ask me questions" question: the reply asks none (31 Oct). */
+    questions?: boolean;
   }): Promise<{
     reply: string;
     draft?: string;
