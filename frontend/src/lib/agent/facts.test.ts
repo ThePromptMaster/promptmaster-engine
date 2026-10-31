@@ -11,3 +11,19 @@ describe('draftFacts: cut off means cut off (6 Oct, production)', () => {
     expect(draftFacts({ id: 'v1', finish_reason: 'stop' }, evaluation)).toEqual({ truncated: false, checked: true });
   });
 });
+
+describe('Go stops continuing a draft that stays cut off (31 Oct)', () => {
+  it('after two continuations still cut off, the draft is left for the user', () => {
+    const v = (op: string, finish: string | null) => ({ source_operation: op, finish_reason: finish });
+    const head = { id: 'v3', finish_reason: 'length' };
+    expect(draftFacts(head, null, [v('stage_draft', 'length'), v('continuation', 'length')]).truncated).toBe(true);
+    expect(draftFacts(head, null, [v('stage_draft', 'length'), v('continuation', 'length'), v('continuation', 'length')]).truncated).toBe(false);
+  });
+
+  it('a revision that is itself cut off does not start the count again', () => {
+    const v = (op: string, finish: string | null) => ({ source_operation: op, finish_reason: finish });
+    const head = { id: 'v5', finish_reason: 'length' };
+    expect(draftFacts(head, null, [v('continuation', 'length'), v('continuation', 'length'), v('agent_apply', 'length')]).truncated).toBe(false);
+    expect(draftFacts(head, null, [v('continuation', 'length'), v('continuation', null), v('agent_apply', 'length')]).truncated).toBe(true);
+  });
+});
