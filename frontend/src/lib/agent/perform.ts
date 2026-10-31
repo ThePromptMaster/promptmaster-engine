@@ -62,6 +62,7 @@ import { claimsInstruction, claimsStillIn, dependentClaimFindings, dependentClai
 import { isSuperseded, markSuperseded, replacedValues } from '@/lib/workflow/superseded-rows';
 import { figureFindings, figureSources } from '@/lib/workflow/figure-support';
 import { asIteration } from '@/lib/workflow/legacy';
+import { headingOutline, joinParts, needsParts, partInstruction, splitIntoParts } from '@/lib/workflow/long-prose';
 import {
   evaluationRecord,
   evaluationRequest,
@@ -823,7 +824,8 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         model: iteration.model_used || ctx.project.model,
         mode: modeForStage(ctx.project, ctx.stage),
         change_summary: withWebLine(iteration.summary || 'Go mode continued the draft from where it was cut off.', continuedWeb),
-        finish_reason: null,
+        // Still cut off stays cut off, so "Continue writing" stays (31 Oct, Sean).
+        finish_reason: continued.finish_reason === 'length' ? 'length' : null,
       });
       const versionId = (created as { id?: unknown } | null)?.id;
       const reconfirmed = typeof versionId === 'string' ? await reconfirmApprovals(ctx, ctx.stage, versionId, iteration.output) : [];
@@ -1078,10 +1080,49 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       const instruction = recheckInstruction(target.label, why, superseded, before ? 'table' : 'prose') + measuredLine + decidedLine + claimsInstruction(claims);
       const fresh = await readManuscript(ctx, target);
       if (!fresh) return manuscriptMissing(key, target);
+      // A head the model cut off is finished first, so the repair starts from
+      // the whole text rather than rewriting a stub (31 Oct, Sean: the second
+      // repair of the book started from the first one's cut-off version).
+      const base = !before && headVersion?.finish_reason === 'length'
+        ? (await finishCutDraft(ctx, inputs, model, target, head, 'length')).content
+        : head;
+      // A text too long to write back in one call is revised a part at a time
+      // and joined in code (31 Oct, Sean: a 60,000-word book against a
+      // ceiling of about 9,000 words, cut off twice before Go stopped).
+      const chunks = !before && !parts.length && needsParts(base) ? splitIntoParts(base) : [];
+      const outline = chunks.length > 1 ? headingOutline(base) : '';
+      let partsKept: number[] = [];
+      let checkedPartsNote = '';
       // Only the first attempt may search: a retry fixes what it wrote, not what it knew.
       let searched = false;
+      const attemptInParts = async (text: string) => {
+        const results: { text: string; note: string | null; kept: boolean; res: Awaited<ReturnType<typeof api.generateStageArtifact>> | null }[] = new Array(chunks.length);
+        const revisePart = async (i: number) => {
+          const request = generationRequest(ctx.project, ctx.template, ctx.state, fresh, target, chunks[i], text + partInstruction(i, chunks.length, outline));
+          // The first part of the first attempt may search; the rest use what is saved.
+          const res = await api.generateStageArtifact(searched || i > 0 ? { ...request, web_access: 'off' } : request, ctx.signal);
+          if (i === 0) await keepWeb(ctx, res, target);
+          const { note, body } = splitChangeNote(generationContent(target, res));
+          // A part still cut off, or returned empty, is kept as it was rather
+          // than saved half-written; the step says which.
+          const kept = !body.trim() || res.finish_reason === 'length';
+          results[i] = { text: kept ? chunks[i] : body, note: kept ? null : note, kept, res };
+        };
+        await revisePart(0);
+        searched = true;
+        for (let next = 1; next < chunks.length; next += PART_CONCURRENCY) {
+          await Promise.all(chunks.slice(next, next + PART_CONCURRENCY).map((_, j) => revisePart(next + j)));
+        }
+        partsKept = results.flatMap((r, i) => (r.kept ? [i + 1] : []));
+        const notes = results.map((r) => r.note?.trim()).filter((n): n is string => Boolean(n));
+        const joined = joinParts(results.map((r) => r.text));
+        const last = results.find((r) => r.res)?.res ?? null;
+        const res = { ...(last ?? ({} as Awaited<ReturnType<typeof api.generateStageArtifact>>)), finish_reason: 'stop' };
+        return { res, content: notes.length ? `What changed: ${notes.join(' ')}\n\n${joined}` : joined };
+      };
       const attempt = async (text: string) => {
-        const request = generationRequest(ctx.project, ctx.template, ctx.state, fresh, target, head, text);
+        if (chunks.length > 1) return attemptInParts(text);
+        const request = generationRequest(ctx.project, ctx.template, ctx.state, fresh, target, base, text);
         const res = await api.generateStageArtifact(searched ? { ...request, web_access: 'off' } : request, ctx.signal);
         searched = true;
         await keepWeb(ctx, res, target);
@@ -1151,8 +1192,13 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // A repair the model cut off is continued before it is saved, and is
       // never marked complete while it is still cut (12 Oct, Diligence: v4
       // stopped halfway through Q11 and the stage read as done).
-      const whole = await finishCutDraft(ctx, inputs, model, target, content, res.finish_reason);
+      const whole = chunks.length > 1
+        ? { content, cut: false, continued: false, finishReason: 'stop' as string | null }
+        : await finishCutDraft(ctx, inputs, model, target, content, res.finish_reason);
       content = whole.content;
+      if (partsKept.length) {
+        checkedPartsNote = `Part${partsKept.length === 1 ? '' : 's'} ${partsKept.join(', ')} of ${chunks.length} could not be revised within the length limit and ${partsKept.length === 1 ? 'is' : 'are'} kept as ${partsKept.length === 1 ? 'it was' : 'they were'}.`;
+      }
       // What the recheck dropped without being asked is put back (14 Oct, Sean,
       // workshop: the recheck after a time change dropped "Confirm 12 attendees",
       // the greeting and the sign-off) — never a line stating a replaced value.
@@ -1226,7 +1272,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         instruction,
         model: res.model_used || ctx.project.model,
         mode: modeForStage(ctx.project, target),
-        change_summary: `Repaired after a change: ${why}${note.note ? ` — ${note.note}` : ''}${checked.notes.length ? ` ${checked.notes.join(' ')}` : ''}`.slice(0, 1000),
+        change_summary: `Repaired after a change: ${why}${note.note ? ` — ${note.note}` : ''}${checked.notes.length ? ` ${checked.notes.join(' ')}` : ''}${checkedPartsNote ? ` ${checkedPartsNote}` : ''}`.slice(0, 1000),
         finish_reason: whole.finishReason,
       });
       const versionId = (created as { id?: unknown } | null)?.id;
@@ -1300,7 +1346,10 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         changes: typeof versionId === 'string' ? { version_ids: [versionId] } : {},
         output: [(triaged.length ? `Decided ${triaged.length} routine finding${triaged.length === 1 ? '' : 's'} it raised, under your routine-decision policy. ` : '') + (evaluation.canAdvance
           ? `Repaired ${target.label} (${why}) — saved as a new version and marked complete again; the earlier version is kept.`
-          : `Repaired ${target.label} (${why}) — saved as a new version; it stays reopened until: ${evaluation.unmet.filter((c) => c.blocking).map((c) => c.label).join('; ')}.`), ...reconfirmed].join(' '),
+          : `Repaired ${target.label} (${why}) — saved as a new version; it stays reopened until: ${evaluation.unmet.filter((c) => c.blocking).map((c) => c.label).join('; ')}.`),
+          ...(chunks.length > 1 ? [`It was revised in ${chunks.length} parts, being too long for one pass.`] : []),
+          ...(checkedPartsNote ? [checkedPartsNote] : []),
+          ...reconfirmed].join(' '),
       });
     }
 
@@ -2293,6 +2342,8 @@ function leadingNotes(content: string): { notes: string[]; body: string } {
 
 /** How many times a cut-off draft is continued before it is saved as cut off. */
 const CONTINUE_TRIES = 2;
+/** Parts of a long text revised at once (31 Oct); more would crowd the provider's rate limit. */
+const PART_CONCURRENCY = 3;
 
 /**
  * A prose draft the model cut off at its token limit, continued from where it
@@ -2315,13 +2366,16 @@ async function finishCutDraft(
   let cut = true;
   for (let i = 0; i < CONTINUE_TRIES && cut; i += 1) {
     try {
-      const { iteration } = await api.continueDocument(
+      const res = await api.continueDocument(
         { inputs, incomplete_iteration: asIteration(text, 1, ctx.project.mode), iteration_number: 2, model },
         ctx.signal
       );
+      const { iteration } = res;
       if (!iteration.output?.trim() || iteration.output.trim().length <= text.trim().length) break;
       text = iteration.output;
-      cut = iteration.evaluation?.completeness?.status === 'incomplete';
+      // The model's own stop reason when the server sends it (31 Oct); the
+      // evaluator's completeness read otherwise.
+      cut = res.finish_reason ? res.finish_reason === 'length' : iteration.evaluation?.completeness?.status === 'incomplete';
     } catch (e) {
       if ((e as Error)?.name === 'AbortError') throw e;
       break;
