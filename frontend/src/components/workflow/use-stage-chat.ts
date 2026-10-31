@@ -1,6 +1,7 @@
 'use client';
 
-import { keepFound, webAccessOf, withWebLine } from '@/lib/workflow/web-found';
+import { keepFound, renumberResponse, webAccessOf, withWebLine } from '@/lib/workflow/web-found';
+import { savedNumbers } from '@/lib/workflow/sources';
 import { RefusedRevision } from '@/lib/workflow/commit-check';
 
 /**
@@ -334,6 +335,8 @@ export function useStageChat({
         if (response.web_query) {
           const found = response.web_sources ?? [];
           const saved = found.length ? await saveSources(project, found, { query: response.web_query, stageId }) : [];
+          // A find already on record keeps its own number (31 Oct).
+          renumberResponse(response, savedNumbers(project.sources, found, saved));
           if (saved.length) await onSourcesChanged?.();
           web = { query: response.web_query, saved: saved.length };
         } else if (response.web_note) {

@@ -9,6 +9,7 @@ engine.
 
 from __future__ import annotations
 
+from promptmaster.project_context import highest_source_number
 from promptmaster.web_search import WebAccess, strip_unknown_citations, with_web
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -100,7 +101,7 @@ async def api_generate_stage_artifact(
         raise llm_http_error(e, PRESERVED_STAGE_VERSIONS)
     result.model_used = _model_used(req.model, client)
     # A citation to a source not on record points at nothing (20 Oct).
-    result.content = strip_unknown_citations(result.content, len(inputs.sources))
+    result.content = strip_unknown_citations(result.content, highest_source_number(inputs.sources))
     # 28 Oct: prose only — a list stage's content is a JSON document.
     if not result.content.lstrip().startswith(("{", "[")):
         result.content = without_repeated_catchphrases(result.content)

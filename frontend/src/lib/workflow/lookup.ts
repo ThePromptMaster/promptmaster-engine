@@ -277,6 +277,9 @@ export function applySavedSources(
   const lookup = schema.lookup;
   if (!lookup) return { items: [...items], found: 0 };
   const live = sources.filter((s) => !s.retired_at && s.title.trim());
+  // Its [S n] as every prompt and the panel number it, not the table's global
+  // sequence (31 Oct): the current sources in saved order.
+  const numberOf = new Map([...sources].filter((s) => !s.retired_at).sort((a, b) => a.seq - b.seq).map((s, i) => [s, i + 1] as const));
   let found = 0;
   const next = items.map((item) => {
     if (item.status_source === 'user' || item.status_source === 'tool') return item;
@@ -292,7 +295,7 @@ export function applySavedSources(
     found += 1;
     const out: StageItem = {
       ...item,
-      [lookup.recordField]: `Found in a saved web source [S${source.seq}], ${source.retrieved_at.slice(0, 10)}: ${source.title} — ${source.url}`.slice(0, 500),
+      [lookup.recordField]: `Found in a saved web source [S${numberOf.get(source) ?? source.seq}], ${source.retrieved_at.slice(0, 10)}: ${source.title} — ${source.url}`.slice(0, 500),
       status: lookup.status,
       status_source: 'tool',
     };
