@@ -24,6 +24,7 @@ export function ProjectCardMenu({
   folders,
   onMove,
   onDelete,
+  onCopy,
 }: {
   project: ProjectSummary;
   userId: string | undefined;
@@ -31,6 +32,8 @@ export function ProjectCardMenu({
   folders: readonly ProjectFolder[];
   onMove: (folderId: string | null) => void;
   onDelete: () => void;
+  /** Make a copy and keep the original (31 Oct). */
+  onCopy?: () => void;
 }) {
   const t = useT();
   const [view, setView] = useState<View | null>(null);
@@ -86,6 +89,21 @@ export function ProjectCardMenu({
                       <button type="button" className={row} onClick={() => setView('use')}>
                         <span aria-hidden className="material-symbols-outlined text-[20px] text-[var(--on-surface-variant)]">link</span>
                         {t('card.useIn')}
+                      </button>
+                    </li>
+                  )}
+                  {onCopy && (
+                    <li>
+                      <button
+                        type="button"
+                        className={row}
+                        onClick={() => {
+                          close();
+                          onCopy();
+                        }}
+                      >
+                        <span aria-hidden className="material-symbols-outlined text-[20px] text-[var(--on-surface-variant)]">content_copy</span>
+                        {t('card.copy')}
                       </button>
                     </li>
                   )}

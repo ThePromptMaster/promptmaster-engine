@@ -6,7 +6,7 @@ export const sw: Record<keyof typeof en, string> = {
   'refs.title': 'Miradi mingine',
   'refs.used': '{count} inatumika',
   'refs.noneUsed': 'hakuna inayotumika',
-  'refs.explain': 'Tumia miradi yako mingine: kazi iliyokamilika na taarifa za hakika za kila mmoja zinaambatana na kila hatua, ukaguzi na gumzo hapa, zikinukuliwa kama [R1], [R2], …. Maelezo ya mradi huu na taarifa zake za hakika hutangulia pale zinapotofautiana. Inasomwa mradi unapofunguliwa.',
+  'refs.explain': 'Tumia miradi yako mingine: kazi iliyokamilika na taarifa za hakika za kila mmoja zinaambatana na kila hatua, ukaguzi na gumzo hapa, zikinukuliwa kama [R1], [R2], …. Maelezo ya mradi huu na taarifa zake za hakika hutangulia pale zinapotofautiana. Kila mmoja ni nakala inayochukuliwa unapouongeza; asili inabaki ilivyo, na unaweza kusasisha nakala kutoka kwake.',
   'refs.listLabel': 'Miradi inayotumika',
   'refs.atMost': 'Miradi {count} kwa kiwango cha juu',
   'refs.useAnother': '+ Tumia mradi mwingine',
@@ -52,4 +52,8 @@ export const sw: Record<keyof typeof en, string> = {
   'reader.sections': 'Sehemu za {stage}',
   'reader.sent': 'Kwenye gumzo la pembeni — haijatumwa',
   'reader.send': 'Tuma sehemu hii kwenye gumzo la pembeni',
+  'refs.asOf': "Nakala ya {date}; mabadiliko ya asili tangu wakati huo hayatumiki hadi uisasishe.",
+  'refs.update': "Sasisha kutoka kwa asili",
+  'refs.updateGone': "Asili iko kwenye tupio au haipo tena, kwa hiyo nakala uliyo nayo inahifadhiwa.",
+  'refs.updateError': "Haikuweza kusasisha kutoka kwa asili.",
 };

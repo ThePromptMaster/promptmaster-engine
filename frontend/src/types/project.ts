@@ -228,6 +228,21 @@ export interface ProjectReference {
   include_facts: boolean;
   position: number;
   created_at: string;
+  /** What the reference brings, as it was when taken (31 Oct); null until the first is stored. */
+  snapshot?: ReferenceSnapshot | null;
+  snapshot_at?: string | null;
+}
+
+/** A referenced project's material as it was at `snapshot_at` (31 Oct). */
+export interface ReferenceSnapshot {
+  title: string;
+  objective: string;
+  deliverable: string;
+  text: string;
+  /** Every current fact then; the reference's own switch decides whether they are sent. */
+  facts: string[];
+  /** When the original was last changed, at the time of the snapshot. */
+  updatedAt: string;
 }
 
 /** One of a user's folders for projects (client, 21 Oct, email 5). */

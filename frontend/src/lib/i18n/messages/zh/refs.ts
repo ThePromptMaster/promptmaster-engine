@@ -7,7 +7,7 @@ export const zh: Record<keyof typeof en, string> = {
   'refs.used': '已使用 {count} 个',
   'refs.noneUsed': '未使用',
   'refs.explain':
-    '借用你的其他项目：每个项目已完成的工作和事实都会随此处的每个阶段、检查和对话一起提供，并以 [R1]、[R2]……的形式引用。两者不一致时，以本项目自己的简介和事实为准。在项目打开时读取。',
+    '借用你的其他项目：每个项目已完成的工作和事实都会随此处的每个阶段、检查和对话一起提供，并以 [R1]、[R2]……的形式引用。两者不一致时，以本项目自己的简介和事实为准。每个都是添加时取得的副本；原项目保持不变，你可以从原项目更新副本。',
   'refs.listLabel': '已使用的项目',
   'refs.atMost': '最多 {count} 个项目',
   'refs.useAnother': '+ 使用另一个项目',
@@ -54,4 +54,8 @@ export const zh: Record<keyof typeof en, string> = {
   'reader.sections': '{stage}的小节',
   'reader.sent': '已在侧边对话中——尚未发送',
   'reader.send': '将此部分发送到侧边对话',
+  'refs.asOf': "截至 {date} 的副本；此后原项目的更改在你更新之前不会被使用。",
+  'refs.update': "从原项目更新",
+  'refs.updateGone': "原项目已在回收站或已不存在，因此保留你现有的副本。",
+  'refs.updateError': "无法从原项目更新。",
 };

@@ -31,6 +31,8 @@ export interface ReferenceMaterial {
   /** In the trash: shown as such, and sent to no prompt. */
   deleted: boolean;
   updatedAt: string;
+  /** When this material was taken from the original (31 Oct); absent when read live. */
+  snapshotAt?: string | null;
 }
 
 function cut(text: string, max: number): string {

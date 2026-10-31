@@ -117,4 +117,9 @@ export const ar: Record<keyof typeof en, string> = {
   'guest.created':
     'أُنشئ الحساب — تفقّد بريدك الإلكتروني لتأكيده. كل ما أنشأته حتى الآن مرتبط به بالفعل.',
   'guest.createError': 'تعذّر إنشاء الحساب.',
+  'card.copy': "إنشاء نسخة",
+  'list.copyNamed': "إنشاء نسخة من {name}",
+  'list.copyFailed': "تعذّر إنشاء النسخة.",
+  'list.copyFailedWhy': "تعذّر إنشاء النسخة: {message}",
+  'list.copyMissing': "أُنشئت النسخة، لكن تعذّر نسخ هذه الملفات إليها: {files}. لا تزال في الأصل.",
 };
