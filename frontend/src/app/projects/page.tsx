@@ -22,7 +22,7 @@ import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import { shownStageId } from '@/lib/i18n/stage';
 import { workflowName } from '@/lib/i18n/templates';
 import { relativeTime } from '@/lib/i18n/format';
-import { copyProject } from '@/lib/supabase/copy-project';
+import { copyProject, copyTitle } from '@/lib/supabase/copy-project';
 
 const WORKFLOW_ICON: Record<string, string> = {
   book: 'menu_book',
@@ -400,8 +400,10 @@ export default function ProjectsPage() {
                       </span>
 
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-title text-[var(--on-surface)]">
-                          {p.title || t('list.untitled')}
+                        {/* A copy's title ends " (copy)"; kept outside the truncation so a long copy is not identical to its original (31 Oct). */}
+                        <span className="flex min-w-0 items-baseline gap-1 text-title text-[var(--on-surface)]">
+                          <span className="min-w-0 truncate">{copyTitle(p.title).base || t('list.untitled')}</span>
+                          {copyTitle(p.title).suffix && <span className="shrink-0">{copyTitle(p.title).suffix}</span>}
                         </span>
                         <span className="mt-1 block truncate text-body text-[var(--on-surface-variant)]">
                           {p.objective || t('list.noObjective')}

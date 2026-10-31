@@ -5,7 +5,7 @@ const copy = vi.fn();
 const from = vi.fn(() => ({ copy }));
 vi.mock('./client', () => ({ createClient: () => ({ rpc, storage: { from } }) }));
 
-import { copyProject } from './copy-project';
+import { copyProject, copyTitle } from './copy-project';
 
 /** 31 Oct: "more like a copy thing … so you have the original project too". */
 describe('making a copy of a project', () => {
@@ -37,5 +37,17 @@ describe('making a copy of a project', () => {
     rpc.mockResolvedValue({ data: null, error: { message: 'project old is not yours to copy' } });
     await expect(copyProject('old')).rejects.toMatchObject({ message: 'project old is not yours to copy' });
     expect(copy).not.toHaveBeenCalled();
+  });
+});
+
+/** 31 Oct: a long copy's "(copy)" was truncated away, so it looked identical to its original. */
+describe('copyTitle', () => {
+  it('splits off the suffix copy_project adds, repeated or not', () => {
+    expect(copyTitle('A long book (copy)')).toEqual({ base: 'A long book', suffix: '(copy)' });
+    expect(copyTitle('Book (copy) (copy)')).toEqual({ base: 'Book', suffix: '(copy) (copy)' });
+  });
+  it('leaves other titles alone', () => {
+    expect(copyTitle('Notes (copy edits)')).toEqual({ base: 'Notes (copy edits)', suffix: '' });
+    expect(copyTitle(null)).toEqual({ base: '', suffix: '' });
   });
 });
