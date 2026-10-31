@@ -11,7 +11,16 @@
 import type { AssessSpec, ExitCriterion, StageDefinition, StageGroup, WorkflowExecution, WorkflowTemplate } from './types';
 import { presetScale, toneAt } from './assess';
 
-export type DesignedKind = 'write' | 'list' | 'check' | 'assess';
+/**
+ * `chapters` (31 Oct): book-length work, planned as chapters and then written
+ * and revised one chapter at a time. Without it a designed book put the whole
+ * manuscript in one `write` page, which no single model call can rewrite: a
+ * repair was cut off by the length limit twice and Go stopped (Sean, 29–31
+ * Oct). It becomes two stages, a chapter plan (the outline editor, approved
+ * like Book's) and the chapters themselves (`long_form`), so it runs through
+ * Book's own outline, job queue and per-chapter repair.
+ */
+export type DesignedKind = 'write' | 'list' | 'check' | 'assess' | 'chapters';
 
 export interface DesignedStage {
   label: string;
@@ -43,11 +52,14 @@ export interface DesignedWorkflow {
   stages: DesignedStage[];
 }
 
-const RENDERER = { write: 'prose', list: 'list', check: 'review', assess: 'assess' } as const;
+const RENDERER = { write: 'prose', list: 'list', check: 'review', assess: 'assess', chapters: 'long_form' } as const;
 /** Kinds the item registry already knows, so a table has real columns and statuses. */
 const LIST_KIND = 'research_notes';
 const CHECK_KIND = 'critique_report';
 const ASSESS_KIND = 'assessments';
+/** The chapters stage's plan: its id, and how it is named beside the chapters. */
+const PLAN_SUFFIX = '_plan';
+const PLAN_LABEL = 'Chapter plan';
 
 export function slug(text: string): string {
   const s = text.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 30);
@@ -66,6 +78,7 @@ function criteriaFor(stage: DesignedStage, id: string, first: boolean): ExitCrit
   if (stage.kind === 'write') out.push({ id: `${id}.written`, label: `${stage.label} is written`, check: 'auto', rule: { type: 'artifact_non_empty' }, blocking: true });
   if (stage.kind === 'list') out.push({ id: `${id}.items`, label: 'At least one item', check: 'auto', rule: { type: 'min_items', n: 1 }, blocking: true });
   if (stage.kind === 'assess') out.push({ id: `${id}.assessed`, label: 'At least one item is assessed', check: 'auto', rule: { type: 'min_items', n: 1 }, blocking: true });
+  if (stage.kind === 'chapters') out.push({ id: `${id}.allsections`, label: 'Every chapter is written', check: 'auto', rule: { type: 'all_sections_complete' }, blocking: true });
   if (stage.kind === 'check') out.push({ id: `${id}.triaged`, label: 'Every finding accepted or rejected', check: 'auto', rule: { type: 'all_findings_triaged' }, blocking: false });
   if (stage.approval.trim()) {
     // Only an explicit "routine" is delegable; a design from before 6 Oct has
@@ -87,42 +100,79 @@ export function templateFromDesign(design: DesignedWorkflow, suffix: string): Wo
     while (ids.includes(id)) id = `${id}_2`;
     ids.push(id);
   }
+  // The flat list of stages as the engine walks them: a chapters stage is its
+  // plan followed by the chapters. Transitions are built on this list.
+  const plan = (id: string) => `${id.slice(0, 40 - PLAN_SUFFIX.length)}${PLAN_SUFFIX}`;
+  const flatIds = design.stages.flatMap((s, i) => (s.kind === 'chapters' ? [plan(ids[i]), ids[i]] : [ids[i]]));
   const count = design.stages.length;
-  const stages: StageDefinition[] = design.stages.map((s, i) => ({
-    id: ids[i],
-    label: s.label,
-    short_label: s.short_label || s.label.slice(0, 20),
-    group: groupFor(i, count, s.kind),
-    required: i === 0 || i === count - 1 ? true : s.required,
-    renderer: RENDERER[s.kind],
-    entry_guidance: s.purpose,
-    // A stage added by hand with no instructions yet still says what to produce.
-    entry_prompt_hint: s.instruction.trim() || `Produce the ${s.label.trim().toLowerCase() || 'stage'}.`,
-    exit_criteria: criteriaFor(s, ids[i], i === 0),
-    expected_artifacts: [{
-      kind: s.kind === 'list' ? LIST_KIND : s.kind === 'check' ? CHECK_KIND : s.kind === 'assess' ? ASSESS_KIND : `${ids[i]}_text`,
-      cardinality: 'one',
-      primary: true,
-    }],
-    recommended_modes: [],
-    skip_reasons: i === 0 || i === count - 1 || s.required ? [] : ['Not needed for this piece'],
-    transitions: {
-      default_next: ids[i + 1] ?? null,
-      allow_skip: !(i === 0 || i === count - 1 || s.required),
-      allow_return_to: ids.slice(0, i),
+  const transitionsAt = (id: string, extra: Partial<StageDefinition['transitions']>, skippable: boolean): StageDefinition['transitions'] => {
+    const at = flatIds.indexOf(id);
+    return {
+      default_next: flatIds[at + 1] ?? null,
+      allow_skip: skippable,
+      allow_return_to: flatIds.slice(0, at),
+      ...extra,
+    };
+  };
+  const stages: StageDefinition[] = design.stages.flatMap((s, i): StageDefinition[] => {
+    const loop = loopTarget(design, i, ids);
+    const skippable = !(i === 0 || i === count - 1 || s.required) && s.kind !== 'chapters';
+    const stage: StageDefinition = {
+      id: ids[i],
+      label: s.label,
+      short_label: s.short_label || s.label.slice(0, 20),
+      group: groupFor(i, count, s.kind),
+      required: i === 0 || i === count - 1 || s.kind === 'chapters' ? true : s.required,
+      renderer: RENDERER[s.kind],
+      entry_guidance: s.purpose,
+      // A stage added by hand with no instructions yet still says what to produce.
+      entry_prompt_hint: s.instruction.trim() || `Produce the ${s.label.trim().toLowerCase() || 'stage'}.`,
+      exit_criteria: criteriaFor(s, ids[i], i === 0),
+      expected_artifacts: [{
+        kind: s.kind === 'list' ? LIST_KIND : s.kind === 'check' ? CHECK_KIND : s.kind === 'assess' ? ASSESS_KIND : s.kind === 'chapters' ? 'manuscript' : `${ids[i]}_text`,
+        cardinality: 'one',
+        primary: true,
+      }],
+      recommended_modes: [],
+      skip_reasons: !skippable ? [] : ['Not needed for this piece'],
       // Ongoing work (7 Oct): the stage that closes a round starts the next
       // from an earlier stage. Only in an ongoing workflow, only backwards.
-      ...(loopTarget(design, i, ids) ? { loop_to: loopTarget(design, i, ids)! } : {}),
-    },
-    ...(s.kind === 'assess' ? { assess: assessSpec(s) } : {}),
-  }));
+      transitions: transitionsAt(ids[i], loop ? { loop_to: loop } : {}, skippable),
+      ...(s.kind === 'assess' ? { assess: assessSpec(s) } : {}),
+    };
+    if (s.kind !== 'chapters') return [stage];
+    const planId = plan(ids[i]);
+    const planStage: StageDefinition = {
+      id: planId,
+      label: `${s.label.trim().slice(0, 60 - PLAN_LABEL.length - 3)} — ${PLAN_LABEL.toLowerCase()}`,
+      short_label: PLAN_LABEL,
+      group: 'outlining',
+      required: true,
+      renderer: 'outline',
+      entry_guidance: 'Plan the chapters before writing them: each becomes a chapter that is written, and later revised, on its own.',
+      entry_prompt_hint:
+        `Produce the ordered chapters of the ${design.deliverable.trim() || 'work'}. Each has a title and a short abstract saying what that chapter does and why it belongs there. ` +
+        `The order is the argument: someone reading only the abstracts, in sequence, should see the whole case being built. Stay inside the objective's scope.`,
+      exit_criteria: [
+        { id: `${planId}.sections`, label: 'The plan has chapters', check: 'auto', rule: { type: 'min_items', n: 2 }, blocking: true, hint: 'Add at least two named chapters — each is written on its own.' },
+        { id: `${planId}.approved`, label: 'A chapter plan is approved', check: 'auto', rule: { type: 'outline_approved' }, blocking: true },
+      ],
+      expected_artifacts: [{ kind: 'outline', cardinality: 'one', primary: true }],
+      recommended_modes: [],
+      skip_reasons: [],
+      transitions: transitionsAt(planId, {}, false),
+    };
+    return [planStage, stage];
+  });
+  const hasChapters = design.stages.some((s) => s.kind === 'chapters');
   return {
     key: `custom_${suffix}`,
     version: 1,
     name: design.name.trim() || 'Custom workflow',
     description: design.description.trim(),
-    outline_stage: 'none',
-    nouns: { deliverable: design.deliverable.trim() || 'piece', unit: 'part' },
+    // Book's mode: the plan is a stage of its own, where the outline is built and approved.
+    outline_stage: hasChapters ? 'explicit' : 'none',
+    nouns: { deliverable: design.deliverable.trim() || 'piece', unit: hasChapters ? 'chapter' : 'part' },
     ...(design.inquiry ? { inquiry: true } : {}),
     ...(design.execution ? { execution: { ...design.execution, success_criterion: design.execution.success_criterion.trim() } } : {}),
     stages,
@@ -145,7 +195,7 @@ function loopTarget(design: DesignedWorkflow, i: number, ids: readonly string[])
   return at >= 0 && at < i ? ids[at] : null;
 }
 
-const KIND_OF: Record<string, DesignedKind> = { prose: 'write', list: 'list', review: 'check', assess: 'assess' };
+const KIND_OF: Record<string, DesignedKind> = { prose: 'write', list: 'list', review: 'check', assess: 'assess', long_form: 'chapters' };
 
 /**
  * A saved workflow back as a design, to edit a copy of it (7 Oct; Sean, 6 Oct,
@@ -160,7 +210,8 @@ export function designFromTemplate(template: WorkflowTemplate): DesignedWorkflow
     deliverable: template.nouns?.deliverable ?? 'piece',
     inquiry: Boolean(template.inquiry),
     ...(template.execution ? { execution: template.execution } : {}),
-    stages: template.stages.map((s) => {
+    // A chapter plan is part of the chapters stage after it, not a stage of its own.
+    stages: template.stages.filter((s, i) => !(s.renderer === 'outline' && template.stages[i + 1]?.renderer === 'long_form')).map((s) => {
       const approval = s.exit_criteria.find((c) => c.id.endsWith('.approved') && c.check === 'manual');
       const decision = s.exit_criteria.find((c) => c.id.endsWith('.decision') && c.check === 'manual');
       return {

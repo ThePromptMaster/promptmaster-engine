@@ -78,6 +78,19 @@ export function validateTemplate(
     }
   }
 
+  // Chapters are written against an approved outline (31 Oct: a designed
+  // workflow may now have a chapters stage). Without one, the page would wait
+  // for an outline nobody can make.
+  const firstChapters = stages.findIndex((s) => s.renderer === 'long_form');
+  if (firstChapters >= 0) {
+    const planned =
+      template.outline_stage === 'derived'
+        ? Boolean(template.derived_outline)
+        : template.outline_stage === 'explicit' && stages.slice(0, firstChapters).some((s) => s.renderer === 'outline');
+    if (!planned) errors.push(`"${stages[firstChapters].label}" writes chapters, so a chapter plan must come before it.`);
+    if (firstChapters === 0) errors.push(`"${stages[0].label}" writes chapters, so it cannot be the first stage.`);
+  }
+
   const terminals = stages.filter((s) => s.transitions.default_next === null);
   if (terminals.length !== 1) errors.push('A workflow must end in exactly one final stage.');
 
