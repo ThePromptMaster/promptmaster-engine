@@ -148,7 +148,8 @@ export function FrontDoor({
   const [asking, setAsking] = useState(false);
   const [questioning, setQuestioning] = useState(false);
 
-  const send = async (given?: string, from: Turn[] = turns): Promise<Turn[] | null> => {
+  /** `questions`: the text answers an "Ask me questions" question, so the reply only acknowledges it. */
+  const send = async (given?: string, from: Turn[] = turns, questions = false): Promise<Turn[] | null> => {
     const text = (given ?? draft).trim();
     if (!text || busy) return null;
     const next: Turn[] = [...from, { role: 'user', content: text }];
@@ -168,6 +169,8 @@ export function FrontDoor({
         ...(material.trim() ? { material } : {}),
         web_access: 'on',
         sources: sourcesFound(from),
+        // The next question comes as a card; a reply asking its own put two in a row (31 Oct).
+        ...(questions ? { questions: true } : {}),
       });
       const web = res.web_query || res.web_note ? { query: res.web_query ?? '', sources: res.web_sources ?? [], ...(res.web_note ? { note: res.web_note } : {}) } : null;
       const after: Turn[] = [
@@ -237,7 +240,7 @@ export function FrontDoor({
   };
 
   const answer = async (answers: string[]) => {
-    const after = await send(answers.join('; '));
+    const after = await send(answers.join('; '), turns, true);
     if (after) await askNext(after);
   };
 

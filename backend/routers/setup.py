@@ -208,6 +208,9 @@ class FrontDoorRequest(BaseModel):
     #: What this conversation's searches have found so far, numbered [S1]… in
     #: this order: a new search's sources follow them.
     sources: list[SavedSource] = Field(default=[], max_length=60)
+    #: The last turn answers an "Ask me questions" question (31 Oct): the reply
+    #: acknowledges it and asks nothing, as the next question comes separately.
+    questions: bool = False
 
 
 @router.post("/front-door")
@@ -217,7 +220,8 @@ async def api_front_door(req: FrontDoorRequest, client: OpenRouterClient = Depen
     turn needs a search (22 Oct); saves nothing."""
     try:
         return await front_door_turn(
-            client, req.model or None, req.turns, req.brief, req.edited, req.material, req.web_access, req.sources
+            client, req.model or None, req.turns, req.brief, req.edited, req.material, req.web_access, req.sources,
+            questions=req.questions,
         )
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)

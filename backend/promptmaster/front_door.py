@@ -103,6 +103,16 @@ BRIEF_FIELDS = ("objective", "audience", "requirements", "evidence", "deliverabl
 #: How much attached material goes into one turn's prompt.
 MAX_MATERIAL = 40_000
 
+#: Said while "Ask me questions" is asking (Sean, 31 Oct). The next question
+#: comes from guide-next-question as a card with answers to tap; a reply that
+#: asks its own question puts two questions in a row on the screen.
+QUESTIONS_ON = (
+    "THE USER IS ANSWERING PROMPTMASTER'S QUESTIONS ONE AT A TIME. The last USER turn answers the question "
+    "just before it. In your reply, acknowledge the answer in one or two sentences and say what it changes. "
+    "Do NOT ask a question and do not suggest what to answer next: the next question is asked separately. "
+    "Update the brief as usual."
+)
+
 
 def build_front_door_prompt(
     turns: list[Turn],
@@ -113,6 +123,7 @@ def build_front_door_prompt(
     web: str = "",
     found: str = "",
     web_access: str = "off",
+    questions: bool = False,
 ) -> tuple[str, str]:
     convo = "\n".join(f"{'USER' if t.role == 'user' else 'YOU'}: {t.content.strip()}" for t in turns[-MAX_TURNS:])
     owned = [f for f in BRIEF_FIELDS if f in (edited or [])]
@@ -123,6 +134,7 @@ def build_front_door_prompt(
         + (f"THE USER EDITED THESE PARTS OF THE BRIEF THEMSELVES — keep them as written: {', '.join(owned)}\n\n" if owned else "")
         + (f"{web}\n\n" if web else "")
         + (f"{found}\n\n" if found else "")
+        + (f"{QUESTIONS_ON}\n\n" if questions else "")
         + 
         'Return JSON only: {"reply": "your next message", "brief": {"objective": "", "audience": "", '
         '"requirements": [], "evidence": [], "deliverables": [], "stages": [], "approvals": []}, "draft": "", "enough": false}'
@@ -241,6 +253,7 @@ async def _answer(
     material: str,
     web_access: str,
     found: str,
+    questions: bool = False,
 ) -> tuple[dict, str, bool]:
     """The turn's JSON, asked for again rather than lost (Sean, 23 Oct: a full
     brief with pricing results came back as "Tell me more about what you want
@@ -257,7 +270,8 @@ async def _answer(
     prose, last_error = "", None
     for i, (results, extra) in enumerate(tries):
         system, user = build_front_door_prompt(
-            turns, brief, edited, material, web=chat_web_line(web_access), found=results, web_access=web_access
+            turns, brief, edited, material, web=chat_web_line(web_access), found=results, web_access=web_access,
+            questions=questions,
         )
         try:
             # A long brief plus a block of results did not fit 2,000 tokens (23 Oct).
@@ -287,6 +301,7 @@ async def front_door_turn(
     material: str = "",
     web_access: str = "off",
     sources: list[SavedSource] | None = None,
+    questions: bool = False,
 ) -> FrontDoorTurn:
     web_query, new_sources, web_note, found = "", [], "", ""
     saved = sources or []
@@ -311,7 +326,7 @@ async def front_door_turn(
         except (OpenRouterError, ValueError, AttributeError) as e:
             logger.warning("front door web search failed: %s", e)
             web_note = "The web search failed, so this reply uses only what you have said."
-    result, prose, dropped = await _answer(client, model, turns, brief, edited, material, web_access, found)
+    result, prose, dropped = await _answer(client, model, turns, brief, edited, material, web_access, found, questions)
     if dropped:
         new_sources, web_note = [], "The search results could not be used in this reply, so it uses only what you have said."
     turn = parse_front_door(result, turns, given=brief, edited=edited, material=material)
