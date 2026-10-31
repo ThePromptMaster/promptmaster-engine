@@ -30,10 +30,12 @@ test('moving on does not complete a stage; finished stages carry their evidence;
   // Audience: block it, then lift the block.
   await transitionBar(page).getByRole('button', { name: /^More/ }).click();
   await page.getByRole('menuitem', { name: 'Mark as stuck…' }).click();
-  await page.getByRole('radio', { name: /Waiting on information/ }).click();
+  // More than one reason may be ticked (31 Oct); "waiting on information" starts ticked.
+  await expect(page.getByRole('checkbox', { name: /Waiting on information/ })).toHaveAttribute('aria-checked', 'true');
+  await page.getByRole('checkbox', { name: /Needs a decision/ }).click();
   await page.getByLabel('What exactly is missing').fill('Reader survey results');
   await page.getByRole('button', { name: 'Mark as stuck' }).click();
-  await expect(page.getByText('Stuck — waiting on information')).toBeVisible();
+  await expect(page.getByText('Stuck — waiting on information · needs a decision')).toBeVisible();
   // No "Move on — nothing outstanding" beside a stuck stage (2 Oct, screenshot 2).
   await expect(page.getByText(/^Move on to Positioning/)).toHaveCount(0);
   await page.screenshot({ path: test.info().outputPath('01-blocked-with-reason.png'), fullPage: true });

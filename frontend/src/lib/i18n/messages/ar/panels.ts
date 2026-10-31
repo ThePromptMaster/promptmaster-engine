@@ -311,7 +311,7 @@ export const ar: Record<keyof typeof en, string> = {
   'ssp.block.needs_decision': 'يحتاج إلى قرار',
   'ssp.block.needs_decision.hint': 'على أحدهم أن يختار قبل أن يمكن المتابعة',
   'ssp.markStuck': 'تعليمها متعثرة',
-  'ssp.waitingOn': 'ما الذي تنتظره هذه المرحلة؟',
+  'ssp.waitingOn': 'ما الذي تنتظره هذه المرحلة؟ اختر كل ما ينطبق.',
   'ssp.whyStuck': 'سبب التعثر',
   'ssp.whatMissing': 'ما الناقص بالضبط',
   'ssp.whatMissingPh': 'ما الناقص بالضبط؟ (مطلوب)',

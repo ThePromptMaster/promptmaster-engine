@@ -17,29 +17,35 @@ const BLOCK_KINDS: { kind: BlockKind; label: string; hint: string }[] = [
   { kind: 'needs_decision', label: 'Needs a decision', hint: 'Someone has to choose before this can go on' },
 ];
 
-/** PM-13: "blocked" is a status with a reason, not a stage left quietly undone. */
+/**
+ * PM-13: "blocked" is a status with a reason, not a stage left quietly undone.
+ * More than one reason may hold at once (31 Oct, Sean: a tool and a decision
+ * on the same run); the first ticked is the one the record leads with.
+ */
 export function BlockForm({
   onSubmit,
   onCancel,
 }: {
-  onSubmit: (block: { kind: BlockKind; reason: string }) => void;
+  onSubmit: (block: { kind: BlockKind; kinds: BlockKind[]; reason: string }) => void;
   onCancel: () => void;
 }) {
   const t = useT();
-  const [kind, setKind] = useState<BlockKind>('data_missing');
+  const [kinds, setKinds] = useState<BlockKind[]>(['data_missing']);
   const [reason, setReason] = useState('');
+  const toggle = (k: BlockKind) => setKinds((now) => (now.includes(k) ? now.filter((x) => x !== k) : [...now, k]));
   return (
     <section aria-label={t('ssp.markStuck')} className="rounded-xl bg-[var(--surface-container-high)] px-5 py-4">
       <p className="text-body text-[var(--on-surface)]">{t('ssp.waitingOn')}</p>
-      <div role="radiogroup" aria-label={t('ssp.whyStuck')} className="mt-3 grid gap-2 sm:grid-cols-3">
+      <div role="group" aria-label={t('ssp.whyStuck')} className="mt-3 grid gap-2 sm:grid-cols-3">
         {BLOCK_KINDS.map((option) => (
           <button
             key={option.kind}
-            role="radio"
-            aria-checked={kind === option.kind}
-            onClick={() => setKind(option.kind)}
+            type="button"
+            role="checkbox"
+            aria-checked={kinds.includes(option.kind)}
+            onClick={() => toggle(option.kind)}
             className={`rounded-lg px-3 py-2 text-start transition-colors ${
-              kind === option.kind
+              kinds.includes(option.kind)
                 ? 'bg-[var(--pm-primary)] text-[var(--on-primary)]'
                 : 'bg-[var(--surface-container-highest)] text-[var(--on-surface)]'
             }`}
@@ -59,8 +65,8 @@ export function BlockForm({
       />
       <div className="mt-3 flex gap-2">
         <button
-          onClick={() => onSubmit({ kind, reason: reason.trim() })}
-          disabled={!reason.trim()}
+          onClick={() => onSubmit({ kind: BLOCK_KINDS.find((o) => kinds.includes(o.kind))!.kind, kinds: BLOCK_KINDS.filter((o) => kinds.includes(o.kind)).map((o) => o.kind), reason: reason.trim() })}
+          disabled={!reason.trim() || kinds.length === 0}
           className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-title text-[var(--on-primary)] disabled:opacity-40"
         >
           {t('ssp.markStuck')}
@@ -73,9 +79,10 @@ export function BlockForm({
   );
 }
 
-export function BlockedNotice({ kind, reason, onUnblock }: { kind: BlockKind; reason: string; onUnblock: () => void }) {
+export function BlockedNotice({ kind, kinds, reason, onUnblock }: { kind: BlockKind; kinds?: BlockKind[]; reason: string; onUnblock: () => void }) {
   const t = useT();
-  const label = BLOCK_KINDS.some((k) => k.kind === kind) ? t(`ssp.block.${kind}` as MessageKey) : t('ssp.stuck');
+  const all = (kinds?.length ? kinds : [kind]).filter((k) => BLOCK_KINDS.some((o) => o.kind === k));
+  const label = all.length ? all.map((k) => t(`ssp.block.${k}` as MessageKey)).join(' · ') : t('ssp.stuck');
   return (
     <div role="status" className="flex flex-wrap items-center gap-3 rounded-xl bg-[var(--surface-container-high)] px-5 py-4">
       <span aria-hidden className="material-symbols-outlined text-[var(--pm-tertiary)]">block</span>

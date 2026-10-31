@@ -1030,6 +1030,10 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // ("Announcement: 100–140 words — 74 words") is repaired as well, not
       // only reported. It stays finished; the new version reopens what read it.
       const measuredFails = target ? unmetMeasurements(ctx, target.id) : [];
+      // Only a limit is met by cutting; a result called verified without a
+      // source is not (31 Oct, Sean: the two were asked as one garbled question).
+      const limitFails = target ? unmetMeasurements(ctx, target.id, { limitsOnly: true }) : [];
+      const evidenceFails = target ? unmetMeasurements(ctx, target.id, { evidenceOnly: true }) : [];
       // 11 Oct: a drafted stage still in progress too — shortening a brief
       // that is over its limit is routine, not the user's decision.
       const drafted = (ctx.bundles[target?.id ?? '']?.versions.length ?? 0) > 0;
@@ -1171,19 +1175,21 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // under one (17 Oct, Sean, FIELDGUIDE: the curriculum lost its timed
       // activities). One more try names what went; if it still goes, nothing
       // is saved and the trade-off is the user's — a decision, not a failed try.
-      let dropped = content && measuredFails.length && !before ? structureDropped(head, content) : [];
+      let dropped = content && limitFails.length && !before ? structureDropped(head, content) : [];
       if (dropped.length) {
         ({ res, content } = await attempt(`${instruction} YOUR PREVIOUS ATTEMPT DROPPED ${dropped.join(', ')}. Keep every heading and the timings under them; shorten by tightening the prose instead.`));
         stillUnmet = content ? unmetMeasurementsOf(ctx, target, content) : [];
         dropped = content ? structureDropped(head, content) : [];
       }
       if (dropped.length) {
-        const question =
-          `Meeting ${measuredFails.join('; ')} would drop ${dropped.join(', ')} from ${target.label}, so I have not saved it; ` +
-          `${headVersion ? `v${headVersion.version_number}` : 'the saved version'} stays as it is. Should the limit change, or should ${target.label} be cut to fit even if those go?`;
+        const { question, questions } = cutToFitQuestions({
+          label: target.label,
+          kept: headVersion ? `v${headVersion.version_number}` : 'the saved version',
+          limits: limitFails, dropped, evidence: evidenceFails,
+        });
         return done(key, {
           status: 'blocked', blockKind: 'needs_decision', toolsUsed: ['model'], changes: {},
-          output: question, stop: { status: 'awaiting_decision', reason: question }, needs: { kind: 'answer_question', question },
+          output: question, stop: { status: 'awaiting_decision', reason: question }, needs: { kind: 'answer_question', question, questions },
         });
       }
       if (!content) {
@@ -1775,7 +1781,10 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
     }
 
     case 'block': {
-      const kind = (['tool_missing', 'data_missing', 'needs_decision'] as const).find((k) => k === params.block_kind) ?? 'needs_decision';
+      const KINDS = ['tool_missing', 'data_missing', 'needs_decision'] as const;
+      const kind = KINDS.find((k) => k === params.block_kind) ?? 'needs_decision';
+      // More than one may hold (31 Oct, Sean); the first named leads.
+      const kinds = [kind, ...(Array.isArray(params.block_kinds) ? KINDS.filter((k) => k !== kind && (params.block_kinds as unknown[]).includes(k)) : [])];
       const reason = (typeof params.reason === 'string' && params.reason.trim()) || ctx.step.rationale || 'Go mode could not continue.';
       const actor = ctx.approvedByUser || ctx.run.policy === 'guided' ? 'user' : 'system';
       // What the stage has to work with now goes on the record with the
@@ -1785,14 +1794,14 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // since it was last cleared: that was a retry, not progress. It is said
       // in those words and costs no step.
       const last = ctx.state.stages[ctx.stage.id]?.last_block;
-      const repeat = last?.kind === kind && inputsChanged(last.inputs, inputs)?.changed === false;
+      const repeat = last?.kind === kind && sameKinds(last.kinds ?? [last.kind], kinds) && inputsChanged(last.inputs, inputs)?.changed === false;
       await appendWorkflowEvent(ctx.project.id, ctx.project.user_id, {
         type: 'stage_blocked',
         stage_id: ctx.stage.id,
         actor,
         agent_run_id: actor === 'system' ? ctx.run.id : null,
         reason,
-        payload: { block_kind: kind, inputs_at_block: inputs },
+        payload: { block_kind: kind, ...(kinds.length > 1 ? { block_kinds: kinds } : {}), inputs_at_block: inputs },
       });
       await ctx.afterStageEvent();
       const said = repeat ? `Nothing has changed since this stage was last marked stuck, so it stops at the same place: ${reason}` : reason;
@@ -1800,7 +1809,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         status: 'blocked', blockKind: kind, toolsUsed: [], changes: { event_types: ['stage_blocked'] },
         output: `Could not continue: ${said}`, stop: { status: 'blocked', reason: said },
         // The card with its options, at once: it used to take a second press of Resume to appear.
-        needs: { kind: 'unblock_stage', stageId: ctx.stage.id, reason, blockKind: kind },
+        needs: { kind: 'unblock_stage', stageId: ctx.stage.id, reason, blockKind: kind, ...(kinds.length > 1 ? { blockKinds: kinds } : {}) },
         ...(repeat ? { free: true } : {}),
       });
     }
@@ -2064,8 +2073,34 @@ export function withFreshMeasurements(evaluation: StageEvaluation, measured: boo
 }
 
 /** A stage's measured requirements that fail, as "Label — measured detail" (L-63). */
-function unmetMeasurements(ctx: Pick<PerformContext, 'context'>, stageId: string): string[] {
-  return (ctx.context.measured?.[stageId] ?? []).filter((m) => !m.satisfied).map((m) => `${m.label} — measured ${m.detail ?? 'not met'}`);
+function unmetMeasurements(ctx: Pick<PerformContext, 'context'>, stageId: string, only: { limitsOnly?: boolean; evidenceOnly?: boolean } = {}): string[] {
+  return (ctx.context.measured?.[stageId] ?? [])
+    .filter((m) => !m.satisfied)
+    .filter((m) => (only.limitsOnly ? m.id !== EVIDENCE_MEASUREMENT : only.evidenceOnly ? m.id === EVIDENCE_MEASUREMENT : true))
+    .map((m) => `${m.label} — measured ${m.detail ?? 'not met'}`);
+}
+
+/** The measurement of results called calculated or verified (L-118): not a limit, so never met by cutting. */
+const EVIDENCE_MEASUREMENT = 'measured.evidence';
+
+/**
+ * A repair that would have to drop headings to meet a limit asks the user,
+ * one question per thing that needs them, each on its own numbered line
+ * (31 Oct, Sean: "The stop reason is unreadable … list each block reason
+ * separately, as a plain question"). The limit is the decision; a result
+ * called verified without a source, if any, is asked about on its own line.
+ */
+export function cutToFitQuestions(input: { label: string; kept: string; limits: readonly string[]; dropped: readonly string[]; evidence: readonly string[] }): { question: string; questions: string[] } {
+  const questions = [
+    `${input.limits.length === 1 ? 'The limit' : 'The limits'} ${input.limits.join('; ')}. Meeting ${input.limits.length === 1 ? 'it' : 'them'} would drop ${input.dropped.join(', ')}. Should the limit change, or should ${input.label} be cut to fit even if those go?`,
+    ...input.evidence.map((e) => {
+      const what = e.replace(/^Results called calculated or verified have the evidence — measured\s*/, '').replace(/\s+— call each reasoned[\s\S]*$/, '');
+      return `Separately, results are called calculated or verified with nothing behind them: ${what}. Should I cite what backs each one, or call them reasoned instead?`;
+    }),
+  ];
+  const lead = `I have not saved a new version of ${input.label}; ${input.kept} stays as it is.`;
+  const question = questions.length === 1 ? `${lead} ${questions[0]}` : `${lead} ${questions.length} things need you:\n${questions.map((q, i) => `${i + 1}. ${q}`).join('\n')}`;
+  return { question, questions };
 }
 
 /** Each of a stage's measured requirements on new text, with its count: "Output: at most 200 words — 187 words". */
@@ -2545,4 +2580,9 @@ export function failedChecks(ctx: Pick<PerformContext, 'context' | 'template'> &
 /** Save what a Go step's search found, citing the run (22 Oct). */
 function keepWeb(ctx: PerformContext, res: WebUse, stage: StageDefinition) {
   return keepFound(ctx.project, res, { stageId: stage.id, agentRunId: ctx.run.id });
+}
+
+/** The same reasons, in any order. */
+function sameKinds(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((k) => b.includes(k));
 }
