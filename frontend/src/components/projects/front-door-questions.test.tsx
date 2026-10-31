@@ -82,7 +82,9 @@ describe('Ask me questions, in the conversation', () => {
     await screen.findByText('Question 1?');
     await user.type(screen.getByLabelText('Your message'), 'Only vegetarian');
     await user.click(screen.getByRole('button', { name: 'Send' }));
-    expect(await screen.findByText('I have what I need.')).toBeInTheDocument();
+    // The end is said plainly, not as the server's restated brief.
+    expect(await screen.findByText('That is enough to set this up.')).toBeInTheDocument();
+    expect(screen.queryByText('I have what I need.')).toBeNull();
     expect(guideNextQuestion.mock.calls[1][0].answered).toEqual([{ question: 'Question 1?', answer: 'Only vegetarian' }]);
     // Asking is over: the button is back.
     expect(screen.getByRole('button', { name: 'Ask me questions' })).toBeInTheDocument();
