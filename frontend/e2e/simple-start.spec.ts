@@ -48,10 +48,11 @@ test('the advanced setup is one click away and remembered', async ({ page }) => 
   await page.getByRole('radio', { name: 'Advanced' }).click();
   await expect(page.getByRole('radio', { name: 'Advanced' })).toHaveAttribute('aria-checked', 'true');
   await expect(page.getByRole('heading', { name: 'What do you want to do or figure out?' })).toBeVisible();
-  await expect(page.getByRole('button', { name: /Guide me — ask me questions/ })).toBeVisible();
+  // 31 Oct: the questions are asked in the conversation, not from here.
+  await expect(page.getByRole('button', { name: /Guide me — ask me questions/ })).toHaveCount(0);
   expect(await page.evaluate(() => localStorage.getItem('pm.experience.v1'))).toBe('advanced');
 
   await page.getByRole('radio', { name: 'Simple' }).click();
   await expect(page.getByRole('radio', { name: 'Simple' })).toHaveAttribute('aria-checked', 'true');
-  await expect(page.getByRole('button', { name: /Ask me a few questions/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Ask me a few questions/ })).toHaveCount(0);
 });

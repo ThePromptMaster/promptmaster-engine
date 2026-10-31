@@ -62,6 +62,7 @@ import { claimsInstruction, claimsStillIn, dependentClaimFindings, dependentClai
 import { isSuperseded, markSuperseded, replacedValues } from '@/lib/workflow/superseded-rows';
 import { figureFindings, figureSources } from '@/lib/workflow/figure-support';
 import { asIteration } from '@/lib/workflow/legacy';
+import { headingOutline, joinParts, needsParts, partInstruction, splitIntoParts } from '@/lib/workflow/long-prose';
 import {
   evaluationRecord,
   evaluationRequest,
@@ -823,7 +824,8 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         model: iteration.model_used || ctx.project.model,
         mode: modeForStage(ctx.project, ctx.stage),
         change_summary: withWebLine(iteration.summary || 'Go mode continued the draft from where it was cut off.', continuedWeb),
-        finish_reason: null,
+        // Still cut off stays cut off, so "Continue writing" stays (31 Oct, Sean).
+        finish_reason: continued.finish_reason === 'length' ? 'length' : null,
       });
       const versionId = (created as { id?: unknown } | null)?.id;
       const reconfirmed = typeof versionId === 'string' ? await reconfirmApprovals(ctx, ctx.stage, versionId, iteration.output) : [];
@@ -1028,6 +1030,10 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // ("Announcement: 100–140 words — 74 words") is repaired as well, not
       // only reported. It stays finished; the new version reopens what read it.
       const measuredFails = target ? unmetMeasurements(ctx, target.id) : [];
+      // Only a limit is met by cutting; a result called verified without a
+      // source is not (31 Oct, Sean: the two were asked as one garbled question).
+      const limitFails = target ? unmetMeasurements(ctx, target.id, { limitsOnly: true }) : [];
+      const evidenceFails = target ? unmetMeasurements(ctx, target.id, { evidenceOnly: true }) : [];
       // 11 Oct: a drafted stage still in progress too — shortening a brief
       // that is over its limit is routine, not the user's decision.
       const drafted = (ctx.bundles[target?.id ?? '']?.versions.length ?? 0) > 0;
@@ -1078,10 +1084,49 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       const instruction = recheckInstruction(target.label, why, superseded, before ? 'table' : 'prose') + measuredLine + decidedLine + claimsInstruction(claims);
       const fresh = await readManuscript(ctx, target);
       if (!fresh) return manuscriptMissing(key, target);
+      // A head the model cut off is finished first, so the repair starts from
+      // the whole text rather than rewriting a stub (31 Oct, Sean: the second
+      // repair of the book started from the first one's cut-off version).
+      const base = !before && headVersion?.finish_reason === 'length'
+        ? (await finishCutDraft(ctx, inputs, model, target, head, 'length')).content
+        : head;
+      // A text too long to write back in one call is revised a part at a time
+      // and joined in code (31 Oct, Sean: a 60,000-word book against a
+      // ceiling of about 9,000 words, cut off twice before Go stopped).
+      const chunks = !before && !parts.length && needsParts(base) ? splitIntoParts(base) : [];
+      const outline = chunks.length > 1 ? headingOutline(base) : '';
+      let partsKept: number[] = [];
+      let checkedPartsNote = '';
       // Only the first attempt may search: a retry fixes what it wrote, not what it knew.
       let searched = false;
+      const attemptInParts = async (text: string) => {
+        const results: { text: string; note: string | null; kept: boolean; res: Awaited<ReturnType<typeof api.generateStageArtifact>> | null }[] = new Array(chunks.length);
+        const revisePart = async (i: number) => {
+          const request = generationRequest(ctx.project, ctx.template, ctx.state, fresh, target, chunks[i], text + partInstruction(i, chunks.length, outline));
+          // The first part of the first attempt may search; the rest use what is saved.
+          const res = await api.generateStageArtifact(searched || i > 0 ? { ...request, web_access: 'off' } : request, ctx.signal);
+          if (i === 0) await keepWeb(ctx, res, target);
+          const { note, body } = splitChangeNote(generationContent(target, res));
+          // A part still cut off, or returned empty, is kept as it was rather
+          // than saved half-written; the step says which.
+          const kept = !body.trim() || res.finish_reason === 'length';
+          results[i] = { text: kept ? chunks[i] : body, note: kept ? null : note, kept, res };
+        };
+        await revisePart(0);
+        searched = true;
+        for (let next = 1; next < chunks.length; next += PART_CONCURRENCY) {
+          await Promise.all(chunks.slice(next, next + PART_CONCURRENCY).map((_, j) => revisePart(next + j)));
+        }
+        partsKept = results.flatMap((r, i) => (r.kept ? [i + 1] : []));
+        const notes = results.map((r) => r.note?.trim()).filter((n): n is string => Boolean(n));
+        const joined = joinParts(results.map((r) => r.text));
+        const last = results.find((r) => r.res)?.res ?? null;
+        const res = { ...(last ?? ({} as Awaited<ReturnType<typeof api.generateStageArtifact>>)), finish_reason: 'stop' };
+        return { res, content: notes.length ? `What changed: ${notes.join(' ')}\n\n${joined}` : joined };
+      };
       const attempt = async (text: string) => {
-        const request = generationRequest(ctx.project, ctx.template, ctx.state, fresh, target, head, text);
+        if (chunks.length > 1) return attemptInParts(text);
+        const request = generationRequest(ctx.project, ctx.template, ctx.state, fresh, target, base, text);
         const res = await api.generateStageArtifact(searched ? { ...request, web_access: 'off' } : request, ctx.signal);
         searched = true;
         await keepWeb(ctx, res, target);
@@ -1130,19 +1175,21 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // under one (17 Oct, Sean, FIELDGUIDE: the curriculum lost its timed
       // activities). One more try names what went; if it still goes, nothing
       // is saved and the trade-off is the user's — a decision, not a failed try.
-      let dropped = content && measuredFails.length && !before ? structureDropped(head, content) : [];
+      let dropped = content && limitFails.length && !before ? structureDropped(head, content) : [];
       if (dropped.length) {
         ({ res, content } = await attempt(`${instruction} YOUR PREVIOUS ATTEMPT DROPPED ${dropped.join(', ')}. Keep every heading and the timings under them; shorten by tightening the prose instead.`));
         stillUnmet = content ? unmetMeasurementsOf(ctx, target, content) : [];
         dropped = content ? structureDropped(head, content) : [];
       }
       if (dropped.length) {
-        const question =
-          `Meeting ${measuredFails.join('; ')} would drop ${dropped.join(', ')} from ${target.label}, so I have not saved it; ` +
-          `${headVersion ? `v${headVersion.version_number}` : 'the saved version'} stays as it is. Should the limit change, or should ${target.label} be cut to fit even if those go?`;
+        const { question, questions } = cutToFitQuestions({
+          label: target.label,
+          kept: headVersion ? `v${headVersion.version_number}` : 'the saved version',
+          limits: limitFails, dropped, evidence: evidenceFails,
+        });
         return done(key, {
           status: 'blocked', blockKind: 'needs_decision', toolsUsed: ['model'], changes: {},
-          output: question, stop: { status: 'awaiting_decision', reason: question }, needs: { kind: 'answer_question', question },
+          output: question, stop: { status: 'awaiting_decision', reason: question }, needs: { kind: 'answer_question', question, questions },
         });
       }
       if (!content) {
@@ -1151,8 +1198,13 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // A repair the model cut off is continued before it is saved, and is
       // never marked complete while it is still cut (12 Oct, Diligence: v4
       // stopped halfway through Q11 and the stage read as done).
-      const whole = await finishCutDraft(ctx, inputs, model, target, content, res.finish_reason);
+      const whole = chunks.length > 1
+        ? { content, cut: false, continued: false, finishReason: 'stop' as string | null }
+        : await finishCutDraft(ctx, inputs, model, target, content, res.finish_reason);
       content = whole.content;
+      if (partsKept.length) {
+        checkedPartsNote = `Part${partsKept.length === 1 ? '' : 's'} ${partsKept.join(', ')} of ${chunks.length} could not be revised within the length limit and ${partsKept.length === 1 ? 'is' : 'are'} kept as ${partsKept.length === 1 ? 'it was' : 'they were'}.`;
+      }
       // What the recheck dropped without being asked is put back (14 Oct, Sean,
       // workshop: the recheck after a time change dropped "Confirm 12 attendees",
       // the greeting and the sign-off) — never a line stating a replaced value.
@@ -1226,7 +1278,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         instruction,
         model: res.model_used || ctx.project.model,
         mode: modeForStage(ctx.project, target),
-        change_summary: `Repaired after a change: ${why}${note.note ? ` — ${note.note}` : ''}${checked.notes.length ? ` ${checked.notes.join(' ')}` : ''}`.slice(0, 1000),
+        change_summary: `Repaired after a change: ${why}${note.note ? ` — ${note.note}` : ''}${checked.notes.length ? ` ${checked.notes.join(' ')}` : ''}${checkedPartsNote ? ` ${checkedPartsNote}` : ''}`.slice(0, 1000),
         finish_reason: whole.finishReason,
       });
       const versionId = (created as { id?: unknown } | null)?.id;
@@ -1300,7 +1352,10 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         changes: typeof versionId === 'string' ? { version_ids: [versionId] } : {},
         output: [(triaged.length ? `Decided ${triaged.length} routine finding${triaged.length === 1 ? '' : 's'} it raised, under your routine-decision policy. ` : '') + (evaluation.canAdvance
           ? `Repaired ${target.label} (${why}) — saved as a new version and marked complete again; the earlier version is kept.`
-          : `Repaired ${target.label} (${why}) — saved as a new version; it stays reopened until: ${evaluation.unmet.filter((c) => c.blocking).map((c) => c.label).join('; ')}.`), ...reconfirmed].join(' '),
+          : `Repaired ${target.label} (${why}) — saved as a new version; it stays reopened until: ${evaluation.unmet.filter((c) => c.blocking).map((c) => c.label).join('; ')}.`),
+          ...(chunks.length > 1 ? [`It was revised in ${chunks.length} parts, being too long for one pass.`] : []),
+          ...(checkedPartsNote ? [checkedPartsNote] : []),
+          ...reconfirmed].join(' '),
       });
     }
 
@@ -1726,7 +1781,10 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
     }
 
     case 'block': {
-      const kind = (['tool_missing', 'data_missing', 'needs_decision'] as const).find((k) => k === params.block_kind) ?? 'needs_decision';
+      const KINDS = ['tool_missing', 'data_missing', 'needs_decision'] as const;
+      const kind = KINDS.find((k) => k === params.block_kind) ?? 'needs_decision';
+      // More than one may hold (31 Oct, Sean); the first named leads.
+      const kinds = [kind, ...(Array.isArray(params.block_kinds) ? KINDS.filter((k) => k !== kind && (params.block_kinds as unknown[]).includes(k)) : [])];
       const reason = (typeof params.reason === 'string' && params.reason.trim()) || ctx.step.rationale || 'Go mode could not continue.';
       const actor = ctx.approvedByUser || ctx.run.policy === 'guided' ? 'user' : 'system';
       // What the stage has to work with now goes on the record with the
@@ -1736,14 +1794,14 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // since it was last cleared: that was a retry, not progress. It is said
       // in those words and costs no step.
       const last = ctx.state.stages[ctx.stage.id]?.last_block;
-      const repeat = last?.kind === kind && inputsChanged(last.inputs, inputs)?.changed === false;
+      const repeat = last?.kind === kind && sameKinds(last.kinds ?? [last.kind], kinds) && inputsChanged(last.inputs, inputs)?.changed === false;
       await appendWorkflowEvent(ctx.project.id, ctx.project.user_id, {
         type: 'stage_blocked',
         stage_id: ctx.stage.id,
         actor,
         agent_run_id: actor === 'system' ? ctx.run.id : null,
         reason,
-        payload: { block_kind: kind, inputs_at_block: inputs },
+        payload: { block_kind: kind, ...(kinds.length > 1 ? { block_kinds: kinds } : {}), inputs_at_block: inputs },
       });
       await ctx.afterStageEvent();
       const said = repeat ? `Nothing has changed since this stage was last marked stuck, so it stops at the same place: ${reason}` : reason;
@@ -1751,7 +1809,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         status: 'blocked', blockKind: kind, toolsUsed: [], changes: { event_types: ['stage_blocked'] },
         output: `Could not continue: ${said}`, stop: { status: 'blocked', reason: said },
         // The card with its options, at once: it used to take a second press of Resume to appear.
-        needs: { kind: 'unblock_stage', stageId: ctx.stage.id, reason, blockKind: kind },
+        needs: { kind: 'unblock_stage', stageId: ctx.stage.id, reason, blockKind: kind, ...(kinds.length > 1 ? { blockKinds: kinds } : {}) },
         ...(repeat ? { free: true } : {}),
       });
     }
@@ -2015,8 +2073,34 @@ export function withFreshMeasurements(evaluation: StageEvaluation, measured: boo
 }
 
 /** A stage's measured requirements that fail, as "Label — measured detail" (L-63). */
-function unmetMeasurements(ctx: Pick<PerformContext, 'context'>, stageId: string): string[] {
-  return (ctx.context.measured?.[stageId] ?? []).filter((m) => !m.satisfied).map((m) => `${m.label} — measured ${m.detail ?? 'not met'}`);
+function unmetMeasurements(ctx: Pick<PerformContext, 'context'>, stageId: string, only: { limitsOnly?: boolean; evidenceOnly?: boolean } = {}): string[] {
+  return (ctx.context.measured?.[stageId] ?? [])
+    .filter((m) => !m.satisfied)
+    .filter((m) => (only.limitsOnly ? m.id !== EVIDENCE_MEASUREMENT : only.evidenceOnly ? m.id === EVIDENCE_MEASUREMENT : true))
+    .map((m) => `${m.label} — measured ${m.detail ?? 'not met'}`);
+}
+
+/** The measurement of results called calculated or verified (L-118): not a limit, so never met by cutting. */
+const EVIDENCE_MEASUREMENT = 'measured.evidence';
+
+/**
+ * A repair that would have to drop headings to meet a limit asks the user,
+ * one question per thing that needs them, each on its own numbered line
+ * (31 Oct, Sean: "The stop reason is unreadable … list each block reason
+ * separately, as a plain question"). The limit is the decision; a result
+ * called verified without a source, if any, is asked about on its own line.
+ */
+export function cutToFitQuestions(input: { label: string; kept: string; limits: readonly string[]; dropped: readonly string[]; evidence: readonly string[] }): { question: string; questions: string[] } {
+  const questions = [
+    `${input.limits.length === 1 ? 'The limit' : 'The limits'} ${input.limits.join('; ')}. Meeting ${input.limits.length === 1 ? 'it' : 'them'} would drop ${input.dropped.join(', ')}. Should the limit change, or should ${input.label} be cut to fit even if those go?`,
+    ...input.evidence.map((e) => {
+      const what = e.replace(/^Results called calculated or verified have the evidence — measured\s*/, '').replace(/\s+— call each reasoned[\s\S]*$/, '');
+      return `Separately, results are called calculated or verified with nothing behind them: ${what}. Should I cite what backs each one, or call them reasoned instead?`;
+    }),
+  ];
+  const lead = `I have not saved a new version of ${input.label}; ${input.kept} stays as it is.`;
+  const question = questions.length === 1 ? `${lead} ${questions[0]}` : `${lead} ${questions.length} things need you:\n${questions.map((q, i) => `${i + 1}. ${q}`).join('\n')}`;
+  return { question, questions };
 }
 
 /** Each of a stage's measured requirements on new text, with its count: "Output: at most 200 words — 187 words". */
@@ -2293,6 +2377,8 @@ function leadingNotes(content: string): { notes: string[]; body: string } {
 
 /** How many times a cut-off draft is continued before it is saved as cut off. */
 const CONTINUE_TRIES = 2;
+/** Parts of a long text revised at once (31 Oct); more would crowd the provider's rate limit. */
+const PART_CONCURRENCY = 3;
 
 /**
  * A prose draft the model cut off at its token limit, continued from where it
@@ -2315,13 +2401,16 @@ async function finishCutDraft(
   let cut = true;
   for (let i = 0; i < CONTINUE_TRIES && cut; i += 1) {
     try {
-      const { iteration } = await api.continueDocument(
+      const res = await api.continueDocument(
         { inputs, incomplete_iteration: asIteration(text, 1, ctx.project.mode), iteration_number: 2, model },
         ctx.signal
       );
+      const { iteration } = res;
       if (!iteration.output?.trim() || iteration.output.trim().length <= text.trim().length) break;
       text = iteration.output;
-      cut = iteration.evaluation?.completeness?.status === 'incomplete';
+      // The model's own stop reason when the server sends it (31 Oct); the
+      // evaluator's completeness read otherwise.
+      cut = res.finish_reason ? res.finish_reason === 'length' : iteration.evaluation?.completeness?.status === 'incomplete';
     } catch (e) {
       if ((e as Error)?.name === 'AbortError') throw e;
       break;
@@ -2491,4 +2580,9 @@ export function failedChecks(ctx: Pick<PerformContext, 'context' | 'template'> &
 /** Save what a Go step's search found, citing the run (22 Oct). */
 function keepWeb(ctx: PerformContext, res: WebUse, stage: StageDefinition) {
   return keepFound(ctx.project, res, { stageId: stage.id, agentRunId: ctx.run.id });
+}
+
+/** The same reasons, in any order. */
+function sameKinds(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((k) => b.includes(k));
 }

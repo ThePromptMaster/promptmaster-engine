@@ -105,6 +105,6 @@ async def api_continue_document(
         iteration = iteration.model_copy(update={"continuity_snapshot": snapshot})
         iteration.output = cite_only_known(iteration.output, inputs, web)
 
-        return IterationFromConversationResponse(iteration=iteration, suggestions=suggestions, **dict(web))
+        return IterationFromConversationResponse(iteration=iteration, suggestions=suggestions, finish_reason=finish_reason, **dict(web))
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)

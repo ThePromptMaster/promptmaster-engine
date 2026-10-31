@@ -126,8 +126,12 @@ The full endpoint inventory is in [`api.md`](api.md).
   (`book`, `research`, `single_output`, `exploration`, `assessment`, `quick`).
 - **The start (27 Oct, Sean 26 Oct).** `projects/new` leads with **Get an answer**: a project
   pinned to `quick` (one prose stage, drafted as it opens), made without a setup screen. The
-  conversation, Guide me and Choose yourself are under "Start with the full workflow instead",
-  which stays open once a user opens it (`pm.start.full.v1`). On a quick project,
+  conversation, "I know what I want to do" and Choose yourself are under "Start with the full
+  workflow instead", which stays open once a user opens it (`pm.start.full.v1`). **Ask me
+  questions** (Sean, 31 Oct) is a button in the start conversation, not on the first screen:
+  `FrontDoor` asks `guide-next-question` with the conversation so far as material, shows the
+  question inline (`guide-question-card.tsx`), and sends each answer through `front-door` as the
+  user's turn, so the outline takes it in. Simple stops at 3. On a quick project,
   `components/workflow/take-full-process.tsx` re-pins the same project to a designed or standard
   workflow: the answer becomes v1 of its deliverable stage (`lib/workflow/quick.ts::carryTarget`),
   the chat is copied to the first stage, and a `workflow_switched` event marks the cut —

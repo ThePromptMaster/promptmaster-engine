@@ -44,65 +44,71 @@ test('"I know what I want to do": the setup is recommended, editable, and carrie
 });
 
 /**
- * 1 Oct, item 9 — "Right now it feels like a smart intake form. The next
- * level is adaptive questioning": several answers where they are not
- * mutually exclusive, typed answers as removable chips, one question at a
- * time branching on the last, and stopping when there is enough.
+ * "Ask me questions" lives in the start conversation, beside the outline
+ * (Sean, 31 Oct), not on the first screen: one question at a time, each
+ * answer the user's turn in the conversation, so the outline takes it in.
  */
-test('"Guide me" asks one question at a time, takes several answers, and stops when it has enough', async ({ page }) => {
+async function conversation(page: import('@playwright/test').Page) {
   await page.goto('/projects/new');
   await dismissBetaNotice(page);
   await page.getByLabel('What do you want to do or figure out?').fill('Why do giraffes have such long necks?');
-  await page.getByRole('button', { name: /Guide me/ }).click();
+  // The full-workflow ways are open for the E2E user (auth.setup.ts).
+  await expect(page.getByRole('button', { name: /Guide me|Ask me a few questions/ })).toHaveCount(0);
+  await page.getByRole('button', { name: /Start the conversation/ }).click();
+  const convo = page.getByRole('region', { name: 'Conversation' });
+  await expect(convo).toContainText('Mock: who is this for?', { timeout: 30_000 });
+  return convo;
+}
 
-  await expect(page.getByRole('heading', { name: 'A few questions' })).toBeVisible();
-  const question = page.getByRole('region', { name: 'Question' });
-  await expect(question.getByRole('heading')).toHaveText('1. What data do you have?');
+test('"Ask me questions" asks in the conversation, one at a time, and stops when it has enough', async ({ page }) => {
+  const convo = await conversation(page);
+  await convo.getByRole('button', { name: 'Ask me questions' }).click();
+
+  const question = convo.getByRole('region', { name: 'Question' });
+  await expect(question.getByRole('heading')).toHaveText('What data do you have?', { timeout: 30_000 });
   await expect(question).toContainText('Choose any that apply.');
 
   // Several of the offered answers, plus one typed in — which becomes a chip that can be removed.
   await question.getByRole('button', { name: 'CRM', exact: true }).click();
   await question.getByRole('button', { name: 'Billing', exact: true }).click();
   await expect(question.getByRole('button', { name: 'CRM', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  await expect(question.getByRole('button', { name: 'Billing', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await question.getByLabel('Your own answer', { exact: true }).fill('Survey results');
   await question.getByRole('button', { name: 'Add', exact: true }).click();
   await question.getByLabel('Your own answer', { exact: true }).fill('A typo');
   await question.getByRole('button', { name: 'Add', exact: true }).click();
   await question.getByRole('button', { name: 'Remove "A typo"' }).click();
-  await expect(question.getByLabel('Your own answers')).toHaveText(/Survey results/);
   await expect(question.getByLabel('Your own answers')).not.toContainText('A typo');
-  await page.screenshot({ path: test.info().outputPath('03-guide-me-several-answers.png'), fullPage: true });
+  await page.screenshot({ path: test.info().outputPath('03-ask-questions-in-conversation.png'), fullPage: true });
+  const answered = page.waitForRequest((r) => r.url().includes('/api/front-door') && r.method() === 'POST');
   await question.getByRole('button', { name: 'Next question' }).click();
+  // The answer is the user's turn, sent to the outline like anything said.
+  const turns = (await answered).postDataJSON().turns;
+  expect(turns.at(-1)).toEqual({ role: 'user', content: 'CRM; Billing; Survey results' });
 
-  // The second question follows from the first answer, and takes one answer.
-  await expect(question.getByRole('heading')).toHaveText('2. Mock follow-up on: CRM; Billing; Survey results');
-  await expect(question).toContainText('Choose one.');
-  await expect(page.getByRole('list', { name: 'Your answers so far' })).toContainText('CRM');
+  // The second question follows from the first answer.
+  await expect(question.getByRole('heading')).toHaveText('Mock follow-up on: CRM; Billing; Survey results', { timeout: 30_000 });
   await question.getByRole('button', { name: 'Executives' }).click();
-  await question.getByRole('button', { name: 'My team' }).click();
-  await expect(question.getByRole('button', { name: 'Executives' })).toHaveAttribute('aria-pressed', 'false');
-  await page.screenshot({ path: test.info().outputPath('04-guide-me-follow-up.png'), fullPage: true });
+  await page.screenshot({ path: test.info().outputPath('04-ask-questions-follow-up.png'), fullPage: true });
   await question.getByRole('button', { name: 'Next question' }).click();
 
-  // Two answers are enough for the scripted model: it says so and recommends.
-  await expect(page.getByText(/closest standard workflow is Research/)).toBeVisible({ timeout: 30_000 });
-  await page.getByRole('radio', { name: /^Research/ }).click();
-  await page.getByRole('button', { name: 'Start Research' }).click();
-  await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}$/);
+  // Two answers are enough for the scripted model: it says so, and asking ends.
+  await expect(convo).toContainText('Mock: that is enough to set this up.', { timeout: 30_000 });
+  await expect(convo.getByRole('button', { name: 'Ask me questions' })).toBeVisible();
+  await expect(convo.getByRole('region', { name: 'Question' })).toHaveCount(0);
 });
 
-test('"That\'s enough" stops the questions at any point and uses what was given', async ({ page }) => {
-  await page.goto('/projects/new');
-  await dismissBetaNotice(page);
-  await page.getByLabel('What do you want to do or figure out?').fill('Why do giraffes have such long necks?');
-  await page.getByRole('button', { name: /Guide me/ }).click();
-  const question = page.getByRole('region', { name: 'Question' });
-  await question.getByRole('button', { name: 'None yet' }).click();
-  const setup = page.waitForRequest((r) => r.url().includes('/api/generate-setup') && r.method() === 'POST');
-  await page.getByRole('button', { name: /That's enough/ }).click();
-  expect((await setup).postDataJSON().answers).toEqual([{ question: 'What data do you have?', answer: 'None yet' }]);
-  await expect(page.getByRole('heading', { name: 'Your setup' })).toBeVisible({ timeout: 30_000 });
+test('"That\'s enough questions" stops the questions at any point', async ({ page }) => {
+  const convo = await conversation(page);
+  await convo.getByRole('button', { name: 'Ask me questions' }).click();
+  const question = convo.getByRole('region', { name: 'Question' });
+  await expect(question.getByRole('heading')).toHaveText('What data do you have?', { timeout: 30_000 });
+  let asked = 0;
+  page.on('request', (r) => { if (r.url().includes('/api/guide-next-question')) asked += 1; });
+  await question.getByRole('button', { name: "That's enough questions" }).click();
+  await expect(convo.getByRole('region', { name: 'Question' })).toHaveCount(0);
+  await expect(convo).toContainText('What data do you have?');
+  await expect(convo.getByRole('button', { name: 'Ask me questions' })).toBeVisible();
+  expect(asked).toBe(0);
 });
 
 test('choosing the workflow yourself is still one click away', async ({ page }) => {

@@ -311,7 +311,7 @@ export const zh: Record<keyof typeof en, string> = {
   'ssp.block.needs_decision': '需要做出决定',
   'ssp.block.needs_decision.hint': '必须有人做出选择才能继续',
   'ssp.markStuck': '标记为受阻',
-  'ssp.waitingOn': '此阶段在等待什么？',
+  'ssp.waitingOn': '此阶段在等待什么？可多选。',
   'ssp.whyStuck': '受阻原因',
   'ssp.whatMissing': '具体缺少什么',
   'ssp.whatMissingPh': '具体缺少什么？（必填）',

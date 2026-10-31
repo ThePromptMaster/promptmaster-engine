@@ -22,7 +22,9 @@ import type {
   WorkflowState,
   WorkflowTemplate,
 } from './types';
-import { isDone } from './types';
+import { isDone, type BlockKind } from './types';
+
+const isBlockKind = (k: unknown): k is BlockKind => k === 'tool_missing' || k === 'data_missing' || k === 'needs_decision';
 
 export function getStage(
   template: WorkflowTemplate,
@@ -468,10 +470,16 @@ export function projectState(
 
       case 'stage_blocked': {
         const kind = event.payload?.block_kind;
+        const primary: BlockKind = kind === 'tool_missing' || kind === 'data_missing' ? kind : 'needs_decision';
+        // Several reasons may hold at once (31 Oct, Sean: "needs a tool" and
+        // "needs a decision" on the same run); `block_kind` stays the first.
+        const listed = Array.isArray(event.payload?.block_kinds) ? (event.payload.block_kinds as unknown[]).filter(isBlockKind) : [];
+        const kinds = [primary, ...listed.filter((k) => k !== primary)];
         set(event.stage_id, {
           status: 'blocked',
           blocked: {
-            kind: kind === 'tool_missing' || kind === 'data_missing' ? kind : 'needs_decision',
+            kind: primary,
+            ...(kinds.length > 1 ? { kinds } : {}),
             reason: event.reason ?? '',
             ...(event.payload?.inputs_at_block ? { inputs: event.payload.inputs_at_block } : {}),
           },
@@ -483,7 +491,7 @@ export function projectState(
         const was = state.stages[event.stage_id]?.blocked;
         set(event.stage_id, {
           status: 'in_progress', blocked: undefined,
-          ...(was ? { last_block: { kind: was.kind, ...(was.inputs ? { inputs: was.inputs } : {}) } } : {}),
+          ...(was ? { last_block: { kind: was.kind, ...(was.kinds ? { kinds: was.kinds } : {}), ...(was.inputs ? { inputs: was.inputs } : {}) } } : {}),
         });
         break;
       }

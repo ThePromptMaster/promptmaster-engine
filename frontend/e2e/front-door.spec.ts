@@ -17,7 +17,8 @@ test('a conversation builds a draft brief; only confirmed facts become the proje
   await page.getByLabel('What do you want to do or figure out?').fill('Choose one research project for next quarter');
   // 14 Oct call: the conversation is the way in; the other two stay one row below.
   await expect(page.getByRole('button', { name: /I know what I want to do/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /Guide me — ask me questions/ })).toBeVisible();
+  // 31 Oct: "Ask me questions" is in the conversation, not here.
+  await expect(page.getByRole('button', { name: /Guide me — ask me questions/ })).toHaveCount(0);
   await page.getByRole('button', { name: /Start the conversation/ }).click();
 
   const convo = page.getByRole('region', { name: 'Conversation' });
