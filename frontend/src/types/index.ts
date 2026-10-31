@@ -262,7 +262,15 @@ export interface ChatContext {
     stop_reason: string;
     steps: { action: string; status: string; execution_label: string | null; block_kind: string | null; output: string }[];
     objective: string;
+    /** What Go is asking, one item per question (31 Oct). */
+    questions?: string[];
   } | null;
+  /** The stage's status as the page shows it (31 Oct). */
+  stage_status?: string;
+  /** The stage's latest versions, oldest first, the one on screen marked (31 Oct). */
+  versions?: { number: number; made_by: string; cut_off: boolean; shown: boolean }[];
+  /** What changed on the page since the chat's last reply (31 Oct, `chat-changes.ts`). */
+  changes?: string[];
 }
 
 export interface ChatMessageRequest {

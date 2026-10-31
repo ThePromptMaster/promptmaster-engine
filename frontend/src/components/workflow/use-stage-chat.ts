@@ -144,6 +144,10 @@ interface Options {
   content: string;
   /** The head version. Instructions apply to the head, never to an old one. */
   headVersion: ArtifactVersion | null;
+  /** The number of the version on screen, when it is not the latest (31 Oct). */
+  shownVersionNumber?: number | null;
+  /** Called once a reply is saved, with the context that reply was written from (31 Oct). */
+  onAnswered?: (context: ChatContext | undefined) => void;
   /** Absent on a surface with no store behind it; then nothing can be applied. */
   appendStageVersion?: (
     stageId: string,
@@ -210,6 +214,8 @@ export function useStageChat({
   stageLabel,
   content,
   headVersion,
+  shownVersionNumber,
+  onAnswered,
   appendStageVersion,
   restoreStageVersion,
   getChatContext,
@@ -270,7 +276,11 @@ export function useStageChat({
     };
   }, [project.id, stageId]);
 
-  const versionNumber = headVersion?.version_number ?? 1;
+  // The version the user is reading, which is what the chat is asked about —
+  // not always the latest (31 Oct, Sean: "wrong version numbers"). A new
+  // version is numbered after the latest.
+  const headNumber = headVersion?.version_number ?? 1;
+  const versionNumber = shownVersionNumber ?? headNumber;
 
   const persist = useCallback(
     async (
@@ -315,6 +325,7 @@ export function useStageChat({
       try {
         const priorHistory = asHistory(messages);
         await persist('user', message, 'discuss');
+        const sentContext = getChatContext?.();
 
         const response = await api.chatMessage({
           inputs: inputsFrom(project),
@@ -322,7 +333,7 @@ export function useStageChat({
           chat_history: priorHistory,
           user_message: message,
           model: project.model,
-          context: getChatContext?.(),
+          context: sentContext,
           web_access: project.web_access ?? 'off',
         });
 
@@ -341,6 +352,7 @@ export function useStageChat({
         }
 
         await persist('assistant', response.assistant_message.content, 'discuss', undefined, web);
+        onAnswered?.(sentContext);
       } catch (err) {
         if (live.current) {
           setError(errorText(err, 'Could not reach the model. Try again in a moment.'));
@@ -349,7 +361,7 @@ export function useStageChat({
         if (live.current) setBusy(false);
       }
     },
-    [busy, loading, messages, persist, project, stageId, content, versionNumber, getChatContext, onSourcesChanged]
+    [busy, loading, messages, persist, project, stageId, content, versionNumber, getChatContext, onSourcesChanged, onAnswered]
   );
 
   /**
@@ -468,7 +480,7 @@ export function useStageChat({
           inputs: inputsFrom(project),
           active_iteration: asIteration(target.text, versionNumber, project.mode),
           chat_history: [...priorHistory, scoped],
-          iteration_number: versionNumber + 1,
+          iteration_number: headNumber + 1,
           model: project.model,
           web_access: webAccessOf(project),
         });
@@ -519,7 +531,7 @@ export function useStageChat({
         if (live.current) setBusy(false);
       }
     },
-    [busy, loading, content, messages, persist, project, versionNumber, checkedRevision, instructionFor, stageId]
+    [busy, loading, content, messages, persist, project, versionNumber, headNumber, checkedRevision, instructionFor, stageId]
   );
 
   /**
@@ -541,7 +553,7 @@ export function useStageChat({
         inputs: inputsFrom(project),
         active_iteration: asIteration(content, versionNumber, project.mode),
         chat_history: asHistory(messages),
-        iteration_number: versionNumber + 1,
+        iteration_number: headNumber + 1,
         model: project.model,
         context: getChatContext?.(),
         web_access: webAccessOf(project),
@@ -573,7 +585,7 @@ export function useStageChat({
     } finally {
       if (live.current) setBusy(false);
     }
-  }, [busy, messages, content, project, versionNumber, getChatContext, checkedRevision, stageId]);
+  }, [busy, messages, content, project, versionNumber, headNumber, getChatContext, checkedRevision, stageId]);
 
   /**
    * Accept the proposal: append it as a new version.

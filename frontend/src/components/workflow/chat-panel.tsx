@@ -88,6 +88,12 @@ interface Props {
   /** The content a scope resolves against — the version on screen. */
   content: string;
   headVersion: ArtifactVersion | null;
+  /** The number of the version on screen, when it is not the latest (31 Oct). */
+  shownVersionNumber?: number | null;
+  /** The page changed since the chat's last reply (31 Oct): said under the thread. */
+  pageChanged?: boolean;
+  /** A reply was saved, written from this context (31 Oct). */
+  onAnswered?: (context: ChatContext | undefined) => void;
   appendStageVersion?: (
     stageId: string,
     name: string,
@@ -195,6 +201,9 @@ export function ChatPanel({
   stageTitle,
   content,
   headVersion,
+  shownVersionNumber,
+  pageChanged = false,
+  onAnswered,
   appendStageVersion,
   restoreStageVersion,
   readOnly = false,
@@ -232,6 +241,8 @@ export function ChatPanel({
     stageLabel,
     content,
     headVersion,
+    shownVersionNumber,
+    onAnswered,
     appendStageVersion,
     restoreStageVersion,
     getChatContext,
@@ -754,6 +765,14 @@ export function ChatPanel({
         )}
       </div>
 
+      {/* 31 Oct (Sean): the run's status and the buttons changed under the
+          chat's last answer. Said here, and the chat is told what changed. */}
+      {pageChanged && chat.messages.length > 0 && (
+        <p role="status" className="flex items-center gap-1.5 px-5 pb-2 text-label text-[var(--on-surface-variant)]">
+          <span aria-hidden className="material-symbols-outlined text-[16px]">history</span>
+          {t('chat.pageChanged')}
+        </p>
+      )}
       {chat.error && (
         <p role="alert" className="px-5 pb-2 text-label text-[var(--pm-error)]">
           {chat.error}

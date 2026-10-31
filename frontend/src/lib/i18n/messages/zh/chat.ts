@@ -80,6 +80,7 @@ export const zh: Record<keyof typeof en, string> = {
   'chat.whatChangedLine': '改动内容：{summary}',
   'chat.checkedLabel': '已基于保存后的文本检查',
   'chat.laterNeeds': '基于此内容的后续工作（{names}）需要更新。点击页面顶部的“应用并继续”，Go 就会更新它们。',
+  'chat.pageChanged': '自上次回复以来页面已有变化（Go、按钮或版本）。你的下一条消息会告诉聊天哪些内容变了。',
   'chat.nothingDepends': '此阶段之后已完成的内容都不依赖它，因此无需更新其他内容。',
   'chat.prevInHistory': '上一个版本仍保留在此阶段的历史记录中。',
   'chat.restorePrev': '恢复上一个版本',
