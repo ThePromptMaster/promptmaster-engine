@@ -96,4 +96,12 @@ export const sw: Record<keyof typeof en, string> = {
   'chat.fact.and': ' na ',
   'chat.fact.heading_one': 'Toleo hili {list}. Ilirekodi ili kila hatua na ukaguzi unaofuata uitumie?',
   'chat.fact.heading_other': 'Toleo hili {list}. Yarekodi ili kila hatua na ukaguzi unaofuata uyatumie?',
+  "cost.reply": "Jibu hili liligharimu {cost}",
+  "cost.replyUnknown": "Bei ya jibu hili haipatikani",
+  "cost.unpriced": "({count} bila bei inayojulikana)",
+  "cost.step": "Gharama {cost}",
+  "cost.run": "Uendeshaji huu hadi sasa: {cost}",
+  "cost.project": "Mradi huu hadi sasa: {cost}",
+  "cost.unavailable": "bei haipatikani",
+  "cost.projectHint": "Simu za modeli zilizofanywa kwa mradi huu: gumzo la pembeni, Go, uandishi na ukaguzi.",
 };

@@ -49,7 +49,9 @@ import {
   REQUEST_ID_HEADER,
   USAGE_HEADER,
   parseUsageHeader,
+  type UsageEvent,
 } from '@/lib/observability/usage';
+import { withSpent } from '@/lib/observability/spent';
 import {
   currentUsageProject,
   recordErrorEvent,
@@ -250,10 +252,11 @@ function header(res: Response, name: string): string | null {
  * their own generation would be the wrong trade in every case. Failures inside
  * are swallowed by `recordModelUsage` itself.
  */
-function meter(res: Response, path: string, requestId: string): void {
+function meter(res: Response, path: string, requestId: string): UsageEvent[] {
   const events = parseUsageHeader(header(res, USAGE_HEADER));
-  if (events.length === 0) return;
+  if (events.length === 0) return events;
   void recordModelUsage(events, { route: path, requestId });
+  return events;
 }
 
 /** `fetch` rejects with a TypeError when the connection itself failed. */
@@ -345,7 +348,7 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   // Read usage before branching on `ok`: a request can fail *after* spending
   // money. A stage generation whose evaluation call 502s has already paid for
   // the generation, and that is exactly the spend an operator needs to see.
-  meter(res, path, header(res, REQUEST_ID_HEADER) ?? requestId);
+  const spent = meter(res, path, header(res, REQUEST_ID_HEADER) ?? requestId);
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ detail: res.statusText }));
@@ -361,7 +364,9 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
     });
     throw error;
   }
-  return res.json();
+  // What this response cost rides on it, out of sight of JSON, for the
+  // surfaces that show it (31 Oct): `spentOn(response)`.
+  return withSpent(await res.json(), spent);
 }
 
 export const api = {

@@ -19,6 +19,7 @@ import { ConfirmOverwrite } from './renderers/stage-chrome';
 import { CheckpointPanel } from './checkpoint-panel';
 import { UpgradeBanner } from './upgrade-banner';
 import { templateDiff } from '@/lib/workflow/upgrade';
+import { ProjectCost } from './project-cost';
 import { BlockForm, BlockedNotice, CompletionDialog, ObjectivePausedNotice } from './stage-status-panels';
 import { StageToolResult } from './stage-tool-result';
 import { CRITIQUE_TOOLS, REWRITE_TOOLS, useStageTools } from './use-stage-tools';
@@ -2580,6 +2581,8 @@ export function WorkflowWorkspace({
               }
               readOnly={project.status === 'finalized'}
             />
+            {/* On every stage: what the project has cost so far (31 Oct). */}
+            <ProjectCost projectId={project.id} refreshKey={`${stage.id}:${project.revision ?? ''}:${go.run?.cost_usd ?? ''}`} />
 
             {outlinePanelHere && showFinishedHint && canReopen && finishedHintBar}
             {addSectionsFrom && (

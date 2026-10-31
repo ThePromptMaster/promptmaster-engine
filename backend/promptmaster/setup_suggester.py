@@ -306,7 +306,10 @@ async def suggest_guide_questions(
 # enough context". This asks for the single next question given what has been
 # answered, and may answer that it has enough.
 
-MAX_GUIDE_QUESTIONS = 6
+#: Advanced asks as many as the work needs, up to this (31 Oct, Sean: "Is the
+#: ask questions option on advanced set up for only 3 questions … As many
+#: questions as possible"). The simple start asks three (`SIMPLE_GUIDE_QUESTIONS`).
+MAX_GUIDE_QUESTIONS = 12
 
 GUIDE_NEXT_SYSTEM = (
     "You are the intake layer of PromptMaster. A user has said what they want "
@@ -318,8 +321,10 @@ GUIDE_NEXT_SYSTEM = (
     "it is one piece, a long document or an investigation. Let the answers so "
     "far decide what to ask next: follow up on what they opened, and never ask "
     "what the objective or an earlier answer already settles.\n\n"
-    "If you already know enough to set the work up well, say so instead of "
-    "asking: enough is a good answer, and three questions is often enough.\n\n"
+    "Keep asking while an answer would still change how the work is set up: "
+    "the user chose to be asked, and a thorough intake is what they want. Say "
+    "there is enough only when no answer could change the setup any more — "
+    "never merely because a few questions have been asked.\n\n"
     "A question is short and plain, with a one-line reason and up to four "
     "short example answers the user can click. Set \"multi\" to true when "
     "several of the options could apply at once (kinds of data available, "
