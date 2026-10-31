@@ -9,6 +9,8 @@ import { MarkdownOutput } from '@/components/shared/markdown-output';
 import type { NewSource } from '@/lib/supabase/sources';
 import { useT } from '@/lib/i18n/i18n-provider';
 import type { MessageKey } from '@/lib/i18n/messages/en';
+import type { GuideQuestion } from '@/types';
+import { GuideQuestionCard } from './guide-question-card';
 
 export interface DraftBrief {
   objective: string;
@@ -25,8 +27,32 @@ export const EMPTY_BRIEF: DraftBrief = { objective: '', audience: '', requiremen
 /** The outline's parts, as the backend names them. */
 export type BriefField = keyof DraftBrief;
 
-/** A turn; an assistant turn may carry a piece of writing to use as it stands (10 Oct, email 1). */
-export type Turn = { role: 'user' | 'assistant'; content: string; draft?: string; web?: FrontDoorSearch };
+/**
+ * A turn; an assistant turn may carry a piece of writing to use as it stands
+ * (10 Oct, email 1), or be a question from "Ask me questions" (31 Oct), whose
+ * answer is the user turn after it.
+ */
+export type Turn = {
+  role: 'user' | 'assistant';
+  content: string;
+  draft?: string;
+  web?: FrontDoorSearch;
+  question?: GuideQuestion;
+  /** The question was skipped: no answer follows it. */
+  skipped?: boolean;
+};
+
+/** The "Ask me questions" questions so far, each with its answer ('' when skipped or not yet answered). */
+export function questionsAsked(turns: readonly Turn[]): { question: string; answer: string }[] {
+  return turns.flatMap((t, i) => {
+    if (!t.question) return [];
+    const next = turns[i + 1];
+    return [{ question: t.question.question, answer: !t.skipped && next?.role === 'user' ? next.content : '' }];
+  });
+}
+
+/** How much of the conversation the next question reads, from its end. */
+const QUESTION_CONTEXT_CHARS = 16_000;
 
 /** A search a reply made (22 Oct): what for, and what it found that is new to the conversation. */
 export interface FrontDoorSearch {
@@ -82,6 +108,8 @@ export function FrontDoor({
   material = '',
   attach,
   busyLabel,
+  maxQuestions,
+  foldWhy = false,
 }: {
   opening: string;
   /** `said`: the user's own turns, to tell what they said from what the brief's drafter assumed. */
@@ -99,6 +127,10 @@ export function FrontDoor({
   attach?: ReactNode;
   /** Set while the page is making the project: the button says so and nothing else can be pressed. */
   busyLabel?: string | null;
+  /** "Ask me questions" asks at most this many (Simple: 3); unset, the server's own limit. */
+  maxQuestions?: number;
+  /** A question's reason behind "Why this question?" rather than printed under it. */
+  foldWhy?: boolean;
 }) {
   const t = useT();
   const [turns, setTurns] = useState<Turn[]>(initialState?.turns ?? []);
@@ -112,10 +144,14 @@ export function FrontDoor({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const send = async (given?: string) => {
+  // On while "Ask me questions" is asking: each answer is followed by the next question.
+  const [asking, setAsking] = useState(false);
+  const [questioning, setQuestioning] = useState(false);
+
+  const send = async (given?: string, from: Turn[] = turns): Promise<Turn[] | null> => {
     const text = (given ?? draft).trim();
-    if (!text || busy) return;
-    const next: Turn[] = [...turns, { role: 'user', content: text }];
+    if (!text || busy) return null;
+    const next: Turn[] = [...from, { role: 'user', content: text }];
     setTurns(next);
     if (given === undefined) setDraft('');
     setBusy(true);
@@ -131,20 +167,84 @@ export function FrontDoor({
         edited,
         ...(material.trim() ? { material } : {}),
         web_access: 'on',
-        sources: sourcesFound(turns),
+        sources: sourcesFound(from),
       });
       const web = res.web_query || res.web_note ? { query: res.web_query ?? '', sources: res.web_sources ?? [], ...(res.web_note ? { note: res.web_note } : {}) } : null;
-      setTurns([
+      const after: Turn[] = [
         ...next,
         { role: 'assistant', content: res.reply, ...(res.draft?.trim() ? { draft: res.draft.trim() } : {}), ...(web ? { web } : {}) },
-      ]);
+      ];
+      setTurns(after);
       setBrief(res.brief);
       setReady(res.ready);
+      return after;
     } catch (e) {
       setError(e instanceof Error && e.message ? e.message : t('door.failed'));
+      return null;
     } finally {
       setBusy(false);
     }
+  };
+
+  /**
+   * "Ask me questions" (Sean, 31 Oct: in the conversation, where the outline
+   * is, not on the first screen). One question at a time, each written after
+   * the last was answered and after reading the conversation so far, so it
+   * never asks what was already said. The answer goes into the conversation
+   * as the user's turn, so the outline takes it in like anything else said.
+   */
+  const askNext = async (from: Turn[]) => {
+    const asked = questionsAsked(from);
+    const stop = (content: string) => {
+      setTurns([...from, { role: 'assistant', content }]);
+      setAsking(false);
+    };
+    if (maxQuestions !== undefined && asked.length >= maxQuestions) {
+      // No call: the cap is the answer.
+      stop(t('guide.enough'));
+      return;
+    }
+    setAsking(true);
+    setQuestioning(true);
+    setError(null);
+    try {
+      const conversation = from.map((x) => `${x.role === 'user' ? 'Me' : 'PromptMaster'}: ${x.content}`).join('\n\n');
+      const read = [material.trim(), conversation ? `THE CONVERSATION SO FAR:\n${conversation.slice(-QUESTION_CONTEXT_CHARS)}` : '']
+        .filter(Boolean)
+        .join('\n\n');
+      const res = await api.guideNextQuestion({
+        objective: (brief.objective || opening || from.find((x) => x.role === 'user')?.content || '').trim().slice(0, INPUT_LIMITS.objective),
+        answered: asked,
+        ...(read ? { material: read } : {}),
+        ...(maxQuestions !== undefined ? { max_questions: maxQuestions } : {}),
+        // A new project has Web access on (22 Oct), as the conversation does.
+        web_access: 'on',
+        sources: sourcesFound(from),
+      });
+      const web = res.web_query || res.web_note ? { query: res.web_query ?? '', sources: res.web_sources ?? [], ...(res.web_note ? { note: res.web_note } : {}) } : null;
+      if (res.enough || !res.question) {
+        setTurns([...from, { role: 'assistant', content: res.reason || t('guide.enough'), ...(web ? { web } : {}) }]);
+        setAsking(false);
+      } else {
+        setTurns([...from, { role: 'assistant', content: res.question.question, question: res.question, ...(web ? { web } : {}) }]);
+      }
+    } catch (e) {
+      setError(e instanceof Error && e.message ? e.message : t('door.failed'));
+      setAsking(false);
+    } finally {
+      setQuestioning(false);
+    }
+  };
+
+  const answer = async (answers: string[]) => {
+    const after = await send(answers.join('; '));
+    if (after) await askNext(after);
+  };
+
+  const skip = (index: number) => {
+    const from = turns.map((x, i) => (i === index ? { ...x, skipped: true } : x));
+    setTurns(from);
+    void askNext(from);
   };
 
   // The first message is what the user typed to start: sent at once, as a
@@ -171,6 +271,17 @@ export function FrontDoor({
     ...edited.flatMap((f) => (Array.isArray(brief[f]) ? (brief[f] as string[]) : [brief[f] as string])),
   ].join('\n');
   const making = Boolean(busyLabel);
+  // The turns below are named `t`; the translator, for inside them.
+  const lbl = t;
+  // While a question is waiting, what is typed and sent is its answer, and the next question follows.
+  const submitDraft = () => {
+    const last = turns[turns.length - 1];
+    const text = draft.trim();
+    if (asking && last?.question && !last.skipped && text) {
+      setDraft('');
+      void answer([text]);
+    } else void send();
+  };
 
   return (
     <div className="grid gap-6 md:grid-cols-[1fr_300px]">
@@ -188,15 +299,36 @@ export function FrontDoor({
               </p>
             ) : (
               <div key={i} className="me-8 space-y-2">
-                <div className="rounded-xl bg-[var(--surface-container-low)] px-4 py-2 text-body text-[var(--on-surface)]">
-                  <MarkdownOutput content={t.content} />
-                </div>
+                {t.question && asking && !t.skipped && i === turns.length - 1 ? (
+                  <GuideQuestionCard
+                    key={t.question.id}
+                    question={t.question}
+                    number={questionsAsked(turns.slice(0, i + 1)).length}
+                    max={maxQuestions}
+                    foldWhy={foldWhy}
+                    disabled={busy || questioning || making}
+                    onAnswer={(a) => void answer(a)}
+                    onSkip={() => skip(i)}
+                    onStop={() => setAsking(false)}
+                  />
+                ) : (
+                  <div className="rounded-xl bg-[var(--surface-container-low)] px-4 py-2 text-body text-[var(--on-surface)]">
+                    {t.question && (
+                      <p className="mb-1 flex items-center gap-1 text-label text-[var(--on-surface-variant)]">
+                        <span aria-hidden className="material-symbols-outlined text-[16px]">quiz</span>
+                        {t.skipped ? lbl('guide.skipped') : lbl('door.questionLabel')}
+                      </p>
+                    )}
+                    <MarkdownOutput content={t.content} />
+                  </div>
+                )}
                 {t.draft && <DraftBlock text={t.draft} />}
                 {t.web && <SearchNote search={t.web} first={sourcesFound(turns.slice(0, i)).length + 1} />}
               </div>
             )
           )}
           {busy && <p role="status" className="text-label text-[var(--on-surface-variant)]">{t('door.thinking')}</p>}
+          {questioning && <p role="status" className="text-label text-[var(--on-surface-variant)]">{t('door.askingQuestion')}</p>}
         </div>
         <div className="mt-4 flex items-end gap-2">
           <AutoGrowTextarea
@@ -205,16 +337,41 @@ export function FrontDoor({
             onKeyDown={(e) => {
               if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                 e.preventDefault();
-                void send();
+                submitDraft();
               }
             }}
             rows={2}
             aria-label={t('door.message')}
             className="min-w-0 flex-1 resize-none rounded-lg bg-[var(--surface-container-low)] px-3 py-2 text-body text-[var(--on-surface)] outline-none focus:ring-2 focus:ring-[var(--pm-primary)]/40"
           />
-          <button onClick={() => void send()} disabled={!draft.trim() || busy || making} className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label text-[var(--on-primary)] disabled:opacity-40">
+          <button onClick={submitDraft} disabled={!draft.trim() || busy || questioning || making} className="rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-label text-[var(--on-primary)] disabled:opacity-40">
             {t('door.send')}
           </button>
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          {asking ? (
+            <button
+              type="button"
+              onClick={() => setAsking(false)}
+              disabled={making}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-high)] px-3 py-1.5 text-label text-[var(--on-surface)] hover:bg-[var(--surface-container-highest)] disabled:opacity-40"
+            >
+              <span aria-hidden className="material-symbols-outlined text-[18px]">stop_circle</span>
+              {t('door.stopAsking')}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => void askNext(turns)}
+              disabled={busy || questioning || making}
+              title={t('door.askQuestionsNote')}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-high)] px-3 py-1.5 text-label text-[var(--on-surface)] hover:bg-[var(--surface-container-highest)] disabled:opacity-40"
+            >
+              <span aria-hidden className="material-symbols-outlined text-[18px]">quiz</span>
+              {t('door.askQuestions')}
+            </button>
+          )}
+          <span className="text-label text-[var(--on-surface-variant)]">{t('door.askQuestionsNote')}</span>
         </div>
         <p className="mt-2 flex items-start gap-1.5 text-label text-[var(--on-surface-variant)]">
           <span aria-hidden className="material-symbols-outlined text-[16px]">travel_explore</span>
