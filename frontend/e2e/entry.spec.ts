@@ -92,7 +92,7 @@ test('"Ask me questions" asks in the conversation, one at a time, and stops when
   await question.getByRole('button', { name: 'Next question' }).click();
 
   // Two answers are enough for the scripted model: it says so, and asking ends.
-  await expect(convo).toContainText('Mock: that is enough to set this up.', { timeout: 30_000 });
+  await expect(convo).toContainText('That is enough to set this up.', { timeout: 30_000 });
   await expect(convo.getByRole('button', { name: 'Ask me questions' })).toBeVisible();
   await expect(convo.getByRole('region', { name: 'Question' })).toHaveCount(0);
 });

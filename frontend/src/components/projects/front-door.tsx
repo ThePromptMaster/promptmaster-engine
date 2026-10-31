@@ -226,7 +226,9 @@ export function FrontDoor({
       });
       const web = res.web_query || res.web_note ? { query: res.web_query ?? '', sources: res.web_sources ?? [], ...(res.web_note ? { note: res.web_note } : {}) } : null;
       if (res.enough || !res.question) {
-        setTurns([...from, { role: 'assistant', content: res.reason || t('guide.enough'), ...(web ? { web } : {}) }]);
+        // The server's reason restates the brief, which reads as a second reply
+        // (prod, 31 Oct); the conversation's own reply has just said what changed.
+        setTurns([...from, { role: 'assistant', content: t('guide.enough'), ...(web ? { web } : {}) }]);
         setAsking(false);
       } else {
         setTurns([...from, { role: 'assistant', content: res.question.question, question: res.question, ...(web ? { web } : {}) }]);
