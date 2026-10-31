@@ -38,6 +38,8 @@ type Need =
     }
   | {
       kind: 'answer_question'; question: string; /** Q3a: the expert review package, as markdown. */ expertPackage?: string;
+      /** Each thing asked, when there is more than one (31 Oct); `question` lists them numbered. */
+      questions?: string[];
       /** Answers the user can click (13 Oct); the text box stays for anything else. */
       choices?: string[];
     }
