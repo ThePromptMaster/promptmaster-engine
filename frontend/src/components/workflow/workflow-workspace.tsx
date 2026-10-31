@@ -3084,7 +3084,7 @@ export function WorkflowWorkspace({
                   shownVersionId: activeVersionId,
                   display: { stageName: (s) => stageText(locale, template.key, s, 'label'), workflowName: shownTemplateName },
                   goRun: {
-                    run: go.run ? { status: go.run.status, policy: go.run.policy, stop_reason: go.run.stop_reason ?? null, questions: go.run.needs?.kind === 'answer_question' ? (go.run.needs as { questions?: string[] }).questions : undefined } : null,
+                    run: go.run ? { status: go.run.status, policy: go.run.policy, stop_reason: go.run.stop_reason ?? null, questions: go.run.needs?.kind === 'answer_question' ? go.run.needs.questions : undefined } : null,
                     steps: go.steps,
                     objective: objectiveAssessment
                       ? `${objectiveAssessment.outcome.replace('_', ' ')} — ${objectiveAssessment.reason}${objectiveAssessment.blockers.length ? ` Waiting for: ${objectiveAssessment.blockers.map((b) => b.need).join('; ')}.` : ''}`

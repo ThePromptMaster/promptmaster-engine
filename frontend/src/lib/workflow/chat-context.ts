@@ -80,8 +80,7 @@ export function stageStatusLine(st: WorkflowState['stages'][string] | undefined)
     case 'stale':
       return `reopened, waiting for a recheck: ${clip(st.stale?.reason ?? 'something it relied on changed')}`;
     case 'blocked': {
-      const listed = (st.blocked as { kinds?: string[] } | undefined)?.kinds;
-      const kinds = (listed ?? (st.blocked ? [st.blocked.kind] : [])).map((k: string) => k.replace(/_/g, ' '));
+      const kinds = (st.blocked?.kinds ?? (st.blocked ? [st.blocked.kind] : [])).map((k) => k.replace(/_/g, ' '));
       return `marked stuck${kinds.length ? ` (${kinds.join(', ')})` : ''}: ${clip(st.blocked?.reason ?? '')}`;
     }
     default:
