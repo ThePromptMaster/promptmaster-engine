@@ -4,6 +4,8 @@ import type { en } from '../areas/assess';
 export const ar: Record<keyof typeof en, string> = {
   "cwd.kind.assess": "تقييم",
   "cwd.kindAssess": "تقييم — الحكم على العناصر الملصقة على مقياس",
+  "cwd.kind.chapters": "فصول",
+  "cwd.kindChapters": "فصول — خطة للفصول، ثم يُكتب كل فصل ويُراجَع على حدة",
   "cwd.scaleOf": "مقياس المرحلة {n}",
   "workflow.name.assessment": "التقييم",
   "workflow.pitch.assessment": "معايير تُحدَّد مرة واحدة، ثم تُقيَّم العناصر على أساسها على دفعات — بإشارة مرور أو درجة أو مقياسك الخاص.",

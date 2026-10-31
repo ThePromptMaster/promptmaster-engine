@@ -4,6 +4,8 @@ import type { en } from '../areas/assess';
 export const zh: Record<keyof typeof en, string> = {
   "cwd.kind.assess": "评估",
   "cwd.kindAssess": "评估——按等级评判粘贴的各项",
+  "cwd.kind.chapters": "章节",
+  "cwd.kindChapters": "章节——先列出章节计划，再逐章撰写和修改",
   "cwd.scaleOf": "第 {n} 阶段的评分等级",
   "workflow.name.assessment": "评估",
   "workflow.pitch.assessment": "标准只定一次，然后按批评判各项——红绿灯、评分或你自己的等级。",

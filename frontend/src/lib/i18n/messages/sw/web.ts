@@ -20,6 +20,8 @@ export const sw: Record<keyof typeof en, string> = {
   'web.searched': ' · ilitafutwa “{query}”',
   'web.takeOut': 'Ondoa',
   'web.none': 'Bado hakuna vyanzo vilivyohifadhiwa.',
+  'web.cited': 'Vyanzo vilivyotajwa',
+  'web.citedLabel': 'Vyanzo vya wavuti vilivyohifadhiwa ambavyo toleo hili linavitaja',
   'web.newSaved_one': 'chanzo {count} kipya kimehifadhiwa',
   'web.newSaved_other': 'vyanzo {count} vipya vimehifadhiwa',
   'web.alreadyOnRecord': '; {count} tayari vimo kwenye kumbukumbu',

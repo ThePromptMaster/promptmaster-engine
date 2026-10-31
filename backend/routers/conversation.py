@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 
 from deps import get_client
 from promptmaster.catchphrases import without_repeated_catchphrases
+from promptmaster.project_context import highest_source_number
 from promptmaster.conversation import (
     build_apply_to_answer_prompt,
     build_chat_reply_prompt,
@@ -201,7 +202,7 @@ async def api_chat_message(
             created_at=_now_iso(),
         )
         if web_query:
-            msg.content = strip_unknown_citations(msg.content, len(saved) + len(new_sources))
+            msg.content = strip_unknown_citations(msg.content, highest_source_number(saved) + len(new_sources))
         # 28 Oct: a catchphrase an earlier reply used is not used again.
         msg.content = without_repeated_catchphrases(
             msg.content, [m.content for m in req.chat_history if m.role == "assistant"], chat=True

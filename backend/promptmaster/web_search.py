@@ -22,6 +22,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from .llm_client import OpenRouterClient, OpenRouterError
+from .project_context import highest_source_number, source_number
 from .schemas import ChatMessage, PMInput, SavedSource, WebSource, WebUse
 
 logger = logging.getLogger(__name__)
@@ -107,7 +108,8 @@ _CITE = re.compile(r"\[S(\d{1,3})\]")
 
 def strip_unknown_citations(text: str, count: int) -> str:
     """A citation to a source the project does not hold is removed: "[S7]"
-    with five sources saved points at nothing (20 Oct)."""
+    with five sources saved points at nothing (20 Oct). `count` is the highest
+    number on record (`highest_source_number`), not how many were sent."""
     return _CITE.sub(lambda m: m.group(0) if 1 <= int(m.group(1)) <= count else "", text)
 
 
@@ -179,9 +181,11 @@ def numbered_found(saved: list[SavedSource], found: list[WebSource]) -> list[tup
     in order — what `saveSources` appends, so [S6] in the reply is [S6] on the
     page after the save.
     """
-    have = {s.url: i for i, s in enumerate(saved, start=1)}
+    have = {s.url: source_number(s, i) for i, s in enumerate(saved, start=1)}
     out: list[tuple[int, WebSource, bool]] = []
-    nxt = len(saved)
+    # After the highest number sent, not the count: past 40 sources the browser
+    # sends a selection, and [S41] must be the next one saved (31 Oct, Sean).
+    nxt = highest_source_number(saved)
     for s in found:
         if s.url in have:
             out.append((have[s.url], s, False))
@@ -293,12 +297,13 @@ async def with_web(
     except OpenRouterError as e:
         logger.warning("web search for a writer failed: %s", e)
         return inputs, WebUse(web_note=WEB_FAILED_NOTE)
-    new = [s for _n, s, is_new in numbered_found(inputs.sources, result.sources) if is_new]
+    numbered = [(n, s) for n, s, is_new in numbered_found(inputs.sources, result.sources) if is_new]
+    new = [s for _n, s in numbered]
     today = datetime.now(timezone.utc).date().isoformat()
-    added = [SavedSource(url=s.url, title=s.title, excerpt=s.excerpt, retrieved=today) for s in new]
+    added = [SavedSource(url=s.url, title=s.title, excerpt=s.excerpt, retrieved=today, n=n) for n, s in numbered]
     return inputs.model_copy(update={"sources": [*inputs.sources, *added]}), WebUse(web_query=query, web_sources=new)
 
 
 def cite_only_known(text: str, inputs: PMInput, web: WebUse) -> str:
     """After a search, a citation past the sources now on record is removed."""
-    return strip_unknown_citations(text, len(inputs.sources)) if web.web_query else text
+    return strip_unknown_citations(text, highest_source_number(inputs.sources)) if web.web_query else text

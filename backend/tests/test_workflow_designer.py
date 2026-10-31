@@ -20,7 +20,7 @@ def test_the_prompt_offers_only_existing_page_kinds_and_names_the_work():
     system, user = build_workflow_prompt("a magazine feature", "Profile a chef")
     assert "THE KIND OF WORK: a magazine feature" in user
     assert '"write"' in user and '"list"' in user and '"check"' in user
-    assert "chapters" not in user
+    assert '"chapters"' in user  # 31 Oct: book-length work is planned and written a chapter at a time
     assert "HOW PROMPTMASTER WORKS" in system
 
 
@@ -128,3 +128,16 @@ def test_an_assess_stage_carries_its_scale_and_never_opens_the_work():
     assert odd.scale == "traffic"
     # Other kinds carry no scale.
     assert wf.stages[0].scale == "" and wf.stages[0].scale_levels == []
+
+
+def test_book_length_work_gets_a_chapters_stage_once_and_never_first():
+    """31 Oct (Sean): a designed book held its whole manuscript in one write
+    page, and a repair could never fit in one call. A chapters stage is
+    written a chapter at a time; only one, and never first."""
+    _system, user = build_workflow_prompt("a nonfiction book", "Write a 70,000-word book")
+    assert "never one \"write\" stage for the whole of such a work" in user
+    wf = parse_workflow({"name": "Book", "stages": [
+        _stage("Book brief", "chapters"), _stage("Evidence base", "list"), _stage("Book manuscript", "chapters"),
+        _stage("Second manuscript", "chapters"), _stage("Assemble"),
+    ]})
+    assert [s.kind for s in wf.stages] == ["write", "list", "chapters", "write", "write"]

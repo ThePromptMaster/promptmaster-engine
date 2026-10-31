@@ -1,6 +1,6 @@
 import { factsForRequest } from './facts';
 import { referencePayload } from './references';
-import { sourcesForRequest } from './sources';
+import { sourcesForRequest, withoutSourcesList } from './sources';
 /**
  * The requests a stage's draft and evaluation send, and what is stored from
  * their responses. Pure.
@@ -41,8 +41,11 @@ import type {
  * artifact must present the model with the same objective, audience and
  * constraints, or the correction is written against a different brief than
  * the one it was judged against.
+ *
+ * `citing` is the text being worked on: past 40 sources, the ones it cites are
+ * sent first, so a revision keeps its citations (31 Oct).
  */
-export function inputsFrom(project: Project): PMInput {
+export function inputsFrom(project: Project, citing = ''): PMInput {
   return {
     objective: project.objective,
     audience: project.audience,
@@ -50,7 +53,7 @@ export function inputsFrom(project: Project): PMInput {
     output_format: project.output_format,
     context: project.context ?? '',
     facts: factsForRequest(project.facts),
-    ...(project.sources?.some((s) => !s.retired_at) ? { sources: sourcesForRequest(project.sources) } : {}),
+    ...(project.sources?.some((s) => !s.retired_at) ? { sources: sourcesForRequest(project.sources, citing) } : {}),
     ...(project.applied_instructions?.length
       ? { user_instructions: project.applied_instructions.map(({ stage, version, instruction }) => ({ stage, version, instruction })) }
       : {}),
@@ -82,7 +85,7 @@ export function generationRequest(
 ): GenerateStageArtifactRequest {
   const schema = itemSchemaFor(target);
   return {
-    inputs: { ...inputsFrom(project), mode: modeForStage(project, target) },
+    inputs: { ...inputsFrom(project, existingContent), mode: modeForStage(project, target) },
     // Every stage may search the web first, while the switch is on (22 Oct).
     web_access: webAccessOf(project),
     stage: {
@@ -147,7 +150,9 @@ export function withinLimits(items: readonly StageItem[], target: StageDefinitio
 }
 
 export function generationContent(target: StageDefinition, response: GenerateStageArtifactResponse): string {
-  if (!rendererHoldsItems(target.renderer)) return response.content.trim() ? response.content : '';
+  // The model's own Sources list is dropped: PromptMaster lists what a text
+  // cites beneath it (31 Oct, Sean: a 40-row table, more than once).
+  if (!rendererHoldsItems(target.renderer)) return response.content.trim() ? withoutSourcesList(response.content) : '';
   if (response.items.length === 0) return itemSchemaFor(target).minItems === 0 ? serializeItems([]) : '';
   const content = serializeItems(withinLimits(response.items as unknown as StageItem[], target));
   return content.trim() ? content : '';

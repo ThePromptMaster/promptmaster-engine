@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 
 from .llm_client import NotJSONError, OpenRouterClient, OpenRouterError
 from .schemas import ChatMessage, PMInput, SavedSource
+from .project_context import highest_source_number
 from .self_model import PROMPTMASTER_SELF_MODEL
 from .catchphrases import without_repeated_catchphrases
 from .source_access import links_rule
@@ -318,6 +319,6 @@ async def front_door_turn(
         # The model answered in prose: the answer stands, the outline as it was.
         turn.reply, turn.brief, turn.ready = _plain(prose.strip())[:8_000], brief, False
     if web_query:
-        turn.reply = strip_unknown_citations(turn.reply, len(saved) + len(new_sources))
+        turn.reply = strip_unknown_citations(turn.reply, highest_source_number(saved) + len(new_sources))
     turn.web_query, turn.web_sources, turn.web_note = web_query, new_sources, web_note
     return turn
