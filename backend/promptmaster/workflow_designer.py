@@ -35,6 +35,14 @@ KINDS = {
         "applications, proposals, suppliers); each is judged against criteria an earlier stage "
         "set, with a verdict on a scale"
     ),
+    # 31 Oct (Sean): a designed book held its whole manuscript in one "write"
+    # page, which no single model call can rewrite; a repair was cut off twice
+    # and Go stopped. A chapters stage is planned, written and revised a
+    # chapter at a time, as Book is.
+    "chapters": (
+        "book-length work written and revised chapter by chapter — a manuscript, a long report, "
+        "a thesis: PromptMaster first asks for a plan of the chapters, then writes each one on its own"
+    ),
 }
 
 #: The scales an assess stage may name (`lib/workflow/assess.ts` SCALE_PRESETS).
@@ -144,6 +152,12 @@ def build_workflow_prompt(description: str, objective: str, web_access: str | No
         "yes, no\"), else []; and item_noun: what the user pastes, plural (\"profiles\"). Never "
         "a criterion about a protected characteristic (age, gender, ethnicity, religion, "
         "disability, family status).\n\n"
+        "Use \"chapters\" when the deliverable is book-length or runs to many chapters or long "
+        "sections (a book, a manuscript, a thesis, a long report) — never one \"write\" stage for the "
+        "whole of such a work, which is too long to write or revise in one pass. At most one chapters "
+        "stage, never first; stages before it set what the chapters need (scope, audience, evidence); "
+        "a stage after it may check or finish the whole. Its instruction says how each chapter is "
+        "written.\n\n"
         "For each stage write:\n"
         "- label: a plain name (≤40 chars), and short_label (≤20 chars) for the side rail\n"
         "- purpose: one sentence the user reads on arrival — what this stage is for\n"
@@ -180,7 +194,7 @@ def build_workflow_prompt(description: str, objective: str, web_access: str | No
         "Return JSON only:\n"
         '{"name": "...", "description": "one sentence", "deliverable": "noun for the '
         'finished thing, e.g. article", "inquiry": false, "stages": [{"label": "...", '
-        '"short_label": "...", "kind": "write|list|check|assess", "purpose": "...", '
+        '"short_label": "...", "kind": "write|list|check|assess|chapters", "purpose": "...", '
         '"instruction": "...", "required": true, "approval": "", "approval_kind": "decision", '
         '"decision": "", "loop_back_to": "", "scale": "", "scale_levels": [], "item_noun": ""}], "execution": {"kind": "finite|ongoing", '
         '"success_criterion": "...", "stop_conditions": ["..."]}}'
@@ -229,7 +243,7 @@ def parse_workflow(result: object) -> DesignedWorkflow:
     # Sean's verification of four deliverables was silently dropped here).
     while stages and stages[0].kind == "check":
         stages.pop(0)
-    stages = with_closing_stage(stages)
+    stages = fix_chapters(with_closing_stage(stages))
     if len(stages) < MIN_STAGES:
         raise ValueError("The design had too few usable stages. Try describing the work in more detail.")
     stages[0].required = True
@@ -268,6 +282,22 @@ def parse_execution(raw: object) -> Execution:
     kind = "ongoing" if str(raw.get("kind") or "").strip().lower() == "ongoing" else "finite"
     stops = [_clip(s, 300) for s in (raw.get("stop_conditions") or []) if _clip(s, 300)][:8]
     return Execution(kind=kind, success_criterion=str(raw.get("success_criterion") or "").strip()[:2_000], stop_conditions=stops)
+
+
+def fix_chapters(stages: list[DesignedStage]) -> list[DesignedStage]:
+    """At most one chapters stage, never the first: the first states the
+    objective, and the plan the chapters are written against needs the stages
+    before it. Any other becomes a write stage rather than being dropped
+    (`validate.ts` checks the same)."""
+    seen = False
+    out: list[DesignedStage] = []
+    for i, s in enumerate(stages):
+        if s.kind == "chapters" and (seen or i == 0):
+            s = s.model_copy(update={"kind": "write"})
+        elif s.kind == "chapters":
+            seen = True
+        out.append(s)
+    return out
 
 
 def fix_loops(stages: list[DesignedStage], execution: Execution) -> list[DesignedStage]:

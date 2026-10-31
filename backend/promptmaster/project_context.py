@@ -127,20 +127,37 @@ def facts_block(inputs: PMInput) -> str:
 
 SOURCES_HEADER = (
     "SOURCES ON RECORD — web sources this project saved, with what the search returned from each. "
-    "Where the work uses one, cite it by its number, [S1], at the point it is used, and end with a "
-    "\"Sources\" list of those cited: number, title, link and the date retrieved. Never cite a source "
-    "that is not listed here, and never claim more than its excerpt says."
+    "Where the work uses one, cite it by its number, [S1], at the point it is used. Do not write a "
+    "Sources, References or Works cited list or table: PromptMaster lists the sources a text cites "
+    "beneath it, and removes such a list where the text already has one. Never cite a source that is "
+    "not listed here, and never claim more than its excerpt says."
 )
 
 
+def source_number(s, position: int) -> int:
+    """A saved source's [S n]: the number the browser sent, else its position."""
+    return s.n or position
+
+
+def highest_source_number(sources) -> int:
+    """The highest [S n] among the sources sent; 0 for none. New finds follow it."""
+    return max((source_number(s, i) for i, s in enumerate(sources or [], start=1)), default=0)
+
+
 def sources_block(inputs: PMInput) -> str:
-    """The saved web sources, numbered, or "" when there are none (20 Oct)."""
+    """The saved web sources, numbered, or "" when there are none (20 Oct).
+
+    31 Oct (Sean, a book at v8): every chapter, continuation and revision was
+    told to end with a Sources list, and the draft carried a 40-row table more
+    than once — words the length limit then had to pay for. The list is
+    PromptMaster's to show, not the model's to write.
+    """
     lines = []
     for i, s in enumerate(inputs.sources or [], start=1):
         title = " ".join(s.title.split()) or s.url
         when = f", retrieved {s.retrieved}" if s.retrieved.strip() else ""
         excerpt = f"\n  {' '.join(s.excerpt.split())}" if s.excerpt.strip() else ""
-        lines.append(f"[S{i}] {title} — {s.url}{when}{excerpt}")
+        lines.append(f"[S{source_number(s, i)}] {title} — {s.url}{when}{excerpt}")
     return f"{SOURCES_HEADER}\n" + "\n".join(lines) if lines else ""
 
 
