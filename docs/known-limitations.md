@@ -2520,3 +2520,83 @@ requested change log was missing, and the final documents carried internal versi
   an earlier chat reply or the previous chapter is dropped, and a chat reply loses a "Great
   question!" opener. Applied to chat replies, the start conversation, stage drafts and
   chapters. A catchphrase used once stays, and so does one in a chapter two or more before.
+
+### L-127 — A long prose stage is revised a part at a time (2026-10-31)
+
+A text over 5,000 words is repaired by splitting it at its headings (chapters first, then
+sub-headings, then paragraphs), revising each part on its own call (three at a time) and joining
+them in code (`lib/workflow/long-prose.ts`, `recheck` in `perform.ts`). A single prose call is
+capped at 12,000 tokens, about 9,000 words, and a book-length manuscript held in one prose stage
+could not be written back whole: the repair was cut off twice and Go stopped. The limits:
+- Each part sees its own text and the outline of every heading, not the other parts. A change
+  that must be consistent across parts relies on the instruction alone; the checks that follow
+  (values left behind, claims, measurements, dropped headings) run on the joined text.
+- Only the first part of the first attempt may search the web.
+- A part still cut off is kept as it was, and the step says which. The repair is not failed for
+  it.
+- Only Go's repair of a reopened or measured stage works in parts. A revision asked for in the
+  side chat or by Go's "Revise" is still one call.
+- New book-length work designed by PromptMaster gets a chapters stage (`chapters` kind → a
+  chapter plan and a `long_form` stage, the Book mechanism), which drafts and repairs per
+  chapter. A project already pinned to a design with a single manuscript page keeps it.
+- A continuation keeps the model's finish reason, so "Continue writing" stays while the text is
+  still cut off. Go continues a draft at most twice since it was last whole
+  (`GO_CONTINUE_TRIES`); after that the button is the user's.
+
+### L-128 — Sources are listed by PromptMaster and numbered in project order (2026-10-31)
+
+Writers cite [S#] and are told not to write a Sources list. A list the model writes anyway is
+removed when every line in it is an [S#] entry (`withoutSourcesList`), and the cited sources are
+shown under the text and appended to exports. Every current source keeps its number in project
+order and the panel lists all of them. A request carries at most 40, chosen as follows: those the
+text being worked on cites first, then the newest. A search numbers its finds after the highest
+number sent, and a find the project already holds is renumbered to its saved number before the
+version is saved. Numbers still shift if a source is retired; that is unchanged.
+
+### L-129 — One plain question per reason; definitions are not claims (2026-10-31)
+
+When a repair would have to drop headings to meet a limit, Go asks one numbered question per
+reason. The heading check runs only when a limit failed: a result called verified without a
+source is never fixed by cutting. The evidence check (L-118) skips the following:
+- sentences that define a word ("X means …", "refers to", "is defined as")
+- bold glossary entries whose term is not itself a claim word
+- anything under a Glossary, Definitions, Key terms or Evidence scale heading
+- "independently verified" used to describe evidence
+
+A definition written as ordinary prose under another heading, with none of those verbs, can
+still be read as a claim.
+
+### L-130 — A stage may be stuck for several reasons (2026-10-31)
+
+"Mark as stuck" takes any of the three reasons. The event keeps `block_kind` (the first ticked)
+and adds `block_kinds`; the database checks only `block_kind`, so a list is not validated in the
+database. A Go step still records one `block_kind`.
+
+### L-131 — The side chat is told what changed since its last reply, in this tab (2026-10-31)
+
+The chat is given the version on screen, the stage's last eight versions, its status, Go's
+separate questions, and what changed since its last reply: Go's status, the stage's status, a
+new version or a different version on screen, and buttons that came or went. "Since its last
+reply" is remembered by the open tab. After a reload, or in another tab, the first message
+carries the page as it is but no changes, and earlier replies in the thread are still covered
+only by the rule that the current page outranks them.
+
+### L-132 — Costs shown to the user are what the provider reported (2026-10-31)
+
+Each side-chat reply, Go step, Go run and the project as a whole show what the model calls cost,
+from the same usage the admin overview reads. A call with no known price is counted and named,
+never added as $0.00. The reply's figure covers the reply call only, not the suggested actions
+fetched after it. The project figure is summed in the browser over at most the latest 10,000
+calls, and it refreshes when the stage changes or Go's cost moves, not after every call.
+Sandbox runs are not included.
+
+### L-133 — A copy is a new project; a reference is a snapshot (2026-10-31)
+
+"Make a copy" duplicates a project in one database transaction (`copy_project`): versions, events,
+facts, sources, files and references, with new ids throughout. Go runs, jobs and usage are not
+copied, and a Go run still going in the original is recorded as stopped in the copy. Stored
+files are copied by the browser afterwards; a file that will not copy is named, and the copy
+still stands. A reference to another project now holds a copy of that project as it was when it
+was added. "Update from the original" refreshes it. References made before 31 Oct are
+snapshotted the next time the project opens. Deleting the referenced project still removes the
+reference and its snapshot.
