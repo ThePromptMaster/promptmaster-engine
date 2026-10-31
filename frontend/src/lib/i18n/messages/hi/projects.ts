@@ -117,4 +117,9 @@ export const hi: Record<keyof typeof en, string> = {
   'guest.created':
     'खाता बन गया — इसकी पुष्टि करने के लिए अपना ईमेल देखें। अब तक आपने जो कुछ भी बनाया है, वह पहले से इससे जुड़ा है।',
   'guest.createError': 'खाता नहीं बनाया जा सका।',
+  'card.copy': "प्रति बनाएँ",
+  'list.copyNamed': "{name} की प्रति बनाएँ",
+  'list.copyFailed': "प्रति नहीं बन सकी।",
+  'list.copyFailedWhy': "प्रति नहीं बन सकी: {message}",
+  'list.copyMissing': "प्रति बन गई, पर ये फ़ाइलें उसमें कॉपी नहीं हो सकीं: {files}। मूल में वे अब भी हैं।",
 };

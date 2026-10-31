@@ -7,16 +7,20 @@ import { formatManuscript } from '@/lib/workflow/digest';
 import { manuscriptArtifactFor } from '@/lib/workflow/context';
 import { REFERENCE_MAX, type ReferenceMaterial } from '@/lib/workflow/references';
 import type { WorkflowTemplate } from '@/lib/workflow/types';
-import type { Artifact, ProjectReference } from '@/types/project';
+import type { Artifact, ProjectReference, ReferenceSnapshot } from '@/types/project';
 
 /**
  * The user's other projects a project draws on (client, 21 Oct, email 5).
- * The rows live in `project_references`; the material is read from the
- * referenced project under the same RLS as everything else, when the project
- * opens. Nothing is copied.
+ * The rows live in `project_references`.
+ *
+ * Since 31 Oct a reference is a copy, taken when it is added ("more like a
+ * copy thing rather than combining them so you have the original project too
+ * as well kind of like the versions"): what the other project brings is kept
+ * on the row with the time it was taken, and the work keeps drawing on that
+ * until the user updates it from the original. The original is only read.
  */
 
-const COLUMNS = 'id, project_id, user_id, referenced_project_id, include_facts, position, created_at';
+const COLUMNS = 'id, project_id, user_id, referenced_project_id, include_facts, position, created_at, snapshot, snapshot_at';
 
 export async function listReferences(projectId: string): Promise<ProjectReference[]> {
   const { data, error } = await createClient()
@@ -36,7 +40,68 @@ export async function addReference(userId: string, projectId: string, referenced
     .select(COLUMNS)
     .single();
   if (error || !data) throw error ?? new Error('The reference could not be added.');
-  return data as ProjectReference;
+  const row = data as ProjectReference;
+  // Taken now, as it is now. A failure leaves the reference reading the
+  // original until the next open stores it.
+  return (await takeSnapshot(row).catch(() => null)) ?? row;
+}
+
+/** What a live read is kept as: every current fact, whatever the switch says now. */
+function snapshotOf(m: ReferenceMaterial): ReferenceSnapshot {
+  return { title: m.title, objective: m.objective, deliverable: m.deliverable, text: m.text, facts: m.facts, updatedAt: m.updatedAt };
+}
+
+/**
+ * Read the original again and keep it on the reference ("Update from the
+ * original"). Returns the row as saved, or null when the original is gone or
+ * in the trash — a snapshot is never replaced by nothing.
+ */
+export async function takeSnapshot(ref: ProjectReference): Promise<ProjectReference | null> {
+  const live = await loadLiveMaterial({ ...ref, include_facts: true });
+  if (live.deleted) return null;
+  const saved = await takeSnapshotFrom(ref, live);
+  if (!saved) throw new Error('The reference could not be updated.');
+  return saved;
+}
+
+/** The material a snapshot holds, with the reference's own facts switch applied. */
+export function materialFromSnapshot(ref: ProjectReference & { snapshot: ReferenceSnapshot }): ReferenceMaterial {
+  const s = ref.snapshot;
+  return {
+    referenceId: ref.id,
+    projectId: ref.referenced_project_id,
+    title: s.title || 'Untitled project',
+    objective: s.objective ?? '',
+    deliverable: s.deliverable ?? '',
+    text: s.text ?? '',
+    facts: ref.include_facts ? (s.facts ?? []) : [],
+    deleted: false,
+    updatedAt: s.updatedAt ?? '',
+    snapshotAt: ref.snapshot_at ?? null,
+  };
+}
+
+/**
+ * What a reference brings: its snapshot when it has one; otherwise — a
+ * reference made before 31 Oct — the original as it is, kept as the
+ * snapshot from now on.
+ */
+export async function loadReferenceMaterial(ref: ProjectReference): Promise<ReferenceMaterial> {
+  if (ref.snapshot) return materialFromSnapshot(ref as ProjectReference & { snapshot: ReferenceSnapshot });
+  const live = await loadLiveMaterial({ ...ref, include_facts: true });
+  if (live.deleted) return live;
+  const saved = await takeSnapshotFrom(ref, live).catch(() => null);
+  return saved ? materialFromSnapshot(saved as ProjectReference & { snapshot: ReferenceSnapshot }) : { ...live, facts: ref.include_facts ? live.facts : [] };
+}
+
+async function takeSnapshotFrom(ref: ProjectReference, live: ReferenceMaterial): Promise<ProjectReference | null> {
+  const { data, error } = await createClient()
+    .from('project_references')
+    .update({ snapshot: snapshotOf(live), snapshot_at: new Date().toISOString() })
+    .eq('id', ref.id)
+    .select(COLUMNS)
+    .single();
+  return error || !data ? null : (data as ProjectReference);
 }
 
 export async function removeReference(id: string): Promise<void> {
@@ -64,11 +129,11 @@ function templateFor(row: { workflow: string; workflow_template_id: string | nul
 }
 
 /**
- * What a reference brings: the referenced project's deliverable as it stands
- * (its head version, or the manuscript's written chapters) and its current
- * facts. Lean on purpose — a handful of reads, not the whole project.
+ * The referenced project's deliverable as it stands now (its head version, or
+ * the manuscript's written chapters) and its current facts. Lean on purpose —
+ * a handful of reads, not the whole project.
  */
-export async function loadReferenceMaterial(ref: ProjectReference): Promise<ReferenceMaterial> {
+export async function loadLiveMaterial(ref: ProjectReference): Promise<ReferenceMaterial> {
   const supabase = createClient();
   const { data: row, error } = await supabase
     .from('projects')

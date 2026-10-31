@@ -4,6 +4,7 @@ import { tr } from '@/lib/i18n/store';
 import { useEffect, useState } from 'react';
 
 import { MarkdownOutput } from '@/components/shared/markdown-output';
+import { shownCost } from '@/lib/observability/spent';
 import { shownStepLabel as stepLabel } from '@/lib/i18n/go';
 import { collapseSteps } from '@/lib/agent/labels';
 import { createClient } from '@/lib/supabase/client';
@@ -99,6 +100,10 @@ export function StepTimeline({
             <div className="mt-2 space-y-2 ps-7">
               {s.rationale && <p className="text-label text-[var(--on-surface-variant)]">{tr('tl.why')}{s.rationale}</p>}
               {s.output && <MarkdownOutput content={s.output} />}
+              {/* What the step cost (31 Oct); a step that called no model shows nothing. */}
+              {s.status !== 'running' && s.cost_usd !== null && s.cost_usd !== undefined && Number(s.cost_usd) > 0 && (
+                <p className="text-label text-[var(--on-surface-variant)]">{tr('cost.step', { cost: shownCost(Number(s.cost_usd)) ?? '' })}</p>
+              )}
               {s.changes?.sandbox_run_id && <SandboxFiles runId={s.changes.sandbox_run_id} />}
               {onApplyAnyway && keptConflictsOf(s.params) && (
                 <button

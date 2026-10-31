@@ -102,4 +102,9 @@ export const zh: Record<keyof typeof en, string> = {
   'guest.notNow': '以后再说',
   'guest.created': '账户已创建——请查收邮件进行确认。你目前创建的所有内容都已关联到该账户。',
   'guest.createError': '无法创建账户。',
+  'card.copy': "复制一份",
+  'list.copyNamed': "复制 {name}",
+  'list.copyFailed': "无法复制。",
+  'list.copyFailedWhy': "无法复制：{message}",
+  'list.copyMissing': "副本已创建，但这些文件未能复制进去：{files}。原项目仍保留它们。",
 };

@@ -97,4 +97,12 @@ export const zh: Record<keyof typeof en, string> = {
   'chat.fact.and': '，并',
   'chat.fact.heading_one': '此修改{list}。是否记录下来，供之后的每个阶段和检查使用？',
   'chat.fact.heading_other': '此修改{list}。是否记录下来，供之后的每个阶段和检查使用？',
+  "cost.reply": "此回复花费 {cost}",
+  "cost.replyUnknown": "此回复的价格不可用",
+  "cost.unpriced": "（{count} 次价格未知）",
+  "cost.step": "费用 {cost}",
+  "cost.run": "本次运行至今：{cost}",
+  "cost.project": "本项目至今：{cost}",
+  "cost.unavailable": "价格不可用",
+  "cost.projectHint": "为本项目进行的模型调用：侧边聊天、Go、起草和检查。",
 };

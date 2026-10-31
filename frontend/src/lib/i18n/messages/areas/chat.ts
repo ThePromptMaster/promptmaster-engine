@@ -95,6 +95,14 @@ export const en = {
   "chat.fact.and": " and ",
   "chat.fact.heading_one": "This {list}. Record it so every later stage and check uses it?",
   "chat.fact.heading_other": "This {list}. Record them so every later stage and check uses them?",
+  "cost.reply": "This reply cost {cost}",
+  "cost.replyUnknown": "This reply’s price is unavailable",
+  "cost.unpriced": "({count} without a known price)",
+  "cost.step": "Cost {cost}",
+  "cost.run": "This run so far: {cost}",
+  "cost.project": "This project so far: {cost}",
+  "cost.unavailable": "price unavailable",
+  "cost.projectHint": "Model calls made for this project: the side chat, Go, drafting and checks.",
 } as const;
 
 type Keys = Record<keyof typeof en, string>;
@@ -195,6 +203,14 @@ export const es: Keys = {
   "chat.fact.and": " y ",
   "chat.fact.heading_one": "Esto {list}. ¿Registrarlo para que todas las etapas y comprobaciones posteriores lo usen?",
   "chat.fact.heading_other": "Esto {list}. ¿Registrarlos para que todas las etapas y comprobaciones posteriores los usen?",
+  "cost.reply": "Esta respuesta costó {cost}",
+  "cost.replyUnknown": "El precio de esta respuesta no está disponible",
+  "cost.unpriced": "({count} sin precio conocido)",
+  "cost.step": "Costo {cost}",
+  "cost.run": "Esta ejecución hasta ahora: {cost}",
+  "cost.project": "Este proyecto hasta ahora: {cost}",
+  "cost.unavailable": "precio no disponible",
+  "cost.projectHint": "Llamadas al modelo hechas para este proyecto: el chat lateral, Go, la redacción y las comprobaciones.",
 };
 
 export const fr: Keys = {
@@ -293,6 +309,14 @@ export const fr: Keys = {
   "chat.fact.and": " et ",
   "chat.fact.heading_one": "Ceci {list}. L’enregistrer pour que chaque étape et vérification suivante l’utilise ?",
   "chat.fact.heading_other": "Ceci {list}. Les enregistrer pour que chaque étape et vérification suivante les utilise ?",
+  "cost.reply": "Cette réponse a coûté {cost}",
+  "cost.replyUnknown": "Le prix de cette réponse n’est pas disponible",
+  "cost.unpriced": "({count} sans prix connu)",
+  "cost.step": "Coût {cost}",
+  "cost.run": "Cette exécution jusqu’ici : {cost}",
+  "cost.project": "Ce projet jusqu’ici : {cost}",
+  "cost.unavailable": "prix indisponible",
+  "cost.projectHint": "Appels au modèle faits pour ce projet : le chat latéral, Go, la rédaction et les vérifications.",
 };
 
 export const pt: Keys = {
@@ -391,4 +415,12 @@ export const pt: Keys = {
   "chat.fact.and": " e ",
   "chat.fact.heading_one": "Isto {list}. Registrar para que todas as etapas e checagens seguintes usem?",
   "chat.fact.heading_other": "Isto {list}. Registrar para que todas as etapas e checagens seguintes os usem?",
+  "cost.reply": "Esta resposta custou {cost}",
+  "cost.replyUnknown": "O preço desta resposta não está disponível",
+  "cost.unpriced": "({count} sem preço conhecido)",
+  "cost.step": "Custo {cost}",
+  "cost.run": "Esta execução até agora: {cost}",
+  "cost.project": "Este projeto até agora: {cost}",
+  "cost.unavailable": "preço indisponível",
+  "cost.projectHint": "Chamadas ao modelo feitas para este projeto: o chat lateral, o Go, a redação e as verificações.",
 };

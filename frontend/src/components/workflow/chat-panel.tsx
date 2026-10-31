@@ -54,6 +54,7 @@ import { keepWithoutAsking, routinePrecedenceNote } from '@/lib/workflow/routine
 import { ReplyActions } from './reply-actions';
 import type { RowChange } from '@/lib/workflow/row-actions';
 import type { ChatContext, ReplyAction } from '@/types';
+import { shownCost } from '@/lib/observability/spent';
 import { documentSections, type ScopeKind } from './chat-scope';
 import type { StageChatMessage } from '@/lib/supabase/conversation';
 import type { NewVersion } from '@/lib/supabase/versions';
@@ -1000,7 +1001,20 @@ function Bubble({ message }: { message: StageChatMessage }) {
           </span>
         </p>
       )}
+      {message.role === 'assistant' && message.spent && <SpentLine spent={message.spent} />}
     </div>
+  );
+}
+
+/** What a reply cost (31 Oct); an unknown price says so, never $0.00. */
+export function SpentLine({ spent }: { spent: { cost: number | null; unpriced: number } }) {
+  const t = useT();
+  const cost = shownCost(spent.cost);
+  return (
+    <p className="mt-1 text-label text-[var(--on-surface-variant)]">
+      {cost ? t('cost.reply', { cost }) : t('cost.replyUnknown')}
+      {cost && spent.unpriced > 0 ? ` ${t('cost.unpriced', { count: spent.unpriced })}` : ''}
+    </p>
   );
 }
 

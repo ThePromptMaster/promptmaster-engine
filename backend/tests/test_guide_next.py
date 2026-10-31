@@ -20,7 +20,7 @@ def test_the_prompt_carries_the_answers_so_far_and_allows_stopping():
     assert "A: CRM; Billing" in prompt
     assert '{"enough": true' in prompt
     assert "Let the answers so far decide what to ask next" in GUIDE_NEXT_SYSTEM
-    assert "enough is a good answer" in GUIDE_NEXT_SYSTEM
+    assert "Say there is enough only when no answer could change the setup" in " ".join(GUIDE_NEXT_SYSTEM.split())
     assert 'Set "multi" to true when several of the options could apply at once' in GUIDE_NEXT_SYSTEM
     assert "(nothing asked yet)" in build_guide_next_prompt("x", [])
 
@@ -109,3 +109,14 @@ def test_ask_me_questions_does_not_search_with_web_off():
         _app.dependency_overrides.pop(_gc, None)
     assert r.status_code == 200 and r.json()["web_sources"] == []
     stub.generate_with_web.assert_not_called()
+
+
+def test_advanced_keeps_asking_while_answers_still_matter():
+    """31 Oct: "Is the ask questions option on advanced set up for only 3
+    questions … As many questions as possible for that." """
+    assert MAX_GUIDE_QUESTIONS == 12
+    assert "three questions is often enough" not in GUIDE_NEXT_SYSTEM
+    assert "never merely because a few questions have been asked" in GUIDE_NEXT_SYSTEM
+    # Advanced is not told a count; only the simple start is.
+    assert "At most" not in build_guide_next_prompt("x", [{"question": "q", "answer": "a"}] * 5)
+    assert "At most 3 questions" in build_guide_next_prompt("x", [], limit=3)

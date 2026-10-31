@@ -3,7 +3,7 @@
 import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import { useState } from 'react';
 
-import { addReference, removeReference, setReferenceFacts } from '@/lib/supabase/references';
+import { addReference, removeReference, setReferenceFacts, takeSnapshot } from '@/lib/supabase/references';
 import { listFolders } from '@/lib/supabase/folders';
 import { listProjects } from '@/lib/supabase/projects';
 import { MAX_REFERENCES, type ReferenceMaterial } from '@/lib/workflow/references';
@@ -102,6 +102,11 @@ export function ProjectReferences({
                   quiet={quiet}
                   onFacts={(value) => void run(() => setReferenceFacts(r.id, value), t('refs.saveError'))}
                   onRemove={() => void run(() => removeReference(r.id), t('refs.removeError'))}
+                  onUpdate={() =>
+                    void run(async () => {
+                      if (!(await takeSnapshot(r))) throw new Error(t('refs.updateGone'));
+                    }, t('refs.updateError'))
+                  }
                   onOpenBeside={onOpenBeside}
                 />
               ))}
@@ -151,6 +156,7 @@ function ReferenceRow({
   quiet,
   onFacts,
   onRemove,
+  onUpdate,
   onOpenBeside,
 }: {
   index: number;
@@ -161,10 +167,14 @@ function ReferenceRow({
   quiet: string;
   onFacts: (value: boolean) => void;
   onRemove: () => void;
+  /** Take the original's material again (31 Oct). */
+  onUpdate: () => void;
   onOpenBeside?: (projectId: string) => void;
 }) {
   const t = useT();
   const locale = useLocale();
+  // A copy, as of when it was taken (31 Oct); the original may have moved on.
+  const asOf = material?.snapshotAt ? new Date(material.snapshotAt).toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' }) : null;
   const words = material?.text.trim() ? material.text.trim().split(/\s+/).length : 0;
   const what = material?.deleted
     ? t('refs.inTrash')
@@ -180,6 +190,7 @@ function ReferenceRow({
         {material?.title ?? t('refs.aProject')}
       </a>
       <span className="block text-label text-[var(--on-surface-variant)]">{what}</span>
+      {asOf && <span className="block text-label text-[var(--on-surface-variant)]">{t('refs.asOf', { date: asOf })}</span>}
       <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
         <label className="inline-flex items-center gap-1.5 text-label text-[var(--on-surface-variant)]">
           <input
@@ -194,6 +205,11 @@ function ReferenceRow({
         {onOpenBeside && !material?.deleted && (
           <button type="button" onClick={() => onOpenBeside(row.referenced_project_id)} className={`${quiet} hidden md:inline`}>
             {t('refs.openBeside')}
+          </button>
+        )}
+        {!readOnly && asOf && (
+          <button type="button" disabled={busy} onClick={onUpdate} className={quiet}>
+            {t('refs.update')}
           </button>
         )}
         {!readOnly && (

@@ -97,4 +97,12 @@ export const hi: Record<keyof typeof en, string> = {
   'chat.fact.and': ' और ',
   'chat.fact.heading_one': 'यह बदलाव {list}। क्या इसे दर्ज करें ताकि बाद का हर चरण और हर जाँच इसका उपयोग करे?',
   'chat.fact.heading_other': 'यह बदलाव {list}। क्या इन्हें दर्ज करें ताकि बाद का हर चरण और हर जाँच इनका उपयोग करे?',
+  "cost.reply": "इस जवाब की लागत {cost}",
+  "cost.replyUnknown": "इस जवाब की कीमत उपलब्ध नहीं है",
+  "cost.unpriced": "({count} बिना ज्ञात कीमत के)",
+  "cost.step": "लागत {cost}",
+  "cost.run": "यह रन अब तक: {cost}",
+  "cost.project": "यह प्रोजेक्ट अब तक: {cost}",
+  "cost.unavailable": "कीमत उपलब्ध नहीं",
+  "cost.projectHint": "इस प्रोजेक्ट के लिए किए गए मॉडल कॉल: साइड चैट, Go, ड्राफ़्टिंग और जाँच।",
 };
