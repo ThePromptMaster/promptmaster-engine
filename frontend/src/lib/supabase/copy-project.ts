@@ -38,3 +38,12 @@ export async function copyProject(projectId: string): Promise<ProjectCopy> {
   }
   return { projectId: result.project_id, missing };
 }
+
+const COPY_SUFFIX = /(\s\(copy\)(?:\s\(copy\))*)$/;
+
+/** A title split into its base and the " (copy)" that copy_project appends, so the list can truncate the base and still show the suffix. */
+export function copyTitle(title: string | null | undefined): { base: string; suffix: string } {
+  const t = title ?? '';
+  const m = COPY_SUFFIX.exec(t);
+  return m ? { base: t.slice(0, m.index), suffix: m[1].trimStart() } : { base: t, suffix: '' };
+}
