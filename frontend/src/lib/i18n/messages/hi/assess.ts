@@ -4,6 +4,8 @@ import type { en } from '../areas/assess';
 export const hi: Record<keyof typeof en, string> = {
   "cwd.kind.assess": "आकलन",
   "cwd.kindAssess": "आकलन — पेस्ट की गई चीज़ों को पैमाने पर आँकना",
+  "cwd.kind.chapters": "अध्याय",
+  "cwd.kindChapters": "अध्याय — पहले अध्यायों की योजना, फिर हर अध्याय अलग से लिखा और संशोधित",
   "cwd.scaleOf": "चरण {n} का पैमाना",
   "workflow.name.assessment": "आकलन",
   "workflow.pitch.assessment": "मानदंड एक बार तय, फिर चीज़ों को बैचों में उन पर आँका जाता है — ट्रैफ़िक लाइट, अंक या आपके अपने पैमाने पर।",
