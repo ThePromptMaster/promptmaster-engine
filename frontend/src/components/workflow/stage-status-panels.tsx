@@ -82,12 +82,14 @@ export function BlockForm({
 export function BlockedNotice({ kind, kinds, reason, onUnblock }: { kind: BlockKind; kinds?: BlockKind[]; reason: string; onUnblock: () => void }) {
   const t = useT();
   const all = (kinds?.length ? kinds : [kind]).filter((k) => BLOCK_KINDS.some((o) => o.kind === k));
-  const label = all.length ? all.map((k) => t(`ssp.block.${k}` as MessageKey)).join(' · ') : t('ssp.stuck');
+  // Each reason starts lower-case after "Stuck —"; names inside it (PromptMaster) keep their capitals.
+  const lower = (x: string) => x.charAt(0).toLocaleLowerCase() + x.slice(1);
+  const label = all.length ? all.map((k) => lower(t(`ssp.block.${k}` as MessageKey))).join(' · ') : lower(t('ssp.stuck'));
   return (
     <div role="status" className="flex flex-wrap items-center gap-3 rounded-xl bg-[var(--surface-container-high)] px-5 py-4">
       <span aria-hidden className="material-symbols-outlined text-[var(--pm-tertiary)]">block</span>
       <div className="me-auto">
-        <p className="text-title text-[var(--on-surface)]">{t('ssp.stuckLabel', { label: label.toLowerCase() })}</p>
+        <p className="text-title text-[var(--on-surface)]">{t('ssp.stuckLabel', { label })}</p>
         <p className="text-label text-[var(--on-surface-variant)]">{reason}</p>
       </div>
       <button onClick={onUnblock} className="rounded-lg bg-[var(--surface-container-highest)] px-4 py-2 text-title text-[var(--on-surface)]">
