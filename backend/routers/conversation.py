@@ -113,6 +113,9 @@ class SaveAsNewVersionRequest(BaseModel):
 class IterationFromConversationResponse(WebUse):
     iteration: Iteration
     suggestions: list[str]
+    #: Why the model stopped; "length" means the text is still cut off (31 Oct,
+    #: Sean: "Continue writing" vanished while the manuscript was still cut).
+    finish_reason: str | None = None
 
 
 class SuggestActionsRequest(BaseModel):

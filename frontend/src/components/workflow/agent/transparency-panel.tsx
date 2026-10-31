@@ -227,7 +227,7 @@ export function TransparencyPanel({
       </dl>
       </details>
       {run?.stop_reason && run.status !== 'running' && (
-        <p role="status" className="mt-3 text-body text-[var(--on-surface)]">
+        <p role="status" className="mt-3 whitespace-pre-line text-body text-[var(--on-surface)]">
           {shownStopReason(getLocale(), run.stop_reason, stageByEnglish)}
         </p>
       )}

@@ -40,11 +40,30 @@ const ALL = `${SOURCE_WORDS}|${RUN_WORDS}`;
 
 /** "Calculated —", "**Verified:**", "(computed)", "| Calculated |", "Status: verified". */
 const LABEL = new RegExp(`(?:^|[\\s(\\[|*_:])(${ALL})(?:[*_]{0,2})\\s*(?=[—–:)\\]|]|-\\s)`, 'i');
-/** "was computed", "have been verified", "we confirmed", "numerically verified" — never "is calculated as", which defines a method. */
+/**
+ * "was computed", "have been verified", "we confirmed", "was numerically
+ * verified" — never "is calculated as", which defines a method, nor
+ * "independently verified evidence", which describes a kind of evidence
+ * (31 Oct, Sean: a definition of "Established" was flagged as a claim).
+ */
 const STATED = new RegExp(
-  `\\b(?:was|were|been|we|I|PromptMaster|Go|numerically|computationally|independently|explicitly)\\s+(?:(?:now|then|also|already|independently|numerically|explicitly|directly|successfully)\\s+)?(${ALL})\\b`,
+  `\\b(?:was|were|been|we|I|PromptMaster|Go)\\s+(?:(?:now|then|also|already|independently|numerically|computationally|explicitly|directly|successfully)\\s+)?(${ALL})\\b`,
   'i'
 );
+/**
+ * A sentence that says what a word means ("Established means strongly
+ * supported by …", "Verified refers to …", "**Speculative** — not yet
+ * tested") defines the word; it claims nothing about the work (31 Oct, Sean).
+ */
+const DEFINES = /^\s*(?:[-*•]\s+)?[*_"'“‘]*(?!(?:this|that|it|which|so|thus|here)\b)[\p{L}][\p{L}\p{N}\s'’/-]{0,60}?[*_"'”’]*\s+(?:means|refers to|is defined as|are defined as|is used to mean|denotes|stands for)\b/iu;
+/**
+ * A glossary entry: a bold term, then a dash or colon, then what it means.
+ * Never one of the claim words itself: "**Calculated** — the ratio tends to
+ * 2.638" is a label on a result.
+ */
+const GLOSSARY_ENTRY = /^\s*(?:[-*•]\s+)?\*\*(?!\s*(?:externally verified|verified|confirmed|calculated|computed|reproduced|simulated)\s*[:]?\*\*)[^*]{1,60}\*\*\s*[:—–-]\s+(?:a|an|the|strongly|weakly|supported|not|no|used|any|some|evidence|result|claim|statement|finding)\b/i;
+/** A section that defines terms, read as definitions throughout. */
+const GLOSSARY_HEADING = /^\s*#{1,6}\s+.*\b(?:glossary|definitions?|key terms|terminology|terms used|evidence (?:scale|grades?|levels?|labels?|ratings?)|how (?:we|i) (?:label|grade|rate) evidence)\b/i;
 /** Any of these in the sentence and it is not a claim that the thing was done. */
 const NOT_A_CLAIM =
   /\b(?:not|no|never|cannot|can't|isn't|wasn't|weren't|hasn't|haven't|hadn't|without|unverified|uncalculated|yet|would|could|should|will|must|might|may|need|needs|needed|pending|planned|plan|proposed?|next|if|once|until|unless|whether|before|reasoned|conditional|speculative|to be)\b/i;
@@ -55,9 +74,24 @@ const NAMES_RUN = /\b(?:sandbox|run [0-9a-f]{8}|ran (?:the )?code|code run)\b/i;
 /** A verification done by computing is a calculation claim. */
 const BY_COMPUTING = /\b(?:numerically|computationally|by (?:the )?code|in (?:the )?sandbox|by running)\b/i;
 
+/** The text without its glossary sections: each runs to the next heading of the same or a higher level. */
+function withoutGlossaries(text: string): string {
+  const out: string[] = [];
+  let skipping = 0;
+  for (const line of text.split('\n')) {
+    const level = /^\s*(#{1,6})\s/.exec(line)?.[1].length ?? 0;
+    if (skipping && level && level <= skipping) skipping = 0;
+    if (!skipping && level && GLOSSARY_HEADING.test(line)) {
+      skipping = level;
+      continue;
+    }
+    if (!skipping) out.push(line);
+  }
+  return out.join('\n');
+}
+
 function sentences(text: string): string[] {
-  return text
-    .replace(/```[\s\S]*?```/g, ' ')
+  return withoutGlossaries(text.replace(/```[\s\S]*?```/g, ' '))
     .split(/\n+|(?<=[.!?])\s+(?=[A-Z*_(\[])/)
     .map((s) => s.trim())
     .filter(Boolean);
@@ -71,6 +105,7 @@ function quoteOf(s: string, max = 160): string {
 export function unsupportedClaims(text: string, evidence: RunEvidence): UnsupportedClaim[] {
   const out: UnsupportedClaim[] = [];
   for (const s of sentences(text)) {
+    if (DEFINES.test(s) || GLOSSARY_ENTRY.test(s)) continue;
     const m = LABEL.exec(s) ?? STATED.exec(s);
     if (!m) continue;
     if (NOT_A_CLAIM.test(s.replace(m[0], ' '))) continue;

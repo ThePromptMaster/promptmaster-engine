@@ -321,6 +321,8 @@ export interface SaveAsNewVersionRequest {
 export interface IterationFromConversationResponse extends WebUse {
   iteration: Iteration;
   suggestions: string[];
+  /** Continue-document only: "length" when the text is still cut off. */
+  finish_reason?: string | null;
 }
 
 export interface ContinueDocumentRequest {

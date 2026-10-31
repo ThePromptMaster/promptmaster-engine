@@ -86,7 +86,12 @@ export interface EvaluationFacts {
 
 /** The current draft of a stage that drafts prose. */
 export interface DraftFacts {
-  /** It was cut off: the model hit its limit, or the check found it incomplete. */
+  /**
+   * It was cut off and Go may still continue it. Since 31 Oct a continuation
+   * that is still cut off stays marked cut off (the page keeps "Continue
+   * writing"), so Go stops after `GO_CONTINUE_TRIES` continuations in a row
+   * rather than spending its window on one draft; the button stays the user's.
+   */
   truncated: boolean;
   /** The stage check has been run on this exact version. */
   checked: boolean;
@@ -101,12 +106,21 @@ export interface DraftFacts {
  * wrote a whole chapter into Positioning, three times over. That verdict is a
  * finding to apply, not text to add.
  */
+export const GO_CONTINUE_TRIES = 2;
+
 export function draftFacts(
   head: { id: string; finish_reason?: string | null },
-  latestEvaluation?: { version_id: string } | null
+  latestEvaluation?: { version_id: string } | null,
+  /** The stage's versions, oldest first: continuations since the text was last whole are counted. */
+  versions: readonly { source_operation?: string | null; finish_reason?: string | null }[] = []
 ): DraftFacts {
+  let continued = 0;
+  // Every continuation since the text was last whole, whatever came between.
+  for (let i = versions.length - 1; i >= 0 && versions[i].finish_reason === 'length'; i -= 1) {
+    if (versions[i].source_operation === 'continuation') continued += 1;
+  }
   return {
-    truncated: head.finish_reason === 'length',
+    truncated: head.finish_reason === 'length' && continued < GO_CONTINUE_TRIES,
     checked: Boolean(latestEvaluation && latestEvaluation.version_id === head.id),
   };
 }
@@ -242,7 +256,7 @@ export async function readStageFacts(input: {
 
   const head = bundles[stage.id]?.versions.at(-1);
   if (stageDrafts(stage) && !rendererHoldsItems(stage.renderer) && head?.content.trim()) {
-    facts.draft = draftFacts(head, latestEvaluation);
+    facts.draft = draftFacts(head, latestEvaluation, bundles[stage.id]?.versions ?? []);
     const code = codeToCheck(head.content, `${input.project.objective}\n${input.project.constraints ?? ''}`);
     if (code) facts.code = code;
   }

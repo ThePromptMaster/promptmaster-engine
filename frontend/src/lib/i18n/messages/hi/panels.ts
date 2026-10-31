@@ -311,7 +311,7 @@ export const hi: Record<keyof typeof en, string> = {
   'ssp.block.needs_decision': 'एक निर्णय की ज़रूरत',
   'ssp.block.needs_decision.hint': 'आगे बढ़ने से पहले किसी को चुनना होगा',
   'ssp.markStuck': 'अटका हुआ चिह्नित करें',
-  'ssp.waitingOn': 'यह चरण किसकी प्रतीक्षा कर रहा है?',
+  'ssp.waitingOn': 'यह चरण किसकी प्रतीक्षा कर रहा है? जो भी लागू हों, सब चुनें।',
   'ssp.whyStuck': 'यह क्यों अटका है',
   'ssp.whatMissing': 'ठीक-ठीक क्या कमी है',
   'ssp.whatMissingPh': 'ठीक-ठीक क्या कमी है? (आवश्यक)',
