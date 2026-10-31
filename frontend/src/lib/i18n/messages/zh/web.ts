@@ -21,6 +21,8 @@ export const zh: Record<keyof typeof en, string> = {
   'web.searched': ' · 搜索了“{query}”',
   'web.takeOut': '移除',
   'web.none': '尚未保存任何来源。',
+  'web.cited': '引用的来源',
+  'web.citedLabel': '此版本引用的已保存网络来源',
   'web.newSaved_one': '已保存 {count} 个新来源',
   'web.newSaved_other': '已保存 {count} 个新来源',
   'web.alreadyOnRecord': '；{count} 个已有记录',

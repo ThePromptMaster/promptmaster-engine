@@ -123,7 +123,7 @@ export function useStageTools({ project, stage, headVersion, fallbackContent = '
       try {
         if (kind === 'continue') {
           const res = await api.continueDocument({
-            inputs: inputsFrom(project),
+            inputs: inputsFrom(project, content),
             incomplete_iteration: asIteration(content, headVersion?.version_number ?? 1, project.mode),
             iteration_number: next,
             model: project.model,
@@ -144,7 +144,7 @@ export function useStageTools({ project, stage, headVersion, fallbackContent = '
         }
 
         const res = await api.flowTrigger({
-          inputs: inputsFrom(project),
+          inputs: inputsFrom(project, content),
           current_output: content,
           trigger: kind,
           iteration_number: next,

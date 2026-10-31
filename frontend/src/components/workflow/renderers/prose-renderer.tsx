@@ -18,6 +18,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { MarkdownOutput } from '@/components/shared/markdown-output';
+import { SourcesCited } from '@/components/workflow/sources-cited';
 import { useProjectImageList } from '@/components/shared/project-images';
 import { imageMarkdown } from '@/lib/data/images';
 import { ConfirmOverwrite, EmptyStage, GenerationBar, VersionBar } from './stage-chrome';
@@ -310,7 +311,10 @@ export function ProseRenderer({
               </p>
             </>
           ) : (
-            <MarkdownOutput content={editing ? draft : content} />
+            <>
+              <MarkdownOutput content={editing ? draft : content} />
+              <SourcesCited content={editing ? draft : content} />
+            </>
           )}
         </article>
       )}
