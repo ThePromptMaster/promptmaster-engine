@@ -130,11 +130,11 @@ def test_versions_are_listed_with_the_one_on_screen_marked():
     assert "The user is looking at v8, not the latest (v9)" in text
 
 
-def test_stage_status_goes_beside_the_stage():
+def test_stage_status_goes_under_the_stage():
     from promptmaster.page_context import ChatContext, format_chat_context
 
     text = format_chat_context(ChatContext(stage_label="Book manuscript", stage_status="reopened: the work went back to Evidence base"))
-    assert "Current stage: Book manuscript — reopened: the work went back to Evidence base" in text
+    assert "Current stage: Book manuscript\nThis stage's status: reopened: the work went back to Evidence base" in text
 
 
 def test_changes_since_the_last_reply_outrank_earlier_replies():

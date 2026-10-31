@@ -197,7 +197,9 @@ def format_chat_context(ctx: ChatContext | None) -> str:
         marked = [f"[{s}]" if s == here else s for s in ctx.workflow_stages]
         lines.append(f"Workflow: {ctx.workflow_label or 'project'} — " + " › ".join(marked))
     if ctx.stage_label:
-        lines.append(f"Current stage: {ctx.stage_label}" + (f" — {ctx.stage_status.strip()}" if ctx.stage_status.strip() else ""))
+        lines.append(f"Current stage: {ctx.stage_label}")
+    if ctx.stage_status.strip():
+        lines.append(f"This stage's status: {ctx.stage_status.strip()}")
     if ctx.stage_instruction.strip():
         lines.append(f"What this stage produces: {ctx.stage_instruction.strip()}")
     if ctx.prior_stages:
