@@ -121,6 +121,11 @@ export const en = {
   'guest.created':
     'Account created — check your email to confirm it. Everything you have made so far is already attached to it.',
   'guest.createError': 'Could not create the account.',
+  'card.copy': "Make a copy",
+  'list.copyNamed': "Make a copy of {name}",
+  'list.copyFailed': "The copy could not be made.",
+  'list.copyFailedWhy': "The copy could not be made: {message}",
+  'list.copyMissing': "The copy was made, but these files could not be copied into it: {files}. The original still has them.",
 } as const;
 
 type Keys = Record<keyof typeof en, string>;
@@ -235,6 +240,11 @@ export const es: Keys = {
   'guest.created':
     'Cuenta creada: revisa tu correo para confirmarla. Todo lo que has hecho hasta ahora ya está vinculado a ella.',
   'guest.createError': 'No se pudo crear la cuenta.',
+  'card.copy': "Hacer una copia",
+  'list.copyNamed': "Hacer una copia de {name}",
+  'list.copyFailed': "No se pudo hacer la copia.",
+  'list.copyFailedWhy': "No se pudo hacer la copia: {message}",
+  'list.copyMissing': "Se hizo la copia, pero estos archivos no se pudieron copiar en ella: {files}. El original los conserva.",
 };
 
 export const fr: Keys = {
@@ -347,6 +357,11 @@ export const fr: Keys = {
   'guest.created':
     'Compte créé — vérifiez vos e-mails pour le confirmer. Tout ce que vous avez fait jusqu’ici y est déjà rattaché.',
   'guest.createError': 'Impossible de créer le compte.',
+  'card.copy': "Faire une copie",
+  'list.copyNamed': "Faire une copie de {name}",
+  'list.copyFailed': "La copie n’a pas pu être faite.",
+  'list.copyFailedWhy': "La copie n’a pas pu être faite : {message}",
+  'list.copyMissing': "La copie a été faite, mais ces fichiers n’ont pas pu y être copiés : {files}. L’original les a toujours.",
 };
 
 export const pt: Keys = {
@@ -459,4 +474,9 @@ export const pt: Keys = {
   'guest.created':
     'Conta criada — confira seu e-mail para confirmá-la. Tudo o que você fez até agora já está vinculado a ela.',
   'guest.createError': 'Não foi possível criar a conta.',
+  'card.copy': "Fazer uma cópia",
+  'list.copyNamed': "Fazer uma cópia de {name}",
+  'list.copyFailed': "Não foi possível fazer a cópia.",
+  'list.copyFailedWhy': "Não foi possível fazer a cópia: {message}",
+  'list.copyMissing': "A cópia foi feita, mas estes arquivos não puderam ser copiados para ela: {files}. O original ainda os tem.",
 };

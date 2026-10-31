@@ -5,7 +5,7 @@ export const en = {
   'refs.used': '{count} used',
   'refs.noneUsed': 'none used',
   'refs.explain':
-    "Draw on your other projects: each one's finished work and facts go with every stage, check and chat here, cited as [R1], [R2], …. This project's own brief and facts come first where they disagree. Read when the project opens.",
+    "Draw on your other projects: each one's finished work and facts go with every stage, check and chat here, cited as [R1], [R2], …. This project's own brief and facts come first where they disagree. Each is a copy taken when you add it; the original stays as it is, and you can update the copy from it.",
   'refs.listLabel': 'Projects used',
   'refs.atMost': 'At most {count} projects',
   'refs.useAnother': '+ Use another project',
@@ -52,6 +52,10 @@ export const en = {
   'reader.sections': '{stage} sections',
   'reader.sent': 'In the side chat — not sent',
   'reader.send': 'Send this section to the side chat',
+  'refs.asOf': "A copy as of {date}; changes to the original since then are not used until you update it.",
+  'refs.update': "Update from the original",
+  'refs.updateGone': "The original is in the trash or gone, so the copy you have is kept.",
+  'refs.updateError': "Could not update from the original.",
 } as const;
 
 type Keys = Record<keyof typeof en, string>;
@@ -62,7 +66,7 @@ export const es: Keys = {
   'refs.used': '{count} en uso',
   'refs.noneUsed': 'ninguno en uso',
   'refs.explain':
-    'Apóyate en tus otros proyectos: el trabajo terminado y los hechos de cada uno acompañan cada etapa, comprobación y chat de aquí, citados como [R1], [R2], …. El planteamiento y los hechos de este proyecto mandan cuando no coinciden. Se leen al abrir el proyecto.',
+    'Apóyate en tus otros proyectos: el trabajo terminado y los hechos de cada uno acompañan cada etapa, comprobación y chat de aquí, citados como [R1], [R2], …. El planteamiento y los hechos de este proyecto mandan cuando no coinciden. Cada uno es una copia tomada al añadirlo; el original queda como está y puedes actualizar la copia desde él.',
   'refs.listLabel': 'Proyectos en uso',
   'refs.atMost': 'Como máximo {count} proyectos',
   'refs.useAnother': '+ Usar otro proyecto',
@@ -109,6 +113,10 @@ export const es: Keys = {
   'reader.sections': 'Secciones de {stage}',
   'reader.sent': 'En el chat lateral, sin enviar',
   'reader.send': 'Enviar esta sección al chat lateral',
+  'refs.asOf': "Una copia del {date}; los cambios posteriores en el original no se usan hasta que la actualices.",
+  'refs.update': "Actualizar desde el original",
+  'refs.updateGone': "El original está en la papelera o ya no existe, así que se conserva la copia que tienes.",
+  'refs.updateError': "No se pudo actualizar desde el original.",
 };
 
 export const fr: Keys = {
@@ -117,7 +125,7 @@ export const fr: Keys = {
   'refs.used': '{count} utilisés',
   'refs.noneUsed': 'aucun utilisé',
   'refs.explain':
-    'Appuyez-vous sur vos autres projets : le travail terminé et les faits de chacun accompagnent chaque étape, vérification et discussion ici, cités en [R1], [R2], …. Le brief et les faits de ce projet priment en cas de désaccord. Lus à l’ouverture du projet.',
+    'Appuyez-vous sur vos autres projets : le travail terminé et les faits de chacun accompagnent chaque étape, vérification et discussion ici, cités en [R1], [R2], …. Le brief et les faits de ce projet priment en cas de désaccord. Chacun est une copie prise quand vous l’ajoutez ; l’original reste tel quel et vous pouvez mettre la copie à jour depuis lui.',
   'refs.listLabel': 'Projets utilisés',
   'refs.atMost': '{count} projets au maximum',
   'refs.useAnother': '+ Utiliser un autre projet',
@@ -164,6 +172,10 @@ export const fr: Keys = {
   'reader.sections': 'Sections de {stage}',
   'reader.sent': 'Dans la discussion latérale — non envoyé',
   'reader.send': 'Envoyer cette section dans la discussion latérale',
+  'refs.asOf': "Une copie du {date} ; les changements apportés depuis à l’original ne sont pas utilisés tant que vous ne la mettez pas à jour.",
+  'refs.update': "Mettre à jour depuis l’original",
+  'refs.updateGone': "L’original est dans la corbeille ou n’existe plus : la copie que vous avez est conservée.",
+  'refs.updateError': "Impossible de mettre à jour depuis l’original.",
 };
 
 export const pt: Keys = {
@@ -172,7 +184,7 @@ export const pt: Keys = {
   'refs.used': '{count} em uso',
   'refs.noneUsed': 'nenhum em uso',
   'refs.explain':
-    'Aproveite seus outros projetos: o trabalho concluído e os fatos de cada um acompanham cada etapa, checagem e chat aqui, citados como [R1], [R2], …. O briefing e os fatos deste projeto prevalecem quando discordam. Lidos quando o projeto abre.',
+    'Aproveite seus outros projetos: o trabalho concluído e os fatos de cada um acompanham cada etapa, checagem e chat aqui, citados como [R1], [R2], …. O briefing e os fatos deste projeto prevalecem quando discordam. Cada um é uma cópia feita quando você o adiciona; o original fica como está e você pode atualizar a cópia a partir dele.',
   'refs.listLabel': 'Projetos em uso',
   'refs.atMost': 'No máximo {count} projetos',
   'refs.useAnother': '+ Usar outro projeto',
@@ -219,4 +231,8 @@ export const pt: Keys = {
   'reader.sections': 'Seções de {stage}',
   'reader.sent': 'No chat lateral — não enviado',
   'reader.send': 'Enviar esta seção para o chat lateral',
+  'refs.asOf': "Uma cópia de {date}; as mudanças feitas depois no original não são usadas até você atualizá-la.",
+  'refs.update': "Atualizar a partir do original",
+  'refs.updateGone': "O original está na lixeira ou não existe mais, então a cópia que você tem é mantida.",
+  'refs.updateError': "Não foi possível atualizar a partir do original.",
 };

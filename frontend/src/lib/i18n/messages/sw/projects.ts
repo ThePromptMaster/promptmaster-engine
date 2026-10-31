@@ -96,4 +96,9 @@ export const sw: Record<keyof typeof en, string> = {
   'guest.notNow': 'Si sasa',
   'guest.created': 'Akaunti imefunguliwa — angalia barua pepe yako ili kuithibitisha. Kila ulichotengeneza hadi sasa tayari kimeunganishwa nayo.',
   'guest.createError': 'Haikuweza kufungua akaunti.',
+  'card.copy': "Tengeneza nakala",
+  'list.copyNamed': "Tengeneza nakala ya {name}",
+  'list.copyFailed': "Nakala haikuweza kutengenezwa.",
+  'list.copyFailedWhy': "Nakala haikuweza kutengenezwa: {message}",
+  'list.copyMissing': "Nakala imetengenezwa, lakini faili hizi hazikuweza kunakiliwa ndani yake: {files}. Asili bado inazo.",
 };

@@ -22,6 +22,7 @@ import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import { shownStageId } from '@/lib/i18n/stage';
 import { workflowName } from '@/lib/i18n/templates';
 import { relativeTime } from '@/lib/i18n/format';
+import { copyProject } from '@/lib/supabase/copy-project';
 
 const WORKFLOW_ICON: Record<string, string> = {
   book: 'menu_book',
@@ -150,6 +151,32 @@ export default function ProjectsPage() {
       window.localStorage.setItem(FOLDER_KEY, next);
     } catch {
       // Private windows: the choice lasts for this page only.
+    }
+  }
+
+  /**
+   * Make a copy and open it; the original stays as it is (31 Oct: "more like a
+   * copy thing … so you have the original project too as well").
+   */
+  const [copying, setCopying] = useState<string | null>(null);
+  async function handleCopy(id: string) {
+    if (copying) return;
+    setCopying(id);
+    setError(null);
+    try {
+      const made = await copyProject(id);
+      // A stored file that would not copy is said here, beside the new copy,
+      // rather than discovered later in it.
+      if (made.missing.length) {
+        setError(t('list.copyMissing', { files: made.missing.join(', ') }));
+        setCopying(null);
+        void load();
+        return;
+      }
+      router.push(`/projects/${made.projectId}`);
+    } catch (e) {
+      setError(e instanceof Error && e.message ? t('list.copyFailedWhy', { message: e.message }) : t('list.copyFailed'));
+      setCopying(null);
     }
   }
 
@@ -424,6 +451,15 @@ export default function ProjectsPage() {
                             {user && <UseInProjectMenu source={p} userId={user.id} projects={projects ?? []} folders={folders} />}
                             <MoveToMenu projectTitle={p.title} folderId={p.folder_id} folders={folders} onMove={(folderId) => void handleMove(p.id, folderId)} />
                             <button
+                              onClick={() => void handleCopy(p.id)}
+                              disabled={copying !== null}
+                              aria-label={t('list.copyNamed', { name: p.title || t('list.aProject') })}
+                              title={t('card.copy')}
+                              className="rounded-lg p-2 text-[var(--on-surface-variant)] opacity-0 transition-opacity hover:bg-[var(--surface-container-high)] focus-visible:opacity-100 group-hover:opacity-100 disabled:opacity-40"
+                            >
+                              <span className={`material-symbols-outlined text-[20px] ${copying === p.id ? 'animate-spin' : ''}`}>{copying === p.id ? 'progress_activity' : 'content_copy'}</span>
+                            </button>
+                            <button
                               onClick={() => setPendingDelete(p.id)}
                               aria-label={t('list.deleteNamed', { name: p.title || t('list.aProject') })}
                               className="rounded-lg p-2 text-[var(--on-surface-variant)] opacity-0 transition-opacity hover:bg-[var(--surface-container-high)] focus-visible:opacity-100 group-hover:opacity-100"
@@ -440,6 +476,7 @@ export default function ProjectsPage() {
                               folders={folders}
                               onMove={(folderId) => void handleMove(p.id, folderId)}
                               onDelete={() => setPendingDelete(p.id)}
+                              onCopy={() => void handleCopy(p.id)}
                             />
                           </div>
                         </>
