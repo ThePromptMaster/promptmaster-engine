@@ -138,7 +138,8 @@ export function useStageTools({ project, stage, headVersion, fallbackContent = '
             model: iteration.model_used || project.model,
             mode: project.mode,
             change_summary: withWebLine(iteration.summary || 'Continued from where the draft was cut off.', web),
-            finish_reason: null,
+            // Still cut off stays cut off, so "Continue writing" stays (31 Oct, Sean).
+            finish_reason: res.finish_reason === 'length' ? 'length' : null,
           });
           return;
         }

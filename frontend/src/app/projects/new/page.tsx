@@ -6,14 +6,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 import { useAuth } from '@/hooks/use-auth';
-import { GuideInterview } from '@/components/projects/guide-interview';
 import { SetupCard, type SetupDraft } from '@/components/projects/setup-card';
 import { RemovedWorkflows, useWorkflowWords } from '@/components/projects/workflow-picker';
 import { useT } from '@/lib/i18n/i18n-provider';
 import { getLocale, tr } from '@/lib/i18n/store';
 import { CustomWorkflowDesigner } from '@/components/projects/custom-workflow-designer';
 import { ColourMenu } from '@/components/shared/colour-preferences';
-import { FrontDoor, type DraftBrief, type FrontDoorSearch, type Turn } from '@/components/projects/front-door';
+import { FrontDoor, type DraftBrief, type Turn } from '@/components/projects/front-door';
 import { saveStageChatMessage } from '@/lib/supabase/conversation';
 import { saveSources } from '@/lib/supabase/sources';
 import type { ProjectSource } from '@/types/project';
@@ -56,12 +55,15 @@ import { describeDraft, worthKeeping, type DesignerState, type FrontDoorState, t
  * recommending the workflow and mode from the objective.
  *
  *   ask ──I know──────────────────────────▶ setup ──Start──▶ project
- *    └──Guide me──▶ questions ──Recommend──▶ setup
+ *    └──Start a conversation──▶ talk (+ Ask me questions) ──▶ setup or project
+ *
+ * "Ask me questions" lives in the conversation, beside the outline, not on
+ * this first screen (Sean, 31 Oct).
  *
  * Choosing the workflow yourself is still one click away on the first screen.
  */
 
-type Step = 'ask' | 'questions' | 'talk' | 'setup';
+type Step = 'ask' | 'talk' | 'setup';
 
 /** The output format a Book gets when setup suggested none. */
 export const BOOK_OUTPUT_FORMAT = 'A book manuscript in continuous prose, chapter by chapter';
@@ -123,8 +125,6 @@ export default function NewProjectPage() {
   const [initialFacts, setInitialFacts] = useState<NewFact[]>([]);
   /** The conversation the project starts from, kept as its first stage's chat. */
   const [openingChat, setOpeningChat] = useState<Turn[]>([]);
-  // What "Ask me questions" searched the web for, saved with the project (22 Oct).
-  const [intakeSearches, setIntakeSearches] = useState<FrontDoorSearch[]>([]);
   /** A saved workflow being edited as a copy. */
   const [copying, setCopying] = useState<(WorkflowTemplate & { id: string }) | null>(null);
   const [recommendedKey, setRecommendedKey] = useState<string | null>(null);
@@ -249,7 +249,8 @@ export default function NewProjectPage() {
   function restoreKept() {
     if (!kept) return;
     const k = kept.data;
-    setStep(k.step);
+    // The questions had a screen of their own until 31 Oct; they are asked in the conversation now.
+    setStep(k.step === 'questions' ? 'talk' : k.step);
     setObjective(k.objective);
     if (k.draft) setDraft(k.draft);
     setTemplateId(k.templateId ?? null);
@@ -296,7 +297,7 @@ export default function NewProjectPage() {
     const [{ suggestion }, design] = await Promise.all([
       api.generateSetup({
         objective: ask.trim(),
-        answers: given?.length ? given.slice(0, 8) : undefined,
+        answers: given?.length ? given.slice(0, 16) : undefined,
         ...(brought ? { material: brought } : {}),
         // A new project has Web access on: its setup may not say there is no web (22 Oct).
         web_access: 'on',
@@ -425,12 +426,6 @@ export default function NewProjectPage() {
       setError(t('start.setUpFailed', { why: whyText(e) }));
       setWorking(null);
     }
-  }
-
-  // The questions are asked one at a time, on their own screen (1 Oct, item 9).
-  function guideMe() {
-    setError(null);
-    setStep('questions');
   }
 
   /** Take a preset off the list; projects that use it keep it (Sean, 23 Oct). */
@@ -589,8 +584,8 @@ export default function NewProjectPage() {
       // What its searches found (22 Oct), saved in the order the conversation
       // cited it, so [S1] in the carried-over chat is [S1] under Web sources.
       let found: ProjectSource[] = [];
-      // The questions' searches too (22 Oct), when the setup came from them.
-      const searches = [...chat.flatMap((t) => (t.web ? [t.web] : [])), ...(given ? [] : intakeSearches)];
+      // "Ask me questions" searches are turns of the conversation too (31 Oct).
+      const searches = chat.flatMap((t) => (t.web ? [t.web] : []));
       for (const web of searches) {
         if (!web.sources.length) continue;
         try {
@@ -857,7 +852,7 @@ export default function NewProjectPage() {
               </p>
 
               <p className="mt-8 text-label uppercase tracking-wider text-[var(--on-surface-variant)]">{t('start.skip')}</p>
-              <div className="mt-3 grid gap-3 sm:grid-cols-3">
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 <button
                   onClick={() => void recommend()}
                   disabled={!hasObjective || working !== null}
@@ -865,16 +860,6 @@ export default function NewProjectPage() {
                 >
                   <span className="block text-title">{simple ? t('start.setItUp') : t('start.know')}</span>
                   <span className="mt-1 block text-label text-[var(--on-surface-variant)]">{simple ? t('start.setItUpNote') : t('start.knowNote')}</span>
-                </button>
-                <button
-                  onClick={() => void guideMe()}
-                  disabled={!hasObjective || working !== null}
-                  className="rounded-2xl bg-[var(--surface-container-high)] px-6 py-4 text-start text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-highest)] disabled:opacity-40"
-                >
-                  <span className="block text-title">{simple ? t('start.askFew') : t('start.guide')}</span>
-                  <span className="mt-1 block text-label text-[var(--on-surface-variant)]">
-                    {simple ? t('start.askFewNote', { count: SIMPLE_GUIDE_QUESTIONS }) : t('start.guideNote')}
-                  </span>
                 </button>
                 {/* A way in of its own, in both setups — not a link beside the setup switch (email 8). */}
                 <button
@@ -918,28 +903,6 @@ export default function NewProjectPage() {
         </>
       )}
 
-      {step === 'questions' && (
-        <>
-          <h1 className="text-display text-[var(--on-surface)]">{t('start.questionsTitle')}</h1>
-          <p className="mt-3 mb-8 text-body text-[var(--on-surface-variant)]">
-            {t('start.about')} <span className="text-[var(--on-surface)]">{objective.trim()}</span>.{' '}
-            {t('start.answerWhatYouCan')}
-          </p>
-          <GuideInterview
-            objective={objective.trim()}
-            material={material}
-            busy={working === 'setup'}
-            onDone={(given, searches) => {
-              setIntakeSearches(searches);
-              void recommend(given);
-            }}
-            onBack={() => setStep('ask')}
-            maxQuestions={simple ? SIMPLE_GUIDE_QUESTIONS : undefined}
-            foldWhy={simple}
-          />
-        </>
-      )}
-
       {step === 'talk' && (
         <>
           <h1 className="sr-only">{t('start.talkTitle')}</h1>
@@ -949,6 +912,8 @@ export default function NewProjectPage() {
             onReady={(brief, transcript, said, turns) => void makeFromConversation(brief, transcript, said, turns)}
             onReview={fromConversation}
             onBack={() => setStep('ask')}
+            maxQuestions={simple ? SIMPLE_GUIDE_QUESTIONS : undefined}
+            foldWhy={simple}
             initialState={frontDoorState}
             onStateChange={setFrontDoorState}
             material={material}

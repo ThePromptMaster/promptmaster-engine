@@ -36,3 +36,11 @@ def test_endpoint_attaches_snapshot_to_iteration():
 def test_endpoint_uses_continuation_trigger_source():
     src = inspect.getsource(cont.api_continue_document)
     assert "continuation" in src  # trigger_source string
+
+
+def test_response_says_whether_the_text_is_still_cut_off():
+    """31 Oct (Sean): "Continue writing" vanished while the book was still cut off,
+    because the browser saved every continuation as finished."""
+    assert "finish_reason" in cont.IterationFromConversationResponse.model_fields
+    src = inspect.getsource(cont.api_continue_document)
+    assert "finish_reason=finish_reason" in src

@@ -24,6 +24,7 @@ export interface DesignerState {
 
 export interface SetupDraftState {
   v: 1;
+  /** 'questions' only in drafts kept before 31 Oct; restored as the conversation. */
   step: 'ask' | 'questions' | 'talk' | 'setup';
   objective: string;
   draft?: SetupDraft;
