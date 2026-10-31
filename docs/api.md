@@ -109,7 +109,7 @@ Project setup:
 | Method | Path | `api` method | Router | Status |
 |---|---|---|---|---|
 | POST | `/api/generate-setup` | `generateSetup` | `setup.py` | **Live** |
-| POST | `/api/guide-next-question` | `guideNextQuestion` | `setup.py` | **Live** — "Guide me": takes the objective and the questions answered so far, returns `{enough, question, reason}` — one question at a time, or `enough: true` |
+| POST | `/api/guide-next-question` | `guideNextQuestion` | `setup.py` | **Live** — "Ask me questions" in the start conversation (31 Oct; the conversation so far is sent as `material`): takes the objective and the questions answered so far, returns `{enough, question, reason}` — one question at a time, or `enough: true` |
 | GET | `/api/models` | `getModels` | `meta.py` | **Live** — carries its own `Depends(require_user)` inside the otherwise-public meta router, because it proxies OpenRouter and is billable |
 
 Go mode (the loop itself runs in the browser; see [`architecture.md`](architecture.md) § Go mode):
