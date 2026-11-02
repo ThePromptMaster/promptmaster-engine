@@ -21,7 +21,7 @@ import { getArtifact } from '@/lib/supabase/versions';
 import { listRecentRunOutputs } from '@/lib/supabase/agent';
 import { manuscriptArtifactFor, manuscriptSourceFor, measureStageContent, stageRequirements } from '@/lib/workflow/context';
 import { COUNTING_RULE, isPart, measure, replaceSection, sectionFor, type MeasurableRequirement } from '@/lib/workflow/measurable';
-import { describeLines, isChangeNote, keepUnasked, structureDropped } from '@/lib/workflow/preservation';
+import { askedOfRecheck, describeLines, isChangeNote, keepUnasked, structureDropped } from '@/lib/workflow/preservation';
 import { notRemovedByUser } from '@/lib/workflow/removed-text';
 import { addedClaims, noInventedDetails, suppliedText } from '@/lib/workflow/fact-boundary';
 import { isDone } from '@/lib/workflow/types';
@@ -1217,7 +1217,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // workshop: the recheck after a time change dropped "Confirm 12 attendees",
       // the greeting and the sign-off) — never a line stating a replaced value.
       // Not when it was shortening to meet a limit: what went is what was asked.
-      const checked = before || measuredFails.length ? { content, notes: [] as string[] } : await keptAndSupplied(ctx, head, content, why, superseded);
+      const checked = before || measuredFails.length ? { content, notes: [] as string[] } : await keptAndSupplied(ctx, head, content, askedOfRecheck(why, ctx.project.facts, headVersion?.created_at), superseded);
       content = checked.content;
       if (whole.continued || checked.notes.length) stillUnmet = unmetMeasurementsOf(ctx, target, content);
       // A repair does not undo the user's own latest version either (10 Oct),

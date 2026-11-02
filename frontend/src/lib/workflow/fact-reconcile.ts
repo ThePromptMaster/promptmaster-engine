@@ -54,7 +54,7 @@ export interface FactChange {
    * field as it is now; ticked, the field is replaced and the old text kept
    * in the brief's history.
    */
-  setup?: 'objective' | 'constraints';
+  setup?: 'objective' | 'constraints' | 'output_format';
 }
 
 function byKind(text: string): Map<keyof FactValues, ValueMention[]> {
@@ -250,11 +250,11 @@ export function applyChangesLabel(count: number): string {
  */
 export async function withMeaningChanges(
   valueChanges: FactChange[],
-  input: { facts: readonly ProjectFact[] | undefined; instruction: string; before: string; after: string; model?: string; setup?: { objective: string; constraints: string } },
-  check: (req: { instruction: string; before: string; after: string; facts: { id: string; statement: string }[]; model?: string; setup?: { objective: string; constraints: string } }) => Promise<{
+  input: { facts: readonly ProjectFact[] | undefined; instruction: string; before: string; after: string; model?: string; setup?: { objective: string; constraints: string; output_format?: string } },
+  check: (req: { instruction: string; before: string; after: string; facts: { id: string; statement: string }[]; model?: string; setup?: { objective: string; constraints: string; output_format?: string } }) => Promise<{
     changes: { fact_id: string; proposed: string; quote: string; why: string }[];
     additions?: { statement: string; kind: 'fact' | 'requirement'; quote: string; request?: boolean; approval?: boolean; approved_by?: string }[];
-    setup_changes?: { field: 'objective' | 'constraints'; proposed: string; quote: string }[];
+    setup_changes?: { field: 'objective' | 'constraints' | 'output_format'; proposed: string; quote: string }[];
   }>
 ): Promise<FactChange[]> {
   const offered = new Set(valueChanges.map((c) => c.fact.id));
@@ -295,8 +295,8 @@ export async function withMeaningChanges(
     const fresh = added.filter((a) => !already.has(sameWords(a.proposed)) && !offeredChanges.some((c) => restates(a.proposed, c)));
     const setup = said && input.setup
       ? (res.setup_changes ?? []).map((c): FactChange => ({
-          fact: { id: `${SETUP_PREFIX}${c.field}`, statement: input.setup![c.field], subject: null, kind: 'requirement' },
-          changes: [{ kind: 'meaning', was: input.setup![c.field], now: `from your instruction — “${c.quote}”` }],
+          fact: { id: `${SETUP_PREFIX}${c.field}`, statement: input.setup![c.field] ?? '', subject: null, kind: 'requirement' },
+          changes: [{ kind: 'meaning', was: input.setup![c.field] ?? '', now: `from your instruction — “${c.quote}”` }],
           proposed: c.proposed,
           setup: c.field,
         }))
