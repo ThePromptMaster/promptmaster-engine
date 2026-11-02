@@ -80,6 +80,13 @@ describe('one text, one count (2 Nov, production pass)', () => {
     expect(words[0].requirement).toMatchObject({ max: 600, headings: true });
   });
 
+  it('a part the stage\'s instruction mentions keeps its own rule', () => {
+    const withHint = { ...finalPlan, entry_prompt_hint: 'Assemble the plan, including the promotional message.' } as unknown as StageDefinition;
+    const reqs = parseRequirements(['Stay under 600 words in total, including headings.', 'The promotional message must be under 80 words.']);
+    const words = requirementsForStage(withHint, 'final', reqs).filter(({ requirement: r }) => r.kind === 'words');
+    expect(words.map(({ requirement: r }) => [r.subject, r.max, Boolean(r.headings)])).toEqual([['', 600, true], ['promotional message', 80, false]]);
+  });
+
   it('two different limits on the whole are both kept, with one counting rule', () => {
     const reqs = parseRequirements(['Stay under 600 words in total, including headings.', 'The launch plan must be at least 300 words.']);
     const words = requirementsForStage(finalPlan, 'final', reqs).filter(({ requirement: r }) => r.kind === 'words');
