@@ -679,7 +679,7 @@ export function requirementsForStage(
     // of a three-section pack were held to the update's 100).
     else if (stage.id === deliverableId) out.push({ requirement: r, whole: subjects.size === 1 && !isPart(r) });
   }
-  return oneCountOfTheWhole(out);
+  return oneCountOfTheWhole(out, stage.label.toLowerCase());
 }
 
 /**
@@ -690,8 +690,11 @@ export function requirementsForStage(
  * A limit that says its headings count makes them count for all of them; two
  * with the same range are shown once.
  */
-function oneCountOfTheWhole(out: { requirement: MeasurableRequirement; whole: boolean }[]): { requirement: MeasurableRequirement; whole: boolean }[] {
-  const onWhole = out.filter(({ requirement: r, whole }) => r.kind === 'words' && (whole || !r.subject));
+function oneCountOfTheWhole(out: { requirement: MeasurableRequirement; whole: boolean }[], label: string): { requirement: MeasurableRequirement; whole: boolean }[] {
+  // A named limit is the whole text's only when the stage is that thing ("Final
+  // decision and launch plan"); a part its instruction mentions ("the
+  // promotional message") is measured under its own heading.
+  const onWhole = out.filter(({ requirement: r, whole }) => r.kind === 'words' && (!r.subject || (whole && label.includes(r.subject))));
   if (onWhole.length < 2) return out;
   const headings = onWhole.some(({ requirement: r }) => r.headings);
   const ranges = new Set<string>();
