@@ -2621,3 +2621,15 @@ fails after that is reported as not run.
 Not covered: `audit_findings.py` still returns no findings on a failed call. It has no caller in
 the workspace today. The four-call iteration pipeline (`evaluator.py`) marks its fallback
 `failed`, but its consumers (side-chat "save as new version") still display the scores.
+### L-140 — A Check approval that only restates "every finding decided" is read from the table (2026-11-02)
+
+Under "Handle them for me", Go now commits the routine approval on a table stage (review or
+list) once only that approval is left. Before, the commit was reached only on stages with a
+draft, so a designed Check stage whose findings Go had just decided stopped for "I have accepted
+or rejected each finding". When an approval's wording only restates that every finding is
+decided, and every row on the table has a decision, Go commits it from the table's count rather
+than asking a model. The wording is matched by pattern ("accepted / rejected / decided … each /
+every / all … finding"). An approval worded differently still goes through the model check. New
+designs no longer produce such an approval on a Check stage: the automatic "Every finding accepted
+or rejected" blocks in its place. Workflows designed before keep their box, which Go now commits.
+Reserved approvals and "Ask me" are unchanged, and material findings are still the user's.

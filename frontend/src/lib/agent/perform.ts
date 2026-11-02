@@ -37,6 +37,7 @@ import { figuresFromOutput, readStageFigures, withRunFigures, type StageFigures 
 import { applyRunBlocked, applyRunResult } from '@/lib/workflow/run-result';
 import { inputsChanged, stageInputs } from '@/lib/workflow/stage-inputs';
 import { applyTriage, isTriageTable, splitUntriaged } from '@/lib/workflow/triage';
+import { findingsAllDecided, restatesTriage } from '@/lib/workflow/triage-approval';
 import { modeForStage } from '@/lib/workflow/stage-mode';
 import { restoreDecided } from '@/lib/workflow/commit-check';
 import { checkVerdict as sharedCheckVerdict } from '@/lib/workflow/check-verdict';
@@ -1456,10 +1457,18 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       if (!head?.content.trim()) {
         return done(key, { status: 'failed', output: `There is nothing on ${ctx.stage.label} to check "${criterion.label}" against yet.`, toolsUsed: [], changes: {} });
       }
-      const check = await api.agentCheckCriterion(
-        { inputs: inputsFrom(ctx.project), stage_label: ctx.stage.label, criterion: criterion.label, content: head.content, model: ctx.project.model },
-        ctx.signal
-      );
+      // An approval that only says every finding is decided is a fact the
+      // engine has already counted (2 Nov, Sean: Go decided all nine routine
+      // findings, then stopped for "I have accepted or rejected each finding").
+      // Asking a model whether the user did it, in the user's own words,
+      // invites "not met"; the table's count answers it.
+      const decided = restatesTriage(criterion.label) ? findingsAllDecided(ctx.stage, head.content) : null;
+      const check = decided
+        ? { met: true, reason: `Every finding on ${ctx.stage.label} has a decision (${decided} of ${decided}), each recorded on its row with its reason.` }
+        : await api.agentCheckCriterion(
+            { inputs: inputsFrom(ctx.project), stage_label: ctx.stage.label, criterion: criterion.label, content: head.content, model: ctx.project.model },
+            ctx.signal
+          );
       if (!check.met) {
         return done(key, {
           status: 'failed', toolsUsed: ['model'], changes: {},
@@ -1478,7 +1487,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       await ctx.commitCriterion(ctx.stage.id, criterion.id, head.id);
       await ctx.afterStageEvent();
       return done(key, {
-        status: 'succeeded', toolsUsed: ['model'], changes: { event_types: ['criterion_committed'] },
+        status: 'succeeded', toolsUsed: decided ? [] : ['model'], changes: { event_types: ['criterion_committed'] },
         output: `"${criterion.label}": checked against version ${head.version_number} — ${check.reason} Committed under your routine-decision policy.`,
       });
     }

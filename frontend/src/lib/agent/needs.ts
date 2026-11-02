@@ -487,7 +487,13 @@ export function requiredWork(input: {
     };
   }
 
-  if (!onlyApprovalLeft(stageEvaluation) || !facts.draft) return null;
+  if (!onlyApprovalLeft(stageEvaluation)) return null;
+  // A table (review, list) has no draft to check or apply findings to, but
+  // its routine approval is still Go's to commit. Until 2 Nov it fell through
+  // the draft guard below, so a requirements check whose nine findings Go had
+  // just decided stopped for "I have accepted or rejected each finding" under
+  // "Handle them for me" (Sean, tattoo test).
+  if (!facts.draft) return commitRoutine(stage, stageEvaluation, input, can);
 
   const findings = facts.evaluationFindings;
   if (!input.asItStands && findings?.aboutHead && findings.count > 0 && can('apply_findings')) {
@@ -504,7 +510,16 @@ export function requiredWork(input: {
       expected: 'A check of the current version against the objective.',
     };
   }
-  // A routine approval, under "handle them for me": checked, then committed (5 Oct).
+  return commitRoutine(stage, stageEvaluation, input, can);
+}
+
+/** A routine approval, under "handle them for me": checked, then committed (5 Oct). */
+function commitRoutine(
+  stage: StageDefinition,
+  stageEvaluation: StageEvaluation,
+  input: { routine?: RoutineDecisions; commitTried?: readonly string[] },
+  can: (k: string) => boolean
+): RequiredMove | null {
   const routine = delegableToCommit(stage, stageEvaluation, input.routine, input.commitTried);
   if (routine && can('commit_delegated')) {
     return {
