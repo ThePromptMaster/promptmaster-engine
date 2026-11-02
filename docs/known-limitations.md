@@ -2788,7 +2788,9 @@ limit's own sentence says the headings count: "including headings", "headings in
 most 600 words (headings included)"). "With headings and tables" says what the text has, not what
 is counted, and does not turn this on. A line in which the text counts itself ("**Length:** 545
 words including headings and tables", "Message: 55 words, counted by hand") is a note and is not counted, as "Word count:" lines
-already were.
+already were. A requirement recorded as "Whole document under 600 words, including headings and
+tables" (the form a generated setup writes) is a limit on the whole, not on a part named "whole
+document"; before, it was measured nowhere and its headings rule was lost.
 
 On 2 Nov the constraint was "Stay under 600 words in total, including headings, tables and a
 promotional message under 80 words". The plan was measured at 566 words and passed; with its
