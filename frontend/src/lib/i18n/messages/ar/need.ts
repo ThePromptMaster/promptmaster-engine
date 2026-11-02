@@ -74,5 +74,6 @@ export const ar: Record<keyof typeof en, string> = {
   'need.acceptRow': 'اقبل {id} وتابع',
   'need.rejectRow': 'ارفض {id}',
   'need.rowEffect': 'قبول {id} يطبّق التغيير المقترح ويحسمه في {where}؛ ورفضه يتجاهل التغيير ويُبقي السبب في الصف.',
+  'need.openFirst': 'لم يُحسم بعد قبل موافقتك: {list}.',
   'need.workOpen': 'كُتبت {stage}، لكن العمل لم يكتمل: {list}. لن أعدّ الهدف متحققًا ما دام أي جزء منه مفتوحًا.',
 };
