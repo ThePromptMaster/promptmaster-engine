@@ -43,7 +43,7 @@ def test_the_endpoint_reports_nothing_when_the_check_fails():
     app.dependency_overrides[get_client] = lambda: stub
     try:
         r = TestClient(app).post("/api/revision-facts", json=REQ.model_dump())
-        assert r.status_code == 200 and r.json() == {"changes": [], "additions": []}
+        assert r.status_code == 200 and r.json() == {"changes": [], "additions": [], "setup_changes": []}
     finally:
         app.dependency_overrides.pop(get_client, None)
 

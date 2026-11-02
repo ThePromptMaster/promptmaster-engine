@@ -127,6 +127,7 @@ export const sw: Record<keyof typeof en, string> = {
   'bcn.first.brief': 'Maelezo ya mradi yamebadilishwa',
   'bcn.first.back': 'Umerudi nyuma',
   'bcn.first.again': 'Hatua imekamilishwa tena',
+  'fcl.group.setup': 'Mpangilio wa mradi',
   'fcl.group.changed': 'Thamani zilizobadilishwa',
   'fcl.group.new': 'Taarifa mpya za hakika',
   'fcl.group.approval': 'Idhini zilizorekodiwa',

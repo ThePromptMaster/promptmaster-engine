@@ -26,6 +26,8 @@ export const sw: Record<keyof typeof en, string> = {
   'ws.reopenedNote': 'Imefunguliwa tena — ibadilishe hapa (ihariri, au tumia gumzo la pembeni), kisha bonyeza Tekeleza na uendelee. Au iwekee alama kuwa imekamilika mwenyewe.',
   'ws.editStage': 'Hariri hatua hii',
   'ws.recheckNote': 'Hatua zinazofuata zitakaguliwa upya baada ya wewe kuibadilisha.',
+  'ws.staleNote': 'Inasubiri kukaguliwa upya: {reason}',
+  'ws.recheckNow': 'Kagua upya hatua zilizobadilishwa',
   'ws.markComplete': 'Weka alama kuwa hatua hii imekamilika',
   'ws.finishedHint': 'Hatua hii imekamilika. Bonyeza Hariri hatua hii ili kuibadilisha — hatua zinazofuata zitakaguliwa upya.',
   'ws.checkAndDials': 'Ukaguzi wa hatua, na ukali wa maoni',

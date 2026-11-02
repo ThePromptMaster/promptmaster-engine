@@ -127,6 +127,7 @@ export const ar: Record<keyof typeof en, string> = {
   'bcn.first.brief': 'تغيّر الموجز',
   'bcn.first.back': 'عاد إلى الخلف',
   'bcn.first.again': 'اكتملت المرحلة مجددًا',
+  'fcl.group.setup': 'إعداد المشروع',
   'fcl.group.changed': 'قيم متغيرة',
   'fcl.group.new': 'حقائق جديدة',
   'fcl.group.approval': 'موافقات مسجّلة',

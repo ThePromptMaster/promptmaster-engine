@@ -47,6 +47,14 @@ export interface FactChange {
    * as a request). An empty string when the approval names nobody.
    */
   approvedBy?: string;
+  /**
+   * Not a fact: the project's stored objective or constraints, rewritten as
+   * the user's instruction asks (1 Nov, Sean, tattoo memo: the scope and the
+   * reserve changed, the setup kept the old ones). `fact.statement` holds the
+   * field as it is now; ticked, the field is replaced and the old text kept
+   * in the brief's history.
+   */
+  setup?: 'objective' | 'constraints';
 }
 
 function byKind(text: string): Map<keyof FactValues, ValueMention[]> {
@@ -165,6 +173,8 @@ export function describeFactChange(c: FactChange): string {
 
 /** The id a standing change carries until it is recorded: it is not a fact yet. */
 const NEW_PREFIX = 'new:';
+/** The id a setup change carries: it is a field of the project, never a fact. */
+const SETUP_PREFIX = 'setup:';
 
 export function isNewFact(c: FactChange): boolean {
   return c.fact.id.startsWith(NEW_PREFIX);
@@ -175,15 +185,17 @@ export function isNewFact(c: FactChange): boolean {
  * (17 Oct, Sean, HARBOR: "Apply and update 6 facts" mixed facts, instructions
  * and statements that other information remained unchanged).
  */
-export type FactChangeGroup = 'changed' | 'new' | 'approval' | 'request';
+export type FactChangeGroup = 'setup' | 'changed' | 'new' | 'approval' | 'request';
 
 export function factChangeGroup(c: FactChange): FactChangeGroup {
+  if (c.setup) return 'setup';
   if (!isNewFact(c)) return 'changed';
   if (c.approvedBy !== undefined) return 'approval';
   return c.request ? 'request' : 'new';
 }
 
 export const FACT_CHANGE_GROUPS: ReadonlyArray<{ group: FactChangeGroup; label: string }> = [
+  { group: 'setup', label: 'Project setup' },
   { group: 'changed', label: 'Changed values' },
   { group: 'new', label: 'New facts' },
   { group: 'approval', label: 'Approvals recorded' },
@@ -238,10 +250,11 @@ export function applyChangesLabel(count: number): string {
  */
 export async function withMeaningChanges(
   valueChanges: FactChange[],
-  input: { facts: readonly ProjectFact[] | undefined; instruction: string; before: string; after: string; model?: string },
-  check: (req: { instruction: string; before: string; after: string; facts: { id: string; statement: string }[]; model?: string }) => Promise<{
+  input: { facts: readonly ProjectFact[] | undefined; instruction: string; before: string; after: string; model?: string; setup?: { objective: string; constraints: string } },
+  check: (req: { instruction: string; before: string; after: string; facts: { id: string; statement: string }[]; model?: string; setup?: { objective: string; constraints: string } }) => Promise<{
     changes: { fact_id: string; proposed: string; quote: string; why: string }[];
     additions?: { statement: string; kind: 'fact' | 'requirement'; quote: string; request?: boolean; approval?: boolean; approved_by?: string }[];
+    setup_changes?: { field: 'objective' | 'constraints'; proposed: string; quote: string }[];
   }>
 ): Promise<FactChange[]> {
   const offered = new Set(valueChanges.map((c) => c.fact.id));
@@ -256,6 +269,8 @@ export async function withMeaningChanges(
       instruction: said || 'The user changed the text to the revised text themselves; every difference is theirs.',
       before: input.before, after: input.after, model: input.model,
       facts: rest.map((f) => ({ id: f.id, statement: f.statement })),
+      // The setup is offered for change only by the user's own instruction.
+      ...(said && input.setup ? { setup: input.setup } : {}),
     });
     const byId = new Map(rest.map((f) => [f.id, f]));
     const meaning = res.changes.flatMap((m): FactChange[] => {
@@ -278,7 +293,15 @@ export async function withMeaningChanges(
     const offeredChanges = [...valueChanges, ...meaning];
     const already = new Set(offeredChanges.map((c) => sameWords(c.proposed)));
     const fresh = added.filter((a) => !already.has(sameWords(a.proposed)) && !offeredChanges.some((c) => restates(a.proposed, c)));
-    return [...valueChanges, ...meaning, ...fresh];
+    const setup = said && input.setup
+      ? (res.setup_changes ?? []).map((c): FactChange => ({
+          fact: { id: `${SETUP_PREFIX}${c.field}`, statement: input.setup![c.field], subject: null, kind: 'requirement' },
+          changes: [{ kind: 'meaning', was: input.setup![c.field], now: `from your instruction — “${c.quote}”` }],
+          proposed: c.proposed,
+          setup: c.field,
+        }))
+      : [];
+    return [...setup, ...valueChanges, ...meaning, ...fresh];
   } catch {
     return valueChanges;
   }

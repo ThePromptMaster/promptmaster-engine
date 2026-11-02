@@ -5,6 +5,7 @@ import { stageText, workflowName as workflowNameText, templateWord } from '@/lib
 import { translate } from '@/lib/i18n/translate';
 import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import { tr } from '@/lib/i18n/store';
+import { shownCheckText } from '@/lib/i18n/check-text';
 import { shownGoWaiting } from '@/lib/i18n/stop-reasons';
 import { WebFoundNotice } from './web-found-notice';
 import { formOf, inFormWords } from '@/lib/workflow/work-form';
@@ -491,7 +492,10 @@ export function WorkflowWorkspace({
   const isEditable = isCurrent || viewedState?.status === 'in_progress';
   const reopenedHere = !isCurrent && viewedState?.status === 'in_progress' && !viewedState.left_open;
   // A skipped stage can be come back to as well as a done one (1 Oct, item 11).
-  const canReopen = !isCurrent && (isDone(viewedState?.status) || viewedState?.status === 'skipped') && project.status !== 'finalized';
+  // …and one a change left awaiting a recheck, which had no button at all:
+  // "Viewing only — nothing changes here" (1 Nov, Sean, tattoo memo).
+  const viewedStale = !isCurrent && viewedState?.status === 'stale' && project.status !== 'finalized';
+  const canReopen = !isCurrent && (isDone(viewedState?.status) || viewedState?.status === 'skipped' || viewedState?.status === 'stale') && project.status !== 'finalized';
   // 16 Oct (Sean): "when you click on something editable but you haven't
   // clicked reopen … it explains how to edit it". Shown on the first click
   // into a finished stage's work, until another stage is opened.
@@ -2342,8 +2346,22 @@ export function WorkflowWorkspace({
                 <span className="text-label text-[var(--on-surface-variant)]">
                   {state.stages[stage.id]?.status === 'not_started' || !state.stages[stage.id]
                     ? t('ws.notReached')
-                    : t('ws.viewOnly')}
+                    : viewedStale
+                      ? t('ws.staleNote', { reason: shownCheckText(locale, viewedState?.stale?.reason ?? '') })
+                      : t('ws.viewOnly')}
                 </span>
+              )}
+              {/* The recheck itself, from the stage that is waiting for it: the
+                  same as "Apply and continue" — Go rechecks the changed stages
+                  in order, before anything is asked of the final work. */}
+              {viewedStale && (
+                <button
+                  onClick={() => void continueWork()}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--pm-primary)] px-3.5 py-1.5 text-label font-semibold text-[var(--on-primary)] hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[var(--pm-primary)]/50 focus:ring-offset-2"
+                >
+                  <span className="material-symbols-outlined text-[16px]">refresh</span>
+                  {t('ws.recheckNow')}
+                </button>
               )}
               {isEditable && !reopenedHere && (
                 <span className="text-label text-[var(--on-surface-variant)]">
@@ -2365,7 +2383,9 @@ export function WorkflowWorkspace({
                   <button
                     ref={editButtonRef}
                     onClick={() => void reopenStage()}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--pm-primary)] px-3.5 py-1.5 text-label font-semibold text-[var(--on-primary)] hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[var(--pm-primary)]/50 focus:ring-offset-2"
+                    className={viewedStale
+                      ? 'inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-container-highest)] px-3 py-1.5 text-label font-semibold text-[var(--on-surface)] hover:opacity-90'
+                      : 'inline-flex items-center gap-1.5 rounded-lg bg-[var(--pm-primary)] px-3.5 py-1.5 text-label font-semibold text-[var(--on-primary)] hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[var(--pm-primary)]/50 focus:ring-offset-2'}
                   >
                     <span className="material-symbols-outlined text-[16px]">edit</span>
                     {t('ws.editStage')}
@@ -3066,6 +3086,7 @@ export function WorkflowWorkspace({
               stageLabel={stage.label}
               stageTitle={stageText(locale, template.key, stage, 'label')}
               onFactsChanged={() => onReload?.()}
+              onPatchSetup={(patch) => onPatchProject(patch)}
               onSourcesChanged={() => onReload?.()}
               // 13 Oct (Sean, email 6): the revision's saved text is checked
               // against what can be measured, and the result shown with it.

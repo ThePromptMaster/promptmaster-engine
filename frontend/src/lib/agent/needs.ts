@@ -96,7 +96,11 @@ type Need =
  * "Go sometimes continued to display an old human request after the project
  * appeared to have advanced").
  */
-export type NeedsUser = Need & { onStage?: string };
+export type NeedsUser = Need & {
+  onStage?: string;
+  /** When the run stopped with it; a change after this can overtake it (1 Nov). */
+  raisedAt?: string;
+};
 
 /** What the run says once the user has done what it asked for, themselves. */
 export const NEED_CLEARED = 'Ready to carry on — press Resume.';
@@ -665,6 +669,28 @@ export function needsUser(input: {
   return null;
 }
 
+/** Requests asked of finished work, which a later change can leave asking about the wrong version. */
+const ASKED_OF_FINISHED_WORK: ReadonlySet<Need['kind']> = new Set(['tick_criterion', 'objective_check', 'answer_question']);
+
+/**
+ * A request raised before a change reopened stages is outdated: the stages are
+ * rechecked first, and anything still needed is asked of the rechecked work.
+ * 1 Nov (Sean, tattoo memo): after the scope change the sidebar said Objective
+ * was "Awaiting recheck", and the main button — "Answer Go's question" — led to
+ * "I approve this memo for use", asked before the change. Only a stage marked
+ * stale after the request was raised overtakes it, so a question Go asks
+ * about a stale stage is not cleared as soon as it is asked.
+ */
+export function overtakenByChange(need: NeedsUser, state: WorkflowState): boolean {
+  if (!need.raisedAt || !ASKED_OF_FINISHED_WORK.has(need.kind)) return false;
+  const raised = Date.parse(need.raisedAt);
+  if (Number.isNaN(raised)) return false;
+  return Object.values(state.stages).some((s) => {
+    const since = s?.status === 'stale' && s.stale?.since ? Date.parse(s.stale.since) : NaN;
+    return !Number.isNaN(since) && since > raised;
+  });
+}
+
 /**
  * Whether a stop the run recorded still describes the project. Pure.
  *
@@ -681,6 +707,7 @@ export function needStillHolds(
   // Another window is the user's click whatever stage the project is on.
   if (need.kind === 'continue_budget') return true;
   if (need.onStage && need.onStage !== input.currentStageId) return false;
+  if (overtakenByChange(need, input.state)) return false;
   switch (need.kind) {
     case 'set_objective':
       return !input.objective.trim();

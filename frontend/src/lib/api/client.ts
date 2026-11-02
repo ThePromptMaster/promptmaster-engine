@@ -624,10 +624,13 @@ export const api = {
     before: string;
     after: string;
     facts: { id: string; statement: string }[];
+    /** The stored objective and constraints, so an instruction that replaces them is offered as a setup change (1 Nov). */
+    setup?: { objective: string; constraints: string };
     model?: string;
   }): Promise<{
     changes: { fact_id: string; proposed: string; quote: string; why: string }[];
     additions?: { statement: string; kind: 'fact' | 'requirement'; quote: string; request?: boolean; approval?: boolean; approved_by?: string }[];
+    setup_changes?: { field: 'objective' | 'constraints'; proposed: string; quote: string }[];
   }> {
     return apiFetch('/api/revision-facts', { method: 'POST', body: JSON.stringify(req) });
   },

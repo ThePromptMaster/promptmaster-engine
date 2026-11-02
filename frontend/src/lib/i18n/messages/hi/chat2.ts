@@ -127,6 +127,7 @@ export const hi: Record<keyof typeof en, string> = {
   'bcn.first.brief': 'ब्रीफ़ बदला गया',
   'bcn.first.back': 'वापस गए',
   'bcn.first.again': 'चरण फिर से पूरा हुआ',
+  'fcl.group.setup': 'प्रोजेक्ट सेटअप',
   'fcl.group.changed': 'बदले गए मान',
   'fcl.group.new': 'नए तथ्य',
   'fcl.group.approval': 'दर्ज की गई स्वीकृतियाँ',
