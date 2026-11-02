@@ -30,6 +30,19 @@ describe('needsUser: the moves that are the user\'s (B4)', () => {
     expect(needsUser({ ...base, stage: stage('outline'), facts: outline(0, false), stageEvaluation: evaluation('outline'), allowed: ['generate_outline'] })).toBeNull();
   });
 
+  it('an empty chapter plan that asks for its own approval is generated first (2 Nov, production)', () => {
+    // A designed workflow's chapter plan holds the outline and the approval on one stage.
+    const plan = {
+      ...stage('outline'), id: 'chapter_plan',
+      exit_criteria: [{ id: 'chapter_plan.approved', label: 'A chapter plan is approved', blocking: true, check: 'auto', rule: { type: 'outline_approved' } }],
+    } as unknown as Parameters<typeof needsUser>[0]['stage'];
+    const unmet = evaluation('chapter_plan', [{ id: 'chapter_plan.approved', label: 'A chapter plan is approved', satisfied: false, blocking: true }]);
+    const input = { ...base, outlineStageId: 'chapter_plan', stage: plan, stageEvaluation: unmet, allowed: ['generate_outline'] };
+    expect(needsUser({ ...input, facts: outline(0, false) })).toBeNull();
+    // Once written, approving it is the user's.
+    expect(needsUser({ ...input, facts: outline(4, false) })).toMatchObject({ kind: 'approve_outline', stageId: 'chapter_plan' });
+  });
+
   it('unsaved outline edits are saved and approved by the card\'s own button', () => {
     const need = needsUser({ ...base, stage: stage('outline'), facts: outline(3, false, true), stageEvaluation: evaluation('outline') });
     expect(describeNeed(need!, label).action).toBe('Save and approve the outline');
