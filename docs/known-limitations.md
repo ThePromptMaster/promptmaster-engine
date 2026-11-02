@@ -2739,3 +2739,14 @@ Go repaired the four, then spent three steps re-finishing the last stage before 
 once nothing Go can repair is left, it stops and asks: keep the stage as it is, or open it.
 "Keep" records the change as dismissed for that stage. The chapters themselves were already
 repaired against the change, so a plan kept as it is still matches what was written.
+
+### L-145 — A Go step's background sections are counted in its cost when it waits for them (2026-11-02)
+
+Sections that Go queues (draft, revise, or repair a manuscript) are written by the background
+drain, which records its own usage rows. Those rows reached the project's total but not the Go
+step that queued them, nor the run's total. On 2 Nov a run said $1.47 when drafting twelve
+chapters had cost $1.26 more. A step that waits for its sections now reads the drain's rows back,
+by each job's request-id prefix, and adds them to its cost. The cost is counted when the step
+finishes waiting. Sections still being written then (the wait ran out, or the user stopped Go)
+are counted in the project's total only, not in the step or the run. The same holds when another
+tab or the scheduled drain wrote them after the step had read the rows.
