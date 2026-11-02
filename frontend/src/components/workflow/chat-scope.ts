@@ -105,10 +105,13 @@ function words(text: string): number {
  * The scope as said once the change is applied: the count is the revised
  * text's, not the one the scope was chosen with. "Applied to the whole
  * document — 1151 words" was the memo before the revision (1 Nov, Sean).
+ * `measured`: the stage's limits are measured on the revision and said beside
+ * it, so the scope carries no count of its own — one text, one count (2 Nov).
  */
-export function appliedScopeLabel(label: string, revised: string, kind: ScopeKind | undefined): string {
+export function appliedScopeLabel(label: string, revised: string, kind: ScopeKind | undefined, measured = false): string {
   if (kind !== 'document') return label;
-  return label.replace(/\s+—\s+\d[\d,]*\s+words$/, '') + ` — ${words(revised).toLocaleString('en-US')} words now`;
+  const scope = label.replace(/\s+—\s+\d[\d,]*\s+words$/, '');
+  return measured ? scope : `${scope} — ${words(revised).toLocaleString('en-US')} words now`;
 }
 
 /**

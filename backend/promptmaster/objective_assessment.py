@@ -319,7 +319,7 @@ def _is_evidence(quote: str, content: str) -> bool:
 
 
 #: How code counts, said to the model wherever a count is (frontend `COUNTING_RULE`).
-COUNTING_RULE = "words of the text itself, not counting headings or a word-count note; labelled assumptions count"
+COUNTING_RULE = "words of the text itself, not counting headings (unless the requirement says headings are included) or a word-count note; labelled assumptions count"
 
 _NUMBER_WORDS = {w: i for i, w in enumerate(
     "zero one two three four five six seven eight nine ten eleven twelve".split()

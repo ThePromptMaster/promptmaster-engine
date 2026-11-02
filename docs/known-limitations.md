@@ -2779,3 +2779,30 @@ The cost:
 
 Checked against all 46 versions of the two prod projects: every version written before the change
 is still caught, and all 34 written after it pass.
+
+### L-147 — A word limit counts headings when it says so; the chat keeps the revision's own count (2026-11-02)
+
+A word limit is counted on the text's prose, not its headings (`COUNTING_RULE`), unless the
+limit's own sentence says the headings count: "including headings", "headings included",
+"counting the headings". Then every heading line is counted too, and the checklist says so ("at
+most 600 words (headings included)"). "With headings and tables" says what the text has, not what
+is counted, and does not turn this on. A line in which the text counts itself ("**Length:** 545
+words including headings and tables", "Message: 55 words, counted by hand") is a note and is not counted, as "Word count:" lines
+already were.
+
+On 2 Nov the constraint was "Stay under 600 words in total, including headings, tables and a
+promotional message under 80 words". The plan was measured at 566 words and passed; with its
+headings it was 601. The side chat's saved line said "Applied to the whole document — 661 words".
+That was the plan *before* the change, counted with table punctuation. The live card already
+said the revised length, but the transcript kept the old one. The saved line now gives what the
+card gives: the stage's limits measured on the new version, or, with none, its length ("— 529 words
+now").
+
+The cost:
+- **The promo limit is still not checked.** A limit on a part named inside the same sentence ("a
+  promotional message under 80 words") is not measured. The promo stage holds the message beside
+  a check table, and the plan's promo section has a "not to be sent" line. Any count of either
+  would include text that is not the message, so it would fail a message that meets the limit.
+  The limit still reaches every prompt.
+- **The text's own count of itself stays as written.** A count the model writes into the text is
+  left in place and is not checked. The checklist count is the one measured in code.

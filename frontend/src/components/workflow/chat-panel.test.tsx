@@ -18,6 +18,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { ChatPanel } from './chat-panel';
+import { saveStageChatMessage } from '@/lib/supabase/conversation';
 import type { NewVersion } from '@/lib/supabase/versions';
 import type { ArtifactVersion, Project } from '@/types/project';
 
@@ -235,6 +236,39 @@ describe('Instruct mode proposes before it applies', () => {
     // Spliced, not replaced: the rest of the document is still there.
     expect(version.content).toContain('Because the rules changed.');
     expect(version.content).toContain('## Why now');
+  });
+
+  // 2 Nov (Sean, photography workshop): the saved line read "Applied to the
+  // whole document — 661 words", the plan before his change, and was taken
+  // for the revision's length against an under-600 limit.
+  it('the line the thread keeps gives the revision measured as the limit measures it, never the length before it', async () => {
+    const checkRevision = vi.fn((text: string) => [
+      { label: `The deliverable: at most 600 words (headings included) — ${text.split(/\s+/).filter(Boolean).length} words`, ok: true },
+    ]);
+    panel({ checkRevision });
+    await instruct('Tighten this.', /whole document/i);
+    await screen.findByLabelText('Proposed revision');
+    await userEvent.setup().click(screen.getByRole('button', { name: /apply as new version/i }));
+
+    await waitFor(() => expect(vi.mocked(saveStageChatMessage).mock.calls.some(([m]) => m.role === 'assistant')).toBe(true));
+    const saved = vi.mocked(saveStageChatMessage).mock.calls.map(([m]) => m).find((m) => m.role === 'assistant')!;
+    const before = CONTENT.split(/\s+/).filter(Boolean).length;
+    expect(saved.content).toMatch(/^Applied to the whole document\. Measured in code on the new version: The deliverable: at most 600 words \(headings included\) — \d+ words \(met\)\./);
+    expect(saved.content).not.toContain(`${before} words.`);
+    expect(saved.scope).toBe('The whole document');
+    expect(checkRevision).toHaveBeenCalledWith(expect.stringContaining('Because the rules changed.'));
+  });
+
+  it('with no limit to measure, the saved line gives the revised length', async () => {
+    panel();
+    await instruct('Tighten this.', /whole document/i);
+    await screen.findByLabelText('Proposed revision');
+    await userEvent.setup().click(screen.getByRole('button', { name: /apply as new version/i }));
+
+    await waitFor(() => expect(vi.mocked(saveStageChatMessage).mock.calls.some(([m]) => m.role === 'assistant')).toBe(true));
+    const saved = vi.mocked(saveStageChatMessage).mock.calls.map(([m]) => m).find((m) => m.role === 'assistant')!;
+    expect(saved.content).toMatch(/^Applied to the whole document — \d+ words now\./);
+    expect(saved.scope).toMatch(/words now$/);
   });
 
   it('discarding leaves the artifact untouched', async () => {
