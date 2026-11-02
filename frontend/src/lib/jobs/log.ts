@@ -76,12 +76,20 @@ export function stepRequestId(jobId: string, step: string): string {
   // a header value carrying `/api/generate-section-prose` is both noise and an
   // invitation to whatever parses the log later. Correlation ids should be
   // opaque tokens.
-  const short = alnum(jobId).slice(0, 12);
   // The tail of the path, not the head: every route here begins `apigenerate`,
   // so the first characters distinguish nothing.
   const label = alnum(step).slice(-6);
   const nonce = Math.random().toString(36).slice(2, 8);
-  return `job${short}${label}${nonce}`;
+  return `${requestIdPrefix(jobId)}${label}${nonce}`;
+}
+
+/**
+ * How every request id a job's steps send begins: the drain's usage rows are
+ * found by it, so what a Go step's background sections cost can be added to
+ * the step (2 Nov).
+ */
+export function requestIdPrefix(jobId: string): string {
+  return `job${alnum(jobId).slice(0, 12)}`;
 }
 
 function alnum(value: string): string {

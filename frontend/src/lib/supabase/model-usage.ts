@@ -67,6 +67,18 @@ export function takeStepCost(stepId: string): number | null {
   return entry?.priced ? entry.cost : null;
 }
 
+/**
+ * Calls a Go step paid for that were not made through this tab: the sections
+ * its background jobs wrote (2 Nov). Added before the step finishes, so
+ * `takeStepCost` totals them with the rest; an unknown price stays unknown.
+ */
+export function addStepCost(stepId: string, spent: { cost: number | null; calls: number }): void {
+  if (!spent.calls) return;
+  const entry = stepCosts.get(stepId) ?? { cost: 0, priced: false };
+  if (spent.cost !== null) Object.assign(entry, { cost: entry.cost + spent.cost, priced: true });
+  stepCosts.set(stepId, entry);
+}
+
 export interface UsageWriteContext {
   route: string;
   requestId: string | null;
