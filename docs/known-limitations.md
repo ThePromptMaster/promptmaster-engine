@@ -2790,7 +2790,11 @@ is counted, and does not turn this on. A line in which the text counts itself ("
 words including headings and tables", "Message: 55 words, counted by hand") is a note and is not counted, as "Word count:" lines
 already were. A requirement recorded as "Whole document under 600 words, including headings and
 tables" (the form a generated setup writes) is a limit on the whole, not on a part named "whole
-document"; before, it was measured nowhere and its headings rule was lost.
+document"; before, it was measured nowhere and its headings rule was lost. Word limits that
+measure the same whole text are one limit with one count: "Decision and launch plan under 600
+words" in the output format and "under 600 words in total, including headings" in the
+constraints were shown as 516 and 564 words for the same plan; now one is shown, with headings
+counted.
 
 On 2 Nov the constraint was "Stay under 600 words in total, including headings, tables and a
 promotional message under 80 words". The plan was measured at 566 words and passed; with its
