@@ -469,6 +469,26 @@ export interface StageContext {
   deferred?: Record<string, { row: string; reason: string }[]>;
   /** Per review stage id: undecided or proposed rows that say a requirement is unmet (`openUnmet`). */
   openUnmet?: Record<string, number>;
+  /**
+   * Per review stage id: the rows nobody has decided, with their wording
+   * (`openFindingRows`). A count alone left Go on a later stage saying "I
+   * can't see the Check table, so I can't tell you the finding's number or
+   * wording" while that finding was all that kept the project from finishing
+   * (1 Nov, Sean, recruitment plan, i11).
+   */
+  openRows?: Record<string, OpenFindingRow[]>;
+}
+
+/** One undecided review row, as every surface that names it shows it. */
+export interface OpenFindingRow {
+  /** The row's id in its table ("i11"). */
+  id: string;
+  /** Its first field: what is wrong. */
+  text: string;
+  severity?: string;
+  suggested_change?: string;
+  /** PromptMaster's proposed status, when there is one waiting to be confirmed. */
+  proposed?: string;
 }
 
 export interface CriterionResult {

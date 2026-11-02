@@ -121,7 +121,7 @@ import { INPUT_LIMITS } from '@/lib/projects/input-limits';
 import { draftBindings } from '@/lib/outline/long-form';
 import { approveOutline, loadOutline, materialiseOutlineInto, outlineStageFor } from '@/lib/outline/actions';
 import type { OutlineDocument } from '@/types/outline';
-import { isTriaged, proposableStatuses, stageDrafts, itemSchemaFor, parseItems, rendererHoldsItems, serializeItems, type StageItem } from '@/lib/workflow/stage-artifact';
+import { decideRow, isTriaged, proposableStatuses, stageDrafts, itemSchemaFor, parseItems, rendererHoldsItems, serializeItems, type StageItem } from '@/lib/workflow/stage-artifact';
 import { previewRowAction } from '@/lib/workflow/row-actions';
 import { readStageFigures, type StageFigures } from '@/lib/workflow/figures';
 import { FiguresOnRecord } from './figures-on-record';
@@ -1586,6 +1586,21 @@ export function WorkflowWorkspace({
         await appendEvent({ type: 'brief_change_dismissed', stage_id: keepId, reason: 'Kept as it is after repairs did not settle it.', payload: { change_at: since, stage_ids: [keepId] } });
       },
       openStage: (openId: string) => setViewingStageId(openId === state.current_stage_id ? null : openId),
+      // One row on another stage, decided from Go's stop that names it (1 Nov).
+      decideRow: async (rowStageId: string, rowId: string, status: 'accepted' | 'rejected', reason?: string) => {
+        const target = template.stages.find((s) => s.id === rowStageId);
+        const head = bundles?.[rowStageId]?.versions.at(-1);
+        const items = parseItems(head?.content);
+        if (!target || !items || !appendStageVersion) throw new Error(tr('wserr.noChange'));
+        await appendStageVersion(rowStageId, target.label, {
+          content: serializeItems(decideRow(items, rowId, status, reason)),
+          source_operation: 'stage_edit',
+          instruction: `${status === 'accepted' ? 'Accepted' : 'Rejected'} ${rowId} from Go's stop.`,
+          model: project.model,
+          mode: project.mode,
+          change_summary: `${status === 'accepted' ? 'Accepted' : 'Rejected'} ${rowId} from Go's stop on ${stage?.label ?? 'this stage'}.`,
+        });
+      },
       // The user's skip, with Go's reason as the recorded one.
       skip: async (reason: string) => {
         const option = transitions.find((t) => t.kind === 'skip');
@@ -1622,7 +1637,7 @@ export function WorkflowWorkspace({
         panel.scrollIntoView({ block: 'center' });
       },
     }),
-    [project.id, project.user_id, project.model, project.mode, materialiseOutline, refreshEvents, setBlocked, handleToggleManual, onReload, transitions, handleTransition, state, appendEvent, template]
+    [project.id, project.user_id, project.model, project.mode, materialiseOutline, refreshEvents, setBlocked, handleToggleManual, onReload, transitions, handleTransition, state, appendEvent, template, bundles, appendStageVersion, stage?.label]
   );
 
   // For Go's card on a stuck stage: has anything changed since it was marked

@@ -71,5 +71,8 @@ export const zh: Record<keyof typeof en, string> = {
   'need.marksComplete': '继续将把{stage}标记为完成，并转到剩余的工作。',
   'need.takesMeTo': '继续将带我前往{next}。',
   'need.carryOpen': '继续处理未完成的工作',
+  'need.acceptRow': '接受 {id} 并继续',
+  'need.rejectRow': '拒绝 {id}',
+  'need.rowEffect': '接受 {id} 会应用其建议的修改，并在 {where} 中将其标为已处理；拒绝则放弃该修改，并在该行保留原因。',
   'need.workOpen': '{stage}已写好，但工作尚未完成：{list}。只要其中任何一项仍未完成，我就不会宣布目标已达成。',
 };

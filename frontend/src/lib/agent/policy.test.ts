@@ -288,7 +288,7 @@ describe('B0: the planner sees what exists on outline, long-form and review stag
       bundles: { continuity: { artifact: { id: 'c', stage_id: 'continuity', long_form: null }, versions: [{ id: 'v', content }] } } as never,
     });
     expect(digest.findings).toEqual({ total: 2, triaged: 1, sample: ['Terminology drifts'] });
-    expect(digest.artifact_excerpt).toBe('[accepted] Ch 3 repeats Ch 1\n[undecided] Terminology drifts');
+    expect(digest.artifact_excerpt).toBe('i1 [accepted] Ch 3 repeats Ch 1\ni2 [undecided] Terminology drifts');
   });
 
   it('a run table is numbered, and with data attached says a computation can carry a row out', async () => {

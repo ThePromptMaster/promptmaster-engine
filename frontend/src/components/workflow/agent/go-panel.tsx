@@ -46,6 +46,11 @@ export interface NeedsActions {
   keepStage?: (stageId: string) => Promise<void>;
   /** Show a stage on the page. */
   openStage?: (stageId: string) => void;
+  /**
+   * Decide one review row on another stage, from Go's stop that names it
+   * (1 Nov): saved as the user's own decision on that stage's table.
+   */
+  decideRow?: (stageId: string, rowId: string, status: 'accepted' | 'rejected', reason?: string) => Promise<void>;
 }
 
 export function GoPanel({
@@ -195,6 +200,13 @@ export function GoPanel({
         // on to what the workflow still holds, or stop here.
         if (option === 'fix') return go.fixObjective(need.items);
         if (option === 'stop') return go.stop();
+        if ((option === 'accept_row' || option === 'reject_row') && need.rows?.length === 1 && needsActions?.decideRow) {
+          const row = need.rows[0];
+          await needsActions.decideRow(
+            row.stageId, row.id, option === 'accept_row' ? 'accepted' : 'rejected',
+            option === 'reject_row' ? `Rejected from Go's stop on ${stageLabel}.` : undefined
+          );
+        }
         await go.go();
         return;
       case 'repair_stuck':

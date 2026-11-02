@@ -12,6 +12,7 @@
  * claim against it.
  */
 
+import { currentFacts } from '@/lib/workflow/facts';
 import { codeToCheck, type CodeToCheck } from './code-check';
 import { loadOutline, outlineStageFor } from '@/lib/outline/actions';
 import { countNamedSections, emptyDocument, parseOutlineDocument } from '@/lib/outline/model';
@@ -241,7 +242,7 @@ export async function readStageFacts(input: {
     const schema = itemSchemaFor(stage);
     const items = parseItems(bundles[stage.id]?.versions.at(-1)?.content) ?? [];
     if (isTriageTable(schema) && items.length) {
-      facts.review = { items, schema, ...splitUntriaged(items, schema), outcome: false };
+      facts.review = { items, schema, ...splitUntriaged(items, schema, currentFacts(project.facts)), outcome: false };
     } else if (items.length) {
       const undecided = items.filter((i) => !isTriaged(i, schema));
       facts.review = { items, schema, routine: [], material: undecided, outcome: true };

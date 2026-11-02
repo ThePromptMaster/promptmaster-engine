@@ -74,6 +74,9 @@ export const en = {
   'need.marksComplete': 'Carrying on marks {stage} complete and moves to what is left.',
   'need.takesMeTo': 'Carrying on takes me to {next}.',
   'need.carryOpen': 'Carry on with the open work',
+  'need.acceptRow': 'Accept {id} and carry on',
+  'need.rejectRow': 'Reject {id}',
+  "need.rowEffect": "Accepting {id} applies its suggested change and settles it on {where}; rejecting it drops the change and keeps the reason on the row.",
   'need.workOpen': '{stage} is written, but the work is not finished: {list}. I will not call the objective met while any of it is open.',
 } as const;
 
@@ -149,6 +152,9 @@ export const es: Keys = {
   'need.marksComplete': 'Al continuar, {stage} se marca como completada y se pasa a lo que queda.',
   'need.takesMeTo': 'Al continuar, paso a {next}.',
   'need.carryOpen': 'Continuar con el trabajo pendiente',
+  'need.acceptRow': 'Aceptar {id} y continuar',
+  'need.rejectRow': 'Rechazar {id}',
+  "need.rowEffect": "Aceptar {id} aplica el cambio sugerido y lo resuelve en {where}; rechazarlo descarta el cambio y conserva el motivo en la fila.",
   'need.workOpen': '{stage} está escrita, pero el trabajo no ha terminado: {list}. No daré el objetivo por cumplido mientras quede algo abierto.',
 };
 
@@ -222,6 +228,9 @@ export const fr: Keys = {
   'need.marksComplete': 'Continuer marque {stage} comme terminée et passe à ce qui reste.',
   'need.takesMeTo': 'Continuer m’amène à {next}.',
   'need.carryOpen': 'Continuer le travail en cours',
+  'need.acceptRow': 'Accepter {id} et continuer',
+  'need.rejectRow': 'Rejeter {id}',
+  "need.rowEffect": "Accepter {id} applique la modification suggérée et la règle dans {where} ; la rejeter écarte la modification et garde la raison sur la ligne.",
   'need.workOpen': '{stage} est rédigée, mais le travail n’est pas terminé : {list}. Je ne considérerai pas l’objectif comme atteint tant qu’une partie reste ouverte.',
 };
 
@@ -295,5 +304,8 @@ export const pt: Keys = {
   'need.marksComplete': 'Continuar marca {stage} como concluída e passa para o que falta.',
   'need.takesMeTo': 'Continuar me leva a {next}.',
   'need.carryOpen': 'Continuar com o trabalho em aberto',
+  'need.acceptRow': 'Aceitar {id} e continuar',
+  'need.rejectRow': 'Rejeitar {id}',
+  "need.rowEffect": "Aceitar {id} aplica a alteração sugerida e a resolve em {where}; rejeitá-la descarta a alteração e mantém o motivo na linha.",
   'need.workOpen': '{stage} está escrita, mas o trabalho não terminou: {list}. Não vou dar o objetivo como atingido enquanto algo estiver em aberto.',
 };

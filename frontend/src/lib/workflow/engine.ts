@@ -12,6 +12,7 @@ import { shownCheckText } from '@/lib/i18n/check-text';
 import { templateWord } from '@/lib/i18n/templates';
 import type { Locale } from '@/lib/i18n/locales';
 import type {
+  OpenFindingRow,
   CriterionResult,
   ExitCriterion,
   StageContext,
@@ -826,7 +827,8 @@ export function completionSummary(
  */
 export type OutstandingItem =
   | { kind: 'stale_stage'; stageId: string; label: string; reason: string }
-  | { kind: 'open_findings'; stageId: string; label: string; count: number; optional?: boolean }
+  /** `rows`: the undecided rows themselves, so a stop can name them (1 Nov: "which finding is it?"). */
+  | { kind: 'open_findings'; stageId: string; label: string; count: number; optional?: boolean; rows?: OpenFindingRow[] }
   | { kind: 'unconfirmed_proposals'; stageId: string; label: string; count: number; optional?: boolean }
   /**
    * Rows carried forward or deferred that say an objective requirement is
@@ -882,7 +884,13 @@ export function outstandingWork(
     // Rows that say a requirement is unmet hold it up wherever they are (C2).
     const optionalTable = !rowsRequired(stage);
     const unmetRows = optionalTable ? Math.min(ctx.openUnmet?.[stage.id] ?? 0, (findings ? findings.total - findings.triaged : 0) + proposed) : 0;
-    if (unmetRows > 0) out.push({ kind: 'open_findings', stageId: stage.id, label, count: unmetRows });
+    const rowsHere = ctx.openRows?.[stage.id];
+    const named = rowsHere?.length ? { rows: rowsHere } : {};
+    let rowsUsed = false;
+    if (unmetRows > 0) {
+      out.push({ kind: 'open_findings', stageId: stage.id, label, count: unmetRows, ...named });
+      rowsUsed = true;
+    }
     let rest = unmetRows;
     const optional = optionalTable ? { optional: true } : {};
     if (findings) {
@@ -890,7 +898,7 @@ export function outstandingWork(
       const all = Math.max(0, findings.total - findings.triaged - proposed);
       const open = Math.max(0, all - rest);
       rest = Math.max(0, rest - all);
-      if (open > 0) out.push({ kind: 'open_findings', stageId: stage.id, label, count: open, ...optional });
+      if (open > 0) out.push({ kind: 'open_findings', stageId: stage.id, label, count: open, ...optional, ...(rowsUsed ? {} : named) });
     }
     const proposals = Math.max(0, proposed - rest);
     if (proposals > 0) out.push({ kind: 'unconfirmed_proposals', stageId: stage.id, label, count: proposals, ...optional });
@@ -963,6 +971,20 @@ export interface OutstandingShow {
   waiting?: (english: string) => string;
 }
 
+/**
+ * The undecided rows, named: "i11 (major): "i2 rests on two premises…" —
+ * suggested: "Do not carry i2's reserve…"". Row text is the table's own, so it
+ * is not translated. Empty when the item carries no rows.
+ */
+export function namedRows(rows: readonly OpenFindingRow[] | undefined, max = 3): string {
+  if (!rows?.length) return '';
+  const shown = rows.slice(0, max).map((r) => {
+    const head = `${r.id}${r.severity ? ` (${r.severity})` : ''}: "${r.text}"`;
+    return r.suggested_change ? `${head} → suggested: "${r.suggested_change}"` : head;
+  });
+  return ` — ${shown.join('; ')}${rows.length > max ? ` (+${rows.length - max})` : ''}`;
+}
+
 /** As `describeOutstanding`, in `locale`. */
 export function shownOutstanding(raw: OutstandingItem, locale: Locale, show: OutstandingShow = {}): string {
   const t = (key: string, vars?: Record<string, string | number>) => translate(locale, key, vars);
@@ -971,7 +993,7 @@ export function shownOutstanding(raw: OutstandingItem, locale: Locale, show: Out
     case 'stale_stage':
       return t('out.stale', { label: item.label, reason: shownCheckText(locale, item.reason) });
     case 'open_findings':
-      return t(item.optional ? 'out.optFindings' : 'out.findings', { label: item.label, count: item.count });
+      return t(item.optional ? 'out.optFindings' : 'out.findings', { label: item.label, count: item.count }) + namedRows(item.rows);
     case 'unconfirmed_proposals':
       return t(item.optional ? 'out.optProposals' : 'out.proposals', { label: item.label, count: item.count });
     case 'carried_forward':

@@ -36,7 +36,7 @@ import { lookupAndVerify } from '@/lib/workflow/verify';
 import { figuresFromOutput, readStageFigures, withRunFigures, type StageFigures } from '@/lib/workflow/figures';
 import { applyRunBlocked, applyRunResult } from '@/lib/workflow/run-result';
 import { inputsChanged, stageInputs } from '@/lib/workflow/stage-inputs';
-import { applyTriage, isTriageTable, splitUntriaged } from '@/lib/workflow/triage';
+import { applyTriage, isTriageTable, recordedDecisions, splitUntriaged } from '@/lib/workflow/triage';
 import { findingsAllDecided, restatesTriage } from '@/lib/workflow/triage-approval';
 import { modeForStage } from '@/lib/workflow/stage-mode';
 import { restoreDecided } from '@/lib/workflow/commit-check';
@@ -46,7 +46,7 @@ import { proposeStatuses } from '@/lib/workflow/propose';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import { dataFileBriefs, summariseStageContent } from '@/lib/workflow/digest';
 import { stageContentForSummary, stageEvidence } from '@/lib/workflow/evidence';
-import { blocksCompletion, deliverableStage, describeOutstanding, evaluateStage, outstandingWork, remainingStages } from '@/lib/workflow/engine';
+import { blocksCompletion, deliverableStage, describeOutstanding, evaluateStage, outstandingWork, remainingStages, type OutstandingItem } from '@/lib/workflow/engine';
 import { describeBasis, executableNext, openWithNextLine, pausedLine, stillMet, type ObjectiveAssessment, type ObjectiveBasis } from '@/lib/workflow/objective';
 import { addedByRun, designAddedStage, MAX_ADDED_PER_RUN, type AddedStage } from '@/lib/workflow/added-stages';
 import { attachedDocuments, currentFacts, supersededFactValues } from '@/lib/workflow/facts';
@@ -962,18 +962,24 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       const r = ctx.facts?.review;
       if (!r || !r.routine.length) return done(key, { status: 'failed', output: 'No routine finding is left to decide.', toolsUsed: [], changes: {} });
       if (!ctx.appendStageVersion) throw new Error('This view cannot save versions.');
-      const res = await api.agentTriage(
-        {
-          inputs, state: ctx.digest,
-          items: r.routine.map((i) => Object.fromEntries(Object.entries(i).filter(([k, v]) => k !== 'status' && k !== 'reason' && typeof v === 'string')) as Record<string, string>),
-          statuses: proposableStatuses(r.schema).map((s) => ({ value: s.value, label: s.label, requires_reason: Boolean(s.requiresReason) })),
-          model,
-        },
-        ctx.signal
-      );
+      // A row that only carries out what the user recorded is accepted in
+      // code, with the fact as its reason; the model decides the rest (1 Nov).
+      const recorded = recordedDecisions(r.routine, r.schema, currentFacts(ctx.project.facts));
+      const forModel = r.routine.filter((i) => !recorded.some((d) => d.id === i.id));
+      const res = forModel.length
+        ? await api.agentTriage(
+            {
+              inputs, state: ctx.digest,
+              items: forModel.map((i) => Object.fromEntries(Object.entries(i).filter(([k, v]) => k !== 'status' && k !== 'reason' && typeof v === 'string')) as Record<string, string>),
+              statuses: proposableStatuses(r.schema).map((s) => ({ value: s.value, label: s.label, requires_reason: Boolean(s.requiresReason) })),
+              model,
+            },
+            ctx.signal
+          )
+        : { decisions: [], model_used: '' };
       // Only the routine rows, only the table's own statuses, a reason where
       // one is demanded — anything else leaves the row for the user.
-      const { items, applied } = applyTriage(r.items, res.decisions.filter((d) => r.routine.some((i) => i.id === d.id)), r.schema);
+      const { items, applied } = applyTriage(r.items, [...recorded, ...res.decisions.filter((d) => forModel.some((i) => i.id === d.id))], r.schema);
       if (!applied.length) return done(key, { status: 'failed', output: 'The model returned no usable decision.', toolsUsed: ['model'], changes: {} });
       const created = await ctx.appendStageVersion(ctx.stage.id, ctx.stage.label, {
         content: serializeItems(items),
@@ -1249,7 +1255,17 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       const triaged: string[] = [];
       if (before && isTriageTable(tableSchema) && ctx.run.policy === 'autonomous' && ctx.project.routine_decisions === 'handle') {
         const rows = parseItems(content) ?? [];
-        const { routine } = splitUntriaged(rows, tableSchema);
+        const facts = currentFacts(ctx.project.facts);
+        const { routine: all } = splitUntriaged(rows, tableSchema, facts);
+        // What carries out the user's own recorded decision is accepted in code (1 Nov).
+        const recorded = recordedDecisions(all, tableSchema, facts);
+        if (recorded.length) {
+          const r = applyTriage(rows, recorded, tableSchema);
+          rows.splice(0, rows.length, ...r.items);
+          content = serializeItems(r.items);
+          triaged.push(...r.applied);
+        }
+        const routine = all.filter((i) => !recorded.some((d) => d.id === i.id));
         if (routine.length) {
           const t = await api.agentTriage(
             {
@@ -1862,7 +1878,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
           status: 'succeeded', toolsUsed: [], changes: {},
           output: `${reason} I will not call the objective met while any of it is open.`,
           stop: { status: 'awaiting_decision', reason },
-          needs: { kind: 'objective_check', stageId: ctx.stage.id, finding: 'work_open', items: open.map(describeOutstanding) },
+          needs: { kind: 'objective_check', stageId: ctx.stage.id, finding: 'work_open', items: open.map(describeOutstanding), ...openRowsOf(ctx.template, open) },
         });
       }
       // PM-25: the model's opinion is not enough — the deliverable has to exist.
@@ -2594,4 +2610,22 @@ function keepWeb(ctx: PerformContext, res: WebUse, stage: StageDefinition) {
 /** The same reasons, in any order. */
 function sameKinds(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && a.every((k) => b.includes(k));
+}
+
+/**
+ * The undecided rows the open work names, for a stop that should show them
+ * (1 Nov: "Tell me which finding it is first" — "I can't see the Check table").
+ */
+function openRowsOf(template: WorkflowTemplate, open: readonly OutstandingItem[]): { rows?: NonNullable<Extract<NeedsUser, { kind: 'objective_check' }>['rows']> } {
+  const rows = open.flatMap((item) => {
+    if (item.kind !== 'open_findings' || !item.rows?.length) return [];
+    const stage = template.stages.find((s) => s.id === item.stageId);
+    const stageLabel = stage ? stage.short_label || stage.label : item.label;
+    return item.rows.map((r) => ({
+      stageId: item.stageId, stageLabel, id: r.id, text: r.text,
+      ...(r.severity ? { severity: r.severity } : {}),
+      ...(r.suggested_change ? { suggested_change: r.suggested_change } : {}),
+    }));
+  });
+  return rows.length ? { rows: rows.slice(0, 12) } : {};
 }

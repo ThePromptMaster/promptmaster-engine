@@ -13,7 +13,7 @@
  * user can fix, never as a thrown exception inside a renderer.
  */
 
-import type { StageDefinition, StageRenderer } from './types';
+import type { OpenFindingRow, StageDefinition, StageRenderer } from './types';
 import { needsPeople } from './human-requirements';
 
 /** One row. Fields beyond id/status/reason are declared by the item schema. */
@@ -811,6 +811,41 @@ function problemText(i: StageItem, schema: StageItemSchema): string {
  */
 export function openUnmet(items: readonly StageItem[], schema: StageItemSchema): number {
   return items.filter((i) => (!isTriaged(i, schema) || i.status_source === 'proposed') && !positiveVerdict(i) && (i.severity === 'major' || UNMET.test(problemText(i, schema)))).length;
+}
+
+/**
+ * The rows nobody has decided, worded as the table words them: id, what is
+ * wrong, severity and the suggested change. Proposed rows are included with
+ * the status PromptMaster proposed — they are not decided until confirmed.
+ * Long text is clipped so a prompt or a stop message stays short.
+ */
+export function openFindingRows(items: readonly StageItem[], schema: StageItemSchema, max = 8): OpenFindingRow[] {
+  const clip = (t: string, n: number) => (t.length > n ? `${t.slice(0, n - 1).trimEnd()}…` : t);
+  return items
+    .filter((i) => !isTriaged(i, schema))
+    .slice(0, max)
+    .map((i) => {
+      const row: OpenFindingRow = { id: i.id, text: clip(problemText(i, schema), 400) };
+      if (i.severity?.trim()) row.severity = i.severity.trim();
+      const change = (i.suggested_change ?? '').trim();
+      if (change) row.suggested_change = clip(change, 300);
+      if (isProposed(i)) row.proposed = i.status;
+      return row;
+    });
+}
+
+/**
+ * One row decided by the user, from wherever they decided it — the table, or
+ * Go's stop on a later stage that names it (1 Nov). The row is theirs from
+ * then on; a status that needs a reason gets the one given, else the row's own.
+ */
+export function decideRow(items: readonly StageItem[], id: string, status: string, reason?: string): StageItem[] {
+  return items.map((r) => {
+    if (r.id !== id) return r;
+    const next: StageItem = { ...r, status, status_source: 'user' };
+    if (reason?.trim()) next.reason = reason.trim();
+    return next;
+  });
 }
 
 function rowText(item: StageItem): string {
