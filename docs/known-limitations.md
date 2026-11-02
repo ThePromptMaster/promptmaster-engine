@@ -2713,3 +2713,18 @@ counted. On 2 Nov three searches on a Sources stage saved 1, 5 and 3 new sources
 with "none of them saved anything". Three searches that found only what was already saved still
 stop the run. The cost is that a run of searches that each turn up something new is bounded only
 by the step window and by the planner choosing to draft, not by this guard.
+
+### L-143 — Findings are applied to a long text a part at a time (2026-11-02)
+
+Applying a check's findings (Go's "Apply the findings" and the stage's Apply button) to a text of
+more than about 5,000 words now revises it a part at a time, split on its top-level headings, and
+joins the parts in code, as a repair has done since L-127. Before, it was one call. On 2 Nov a
+13,504-word final report came back at 9,249 words, mid-section, and was saved as the current
+version with the step marked "succeeded". Every part is sent every finding and told where it sits
+in the whole. A finding that concerns one part is applied there, and the other parts are returned
+as they are. Only the first part may search the web. A part that comes back cut off or empty is
+kept as it was, and the step names it. A revision of a shorter text that the length limit still
+cuts off is no longer saved: it would replace a whole text with part of one. The previous version
+stands and the step fails, saying so. The cost is that a finding that spans parts (renumbering
+sections, say) is applied by each part separately, which can be uneven; the next check reads
+the joined text.

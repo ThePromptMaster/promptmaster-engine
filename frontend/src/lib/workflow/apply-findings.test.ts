@@ -69,3 +69,46 @@ describe('applying findings to a table stage (production, 2026-10-01)', () => {
     expect(out[0]).toMatchObject({ finding: 'z', status: 'candidate' });
   });
 });
+
+describe('applying findings to a long text (2 Nov, production: 13,504 words came back as 9,249)', () => {
+  const section = (n: number) => `## Section ${n}\n\n${Array.from({ length: 2_400 }, (_, i) => `w${n}x${i}`).join(' ')}\n\n`;
+  const long = [1, 2, 3, 4].map(section).join('');
+
+  it('revises it a part at a time, every finding to every part, and joins the parts in code', async () => {
+    vi.mocked(api.applyRecommendations).mockReset();
+    vi.mocked(api.applyRecommendations).mockImplementation(async (req) => ({
+      content: req.content.replace(/^## Section (\d)/gm, '## Revised $1'), instruction: 'block', finish_reason: 'stop',
+    }) as never);
+    const rev = await reviseWithFindings({ project, content: long, findings, source: 'the stage check' });
+    const calls = vi.mocked(api.applyRecommendations).mock.calls.map((c) => c[0]);
+    expect(calls.length).toBeGreaterThan(1);
+    for (const c of calls) expect(c.findings[0]).toEqual(findings[0]);
+    expect(calls[0].findings.at(-1)!.suggested_change).toContain(`part 1 of ${calls.length}`);
+    // Only the first part may search.
+    expect(calls.slice(1).every((c) => c.web_access === 'off')).toBe(true);
+    expect(rev.after.match(/^## Revised \d/gm)).toEqual(['## Revised 1', '## Revised 2', '## Revised 3', '## Revised 4']);
+    expect(rev.finishReason).toBe('stop');
+    expect(rev.parts).toEqual({ count: calls.length, kept: [] });
+  });
+
+  it('keeps a part that comes back cut off as it was, and says which', async () => {
+    vi.mocked(api.applyRecommendations).mockReset();
+    vi.mocked(api.applyRecommendations).mockImplementation(async (req) => {
+      const cut = req.findings.at(-1)!.summary === 'Part 2 of 2';
+      return { content: cut ? '## Section 3\n\nhalf' : req.content.replace(/^## Section/gm, '## Revised'), instruction: 'block', finish_reason: cut ? 'length' : 'stop' } as never;
+    });
+    const rev = await reviseWithFindings({ project, content: long, findings, source: 's' });
+    expect(rev.parts).toEqual({ count: 2, kept: [2] });
+    expect(rev.after).toContain('## Revised 1');
+    expect(rev.after).toContain(section(3).trim());
+    expect(rev.after).toContain(section(4).trim());
+  });
+
+  it('a short text is still one call', async () => {
+    vi.mocked(api.applyRecommendations).mockReset();
+    vi.mocked(api.applyRecommendations).mockResolvedValueOnce({ content: 'revised', instruction: 'block', finish_reason: 'stop' } as never);
+    const rev = await reviseWithFindings({ project, content: section(1), findings, source: 's' });
+    expect(api.applyRecommendations).toHaveBeenCalledTimes(1);
+    expect(rev.parts).toBeUndefined();
+  });
+});
