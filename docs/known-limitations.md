@@ -2621,6 +2621,61 @@ fails after that is reported as not run.
 Not covered: `audit_findings.py` still returns no findings on a failed call. It has no caller in
 the workspace today. The four-call iteration pipeline (`evaluator.py`) marks its fallback
 `failed`, but its consumers (side-chat "save as new version") still display the scores.
+### L-135 — An open finding is named; only one is decided from Go's stop (2026-11-02)
+
+Undecided review rows now reach Go's state, the open-work lines and the side chat with their id,
+wording, severity and suggested change, instead of a count (Sean, 1 Nov: "I can't see the Check
+table from this stage"). Go is given at most 12 such rows, each clipped to 400 characters (its
+suggested change to 300); a stop line names at most three. Go's completion stop offers Accept
+and Reject only when one row is all that is open; with several it still offers "Carry on with
+the open work", and the rows are decided in their table. A row decided from the stop is saved as
+the user's decision on that stage's table, which marks the stages after it for a recheck, as any
+change to the table does.
+
+### L-136 — "Carries out your decision" rests on a quote of the fact (2026-11-02)
+
+A triage row is routine, whatever its severity, when it quotes an accepted fact it only carries
+out (`implements`); it is the user's, whatever its severity, when it quotes one it would alter
+(`changes`). The model writes the quote; code matches it against the current facts (case, quotes
+and spacing aside, one containing the other, at least 12 characters), so a row cannot cite
+something the user never recorded. A finding the model does not tie to a fact falls back to
+severity, as before. Rows written before 2 Nov carry no quote. An `implements` row is accepted in
+code, with the fact as its reason, only under "Handle them for me", in Go's triage.
+
+### L-137 — The setup follows an explicit change made through the side chat (2026-11-02)
+
+When a side-chat change explicitly replaces the objective or a constraint ("compare B and C
+only", "replace the $40,000 reserve with $75,000"), the change is offered first, under
+"Project setup", with the facts it records. Ticked, the stored field is replaced; the old text
+is kept in the brief's history (`brief_changed`) and what relied on it is reopened. Each needs
+a verbatim quote from the instruction. A hand edit, a restored version and Go's own revisions
+never change the setup. A change the check does not report can still be made by hand in the
+project setup.
+
+### L-138 — A request asked before a change is dropped by the change (2026-11-02)
+
+A Go request for an approval, an objective decision or an answer, raised before a later change
+marked stages for a recheck, no longer holds. The rechecks come first, and anything still needed
+is asked of the rechecked work. This compares the request's time (`raisedAt`, recorded from 2 Nov)
+with each stale stage's `since`. A request recorded before this release has no time and keeps
+showing until it is answered or Go is resumed. A stage awaiting recheck now says why, and offers
+"Recheck the changed stages" and "Edit this stage".
+
+### L-139 — The deliverable check is a model's check, bounded at two rounds (2026-11-02)
+
+Before Go calls the objective met, one call checks the deliverable. It looks at whether each
+accepted finding on the tables before it is carried, and for contradictions between a rule,
+gate or threshold and the text's own caveats or the accepted facts. A claim stands only with
+its passage found in the text, so the check cannot invent a contradiction it cannot point to.
+It can still miss one, or call a carried finding not carried.
+
+Its issues go to the objective check as failed checks for at most two rounds a run on a
+deliverable. After that they are recorded as stated limitations, and the run stops on the
+assessment as it is. The result is saved with the objective assessment (`deliverable_check`).
+It is not shown on the finding rows: a row's states are decided and applied, and whether it was
+carried is in the run's record and the assessment. A check that cannot run concludes nothing and
+never blocks.
+
 ### L-140 — A Check approval that only restates "every finding decided" is read from the table (2026-11-02)
 
 Under "Handle them for me", Go now commits the routine approval on a table stage (review or

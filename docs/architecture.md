@@ -673,6 +673,24 @@ Assessment: `docs/assessments/2026-10-21-oct14-call.md`.
 | Project colour | `projects.accent` (`20261107000000`, checked by `accent-drift.test.ts`); `lib/appearance/colours.ts` `accentVariables`, set on the workspace root and the project card |
 | Full-work reader note | `lib/workflow/reader-lag.ts` |
 
+### Intent, delegation and completion (2026-11-02)
+
+Sean's four 1 Nov emails (recruitment plan, tattoo memo). The failed-check and delegated-approval
+halves are L-134 and L-140 (#451, #453); the rest is here (#452, #454, #455, #456).
+
+| Concern | Where it lives |
+|---|---|
+| An open finding is named, not counted | `StageContext.openRows` (`context.ts`, `stage-artifact.openFindingRows`); the `open_findings` outstanding item carries `rows`, and `describeOutstanding` names them (`engine.namedRows`); Go's state has `open_findings_elsewhere` (`lib/agent/digest.ts` → `AgentState` in `promptmaster/agent.py`); the side chat's digest keeps row ids (`lib/workflow/digest.ts`) |
+| Deciding it from Go's stop | `work_open` with one row offers Accept / Reject (`needs.ts`, `need.acceptRow`/`rejectRow`/`rowEffect`); `GoPanel` calls `needsActions.decideRow`, which saves the user's decision on that stage's table (`stage-artifact.decideRow`) |
+| A finding that carries out the user's own decision | Triage rows may quote the accepted fact they carry out (`implements`) or alter (`changes`) — asked in `promptmaster/stage.py`, kept by `_parse_items`; matched in code by `triage.quotedFact`. `findingRisk` reads them before severity; `recordedDecisions` accepts an `implements` row with no model call, the fact as its reason (L-136) |
+| The setup follows an explicit change | `revision_facts.py` `setup_changes` (quote verbatim from the instruction); `fact-reconcile.withMeaningChanges` turns each into a `FactChange` with `setup`, grouped first as "Project setup"; `use-stage-chat` `accept()` → `onPatchSetup` → `onPatchProject`; the brief-change watcher records the old text and reopens what relied on it (L-137) |
+| Precedence of an explicit change of objective | `self_model.py`, `precedence.py` (objective entry), `conversation.py` (`_PROMPTMASTER_CONTEXT`, `_INSTRUCTION_IS_LATER`); record-keeping never goes into the work |
+| Thousands separators in measured limits | `measurable.ts` `NUM` / `num` and the no-break-space normalisation in `parseRequirements` |
+| A route through the rechecks | `next-step.goIsAsking`: a cleared request is not a question, so the bar offers Apply and continue (#456). A stale stage's banner (`ws.staleNote`) and "Recheck the changed stages" (`continueWork`) in `workflow-workspace.tsx`; `needs.overtakenByChange` drops a request raised (`NeedsUser.raisedAt`, stamped in `use-go-loop` `setRunStatus`) before a stage went stale (L-138) |
+| The deliverable checked before "objective met" | `POST /api/agent/check-deliverable` (`promptmaster/deliverable_check.py`); `lib/agent/deliverable-check.ts`; run by `judgeObjective` in `perform.ts`; issues go in as failed checks; at most `MAX_CHECK_ROUNDS` a run, then stated limitations; saved as `deliverable_check` in the `objective_assessed` payload (L-139) |
+| A conditional decision memo can be complete | `objective_assessment._ASSESS_INSTRUCTION` |
+| Approval is for use, not of every assumption | `saved_documents.DOCUMENTS_RULE`; the planner's "Earlier stages" line (`agent._format_state`) |
+
 ## Extension points
 
 These are the seams the system was built to be extended at. Working with them is
