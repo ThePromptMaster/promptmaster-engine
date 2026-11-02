@@ -2688,3 +2688,18 @@ every / all … finding"). An approval worded differently still goes through the
 designs no longer produce such an approval on a Check stage: the automatic "Every finding accepted
 or rejected" blocks in its place. Workflows designed before keep their box, which Go now commits.
 Reserved approvals and "Ask me" are unchanged, and material findings are still the user's.
+
+### L-141 — An approximate word range is a target, not a measured limit (2026-11-02)
+
+A word range written as an approximation ("roughly 4,500–5,000 words", "about 300–400 words",
+"a roughly 250-word summary", "~150–200 words") is no longer measured in code. It still reaches
+every prompt as part of the brief, and the model is still asked to write to it; only the
+pass/fail count is skipped, as it already was for a single approximate figure ("about 14,000
+words"). Before, such a range was read as a firm limit, and the approximation word could be
+taken as the name of the part it limits. On 2 Nov a generated setup said "about four sections
+on history (roughly 4,500–5,000 words)". That was read as a 4,500–5,000-word limit named
+"roughly" and held against the outline stage, whose instruction also says "roughly". Go repaired
+a 1,553-word outline twice towards 4,500 words, then stopped with "the last 2 steps failed".
+A firm range ("100–140 words", "under 300 words", "exactly 50 words") is measured as before. The
+cost is that an approximate range is never enforced: a section that lands well outside it is
+caught only by the evaluator or by the user.

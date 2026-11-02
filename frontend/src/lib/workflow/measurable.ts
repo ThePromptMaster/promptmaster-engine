@@ -182,6 +182,18 @@ const NEGATED = /\b(?:no|not an?|without an?|never an?)\s+(?:[a-z-]+\s+){0,2}$/i
 /** Words between a part's name and its limit: "must be", "is", "should stay". */
 const TRAILING_VERB = /^(?:is|are|be|must|should|shall|will|stays?|remains?|kept|runs?|needs?|to|has|have)$/i;
 
+/**
+ * "roughly 4,500–5,000 words", "about 300–400 words", "a roughly 250-word
+ * summary": a target the brief gives, not a limit to fail a stage on. The
+ * text still reaches every prompt; only the measurement in code is skipped,
+ * as it already is for "about 14,000 words" (2 Nov: "about four sections on
+ * history (roughly 4,500–5,000 words)" was read as a limit named "roughly",
+ * held against the outline, which says "roughly", and Go repaired a
+ * 1,553-word outline twice towards 4,500 words, then stopped: the last 2
+ * steps failed).
+ */
+const APPROXIMATE = /(?:\b(?:roughly|about|around|approximately|approx\.?|some|circa|nearly|almost)|~|约)\s*$/i;
+
 /** Names for the whole deliverable, not a part of it. */
 const WHOLE = /^(?:deliverable|document|output|response|pack|package|whole(?: thing)?|text|draft|piece|it)$/i;
 
@@ -225,6 +237,7 @@ export function parseRequirements(texts: readonly string[]): MeasurableRequireme
       for (const m of t.matchAll(re)) {
         const r = read(m);
         if ((r.min ?? 0) > 20_000 || (r.max ?? 0) > 20_000) continue;
+        if (APPROXIMATE.test(t.slice(Math.max(0, m.index! - 20), m.index!))) continue;
         // "Keep the summary to 250 words" names its subject inside the match.
         const inside = m[0].match(SUBJECT_RE);
         const subject = inside ? canonical(inside[1]) : partBefore(t, m.index!) || itemBefore(t, m.index!) || subjectNear(t, m.index!, m.index! + m[0].length);
