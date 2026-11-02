@@ -114,6 +114,14 @@ async def test_length_marker_reports_truncation():
     assert finish == "length"
 
 
+@pytest.mark.asyncio
+async def test_length_marker_cuts_the_draft_not_a_revision_against_findings():
+    _content, _usage, finish = await ScriptedClient().generate_with_meta(
+        "Original objective: go [[mock:length]]\n\nPREVIOUS OUTPUT (revise this — do not repeat verbatim):\nMock output\n\nFINDINGS TO ADDRESS:\n- tighten"
+    )
+    assert finish == "stop"
+
+
 def test_402_reaches_the_user_as_a_structured_error(http):
     """The drain parses `detail.code` to decide not to retry (PM-04)."""
     inputs = {**INPUTS, "objective": "Credits test [[mock:402]]"}
