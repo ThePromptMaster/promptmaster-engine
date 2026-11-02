@@ -245,6 +245,15 @@ describe('a value is replaced by the one the user names in its place (2 Nov, pho
     expect(said.map((c) => c.proposed)).toEqual(['The ticket price is $35 per person, replacing $40.']);
   });
 
+  it('what a fact records it replaced is its history, never changed (2 Nov, production pass)', () => {
+    const recorded = [fact('n', 'The ticket price is $30 per person, replacing $40.'), fact('t', 'Tickets cost $40 per person.')];
+    const out = factChangesFromRevision({ facts: recorded, instruction, before: after, after });
+    expect(out.map((c) => [c.fact.id, c.proposed])).toEqual([['t', 'Tickets cost $30 per person.']]);
+    // "not" and "from" in a fact's own words are not a record of replacement.
+    const capped = factChangesFromRevision({ facts: [fact('x', 'Do not spend more than $300.')], instruction: 'Replace the $300 spending cap with $250.', before: 'Spend at most $300.', after: 'Spend at most $250.' });
+    expect(capped.map((c) => c.proposed)).toEqual(['Do not spend more than $250.']);
+  });
+
   it('a sentence about something else does not change a fact that happens to share the value', () => {
     const venue = fact('v', 'The venue deposit is $400.');
     const out = factChangesFromRevision({ facts: [venue], instruction: 'Replace the $400 minimum unspent reserve with $800.', before: 'Deposit $400.', after: 'Deposit $400.' });

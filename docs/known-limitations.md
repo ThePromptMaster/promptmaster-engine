@@ -2823,7 +2823,9 @@ it gives the value nearest it as the new one. Replacing means "replace … with"
 "instead of", "→" or "was $16,000, not $18,000". It must also share a word with what the fact is
 about (not "under", "words" or the like). A sentence that names the value without replacing it
 keeps the fact as it is. So does a sentence in which the fact's value is the new one ("… with
-$800", "to $30"), so a fact already updated is never offered its old value back. A new limit
+$800", "to $30"), so a fact already updated is never offered its old value back. A value a
+fact records as replaced ("The ticket price is $30 per person, replacing $40") is its history and
+is never offered for change. A new limit
 changes only the fact it names, when more than one fact holds a limit in that unit. Otherwise
 the matcher works as before.
 

@@ -115,6 +115,12 @@ const stemmed = (t: string) =>
 /** Where `raw` is written as a whole value: "$40" is not found inside "$400". */
 const valueAt = (text: string, raw: string) => text.search(new RegExp(`${raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\d])`));
 
+/** "…, replacing $40", "superseding the earlier $30 million": a value the fact itself records as replaced. */
+function recordedAsReplaced(statement: string, raw: string): boolean {
+  const lead = statement.slice(0, Math.max(0, valueAt(statement, raw))).split(/[$€£]?\d[\d,.]*/).at(-1) ?? '';
+  return /(?:\breplac\w*|\bsupersed\w*|\binstead of|\brather than|\bpreviously|\bformerly)\b[^.;]{0,30}$/i.test(lead);
+}
+
 /**
  * Which side of the replacement a value is on, from the words just before it:
  * "replace the $400 … with $800", "from $40 to $30", "$30, replacing $40",
@@ -224,6 +230,10 @@ export function factChangesFromRevision(input: {
     let proposed = own;
     for (const m of valueMentions(own)) {
       if (!RECONCILED.includes(m.kind)) continue;
+      // What the fact records it replaced is its history: "The ticket price is
+      // $30 per person, replacing $40" keeps its $40 (2 Nov, production pass:
+      // it was offered as "replacing $30").
+      if (recordedAsReplaced(own, m.raw)) continue;
       // The user's own words first: a sentence that replaces this value names
       // its successor; one that only says it again keeps it.
       const told = inInstruction(input.instruction, m, own);
