@@ -478,7 +478,14 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       set({
         // Unsaved local edits stay on screen over the freshly loaded row; the
         // pending flush will send them with the new revision.
-        project: background ? { ...project, ...pendingPatch } : project,
+        // A background read that left before a save landed carries an older
+        // revision: the newer copy stays, or the next save meets "changed in
+        // another tab" with one tab open (2 Nov).
+        project: background
+          ? (get().project?.revision ?? -1) > project.revision
+            ? get().project!
+            : { ...project, ...pendingPatch }
+          : project,
         artifact,
         versions,
         stages,

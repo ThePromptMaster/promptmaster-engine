@@ -1158,10 +1158,15 @@ export function WorkflowWorkspace({
 
   const handleToggleManual = useCallback(
     async (id: string, checked: boolean) => {
-      const manual_checks = { ...(project.manual_checks ?? {}), [id]: checked };
+      // From the store's latest copy, as commitCriterion does: a tick built on
+      // this render's \`project\` wiped an approval Go had committed since (2 Nov,
+      // prod: "This list matches the requirements I gave" vanished after three
+      // later ticks, and Requirements could never close again).
+      const latest = useProjectStore.getState().project ?? project;
+      const manual_checks = { ...(latest.manual_checks ?? {}), [id]: checked };
       // Which version the approval was given on (19 Oct).
       const head = stageBundles[stageId]?.versions.at(-1)?.id;
-      const others = Object.fromEntries(Object.entries(project.manual_check_versions ?? {}).filter(([k]) => k !== id));
+      const others = Object.fromEntries(Object.entries(latest.manual_check_versions ?? {}).filter(([k]) => k !== id));
       onPatchProject({ manual_checks, manual_check_versions: checked && head ? { ...others, [id]: head } : others });
 
       // Ticking the last required box on a stage that was left open closes

@@ -634,15 +634,21 @@ export function useStageChat({
       const chosen = (proposal.factChanges ?? []).filter((c) => !updateFactIds || updateFactIds.includes(c.fact.id));
       let factsUpdated = 0;
       const setupUpdated: string[] = [];
+      // The setup fields go in one patch, one save (2 Nov: a save per field,
+      // then a reload, showed "changed in another tab" with one tab open).
+      const setupChosen = chosen.filter((c) => c.setup);
+      if (setupChosen.length && onPatchSetup) {
+        try {
+          await onPatchSetup(Object.fromEntries(setupChosen.map((c) => [c.setup!, c.proposed])));
+          setupUpdated.push(...setupChosen.map((c) => (c.setup === 'output_format' ? 'output format' : c.setup!)));
+        } catch {
+          // The version is saved; the setup is still editable in Project setup.
+        }
+      }
       for (const c of chosen) {
         try {
           const from = { via: 'revision', stage_id: stageId, instruction: proposal.instruction.slice(0, 500) };
-          if (c.setup) {
-            if (!onPatchSetup) continue;
-            await onPatchSetup({ [c.setup]: c.proposed });
-            setupUpdated.push(c.setup === 'output_format' ? 'output format' : c.setup);
-            continue;
-          }
+          if (c.setup) continue;
           if (isNewFact(c)) await recordFacts(project, [{ statement: c.proposed, kind: c.fact.kind, source_kind: 'user_edit', source_ref: newFactSource(c, from) }]);
           else await supersedeFact(project, c.fact, c.proposed, from);
           factsUpdated += 1;
