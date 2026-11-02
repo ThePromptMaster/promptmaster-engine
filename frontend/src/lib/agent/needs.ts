@@ -641,7 +641,12 @@ export function needsUser(input: {
   }
   const wantsApproval = stage.exit_criteria.some((c) => c.rule?.type === 'outline_approved');
   const approvalUnmet = stageEvaluation.unmet.some((c) => stage.exit_criteria.find((x) => x.id === c.id)?.rule?.type === 'outline_approved');
-  if (wantsApproval && approvalUnmet && outlineStageId) {
+  // A stage that holds the outline and asks for it approved, with no outline
+  // written yet, is Go's to generate, not the user's to approve (2 Nov,
+  // production: a designed Chapter plan stage was empty and Go stopped on
+  // "Approve the outline", which answered "There is no saved outline").
+  const outlineEmptyHere = facts.outline !== undefined && facts.outline.namedSections === 0;
+  if (wantsApproval && approvalUnmet && outlineStageId && !outlineEmptyHere) {
     return { kind: 'approve_outline', stageId: outlineStageId, versionNumber: null, unsavedDraft: false };
   }
   if (facts.manuscript && !facts.manuscript.approvedOutlineVersionId && outlineStageId) {
