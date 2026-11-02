@@ -366,9 +366,10 @@ const isQuestion = (l: Line) => {
  * label its assumptions holds them as part of what it says, so "Assumption:
  * the survey runs online" counts — as it does when anyone counts the brief.
  */
-// "**Length:** 545 words including headings and tables" is the text's own
-// count of itself, not part of it (2 Nov, photography workshop).
-const NOTE = /^\W*(?:(?:what changed|revision notes?|change notes?|notes?|word count|words?\s*:|\(\d+\s+words?\)|verification)\b|(?:total\s+)?length\W*(?:about\s+|~\s*)?\d[\d,]*\s+words?\b)/i;
+// "**Length:** 545 words including headings and tables", "Message: 55 words,
+// counted by hand": the text's own count of itself, not part of it (2 Nov,
+// photography workshop: the promo measured 61 with its count line, 55 without).
+const NOTE = /^\W*(?:(?:what changed|revision notes?|change notes?|notes?|word count|words?\s*:|\(\d+\s+words?\)|verification)\b|[a-z][a-z ]{0,30}?\W*:\W*(?:about\s+|~\s*)?\d[\d,]*\s+words?\b)/i;
 
 /**
  * A part of a document that sits beside other parts — "a summary of at most

@@ -53,5 +53,7 @@ describe('a word limit that says its headings count', () => {
     expect(countWords(text)).toBe(5);
     expect(countWords(text, { headings: true })).toBe(5);
     expect(countWords('Length: 2 hours, in person.')).toBe(5);
+    expect(countWords('> New to photography? Join us.\n\nMessage: 55 words, counted by hand.')).toBe(5);
+    expect(countWords('Section two covers 300 words of history.')).toBe(7);
   });
 });

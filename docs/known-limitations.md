@@ -2787,7 +2787,7 @@ limit's own sentence says the headings count: "including headings", "headings in
 "counting the headings". Then every heading line is counted too, and the checklist says so ("at
 most 600 words (headings included)"). "With headings and tables" says what the text has, not what
 is counted, and does not turn this on. A line in which the text counts itself ("**Length:** 545
-words including headings and tables") is a note and is not counted, as "Word count:" lines
+words including headings and tables", "Message: 55 words, counted by hand") is a note and is not counted, as "Word count:" lines
 already were.
 
 On 2 Nov the constraint was "Stay under 600 words in total, including headings, tables and a
