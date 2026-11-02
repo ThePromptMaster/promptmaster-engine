@@ -112,6 +112,7 @@ export const zh: Record<keyof typeof en, string> = {
   'pnl.findingsShown_one': '{count} 个发现项，按其影响的评分分别列出。',
   'pnl.findingsShown_other': '{count} 个发现项，按其影响的评分分别列出。',
   'pnl.noDefects': '未发现具体问题。',
+  'pnl.checkDidNotRun': '此检查未能运行，因此没有作出任何评判。没有丢失任何内容——请重新运行检查。',
   'pnl.furtherFindings_one': '另有 {count} 个发现项',
   'pnl.furtherFindings_other': '另有 {count} 个发现项',
   'pnl.ratingLabel': '{label}评分',

@@ -18,6 +18,7 @@
  * manuscript come from that same read (1 Oct, item 1).
  */
 
+import { isFailedEvaluation } from '@/lib/workflow/evaluation-failure';
 import { countNamedSections, parseOutlineDocument } from '@/lib/outline/model';
 import { manuscriptArtifactFor, manuscriptSourceFor } from '@/lib/workflow/context';
 import { formatManuscript, type DataFileBrief, type StageArtifactBundle } from '@/lib/workflow/digest';
@@ -299,7 +300,10 @@ export function buildAgentState(input: {
       ];
       return notes.length ? `${c.label} (${notes.join('; ')})` : c.label;
     }),
-    evaluation: ev
+    // A check that could not run judged nothing (2 Nov); the planner is told so.
+    evaluation: ev && isFailedEvaluation(ev)
+      ? 'the last check could not run (the model returned nothing); it has not been checked'
+      : ev
       ? `alignment ${ev.alignment_score}, clarity ${ev.clarity_score}, drift ${ev.drift_score}` +
         (ev.findings?.length ? `; ${ev.findings.length} finding(s)` : '') +
         // PM-25: the evaluator's own "no further pass needed" reaches the planner.

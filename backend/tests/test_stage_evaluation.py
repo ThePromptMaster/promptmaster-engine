@@ -489,6 +489,21 @@ async def test_llm_failure_returns_a_renderable_result(
     assert result.evaluation.alignment.score == "Medium"
     assert "upstream is down" in result.evaluation.alignment.explanation
     assert result.recommendation is None
+    # 2 Nov (Sean): the placeholder scores were saved and shown as a check that
+    # passed. The response now says it is not a result.
+    assert result.evaluation.failed is True
+    assert result.evaluation.failure and "upstream is down" not in result.evaluation.failure
+
+
+@pytest.mark.asyncio
+async def test_a_real_evaluation_is_not_marked_failed(book_inputs, positioning_stage, book_digest):
+    client = AsyncMock()
+    client.generate_json = AsyncMock(return_value=(_defect_response(), {}))
+    result = await evaluate_stage_artifact(
+        client=client, inputs=book_inputs, stage=positioning_stage, content=OFF_OBJECTIVE, digest=book_digest,
+    )
+    assert result.evaluation.failed is False
+    assert client.generate_json.await_args.kwargs["max_tokens"] >= 4096
 
 
 def test_endpoint_returns_findings_and_a_recommendation(monkeypatch):

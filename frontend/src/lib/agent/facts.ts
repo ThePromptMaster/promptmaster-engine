@@ -33,6 +33,7 @@ import type { Artifact, ArtifactVersion, Evaluation, Project } from '@/types/pro
 import { actionFor } from './actions';
 import type { OutcomeProof } from './outcome';
 import type { StepOutcome } from './perform';
+import { isFailedEvaluation } from '@/lib/workflow/evaluation-failure';
 
 export interface OutlineFacts {
   artifact: Artifact;
@@ -110,7 +111,7 @@ export const GO_CONTINUE_TRIES = 2;
 
 export function draftFacts(
   head: { id: string; finish_reason?: string | null },
-  latestEvaluation?: { version_id: string } | null,
+  latestEvaluation?: ({ version_id: string } & Parameters<typeof isFailedEvaluation>[0]) | null,
   /** The stage's versions, oldest first: continuations since the text was last whole are counted. */
   versions: readonly { source_operation?: string | null; finish_reason?: string | null }[] = []
 ): DraftFacts {
@@ -121,7 +122,8 @@ export function draftFacts(
   }
   return {
     truncated: head.finish_reason === 'length' && continued < GO_CONTINUE_TRIES,
-    checked: Boolean(latestEvaluation && latestEvaluation.version_id === head.id),
+    // A check that could not run is not a check (2 Nov): Go runs it again.
+    checked: Boolean(latestEvaluation && latestEvaluation.version_id === head.id && !isFailedEvaluation(latestEvaluation)),
   };
 }
 
@@ -246,7 +248,7 @@ export async function readStageFacts(input: {
     }
   }
 
-  if (stageDrafts(stage) && latestEvaluation) {
+  if (stageDrafts(stage) && latestEvaluation && !isFailedEvaluation(latestEvaluation)) {
     const head = bundles[stage.id]?.versions.at(-1);
     facts.evaluationFindings = {
       count: latestEvaluation.findings?.length ?? 0,

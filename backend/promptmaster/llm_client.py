@@ -23,6 +23,10 @@ _RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 #: Whether the call being made is a JSON repair pass. Set around the repair in
 #: `generate_json`, read by `_meter` (E1, 6 Oct: repair work is measured).
 _REPAIRING: contextvars.ContextVar[bool] = contextvars.ContextVar("pm_repairing", default=False)
+# The finish_reason of the last `generate` in this context, so `generate_json`
+# can tell a cut-off answer from a malformed one (2 Nov) without changing
+# `generate`'s two-tuple.
+_LAST_FINISH: contextvars.ContextVar[str | None] = contextvars.ContextVar("pm_last_finish", default=None)
 
 #: The sources a web-search call returned (OpenRouter's `url_citation`
 #: annotations). Set by the request, read by `generate_with_web` (20 Oct).
@@ -269,6 +273,20 @@ def _token_budget(model: str, max_tokens: int) -> dict[str, Any]:
     return {"max_tokens": max_tokens}
 
 
+def _with_room_for_answer(payload: dict[str, Any]) -> dict[str, Any]:
+    """The same request with twice the tokens and the reasoning held to low effort.
+
+    For a reply that came back empty at `finish_reason='length'`: the reasoning
+    took everything (`_token_budget`'s docstring), so the retry gives the
+    answer the room instead of asking the same question the same way.
+    """
+    out = dict(payload)
+    out["max_tokens"] = int(payload.get("max_tokens") or 2048) * 2
+    if "reasoning" in payload:
+        out["reasoning"] = {"effort": "low"}
+    return out
+
+
 class OpenRouterClient:
     """Async client for the OpenRouter API.
 
@@ -343,6 +361,7 @@ class OpenRouterClient:
         content, usage_stats, _finish_reason = await self._request_with_retries(
             payload, headers, timeout, deadline
         )
+        _LAST_FINISH.set(_finish_reason)
         return content, usage_stats
 
     async def generate_with_meta(
@@ -462,6 +481,34 @@ class OpenRouterClient:
         except json.JSONDecodeError as parse_error:
             pass
 
+        # Cut off at the limit, not malformed: a repair would close the
+        # brackets on half an answer — a stage check that lost its findings
+        # and read as clean (2 Nov, production: every check on a long
+        # deliverable stopped at the same 3,584 tokens). Asked again once,
+        # with twice the room, before anything is repaired.
+        if _LAST_FINISH.get() == "length":
+            _LAST_FINISH.set(None)
+            logger.warning("JSON cut off at the token limit; asking again with twice the room")
+            content, again = await self.generate(
+                prompt=prompt,
+                system=system,
+                temperature=temperature,
+                max_tokens=max_tokens * 2,
+                json_mode=True,
+                model=model,
+                timeout=timeout,
+                deadline=deadline,
+            )
+            usage = {
+                "tokens_in": usage.get("tokens_in", 0) + again.get("tokens_in", 0),
+                "tokens_out": usage.get("tokens_out", 0) + again.get("tokens_out", 0),
+            }
+            cleaned = self._clean_json_response(content)
+            try:
+                return json.loads(cleaned), usage
+            except json.JSONDecodeError:
+                pass
+
         # Prose with no object in it at all is not malformed JSON: a repair
         # has nothing to fix, and with search results quoted back to it the
         # provider's content filter answered it with nothing (Sean, 24 Oct).
@@ -525,6 +572,7 @@ class OpenRouterClient:
         function limit and turns a recoverable retry into an opaque 504.
         """
         last_error: Exception | None = None
+        roomed = False
 
         for attempt in range(1, _RETRY_MAX_ATTEMPTS + 1):
             # Never let one attempt outlive the budget.
@@ -540,6 +588,15 @@ class OpenRouterClient:
             try:
                 return await self._single_request(payload, headers, attempt, call_timeout)
             except OpenRouterError as e:
+                # 1 Nov (production, a stage check): the model reasoned until
+                # the limit and answered nothing. Once, straight away, with low
+                # effort and twice the room, rather than failing the check.
+                if e.provider_code == "empty_length" and not roomed and attempt < _RETRY_MAX_ATTEMPTS:
+                    roomed = True
+                    last_error = e
+                    payload = _with_room_for_answer(payload)
+                    logger.warning(f"Empty reply at the token limit; retrying once with more room: {e}")
+                    continue
                 if not self._is_retryable(e) or attempt == _RETRY_MAX_ATTEMPTS:
                     if attempt == _RETRY_MAX_ATTEMPTS:
                         last_error = e
@@ -611,7 +668,12 @@ class OpenRouterClient:
                     finish_reason=finish_reason,
                     attempt=attempt,
                 )
-                raise OpenRouterError(f"No content in response (finish_reason={finish_reason!r})")
+                raise OpenRouterError(
+                    f"No content in response (finish_reason={finish_reason!r})",
+                    # A reply spent wholly on reasoning: worth one more try with
+                    # the room moved to the answer (`_with_room_for_answer`).
+                    provider_code="empty_length" if finish_reason == "length" else None,
+                )
 
             if finish_reason == "length":
                 logger.warning("Response truncated (finish_reason='length') — returning partial content")

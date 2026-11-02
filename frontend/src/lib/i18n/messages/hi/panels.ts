@@ -112,6 +112,7 @@ export const hi: Record<keyof typeof en, string> = {
   'pnl.findingsShown_one': '{count} निष्कर्ष, उस रेटिंग के सामने दिखाया गया जिसे यह प्रभावित करता है।',
   'pnl.findingsShown_other': '{count} निष्कर्ष, हर एक उस रेटिंग के सामने दिखाया गया जिसे वह प्रभावित करता है।',
   'pnl.noDefects': 'कोई विशिष्ट कमी नहीं मिली।',
+  'pnl.checkDidNotRun': 'यह जाँच नहीं चल सकी, इसलिए कुछ भी आँका नहीं गया। कुछ भी नहीं खोया — जाँच फिर से चलाएँ।',
   'pnl.furtherFindings_one': '{count} और निष्कर्ष',
   'pnl.furtherFindings_other': '{count} और निष्कर्ष',
   'pnl.ratingLabel': '{label} रेटिंग',

@@ -145,6 +145,7 @@ import { useExperience } from '@/lib/projects/experience';
 import { freshOrPage } from '@/lib/workflow/fresh-manuscript';
 import { addedSignature, designAddedStage, effectiveTemplate } from '@/lib/workflow/added-stages';
 import { withApprovals } from '@/lib/workflow/approvals';
+import { isFailedEvaluation } from '@/lib/workflow/evaluation-failure';
 
 interface Props {
   project: Project;
@@ -1731,7 +1732,7 @@ export function WorkflowWorkspace({
     truncated,
     evaluable: draftable && Boolean(stageEvaluation.evaluate),
     framing: FRAMING_KINDS.has(stage.expected_artifacts[0]?.kind ?? ''),
-    evaluated: Boolean(headEvaluation),
+    evaluated: Boolean(headEvaluation) && !isFailedEvaluation(headEvaluation),
     evaluationClean: Boolean(
       headEvaluation &&
         headEvaluation.further_pass_needed !== true &&

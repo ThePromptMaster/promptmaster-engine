@@ -112,6 +112,7 @@ export const ar: Record<keyof typeof en, string> = {
   'pnl.findingsShown_one': '{count} ملاحظة، معروضة مقابل التقييم الذي تؤثر فيه.',
   'pnl.findingsShown_other': 'ملاحظات (العدد: {count})، معروضة مقابل التقييم الذي تؤثر فيه كلٌّ منها.',
   'pnl.noDefects': 'لم يُعثر على عيوب محددة.',
+  'pnl.checkDidNotRun': 'تعذّر تشغيل هذا الفحص، لذا لم يُقيَّم شيء. لم يُفقد شيء — شغّل الفحص مرة أخرى.',
   'pnl.furtherFindings_one': '{count} ملاحظة إضافية',
   'pnl.furtherFindings_other': 'ملاحظات إضافية: {count}',
   'pnl.ratingLabel': 'تقييم {label}',

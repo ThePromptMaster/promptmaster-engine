@@ -235,6 +235,11 @@ class EvaluationResult(BaseModel):
         default=None,
         description="Plain-language 3-4 bullet summary of why the output works or what to improve.",
     )
+    # 2 Nov (Sean): a check whose model call failed came back as Medium ×3 with
+    # no findings, and was saved and shown as a check that passed. The scores
+    # stay for older renderers; `failed` says none of them is a judgement.
+    failed: bool = Field(default=False, description="The evaluation could not run; the scores are placeholders, not a result.")
+    failure: str | None = Field(default=None, description="What went wrong, in words a user can act on, when failed.")
     findings: list[AuditFinding] = Field(
         default_factory=list,
         description=(
