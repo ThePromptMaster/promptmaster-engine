@@ -676,7 +676,7 @@ Assessment: `docs/assessments/2026-10-21-oct14-call.md`.
 ### Intent, delegation and completion (2026-11-02)
 
 Sean's four 1 Nov emails (recruitment plan, tattoo memo). The failed-check and delegated-approval
-halves are L-134 and L-140; the rest is here.
+halves are L-134 and L-140 (#451, #453); the rest is here (#452, #454, #455, #456).
 
 | Concern | Where it lives |
 |---|---|
@@ -686,7 +686,7 @@ halves are L-134 and L-140; the rest is here.
 | The setup follows an explicit change | `revision_facts.py` `setup_changes` (quote verbatim from the instruction); `fact-reconcile.withMeaningChanges` turns each into a `FactChange` with `setup`, grouped first as "Project setup"; `use-stage-chat` `accept()` → `onPatchSetup` → `onPatchProject`; the brief-change watcher records the old text and reopens what relied on it (L-137) |
 | Precedence of an explicit change of objective | `self_model.py`, `precedence.py` (objective entry), `conversation.py` (`_PROMPTMASTER_CONTEXT`, `_INSTRUCTION_IS_LATER`); record-keeping never goes into the work |
 | Thousands separators in measured limits | `measurable.ts` `NUM` / `num` and the no-break-space normalisation in `parseRequirements` |
-| A route through the rechecks | A stale stage's banner (`ws.staleNote`) and "Recheck the changed stages" (`continueWork`) in `workflow-workspace.tsx`; `needs.overtakenByChange` drops a request raised (`NeedsUser.raisedAt`, stamped in `use-go-loop` `setRunStatus`) before a stage went stale (L-138) |
+| A route through the rechecks | `next-step.goIsAsking`: a cleared request is not a question, so the bar offers Apply and continue (#456). A stale stage's banner (`ws.staleNote`) and "Recheck the changed stages" (`continueWork`) in `workflow-workspace.tsx`; `needs.overtakenByChange` drops a request raised (`NeedsUser.raisedAt`, stamped in `use-go-loop` `setRunStatus`) before a stage went stale (L-138) |
 | The deliverable checked before "objective met" | `POST /api/agent/check-deliverable` (`promptmaster/deliverable_check.py`); `lib/agent/deliverable-check.ts`; run by `judgeObjective` in `perform.ts`; issues go in as failed checks; at most `MAX_CHECK_ROUNDS` a run, then stated limitations; saved as `deliverable_check` in the `objective_assessed` payload (L-139) |
 | A conditional decision memo can be complete | `objective_assessment._ASSESS_INSTRUCTION` |
 | Approval is for use, not of every assumption | `saved_documents.DOCUMENTS_RULE`; the planner's "Earlier stages" line (`agent._format_state`) |
