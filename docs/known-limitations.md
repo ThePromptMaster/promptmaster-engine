@@ -2806,3 +2806,23 @@ The cost:
   The limit still reaches every prompt.
 - **The text's own count of itself stays as written.** A count the model writes into the text is
   left in place and is not checked. The checklist count is the one measured in code.
+
+### L-148 — A changed value is paired with the one the user names in its place (2026-11-02)
+
+When a "Change it" revision changes a value an accepted fact states, the fact is offered for
+update with the new value. The value is matched in code. On 2 Nov, Sean's instruction said
+"Replace the $400 minimum unspent reserve with $800. Replace the $40 ticket price with $30. …
+Keep the complete final plan under 600 words and the promotional message under 80 words". It
+offered "Tickets cost $800 per person", the plan's limit as 80 words, and the message's as 600.
+The replacement was chosen from all of the instruction's values, by the words around them.
+
+Now the user's own sentence decides first. A sentence that names the fact's value and replaces
+it gives the value nearest it as the new one. Replacing means "replace … with", "from … to",
+"instead of", "→" or "was $16,000, not $18,000". It must also share a word with what the fact is
+about (not "under", "words" or the like). A sentence that names the value without replacing it
+keeps the fact as it is. A new limit changes only the fact it names, when more than one fact
+holds a limit in that unit. Otherwise the matcher works as before.
+
+The cost: a replacing sentence that shares no word with the fact ("raise the reserve from $400 to
+$800" for "At least $400 must remain unspent") falls back to the old matcher. The user still sees
+every offered change, ticked, and can untick a wrong one before applying.

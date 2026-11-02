@@ -194,3 +194,57 @@ describe('a recorded answer is matched on its answer only (18 Oct, pilot)', () =
     expect(factChangesFromRevision({ facts, instruction: 'Spending to date is $18,000.', before, after })).toEqual([]);
   });
 });
+
+/**
+ * 2 Nov, production pass on Sean's photography brief. His instruction:
+ * "Replace the $400 minimum unspent reserve with $800. Replace the $40 ticket
+ * price with $30. … Keep the complete final plan under 600 words and the
+ * promotional message under 80 words." The facts were offered as "Tickets cost
+ * $800 per person", the plan's limit as 80 words and the message's as 600.
+ */
+describe('a value is replaced by the one the user names in its place (2 Nov, photography workshop)', () => {
+  const facts = [
+    fact('t', 'Tickets cost $40 per person.'),
+    fact('r', 'At least $400 must remain unspent.'),
+    fact('c', 'Check whether either workshop can operate at capacity while preserving the $400 reserve.', 'requirement'),
+    fact('w', 'Whole document under 600 words, including headings and tables.', 'requirement'),
+    fact('p', 'Promotional message under 80 words, counted within the 600-word limit.', 'requirement'),
+    fact('f', 'The organizer has $1,200 available.'),
+    fact('m', 'Each attendee incurs $5 in materials.'),
+  ];
+  const instruction =
+    'Replace the $400 minimum unspent reserve with $800. Replace the $40 ticket price with $30. Funds remain $1,200. Materials remain $5 per attendee.\n\n' +
+    'Keep the complete final plan under 600 words and the promotional message under 80 words.';
+  const before = '| Fact | $1,200 available; at least $400 must remain unspent |\n| Fact | Ticket $40 per person; materials $5 |\nUnder 600 words.';
+  const after = '| Fact | $1,200 available; at least $800 must remain unspent |\n| Fact | Ticket $30 per person; materials $5 |\nSpendable: $1,200 − $800 = $400.';
+
+  it('the ticket takes $30 and the reserve $800; the restated limits and amounts are kept', () => {
+    const out = factChangesFromRevision({ facts, instruction, before, after });
+    expect(out.map((c) => [c.fact.id, c.proposed])).toEqual([
+      ['t', 'Tickets cost $30 per person.'],
+      ['r', 'At least $800 must remain unspent.'],
+      ['c', 'Check whether either workshop can operate at capacity while preserving the $800 reserve.'],
+    ]);
+  });
+
+  it('pairs each old value with the new one nearest it in one sentence', () => {
+    const out = factChangesFromRevision({
+      facts,
+      instruction: 'Raise the unspent reserve from $400 to $800 and cut the ticket price from $40 to $30.',
+      before, after,
+    });
+    expect(out.find((c) => c.fact.id === 't')?.proposed).toBe('Tickets cost $30 per person.');
+    expect(out.find((c) => c.fact.id === 'r')?.proposed).toBe('At least $800 must remain unspent.');
+  });
+
+  it('a sentence about something else does not change a fact that happens to share the value', () => {
+    const venue = fact('v', 'The venue deposit is $400.');
+    const out = factChangesFromRevision({ facts: [venue], instruction: 'Replace the $400 minimum unspent reserve with $800.', before: 'Deposit $400.', after: 'Deposit $400.' });
+    expect(out).toEqual([]);
+  });
+
+  it('a limit the instruction changes is still changed', () => {
+    const out = factChangesFromRevision({ facts, instruction: 'Change the whole document limit to under 500 words.', before, after: before });
+    expect(out.map((c) => [c.fact.id, c.proposed])).toEqual([['w', 'Whole document under 500 words, including headings and tables.']]);
+  });
+});

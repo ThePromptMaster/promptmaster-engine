@@ -105,6 +105,68 @@ const has = (list: readonly ValueMention[] | undefined, value: string) => (list 
 /** A limit is replaced only by a limit on the same unit: "70 words" does not replace "one page". */
 const sameUnit = (a: string, b: string) => a.split(':')[0] === b.split(':')[0];
 
+/** Words that say one value replaces another: "replace … with", "from … to", "instead of", "→". */
+// "was $16,000, not $18,000" corrects; "not counting headings" does not.
+const REPLACING = /\breplac\w*|\binstead of\b|\brather than\b|\bsupersed\w*|\bcorrect(?:ion|ed)?\b|→|->|\bnot\s+(?:[$€£]\s?)?\d|\bfrom\b[^.;]{0,80}?\bto\b|\b(?:chang|rais|lower|increas|reduc|mov|switch|swap)\w*\b[^.;]{0,80}?\b(?:to|with)\b/i;
+/** Words that say how much or of what unit, not what the value is about. */
+const GENERIC = new Set(['under', 'word', 'words', 'page', 'pages', 'more', 'less', 'than', 'least', 'most', 'with', 'from', 'that', 'this', 'each', 'must', 'keep', 'only', 'total', 'limit', 'within', 'replace', 'replacing']);
+const stemmed = (t: string) =>
+  new Set((t.toLowerCase().match(/[a-z]{4,}/g) ?? []).filter((w) => !GENERIC.has(w)).map((w) => w.replace(/(?<!s)s$/, '').slice(0, 6)));
+/** Where `raw` is written as a whole value: "$40" is not found inside "$400". */
+const valueAt = (text: string, raw: string) => text.search(new RegExp(`${raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\d])`));
+
+/**
+ * What the user's instruction says about one value of a fact. `paired`: a
+ * sentence about the same thing replaces it, and this is the value it names in
+ * its place — "Replace the $40 ticket price with $30" gives $30. `restated`:
+ * the instruction says the value again without replacing it ("Keep the
+ * complete plan under 600 words"), so the fact keeps it.
+ *
+ * 2 Nov (production pass, Sean's photography brief): "Replace the $400 …
+ * reserve with $800. Replace the $40 ticket price with $30." offered "Tickets
+ * cost $800 per person", and "Keep the complete final plan under 600 words and
+ * the promotional message under 80 words" offered the plan's limit as 80 and
+ * the message's as 600. The value was chosen from the whole instruction.
+ */
+function inInstruction(instruction: string, m: ValueMention, statement: string): { paired?: ValueMention; restated: boolean } {
+  const about = stemmed(statement.split(m.raw).join(' '));
+  let restated = false;
+  for (const piece of instruction.split(/(?<=[.!?;])\s+|\n+/)) {
+    const here = valueMentions(piece).filter((x) => x.kind === m.kind);
+    const own = here.find((x) => x.value === m.value);
+    if (!own) continue;
+    const others = here.filter((x) => x.value !== m.value && (m.kind !== 'limits' || sameUnit(x.value, m.value)));
+    const sameThing = [...stemmed(piece)].some((w) => about.has(w));
+    if (!REPLACING.test(piece) || !others.length) {
+      restated = true;
+      continue;
+    }
+    if (!sameThing) continue;
+    // The value nearest the old one in the sentence: "from $400 to $800 and
+    // from $40 to $30" pairs $40 with $30.
+    const at = valueAt(piece, own.raw);
+    const nearest = others
+      .map((o) => ({ o, d: Math.abs(valueAt(piece, o.raw) - at) }))
+      .sort((a, b) => a.d - b.d)[0].o;
+    return { paired: nearest, restated: false };
+  }
+  return { restated };
+}
+
+/**
+ * The limit the instruction gives for this fact's subject: with more than one
+ * limit fact in the unit, only a sentence that names what this one is about
+ * ("the whole document … under 500 words" is not the promotional message's).
+ */
+function limitFor(instruction: string, m: ValueMention, statement: string, ambiguous: boolean): ValueMention | undefined {
+  const about = stemmed(statement.split(m.raw).join(' '));
+  for (const piece of instruction.split(/(?<=[.!?;])\s+|\n+/)) {
+    const found = valueMentions(piece).find((x) => x.kind === 'limits' && x.value !== m.value && sameUnit(x.value, m.value));
+    if (found && (!ambiguous || [...stemmed(piece)].some((w) => about.has(w)))) return found;
+  }
+  return undefined;
+}
+
 /**
  * For each current fact, the values the revision replaced.
  *
@@ -124,7 +186,15 @@ export function factChangesFromRevision(input: {
   const before = byKind(input.before);
   const after = byKind(input.after);
   const out: FactChange[] = [];
-  for (const fact of currentFacts(input.facts)) {
+  const current = currentFacts(input.facts);
+  // How many facts hold a limit in each unit: with two, a new limit belongs to the one it names.
+  const limitFacts = new Map<string, number>();
+  for (const f of current) {
+    for (const unit of new Set(valueMentions(answered(f.statement)).filter((x) => x.kind === 'limits').map((x) => x.value.split(':')[0]))) {
+      limitFacts.set(unit, (limitFacts.get(unit) ?? 0) + 1);
+    }
+  }
+  for (const fact of current) {
     const changes: FactValueChange[] = [];
     // A recorded answer carries the question it answered; only the answer is
     // the user's value (18 Oct, pilot: "$25,000" inside Go's question was
@@ -134,20 +204,31 @@ export function factChangesFromRevision(input: {
     let proposed = own;
     for (const m of valueMentions(own)) {
       if (!RECONCILED.includes(m.kind)) continue;
-      const candidates = [
-        ...(said.get(m.kind) ?? []).map((n) => ({ m: n, text: input.instruction })),
-        ...(after.get(m.kind) ?? []).filter((a) => !has(before.get(m.kind), a.value)).map((n) => ({ m: n, text: input.after })),
-      ].filter(({ m: n }) => n.value !== m.value && (m.kind !== 'limits' || sameUnit(n.value, m.value)));
-      const newer = candidates.map((c) => c.m);
-      if (!newer.length) continue;
-      if (m.kind === 'limits') {
-        if (!has(said.get(m.kind), newer[0].value)) continue;
-      } else if (!has(before.get(m.kind), m.value) || has(after.get(m.kind), m.value)) {
-        continue;
+      // The user's own words first: a sentence that replaces this value names
+      // its successor; one that only says it again keeps it.
+      const told = inInstruction(input.instruction, m, own);
+      let replacement: ValueMention;
+      if (told.paired) {
+        replacement = told.paired;
+      } else {
+        if (told.restated) continue;
+        const candidates = [
+          ...(said.get(m.kind) ?? []).map((n) => ({ m: n, text: input.instruction })),
+          ...(after.get(m.kind) ?? []).filter((a) => !has(before.get(m.kind), a.value)).map((n) => ({ m: n, text: input.after })),
+        ].filter(({ m: n }) => n.value !== m.value && (m.kind !== 'limits' || sameUnit(n.value, m.value)));
+        const newer = candidates.map((c) => c.m);
+        if (!newer.length) continue;
+        if (m.kind === 'limits') {
+          const given = limitFor(input.instruction, m, own, (limitFacts.get(m.value.split(':')[0]) ?? 0) > 1);
+          if (!given) continue;
+          replacement = given;
+        } else {
+          if (!has(before.get(m.kind), m.value) || has(after.get(m.kind), m.value)) continue;
+          // The value written where the old one stood; among equals, the user's
+          // own words where they gave them, else the new version's.
+          replacement = inItsPlace(m, [own, input.before], candidates);
+        }
       }
-      // The value written where the old one stood; among equals, the user's
-      // own words where they gave them, else the new version's.
-      const replacement = m.kind === 'limits' ? newer[0] : inItsPlace(m, [own, input.before], candidates);
       if (changes.some((c) => c.kind === m.kind && c.was === describeValue(m))) continue;
       changes.push({ kind: m.kind, was: describeValue(m), now: describeValue(replacement) });
       // "p.m." before the fact's own full stop would read "p.m..".
