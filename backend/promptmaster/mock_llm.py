@@ -862,7 +862,11 @@ class ScriptedClient(OpenRouterClient):
         # the marker cuts the first draft, not every call after it (31 Oct —
         # a continuation now keeps its own finish reason).
         continuing = "PREVIOUS OUTPUT (do not repeat any of this)" in prompt
-        finish_reason = "length" if "length" in markers and not continuing else "stop"
+        # Nor does it cut a revision against findings (2 Nov): a cut revision
+        # is now refused rather than saved over the whole text, and the mock's
+        # texts are short enough that a real one would come back whole.
+        revising = "FINDINGS TO ADDRESS:" in prompt
+        finish_reason = "length" if "length" in markers and not continuing and not revising else "stop"
         # Metered like a real call (E1), so the browser tests see usage rows;
         # the mock model has no price, so its cost is unknown, never zero.
         from promptmaster.llm_client import _meter
