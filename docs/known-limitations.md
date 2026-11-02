@@ -2753,6 +2753,8 @@ tab or the scheduled drain wrote them after the step had read the rows.
 
 ### L-146 — A figure worked out from current values may equal an old one (2026-11-02)
 
+Shipped in #470.
+
 After a fact changes a value, Go's repair check fails a stage that still states the old value as
 current. On 2 Nov the reserve moved from $400 to $800 and the ticket from $40 to $30. Every
 repair of the plan then failed with "still states $400", and a retest failed six times on "$40".
@@ -2781,6 +2783,8 @@ Checked against all 46 versions of the two prod projects: every version written 
 is still caught, and all 34 written after it pass.
 
 ### L-147 — A word limit counts headings when it says so; the chat keeps the revision's own count (2026-11-02)
+
+Shipped in #471, #474, #476, #477.
 
 A word limit is counted on the text's prose, not its headings (`COUNTING_RULE`), unless the
 limit's own sentence says the headings count: "including headings", "headings included",
@@ -2814,6 +2818,8 @@ The cost:
   left in place and is not checked. The checklist count is the one measured in code.
 
 ### L-148 — A changed value is paired with the one the user names in its place (2026-11-02)
+
+Shipped in #472, #473, #475.
 
 When a "Change it" revision changes a value an accepted fact states, the fact is offered for
 update with the new value. The value is matched in code. On 2 Nov, Sean's instruction said
