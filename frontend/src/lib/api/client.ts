@@ -859,6 +859,27 @@ export const api = {
     return apiFetch('/api/agent/check-answer', { method: 'POST', body: JSON.stringify(req), signal });
   },
 
+  /**
+   * Whether the finished deliverable carries the accepted findings and holds
+   * together (1 Nov). One call, a check: it writes nothing.
+   */
+  async agentCheckDeliverable(
+    req: {
+      inputs: PMInput;
+      deliverable_label: string;
+      content: string;
+      accepted: { id: string; stage_label: string; finding: string; suggested_change: string }[];
+      model?: string;
+    },
+    signal?: AbortSignal
+  ): Promise<{
+    findings: { id: string; verdict: 'carried' | 'not_carried' | 'not_applicable'; quote: string; note: string }[];
+    contradictions: { rule_quote: string; conflicts_quote: string; problem: string; fix: string }[];
+    model_used: string;
+  }> {
+    return apiFetch('/api/agent/check-deliverable', { method: 'POST', body: JSON.stringify(req), signal });
+  },
+
   async agentAssessObjective(
     req: {
       inputs: PMInput;

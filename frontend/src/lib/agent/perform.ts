@@ -50,6 +50,7 @@ import { blocksCompletion, deliverableStage, describeOutstanding, evaluateStage,
 import { describeBasis, executableNext, openWithNextLine, pausedLine, stillMet, type ObjectiveAssessment, type ObjectiveBasis } from '@/lib/workflow/objective';
 import { addedByRun, designAddedStage, MAX_ADDED_PER_RUN, type AddedStage } from '@/lib/workflow/added-stages';
 import { attachedDocuments, currentFacts, supersededFactValues } from '@/lib/workflow/facts';
+import { acceptedRowsBefore, checkedVersion, describeCheck, issuesFrom, MAX_CHECK_ROUNDS, roundsUsed, type DeliverableCheckRecord } from './deliverable-check';
 import { ManuscriptMissing, withFreshManuscript } from '@/lib/workflow/fresh-manuscript';
 import { useProjectStore } from '@/stores/project-store';
 import { describeValue, leftoverValues, type SupersededValue } from '@/lib/workflow/fact-values';
@@ -2463,6 +2464,9 @@ async function judgeObjective(ctx: PerformContext, holder: StageDefinition | nul
   const measured = holder
     ? (ctx.context.measured?.[holder.id] ?? []).filter((m) => m.satisfied).map((m) => `${m.label} — ${m.value ?? 'met'}`)
     : [];
+  // The accepted findings and the text's own consistency, checked first: what
+  // fails goes to the assessment as failed checks (1 Nov).
+  const check = holder ? await checkDeliverable(ctx, holder, content, label) : null;
   const assessment = await api.agentAssessObjective(
     {
       inputs: inputsFrom(ctx.project),
@@ -2471,7 +2475,7 @@ async function judgeObjective(ctx: PerformContext, holder: StageDefinition | nul
       steps: ctx.digest.recent_steps.map((s) => ({ action_key: s.action_key, execution_label: s.execution_label, output: s.output })),
       // The criterion the workflow was designed against, kept from the objective (7 Oct).
       success_criterion: ctx.template.execution?.success_criterion ?? '',
-      failed_checks: failedChecks(ctx),
+      failed_checks: [...failedChecks(ctx), ...(check && !check.bounded && !check.failed ? check.issues : [])].slice(0, 40),
       measured,
       // The saved versions, and the earlier ones the text cites (19 Oct, HARBOR).
       known_versions: knownVersions(ctx.template, ctx.bundles),
@@ -2494,12 +2498,14 @@ async function judgeObjective(ctx: PerformContext, holder: StageDefinition | nul
     measured,
     assessed: criteria.filter((c) => c.verdict !== 'not_checked'),
     not_checked: criteria.filter((c) => c.verdict === 'not_checked').map((c) => c.requirement),
+    ...(check ? { check: describeCheck(check, labelOverride ?? holder?.short_label ?? label).trim() } : {}),
   };
   const payload = {
     outcome: assessment.outcome, reason: assessment.reason, basis_quote: assessment.basis_quote,
     blockers: assessment.blockers, performed: assessment.performed, proposed_next: assessment.proposed_next,
     criteria, basis,
     ...(assessment.limitations?.length ? { limitations: assessment.limitations } : {}),
+    ...(check ? { deliverable_check: check } : {}),
     ...(assessment.ready_for_later_stage ? { ready_for_later_stage: true } : {}),
     ...(assessment.unmet?.length ? { unmet: assessment.unmet } : {}),
     ...(assessment.model_note ? { model_note: assessment.model_note } : {}),
@@ -2518,6 +2524,35 @@ async function judgeObjective(ctx: PerformContext, holder: StageDefinition | nul
   });
   await ctx.afterStageEvent();
   return { assessment, basis };
+}
+
+/**
+ * The deliverable checked against the accepted findings and for contradictions
+ * (`lib/agent/deliverable-check.ts`). A version already checked keeps its
+ * result; after the run's repair rounds are used up the issues are limitations.
+ * A check that cannot run concludes nothing and never blocks the assessment.
+ */
+async function checkDeliverable(ctx: PerformContext, holder: StageDefinition, content: string, label: string): Promise<DeliverableCheckRecord | null> {
+  if (!content.trim()) return null;
+  const head = ctx.bundles[holder.id]?.versions.at(-1);
+  const events = ctx.loadEvents ? await ctx.loadEvents() : [];
+  const kept = checkedVersion(events, head?.id ?? null);
+  const rounds = roundsUsed(events, ctx.run.id, holder.id);
+  const at = { version_id: head?.id ?? null, version_number: head?.version_number ?? null };
+  if (kept) return { ...kept, ...at, bounded: Boolean(kept.issues.length) && rounds >= MAX_CHECK_ROUNDS };
+  const rows = acceptedRowsBefore(ctx.template, ctx.bundles, holder.id);
+  try {
+    const res = await api.agentCheckDeliverable(
+      { inputs: inputsFrom(ctx.project), deliverable_label: label, content, accepted: rows, model: ctx.project.model },
+      ctx.signal
+    );
+    const issues = issuesFrom(res, rows, label);
+    const carried = res.findings.filter((f) => f.verdict === 'carried').length;
+    const accepted = rows.length - res.findings.filter((f) => f.verdict === 'not_applicable').length;
+    return { ...at, accepted, carried, issues, ...(issues.length && rounds >= MAX_CHECK_ROUNDS ? { bounded: true } : {}) };
+  } catch {
+    return { ...at, accepted: rows.length, carried: 0, issues: [], failed: true };
+  }
 }
 
 /**

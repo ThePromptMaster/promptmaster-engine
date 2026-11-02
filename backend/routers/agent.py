@@ -20,6 +20,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from promptmaster.deliverable_check import AcceptedFinding, DeliverableCheck, check_deliverable
 from promptmaster.web_search import WebAccess, WebUse, cite_only_known, with_web
 from deps import get_client, llm_mode
 from promptmaster.literature import MAX_SEARCH_RESULTS, MAX_WORKS, WorkMatch, WorkQuery, lookup_works, search_works
@@ -378,6 +379,29 @@ async def api_assess_objective(req: AssessObjectiveRequest, client: OpenRouterCl
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
     return AssessObjectiveResponse(**result.model_dump(), model_used=_model_used(req.model, client))
+
+
+class CheckDeliverableRequest(BaseModel):
+    inputs: PMInput
+    deliverable_label: str = Field(default="", max_length=200)
+    content: str = Field(min_length=1, max_length=200_000)
+    accepted: list[AcceptedFinding] = Field(default_factory=list, max_length=60)
+    model: str = ""
+
+
+class CheckDeliverableResponse(DeliverableCheck):
+    model_used: str = ""
+
+
+@router.post("/check-deliverable")
+async def api_check_deliverable(req: CheckDeliverableRequest, client: OpenRouterClient = Depends(get_client)) -> CheckDeliverableResponse:
+    """Whether the deliverable carries the accepted findings and holds together
+    (1 Nov). 1 LLM call; a check — writes nothing, never searches the web."""
+    try:
+        result = await check_deliverable(client, req.model or None, req.inputs, req.deliverable_label or "the deliverable", req.content, req.accepted)
+    except OpenRouterError as e:
+        raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
+    return CheckDeliverableResponse(**result.model_dump(), model_used=_model_used(req.model, client))
 
 
 class ExpertPackageRequest(BaseModel):

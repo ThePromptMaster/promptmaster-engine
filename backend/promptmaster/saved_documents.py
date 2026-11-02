@@ -18,7 +18,15 @@ DOCUMENTS_RULE = (
     "earlier stage contains, base it on the text shown here, quoting it where it "
     "matters; never infer content from a summary or from what the stage was meant "
     "to produce. Where a document is marked as cut or as a summary only, say what "
-    "you could not see instead of guessing."
+    "you could not see instead of guessing. "
+    # 1 Nov (Sean, tattoo memo): "Approving a stage should not silently turn every
+    # assumption or inference in it into a user-confirmed fact" — the facts stage
+    # read an unsigned lease as proof that no other costs were committed.
+    "A finished or approved stage was approved for use as the basis for this work; "
+    "that does not make each assumption, estimate or inference in it a confirmed "
+    "fact. Keep what a document calls an assumption, estimate or inference labelled "
+    "as one. What is established is the accepted facts and requirements and the "
+    "figures the user supplied."
 )
 
 
