@@ -291,6 +291,22 @@ describe('background reload (A1d)', () => {
     expect(updateProject).toHaveBeenCalledWith('p1', { objective: 'typed but not saved yet' }, 4);
   });
 
+  it('a background read older than a save that landed keeps the newer copy (2 Nov, false "another tab")', async () => {
+    await loadFixture();
+    useProjectStore.getState().patchProject({ objective: 'B and C only' });
+    updateProject.mockResolvedValue(project({ objective: 'B and C only', revision: 4 }));
+    await useProjectStore.getState().flush();
+    // A reload that read the row before that save.
+    getProject.mockResolvedValue(project({ revision: 3 }));
+    await useProjectStore.getState().loadProject('p1', { background: true });
+    expect(useProjectStore.getState().project).toMatchObject({ objective: 'B and C only', revision: 4 });
+    // The next save goes against revision 4, not 3.
+    useProjectStore.getState().patchProject({ constraints: '$75,000' });
+    updateProject.mockResolvedValue(project({ revision: 5 }));
+    await useProjectStore.getState().flush();
+    expect(updateProject).toHaveBeenLastCalledWith('p1', { constraints: '$75,000' }, 4);
+  });
+
   it('a normal load still shows the skeleton and starts clean', async () => {
     await loadFixture();
     const seen: boolean[] = [];
