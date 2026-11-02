@@ -662,13 +662,21 @@ export function useStageChat({
         setError(`The revision was saved, but ${factsChosen - factsUpdated} of the facts could not be updated. Change them in Facts and requirements, or Go will treat the old values as current.`);
       }
 
+      // What the transcript keeps says the revision's own length, measured as
+      // the stage's limits measure it — not the length the scope was chosen
+      // with (2 Nov, Sean: "Applied to the whole document — 661 words" was
+      // the plan before his change, read as the revision's count).
+      const measured = checkRevision?.(proposal.nextContent) ?? [];
+      const scopeNow = appliedScopeLabel(proposal.target.label, proposal.nextContent, proposal.target.kind, measured.length > 0);
       await persist(
         'assistant',
-        `Applied to ${proposal.target.label.toLowerCase()}. The previous version is kept and can be restored.` +
+        `Applied to ${scopeNow.toLowerCase()}.` +
+          (measured.length ? ` Measured in code on the new version: ${measured.map((c) => `${c.label} (${c.ok ? 'met' : 'not met'})`).join('; ')}.` : '') +
+          ' The previous version is kept and can be restored.' +
           (factsUpdated ? ` Recorded ${factsUpdated === 1 ? 'one fact' : `${factsUpdated} facts`} with it.` : '') +
           (setupUpdated.length ? ` Updated the project's ${setupUpdated.length > 2 ? `${setupUpdated.slice(0, -1).join(', ')} and ${setupUpdated.at(-1)}` : setupUpdated.join(' and ')}; the earlier wording is kept in the brief's history.` : ''),
         'instruct',
-        proposal.target.label
+        scopeNow
       );
 
       if (proposal.messageId) {
@@ -685,7 +693,7 @@ export function useStageChat({
 
       if (live.current) {
         setApplied({
-          scope: appliedScopeLabel(proposal.target.label, proposal.nextContent, proposal.target.kind),
+          scope: scopeNow,
           previousVersionId,
           summary: proposal.changeSummary,
           checks: [
@@ -693,7 +701,7 @@ export function useStageChat({
               ? [{ label: `Kept ${describeLines(proposal.putBack)}, which the change did not ask to remove`, ok: true }]
               : []),
             ...(proposal.addedClaims?.length ? [{ label: `Kept details you did not supply: ${describeLines(proposal.addedClaims.map((c) => c.quote))}`, ok: false }] : []),
-            ...(checkRevision?.(proposal.nextContent) ?? []),
+            ...measured,
           ],
           auto: autoRef.current === proposal,
         });

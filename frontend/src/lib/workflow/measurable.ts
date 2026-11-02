@@ -31,6 +31,12 @@ export interface MeasurableRequirement {
   max?: number;
   /** For questions: each must have an answer under it. */
   answered?: boolean;
+  /**
+   * For words: the requirement counts the headings too ("under 600 words in
+   * total, including headings, tables and…"). Otherwise headings are not
+   * counted (`COUNTING_RULE`).
+   */
+  headings?: boolean;
   /** The words it was read from, for the checklist. */
   source: string;
   /**
@@ -173,6 +179,16 @@ function itemBefore(text: string, start: number): string {
   return phrase.replace(/(?<!s)s$/, '');
 }
 
+/**
+ * "including headings", "headings included", "counting the headings": the
+ * requirement's own rule for what is counted. 2 Nov (Sean, photography
+ * workshop): "Stay under 600 words in total, including headings, tables and a
+ * promotional message" was measured without its headings — 566 words, where
+ * his count was 637. "With headings and tables" says what the text has, not
+ * what is counted.
+ */
+const HEADINGS_COUNTED = /\b(?:includ(?:ing|es?)|incl\.?|counting)\b[^.;:]{0,40}?\bheadings?\b|\bheadings?\b[^.;:]{0,20}?\b(?:included|count(?:ed|s)?)\b/i;
+
 /** Words that say a limit is on the whole, not a part: "300 words in total". */
 const WHOLE_CONTEXT = /\b(?:total|overall|whole|entire|combined|altogether|in all|complete|full)\b/i;
 
@@ -202,7 +218,10 @@ export function parseRequirements(texts: readonly string[]): MeasurableRequireme
   const out = new Map<string, MeasurableRequirement>();
   const add = (r: Omit<MeasurableRequirement, 'id'>) => {
     const id = `${r.kind}:${r.subject || 'all'}`;
-    if (!out.has(id)) out.set(id, { id, ...r });
+    const had = out.get(id);
+    if (!had) out.set(id, { id, ...r });
+    // The same limit said again with its counting rule: the rule holds.
+    else if (r.headings) had.headings = true;
   };
   for (const text of texts) {
     // Word limits with no name, in a text that names other parts' limits: a
@@ -245,12 +264,10 @@ export function parseRequirements(texts: readonly string[]): MeasurableRequireme
           out.set(`retire:words:${subject || 'all'}`, { id: `words:${subject || 'all'}`, kind: 'words', subject, source: m[0].trim(), retires: true, ...r });
           continue;
         }
+        const sentence = t.slice(Math.max(0, t.lastIndexOf('.', m.index!) + 1), t.indexOf('.', m.index! + m[0].length) + 1 || t.length);
         if (subject) named += 1;
-        else {
-          const sentence = t.slice(Math.max(0, t.lastIndexOf('.', m.index!) + 1), t.indexOf('.', m.index! + m[0].length) + 1 || t.length);
-          if (!out.has('words:all')) unnamed.push({ id: 'words:all', whole: WHOLE_CONTEXT.test(sentence) });
-        }
-        add({ kind: 'words', subject, source: m[0].trim(), ...r });
+        else if (!out.has('words:all')) unnamed.push({ id: 'words:all', whole: WHOLE_CONTEXT.test(sentence) });
+        add({ kind: 'words', subject, source: m[0].trim(), ...r, ...(HEADINGS_COUNTED.test(sentence) ? { headings: true } : {}) });
       }
     }
     // "Word limits: memo 400, curriculum 900, practice case 900, evaluation
@@ -349,7 +366,9 @@ const isQuestion = (l: Line) => {
  * label its assumptions holds them as part of what it says, so "Assumption:
  * the survey runs online" counts — as it does when anyone counts the brief.
  */
-const NOTE = /^\W*(what changed|revision notes?|change notes?|notes?|word count|words?\s*:|\(\d+\s+words?\)|verification)\b/i;
+// "**Length:** 545 words including headings and tables" is the text's own
+// count of itself, not part of it (2 Nov, photography workshop).
+const NOTE = /^\W*(?:(?:what changed|revision notes?|change notes?|notes?|word count|words?\s*:|\(\d+\s+words?\)|verification)\b|(?:total\s+)?length\W*(?:about\s+|~\s*)?\d[\d,]*\s+words?\b)/i;
 
 /**
  * A part of a document that sits beside other parts — "a summary of at most
@@ -503,10 +522,13 @@ function units(token: string): number {
   return cjk + token.split(CJK).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
 }
 
-/** Words of prose, by whitespace (characters in Chinese), leaving out headings and notes about the text. */
-export function countWords(text: string): number {
+/**
+ * Words of prose, by whitespace (characters in Chinese), leaving out headings
+ * and notes about the text. `headings`: the requirement counts them too.
+ */
+export function countWords(text: string, options: { headings?: boolean } = {}): number {
   return lines(text)
-    .filter((l) => l.level === 0 && !NOTE.test(l.text))
+    .filter((l) => (l.level === 0 || options.headings) && !NOTE.test(l.text))
     .map((l) => plain(l.text.replace(/^[-*+]\s+/, '')))
     .join(' ')
     .split(/\s+/)
@@ -539,7 +561,7 @@ export function countSections(text: string): number {
 export const WORDS_PER_PAGE = 550;
 
 /** How a count is made, said wherever a count is shown or asked for (11 Oct). */
-export const COUNTING_RULE = 'words of the text itself, not counting headings or a word-count note; labelled assumptions count';
+export const COUNTING_RULE = 'words of the text itself, not counting headings (unless the requirement says headings are included) or a word-count note; labelled assumptions count';
 
 /** The questions in a text and how many have an answer under them. */
 export function countQuestions(text: string): { total: number; answered: number } {
@@ -584,12 +606,14 @@ export function measure(r: MeasurableRequirement, text: string, whole = false): 
   if (section === null) return null;
   const name = subjectLabel(r.subject);
   if (r.kind === 'words') {
-    const n = countWords(section);
+    const n = countWords(section, { headings: r.headings });
     const ok = (r.min === undefined || n >= r.min) && (r.max === undefined || n <= r.max);
     // The count says which text it was made of, so a wrong section shows (12 Oct).
     const span = r.subject && section !== text ? quoteSpan(section) : '';
     const value = `${n} words${span ? `, counted ${span}` : ''}`;
-    return { id: `measured.${r.id}`, label: `${name}: ${rangeText(r)} words`, satisfied: ok, value, ...(ok ? {} : { detail: `${n} words` }) };
+    // The rule is said with the limit, so a count by hand can match it (2 Nov).
+    const label = `${name}: ${rangeText(r)} words${r.headings ? ' (headings included)' : ''}`;
+    return { id: `measured.${r.id}`, label, satisfied: ok, value, ...(ok ? {} : { detail: `${n} words` }) };
   }
   if (r.kind === 'pages') {
     // An estimate, said as one: a printed page depends on fonts and margins,
