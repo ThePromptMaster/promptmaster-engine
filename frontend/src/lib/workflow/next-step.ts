@@ -8,6 +8,7 @@
  * it at the top of whichever stage is open. Pure.
  */
 
+import { isClearedNote } from '@/lib/agent/needs';
 import { tr } from '@/lib/i18n/store';
 import { NEXT_STEP_LABELS } from './stage-controls';
 
@@ -38,6 +39,17 @@ export interface NextActionInput {
   run: { status: string; ended_at: string | null; hasNeed: boolean; asking: boolean } | null;
   /** The open stage is the project's current one, where Go's own panel shows its card and Resume. */
   onCurrentStage: boolean;
+}
+
+/**
+ * Whether a paused run is still asking the user something. A request the
+ * project overtook, or one the user answered on the stage, is cleared to a
+ * note ("Ready to carry on — press Resume."): that note is not a question, so
+ * the next step is the recheck the change needs, not "Answer Go's question"
+ * (2 Nov, production pass of Sean's 1 Nov sequence).
+ */
+export function goIsAsking(stopReason: string | null | undefined): boolean {
+  return Boolean(stopReason) && !isClearedNote(stopReason);
 }
 
 export function nextAction(i: NextActionInput): NextAction | null {

@@ -108,7 +108,7 @@ import { PendingChangeNotice } from './pending-change-notice';
 import { NextActionBar } from './next-action-bar';
 import { ProjectTimeline } from './project-timeline';
 import { accentVariables, backgroundOfVersion, rootSurfaces, versionTintVariables } from '@/lib/appearance/colours';
-import { nextAction } from '@/lib/workflow/next-step';
+import { goIsAsking, nextAction } from '@/lib/workflow/next-step';
 import { holdPendingChange, pendingChanges, settlePendingChange, type PendingChange } from '@/lib/workflow/conflict-trail';
 import { keptConflictsOf } from '@/lib/workflow/routine-conflicts';
 import { FactsNextStep } from './facts-next-step';
@@ -1548,7 +1548,7 @@ export function WorkflowWorkspace({
     awaitingUpdate: awaitingLabels,
     goActive: go.active,
     goWorkingOn: getStage(template, state.current_stage_id)?.label,
-    run: go.run ? { status: go.run.status, ended_at: go.run.ended_at, hasNeed: Boolean(go.run.needs), asking: Boolean(go.run.stop_reason) } : null,
+    run: go.run ? { status: go.run.status, ended_at: go.run.ended_at, hasNeed: Boolean(go.run.needs), asking: goIsAsking(go.run.stop_reason) } : null,
     onCurrentStage: isCurrent,
   });
   // A paused run holds the next move too: the page drafting Realign while Go
@@ -3086,7 +3086,12 @@ export function WorkflowWorkspace({
               stageLabel={stage.label}
               stageTitle={stageText(locale, template.key, stage, 'label')}
               onFactsChanged={() => onReload?.()}
-              onPatchSetup={(patch) => onPatchProject(patch)}
+              // Written before the facts reload the project, or the reload brings
+              // back the old objective over the one just set (2 Nov, prod pass).
+              onPatchSetup={async (patch) => {
+                onPatchProject(patch);
+                await useProjectStore.getState().flush();
+              }}
               onSourcesChanged={() => onReload?.()}
               // 13 Oct (Sean, email 6): the revision's saved text is checked
               // against what can be measured, and the result shown with it.
