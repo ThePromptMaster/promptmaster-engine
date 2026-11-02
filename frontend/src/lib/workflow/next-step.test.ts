@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { nextAction, type NextActionInput } from './next-step';
+import { NEED_CLEARED } from '@/lib/agent/needs';
+import { goIsAsking, nextAction, type NextActionInput } from './next-step';
 
 const base: NextActionInput = {
   finalized: false, canAct: true, heldChanges: 0, reopenedHere: false, awaitingUpdate: [], goActive: false, run: null, onCurrentStage: false,
@@ -46,3 +47,14 @@ describe('one next action, on whichever stage is open (17 Oct, Sean, emails 2.2 
     expect(nextAction({ ...base, goActive: true, goWorkingOn: 'Output', awaitingUpdate: ['Input'] })).toEqual({ kind: 'working', label: 'Go is working on Output…', why: '' });
   });
 });
+
+describe('a cleared request is not a question (2 Nov, production pass)', () => {
+  it('after a change overtakes Go\'s approval request, the next step is the recheck', () => {
+    expect(goIsAsking(NEED_CLEARED)).toBe(false);
+    expect(goIsAsking('Needs your approval: "I approve this plan for use."')).toBe(true);
+    expect(goIsAsking(null)).toBe(false);
+    const run = { status: 'awaiting_decision', ended_at: null, hasNeed: false, asking: goIsAsking(NEED_CLEARED) };
+    expect(nextAction({ ...base, run, awaitingUpdate: ['Objective', 'Draft plan', 'Check plan', 'Final plan'] })).toMatchObject({ kind: 'apply_continue', label: 'Apply and continue' });
+  });
+});
+
