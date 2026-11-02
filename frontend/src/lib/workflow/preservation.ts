@@ -238,6 +238,25 @@ export function keepUnasked(
 }
 
 /**
+ * What a recheck was asked to do, for `keepUnasked`: the reason the stage was
+ * reopened and every accepted fact or requirement recorded since its current
+ * version. 2 Nov prod pass (tattoo memo): after "drop option A entirely" the
+ * recheck's reason said only that the stage "includes an explicit ruling on
+ * Option A", so the paragraph the model rightly removed was put back, at the
+ * top. The requirement "Option A … is dropped entirely" is what was asked.
+ */
+export function askedOfRecheck(
+  why: string,
+  facts: readonly { statement: string; created_at: string; retired_at: string | null }[] | undefined,
+  versionCreatedAt: string | undefined
+): string {
+  const since = versionCreatedAt ? Date.parse(versionCreatedAt) : NaN;
+  if (Number.isNaN(since)) return why;
+  const newer = (facts ?? []).filter((f) => !f.retired_at && Date.parse(f.created_at) > since).map((f) => f.statement.trim()).filter(Boolean);
+  return newer.length ? `${why} ${newer.join(' ')}` : why;
+}
+
+/**
  * The values an instruction says are wrong: "revenue was $27 million, not $30
  * million", "instead of 100 hours". A line the revision dropped that states
  * one is the old figure, and is never put back (19 Oct, Ridgeway).

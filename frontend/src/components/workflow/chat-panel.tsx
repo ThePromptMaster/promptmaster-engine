@@ -150,7 +150,7 @@ interface Props {
   /** After a revision updated accepted facts, so the project reloads them. */
   onFactsChanged?: () => Promise<unknown> | void;
   /** Replace the stored objective or constraints, as a ticked instruction asks (1 Nov). */
-  onPatchSetup?: (patch: { objective?: string; constraints?: string }) => Promise<unknown> | void;
+  onPatchSetup?: (patch: { objective?: string; constraints?: string; output_format?: string }) => Promise<unknown> | void;
   /** After the chat saved web sources, so the project reloads them (22 Oct). */
   onSourcesChanged?: () => Promise<unknown> | void;
   /** The requirements checked on a revision's saved text (13 Oct). */

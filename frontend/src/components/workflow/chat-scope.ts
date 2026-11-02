@@ -17,6 +17,8 @@
  * `artifact_versions.content` holds.
  */
 
+import { countWords } from '@/lib/workflow/measurable';
+
 export type ScopeKind = 'selection' | 'section' | 'document';
 
 /** One heading-delimited span of the document. */
@@ -90,8 +92,13 @@ export function documentSections(content: string): DocumentSection[] {
   return sections;
 }
 
+/**
+ * Counted as a word limit is (`countWords`: prose, not headings), so the card
+ * never shows two counts for one text (2 Nov prod pass: "926 words now" above
+ * "at most 1000 words — 829 words").
+ */
 function words(text: string): number {
-  return text.trim() ? text.trim().split(/\s+/).length : 0;
+  return countWords(text);
 }
 
 /**

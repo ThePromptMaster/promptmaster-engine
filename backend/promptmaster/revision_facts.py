@@ -42,9 +42,15 @@ class RevisionFact(BaseModel):
 
 
 class ProjectSetup(BaseModel):
-    """The project's stored objective and constraints, as the setup panel shows them."""
+    """The project's stored objective, constraints and output format, as the setup panel shows them."""
     objective: str = Field(default="", max_length=8_000)
     constraints: str = Field(default="", max_length=8_000)
+    #: 2 Nov prod pass: after "drop option A" the output format still read
+    #: "Options A–C assessed", and every recheck was handed it.
+    output_format: str = Field(default="", max_length=8_000)
+
+
+SETUP_FIELDS = ("objective", "constraints", "output_format")
 
 
 class RevisionFactsRequest(BaseModel):
@@ -86,7 +92,7 @@ class SetupChange(BaseModel):
     recorded; the stored objective and constraints kept the old scope and
     $40,000, and every recheck was handed them as authoritative.
     """
-    field: str  # "objective" | "constraints"
+    field: str  # "objective" | "constraints" | "output_format"
     proposed: str
     quote: str
 
@@ -117,10 +123,10 @@ _INSTRUCTION = (
     "(and name them in \"authority\"), \"request\" when someone only asks for or proposes it, otherwise "
     "\"fact\".\n"
     "Rules for standing changes:\n" + RULES +
-    "SEPARATELY, when PROJECT SETUP is given: report a change to the stored OBJECTIVE or CONSTRAINTS ONLY when "
+    "SEPARATELY, when PROJECT SETUP is given: report a change to the stored OBJECTIVE, CONSTRAINTS or OUTPUT FORMAT ONLY when "
     "the INSTRUCTION itself replaces what they say — a change of scope, of the options compared, of the "
     "deliverable, or of a limit or figure the setup states (\"compare B and C only\", \"replace the $40,000 "
-    "reserve with $75,000\", \"update the objective\"). For each: the field (\"objective\" or \"constraints\"), "
+    "reserve with $75,000\", \"update the objective\"). For each: the field (\"objective\", \"constraints\" or \"output_format\"), "
     "the whole field rewritten so it says what the instruction now asks, changing as little else as possible "
     "and keeping its wording where it still holds, and a quote copied verbatim from the instruction (one "
     "sentence or less). A revision that only rewords the document, or a value the setup does not state, is "
@@ -128,7 +134,7 @@ _INSTRUCTION = (
     "Return JSON: {\"changes\": [{\"fact_id\": string, \"proposed\": string, \"quote\": string, \"why\": string}], "
     "\"additions\": [{\"statement\": string, \"kind\": \"fact\" | \"requirement\", \"quote\": string, "
     "\"status\": \"fact\" | \"request\" | \"approval\", \"authority\": string}], "
-    "\"setup_changes\": [{\"field\": \"objective\" | \"constraints\", \"proposed\": string, \"quote\": string}]}"
+    "\"setup_changes\": [{\"field\": \"objective\" | \"constraints\" | \"output_format\", \"proposed\": string, \"quote\": string}]}"
 )
 
 
@@ -147,7 +153,8 @@ def build_prompt(req: RevisionFactsRequest) -> tuple[str, str]:
     if req.setup is not None:
         prompt += (
             f"\n\nPROJECT SETUP:\nOBJECTIVE: {req.setup.objective.strip() or '(empty)'}\n"
-            f"CONSTRAINTS: {req.setup.constraints.strip() or '(empty)'}"
+            f"CONSTRAINTS: {req.setup.constraints.strip() or '(empty)'}\n"
+            f"OUTPUT FORMAT: {req.setup.output_format.strip() or '(empty)'}"
         )
     return _INSTRUCTION, prompt
 
@@ -168,11 +175,11 @@ def _setup_changes(raw: dict, req: RevisionFactsRequest) -> list[SetupChange]:
         return []
     instruction = _norm(req.instruction)
     out: list[SetupChange] = []
-    for item in items[:2]:
+    for item in items[:3]:
         if not isinstance(item, dict):
             continue
         field = str(item.get("field") or "").strip().lower()
-        if field not in ("objective", "constraints") or any(c.field == field for c in out):
+        if field not in SETUP_FIELDS or any(c.field == field for c in out):
             continue
         proposed = str(item.get("proposed") or "").strip()[:8_000]
         quote = " ".join(str(item.get("quote") or "").split()).strip('"“”')[:600]

@@ -21,7 +21,7 @@ import { getArtifact } from '@/lib/supabase/versions';
 import { listRecentRunOutputs } from '@/lib/supabase/agent';
 import { manuscriptArtifactFor, manuscriptSourceFor, measureStageContent, stageRequirements } from '@/lib/workflow/context';
 import { COUNTING_RULE, isPart, measure, replaceSection, sectionFor, type MeasurableRequirement } from '@/lib/workflow/measurable';
-import { describeLines, isChangeNote, keepUnasked, structureDropped } from '@/lib/workflow/preservation';
+import { askedOfRecheck, describeLines, isChangeNote, keepUnasked, structureDropped } from '@/lib/workflow/preservation';
 import { notRemovedByUser } from '@/lib/workflow/removed-text';
 import { addedClaims, noInventedDetails, suppliedText } from '@/lib/workflow/fact-boundary';
 import { isDone } from '@/lib/workflow/types';
@@ -1217,7 +1217,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // workshop: the recheck after a time change dropped "Confirm 12 attendees",
       // the greeting and the sign-off) — never a line stating a replaced value.
       // Not when it was shortening to meet a limit: what went is what was asked.
-      const checked = before || measuredFails.length ? { content, notes: [] as string[] } : await keptAndSupplied(ctx, head, content, why, superseded);
+      const checked = before || measuredFails.length ? { content, notes: [] as string[] } : await keptAndSupplied(ctx, head, content, askedOfRecheck(why, ctx.project.facts, headVersion?.created_at), superseded);
       content = checked.content;
       if (whole.continued || checked.notes.length) stillUnmet = unmetMeasurementsOf(ctx, target, content);
       // A repair does not undo the user's own latest version either (10 Oct),
@@ -1311,7 +1311,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // stays the user's, and the stage stays reopened until they give it.
       // The context was read before this save, so its measurements are of the
       // old text: they are taken from the new one (L-63).
-      const evaluation = withFreshMeasurements(evaluateStage(ctx.template, target.id, ctx.context), measureStageContent(ctx.project, ctx.template, target, content).length > 0, stillUnmet);
+      let evaluation = withFreshMeasurements(evaluateStage(ctx.template, target.id, ctx.context), measureStageContent(ctx.project, ctx.template, target, content).length > 0, stillUnmet);
       const actor = stageMoveActor(ctx.run.policy, ctx.approvedByUser);
       if (staleClaims.length && !leftover.length) {
         return done(key, {
@@ -1345,6 +1345,19 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
               ].join(' '),
             });
       }
+      // Approvals are re-confirmed before the stage is judged closed: one that
+      // is routine, and the only thing keeping it open, is checked against the
+      // new version and committed — never left for another repair that cannot
+      // tick it (2 Nov, prod, Requirements).
+      const recommitted: string[] = [];
+      const routineOpen = ctx.project.routine_decisions !== 'handle' || !ctx.commitCriterion ? [] : evaluation.unmet.filter((c) => c.blocking && c.manual && target.exit_criteria.find((x) => x.id === c.id)?.authority === 'delegable').map((c) => c.id);
+      const reconfirmed = typeof versionId === 'string' && !measuredRepair
+        ? await reconfirmApprovals(ctx, target, versionId, content, routineOpen, recommitted)
+        : [];
+      if (!evaluation.canAdvance && recommitted.length) {
+        const unmet = evaluation.unmet.filter((c) => !recommitted.includes(c.id));
+        evaluation = { ...evaluation, unmet, canAdvance: unmet.every((c) => !c.blocking) };
+      }
       if (evaluation.canAdvance && typeof versionId === 'string') {
         if (ctx.setStageSummary) {
           const summary = summariseStageContent(target, content);
@@ -1364,7 +1377,6 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         });
         await ctx.afterStageEvent();
       }
-      const reconfirmed = typeof versionId === 'string' ? await reconfirmApprovals(ctx, target, versionId, content) : [];
       return done(key, {
         status: 'succeeded', toolsUsed: ['model'],
         changes: typeof versionId === 'string' ? { version_ids: [versionId] } : {},
@@ -2205,11 +2217,22 @@ export async function reconfirmApprovals(
   ctx: Pick<PerformContext, 'project' | 'run' | 'signal' | 'commitCriterion'>,
   stage: StageDefinition,
   versionId: string,
-  content: string
+  content: string,
+  /**
+   * Routine approvals the repaired stage still lacks although no box shows
+   * them ticked: they are checked and committed like any other (2 Nov, prod:
+   * "This list matches the requirements I gave" was committed on v3, its box
+   * was lost, and every recheck of Requirements "stayed reopened until" it —
+   * two repairs that changed nothing, then "did not settle it").
+   */
+  unmetRoutine: readonly string[] = [],
+  committed?: string[]
 ): Promise<string[]> {
   const ticked = ctx.project.manual_checks ?? {};
   const given = ctx.project.manual_check_versions ?? {};
-  const stale = stage.exit_criteria.filter((c) => c.check === 'manual' && ticked[c.id] && given[c.id] !== versionId);
+  const stale = stage.exit_criteria.filter(
+    (c) => c.check === 'manual' && ((ticked[c.id] && given[c.id] !== versionId) || (c.authority === 'delegable' && unmetRoutine.includes(c.id)))
+  );
   if (!stale.length) return [];
   const lines: string[] = [];
   const yours = stale.filter((c) => c.authority !== 'delegable' || ctx.project.routine_decisions !== 'handle' || !ctx.commitCriterion);
@@ -2231,6 +2254,7 @@ export async function reconfirmApprovals(
       payload: { criterion_id: c.id, policy: 'routine_decisions', evidence_version_id: versionId, reconfirmed: true },
     });
     await ctx.commitCriterion!(stage.id, c.id, versionId);
+    committed?.push(c.id);
     lines.push(`"${c.label}" re-confirmed on the new version under your routine-decision policy — ${check.reason}`);
   }
   if (yours.length) {

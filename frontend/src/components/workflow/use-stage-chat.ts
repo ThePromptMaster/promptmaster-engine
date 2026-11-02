@@ -167,7 +167,7 @@ interface Options {
    * the user ticked asks (1 Nov). The brief-change watcher records the old
    * text and reopens what relied on it.
    */
-  onPatchSetup?: (patch: { objective?: string; constraints?: string }) => Promise<unknown> | void;
+  onPatchSetup?: (patch: { objective?: string; constraints?: string; output_format?: string }) => Promise<unknown> | void;
   /** After the chat saved web sources, so the project reloads them (22 Oct). */
   onSourcesChanged?: () => Promise<unknown> | void;
   /** The requirements checked on a revision's saved text, each met or not (13 Oct). */
@@ -529,7 +529,7 @@ export function useStageChat({
           messageId: saved.id,
           factChanges: await withMeaningChanges(
             factChangesFromRevision({ facts: project.facts, instruction: ask, before: content, after: checked.nextContent }),
-            { facts: project.facts, instruction: ask, before: content, after: checked.nextContent, model: project.model, setup: { objective: project.objective ?? '', constraints: project.constraints ?? '' } },
+            { facts: project.facts, instruction: ask, before: content, after: checked.nextContent, model: project.model, setup: { objective: project.objective ?? '', constraints: project.constraints ?? '', output_format: project.output_format ?? '' } },
             (req) => api.revisionFacts(req)
           ),
           changeSummary: withWebLine(
@@ -640,7 +640,7 @@ export function useStageChat({
           if (c.setup) {
             if (!onPatchSetup) continue;
             await onPatchSetup({ [c.setup]: c.proposed });
-            setupUpdated.push(c.setup);
+            setupUpdated.push(c.setup === 'output_format' ? 'output format' : c.setup);
             continue;
           }
           if (isNewFact(c)) await recordFacts(project, [{ statement: c.proposed, kind: c.fact.kind, source_kind: 'user_edit', source_ref: newFactSource(c, from) }]);
@@ -660,7 +660,7 @@ export function useStageChat({
         'assistant',
         `Applied to ${proposal.target.label.toLowerCase()}. The previous version is kept and can be restored.` +
           (factsUpdated ? ` Recorded ${factsUpdated === 1 ? 'one fact' : `${factsUpdated} facts`} with it.` : '') +
-          (setupUpdated.length ? ` Updated the project's ${setupUpdated.join(' and ')}; the earlier wording is kept in the brief's history.` : ''),
+          (setupUpdated.length ? ` Updated the project's ${setupUpdated.length > 2 ? `${setupUpdated.slice(0, -1).join(', ')} and ${setupUpdated.at(-1)}` : setupUpdated.join(' and ')}; the earlier wording is kept in the brief's history.` : ''),
         'instruct',
         proposal.target.label
       );

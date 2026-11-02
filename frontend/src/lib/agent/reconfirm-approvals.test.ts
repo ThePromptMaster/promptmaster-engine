@@ -80,3 +80,32 @@ describe('approvals given on a replaced version (L-117)', () => {
     expect(await reconfirmApprovals(ctx('handle', { 'plan.routine': 'v2', 'plan.mine': 'v2' }), stage, 'v2', 'text')).toEqual([]);
   });
 });
+
+describe('a routine approval the repaired stage lacks with no box ticked (2 Nov, prod)', () => {
+  // Requirements: "This list matches the requirements I gave" was committed on
+  // v3, its box was lost, and each recheck "stayed reopened until" it.
+  const lost = () => {
+    const c = ctx('handle');
+    (c.project as { manual_checks: Record<string, boolean> }).manual_checks = { 'plan.mine': true };
+    (c.project as { manual_check_versions: Record<string, string> }).manual_check_versions = { 'plan.mine': 'v2' };
+    return c;
+  };
+
+  it('is checked on the new version and committed when it is the open one', async () => {
+    agentCheckCriterion.mockResolvedValue({ met: true, reason: 'Rows match the requirements given.' });
+    const committed: string[] = [];
+    const lines = await reconfirmApprovals(lost(), stage, 'v2', 'text', ['plan.routine'], committed);
+    expect(committed).toEqual(['plan.routine']);
+    expect(commitCriterion).toHaveBeenCalledWith('plan', 'plan.routine', 'v2');
+    expect(lines.join(' ')).toContain('re-confirmed on the new version');
+  });
+
+  it('is not touched unless named, and a reserved one is never committed this way', async () => {
+    agentCheckCriterion.mockResolvedValue({ met: true, reason: 'ok' });
+    const committed: string[] = [];
+    expect(await reconfirmApprovals(lost(), stage, 'v2', 'text', [], committed)).toEqual([]);
+    await reconfirmApprovals(lost(), stage, 'v2', 'text', ['plan.mine'], committed);
+    expect(committed).toEqual([]);
+    expect(commitCriterion).not.toHaveBeenCalled();
+  });
+});
