@@ -191,14 +191,123 @@ const RANGE = new RegExp(
   'gi'
 );
 
+/** The pieces a check reads a text in: its sentences, lines and JSON strings. */
+function sentencesOf(text: string): string[] {
+  return text
+    .replace(/\\n/g, '\n')
+    .split(/(?<=[.!?;])\s+|\s*\n\s*|",\s*"/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+}
+
+/** What works one figure out from others: a sign, or the word for one. */
+const OPERATOR = /[−–\-+×*÷/]|\b(?:x|less|minus|plus|times|divided)\b/i;
+/** Before a result: "= $400", "≈ 20", "≥ 12", "equals $400", "leaves $400". */
+const RESULT = /(?:[=≈≤≥<>]|\bequals?\b|\bleav(?:es|ing)\b|\bcomes? to\b)\s*/gi;
+/** A one-letter variable bounded by a value: "c ≤ $40", "x < 12". */
+const BOUND = /(?<![\p{L}\p{N}])\p{L}\s*(?:≤|≥|<=|>=|<|>)\s*/gu;
+const FIGURE = /^\(?\s*((?:[$€£]\s?)?\d[\d,]*(?:\.\d+)?(?:\s?(?:usd|dollars?|eur|euros?|gbp|pounds?)\b)?)/i;
+
 /**
- * The superseded values `text` still states as current. A sentence that names
- * the old value beside the new one ("moved from November 12 to November 19")
- * or the repair's own "What changed:" line describes the change; it is not a
- * value left behind.
+ * The amounts and plain numbers a text works out as results — "$1,200 − $800
+ * = $400", "c ≤ $40" — keyed by value alone, since a derived "40" and "$40"
+ * are the same figure (2 Nov, Sean, photography workshop: the spendable $400
+ * left after the new $800 reserve was read as the old $400 reserve, and the
+ * $40 ceiling on Option C's cost as the old $40 ticket; every repair failed).
+ * "Price = $40" works nothing out: the left side must hold another figure and
+ * an operator.
  */
-export function leftoverValues(text: string, superseded: readonly SupersededValue[]): SupersededValue[] {
+export function derivedValues(text: string): Set<string> {
+  const out = new Set<string>();
+  const add = (right: string) => {
+    const m = FIGURE.exec(right);
+    if (!m) return;
+    const v = valueMentions(m[1]).find((x) => x.kind === 'money' || x.kind === 'numbers');
+    if (v) out.add(v.value);
+  };
+  for (const piece of sentencesOf(text)) {
+    for (const m of piece.matchAll(RESULT)) {
+      const left = piece.slice(0, m.index);
+      if (/\d/.test(left) && OPERATOR.test(left)) add(piece.slice(m.index! + m[0].length));
+    }
+    for (const m of piece.matchAll(BOUND)) add(piece.slice(m.index! + m[0].length));
+  }
+  return out;
+}
+
+const STOPWORDS = new Set([
+  'this', 'that', 'with', 'from', 'have', 'been', 'will', 'must', 'only', 'also', 'each', 'more', 'than', 'into', 'which',
+  'their', 'there', 'these', 'those', 'about', 'after', 'before', 'still', 'remain', 'remains', 'keep', 'kept', 'stays',
+  'should', 'shall', 'would', 'could', 'when', 'where', 'what', 'while', 'every', 'other', 'same', 'such', 'over', 'under',
+  'least', 'most', 'none', 'instead', 'replacing', 'replaces', 'replaced', 'superseding', 'supersedes', 'previously', 'earlier',
+]);
+const stem = (w: string) => w.toLowerCase().replace(/(?<!s)s$/, '');
+const sameWord = (a: string, b: string) => a === b || (a.length >= 5 && b.length >= 5 && a.slice(0, 5) === b.slice(0, 5));
+
+/** The words a fact names its subject with: "minimum", "unspent", "reserve" for "The minimum unspent reserve is $800". */
+function subjectWords(statement: string): string[] {
+  const words = statement.replace(/[$€£]?\d[\d,.]*/g, ' ').match(/\p{L}{4,}/gu) ?? [];
+  return [...new Set(words.map(stem).filter((w) => !STOPWORDS.has(w) && !ATTRIBUTED.test(w)))];
+}
+
+const SIGN = /[−–\-+×*÷/=≈≤≥<>]/;
+
+/**
+ * Whether a mention of `s` in `piece` sits within four words of what the fact
+ * is about. In a calculation the words before it label the result, so only
+ * the words straight after it name what it is: "the reserve preserved: ($400
+ * − $300) ÷ $5 = 20" is not a $400 reserve; "$1,200 − $400 reserve" is.
+ */
+function boundToSubject(piece: string, s: SupersededValue, subject: readonly string[]): boolean {
+  const raws = valueMentions(piece).filter((m) => m.kind === s.kind && m.value === s.value).map((m) => m.raw);
+  for (const raw of new Set(raws)) {
+    for (let at = piece.indexOf(raw); at >= 0; at = piece.indexOf(raw, at + raw.length)) {
+      const left = piece.slice(0, at).replace(/[\s(]+$/, '');
+      const right = piece.slice(at + raw.length);
+      const operand = SIGN.test(left.slice(-1)) || SIGN.test(right.replace(/^[\s)]+/, '').charAt(0));
+      const before = operand ? [] : (left.match(/\p{L}+/gu) ?? []).slice(-4);
+      const after = ((operand ? right.split(/[\d−–\-+×*÷/=≈≤≥<>]/)[0] : right).match(/\p{L}+/gu) ?? []).slice(0, 4);
+      if ([...before, ...after].some((w) => subject.some((x) => sameWord(stem(w), x)))) return true;
+    }
+  }
+  return false;
+}
+
+/** A piece as a message quotes it: no JSON key or quoting around it. */
+function quotable(piece: string): string {
+  const t = piece
+    .replace(/^[\s{[,]*"?[\w ]{1,40}"\s*:\s*"/, '')
+    .replace(/"\s*[,}\]]*\s*$/, '')
+    .replace(/\\"/g, '"')
+    .trim();
+  return t.length > 200 ? `${t.slice(0, 197)}…` : t;
+}
+
+/** One superseded value a text still states as current, and a sentence that states it. */
+export interface LeftoverMention {
+  value: SupersededValue;
+  sentence: string;
+}
+
+/**
+ * The superseded values `text` still states as current, each with the
+ * sentences that state it. A sentence that names the old value beside the new
+ * one ("moved from November 12 to November 19") or the repair's own "What
+ * changed:" line describes the change; it is not a value left behind.
+ *
+ * An amount the text works out as a result (`derivedValues` of `derivedIn`,
+ * the whole document the text is part of) is a figure of its own that may
+ * equal an old one: "$1,200 − $800 = $400" is what is left to spend, not the
+ * $400 reserve the $800 replaced. A mention of it is left behind only where
+ * it sits beside the words of what the fact changed ("a $400 minimum reserve").
+ */
+export function leftoverMentions(
+  text: string,
+  superseded: readonly SupersededValue[],
+  options: { derivedIn?: string } = {}
+): LeftoverMention[] {
   if (!superseded.length) return [];
+  const derived = derivedValues(options.derivedIn ?? text);
   // A list under a line that sets values aside ("The following alternatives
   // are excluded:") is that line's: each item reports a value, it does not
   // state it (8 Oct, production: "- $18 per user per month price").
@@ -233,21 +342,54 @@ export function leftoverValues(text: string, superseded: readonly SupersededValu
     if (t) underAttribution = false;
     return true;
   });
-  text = kept.join('\n');
-  const pieces = text
-    .replace(/\\n/g, '\n')
-    .split(/(?<=[.!?;])\s+|\s*\n\s*|",\s*"/)
-    .map((p) => p.trim())
-    .filter(Boolean);
-  return superseded.filter((s) => {
+  const pieces = sentencesOf(kept.join('\n'));
+  const out: LeftoverMention[] = [];
+  for (const s of superseded) {
     const now = factValues(s.now)[s.kind].filter((v) => v !== s.value);
     const spanned = s.kind === 'dates' && new RegExp(RANGE.source, 'i').test(s.was);
-    return pieces.some((p) => {
-      if (/^\W*what changed\b/i.test(p) || ATTRIBUTED.test(p)) return false;
+    const coincident = (s.kind === 'money' || s.kind === 'numbers') && derived.has(s.value);
+    const subject = coincident ? subjectWords(s.now) : [];
+    for (const p of pieces) {
+      if (/^\W*what changed\b/i.test(p) || ATTRIBUTED.test(p)) continue;
       const found = factValues(s.kind === 'dates' && !spanned ? p.replace(RANGE, ' ') : p)[s.kind];
-      return found.includes(s.value) && !now.some((v) => found.includes(v));
-    });
-  });
+      if (!found.includes(s.value) || now.some((v) => found.includes(v))) continue;
+      // A figure the document works out is its own; only beside the fact's
+      // own words is it the replaced one. A fact naming nothing is read strictly.
+      if (coincident && subject.length && !boundToSubject(p, s, subject)) continue;
+      out.push({ value: s, sentence: quotable(p) });
+    }
+  }
+  return out;
+}
+
+/**
+ * Each value left behind with the sentences that state it, as a message
+ * names it: "$400 in "Keep a $400 reserve."". The line, not the fact — the
+ * fact alone read as the sentence rejected (2 Nov, Sean: "it rejects the
+ * historical mention itself").
+ */
+export function namedLeftovers(mentions: readonly LeftoverMention[], perValue = 2): { value: SupersededValue; text: string }[] {
+  const groups = new Map<SupersededValue, string[]>();
+  for (const m of mentions) {
+    const list = groups.get(m.value) ?? [];
+    if (!list.includes(m.sentence)) list.push(m.sentence);
+    groups.set(m.value, list);
+  }
+  return [...groups].map(([value, sentences]) => ({
+    value,
+    text: `${describeValue(value)} in ${sentences.slice(0, perValue).map((s) => `"${s}"`).join(' and ')}${sentences.length > perValue ? ` (and ${sentences.length - perValue} more)` : ''}`,
+  }));
+}
+
+/** The superseded values `text` still states as current (`leftoverMentions`, one per value). */
+export function leftoverValues(
+  text: string,
+  superseded: readonly SupersededValue[],
+  options: { derivedIn?: string } = {}
+): SupersededValue[] {
+  const seen = new Set<SupersededValue>();
+  for (const m of leftoverMentions(text, superseded, options)) seen.add(m.value);
+  return superseded.filter((s) => seen.has(s));
 }
 
 /** "November 12" for "11-12", "$12" for money — how a message names a value. */

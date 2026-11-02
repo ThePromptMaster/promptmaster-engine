@@ -377,5 +377,7 @@ export function establishedFigures(
 
 function withoutSuperseded(figures: StageDigest['figures'], superseded: readonly SupersededValue[]): StageDigest['figures'] {
   if (!superseded.length) return figures;
-  return figures.filter((f) => leftoverValues(f.value, superseded).length === 0);
+  // A figure worked out from current ones keeps its value even where it
+  // equals an old one ("$1,200 − $800 = $400" left to spend; 2 Nov).
+  return figures.filter((f) => leftoverValues(f.value, superseded, { derivedIn: `${f.value} ${f.context}` }).length === 0);
 }
