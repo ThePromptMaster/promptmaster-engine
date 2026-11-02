@@ -8,6 +8,7 @@
  * `validateTemplate` is the check before it is saved.
  */
 
+import { restatesTriage } from './triage-approval';
 import type { AssessSpec, ExitCriterion, StageDefinition, StageGroup, WorkflowExecution, WorkflowTemplate } from './types';
 import { presetScale, toneAt } from './assess';
 
@@ -79,8 +80,13 @@ function criteriaFor(stage: DesignedStage, id: string, first: boolean): ExitCrit
   if (stage.kind === 'list') out.push({ id: `${id}.items`, label: 'At least one item', check: 'auto', rule: { type: 'min_items', n: 1 }, blocking: true });
   if (stage.kind === 'assess') out.push({ id: `${id}.assessed`, label: 'At least one item is assessed', check: 'auto', rule: { type: 'min_items', n: 1 }, blocking: true });
   if (stage.kind === 'chapters') out.push({ id: `${id}.allsections`, label: 'Every chapter is written', check: 'auto', rule: { type: 'all_sections_complete' }, blocking: true });
-  if (stage.kind === 'check') out.push({ id: `${id}.triaged`, label: 'Every finding accepted or rejected', check: 'auto', rule: { type: 'all_findings_triaged' }, blocking: false });
-  if (stage.approval.trim()) {
+  // An approval that only restates the automatic check is that check, and
+  // blocks as the approval would have (2 Nov, Sean): the table's rows say
+  // whether every finding is decided, and a second box in the user's words
+  // stopped Go after it had decided them.
+  const restated = stage.kind === 'check' && restatesTriage(stage.approval);
+  if (stage.kind === 'check') out.push({ id: `${id}.triaged`, label: 'Every finding accepted or rejected', check: 'auto', rule: { type: 'all_findings_triaged' }, blocking: restated });
+  if (stage.approval.trim() && !restated) {
     // Only an explicit "routine" is delegable; a design from before 6 Oct has
     // no kind and stays the user's.
     const authority = stage.approval_kind === 'routine' ? 'delegable' : 'reserved';

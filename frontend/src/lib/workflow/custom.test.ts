@@ -173,3 +173,25 @@ describe('a designed book is written a chapter at a time (31 Oct)', () => {
     expect(validateTemplate(broken).join(' ')).toMatch(/chapter plan must come before it/);
   });
 });
+
+describe('a Check stage whose approval only restates the triage (2 Nov, Sean)', () => {
+  const withApproval = (approval: string): DesignedWorkflow => ({
+    ...design,
+    stages: design.stages.map((s) => (s.kind === 'check' ? { ...s, approval, approval_kind: 'routine' as const } : s)),
+  });
+
+  it('becomes the automatic check, blocking as the approval would have', () => {
+    const t = templateFromDesign(withApproval('I have accepted or rejected each finding'), 'r1');
+    const c = t.stages[2].exit_criteria;
+    expect(c.map((x) => x.id)).toEqual(['fact_check.triaged']);
+    expect(c[0]).toMatchObject({ check: 'auto', rule: { type: 'all_findings_triaged' }, blocking: true });
+    expect(validateTemplate(t)).toEqual([]);
+  });
+
+  it('keeps an approval about what the check concludes, and the triage stays optional', () => {
+    const t = templateFromDesign(withApproval('I confirm the memo meets every requirement'), 'r2');
+    const c = t.stages[2].exit_criteria;
+    expect(c.map((x) => x.id)).toEqual(['fact_check.triaged', 'fact_check.approved']);
+    expect(c[0].blocking).toBe(false);
+  });
+});
