@@ -2600,3 +2600,24 @@ still stands. A reference to another project now holds a copy of that project as
 was added. "Update from the original" refreshes it. References made before 31 Oct are
 snapshotted the next time the project opens. Deleting the referenced project still removes the
 reference and its snapshot.
+
+### L-134 — A check that could not run is reported as not run (2026-11-02)
+
+A stage check whose model call fails (no answer, or an answer cut off at the token limit) used
+to come back as Medium on every score with no findings. It was saved, shown as "No specific
+defects found", and counted by Go as the version's check. It now comes back marked `failed`.
+The browser refuses to save it, every caller shows it as an error, and Go runs the check again.
+Rows saved before this are recognised by the fallback's wording ("(Technical detail: …") and
+shown as "This check could not run". They stay in the table, since `evaluations` rows are not
+rewritten.
+
+The cause on long deliverables was the budget. The check asked for 1,536 answer tokens, and Opus
+reasoned until the limit (3,584 tokens out on every check over about 13,000 tokens in). It now
+asks for 4,096 with reasoning held to low effort. An empty reply at the limit is retried once
+with twice the room. JSON cut off at the limit is asked for again with twice the room before
+any repair, because a repair closes the brackets on half the findings. A check that still
+fails after that is reported as not run.
+
+Not covered: `audit_findings.py` still returns no findings on a failed call. It has no caller in
+the workspace today. The four-call iteration pipeline (`evaluator.py`) marks its fallback
+`failed`, but its consumers (side-chat "save as new version") still display the scores.

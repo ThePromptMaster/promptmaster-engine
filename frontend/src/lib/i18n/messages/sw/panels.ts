@@ -112,6 +112,7 @@ export const sw: Record<keyof typeof en, string> = {
   'pnl.findingsShown_one': 'Ugunduzi {count}, unaonyeshwa dhidi ya kiwango unachoathiri.',
   'pnl.findingsShown_other': 'Ugunduzi {count}, kila mmoja unaonyeshwa dhidi ya kiwango unachoathiri.',
   'pnl.noDefects': 'Hakuna kasoro mahususi zilizopatikana.',
+  'pnl.checkDidNotRun': 'Ukaguzi huu haukuweza kuendeshwa, kwa hiyo hakuna kilichopimwa. Hakuna kilichopotea — endesha ukaguzi tena.',
   'pnl.furtherFindings_one': 'Ugunduzi {count} zaidi',
   'pnl.furtherFindings_other': 'Ugunduzi {count} zaidi',
   'pnl.ratingLabel': 'Kiwango cha {label}',

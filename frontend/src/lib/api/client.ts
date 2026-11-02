@@ -59,6 +59,7 @@ import {
 } from '@/lib/supabase/model-usage';
 import { languageHeaders } from './language';
 import { thinkingHeaders } from './thinking';
+import { EvaluationDidNotRun } from '@/lib/workflow/evaluation-failure';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -588,11 +589,15 @@ export const api = {
     req: EvaluateStageArtifactRequest,
     signal?: AbortSignal
   ): Promise<EvaluateStageArtifactResponse> {
-    return apiFetch('/api/evaluate-stage-artifact', {
+    const res = await apiFetch<EvaluateStageArtifactResponse>('/api/evaluate-stage-artifact', {
       method: 'POST',
       body: JSON.stringify(req),
       signal,
     });
+    // A check that could not run is an error to every caller, never a
+    // result to save (2 Nov: it was saved as Medium ×3 and shown as Done).
+    if (res.evaluation?.failed) throw new EvaluationDidNotRun(res.evaluation.failure);
+    return res;
   },
 
   /** Propose the stages of a workflow for this kind of work (3 Oct call). 1 LLM call; saves nothing. */

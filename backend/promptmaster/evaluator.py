@@ -169,4 +169,6 @@ async def evaluate_output(
             clarity=DimensionScore(score="Medium", explanation=f"Evaluation error: {e}"),
             completeness=None,
             interpretation=None,
+            failed=True,
+            failure="This version could not be scored. Nothing was lost; run the check again.",
         )

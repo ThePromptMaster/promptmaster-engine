@@ -37,7 +37,7 @@ import uuid
 from .conversation import _shared_system
 from .critique_style import MAX_FINDINGS, critique_style_block, intensity_of
 from .errors import PRESERVED_EVALUATION, classify_error
-from .llm_client import OpenRouterClient
+from .llm_client import LONG_ANSWER_TOKENS, OpenRouterClient
 from .schemas import (
     AuditFinding,
     CompletenessResult,
@@ -469,6 +469,8 @@ def _failed(reason: str, error: BaseException | None = None) -> StageEvaluationR
             alignment=DimensionScore(score="Medium", explanation=explanation),
             drift=DimensionScore(score="Medium", explanation=explanation),
             clarity=DimensionScore(score="Medium", explanation=explanation),
+            failed=True,
+            failure=plain,
         ),
         recommendation=None,
     )
@@ -501,7 +503,10 @@ async def evaluate_stage_artifact(
             # Low, for the same reason evaluator.py runs cold: a score that
             # moves when the text did not reads to a user as a bug.
             temperature=0.15,
-            max_tokens=1536,
+            # The long-answer tier, so the reasoning runs at low effort beside
+            # it: at 1,536 Opus reasoned through the whole budget and answered
+            # nothing (1 Nov, production: "finish_reason='length'").
+            max_tokens=LONG_ANSWER_TOKENS,
             model=model,
         )
     except Exception as e:

@@ -112,3 +112,59 @@ def test_the_thinking_header_sets_the_level_for_the_request_and_nothing_else():
     assert client.get("/level").json() == {"thinking": "standard"}
     # Anything unrecognised is Standard: an unknown level never raises the bill.
     assert parse_thinking("maximum") == "standard"
+
+
+async def test_an_empty_reply_at_the_limit_is_retried_once_with_room_for_the_answer(monkeypatch):
+    """1 Nov (production): a stage check came back "No content in response
+    (finish_reason='length')" — the reasoning took the whole budget."""
+    sent = []
+
+    def handler(request):
+        import json
+        sent.append(json.loads(request.content))
+        if len(sent) == 1:
+            return httpx.Response(200, json={"choices": [{"message": {"content": ""}, "finish_reason": "length"}], "usage": {}})
+        return httpx.Response(200, json={"choices": [{"message": {"content": "{}"}, "finish_reason": "stop"}], "usage": {}})
+
+    client = OpenRouterClient(api_key="k")
+    client._client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    await client.generate("hi", model="anthropic/claude-opus-5.5", max_tokens=1000)
+    assert len(sent) == 2
+    assert sent[1]["max_tokens"] == 2 * sent[0]["max_tokens"]
+    assert sent[1]["reasoning"] == {"effort": "low"}
+
+
+async def test_an_empty_reply_at_the_limit_is_retried_only_once():
+    calls = []
+
+    def handler(request):
+        calls.append(1)
+        return httpx.Response(200, json={"choices": [{"message": {"content": ""}, "finish_reason": "length"}], "usage": {}})
+
+    client = OpenRouterClient(api_key="k")
+    client._client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    with pytest.raises(OpenRouterError, match="No content"):
+        await client.generate("hi", model="anthropic/claude-opus-5.5", max_tokens=1000)
+    assert len(calls) == 2
+
+
+async def test_json_cut_off_at_the_limit_is_asked_again_not_repaired():
+    """2 Nov (production): long stage checks stopped at the same 3,584 tokens;
+    a repair closed the brackets on half the findings and the check read clean."""
+    import json as _json
+    sent = []
+
+    def handler(request):
+        body = _json.loads(request.content)
+        sent.append(body)
+        if len(sent) == 1:
+            return httpx.Response(200, json={"choices": [{"message": {"content": '{"findings": [{"id": "f1", "text": "cut'}, "finish_reason": "length"}], "usage": {}})
+        return httpx.Response(200, json={"choices": [{"message": {"content": '{"findings": [{"id": "f1"}, {"id": "f2"}]}'}, "finish_reason": "stop"}], "usage": {}})
+
+    client = OpenRouterClient(api_key="k")
+    client._client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    result, _ = await client.generate_json("check this", model="anthropic/claude-opus-5.5", max_tokens=4096)
+    assert [f["id"] for f in result["findings"]] == ["f1", "f2"]
+    assert len(sent) == 2
+    assert "malformed" not in sent[1]["messages"][-1]["content"]
+    assert sent[1]["max_tokens"] > sent[0]["max_tokens"]

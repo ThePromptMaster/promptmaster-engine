@@ -25,6 +25,7 @@
 import { useT } from '@/lib/i18n/i18n-provider';
 import { EvaluationRatings } from './evaluation-ratings';
 import type { Evaluation } from '@/types/project';
+import { isFailedEvaluation } from '@/lib/workflow/evaluation-failure';
 
 interface Props {
   evaluation: Evaluation | undefined;
@@ -36,6 +37,20 @@ export function StageEvaluationPanel({ evaluation }: Props) {
   const interpretation = evaluation?.interpretation ?? null;
 
   if (!evaluation) return null;
+
+  // 2 Nov (Sean): a check that could not run was shown as Medium ×3 and
+  // "No specific defects found". It judged nothing, so it shows nothing judged.
+  if (isFailedEvaluation(evaluation)) {
+    return (
+      <section aria-label={t('pnl.evalLabel')} className="rounded-xl bg-[var(--surface-container-low)] px-5 py-4">
+        <h3 className="text-label uppercase tracking-wider text-[var(--on-surface-variant)]">{t('pnl.evaluation')}</h3>
+        <p role="status" className="mt-2 flex items-start gap-2 text-body text-[var(--pm-error)]">
+          <span aria-hidden className="material-symbols-outlined">error</span>
+          {t('pnl.checkDidNotRun')}
+        </p>
+      </section>
+    );
+  }
 
   return (
     <section

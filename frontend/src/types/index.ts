@@ -68,6 +68,9 @@ export interface EvaluationResult {
   clarity: DimensionScore;
   completeness?: CompletenessResult | null;
   interpretation?: WhyThisWorks | null;
+  /** The check could not run; the scores are placeholders (2 Nov). Never recorded. */
+  failed?: boolean;
+  failure?: string | null;
   /**
    * FR-11: the specific defects this evaluation found.
    *
