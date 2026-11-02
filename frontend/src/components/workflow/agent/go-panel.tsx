@@ -171,6 +171,17 @@ export function GoPanel({
         await go.go();
         return;
       case 'tick_criterion':
+        // A finding still undecided elsewhere is settled first; Go then asks
+        // for the approval again of the work as it now stands (2 Nov).
+        if ((option === 'accept_row' || option === 'reject_row') && need.openRows?.length === 1 && needsActions?.decideRow) {
+          const row = need.openRows[0];
+          await needsActions.decideRow(
+            row.stageId, row.id, option === 'accept_row' ? 'accepted' : 'rejected',
+            option === 'reject_row' ? `Rejected from Go's request on ${stageLabel}.` : undefined
+          );
+          await go.go();
+          return;
+        }
         await needsActions?.tick(need.criterionId);
         await go.go();
         return;

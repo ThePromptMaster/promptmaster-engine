@@ -74,5 +74,6 @@ export const sw: Record<keyof typeof en, string> = {
   'need.acceptRow': 'Kubali {id} na uendelee',
   'need.rejectRow': 'Kataa {id}',
   'need.rowEffect': 'Kukubali {id} kunatekeleza mabadiliko yaliyopendekezwa na kuyamaliza katika {where}; kuyakataa kunaacha mabadiliko na kuhifadhi sababu kwenye safu.',
+  'need.openFirst': 'Bado haijaamuliwa kabla hujaidhinisha: {list}.',
   'need.workOpen': '{stage} imeandikwa, lakini kazi haijakamilika: {list}. Sitasema lengo limefikiwa wakati lolote kati ya haya bado liko wazi.',
 };

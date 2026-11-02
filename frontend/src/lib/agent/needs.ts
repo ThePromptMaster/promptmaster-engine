@@ -14,6 +14,7 @@ import type { AgentStep, ExecutionPolicy } from '@/types/agent';
 import type { ExitCriterion, StageDefinition, StageEvaluation, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
 import { isDone } from '@/lib/workflow/types';
 import type { RoutineDecisions } from '@/types/project';
+import type { OutstandingItem } from '@/lib/workflow/engine';
 import type { StageFacts } from './facts';
 import type { InputsChange } from '@/lib/workflow/stage-inputs';
 import { awaitsAttempt, confirmableProposals } from '@/lib/workflow/stage-artifact';
@@ -35,6 +36,13 @@ type Need =
        * 'policy_ask': routine, but routine decisions are set to Ask me.
        */
       authority?: 'reserved' | 'policy_ask';
+      /**
+       * Undecided findings on other stages that block finishing (2 Nov, after
+       * Sean's 1 Nov recruitment plan: Go asked "I approve this plan" while
+       * Check's i11 was still open, and the request did not say so). They are
+       * named on the card; one is decided from it before the approval.
+       */
+      openRows?: OpenRow[];
     }
   | {
       kind: 'answer_question'; question: string; /** Q3a: the expert review package, as markdown. */ expertPackage?: string;
@@ -87,8 +95,29 @@ type Need =
        * without displaying its actual wording"). One row is decided from the
        * stop itself.
        */
-      rows?: { stageId: string; stageLabel: string; id: string; text: string; severity?: string; suggested_change?: string }[];
+      rows?: OpenRow[];
     };
+
+/** An undecided review row on some stage, by id and wording, for a request that names it. */
+export interface OpenRow { stageId: string; stageLabel: string; id: string; text: string; severity?: string; suggested_change?: string }
+
+/**
+ * The undecided rows the open work names, for a stop that should show them
+ * (1 Nov: "Tell me which finding it is first" — "I can't see the Check table").
+ */
+export function openRowsOf(template: WorkflowTemplate, open: readonly OutstandingItem[]): { rows?: OpenRow[] } {
+  const rows = open.flatMap((item) => {
+    if (item.kind !== 'open_findings' || !item.rows?.length) return [];
+    const stage = template.stages.find((s) => s.id === item.stageId);
+    const stageLabel = stage ? stage.short_label || stage.label : item.label;
+    return item.rows.map((r) => ({
+      stageId: item.stageId, stageLabel, id: r.id, text: r.text,
+      ...(r.severity ? { severity: r.severity } : {}),
+      ...(r.suggested_change ? { suggested_change: r.suggested_change } : {}),
+    }));
+  });
+  return rows.length ? { rows: rows.slice(0, 12) } : {};
+}
 
 /**
  * `onStage` is the stage the project was on when the run stopped. A request
@@ -573,6 +602,8 @@ export function needsUser(input: {
   runAttemptsLeft?: number;
   /** The user said to approve the current version as it stands (`approvedAsItStands`). */
   asItStands?: boolean;
+  /** Undecided findings on other stages that block finishing (`openRowsOf`). */
+  openElsewhere?: readonly OpenRow[];
 }): NeedsUser | null {
   const { state, stage, facts, stageEvaluation, allowed, policy, outlineStageId } = input;
 
@@ -663,6 +694,7 @@ export function needsUser(input: {
       kind: 'tick_criterion', stageId: stage.id, criterionId: c.id, label: c.label,
       ...(c.hint ? { hint: c.hint } : {}),
       ...(authority ? { authority } : {}),
+      ...(input.openElsewhere?.length ? { openRows: input.openElsewhere.slice(0, 12) } : {}),
     };
   }
 
@@ -867,10 +899,23 @@ export function describeNeed(
       // What is needed, why the policy cannot cover it, and what answering unlocks (5 Oct).
       const why =
         need.authority === 'reserved' ? t('need.reserved') : need.authority === 'policy_ask' ? t('need.policyAsk') : '';
-      return {
-        message: [t('need.approval', { label: word(need.label) }), why, need.hint ? word(need.hint) : ''].filter(Boolean).join(' '),
-        action: t('need.approveResume'),
-      };
+      const message = [t('need.approval', { label: word(need.label) }), why, need.hint ? word(need.hint) : ''].filter(Boolean).join(' ');
+      const open = need.openRows ?? [];
+      if (open.length === 0) return { message, action: t('need.approveResume') };
+      // A finding still undecided elsewhere is named before the approval, and
+      // a single one is settled from here first: accepting it may change the
+      // work being approved (2 Nov).
+      const list = open.slice(0, 3).map((r) => `${r.id} (${r.stageLabel}) — “${r.text.length > 160 ? `${r.text.slice(0, 159)}…` : r.text}”`).join('; ')
+        + (open.length > 3 ? ` (+${open.length - 3})` : '');
+      const named = `${message} ${t('need.openFirst', { list })}`;
+      if (open.length > 1) return { message: named, action: t('need.approveResume') };
+      const only = open[0];
+      const options = [
+        { id: 'accept_row' as const, label: t('need.acceptRow', { id: only.id }) },
+        { id: 'reject_row' as const, label: t('need.rejectRow', { id: only.id }) },
+        { id: 'resume' as const, label: t('need.approveResume') },
+      ];
+      return { message: `${named} ${t('need.rowEffect', { id: only.id, where: only.stageLabel })}`, action: options[0].label, options };
     }
     case 'answer_question':
       return { message: need.question, action: null };

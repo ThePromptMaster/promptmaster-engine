@@ -46,7 +46,7 @@ import { proposeStatuses } from '@/lib/workflow/propose';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import { dataFileBriefs, summariseStageContent } from '@/lib/workflow/digest';
 import { stageContentForSummary, stageEvidence } from '@/lib/workflow/evidence';
-import { blocksCompletion, deliverableStage, describeOutstanding, evaluateStage, outstandingWork, remainingStages, type OutstandingItem } from '@/lib/workflow/engine';
+import { blocksCompletion, deliverableStage, describeOutstanding, evaluateStage, outstandingWork, remainingStages } from '@/lib/workflow/engine';
 import { describeBasis, executableNext, openWithNextLine, pausedLine, stillMet, type ObjectiveAssessment, type ObjectiveBasis } from '@/lib/workflow/objective';
 import { addedByRun, designAddedStage, MAX_ADDED_PER_RUN, type AddedStage } from '@/lib/workflow/added-stages';
 import { attachedDocuments, currentFacts, supersededFactValues } from '@/lib/workflow/facts';
@@ -82,7 +82,7 @@ import type { Evaluation, Project } from '@/types/project';
 import { actionFor, AWAIT_SECTIONS_STEP, INTERPRET_STEP } from './actions';
 import type { AgentStateDigest } from './digest';
 import type { StageFacts } from './facts';
-import type { NeedsUser } from './needs';
+import { openRowsOf, type NeedsUser } from './needs';
 import { deriveExecutionLabel } from './labels';
 import { returnInstruction } from './return-work';
 import { stageMoveActor } from './policy';
@@ -2647,20 +2647,3 @@ function sameKinds(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && a.every((k) => b.includes(k));
 }
 
-/**
- * The undecided rows the open work names, for a stop that should show them
- * (1 Nov: "Tell me which finding it is first" — "I can't see the Check table").
- */
-function openRowsOf(template: WorkflowTemplate, open: readonly OutstandingItem[]): { rows?: NonNullable<Extract<NeedsUser, { kind: 'objective_check' }>['rows']> } {
-  const rows = open.flatMap((item) => {
-    if (item.kind !== 'open_findings' || !item.rows?.length) return [];
-    const stage = template.stages.find((s) => s.id === item.stageId);
-    const stageLabel = stage ? stage.short_label || stage.label : item.label;
-    return item.rows.map((r) => ({
-      stageId: item.stageId, stageLabel, id: r.id, text: r.text,
-      ...(r.severity ? { severity: r.severity } : {}),
-      ...(r.suggested_change ? { suggested_change: r.suggested_change } : {}),
-    }));
-  });
-  return rows.length ? { rows: rows.slice(0, 12) } : {};
-}
