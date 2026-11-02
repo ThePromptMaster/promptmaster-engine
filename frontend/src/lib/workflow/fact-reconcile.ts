@@ -116,6 +116,19 @@ const stemmed = (t: string) =>
 const valueAt = (text: string, raw: string) => text.search(new RegExp(`${raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\d])`));
 
 /**
+ * Which side of the replacement a value is on, from the words just before it:
+ * "replace the $400 … with $800", "from $40 to $30", "$30, replacing $40",
+ * "was $16,000, not $18,000". A fact that already holds the new value is not
+ * offered the old one back.
+ */
+function side(piece: string, raw: string): 'old' | 'new' | null {
+  const lead = piece.slice(0, Math.max(0, valueAt(piece, raw))).split(/[$€£]?\d[\d,.]*/).at(-1) ?? '';
+  if (/(?:\bwith|\bto|→|->|\bnow|\bbecomes?)\s*(?:the\s+|a\s+|an\s+)?$/i.test(lead)) return 'new';
+  if (/(?:\breplac\w*|\bfrom|\binstead of|\brather than|\bnot|\bsupersed\w*)\b[^.;]{0,60}$/i.test(lead)) return 'old';
+  return null;
+}
+
+/**
  * What the user's instruction says about one value of a fact. `paired`: a
  * sentence about the same thing replaces it, and this is the value it names in
  * its place — "Replace the $40 ticket price with $30" gives $30. `restated`:
@@ -142,10 +155,17 @@ function inInstruction(instruction: string, m: ValueMention, statement: string):
       continue;
     }
     if (!sameThing) continue;
+    // The fact already says what the sentence makes current: nothing to change.
+    if (side(piece, own.raw) === 'new') {
+      restated = true;
+      continue;
+    }
+    const successors = others.filter((o) => side(piece, o.raw) !== 'old');
+    if (!successors.length) continue;
     // The value nearest the old one in the sentence: "from $400 to $800 and
     // from $40 to $30" pairs $40 with $30.
     const at = valueAt(piece, own.raw);
-    const nearest = others
+    const nearest = successors
       .map((o) => ({ o, d: Math.abs(valueAt(piece, o.raw) - at) }))
       .sort((a, b) => a.d - b.d)[0].o;
     return { paired: nearest, restated: false };
