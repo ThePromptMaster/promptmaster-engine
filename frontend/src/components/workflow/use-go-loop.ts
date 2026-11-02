@@ -42,7 +42,7 @@ import { actionFor, actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, ROUTINE_DE
 import { contextWithFacts, readOutcomeProof, readStageFacts, type StageFacts } from '@/lib/agent/facts';
 import { serializeItems, stageDrafts } from '@/lib/workflow/stage-artifact';
 import { carryNewerFixes, describeCarried, reasksCarried } from '@/lib/agent/review-rounds';
-import { approvedAsItStands, delegableToCommit, exhaustedRepair, policyConfirmable, repairStuckNeed, repairTries, staleRepair, describeNeed, NEED_CLEARED, NEED_MOVED_ON, needStillHolds, needsUser, openRowsOf, requiredWork, type NeedsUser } from '@/lib/agent/needs';
+import { approvedAsItStands, delegableToCommit, exhaustedRepair, policyConfirmable, repairStuckNeed, repairTries, staleRepair, describeNeed, NEED_CLEARED, NEED_MOVED_ON, needStillHolds, needsUser, openRowsElsewhere, requiredWork, type NeedsUser } from '@/lib/agent/needs';
 import { assertHonestOutcome, verifyOutcome } from '@/lib/agent/outcome';
 import { outlineStageFor } from '@/lib/outline/actions';
 import { effectiveRenderer } from '@/lib/workflow/stage-artifact';
@@ -75,7 +75,7 @@ import {
 import { dataFileBriefs, type StageArtifactBundle } from '@/lib/workflow/digest';
 import type { StageFigures } from '@/lib/workflow/figures';
 import type { StageControl } from '@/lib/workflow/stage-controls';
-import { blocksCompletion, deliverableStage, evaluateStage, getStage, nextSuggestedStage, outstandingWork } from '@/lib/workflow/engine';
+import { deliverableStage, evaluateStage, getStage, nextSuggestedStage } from '@/lib/workflow/engine';
 import { objectiveUnmet } from '@/lib/workflow/objective';
 import { addedByRun, MAX_ADDED_PER_RUN } from '@/lib/workflow/added-stages';
 import { isDone } from '@/lib/workflow/types';
@@ -731,15 +731,11 @@ export function useGoLoop(opts: Options) {
 
         // Before the planner is asked: is the next move the user's? (B4)
         // Findings undecided on other stages are named with any approval asked here (2 Nov).
-        const hereId = o.stage.id;
-        const openElsewhere = openRowsOf(
-          o.template,
-          outstandingWork(o.template, o.state, context).filter((i) => i.kind === 'open_findings' && i.stageId !== hereId && blocksCompletion(i))
-        ).rows;
+        const openElsewhere = openRowsElsewhere(o.template, o.state, context, o.stage.id);
         const need = repair ? null : needsUser({
           state: o.state, stage: o.stage, facts, stageEvaluation, allowed, policy: current.policy,
           outlineStageId: outlineStageFor(o.template)?.id ?? null, largeJobAcknowledged: largeJobOkRef.current,
-          runAttemptsLeft, lookupDue, routine, commitTried, asItStands, ...(openElsewhere ? { openElsewhere } : {}),
+          runAttemptsLeft, lookupDue, routine, commitTried, asItStands, ...(openElsewhere.length ? { openElsewhere } : {}),
         });
         if (need) {
           await setRunStatus('awaiting_decision', describeNeed(need, stageLabelFor).message, need);

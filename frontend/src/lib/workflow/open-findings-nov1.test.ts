@@ -9,7 +9,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { buildAgentState } from '@/lib/agent/digest';
-import { describeNeed } from '@/lib/agent/needs';
+import { describeNeed, listOpenRows, openRowsElsewhere } from '@/lib/agent/needs';
 import { buildStageContext } from './context';
 import { describeOutstanding, evaluateStage, outstandingWork, projectState } from './engine';
 import { decideRow, itemSchemaFor, parseItems, serializeItems, type StageItem } from './stage-artifact';
@@ -125,5 +125,18 @@ describe('the finding that holds the project open is named wherever it is asked 
     const items = decideRow(parseItems(bundles.critique.versions[0].content)!, 'i11', 'accepted');
     expect(items.find((r) => r.id === 'i11')).toMatchObject({ status: 'accepted', status_source: 'user' });
     expect(items.find((r) => r.id === 'i10')).toEqual(i10);
+  });
+});
+
+describe('a question asked on the final stage names what is still undecided elsewhere (2 Nov)', () => {
+  const context = buildStageContext({ template: T, project, bundles, events: [] });
+  const state = projectState(T, [], 'final_review');
+  for (const s of T.stages) if (s.id !== 'final_review') state.stages[s.id] = { ...state.stages[s.id], status: 'complete' } as never;
+
+  it('finds i11 on Critique from Final review, and nothing from Critique itself', () => {
+    const rows = openRowsElsewhere(T, state, context, 'final_review');
+    expect(rows.map((r) => [r.id, r.stageId])).toEqual([['i11', 'critique']]);
+    expect(openRowsElsewhere(T, state, context, 'critique')).toEqual([]);
+    expect(listOpenRows(rows)).toMatch(/^i11 \(.+\) — “i2 rests on two premises/);
   });
 });

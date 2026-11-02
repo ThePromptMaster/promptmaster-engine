@@ -82,7 +82,7 @@ import type { Evaluation, Project } from '@/types/project';
 import { actionFor, AWAIT_SECTIONS_STEP, INTERPRET_STEP } from './actions';
 import type { AgentStateDigest } from './digest';
 import type { StageFacts } from './facts';
-import { openRowsOf, type NeedsUser } from './needs';
+import { listOpenRows, openRowsElsewhere, openRowsOf, type NeedsUser } from './needs';
 import { deriveExecutionLabel } from './labels';
 import { returnInstruction } from './return-work';
 import { stageMoveActor } from './policy';
@@ -1848,7 +1848,14 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         (c) => typeof params.control === 'string' && c.label.toLowerCase() === params.control.trim().toLowerCase()
       );
       const pointer = named ? `\n\nThe button is "${named.label}", ${named.where}.` : '';
-      const question = `${ctx.step.decision_question || 'Which way should this go?'}${pointer}`;
+      // A question asked on the deliverable stage names the findings still
+      // undecided elsewhere (2 Nov prod pass: "Do you approve version 14 …"
+      // with nine Check rows open, none named).
+      const openRows = deliverableStage(ctx.template)?.id === ctx.stage.id ? openRowsElsewhere(ctx.template, ctx.state, ctx.context, ctx.stage.id) : [];
+      const undecided = openRows.length
+        ? `\n\nStill undecided before you approve: ${listOpenRows(openRows)}. Approving now leaves ${openRows.length === 1 ? 'it' : 'them'} open; ${openRows.length === 1 ? 'it is' : 'they are'} decided on ${[...new Set(openRows.map((r) => r.stageLabel))].join(', ')}.`
+        : '';
+      const question = `${ctx.step.decision_question || 'Which way should this go?'}${pointer}${undecided}`;
       // What Go checked before interrupting (Q1b): on the record, under the question.
       const audit = typeof params.stop_audit === 'string' ? `\n\n${params.stop_audit}` : '';
       // Q3a: a question for an expert carries the package for them, on the record.
