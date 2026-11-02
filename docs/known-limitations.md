@@ -2820,8 +2820,10 @@ Now the user's own sentence decides first. A sentence that names the fact's valu
 it gives the value nearest it as the new one. Replacing means "replace … with", "from … to",
 "instead of", "→" or "was $16,000, not $18,000". It must also share a word with what the fact is
 about (not "under", "words" or the like). A sentence that names the value without replacing it
-keeps the fact as it is. A new limit changes only the fact it names, when more than one fact
-holds a limit in that unit. Otherwise the matcher works as before.
+keeps the fact as it is. So does a sentence in which the fact's value is the new one ("… with
+$800", "to $30"), so a fact already updated is never offered its old value back. A new limit
+changes only the fact it names, when more than one fact holds a limit in that unit. Otherwise
+the matcher works as before.
 
 The cost: a replacing sentence that shares no word with the fact ("raise the reserve from $400 to
 $800" for "At least $400 must remain unspent") falls back to the old matcher. The user still sees

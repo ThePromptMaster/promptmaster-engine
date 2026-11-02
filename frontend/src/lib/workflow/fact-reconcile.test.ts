@@ -237,6 +237,14 @@ describe('a value is replaced by the one the user names in its place (2 Nov, pho
     expect(out.find((c) => c.fact.id === 'r')?.proposed).toBe('At least $800 must remain unspent.');
   });
 
+  it('a fact that already holds the new value is not offered the old one back', () => {
+    const updated = [fact('r2', 'At least $800 must remain unspent.'), fact('c2', 'Check capacity while preserving the $800 reserve.', 'requirement'), fact('t', 'Tickets cost $40 per person.')];
+    const out = factChangesFromRevision({ facts: updated, instruction, before: after, after });
+    expect(out.map((c) => [c.fact.id, c.proposed])).toEqual([['t', 'Tickets cost $30 per person.']]);
+    const said = factChangesFromRevision({ facts: [fact('s', 'The ticket price is $30 per person, replacing $40.')], instruction: 'The ticket price is $35, replacing $30.', before: 'Ticket $30.', after: 'Ticket $35.' });
+    expect(said.map((c) => c.proposed)).toEqual(['The ticket price is $35 per person, replacing $40.']);
+  });
+
   it('a sentence about something else does not change a fact that happens to share the value', () => {
     const venue = fact('v', 'The venue deposit is $400.');
     const out = factChangesFromRevision({ facts: [venue], instruction: 'Replace the $400 minimum unspent reserve with $800.', before: 'Deposit $400.', after: 'Deposit $400.' });
