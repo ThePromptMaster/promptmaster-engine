@@ -939,6 +939,16 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
           ? { table: { stage: ctx.stage, request: async (instruction: string) => generationRequest(ctx.project, ctx.template, ctx.state, (await readManuscript(ctx, ctx.stage)) ?? ctx.bundles, ctx.stage, head.content, instruction) } }
           : {}),
       });
+      // A revision cut off by the length limit is a shorter copy of a whole
+      // text: saved, it would drop everything after the cut (2 Nov,
+      // production: 13,504 words became 9,249 and the step said "succeeded").
+      // A long text is revised in parts, so this is a short one that grew.
+      if (rev.finishReason === 'length' && !rendererHoldsItems(ctx.stage.renderer)) {
+        return done(key, {
+          status: 'failed', toolsUsed: ['model'], changes: {},
+          output: `The revision of ${ctx.stage.label} was cut off by the model's length limit, so it was not saved; v${head.version_number} stays as it is. Revise it in smaller steps, or ask Go to try again.`,
+        });
+      }
       // Go's own apply, told apart from the user's Apply button in the history.
       const created = await ctx.appendStageVersion(ctx.stage.id, ctx.stage.label, { ...appliedFindingsVersion(rev, ctx.project), source_operation: 'agent_apply' });
       const versionId = (created as { id?: unknown } | null)?.id;
@@ -949,7 +959,8 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         status: 'succeeded', toolsUsed: ['model'],
         changes: typeof versionId === 'string' ? { version_ids: [versionId] } : {},
         output: [
-          `Applied ${findings.length} finding${findings.length === 1 ? '' : 's'} to ${ctx.stage.label} — saved as a new version.`,
+          `Applied ${findings.length} finding${findings.length === 1 ? '' : 's'} to ${ctx.stage.label} — saved as a new version${rev.parts ? `, revised in ${rev.parts.count} parts` : ''}.`,
+          ...(rev.parts?.kept.length ? [`Part${rev.parts.kept.length === 1 ? '' : 's'} ${rev.parts.kept.join(', ')} came back cut off or empty and ${rev.parts.kept.length === 1 ? 'was' : 'were'} kept as before.`] : []),
           ...findings.slice(0, 4).map((f) => `Finding: ${f.summary.slice(0, 200)}`),
           `What changed:\n${describeVersionChange(versionChange(rev.before, rev.after, 6))}`,
           ...(routineKept ? [routineKept.note] : []),

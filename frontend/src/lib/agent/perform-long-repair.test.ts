@@ -2,11 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const generateStageArtifact = vi.fn();
 const continueDocument = vi.fn();
+const applyRecommendations = vi.fn();
 const appendWorkflowEvent = vi.fn(async () => undefined);
 vi.mock('@/lib/api/client', () => ({
   api: {
     generateStageArtifact: (...a: unknown[]) => generateStageArtifact(...a),
     continueDocument: (...a: unknown[]) => continueDocument(...a),
+    applyRecommendations: (...a: unknown[]) => applyRecommendations(...a),
     dependentClaims: async () => ({ claims: [] }),
     checkNewClaims: async () => ({ claims: [] }),
   },
@@ -115,5 +117,44 @@ describe('a book too long for one call is repaired a part at a time', () => {
     await performStep(c);
     expect(continueDocument).toHaveBeenCalledTimes(1);
     expect(generateStageArtifact.mock.calls[0][0].existing_content).toContain('The end of it.');
+  });
+});
+
+
+describe("applying a check's findings to a text too long for one call (2 Nov, production)", () => {
+  const applyCtx = (content: string) => {
+    const { c, saved } = ctx({ content });
+    Object.assign(c, {
+      state: { current_stage_id: 'output', stages: { output: { status: 'in_progress' } } },
+      step: { action_key: 'apply_findings', params: {}, rationale: 'The check found problems.' },
+      latestEvaluation: { findings: [{ id: 'f1', category: 'accuracy', summary: 'A figure is wrong', suggested_change: 'Fix it' }] },
+      // Skips the conflict check, which this test is not about.
+      conflictAnswer: 'The findings.',
+    });
+    return { c, saved };
+  };
+
+  it('revises it a part at a time and saves the whole text', async () => {
+    applyRecommendations.mockReset();
+    applyRecommendations.mockImplementation(async (req: { content: string }) => ({
+      content: req.content.replace(/^# Chapter (\d+)/gm, '# Chapter $1 (revised)'), instruction: 'block', finish_reason: 'stop',
+    }));
+    const { c, saved } = applyCtx(BOOK);
+    const out = await performStep(c);
+    expect(applyRecommendations.mock.calls.length).toBeGreaterThan(1);
+    expect(saved).toHaveLength(1);
+    for (let i = 1; i <= 6; i += 1) expect(saved[0].content).toContain(`# Chapter ${i} (revised)`);
+    expect(out.status).toBe('succeeded');
+    expect(out.output).toMatch(/revised in \d+ parts/);
+  });
+
+  it('never saves a revision the length limit cut off', async () => {
+    applyRecommendations.mockReset();
+    applyRecommendations.mockResolvedValueOnce({ content: '# Chapter 1\n\nhalf', instruction: 'block', finish_reason: 'length' });
+    const { c, saved } = applyCtx(chapter(1));
+    const out = await performStep(c);
+    expect(saved).toHaveLength(0);
+    expect(out.status).toBe('failed');
+    expect(out.output).toMatch(/cut off .* not saved; v8 stays as it is/);
   });
 });
