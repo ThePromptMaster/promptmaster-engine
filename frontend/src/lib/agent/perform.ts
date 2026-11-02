@@ -13,6 +13,9 @@ import { api } from '@/lib/api/client';
 import { saveSources } from '@/lib/supabase/sources';
 import { awaitSectionJobs, type WaitResult } from '@/lib/jobs/await';
 import { enqueueDraftJobs, enqueueRevisionJobs, writtenSections } from '@/lib/jobs/sections';
+import { listProjectJobs } from '@/lib/supabase/jobs';
+import { jobsSpent } from '@/lib/supabase/project-cost';
+import { addStepCost } from '@/lib/supabase/model-usage';
 import { generateOutlineDraft } from '@/lib/outline/actions';
 import { countNamedSections, parseOutlineDocument } from '@/lib/outline/model';
 import { approvedOutlineVersionId, commitOutlineVersion } from '@/lib/supabase/outline';
@@ -203,6 +206,7 @@ async function waitForSections(
     onProgress: (s) => ctx.onProgress?.(`${s.complete} of ${s.total} sections written`),
   });
   ctx.refresh?.();
+  await countSectionCost(ctx, m.artifactId, ids);
   const changes = { jobs: ids, sections_written: r.written };
   const wrote = r.written.length ? `${verb} ${r.written.length} section${r.written.length === 1 ? '' : 's'}: ${r.written.map(title).join('; ')}.` : `${verb} nothing yet.`;
   const standing = ` ${r.complete} of ${r.total} written.`;
@@ -226,6 +230,28 @@ async function waitForSections(
         output: `${wrote} ${r.pending.length} still being written when the wait ran out; they continue in the background.${standing}`,
         needs: { kind: 'wait_for_jobs', stageId: ctx.stage.id, pending: r.pending.length, complete: r.complete, total: r.total },
       });
+  }
+}
+
+/**
+ * What the sections this step queued cost, added to the step (2 Nov): the
+ * drain wrote them in the background, so the step's own tally never saw
+ * those calls and the run's total left them out. Best-effort.
+ */
+async function countSectionCost(ctx: PerformContext, artifactId: string, sectionIds: readonly string[]): Promise<void> {
+  const stepId = ctx.step.id;
+  if (!stepId || !sectionIds.length) return;
+  try {
+    const since = ctx.step.started_at || null;
+    const from = since ? Date.parse(since) : NaN;
+    const wanted = new Set(sectionIds);
+    const jobs = (await listProjectJobs(ctx.project.id)).filter(
+      (j) => j.payload?.artifact_id === artifactId && wanted.has(j.payload?.section_id ?? '') && (Number.isNaN(from) || Date.parse(j.created_at) >= from)
+    );
+    const spent = await jobsSpent(ctx.project.id, jobs.map((j) => j.id), since);
+    if (spent) addStepCost(stepId, spent);
+  } catch {
+    // A missed cost costs the line, not the step.
   }
 }
 
