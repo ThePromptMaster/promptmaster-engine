@@ -22,7 +22,43 @@ export function isTriageTable(schema: StageItemSchema): boolean {
   return Boolean(schema.statuses?.some((s) => s.value === 'accepted')) && schema.fields.some((f) => f.key === 'severity' && f.options);
 }
 
-export function findingRisk(item: StageItem, schema: StageItemSchema): TriageRisk {
+/** An accepted fact a finding may name: only its words are read. */
+export interface FactWords {
+  statement: string;
+}
+
+const norm = (t: string) => t.toLowerCase().replace(/[“”"'‘’`]/g, '').replace(/[^\p{L}\p{N}$%.,]+/gu, ' ').replace(/[.,](?=\s|$)/g, '').trim();
+
+/**
+ * The accepted fact a row's quote names, matched in code: the quote and the
+ * fact contain one another once case, quotes and spacing are set aside. A
+ * quote that matches no current fact names nothing — a row cannot make
+ * itself routine by citing something the user never decided.
+ */
+export function quotedFact(quote: string | undefined, facts: readonly FactWords[] | undefined): FactWords | null {
+  const q = norm(quote ?? '');
+  if (q.length < 12 || !facts?.length) return null;
+  return facts.find((f) => {
+    const s = norm(f.statement);
+    return s.length >= 12 && (s.includes(q) || q.includes(s));
+  }) ?? null;
+}
+
+/**
+ * Whether a finding is Go's to decide under "handle them for me" (B3).
+ *
+ * Severity is not the only rule (1 Nov, Sean: "A major correction that
+ * restores an explicit user requirement may already be authorized. A small
+ * alteration to a hard constraint may not be."). A row whose suggested change
+ * would alter an accepted fact or requirement is the user's whatever its
+ * severity; one that only carries out an accepted fact is routine whatever its
+ * severity — the decision was made when the user recorded it. Both are read
+ * from the row's quote of the fact (`changes`, `implements`), matched against
+ * the current facts in code.
+ */
+export function findingRisk(item: StageItem, schema: StageItemSchema, facts?: readonly FactWords[]): TriageRisk {
+  if (quotedFact(item.changes, facts)) return 'material';
+  if (quotedFact(item.implements, facts)) return 'routine';
   const field = schema.fields.find((f) => f.key === 'severity' && f.options);
   if (!field) return 'material';
   const value = (item.severity ?? '').trim().toLowerCase();
@@ -30,12 +66,16 @@ export function findingRisk(item: StageItem, schema: StageItemSchema): TriageRis
   return ROUTINE_SEVERITIES.has(value) ? 'routine' : 'material';
 }
 
-export function splitUntriaged(items: readonly StageItem[], schema: StageItemSchema): { routine: StageItem[]; material: StageItem[] } {
+export function splitUntriaged(
+  items: readonly StageItem[],
+  schema: StageItemSchema,
+  facts?: readonly FactWords[]
+): { routine: StageItem[]; material: StageItem[] } {
   const routine: StageItem[] = [];
   const material: StageItem[] = [];
   for (const item of items) {
     if (isTriaged(item, schema)) continue;
-    (findingRisk(item, schema) === 'routine' ? routine : material).push(item);
+    (findingRisk(item, schema, facts) === 'routine' ? routine : material).push(item);
   }
   return { routine, material };
 }
@@ -72,4 +112,22 @@ export function applyTriage(
     return { ...item, status: option.value, status_source: 'model', ...(reason ? { reason } : {}) };
   });
   return { items: next, applied };
+}
+
+/** The reason recorded on a row accepted because it carries out the user's own decision. */
+export const RECORDED_REASON = 'Carries out what you already decided:';
+
+/**
+ * Rows decided in code, with no model call: an undecided finding that only
+ * carries out an accepted fact or requirement (its `implements` quote matches
+ * one, and no `changes` quote does) is accepted, with the fact named as the
+ * reason (1 Nov). The user made that decision when they recorded the fact.
+ */
+export function recordedDecisions(items: readonly StageItem[], schema: StageItemSchema, facts?: readonly FactWords[]): TriageDecision[] {
+  if (!schema.statuses?.some((s) => s.value === 'accepted')) return [];
+  return items.flatMap((item) => {
+    if (isTriaged(item, schema) || quotedFact(item.changes, facts)) return [];
+    const fact = quotedFact(item.implements, facts);
+    return fact ? [{ id: item.id, status: 'accepted', reason: `${RECORDED_REASON} "${fact.statement.trim()}"` }] : [];
+  });
 }

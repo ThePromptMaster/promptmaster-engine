@@ -71,5 +71,8 @@ export const ar: Record<keyof typeof en, string> = {
   'need.marksComplete': 'المتابعة تعلّم {stage} مكتملة وتنتقل إلى ما تبقّى.',
   'need.takesMeTo': 'المتابعة تنقلني إلى {next}.',
   'need.carryOpen': 'تابع مع العمل المفتوح',
+  'need.acceptRow': 'اقبل {id} وتابع',
+  'need.rejectRow': 'ارفض {id}',
+  'need.rowEffect': 'قبول {id} يطبّق التغيير المقترح ويحسمه في {where}؛ ورفضه يتجاهل التغيير ويُبقي السبب في الصف.',
   'need.workOpen': 'كُتبت {stage}، لكن العمل لم يكتمل: {list}. لن أعدّ الهدف متحققًا ما دام أي جزء منه مفتوحًا.',
 };

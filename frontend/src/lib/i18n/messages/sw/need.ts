@@ -71,5 +71,8 @@ export const sw: Record<keyof typeof en, string> = {
   'need.marksComplete': 'Kuendelea kunaweka alama kuwa {stage} imekamilika na kuhamia kilichobaki.',
   'need.takesMeTo': 'Kuendelea kunanipeleka hadi {next}.',
   'need.carryOpen': 'Endelea na kazi iliyo wazi',
+  'need.acceptRow': 'Kubali {id} na uendelee',
+  'need.rejectRow': 'Kataa {id}',
+  'need.rowEffect': 'Kukubali {id} kunatekeleza mabadiliko yaliyopendekezwa na kuyamaliza katika {where}; kuyakataa kunaacha mabadiliko na kuhifadhi sababu kwenye safu.',
   'need.workOpen': '{stage} imeandikwa, lakini kazi haijakamilika: {list}. Sitasema lengo limefikiwa wakati lolote kati ya haya bado liko wazi.',
 };

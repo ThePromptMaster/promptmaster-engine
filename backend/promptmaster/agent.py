@@ -96,6 +96,23 @@ class AgentFindings(BaseModel):
     sample: list[str] = Field(default_factory=list, max_length=8)
 
 
+class AgentOpenFinding(BaseModel):
+    """One undecided row on another stage's review table, as the table words it.
+
+    1 Nov (Sean, recruitment plan): on Final plan Go knew "Check: 1 finding not
+    yet accepted or rejected" and nothing more, and answered "I can't see the
+    Check table from this stage, so I can't tell you the finding's number or
+    wording" — while that finding (i11) was all that kept the project open.
+    """
+    stage_id: str = Field(max_length=100)
+    stage_label: str = Field(default="", max_length=200)
+    id: str = Field(max_length=40)
+    text: str = Field(max_length=400)
+    severity: str = Field(default="", max_length=80)
+    suggested_change: str = Field(default="", max_length=300)
+    proposed: str = Field(default="", max_length=40)
+
+
 class AgentWorkflowStage(BaseModel):
     label: str = Field(max_length=200)
     renderer: str = Field(default="", max_length=40)
@@ -194,6 +211,8 @@ class AgentState(BaseModel):
     routine_decisions: str = Field(default="", max_length=20)
     #: What the stage's latest version changed. None for a first version.
     latest_change: AgentLatestChange | None = None
+    #: Undecided rows on review stages other than this one, with their wording.
+    open_findings_elsewhere: list[AgentOpenFinding] = Field(default_factory=list, max_length=12)
 
 
 #: How long a move's rationale may be: what a web search's purpose accepts.
@@ -420,6 +439,21 @@ def _format_state(inputs: PMInput, state: AgentState) -> str:
             + "). Lines removed (−) and added (+), worked out in code — when the user asks what "
             "changed, say this; never say you cannot see it:\n"
             + (c.diff.strip() or "(no text changed)")
+        )
+    if state.open_findings_elsewhere:
+        facts.append(
+            "UNDECIDED FINDINGS ON OTHER STAGES (the rows themselves, by id — when the user asks which "
+            "finding is open, quote it from here; never say you cannot see another stage's table). When "
+            "you ask about one, name its stage and id, quote its wording, and say what accepting it "
+            "(its suggested change is applied) and rejecting it (it is dropped, with the reason kept) will do:\n"
+            + "\n".join(
+                f"- {f.stage_label or f.stage_id} {f.id}"
+                + (f" ({f.severity})" if f.severity else "")
+                + (f" [proposed: {f.proposed}]" if f.proposed else "")
+                + f": {f.text.strip()}"
+                + (f" — suggested change: {f.suggested_change.strip()}" if f.suggested_change.strip() else "")
+                for f in state.open_findings_elsewhere
+            )
         )
     if state.tools:
         facts.append("TOOLS: " + ", ".join(f"{k}={'yes' if v else 'no'}" for k, v in sorted(state.tools.items())))

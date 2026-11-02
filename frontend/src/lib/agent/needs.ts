@@ -81,6 +81,13 @@ type Need =
       next?: string;
       /** The stage the objective was met on, for `stages_left` when it is not the one the run is on. */
       metOn?: string;
+      /**
+       * `work_open`: undecided review rows on other stages, by id and wording
+       * (1 Nov, Sean: "Some questions referred to the unresolved finding
+       * without displaying its actual wording"). One row is decided from the
+       * stop itself.
+       */
+      rows?: { stageId: string; stageLabel: string; id: string; text: string; severity?: string; suggested_change?: string }[];
     };
 
 /**
@@ -710,7 +717,7 @@ export function needStillHolds(
  * lifts the block and leaves the user on the stage — what the More menu's
  * "Continue this stage" does — without Go resuming.
  */
-export type StuckOption = 'resume' | 'add_data' | 'skip' | 'retry' | 'clear' | 'fix' | 'stop' | 'keep' | 'open';
+export type StuckOption = 'resume' | 'add_data' | 'skip' | 'retry' | 'clear' | 'fix' | 'stop' | 'keep' | 'open' | 'accept_row' | 'reject_row';
 
 /** At most this many ways forward on a stuck card (2 Oct screenshots: five was too many). */
 export const STUCK_OPTIONS_MAX = 3;
@@ -965,6 +972,20 @@ function describeObjectiveCheck(
       };
     }
     case 'work_open': {
+      // One undecided row is all that is open: it is decided here, with what
+      // each answer does said on the card, not by sending the user back to find it.
+      const only = need.rows?.length === 1 && need.items.length === 1 ? need.rows[0] : null;
+      if (only) {
+        const options = [
+          { id: 'accept_row' as const, label: t('need.acceptRow', { id: only.id }) },
+          { id: 'reject_row' as const, label: t('need.rejectRow', { id: only.id }) },
+          { id: 'stop' as const, label: t('need.stopHere') },
+        ];
+        return {
+          message: `${t('need.workOpen', { stage, list })} ${t('need.rowEffect', { id: only.id, where: only.stageLabel })}`,
+          action: options[0].label, options,
+        };
+      }
       const options = [
         { id: 'resume' as const, label: t('need.carryOpen') },
         { id: 'stop' as const, label: t('need.stopHere') },

@@ -19,8 +19,8 @@ import { approvedOutlineVersionId } from '@/lib/supabase/outline';
 import type { Artifact, ArtifactVersion, Project } from '@/types/project';
 import { draftingStageId } from './derived-outline';
 import type { StageArtifactBundle } from './digest';
-import { carriedForwardUnmet, deferredNotBlocking, confirmableProposals, openUnmet, effectiveRenderer, isTriaged, itemSchemaFor, parseItems, rendererHoldsItems } from './stage-artifact';
-import type { StageContext, StageDefinition, WorkflowEvent, WorkflowTemplate } from './types';
+import { carriedForwardUnmet, deferredNotBlocking, confirmableProposals, openFindingRows, openUnmet, effectiveRenderer, isTriaged, itemSchemaFor, parseItems, rendererHoldsItems } from './stage-artifact';
+import type { OpenFindingRow, StageContext, StageDefinition, WorkflowEvent, WorkflowTemplate } from './types';
 import { deliverableStage, rowsRequired } from './engine';
 import { currentFacts } from './facts';
 import { describeUnsupported, unsupportedClaims } from './evidence-claims';
@@ -97,6 +97,7 @@ export function buildStageContext(input: BuildContextInput): StageContext {
   const carriedForward: Record<string, string[]> = {};
   const deferred: Record<string, { row: string; reason: string }[]> = {};
   const openUnmetRows: Record<string, number> = {};
+  const openRows: Record<string, OpenFindingRow[]> = {};
 
   for (const s of template.stages) {
     const bundle = bundles[s.id];
@@ -157,6 +158,8 @@ export function buildStageContext(input: BuildContextInput): StageContext {
       if (later.length) deferred[s.id] = later;
       const unmet = openUnmet(items, schema);
       if (unmet) openUnmetRows[s.id] = unmet;
+      const rows = openFindingRows(items, schema);
+      if (rows.length) openRows[s.id] = rows;
     }
   }
 
@@ -173,6 +176,7 @@ export function buildStageContext(input: BuildContextInput): StageContext {
     carriedForward,
     deferred,
     openUnmet: openUnmetRows,
+    openRows,
     fields: {
       objective: project.objective,
       audience: project.audience,

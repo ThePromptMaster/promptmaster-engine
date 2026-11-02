@@ -93,6 +93,28 @@ def _format_digest(digest: StageDigest) -> str:
     return format_prior_documents(digest)
 
 
+#: Keys a triage row may carry beside the table's own fields (1 Nov).
+IMPLEMENTS_KEY = "implements"
+CHANGES_KEY = "changes"
+IMPLEMENTS_RULE = (
+    "ONLY when this finding's suggested change does nothing but carry out one of the ACCEPTED "
+    "PROJECT FACTS AND REQUIREMENTS (the user's own decision or correction, already on record), "
+    "copy that fact's words here exactly. Such a finding is not a new decision for the user. "
+    "Leave it out otherwise."
+)
+CHANGES_RULE = (
+    "when this finding's suggested change would alter, loosen, replace or drop one of the "
+    "ACCEPTED PROJECT FACTS AND REQUIREMENTS, copy that fact's words here exactly, whatever the "
+    "finding's severity: changing what the user decided is theirs to approve. Leave it out otherwise."
+)
+
+
+def _is_triage_table(schema: StageItemSchema) -> bool:
+    """A findings table the user accepts or rejects row by row, with a severity."""
+    has_severity = any(f.key == "severity" for f in schema.fields)
+    return has_severity and any(s.value == "accepted" for s in schema.statuses)
+
+
 def _format_item_schema(schema: StageItemSchema) -> str:
     """State the item shape in words. The literal example is built separately."""
     if not schema.fields:
@@ -107,6 +129,14 @@ def _format_item_schema(schema: StageItemSchema) -> str:
         # clipped and flagged red before the user has touched it.
         limit = f" At most {field.max_chars} characters." if field.max_chars else ""
         lines.append(f"- {field.key}: {label}.{hint}{limit}".rstrip())
+    if _is_triage_table(schema):
+        # 1 Nov (Sean, recruitment plan): a recheck wrote finding i11 — drop the
+        # payment reserve, keep tester payments at $0 — which only carried out the
+        # user's own correction. It was marked major, so it was held for the user
+        # as a new decision. What a finding carries out, or alters, is named by
+        # quoting the accepted fact; the client matches the quote in code.
+        lines.append(f"- {IMPLEMENTS_KEY}: {IMPLEMENTS_RULE}")
+        lines.append(f"- {CHANGES_KEY}: {CHANGES_RULE}")
     explained = [s for s in schema.statuses if s.explain]
     if explained:
         # The user picks from these; the draft has to describe what was done
@@ -653,7 +683,11 @@ def _parse_items(raw_result: dict, schema: StageItemSchema | None) -> list[Stage
         if allowed:
             # Keep declared fields plus id; a hallucinated extra column renders
             # as a stray input the user cannot explain.
-            row = {k: v for k, v in row.items() if k in allowed or k in ("id", "status", "reason")}
+            extra = (IMPLEMENTS_KEY, CHANGES_KEY) if schema and _is_triage_table(schema) else ()
+            row = {k: v for k, v in row.items() if k in allowed or k in ("id", "status", "reason", *extra)}
+            for key in extra:
+                if key in row and not (isinstance(row[key], str) and row[key].strip()):
+                    del row[key]
         # A status the model proposes is a suggestion, and two of them are not
         # even the model's to make. The stored value for "remove" is "removed"
         # (a row marked "remove" matched no option and showed as "Not looked

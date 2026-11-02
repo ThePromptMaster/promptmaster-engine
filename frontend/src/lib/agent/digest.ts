@@ -58,6 +58,11 @@ export interface AgentStateDigest {
   recent_steps: { action_key: string; status: string; execution_label: string | null; output: string }[];
   outline?: { sections: string[]; named_count: number; approved: boolean };
   /**
+   * Undecided rows on review stages other than this one, worded as their
+   * table words them (1 Nov: "I can't see the Check table from this stage").
+   */
+  open_findings_elsewhere?: { stage_id: string; stage_label: string; id: string; text: string; severity: string; suggested_change: string; proposed: string }[];
+  /**
    * `complete` counts the sections that hold text. `own` is true on the
    * long-form stage that writes the chapters; on a stage after drafting that
    * reads them (Continuity, Critique, Fact-check, Final review) it is false
@@ -264,7 +269,7 @@ export function buildAgentState(input: {
     // A proposal is marked as one: "[accepted]" on a row the user never
     // confirmed let the planner write "accepted review findings" (Sean, 10 Oct, email 6.4).
     excerpt = items
-      .map((i, n) => `${schema.execution ? `${n + 1}. ` : ''}[${isProposed(i) ? `proposed, not confirmed: ${i.status}` : i.status || 'undecided'}] ${firstField(i)}`)
+      .map((i, n) => `${schema.execution ? `${n + 1}. ` : i.id ? `${i.id} ` : ''}[${isProposed(i) ? `proposed, not confirmed: ${i.status}` : i.status || 'undecided'}] ${firstField(i)}`)
       .join('\n');
     if (schema.execution && items.length && dataFiles.length) {
       excerpt +=
@@ -280,6 +285,23 @@ export function buildAgentState(input: {
     const sections = facts?.reads_manuscript?.outline ?? bundles[source.id]?.artifact?.long_form?.outline ?? [];
     if (sections.some(hasText)) manuscript = describeManuscript(sections, source.label, false);
   }
+
+  // Every other review stage's undecided rows, by id and wording, so a stop
+  // on a later stage can say which finding holds it up.
+  const elsewhere = template.stages
+    .filter((s) => s.id !== stage.id)
+    .flatMap((s) =>
+      (context?.openRows?.[s.id] ?? []).map((r) => ({
+        stage_id: s.id,
+        stage_label: s.short_label || s.label,
+        id: r.id.slice(0, 40),
+        text: r.text,
+        severity: r.severity ?? '',
+        suggested_change: r.suggested_change ?? '',
+        proposed: r.proposed ?? '',
+      }))
+    )
+    .slice(0, 12);
 
   return {
     stage_id: stage.id,
@@ -340,6 +362,7 @@ export function buildAgentState(input: {
     ...(outline ? { outline } : {}),
     ...(manuscript ? { manuscript } : {}),
     ...(findings ? { findings } : {}),
+    ...(elsewhere.length ? { open_findings_elsewhere: elsewhere } : {}),
     ...(input.memory?.length ? { memory: input.memory } : {}),
     ...(dataFiles.length ? { data_files: dataFiles } : {}),
     ...(input.controls ? { controls: input.controls.slice(0, CONTROLS_MAX).map((c) => ({ label: c.label, where: PLACE_WORDS[c.place] })) } : {}),

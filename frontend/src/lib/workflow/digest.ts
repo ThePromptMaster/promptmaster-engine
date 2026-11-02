@@ -201,6 +201,8 @@ export function documentText(stage: StageDefinition, content: string | null | un
   const items = parseItems(content);
   if (!items) return content.trim();
   const labels = new Map(itemSchemaFor(stage).fields.map((f) => [f.key, f.label || f.key]));
+  // A findings row keeps its id, so the chat can say "i11" as the table does (1 Nov).
+  const review = stage.renderer === 'review';
   return items
     .map((item, i) => {
       const fields = Object.entries(item)
@@ -209,7 +211,7 @@ export function documentText(stage: StageDefinition, content: string | null | un
       const status = item.status
         ? ` [status: ${item.status_source === 'proposed' ? 'proposed, not yet decided: ' : ''}${item.status}${item.reason ? ` — ${String(item.reason).trim()}` : ''}]`
         : ' [status: undecided]';
-      return `${i + 1}. ${fields.join(' | ')}${status}`;
+      return `${i + 1}. ${review && item.id ? `(${item.id}) ` : ''}${fields.join(' | ')}${status}`;
     })
     .join('\n');
 }
