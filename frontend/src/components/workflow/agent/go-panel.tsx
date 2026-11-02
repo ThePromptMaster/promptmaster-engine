@@ -43,7 +43,7 @@ export interface NeedsActions {
   /** Bring the Data panel into view, where a file is attached. */
   showData?: () => void;
   /** Keep a reopened stage as it is now: its recheck is dismissed, on that stage only. */
-  keepStage?: (stageId: string) => Promise<void>;
+  keepStage?: (stageId: string, reason?: string) => Promise<void>;
   /** Show a stage on the page. */
   openStage?: (stageId: string) => void;
   /**
@@ -223,7 +223,7 @@ export function GoPanel({
       case 'repair_stuck':
         // What each button does is on it (13 Oct): once more, keep it, or open it.
         if (option === 'keep') {
-          await needsActions?.keepStage?.(need.stageId);
+          await needsActions?.keepStage?.(need.stageId, need.byHand ? 'Kept as it is: Go does not revise this stage itself.' : undefined);
           await go.go();
           return;
         }

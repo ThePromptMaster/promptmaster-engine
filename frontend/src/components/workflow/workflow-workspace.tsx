@@ -1589,10 +1589,10 @@ export function WorkflowWorkspace({
       },
       unblock: () => setBlocked(null),
       tick: (criterionId: string) => handleToggleManual(criterionId, true),
-      keepStage: async (keepId: string) => {
+      keepStage: async (keepId: string, reason?: string) => {
         const since = state.stages[keepId]?.stale?.since;
         if (!since) return;
-        await appendEvent({ type: 'brief_change_dismissed', stage_id: keepId, reason: 'Kept as it is after repairs did not settle it.', payload: { change_at: since, stage_ids: [keepId] } });
+        await appendEvent({ type: 'brief_change_dismissed', stage_id: keepId, reason: reason ?? 'Kept as it is after repairs did not settle it.', payload: { change_at: since, stage_ids: [keepId] } });
       },
       openStage: (openId: string) => setViewingStageId(openId === state.current_stage_id ? null : openId),
       // One row on another stage, decided from Go's stop that names it (1 Nov).

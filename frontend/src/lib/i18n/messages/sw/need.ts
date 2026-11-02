@@ -57,6 +57,7 @@ export const sw: Record<keyof typeof en, string> = {
   'need.repairWhy': 'Kisichotatuliwa bado: {why}.',
   'need.repairLast': 'Jaribio la mwisho: {last}.',
   'need.repairChoose': 'Chagua jinsi ya kuendelea: jaribu mara moja zaidi (linaanza kutoka toleo la sasa na kuhifadhi kila safu iliyoamuliwa), acha {stage} kama ilivyo sasa na uendelee, au ifungue na uibadilishe mwenyewe.',
+  'need.notRevisedByGo': '{stage} inahitaji kukaguliwa upya: {why}. Siirekebishi hatua ya aina hii mwenyewe, na hatua ninazoweza kurekebisha zimerekebishwa. Iache kama ilivyo sasa na uendelee, au ifungue na uibadilishe mwenyewe.',
   'need.fixAndCheck': 'Acha Go irekebishe {stage} na ikague tena',
   'need.fixMyself': 'Nitairekebisha mwenyewe',
   'need.unmet': 'Lengo bado halijafikiwa — halijafikiwa: {list}. Ninaweza kurekebisha {stage} na kukagua tena.',

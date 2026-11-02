@@ -2728,3 +2728,14 @@ cuts off is no longer saved: it would replace a whole text with part of one. The
 stands and the step fails, saying so. The cost is that a finding that spans parts (renumbering
 sections, say) is applied by each part separately, which can be uneven; the next check reads
 the joined text.
+
+### L-144 — A reopened chapter plan is the user's to keep or open (2026-11-02)
+
+Go repairs a reopened stage that is prose, a list, a review table or a manuscript. It does not
+revise a reopened outline (a chapter plan) or an assessment: the outline is the user's to
+approve, and an assessment's verdicts are the user's. Before, such a stage was simply skipped.
+On 2 Nov a change to Sources reopened a designed report's chapter plan with four other stages.
+Go repaired the four, then spent three steps re-finishing the last stage before it asked. Now,
+once nothing Go can repair is left, it stops and asks: keep the stage as it is, or open it.
+"Keep" records the change as dismissed for that stage. The chapters themselves were already
+repaired against the change, so a plan kept as it is still matches what was written.

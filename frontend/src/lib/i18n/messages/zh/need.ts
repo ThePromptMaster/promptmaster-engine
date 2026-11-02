@@ -57,6 +57,7 @@ export const zh: Record<keyof typeof en, string> = {
   'need.repairWhy': '仍未解决的问题：{why}。',
   'need.repairLast': '最后一次尝试：{last}。',
   'need.repairChoose': '请选择如何继续：再试一次（从当前版本开始，并保留所有已定夺的行）、保持{stage}的当前状态并继续推进，或者打开它自行修改。',
+  'need.notRevisedByGo': '{stage}需要重新检查：{why}。这类阶段我不会自行修改，我能修复的阶段都已修复。请保持其当前状态并继续推进，或者打开它自行修改。',
   'need.fixAndCheck': '让 Go 修正{stage}并重新检查',
   'need.fixMyself': '我自己来修改',
   'need.unmet': '目标尚未达成——未满足：{list}。我可以修正{stage}并重新检查。',
