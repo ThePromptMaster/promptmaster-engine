@@ -130,7 +130,10 @@ function partBefore(text: string, start: number): string {
   if (!words.length || words.length > 3) return '';
   if (words.some((w) => NOT_A_NAME.test(w) || !/^[a-z][a-z-]*$/i.test(w))) return '';
   const phrase = words.join(' ').toLowerCase();
-  if (WHOLE.test(phrase)) return '';
+  // "Whole document under 600 words, including headings": the whole, not a
+  // part named "whole document" (2 Nov, production pass: the requirement a
+  // generated setup recorded was measured nowhere, and its headings rule lost).
+  if (WHOLE.test(phrase) || WHOLE.test(words.at(-1)!)) return '';
   // "executive summary" is the summary every other check already knows.
   const listed = phrase.match(SUBJECT_RE);
   if (listed) return canonical(listed[1]);

@@ -27,6 +27,13 @@ describe('a word limit that says its headings count', () => {
     expect(parseRequirements(['Under 600 words.'])[0].headings).toBeUndefined();
   });
 
+  it('a requirement recorded as "Whole document under 600 words, including headings" is the whole', () => {
+    expect(parseRequirements(['Whole document under 600 words, including headings and tables.'])).toEqual([
+      expect.objectContaining({ id: 'words:all', subject: '', max: 600, headings: true }),
+    ]);
+    expect(parseRequirements(['Executive update must be no more than 100 words.'])[0].subject).toBe('executive update');
+  });
+
   it('the same limit said again keeps the rule', () => {
     const [all] = parseRequirements(['Under 600 words.', CONSTRAINT]);
     expect(all).toMatchObject({ id: 'words:all', headings: true });
