@@ -14,11 +14,10 @@ import type { AgentStep, ExecutionPolicy } from '@/types/agent';
 import type { ExitCriterion, StageDefinition, StageEvaluation, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
 import { isDone } from '@/lib/workflow/types';
 import type { RoutineDecisions } from '@/types/project';
-import type { OutstandingItem } from '@/lib/workflow/engine';
 import type { StageFacts } from './facts';
 import type { InputsChange } from '@/lib/workflow/stage-inputs';
 import { awaitsAttempt, confirmableProposals } from '@/lib/workflow/stage-artifact';
-import { rowsRequired } from '@/lib/workflow/engine';
+import { outstandingWork, rowsRequired, type OutstandingItem } from '@/lib/workflow/engine';
 import { translate, type Vars } from '@/lib/i18n/translate';
 import { itemPlural, templateWord } from '@/lib/i18n/templates';
 import type { Locale } from '@/lib/i18n/locales';
@@ -117,6 +116,24 @@ export function openRowsOf(template: WorkflowTemplate, open: readonly Outstandin
     }));
   });
   return rows.length ? { rows: rows.slice(0, 12) } : {};
+}
+
+/**
+ * Every undecided finding on a stage other than `stageId`, by id and wording —
+ * whether or not its table blocks finishing — for a request that should name
+ * it (2 Nov prod pass: Go asked "Do you approve version 14 …" with nine Check
+ * rows undecided and did not say so).
+ */
+export function openRowsElsewhere(
+  template: WorkflowTemplate, state: WorkflowState, context: Parameters<typeof outstandingWork>[2], stageId: string
+): OpenRow[] {
+  return openRowsOf(template, outstandingWork(template, state, context).filter((i) => i.kind === 'open_findings' && i.stageId !== stageId)).rows ?? [];
+}
+
+/** The open rows as one line: up to three by id, stage and wording, then how many more. */
+export function listOpenRows(rows: readonly OpenRow[]): string {
+  const shown = rows.slice(0, 3).map((r) => `${r.id} (${r.stageLabel}) — “${r.text.length > 160 ? `${r.text.slice(0, 159)}…` : r.text}”`).join('; ');
+  return rows.length > 3 ? `${shown} (+${rows.length - 3})` : shown;
 }
 
 /**
@@ -905,9 +922,7 @@ export function describeNeed(
       // A finding still undecided elsewhere is named before the approval, and
       // a single one is settled from here first: accepting it may change the
       // work being approved (2 Nov).
-      const list = open.slice(0, 3).map((r) => `${r.id} (${r.stageLabel}) — “${r.text.length > 160 ? `${r.text.slice(0, 159)}…` : r.text}”`).join('; ')
-        + (open.length > 3 ? ` (+${open.length - 3})` : '');
-      const named = `${message} ${t('need.openFirst', { list })}`;
+      const named = `${message} ${t('need.openFirst', { list: listOpenRows(open) })}`;
       if (open.length > 1) return { message: named, action: t('need.approveResume') };
       const only = open[0];
       const options = [
