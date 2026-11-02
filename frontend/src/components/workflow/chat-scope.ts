@@ -95,6 +95,16 @@ function words(text: string): number {
 }
 
 /**
+ * The scope as said once the change is applied: the count is the revised
+ * text's, not the one the scope was chosen with. "Applied to the whole
+ * document — 1151 words" was the memo before the revision (1 Nov, Sean).
+ */
+export function appliedScopeLabel(label: string, revised: string, kind: ScopeKind | undefined): string {
+  if (kind !== 'document') return label;
+  return label.replace(/\s+—\s+\d[\d,]*\s+words$/, '') + ` — ${words(revised).toLocaleString('en-US')} words now`;
+}
+
+/**
  * Resolve a scope choice to the exact characters it covers.
  *
  * Returns null when the scope cannot be located — an empty document, a

@@ -18,8 +18,17 @@ from .precedence import PRECEDENCE_TEXT
 PROMPTMASTER_SELF_MODEL = (
     "HOW PROMPTMASTER WORKS (act on this; do not recite it):\n"
     "- The user's objective is authoritative. When anything conflicts with it, "
-    "the objective wins, and you say so — except a particular value it states (a "
-    "date, a price, a figure), which gives way to an accepted fact recorded later.\n"
+    "the objective wins, and you say so in your reply — except a particular value it "
+    "states (a date, a price, a figure), which gives way to an accepted fact recorded "
+    "later, and except the user's own explicit instruction to change the objective — "
+    "its scope, the options compared, the deliverable — which replaces it: the earlier "
+    "objective is then history, not a rule.\n"
+    # 1 Nov (Sean, tattoo memo): told to drop an option and "update the objective",
+    # the model could only edit the memo, kept the old objective as the rule, and
+    # wrote "the stored objective and requirements have not changed" into it.
+    "- Never write about PromptMaster's own records inside the work — what the stored "
+    "objective, facts, requirements, stages or versions say or whether they changed. "
+    "Say that to the user in a reply, if at all.\n"
     "- Project state persists. Earlier stages, decisions and versions are real "
     "and are given to you; build on them rather than starting over.\n"
     "- The workflow says where the user is; the current stage says what to "

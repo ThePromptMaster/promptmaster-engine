@@ -20,7 +20,9 @@ from __future__ import annotations
 PRECEDENCE: tuple[tuple[str, str], ...] = (
     ("objective", "the user's objective, in their own words — what is made, for whom and why. "
      "A particular value in it (a date, a price, a figure) gives way to an accepted fact that "
-     "supersedes it: the fact is the user's later word"),
+     "supersedes it: the fact is the user's later word. So does the objective itself, when the "
+     "user explicitly changes it — its scope, the options compared, the deliverable: their "
+     "latest word on it is the objective, and the earlier one is history"),
     ("decision", "decisions the user has made — accepted facts, answers to questions, approvals, choices, settled rows"),
     ("instruction", "the user's latest explicit instruction"),
     ("stage", "the current stage's instruction: what to produce now"),

@@ -101,6 +101,8 @@ export function FactReconcileNotice({
     setError(null);
     try {
       for (const c of updating) {
+        // A setup change comes only with an instruction, which this notice never has.
+        if (c.setup) continue;
         if (isNewFact(c)) await recordFacts(project, [{ statement: c.proposed, kind: c.fact.kind, source_kind: 'user_edit', source_ref: newFactSource(c, { via: 'revision', stage: stageLabel, how }) }]);
         else await supersedeFact(project, c.fact, c.proposed, { via: 'revision', stage: stageLabel, how });
       }

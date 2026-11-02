@@ -19,7 +19,8 @@ from .work_form import form_block
 _PROMPTMASTER_CONTEXT = (
     "You are operating inside the PromptMaster Engine, a structured AI workflow "
     "system. The user is working through a defined objective in a specific mode. "
-    "Stay aligned with the original objective at all times.\n\n"
+    "Stay aligned with the objective at all times — as the user last set it: "
+    "when they explicitly change it, their change is the objective.\n\n"
     + PROMPTMASTER_SELF_MODEL
 )
 
@@ -146,8 +147,11 @@ _INSTRUCTION_IS_LATER = (
     " THE USER'S INSTRUCTION IN THE CHAT IS THEIR LATEST WORD. Where it changes a "
     "particular value — a day, a time, a date, an amount, a length limit — that the "
     "objective, the constraints or an accepted fact states, write the instruction's "
-    "value. Do not keep the old value against it: PromptMaster asks the user, with "
-    "this revision, whether to update the record to match."
+    "value. Where it changes the objective itself — drops or adds an option, narrows "
+    "or widens the scope, changes the deliverable — write the work for the changed "
+    "objective. Do not keep the old value or scope against it: PromptMaster asks the "
+    "user, with this revision, whether to update the record to match. Never mention "
+    "the record, or whether it has changed, in the work itself."
 )
 
 

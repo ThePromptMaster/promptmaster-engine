@@ -41,11 +41,19 @@ class RevisionFact(BaseModel):
     statement: str = Field(min_length=1, max_length=2_000)
 
 
+class ProjectSetup(BaseModel):
+    """The project's stored objective and constraints, as the setup panel shows them."""
+    objective: str = Field(default="", max_length=8_000)
+    constraints: str = Field(default="", max_length=8_000)
+
+
 class RevisionFactsRequest(BaseModel):
     instruction: str = Field(min_length=1, max_length=8_000)
     before: str = Field(default="", max_length=200_000)
     after: str = Field(min_length=1, max_length=200_000)
     facts: list[RevisionFact] = Field(default_factory=list, max_length=MAX_FACTS)
+    #: None from a client that predates it: no setup change is then reported.
+    setup: ProjectSetup | None = None
     model: str = ""
 
 
@@ -69,9 +77,24 @@ class NewStandingFact(BaseModel):
     approved_by: str = ""
 
 
+class SetupChange(BaseModel):
+    """The objective or the constraints rewritten as the user's instruction asks.
+
+    1 Nov (Sean, tattoo memo): "Compare expanded hours with keeping operations
+    unchanged only … replace the $40,000 reserve with $75,000 … update the
+    objective, requirements and affected analysis." The requirements were
+    recorded; the stored objective and constraints kept the old scope and
+    $40,000, and every recheck was handed them as authoritative.
+    """
+    field: str  # "objective" | "constraints"
+    proposed: str
+    quote: str
+
+
 class RevisionFactsResponse(BaseModel):
     changes: list[FactMeaningChange] = Field(default_factory=list)
     additions: list[NewStandingFact] = Field(default_factory=list)
+    setup_changes: list[SetupChange] = Field(default_factory=list)
 
 
 _INSTRUCTION = (
@@ -94,9 +117,18 @@ _INSTRUCTION = (
     "(and name them in \"authority\"), \"request\" when someone only asks for or proposes it, otherwise "
     "\"fact\".\n"
     "Rules for standing changes:\n" + RULES +
+    "SEPARATELY, when PROJECT SETUP is given: report a change to the stored OBJECTIVE or CONSTRAINTS ONLY when "
+    "the INSTRUCTION itself replaces what they say — a change of scope, of the options compared, of the "
+    "deliverable, or of a limit or figure the setup states (\"compare B and C only\", \"replace the $40,000 "
+    "reserve with $75,000\", \"update the objective\"). For each: the field (\"objective\" or \"constraints\"), "
+    "the whole field rewritten so it says what the instruction now asks, changing as little else as possible "
+    "and keeping its wording where it still holds, and a quote copied verbatim from the instruction (one "
+    "sentence or less). A revision that only rewords the document, or a value the setup does not state, is "
+    "not a setup change. When in doubt, report nothing.\n"
     "Return JSON: {\"changes\": [{\"fact_id\": string, \"proposed\": string, \"quote\": string, \"why\": string}], "
     "\"additions\": [{\"statement\": string, \"kind\": \"fact\" | \"requirement\", \"quote\": string, "
-    "\"status\": \"fact\" | \"request\" | \"approval\", \"authority\": string}]}"
+    "\"status\": \"fact\" | \"request\" | \"approval\", \"authority\": string}], "
+    "\"setup_changes\": [{\"field\": \"objective\" | \"constraints\", \"proposed\": string, \"quote\": string}]}"
 )
 
 
@@ -112,6 +144,11 @@ def build_prompt(req: RevisionFactsRequest) -> tuple[str, str]:
         f"THE REVISED TEXT:\n{req.after.strip()}\n\n"
         f"ACCEPTED FACTS:\n{facts or '(none)'}"
     )
+    if req.setup is not None:
+        prompt += (
+            f"\n\nPROJECT SETUP:\nOBJECTIVE: {req.setup.objective.strip() or '(empty)'}\n"
+            f"CONSTRAINTS: {req.setup.constraints.strip() or '(empty)'}"
+        )
     return _INSTRUCTION, prompt
 
 
@@ -120,7 +157,30 @@ def parse(raw: object, req: RevisionFactsRequest) -> RevisionFactsResponse:
     the revised text; an addition only with a quote verbatim in the instruction."""
     if not isinstance(raw, dict):
         return RevisionFactsResponse()
-    return RevisionFactsResponse(changes=_changes(raw, req), additions=_additions(raw, req))
+    return RevisionFactsResponse(changes=_changes(raw, req), additions=_additions(raw, req), setup_changes=_setup_changes(raw, req))
+
+
+def _setup_changes(raw: dict, req: RevisionFactsRequest) -> list[SetupChange]:
+    """Kept only with a setup to change, a quote verbatim in the instruction, and
+    a rewrite that differs from what the field says now."""
+    items = raw.get("setup_changes")
+    if req.setup is None or not isinstance(items, list):
+        return []
+    instruction = _norm(req.instruction)
+    out: list[SetupChange] = []
+    for item in items[:2]:
+        if not isinstance(item, dict):
+            continue
+        field = str(item.get("field") or "").strip().lower()
+        if field not in ("objective", "constraints") or any(c.field == field for c in out):
+            continue
+        proposed = str(item.get("proposed") or "").strip()[:8_000]
+        quote = " ".join(str(item.get("quote") or "").split()).strip('"“”')[:600]
+        current = getattr(req.setup, field)
+        if len(proposed) < 4 or len(quote) < 8 or _norm(quote) not in instruction or _norm(proposed) == _norm(current):
+            continue
+        out.append(SetupChange(field=field, proposed=proposed, quote=quote))
+    return out
 
 
 def _additions(raw: dict, req: RevisionFactsRequest) -> list[NewStandingFact]:
@@ -177,7 +237,7 @@ async def revision_facts(client: OpenRouterClient, req: RevisionFactsRequest) ->
         return RevisionFactsResponse()
     system, prompt = build_prompt(req)
     try:
-        raw, _usage = await client.generate_json(prompt=prompt, system=system, temperature=0, max_tokens=1_200, model=req.model or None)
+        raw, _usage = await client.generate_json(prompt=prompt, system=system, temperature=0, max_tokens=2_400 if req.setup is not None else 1_200, model=req.model or None)
     except Exception:  # noqa: BLE001 — a failed check never blocks the revision
         return RevisionFactsResponse()
     return parse(raw, req)

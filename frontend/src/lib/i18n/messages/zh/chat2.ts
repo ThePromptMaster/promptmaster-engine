@@ -127,6 +127,7 @@ export const zh: Record<keyof typeof en, string> = {
   'bcn.first.brief': '项目简介已变更',
   'bcn.first.back': '已返回',
   'bcn.first.again': '阶段已再次完成',
+  'fcl.group.setup': '项目设置',
   'fcl.group.changed': '已变更的值',
   'fcl.group.new': '新事实',
   'fcl.group.approval': '已记录的批准',

@@ -27,6 +27,8 @@ export const zh: Record<keyof typeof en, string> = {
   'ws.reopenedNote': '已重新打开——在此处修改（直接编辑，或使用侧边对话），然后按“应用并继续”。或者由你自己将其标记为完成。',
   'ws.editStage': '编辑此阶段',
   'ws.recheckNote': '你修改后，后续阶段将被重新检查。',
+  'ws.staleNote': '等待重新检查：{reason}',
+  'ws.recheckNow': '重新检查已更改的阶段',
   'ws.markComplete': '将此阶段标记为完成',
   'ws.finishedHint': '此阶段已完成。按“编辑此阶段”进行修改——后续阶段将被重新检查。',
   'ws.checkAndDials': '阶段检查，以及反馈的严格程度',

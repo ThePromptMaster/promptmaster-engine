@@ -48,6 +48,7 @@ import { saveSources } from '@/lib/supabase/sources';
 import { inputsFrom } from './use-stage-generation';
 import { asIteration } from '@/lib/workflow/legacy';
 import {
+  appliedScopeLabel,
   describeScope,
   resolveScope,
   scopeNoun,
@@ -161,6 +162,12 @@ interface Options {
   getChatContext?: () => ChatContext;
   /** After facts were updated with a revision, so the project reloads them. */
   onFactsChanged?: () => Promise<unknown> | void;
+  /**
+   * Replace the project's stored objective or constraints, as an instruction
+   * the user ticked asks (1 Nov). The brief-change watcher records the old
+   * text and reopens what relied on it.
+   */
+  onPatchSetup?: (patch: { objective?: string; constraints?: string }) => Promise<unknown> | void;
   /** After the chat saved web sources, so the project reloads them (22 Oct). */
   onSourcesChanged?: () => Promise<unknown> | void;
   /** The requirements checked on a revision's saved text, each met or not (13 Oct). */
@@ -222,6 +229,7 @@ export function useStageChat({
   restoreStageVersion,
   getChatContext,
   onFactsChanged,
+  onPatchSetup,
   onSourcesChanged,
   checkRevision,
   autoApply = false,
@@ -521,7 +529,7 @@ export function useStageChat({
           messageId: saved.id,
           factChanges: await withMeaningChanges(
             factChangesFromRevision({ facts: project.facts, instruction: ask, before: content, after: checked.nextContent }),
-            { facts: project.facts, instruction: ask, before: content, after: checked.nextContent, model: project.model },
+            { facts: project.facts, instruction: ask, before: content, after: checked.nextContent, model: project.model, setup: { objective: project.objective ?? '', constraints: project.constraints ?? '' } },
             (req) => api.revisionFacts(req)
           ),
           changeSummary: withWebLine(
@@ -625,9 +633,16 @@ export function useStageChat({
       // same step, so no later prompt is told the old ones outrank it.
       const chosen = (proposal.factChanges ?? []).filter((c) => !updateFactIds || updateFactIds.includes(c.fact.id));
       let factsUpdated = 0;
+      const setupUpdated: string[] = [];
       for (const c of chosen) {
         try {
           const from = { via: 'revision', stage_id: stageId, instruction: proposal.instruction.slice(0, 500) };
+          if (c.setup) {
+            if (!onPatchSetup) continue;
+            await onPatchSetup({ [c.setup]: c.proposed });
+            setupUpdated.push(c.setup);
+            continue;
+          }
           if (isNewFact(c)) await recordFacts(project, [{ statement: c.proposed, kind: c.fact.kind, source_kind: 'user_edit', source_ref: newFactSource(c, from) }]);
           else await supersedeFact(project, c.fact, c.proposed, from);
           factsUpdated += 1;
@@ -635,15 +650,17 @@ export function useStageChat({
           // The version is saved; a fact that could not be changed is said below.
         }
       }
-      if (chosen.length) await onFactsChanged?.();
-      if (factsUpdated < chosen.length && live.current) {
-        setError(`The revision was saved, but ${chosen.length - factsUpdated} of the facts could not be updated. Change them in Facts and requirements, or Go will treat the old values as current.`);
+      const factsChosen = chosen.filter((c) => !c.setup).length;
+      if (factsChosen) await onFactsChanged?.();
+      if (factsUpdated < factsChosen && live.current) {
+        setError(`The revision was saved, but ${factsChosen - factsUpdated} of the facts could not be updated. Change them in Facts and requirements, or Go will treat the old values as current.`);
       }
 
       await persist(
         'assistant',
         `Applied to ${proposal.target.label.toLowerCase()}. The previous version is kept and can be restored.` +
-          (factsUpdated ? ` Recorded ${factsUpdated === 1 ? 'one fact' : `${factsUpdated} facts`} with it.` : ''),
+          (factsUpdated ? ` Recorded ${factsUpdated === 1 ? 'one fact' : `${factsUpdated} facts`} with it.` : '') +
+          (setupUpdated.length ? ` Updated the project's ${setupUpdated.join(' and ')}; the earlier wording is kept in the brief's history.` : ''),
         'instruct',
         proposal.target.label
       );
@@ -662,7 +679,7 @@ export function useStageChat({
 
       if (live.current) {
         setApplied({
-          scope: proposal.target.label,
+          scope: appliedScopeLabel(proposal.target.label, proposal.nextContent, proposal.target.kind),
           previousVersionId,
           summary: proposal.changeSummary,
           checks: [
@@ -694,7 +711,7 @@ export function useStageChat({
     } finally {
       if (live.current) setBusy(false);
     }
-  }, [proposal, appendStageVersion, busy, headVersion?.id, stageId, stageLabel, project, persist, onFactsChanged, checkRevision]);
+  }, [proposal, appendStageVersion, busy, headVersion?.id, stageId, stageLabel, project, persist, onFactsChanged, onPatchSetup, checkRevision]);
 
   // Under delegated routine decisions, a proposal that changes no accepted
   // fact is applied as soon as it is drafted, once (13 Oct). The previous

@@ -54,8 +54,12 @@ const NUMBER_WORDS: Record<string, number> = {
   one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
   eleven: 11, twelve: 12, fifteen: 15, twenty: 20,
 };
-const NUM = `(\\d{1,4}|${Object.keys(NUMBER_WORDS).join('|')})`;
-const num = (raw: string) => NUMBER_WORDS[raw.toLowerCase()] ?? Number(raw);
+// "1,000" and "1 000" (a no-break space) are one number: "under 1,000 words"
+// measured nothing, and a 1,151-word memo passed as finished (1 Nov, Sean,
+// tattoo memo). A plain space is not a separator — "3 100-word sections" is
+// three sections — and a dot is one only before exactly three digits.
+const NUM = `(\\d{1,3}(?:[,\u00a0\u202f]\\d{3})+(?!\\d)|\\d{1,3}(?:\\.\\d{3})+(?![\\d.])|\\d{1,5}|${Object.keys(NUMBER_WORDS).join('|')})`;
+const num = (raw: string) => NUMBER_WORDS[raw.toLowerCase()] ?? Number(raw.replace(/[,.\u00a0\u202f]/g, ''));
 
 /** The deliverables a requirement may name. "FAQ" also matches "frequently asked questions". */
 const SUBJECTS = [
@@ -194,7 +198,8 @@ export function parseRequirements(texts: readonly string[]): MeasurableRequireme
     const unnamed: { id: string; whole: boolean }[] = [];
     let named = 0;
     if (!text?.trim()) continue;
-    const t = text.replace(/ /g, ' ');
+    // A no-break space between digit groups is a thousands separator ("1 000"); anywhere else, a space.
+    const t = text.replace(/(\d)[\u00a0\u202f](?=\d{3}(?!\d))/g, '$1,').replace(/ /g, ' ');
     const patterns: [RegExp, (m: RegExpMatchArray) => Partial<MeasurableRequirement>][] = [
       [new RegExp(`${NUM}\\s*(?:–|—|-|to)\\s*${NUM}[\\s-]*words?\\b`, 'gi'), (m) => ({ min: num(m[1]), max: num(m[2]) })],
       [new RegExp(`\\bexactly\\s+${NUM}[\\s-]*words?\\b`, 'gi'), (m) => ({ min: num(m[1]), max: num(m[1]) })],

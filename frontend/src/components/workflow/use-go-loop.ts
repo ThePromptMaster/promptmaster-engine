@@ -323,7 +323,7 @@ export function useGoLoop(opts: Options) {
       if (!current) return;
       // Where the project was when the run asked: a request is only shown,
       // and only re-checked, against that stage.
-      if (needs) needs = { ...needs, onStage: latest.current.state.current_stage_id };
+      if (needs) needs = { ...needs, onStage: latest.current.state.current_stage_id, raisedAt: new Date().toISOString() };
       const terminal = ['completed', 'budget_exhausted', 'stopped', 'failed'].includes(status);
       if (terminal) await endAgentRun(current.id, status, reason ?? '', needs);
       else await updateAgentRun(current.id, { status, stop_reason: reason, needs });
