@@ -8,7 +8,8 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { countWords, measure, parseRequirements } from './measurable';
+import { countWords, measure, parseRequirements, requirementsForStage } from './measurable';
+import type { StageDefinition } from './types';
 
 const CONSTRAINT =
   'Use only the supplied facts, with no outside data. Stay under 600 words in total, including headings, tables and a promotional message under 80 words.';
@@ -62,5 +63,26 @@ describe('a word limit that says its headings count', () => {
     expect(countWords('Length: 2 hours, in person.')).toBe(5);
     expect(countWords('> New to photography? Join us.\n\nMessage: 55 words, counted by hand.')).toBe(5);
     expect(countWords('Section two covers 300 words of history.')).toBe(7);
+  });
+});
+
+describe('one text, one count (2 Nov, production pass)', () => {
+  const finalPlan = { id: 'final', label: 'Final decision and launch plan', renderer: 'prose', exit_criteria: [], expected_artifacts: [{ kind: 'final_plan', primary: true }] } as unknown as StageDefinition;
+  it('the output format\'s "launch plan under 600 words" and the constraint\'s whole-plan limit are measured once, headings counted', () => {
+    const reqs = parseRequirements([
+      'Keep the whole plan under 600 words.',
+      'Decision and launch plan under 600 words with headings and tables: facts, calculations, next steps',
+      'Whole document under 600 words, including headings and tables.',
+    ]);
+    const applied = requirementsForStage(finalPlan, 'final', reqs);
+    const words = applied.filter(({ requirement: r }) => r.kind === 'words');
+    expect(words).toHaveLength(1);
+    expect(words[0].requirement).toMatchObject({ max: 600, headings: true });
+  });
+
+  it('two different limits on the whole are both kept, with one counting rule', () => {
+    const reqs = parseRequirements(['Stay under 600 words in total, including headings.', 'The launch plan must be at least 300 words.']);
+    const words = requirementsForStage(finalPlan, 'final', reqs).filter(({ requirement: r }) => r.kind === 'words');
+    expect(words.map(({ requirement: r }) => [r.min ?? null, r.max ?? null, Boolean(r.headings)])).toEqual([[null, 600, true], [300, null, true]]);
   });
 });

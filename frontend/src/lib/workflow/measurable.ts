@@ -679,5 +679,27 @@ export function requirementsForStage(
     // of a three-section pack were held to the update's 100).
     else if (stage.id === deliverableId) out.push({ requirement: r, whole: subjects.size === 1 && !isPart(r) });
   }
-  return out;
+  return oneCountOfTheWhole(out);
+}
+
+/**
+ * Word limits measured on the same whole text are one limit with one count
+ * (2 Nov, production pass: "Decision and launch plan under 600 words" in the
+ * output format, read as the launch plan's, measured the plan at 516 beside
+ * the constraint's "under 600 words in total, including headings" at 564).
+ * A limit that says its headings count makes them count for all of them; two
+ * with the same range are shown once.
+ */
+function oneCountOfTheWhole(out: { requirement: MeasurableRequirement; whole: boolean }[]): { requirement: MeasurableRequirement; whole: boolean }[] {
+  const onWhole = out.filter(({ requirement: r, whole }) => r.kind === 'words' && (whole || !r.subject));
+  if (onWhole.length < 2) return out;
+  const headings = onWhole.some(({ requirement: r }) => r.headings);
+  const ranges = new Set<string>();
+  return out.flatMap((e) => {
+    if (!onWhole.includes(e)) return [e];
+    const range = `${e.requirement.min ?? ''}-${e.requirement.max ?? ''}`;
+    if (ranges.has(range)) return [];
+    ranges.add(range);
+    return [headings ? { ...e, requirement: { ...e.requirement, headings: true } } : e];
+  });
 }
