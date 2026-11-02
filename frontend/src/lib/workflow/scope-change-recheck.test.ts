@@ -45,9 +45,18 @@ describe('a recheck after a scope change keeps what the change removed out', () 
     expect(kept.text).toBe(after);
   });
 
-  it('without a version time, or with nothing newer, the reason stands alone', () => {
-    expect(askedOfRecheck(why, facts, undefined)).toBe(why);
-    expect(askedOfRecheck(why, facts, '2026-11-02T14:00:00.000Z')).toBe(why);
+  it('a standing removal counts even when it is older than the version (second scope change)', () => {
+    // v3 already carried the restored Option A lines; the fact predates it.
+    const asked = askedOfRecheck('the reserve is now $90,000', facts, '2026-11-02T14:00:00.000Z');
+    expect(asked).toContain('is dropped entirely');
+    expect(asked).not.toContain('Under 1,000 words');
+    expect(keepUnasked(before, after, asked).restored).toEqual([]);
+  });
+
+  it('with no standing removal and nothing newer, the reason stands alone', () => {
+    const plain = facts.filter((f) => !f.statement.includes('dropped'));
+    expect(askedOfRecheck(why, plain, undefined)).toBe(why);
+    expect(askedOfRecheck(why, plain, '2026-11-02T14:00:00.000Z')).toBe(why);
   });
 });
 

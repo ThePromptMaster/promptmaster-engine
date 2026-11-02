@@ -251,9 +251,14 @@ export function askedOfRecheck(
   versionCreatedAt: string | undefined
 ): string {
   const since = versionCreatedAt ? Date.parse(versionCreatedAt) : NaN;
-  if (Number.isNaN(since)) return why;
-  const newer = (facts ?? []).filter((f) => !f.retired_at && Date.parse(f.created_at) > since).map((f) => f.statement.trim()).filter(Boolean);
-  return newer.length ? `${why} ${newer.join(' ')}` : why;
+  // A standing removal ("Option A … is dropped entirely") always counts,
+  // whenever it was recorded: on prod the version being rechecked already
+  // carried the restored lines, so a fact older than it was still the one
+  // asking for them to go (2 Nov, second scope change).
+  const asked = (facts ?? []).filter(
+    (f) => !f.retired_at && ((!Number.isNaN(since) && Date.parse(f.created_at) > since) || asksForRemovals(f.statement))
+  ).map((f) => f.statement.trim()).filter(Boolean);
+  return asked.length ? `${why} ${asked.join(' ')}` : why;
 }
 
 /**
