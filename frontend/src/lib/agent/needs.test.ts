@@ -5,7 +5,8 @@ import { describe, expect, it } from 'vitest';
 import { BOOK_V1 } from '@/lib/workflow/templates/book.v1';
 import { initialState, projectState } from '@/lib/workflow/engine';
 import type { StageEvaluation, WorkflowEvent } from '@/lib/workflow/types';
-import { approvedAsItStands, delegableToCommit, describeNeed, needIsDecidedOnStage, needStillHolds, needsUser, requiredWork, type NeedsUser } from './needs';
+import { approvedAsItStands, delegableToCommit, describeNeed, needIsDecidedOnStage, needStillHolds, needsUser, repairStuckNeed, requiredWork, staleRepair, unrepairableStale, type NeedsUser } from './needs';
+import { shownStopReason } from '@/lib/i18n/stop-reasons';
 import { RESEARCH_V1 } from '@/lib/workflow/templates/research.v1';
 
 const stage = (id: string) => BOOK_V1.stages.find((s) => s.id === id)!;
@@ -533,5 +534,34 @@ describe('"Approve it as it stands" (19 Oct, Research › Method screenshot)', (
     expect(requiredWork(args)?.key).toBe('apply_findings');
     expect(requiredWork({ ...args, asItStands: true })).toBeNull();
     expect(needsUser({ ...base, ...args, asItStands: true })).toMatchObject({ kind: 'tick_criterion', criterionId: 'method.approved' });
+  });
+});
+
+describe('a reopened stage Go does not revise is the user\'s to keep or open (2 Nov, production)', () => {
+  const stale = { status: 'stale', stale: { reason: 'The work went back to Research after this stage used it.', since: '2026-11-02T00:00:00Z' } };
+  const withStale = (stages: Record<string, unknown>) => {
+    const s = initialState(BOOK_V1);
+    return { ...s, current_stage_id: 'drafting', stages: { ...s.stages, ...stages } } as never;
+  };
+
+  it('is found once nothing Go can repair is left, and a reopened draft is still Go\'s', () => {
+    expect(unrepairableStale(BOOK_V1, withStale({ outline: stale }))).toBe('outline');
+    // Go repairs nothing on a reopened outline, which is why it is the user's.
+    expect(staleRepair(BOOK_V1, withStale({ outline: stale }))).toBeNull();
+    // A reopened prose stage is Go's to repair, not this.
+    expect(unrepairableStale(BOOK_V1, withStale({ positioning: stale }))).toBeNull();
+    expect(unrepairableStale(BOOK_V1, withStale({}))).toBeNull();
+  });
+
+  it('asks keep or open, never "try once more", and the stop reason reads in Spanish', () => {
+    const need = { ...repairStuckNeed(withStale({ outline: stale }), 'outline', []), byHand: true };
+    const d = describeNeed(need, label);
+    expect(d.message).toBe(
+      `${label('outline')} needs a recheck: The work went back to Research after this stage used it. I do not revise this kind of stage myself, and the stages I can repair have been repaired. Keep it as it is now and carry on, or open it and change it yourself.`
+    );
+    expect(d.options?.map((o) => o.id)).toEqual(['keep', 'open']);
+    expect(shownStopReason('es', d.message)).toMatch(/necesita una revisión/);
+    // Still the user's while the stage waits; gone once it is kept.
+    expect(needStillHolds(need, { ...base, state: withStale({ outline: stale }), stage: stage('outline'), facts: {}, stageEvaluation: evaluation('outline'), objective: 'o', currentStageId: 'drafting' })).toBe(true);
   });
 });

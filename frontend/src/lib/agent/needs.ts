@@ -60,7 +60,11 @@ type Need =
    * offer an actionable next step"). `why`: what reopened it and is still
    * unresolved; `last`: what the last attempt did, in the record's words.
    */
-  | { kind: 'repair_stuck'; stageId: string; why: string; last: string; tries: number; saved: number }
+  | {
+      kind: 'repair_stuck'; stageId: string; why: string; last: string; tries: number; saved: number;
+      /** A reopened stage of a kind Go does not revise (a chapter plan): kept or opened by the user, never retried. */
+      byHand?: boolean;
+    }
   /** Go thinks this stage is not the best next move; skipping it is the user's call. */
   | { kind: 'skip_stage'; stageId: string; reason: string }
   /** Go's proposal to add the next task as a stage (25 Oct); the user adds it. */
@@ -338,6 +342,30 @@ export function repairStuckNeed(state: WorkflowState, stageId: string, steps: re
   };
 }
 
+/** The renderers whose reopened stages Go repairs (`staleRepair`). */
+const REPAIRABLE: ReadonlySet<string> = new Set(['prose', 'list', 'review', 'long_form']);
+
+/**
+ * A reopened stage Go does not revise itself — a chapter plan, an assessment
+ * — that `staleRepair` would otherwise have reached, or null. It is the user's
+ * next decision: keep it as it is, or open it (2 Nov, production: a change to
+ * Sources reopened a designed report's chapter plan with the rest; Go repaired
+ * the rest, then spent three steps re-finishing the last stage before it
+ * asked). Checked only once nothing is left to repair.
+ */
+export function unrepairableStale(template: WorkflowTemplate, state: WorkflowState): string | null {
+  const loops = template.stages.some((s) => s.transitions.loop_to);
+  const here = template.stages.findIndex((s) => s.id === state.current_stage_id);
+  const reworking = ['in_progress', 'not_started'].includes(state.stages[state.current_stage_id]?.status ?? 'not_started');
+  const ahead = !loops && !reworking;
+  for (const [index, stage] of template.stages.entries()) {
+    if (state.stages[stage.id]?.status !== 'stale' || REPAIRABLE.has(stage.renderer)) continue;
+    if (here >= 0 && index > here && !ahead) continue;
+    return stage.id;
+  }
+  return null;
+}
+
 export function staleRepair(
   template: WorkflowTemplate,
   state: WorkflowState,
@@ -396,7 +424,7 @@ export function staleRepair(
       continue;
     }
     // L-64 (9 Oct): a reopened manuscript is repaired by revising its sections.
-    if (!['prose', 'list', 'review', 'long_form'].includes(stage.renderer)) continue;
+    if (!REPAIRABLE.has(stage.renderer)) continue;
     return {
       key: 'recheck_stage',
       rationale: `${stage.label} was reopened: ${(st.stale?.reason ?? 'something it relied on changed').replace(/[.\s]+$/, '')}. Repairing it keeps the project consistent.`,
@@ -1003,6 +1031,13 @@ function describeRepairStuck(
 ): { message: string; action: string; options: { id: StuckOption; label: string }[] } {
   const t = (key: string, vars?: Vars) => translate(locale, key, vars);
   const why = need.why.replace(/[.\s]+$/, '');
+  if (need.byHand) {
+    const options = [
+      { id: 'keep' as const, label: t('need.keepAsIs', { stage }) },
+      { id: 'open' as const, label: t('need.openStage', { stage }) },
+    ];
+    return { message: t('need.notRevisedByGo', { stage, why }), action: options[0].label, options };
+  }
   const last = need.last.replace(/\s+/g, ' ').trim().replace(/[.\s]+$/, '');
   const attempts = t('need.repairs', { count: need.tries, stage });
   const saved = need.saved === 0

@@ -42,7 +42,7 @@ import { actionFor, actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, ROUTINE_DE
 import { contextWithFacts, readOutcomeProof, readStageFacts, type StageFacts } from '@/lib/agent/facts';
 import { serializeItems, stageDrafts } from '@/lib/workflow/stage-artifact';
 import { carryNewerFixes, describeCarried, reasksCarried } from '@/lib/agent/review-rounds';
-import { approvedAsItStands, delegableToCommit, exhaustedRepair, policyConfirmable, repairStuckNeed, repairTries, staleRepair, describeNeed, NEED_CLEARED, NEED_MOVED_ON, needStillHolds, needsUser, openRowsElsewhere, requiredWork, type NeedsUser } from '@/lib/agent/needs';
+import { approvedAsItStands, delegableToCommit, exhaustedRepair, policyConfirmable, repairStuckNeed, repairTries, staleRepair, unrepairableStale, describeNeed, NEED_CLEARED, NEED_MOVED_ON, needStillHolds, needsUser, openRowsElsewhere, requiredWork, type NeedsUser } from '@/lib/agent/needs';
 import { assertHonestOutcome, verifyOutcome } from '@/lib/agent/outcome';
 import { outlineStageFor } from '@/lib/outline/actions';
 import { effectiveRenderer } from '@/lib/workflow/stage-artifact';
@@ -722,6 +722,14 @@ export function useGoLoop(opts: Options) {
         const exhausted = repair ? null : exhaustedRepair(o.template, o.state, recheckTried);
         if (exhausted) {
           const stuck = repairStuckNeed(o.state, exhausted, [...priorStepsRef.current, ...stepsRef.current]);
+          await setRunStatus('awaiting_decision', describeNeed(stuck, stageLabelFor).message, stuck);
+          break;
+        }
+        // …and so is a reopened stage Go does not revise (a chapter plan),
+        // once everything it can repair is repaired (2 Nov, production).
+        const byHand = repair ? null : unrepairableStale(o.template, o.state);
+        if (byHand) {
+          const stuck = { ...repairStuckNeed(o.state, byHand, [...priorStepsRef.current, ...stepsRef.current]), byHand: true };
           await setRunStatus('awaiting_decision', describeNeed(stuck, stageLabelFor).message, stuck);
           break;
         }
