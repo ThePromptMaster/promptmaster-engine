@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { describeValue, factValues, leftoverValues, supersededValues } from './fact-values';
+import { derivedValues, describeValue, factValues, leftoverMentions, leftoverValues, namedLeftovers, supersededValues } from './fact-values';
+import { supersededFactValues } from './facts';
+import type { ProjectFact } from '@/types/project';
 
 describe('the values a fact states (8 Oct; Sean, 7 Oct, TeamNotes)', () => {
   it('reads one date however it is written, without the year', () => {
@@ -103,5 +105,79 @@ describe('history is not a value left behind (Sean, 14 Oct: SUMMIT change log, J
     expect(leftoverValues('- Testing — November 16 to November 20, 2026 — Owner: Luis', launch)).toHaveLength(0);
     expect(leftoverValues('Testing runs Nov 16–20.', launch)).toHaveLength(0);
     expect(leftoverValues('Launch: November 20, 2026.', launch)).toHaveLength(1);
+  });
+});
+
+/**
+ * 2 Nov (Sean, photography workshop). The reserve moved from $400 to $800 and
+ * the ticket from $40 to $30. Every repair failed with "the new version still
+ * states $400": the plan's $400 was what is left to spend ($1,200 − $800), and
+ * in the retest its $40 was the most Option C may cost ("c ≤ $40"). The lines
+ * that recorded the old values as superseded were already read as history.
+ */
+describe('a figure worked out from current values may equal an old one (2 Nov, photography workshop)', () => {
+  const fact = (id: string, statement: string): ProjectFact => ({
+    id, project_id: 'p', user_id: 'u', statement, subject: null, kind: 'requirement', source_kind: 'user_edit', source_ref: {},
+    accepted_by: 'user', agent_run_id: null, supersedes: null, retired_at: null, retired_reason: null, created_at: '2026-11-02T08:48:23Z',
+  });
+  const superseded = supersededFactValues([
+    fact('r', 'The minimum unspent reserve is $800, replacing $400.'),
+    fact('t', 'The ticket price is $30 per person, replacing $40.'),
+  ]);
+  const plan = [
+    '## Reserve check',
+    '| Spendable while keeping $800 | $1,200 − $800 = $400 |',
+    '| Left for materials | $400 − $300 = $100 |',
+    '| At 20 | $300 + 20 × $5 = $400 spent; $1,200 − $400 = $800 unspent |',
+    'Spending up to $400 authorized.',
+    'B reaches break-even (300 + 12×5 = $360) only if c ≤ $40, and cannot be funded if c exceeds $100.',
+    '## History',
+    '- Minimum reserve: $400, replaced by $800.',
+    '| Ticket $40 | Superseded | Replaced by $30 per person (2 Nov) |',
+  ].join('\n');
+  /** The plan with one more line, above its history. */
+  const planWith = (line: string) => plan.replace('## History', `${line}\n## History`);
+
+  it('reads the values the text works out, not the ones it is told', () => {
+    expect([...derivedValues('$1,200 − $800 = $400')]).toEqual(['400']);
+    expect(derivedValues('(100 − c) ÷ 5 ≥ 12 requires c ≤ 40')).toEqual(new Set(['12', '40']));
+    expect(derivedValues('only if c ≤ $40').has('40')).toBe(true);
+    expect(derivedValues('$1,200 less the $800 reserve leaves $400').has('400')).toBe(true);
+    expect(derivedValues('Price = $40').size).toBe(0);
+    expect(derivedValues('The reserve is $400.').size).toBe(0);
+  });
+
+  it('the plan that failed every repair now passes', () => {
+    expect(leftoverMentions(plan, superseded)).toEqual([]);
+  });
+
+  it('a derived figure is still the old value beside the words of what changed', () => {
+    for (const line of ['| Minimum reserve | $400 |', 'Keep a $400 reserve unspent.', 'We hold $400 in reserve.']) {
+      expect(leftoverValues(planWith(line), superseded).map(describeValue)).toEqual(['$400']);
+    }
+    expect(leftoverValues(planWith('Tickets are $40 per person.'), superseded).map(describeValue)).toEqual(['$40']);
+    expect(leftoverValues(planWith('Budget: $1,200 − $400 reserve − $300 fixed costs = $500.'), superseded).map(describeValue)).toEqual(['$400']);
+  });
+
+  it('in a calculation, the words before it label the result, not the old value', () => {
+    expect(leftoverValues(planWith('Maximum B attendees fundable with the reserve preserved: ($400 − $300) ÷ $5 = 20.'), superseded)).toEqual([]);
+  });
+
+  it('with nothing worked out, the old value is read strictly, as before', () => {
+    expect(leftoverValues('Spending up to $400 authorized.', superseded).map(describeValue)).toEqual(['$400']);
+    expect(leftoverValues('Revenue at 8 paid: 8 × $40 = $320.', superseded).map(describeValue)).toEqual(['$40']);
+    expect(leftoverValues('Just $40 to join!', superseded).map(describeValue)).toEqual(['$40']);
+  });
+
+  it('a table row is read against the whole document it is part of', () => {
+    const row = '{"finding":"Financial limit: ($400 − $300) ÷ $5 = 20.","status":"accepted"}';
+    expect(leftoverValues(row, superseded)).toHaveLength(1);
+    expect(leftoverValues(row, superseded, { derivedIn: `Spendable: $1,200 − $800 = $400.\n${row}` })).toHaveLength(0);
+  });
+
+  it('a message names the line that states it, not only the fact', () => {
+    const named = namedLeftovers(leftoverMentions('{"finding":"Keep the $400 reserve.","why":"x"}', superseded));
+    expect(named.map((n) => n.text)).toEqual(['$400 in "Keep the $400 reserve."']);
+    expect(named[0].value.now).toBe('The minimum unspent reserve is $800, replacing $400.');
   });
 });

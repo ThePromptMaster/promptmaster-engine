@@ -56,7 +56,7 @@ import { attachedDocuments, currentFacts, supersededFactValues } from '@/lib/wor
 import { acceptedRowsBefore, checkedVersion, describeCheck, issuesFrom, MAX_CHECK_ROUNDS, roundsUsed, type DeliverableCheckRecord } from './deliverable-check';
 import { ManuscriptMissing, withFreshManuscript } from '@/lib/workflow/fresh-manuscript';
 import { useProjectStore } from '@/stores/project-store';
-import { describeValue, leftoverValues, type SupersededValue } from '@/lib/workflow/fact-values';
+import { describeValue, leftoverMentions, leftoverValues, namedLeftovers, type SupersededValue } from '@/lib/workflow/fact-values';
 import { revertsUserVersion, USER_CHOSEN_OPERATIONS } from '@/lib/workflow/fact-reconcile';
 import { hasIdChanges, idChangeDefault, idChangeQuestion, idChanges, removedByUser } from '@/lib/workflow/id-changes';
 import { recordPolicyFacts } from '@/lib/supabase/facts';
@@ -1192,12 +1192,14 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // review row quoting version 1 failed a repair that could not change it).
       const leftoverIn = (text: string) => {
         const rows = before ? parseItems(text) : null;
-        return leftoverValues(rows ? serializeItems(rows.filter((r) => !isSuperseded(r) && !before!.some((b) => b.status && b.id === r.id))) : text, superseded);
+        // What the whole text works out counts, decided rows included: a
+        // figure equal to an old value is its own there (2 Nov, photography).
+        return leftoverMentions(rows ? serializeItems(rows.filter((r) => !isSuperseded(r) && !before!.some((b) => b.status && b.id === r.id))) : text, superseded, { derivedIn: text });
       };
       let leftover = content ? leftoverIn(content) : [];
       if (content && leftover.length) {
         ({ res, content } = await attempt(
-          `${instruction} YOUR PREVIOUS ATTEMPT STILL STATED AS CURRENT: ${leftover.map(describeValue).join(', ')}. Replace each where it is stated as current. Where the text records history, keep it there under its kind: superseded (was in force, now replaced), a correction (keeps its own reporting date), or declined (a request or proposal never adopted — never called superseded).`
+          `${instruction} YOUR PREVIOUS ATTEMPT STILL STATED AS CURRENT: ${namedLeftovers(leftover).map((l) => l.text).join('; ')}. Replace each where it stands for what the fact changed. A different figure that only equals an old value — a result worked out from current figures — may stay, with its working shown beside it. Where the text records history, keep it there under its kind: superseded (was in force, now replaced), a correction (keeps its own reporting date), or declined (a request or proposal never adopted — never called superseded).`
         ));
         leftover = content ? leftoverIn(content) : [];
       }
@@ -1358,11 +1360,13 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         });
       }
       if (leftover.length) {
-        const named = leftover.map((v) => `${describeValue(v)} (now: "${v.now}")`).join('; ');
+        // The line that states it, then the fact: the fact alone was read as
+        // the sentence rejected (2 Nov, Sean, photography workshop).
+        const named = namedLeftovers(leftover).map((l) => `${l.text} (the fact now: "${l.value.now}")`).join('; ');
         return done(key, {
           status: 'failed', toolsUsed: ['model'],
           changes: typeof versionId === 'string' ? { version_ids: [versionId] } : {},
-          output: `Couldn't finish repairing ${target.label}: the new version still states ${named}. It is saved, so you can see it, and the stage stays reopened; edit those values or ask Go to try again.`,
+          output: `Couldn't finish repairing ${target.label}: the new version still gives ${named}. Lines that record an old value as superseded are history and are kept; these state it as current. It is saved, so you can see it, and the stage stays reopened; edit those lines or ask Go to try again.`,
         });
       }
       // A measured repair of a finished stage: it stays finished, and is
@@ -2230,7 +2234,9 @@ async function keptAndSupplied(
 ): Promise<{ content: string; notes: string[] }> {
   if (!head.trim() || !content.trim()) return { content, notes: [] };
   const removed = notRemovedByUser(ctx.project.removed_text);
-  const kept = keepUnasked(head, content, asked, (line) => leftoverValues(line, superseded).length === 0 && removed(line));
+  // A line of the earlier version is read in that version: a figure it works
+  // out there is its own, whatever value a fact replaced.
+  const kept = keepUnasked(head, content, asked, (line) => leftoverValues(line, superseded, { derivedIn: head }).length === 0 && removed(line));
   const notes: string[] = [];
   if (kept.restored.length) notes.push(`Kept ${describeLines(kept.restored)}, which the revision dropped without being asked.`);
   if (kept.reported.length) notes.push(`No longer there: ${describeLines(kept.reported, 2)}.`);
@@ -2395,6 +2401,9 @@ export function recheckInstruction(
   const changes = [...new Map(superseded.map((v) => [`${v.kind}:${v.value}`, v])).values()];
   const replace = changes.length
     ? ' CHANGED FACTS — these values are no longer true; replace every place the work states one as current, in every form it is written, with the current fact. ' +
+      // 2 Nov (Sean, photography): the $400 left to spend after the new $800
+      // reserve is not the old $400 reserve.
+      'A different figure worked out from current values that happens to equal an old one is not the old value: keep it, with its working beside it. ' +
       // 14 Oct (Sean, SUMMIT): "replace every occurrence" emptied the change log.
       // 15 Oct (Sean, HARBOR): declined requests and embedded instructions were
       // filed under "Superseded history", then "Corrections".

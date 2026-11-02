@@ -2750,3 +2750,32 @@ by each job's request-id prefix, and adds them to its cost. The cost is counted 
 finishes waiting. Sections still being written then (the wait ran out, or the user stopped Go)
 are counted in the project's total only, not in the step or the run. The same holds when another
 tab or the scheduled drain wrote them after the step had read the rows.
+
+### L-146 — A figure worked out from current values may equal an old one (2026-11-02)
+
+After a fact changes a value, Go's repair check fails a stage that still states the old value as
+current. On 2 Nov the reserve moved from $400 to $800 and the ticket from $40 to $30. Every
+repair of the plan then failed with "still states $400", and a retest failed six times on "$40".
+The plan's $400 was what is left to spend ($1,200 − $800), and the retest's $40 was the most
+Option C may cost ("c ≤ $40"). Neither can be "fixed", so Go was stuck. The message also quoted
+the fact instead of the offending line, so it read as the history line being rejected. Lines that
+record the old value as history were never the problem.
+
+Now an amount or number that the text works out as a result counts as a figure of its own. A
+result is a value after "=", "≈", "≤", "≥", "leaves" or "equals", where the left side holds another
+figure and an operator, or a value that bounds a one-letter variable. The whole document is
+searched for such results, decided table rows included. A mention of that value then counts as
+left behind only where it sits within four words of the changed fact's own words: "a $400 minimum
+reserve" or "| Minimum reserve | $400 |" still fails. In a calculation, only the words straight
+after the value count, since the words before it label the result. A value nothing works out is
+read strictly, as before. The failure message and the retry now quote the line that still states
+the value, then the fact.
+
+The cost:
+- An old value that the text also works out, restated as current without the fact's words nearby
+  ("Just $400 to start"), passes.
+- A fact that names no subject words (only figures) is read strictly, so a coincident figure
+  there still fails, and the message names the line.
+
+Checked against all 46 versions of the two prod projects: every version written before the change
+is still caught, and all 34 written after it pass.
