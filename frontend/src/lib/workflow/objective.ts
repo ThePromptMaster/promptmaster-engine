@@ -84,6 +84,8 @@ export interface ObjectiveBasis {
   measured: string[];
   assessed: CriterionResult[];
   not_checked: string[];
+  /** The deliverable check's finding in counts (1 Nov, `lib/agent/deliverable-check.ts`). */
+  check?: string;
 }
 
 /** "Checked Output v3: 2 measured in code, 4 assessed by the model; not verified: fits on one page." */
@@ -95,7 +97,7 @@ export function describeBasis(b: ObjectiveBasis): string {
     met ? `${met} assessed by the AI model against the text` : '',
   ].filter(Boolean);
   const unchecked = b.not_checked.length ? ` Not verified: ${b.not_checked.join('; ')}.` : '';
-  return `Checked ${where}${parts.length ? `: ${parts.join(', ')}` : ''}.${unchecked}`;
+  return `Checked ${where}${parts.length ? `: ${parts.join(', ')}` : ''}.${unchecked}${b.check ? ` ${b.check}` : ''}`;
 }
 
 /** The latest assessment in the log, if any. */

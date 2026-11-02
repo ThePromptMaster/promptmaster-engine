@@ -490,7 +490,8 @@ def _format_state(inputs: PMInput, state: AgentState) -> str:
         "Requirements met: " + ("; ".join(state.criteria_met) or "(none)"),
         "Requirements still open: " + ("; ".join(state.criteria_unmet) or "(none)"),
         f"Latest evaluation: {state.evaluation or '(not checked yet)'}",
-        "Earlier stages: " + ("; ".join(state.prior_stages) or "(none)"),
+        "Earlier stages (complete = approved for use; an assumption or inference in one is still "
+        "an assumption, not a confirmed fact): " + ("; ".join(state.prior_stages) or "(none)"),
         *(
             [
                 "",

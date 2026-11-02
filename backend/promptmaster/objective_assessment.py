@@ -65,10 +65,18 @@ _ASSESS_INSTRUCTION = (
     "not judge the finished deliverable against a step that belonged before it; judge "
     "the deliverable against what it was to contain. "
     # Q3a/Q3b (9 Oct): conditional results and AI passes do not stand in.
-    "A result the deliverable labels as resting on an unverified assumption ('assumed, not "
-    "verified', 'conditional on') does not meet the objective; nor does an AI pass where the "
-    "objective requires people (independent human coders, participants, a laboratory "
-    "measurement). "
+    "Where the objective asks for a result itself (a finding, a measurement, a proof), a result the "
+    "deliverable labels as resting on an unverified assumption ('assumed, not verified', 'conditional "
+    "on') does not meet it; nor does an AI pass where the objective requires people (independent human "
+    "coders, participants, a laboratory measurement). "
+    # 1 Nov (Sean, tattoo memo): "Distinguish completing a decision document from
+    # executing the real-world decision or collecting future evidence." "A
+    # conditional decision memo can finish while real-world evidence remains unknown."
+    "Where the objective asks for a document that decides or recommends under uncertainty (a decision "
+    "memo, a plan, a recommendation), a conditional recommendation that says what is unknown and what "
+    "evidence would change it MEETS it. Collecting that evidence, and carrying out or authorising the "
+    "decision, is future work the document recommends: list it under proposed_next, never as unmet or a "
+    "blocker. "
     # 14 Oct (Sean, SUMMIT): Luis's request to count two testing days was
     # recorded as a requirement; the pack correctly refused it, and the check
     # called the objective unmet because the request was not carried out.

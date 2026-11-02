@@ -330,7 +330,7 @@ def _next_action(system: str, prompt: str) -> dict:
 def _json_reply(system: str, prompt: str) -> dict:
     # Imported here, not at module top, to avoid import cycles with modules that
     # import the client.
-    from promptmaster import agent, audit_findings, continuity, evaluator, guidance, long_form, setup_suggester
+    from promptmaster import agent, audit_findings, continuity, deliverable_check, evaluator, guidance, long_form, setup_suggester
     from promptmaster.stage import _LIST_INSTRUCTION
     from promptmaster.stage_evaluation import _STAGE_EVAL_INSTRUCTION
 
@@ -669,6 +669,9 @@ def _json_reply(system: str, prompt: str) -> dict:
         return {"summary": "Mock snapshot.", "sections_done": [], "next": "Continue."}
     if system.startswith(guidance.GUIDANCE_SYSTEM[:60]):
         return {"suggestions": [{"text": "Mock suggestion.", "action": "Refine"}]}
+    if system.startswith(deliverable_check._INSTRUCTION[:60]):
+        # Nothing missing, nothing contradictory: the scripted deliverable passes.
+        return {"findings": [], "contradictions": []}
     # Unknown JSON call site: an empty object. Every parser in this codebase
     # degrades on missing fields, so this surfaces as a visible default rather
     # than a crash — and a new call site should add a branch above.
