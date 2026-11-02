@@ -23,6 +23,34 @@ describe('requirements PromptMaster can measure (C1; Sean, 7 Oct)', () => {
     ]);
   });
 
+  it('reads an approximate range as a target, not a limit (2 Nov, library report)', () => {
+    // The setup the start conversation wrote: the 4,500–5,000 was read as a
+    // limit named "roughly", held against the outline, and Go stopped.
+    const constraints =
+      'About 14,000 words in twelve sections with ## headings: about four on the history of US public libraries (roughly 4,500–5,000 words) and about eight on the present, the future and recommendations.';
+    const reqs = parseRequirements([constraints]);
+    expect(reqs.filter((r) => r.kind === 'words')).toEqual([]);
+    expect(reqs).toEqual([expect.objectContaining({ kind: 'sections', min: 12, max: 12 })]);
+    for (const text of ['about 300–400 words', 'around 120 to 180 words', 'a roughly 250-word summary', 'approximately 200-300 words', '~150–200 words', '约200-300字']) {
+      expect(parseRequirements([text]), text).toEqual([]);
+    }
+    // A firm range or limit is still a limit.
+    expect(parseRequirements(['a 100-140 word announcement'])).toEqual([expect.objectContaining({ kind: 'words', subject: 'announcement', min: 100, max: 140 })]);
+    expect(parseRequirements(['Keep the summary under about 300 words; the memo at most 400 words.'])).toEqual([
+      expect.objectContaining({ kind: 'words', subject: 'memo', max: 400 }),
+    ]);
+  });
+
+  it('holds no outline to a range the brief only gives as a target', () => {
+    const outline = {
+      id: 'outline', label: 'Twelve-section outline', renderer: 'prose',
+      entry_prompt_hint: 'The targets should total about 14,000, with roughly 4,500 to 5,000 words for history.',
+      exit_criteria: [], expected_artifacts: [], group: 'drafting', required: true, transitions: {},
+    } as unknown as StageDefinition;
+    const reqs = parseRequirements(['about four on the history (roughly 4,500–5,000 words) and about eight on the future']);
+    expect(requirementsForStage(outline, 'final', reqs)).toEqual([]);
+  });
+
   it('recognises nothing in a sentence that states no measure', () => {
     expect(parseRequirements(['The objective required three cycles: reject a formula, prove it, check four values.'])).toEqual([]);
     expect(parseRequirements(['Answer the five questions the board asked.'])).toEqual([]);
