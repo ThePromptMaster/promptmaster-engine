@@ -104,6 +104,19 @@ describe('preempt — checked before any model call', () => {
     );
   });
 
+  it('searches that each saved new sources are research, not a loop (2 Nov, production)', () => {
+    const search = (idx: number, sourceIds: string[]) =>
+      step({ idx, stage_id: 'sources', action_key: 'search_web', changes: sourceIds.length ? { source_ids: sourceIds } : {} });
+    // The production run: 1, 5 and 3 new sources.
+    const found = [search(0, ['s1']), search(1, ['s2', 's3', 's4', 's5', 's6']), search(2, ['s7', 's8', 's9'])];
+    expect(noProgress(found)).toBe(false);
+    expect(preempt({ ...base, steps: found })).toBeNull();
+    // Three that found only what was already saved are still a circle.
+    const nothing = [search(0, []), search(1, []), search(2, [])];
+    expect(noProgress(nothing)).toBe(true);
+    expect(preempt({ ...base, steps: nothing })?.reason).toContain('none of them saved anything');
+  });
+
   it('counts a repair by the stage it repaired, and a manuscript repair as saved (13 Oct, screenplay)', () => {
     const repair = (idx: number, stage: string, changes: Record<string, unknown>) =>
       step({ idx, stage_id: 'critique', action_key: 'recheck_stage', params: { stage_id: stage }, changes });

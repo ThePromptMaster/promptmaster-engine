@@ -503,10 +503,15 @@ const SAVING = new Set(['draft', 'revise', 'continue', 'outline', 'apply', 'tria
 /** The step saved something new to the project. */
 function savedSomething(s: AgentStep): boolean {
   if (s.status !== 'succeeded') return false;
-  const changes = (s.changes ?? {}) as { version_ids?: unknown; sections_written?: unknown };
+  const changes = (s.changes ?? {}) as { version_ids?: unknown; sections_written?: unknown; source_ids?: unknown };
   // Sections written into a manuscript are saved work too: a manuscript
   // repair records its sections, not a version (13 Oct).
   if (Array.isArray(changes.sections_written) && changes.sections_written.length > 0) return true;
+  // So are new sources a search saved to the project (2 Nov, production: three
+  // searches on a Sources stage saved 1, 5 and 3 new sources, and Go stopped
+  // with "none of them saved anything"). A search that found only what was
+  // already saved records none, and three of those still stop.
+  if (s.action_key === 'search_web' && Array.isArray(changes.source_ids) && changes.source_ids.length > 0) return true;
   if (!SAVING.has(actionFor(s.action_key)?.performer ?? '')) return false;
   return Array.isArray(changes.version_ids) && changes.version_ids.length > 0;
 }

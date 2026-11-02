@@ -2703,3 +2703,13 @@ a 1,553-word outline twice towards 4,500 words, then stopped with "the last 2 st
 A firm range ("100–140 words", "under 300 words", "exactly 50 words") is measured as before. The
 cost is that an approximate range is never enforced: a section that lands well outside it is
 caught only by the evaluator or by the user.
+
+### L-142 — A web search that saved new sources is progress, not a loop (2026-11-02)
+
+Go's "going round in circles" guard stops a run when the same move is chosen three times in a
+row for one stage and they did not all save something. A web search that saved new sources to
+the project now counts as having saved something. Before, only a new version or written sections
+counted. On 2 Nov three searches on a Sources stage saved 1, 5 and 3 new sources, and Go stopped
+with "none of them saved anything". Three searches that found only what was already saved still
+stop the run. The cost is that a run of searches that each turn up something new is bounded only
+by the step window and by the planner choosing to draft, not by this guard.
