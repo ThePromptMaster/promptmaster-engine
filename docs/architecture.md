@@ -124,10 +124,12 @@ The full endpoint inventory is in [`api.md`](api.md).
   evaluate a stage's exit criteria, project state from the event log, list available
   transitions. `templates/*.v1.ts` are the authoring source for the system workflows
   (`book`, `research`, `single_output`, `exploration`, `assessment`, `quick`).
-- **The start (27 Oct, Sean 26 Oct).** `projects/new` leads with **Get an answer**: a project
-  pinned to `quick` (one prose stage, drafted as it opens), made without a setup screen. The
-  conversation, "I know what I want to do" and Choose yourself are under "Start with the full
-  workflow instead", which stays open once a user opens it (`pm.start.full.v1`). **Ask me
+- **The start (27 Oct, Sean 26 Oct; 4 Nov).** `projects/new` leads with **Get an answer**: a project
+  pinned to `quick` (one prose stage, drafted as it opens), made without a setup screen.
+  **Start the conversation** sits beside it (4 Nov). "I know what I want to do" and Choose
+  yourself are under **"Advanced ways to start"** — not plain "Advanced", which the Setup
+  Simple/Advanced switch already uses — and it stays open once a user opens it (`pm.start.full.v1`,
+  the key the earlier "Start with the full workflow instead" toggle used). **Ask me
   questions** (Sean, 31 Oct) is a button in the start conversation, not on the first screen:
   `FrontDoor` asks `guide-next-question` with the conversation so far as material, shows the
   question inline (`guide-question-card.tsx`), and sends each answer through `front-door` as the
@@ -694,6 +696,21 @@ halves are L-134 and L-140 (#451, #453); the rest is here (#452, #454, #455, #45
 | The deliverable checked before "objective met" | `POST /api/agent/check-deliverable` (`promptmaster/deliverable_check.py`); `lib/agent/deliverable-check.ts`; run by `judgeObjective` in `perform.ts`; issues go in as failed checks; at most `MAX_CHECK_ROUNDS` a run, then stated limitations; saved as `deliverable_check` in the `objective_assessed` payload (L-139) |
 | A conditional decision memo can be complete | `objective_assessment._ASSESS_INSTRUCTION` |
 | Approval is for use, not of every assumption | `saved_documents.DOCUMENTS_RULE`; the planner's "Earlier stages" line (`agent._format_state`) |
+
+### Notes to the user, the polish cap and repeated questions (2026-11-04)
+
+Sean's 4 Nov Lakeside proposal: Go removed the notes after section 7 six times, each revision
+added a new block addressed to him, and Go then asked him three times how to remove them while
+the run's cost rose from $1.81 to $2.61 (#479, #480; L-149, L-150).
+
+| Concern | Where it lives |
+|---|---|
+| The writer's note to the user | `promptmaster/reader_text.py`: `USER_NOTE_RULE` (in the prose stage instruction) tells the writer to put anything for the user after `USER_NOTE_MARKER`; `split_user_note` takes that off, or a labelled or note-shaped block at the very end, in `routers/stage.py`, and returns it as `note_to_user`. The browser's `lib/workflow/user-note.ts` (`splitUserNote`, `userNoteLine`) does the same for a continued draft and for export (`forReader`); both run `backend/tests/fixtures/user_notes.json` |
+| Where the note goes | `perform.ts` draft / revise / recheck / return: the step's output and the version's `change_summary` ("Kept out of the document, for you: …"); `use-stage-generation.ts` and `apply-findings.ts` keep it off the document too. `keptAndSupplied` reads the head without its note, and `isChangeNote` knows these lines, so the kept-lines guard never puts one back. `DELEGATED_ANSWER` asks for the choice in the note |
+| The polish cap, said | `policy.polishCapped`; when it has taken `revise_stage` away, `use-go-loop` passes `polishPaused` → `polish_paused` (`AgentState`), and `agent._format_state` says it is the run's limit, never an inability to edit |
+| Buttons are the user's | `agent._format_state` BUTTONS line; More-menu tools carry `does` (`stage-controls.ts` `MORE_DOES` → `AgentControl.does`), so "Refine: make it shorter" reads as a whole-draft rewrite |
+| A question asked once | `lib/agent/repeat-question.ts` (`repeatedQuestion`, `repeatPause`), called in `use-go-loop` before `auditStop` across the run chain; a repeat sets the run `blocked` with `stop.repeatQuestion` (all eight languages). Asking to approve a version Go changed since is exempt |
+| Decision facts | `answers.questionOf` drops Go's sentences about buttons and its own abilities |
 
 ## Extension points
 
