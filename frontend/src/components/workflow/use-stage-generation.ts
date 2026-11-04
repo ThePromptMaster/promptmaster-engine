@@ -37,7 +37,7 @@ import {
 } from '@/lib/errors/recovery';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import { stageDrafts } from '@/lib/workflow/stage-artifact';
-import { ManuscriptMissing, withFreshManuscript } from '@/lib/workflow/fresh-manuscript';
+import { InputMissing, assertCheckedInput, withFreshManuscript } from '@/lib/workflow/fresh-manuscript';
 import { manuscriptSourceFor } from '@/lib/workflow/context';
 import { generationContent, generationRequest } from '@/lib/workflow/stage-requests';
 import type { StageDefinition, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
@@ -151,7 +151,8 @@ export function useStageGeneration({
 
       try {
         // The chapters as saved, not this page's copy (10 Oct, email 6.2).
-        const fresh = manuscriptSourceFor(t, target) ? await withFreshManuscript(t, target, b, p.id) : b;
+        // …and a check is never written about work that has no saved text (4 Nov).
+        const fresh = manuscriptSourceFor(t, target) ? await withFreshManuscript(t, target, b, p.id) : (assertCheckedInput(t, target, b), b);
         const response = await api.generateStageArtifact(
           generationRequest(p, t, s, fresh, target, options?.force ? head : ''),
           controller.signal
@@ -196,7 +197,7 @@ export function useStageGeneration({
         });
       } catch (err) {
         if (controller.signal.aborted || (err as Error)?.name === 'AbortError') return;
-        if (err instanceof ManuscriptMissing) {
+        if (err instanceof InputMissing) {
           setFailure({ stageId: target.id, failure: localFailure('Nothing to read yet', err.message, preserved) });
           return;
         }

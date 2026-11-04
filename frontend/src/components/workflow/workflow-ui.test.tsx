@@ -395,6 +395,16 @@ describe('StageTransitionBar', () => {
     expect(screen.getByText(/outstanding/)).toBeInTheDocument();
   });
 
+  it('a stage with nothing saved is not "ready", though it may move on (4 Nov)', () => {
+    const evaluation = evaluateStage(BOOK_V1, stage.id, ctx({ fields: { objective: 'Write a book' } }));
+    const options = availableTransitions(BOOK_V1, projectState(BOOK_V1, []), evaluation);
+    const { rerender } = render(<StageTransitionBar stage={stage} evaluation={evaluation} options={options} onTransition={vi.fn()} nothingSaved />);
+    expect(screen.getAllByText(/Nothing is saved on this stage yet/).length).toBeGreaterThan(0);
+    expect(screen.queryByText('Ready to move on')).toBeNull();
+    rerender(<StageTransitionBar stage={stage} evaluation={evaluation} options={options} onTransition={vi.fn()} />);
+    expect(screen.getAllByText('Ready to move on').length).toBeGreaterThan(0);
+  });
+
   it('advances without ceremony once criteria are met', async () => {
     const { onTransition } = setup(ctx({ fields: { objective: 'Write a book' } }));
     await userEvent.click(screen.getByRole('button', { name: 'Advance' }));

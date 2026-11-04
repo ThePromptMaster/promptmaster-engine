@@ -71,3 +71,41 @@ describe('the chapters are found when the page has none (25 Oct, Sean: Continuit
     await expect(withFreshManuscript(BOOK_V1, after, {}, 'p1')).rejects.toBeInstanceOf(ManuscriptMissing);
   });
 });
+
+describe('a check is never written about work that has no saved text (4 Nov, Sean)', () => {
+  // "A downstream stage should receive the current artifact and report when a required input is missing."
+  const memo = {
+    ...BOOK_V1,
+    key: 'custom_memo',
+    stages: [
+      { ...BOOK_V1.stages[0], id: 'draft', label: 'Draft decision memo', renderer: 'prose' as const },
+      { ...BOOK_V1.stages.find((s) => s.renderer === 'review')!, id: 'check', label: 'Check memo against brief' },
+      { ...BOOK_V1.stages[0], id: 'final', label: 'Final decision memo', renderer: 'prose' as const },
+    ],
+  };
+  const version = (content: string) => ({ versions: [{ id: 'v1', content }] }) as unknown as StageArtifactBundle;
+
+  it('the check reads the nearest written stage before it', async () => {
+    const { checkedStageFor } = await import('./fresh-manuscript');
+    expect(checkedStageFor(memo, memo.stages[1])?.id).toBe('draft');
+    // A written stage is not a check, and Book's checks read the manuscript instead.
+    expect(checkedStageFor(memo, memo.stages[2])).toBeNull();
+    expect(checkedStageFor(BOOK_V1, BOOK_V1.stages[BOOK_V1.stages.indexOf(drafting) + 1])).toBeNull();
+  });
+
+  it('refuses, naming the stage it needs, while that stage is empty', async () => {
+    const { InputMissing } = await import('./fresh-manuscript');
+    await expect(withFreshManuscript(memo, memo.stages[1], {})).rejects.toBeInstanceOf(InputMissing);
+    await expect(withFreshManuscript(memo, memo.stages[1], { draft: version('  ') })).rejects.toThrow(
+      'There is nothing in Draft decision memo yet, so this check has nothing to read. Write Draft decision memo first.'
+    );
+    const ready = { draft: version('# Memo\nText.') };
+    await expect(withFreshManuscript(memo, memo.stages[1], ready)).resolves.toBe(ready);
+    expect(getArtifact).not.toHaveBeenCalled();
+  });
+
+  it('a missing manuscript is still a missing input', async () => {
+    const { InputMissing } = await import('./fresh-manuscript');
+    expect(new ManuscriptMissing('Drafting')).toBeInstanceOf(InputMissing);
+  });
+});

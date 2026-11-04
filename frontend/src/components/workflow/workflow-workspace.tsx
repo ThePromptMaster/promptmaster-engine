@@ -149,6 +149,7 @@ import { withApprovals } from '@/lib/workflow/approvals';
 import { isFailedEvaluation, lastCompletedCheck } from '@/lib/workflow/evaluation-failure';
 import { otherWorkFor } from '@/lib/agent/other-work';
 import { createClient as createBrowserClient } from '@/lib/supabase/client';
+import { changeOutcomes } from '@/lib/workflow/change-outcomes';
 
 interface Props {
   project: Project;
@@ -1267,6 +1268,21 @@ export function WorkflowWorkspace({
     const found = settledChange(events ?? [], state, Date.now());
     return found && found.event.created_at !== settledDismissed ? found : null;
   }, [events, state, settledDismissed]);
+  // What became of each stage the change reopened: its version, who made it, what its check found (4 Nov).
+  const settledOutcomes = useMemo(
+    () =>
+      settled
+        ? changeOutcomes(
+            settled.stageIds,
+            settled.event.created_at,
+            template.stages,
+            (id) => stageBundles[id]?.versions ?? [],
+            evaluations,
+            (id) => context.openRows?.[id]?.length ?? 0
+          )
+        : [],
+    [settled, template, stageBundles, evaluations, context]
+  );
 
   // A version the user saved themselves that states values the facts do not
   // (10 Oct, Sean: restoring the Wednesday draft left the facts on Thursday).
@@ -2623,6 +2639,7 @@ export function WorkflowWorkspace({
               updating={go.active}
               judging={judgingChange}
               settled={settled}
+              outcomes={settledOutcomes}
               onDismissSettled={() => settled && setSettledDismissed(settled.event.created_at)}
             />
             {factReconcile && factReconcile.stageId === stage.id && (
@@ -2972,6 +2989,7 @@ export function WorkflowWorkspace({
               <StageTransitionBar
                 stage={stage}
                 evaluation={evaluation}
+                nothingSaved={!(headVersion?.content ?? '').trim()}
                 options={transitions}
                 onTransition={(option, note) => {
                   // PM-14: finishing shows what is being finished, first.

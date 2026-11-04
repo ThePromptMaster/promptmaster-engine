@@ -99,6 +99,7 @@ export const zh: Record<keyof typeof en, string> = {
   'tb.objectiveNotMet': '目标尚未达成',
   'tb.doneElsewhere': '本阶段已完成 · 其他地方仍有 {count} 项未完成：{items}',
   'tb.ready': '可以继续',
+  'tb.nothingSaved': '此阶段尚未保存任何内容。你仍可继续；它将保持为空。',
   'tb.outstanding_one': '{count} 项未完成',
   'tb.outstanding_other': '{count} 项未完成',
   'tb.thinking': '思考中…',

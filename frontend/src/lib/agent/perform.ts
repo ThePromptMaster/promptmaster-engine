@@ -54,7 +54,7 @@ import { describeBasis, executableNext, openWithNextLine, pausedLine, stillMet, 
 import { addedByRun, designAddedStage, MAX_ADDED_PER_RUN, type AddedStage } from '@/lib/workflow/added-stages';
 import { attachedDocuments, currentFacts, supersededFactValues } from '@/lib/workflow/facts';
 import { acceptedRowsBefore, checkedVersion, describeCheck, issuesFrom, MAX_CHECK_ROUNDS, roundsUsed, type DeliverableCheckRecord } from './deliverable-check';
-import { ManuscriptMissing, withFreshManuscript } from '@/lib/workflow/fresh-manuscript';
+import { InputMissing, ManuscriptMissing, checkedStageFor, withFreshManuscript } from '@/lib/workflow/fresh-manuscript';
 import { useProjectStore } from '@/stores/project-store';
 import { describeValue, leftoverMentions, leftoverValues, namedLeftovers, type SupersededValue } from '@/lib/workflow/fact-values';
 import { revertsUserVersion, USER_CHOSEN_OPERATIONS } from '@/lib/workflow/fact-reconcile';
@@ -284,15 +284,17 @@ async function readManuscript(ctx: PerformContext, target: StageDefinition): Pro
   try {
     return await withFreshManuscript(ctx.template, target, ctx.bundles, ctx.project.id);
   } catch (e) {
-    if (e instanceof ManuscriptMissing) return null;
+    if (e instanceof InputMissing) return null;
     throw e;
   }
 }
 
-/** A stage that reads the chapters is not written without them, and says so. */
-function manuscriptMissing(key: string, target: StageDefinition): StepOutcome {
-  const source = 'the drafting stage';
-  const reason = `${target.label} reads the manuscript, and no chapter in ${source} has saved text yet. Nothing was written, so nothing claims to have reviewed a draft it was not given.`;
+/** A stage that reads the chapters, or a check whose work is unwritten, is not written without them, and says so. */
+function manuscriptMissing(key: string, target: StageDefinition, template?: WorkflowTemplate): StepOutcome {
+  const checked = template ? checkedStageFor(template, target) : null;
+  const reason = checked
+    ? `${target.label} checks ${checked.label}, which has no saved text yet. Nothing was written, so no check claims to have read work it was not given. ${checked.label} comes first.`
+    : `${target.label} reads the manuscript, and no chapter in the drafting stage has saved text yet. Nothing was written, so nothing claims to have reviewed a draft it was not given.`;
   return done(key, {
     status: 'blocked', blockKind: 'data_missing', toolsUsed: [], changes: {},
     output: reason, stop: { status: 'blocked', reason },
@@ -796,7 +798,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // model: "revise" was "regenerate with the old draft as context" (B0).
       // The chapters as saved, not the page's copy of them (10 Oct, email 6.2).
       const fresh = await readManuscript(ctx, ctx.stage);
-      if (!fresh) return manuscriptMissing(key, ctx.stage);
+      if (!fresh) return manuscriptMissing(key, ctx.stage, ctx.template);
       const res = await api.generateStageArtifact(
         generationRequest(ctx.project, ctx.template, ctx.state, fresh, ctx.stage, revising ? head : '', revising ? withDerivation(routineKept?.instruction ?? withAnswer(instruction, ctx.conflictAnswer), ctx.derived) : ''),
         ctx.signal

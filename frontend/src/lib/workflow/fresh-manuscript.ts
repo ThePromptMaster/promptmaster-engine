@@ -15,12 +15,40 @@ import type { Artifact } from '@/types/project';
 import type { StageDefinition, WorkflowTemplate } from '@/lib/workflow/types';
 
 import { manuscriptSourceFor } from './context';
+import { effectiveRenderer } from './stage-artifact';
 import type { StageArtifactBundle } from './digest';
 
-export class ManuscriptMissing extends Error {
-  constructor(readonly holderLabel: string) {
-    super(`There is no drafted text in ${holderLabel} yet, so this stage has nothing to read. Draft the chapters there first.`);
+/** A stage asked to read work that has no saved text yet: nothing is written about nothing (4 Nov). */
+export class InputMissing extends Error {
+  constructor(readonly holderLabel: string, message?: string) {
+    super(message ?? `There is nothing in ${holderLabel} yet, so this check has nothing to read. Write ${holderLabel} first.`);
+    this.name = 'InputMissing';
+  }
+}
+
+export class ManuscriptMissing extends InputMissing {
+  constructor(holderLabel: string) {
+    super(holderLabel, `There is no drafted text in ${holderLabel} yet, so this stage has nothing to read. Draft the chapters there first.`);
     this.name = 'ManuscriptMissing';
+  }
+}
+
+/**
+ * The written stage a check reads, when the manuscript is not what it reads:
+ * the nearest written stage before it (4 Nov, Sean: "A downstream stage should
+ * receive the current artifact and report when a required input is missing").
+ */
+export function checkedStageFor(template: WorkflowTemplate, target: StageDefinition): StageDefinition | null {
+  if (effectiveRenderer(target) !== 'review' || manuscriptSourceFor(template, target)) return null;
+  const at = template.stages.findIndex((s) => s.id === target.id);
+  return [...template.stages.slice(0, Math.max(0, at))].reverse().find((s) => s.renderer === 'prose' || s.renderer === 'long_form') ?? null;
+}
+
+/** Throws `InputMissing` when the stage a check reads has no saved text. */
+export function assertCheckedInput(template: WorkflowTemplate, target: StageDefinition, bundles: Record<string, StageArtifactBundle>): void {
+  const source = checkedStageFor(template, target);
+  if (source && source.renderer === 'prose' && !(bundles[source.id]?.versions.at(-1)?.content ?? '').trim()) {
+    throw new InputMissing(source.label);
   }
 }
 
@@ -44,7 +72,10 @@ export async function withFreshManuscript(
   projectId?: string
 ): Promise<Record<string, StageArtifactBundle>> {
   const source = manuscriptSourceFor(template, target);
-  if (!source) return bundles;
+  if (!source) {
+    assertCheckedInput(template, target, bundles);
+    return bundles;
+  }
   const holder = bundles[source.id]?.artifact ?? null;
   let fresh: Artifact | null = null;
   try {

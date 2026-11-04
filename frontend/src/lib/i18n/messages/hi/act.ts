@@ -99,6 +99,7 @@ export const hi: Record<keyof typeof en, string> = {
   "tb.objectiveNotMet": "उद्देश्य पूरा नहीं हुआ है",
   "tb.doneElsewhere": "यह चरण पूरा है · {count} अभी भी कहीं और खुले हैं: {items}",
   "tb.ready": "आगे बढ़ने के लिए तैयार",
+  "tb.nothingSaved": "इस चरण में अभी कुछ भी सहेजा नहीं गया है। आप फिर भी आगे बढ़ सकते हैं; यह खाली रहेगा।",
   "tb.outstanding_one": "{count} चीज़ बाकी है",
   "tb.outstanding_other": "{count} चीज़ें बाकी हैं",
   "tb.thinking": "सोच रहा है…",
