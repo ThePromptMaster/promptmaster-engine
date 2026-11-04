@@ -1,0 +1,58 @@
+Create a decision memo for choosing a customer-support software plan.
+
+Use only the supplied facts. Do not invent product features, savings, implementation dates or approvals.
+
+SUPPLIED FACTS
+
+Our company has 12 support agents.
+
+Available cash is $18,000. At least $12,000 must remain unspent at every point. Do not assume future revenue or savings can fund this project.
+
+Option A:
+- $800 one-time setup fee.
+- $25 per agent per month.
+- Monthly billing with no annual commitment.
+- All 12 agents need seats.
+
+Option B:
+- $500 one-time setup fee.
+- $20 per agent per month.
+- All 12 agents need seats.
+- The first 12 months must be paid upfront.
+- The annual subscription payment is nonrefundable.
+
+Option C:
+- Keep the current system while collecting evidence.
+- Its existing costs are outside this comparison.
+- Evidence-collection costs are unknown.
+
+There are reports of slow responses, but no measured response times or evidence that either new tool would improve them.
+
+Compatibility with our existing systems is unconfirmed for both A and B.
+
+No purchase, vendor contact or spending is authorized.
+
+DELIVERABLE
+
+Produce a complete decision memo under 500 words, including headings and tables.
+
+Include:
+1. A comparison of A, B and C.
+2. For A and B, subscription cost per month, initial cash required, cash remaining immediately afterward, and total cost over the first 12 months including setup.
+3. Whether each option preserves the reserve initially and through the first 12 months, assuming no replenishment of cash.
+4. A conditional recommendation, distinguishing affordability from evidence of usefulness.
+5. Missing information and practical next steps, with owners marked “to confirm.”
+
+For A, initial cash required includes setup and the first month. Its first-year total includes exactly 12 monthly payments, not 13.
+
+For B, distinguish the monthly equivalent from the actual upfront payment.
+
+Do not treat C’s unknown evidence-collection cost as zero.
+
+Separate supplied facts, calculations and assumptions. Keep explanations about internal workflow outside the memo.
+
+Complete the memo using the information available. Compatibility checks, demand for evidence, vendor contact and purchase approvals should appear as future conditions or next steps. Their absence must not prevent completion of this planning document.
+
+Handle routine drafting, arithmetic, checking and corrections without asking me to decide each one. You may ask me to approve the finished document.
+
+This authorizes creating and revising the document only.

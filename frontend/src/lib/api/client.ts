@@ -451,6 +451,13 @@ export const api = {
    * something (18 Oct, Summit). One small call; records nothing; a failed
    * check reports nothing.
    */
+  async claimSupport(
+    req: { stage_label: string; text: string; supplied: string; model?: string },
+    signal?: AbortSignal
+  ): Promise<{ claims: { quote: string; supplied: string; why: string }[] }> {
+    return apiFetch('/api/claim-support', { method: 'POST', body: JSON.stringify(req), signal });
+  },
+
   async dependentClaims(
     req: { stage_label: string; text: string; changed: { statement: string; replaces?: string }[]; facts?: string[]; model?: string },
     signal?: AbortSignal
