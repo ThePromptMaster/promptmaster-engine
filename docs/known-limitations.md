@@ -2421,7 +2421,9 @@ looks as it did. The timeline's dot still shows the button colour only.
 
 ### L-123 — A quick answer moves into the full process once, and a manuscript does not take it as a version (2026-10-27)
 
-The start screen leads with **Get an answer** (Sean, 26 Oct): a project on the one-stage
+The start screen leads with **Get an answer** (Sean, 26 Oct), with **Start the conversation**
+beside it since 4 Nov ("I know what I want to do" and Choose yourself are under "Advanced ways to
+start"): a project on the one-stage
 `quick` workflow, drafted as it opens. **Take this into the full PromptMaster process** re-pins
 the same project (`workflow_switched`, `20261122000000_workflow_switched_event.sql`) to a
 workflow designed for the work or the standard one the setup picks. The projection reads only
@@ -2842,3 +2844,52 @@ the matcher works as before.
 The cost: a replacing sentence that shares no word with the fact ("raise the reserve from $400 to
 $800" for "At least $400 must remain unspent") falls back to the old matcher. The user still sees
 every offered change, ticked, and can untick a wrong one before applying.
+
+### L-149 — A note to the user is taken off the end of the work, by marker or by its label (2026-11-04)
+
+Shipped in #479.
+
+On 4 Nov (Sean, Lakeside proposal) every revision Go saved of the final proposal ended with a
+block addressed to him — "Notes for you, outside the proposal:", "*Reply to you, not part of the
+document:*" — restating what approval covers, that figures were worked by hand and that no
+further pass was needed. The prompts ask for those things "in a reply", and the stage writer's
+only output was the document. Go removed a block six times and a new one came each time.
+
+The prose stage writer now puts anything for the user after `=== NOTE FOR THE USER ===`; the
+router takes it off and returns it as `note_to_user`, which Go shows in its step and records on
+the version. For a model that ignores the marker, only a block at the very end is taken off:
+one whose first line is labelled as addressed to the user ("Notes for you", "Reply to you",
+"Notes on this version"), or labelled "Outside the proposal" / "Not part of the document" /
+"Status of the results" with at least one thing a note says in it, or an unlabelled block after
+a closing rule that says two of them ("does not authorise", "by hand", "no further drafting
+pass", "word count", "unless you change a fact", "accepted findings"). Exports drop the same
+block from versions saved before this.
+
+The cost: a note written in the middle of the work, or at the end without a label or those
+phrases, stays in; and a document whose own last section is labelled "Notes for you" loses it to
+the note. Chapters (long-form sections) are not split. Both splitters run the same fixtures:
+the ten endings saved on prod and seven endings that are not notes.
+
+### L-150 — A question Go already asked and was answered is not asked again (2026-11-04)
+
+Shipped in #480.
+
+On 4 Nov (Sean, Lakeside proposal) Go asked three times how the notes after section 7 should
+come out, each time after an answer, while the run's cost rose from $1.81 to $2.61. Each
+question ended the run and Resume started a fresh window, so the no-change and no-progress
+stops never compared them. The polish cap had also taken revising away after two moves without
+telling the planner, which then told Sean "I cannot make that edit from here".
+
+Now the planner is told when the cap has paused revising (`polish_paused`), the page's buttons
+are described as the user's with what each does, and a question is not asked again when Go
+already asked it on the stage, the user answered, and nothing the user did has changed the
+stage since (no version of their own, no fact they added). The run pauses once, saying what was
+asked, what was answered, how many moves since and what is still open. A question counts as the
+same when it shares at least 30% of the shorter question's content words or names the same
+button. Asking to approve the current version is exempt when Go has saved a newer version since
+the earlier ask.
+
+The cost: the comparison is on words, so a reworded repeat can pass and two different questions
+naming the same button can be taken as one. The planner still makes one call before the guard
+fires on a Resume with nothing changed.
+
