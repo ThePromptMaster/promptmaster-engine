@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { meaningOf, openBriefChange, presentationOnly, settledChange } from './brief-change';
+import { answeredOnStages, meaningOf, openBriefChange, presentationOnly, settledChange } from './brief-change';
+import { factsText } from './facts';
+import type { ProjectFact } from '@/types/project';
 import { laterDoneStages, projectState } from './engine';
 import { BOOK_V1 } from './templates/book.v1';
 import type { WorkflowEvent } from './types';
@@ -158,5 +160,35 @@ describe('"Updated and checked", the last step (Sean, 14 Oct, SUMMIT)', () => {
   it('is not reached when the user kept the work as it was', () => {
     const kept = [...done, fact, ev('brief_change_dismissed', 'positioning', '2026-10-14T09:01:00Z', { payload: { change_at: fact.created_at } })];
     expect(settledChange(kept, projectState(BOOK_V1, kept), now)).toBeNull();
+  });
+});
+
+describe('an answer given to Go is left to Go on the stage it was asked from (4 Nov)', () => {
+  const fact = (id: string, statement: string, source_ref: Record<string, unknown>, extra: Partial<ProjectFact> = {}): ProjectFact => ({
+    id, project_id: 'p', user_id: 'u', statement, subject: null, kind: 'fact', source_kind: 'user_edit', source_ref,
+    accepted_by: 'user', agent_run_id: null, supersedes: null, retired_at: null, retired_reason: null, created_at: '2026-11-04T14:02:34Z', ...extra,
+  });
+  const brief = fact('f1', 'The participant count is 24, replacing 18.', {}, { kind: 'requirement' });
+  // The production fact, as answerAsFact recorded it.
+  const answer = fact('f2', 'Decided by the user — asked "Do you approve this current version as the finished proposal?", answered: Make it shorter to leave room under 650 words', {
+    via: 'go answer', run_id: 'r1', step_id: 's7', stage_id: 'final_proposal',
+  });
+
+  it('names the stage of an answer that is all the change added', () => {
+    expect([...answeredOnStages(factsText([brief]), [brief, answer])!]).toEqual(['final_proposal']);
+  });
+
+  it('judges everywhere when the user added a fact of their own too, or nothing was added', () => {
+    const own = fact('f3', 'The budget is $1,500.', { via: 'facts panel' });
+    expect(answeredOnStages(factsText([brief]), [brief, answer, own])).toBeNull();
+    expect(answeredOnStages(factsText([brief]), [brief, own])).toBeNull();
+    expect(answeredOnStages(factsText([brief, answer]), [brief, answer])).toBeNull();
+    // Retiring a fact is not an answer either.
+    expect(answeredOnStages(factsText([brief, answer]), [{ ...brief, retired_at: '2026-11-04T15:00:00Z' }, answer])).toBeNull();
+  });
+
+  it('an answer recorded without its stage is judged everywhere', () => {
+    const loose = fact('f4', 'Decided by the user — answered: yes', { via: 'go answer', run_id: 'r1' });
+    expect(answeredOnStages(factsText([brief]), [brief, loose])).toBeNull();
   });
 });

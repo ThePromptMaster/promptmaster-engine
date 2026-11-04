@@ -11,6 +11,8 @@
 
 import { isDone, type StageDefinition, type WorkflowEvent, type WorkflowState, type WorkflowTemplate } from './types';
 import { summariseStageContent, type StageArtifactBundle } from './digest';
+import { currentFacts, factLine } from './facts';
+import type { ProjectFact } from '@/types/project';
 
 export const BRIEF_FIELDS = ['objective', 'audience', 'constraints', 'output_format', 'context'] as const;
 export type BriefField = (typeof BRIEF_FIELDS)[number];
@@ -181,4 +183,30 @@ export function settledChange(
     return settled ? { event: e, stageIds } : null;
   }
   return null;
+}
+
+/**
+ * The stages a facts change was answered on in Go, when every fact it added is
+ * an answer given to Go there (`source_ref.via === 'go answer'`); otherwise
+ * null, and the change is judged everywhere as before.
+ *
+ * Go's run acts on an answer on the stage it asked from: it reads the answer as
+ * its latest step and revises there. Judged as a brief change too, the answer
+ * reopened that stage a second time — 4 Nov, production (Lakeside copy):
+ * "Make it shorter to leave room under 650 words" was revised into v6, then the
+ * change check marked Final proposal for a recheck for the same answer, and Go
+ * revised it again into v7 ($0.17). Earlier stages the answer touches are
+ * still judged; only the stage it was given on is left to Go.
+ */
+export function answeredOnStages(before: string, facts: readonly ProjectFact[] | undefined): Set<string> | null {
+  const had = new Set(before.split('\n'));
+  const added = currentFacts(facts).filter((f) => !had.has(factLine(f)));
+  if (!added.length) return null;
+  const stages = new Set<string>();
+  for (const f of added) {
+    const ref = f.source_ref ?? {};
+    if (ref.via !== 'go answer' || typeof ref.stage_id !== 'string' || !ref.stage_id) return null;
+    stages.add(ref.stage_id);
+  }
+  return stages;
 }

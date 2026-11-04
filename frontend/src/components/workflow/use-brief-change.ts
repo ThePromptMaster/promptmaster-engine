@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { api } from '@/lib/api/client';
-import { BRIEF_FIELDS, finishedConclusions, presentationOnly, type WatchedField } from '@/lib/workflow/brief-change';
+import { BRIEF_FIELDS, answeredOnStages, finishedConclusions, presentationOnly, type WatchedField } from '@/lib/workflow/brief-change';
 import { factsText } from '@/lib/workflow/facts';
 import { stagesUsingFacts, statementsOf } from '@/lib/workflow/fact-dependencies';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
@@ -94,7 +94,10 @@ export function useBriefChange({
             await append({ type: 'brief_changed', stage_id: at, payload: { field, kind: 'wording', presentation_only: true, affected: [], ...texts } });
             continue;
           }
-          const stages = finishedConclusions(t, s, b, since);
+          // An answer given to Go is acted on by Go on the stage it was asked
+          // from; only the other finished stages are judged (4 Nov).
+          const answeredOn = field === 'facts' ? answeredOnStages(before, p.facts) : null;
+          const stages = finishedConclusions(t, s, b, since).filter((st) => !answeredOn?.has(st.stage_id));
           // A fact changed or taken out (L-52): what used the old value is in
           // the text. Only those stages reopen, each with the sentence; the
           // change is recorded even when nothing is finished yet.

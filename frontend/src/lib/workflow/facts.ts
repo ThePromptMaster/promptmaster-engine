@@ -136,9 +136,12 @@ function namedReplaced(statement: string): string | undefined {
  * retired is a change to the brief like an edit of its context (C1).
  */
 export function factsText(facts: readonly ProjectFact[] | undefined): string {
-  return currentFacts(facts)
-    .map((f) => `- ${f.kind === 'requirement' ? 'Requirement: ' : ''}${f.subject ? `${f.subject}: ` : ''}${f.statement}`)
-    .join('\n');
+  return currentFacts(facts).map(factLine).join('\n');
+}
+
+/** One fact's line in `factsText`. */
+export function factLine(f: ProjectFact): string {
+  return `- ${f.kind === 'requirement' ? 'Requirement: ' : ''}${f.subject ? `${f.subject}: ` : ''}${f.statement}`;
 }
 
 /** Superseded and retired facts, newest first: the history. */
