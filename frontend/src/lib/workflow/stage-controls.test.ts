@@ -66,3 +66,11 @@ describe('the buttons on a stage\'s page (2 Oct, item 10)', () => {
     expect(findControl(stageControls({ more: [], options: [] }), 'Add a chapter or section')).toBeNull();
   });
 });
+
+describe('a More-menu tool says what it does (4 Nov, Lakeside)', () => {
+  it('"Refine: make it shorter" rewrites the whole draft; it does not remove one passage', () => {
+    const controls = stageControls({ primary: null, more: [{ id: 'refine_shorter', label: 'Refine: make it shorter' }, { id: 'mark-complete', label: 'Mark complete' }], options: [] });
+    expect(controls.find((c) => c.id === 'refine_shorter')?.does).toMatch(/rewrites the whole draft shorter.*does not remove one named passage/);
+    expect(controls.find((c) => c.id === 'mark-complete')?.does).toBeUndefined();
+  });
+});

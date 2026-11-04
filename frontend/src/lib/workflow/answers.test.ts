@@ -62,3 +62,21 @@ describe('what code measured is a document an answer is read against (L-65, 9 Oc
     expect(measuredDocument(SINGLE_OUTPUT_V1, {})).toEqual([]);
   });
 });
+
+describe('Go’s words about itself are not recorded with the answer (4 Nov, Lakeside)', () => {
+  const asked =
+    'The proposal still ends with four internal notes that must come out of the document, and it may be slightly over 650 words. Should I remove the notes and trim the wording to fit the limit, keeping every figure, table and section unchanged? There is no button that starts this edit from my side. Pressing "Refine: make it shorter" under "More" at the bottom of the stage would do it.';
+
+  it('keeps the question about the work and drops the button talk', () => {
+    expect(questionOf(asked)).toBe(
+      'The proposal still ends with four internal notes that must come out of the document, and it may be slightly over 650 words. Should I remove the notes and trim the wording to fit the limit, keeping every figure, table and section unchanged?'
+    );
+    const fact = answerAsFact(asked, 'Remove the notes and trim to 650 words, keeping all figures', { run_id: 'r', stage_id: 'final_proposal' })!;
+    expect(fact.statement).not.toMatch(/button|from my side|Pressing/);
+  });
+
+  it('leaves a question with nothing about itself as it was', () => {
+    const plain = 'Which price should the announcement use: $18 or $24 per user per month?';
+    expect(questionOf(plain)).toBe(plain);
+  });
+});

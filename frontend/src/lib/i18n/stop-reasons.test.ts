@@ -12,6 +12,7 @@ const SOURCES = [
   'src/components/workflow/use-go-loop.ts',
   'src/lib/agent/policy.ts',
   'src/lib/agent/round-close.ts',
+  'src/lib/agent/repeat-question.ts',
   'src/lib/agent/needs.ts',
   'src/lib/workflow/objective.ts',
   'src/components/workflow/workflow-workspace.tsx',

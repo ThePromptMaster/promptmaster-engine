@@ -23,7 +23,26 @@ export interface StageControl {
   /** The words on the button, exactly. */
   label: string;
   place: ControlPlace;
+  /**
+   * What pressing it does to the work, for the planner (4 Nov, Sean,
+   * Lakeside: Go sent him to "Refine: make it shorter" to delete one block
+   * of notes — a button that rewrites the whole draft shorter).
+   */
+  does?: string;
 }
+
+/** What each More-menu tool does to the work. In English: it is read by the planner, not shown. */
+const MORE_DOES: Record<string, string> = {
+  drift_alert: 'rewrites the whole draft back toward the objective, as a new version',
+  refine_shorter: 'rewrites the whole draft shorter, as a new version; it may reword any part, and it does not remove one named passage',
+  refine_concrete: 'rewrites the whole draft more concretely, as a new version',
+  refine_technical: 'rewrites the whole draft more technically, as a new version',
+  refine_cautious: 'rewrites the whole draft more cautiously, as a new version',
+  refine_angle: 'rewrites the whole draft from a different angle, as a new version',
+  challenge: 'writes the case against the draft beside it; changes nothing in it',
+  reframe: 'writes another way to see the draft beside it; changes nothing in it',
+  self_audit: 'writes a critical self-audit beside the draft; changes nothing in it',
+};
 
 /** Where a control is, in words for the user. */
 /**
@@ -161,7 +180,7 @@ export function stageControls(input: {
     controls.push({ id: `primary-${input.primary.kind}`, label: input.primary.label, place: 'stage_bar' });
   }
   for (const m of input.more) {
-    if (!m.disabled) controls.push({ id: m.id, label: m.label, place: 'more_menu' });
+    if (!m.disabled) controls.push({ id: m.id, label: m.label, place: 'more_menu', ...(MORE_DOES[m.id] ? { does: MORE_DOES[m.id] } : {}) });
   }
   for (const t of transitionEntries(input)) controls.push({ id: t.id, label: t.label, place: 'more_menu' });
   for (const c of input.openApprovals ?? []) controls.push({ id: `tick-${c.id}`, label: c.label, place: 'checklist' });

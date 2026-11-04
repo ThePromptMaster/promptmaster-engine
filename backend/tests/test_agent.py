@@ -353,7 +353,7 @@ def test_the_planner_is_given_the_page_s_buttons_and_may_name_only_those():
     assert "You may name a button ONLY if it is in that list, in exactly those words" in system
     assert 'never write "if your interface has"' in system
     assert "there is no button for this on this stage" in system
-    assert "BUTTONS ON THIS PAGE NOW (the user presses these; you cannot" in user
+    assert "BUTTONS ON THIS PAGE NOW — the user's buttons, not your moves." in user
     assert '- "Run revision on every section" — the main button at the bottom of the stage' in user
 
     # A page that is not known, and a page with no buttons, both forbid naming one.
@@ -820,3 +820,32 @@ def test_a_script_that_stops_on_its_time_budget_exits_cleanly_with_what_it_finis
     system, _ = build_write_code_prompt(INPUTS, STATE, "enumerate batches 10-53", "computation")
     assert "stops early on its own time budget has a partial result, not a failure" in system
     assert "exit normally (code 0)" in system
+
+
+def test_buttons_are_the_user_s_and_say_what_they_do():
+    """4 Nov (Sean, Lakeside): "the user presses these; you cannot" read as "you
+    cannot edit", and Go sent him to a button that rewrites the whole draft
+    shorter to delete one block of notes it could remove itself."""
+    from promptmaster.agent import AgentControl
+
+    state = STATE.model_copy(update={"controls": [
+        AgentControl(
+            label="Refine: make it shorter", where='under "More" at the bottom of the stage',
+            does="rewrites the whole draft shorter, as a new version; it may reword any part, and it does not remove one named passage",
+        ),
+    ]})
+    _, user = build_next_action_prompt(INPUTS, state, RESEARCH, "guided")
+    assert "the user presses these; you cannot" not in user
+    assert "when one of them makes the change, make it yourself" in user
+    assert "never say you cannot edit the work while revise_stage is listed" in user
+    assert '- "Refine: make it shorter" — under "More" at the bottom of the stage; rewrites the whole draft shorter' in user
+    assert "it does not remove one named passage" in user
+
+
+def test_a_paused_revise_is_said_not_silently_withheld():
+    _, quiet = build_next_action_prompt(INPUTS, STATE, RESEARCH, "guided")
+    assert "REVISING IS PAUSED" not in quiet
+    _, user = build_next_action_prompt(INPUTS, STATE.model_copy(update={"polish_paused": 2}), RESEARCH, "guided")
+    assert "REVISING IS PAUSED ON THIS STAGE FOR THE REST OF THIS RUN: 2 checks, applied findings or revisions" in user
+    assert "never tell the user you cannot edit the work" in user
+    assert "ask whether you should try again" in user

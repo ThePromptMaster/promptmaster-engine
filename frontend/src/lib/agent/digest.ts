@@ -91,7 +91,13 @@ export interface AgentStateDigest {
    * the page is not known (another stage is on show): the planner is then
    * told it may not name a button at all.
    */
-  controls?: { label: string; where: string }[];
+  controls?: { label: string; where: string; does?: string }[];
+  /**
+   * Polishing moves on this stage since the user's last direction, when the
+   * cap has taken Revise away for the rest of the run (4 Nov, Sean, Lakeside:
+   * the move vanished unexplained and Go told him it "cannot make that edit").
+   */
+  polish_paused?: number;
   /** The earlier stages Go may go back to from here (Q2), when it may. */
   return_targets?: { id: string; label: string }[];
   /**
@@ -177,6 +183,8 @@ export function buildAgentState(input: {
   controls?: readonly StageControl[];
   /** Stages Go may go back to from this one, when return_to_stage is offered (Q2). */
   returnTargets?: readonly { id: string; label: string }[];
+  /** Polishing moves since the user's last direction, when the cap has taken Revise away. */
+  polishPaused?: number;
 }): AgentStateDigest {
   const { template, state, stage, bundles, stageEvaluation, latestEvaluation, steps, context, approvedOutline = [], facts } = input;
   const pendingJobs = facts?.manuscript?.pendingJobs.length ?? input.pendingJobs ?? 0;
@@ -365,7 +373,8 @@ export function buildAgentState(input: {
     ...(elsewhere.length ? { open_findings_elsewhere: elsewhere } : {}),
     ...(input.memory?.length ? { memory: input.memory } : {}),
     ...(dataFiles.length ? { data_files: dataFiles } : {}),
-    ...(input.controls ? { controls: input.controls.slice(0, CONTROLS_MAX).map((c) => ({ label: c.label, where: PLACE_WORDS[c.place] })) } : {}),
+    ...(input.controls ? { controls: input.controls.slice(0, CONTROLS_MAX).map((c) => ({ label: c.label, where: PLACE_WORDS[c.place], ...(c.does ? { does: c.does } : {}) })) } : {}),
+    ...(input.polishPaused ? { polish_paused: input.polishPaused } : {}),
     ...(input.returnTargets?.length ? { return_targets: input.returnTargets.map((t) => ({ id: t.id, label: t.label })) } : {}),
     workflow: describeWorkflow(template),
     tools,
