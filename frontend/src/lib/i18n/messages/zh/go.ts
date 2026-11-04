@@ -121,6 +121,7 @@ export const zh: Record<keyof typeof en, string> = {
   'nyc.decideThere': '请在那里逐项定夺。它们都定夺后我会察觉；然后按“继续”。',
   'nyc.orYourself': '或者自己在阶段中完成。我会察觉到，“继续”按钮会出现在这里。',
   'nyc.carryOn': '先处理其他工作',
+  'nyc.nothingElse': '在此事决定之前，其他工作无法推进。',
   'nyc.thenResume': '然后按“继续”。',
   'gt.label': 'Go 可以做什么',
   'gt.auto': 'Go 会推进各阶段，需要你时就停下。完成项目始终需要你亲自点击。',

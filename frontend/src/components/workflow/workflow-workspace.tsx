@@ -147,6 +147,7 @@ import { freshOrPage } from '@/lib/workflow/fresh-manuscript';
 import { addedSignature, designAddedStage, effectiveTemplate } from '@/lib/workflow/added-stages';
 import { withApprovals } from '@/lib/workflow/approvals';
 import { isFailedEvaluation } from '@/lib/workflow/evaluation-failure';
+import { otherWorkFor } from '@/lib/agent/other-work';
 
 interface Props {
   project: Project;
@@ -2513,6 +2514,7 @@ export function WorkflowWorkspace({
               stageModes={{ value: project.stage_modes ?? 'stage', onChange: (v) => onPatchProject({ stage_modes: v }) }}
               latestChange={goLatestChange}
               onApplyAnyway={applyAnyway}
+              otherWork={(id) => otherWorkFor(outstanding, id)}
             />
           )}
           <div ref={finishedRef} className="scroll-mt-20" />

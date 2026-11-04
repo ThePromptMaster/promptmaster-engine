@@ -16,6 +16,7 @@ export function NeedsYouCard({
   onAction,
   context,
   onCarryOn,
+  nothingElse,
 }: {
   need: NeedsUser;
   /**
@@ -25,6 +26,8 @@ export function NeedsYouCard({
    * — at no cost — only if nothing can.
    */
   onCarryOn?: () => void;
+  /** An approval stop with nothing else Go can do meanwhile: said, instead of a button that comes straight back (4 Nov). */
+  nothingElse?: boolean;
   stageLabel: (stageId: string) => string;
   /** Clear the need and resume. Rejects with a message the card shows. A stuck stage says which of its options was chosen. */
   onAction: (option?: StuckOption) => Promise<void>;
@@ -82,7 +85,7 @@ export function NeedsYouCard({
                 ? t('nyc.decideThere')
                 : t('nyc.orYourself')}
           </span>
-          {onCarryOn && (
+          {onCarryOn ? (
             <button
               onClick={onCarryOn}
               disabled={busy}
@@ -90,7 +93,9 @@ export function NeedsYouCard({
             >
               {t('nyc.carryOn')}
             </button>
-          )}
+          ) : nothingElse ? (
+            <span data-nothing-else className="basis-full text-label text-[var(--on-surface-variant)]">{t('nyc.nothingElse')}</span>
+          ) : null}
         </div>
       ) : (
         <p className="mt-2 text-label text-[var(--on-surface-variant)]">{t('nyc.thenResume')}</p>
