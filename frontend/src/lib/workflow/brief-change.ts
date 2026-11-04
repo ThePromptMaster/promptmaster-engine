@@ -195,8 +195,12 @@ export function settledChange(
  * reopened that stage a second time — 4 Nov, production (Lakeside copy):
  * "Make it shorter to leave room under 650 words" was revised into v6, then the
  * change check marked Final proposal for a recheck for the same answer, and Go
- * revised it again into v7 ($0.17). Earlier stages the answer touches are
- * still judged; only the stage it was given on is left to Go.
+ * revised it again into v7 ($0.17). The answer is still judged against every
+ * finished stage, and only the stage it was given on is then left to Go
+ * (`leftToGo`). Leaving that stage out of the judgment instead (#483) made the
+ * judge name the stages before it: "make Section 7 a single sentence" reopened
+ * Draft proposal and Check, whose repairs reopened Final proposal anyway
+ * (16:36, $0.64).
  */
 export function answeredOnStages(before: string, facts: readonly ProjectFact[] | undefined): Set<string> | null {
   const had = new Set(before.split('\n'));
@@ -209,4 +213,13 @@ export function answeredOnStages(before: string, facts: readonly ProjectFact[] |
     stages.add(ref.stage_id);
   }
   return stages;
+}
+
+/** The judged stages without those an answer was given on (`answeredOnStages`), and which those were. */
+export function leftToGo<A extends { stage_id: string }>(affected: readonly A[], answeredOn: ReadonlySet<string> | null): { affected: A[]; left: string[] } {
+  if (!answeredOn?.size) return { affected: [...affected], left: [] };
+  return {
+    affected: affected.filter((a) => !answeredOn.has(a.stage_id)),
+    left: affected.filter((a) => answeredOn.has(a.stage_id)).map((a) => a.stage_id),
+  };
 }
