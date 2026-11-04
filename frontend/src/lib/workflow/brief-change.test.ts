@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { answeredOnStages, meaningOf, openBriefChange, presentationOnly, settledChange } from './brief-change';
+import { answeredOnStages, leftToGo, meaningOf, openBriefChange, presentationOnly, settledChange } from './brief-change';
 import { factsText } from './facts';
 import type { ProjectFact } from '@/types/project';
 import { laterDoneStages, projectState } from './engine';
@@ -185,6 +185,17 @@ describe('an answer given to Go is left to Go on the stage it was asked from (4 
     expect(answeredOnStages(factsText([brief, answer]), [brief, answer])).toBeNull();
     // Retiring a fact is not an answer either.
     expect(answeredOnStages(factsText([brief, answer]), [{ ...brief, retired_at: '2026-11-04T15:00:00Z' }, answer])).toBeNull();
+  });
+
+  it('the judged stages keep everything but the stage the answer was given on', () => {
+    // The production judgments: "Make it shorter…" (14:02) named Final proposal
+    // alone; "make Section 7 a single sentence", judged with Final proposal
+    // hidden (#483), named the stages before it (16:36).
+    const shorter = [{ stage_id: 'final_proposal', reason: 'The user asked for it to be shortened.' }];
+    expect(leftToGo(shorter, new Set(['final_proposal']))).toEqual({ affected: [], left: ['final_proposal'] });
+    const figures = [{ stage_id: 'option_pricing', reason: 'Priced for 18.' }, { stage_id: 'final_proposal', reason: 'Built on 18.' }];
+    expect(leftToGo(figures, new Set(['final_proposal']))).toEqual({ affected: [figures[0]], left: ['final_proposal'] });
+    expect(leftToGo(figures, null)).toEqual({ affected: figures, left: [] });
   });
 
   it('an answer recorded without its stage is judged everywhere', () => {
