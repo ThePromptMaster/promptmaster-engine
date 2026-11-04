@@ -67,6 +67,7 @@ export function GoPanel({
   onApplyAnyway,
   stageName,
   stageByEnglish,
+  otherWork,
 }: {
   go: ReturnType<typeof useGoLoop>;
   /**
@@ -93,6 +94,8 @@ export function GoPanel({
   dockHost?: HTMLElement | null;
   /** 13 Oct: each stage in its own recommended mode, or the project's mode everywhere. */
   stageModes?: { value: 'stage' | 'project'; onChange: (v: 'stage' | 'project') => void };
+  /** Whether another stage holds work Go can do while an approval here waits (`otherWorkFor`). */
+  otherWork?: (stageId: string) => boolean;
   /** The latest version of the stage Go asks about, when it came from applied findings. */
   latestChange?: LatestChange | null;
   /** "Routine decisions": who may decide an approval Go can check (5 Oct). */
@@ -368,7 +371,8 @@ export function GoPanel({
           {need && (
             <NeedsYouCard
               key={`${need.kind}:${go.run?.id}`} need={need} stageLabel={shownStage} onAction={act} context={needContext}
-              onCarryOn={need.kind === 'tick_criterion' && canResume ? () => void go.go() : undefined}
+              onCarryOn={need.kind === 'tick_criterion' && canResume && otherWork?.(need.stageId) ? () => void go.go() : undefined}
+              nothingElse={need.kind === 'tick_criterion' && canResume && !otherWork?.(need.stageId)}
             />
           )}
           {go.phase === 'watching' && (

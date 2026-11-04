@@ -121,6 +121,7 @@ export const sw: Record<keyof typeof en, string> = {
   'nyc.decideThere': 'Amua kila moja hapo. Nitagundua yakishaamuliwa; kisha bonyeza Endelea tena.',
   'nyc.orYourself': 'Au ifanye mwenyewe kwenye hatua. Nitagundua, na Endelea tena itaonekana hapa.',
   'nyc.carryOn': 'Endelea na kazi nyingine kwanza',
+  'nyc.nothingElse': 'Hakuna kingine kinachoweza kuendelea hadi hili liamuliwe.',
   'nyc.thenResume': 'Kisha bonyeza Endelea tena.',
   'gt.label': 'Go inaruhusiwa kufanya nini',
   'gt.auto': 'Go inapitia hatua na kusimama inapokuhitaji. Kumaliza mradi daima ni kubofya kwako.',

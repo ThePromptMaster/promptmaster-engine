@@ -12,6 +12,7 @@
  */
 
 import type { ExitCriterion, StageDefinition, WorkflowEvent, WorkflowTemplate } from './types';
+import { withRestatedApprovalsAsChecks } from './triage-approval';
 
 export type AddedStageKind = 'write' | 'list' | 'check';
 
@@ -81,7 +82,9 @@ export function addedStageOf(event: Pick<WorkflowEvent, 'type' | 'payload'>): Ad
  * The pinned template with the project's added stages in place. The same
  * object comes back when nothing was added, so callers can memoise on it.
  */
-export function effectiveTemplate(template: WorkflowTemplate, events: readonly Pick<WorkflowEvent, 'type' | 'payload'>[] | null | undefined): WorkflowTemplate {
+export function effectiveTemplate(pinned: WorkflowTemplate, events: readonly Pick<WorkflowEvent, 'type' | 'payload'>[] | null | undefined): WorkflowTemplate {
+  // An old design's approval box that only restates "every finding decided" is that check (4 Nov).
+  const template = withRestatedApprovalsAsChecks(pinned);
   const added = (events ?? []).map(addedStageOf).filter((s): s is AddedStage => s !== null);
   if (!added.length) return template;
   const stages = template.stages.map((s) => ({ ...s, transitions: { ...s.transitions } }));
