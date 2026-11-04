@@ -12,6 +12,7 @@ from .limits import (
     MAX_INSTRUCTION_CHARS,
     MAX_OBJECTIVE_CHARS,
     MAX_PREAMBLE_CHARS,
+    MAX_SAMPLE_CHARS,
     MAX_SESSION_FACT_CHARS,
     MAX_SESSION_FACTS,
     MAX_SHORT_TEXT_CHARS,
@@ -124,6 +125,9 @@ class PMInput(BaseModel):
     # 4 Oct: the facts, figures and background behind the objective, kept apart
     # from it so the objective stays short. Material to use, not instructions.
     context: str = Field(default="", max_length=MAX_CONTEXT_CHARS, description="The project's source material")
+    #: A sample of what good looks like (4 Nov, Sean: "an optional field for source
+    #: material or a sample output … a concrete standard for depth and style").
+    sample_output: str = Field(default="", max_length=MAX_SAMPLE_CHARS)
     # 7 Oct (Sean, 6 Oct): the facts and requirements the project has accepted,
     # each with its source. Every prompt that carries the context carries these
     # first (`project_context.context_block`), so every stage, check and chat

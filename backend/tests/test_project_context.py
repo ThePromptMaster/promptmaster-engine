@@ -159,3 +159,20 @@ def test_a_sentence_the_user_removed_reaches_every_stage_prompt(basic_inputs):
 
 def test_no_removed_block_when_nothing_was_removed(basic_inputs):
     assert "REMOVED BY THE USER" not in context_block(basic_inputs)
+
+
+def test_a_sample_sets_the_standard_and_is_never_a_source():
+    """4 Nov (Sean): "an optional field for source material or a sample output …
+    a concrete standard for depth and style"."""
+    from promptmaster.project_context import SAMPLE_HEADER, context_block
+    from promptmaster.schemas import PMInput
+
+    plain = PMInput(objective="A talk on cryo-EM.", mode="architect")
+    assert "SAMPLE" not in context_block(plain)
+    with_sample = plain.model_copy(update={"sample_output": "Resolution here is local, not global: a 3.1 Å map can hide 6 Å loops."})
+    block = context_block(with_sample)
+    assert SAMPLE_HEADER in block
+    assert "never take its facts, figures, names or claims as this project's" in block
+    assert "a 3.1 Å map can hide 6 Å loops" in block
+    long = plain.model_copy(update={"sample_output": "x" * 20_000})
+    assert "[…the rest of the sample is not shown]" in context_block(long)

@@ -26,6 +26,7 @@ describe('input limits', () => {
     expect(INPUT_LIMITS.constraints).toBe(py('MAX_FIELD_CHARS'));
     expect(INPUT_LIMITS.output_format).toBe(py('MAX_FIELD_CHARS'));
     expect(INPUT_LIMITS.context).toBe(py('MAX_CONTEXT_CHARS'));
+    expect(INPUT_LIMITS.sample_output).toBe(py('MAX_SAMPLE_CHARS'));
     expect(INPUT_LIMITS.instruction).toBe(py('MAX_INSTRUCTION_CHARS'));
     expect(INPUT_LIMITS.message).toBe(py('MAX_CHAT_MESSAGE_CHARS'));
   });

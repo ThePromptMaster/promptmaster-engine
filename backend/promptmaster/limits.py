@@ -47,6 +47,10 @@ MAX_PREAMBLE_CHARS = 8_000
 #: brief attached on the start screen. It rides on every stage call (L-38), so
 #: it is still bounded: about 50k tokens, a long report, not a library.
 MAX_CONTEXT_CHARS = 200_000
+#: A sample of what good looks like (4 Nov): a standard for depth and style, not
+#: source material. Stored up to this; prompts carry its opening (SAMPLE_PROMPT_CHARS).
+MAX_SAMPLE_CHARS = 60_000
+SAMPLE_PROMPT_CHARS = 12_000
 #: A one-off instruction — a revise request, a chat instruction, a stage hint.
 MAX_INSTRUCTION_CHARS = 20_000
 #: What someone types into the side chat, a "Guide me" answer, or the

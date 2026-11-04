@@ -12,6 +12,7 @@ from __future__ import annotations
 import re
 from datetime import date
 
+from .limits import SAMPLE_PROMPT_CHARS
 from .schemas import PMInput
 
 _HEADER = (
@@ -361,9 +362,28 @@ def context_block(inputs: PMInput, limit: int | None = None) -> str:
         text = cut.rstrip() + f"\n{CONTEXT_SHORTENED}"
     context = f"{_HEADER}\n<<<\n{text}\n>>>" if text else ""
     boundary = FACT_BOUNDARY if no_invented_details(inputs) else ""
+    sample = sample_block(inputs)
     # Last: the other projects inform, and everything above outranks them.
     references = references_block(inputs, limit)
-    return "\n\n".join(b for b in (facts, approved, sources, said, removed, boundary, context, references) if b)
+    return "\n\n".join(b for b in (facts, approved, sources, said, removed, boundary, context, sample, references) if b)
+
+
+#: 4 Nov (Sean, after Jordan's niche science talk "got the general information
+#: right but lacked the nuance"): a sample the user gives sets the standard for
+#: depth and style. It is not a source: its facts belong to another piece.
+SAMPLE_HEADER = (
+    "THE USER'S SAMPLE OF WHAT GOOD LOOKS LIKE — match its depth, specificity, structure of argument and "
+    "style. It is not a source: never take its facts, figures, names or claims as this project's."
+)
+
+
+def sample_block(inputs: PMInput) -> str:
+    text = (inputs.sample_output or "").strip()
+    if not text:
+        return ""
+    if len(text) > SAMPLE_PROMPT_CHARS:
+        text = text[:SAMPLE_PROMPT_CHARS].rstrip() + "\n[…the rest of the sample is not shown]"
+    return f"{SAMPLE_HEADER}\n<<<\n{text}\n>>>"
 
 
 def context_line(inputs: PMInput) -> str:

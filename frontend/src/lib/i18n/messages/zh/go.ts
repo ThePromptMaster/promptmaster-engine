@@ -62,7 +62,7 @@ export const zh: Record<keyof typeof en, string> = {
   'runStatus.stopped': '已停止',
   'runStatus.failed': '失败',
   'go.title': 'Go 模式',
-  'go.intro': '一步一步替你完成接下来的工作，并告诉你它做了什么。只有当决定需要由你作出时，它才会询问你。',
+  'go.intro': 'Go 一步一步替你执行项目接下来的步骤，并告诉你它做了什么。只有当决定需要由你作出时，它才会询问你。',
   'go.setUp': '设置 Go',
   'go.letRun': '让 Go 来运行',
   'go.otherTab': '本次运行正由另一个标签页驱动。如果那个标签页关闭，运行会在这里继续。',

@@ -11,6 +11,7 @@ import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import { templateWord } from '@/lib/i18n/templates';
 import { shownModeName } from '@/lib/i18n/stage';
 import { useWorkflowWords } from '@/components/projects/workflow-picker';
+import { SampleField } from './sample-field';
 
 
 /** Added to the output format by "Keep it concise". */
@@ -24,6 +25,8 @@ export interface SetupDraft {
   output_format: string;
   /** Source material behind the objective (4 Oct, item 7); may be long. */
   context: string;
+  /** A sample of what good looks like (4 Nov): a standard for depth and style, never a source. */
+  sample_output?: string;
   mode: ModeType;
 }
 
@@ -173,6 +176,10 @@ export function SetupCard({
         </p>
       </section>
 
+      <section>
+        <SampleField value={draft.sample_output ?? ''} onChange={(v) => onChange({ sample_output: v })} fieldClass={field} labelClass={label} />
+      </section>
+
       {rationale && (
         <p className="text-body text-[var(--on-surface-variant)]">
           <span className="material-symbols-outlined me-1 align-[-4px] text-[18px] text-[var(--pm-primary)]" aria-hidden>
@@ -183,14 +190,14 @@ export function SetupCard({
       )}
       <div className="grid gap-6 md:grid-cols-3">
         <section>
-          <label htmlFor="setup-audience" className={label}>{t('setup.audience')}</label>
+          <label htmlFor="setup-audience" className={label}>{t('setup.audience')} <span data-optional className="ms-1 normal-case tracking-normal text-[var(--outline)]">{t('setup.optionalTag')}</span></label>
           <AutoGrowTextarea id="setup-audience" value={draft.audience} rows={2}
             onChange={(e) => onChange({ audience: withinLimit('audience', e.target.value) })} className={field} />
           <LimitCounter length={draft.audience.length} limit={INPUT_LIMITS.audience} />
           {why(rationale?.audience)}
         </section>
         <section>
-          <label htmlFor="setup-constraints" className={label}>{t('setup.constraints')}</label>
+          <label htmlFor="setup-constraints" className={label}>{t('setup.constraints')} <span data-optional className="ms-1 normal-case tracking-normal text-[var(--outline)]">{t('setup.optionalTag')}</span></label>
           <AutoGrowTextarea id="setup-constraints" value={draft.constraints} rows={2}
             placeholder={t('setup.constraintsPlaceholder')}
             onChange={(e) => onChange({ constraints: withinLimit('constraints', e.target.value) })} className={field} />
@@ -204,7 +211,7 @@ export function SetupCard({
           {why(rationale?.constraints)}
         </section>
         <section>
-          <label htmlFor="setup-format" className={label}>{t('setup.format')}</label>
+          <label htmlFor="setup-format" className={label}>{t('setup.format')} <span data-optional className="ms-1 normal-case tracking-normal text-[var(--outline)]">{t('setup.optionalTag')}</span></label>
           <AutoGrowTextarea id="setup-format" value={draft.output_format} rows={2}
             placeholder={t('setup.formatPlaceholder')}
             onChange={(e) => onChange({ output_format: withinLimit('output_format', e.target.value) })} className={field} />
