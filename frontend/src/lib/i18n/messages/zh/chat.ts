@@ -100,6 +100,7 @@ export const zh: Record<keyof typeof en, string> = {
   "cost.reply": "此回复花费 {cost}",
   "cost.replyUnknown": "此回复的价格不可用",
   "cost.unpriced": "（{count} 次价格未知）",
+  "cost.breakdown": "共 {calls} 次模型调用；其中 {goCalls} 次来自 Go，涉及 {steps} 步",
   "cost.step": "费用 {cost}",
   "cost.run": "本次运行至今：{cost}",
   "cost.project": "本项目至今：{cost}",

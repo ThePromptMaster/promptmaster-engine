@@ -100,6 +100,7 @@ export const sw: Record<keyof typeof en, string> = {
   "cost.reply": "Jibu hili liligharimu {cost}",
   "cost.replyUnknown": "Bei ya jibu hili haipatikani",
   "cost.unpriced": "({count} bila bei inayojulikana)",
+  "cost.breakdown": "Miito {calls} ya modeli; {goCalls} kati yake ni ya Go, kwa hatua {steps}",
   "cost.step": "Gharama {cost}",
   "cost.run": "Uendeshaji huu hadi sasa: {cost}",
   "cost.project": "Mradi huu hadi sasa: {cost}",

@@ -32,7 +32,7 @@ import { sourcesToCheck } from '@/lib/workflow/lookup';
  * open. Closing it pauses the run, and reopening the project resumes it.
  */
 
-import { recordErrorEvent, setUsageOperation, takeStepCost } from '@/lib/supabase/model-usage';
+import { recordErrorEvent, runMeterCalls, setUsageOperation, startRunMeter, takeOutsideCost, takeStepCost } from '@/lib/supabase/model-usage';
 import { asError, retryOnce } from '@/lib/supabase/errors';
 import { RefusedRevision } from '@/lib/workflow/commit-check';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -59,7 +59,7 @@ import { performStep, type PerformContext, type StepOutcome } from '@/lib/agent/
 import { needsExpert, packageMarkdown, recordDocuments } from '@/lib/agent/expert';
 import { auditStop, describeAudit, proposedDefault, touchesObjective } from '@/lib/agent/stop-audit';
 import { recordRoutineDefault } from '@/lib/supabase/facts';
-import { allowedActions, answeredReturn, reconsiderNote, returnTargets, runAttemptsFor, stageHasCurrentDraft, toolsFor, polishSinceDirection, polishCapped, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, withoutEndlessPolish, withoutSettledRuns, withoutOverride, DEFAULT_BUDGET_STEPS, fitsBudget, noChange, plannedBeforeLatestChange, preempt, shouldPause, stateFingerprint, stepCost } from '@/lib/agent/policy';
+import { allowedActions, answeredReturn, reconsiderNote, returnTargets, runAttemptsFor, stageHasCurrentDraft, toolsFor, polishSinceDirection, polishCapped, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, withoutEndlessPolish, withoutSettledRuns, withoutOverride, DEFAULT_BUDGET_STEPS, MAX_MODEL_CALLS_PER_CHAIN, fitsBudget, noChange, plannedBeforeLatestChange, preempt, shouldPause, stateFingerprint, stepCost } from '@/lib/agent/policy';
 import {
   autoWindowsLeft,
   createAgentRun,
@@ -241,6 +241,29 @@ function tabIdentity(): string {
 /** Let React render what the last await changed before reading props again. */
 const settle = () => new Promise((r) => setTimeout(r, 60));
 
+/** The planner's calls, tagged as Go's so the usage views count them (4 Nov). */
+async function planning<T>(call: () => Promise<T>): Promise<T> {
+  setUsageOperation({ operation: 'go:plan' });
+  try {
+    return await call();
+  } finally {
+    setUsageOperation(null);
+  }
+}
+
+/** The stages this run saved a version on, by name, for the pause that says what was saved (4 Nov). */
+export function savedStages(steps: readonly AgentStep[], stageLabel: (id: string) => string): string[] {
+  const out: string[] = [];
+  for (const s of steps) {
+    const ids = (s.changes as { version_ids?: unknown } | null)?.version_ids;
+    if (!Array.isArray(ids) || !ids.length) continue;
+    const target = (s.params as { stage_id?: unknown } | null)?.stage_id;
+    const label = stageLabel(typeof target === 'string' && target ? target : s.stage_id);
+    if (!out.includes(label)) out.push(label);
+  }
+  return out;
+}
+
 export function useGoLoop(opts: Options) {
   const [policy, setPolicy] = useState<ExecutionPolicy>('guided');
   const [budget, setBudget] = useState(DEFAULT_BUDGET_STEPS);
@@ -277,6 +300,16 @@ export function useGoLoop(opts: Options) {
   const abortRef = useRef<AbortController | null>(null);
   const followRef = useRef<StepOutcome['followUp'] | null>(null);
   const [progress, setProgress] = useState<string | null>(null);
+  // The call ceiling (4 Nov): set when a run paused at it, so no window starts on its own past it.
+  const callCapRef = useRef(false);
+  // Model calls this allowance has made, refreshed as the run moves.
+  const [calls, setCalls] = useState<number | null>(null);
+  /** A user's Go, Resume or Continue: a fresh allowance of model calls. */
+  const freshAllowance = useCallback(() => {
+    callCapRef.current = false;
+    startRunMeter(0);
+    setCalls(0);
+  }, []);
   /** Steps of the windows this run continues (B4): the planner reads them as history. */
   const priorStepsRef = useRef<AgentStep[]>([]);
   /** The user said "draft them anyway" for this many sections (FR-18). */
@@ -440,8 +473,12 @@ export function useGoLoop(opts: Options) {
       setProgress(null);
       // The run's cost is the sum of its steps' (31 Oct: shown in the Go
       // panel). Best-effort: a missed total costs the line, not the step.
-      if (costUsd !== null && costUsd > 0 && runRef.current) {
-        const total = Number(runRef.current.cost_usd ?? 0) + costUsd;
+      setCalls(runMeterCalls());
+      // …and what Go spent choosing its moves, which no step carries (4 Nov).
+      const outside = takeOutsideCost().cost;
+      const added = (costUsd ?? 0) + outside;
+      if (added > 0 && runRef.current) {
+        const total = Number(runRef.current.cost_usd ?? 0) + added;
         commitRun({ ...runRef.current, cost_usd: total });
         void updateAgentRun(current.id, { cost_usd: total }).catch(() => undefined);
       }
@@ -533,6 +570,15 @@ export function useGoLoop(opts: Options) {
           continue;
         }
 
+        // The call ceiling (4 Nov): counted whatever the price, across the
+        // windows Go started on its own; only the user's click starts afresh.
+        const callsSoFar = runMeterCalls();
+        if (callsSoFar !== null && callsSoFar >= MAX_MODEL_CALLS_PER_CHAIN) {
+          callCapRef.current = true;
+          const need: NeedsUser = { kind: 'continue_budget', budgetSteps: current.budget_steps, callCap: MAX_MODEL_CALLS_PER_CHAIN, saved: savedStages([...priorStepsRef.current, ...stepsRef.current], stageLabelFor) };
+          await setRunStatus('budget_exhausted', `Paused after ${callsSoFar} model calls, the most one run makes without your click.`, need);
+          break;
+        }
         const stop = preempt({
           state: o.state, objective: o.project.objective, stepsUsed: current.steps_used,
           budgetSteps: current.budget_steps,
@@ -558,7 +604,7 @@ export function useGoLoop(opts: Options) {
           const repairTarget = lastRepair ? String(lastRepair.params?.stage_id ?? lastRepair.stage_id) : '';
           const need: NeedsUser | null =
             lastRepair ? repairStuckNeed(o.state, repairTarget, [...priorStepsRef.current, ...stepsRef.current])
-            : stop.status === 'budget_exhausted' ? { kind: 'continue_budget', budgetSteps: current.budget_steps }
+            : stop.status === 'budget_exhausted' ? { kind: 'continue_budget', budgetSteps: current.budget_steps, saved: savedStages([...priorStepsRef.current, ...stepsRef.current], stageLabelFor) }
             : stop.status === 'blocked' && blocked ? { kind: 'unblock_stage', stageId: o.stage.id, reason: blocked.reason, blockKind: blocked.kind }
             : stop.status === 'awaiting_decision' && !o.project.objective.trim() ? { kind: 'set_objective' }
             : null;
@@ -772,11 +818,11 @@ export function useGoLoop(opts: Options) {
               action_key: required.key, params: required.params ?? {}, rationale: required.rationale, expected_outcome: required.expected,
               needs_user_decision: false, decision_question: null,
             }
-          : await api.agentNextAction(
+          : await planning(() => api.agentNextAction(
               {
                 inputs: inputsFrom(o.project),
                 state: buildAgentState({
-                  template: o.template, state: o.state, stage: o.stage, bundles: o.bundles,
+                  template: o.template, state: o.state, stage: o.stage!, bundles: o.bundles,
                   stageEvaluation, latestEvaluation: o.latestEvaluation, steps: [...priorStepsRef.current, ...stepsRef.current],
                   context, approvedOutline: o.approvedOutline, facts, dataFiles: dataFileBriefs(o.project), tools: toolsFor(o.project), routine: o.project.routine_decisions ?? undefined, delegation: delegationSentences(o.project), memory: reconsider ? [reconsider.note, ...memory].slice(0, 24) : memory, controls: o.getControls?.() ?? undefined,
                   returnTargets: goBackTo,
@@ -786,7 +832,7 @@ export function useGoLoop(opts: Options) {
                 allowed_actions: allowed, policy: current.policy, model: o.project.model,
               },
               signal
-            );
+            ));
         if (signal.aborted) throw new Stopped();
         if (reconsider) reconsiderRef.current = { ...reconsider, pending: false };
         // A reasoning move repeated while its last result is unsaved becomes
@@ -958,7 +1004,7 @@ export function useGoLoop(opts: Options) {
       // A window used up under Autonomous, with further windows authorized
       // in advance: carry on, recording the window as it starts.
       const ended = runRef.current;
-      if (ended?.status === 'budget_exhausted' && ended.policy === 'autonomous' && autoLeftRef.current > 0) {
+      if (ended?.status === 'budget_exhausted' && ended.policy === 'autonomous' && autoLeftRef.current > 0 && !callCapRef.current) {
         autoLeftRef.current -= 1;
         void continueRef.current(true).finally(() => setAutoPending(autoLeftRef.current > 0));
       }
@@ -1045,6 +1091,8 @@ export function useGoLoop(opts: Options) {
    * against it.
    */
   const continueRun = useCallback(async (auto = false) => {
+    // A window Go starts on its own keeps counting; the user's click starts afresh (4 Nov).
+    if (!auto) freshAllowance();
     const o = latest.current;
     const prev = runRef.current;
     if (!prev || prev.status !== 'budget_exhausted') {
@@ -1094,7 +1142,7 @@ export function useGoLoop(opts: Options) {
       if (auto) autoLeftRef.current = 0;
       else setError(asError(e, 'Could not continue Go mode.').message);
     }
-  }, [commitRun, commitSteps, loop]);
+  }, [commitRun, commitSteps, loop, freshAllowance]);
   continueRef.current = continueRun;
 
   /**
@@ -1131,6 +1179,7 @@ export function useGoLoop(opts: Options) {
 
   const go = useCallback(async () => {
     setError(null);
+    freshAllowance();
     if (phaseRef.current === 'watching') {
       setError(WATCHING_ELSEWHERE);
       return;
@@ -1174,7 +1223,7 @@ export function useGoLoop(opts: Options) {
     } catch (e) {
       setError(asError(e, 'Could not start Go mode.').message);
     }
-  }, [policy, budget, pendingStepId, commitRun, loop, startRun, continueRun, authorizeAndStart]);
+  }, [policy, budget, pendingStepId, commitRun, loop, startRun, continueRun, authorizeAndStart, freshAllowance]);
 
   /**
    * "Update affected work and resume" (D2): repairing every reopened stage
@@ -1187,6 +1236,7 @@ export function useGoLoop(opts: Options) {
       setError(WATCHING_ELSEWHERE);
       return;
     }
+    freshAllowance();
     const live = runRef.current;
     const left = live ? live.budget_steps - stepsRef.current.length : 0;
     if (live && !live.ended_at && live.policy === chosen && (live.status === 'blocked' || live.status === 'awaiting_decision') && left < 4 && !pendingStepId) {
@@ -1211,7 +1261,7 @@ export function useGoLoop(opts: Options) {
       return;
     }
     await go();
-  }, [policy, pendingStepId, commitRun, continueRun, go, authorizeAndStart]);
+  }, [policy, pendingStepId, commitRun, continueRun, go, authorizeAndStart, freshAllowance]);
 
   /**
    * "Apply and continue": the button says Go updates the work and carries on,
@@ -1682,6 +1732,7 @@ export function useGoLoop(opts: Options) {
 
   return {
     progress,
+    calls: calls === null ? null : { used: calls, cap: MAX_MODEL_CALLS_PER_CHAIN },
     needs: run?.needs ?? null,
     continueRun,
     acknowledgeLargeJob,

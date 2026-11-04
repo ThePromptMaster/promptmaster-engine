@@ -135,7 +135,18 @@ describe('needsUser: the moves that are the user\'s (B4)', () => {
   });
 
   it('says the window and the wait in the user\'s terms', () => {
-    expect(describeNeed({ kind: 'continue_budget', budgetSteps: 12 }, label)).toEqual({ message: 'This window of 12 steps is used up and the work is not done.', action: 'Continue for 12 more steps' });
+    expect(describeNeed({ kind: 'continue_budget', budgetSteps: 12 }, label)).toEqual({
+      message: 'This window of 12 steps is used up and the work is not done.',
+      detail: 'Continue starts a new window of 12 steps in a run linked to this one, with the work and its history carried over.',
+      action: 'Continue for 12 more steps',
+    });
+    // 4 Nov (Sean): what was saved, why Go paused, and what Continue does.
+    expect(describeNeed({ kind: 'continue_budget', budgetSteps: 25, saved: ['Draft memo', 'Check'] }, label).detail).toBe(
+      'Everything it did is saved: Draft memo, Check. Continue starts a new window of 25 steps in a run linked to this one, with the work and its history carried over.'
+    );
+    expect(describeNeed({ kind: 'continue_budget', budgetSteps: 25, callCap: 400 }, label).message).toBe(
+      'Go paused after 400 model calls in this run, the most one run makes without your click.'
+    );
     expect(describeNeed({ kind: 'wait_for_jobs', stageId: 'drafting', pending: 2, complete: 1, total: 3 }, label).action).toBe('Keep waiting');
   });
 });

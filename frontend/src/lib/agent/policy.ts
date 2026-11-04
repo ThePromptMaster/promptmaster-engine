@@ -37,6 +37,15 @@ export const DEFAULT_BUDGET_STEPS = 25;
 /** The same move on the same stage this many times running is not progress. */
 export const NO_PROGRESS_REPEATS = 3;
 export const MAX_CONSECUTIVE_FAILURES = 2;
+/**
+ * Model calls one run may make before it pauses for the user's click (4 Nov,
+ * Sean: "If we need a billing safeguard, please tell me what we can reliably
+ * enforce when some calls have unknown pricing"). Calls are counted whatever
+ * their price; windows Go starts on its own keep counting, and only the user's
+ * Go, Resume or Continue starts a fresh allowance. A full memo run makes about
+ * 60–120 calls, so this stops runaways, not work.
+ */
+export const MAX_MODEL_CALLS_PER_CHAIN = 400;
 /** This many performed moves in a row that left the project exactly as it was is not progress either. */
 export const NO_CHANGE_STEPS = 3;
 

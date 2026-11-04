@@ -20,6 +20,8 @@ export function GoControl({
   disabled,
   hideResume = false,
   compact = false,
+  doing = null,
+  calls = null,
 }: {
   run: AgentRun | null;
   running: boolean;
@@ -35,6 +37,10 @@ export function GoControl({
   hideResume?: boolean;
   /** The pinned copy at the top of the page: the controls, without the explanation under them. */
   compact?: boolean;
+  /** What Go is doing now, in plain words (`doingNow`), shown beside the button (4 Nov). */
+  doing?: string | null;
+  /** Model calls this run chain, against its ceiling (4 Nov). */
+  calls?: { used: number; cap: number } | null;
 }) {
   // Both numbers come from the run on show. The selector is the size of the
   // *next* window; mixing it in printed "20 / 12" for an ended run and
@@ -49,6 +55,16 @@ export function GoControl({
   // What Resume or Continue does. Under the button on the panel; on the pinned
   // copy it is the button's tooltip, since the sentence squeezed beside the
   // dock's buttons wrapped one word per line on an iPad (Sean, 25 Oct).
+  const counter = run ? (
+    <div className={`flex flex-1 items-center gap-2 ${compact ? 'min-w-28' : 'min-w-40'}`} aria-label={t('gc.used')}>
+      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--surface-container-highest)]">
+        <div className="h-full rounded-full bg-[var(--pm-primary)]" style={{ width: `${pct}%` }} />
+      </div>
+      <span className="text-label text-[var(--on-surface-variant)]">
+        {live ? t('gc.thisWindow', { used, cap }) : t('gc.lastWindow', { used, cap })}
+      </span>
+    </div>
+  ) : null;
   const means = !running && !(hideResume && canResume) && (canResume || canContinue)
     ? canResume ? t('gc.resumeMeans') : t('gc.continueMeans')
     : null;
@@ -74,8 +90,14 @@ export function GoControl({
           {canResume ? t('go.resume') : canContinue ? t('go.continue') : t('go.go')}
         </button>
       )}
+      {/* 4 Nov (Sean): what Go is doing, in words, beside the button that started it. */}
+      {running && doing && (
+        <span role="status" data-go-doing className={`min-w-0 text-body text-[var(--on-surface)] ${compact ? 'truncate' : ''}`}>
+          {doing}
+        </span>
+      )}
       {/* A live window's size is locked, so the pinned copy leaves it to the
-          panel and keeps to one row: the count beside the bar says it. */}
+          panel and keeps to one row. */}
       {!(compact && live) && (
       <label className="flex items-center gap-2 text-label text-[var(--on-surface-variant)]">
         {/* After a run ends the selector is the size of the *next* window, and says so
@@ -96,24 +118,32 @@ export function GoControl({
         </select>
       </label>
       )}
-      {run && (
-        <div className={`flex flex-1 items-center gap-2 ${compact ? 'min-w-28' : 'min-w-40'}`} aria-label={t('gc.used')}>
-          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--surface-container-highest)]">
-            <div className="h-full rounded-full bg-[var(--pm-primary)]" style={{ width: `${pct}%` }} />
-          </div>
-          <span className="text-label text-[var(--on-surface-variant)]">
-            {live ? t('gc.thisWindow', { used, cap }) : t('gc.lastWindow', { used, cap })}
-          </span>
-        </div>
-      )}
+      {/* The pinned copy keeps the count only while nothing is being done; the words say more. */}
+      {compact && run && !(running && doing) && counter}
     </div>
-    {/* What the run has cost (31 Oct); shown once a priced step has run. */}
-    {!compact && run && Number(run.cost_usd ?? 0) > 0 && (
-    <p className="mt-2 text-label text-[var(--on-surface-variant)]">
-      {t('cost.run', { cost: shownCost(Number(run.cost_usd)) ?? '' })}
-    </p>
+    {/* 4 Nov (Sean: "I'd put the counter under Run details"): the count, the
+        calls and the cost, one click away rather than the first thing read. */}
+    {!compact && run && (
+    <details data-run-details className="mt-2">
+      <summary className="cursor-pointer text-label text-[var(--on-surface-variant)]">{t('gc.runDetails')}</summary>
+      <div className="mt-2 space-y-1">
+        {counter}
+        {calls && (
+        <p className="text-label text-[var(--on-surface-variant)]">{t('gc.calls', { used: calls.used, cap: calls.cap })}</p>
+        )}
+        {/* What the run has cost (31 Oct); shown once a priced step has run. */}
+        {Number(run.cost_usd ?? 0) > 0 && (
+        <p className="text-label text-[var(--on-surface-variant)]">
+          {t('cost.run', { cost: shownCost(Number(run.cost_usd)) ?? '' })}
+        </p>
+        )}
+        <p className="text-label text-[var(--on-surface-variant)]">
+          {t('gc.explain')}
+        </p>
+      </div>
+    </details>
     )}
-    {!compact && (
+    {!compact && !run && (
     <p className="mt-2 text-label text-[var(--on-surface-variant)]">
       {t('gc.explain')}
     </p>

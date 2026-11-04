@@ -21,6 +21,7 @@ import type { AgentStep } from '@/types/agent';
 import { StepTimeline } from './step-timeline';
 import { RunAccountCard } from './run-account';
 import { TransparencyPanel } from './transparency-panel';
+import { doingNow } from '@/lib/agent/doing';
 
 /**
  * Go mode (PM-17 … PM-20): the four layers side by side — the stage (where),
@@ -121,6 +122,8 @@ export function GoPanel({
   const live = go.run && !go.run.ended_at;
   const expanded = open || Boolean(live) || go.steps.length > 0 || Boolean(go.authorizing);
   const current = go.steps.at(-1) ?? null;
+  // 4 Nov (Sean): what Go is doing, in plain words, beside the button and on the pinned copy.
+  const doing = doingNow(current, shownStage, { thinking: go.phase === 'thinking', progress: go.progress });
   const askingUser = Boolean(live && go.run!.status === 'awaiting_decision' && !go.pendingStep && !go.active);
   const canResume = Boolean(live && (go.run!.status === 'blocked' || go.run!.status === 'awaiting_decision') && !go.pendingStep);
   // The "I need you to…" card (B4): shown for a stop the user can clear, live
@@ -249,6 +252,8 @@ export function GoPanel({
   const controlProps = {
     run: go.run,
     running: go.active,
+    doing,
+    calls: go.calls ?? null,
     budget: go.budget,
     onBudget: go.setBudget,
     // Resume is also the way to update work a change reopened: with the
@@ -288,7 +293,7 @@ export function GoPanel({
               }`}
             >
               <span aria-hidden className="material-symbols-outlined text-[16px]">{go.active ? 'progress_activity' : 'play_arrow'}</span>
-              <span className="truncate">{dockAction ? dockAction.label : waiting ? t('go.needsYou') : go.active ? t('go.working') : t('go.go')}</span>
+              <span className="truncate">{dockAction ? dockAction.label : waiting ? t('go.needsYou') : go.active ? (doing ?? t('go.working')) : t('go.go')}</span>
             </button>
             {/* The controls keep a real width and the buttons wrap under them:
                 with a basis of 0 they were squeezed to a word a line between two

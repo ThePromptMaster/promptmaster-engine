@@ -121,6 +121,40 @@ export async function flushUsage(): Promise<void> {
  * a possible repair pass, and five round-trips of telemetry behind one
  * generation is telemetry that costs more than it measures.
  */
+/**
+ * What a Go run has spent while it runs (4 Nov, Sean: "How many model calls
+ * can a step trigger? … What caps usage across a whole project or account?").
+ * Every model call made while the meter is on is counted, priced or not — the
+ * run's call ceiling counts calls, not dollars, because some prices are
+ * unknown. Calls made outside any step (Go choosing its next move) are kept
+ * apart, so the run's cost can include them: before, it summed its steps only
+ * and left the planner out.
+ */
+let runMeter: { calls: number; outsideCost: number; outsideUnpriced: number } | null = null;
+
+/** Start counting from `calls` (0 for a fresh allowance). */
+export function startRunMeter(calls = 0): void {
+  runMeter = { calls, outsideCost: 0, outsideUnpriced: 0 };
+}
+
+export function stopRunMeter(): void {
+  runMeter = null;
+}
+
+/** Model calls counted since the meter started; null when it is off. */
+export function runMeterCalls(): number | null {
+  return runMeter ? runMeter.calls : null;
+}
+
+/** The cost of calls made outside any step since the last take, and how many had no price. */
+export function takeOutsideCost(): { cost: number; unpriced: number } {
+  if (!runMeter) return { cost: 0, unpriced: 0 };
+  const out = { cost: runMeter.outsideCost, unpriced: runMeter.outsideUnpriced };
+  runMeter.outsideCost = 0;
+  runMeter.outsideUnpriced = 0;
+  return out;
+}
+
 export async function recordModelUsage(
   events: UsageEvent[],
   context: UsageWriteContext
@@ -130,6 +164,15 @@ export async function recordModelUsage(
   // Before the first await: the response that carried these events reaches its
   // caller right after this, and a Go step totals its cost when it finishes.
   const op = currentOperation;
+  if (runMeter) {
+    runMeter.calls += events.length;
+    if (!op?.agentStepId) {
+      for (const e of events) {
+        if (e.costUsd === null) runMeter.outsideUnpriced += 1;
+        else runMeter.outsideCost += e.costUsd;
+      }
+    }
+  }
   if (op?.agentStepId) {
     const entry = stepCosts.get(op.agentStepId) ?? { cost: 0, priced: false };
     for (const e of events) if (e.costUsd !== null) Object.assign(entry, { cost: entry.cost + e.costUsd, priced: true });
