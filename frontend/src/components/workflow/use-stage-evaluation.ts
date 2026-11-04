@@ -105,7 +105,7 @@ export function useStageEvaluation({
     setChecked(null);
   }, [stageId]);
 
-  const evaluate = useCallback(async () => {
+  const evaluate = useCallback(async (opts?: { simulate?: 'empty' }) => {
     const {
       project: p,
       template: t,
@@ -142,7 +142,11 @@ export function useStageEvaluation({
     setFailure(null);
 
     try {
-      const request = evaluationRequest(p, t, s, await freshOrPage(t, stage, b, p.id), stage, version.content, outline);
+      const request = {
+        ...evaluationRequest(p, t, s, await freshOrPage(t, stage, b, p.id), stage, version.content, outline),
+        // A test account's simulated empty check (4 Nov); the server refuses anyone else.
+        ...(opts?.simulate ? { simulate: opts.simulate } : {}),
+      };
       const response = withoutHandCounts(await api.evaluateStageArtifact(request, controller.signal), request.measured ?? []);
 
       if (controller.signal.aborted) return;

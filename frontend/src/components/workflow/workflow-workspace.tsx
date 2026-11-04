@@ -146,8 +146,9 @@ import { useExperience } from '@/lib/projects/experience';
 import { freshOrPage } from '@/lib/workflow/fresh-manuscript';
 import { addedSignature, designAddedStage, effectiveTemplate } from '@/lib/workflow/added-stages';
 import { withApprovals } from '@/lib/workflow/approvals';
-import { isFailedEvaluation } from '@/lib/workflow/evaluation-failure';
+import { isFailedEvaluation, lastCompletedCheck } from '@/lib/workflow/evaluation-failure';
 import { otherWorkFor } from '@/lib/agent/other-work';
+import { createClient as createBrowserClient } from '@/lib/supabase/client';
 
 interface Props {
   project: Project;
@@ -712,6 +713,27 @@ export function WorkflowWorkspace({
     openVersionRef.current = null;
   }, [headVersion?.id]);
   const shownEvaluation = evaluations?.[activeVersionId ?? headVersion?.id ?? ''];
+  // Whether this user may simulate a failed check: asked once, of a route that checks ADMIN_USER_IDS (4 Nov).
+  const [canSimulate, setCanSimulate] = useState(false);
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      try {
+        const { data } = await createBrowserClient().auth.getSession();
+        const token = data.session?.access_token;
+        if (!token) return;
+        const res = await fetch('/api/admin/can-simulate', { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
+        if (live && res.ok) setCanSimulate(Boolean((await res.json())?.allowed));
+      } catch {
+        // No switch, then: it is a test aid, never part of the work.
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, []);
+  // The last check that ran, on an earlier version, while this one has none that did (4 Nov).
+  const earlierEvaluation = lastCompletedCheck(stageVersionList, evaluations, activeVersionId ?? headVersion?.id);
 
   // A stage's unsaved edits belong to that stage.
   useEffect(() => {
@@ -2845,22 +2867,34 @@ export function WorkflowWorkspace({
                 answers by judgment. */}
             {/* PM-21: the dials sit with the critique they shape. */}
             {foldStageExtras ? (
-              (showDials || shownEvaluation) && (
+              (showDials || shownEvaluation || earlierEvaluation) && (
                 <details data-stage-extras className="rounded-xl bg-[var(--surface-container-low)] px-5 py-3">
                   <summary className="cursor-pointer text-label text-[var(--on-surface-variant)]">
-                    {shownEvaluation ? t('ws.checkAndDials') : t('ws.dials')}
+                    {shownEvaluation || earlierEvaluation ? t('ws.checkAndDials') : t('ws.dials')}
                   </summary>
                   <div className="mt-3 space-y-4">
                     {showDials && dials}
-                    <StageEvaluationPanel evaluation={shownEvaluation} />
+                    <StageEvaluationPanel evaluation={shownEvaluation} earlier={earlierEvaluation} onRetry={isCurrent && isEditable && stageEvaluation.evaluate ? () => void stageEvaluation.evaluate?.() : undefined} retrying={stageEvaluation.evaluating} />
                   </div>
                 </details>
               )
             ) : (
               <>
                 {showDials && dials}
-                <StageEvaluationPanel evaluation={shownEvaluation} />
+                <StageEvaluationPanel evaluation={shownEvaluation} earlier={earlierEvaluation} onRetry={isCurrent && isEditable && stageEvaluation.evaluate ? () => void stageEvaluation.evaluate?.() : undefined} retrying={stageEvaluation.evaluating} />
               </>
+            )}
+
+            {/* 4 Nov: a test account can make a check come back empty, to see it reported as not run. */}
+            {canSimulate && isCurrent && headVersion && stageEvaluation.evaluate && (
+              <button
+                data-simulate-failed-check
+                onClick={() => void stageEvaluation.evaluate?.({ simulate: 'empty' })}
+                disabled={stageEvaluation.evaluating}
+                className="text-label text-[var(--on-surface-variant)] underline-offset-2 hover:underline disabled:opacity-50"
+              >
+                {t('pnl.simulate')}
+              </button>
             )}
 
             {/* PM-22: the easy actions after a check, on the version it checked. */}

@@ -614,6 +614,8 @@ export interface EvaluateStageArtifactRequest {
   iterations?: Iteration[];
   /** What code counted on this text (4 Nov): the check reports these, never an estimate. */
   measured?: MeasuredLine[];
+  /** A test account's simulated empty check (4 Nov); refused for anyone else. */
+  simulate?: 'empty';
   model?: string;
 }
 

@@ -305,3 +305,31 @@ describe('the evaluation panel', () => {
     expect(container.firstChild).toBeNull();
   });
 });
+
+// --- 4 Nov: a check that could not run keeps the last one that did --------
+
+describe('a check that could not run (4 Nov, Sean: "preserve the prior valid … evaluation")', () => {
+  const failed = evaluation({ failed: true, findings: [] } as Partial<Evaluation>);
+
+  it('says it could not run, offers to run it again, and shows the last completed check under its own version', async () => {
+    const onRetry = vi.fn();
+    render(<StageEvaluationPanel evaluation={failed} earlier={{ evaluation: evaluation(), version: 3 }} onRetry={onRetry} />);
+    expect(screen.getByText(/This check could not run/i)).toBeTruthy();
+    expect(screen.getByText('Last completed check: v3 — an earlier version. This version has no completed check yet.')).toBeTruthy();
+    // The earlier check's findings are shown, not "No specific defects found".
+    expect(screen.getByText(/approved outline does not contain/i)).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Run the check again' }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('a version never checked shows the last completed check, labelled', () => {
+    render(<StageEvaluationPanel evaluation={undefined} earlier={{ evaluation: evaluation(), version: 2 }} />);
+    expect(screen.queryByText(/This check could not run/i)).toBeNull();
+    expect(screen.getByText(/Last completed check: v2/)).toBeTruthy();
+  });
+
+  it('shows nothing when there is no check at all', () => {
+    const { container } = render(<StageEvaluationPanel evaluation={undefined} />);
+    expect(container.textContent).toBe('');
+  });
+});

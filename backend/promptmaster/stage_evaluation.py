@@ -37,7 +37,7 @@ import uuid
 from .conversation import _shared_system
 from .critique_style import MAX_FINDINGS, critique_style_block, intensity_of
 from .errors import PRESERVED_EVALUATION, classify_error
-from .llm_client import LONG_ANSWER_TOKENS, OpenRouterClient
+from .llm_client import OpenRouterError, LONG_ANSWER_TOKENS, OpenRouterClient
 from .measured import MeasuredLine, measured_block
 from .schemas import (
     AuditFinding,
@@ -440,6 +440,14 @@ def _further_pass(raw: object, evaluation: EvaluationResult) -> tuple[bool | Non
         if evaluation.findings:
             return True, "There are open findings to address first."
     return needed, reason
+
+
+def simulated_empty_check() -> StageEvaluationResponse:
+    """What a check returns when the model's reply came back empty at the token
+    limit — built from the same error the client raises, so the browser sees
+    exactly what it would see from a real one (4 Nov; `backend/simulation.py`)."""
+    error = OpenRouterError("No content in response (finish_reason='length')", provider_code="empty_length")
+    return _failed(str(error), error)
 
 
 def _failed(reason: str, error: BaseException | None = None) -> StageEvaluationResponse:
