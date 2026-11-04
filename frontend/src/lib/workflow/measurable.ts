@@ -650,6 +650,24 @@ export function measure(r: MeasurableRequirement, text: string, whole = false): 
   };
 }
 
+/** What a stage writes on the way to a deliverable rather than the deliverable itself. */
+const PREPARES = /\b(?:brief|outline|plan|planning|criteria|success tests?|tests?|checklist|notes|questions|requirements|spec(?:ification)?|structure|scope|scoping|research|sources|facts|figures|calculations|assumptions|check|review|critique)\b/;
+
+/**
+ * A stage whose label names something that prepares the deliverable — "Memo
+ * brief and success test", "Report outline", "Research plan" for a report —
+ * is about the deliverable without being it, so the deliverable's length is
+ * not its own (4 Nov, production pass: "Memo: at most 500 words" was held
+ * against a 669-word brief and success test, and Go repaired the brief twice
+ * and stopped). The subject's own words are set aside first, so a stage that
+ * *is* the thing ("Research plan" when the plan is what was asked for) still
+ * answers for it.
+ */
+export function preparesFor(label: string, subject: string): boolean {
+  const rest = subject ? label.toLowerCase().split(subject).join(' ') : label.toLowerCase();
+  return PREPARES.test(rest);
+}
+
 /**
  * Which requirements a stage answers for. A requirement naming a deliverable
  * applies to a written stage that is about it (its label or instruction names
@@ -670,7 +688,8 @@ export function requirementsForStage(
   const subjects = new Set(requirements.map((r) => r.subject));
   const out: { requirement: MeasurableRequirement; whole: boolean }[] = [];
   for (const r of requirements) {
-    const aboutIt = Boolean(r.subject) && (r.subject === 'faq' ? /\bfaq\b|frequently asked questions/.test(about) : about.includes(r.subject));
+    const aboutIt = Boolean(r.subject) && !preparesFor(stage.label, r.subject) &&
+      (r.subject === 'faq' ? /\bfaq\b|frequently asked questions/.test(about) : about.includes(r.subject));
     if (aboutIt) out.push({ requirement: r, whole: true });
     // On the deliverable, a named part is looked for under its heading; the
     // whole text stands for it only when it is the one thing asked for.

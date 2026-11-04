@@ -141,3 +141,12 @@ def test_book_length_work_gets_a_chapters_stage_once_and_never_first():
         _stage("Second manuscript", "chapters"), _stage("Assemble"),
     ]})
     assert [s.kind for s in wf.stages] == ["write", "list", "chapters", "write", "write"]
+
+
+def test_a_stage_instruction_names_sections_only_when_the_user_gave_them():
+    """4 Nov (production pass, Sean's support-software prompt): the draft stage's
+    instruction said "Use these sections: Purpose; Supplied facts; …", which the
+    user never named, and a check enforces what an instruction names."""
+    system, user = build_workflow_prompt("a decision memo", "Choose a support plan")
+    assert "Name sections, headings or their order only when the user gave them" in system + user
+    assert "leave its structure to the writer" in system + user
