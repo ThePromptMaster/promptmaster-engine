@@ -148,10 +148,13 @@ AgentWorkflow.model_rebuild()
 
 
 class AgentControl(BaseModel):
-    """One button on the stage's page: its exact words, and where it is."""
+    """One button on the stage's page: its exact words, where it is, and what it does."""
 
     label: str = Field(max_length=200)
     where: str = Field(default="", max_length=200)
+    #: What pressing it does to the work (4 Nov, Sean, Lakeside: Go sent him to
+    #: "Refine: make it shorter" to delete one block of notes).
+    does: str = Field(default="", max_length=300)
 
 
 class AgentStageRef(BaseModel):
@@ -213,6 +216,9 @@ class AgentState(BaseModel):
     latest_change: AgentLatestChange | None = None
     #: Undecided rows on review stages other than this one, with their wording.
     open_findings_elsewhere: list[AgentOpenFinding] = Field(default_factory=list, max_length=12)
+    #: Polishing moves on this stage since the user's last direction, when the
+    #: run's cap has taken revising away (4 Nov, Sean, Lakeside). 0 when it has not.
+    polish_paused: int = Field(default=0, ge=0, le=500)
 
 
 #: How long a move's rationale may be: what a web search's purpose accepts.
@@ -422,12 +428,29 @@ def _format_state(inputs: PMInput, state: AgentState) -> str:
     if state.controls is None:
         facts.append("BUTTONS ON THIS PAGE NOW: not known. Do not name any button.")
     elif state.controls:
+        # 4 Nov (Sean, Lakeside): "the user presses these; you cannot" read as
+        # "you cannot edit", and Go asked him to press a button that rewrites
+        # the whole draft to delete one block it could remove itself.
         facts.append(
-            "BUTTONS ON THIS PAGE NOW (the user presses these; you cannot — name one only in these exact words):\n"
-            + "\n".join(f'- "{c.label}" — {c.where}' for c in state.controls)
+            "BUTTONS ON THIS PAGE NOW — the user's buttons, not your moves. Your own moves are under MOVES "
+            "AVAILABLE NOW: when one of them makes the change, make it yourself; never ask the user to press a "
+            "button for a change you can make, and never say you cannot edit the work while revise_stage is "
+            "listed. Name a button only in these exact words, and only when what it does is what is needed:\n"
+            + "\n".join(f'- "{c.label}" — {c.where}' + (f"; {c.does}" if c.does else "") for c in state.controls)
         )
     else:
         facts.append("BUTTONS ON THIS PAGE NOW: none. Do not name any button.")
+    if state.polish_paused:
+        # 4 Nov (Sean, Lakeside): the cap took revise_stage away without a word,
+        # and Go told him it "cannot make that edit from here" — three times.
+        facts.append(
+            f"REVISING IS PAUSED ON THIS STAGE FOR THE REST OF THIS RUN: {state.polish_paused} checks, applied "
+            "findings or revisions here since the user's last direction, so revise_stage, apply_findings and "
+            "evaluate_stage are not offered now. That is this run's limit, not something you are unable to do: "
+            "never tell the user you cannot edit the work, and never ask them to press a button to make an edit "
+            "for you. If a change the requirements need has still not held, say once what is left and why, and "
+            "ask whether you should try again — their answer lets you revise again."
+        )
     if state.latest_change is not None:
         # 19 Oct (Research › Method): asked what an applied finding changed, Go
         # said it could not see it. The change is computed by the client.

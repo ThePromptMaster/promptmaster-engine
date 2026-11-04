@@ -247,6 +247,11 @@ export function polishSinceDirection(
     .filter((s) => s.stage_id === stageId && (POLISH_MOVES as readonly string[]).includes(s.action_key)).length;
 }
 
+/** Whether the cap has taken the polishing moves away on this stage. */
+export function polishCapped(polishedHere: number, canAdvance: boolean): boolean {
+  return polishedHere >= POLISH_MAX || (canAdvance && polishedHere >= POLISH_WHEN_READY);
+}
+
 export function withoutEndlessPolish(
   allowed: readonly string[],
   polishedHere: number,
@@ -259,8 +264,7 @@ export function withoutEndlessPolish(
    */
   unsavedReasoning = false
 ): string[] {
-  const capped = polishedHere >= POLISH_MAX || (canAdvance && polishedHere >= POLISH_WHEN_READY);
-  if (!capped) return [...allowed];
+  if (!polishCapped(polishedHere, canAdvance)) return [...allowed];
   return allowed.filter((k) => !(POLISH_MOVES as readonly string[]).includes(k) || (unsavedReasoning && k === 'revise_stage'));
 }
 

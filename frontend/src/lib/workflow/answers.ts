@@ -32,10 +32,26 @@ export function isDelegatedAnswer(answer: string): boolean {
 }
 const STATEMENT_MAX = 2_000;
 
-/** The question as the fact records it: the first paragraph, without the pointer to a button. */
+/**
+ * Go's sentences about its own buttons and abilities. Not part of what was
+ * decided: on 4 Nov (Sean, Lakeside) "There is no button that starts this
+ * edit from my side" was recorded with his answer, and every later prompt
+ * read it as a fact of the project.
+ */
+const ABOUT_ITSELF: readonly RegExp[] = [
+  /\bno button\b/i,
+  /\bpress(?:ing)?\b[^.?!]*\bbutton\b/i,
+  /\bpress(?:ing)? ["“][^"”]+["”]/i,
+  /\b(?:i|go) (?:cannot|can't|can not|am unable to|have no way to)\b[^.?!]*\b(?:edit|make|start|remove|change|do)\b/i,
+  /\bfrom my side\b/i,
+];
+
+/** The question as the fact records it: the first paragraph, without the pointer to a button or Go's words about itself. */
 export function questionOf(question: string): string {
   const first = question.split(/\n\s*\n/)[0]?.replace(/\s+/g, ' ').trim() ?? '';
-  return first.length > QUESTION_MAX ? `${first.slice(0, QUESTION_MAX - 1).trimEnd()}…` : first;
+  const sentences = first.split(/(?<=[.?!])\s+(?=["“'A-Z0-9])/);
+  const kept = sentences.filter((s) => !ABOUT_ITSELF.some((re) => re.test(s))).join(' ').trim() || first;
+  return kept.length > QUESTION_MAX ? `${kept.slice(0, QUESTION_MAX - 1).trimEnd()}…` : kept;
 }
 
 /**

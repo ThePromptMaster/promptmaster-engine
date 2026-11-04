@@ -23,6 +23,7 @@ export const sw: Record<keyof typeof en, string> = {
   'stop.noProgressNone': 'Inazunguka pale pale: "{action}" ilichaguliwa mara {n} mfululizo kwa hatua ileile, na hakuna hata mara moja iliyohifadhi chochote. Kila kilichozalishwa kimo kwenye kumbukumbu ya mzunguko.',
   'stop.noProgressSome': 'Inazunguka pale pale: "{action}" ilichaguliwa mara {n} mfululizo kwa hatua ileile, na ni {saved} tu kati yake zilizohifadhi toleo jipya. Kila kilichozalishwa kimo kwenye kumbukumbu ya mzunguko.',
   'stop.noChange': 'Vitendo {n} vya mwisho havikubadilisha chochote kwenye hatua hii — hakuna toleo jipya, hakuna uamuzi uliorekodiwa, hakuna hitaji lililotimizwa. Niambie nifanye nini tofauti, au fanya sehemu inayofuata mwenyewe kisha bonyeza Endelea tena.',
+  'stop.repeatQuestion': 'Niliuliza hili awali — "{asked}" — na ukajibu "{answer}". Vitendo {n} kwenye {stage} tangu hapo havijalimaliza, kwa hiyo nimesimama badala ya kukuuliza tena. Bado wazi: {open} Hakuna kitakachotumika zaidi hadi uchukue hatua: badilisha maandishi mwenyewe, au niambie nifanye nini tofauti kisha bonyeza Endelea tena.',
   'stop.roundsIdle': 'Go imefanya mizunguko {n} tangu kitu kipya kifike kwenye mradi, kwa hiyo haianzishi mzunguko mwingine: inaendelea hadi {stage}. Kilichobaki wazi kinasonga mbele kama vipengele vilivyo wazi na mapungufu.',
   'stop.aDecision': 'uamuzi kutoka kwako',
   'stop.resumeCheck': 'endeleza Go ili ikague lengo tena',

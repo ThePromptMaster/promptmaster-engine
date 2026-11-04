@@ -213,3 +213,20 @@ describe('buildAgentState: the latest change on the stage (19 Oct, Research › 
     expect(digest.latest_change).toBeUndefined();
   });
 });
+
+describe('what the planner is told about its own limits and the page (4 Nov, Lakeside)', () => {
+  const base = { template: BOOK_V1, state: initialState(BOOK_V1), stage: stage('research'), bundles: {}, steps: [], stageEvaluation: evaluation('research') };
+
+  it('a revise the cap withheld is said, with how many moves took it', () => {
+    expect(buildAgentState(base).polish_paused).toBeUndefined();
+    expect(buildAgentState({ ...base, polishPaused: 2 }).polish_paused).toBe(2);
+  });
+
+  it('a button carries what it does', () => {
+    const digest = buildAgentState({
+      ...base,
+      controls: [{ id: 'refine_shorter', label: 'Refine: make it shorter', place: 'more_menu', does: 'rewrites the whole draft shorter' }],
+    });
+    expect(digest.controls).toEqual([{ label: 'Refine: make it shorter', where: 'under "More" at the bottom of the stage', does: 'rewrites the whole draft shorter' }]);
+  });
+});
