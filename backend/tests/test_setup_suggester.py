@@ -210,3 +210,18 @@ def test_screening_in_batches_is_offered_the_assessment_workflow():
     text = SETUP_SUGGESTER_SYSTEM + build_setup_prompt("Screen candidates")
     assert "- assessment:" in text and "assessment" in _VALID_WORKFLOWS
     assert SetupSuggestion.model_fields["workflow"].annotation is not None
+
+
+def test_the_setup_never_invents_headings_and_keeps_the_delegation_verbatim():
+    """4 Nov (Sean, support-software memo): five required contents and no
+    headings became seven exact headings in a fixed order, and "Handle routine
+    drafting, arithmetic, checking and corrections without asking me" became
+    "Handle drafting and arithmetic without asking"."""
+    from promptmaster.setup_suggester import SETUP_SUGGESTER_SYSTEM
+
+    assert "Two-section memo: Findings / Recommendations" not in SETUP_SUGGESTER_SYSTEM
+    assert "Section names and their order go in only when the user gave them" in SETUP_SUGGESTER_SYSTEM
+    assert "section names and order are the writer's choice" in SETUP_SUGGESTER_SYSTEM
+    assert "never invent headings, an order or a number of sections" in SETUP_SUGGESTER_SYSTEM
+    assert "Copy word for word, never shortened or merged" in SETUP_SUGGESTER_SYSTEM
+    assert "what may be done without asking them" in SETUP_SUGGESTER_SYSTEM

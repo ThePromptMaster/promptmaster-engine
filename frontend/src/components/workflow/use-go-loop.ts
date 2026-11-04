@@ -54,6 +54,7 @@ import { appendWorkflowEvent } from '@/lib/supabase/workflow';
 import { answerAsFact, answerDocuments, measuredDocument } from '@/lib/workflow/answers';
 import { authorizeRun, DEFAULT_AUTO_WINDOWS } from '@/lib/agent/authorize';
 import { buildAgentState } from '@/lib/agent/digest';
+import { delegationSentences } from '@/lib/agent/delegation';
 import { performStep, type PerformContext, type StepOutcome } from '@/lib/agent/perform';
 import { needsExpert, packageMarkdown, recordDocuments } from '@/lib/agent/expert';
 import { auditStop, describeAudit, proposedDefault, touchesObjective } from '@/lib/agent/stop-audit';
@@ -374,7 +375,7 @@ export function useGoLoop(opts: Options) {
           template: o.template, state: o.state, stage: o.stage, bundles: o.bundles,
           stageEvaluation: evaluateStage(o.template, o.stage.id, context), latestEvaluation: o.latestEvaluation,
           steps: [...priorStepsRef.current, ...stepsRef.current],
-          context, approvedOutline: o.approvedOutline, facts, dataFiles: dataFileBriefs(o.project), tools: toolsFor(o.project), routine: o.project.routine_decisions ?? undefined, memory, controls: o.getControls?.() ?? undefined,
+          context, approvedOutline: o.approvedOutline, facts, dataFiles: dataFileBriefs(o.project), tools: toolsFor(o.project), routine: o.project.routine_decisions ?? undefined, delegation: delegationSentences(o.project), memory, controls: o.getControls?.() ?? undefined,
         }),
         approvedByUser, deliverableDone: o.deliverableDone,
         interpret: interpret
@@ -777,7 +778,7 @@ export function useGoLoop(opts: Options) {
                 state: buildAgentState({
                   template: o.template, state: o.state, stage: o.stage, bundles: o.bundles,
                   stageEvaluation, latestEvaluation: o.latestEvaluation, steps: [...priorStepsRef.current, ...stepsRef.current],
-                  context, approvedOutline: o.approvedOutline, facts, dataFiles: dataFileBriefs(o.project), tools: toolsFor(o.project), routine: o.project.routine_decisions ?? undefined, memory: reconsider ? [reconsider.note, ...memory].slice(0, 24) : memory, controls: o.getControls?.() ?? undefined,
+                  context, approvedOutline: o.approvedOutline, facts, dataFiles: dataFileBriefs(o.project), tools: toolsFor(o.project), routine: o.project.routine_decisions ?? undefined, delegation: delegationSentences(o.project), memory: reconsider ? [reconsider.note, ...memory].slice(0, 24) : memory, controls: o.getControls?.() ?? undefined,
                   returnTargets: goBackTo,
                   // Said, not silently withheld (4 Nov, Lakeside): "I cannot make that edit from here".
                   polishPaused: polishCapped(polishedHere, stageEvaluation.canAdvance) && !allowed.includes('revise_stage') ? polishedHere : undefined,
