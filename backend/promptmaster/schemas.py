@@ -702,6 +702,9 @@ class GenerateStageArtifactResponse(WebUse):
     content: str = Field(default="")
     items: list[StageItem] = Field(default_factory=list)
     finish_reason: str = Field(default="")
+    #: What the writer said to the user rather than the reader, taken off the
+    #: end of `content` (4 Nov). Shown as the reply; never part of the work.
+    note_to_user: str = Field(default="")
     model_used: str = Field(
         default="",
         description="Model that produced this draft, resolved server-side (FR-10).",

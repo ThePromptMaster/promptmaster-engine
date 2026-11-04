@@ -44,7 +44,7 @@ from .schemas import (
 )
 from .project_context import context_block
 from .notation import NOTATION_RULE
-from .reader_text import READER_TEXT_RULE
+from .reader_text import READER_TEXT_RULE, USER_NOTE_MARKER, USER_NOTE_RULE
 from .saved_documents import format_prior_documents
 from .saved_text_checks import VERIFY_RULE, disproved_missing
 
@@ -77,6 +77,7 @@ _PROSE_INSTRUCTION = (
     "simplified or childish. When the user has given the topic or the choice, "
     "write one finished piece on exactly that; do not offer alternatives or "
     "several versions unless they ask for options.\n\n" + NOTATION_RULE + "\n\n" + READER_TEXT_RULE
+    + "\n\n" + USER_NOTE_RULE
 )
 
 _LIST_INSTRUCTION = (
@@ -563,7 +564,8 @@ def build_stage_prompt(
     else:
         parts += [
             "",
-            "Write this stage's artifact and nothing else. Markdown is fine; "
+            "Write this stage's artifact and nothing else, except a note to the user "
+            f"after the line {USER_NOTE_MARKER} if you have one. Markdown is fine; "
             "headings only if the artifact genuinely has sections.",
         ]
 

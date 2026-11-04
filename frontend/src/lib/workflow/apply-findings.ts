@@ -22,6 +22,7 @@ import type { AuditFinding, GenerateStageArtifactRequest } from '@/types';
 import type { Project } from '@/types/project';
 import { keepFound, webAccessOf, withWebLine, type WebFound } from '@/lib/workflow/web-found';
 import { headingOutline, joinParts, needsParts, partInstruction, splitIntoParts } from '@/lib/workflow/long-prose';
+import { splitUserNote } from './user-note';
 
 export interface PendingRevision {
   findings: AuditFinding[];
@@ -148,7 +149,8 @@ export async function reviseWithFindings(args: {
   return {
     findings,
     before: content,
-    after: res.content,
+    // A note to the user is not the end of the document (4 Nov, Lakeside).
+    after: splitUserNote(res.content).body,
     instruction: res.instruction,
     finishReason: res.finish_reason || null,
     source,
@@ -185,7 +187,7 @@ async function reviseInParts(args: {
     );
     const web = i === 0 ? await keepFound(project, res, where) : null;
     const kept = !res.content.trim() || res.finish_reason === 'length';
-    results[i] = { text: kept ? chunks[i] : res.content, kept, instruction: res.instruction, web };
+    results[i] = { text: kept ? chunks[i] : splitUserNote(res.content).body, kept, instruction: res.instruction, web };
   };
   await revisePart(0);
   for (let next = 1; next < chunks.length; next += PART_CONCURRENCY) {

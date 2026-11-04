@@ -90,6 +90,7 @@ import { deriveExecutionLabel } from './labels';
 import { returnInstruction } from './return-work';
 import { stageMoveActor } from './policy';
 import { describeVersionChange, versionChange } from '@/lib/workflow/version-change';
+import { splitUserNote, userNoteLine } from '@/lib/workflow/user-note';
 
 export interface PerformContext {
   project: Project;
@@ -762,7 +763,12 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         return done(key, { status: 'failed', output: 'The model returned nothing usable.', toolsUsed: ['model'], changes: {} });
       }
       const whole = await finishCutDraft(ctx, inputs, model, ctx.stage, joined, res.finish_reason);
-      const checked = revising && !before ? await keptAndSupplied(ctx, head, whole.content, instruction, []) : { content: whole.content, notes: [] };
+      // 4 Nov (Sean, Lakeside): what the writer says to the user is a reply,
+      // not the end of the document — taken off by the backend, and here from
+      // a draft continued after a cut-off.
+      const split = rendererHoldsItems(ctx.stage.renderer) ? { body: whole.content, note: '' } : splitUserNote(whole.content);
+      const noteLine = userNoteLine([res.note_to_user, split.note].filter(Boolean).join(' '));
+      const checked = revising && !before ? await keptAndSupplied(ctx, head, split.body, instruction, []) : { content: split.body, notes: [] };
       const content = checked.content;
       // The user's own latest version outranks an older fact it changed: a
       // revision that would put the fact's value back is not saved, and the
@@ -804,7 +810,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         instruction: instruction || ctx.step.rationale || ctx.stage.entry_prompt_hint || '',
         model: res.model_used || ctx.project.model,
         mode: modeForStage(ctx.project, ctx.stage),
-        change_summary: (revising ? `Go mode: ${instruction || 'revised'}${checked.notes.length ? ` — ${checked.notes.join(' ')}` : ''}` : 'Go mode draft.').slice(0, 1000),
+        change_summary: ((revising ? `Go mode: ${instruction || 'revised'}${checked.notes.length ? ` — ${checked.notes.join(' ')}` : ''}` : 'Go mode draft.') + (noteLine ? ` — ${noteLine}` : '')).slice(0, 1000),
         finish_reason: whole.finishReason,
       });
       const versionId = (created as { id?: unknown } | null)?.id;
@@ -821,7 +827,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         status: 'succeeded', toolsUsed: ['model'],
         // What changed, so the record can be checked against the project (SN-25).
         changes: typeof versionId === 'string' ? { version_ids: [versionId] } : {},
-        output: [`${revising ? 'Revised' : 'Drafted'} ${ctx.stage.label} — saved as a new version (${content.length.toLocaleString()} characters).${checked.notes.length ? ` ${checked.notes.join(' ')}` : ''}${routineKept ? ` ${routineKept.note}` : ''}`, ...reconfirmed].join(' '),
+        output: [`${revising ? 'Revised' : 'Drafted'} ${ctx.stage.label} — saved as a new version (${content.length.toLocaleString()} characters).${checked.notes.length ? ` ${checked.notes.join(' ')}` : ''}${routineKept ? ` ${routineKept.note}` : ''}`, ...reconfirmed, ...(noteLine ? [noteLine] : [])].join(' '),
         ...(routineKept ? { params: { ...params, ...routineKept.params } } : {}),
       });
     }
@@ -1249,6 +1255,11 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         ? { content, cut: false, continued: false, finishReason: 'stop' as string | null }
         : await finishCutDraft(ctx, inputs, model, target, content, res.finish_reason);
       content = whole.content;
+      // 4 Nov (Sean, Lakeside): what the writer says to the user is a reply,
+      // never the end of the document.
+      const userSplit = before ? { body: content, note: '' } : splitUserNote(content);
+      content = userSplit.body;
+      const recheckNote = userNoteLine([res.note_to_user, userSplit.note].filter(Boolean).join(' '));
       if (partsKept.length) {
         checkedPartsNote = `Part${partsKept.length === 1 ? '' : 's'} ${partsKept.join(', ')} of ${chunks.length} could not be revised within the length limit and ${partsKept.length === 1 ? 'is' : 'are'} kept as ${partsKept.length === 1 ? 'it was' : 'they were'}.`;
       }
@@ -1335,7 +1346,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         instruction,
         model: res.model_used || ctx.project.model,
         mode: modeForStage(ctx.project, target),
-        change_summary: `Repaired after a change: ${why}${note.note ? ` — ${note.note}` : ''}${checked.notes.length ? ` ${checked.notes.join(' ')}` : ''}${checkedPartsNote ? ` ${checkedPartsNote}` : ''}`.slice(0, 1000),
+        change_summary: `Repaired after a change: ${why}${note.note ? ` — ${note.note}` : ''}${checked.notes.length ? ` ${checked.notes.join(' ')}` : ''}${checkedPartsNote ? ` ${checkedPartsNote}` : ''}${recheckNote ? ` — ${recheckNote}` : ''}`.slice(0, 1000),
         finish_reason: whole.finishReason,
       });
       const versionId = (created as { id?: unknown } | null)?.id;
@@ -1426,7 +1437,8 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
           : `Repaired ${target.label} (${why}) — saved as a new version; it stays reopened until: ${evaluation.unmet.filter((c) => c.blocking).map((c) => c.label).join('; ')}.`),
           ...(chunks.length > 1 ? [`It was revised in ${chunks.length} parts, being too long for one pass.`] : []),
           ...(checkedPartsNote ? [checkedPartsNote] : []),
-          ...reconfirmed].join(' '),
+          ...reconfirmed,
+          ...(recheckNote ? [recheckNote] : [])].join(' '),
       });
     }
 
@@ -1782,7 +1794,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
           const generated = generationContent(target, res);
           const before = rendererHoldsItems(target.renderer) ? parseItems(head) : null;
           const after = before ? parseItems(generated) : null;
-          const content = before && after ? serializeItems(carryUserFields(before, after, itemSchemaFor(target))) : generated;
+          const content = before && after ? serializeItems(carryUserFields(before, after, itemSchemaFor(target))) : before ? generated : splitUserNote(generated).body;
           if (content) {
             const created = await ctx.appendStageVersion(target.id, target.label, {
               content, source_operation: 'agent_revise', base_content: head, instruction,
@@ -2236,7 +2248,9 @@ async function keptAndSupplied(
   const removed = notRemovedByUser(ctx.project.removed_text);
   // A line of the earlier version is read in that version: a figure it works
   // out there is its own, whatever value a fact replaced.
-  const kept = keepUnasked(head, content, asked, (line) => leftoverValues(line, superseded, { derivedIn: head }).length === 0 && removed(line));
+  // A note to the user at the end of the earlier version is not a line of it
+  // to keep (4 Nov, Lakeside: each removal brought a note back).
+  const kept = keepUnasked(splitUserNote(head).body, content, asked, (line) => leftoverValues(line, superseded, { derivedIn: head }).length === 0 && removed(line) && !isChangeNote(line));
   const notes: string[] = [];
   if (kept.restored.length) notes.push(`Kept ${describeLines(kept.restored)}, which the revision dropped without being asked.`);
   if (kept.reported.length) notes.push(`No longer there: ${describeLines(kept.reported, 2)}.`);

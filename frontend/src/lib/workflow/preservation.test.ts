@@ -211,3 +211,21 @@ describe('values an instruction corrects', () => {
     expect(kept.restored).toEqual(['Prepared for the board.']);
   });
 });
+
+describe('a note to the user is a change note (4 Nov, Lakeside proposal)', () => {
+  it.each([
+    'Notes for you, outside the proposal:',
+    '**Notes for you (not part of the proposal)**',
+    '*Reply to you, not part of the document:*',
+    '- **What approval covers:** approving this document does not authorise sending it, booking the workshop or spending money.',
+    '- No further drafting pass is needed unless you change a fact.',
+    '- The proposal now ends with section 7. The rest of the text is unchanged.',
+  ])('%s', (line) => {
+    expect(isChangeNote(line)).toBe(true);
+  });
+
+  it('a line of the proposal itself is not', () => {
+    expect(isChangeNote('Please confirm whether Option B suits you, and answer the items in section 6.')).toBe(false);
+    expect(isChangeNote('**Not part of this proposal:** follow-up support and travel.')).toBe(false);
+  });
+});

@@ -571,6 +571,11 @@ export interface GenerateStageArtifactResponse extends WebUse {
   finish_reason: string;
   /** The model the call actually ran on, resolved server-side (FR-10). */
   model_used: string;
+  /**
+   * What the writer said to the user rather than the reader, taken off the end
+   * of `content` by the backend (4 Nov). The reply, never part of the work.
+   */
+  note_to_user?: string;
 }
 
 /**
