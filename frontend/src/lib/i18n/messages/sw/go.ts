@@ -62,7 +62,7 @@ export const sw: Record<keyof typeof en, string> = {
   'runStatus.stopped': 'Imesimamishwa',
   'runStatus.failed': 'Imeshindwa',
   'go.title': 'Hali ya Go',
-  'go.intro': 'Inakufanyia hatua zinazofuata, moja baada ya nyingine, na inakueleza ilichofanya. Inakuuliza tu pale uamuzi ni wako.',
+  'go.intro': 'Go inaendesha hatua zinazofuata za mradi kwa ajili yako, moja baada ya nyingine, na inakueleza ilichofanya. Inakuuliza tu pale uamuzi ni wako.',
   'go.setUp': 'Weka mipangilio ya Go',
   'go.letRun': 'Acha Go ishughulikie hili',
   'go.otherTab': 'Uendeshaji huu unaongozwa kutoka kichupo kingine. Utaendelea hapa kichupo hicho kikifungwa.',

@@ -43,6 +43,7 @@ import { clearSetupDraft, loadSetupDraft, saveSetupDraft } from '@/lib/supabase/
 import { SIMPLE_GUIDE_QUESTIONS, useExperience } from '@/lib/projects/experience';
 import { sourceAccessNote } from '@/lib/projects/links';
 import { describeDraft, worthKeeping, type DesignerState, type FrontDoorState, type SetupDraftState } from '@/lib/projects/setup-draft';
+import { SampleField } from '@/components/projects/sample-field';
 
 /**
  * PM-09 — the unified entry.
@@ -525,6 +526,7 @@ export default function NewProjectPage() {
           audience: draft.audience.trim() || 'General',
           constraints: draft.constraints.trim(),
           context: draft.context.trim(),
+          ...(draft.sample_output?.trim() ? { sample_output: draft.sample_output.trim() } : {}),
           // A book's deliverable is prose. Left empty, every chapter prompt
           // read "Output format: (none)" and the mode's structural habits
           // filled the gap (2 Oct: "it really wants to make outlines").
@@ -801,6 +803,9 @@ export default function NewProjectPage() {
               onImages={setStartImages}
               disabled={working !== null}
             />
+            <div className="mt-3">
+              <SampleField value={draft.sample_output ?? ''} onChange={(v) => setDraft((d) => ({ ...d, sample_output: v }))} disabled={working !== null} />
+            </div>
             {/* The backend opens no link; say so before any work rests on one (email 7). */}
             {linkNote && (
               <p role="note" aria-label={t('start.links')} className="mt-3 flex gap-1.5 text-label text-[var(--pm-tertiary)]">
@@ -831,6 +836,13 @@ export default function NewProjectPage() {
               <span aria-hidden className="material-symbols-outlined text-[20px]">arrow_upward</span>
             </button>
           </div>
+          {/* 4 Nov (Jordan, via Sean): the sign that work had started was far below the button pressed. */}
+          {working === 'creating' && (
+            <p role="status" data-start-status className="mt-2 flex items-center justify-end gap-2 text-body text-[var(--on-surface)]">
+              <span aria-hidden className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--pm-primary)] border-t-transparent" />
+              {t('start.creatingNow')}
+            </p>
+          )}
           <div className="mt-2 space-y-1 text-end text-label text-[var(--on-surface-variant)]">
             <p><span className="font-medium text-[var(--on-surface)]">{t('start.quickAnswer')}</span> — {t('start.quickNote')}</p>
             <p><span className="font-medium text-[var(--on-surface)]">{t('start.startConversation')}</span> — {t('start.conversationNote')}</p>

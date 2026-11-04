@@ -10,6 +10,8 @@ export interface PMInput {
   output_format: string;
   /** The user's source material — facts, figures, background — kept apart from the objective. */
   context?: string;
+  /** A sample of what good looks like (4 Nov): matched for depth and style, never a source. */
+  sample_output?: string;
   /** Accepted facts and requirements, current only, each with its source (F1, 7 Oct). */
   facts?: { statement: string; subject: string; kind: 'fact' | 'requirement'; source: string; replaces?: string }[];
   /** Saved web sources, cited as [S1]… in this order (20 Oct). */

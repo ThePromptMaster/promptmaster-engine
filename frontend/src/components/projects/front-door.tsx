@@ -390,6 +390,8 @@ export function FrontDoor({
       <aside aria-label={t('door.briefLabel')} className="h-fit rounded-2xl bg-[var(--surface-container-low)] px-5 py-4">
         <p className="text-label uppercase tracking-wider text-[var(--on-surface-variant)]">{t('door.outlineTitle')}</p>
         <p className="mt-1 text-label text-[var(--on-surface-variant)]">{t('door.outlineNote')}</p>
+        {/* 4 Nov (Jordan, via Sean): the fields looked required. */}
+        <p data-all-optional className="mt-1 text-label text-[var(--on-surface-variant)]">{t('door.allOptional')}</p>
 
         <label className="mt-3 block text-label font-semibold text-[var(--on-surface)]" htmlFor="outline-objective">{t('door.objective')}</label>
         <AutoGrowTextarea

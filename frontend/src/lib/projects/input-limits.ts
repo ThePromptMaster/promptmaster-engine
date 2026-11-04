@@ -14,6 +14,8 @@ export const INPUT_LIMITS = {
   constraints: 60_000,
   output_format: 60_000,
   context: 200_000,
+  /** A sample of what good looks like (4 Nov). */
+  sample_output: 60_000,
   /** A revise request, chat instruction or stage hint. */
   instruction: 20_000,
   /**

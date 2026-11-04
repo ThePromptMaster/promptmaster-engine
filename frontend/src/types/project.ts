@@ -140,6 +140,8 @@ export interface Project {
    * board-level brief overloaded the objective past its limit).
    */
   context?: string;
+  /** A sample of what good looks like (4 Nov); a standard for depth and style, never a source. */
+  sample_output?: string | null;
 
   mode: ModeType;
   custom_name: string;
@@ -381,6 +383,7 @@ export interface ProjectInput {
   constraints?: string;
   output_format?: string;
   context?: string;
+  sample_output?: string;
   mode?: ModeType;
   model?: string;
   workflow?: string;
@@ -403,6 +406,7 @@ export type ProjectPatch = Partial<
     | 'audience'
     | 'constraints'
     | 'context'
+    | 'sample_output'
     | 'output_format'
     | 'mode'
     | 'custom_name'
