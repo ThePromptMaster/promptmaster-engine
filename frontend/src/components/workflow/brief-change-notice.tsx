@@ -5,6 +5,7 @@ import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import type { MessageKey } from '@/lib/i18n/messages/en';
 import { BRIEF_FIELD_LABEL, type OpenChange, type WatchedField } from '@/lib/workflow/brief-change';
 import type { WorkflowEvent } from '@/lib/workflow/types';
+import type { ChangeOutcome } from '@/lib/workflow/change-outcomes';
 
 /**
  * "Changing this reopened Recommendations for a recheck — it relied on
@@ -29,6 +30,7 @@ export function BriefChangeNotice({
   updating = false,
   judging = false,
   settled = null,
+  outcomes = [],
   onDismissSettled,
 }: {
   change: OpenChange | null;
@@ -45,6 +47,8 @@ export function BriefChangeNotice({
   judging?: boolean;
   /** The last change, once everything it reopened is finished again. */
   settled?: { event: WorkflowEvent; stageIds: string[] } | null;
+  /** For each stage it reopened: the version that finished it, by whom, and what its check found (4 Nov). */
+  outcomes?: ChangeOutcome[];
   onDismissSettled?: () => void;
 }) {
   const t = useT();
@@ -66,6 +70,27 @@ export function BriefChangeNotice({
           <button onClick={onDismissSettled} className="ms-auto text-label text-[var(--pm-primary)] hover:underline">
             {t('bcn.dismiss')}
           </button>
+        )}
+        {outcomes.length > 0 && (
+          // 4 Nov (Sean): which stages were updated, which rechecked, which still have findings open.
+          <ul data-change-outcomes className="basis-full list-disc ps-6 text-label">
+            {outcomes.map((o) => (
+              <li key={o.stageId}>
+                {t('bcn.outcomeLine', {
+                  stage: stageLabel(o.stageId),
+                  what: o.version === null ? t('bcn.kept') : t('bcn.updatedBy', { version: o.version, who: o.by === 'go' ? t('bcn.byGo') : t('bcn.byYou') }),
+                  check:
+                    o.check === 'table'
+                      ? o.count ? t('bcn.rows', { count: o.count }) : t('bcn.rowsDecided')
+                      : o.check === 'not_checked'
+                      ? t('bcn.notChecked')
+                      : o.check === 'clean'
+                      ? t('bcn.clean')
+                      : t('bcn.findings', { count: o.count }),
+                })}
+              </li>
+            ))}
+          </ul>
         )}
       </div>
     );
