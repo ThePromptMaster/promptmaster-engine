@@ -53,6 +53,28 @@ FINDINGS_TABLE_RULE = (
 )
 
 
+def setup_block(inputs: PMInput) -> str:
+    """The project's setup, which the stage's text is written to follow (4 Nov).
+
+    Production pass of Sean's support-software prompt: the brief said
+    "Audience: Executive", the setup's own audience. The check was shown the
+    objective and the user's material, not the setup, so it read the audience
+    as invented — "not met" twice, the brief revised twice, then Go stopped.
+    """
+    fields = [
+        ("Audience", inputs.audience),
+        ("Constraints", inputs.constraints),
+        ("Output format", inputs.output_format),
+    ]
+    lines = [f"{name}: {' '.join(str(value).split())[:1_500]}" for name, value in fields if str(value or "").strip()]
+    if not lines:
+        return ""
+    return (
+        "THE PROJECT'S SETUP (settled in the project; text that follows it is not invented and is never a "
+        "reason for \"not met\", even where the user's own material does not say it):\n" + "\n".join(lines) + "\n"
+    )
+
+
 def build_check_prompt(
     inputs: PMInput, stage_label: str, criterion: str, content: str,
     measured: list[MeasuredLine] | None = None, findings_table: bool = False,
@@ -66,6 +88,7 @@ def build_check_prompt(
         )
     user = (
         f"PROJECT OBJECTIVE: {inputs.objective}\n"
+        + setup_block(inputs)
         + (f"{context_block(inputs, limit=CHECK_CONTEXT_MAX)}\n" if context_block(inputs) else "")
         + f"STAGE: {stage_label}\n"
         + (f"{FINDINGS_TABLE_RULE}\n" if findings_table else "")

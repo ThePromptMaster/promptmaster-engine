@@ -21,7 +21,8 @@ def test_the_prompt_judges_only_the_statement_from_the_text(basic_inputs):
 
 def test_a_long_stage_is_cut_and_says_so(basic_inputs):
     _, user = build_check_prompt(basic_inputs, "S", "c", "x" * (MAX_CHECK_CONTENT * 2))
-    assert user.count("x") <= MAX_CHECK_CONTENT + 2
+    stage_text = user.split("--- THE STAGE'S TEXT ---")[1].split("--- END ---")[0]
+    assert stage_text.count("x") <= MAX_CHECK_CONTENT + 2
     assert "not shown" in user
 
 
@@ -45,3 +46,14 @@ def test_the_route_returns_the_verdict(basic_inputs):
         app.dependency_overrides.pop(get_client, None)
     assert res.status_code == 200
     assert res.json()["met"] is False and res.json()["reason"] == "No scope is stated."
+
+
+def test_the_check_is_given_the_projects_setup_as_settled(basic_inputs):
+    """4 Nov (production pass, Sean's support-software prompt): the brief's
+    "Audience: Executive" — the setup's own audience — was judged invented,
+    because the check was never shown the setup; Go revised twice and stopped."""
+    inputs = basic_inputs.model_copy(update={"audience": "Executive", "constraints": "Under 500 words.", "output_format": "Decision memo"})
+    _, user = build_check_prompt(inputs, "Brief", "I approve this brief as the basis for the memo.", "Audience: Executive")
+    assert "THE PROJECT'S SETUP (settled in the project; text that follows it is not invented" in user
+    assert "Audience: Executive" in user.split("--- THE STAGE'S TEXT ---")[0]
+    assert "Constraints: Under 500 words." in user and "Output format: Decision memo" in user
