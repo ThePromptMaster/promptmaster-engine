@@ -56,6 +56,23 @@ def test_a_triage_table_asks_which_accepted_fact_a_finding_carries_out_or_alters
     assert "There are no promised tester payments." in prompt
 
 
+def test_a_requirement_the_brief_states_counts_as_decided_but_the_objective_alone_does_not():
+    """4 Nov (Sean, support-software memo): a "major" heading row quoted the
+    brief's Output format; only facts were matched, so Go stopped for it."""
+    stage = StageDescriptor(id="check", label="Check the memo", renderer="review", entry_prompt_hint="Check it.", artifact_kind="critique_report")
+    inputs = _inputs().model_copy(update={
+        "output_format": "Decision memo with headings (Facts / Calculations / Recommendation), under 500 words",
+    })
+    system, user = build_stage_prompt(inputs, stage, StageDigest(entries=[]), _check_schema())
+    prompt = system + user
+    assert "its constraints, its output format, or the user's own request in the project context" in prompt
+    assert "never the objective alone" in prompt
+    assert "without the field's name" in prompt
+    assert "whatever its severity" in prompt
+    # The output format it may quote is in the same prompt.
+    assert "Decision memo with headings (Facts / Calculations / Recommendation)" in prompt
+
+
 def test_a_table_without_triage_is_not_asked():
     schema = StageItemSchema(item_label="segment", fields=[StageItemField(key="who", label="Who")])
     stage = StageDescriptor(id="aud", label="Audience", renderer="list", entry_prompt_hint="List them.")

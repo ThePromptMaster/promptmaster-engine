@@ -39,7 +39,7 @@ import { lookupAndVerify } from '@/lib/workflow/verify';
 import { figuresFromOutput, readStageFigures, withRunFigures, type StageFigures } from '@/lib/workflow/figures';
 import { applyRunBlocked, applyRunResult } from '@/lib/workflow/run-result';
 import { inputsChanged, stageInputs } from '@/lib/workflow/stage-inputs';
-import { applyTriage, isTriageTable, recordedDecisions, splitUntriaged } from '@/lib/workflow/triage';
+import { applyTriage, decidedWords, isTriageTable, recordedDecisions, splitUntriaged } from '@/lib/workflow/triage';
 import { findingsAllDecided, restatesTriage } from '@/lib/workflow/triage-approval';
 import { modeForStage } from '@/lib/workflow/stage-mode';
 import { restoreDecided } from '@/lib/workflow/commit-check';
@@ -1057,7 +1057,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       if (!ctx.appendStageVersion) throw new Error('This view cannot save versions.');
       // A row that only carries out what the user recorded is accepted in
       // code, with the fact as its reason; the model decides the rest (1 Nov).
-      const recorded = recordedDecisions(r.routine, r.schema, currentFacts(ctx.project.facts));
+      const recorded = recordedDecisions(r.routine, r.schema, decidedWords(ctx.project));
       const forModel = r.routine.filter((i) => !recorded.some((d) => d.id === i.id));
       const res = forModel.length
         ? await api.agentTriage(
@@ -1355,7 +1355,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       const triaged: string[] = [];
       if (before && isTriageTable(tableSchema) && ctx.run.policy === 'autonomous' && ctx.project.routine_decisions === 'handle') {
         const rows = parseItems(content) ?? [];
-        const facts = currentFacts(ctx.project.facts);
+        const facts = decidedWords(ctx.project);
         const { routine: all } = splitUntriaged(rows, tableSchema, facts);
         // What carries out the user's own recorded decision is accepted in code (1 Nov).
         const recorded = recordedDecisions(all, tableSchema, facts);
