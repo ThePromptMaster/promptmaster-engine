@@ -710,8 +710,7 @@ database ceiling is 20, the Autonomous "Keep going" setting);
 a window the user clicks is unmarked and starts the count again. What the guard cannot do
 is tell a click from a client that leaves the mark off — the row is written by the user's
 own session, so this holds the loop to its terms rather than defending the user against
-their own browser. It is also forgotten on reload (a reloaded run asks before its next
-window), and it still needs the tab open — a run that survives a closed tab is not
+their own browser. Since 26 Oct a reload restores the allowance (`use-go-loop` reads it back), and it still needs the tab open — a run that survives a closed tab is not
 built. Also since 2026-10-01 the planner is given **what the project has already
 decided** (`lib/agent/memory.ts`: skips and overrides with their reasons, reopenings,
 priority decisions, suggestions taken and turned down, the user's answers to Go's
@@ -1007,8 +1006,8 @@ evaluator, not by the conflict check.
 Sean, 5 Oct: "a sequence of small changes should not bypass a boundary that one larger
 change would trigger." Delegation is per approval (L-49): Go may commit a routine one, and
 each is checked on its own. Nothing adds them up. The only cumulative bound that exists is
-the run's step budget (12 by default) and the 20-window "keep going" limit;
-`agent_runs.budget_usd` is still not enforced (L-B4). A spend or scope limit would be a
+the run's step budget (25 by default since 18 Oct) and the 20-window "keep going" limit, and
+since 4 Nov the run's call ceiling (L-159); `agent_runs.budget_usd` is still not enforced (L-B4). A spend or scope limit would be a
 project-level field read by the same database guard that reads `routine_decisions`
 (`20261018000100`), summing the committed changes of a kind. With per-call cost now
 attributed to Go steps (E1), the spend half has its data.
@@ -2951,4 +2950,112 @@ A problem that was a deleted line has no quote, and a row is named on the planne
 it. Quotes from a table are shown with their Markdown (`| **90** | **Total** |`). When Go stops for
 an approval before the planner runs (`needsUser` with `openElsewhere`), the rows are listed as
 before, unread against the version.
+
+### L-153 — A correction the brief already settles is routine, whatever its severity (2026-11-04)
+
+Shipped in #489, with the setup changes in #490 and #491.
+
+Sean's support-software memo: the check's row f1 asked for the headings the Output format named,
+rated "major", and quoted that Output format as what it carried out. Only accepted facts were
+matched, so it fell back to its severity and Go stopped for a correction the brief had settled.
+A row's `implements`/`changes` quote is now matched against the brief's own requirements too: the
+constraints and the output format whole, and the user's request (project context) a line at a
+time. Under "handle", a row that only carries one out is accepted in code with "Settled by your
+brief — {field}: …"; one that would alter one stays the user's.
+
+The costs: the objective is never matched — nearly any change can claim to serve it — so a
+correction that only restates the objective still goes by severity. A quote spanning two lines of
+the request matches neither and falls back to severity. The headings Sean's setup named were the
+setup's own invention, not his; #490 stops the setup inventing section names and order, and
+keeps delegation sentences word for word, so the case is now settled at the source. Old designs
+whose check stage carries "I have accepted or rejected each finding" beside the automatic rule
+have the box folded into the rule when read (#491). "Carry on with other work first" is offered
+only when another stage awaits a recheck or a draft Go would revise.
+
+### L-154 — Terms checked against what was supplied, by one small reading (2026-11-04)
+
+Shipped in #493. Sean's memo said all $3,380 of option B was nonrefundable; the facts gave that
+only for the $2,880 subscription. Every check of a written stage with supplied material (the
+request and accepted facts) now makes one more small call (`/api/claim-support`) for terms
+attached to the wrong amount, option or item. A claim is kept only with its text quote verbatim in
+the text, and the supplied passage it names, if any, verbatim in what was supplied. Live on Sean's
+memo: v3 flagged twice, the corrected v4 not at all.
+
+The costs: one extra call per check (about $0.01–0.03 on Opus). It is a model's reading, so it
+can miss one or flag a fair paraphrase; a flag is a finding the user or Go decides, never a block.
+It reads the request and facts, not attached files' full text beyond what went into the context.
+
+### L-155 — Checks are given the code's counts; a limit it cannot count is "not verified" (2026-11-04)
+
+Shipped in #494. The stage check, a check table's generation and the routine-approval check are
+told what code counted on the text (or, for a check table, on the written stages before it), and
+told never to estimate a measured limit. A check finding that only estimates a length code counted
+is dropped. A limit code could not count — a named part with no heading of its own — is a
+non-blocking "… — not verified" checklist row, and every check is told it is not verified.
+
+The costs: the drop is a pattern ("about 470–490 words", "No word count was run", "hand
+estimate"); a check that words its estimate otherwise keeps its finding beside the count. A
+not-verified row never blocks, so a part that should have been counted can still be finished
+without one. A routine approval on a findings table is met when every finding has a decision and
+each accepted one says its change (`FINDINGS_TABLE_RULE`): whether the change was made is checked
+on the stage that makes it. The approval check is shown the project's setup (#495), so text that
+follows it is not read as invented.
+
+### L-156 — A check that could not run keeps the last one that did; a test switch can make one fail (2026-11-04)
+
+Shipped in #496. When the version shown has no check that ran, the panel shows the last completed
+check of an earlier version under its own number, and a failed one offers "Run the check again".
+`SIMULATE_FAILURE_USER_IDS` (production: john@ and Sean) may send a check with `simulate: "empty"`
+and get exactly what a real empty reply at the token limit returns, with no model call; the page
+shows "Test: simulate a failed check" only to `ADMIN_USER_IDS` too. The earlier check is about an
+earlier version and says so; it is not this version's. L-134's remaining gaps
+(`audit_findings.py`, the four-call pipeline's consumers) are unchanged.
+
+### L-157 — A check names the work it needs; the change summary says what became of each stage (2026-11-04)
+
+Shipped in #497 and #499. A check stage that does not read the manuscript reads the nearest
+written stage before it, and is not generated while that stage has no saved text ("There is
+nothing in Draft memo yet…"). A stage with no saved work no longer says "Ready to move on". Once a
+change settles, the notice lists each stage it reopened: the version made after it and by whom,
+and what the check on it found (nothing noted, N findings noted, not checked since the change),
+or a findings table's undecided rows; a plain table says only its version.
+
+The costs: "the stage a check reads" is the nearest written stage before it, not a declared
+input; a check meant for an earlier stage, with an empty one between, is held up by the empty
+one. "Not checked since the change" is true of a stage Go repaired with code-measured checks but
+no model check. The summary shows for 12 hours after the change settles, then goes.
+
+### L-158 — The deliverable check reads the outcome tables before it (2026-11-04)
+
+Shipped in #498. The deliverable check is given the outcome tables before the deliverable
+(tables with statuses, not findings tables), each row with its status, and reports a statement a
+row contradicts (reproduced against "Not reproduced"), quoting a row that is on record. At most
+four tables, 8,000 characters each; a table past that is cut. It runs where the deliverable check
+runs: before Go calls the objective met, bounded at two rounds (L-139).
+
+### L-159 — Go's progress in words; a run pauses at 400 model calls; the run's cost includes the planner (2026-11-04)
+
+Shipped in #500. What Go is doing is said in words beside Stop and on the pinned copy; the step
+count, the calls and the cost are under "Run details". A run meter counts every model call made
+while a run is going, priced or not; at 400 the run pauses and no window starts on its own past
+it; only the user's Go, Resume or Continue starts a fresh allowance. The planner's calls are
+tagged `go:plan`, and their cost is now in the run's (it summed its steps only). The project cost
+line says how many of its calls were Go's, for how many steps.
+
+The costs: the meter lives in the tab — a reload starts it at 0, the same as the user's click —
+and it counts any call made in that tab while the run is going (a side-chat question too). It
+counts calls, not dollars, because some calls have no known price. There is still no account- or
+day-level cap in the product: the OpenRouter key's spend limit is the ceiling, because a
+server-side cap would need a shared store the backend does not have by design.
+
+### L-160 — First use: Go's words, optional fields, and a sample of what good looks like (2026-11-04)
+
+Shipped in #501. Go is introduced as "Go runs the next project steps"; Audience, Constraints and
+Output format say Optional, and the conversation's outline says every field is; "Get an answer"
+says the project is being created right under the button; the landing page no longer says a chat
+is faster. A sample of what good looks like (`projects.sample_output`, ≤60,000 characters, folded
+at start and in the setup) reaches every prompt as THE USER'S SAMPLE — matched for depth and
+style, never a source — up to 12,000 characters. It is not shown in the workspace's own setup
+panel yet; it is set at start. The landing walkthrough is proposed, not built, until Sean picks
+the audience and workflow.
 

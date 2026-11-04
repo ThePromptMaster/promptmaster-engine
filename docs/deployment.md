@@ -77,6 +77,7 @@ does not exist in the repository**; and `[db.network_restrictions]` is disabled 
 | `SUPABASE_JWT_SECRET` | If the project signs HS256 | Legacy symmetric signing. Harmless to set alongside `SUPABASE_URL`. |
 | `WORKER_SHARED_SECRET` | Yes | **Must match the frontend's.** |
 | `AUTH_ENFORCED` | No | Defaults to `true`. Set `false` only during a deploy-ordering emergency; it lets unauthenticated requests through, logging `UNAUTHENTICATED_REQUEST`. |
+| `SIMULATE_FAILURE_USER_IDS` | No | Comma-separated Supabase user ids that may send a stage check with `simulate: "empty"` and get back exactly what a real empty reply at the token limit returns, with no model call (`backend/simulation.py`; 4 Nov). **Unset means no one.** Read per call, but Vercel needs a redeploy to see a change. The page shows the switch only to `ADMIN_USER_IDS` as well. Production: john@ and Sean (see the admin allowlist). |
 
 ### Local development
 
