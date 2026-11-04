@@ -876,6 +876,7 @@ export const api = {
       deliverable_label: string;
       content: string;
       accepted: { id: string; stage_label: string; finding: string; suggested_change: string }[];
+      tables?: { label: string; rows: string }[];
       model?: string;
     },
     signal?: AbortSignal

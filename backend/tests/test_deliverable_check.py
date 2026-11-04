@@ -120,3 +120,26 @@ def test_a_term_stated_of_a_whole_amount_is_a_contradiction_to_look_for():
     from promptmaster.deliverable_check import _INSTRUCTION
 
     assert "a term the facts give for only part of an amount stated of the whole of it" in _INSTRUCTION
+
+
+def test_a_statement_a_table_on_record_contradicts_is_found_with_the_row_quoted():
+    """4 Nov (Sean): "In Research, the narrative and evidence table disagreed about
+    what had been reproduced." The write-up is checked against the outcome tables
+    it reports on; the conflict must quote a row that is there."""
+    from promptmaster.deliverable_check import RecordedTable, build_prompt, parse
+    from promptmaster.schemas import PMInput
+
+    inputs = PMInput(objective="Report what was reproduced.", mode="analyst")
+    table = RecordedTable(label="Validation", rows="- v1: Effect of dose on recovery | 12 runs — status: Not reproduced\n- v2: Baseline rate | 3 runs — status: Independently reproduced")
+    text = "Both results were independently reproduced, so the effect of dose on recovery is established."
+    _, user = build_prompt(inputs, "Write-up", text, [], [table])
+    assert "TABLES ON RECORD THAT THE DELIVERABLE REPORTS ON" in user and "### Validation" in user
+    raw = {"findings": [], "contradictions": [
+        {"rule_quote": "Both results were independently reproduced", "conflicts_quote": "v1: Effect of dose on recovery | 12 runs — status: Not reproduced", "problem": "The table says v1 was not reproduced.", "fix": "Say only v2 was reproduced."},
+        {"rule_quote": "Both results were independently reproduced", "conflicts_quote": "v3: Something never in the table", "problem": "x"},
+    ]}
+    out = parse(raw, inputs, text, [], [table])
+    assert len(out.contradictions) == 1
+    assert out.contradictions[0].conflicts_quote.startswith("v1: Effect of dose")
+    # Without the table, the row quote is not on record, so nothing is kept.
+    assert parse(raw, inputs, text, []).contradictions == []

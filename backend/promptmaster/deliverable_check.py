@@ -43,6 +43,18 @@ class AcceptedFinding(BaseModel):
     suggested_change: str = Field(default="", max_length=1_000)
 
 
+class RecordedTable(BaseModel):
+    """A table the deliverable reports on, as its rows stand (4 Nov, Sean: "In
+    Research, the narrative and evidence table disagreed about what had been
+    reproduced")."""
+
+    label: str = Field(default="", max_length=200)
+    rows: str = Field(default="", max_length=8_000)
+
+
+MAX_TABLES = 4
+
+
 class FindingCheck(BaseModel):
     id: str
     #: carried — the deliverable makes the change; not_carried — it still has the
@@ -80,7 +92,10 @@ _INSTRUCTION = (
     "example: a gate that clears on an action whose restart rule lets the risk return unchecked; a threshold "
     "said to justify a permanent decision when the text says it only covers running costs; a measure said to "
     "solve a cash problem it does not solve; two statements about the same thing that cannot both be true; a "
-    "rule applied to a case the text says has different, unknown costs; a term the facts give for only part of "
+    "rule applied to a case the text says has different, unknown costs; a statement of what a TABLE ON RECORD "
+    "shows that the table's own row contradicts (the text says a result was reproduced, confirmed, completed "
+    "or verified; the row says not reproduced, not attempted, deviated or unconfirmed) — quote that row as what "
+    "it conflicts with; a term the facts give for only part of "
     "an amount stated of the whole of it (\"$3,380 upfront, nonrefundable\" when only the $2,880 subscription "
     "is said to be nonrefundable and the setup fee's terms are not given). For each: the rule quoted verbatim, "
     "what it conflicts with quoted verbatim (from the deliverable, or the fact's own words), the problem in one "
@@ -93,7 +108,18 @@ _INSTRUCTION = (
 )
 
 
-def build_prompt(inputs: PMInput, label: str, content: str, findings: list[AcceptedFinding]) -> tuple[str, str]:
+def _tables_block(tables: list[RecordedTable] | None) -> str:
+    kept = [t for t in (tables or [])[:MAX_TABLES] if t.rows.strip()]
+    if not kept:
+        return ""
+    return "TABLES ON RECORD THAT THE DELIVERABLE REPORTS ON (each row as it stands):\n" + "\n".join(
+        f"### {t.label or 'Table'}\n{t.rows.strip()}" for t in kept
+    ) + "\n\n"
+
+
+def build_prompt(
+    inputs: PMInput, label: str, content: str, findings: list[AcceptedFinding], tables: list[RecordedTable] | None = None,
+) -> tuple[str, str]:
     rows = "\n".join(
         f"- {f.id}{f' ({f.stage_label})' if f.stage_label else ''}: {' '.join(f.finding.split())}"
         + (f" — suggested change: {' '.join(f.suggested_change.split())}" if f.suggested_change.strip() else "")
@@ -104,7 +130,8 @@ def build_prompt(inputs: PMInput, label: str, content: str, findings: list[Accep
         f"OBJECTIVE: {inputs.objective}\n"
         + (f"{facts}\n" if facts else "")
         + f"\nACCEPTED FINDINGS:\n{rows or '(none)'}\n\n"
-        f"THE DELIVERABLE — {label}:\n{content}"
+        + _tables_block(tables)
+        + f"THE DELIVERABLE — {label}:\n{content}"
     )
     return _INSTRUCTION, user
 
@@ -119,7 +146,9 @@ def _found(quote: str, *texts: str) -> bool:
     return len(q) >= 8 and any(q in _norm(t) for t in texts)
 
 
-def parse(raw: object, inputs: PMInput, content: str, findings: list[AcceptedFinding]) -> DeliverableCheck:
+def parse(
+    raw: object, inputs: PMInput, content: str, findings: list[AcceptedFinding], tables: list[RecordedTable] | None = None,
+) -> DeliverableCheck:
     """A verdict is kept only for a finding that was sent; "carried" only with its
     passage found in the text — without one it is not shown to be carried. A
     contradiction is kept only when both of its quotes are found."""
@@ -142,6 +171,8 @@ def parse(raw: object, inputs: PMInput, content: str, findings: list[AcceptedFin
             continue
         checks.append(FindingCheck(id=fid, verdict=verdict, quote=quote, note=" ".join(str(item.get("note") or "").split())[:300]))
     record = " ".join(f.statement for f in (inputs.facts or []))
+    # What a table on record says is a source a conflict may quote (4 Nov).
+    on_record = "\n".join(t.rows for t in (tables or [])[:MAX_TABLES])
     contradictions: list[Contradiction] = []
     for item in (raw.get("contradictions") or [])[:MAX_CONTRADICTIONS]:
         if not isinstance(item, dict):
@@ -149,7 +180,7 @@ def parse(raw: object, inputs: PMInput, content: str, findings: list[AcceptedFin
         rule = " ".join(str(item.get("rule_quote") or "").split()).strip('"“”')[:400]
         other = " ".join(str(item.get("conflicts_quote") or "").split()).strip('"“”')[:400]
         problem = " ".join(str(item.get("problem") or "").split())[:400]
-        if not problem or not _found(rule, content) or not _found(other, content, record) or _norm(rule) == _norm(other):
+        if not problem or not _found(rule, content) or not _found(other, content, record, on_record) or _norm(rule) == _norm(other):
             continue
         contradictions.append(Contradiction(rule_quote=rule, conflicts_quote=other, problem=problem, fix=" ".join(str(item.get("fix") or "").split())[:400]))
     return DeliverableCheck(findings=checks, contradictions=contradictions)
@@ -162,9 +193,10 @@ async def check_deliverable(
     label: str,
     content: str,
     findings: list[AcceptedFinding],
+    tables: list[RecordedTable] | None = None,
 ) -> DeliverableCheck:
     if not content.strip():
         return DeliverableCheck()
-    system, user = build_prompt(inputs, label, content, findings)
+    system, user = build_prompt(inputs, label, content, findings, tables)
     raw, _usage = await client.generate_json(prompt=user, system=system, temperature=0, max_tokens=3_000, model=model)
-    return parse(raw, inputs, content, findings)
+    return parse(raw, inputs, content, findings, tables)
