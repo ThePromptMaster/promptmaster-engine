@@ -154,7 +154,6 @@ export const en = {
   "start.links": "Links",
   "start.startConversation": "Start the conversation",
   "start.conversationNote": "Chat as you normally would; an outline builds up beside it. Or press Ask me questions and PromptMaster asks, one at a time. It becomes a project when you say so.",
-  "start.skip": "Or skip the conversation",
   "start.setItUp": "Set it up for me",
   "start.setItUpNote": "One screen to check, then Start",
   "start.know": "I know what I want to do",

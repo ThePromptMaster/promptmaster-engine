@@ -130,7 +130,6 @@ export const sw: Messages = {
   'start.links': 'Viungo',
   'start.startConversation': 'Anza mazungumzo',
   'start.conversationNote': 'Zungumza kama ambavyo ungefanya kawaida; muhtasari hujengeka kando yake. Au bonyeza Niulize maswali na PromptMaster atauliza moja baada ya jingine. Unakuwa mradi pale utakaposema.',
-  'start.skip': 'Au ruka mazungumzo',
   'start.setItUp': 'Nisanidie',
   'start.setItUpNote': 'Skrini moja ya kukagua, kisha Anza',
   'start.know': 'Najua ninachotaka kufanya',

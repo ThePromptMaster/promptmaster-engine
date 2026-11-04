@@ -60,7 +60,9 @@ import { describeDraft, worthKeeping, type DesignerState, type FrontDoorState, t
  * "Ask me questions" lives in the conversation, beside the outline, not on
  * this first screen (Sean, 31 Oct).
  *
- * Choosing the workflow yourself is still one click away on the first screen.
+ * The first screen leads with "Get an answer" and "Start the conversation"
+ * side by side; "I know what I want to do" and "Choose the workflow
+ * yourself" are under "Advanced ways to start" (Sean, 4 Nov).
  */
 
 type Step = 'ask' | 'talk' | 'setup';
@@ -75,7 +77,7 @@ function titleFrom(objective: string): string {
 
 /** The id of a workflow designed for this project and not yet saved (24 Oct). */
 const DESIGNED = 'designed:';
-/** Whether this user keeps the full-workflow ways in open on the start screen. */
+/** Whether this user keeps "Advanced ways to start" open on the start screen (the key predates the name). */
 const FULL_KEY = 'pm.start.full.v1';
 /** How much of the ask and the conversation goes to the workflow designer. */
 const DESIGN_BRIEF_MAX = 8_000;
@@ -151,8 +153,10 @@ export default function NewProjectPage() {
     return { ...ask, context: contextFromDocuments(ask.context, documentsOf(startFiles), INPUT_LIMITS.context).context };
   };
   const [working, setWorking] = useState<null | 'questions' | 'setup' | 'creating'>(null);
-  // Sean, 26 Oct: the start is an answer, as in Claude; the full workflow is
-  // one press away and, once opened, stays open for this user.
+  // Sean, 26 Oct: the start is an answer, as in Claude. Sean, 4 Nov: the
+  // conversation sits beside it, and "Advanced ways to start" (the setup from
+  // what you wrote, or choosing the workflow) is one press away and, once
+  // opened, stays open for this user — under the key it always had.
   const [showFull, setShowFull] = useState(false);
   useEffect(() => {
     try {
@@ -806,9 +810,18 @@ export default function NewProjectPage() {
             )}
           </div>
 
-          {/* Sean, 26 Oct: an answer first, as in Claude. The full workflow's
-              ways in stay, one press below. */}
-          <div className="mt-4 flex justify-end">
+          {/* Sean, 26 Oct: an answer first, as in Claude. Sean, 4 Nov: the
+              conversation beside it, and the other two ways in under
+              "Advanced ways to start". The answer stays the primary action. */}
+          <div className="mt-4 flex flex-wrap items-center justify-end gap-3">
+            <button
+              onClick={() => { setError(null); setStep('talk'); }}
+              disabled={!hasObjective || working !== null}
+              className="inline-flex items-center gap-2 rounded-xl bg-[var(--surface-container-high)] px-6 py-3 text-title text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-highest)] disabled:opacity-40"
+            >
+              {t('start.startConversation')}
+              <span aria-hidden className="material-symbols-outlined text-[20px]">forum</span>
+            </button>
             <button
               onClick={quickStart}
               disabled={!hasObjective || working !== null || !user || !templateFor('quick')}
@@ -818,40 +831,24 @@ export default function NewProjectPage() {
               <span aria-hidden className="material-symbols-outlined text-[20px]">arrow_upward</span>
             </button>
           </div>
-          <p className="mt-2 text-end text-label text-[var(--on-surface-variant)]">
-            {t('start.quickNote')}
-          </p>
+          <div className="mt-2 space-y-1 text-end text-label text-[var(--on-surface-variant)]">
+            <p><span className="font-medium text-[var(--on-surface)]">{t('start.quickAnswer')}</span> — {t('start.quickNote')}</p>
+            <p><span className="font-medium text-[var(--on-surface)]">{t('start.startConversation')}</span> — {t('start.conversationNote')}</p>
+          </div>
 
           <button
             type="button"
             onClick={toggleFull}
             aria-expanded={showFull}
-            aria-controls="full-workflow-ways"
+            aria-controls="advanced-ways"
             className="mt-8 inline-flex items-center gap-1.5 text-body font-medium text-[var(--pm-primary)] hover:underline"
           >
             <span aria-hidden className="material-symbols-outlined text-[18px]">{showFull ? 'expand_less' : 'expand_more'}</span>
-            {showFull ? t('start.fullWorkflowHide') : t('start.fullWorkflow')}
+            {showFull ? t('start.advancedHide') : t('start.advanced')}
           </button>
           {showFull && (
-            <div id="full-workflow-ways" className="mt-3">
-              <p className="text-label text-[var(--on-surface-variant)]">{t('start.fullWorkflowNote')}</p>
-              {/* 14 Oct call: start as in any chat — the conversation is the way in,
-                  with the outline beside it. The other ways stay, one row below. */}
-              <div className="mt-4 flex justify-end">
-                <button
-                  onClick={() => { setError(null); setStep('talk'); }}
-                  disabled={!hasObjective || working !== null}
-                  className="inline-flex items-center gap-2 rounded-xl bg-[var(--surface-container-high)] px-6 py-3 text-title text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-highest)] disabled:opacity-40"
-                >
-                  {t('start.startConversation')}
-                  <span aria-hidden className="material-symbols-outlined text-[20px]">arrow_upward</span>
-                </button>
-              </div>
-              <p className="mt-2 text-end text-label text-[var(--on-surface-variant)]">
-                {t('start.conversationNote')}
-              </p>
-
-              <p className="mt-8 text-label uppercase tracking-wider text-[var(--on-surface-variant)]">{t('start.skip')}</p>
+            <div id="advanced-ways" className="mt-3">
+              <p className="text-label text-[var(--on-surface-variant)]">{t('start.advancedNote')}</p>
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 <button
                   onClick={() => void recommend()}
@@ -871,7 +868,6 @@ export default function NewProjectPage() {
                   <span className="mt-1 block text-label text-[var(--on-surface-variant)]">{t('start.chooseNote')}</span>
                 </button>
               </div>
-
             </div>
           )}
 

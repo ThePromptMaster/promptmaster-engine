@@ -20,9 +20,20 @@ test('an answer first, then the same project taken into the full process', async
   test.setTimeout(120_000);
   await page.goto('/projects/new');
   await dismissBetaNotice(page);
-  // The full workflow is one press away, not on the first screen.
-  await expect(page.getByRole('button', { name: /Start the conversation/ })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Start with the full workflow instead' })).toHaveAttribute('aria-expanded', 'false');
+  // Sean, 4 Nov: the conversation sits beside the answer; the setup from
+  // what you wrote and choosing the workflow are under "Advanced ways to start".
+  await expect(page.getByRole('button', { name: /Start the conversation/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Get an answer/ })).toBeVisible();
+  const advanced = page.getByRole('button', { name: 'Advanced ways to start' });
+  await expect(advanced).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByRole('button', { name: /I know what I want to do/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Choose the workflow yourself/ })).toHaveCount(0);
+  await page.screenshot({ path: test.info().outputPath('start-screen.png') });
+  await advanced.click();
+  await expect(page.getByRole('button', { name: /I know what I want to do/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Choose the workflow yourself/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Hide advanced ways to start' })).toHaveAttribute('aria-expanded', 'true');
+  await page.screenshot({ path: test.info().outputPath('start-screen-advanced.png') });
 
   await page.getByLabel('What do you want to do or figure out?').fill('Write a two-line thank-you note to the volunteers');
   await page.getByRole('button', { name: /Get an answer/ }).click();

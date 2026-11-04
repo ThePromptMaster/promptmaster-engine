@@ -138,7 +138,6 @@ export const pt: Messages = {
   "start.links": "Links",
   "start.startConversation": "Começar a conversa",
   "start.conversationNote": "Converse como faria normalmente; um esboço vai se formando ao lado. Ou toque em Faça perguntas e o PromptMaster pergunta, uma de cada vez. Ele vira um projeto quando você disser.",
-  "start.skip": "Ou pule a conversa",
   "start.setItUp": "Configure para mim",
   "start.setItUpNote": "Uma tela para conferir e depois Começar",
   "start.know": "Sei o que quero fazer",
