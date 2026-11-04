@@ -29,26 +29,55 @@ import { isFailedEvaluation } from '@/lib/workflow/evaluation-failure';
 
 interface Props {
   evaluation: Evaluation | undefined;
+  /**
+   * The last completed check of an earlier version, when this version has none
+   * or only one that could not run (4 Nov, Sean: keep "the prior valid …
+   * evaluation"). Shown under its own version number.
+   */
+  earlier?: { evaluation: Evaluation; version: number } | null;
+  /** Run the check again, offered beside a check that could not run. */
+  onRetry?: () => void;
+  retrying?: boolean;
 }
 
-export function StageEvaluationPanel({ evaluation }: Props) {
+export function StageEvaluationPanel({ evaluation, earlier = null, onRetry, retrying = false }: Props) {
   const t = useT();
   const findings = evaluation?.findings ?? [];
   const interpretation = evaluation?.interpretation ?? null;
 
-  if (!evaluation) return null;
+  if (!evaluation && !earlier) return null;
 
   // 2 Nov (Sean): a check that could not run was shown as Medium ×3 and
-  // "No specific defects found". It judged nothing, so it shows nothing judged.
-  if (isFailedEvaluation(evaluation)) {
+  // "No specific defects found". It judged nothing, so it shows nothing judged
+  // — and the last check that did run stays in view under its own version.
+  if (!evaluation || isFailedEvaluation(evaluation)) {
     return (
-      <section aria-label={t('pnl.evalLabel')} className="rounded-xl bg-[var(--surface-container-low)] px-5 py-4">
-        <h3 className="text-label uppercase tracking-wider text-[var(--on-surface-variant)]">{t('pnl.evaluation')}</h3>
-        <p role="status" className="mt-2 flex items-start gap-2 text-body text-[var(--pm-error)]">
-          <span aria-hidden className="material-symbols-outlined">error</span>
-          {t('pnl.checkDidNotRun')}
-        </p>
-      </section>
+      <div className="space-y-3">
+        {evaluation && (
+          <section aria-label={t('pnl.evalLabel')} className="rounded-xl bg-[var(--surface-container-low)] px-5 py-4">
+            <h3 className="text-label uppercase tracking-wider text-[var(--on-surface-variant)]">{t('pnl.evaluation')}</h3>
+            <p role="status" className="mt-2 flex items-start gap-2 text-body text-[var(--pm-error)]">
+              <span aria-hidden className="material-symbols-outlined">error</span>
+              {t('pnl.checkDidNotRun')}
+            </p>
+            {onRetry && (
+              <button
+                onClick={onRetry}
+                disabled={retrying}
+                className="mt-3 rounded-lg bg-[var(--pm-primary)] px-4 py-2 text-title text-[var(--on-primary)] disabled:opacity-50"
+              >
+                {retrying ? t('stage.evaluating') : t('pnl.runAgain')}
+              </button>
+            )}
+          </section>
+        )}
+        {earlier && (
+          <div data-earlier-check>
+            <p className="mb-1 text-label text-[var(--on-surface-variant)]">{t('pnl.lastCompleted', { version: earlier.version })}</p>
+            <StageEvaluationPanel evaluation={earlier.evaluation} />
+          </div>
+        )}
+      </div>
     );
   }
 

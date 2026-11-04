@@ -9,9 +9,11 @@ engine.
 
 from __future__ import annotations
 
+from typing import Literal
+
 from promptmaster.project_context import highest_source_number
 from promptmaster.web_search import WebAccess, strip_unknown_citations, with_web
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from deps import get_client
@@ -36,7 +38,8 @@ from promptmaster.claim_support import ClaimSupportRequest, ClaimSupportResponse
 from promptmaster.figures import Figure, extract_figures
 from promptmaster.stage import generate_stage_artifact
 from routers._errors import llm_http_error
-from promptmaster.stage_evaluation import evaluate_stage_artifact
+from promptmaster.stage_evaluation import evaluate_stage_artifact, simulated_empty_check
+from simulation import simulation_allowed
 
 router = APIRouter(prefix="/api", tags=["stage"])
 
@@ -129,6 +132,9 @@ class EvaluateStageArtifactRequest(BaseModel):
     # the prompt states in words rather than dropping the axis silently.
     approved_outline: list[OutlineSection] = []
     iterations: list[Iteration] = []
+    #: "empty": answer as a real empty reply at the token limit would, with no
+    #: model call — only for SIMULATE_FAILURE_USER_IDS (4 Nov; `simulation.py`).
+    simulate: Literal["", "empty"] = ""
     #: What code counted on this text (4 Nov): the check reports these, never an estimate.
     measured: list[MeasuredLine] = Field(default_factory=list, max_length=MAX_MEASURED)
     model: str = ""
@@ -137,6 +143,7 @@ class EvaluateStageArtifactRequest(BaseModel):
 @router.post("/evaluate-stage-artifact")
 async def api_evaluate_stage_artifact(
     req: EvaluateStageArtifactRequest,
+    request: Request,
     client: OpenRouterClient = Depends(get_client),
 ) -> StageEvaluationResponse:
     """Evaluate one stage's artifact. 1 LLM call. FR-11, FR-12.
@@ -147,6 +154,10 @@ async def api_evaluate_stage_artifact(
     four calls scoring against `inputs.objective`, and this one judges the
     artifact against the stage's declared intent instead.
     """
+    if req.simulate:
+        if not simulation_allowed(getattr(request.state, "user", None)):
+            raise HTTPException(403, "Simulating a failed check is limited to test accounts.")
+        return simulated_empty_check()
     try:
         result = await evaluate_stage_artifact(
             client=client,
