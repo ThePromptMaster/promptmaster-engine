@@ -15,7 +15,8 @@ import type { Artifact } from '@/types/project';
 import type { StageDefinition, WorkflowTemplate } from '@/lib/workflow/types';
 
 import { manuscriptSourceFor } from './context';
-import { effectiveRenderer } from './stage-artifact';
+import { effectiveRenderer, itemSchemaFor } from './stage-artifact';
+import { isTriageTable } from './triage';
 import type { StageArtifactBundle } from './digest';
 
 /** A stage asked to read work that has no saved text yet: nothing is written about nothing (4 Nov). */
@@ -39,7 +40,10 @@ export class ManuscriptMissing extends InputMissing {
  * receive the current artifact and report when a required input is missing").
  */
 export function checkedStageFor(template: WorkflowTemplate, target: StageDefinition): StageDefinition | null {
-  if (effectiveRenderer(target) !== 'review' || manuscriptSourceFor(template, target)) return null;
+  // Only a findings table checks earlier work. A table of runs or results
+  // (Research's Experiment) is work of its own, written from the plan, and is
+  // never held up by an empty stage before it (CI, 4 Nov: criteria.spec).
+  if (effectiveRenderer(target) !== 'review' || !isTriageTable(itemSchemaFor(target)) || manuscriptSourceFor(template, target)) return null;
   const at = template.stages.findIndex((s) => s.id === target.id);
   return [...template.stages.slice(0, Math.max(0, at))].reverse().find((s) => s.renderer === 'prose' || s.renderer === 'long_form') ?? null;
 }
