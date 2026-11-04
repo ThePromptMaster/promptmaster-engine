@@ -34,7 +34,11 @@ test('a Go move\'s model calls are recorded with the move, the step and their ti
     expect(r).toMatchObject({ operation: 'go:evaluate_stage', attempt: 'first', project_id: id });
     expect(r.elapsed_ms).toBeGreaterThanOrEqual(0);
   }
-  // Calls outside a Go move carry their route as the operation.
-  const draft = await serviceSelect('model_usage', `project_id=eq.${id}&agent_step_id=is.null&select=operation,route&limit=1`);
-  expect(draft[0].operation).toBe(draft[0].route);
+  // Calls outside a Go move carry their route as the operation — except Go
+  // choosing its next move, which is Go's own (4 Nov: counted in the run's cost).
+  const outside = (await serviceSelect('model_usage', `project_id=eq.${id}&agent_step_id=is.null&select=operation,route`)) as { operation: string; route: string }[];
+  for (const r of outside) {
+    expect(r.operation).toBe(r.route === '/api/agent/next-action' ? 'go:plan' : r.route);
+  }
+  expect(outside.some((r) => r.operation === r.route)).toBe(true);
 });

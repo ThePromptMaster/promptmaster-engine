@@ -79,7 +79,7 @@ describe('a check is never written about work that has no saved text (4 Nov, Sea
     key: 'custom_memo',
     stages: [
       { ...BOOK_V1.stages[0], id: 'draft', label: 'Draft decision memo', renderer: 'prose' as const },
-      { ...BOOK_V1.stages.find((s) => s.renderer === 'review')!, id: 'check', label: 'Check memo against brief' },
+      { ...BOOK_V1.stages.find((s) => s.id === 'critique')!, id: 'check', label: 'Check memo against brief' },
       { ...BOOK_V1.stages[0], id: 'final', label: 'Final decision memo', renderer: 'prose' as const },
     ],
   };
@@ -102,6 +102,14 @@ describe('a check is never written about work that has no saved text (4 Nov, Sea
     const ready = { draft: version('# Memo\nText.') };
     await expect(withFreshManuscript(memo, memo.stages[1], ready)).resolves.toBe(ready);
     expect(getArtifact).not.toHaveBeenCalled();
+  });
+
+  it('a table of runs or results is work of its own, never held up by an empty stage before it', async () => {
+    const { checkedStageFor } = await import('./fresh-manuscript');
+    const { RESEARCH_V1 } = await import('./templates/research.v1');
+    const experiment = RESEARCH_V1.stages.find((s) => s.id === 'experiment')!;
+    expect(checkedStageFor(RESEARCH_V1, experiment)).toBeNull();
+    await expect(withFreshManuscript(RESEARCH_V1, experiment, {})).resolves.toEqual({});
   });
 
   it('a missing manuscript is still a missing input', async () => {
