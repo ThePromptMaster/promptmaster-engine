@@ -715,6 +715,27 @@ the run's cost rose from $1.81 to $2.61 (#479, #480; L-149, L-150).
 | An approval after a revision is not a repeat (#486) | `repeat-question.asksForApproval`: any "?" sentence of the first paragraph that asks for approval |
 | Rows the deliverable carries out (#485, #487; L-152) | The planner's `params.rows_addressed` (`{id, quotes}`, rule in `agent._format_state`, shape in `_rows_addressed`) on an approval ask on the deliverable; `lib/agent/addressed-rows.ts` keeps a row only when every quote is in the saved text or a met measurement; `perform.ts` `recordCarriedOut` records them as accepted under routine "handle" (`CARRIED_OUT_REASON`), and `project-store` does not reopen later stages for such a save (`triage.onlyRecordsCarriedOut`) |
 
+### One dependable flow: delegation, checks, handoffs, Go's progress, first use (2026-11-04)
+
+Sean's consolidated beta email (items 1–6). Prod evidence from his support-software memo
+(project `543d1333`, read only) and guest passes `b526be84`, `489966ed`, `b6950b9e` (#489–#501;
+L-153 – L-160).
+
+| Concern | Where it lives |
+|---|---|
+| A correction the brief settles is routine (#489; L-153) | `stage.py` `IMPLEMENTS_RULE`/`CHANGES_RULE` name the brief's own requirements; `triage.ts` `decidedWords` = current facts + `briefWords` (constraints and output format whole, the user's request a line at a time, never the objective); `recordedDecisions` accepts such a row with "Settled by your brief — {field}: …" |
+| The setup keeps what the user left open (#490) | `setup_suggester.py`: no section names or order the user did not give ("section names and order are the writer's choice"); delegation sentences word for word. `lib/agent/delegation.ts` `delegationSentences` → `AgentState.delegation` → "THE USER'S DELEGATION, IN THEIR OWN WORDS" |
+| Old designs' "accepted or rejected each finding" box (#491) | `triage-approval.withRestatedApprovalsAsChecks`, read in `effectiveTemplate`; `lib/agent/other-work.ts` `otherWorkFor` decides whether "Carry on with other work first" is offered |
+| A stage that prepares the deliverable (#492) | `measurable.preparesFor` in `requirementsForStage`; `workflow_designer.py` names no sections the user did not |
+| Claims against what was supplied (#493; L-154) | `promptmaster/claim_support.py`, `POST /api/claim-support`; `lib/workflow/claim-support.ts` `writtenClaimFindings` beside `dependentClaimsFor` in every check of a written stage; the pattern is also in `deliverable_check.py` |
+| The code's counts reach the checks (#494; L-155) | `context.measuredLines` / `unverifiedLimits`, `stage-requests.checkedCounts`, `withoutHandCounts`; `promptmaster/measured.py` `measured_block` in the stage check, a check table's generation and `criterion_check.py` (with `FINDINGS_TABLE_RULE`); `ctx.unverified` rows are non-blocking |
+| The approval check sees the setup (#495) | `criterion_check.setup_block` |
+| A check that could not run; the test switch (#496; L-156) | `evaluation-failure.lastCompletedCheck`, `evaluation-panel.tsx` (`earlier`, `onRetry`); `backend/simulation.py`, `stage_evaluation.simulated_empty_check`, `/api/admin/can-simulate` |
+| Missing inputs; an empty stage is not "ready"; the change summary (#497, #499; L-157) | `fresh-manuscript.checkedStageFor` / `assertCheckedInput` / `InputMissing`; `StageTransitionBar` `nothingSaved`; `lib/workflow/change-outcomes.ts` → `BriefChangeNotice` `outcomes` |
+| Narrative against the tables on record (#498; L-158) | `deliverable-check.outcomeTablesBefore` → `CheckDeliverableRequest.tables` → `deliverable_check.py` `RecordedTable` |
+| Go's progress, Run details, the call ceiling, run cost (#500; L-159) | `lib/agent/doing.ts` `doingNow`; `go-control.tsx` (`doing`, `calls`, `data-run-details`); `model-usage.ts` run meter (`startRunMeter`, `runMeterCalls`, `takeOutsideCost`); `policy.MAX_MODEL_CALLS_PER_CHAIN`; planner calls tagged `go:plan`; `project-cost.goShare` |
+| First use; the sample (#501; L-160) | `go.intro`, landing copy, `setup.optionalTag`, `door.allOptional`, `start.creatingNow`; `components/projects/sample-field.tsx`, `projects.sample_output` (`20261126000000`), `PMInput.sample_output`, `project_context.sample_block` |
+
 ## Extension points
 
 These are the seams the system was built to be extended at. Working with them is
