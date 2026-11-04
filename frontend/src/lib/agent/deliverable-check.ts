@@ -72,6 +72,40 @@ export function acceptedRowsBefore(template: WorkflowTemplate, bundles: Record<s
   }).slice(0, 30);
 }
 
+export interface RecordedTable {
+  label: string;
+  rows: string;
+}
+
+/**
+ * The outcome tables before the deliverable, as their rows stand — the tables
+ * a write-up reports on (4 Nov, Sean: "In Research, the narrative and evidence
+ * table disagreed about what had been reproduced"). A findings table is left
+ * out: its accepted rows are sent as findings. Each row is its fields, then its
+ * status as the table names it.
+ */
+export function outcomeTablesBefore(template: WorkflowTemplate, bundles: Record<string, StageArtifactBundle>, holderId: string): RecordedTable[] {
+  const end = template.stages.findIndex((s) => s.id === holderId);
+  return template.stages.slice(0, end < 0 ? template.stages.length : end).flatMap((stage) => {
+    const renderer = effectiveRenderer(stage);
+    if (renderer !== 'list' && renderer !== 'review') return [];
+    const schema = itemSchemaFor(stage);
+    if (!schema.statuses?.length || isTriageTable(schema)) return [];
+    const items = parseItems(bundles[stage.id]?.versions.at(-1)?.content) ?? [];
+    if (!items.length) return [];
+    const rows = items
+      .filter((i) => !isSuperseded(i))
+      .map((i) => {
+        const fields = schema.fields.map((f) => (i[f.key] ?? '').toString().trim()).filter(Boolean).join(' | ');
+        const status = schema.statuses?.find((s) => s.value === i.status)?.label ?? 'no status';
+        return `- ${i.id}: ${fields} — status: ${status}`;
+      })
+      .join('\n')
+      .slice(0, 8_000);
+    return [{ label: stage.short_label || stage.label, rows }];
+  }).slice(-4);
+}
+
 /** The check's result as lines the objective check reads as unmet. */
 export function issuesFrom(result: CheckResult, rows: readonly AcceptedRow[], label: string): string[] {
   const byId = new Map(rows.map((r) => [r.id, r]));

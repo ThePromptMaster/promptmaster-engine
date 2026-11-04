@@ -53,7 +53,7 @@ import { blocksCompletion, deliverableStage, describeOutstanding, evaluateStage,
 import { describeBasis, executableNext, openWithNextLine, pausedLine, stillMet, type ObjectiveAssessment, type ObjectiveBasis } from '@/lib/workflow/objective';
 import { addedByRun, designAddedStage, MAX_ADDED_PER_RUN, type AddedStage } from '@/lib/workflow/added-stages';
 import { attachedDocuments, currentFacts, supersededFactValues } from '@/lib/workflow/facts';
-import { acceptedRowsBefore, checkedVersion, describeCheck, issuesFrom, MAX_CHECK_ROUNDS, roundsUsed, type DeliverableCheckRecord } from './deliverable-check';
+import { acceptedRowsBefore, outcomeTablesBefore, checkedVersion, describeCheck, issuesFrom, MAX_CHECK_ROUNDS, roundsUsed, type DeliverableCheckRecord } from './deliverable-check';
 import { InputMissing, ManuscriptMissing, checkedStageFor, withFreshManuscript } from '@/lib/workflow/fresh-manuscript';
 import { useProjectStore } from '@/stores/project-store';
 import { describeValue, leftoverMentions, leftoverValues, namedLeftovers, type SupersededValue } from '@/lib/workflow/fact-values';
@@ -2705,7 +2705,7 @@ async function checkDeliverable(ctx: PerformContext, holder: StageDefinition, co
   const rows = acceptedRowsBefore(ctx.template, ctx.bundles, holder.id);
   try {
     const res = await api.agentCheckDeliverable(
-      { inputs: inputsFrom(ctx.project), deliverable_label: label, content, accepted: rows, model: ctx.project.model },
+      { inputs: inputsFrom(ctx.project), deliverable_label: label, content, accepted: rows, tables: outcomeTablesBefore(ctx.template, ctx.bundles, holder.id), model: ctx.project.model },
       ctx.signal
     );
     const issues = issuesFrom(res, rows, label);
