@@ -129,7 +129,8 @@ def test_the_planner_may_name_rows_the_current_version_already_carries_out():
     )
     _, user = build_next_action_prompt(_inputs(), state, ["request_user_decision"], "autonomous")
     assert "params.rows_addressed" in user
-    assert "exact words of the current version" in user
+    assert "one quote for each problem the row names" in user
+    assert "The first quote answers the row's first problem" in user
     assert "one whose change is still to be made stays undecided" in user
 
 
@@ -142,8 +143,11 @@ def test_rows_addressed_are_kept_only_in_their_shape():
             "decision_question": "Do you approve this version?",
             "params": {
                 "rows_addressed": [
-                    {"id": "i10", "quote": "Session total | 90"},
+                    {"id": "i10", "quotes": ["| **90** | **Total** |", "**AI tool access:** Which tool participants will use"]},
+                    {"id": "i9", "quote": "Session total | 90"},
                     {"id": "i11", "quote": "short"},
+                    {"id": "i14", "quotes": ["Session total | 90", "short"]},
+                    {"id": "i15", "quotes": ["one quote here", "two quotes here", "three quotes here", "four quotes here"]},
                     {"id": "", "quote": "an id is needed for this"},
                     "i12",
                     {"id": "i13", "quote": "x" * 301},
@@ -152,7 +156,10 @@ def test_rows_addressed_are_kept_only_in_their_shape():
         },
         ["request_user_decision"],
     )
-    assert choice.params["rows_addressed"] == [{"id": "i10", "quote": "Session total | 90"}]
+    assert choice.params["rows_addressed"] == [
+        {"id": "i10", "quotes": ["| **90** | **Total** |", "**AI tool access:** Which tool participants will use"]},
+        {"id": "i9", "quotes": ["Session total | 90"]},
+    ]
 
     none = parse_next_action(
         {"action_key": "request_user_decision", "decision_question": "Approve?", "params": {"rows_addressed": "i10"}},

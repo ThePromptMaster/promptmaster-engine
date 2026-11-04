@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('@/lib/api/client', () => ({ api: {} }));
 
 import { performStep, type PerformContext } from './perform';
-import { addressedRows, carriedOutReason } from './addressed-rows';
+import { addressedRows, carriedOutReason, describeAddressed } from './addressed-rows';
 import type { OpenRow } from './needs';
 import { parseItems, serializeItems, type StageItem } from '@/lib/workflow/stage-artifact';
 import { CARRIED_OUT_REASON, onlyRecordsCarriedOut } from '@/lib/workflow/triage';
@@ -32,8 +32,21 @@ const OPEN = [row('i10', I10), row('i11', I11), row('i12', I12)];
 
 describe('rows the current version already carries out', () => {
   it('keeps a row shown by the words of the version, or by a requirement measured as met', () => {
-    const got = addressedRows(OPEN, [{ id: 'i10', quote: 'Session total | 90' }, { id: 'i11', quote: '629 words' }], FINAL, MEASURED);
-    expect(got.map((r) => [r.id, r.measured])).toEqual([['i10', false], ['i11', true]]);
+    const got = addressedRows(OPEN, [{ id: 'i10', quote: 'Session total | 90' }, { id: 'i11', quotes: ['629 words'] }], FINAL, MEASURED);
+    expect(got.map((r) => [r.id, r.evidence.map((e) => e.measured)])).toEqual([['i10', [false]], ['i11', [true]]]);
+  });
+
+  it('a row naming several problems is shown by a quote for each, every one borne out (4 Nov, the next pass)', () => {
+    // i10 as rechecked: Session 1's timings, the Option A line, AI tool access.
+    const text = `${FINAL}- **AI tool access:** Which tool participants will use, and device access for each participant.\n`;
+    const quotes = ['| **Session total** | **90** |', '**AI tool access:** Which tool participants will use'];
+    const [r] = addressedRows(OPEN, [{ id: 'i10', quotes }], text, MEASURED);
+    expect(r.evidence.map((e) => e.quote)).toEqual(quotes);
+    expect(describeAddressed([r])).toContain('— this version: it says “| **Session total** | **90** |”, “**AI tool access:** Which tool participants will use”');
+    // One quote the version does not bear out, and the row is not shown at all.
+    expect(addressedRows(OPEN, [{ id: 'i10', quotes: [quotes[0], 'Session 1 now totals 90 minutes'] }], text)).toEqual([]);
+    // More than three is not a row.
+    expect(addressedRows(OPEN, [{ id: 'i10', quotes: [quotes[0], quotes[0], quotes[0], quotes[0]] }], text)).toEqual([]);
   });
 
   it('drops a quote the version does not contain, one too short, an unknown or repeated id, and anything not a pair', () => {
@@ -60,6 +73,8 @@ describe('rows the current version already carries out', () => {
     const [r] = addressedRows(OPEN, [{ id: 'i10', quote: 'Session total | 90' }], FINAL);
     const reason = carriedOutReason(r, 'Final proposal', 7);
     expect(reason.startsWith(`${CARRIED_OUT_REASON} Final proposal v7: it says “Session total | 90”.`)).toBe(true);
+    expect(carriedOutReason({ ...r, evidence: [...r.evidence, { quote: 'at most 650 words', measured: true }] }, 'Final proposal', 7))
+      .toContain('it says “Session total | 90”; measured in code “at most 650 words”.');
     const recorded = before.map((i) => (i.id === 'i10' ? { ...i, status: 'accepted', status_source: 'model', reason } : i));
     expect(onlyRecordsCarriedOut(serializeItems(before), serializeItems(recorded))).toBe(true);
     // Rejected, or the user's own decision, or a reworded finding: an ordinary save.
