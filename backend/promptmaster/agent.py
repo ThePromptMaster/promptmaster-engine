@@ -472,13 +472,15 @@ def _format_state(inputs: PMInput, state: AgentState) -> str:
             # 4 Nov, production (Lakeside copy): i10 "Session 1 timings sum to
             # 105" was listed as undecided under the approval of a version where
             # they summed to 90, which the planner itself said it had fixed.
-            "When you ask the user to approve this stage's work and a row below describes a problem the "
+            "When you ask the user to approve this stage's work and a row below describes problems the "
             "current version of this stage no longer has, list it in params.rows_addressed as "
-            '{"id": "<row id>", "quote": "<what shows it>"}: the quote is the exact words of the current '
-            "version that show it dealt with (8 to 200 characters, copied, not paraphrased), or, for a length "
-            "or a count, the measured result as the requirements list it. Name only a row you can show that "
-            "way; one whose change is still to be made stays undecided. Each is checked against the saved "
-            "text before it is recorded:\n"
+            '{"id": "<row id>", "quotes": ["<what shows it>", ...]}: one quote for each problem the row '
+            "names, in the row's order, at most 3 — the exact words of the current version that show that "
+            "problem dealt with (8 to 200 characters, copied, not paraphrased), or, for a length or a count, "
+            "the measured result as the requirements list it. The first quote answers the row's first "
+            "problem; a problem that was only a line now deleted needs no quote. Name only a row you can "
+            "show that way; one whose change is still to be made stays undecided. Each quote is checked "
+            "against the saved text before the row is recorded:\n"
             + "\n".join(
                 f"- {f.stage_label or f.stage_id} {f.id}"
                 + (f" ({f.severity})" if f.severity else "")
@@ -624,22 +626,27 @@ def parse_next_action(result: object, allowed: list[str], controls: list[AgentCo
     )
 
 
-def _rows_addressed(raw: object) -> list[dict[str, str]]:
-    """Up to 12 ``{"id", "quote"}`` pairs, each a short id and a quote of at most
-    300 characters; anything else is dropped. The browser checks each quote
+def _rows_addressed(raw: object) -> list[dict[str, object]]:
+    """Up to 12 rows as ``{"id", "quotes"}``: a short id and 1–3 quotes of 8–300
+    characters (a single ``"quote"`` is read as one). A row with any quote out of
+    shape is dropped whole, as is anything else. The browser checks each quote
     against the saved text before anything is recorded."""
     if not isinstance(raw, list):
         return []
-    out: list[dict[str, str]] = []
+    out: list[dict[str, object]] = []
     for item in raw[:12]:
         if not isinstance(item, dict):
             continue
-        row_id, quote = item.get("id"), item.get("quote")
-        if not isinstance(row_id, str) or not isinstance(quote, str):
+        row_id = item.get("id")
+        given = item.get("quotes", item.get("quote"))
+        quotes = [given] if isinstance(given, str) else given
+        if not isinstance(row_id, str) or not isinstance(quotes, list) or not 1 <= len(quotes) <= 3:
             continue
-        row_id, quote = row_id.strip(), quote.strip()
-        if row_id and len(row_id) <= 40 and 8 <= len(quote) <= 300:
-            out.append({"id": row_id, "quote": quote})
+        if not all(isinstance(q, str) and 8 <= len(q.strip()) <= 300 for q in quotes):
+            continue
+        row_id = row_id.strip()
+        if row_id and len(row_id) <= 40:
+            out.append({"id": row_id, "quotes": [q.strip() for q in quotes]})
     return out
 
 
