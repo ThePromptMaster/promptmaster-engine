@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { questionOverlap, repeatedQuestion, repeatPause, SAME_QUESTION, type AskedStep } from './repeat-question';
+import { asksForApproval, questionOverlap, repeatedQuestion, repeatPause, SAME_QUESTION, type AskedStep } from './repeat-question';
 
 /**
  * 4 Nov (Sean, Lakeside proposal, run d1bd9ea9): Go asked steps 10, 15 and 19
@@ -63,6 +63,22 @@ describe('a question Go already asked (4 Nov, Lakeside)', () => {
     expect(repeatedQuestion({ question: Q15, control: SHORTER, stageId: 'final_proposal', steps: RUN, facts: own })).toBeNull();
     const fromAnswer = [{ created_at: at(17), accepted_by: 'user', source_ref: { via: 'go answer' }, retired_at: null }];
     expect(repeatedQuestion({ question: Q15, control: SHORTER, stageId: 'final_proposal', steps: RUN, facts: fromAnswer })).not.toBeNull();
+  });
+
+  it('an approval asked after a sentence saying what changed is still an approval (4 Nov, prod)', () => {
+    const first = 'Do you approve this version, with Section 7 now a single sentence, as the finished proposal? As before, approval does not authorise sending it, booking a workshop or spending money.';
+    const next = 'Section 6 now lists the items to confirm in alphabetical order. Do you approve this version as the finished proposal? As before, approval does not authorise sending it, booking a workshop or spending money.';
+    expect(asksForApproval(next)).toBe(true);
+    const steps = [ask(first, 22, ''), answer('Not yet: in Section 6, list the items to confirm in alphabetical order, then I will approve.', 24), revise(25)];
+    const versions = [{ source_operation: 'agent_revise', created_at: at(25) }];
+    expect(repeatedQuestion({ question: next, control: null, stageId: 'final_proposal', steps, versions })).toBeNull();
+  });
+
+  it("a statement about approval around another question is not an approval ask (Sean's notes questions)", () => {
+    expect(asksForApproval(Q15)).toBe(false);
+    expect(asksForApproval(Q19)).toBe(false);
+    expect(asksForApproval('Approve it? \n\nOr not.')).toBe(true);
+    expect(asksForApproval('How should the notes come out?\n\nDo you approve the rest?')).toBe(false);
   });
 
   it('asking to approve the version Go changed on the answer is the next step, not a repeat', () => {

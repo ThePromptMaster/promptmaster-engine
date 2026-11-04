@@ -63,11 +63,22 @@ export function questionOverlap(a: string, b: string): number {
   return [...A].filter((w) => B.has(w)).length / fewer;
 }
 
-/** A question whose first sentence asks the user to approve or re-confirm the work. */
+/** Words that ask the user to approve or re-confirm the work. */
 const APPROVAL = /\b(?:approve|approval|re-?confirm|sign off on)\b/i;
 
-function firstSentence(question: string): string {
-  return (question.split(/\n\s*\n/)[0] ?? '').split(/(?<=[.?!])\s+/)[0] ?? '';
+/**
+ * Whether the question asks for approval: one of the sentences of its first
+ * paragraph that ends in "?" does. Not only the first sentence (4 Nov, prod,
+ * Lakeside copy: "Section 6 now lists the items to confirm in alphabetical
+ * order. Do you approve this version as the finished proposal?" was stopped as
+ * a repeat after the revision the user asked for), and never a statement:
+ * Sean's notes questions said "please re-approve the proposal" and "Approving
+ * the document does not authorise…" around a question about the notes.
+ */
+export function asksForApproval(question: string): boolean {
+  return (question.split(/\n\s*\n/)[0] ?? '')
+    .split(/(?<=[.?!])\s+/)
+    .some((sentence) => sentence.trim().endsWith('?') && APPROVAL.test(sentence));
 }
 
 function controlOf(step: AskedStep): string {
@@ -120,7 +131,7 @@ export function repeatedQuestion(input: {
   // Asking to approve the current version again after Go changed it is the
   // next step, not a repeat: "make it shorter" answered, the shorter version
   // is the one to approve (4 Nov prod pass on the Lakeside copy).
-  const approval = APPROVAL.test(firstSentence(question));
+  const approval = asksForApproval(question);
   const newVersionSince = (iso: string) => {
     const at = Date.parse(iso);
     return !Number.isNaN(at) && (input.versions ?? []).some((v) => Date.parse(v.created_at) > at);
