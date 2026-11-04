@@ -2893,3 +2893,62 @@ The cost: the comparison is on words, so a reworded repeat can pass and two diff
 naming the same button can be taken as one. The planner still makes one call before the guard
 fires on a Resume with nothing changed.
 
+Updated in #486 (same day, prod pass). Whether a question asks for approval used to be read from
+its first sentence only, so "Section 6 now lists the items to confirm in alphabetical order. Do you
+approve this version …?" was stopped as a repeat after the revision the user had asked for. Now
+any sentence of the first paragraph that ends in "?" and asks for approval counts; a statement
+("please re-approve the proposal") around another question still does not.
+
+A known gap, seen on the same pass: an answer that asks for a change the version already has
+("Not yet: put the recommended option name in bold" when it was bold) leaves Go nothing to change,
+so its approval question has no newer version behind it and is stopped as a repeat. The stop says
+why ("Option B is already in bold … Do you approve this version?"); the user ticks the approval,
+or asks for a real change.
+
+### L-151 — An answer given to Go reopens nothing on the stage it was given on (2026-11-04)
+
+Shipped in #483, corrected in #484.
+
+On the 4 Nov prod pass (Lakeside copy) the user answered Go's approval question with "Make it
+shorter to leave room under 650 words". Go revised Final proposal for it; the answer was also
+recorded as a fact, and the brief-change check judged that fact as a change and reopened Final
+proposal for the same answer, so Go revised it a second time on the recheck ($0.17).
+
+#483 left the stage the answer was given on out of the check's judgment. That made it worse: the
+judge, not shown Final proposal, named the stages before it ("make Section 7 a single sentence"
+reopened Draft proposal and Check, whose repairs reopened Final proposal anyway; $0.64). #484
+judges the answer against every finished stage as before and then takes only the stage it was
+given on out of what it reopens (`leftToGo`, recorded on the event as `left_to_go`). Go acts on the
+answer there: it is the run's latest step.
+
+The cost: a fact change counts as an answer only when every fact it added is one
+(`source_ref.via === 'go answer'` with a `stage_id`); an answer recorded together with a fact of
+the user's own reopens as before. If the run stops before Go acts on the answer, the stage it was
+given on is not marked for a recheck; the answer is still a fact every later prompt reads.
+
+### L-152 — Review rows the deliverable already carries out are recorded at the approval (2026-11-04)
+
+Shipped in #485, with a quote per problem in #487.
+
+On the 4 Nov prod pass (Lakeside copy) Go fixed Session 1's timings and the length on Final
+proposal itself, checked it and asked for approval, and the question still listed Check's i10
+("Session 1 timings sum to 105") and i11 ("about 720 words") as "Still undecided before you
+approve" under a version where Session 1 summed to 90 and the measured count was 629. Undecided,
+they would also have held "Objective met" up after the approval.
+
+When Go asks for approval on the deliverable, the planner may now name the undecided rows the
+current version carries out, each with up to three quotes, one per problem the row names: the
+words of the current version, or a requirement measured as met. Code keeps a row only if every
+quote is borne out (`lib/agent/addressed-rows.ts`). Under "handle routine decisions" Go records
+those rows as accepted on their own table, as its decision, with the quotes as the reason
+("Already carried out in Final proposal v12: it says …"), in a version that reopens nothing after
+it (`onlyRecordsCarriedOut`); the question says so. Under "ask me" they are named as carried out
+for the user to accept.
+
+The cost: a quote shows that some words are in the text, not that the problem is gone — a row
+whose problem is a sum (105, not 90) is shown by the corrected total, which code does not add up.
+A problem that was a deleted line has no quote, and a row is named on the planner's judgment for
+it. Quotes from a table are shown with their Markdown (`| **90** | **Total** |`). When Go stops for
+an approval before the planner runs (`needsUser` with `openElsewhere`), the rows are listed as
+before, unread against the version.
+
