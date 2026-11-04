@@ -63,6 +63,13 @@ export function questionOverlap(a: string, b: string): number {
   return [...A].filter((w) => B.has(w)).length / fewer;
 }
 
+/** A question whose first sentence asks the user to approve or re-confirm the work. */
+const APPROVAL = /\b(?:approve|approval|re-?confirm|sign off on)\b/i;
+
+function firstSentence(question: string): string {
+  return (question.split(/\n\s*\n/)[0] ?? '').split(/(?<=[.?!])\s+/)[0] ?? '';
+}
+
 function controlOf(step: AskedStep): string {
   const c = step.params?.control;
   return typeof c === 'string' ? c.trim().toLowerCase() : '';
@@ -110,6 +117,14 @@ export function repeatedQuestion(input: {
     );
     return edited || added;
   };
+  // Asking to approve the current version again after Go changed it is the
+  // next step, not a repeat: "make it shorter" answered, the shorter version
+  // is the one to approve (4 Nov prod pass on the Lakeside copy).
+  const approval = APPROVAL.test(firstSentence(question));
+  const newVersionSince = (iso: string) => {
+    const at = Date.parse(iso);
+    return !Number.isNaN(at) && (input.versions ?? []).some((v) => Date.parse(v.created_at) > at);
+  };
   let found: Repeat | null = null;
   steps.forEach((step, i) => {
     if (step.action_key !== 'request_user_decision' || step.stage_id !== stageId) return;
@@ -118,6 +133,7 @@ export function repeatedQuestion(input: {
     const answered = steps[answerAt];
     const answer = (answered.output ?? '').trim();
     if (!answer || userChangedSince(answered.finished_at ?? answered.started_at ?? '')) return;
+    if (approval && newVersionSince(step.finished_at ?? step.started_at ?? '')) return;
     const asked = questionOf(step);
     const sameButton = Boolean(control) && controlOf(step) === control;
     if (!sameButton && questionOverlap(asked, question) < SAME_QUESTION) return;

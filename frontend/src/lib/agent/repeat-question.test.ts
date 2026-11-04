@@ -65,6 +65,17 @@ describe('a question Go already asked (4 Nov, Lakeside)', () => {
     expect(repeatedQuestion({ question: Q15, control: SHORTER, stageId: 'final_proposal', steps: RUN, facts: fromAnswer })).not.toBeNull();
   });
 
+  it('asking to approve the version Go changed on the answer is the next step, not a repeat', () => {
+    const approve = 'Do you approve this current version as the finished proposal? Your earlier approval was given on an earlier version.';
+    const steps = [ask(approve, 22, ''), answer('Make it shorter to leave room under 650 words', 24), revise(25)];
+    const versions = [{ source_operation: 'agent_revise', created_at: at(25) }];
+    expect(repeatedQuestion({ question: approve, control: null, stageId: 'final_proposal', steps, versions })).toBeNull();
+    // With nothing new to approve, it is asked once.
+    expect(repeatedQuestion({ question: approve, control: null, stageId: 'final_proposal', steps, versions: [] })).not.toBeNull();
+    // Sean's questions were about the notes, not approval: a new version does not excuse them.
+    expect(repeatedQuestion({ question: Q15, control: SHORTER, stageId: 'final_proposal', steps: RUN, versions: [{ source_operation: 'agent_revise', created_at: at(18) }] })).not.toBeNull();
+  });
+
   it('two different questions on one stage are two questions', () => {
     const date = 'The sources disagree on the launch date (December 3 vs December 10). Which should I use?';
     const price = 'Which price should the announcement use — $18 or $24 per user per month?';
