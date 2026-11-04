@@ -468,7 +468,17 @@ def _format_state(inputs: PMInput, state: AgentState) -> str:
             "UNDECIDED FINDINGS ON OTHER STAGES (the rows themselves, by id — when the user asks which "
             "finding is open, quote it from here; never say you cannot see another stage's table). When "
             "you ask about one, name its stage and id, quote its wording, and say what accepting it "
-            "(its suggested change is applied) and rejecting it (it is dropped, with the reason kept) will do:\n"
+            "(its suggested change is applied) and rejecting it (it is dropped, with the reason kept) will do. "
+            # 4 Nov, production (Lakeside copy): i10 "Session 1 timings sum to
+            # 105" was listed as undecided under the approval of a version where
+            # they summed to 90, which the planner itself said it had fixed.
+            "When you ask the user to approve this stage's work and a row below describes a problem the "
+            "current version of this stage no longer has, list it in params.rows_addressed as "
+            '{"id": "<row id>", "quote": "<what shows it>"}: the quote is the exact words of the current '
+            "version that show it dealt with (8 to 200 characters, copied, not paraphrased), or, for a length "
+            "or a count, the measured result as the requirements list it. Name only a row you can show that "
+            "way; one whose change is still to be made stays undecided. Each is checked against the saved "
+            "text before it is recorded:\n"
             + "\n".join(
                 f"- {f.stage_label or f.stage_id} {f.id}"
                 + (f" ({f.severity})" if f.severity else "")
@@ -580,6 +590,10 @@ def parse_next_action(result: object, allowed: list[str], controls: list[AgentCo
         logger.warning(f"Planner chose {key!r}, outside the allowed actions; asking the user instead")
         return _ask("I could not settle on a next step that I can carry out from here. What would you like to do next?")
     params = _named_control(result.get("params") if isinstance(result.get("params"), dict) else {}, controls)
+    if "rows_addressed" in params:
+        rows = _rows_addressed(params.pop("rows_addressed"))
+        if rows:
+            params["rows_addressed"] = rows
     question = result.get("decision_question")
 
     # The words around params.control are shown to the user too; a button
@@ -608,6 +622,25 @@ def parse_next_action(result: object, allowed: list[str], controls: list[AgentCo
         decision_choices=_choices(result.get("decision_choices"), shown) if question else [],
         objective_complete=bool(result.get("objective_complete")) or key == "declare_objective_complete",
     )
+
+
+def _rows_addressed(raw: object) -> list[dict[str, str]]:
+    """Up to 12 ``{"id", "quote"}`` pairs, each a short id and a quote of at most
+    300 characters; anything else is dropped. The browser checks each quote
+    against the saved text before anything is recorded."""
+    if not isinstance(raw, list):
+        return []
+    out: list[dict[str, str]] = []
+    for item in raw[:12]:
+        if not isinstance(item, dict):
+            continue
+        row_id, quote = item.get("id"), item.get("quote")
+        if not isinstance(row_id, str) or not isinstance(quote, str):
+            continue
+        row_id, quote = row_id.strip(), quote.strip()
+        if row_id and len(row_id) <= 40 and 8 <= len(quote) <= 300:
+            out.append({"id": row_id, "quote": quote})
+    return out
 
 
 def _choices(raw: object, shown) -> list[str]:
