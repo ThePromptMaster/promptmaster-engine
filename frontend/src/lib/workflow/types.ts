@@ -460,6 +460,13 @@ export interface StageContext {
    */
   measured?: Record<string, { id: string; label: string; satisfied: boolean; detail?: string; value?: string }[]>;
   /**
+   * Per stage id: limits the stage answers for that code could not count on
+   * its saved text — a named part with no heading of its own (4 Nov, Sean:
+   * "If a measurement hasn't run, show the limit as unverified"). Shown, never
+   * blocking; a model's estimate does not stand in for them.
+   */
+  unverified?: Record<string, { id: string; label: string; satisfied: boolean; value?: string }[]>;
+  /**
    * Per review stage id: rows carried forward or deferred whose text says an
    * objective requirement is unmet (`carriedForwardUnmet`, C2). Each is open
    * work for "Objective met", whatever its row status.

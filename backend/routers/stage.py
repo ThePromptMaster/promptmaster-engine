@@ -19,6 +19,7 @@ from promptmaster.catchphrases import without_repeated_catchphrases
 from promptmaster.reader_text import split_user_note
 from promptmaster.errors import PRESERVED_EVALUATION, PRESERVED_STAGE_VERSIONS
 from promptmaster.limits import MAX_INSTRUCTION_CHARS
+from promptmaster.measured import MAX_LINES as MAX_MEASURED, MeasuredLine
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError, resolve_model
 from promptmaster.schemas import (
     GenerateStageArtifactResponse,
@@ -67,6 +68,8 @@ class GenerateStageArtifactRequest(BaseModel):
     #: The project's Web access switch (22 Oct): on, the stage searches the
     #: web first when its work needs outside facts.
     web_access: WebAccess = "off"
+    #: On a check stage: what code counted on the written work it checks (4 Nov).
+    measured: list[MeasuredLine] = Field(default_factory=list, max_length=MAX_MEASURED)
 
 
 @router.post("/generate-stage-artifact")
@@ -98,6 +101,7 @@ async def api_generate_stage_artifact(
             item_schema=req.item_schema,
             existing_content=req.existing_content,
             instruction=req.instruction,
+            measured=req.measured,
         )
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_STAGE_VERSIONS)
@@ -125,6 +129,8 @@ class EvaluateStageArtifactRequest(BaseModel):
     # the prompt states in words rather than dropping the axis silently.
     approved_outline: list[OutlineSection] = []
     iterations: list[Iteration] = []
+    #: What code counted on this text (4 Nov): the check reports these, never an estimate.
+    measured: list[MeasuredLine] = Field(default_factory=list, max_length=MAX_MEASURED)
     model: str = ""
 
 
@@ -151,6 +157,7 @@ async def api_evaluate_stage_artifact(
             approved_outline=req.approved_outline or None,
             iterations=req.iterations,
             model=req.model or None,
+            measured=req.measured,
         )
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_EVALUATION)

@@ -561,7 +561,16 @@ export interface GenerateStageArtifactRequest {
   existing_content?: string;
   /** What to change about the current draft (a revision), when there is one. */
   instruction?: string;
+  /** On a check stage: what code counted on the written work it checks (4 Nov). */
+  measured?: MeasuredLine[];
   model?: string;
+}
+
+/** A count code made, as a check is told it; `met: null` when it could not count (4 Nov). */
+export interface MeasuredLine {
+  label: string;
+  value: string;
+  met: boolean | null;
 }
 
 export interface GenerateStageArtifactResponse extends WebUse {
@@ -603,6 +612,8 @@ export interface EvaluateStageArtifactRequest {
   /** FR-12's fourth drift axis. Empty when no outline has been approved. */
   approved_outline?: OutlineSection[];
   iterations?: Iteration[];
+  /** What code counted on this text (4 Nov): the check reports these, never an estimate. */
+  measured?: MeasuredLine[];
   model?: string;
 }
 

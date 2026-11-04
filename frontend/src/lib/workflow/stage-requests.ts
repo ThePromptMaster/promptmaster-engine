@@ -21,6 +21,7 @@ import {
   type StageItem,
 } from '@/lib/workflow/stage-artifact';
 import { webAccessOf } from '@/lib/workflow/web-found';
+import { measuredLines, type MeasuredLine } from '@/lib/workflow/context';
 import type { AuditFinding } from '@/types';
 import type { StageDefinition, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
 import type { NewEvaluation } from '@/lib/supabase/versions';
@@ -117,8 +118,47 @@ export function generationRequest(
       : null,
     existing_content: existingContent,
     ...(instruction.trim() ? { instruction: instruction.trim() } : {}),
+    // A check table is told what code counted on the written work it checks (4 Nov).
+    ...(target.renderer === 'review' ? withMeasured(checkedCounts(project, template, bundles, target)) : {}),
     model: project.model,
   };
+}
+
+const withMeasured = (lines: MeasuredLine[]) => (lines.length ? { measured: lines } : {});
+
+/** "about 470–490 words", "No word count was run", "a hand estimate by section": a count by eye. */
+const HAND_COUNT = /\b(?:about|roughly|approximately|around|an? estimated?|estimated?|~)\s*[\d,]+(?:\s*[–-]\s*[\d,]+)?\s*words\b|\bno word count was run\b|\bhand (?:count|estimate)\b|\bby (?:hand|my count)\b/i;
+
+/**
+ * A check's findings, less any that only estimate a length code has counted
+ * (4 Nov, Sean: "The manual check estimated roughly 480 words and declared the
+ * memo under 500 without counting"). The count is on the checklist, measured;
+ * an estimate beside it can only disagree with it.
+ */
+export function withoutHandCounts(response: EvaluateStageArtifactResponse, lines: readonly MeasuredLine[]): EvaluateStageArtifactResponse {
+  const counted = lines.some((l) => l.met !== null && /\bwords\b/.test(l.label));
+  const findings = response.evaluation.findings;
+  if (!counted || !findings?.length) return response;
+  const kept = findings.filter((f) => !HAND_COUNT.test(`${f.summary ?? ''} ${f.suggested_change ?? ''}`));
+  return kept.length === findings.length ? response : { ...response, evaluation: { ...response.evaluation, findings: kept } };
+}
+
+/**
+ * What code counted on the written stages before a check stage, by stage (4
+ * Nov, Sean: the check row said "Estimated length is about 470–490 words… No
+ * word count was run", beside a memo code had measured).
+ */
+export function checkedCounts(
+  project: Project,
+  template: WorkflowTemplate,
+  bundles: Record<string, StageArtifactBundle>,
+  check: StageDefinition
+): MeasuredLine[] {
+  const at = template.stages.findIndex((s) => s.id === check.id);
+  return template.stages
+    .slice(0, Math.max(0, at))
+    .filter((s) => s.renderer === 'prose')
+    .flatMap((s) => measuredLines(project, template, s, bundles[s.id]?.versions.at(-1)?.content ?? '', s.label));
 }
 
 /**
@@ -183,6 +223,8 @@ export function evaluationRequest(
     content,
     digest: buildStageDigest(template, state, project, bundles, stage.id),
     approved_outline: approvedOutline,
+    // What code counted on this text: a check never estimates it (4 Nov).
+    ...withMeasured(stage.renderer === 'review' ? checkedCounts(project, template, bundles, stage) : measuredLines(project, template, stage, content)),
     model: project.model,
   };
 }

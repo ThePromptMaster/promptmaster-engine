@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 
 from .llm_client import OpenRouterClient
 from .project_context import CHECK_CONTEXT_MAX, context_block
+from .measured import MeasuredLine, measured_block
 from .schemas import PMInput
 
 #: The stage text a check reads. A routine approval is about what the stage
@@ -39,7 +40,23 @@ class CriterionCheck(BaseModel):
     reason: str = Field(default="", max_length=400)
 
 
-def build_check_prompt(inputs: PMInput, stage_label: str, criterion: str, content: str) -> tuple[str, str]:
+#: 4 Nov (production pass, Sean's support-software prompt): "I accept that the
+#: memo meets the brief once these findings are applied", on a check table,
+#: was judged "not met" because the table cannot show the findings applied —
+#: they are applied on the next stage, which is checked there.
+FINDINGS_TABLE_RULE = (
+    "This stage is a table of findings about earlier work; the accepted findings are carried out on a later "
+    "stage, and checked there. An approval about accepting the check's conclusions, or conditional on its "
+    "findings being applied (\"once these findings are applied\", \"after these corrections\"), is met when "
+    "every finding has a decision and each accepted one says what change it makes — never require the table "
+    "to show the change already made."
+)
+
+
+def build_check_prompt(
+    inputs: PMInput, stage_label: str, criterion: str, content: str,
+    measured: list[MeasuredLine] | None = None, findings_table: bool = False,
+) -> tuple[str, str]:
     text = content.strip()
     if len(text) > MAX_CHECK_CONTENT:
         # Said so it is not read as a gap in the work (12 Oct, Northstar; 13 Oct).
@@ -51,7 +68,9 @@ def build_check_prompt(inputs: PMInput, stage_label: str, criterion: str, conten
         f"PROJECT OBJECTIVE: {inputs.objective}\n"
         + (f"{context_block(inputs, limit=CHECK_CONTEXT_MAX)}\n" if context_block(inputs) else "")
         + f"STAGE: {stage_label}\n"
-        f"THE APPROVAL, as the user would state it: \"{criterion}\"\n\n"
+        + (f"{FINDINGS_TABLE_RULE}\n" if findings_table else "")
+        + (f"{measured_block(measured)}\n" if measured else "")
+        + f"THE APPROVAL, as the user would state it: \"{criterion}\"\n\n"
         f"--- THE STAGE'S TEXT ---\n{text}\n--- END ---\n\n"
         'Return JSON: {"met": true|false, "reason": "one sentence — where the text shows it, or what is missing"}'
     )
@@ -67,8 +86,9 @@ def parse_check(result: object) -> CriterionCheck:
 
 
 async def check_criterion(
-    client: OpenRouterClient, model: str | None, inputs: PMInput, stage_label: str, criterion: str, content: str
+    client: OpenRouterClient, model: str | None, inputs: PMInput, stage_label: str, criterion: str, content: str,
+    measured: list[MeasuredLine] | None = None, findings_table: bool = False,
 ) -> CriterionCheck:
-    system, user = build_check_prompt(inputs, stage_label, criterion, content)
+    system, user = build_check_prompt(inputs, stage_label, criterion, content, measured, findings_table)
     result, _usage = await client.generate_json(prompt=user, system=system, temperature=0, max_tokens=300, model=model)
     return parse_check(result)

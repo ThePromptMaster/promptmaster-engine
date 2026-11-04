@@ -33,6 +33,7 @@ import uuid
 from .work_form import FICTION_CHECK_RULE, FICTION_CLAIMS_RULE, form_of
 from .conversation import _shared_system
 from .llm_client import OpenRouterClient, OpenRouterDeadlineError, OpenRouterError
+from .measured import MeasuredLine, measured_block
 from .schemas import (
     format_data_files,
     GenerateStageArtifactResponse,
@@ -732,6 +733,7 @@ async def generate_stage_artifact(
     item_schema: StageItemSchema | None = None,
     existing_content: str = "",
     instruction: str = "",
+    measured: list[MeasuredLine] | None = None,
 ) -> GenerateStageArtifactResponse:
     """Generate one stage's artifact. One LLM call.
 
@@ -748,6 +750,11 @@ async def generate_stage_artifact(
         existing_content=existing_content,
         instruction=instruction,
     )
+    # A check table is told what code counted on the work it checks (4 Nov,
+    # Sean: "Estimated length is about 470–490 words … No word count was run").
+    counts = measured_block(measured or [], "THE WRITTEN WORK THIS CHECK READS")
+    if counts:
+        user = f"{user}\n\n{counts}"
 
     if stage.renderer in ("list", "review"):
         try:
