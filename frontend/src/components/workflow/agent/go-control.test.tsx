@@ -79,3 +79,28 @@ describe('GoControl, Resume hidden', () => {
     expect(screen.queryByText(/Resume carries on this run/)).toBeNull();
   });
 });
+
+describe('GoControl: plain progress, and the count under Run details (4 Nov, Sean)', () => {
+  it('says what Go is doing beside Stop, and keeps the count, calls and cost under Run details', () => {
+    const { container } = render(
+      <GoControl run={run({ cost_usd: 0.42 })} running budget={25} onBudget={() => {}} onGo={() => {}} onStop={() => {}}
+        canResume={false} disabled={false} doing="Checking Final memo…" calls={{ used: 37, cap: 400 }} />
+    );
+    expect(screen.getByText('Checking Final memo…')).toBeInTheDocument();
+    const details = container.querySelector('[data-run-details]') as HTMLDetailsElement;
+    expect(details).toBeTruthy();
+    expect(details.open).toBe(false);
+    expect(details.textContent).toContain('Run details');
+    expect(details.textContent).toContain('14 / 25 steps this window');
+    expect(details.textContent).toContain('Model calls this run: 37 of 400');
+  });
+
+  it('the pinned copy shows the words, not the bar, while Go works', () => {
+    render(
+      <GoControl run={run({})} running budget={25} onBudget={() => {}} onGo={() => {}} onStop={() => {}}
+        canResume={false} disabled={false} compact doing="Drafting Draft memo…" />
+    );
+    expect(screen.getByText('Drafting Draft memo…')).toBeInTheDocument();
+    expect(screen.queryByText('14 / 25 steps this window')).toBeNull();
+  });
+});

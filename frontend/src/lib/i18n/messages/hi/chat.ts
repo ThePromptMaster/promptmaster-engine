@@ -100,6 +100,7 @@ export const hi: Record<keyof typeof en, string> = {
   "cost.reply": "इस जवाब की लागत {cost}",
   "cost.replyUnknown": "इस जवाब की कीमत उपलब्ध नहीं है",
   "cost.unpriced": "({count} बिना ज्ञात कीमत के)",
+  "cost.breakdown": "{calls} मॉडल कॉल; इनमें से {goCalls} Go के, {steps} कदमों के लिए",
   "cost.step": "लागत {cost}",
   "cost.run": "यह रन अब तक: {cost}",
   "cost.project": "यह प्रोजेक्ट अब तक: {cost}",

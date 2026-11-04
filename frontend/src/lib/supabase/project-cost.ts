@@ -12,18 +12,18 @@ export const PROJECT_COST_ROWS = 10_000;
  * unknown and is counted, never added as zero (FR-18). Null when it cannot
  * be read.
  */
-export async function projectSpent(projectId: string): Promise<(Spent & { capped: boolean }) | null> {
+export async function projectSpent(projectId: string): Promise<(Spent & { capped: boolean; goSteps: number; goCalls: number }) | null> {
   try {
     const { data, error } = await createClient()
       .from('model_usage')
-      .select('cost_usd')
+      .select('cost_usd, operation, agent_step_id')
       .eq('project_id', projectId)
       .order('created_at', { ascending: false })
       .limit(PROJECT_COST_ROWS);
     if (error || !data) return null;
-    const rows = data as { cost_usd: string | number | null }[];
+    const rows = data as { cost_usd: string | number | null; operation?: string | null; agent_step_id?: string | null }[];
     const spent = totalOf(rows.map((r) => ({ costUsd: r.cost_usd === null ? null : Number(r.cost_usd) })));
-    return { ...spent, capped: rows.length >= PROJECT_COST_ROWS };
+    return { ...spent, capped: rows.length >= PROJECT_COST_ROWS, ...goShare(rows) };
   } catch {
     return null;
   }
@@ -58,4 +58,20 @@ export async function jobsSpent(projectId: string, jobIds: readonly string[], si
   } catch {
     return null;
   }
+}
+
+/**
+ * Go's share of a project's calls, told apart from its steps (4 Nov, Sean: "a
+ * way to distinguish workflow actions from model calls in the usage view"): the
+ * steps Go took, and the model calls made for them or for choosing them.
+ */
+export function goShare(rows: readonly { operation?: string | null; agent_step_id?: string | null }[]): { goSteps: number; goCalls: number } {
+  const steps = new Set<string>();
+  let goCalls = 0;
+  for (const r of rows) {
+    if (!(r.operation ?? '').startsWith('go:')) continue;
+    goCalls += 1;
+    if (r.agent_step_id) steps.add(r.agent_step_id);
+  }
+  return { goSteps: steps.size, goCalls };
 }

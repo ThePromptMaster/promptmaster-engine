@@ -51,7 +51,11 @@ type Need =
       choices?: string[];
     }
   | { kind: 'wait_for_jobs'; stageId: string; pending: number; complete: number; total: number }
-  | { kind: 'continue_budget'; budgetSteps: number }
+  /**
+   * A window used up, or (with `callCap`) the run's model-call ceiling reached.
+   * `saved`: the stages this run saved a version on, so the pause says what is kept (4 Nov).
+   */
+  | { kind: 'continue_budget'; budgetSteps: number; callCap?: number; saved?: string[] }
   | { kind: 'large_job'; stageId: string; sections: number }
   | { kind: 'triage_findings'; stageId: string; count: number }
   /**
@@ -930,7 +934,7 @@ export function describeNeed(
   stageLabel: (id: string) => string,
   ctx: NeedContext = {},
   locale: Locale = 'en'
-): { message: string; action: string | null; options?: { id: StuckOption; label: string }[]; footer?: string } {
+): { message: string; action: string | null; options?: { id: StuckOption; label: string }[]; footer?: string; detail?: string } {
   const t = (key: string, vars?: Vars) => translate(locale, key, vars);
   const word = (text: string) => templateWord(locale, text);
   switch (need.kind) {
@@ -987,8 +991,13 @@ export function describeNeed(
         message: t('need.waiting', { count: need.pending, complete: need.complete, total: need.total }),
         action: t('need.keepWaiting'),
       };
-    case 'continue_budget':
-      return { message: t('need.budget', { n: need.budgetSteps }), action: t('need.budgetMore', { n: need.budgetSteps }) };
+    case 'continue_budget': {
+      // 4 Nov (Sean): "If a limit is reached, show what was saved, why Go paused, and whether Resume starts another run."
+      // The reason is one sentence, as the stop reason records it; what is kept and what Continue does go under it.
+      const why = need.callCap ? t('need.callCap', { n: need.callCap }) : t('need.budget', { n: need.budgetSteps });
+      const saved = need.saved?.length ? `${t('need.budgetSaved', { stages: need.saved.map(word).join(', ') })} ` : '';
+      return { message: why, detail: `${saved}${t('need.budgetNext', { n: need.budgetSteps })}`, action: t('need.budgetMore', { n: need.budgetSteps }) };
+    }
     case 'large_job':
       return { message: t('need.large', { n: need.sections }), action: t('need.largeAnyway', { n: need.sections }) };
     case 'decide_rows':

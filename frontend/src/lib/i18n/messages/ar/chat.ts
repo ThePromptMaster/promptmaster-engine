@@ -100,6 +100,7 @@ export const ar: Record<keyof typeof en, string> = {
   "cost.reply": "تكلفة هذا الرد {cost}",
   "cost.replyUnknown": "سعر هذا الرد غير متاح",
   "cost.unpriced": "({count} دون سعر معروف)",
+  "cost.breakdown": "{calls} استدعاءً للنموذج؛ منها {goCalls} لـGo، في {steps} خطوة",
   "cost.step": "التكلفة {cost}",
   "cost.run": "هذا التشغيل حتى الآن: {cost}",
   "cost.project": "هذا المشروع حتى الآن: {cost}",

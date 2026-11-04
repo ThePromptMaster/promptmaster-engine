@@ -61,7 +61,7 @@ function shownAction(locale: Locale, english: string): string {
 type NeedKey = keyof typeof needEn;
 const NEED_MESSAGES: NeedKey[] = [
   'need.setObjective', 'need.outlineUnsaved', 'need.outlineVersion', 'need.outlinePlain', 'need.suggestSkip',
-  'need.roundDone', 'need.waiting_one', 'need.waiting_other', 'need.budget', 'need.large', 'need.unmet',
+  'need.roundDone', 'need.waiting_one', 'need.waiting_other', 'need.budget', 'need.callCap', 'need.large', 'need.unmet',
   'need.noEvidence', 'need.workOpen', 'need.triage_one', 'need.triage_other', 'need.stuckWhyReason', 'need.stuckWhy', 'need.notRevisedByGo',
 ];
 const NEED_SHAPES = NEED_MESSAGES

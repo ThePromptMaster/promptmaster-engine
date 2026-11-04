@@ -29,6 +29,7 @@ export function ProjectCost({ projectId, refreshKey }: { projectId: string; refr
       <span aria-hidden className="material-symbols-outlined text-[16px]">savings</span>
       {t('cost.project', { cost: cost ?? t('cost.unavailable') })}
       {cost && spent.unpriced > 0 ? ` ${t('cost.unpriced', { count: spent.unpriced })}` : ''}
+      {spent.goCalls > 0 ? ` · ${t('cost.breakdown', { calls: spent.calls, goCalls: spent.goCalls, steps: spent.goSteps })}` : ''}
     </p>
   );
 }
