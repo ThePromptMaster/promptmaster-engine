@@ -212,6 +212,11 @@ class AgentState(BaseModel):
     return_targets: list[AgentStageRef] = Field(default_factory=list, max_length=12)
     #: The project's "Routine decisions": 'handle' when they are Go's to make.
     routine_decisions: str = Field(default="", max_length=20)
+    #: The user's own sentences on what may be done without asking, what to ask
+    #: and what is authorised, verbatim from the brief (4 Nov, Sean: the setup had
+    #: shortened "routine drafting, arithmetic, checking and corrections" to
+    #: "drafting and arithmetic", and only the flag reached the planner).
+    delegation: list[str] = Field(default_factory=list, max_length=6)
     #: What the stage's latest version changed. None for a first version.
     latest_change: AgentLatestChange | None = None
     #: Undecided rows on review stages other than this one, with their wording.
@@ -424,6 +429,14 @@ def _format_state(inputs: PMInput, state: AgentState) -> str:
             "tolerance — is routine: do not ask it. Make the choice, say it is an assumption the user can "
             "change, and carry on with the move that uses it. Ask only about the objective, an accepted "
             "requirement, an approval reserved to the user, or a choice with no defensible default."
+        )
+    if state.delegation:
+        facts.append(
+            "THE USER'S DELEGATION, IN THEIR OWN WORDS (from the brief):\n"
+            + "\n".join(f"- {d[:500]}" for d in state.delegation[:6])
+            + "\nWhat these sentences let you do without asking, do — including a correction the brief "
+            "or the supplied facts already settle — and say what you did. Ask only for what they reserve "
+            "to the user."
         )
     if state.controls is None:
         facts.append("BUTTONS ON THIS PAGE NOW: not known. Do not name any button.")

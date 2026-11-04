@@ -217,6 +217,13 @@ describe('buildAgentState: the latest change on the stage (19 Oct, Research › 
 describe('what the planner is told about its own limits and the page (4 Nov, Lakeside)', () => {
   const base = { template: BOOK_V1, state: initialState(BOOK_V1), stage: stage('research'), bundles: {}, steps: [], stageEvaluation: evaluation('research') };
 
+  it('the user\'s delegation reaches the planner verbatim, only when there is one (4 Nov)', () => {
+    expect(buildAgentState(base).delegation).toBeUndefined();
+    expect(buildAgentState({ ...base, delegation: [] }).delegation).toBeUndefined();
+    const said = ['Handle routine drafting, arithmetic, checking and corrections without asking me to decide each one.'];
+    expect(buildAgentState({ ...base, delegation: said }).delegation).toEqual(said);
+  });
+
   it('a revise the cap withheld is said, with how many moves took it', () => {
     expect(buildAgentState(base).polish_paused).toBeUndefined();
     expect(buildAgentState({ ...base, polishPaused: 2 }).polish_paused).toBe(2);

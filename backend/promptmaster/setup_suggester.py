@@ -52,15 +52,29 @@ SETUP_SUGGESTER_SYSTEM = (
     "the user stated, or that follow directly from what they said. Do not add "
     "limits of your own (Sean, 10 Oct: \"avoid specialized training materials\" "
     "appeared in a setup nobody asked for it in). If none apply, return an empty "
-    "string.\n\n"
+    "string. "
+    # 4 Nov (Sean, support-software memo): "Handle routine drafting, arithmetic,
+    # checking and corrections without asking me to decide each one" became
+    # "Handle drafting and arithmetic without asking", and checking and
+    # corrections were no longer delegated.
+    "Copy word for word, never shortened or merged, every sentence in which the user "
+    "says what may be done without asking them, what they want to be asked about, what "
+    "they will approve, or what is or is not authorised.\n\n"
     "Output format: a short phrase describing what the finished deliverable looks "
     "like. For a book (workflow book) that is manuscript prose — e.g. \"Chapter-"
     "by-chapter manuscript in continuous prose, about 3,000 words a chapter\" or "
     "\"Narrative prose with section headings only\" — never an outline, a list "
     "or a table: the outline is scaffolding, not the product. For a single "
-    "output, e.g. \"Numbered list with 3-5 items\", \"Two-section memo: Findings "
-    "/ Recommendations\", \"Markdown table\". If none clearly apply, return "
-    "\"Free-form prose\".\n\n"
+    "output, e.g. \"Numbered list with 3-5 items\", \"Memo\", \"Markdown table\". "
+    # 4 Nov (Sean, support-software memo): the user listed five things the memo
+    # must contain and named no headings; the setup wrote seven exact headings in
+    # a fixed order, the check enforced them as "major", and Go stopped for it.
+    "Section names and their order go in only when the user gave them, in the user's "
+    "own words. When the user lists what the deliverable must contain but names no "
+    "headings, say what it must contain and add \"section names and order are the "
+    "writer's choice\" — never invent headings, an order or a number of sections. "
+    "Keep any length limit exactly as the user wrote it. If none clearly apply, "
+    "return \"Free-form prose\".\n\n"
     "Rationale: one line per field (≤80 chars) explaining why you picked it. "
     "Be brief and useful, not generic.\n\n"
     "Workflow: which PromptMaster workflow fits the objective.\n"

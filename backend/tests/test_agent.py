@@ -849,3 +849,15 @@ def test_a_paused_revise_is_said_not_silently_withheld():
     assert "REVISING IS PAUSED ON THIS STAGE FOR THE REST OF THIS RUN: 2 checks, applied findings or revisions" in user
     assert "never tell the user you cannot edit the work" in user
     assert "ask whether you should try again" in user
+
+
+def test_the_users_delegation_reaches_the_planner_in_their_words():
+    """4 Nov (Sean): only the "Routine decisions" flag reached the planner."""
+    _, quiet = build_next_action_prompt(INPUTS, STATE, RESEARCH, "guided")
+    assert "THE USER'S DELEGATION" not in quiet
+    said = "Handle routine drafting, arithmetic, checking and corrections without asking me to decide each one."
+    _, user = build_next_action_prompt(INPUTS, STATE.model_copy(update={"delegation": [said]}), RESEARCH, "guided")
+    assert "THE USER'S DELEGATION, IN THEIR OWN WORDS (from the brief):" in user
+    assert f"- {said}" in user
+    assert "including a correction the brief or the supplied facts already settle" in user
+    assert "Ask only for what they reserve to the user." in user
