@@ -696,7 +696,14 @@ export function requirementsForStage(
   const kind = primaryArtifactKind(stage) ?? '';
   if (kind === 'prompt' || kind.includes('objective')) return [];
   const about = `${stage.label} ${stage.entry_prompt_hint ?? ''}`.toLowerCase();
-  const subjects = new Set(requirements.map((r) => r.subject));
+  // What names the deliverable itself, as against a part of it ("executive
+  // summary", "promotional message"). One such name is the whole text even
+  // beside limits on parts (4 Nov, prod check: "a memo under 500 words … the
+  // executive summary no more than 60" left the memo's limit uncounted).
+  // A summary, abstract or overview beside a memo or report is a part of it.
+  const named = [...new Set(requirements.filter((r) => !isPart(r)).map((r) => r.subject))];
+  const deliverables = named.filter((n) => !PART_SUBJECTS.has(n));
+  const wholeSubjects = new Set(deliverables.length ? deliverables : named);
   const out: { requirement: MeasurableRequirement; whole: boolean }[] = [];
   for (const r of requirements) {
     const aboutIt = Boolean(r.subject) && !preparesFor(stage.label, r.subject) &&
@@ -707,7 +714,7 @@ export function requirementsForStage(
     // A part of it ("executive update", "section 1") is only ever that part:
     // with no heading for it, nothing is measured (14 Oct, ASPEN: 171 words
     // of a three-section pack were held to the update's 100).
-    else if (stage.id === deliverableId) out.push({ requirement: r, whole: subjects.size === 1 && !isPart(r) });
+    else if (stage.id === deliverableId) out.push({ requirement: r, whole: wholeSubjects.size === 1 && wholeSubjects.has(r.subject) && !isPart(r) });
   }
   return oneCountOfTheWhole(out, stage.label.toLowerCase());
 }
