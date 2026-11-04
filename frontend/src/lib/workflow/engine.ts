@@ -195,6 +195,8 @@ export function evaluateStage(
     ...stage.exit_criteria.map((c) => evaluateCriterion(c, stageId, ctx, stage.renderer)),
     // What the user asked for in numbers, counted on the saved text (C1, 8 Oct).
     ...(ctx.measured?.[stageId] ?? []).map((m) => ({ ...m, blocking: true })),
+    // A limit code could not count is said as not verified, and holds nothing up (4 Nov).
+    ...(ctx.unverified?.[stageId] ?? []).map((m) => ({ ...m, blocking: false })),
   ];
   const unmet = criteria.filter((c) => !c.satisfied);
   return {

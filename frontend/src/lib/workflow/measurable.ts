@@ -372,7 +372,9 @@ const isQuestion = (l: Line) => {
 // "**Length:** 545 words including headings and tables", "Message: 55 words,
 // counted by hand": the text's own count of itself, not part of it (2 Nov,
 // photography workshop: the promo measured 61 with its count line, 55 without).
-const NOTE = /^\W*(?:(?:what changed|revision notes?|change notes?|notes?|word count|words?\s*:|\(\d+\s+words?\)|verification)\b|[a-z][a-z ]{0,30}?\W*:\W*(?:about\s+|~\s*)?\d[\d,]*\s+words?\b)/i;
+// 4 Nov (Sean, support-software memo): "roughly 480 words", "approximately
+// 470–490 words", "The memo is about 490 words by my count" are counts too.
+const NOTE = /^\W*(?:(?:what changed|revision notes?|change notes?|notes?|word count|words?\s*:|\(\d+\s+words?\)|verification)\b|[a-z][a-z ]{0,30}?\W*:\W*(?:(?:about|roughly|approximately|around|under|estimated)\s+|~\s*)?\d[\d,]*(?:\s*[–-]\s*\d[\d,]*)?\s+words?\b|(?:this|the) (?:memo|document|draft|text|plan|report|brief|proposal|summary) (?:is|runs to|comes to) (?:about |roughly |approximately |around |~\s*)?\d[\d,]*\s+words?\b)/i;
 
 /**
  * A part of a document that sits beside other parts — "a summary of at most
@@ -594,6 +596,15 @@ export const isPart = (r: Pick<MeasurableRequirement, 'subject'>) => Boolean(r.s
 function rangeText(r: MeasurableRequirement): string {
   if (r.min !== undefined && r.max !== undefined) return r.min === r.max ? `exactly ${r.min}` : `${r.min}–${r.max}`;
   return r.max !== undefined ? `at most ${r.max}` : `at least ${r.min}`;
+}
+
+/** How a requirement is named wherever it is shown, measured or not: "Memo: at most 500 words (headings included)". */
+export function requirementLabel(r: MeasurableRequirement): string {
+  const name = subjectLabel(r.subject);
+  if (r.kind === 'words') return `${name}: ${rangeText(r)} words${r.headings ? ' (headings included)' : ''}`;
+  if (r.kind === 'pages') return `${name}: ${rangeText(r)} page${r.max === 1 ? '' : 's'} (estimated)`;
+  if (r.kind === 'sections') return `${name}: ${rangeText(r)} sections`;
+  return `${name}: ${rangeText(r)} questions${r.answered ? ', each answered' : ''}`;
 }
 
 /**

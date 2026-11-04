@@ -22,7 +22,7 @@ import { approvedOutlineVersionId, commitOutlineVersion } from '@/lib/supabase/o
 import { appendWorkflowEvent, listWorkflowEvents } from '@/lib/supabase/workflow';
 import { getArtifact } from '@/lib/supabase/versions';
 import { listRecentRunOutputs } from '@/lib/supabase/agent';
-import { manuscriptArtifactFor, manuscriptSourceFor, measureStageContent, stageRequirements } from '@/lib/workflow/context';
+import { manuscriptArtifactFor, manuscriptSourceFor, measureStageContent, measuredLines, stageRequirements } from '@/lib/workflow/context';
 import { COUNTING_RULE, isPart, measure, replaceSection, sectionFor, type MeasurableRequirement } from '@/lib/workflow/measurable';
 import { askedOfRecheck, describeLines, isChangeNote, keepUnasked, structureDropped } from '@/lib/workflow/preservation';
 import { notRemovedByUser } from '@/lib/workflow/removed-text';
@@ -71,7 +71,7 @@ import { asIteration } from '@/lib/workflow/legacy';
 import { headingOutline, joinParts, needsParts, partInstruction, splitIntoParts } from '@/lib/workflow/long-prose';
 import {
   evaluationRecord,
-  evaluationRequest,
+  evaluationRequest, withoutHandCounts,
   generationContent,
   generationRequest,
   inputsFrom,
@@ -1549,10 +1549,8 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         return done(key, { status: 'failed', output: 'There is no draft to check yet.', toolsUsed: [], changes: {} });
       }
       if (!ctx.recordStageEvaluation) throw new Error('This view cannot save evaluations.');
-      const res = await api.evaluateStageArtifact(
-        evaluationRequest(ctx.project, ctx.template, ctx.state, (await readManuscript(ctx, ctx.stage)) ?? ctx.bundles, ctx.stage, version.content, ctx.approvedOutline),
-        ctx.signal
-      );
+      const request = evaluationRequest(ctx.project, ctx.template, ctx.state, (await readManuscript(ctx, ctx.stage)) ?? ctx.bundles, ctx.stage, version.content, ctx.approvedOutline);
+      const res = withoutHandCounts(await api.evaluateStageArtifact(request, ctx.signal), request.measured ?? []);
       await ctx.recordStageEvaluation(
         ctx.stage.id, version.id,
         evaluationRecord(res, ctx.project.model, 'manual', [
@@ -1598,7 +1596,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       const check = decided
         ? { met: true, reason: `Every finding on ${ctx.stage.label} has a decision (${decided} of ${decided}), each recorded on its row with its reason.` }
         : await api.agentCheckCriterion(
-            { inputs: inputsFrom(ctx.project), stage_label: ctx.stage.label, criterion: criterion.label, content: head.content, model: ctx.project.model },
+            { inputs: inputsFrom(ctx.project), stage_label: ctx.stage.label, criterion: criterion.label, content: head.content, measured: measuredLines(ctx.project, ctx.template, ctx.stage, head.content), findings_table: isTriageTable(itemSchemaFor(ctx.stage)), model: ctx.project.model },
             ctx.signal
           );
       if (!check.met) {

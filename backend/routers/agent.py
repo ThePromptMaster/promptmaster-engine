@@ -39,6 +39,7 @@ from promptmaster.agent import (
 from promptmaster.web_search import MAX_RESULTS as MAX_WEB_RESULTS, WebSearchResult, search_web
 from promptmaster.verify_sources import MAX_VERIFY, SourceToVerify, SourceVerdict, verify_sources
 from promptmaster.criterion_check import CriterionCheck, check_criterion
+from promptmaster.measured import MAX_LINES as MAX_MEASURED, MeasuredLine
 from promptmaster.answer_check import CheckAnswerRequest, CheckAnswerResponse, check_answer
 from promptmaster.objective_assessment import ObjectiveAssessment, RunStep, assess_objective
 from promptmaster.expert_review import ExpertPackage, RecordDocument, prepare_expert_package
@@ -311,6 +312,10 @@ class CheckCriterionRequest(BaseModel):
     stage_label: str = Field(max_length=200)
     criterion: str = Field(min_length=1, max_length=400)
     content: str = Field(min_length=1, max_length=400_000)
+    #: What code counted on the stage (4 Nov): reported, never estimated.
+    measured: list[MeasuredLine] = Field(default_factory=list, max_length=MAX_MEASURED)
+    #: The stage is a findings table whose accepted rows are carried out later (4 Nov).
+    findings_table: bool = False
     model: str = ""
 
 
@@ -323,7 +328,7 @@ async def api_check_criterion(req: CheckCriterionRequest, client: OpenRouterClie
     """Whether a stage's text satisfies a routine approval, before Go commits it
     under the routine-decision policy (5 Oct). 1 small LLM call; commits nothing."""
     try:
-        result = await check_criterion(client, req.model or None, req.inputs, req.stage_label, req.criterion, req.content)
+        result = await check_criterion(client, req.model or None, req.inputs, req.stage_label, req.criterion, req.content, req.measured, req.findings_table)
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
     return CheckCriterionResponse(**result.model_dump(), model_used=_model_used(req.model, client))

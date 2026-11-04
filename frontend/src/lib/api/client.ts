@@ -934,7 +934,7 @@ export const api = {
 
   /** Whether a stage's text satisfies a routine approval, before Go commits it (5 Oct). Commits nothing. */
   async agentCheckCriterion(
-    req: { inputs: PMInput; stage_label: string; criterion: string; content: string; model?: string },
+    req: { inputs: PMInput; stage_label: string; criterion: string; content: string; measured?: { label: string; value: string; met: boolean | null }[]; findings_table?: boolean; model?: string },
     signal?: AbortSignal
   ): Promise<{ met: boolean; reason: string; model_used: string }> {
     return apiFetch('/api/agent/check-criterion', { method: 'POST', body: JSON.stringify(req), signal });

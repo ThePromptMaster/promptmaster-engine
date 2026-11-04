@@ -38,6 +38,7 @@ from .conversation import _shared_system
 from .critique_style import MAX_FINDINGS, critique_style_block, intensity_of
 from .errors import PRESERVED_EVALUATION, classify_error
 from .llm_client import LONG_ANSWER_TOKENS, OpenRouterClient
+from .measured import MeasuredLine, measured_block
 from .schemas import (
     AuditFinding,
     CompletenessResult,
@@ -485,6 +486,7 @@ async def evaluate_stage_artifact(
     approved_outline: list[OutlineSection] | None = None,
     iterations: list[Iteration] | None = None,
     model: str | None = None,
+    measured: list[MeasuredLine] | None = None,
 ) -> StageEvaluationResponse:
     """Evaluate one stage's artifact. Exactly one LLM call."""
     system, user = build_stage_evaluation_prompt(
@@ -495,6 +497,10 @@ async def evaluate_stage_artifact(
         approved_outline=approved_outline,
         iterations=iterations,
     )
+    # 4 Nov (Sean): a check estimated "roughly 480 words" of a memo code had counted.
+    counts = measured_block(measured or [], "THE WRITTEN WORK THIS CHECK READS" if stage.renderer == "review" else "THIS TEXT")
+    if counts:
+        user = f"{user}\n\n{counts}"
 
     try:
         result, _usage = await client.generate_json(

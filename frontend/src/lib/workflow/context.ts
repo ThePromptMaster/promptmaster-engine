@@ -17,6 +17,7 @@
 import { countNamedSections, parseOutlineDocument } from '@/lib/outline/model';
 import { approvedOutlineVersionId } from '@/lib/supabase/outline';
 import type { Artifact, ArtifactVersion, Project } from '@/types/project';
+import type { MeasuredLine } from '@/types';
 import { draftingStageId } from './derived-outline';
 import type { StageArtifactBundle } from './digest';
 import { carriedForwardUnmet, deferredNotBlocking, confirmableProposals, openFindingRows, openUnmet, effectiveRenderer, isTriaged, itemSchemaFor, parseItems, rendererHoldsItems } from './stage-artifact';
@@ -24,7 +25,7 @@ import type { OpenFindingRow, StageContext, StageDefinition, WorkflowEvent, Work
 import { deliverableStage, rowsRequired } from './engine';
 import { currentFacts } from './facts';
 import { describeUnsupported, unsupportedClaims } from './evidence-claims';
-import { measure, parseRequirements, requirementsForStage, type MeasurableRequirement, type Measurement } from './measurable';
+import { measure, parseRequirements, requirementLabel, requirementsForStage, type MeasurableRequirement, type Measurement } from './measurable';
 
 export interface BuildContextInput {
   template: WorkflowTemplate;
@@ -166,13 +167,18 @@ export function buildStageContext(input: BuildContextInput): StageContext {
   // C1 (8 Oct): word ranges, limits and question counts the user asked for,
   // measured on the stages that produce what they describe.
   const measured: Record<string, Measurement[]> = {};
+  const unverified: Record<string, Measurement[]> = {};
   for (const s of template.stages) {
-    const results = measureStageContent(project, template, s, bundles[s.id]?.versions.at(-1)?.content ?? '');
+    const content = bundles[s.id]?.versions.at(-1)?.content ?? '';
+    const results = measureStageContent(project, template, s, content);
     if (results.length) measured[s.id] = results;
+    const notCounted = unverifiedLimits(project, template, s, content);
+    if (notCounted.length) unverified[s.id] = notCounted;
   }
 
   return {
     measured,
+    ...(Object.keys(unverified).length ? { unverified } : {}),
     carriedForward,
     deferred,
     openUnmet: openUnmetRows,
@@ -251,6 +257,45 @@ export function measureStageContent(
       .map(({ requirement, whole }) => measure(requirement, content, whole))
       .filter((m): m is Measurement => m !== null),
     ...(evidence ? [evidence] : []),
+  ];
+}
+
+/** What it says when a limit could not be counted. */
+export const NOT_COUNTED = 'not verified: no part of the saved text is headed for it, so it was not counted';
+
+/**
+ * The limits a stage answers for that code could not count on `content` (4
+ * Nov): a named part with no heading of its own. Said as not verified, so a
+ * model's estimate is never taken for a count.
+ */
+export function unverifiedLimits(
+  project: Pick<Project, 'objective' | 'constraints'> & Partial<Pick<Project, 'output_format' | 'facts'>>,
+  template: WorkflowTemplate,
+  stage: StageDefinition,
+  content: string
+): Measurement[] {
+  if (!content.trim()) return [];
+  return stageRequirements(project, template, stage)
+    .filter(({ requirement, whole }) => measure(requirement, content, whole) === null)
+    .map(({ requirement }) => ({ id: `unverified.${requirement.id}`, label: `${requirementLabel(requirement)} — not verified`, satisfied: false, value: NOT_COUNTED }));
+}
+
+export type { MeasuredLine };
+
+/** What code counted on `content` for `stage`, and what it could not (4 Nov): handed to every check of it. */
+export function measuredLines(
+  project: Pick<Project, 'objective' | 'constraints'> & Partial<Pick<Project, 'output_format' | 'facts' | 'code_runs'>>,
+  template: WorkflowTemplate,
+  stage: StageDefinition,
+  content: string,
+  prefix = ''
+): MeasuredLine[] {
+  const name = (label: string) => (prefix ? `${prefix} — ${label}` : label);
+  return [
+    ...measureStageContent(project, template, stage, content)
+      .filter((m) => m.id !== 'measured.evidence')
+      .map((m) => ({ label: name(m.label), value: m.value ?? '', met: m.satisfied })),
+    ...unverifiedLimits(project, template, stage, content).map((m) => ({ label: name(m.label.replace(/ — not verified$/, '')), value: NOT_COUNTED, met: null })),
   ];
 }
 

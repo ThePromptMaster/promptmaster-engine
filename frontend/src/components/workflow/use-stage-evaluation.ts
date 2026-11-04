@@ -30,7 +30,7 @@ import {
   type StageFailure,
 } from '@/lib/errors/recovery';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
-import { evaluationRecord, evaluationRequest } from '@/lib/workflow/stage-requests';
+import { evaluationRecord, evaluationRequest, withoutHandCounts } from '@/lib/workflow/stage-requests';
 import type { StageDefinition, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
 import type { NewEvaluation } from '@/lib/supabase/versions';
 import type { Evaluation, Project } from '@/types/project';
@@ -142,10 +142,8 @@ export function useStageEvaluation({
     setFailure(null);
 
     try {
-      const response = await api.evaluateStageArtifact(
-        evaluationRequest(p, t, s, await freshOrPage(t, stage, b, p.id), stage, version.content, outline),
-        controller.signal
-      );
+      const request = evaluationRequest(p, t, s, await freshOrPage(t, stage, b, p.id), stage, version.content, outline);
+      const response = withoutHandCounts(await api.evaluateStageArtifact(request, controller.signal), request.measured ?? []);
 
       if (controller.signal.aborted) return;
 
