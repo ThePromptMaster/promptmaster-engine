@@ -46,3 +46,27 @@ describe('a stage that prepares the deliverable is not held to its length', () =
     expect(preparesFor('Memo brief and success test', 'memo')).toBe(true);
   });
 });
+
+describe('the deliverable\'s own limit beside a limit on one of its parts (4 Nov, prod check)', () => {
+  // "Produce a decision memo under 500 words … The executive summary must be no more than 60 words."
+  const both = parseRequirements(['Keep the memo under 500 words, including headings and tables. The executive summary must be no more than 60 words.']);
+  const answer = stage('answer', 'Answer');
+
+  it('counts the memo on the whole text, and the summary only under its own heading', () => {
+    const out = requirementsForStage(answer, 'answer', both);
+    const memo = out.find((o) => o.requirement.subject === 'memo');
+    const summary = out.find((o) => o.requirement.subject !== 'memo');
+    expect(memo?.whole).toBe(true);
+    expect(summary?.whole).toBe(false);
+  });
+
+  it('a summary asked for on its own is still the whole text', () => {
+    const alone = parseRequirements(['Write a summary of no more than 120 words.']);
+    expect(requirementsForStage(answer, 'answer', alone)[0].whole).toBe(true);
+  });
+
+  it('two names for the deliverable are still ambiguous, and neither is taken as the whole', () => {
+    const two = parseRequirements(['The memo must be under 500 words. The report must be under 900 words.']);
+    expect(requirementsForStage(answer, 'answer', two).every((o) => !o.whole)).toBe(true);
+  });
+});
