@@ -100,6 +100,7 @@ export const ar: Record<keyof typeof en, string> = {
   'bcn.namesUpdated': 'حُدّث: {names}',
   'bcn.checkedAgain': 'تم التحقق مجددًا',
   'bcn.outcomeLine': '{stage}: {what} — {check}',
+  'bcn.outcomeLineShort': '{stage}: {what}',
   'bcn.updatedBy': 'حدّثها {who} إلى v{version}',
   'bcn.byGo': 'Go',
   'bcn.byYou': 'أنت',

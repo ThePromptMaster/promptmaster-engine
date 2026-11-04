@@ -100,6 +100,7 @@ export const zh: Record<keyof typeof en, string> = {
   'bcn.namesUpdated': '{names}已更新',
   'bcn.checkedAgain': '已重新检查',
   'bcn.outcomeLine': '{stage}：{what} — {check}',
+  'bcn.outcomeLineShort': '{stage}：{what}',
   'bcn.updatedBy': '已由{who}更新为 v{version}',
   'bcn.byGo': 'Go',
   'bcn.byYou': '你',

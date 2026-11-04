@@ -16,8 +16,8 @@ export interface ChangeOutcome {
   /** The version made after the change; null when the stage was finished again as it was. */
   version: number | null;
   by: 'go' | 'you' | null;
-  /** clean / findings: a check ran on that version; not_checked: none did; table: a findings table. */
-  check: 'clean' | 'findings' | 'not_checked' | 'table';
+  /** clean / findings: a check ran on that version; not_checked: none did; table: a findings table; none: a plain table, with nothing to decide. */
+  check: 'clean' | 'findings' | 'not_checked' | 'table' | 'none';
   /** Findings the check noted, or a table's undecided rows. */
   count: number;
 }
@@ -39,9 +39,9 @@ export function changeOutcomes(
     const last = after.at(-1) ?? null;
     const version = last?.version_number ?? null;
     const by = last ? ((last.source_operation ?? '').startsWith('agent_') ? 'go' : 'you') : null;
-    if (stage && stage.renderer !== 'prose' && stage.renderer !== 'long_form') {
-      return { stageId, version, by, check: 'table', count: undecidedRows(stageId) };
-    }
+    // A findings table says how many are undecided; a plain table (facts, figures) has nothing to decide (4 Nov, prod pass).
+    if (stage && stage.renderer === 'review') return { stageId, version, by, check: 'table', count: undecidedRows(stageId) };
+    if (stage && stage.renderer !== 'prose' && stage.renderer !== 'long_form') return { stageId, version, by, check: 'none', count: 0 };
     const latest = versionsOf(stageId).at(-1);
     const ev = latest ? evaluations?.[latest.id] : undefined;
     if (!ev || isFailedEvaluation(ev)) return { stageId, version, by, check: 'not_checked', count: 0 };
