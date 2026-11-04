@@ -12,7 +12,6 @@
  * claim against it.
  */
 
-import { currentFacts } from '@/lib/workflow/facts';
 import { codeToCheck, type CodeToCheck } from './code-check';
 import { loadOutline, outlineStageFor } from '@/lib/outline/actions';
 import { countNamedSections, emptyDocument, parseOutlineDocument } from '@/lib/outline/model';
@@ -25,7 +24,7 @@ import { withFreshManuscript } from '@/lib/workflow/fresh-manuscript';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import { revisionBrief, type RevisionBrief } from '@/lib/workflow/revision';
 import { effectiveRenderer, itemSchemaFor, parseItems, rendererHoldsItems, stageDrafts, type StageItem, type StageItemSchema, isTriaged } from '@/lib/workflow/stage-artifact';
-import { isTriageTable, splitUntriaged } from '@/lib/workflow/triage';
+import { decidedWords, isTriageTable, splitUntriaged } from '@/lib/workflow/triage';
 import { projectState } from '@/lib/workflow/engine';
 import type { StageContext, StageDefinition, WorkflowEvent, WorkflowTemplate } from '@/lib/workflow/types';
 import type { OutlineSection } from '@/types';
@@ -242,7 +241,7 @@ export async function readStageFacts(input: {
     const schema = itemSchemaFor(stage);
     const items = parseItems(bundles[stage.id]?.versions.at(-1)?.content) ?? [];
     if (isTriageTable(schema) && items.length) {
-      facts.review = { items, schema, ...splitUntriaged(items, schema, currentFacts(project.facts)), outcome: false };
+      facts.review = { items, schema, ...splitUntriaged(items, schema, decidedWords(project)), outcome: false };
     } else if (items.length) {
       const undecided = items.filter((i) => !isTriaged(i, schema));
       facts.review = { items, schema, routine: [], material: undecided, outcome: true };

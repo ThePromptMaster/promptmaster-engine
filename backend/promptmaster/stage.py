@@ -97,16 +97,27 @@ def _format_digest(digest: StageDigest) -> str:
 #: Keys a triage row may carry beside the table's own fields (1 Nov).
 IMPLEMENTS_KEY = "implements"
 CHANGES_KEY = "changes"
+# 4 Nov (Sean, support-software memo): a "major" heading correction quoted the
+# brief's Output format as what it carried out, but only accepted facts were
+# matched, so it fell back to its severity and Go stopped for it. A requirement
+# the brief itself states — its constraints, its output format, the user's own
+# request in the project context — was decided when the user wrote it. The
+# objective alone is not such a requirement: nearly every change "serves" it.
+BRIEF_SOURCES = (
+    "a requirement the user's brief states in so many words (its constraints, its output format, "
+    "or the user's own request in the project context; never the objective alone)"
+)
 IMPLEMENTS_RULE = (
     "ONLY when this finding's suggested change does nothing but carry out one of the ACCEPTED "
     "PROJECT FACTS AND REQUIREMENTS (the user's own decision or correction, already on record), "
-    "copy that fact's words here exactly. Such a finding is not a new decision for the user. "
-    "Leave it out otherwise."
+    f"or {BRIEF_SOURCES}, copy those words here exactly, without the field's name. Such a finding "
+    "is not a new decision for the user, whatever its severity. Leave it out otherwise."
 )
 CHANGES_RULE = (
     "when this finding's suggested change would alter, loosen, replace or drop one of the "
-    "ACCEPTED PROJECT FACTS AND REQUIREMENTS, copy that fact's words here exactly, whatever the "
-    "finding's severity: changing what the user decided is theirs to approve. Leave it out otherwise."
+    f"ACCEPTED PROJECT FACTS AND REQUIREMENTS, or {BRIEF_SOURCES}, copy those words here exactly, "
+    "whatever the finding's severity: changing what the user decided is theirs to approve. Leave it "
+    "out otherwise."
 )
 
 
