@@ -711,6 +711,9 @@ the run's cost rose from $1.81 to $2.61 (#479, #480; L-149, L-150).
 | Buttons are the user's | `agent._format_state` BUTTONS line; More-menu tools carry `does` (`stage-controls.ts` `MORE_DOES` → `AgentControl.does`), so "Refine: make it shorter" reads as a whole-draft rewrite |
 | A question asked once | `lib/agent/repeat-question.ts` (`repeatedQuestion`, `repeatPause`), called in `use-go-loop` before `auditStop` across the run chain; a repeat sets the run `blocked` with `stop.repeatQuestion` (all eight languages). Asking to approve a version Go changed since is exempt |
 | Decision facts | `answers.questionOf` drops Go's sentences about buttons and its own abilities |
+| An answer reopens nothing where it was given (#483, #484; L-151) | `use-brief-change.ts`: a facts change whose added facts are all Go answers (`brief-change.answeredOnStages`) is judged against every finished stage, then `leftToGo` takes the stages they were given on out of `affected` (kept as `left_to_go` on the event) |
+| An approval after a revision is not a repeat (#486) | `repeat-question.asksForApproval`: any "?" sentence of the first paragraph that asks for approval |
+| Rows the deliverable carries out (#485, #487; L-152) | The planner's `params.rows_addressed` (`{id, quotes}`, rule in `agent._format_state`, shape in `_rows_addressed`) on an approval ask on the deliverable; `lib/agent/addressed-rows.ts` keeps a row only when every quote is in the saved text or a met measurement; `perform.ts` `recordCarriedOut` records them as accepted under routine "handle" (`CARRIED_OUT_REASON`), and `project-store` does not reopen later stages for such a save (`triage.onlyRecordsCarriedOut`) |
 
 ## Extension points
 
