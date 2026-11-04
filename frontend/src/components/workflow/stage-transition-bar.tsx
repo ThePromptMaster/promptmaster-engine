@@ -53,6 +53,12 @@ export function byGroup(items: readonly MoreAction[]): MoreAction[] {
 interface Props {
   stage: StageDefinition;
   evaluation: StageEvaluation;
+  /**
+   * The stage has no saved work. Its criteria may all be optional (Book's
+   * Continuity), so it can advance — but it is not "ready" (4 Nov, Sean:
+   * "Some screens still said the user could move on").
+   */
+  nothingSaved?: boolean;
   options: TransitionOption[];
   onTransition: (option: TransitionOption, note?: string) => void;
   /** A transition is being written; the buttons wait rather than double-submit. */
@@ -108,6 +114,7 @@ interface Props {
 export function StageTransitionBar({
   stage,
   evaluation,
+  nothingSaved = false,
   options,
   onTransition,
   busy = false,
@@ -241,6 +248,8 @@ export function StageTransitionBar({
       ? t('tb.projectOpen', { count: elsewhere.length || 1, items: elsewhere.join('; ') || t('tb.objectiveNotMet') })
       : elsewhere.length
       ? t('tb.doneElsewhere', { count: elsewhere.length, items: elsewhere.join('; ') })
+      : nothingSaved
+      ? t('tb.nothingSaved')
       : t('tb.ready')
     : `${t('tb.outstanding', { count: evaluation.unmet.length })}${elsewhereNote}`;
 

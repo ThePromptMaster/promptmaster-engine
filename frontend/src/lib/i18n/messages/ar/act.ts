@@ -99,6 +99,7 @@ export const ar: Record<keyof typeof en, string> = {
   'tb.objectiveNotMet': 'الهدف لم يتحقق',
   'tb.doneElsewhere': 'هذه المرحلة منجزة · لا يزال مفتوحًا في مواضع أخرى ({count}): {items}',
   'tb.ready': 'جاهز للانتقال',
+  'tb.nothingSaved': 'لم يُحفظ شيء في هذه المرحلة بعد. يمكنك المتابعة مع ذلك؛ ستبقى فارغة.',
   'tb.outstanding_one': '{count} بند معلّق',
   'tb.outstanding_other': 'بنود معلّقة: {count}',
   'tb.thinking': 'جارٍ التفكير…',

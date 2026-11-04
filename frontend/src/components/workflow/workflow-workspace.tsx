@@ -2972,6 +2972,7 @@ export function WorkflowWorkspace({
               <StageTransitionBar
                 stage={stage}
                 evaluation={evaluation}
+                nothingSaved={!(headVersion?.content ?? '').trim()}
                 options={transitions}
                 onTransition={(option, note) => {
                   // PM-14: finishing shows what is being finished, first.

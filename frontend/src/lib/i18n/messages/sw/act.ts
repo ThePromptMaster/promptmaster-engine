@@ -99,6 +99,7 @@ export const sw: Record<keyof typeof en, string> = {
   'tb.objectiveNotMet': 'lengo halijafikiwa',
   'tb.doneElsewhere': 'Hatua hii imekamilika · {count} bado wazi mahali pengine: {items}',
   'tb.ready': 'Tayari kuendelea',
+  'tb.nothingSaved': 'Hakuna kilichohifadhiwa katika hatua hii bado. Bado unaweza kuendelea; itabaki tupu.',
   'tb.outstanding_one': 'Kipengele {count} kimesalia',
   'tb.outstanding_other': 'Vipengele {count} vimesalia',
   'tb.thinking': 'Inafikiri…',
