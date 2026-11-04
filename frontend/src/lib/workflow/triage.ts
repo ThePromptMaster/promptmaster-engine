@@ -10,7 +10,7 @@
  * severity at all — is material, because unknown is not routine.
  */
 
-import { isTriaged, type StageItem, type StageItemSchema } from './stage-artifact';
+import { isTriaged, parseItems, type StageItem, type StageItemSchema } from './stage-artifact';
 
 export type TriageRisk = 'routine' | 'material';
 
@@ -130,4 +130,37 @@ export function recordedDecisions(items: readonly StageItem[], schema: StageItem
     const fact = quotedFact(item.implements, facts);
     return fact ? [{ id: item.id, status: 'accepted', reason: `${RECORDED_REASON} "${fact.statement.trim()}"` }] : [];
   });
+}
+
+/**
+ * The reason recorded on a row accepted because the deliverable already
+ * carries it out (4 Nov): Go fixed the problem on the final stage, and the
+ * review's row about the earlier draft was still listed as undecided in the
+ * approval question ("Session 1 timings sum to 105", on a version where they
+ * summed to 90).
+ */
+export const CARRIED_OUT_REASON = 'Already carried out in';
+
+/**
+ * A version that only records rows as accepted because the deliverable
+ * already carries them out changes nothing a later stage read: each changed
+ * row went from undecided to accepted, as Go's decision, with
+ * `CARRIED_OUT_REASON`, and nothing else in the table moved. Saving it must not
+ * reopen the deliverable it names, or the recheck would revise it again.
+ */
+export function onlyRecordsCarriedOut(before: string | null | undefined, after: string | null | undefined): boolean {
+  const a = parseItems(before);
+  const b = parseItems(after);
+  if (!a || !b || a.length !== b.length || a.length === 0) return false;
+  let recorded = 0;
+  for (let i = 0; i < a.length; i += 1) {
+    const { status: wasStatus, status_source: wasSource, reason: wasReason, ...restA } = a[i];
+    const { status, status_source: source, reason, ...restB } = b[i];
+    if (JSON.stringify(restA) !== JSON.stringify(restB)) return false;
+    if (wasStatus === status && wasSource === source && wasReason === reason) continue;
+    const undecided = !wasStatus || wasSource === 'proposed';
+    if (!undecided || status !== 'accepted' || source !== 'model' || !(reason ?? '').startsWith(CARRIED_OUT_REASON)) return false;
+    recorded += 1;
+  }
+  return recorded > 0;
 }

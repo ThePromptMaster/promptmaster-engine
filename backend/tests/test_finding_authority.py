@@ -112,3 +112,50 @@ def test_no_block_when_nothing_is_open_elsewhere():
 
     _, user = build_next_action_prompt(_inputs(), AgentState(stage_id="final_plan"), ["request_user_decision"], "guided")
     assert "UNDECIDED FINDINGS ON OTHER STAGES" not in user
+
+
+def test_the_planner_may_name_rows_the_current_version_already_carries_out():
+    """4 Nov, prod (Lakeside copy): i10 "Session 1 timings sum to 105" was listed as
+    undecided under the approval of a version where they summed to 90."""
+    from promptmaster.agent import AgentOpenFinding, AgentState, build_next_action_prompt
+
+    state = AgentState(
+        stage_id="final_proposal",
+        stage_label="Final proposal",
+        open_findings_elsewhere=[
+            AgentOpenFinding(stage_id="proposal_check", stage_label="Check", id="i10", severity="major",
+                             text="Session 1 timings sum to 105, not the stated 90."),
+        ],
+    )
+    _, user = build_next_action_prompt(_inputs(), state, ["request_user_decision"], "autonomous")
+    assert "params.rows_addressed" in user
+    assert "exact words of the current version" in user
+    assert "one whose change is still to be made stays undecided" in user
+
+
+def test_rows_addressed_are_kept_only_in_their_shape():
+    from promptmaster.agent import parse_next_action
+
+    choice = parse_next_action(
+        {
+            "action_key": "request_user_decision",
+            "decision_question": "Do you approve this version?",
+            "params": {
+                "rows_addressed": [
+                    {"id": "i10", "quote": "Session total | 90"},
+                    {"id": "i11", "quote": "short"},
+                    {"id": "", "quote": "an id is needed for this"},
+                    "i12",
+                    {"id": "i13", "quote": "x" * 301},
+                ]
+            },
+        },
+        ["request_user_decision"],
+    )
+    assert choice.params["rows_addressed"] == [{"id": "i10", "quote": "Session total | 90"}]
+
+    none = parse_next_action(
+        {"action_key": "request_user_decision", "decision_question": "Approve?", "params": {"rows_addressed": "i10"}},
+        ["request_user_decision"],
+    )
+    assert "rows_addressed" not in none.params

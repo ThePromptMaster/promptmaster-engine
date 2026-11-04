@@ -85,7 +85,8 @@ import type { Evaluation, Project } from '@/types/project';
 import { actionFor, AWAIT_SECTIONS_STEP, INTERPRET_STEP } from './actions';
 import type { AgentStateDigest } from './digest';
 import type { StageFacts } from './facts';
-import { listOpenRows, openRowsElsewhere, openRowsOf, type NeedsUser } from './needs';
+import { listOpenRows, openRowsElsewhere, openRowsOf, type NeedsUser, type OpenRow } from './needs';
+import { addressedRows, carriedOutReason, describeAddressed, type AddressedRow } from './addressed-rows';
 import { deriveExecutionLabel } from './labels';
 import { returnInstruction } from './return-work';
 import { stageMoveActor } from './policy';
@@ -354,6 +355,54 @@ async function keptUnderRoutine(
  * the stage's figures. Neither is essential — a failure here leaves the run
  * recorded and says nothing more.
  */
+/**
+ * Record review rows the deliverable already carries out as accepted, on their
+ * own tables, as Go's decisions with the evidence as the reason (4 Nov). The
+ * version saved changes only those rows' statuses, so it reopens nothing after
+ * it (`onlyRecordsCarriedOut`). A table that cannot take the decision, or a save
+ * that fails, leaves its rows undecided and named in the question.
+ */
+async function recordCarriedOut(
+  ctx: PerformContext,
+  rows: readonly AddressedRow[],
+  versionNumber: number | undefined
+): Promise<{ rows: AddressedRow[]; versionIds: string[] }> {
+  const out: { rows: AddressedRow[]; versionIds: string[] } = { rows: [], versionIds: [] };
+  if (!ctx.appendStageVersion) return out;
+  for (const stageId of [...new Set(rows.map((r) => r.stageId))]) {
+    const stage = ctx.template.stages.find((s) => s.id === stageId);
+    const head = ctx.bundles[stageId]?.versions.at(-1);
+    const items = parseItems(head?.content);
+    if (!stage || !items) continue;
+    const schema = itemSchemaFor(stage);
+    if (!isTriageTable(schema)) continue;
+    const here = rows.filter((r) => r.stageId === stageId);
+    const { items: next, applied } = applyTriage(
+      items,
+      here.map((r) => ({ id: r.id, status: 'accepted', reason: carriedOutReason(r, ctx.stage.label, versionNumber) })),
+      schema
+    );
+    if (!applied.length) continue;
+    try {
+      const created = await ctx.appendStageVersion(stageId, stage.label, {
+        content: serializeItems(next),
+        source_operation: 'agent_triage',
+        base_content: head?.content ?? '',
+        instruction: `Recorded as accepted: ${ctx.stage.label}${typeof versionNumber === 'number' ? ` v${versionNumber}` : ''} already carries ${applied.length === 1 ? 'it' : 'them'} out.`,
+        model: ctx.project.model,
+        mode: modeForStage(ctx.project, stage),
+        change_summary: `Go recorded ${applied.join(', ')} as accepted under your routine-decision policy: ${ctx.stage.label} already carries ${applied.length === 1 ? 'it' : 'them'} out.`,
+      });
+      const id = (created as { id?: unknown } | null)?.id;
+      if (typeof id === 'string') out.versionIds.push(id);
+      out.rows.push(...here.filter((r) => applied.includes(r.id)));
+    } catch {
+      // Not recorded: the rows stay undecided and are named as carried out.
+    }
+  }
+  return out;
+}
+
 async function recordRun(
   ctx: PerformContext,
   rowNumber: unknown,
@@ -1916,18 +1965,39 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // A question asked on the deliverable stage names the findings still
       // undecided elsewhere (2 Nov prod pass: "Do you approve version 14 …"
       // with nine Check rows open, none named).
-      const openRows = deliverableStage(ctx.template)?.id === ctx.stage.id ? openRowsElsewhere(ctx.template, ctx.state, ctx.context, ctx.stage.id) : [];
+      const allOpen = deliverableStage(ctx.template)?.id === ctx.stage.id ? openRowsElsewhere(ctx.template, ctx.state, ctx.context, ctx.stage.id) : [];
+      // …except those this version already carries out, shown from its own
+      // text or a measured result (4 Nov, prod: i10 "Session 1 timings sum to
+      // 105" listed under a version where they summed to 90). Under the
+      // routine-decision policy Go records them as accepted, so they hold
+      // nothing up; under "ask me" they are named as carried out, for the user.
+      const head = ctx.bundles[ctx.stage.id]?.versions.at(-1);
+      const addressed = addressedRows(allOpen, params.rows_addressed, head?.content ?? '', ctx.context.measured?.[ctx.stage.id] ?? []);
+      const routineHandled = ctx.run.policy === 'autonomous' && ctx.project.routine_decisions === 'handle';
+      const saved = addressed.length && routineHandled ? await recordCarriedOut(ctx, addressed, head?.version_number) : { rows: [], versionIds: [] };
+      const same = (a: OpenRow, b: OpenRow) => a.stageId === b.stageId && a.id === b.id;
+      const notRecorded = addressed.filter((r) => !saved.rows.some((x) => same(x, r)));
+      const openRows = allOpen.filter((r) => !addressed.some((x) => same(x, r)));
+      const them = (n: number, one: string, many: string) => (n === 1 ? one : many);
+      const stagesOf = (rows: readonly OpenRow[]) => [...new Set(rows.map((r) => r.stageLabel))].join(', ');
       const undecided = openRows.length
-        ? `\n\nStill undecided before you approve: ${listOpenRows(openRows)}. Approving now leaves ${openRows.length === 1 ? 'it' : 'them'} open; ${openRows.length === 1 ? 'it is' : 'they are'} decided on ${[...new Set(openRows.map((r) => r.stageLabel))].join(', ')}.`
+        ? `\n\nStill undecided before you approve: ${listOpenRows(openRows)}. Approving now leaves ${them(openRows.length, 'it', 'them')} open; ${them(openRows.length, 'it is', 'they are')} decided on ${stagesOf(openRows)}.`
         : '';
-      const question = `${ctx.step.decision_question || 'Which way should this go?'}${pointer}${undecided}`;
+      const carriedOut = notRecorded.length
+        ? `\n\nUndecided on ${stagesOf(notRecorded)}, though this version already carries ${them(notRecorded.length, 'it', 'them')} out: ${describeAddressed(notRecorded)}. Accept ${them(notRecorded.length, 'it', 'them')} there; approving now leaves ${them(notRecorded.length, 'it', 'them')} open.`
+        : '';
+      const recorded = saved.rows.length
+        ? `\n\nAlready carried out in this version, so recorded as accepted on ${stagesOf(saved.rows)} under your routine-decision policy (yours to change there): ${describeAddressed(saved.rows)}.`
+        : '';
+      const question = `${ctx.step.decision_question || 'Which way should this go?'}${pointer}${undecided}${carriedOut}${recorded}`;
       // What Go checked before interrupting (Q1b): on the record, under the question.
       const audit = typeof params.stop_audit === 'string' ? `\n\n${params.stop_audit}` : '';
       // Q3a: a question for an expert carries the package for them, on the record.
       const expertPackage = typeof params.expert_package === 'string' && params.expert_package.trim() ? params.expert_package : '';
       const choices = Array.isArray(params.choices) ? params.choices.filter((c): c is string => typeof c === 'string' && c.trim().length > 0).slice(0, 4) : [];
       return done(key, {
-        status: 'succeeded', toolsUsed: expertPackage ? ['model'] : [], changes: {},
+        status: 'succeeded', toolsUsed: expertPackage ? ['model'] : [],
+        changes: saved.versionIds.length ? { version_ids: saved.versionIds, items_triaged: saved.rows.map((r) => r.id) } : {},
         output: `${question}${audit}${expertPackage ? `\n\nPrepared for an expert's review:\n\n${expertPackage}` : ''}`,
         stop: { status: 'awaiting_decision', reason: question },
         needs: { kind: 'answer_question', question, ...(expertPackage ? { expertPackage } : {}), ...(choices.length >= 2 ? { choices } : {}) },
