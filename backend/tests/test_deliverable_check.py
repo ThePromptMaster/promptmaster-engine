@@ -112,3 +112,11 @@ def test_approving_a_stage_does_not_promote_its_assumptions():
     assert "does not make each assumption, estimate or inference in it a confirmed fact" in DOCUMENTS_RULE
     _, user = build_next_action_prompt(INPUTS, AgentState(stage_id="memo", prior_stages=["Facts: complete"]), ["draft_stage"], "guided")
     assert "an assumption or inference in one is still an assumption, not a confirmed fact" in user
+
+
+def test_a_term_stated_of_a_whole_amount_is_a_contradiction_to_look_for():
+    """4 Nov (Sean, support-software memo): "$3,380 … nonrefundable" when only
+    the $2,880 subscription was supplied as nonrefundable."""
+    from promptmaster.deliverable_check import _INSTRUCTION
+
+    assert "a term the facts give for only part of an amount stated of the whole of it" in _INSTRUCTION

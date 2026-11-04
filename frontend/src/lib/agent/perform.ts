@@ -63,7 +63,8 @@ import { recordPolicyFacts } from '@/lib/supabase/facts';
 import { checkGoal } from './code-check';
 import { unmetHumanRequirements } from '@/lib/workflow/human-requirements';
 import { approverFindings, approverSources } from '@/lib/workflow/approver-support';
-import { claimsInstruction, claimsStillIn, dependentClaimFindings, dependentClaimsFor } from '@/lib/workflow/dependent-claims';
+import { claimsInstruction, claimsStillIn, dependentClaimsFor } from '@/lib/workflow/dependent-claims';
+import { writtenClaimFindings } from '@/lib/workflow/claim-support';
 import { isSuperseded, markSuperseded, replacedValues } from '@/lib/workflow/superseded-rows';
 import { figureFindings, figureSources } from '@/lib/workflow/figure-support';
 import { asIteration } from '@/lib/workflow/legacy';
@@ -1558,7 +1559,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
           ...figureFindings(version.content, figureSources(ctx.project, ctx.bundles, ctx.stage.id)),
           ...approverFindings(version.content, approverSources(ctx.project)),
           // 18 Oct (Summit): a conclusion the corrected facts no longer support is a finding, not a pass.
-          ...(rendererHoldsItems(ctx.stage.renderer) ? [] : dependentClaimFindings(await dependentClaimsFor(ctx.project, ctx.stage.label, version.content, ctx.signal))),
+          ...(rendererHoldsItems(ctx.stage.renderer) ? [] : await writtenClaimFindings(ctx.project, ctx.stage.label, version.content, ctx.signal)),
         ])
       );
       const e = res.evaluation;

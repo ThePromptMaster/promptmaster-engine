@@ -31,6 +31,7 @@ from promptmaster.schemas import (
     StageItemSchema,
 )
 from promptmaster.dependent_claims import DependentClaimsRequest, DependentClaimsResponse, dependent_claims
+from promptmaster.claim_support import ClaimSupportRequest, ClaimSupportResponse, claim_support
 from promptmaster.figures import Figure, extract_figures
 from promptmaster.stage import generate_stage_artifact
 from routers._errors import llm_http_error
@@ -192,3 +193,16 @@ async def api_dependent_claims(
     revenue correction). 1 small LLM call, made only when a fact changed;
     commits nothing. A failed check reports nothing."""
     return await dependent_claims(client, req)
+
+
+@router.post("/claim-support")
+async def api_claim_support(
+    req: ClaimSupportRequest,
+    client: OpenRouterClient = Depends(get_client),
+) -> ClaimSupportResponse:
+    """Terms the text attaches to an amount or item that the supplied material
+    does not (4 Nov, Sean: "all $3,380 … nonrefundable" when only the $2,880
+    subscription was). 1 small LLM call, made with a stage check when the
+    project has supplied material; commits nothing. A failed check reports
+    nothing."""
+    return await claim_support(client, req)

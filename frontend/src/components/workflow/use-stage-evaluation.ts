@@ -37,7 +37,7 @@ import type { Evaluation, Project } from '@/types/project';
 import type { OutlineSection, StageRecommendation } from '@/types';
 import { approverFindings, approverSources } from '@/lib/workflow/approver-support';
 import { figureFindings, figureSources } from '@/lib/workflow/figure-support';
-import { dependentClaimFindings, dependentClaimsFor } from '@/lib/workflow/dependent-claims';
+import { writtenClaimFindings } from '@/lib/workflow/claim-support';
 import { rendererHoldsItems } from '@/lib/workflow/stage-artifact';
 import { freshOrPage } from '@/lib/workflow/fresh-manuscript';
 
@@ -156,7 +156,7 @@ export function useStageEvaluation({
         evaluationRecord(response, p.model, 'manual', [
           ...figureFindings(version.content, figureSources(p, b, stage.id)),
           ...approverFindings(version.content, approverSources(p)),
-          ...(rendererHoldsItems(stage.renderer) ? [] : dependentClaimFindings(await dependentClaimsFor(p, stage.label, version.content))),
+          ...(rendererHoldsItems(stage.renderer) ? [] : await writtenClaimFindings(p, stage.label, version.content)),
         ])
       );
 
