@@ -25,6 +25,7 @@
  */
 
 import { keepFound, withWebLine } from '@/lib/workflow/web-found';
+import { userNoteLine } from '@/lib/workflow/user-note';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { api } from '@/lib/api/client';
@@ -184,7 +185,11 @@ export function useStageGeneration({
           mode: p.mode,
           // Where a version came from is on the version (10 Oct, email 6.7).
           change_summary: withWebLine(
-            options?.force ? 'Regenerated draft.' : options?.auto ? 'Drafted automatically when the stage opened.' : 'Drafted from the stage menu.',
+            [
+              options?.force ? 'Regenerated draft.' : options?.auto ? 'Drafted automatically when the stage opened.' : 'Drafted from the stage menu.',
+              // What the writer said to the user, kept off the document (4 Nov).
+              userNoteLine(response.note_to_user),
+            ].filter(Boolean).join(' '),
             web
           ),
           finish_reason: response.finish_reason || null,

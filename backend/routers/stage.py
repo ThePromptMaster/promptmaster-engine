@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 
 from deps import get_client
 from promptmaster.catchphrases import without_repeated_catchphrases
+from promptmaster.reader_text import split_user_note
 from promptmaster.errors import PRESERVED_EVALUATION, PRESERVED_STAGE_VERSIONS
 from promptmaster.limits import MAX_INSTRUCTION_CHARS
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError, resolve_model
@@ -104,6 +105,9 @@ async def api_generate_stage_artifact(
     result.content = strip_unknown_citations(result.content, highest_source_number(inputs.sources))
     # 28 Oct: prose only — a list stage's content is a JSON document.
     if not result.content.lstrip().startswith(("{", "[")):
+        # 4 Nov (Sean, Lakeside): what the writer says to the user is its reply,
+        # returned beside the work — never saved as the end of the document.
+        result.content, result.note_to_user = split_user_note(result.content)
         result.content = without_repeated_catchphrases(result.content)
     return result.model_copy(update=dict(web))
 

@@ -1,0 +1,143 @@
+{
+ "_about": "Notes to the user written into the end of a stage's work (4 Nov, Sean, Lakeside proposal). Read by backend/tests/test_user_note.py and frontend/src/lib/workflow/user-note.test.ts: the two splitters must agree.",
+ "cases": [
+  {
+   "name": "Lakeside final proposal v1 (4 Nov, prod)",
+   "text": "# Training workshop proposal for Lakeside Services\n\n## 6. Items to confirm\n\n- **Scheduling:** dates and start times of both sessions.\n- **Payment and cancellation terms:** not yet supplied.\n\n## 7. Next step\n\nPlease tell us which option you prefer and answer the items in section 6. We will then confirm scheduling, facilitator availability and terms with you before any booking or payment.\n\n---\n\nAll accepted findings are applied. I shortened section 1, section 5's final sentence and section 6, which brings the document under the 650-word limit. That count is reasoned by hand, not machine-counted. Option B's paired work is now worded as subject to confirmation, and section 6 opens with \"To confirm before scheduling:\". The pricing and agenda timings are unchanged.\n\nApproving this document does not authorise sending it, booking the workshop or spending money. No further drafting pass is needed unless you change a fact. The next step is your decision on whether to send it. If it goes ahead, the operations director's answers on the section 6 items will be needed before anything is booked.",
+   "document": "# Training workshop proposal for Lakeside Services\n\n## 6. Items to confirm\n\n- **Scheduling:** dates and start times of both sessions.\n- **Payment and cancellation terms:** not yet supplied.\n\n## 7. Next step\n\nPlease tell us which option you prefer and answer the items in section 6. We will then confirm scheduling, facilitator availability and terms with you before any booking or payment.",
+   "note": true
+  },
+  {
+   "name": "Lakeside final proposal v2 (4 Nov, prod)",
+   "text": "# Training workshop proposal for Lakeside Services\n\n## 6. Items to confirm\n\n- **Scheduling:** dates and start times of both sessions.\n- **Payment and cancellation terms:** not yet supplied.\n\n## 7. Next step\n\nPlease tell us which option you prefer and answer the items in section 6. We will then confirm scheduling, facilitator availability and terms with you before any booking or payment.\n\n---\n\n**Notes for you (not part of the proposal)**\n\n- **Word count:** I estimate the proposal at roughly 560 to 600 words, including headings and tables. This is a hand estimate, not a machine count, and it leaves a margin under 650.\n- **What approval covers:** approving this document does not authorise sending it, booking the workshop or spending money.\n- **Further drafting:** no further drafting pass is needed unless you change a fact.\n- **Next step:** decide whether to send the proposal. If it goes ahead, the operations director's answers on the section 6 items are needed before anything is booked.",
+   "document": "# Training workshop proposal for Lakeside Services\n\n## 6. Items to confirm\n\n- **Scheduling:** dates and start times of both sessions.\n- **Payment and cancellation terms:** not yet supplied.\n\n## 7. Next step\n\nPlease tell us which option you prefer and answer the items in section 6. We will then confirm scheduling, facilitator availability and terms with you before any booking or payment.",
+   "note": true
+  },
+  {
+   "name": "Lakeside final proposal v3 (4 Nov, prod)",
+   "text": "# Training workshop proposal for Lakeside Services\n\n## 6. Items to confirm\n\n- **Scheduling:** dates and start times of both sessions.\n- **Payment and cancellation terms:** not yet supplied.\n\n## 7. Next step\n\nPlease tell us which option you prefer and answer the items in section 6. We will then confirm scheduling, facilitator availability and terms with you before any booking or payment.",
+   "document": "# Training workshop proposal for Lakeside Services\n\n## 6. Items to confirm\n\n- **Scheduling:** dates and start times of both sessions.\n- **Payment and cancellation terms:** not yet supplied.\n\n## 7. Next step\n\nPlease tell us which option you prefer and answer the items in section 6. We will then confirm scheduling, facilitator availability and terms with you before any booking or payment.",
+   "note": false
+  },
+  {
+   "name": "Lakeside final proposal v4 (4 Nov, prod)",
+   "text": "# Training workshop proposal for Lakeside Services\n\n## 6. Items to confirm\n\n- **Scheduling:** dates and start times of both sessions.\n- **Payment and cancellation terms:** not yet supplied.\n\n## 7. Next step\n\nPlease confirm whether Option B suits you, and answer the items in section 6. We will then confirm scheduling, facilitator availability and terms with you before any booking or payment.",
+   "document": "# Training workshop proposal for Lakeside Services\n\n## 6. Items to confirm\n\n- **Scheduling:** dates and start times of both sessions.\n- **Payment and cancellation terms:** not yet supplied.\n\n## 7. Next step\n\nPlease confirm whether Option B suits you, and answer the items in section 6. We will then confirm scheduling, facilitator availability and terms with you before any booking or payment.",
+   "note": false
+  },
+  {
+   "name": "Lakeside final proposal v5 (4 Nov, prod)",
+   "text": "# Training workshop proposal for Lakeside Services\n\n## 6. Items to confirm\n\n- **Scheduling:** dates and start times of both sessions.\n- **Payment and cancellation terms:** not yet supplied.\n\n## 7. Next step\n\nPlease confirm whether Option B suits you, and answer the items in section 6. We will then confirm scheduling, facilitator availability and terms with you before any booking or payment.\n\n---\n\n**Status of the results:**\n- **Pricing and session totals: reasoned.** I worked them by hand from the supplied figures. No code computed them.\n- **Word count: reasoned.** By my hand estimate, the proposal is under 650 words including headings and tables. I have not counted it with a tool.\n\n**What approval covers:** Approving this document does not authorise sending it, booking the workshop or spending money.\n\n**Further drafting:** None is needed unless you change a fact, such as the participant count, the budget or an option's terms. The next step sits with you: decide whether and when to send the proposal to the operations director.",
+   "document": "# Training workshop proposal for Lakeside Services\n\n## 6. Items to confirm\n\n- **Scheduling:** dates and start times of both sessions.\n- **Payment and cancellation terms:** not yet supplied.\n\n## 7. Next step\n\nPlease confirm whether Option B suits you, and answer the items in section 6. We will then confirm scheduling, facilitator availability and terms with you before any booking or payment.",
+   "note": true
+  },
+  {
+   "name": "Lakeside final proposal v6 (4 Nov, prod)",
+   "text": "# Training workshop proposal for Lakeside Services\n\n## 6. Items to confirm\n\n- **Scheduling:** dates and start times of both sessions.\n- **Payment and cancellation terms:** not yet supplied.\n\n## 7. Next step\n\nPlease confirm whether Option B suits you, and answer the items in section 6. We will then confirm scheduling, facilitator availability and terms with you before any booking or payment.\n\n---\n\n**Notes on this version**\n\n- **Revision limits:** I followed your instruction to trim wording only. Every figure, table row, section and item to confirm is unchanged.\n- **Word count:** I estimated it by hand, counting numbers and $ figures as words. The estimate is about 600 to 620 words, within the 650 limit. I did not count it with a tool.\n- **Pricing and session totals:** These are reasoned, worked by hand from the supplied figures.\n- **What approval covers:** Approving this document does not authorise sending it, booking the workshop or spending money.\n- **Further drafting:** No further drafting pass is needed unless you change a fact. The next step is your decision on whether and when to send the proposal to the operations director.",
+   "document": "# Training workshop proposal for Lakeside Services\n\n## 6. Items to confirm\n\n- **Scheduling:** dates and start times of both sessions.\n- **Payment and cancellation terms:** not yet supplied.\n\n## 7. Next step\n\nPlease confirm whether Option B suits you, and answer the items in section 6. We will then confirm scheduling, facilitator availability and terms with you before any booking or payment.",
+   "note": true
+  },
+  {
+   "name": "Lakeside final proposal v7 (4 Nov, prod)",
+   "text": "# Training workshop proposal for Lakeside Services\n\n## 6. Items to confirm\n\n- **Scheduling:** dates and start times of both sessions.\n- **Payment and cancellation terms:** not yet supplied.\n\n## 7. Next step\n\nPlease confirm whether Option B suits you, and answer the items in section 6. We will then confirm scheduling, facilitator availability and terms with you before any booking or payment.",
+   "document": "# Training workshop proposal for Lakeside Services\n\n## 6. Items to confirm\n\n- **Scheduling:** dates and start times of both sessions.\n- **Payment and cancellation terms:** not yet supplied.\n\n## 7. Next step\n\nPlease confirm whether Option B suits you, and answer the items in section 6. We will then confirm scheduling, facilitator availability and terms with you before any booking or payment.",
+   "note": false
+  },
+  {
+   "name": "Lakeside final proposal v8 (4 Nov, prod)",
+   "text": "# Training workshop proposal for Lakeside Services\n\n## 6. Items to confirm\n\n- **Scheduling:** dates and start times of both sessions.\n- **Payment and cancellation terms:** not yet supplied.\n\n## 7. Next step\n\nPlease confirm whether Option B suits you, and answer the items in section 6. We will then confirm scheduling, facilitator availability and terms with you before any booking or payment.\n\n---\n\n- **Approval scope:** Approving this document does not authorise sending it, booking the workshop or spending money.\n- **Status:** The pricing and timing totals are reasoned, worked by hand from the supplied figures. They were not computed by code.\n- **Word count:** By hand estimate, the proposal is about 600 words including headings and tables. That is within the 650-word limit.\n- **Further drafting:** No further drafting pass is needed unless you change a fact.",
+   "document": "# Training workshop proposal for Lakeside Services\n\n## 6. Items to confirm\n\n- **Scheduling:** dates and start times of both sessions.\n- **Payment and cancellation terms:** not yet supplied.\n\n## 7. Next step\n\nPlease confirm whether Option B suits you, and answer the items in section 6. We will then confirm scheduling, facilitator availability and terms with you before any booking or payment.",
+   "note": true
+  },
+  {
+   "name": "Lakeside final proposal v9 (4 Nov, prod)",
+   "text": "# Training workshop proposal for Lakeside Services\n\n## 6. Items to confirm\n\n- **Scheduling:** dates and start times of both sessions.\n- **Payment and cancellation terms:** not yet supplied.\n\n## 7. Next step\n\nPlease confirm whether Option B suits you and answer the items in section 6. We will then confirm scheduling, facilitator availability and terms with you before any booking or payment.\n\n<br>\n\n*Outside the document:* Approving this proposal does not authorise sending it, booking the workshop or spending money. The pricing and timing totals are reasoned from the supplied figures by hand arithmetic. By a hand count, the proposal is under 650 words, with numbers and $ figures counted as words. No further drafting pass is needed unless you change a fact.",
+   "document": "# Training workshop proposal for Lakeside Services\n\n## 6. Items to confirm\n\n- **Scheduling:** dates and start times of both sessions.\n- **Payment and cancellation terms:** not yet supplied.\n\n## 7. Next step\n\nPlease confirm whether Option B suits you and answer the items in section 6. We will then confirm scheduling, facilitator availability and terms with you before any booking or payment.",
+   "note": true
+  },
+  {
+   "name": "Lakeside final proposal v10 (4 Nov, prod)",
+   "text": "# Training workshop proposal for Lakeside Services\n\n## 6. Items to confirm\n\n- **Scheduling:** dates and start times of both sessions.\n- **Payment and cancellation terms:** not yet supplied.\n\n## 7. Next step\n\nPlease confirm whether Option B suits you and answer the items in section 6. We will then confirm scheduling, facilitator availability and terms with you before any booking or payment.\n\n---\n\n**Notes for you (not part of the proposal):**\n\n- **What approval covers:** approving this document does not authorise sending it, booking the workshop or spending money.\n- **How the figures stand:** the pricing and timing totals are reasoned by hand arithmetic from the supplied figures. The word count is a hand estimate, not a tool count.\n- **Next pass:** no further drafting pass is needed unless you change a fact. The next step is your decision on whether to send the proposal to the operations director.",
+   "document": "# Training workshop proposal for Lakeside Services\n\n## 6. Items to confirm\n\n- **Scheduling:** dates and start times of both sessions.\n- **Payment and cancellation terms:** not yet supplied.\n\n## 7. Next step\n\nPlease confirm whether Option B suits you and answer the items in section 6. We will then confirm scheduling, facilitator availability and terms with you before any booking or payment.",
+   "note": true
+  },
+  {
+   "name": "Lakeside final proposal v11 (4 Nov, prod)",
+   "text": "# Training workshop proposal for Lakeside Services\n\n## 6. Items to confirm\n\n- **Scheduling:** dates and start times of both sessions.\n- **Payment and cancellation terms:** not yet supplied.\n\n## 7. Next step\n\nPlease confirm whether Option B suits you and answer the items in section 6. We will then confirm scheduling, facilitator availability and terms with you before any booking or payment.\n\n&nbsp;\n\n*Outside the proposal:* Approving this document does not authorise sending it, booking the workshop or spending money. No further drafting pass is needed unless you change a fact. The pricing and timing totals are reasoned by hand from the supplied figures.",
+   "document": "# Training workshop proposal for Lakeside Services\n\n## 6. Items to confirm\n\n- **Scheduling:** dates and start times of both sessions.\n- **Payment and cancellation terms:** not yet supplied.\n\n## 7. Next step\n\nPlease confirm whether Option B suits you and answer the items in section 6. We will then confirm scheduling, facilitator availability and terms with you before any booking or payment.",
+   "note": true
+  },
+  {
+   "name": "Lakeside final proposal v12 (4 Nov, prod)",
+   "text": "# Training workshop proposal for Lakeside Services\n\n## 6. Items to confirm\n\n- **Scheduling:** dates and start times of both sessions.\n- **Payment and cancellation terms:** not yet supplied.\n\n## 7. Next step\n\nPlease confirm whether Option B suits you and answer the items in section 6. We will then confirm scheduling, facilitator availability and terms with you before any booking or payment.\n\n---\n\n*Reply to you, not part of the document:*\n\n- The proposal now ends with section 7. The rest of the text is unchanged.\n- Approving the document does not authorise sending it, booking the workshop or spending money.\n- No further drafting pass is needed unless you change a fact.\n- The pricing, timing totals and word count were worked out by hand, not computed.",
+   "document": "# Training workshop proposal for Lakeside Services\n\n## 6. Items to confirm\n\n- **Scheduling:** dates and start times of both sessions.\n- **Payment and cancellation terms:** not yet supplied.\n\n## 7. Next step\n\nPlease confirm whether Option B suits you and answer the items in section 6. We will then confirm scheduling, facilitator availability and terms with you before any booking or payment.",
+   "note": true
+  },
+  {
+   "name": "Lakeside final proposal v13 (4 Nov, prod)",
+   "text": "# Training workshop proposal for Lakeside Services\n\n## 6. Items to confirm\n\n- **Scheduling:** dates and start times of both sessions.\n- **Payment and cancellation terms:** not yet supplied.\n\n## 7. Next step\n\nPlease confirm whether Option B suits you and answer the items in section 6. We will then confirm scheduling, facilitator availability and terms with you before any booking or payment.\n\n&nbsp;\n\nNotes for you, outside the proposal:\n\n- The closing note block was removed. Sections 1 to 7 are unchanged.\n- Approving the document does not authorise sending it, booking the workshop or spending money.\n- No further drafting pass is needed unless you change a fact.",
+   "document": "# Training workshop proposal for Lakeside Services\n\n## 6. Items to confirm\n\n- **Scheduling:** dates and start times of both sessions.\n- **Payment and cancellation terms:** not yet supplied.\n\n## 7. Next step\n\nPlease confirm whether Option B suits you and answer the items in section 6. We will then confirm scheduling, facilitator availability and terms with you before any booking or payment.",
+   "note": true
+  },
+  {
+   "name": "a Notes section of the document itself",
+   "text": "# Price list\n\n## Prices\n\nOption A costs ,500.\n\n## Notes\n\n- Prices include VAT.\n- Valid for 30 days.",
+   "document": "# Price list\n\n## Prices\n\nOption A costs ,500.\n\n## Notes\n\n- Prices include VAT.\n- Valid for 30 days.",
+   "note": false
+  },
+  {
+   "name": "a closing line after a rule",
+   "text": "# Proposal\n\n## Next step\n\nPlease confirm the option.\n\n---\n\nPrepared by Northwind Consulting, March 2026.",
+   "document": "# Proposal\n\n## Next step\n\nPlease confirm the option.\n\n---\n\nPrepared by Northwind Consulting, March 2026.",
+   "note": false
+  },
+  {
+   "name": "a scope exclusion labelled like a note",
+   "text": "# Proposal\n\n## 5. Scope\n\nTwo online sessions.\n\n**Not part of this proposal:** follow-up support, travel and printed materials.",
+   "document": "# Proposal\n\n## 5. Scope\n\nTwo online sessions.\n\n**Not part of this proposal:** follow-up support, travel and printed materials.",
+   "note": false
+  },
+  {
+   "name": "outside the proposal inside a sentence",
+   "text": "# Proposal\n\n## Costs\n\nTravel costs outside the proposal are not included.\n\n## Next step\n\nPlease confirm.",
+   "document": "# Proposal\n\n## Costs\n\nTravel costs outside the proposal are not included.\n\n## Next step\n\nPlease confirm.",
+   "note": false
+  },
+  {
+   "name": "a speech ending with thanks to you",
+   "text": "# Toast\n\nWe made it through the year together.\n\nTo you, my friends: thank you.",
+   "document": "# Toast\n\nWe made it through the year together.\n\nTo you, my friends: thank you.",
+   "note": false
+  },
+  {
+   "name": "an appendix after a rule, with its own heading",
+   "text": "# Report\n\n## Findings\n\nAll good.\n\n---\n\n## Appendix: method\n\nThe word count was taken by hand, not computed.",
+   "document": "# Report\n\n## Findings\n\nAll good.\n\n---\n\n## Appendix: method\n\nThe word count was taken by hand, not computed.",
+   "note": false
+  },
+  {
+   "name": "one note-like phrase after a rule",
+   "text": "# Report\n\n## Summary\n\nSales rose.\n\n---\n\nWord count: 412.",
+   "document": "# Report\n\n## Summary\n\nSales rose.\n\n---\n\nWord count: 412.",
+   "note": false
+  },
+  {
+   "name": "the marker the writer is given",
+   "text": "# Proposal\n\n## 7. Next step\n\nPlease confirm the option.\n\n=== NOTE FOR THE USER ===\nApproving this document does not authorise sending it. No further drafting pass is needed.",
+   "document": "# Proposal\n\n## 7. Next step\n\nPlease confirm the option.",
+   "note": true
+  },
+  {
+   "name": "the marker after a rule",
+   "text": "# Proposal\n\n## 7. Next step\n\nPlease confirm the option.\n\n---\n\n**=== NOTE FOR THE USER ===**\n\nThe totals were worked by hand.",
+   "document": "# Proposal\n\n## 7. Next step\n\nPlease confirm the option.",
+   "note": true
+  },
+  {
+   "name": "a note heading",
+   "text": "# Proposal\n\n## 7. Next step\n\nPlease confirm the option.\n\n## Notes on this version\n\n- Trimmed to 640 words.",
+   "document": "# Proposal\n\n## 7. Next step\n\nPlease confirm the option.",
+   "note": true
+  }
+ ]
+}

@@ -51,7 +51,7 @@ const masked = (line: string) => norm(line).replace(TIME, '#').replace(NUMBER, '
 const words = (line: string) => masked(line).split(' ').filter((w) => w && w !== '#');
 
 /** Things a document is made of, as a revision note names them. */
-const DOC_PART = String.raw`(?:summary|tracker|log|table|pack|draft|document|report|section|closing sentence|opening sentence|heading|column|row|list|paragraph|chapter|introduction|conclusion)`;
+const DOC_PART = String.raw`(?:summary|tracker|log|table|pack|draft|document|report|proposal|memo|letter|announcement|section|closing sentence|opening sentence|heading|column|row|list|paragraph|chapter|introduction|conclusion)`;
 
 const NOTE_PATTERNS: readonly RegExp[] = [
   // A labelled note.
@@ -59,12 +59,19 @@ const NOTE_PATTERNS: readonly RegExp[] = [
   // The model narrating its own revision. "I" only: "We kept the Friday
   // deadline" is the document speaking for its authors.
   /^i (?:followed|kept|set aside|added|removed|changed|updated|dropped|moved|corrected|restored|regrouped|folded|replaced|rewrote|reworded|fixed|left|renamed|restated)\b/,
+  // A note to the user written into the work (4 Nov, Sean, Lakeside proposal):
+  // "Notes for you, outside the proposal:", "- **What approval covers:**
+  // approving this document does not authorise sending it", "No further
+  // drafting pass is needed". Never put back by the kept-lines guard.
+  /^(?:notes? (?:for|to) you|reply to you|notes? on this (?:version|draft|revision))\b/,
+  /^(?:[\w ]{1,40}: )?approv(?:ing|al of) (?:this|the) [\w-]+ does(?:n't| not) authori[sz]e\b/,
+  /^(?:[\w ]{1,40}: )?no further (?:drafting )?pass is needed\b/,
   // 'KES-T2 now reads "60% as last reported"'.
   /\bnow (?:reads|says) ["“]/,
   // "The summary now includes …", "The tracker's last column is now "…"",
   // "The log is regrouped …", "The closing sentence is dropped …".
   new RegExp(
-    String.raw`^(?:the|this|each|every)\s+(?:[\w-]+'s\s+)?(?:[\w-]+\s+){0,2}${DOC_PART}s?\b[^.]*?\b(?:now (?:includes?|lists?|shows?|states?|has|have|carries|carry|groups?|names?)|(?:is|are) now ["“]|(?:is|are|was|were|has been|have been) (?:now )?(?:added|removed|dropped|regrouped|folded|moved|renamed|replaced|updated|corrected|changed|reworded|restated|merged|split|reordered|shortened)\b)`
+    String.raw`^(?:the|this|each|every)\s+(?:[\w-]+'s\s+)?(?:[\w-]+\s+){0,2}${DOC_PART}s?\b[^.]*?\b(?:now (?:includes?|lists?|shows?|states?|has|have|carries|carry|groups?|names?|ends? (?:with|at))|(?:is|are) now ["“]|(?:is|are|was|were|has been|have been) (?:now )?(?:added|removed|dropped|regrouped|folded|moved|renamed|replaced|updated|corrected|changed|reworded|restated|merged|split|reordered|shortened)\b)`
   ),
 ];
 

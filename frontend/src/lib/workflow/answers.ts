@@ -23,7 +23,9 @@ const QUESTION_MAX = 600;
  * what Go then chooses is in the version it saves.
  */
 export const DELEGATED_ANSWER =
-  'Do whatever is best: use your judgement within the objective, the accepted facts and my latest version, and say in the result what you chose.';
+  // "say in the result what you chose" (until 4 Nov) put a note to the user
+  // into the document itself: "The proposal now ends with section 7 …" (Lakeside v12).
+  'Do whatever is best: use your judgement within the objective, the accepted facts and my latest version, and tell me what you chose in your note to me, not in the document.';
 
 export function isDelegatedAnswer(answer: string): boolean {
   return answer.trim() === DELEGATED_ANSWER || /^do (?:whatever|what) (?:is|you think is) best\b/i.test(answer.trim());
