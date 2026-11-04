@@ -138,7 +138,6 @@ export const fr: Messages = {
   "start.links": "Liens",
   "start.startConversation": "Commencer la conversation",
   "start.conversationNote": "Discutez comme d’habitude ; un plan se construit à côté. Ou appuyez sur Pose-moi des questions et PromptMaster pose ses questions une à une. Il devient un projet quand vous le décidez.",
-  "start.skip": "Ou passez la conversation",
   "start.setItUp": "Configurez-le pour moi",
   "start.setItUpNote": "Un écran à vérifier, puis Démarrer",
   "start.know": "Je sais ce que je veux faire",

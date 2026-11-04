@@ -131,7 +131,6 @@ export const ar: Messages = {
   'start.links': 'الروابط',
   'start.startConversation': 'بدء المحادثة',
   'start.conversationNote': 'تحدّث كما تفعل عادةً؛ ويُبنى مخطط بجانب المحادثة. أو اضغط اطرح عليّ أسئلة فيسألك PromptMaster سؤالًا تلو الآخر. ويصبح مشروعًا حين تقول ذلك.',
-  'start.skip': 'أو تخطَّ المحادثة',
   'start.setItUp': 'أعدّه لي',
   'start.setItUpNote': 'شاشة واحدة للمراجعة، ثم «بدء»',
   'start.know': 'أعرف ما أريد فعله',

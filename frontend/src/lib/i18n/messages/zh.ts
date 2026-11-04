@@ -138,7 +138,6 @@ export const zh: Messages = {
   'start.links': '链接',
   'start.startConversation': '开始对话',
   'start.conversationNote': '像平常一样聊天；旁边会逐步生成一份大纲。或者点“向我提问”，PromptMaster 会一次问一个。你说可以时，它就会成为一个项目。',
-  'start.skip': '或者跳过对话',
   'start.setItUp': '帮我设置',
   'start.setItUpNote': '检查一个页面，然后开始',
   'start.know': '我知道自己想做什么',
