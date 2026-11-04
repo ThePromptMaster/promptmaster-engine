@@ -100,6 +100,7 @@ export const sw: Record<keyof typeof en, string> = {
   'bcn.namesUpdated': '{names} imesasishwa',
   'bcn.checkedAgain': 'Imekaguliwa tena',
   'bcn.outcomeLine': '{stage}: {what} — {check}',
+  'bcn.outcomeLineShort': '{stage}: {what}',
   'bcn.updatedBy': 'imesasishwa hadi v{version} na {who}',
   'bcn.byGo': 'Go',
   'bcn.byYou': 'wewe',

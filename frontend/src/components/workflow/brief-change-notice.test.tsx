@@ -16,14 +16,14 @@ describe('the settled change says what became of each stage (4 Nov, Sean)', () =
         onKeep={() => undefined}
         settled={{ event, stageIds: ['figures', 'draft', 'check', 'final'] }}
         outcomes={[
-          { stageId: 'figures', version: 2, by: 'go', check: 'table', count: 0 },
+          { stageId: 'figures', version: 2, by: 'go', check: 'none', count: 0 },
           { stageId: 'draft', version: 3, by: 'you', check: 'clean', count: 0 },
           { stageId: 'check', version: null, by: null, check: 'table', count: 2 },
           { stageId: 'final', version: 4, by: 'go', check: 'not_checked', count: 0 },
         ]}
       />
     );
-    expect(screen.getByText('Facts and calculations: updated to v2 by Go — every finding decided')).toBeTruthy();
+    expect(screen.getByText('Facts and calculations: updated to v2 by Go')).toBeTruthy();
     expect(screen.getByText('Draft memo: updated to v3 by you — checked, nothing noted')).toBeTruthy();
     expect(screen.getByText('Check: finished again as it was — 2 findings undecided')).toBeTruthy();
     expect(screen.getByText('Final memo: updated to v4 by Go — not checked since the change')).toBeTruthy();

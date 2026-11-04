@@ -29,7 +29,8 @@ describe('what became of each stage a change reopened', () => {
   it('says the version, who made it, and what the check on it found', () => {
     const out = changeOutcomes(['figures', 'draft', 'check', 'final'], since, stages, (id) => versions[id] ?? [], evaluations, (id) => (id === 'figures' ? 0 : id === 'check' ? 2 : 0));
     expect(out).toEqual([
-      { stageId: 'figures', version: 2, by: 'go', check: 'table', count: 0 },
+      // A plain table (facts and figures) has nothing to decide (4 Nov, prod pass).
+      { stageId: 'figures', version: 2, by: 'go', check: 'none', count: 0 },
       { stageId: 'draft', version: 2, by: 'you', check: 'clean', count: 0 },
       // Finished again without a new version: kept as it was; its rows still undecided.
       { stageId: 'check', version: null, by: null, check: 'table', count: 2 },

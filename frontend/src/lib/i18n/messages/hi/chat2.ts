@@ -100,6 +100,7 @@ export const hi: Record<keyof typeof en, string> = {
   'bcn.namesUpdated': '{names} अपडेट किया गया',
   'bcn.checkedAgain': 'फिर से जाँचा गया',
   'bcn.outcomeLine': '{stage}: {what} — {check}',
+  'bcn.outcomeLineShort': '{stage}: {what}',
   'bcn.updatedBy': '{who} ने v{version} में अद्यतन किया',
   'bcn.byGo': 'Go',
   'bcn.byYou': 'आप',

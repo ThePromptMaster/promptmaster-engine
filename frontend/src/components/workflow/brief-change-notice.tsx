@@ -76,7 +76,12 @@ export function BriefChangeNotice({
           <ul data-change-outcomes className="basis-full list-disc ps-6 text-label">
             {outcomes.map((o) => (
               <li key={o.stageId}>
-                {t('bcn.outcomeLine', {
+                {o.check === 'none'
+                  ? t('bcn.outcomeLineShort', {
+                      stage: stageLabel(o.stageId),
+                      what: o.version === null ? t('bcn.kept') : t('bcn.updatedBy', { version: o.version, who: o.by === 'go' ? t('bcn.byGo') : t('bcn.byYou') }),
+                    })
+                  : t('bcn.outcomeLine', {
                   stage: stageLabel(o.stageId),
                   what: o.version === null ? t('bcn.kept') : t('bcn.updatedBy', { version: o.version, who: o.by === 'go' ? t('bcn.byGo') : t('bcn.byYou') }),
                   check:
