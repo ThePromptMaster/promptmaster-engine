@@ -5,6 +5,7 @@ from promptmaster.conversation import (
     build_chat_reply_prompt,
     build_save_as_new_version_prompt,
 )
+from promptmaster.page_context import ChatContext, GoRunTrace, format_chat_context, format_go_run
 from promptmaster.schemas import ChatMessage
 
 
@@ -126,7 +127,7 @@ def test_the_chat_is_given_go_s_run_record_and_may_not_infer_a_stop_reason():
     """6 Oct, email 10: asked why Go stopped, the chat first said external
     validation was required — an inference — and then that it could not see
     the run. It is now given the run record, and told to answer from it."""
-    from promptmaster.page_context import ChatContext, GoRunTrace, GoStepTrace, format_chat_context
+    from promptmaster.page_context import ChatContext, GoRunTrace, GoStepTrace, format_chat_context, format_go_run
 
     ctx = ChatContext(stage_label="Final", go_run=GoRunTrace(
         status="blocked", policy="autonomous",
@@ -153,3 +154,28 @@ def test_a_change_the_user_asks_for_is_later_than_an_older_fact(basic_inputs, ba
     assert "THE USER'S INSTRUCTION IN THE CHAT IS THEIR LATEST WORD" in system
     assert "write the instruction's value" in system
     assert "a change the user is asking for right now, in their own words in the side chat" in FACTS_HEADER
+
+
+class TestChatReadsTheRunRecord:
+    """5 Nov (a research project): the chat said nothing had been run, then that Go was
+    still running, and only then what had happened."""
+
+    def test_says_how_far_along_it_is(self):
+        run = GoRunTrace(status="blocked", policy="autonomous", from_record=True, moves=24, cost_usd=12.16, last_activity_minutes=3)
+        said = format_go_run(run)
+        assert "Read from the run record just now: 24 moves; $12.16 so far; last activity 3 minutes ago." in said
+
+    def test_running_with_nothing_happening_is_not_said_to_be_working(self):
+        said = format_go_run(GoRunTrace(status="running", from_record=True, last_activity_minutes=40))
+        assert "nothing has happened for 40 minutes" in said
+        assert "do not say it is working" in said
+        assert "nothing has happened" not in format_go_run(GoRunTrace(status="running", from_record=True, last_activity_minutes=1))
+
+    def test_a_tabs_memory_makes_no_such_claim(self):
+        assert "Read from the run record" not in format_go_run(GoRunTrace(status="running"))
+
+    def test_a_failed_read_never_reads_as_no_run(self):
+        assert format_go_run(None) == "GO: no run on this project yet."
+        said = format_go_run(None, read=False)
+        assert "could not be read" in said and "do not say it has not run" in said
+        assert "could not be read" in format_chat_context(ChatContext(stage_label="Final", go_run_read=False))

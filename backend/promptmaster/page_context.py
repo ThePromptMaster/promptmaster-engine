@@ -48,6 +48,11 @@ class GoRunTrace(BaseModel):
     objective: str = Field(default="", max_length=2_000)
     #: What Go is asking, one question per item, when it stopped on questions (31 Oct).
     questions: list[str] = Field(default_factory=list, max_length=8)
+    #: Read from the database when the user asked, not from a tab's memory (5 Nov).
+    from_record: bool = False
+    moves: int | None = Field(default=None, ge=0)
+    cost_usd: float | None = None
+    last_activity_minutes: int | None = Field(default=None, ge=0)
 
 
 class VersionTrace(BaseModel):
@@ -82,6 +87,8 @@ class ChatContext(BaseModel):
     buttons: list[PageButton] | None = Field(default=None, max_length=40)
     #: The latest Go run on this project; None when there has been none.
     go_run: GoRunTrace | None = None
+    #: False when the run record could not be read for this reply: then None says nothing.
+    go_run_read: bool = True
     #: The stage's status as the page shows it ("complete", "reopened: …", "stuck: …").
     stage_status: str = Field(default="", max_length=600)
     #: The stage's latest versions, oldest first.
@@ -122,11 +129,37 @@ WHAT_CHAT_CAN_CHANGE = (
 )
 
 
-def format_go_run(run: GoRunTrace | None) -> str:
+#: Past this, a run recorded as running is not treated as working.
+_QUIET_MINUTES = 5
+
+
+def _how_far(run: GoRunTrace) -> list[str]:
+    """How far along it is, as the record has it (5 Nov, a research project: the chat said
+    nothing had been run, then that Go was still running, and only then what had happened)."""
+    if not run.from_record:
+        return []
+    said = [
+        *([f"{run.moves} moves"] if run.moves is not None else []),
+        *([f"${run.cost_usd:.2f} so far"] if run.cost_usd is not None else []),
+        *([f"last activity {run.last_activity_minutes} minutes ago"] if run.last_activity_minutes is not None else []),
+    ]
+    lines = [f"Read from the run record just now: {'; '.join(said)}."] if said else []
+    if run.status == "running" and (run.last_activity_minutes or 0) >= _QUIET_MINUTES:
+        lines.append(
+            f"It is recorded as running, but nothing has happened for {run.last_activity_minutes} minutes, so the tab "
+            "driving it may have closed. Say that; do not say it is working."
+        )
+    return lines
+
+
+def format_go_run(run: GoRunTrace | None, read: bool = True) -> str:
     """The run trace, with the rule that the chat may not invent a stop reason."""
     if run is None:
-        return "GO: no run on this project yet."
+        if read:
+            return "GO: no run on this project yet."
+        return "GO: the run record could not be read for this reply. Say you cannot tell what Go has done; do not say it has not run."
     lines = [f"GO'S LATEST RUN: {run.status}" + (f" ({run.policy})" if run.policy else "")]
+    lines += _how_far(run)
     if run.stop_reason.strip():
         lines.append(f"Recorded stop reason: {run.stop_reason.strip()}")
     if run.objective.strip():
@@ -139,7 +172,7 @@ def format_go_run(run: GoRunTrace | None) -> str:
         for s in run.steps:
             label = s.execution_label or "no execution"
             extra = f", blocked: {s.block_kind}" if s.block_kind else ""
-            out = f" — {' '.join(s.output.split())[:160]}" if s.output.strip() else ""
+            out = f" — {' '.join(s.output.split())[:300]}" if s.output.strip() else ""
             lines.append(f"- {s.action} [{s.status}; {label}{extra}]{out}")
     lines.append(
         "When asked why Go stopped or what it did, answer from this record only. If the record does "
@@ -218,7 +251,7 @@ def format_chat_context(ctx: ChatContext | None) -> str:
     versions = format_versions(ctx.versions)
     if versions:
         lines += ["", versions]
-    lines += ["", format_go_run(ctx.go_run), "", WHAT_CHAT_CAN_CHANGE]
+    lines += ["", format_go_run(ctx.go_run, ctx.go_run_read), "", WHAT_CHAT_CAN_CHANGE]
     lines += ["", format_buttons(ctx.buttons), "", NEVER_PASTE_RULE]
     changes = format_changes(ctx.changes)
     if changes:
