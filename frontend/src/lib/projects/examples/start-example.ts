@@ -43,7 +43,7 @@ export async function startExample(
   const project = await createProject(
     {
       ...example.project,
-      ...(own ? { title: own.title, objective: own.objective, context: own.context, audience: '', constraints: '' } : {}),
+      ...(own ? { title: own.title, objective: own.objective, context: own.context, audience: '', constraints: '', model: undefined } : {}),
       workflow: template.key,
       language,
     },
