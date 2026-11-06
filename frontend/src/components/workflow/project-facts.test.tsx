@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 
-import type { ProjectFact } from '@/lib/workflow/facts';
+import type { ProjectFact } from '@/types/project';
 
 import { ProjectFacts } from './project-facts';
 
