@@ -570,7 +570,9 @@ def format_data_files(files: list["DataFileBrief"]) -> str:
     for f in files[:20]:
         cols = ", ".join(f.columns[:60]) or "(no columns read)"
         lines.append(f"- /data/{f.name} — {f.rows} {'lines' if f.kind == 'text' else 'rows'}; columns: {cols}")
-        for row in f.sample[:3]:
+        # All the preview holds: five fiscal years cut to three sent a memo's analysis to
+        # the teaser for the last two (6 Nov, production).
+        for row in f.sample[:5]:
             lines.append("    e.g. " + " | ".join(str(c)[:80] for c in row))
     return "\n".join(lines)
 

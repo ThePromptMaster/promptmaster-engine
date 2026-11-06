@@ -138,6 +138,19 @@ export function serializeAssessment(scale: AssessScale, items: StageItem[]): str
 }
 
 /** A returned row as the table stores it. */
+/**
+ * What an Assess stage is waiting for, or null when it has rows to show: a batch
+ * it was given (a curated example's sample), or one the user has to paste. Go can
+ * judge the first; the second only the user can supply.
+ */
+export function batchAwaited(
+  stage: { renderer: string; assess?: { offered_batch?: string; item_noun?: string } },
+  head: string | null | undefined
+): { offered: boolean; noun: string | null } | null {
+  if (stage.renderer !== 'assess' || parseAssessment(head)?.items.length) return null;
+  return { offered: Boolean(stage.assess?.offered_batch?.trim()), noun: stage.assess?.item_noun?.trim() || null };
+}
+
 export interface AssessedRow {
   id: string;
   subject: string;

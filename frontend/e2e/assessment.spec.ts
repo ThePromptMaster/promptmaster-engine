@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { createProject, pressTransition, stageArtifact } from './helpers';
+import { createProject, pressTransition, serviceSelect, stageArtifact } from './helpers';
 
 /**
  * Client, 25 Oct: "we copy a profile and paste it into ChatGPT and it gives a
@@ -43,4 +43,33 @@ test('criteria once, then pasted batches judged on a chosen scale, each adding t
   await filters.getByRole('button', { name: /^5/ }).click();
   await expect(table.getByRole('row')).toHaveCount(3); // header + Jane and Ann at "5"
   await page.screenshot({ path: test.info().outputPath('02-filtered.png'), fullPage: true });
+});
+
+/**
+ * 6 Nov, production: on an Assess stage Go told a tester to "attach a data file".
+ * Only the user can paste what it judges, so it says so, by the box's own name.
+ */
+test('Go asks for the batch by name, and carries on once something is judged', async ({ page }) => {
+  test.setTimeout(120_000);
+  const id = await createProject(page, {
+    workflow: 'Assessment', name: 'E2E Go on an Assess stage',
+    objective: 'Screen supplier applications against our criteria [[mock:plan=declare_objective_complete]]',
+  });
+  await expect(stageArtifact(page)).toContainText('Mock', { timeout: 30_000 });
+  await pressTransition(page);
+  await expect(page.getByRole('heading', { name: 'Assess', exact: true })).toBeVisible({ timeout: 30_000 });
+
+  const panel = page.getByRole('region', { name: 'Go mode', exact: true });
+  await panel.getByRole('button', { name: 'Set up Go' }).click();
+  await panel.getByRole('radio', { name: /^Autonomous/ }).click();
+  await panel.getByRole('button', { name: /^Go$/ }).click();
+
+  const card = page.getByRole('region', { name: 'Go mode needs you' });
+  await expect(card).toContainText('into the box on this stage and press Assess', { timeout: 30_000 });
+  await expect(card).not.toContainText('Attach a data file');
+  await page.screenshot({ path: test.info().outputPath('01-go-asks-for-the-batch.png'), fullPage: true });
+  await card.getByRole('button', { name: 'Go to the box' }).click();
+  await expect(page.locator('[data-batch-box] textarea')).toBeFocused();
+  const [run] = await serviceSelect('agent_runs', `project_id=eq.${id}&select=needs&order=created_at.desc&limit=1`);
+  expect(run.needs).toMatchObject({ kind: 'paste_batch' });
 });

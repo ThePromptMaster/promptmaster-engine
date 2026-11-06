@@ -12,6 +12,8 @@
  * claim against it.
  */
 
+import { PREPARED_OPERATION } from '@/lib/projects/examples/cards';
+import { batchAwaited } from '@/lib/workflow/assess';
 import { codeToCheck, type CodeToCheck } from './code-check';
 import { loadOutline, outlineStageFor } from '@/lib/outline/actions';
 import { countNamedSections, emptyDocument, parseOutlineDocument } from '@/lib/outline/model';
@@ -155,6 +157,10 @@ export interface StageFacts {
   review?: ReviewFacts;
   /** Python in this stage's draft that the objective asks to have checked (M3). */
   code?: CodeToCheck;
+  /** An Assess stage with nothing judged yet (`batchAwaited`). */
+  batch?: { offered: boolean; noun: string | null };
+  /** The stage still holds what a curated example prepared for the reader to approve. */
+  prepared?: boolean;
 }
 
 export async function readStageFacts(input: {
@@ -236,6 +242,10 @@ export async function readStageFacts(input: {
       };
     }
   }
+
+  const awaited = batchAwaited(stage, bundles[stage.id]?.versions.at(-1)?.content);
+  if (awaited) facts.batch = awaited;
+  if (bundles[stage.id]?.versions.at(-1)?.source_operation === PREPARED_OPERATION) facts.prepared = true;
 
   if (effectiveRenderer(stage) === 'review') {
     const schema = itemSchemaFor(stage);

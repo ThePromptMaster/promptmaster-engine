@@ -59,6 +59,8 @@ type Need =
    */
   | { kind: 'continue_budget'; budgetSteps: number; callCap?: number; saved?: string[] }
   | { kind: 'large_job'; stageId: string; sections: number }
+  /** An Assess stage with nothing to judge: only the user can paste what it judges (6 Nov). */
+  | { kind: 'paste_batch'; stageId: string; noun: string | null }
   | { kind: 'triage_findings'; stageId: string; count: number }
   /**
    * A repair that did not settle (13 Oct, Sean: "The recovery should identify
@@ -544,6 +546,14 @@ export function requiredWork(input: {
     };
   }
 
+  if (facts.batch?.offered && can('assess_batch')) {
+    return {
+      key: 'assess_batch',
+      rationale: `${stage.label} was given a sample batch and has judged nothing yet.`,
+      expected: 'Each item in the batch judged against the earlier stages, in a table on this stage.',
+    };
+  }
+
   if (round?.staleDraft && can('draft_stage')) {
     return {
       key: 'draft_stage',
@@ -696,6 +706,10 @@ export function needsUser(input: {
     return { kind: 'approve_outline', stageId: outlineStageId, versionNumber: null, unsavedDraft: false };
   }
 
+  // Nothing to judge yet, and nothing Go can fetch: said plainly, before any planner
+  // call. Left to the planner it told testers to "attach a data file" (6 Nov, production).
+  if (facts.batch && !facts.batch.offered) return { kind: 'paste_batch', stageId: stage.id, noun: facts.batch.noun };
+
   // FR-18: a large drafting run under Autonomous is a spend the user confirms.
   if (policy === 'autonomous' && allowed.includes('draft_sections') && facts.manuscript) {
     const unwritten = facts.manuscript.total - facts.manuscript.complete;
@@ -816,6 +830,8 @@ export function needStillHolds(
       return true;
     case 'unblock_stage':
       return input.state.stages[need.stageId]?.status === 'blocked';
+    case 'paste_batch':
+      return Boolean(input.facts.batch);
     case 'wait_for_jobs':
       return (input.facts.manuscript?.pendingJobs.length ?? 0) > 0;
     case 'repair_stuck':
@@ -1011,6 +1027,11 @@ export function describeNeed(
     }
     case 'large_job':
       return { message: t('need.large', { n: need.sections }), action: t('need.largeAnyway', { n: need.sections }) };
+    case 'paste_batch':
+      return {
+        message: t('need.pasteBatch', { items: need.noun ? word(need.noun) : t('need.pasteItems'), button: t('assess.run') }),
+        action: t('need.showBox'),
+      };
     case 'decide_rows':
       if (need.proposed) {
         const rest = need.count - need.proposed;

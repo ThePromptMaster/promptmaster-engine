@@ -857,6 +857,31 @@ describe('a repair cascade stops (Sean, 10 Oct, email 7.6)', () => {
   });
 });
 
+describe('a curated example on Go (6 Nov, production)', () => {
+  const offered = async () => {
+    const { SINGLE_OUTPUT_V1 } = await import('@/lib/workflow/templates/single-output.v1');
+    const { initialState } = await import('@/lib/workflow/engine');
+    const stage = SINGLE_OUTPUT_V1.stages.find((s) => s.id === 'output')!;
+    return { template: SINGLE_OUTPUT_V1, state: initialState(SINGLE_OUTPUT_V1), stage };
+  };
+
+  it('does not check or rewrite what the example prepared for the reader to approve', async () => {
+    const { template, state, stage } = await offered();
+    const keys = allowedActions(template, state, stage, true, undefined, { prepared: true });
+    expect(keys).not.toContain('evaluate_stage');
+    expect(keys).not.toContain('revise_stage');
+    expect(keys).not.toContain('apply_findings');
+    // Edited, it is the user's text, and the ordinary moves are back.
+    expect(allowedActions(template, state, stage, true, undefined, {})).toContain('evaluate_stage');
+  });
+
+  it('offers to judge a batch only when one was given', async () => {
+    const { template, state, stage } = await offered();
+    expect(allowedActions(template, state, stage, false, undefined, { batch: { offered: true, noun: 'deals' } })).toContain('assess_batch');
+    expect(allowedActions(template, state, stage, false, undefined, { batch: { offered: false, noun: 'deals' } })).not.toContain('assess_batch');
+  });
+});
+
 describe('going back after an answer that does not say so (6 Nov, production pass)', () => {
   // The project: asked on Final review whether to allow two phrases, the user
   // kept the rule, and the note to change was on Output. Go could only ask how.

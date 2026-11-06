@@ -174,6 +174,8 @@ export function stageControls(input: {
   go?: readonly StageControl[];
   /** A drafting stage whose outline can be reopened to add chapters or sections. */
   addSections?: boolean;
+  /** An Assess stage's box, and whether it offers a sample batch to fill it with. */
+  assess?: { sample: boolean };
 }): StageControl[] {
   const controls: StageControl[] = [];
   if (input.primary && input.primary.kind !== 'none' && input.primary.label) {
@@ -187,6 +189,10 @@ export function stageControls(input: {
   if (input.proposeRows) controls.push({ id: 'propose-statuses', label: tr('controls.propose'), place: 'table' });
   if (input.proposals) controls.push({ id: 'confirm-proposals', label: confirmProposalsLabel(input.proposals), place: 'table' });
   if (input.lookupNoun) controls.push({ id: 'lookup', label: lookupLabel(input.lookupNoun), place: 'table' });
+  if (input.assess) {
+    if (input.assess.sample) controls.push({ id: 'use-sample-batch', label: tr('ex.useBatch'), place: 'table' });
+    controls.push({ id: 'assess-batch', label: tr('assess.run'), place: 'table' });
+  }
   if (input.dataPanel) controls.push({ id: 'attach-data', label: tr('data.attachData'), place: 'data_panel' });
   if (input.addSections) controls.push({ id: 'add-sections', label: addSectionsLabel(), place: 'above_work' });
   if (input.nextStep) controls.push({ id: 'next-step', label: input.nextStep, place: 'next_step' });
