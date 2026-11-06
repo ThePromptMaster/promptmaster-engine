@@ -46,6 +46,8 @@ test('an example from a signed-out visit: nothing is spent until a press says so
   // The first stage is already there, and marked as what it is.
   await expect(page.getByRole('heading', { name: 'Deal brief' })).toBeVisible();
   await expect(page.getByText(/What would make it a yes/)).toBeVisible();
+  // What it is about is one line above it, not a form it has to be scrolled past.
+  await expect(page.getByLabel('Objective').first()).toBeHidden();
   await shot('03-prepared-stage.png');
 
   const [project] = await serviceSelect('projects', `id=eq.${id}&select=example_key,web_access,routine_decisions,user_id,objective`);

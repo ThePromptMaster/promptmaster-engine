@@ -2633,8 +2633,10 @@ export function WorkflowWorkspace({
           <div className="mb-8">
             {/* The stage's exit criteria say whether the project's setup fields
                 belong here — no stage in any template asks for them twice, and
-                nothing about this reads the workflow's name. */}
-            {stageWantsSetup(stage) && !isQuickAnswer(template) ? (
+                nothing about this reads the workflow's name. A stage prepared for the
+                reader has them filled in already: as a form they put the brief itself
+                three screens down, on a tester's first look (6 Nov). */}
+            {stageWantsSetup(stage) && !isQuickAnswer(template) && headVersion?.source_operation !== PREPARED_OPERATION ? (
               <ProjectSetup
                 project={project}
                 stage={stage}
