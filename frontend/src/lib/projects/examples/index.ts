@@ -6,6 +6,7 @@ import { BUSINESS_ANALYSIS } from './business-analysis';
 import type { ExampleKey } from './cards';
 import { DEAL_SCREENING } from './deal-screening';
 import { INVESTMENT_MEMO } from './investment-memo';
+import { FINISHED_RESULTS, type FinishedResult } from './results';
 import { SLIDE_DECK } from './slide-deck';
 
 /**
@@ -38,6 +39,11 @@ export interface Example {
   prepared: string;
   /** Data files the project starts with. */
   files?: { name: string; text: string }[];
+}
+
+/** An example with what a real run of it produced, for its preview page. */
+export function resultOf(example: Pick<Example, 'key'>): FinishedResult | undefined {
+  return FINISHED_RESULTS[example.key];
 }
 
 export const EXAMPLES: readonly Example[] = [DEAL_SCREENING, INVESTMENT_MEMO, BUSINESS_ANALYSIS, SLIDE_DECK];
