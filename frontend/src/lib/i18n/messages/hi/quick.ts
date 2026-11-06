@@ -14,6 +14,7 @@ export const hi: Record<keyof typeof en, string> = {
   "start.advanced": "शुरू करने के और तरीके",
   "start.advancedHide": "शुरू करने के अन्य तरीके छिपाएँ",
   "start.advancedNote": "बातचीत छोड़ें: आपने जो लिखा उससे सुझाया गया सेटअप पाएँ, या वर्कफ़्लो खुद चुनें।",
+  "start.docCut": "{names} इतना लंबा है कि प्रोजेक्ट इसे पूरा नहीं रख सकता: केवल इसके पहले 2,00,000 अक्षर इस्तेमाल होते हैं।",
   "quick.takeFull": "इसे पूरी PromptMaster प्रक्रिया में ले जाएँ",
   "quick.takeFullNote": "चरण, जाँचें, संशोधन और निर्णय — जो आपके पास यहाँ है उसी पर।",
   "quick.takeFullTitle": "इसे पूरी प्रक्रिया में ले जाएँ",

@@ -34,6 +34,7 @@ _FRIENDLY: dict[str, str] = {
     "suggested_section_count": "the number of sections",
     "objective": "the objective",
     "context": "the project context",
+    "material": "the attached material",
     "description": "the description of the work",
     "constraints": "the constraints text",
     "output_format": "the output format",

@@ -14,6 +14,7 @@ export const sw: Record<keyof typeof en, string> = {
   "start.advanced": "Njia zaidi za kuanza",
   "start.advancedHide": "Ficha njia nyingine za kuanza",
   "start.advancedNote": "Ruka mazungumzo: pata mpangilio unaopendekezwa kutokana na ulichoandika, au chagua mtiririko mwenyewe.",
+  "start.docCut": "{names} ni ndefu mno kwa mradi kuihifadhi yote: herufi 200,000 za kwanza pekee ndizo zinatumika.",
   "quick.takeFull": "Peleka hiki kwenye mchakato kamili wa PromptMaster",
   "quick.takeFullNote": "Hatua, ukaguzi, marekebisho na maamuzi, juu ya ulicho nacho hapa.",
   "quick.takeFullTitle": "Peleka kwenye mchakato kamili",

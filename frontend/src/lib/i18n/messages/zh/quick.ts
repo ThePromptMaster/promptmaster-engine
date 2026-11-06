@@ -14,6 +14,7 @@ export const zh: Record<keyof typeof en, string> = {
   "start.advanced": "更多开始方式",
   "start.advancedHide": "隐藏其他开始方式",
   "start.advancedNote": "跳过对话：根据你写的内容推荐设置，或自己选择工作流。",
+  "start.docCut": "{names} 太长，项目无法完整保留：只使用前 200,000 个字符。",
   "quick.takeFull": "转入完整的 PromptMaster 流程",
   "quick.takeFullNote": "阶段、检查、修订和决定，基于你在这里已有的内容。",
   "quick.takeFullTitle": "转入完整流程",
