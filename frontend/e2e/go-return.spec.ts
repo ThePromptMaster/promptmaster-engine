@@ -116,42 +116,38 @@ test('straight after an answer about earlier work, Go goes back there itself, on
  */
 test('accepted findings on the last review go back to the deliverable before sign-off', async ({ page }) => {
   test.setTimeout(300_000);
-  const id = await createProject(page, {
-    workflow: 'Single output', name: 'E2E accepted fixes go back',
-    objective: 'A short staff note about the offsite [[mock:plan=declare_objective_complete]]',
-  });
+  await page.goto('/examples/slide-deck');
+  await page.getByRole('button', { name: 'Try it on this sample' }).click();
+  await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}$/, { timeout: 30_000 });
+  const id = page.url().split('/').at(-1)!;
   const finalReview = page.locator('header').getByRole('heading', { name: 'Final review', exact: true });
-  for (let i = 0; i < 6 && !(await finalReview.isVisible().catch(() => false)); i += 1) {
+  for (let i = 0; i < 5 && !(await finalReview.isVisible().catch(() => false)); i += 1) {
     await pressTransition(page);
     await page.waitForTimeout(1_200);
   }
   await expect(finalReview).toBeVisible();
-  await expect(stageArtifact(page)).toContainText('Mock', { timeout: 30_000 });
-  const [art] = await serviceSelect('artifacts', `project_id=eq.${id}&stage_id=eq.summary&select=id,user_id`);
+  // A prepared example waits for a press, so the review is drafted by hand here.
+  await page.getByRole('button', { name: 'Draft this stage' }).first().click();
+  await expect(stageArtifact(page)).toContainText('Mock', { timeout: 60_000 });
+  const [art] = await serviceSelect('artifacts', `project_id=eq.${id}&stage_id=eq.final_review&select=id,user_id`);
   await serviceInsert('artifact_versions', {
     user_id: art.user_id, project_id: id, artifact_id: art.id, source_operation: 'stage_edit', instruction: '', model: '', mode: 'analyst',
     content: JSON.stringify({
       kind: 'stage_items',
-      items: [{ id: 'r1', finding: 'The note runs long', why_it_matters: 'Nobody reads it', suggested_change: 'Cut the second paragraph', severity: 'minor', status: 'accepted', status_source: 'policy' }],
+      items: [{ id: 'r1', finding: 'The ask slide runs long', why_it_matters: 'Nobody reads it', suggested_change: 'Cut it to one line', severity: 'minor', status: 'accepted', status_source: 'policy' }],
     }),
   });
   await page.reload();
-  await expect(stageArtifact(page)).toContainText('The note runs long', { timeout: 30_000 });
+  await expect(stageArtifact(page)).toContainText('The ask slide runs long', { timeout: 30_000 });
 
-  const panel = goPanel(page);
-  await panel.getByRole('button', { name: 'Set up Go' }).click();
-  await panel.getByRole('radio', { name: /^Handle them for me/ }).click();
-  await expect.poll(async () => (await serviceSelect('projects', `id=eq.${id}&select=routine_decisions`))[0].routine_decisions).toBe('handle');
-  await panel.getByRole('radio', { name: /^Autonomous/ }).click();
-  await panel.getByRole('button', { name: /^Go$/ }).click();
-
+  await page.getByRole('button', { name: 'Let Go run this' }).click();
   await expect.poll(
     async () => (await serviceSelect('workflow_events', `project_id=eq.${id}&type=eq.stage_returned&select=id`)).length,
     { timeout: 60_000 }
   ).toBe(1);
   const [returned] = await serviceSelect('workflow_events', `project_id=eq.${id}&type=eq.stage_returned&select=actor,stage_id,to_stage_id,payload`);
   expect(returned).toMatchObject({
-    actor: 'system', stage_id: 'summary', to_stage_id: 'output',
+    actor: 'system', stage_id: 'final_review', to_stage_id: 'slides',
     payload: { agent_return: true, work: expect.stringContaining('accepted finding') },
   });
   await page.screenshot({ path: test.info().outputPath('01-accepted-fixes-went-back.png'), fullPage: true });

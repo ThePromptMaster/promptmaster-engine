@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import { API_URL } from './env';
-import { dismissBetaNotice, serviceSelect, transitionBar } from './helpers';
+import { dismissBetaNotice, servicePatch, serviceSelect, transitionBar } from './helpers';
 
 /**
  * The curated examples (the client's call, 4 Nov): a visitor with no account can
@@ -139,6 +139,10 @@ test('deal screening under Go: it judges the sample batch itself, and does not c
   await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}$/, { timeout: 30_000 });
   await expect(page.getByRole('heading', { name: 'Mandate and criteria' })).toBeVisible();
   const id = page.url().split('/').at(-1)!;
+  // A real planner moves on once the criteria are approved; the scripted one is told to.
+  await servicePatch('projects', `id=eq.${id}`, { objective: 'Screen the deals [[mock:plan=advance_stage]]' });
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Mandate and criteria' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Let Go run this' }).click();
   const card = page.getByRole('region', { name: 'Go mode needs you' });
