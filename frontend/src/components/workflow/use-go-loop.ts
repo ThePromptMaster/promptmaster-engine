@@ -44,7 +44,7 @@ import { actionFor, actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, ROUTINE_DE
 import { contextWithFacts, readOutcomeProof, readStageFacts, type StageFacts } from '@/lib/agent/facts';
 import { serializeItems, stageDrafts } from '@/lib/workflow/stage-artifact';
 import { carryNewerFixes, describeCarried, reasksCarried } from '@/lib/agent/review-rounds';
-import { approvedAsItStands, delegableToCommit, exhaustedRepair, policyConfirmable, repairStuckNeed, repairTries, staleRepair, unrepairableStale, describeNeed, NEED_CLEARED, NEED_MOVED_ON, needStillHolds, needsUser, openRowsElsewhere, requiredWork, type NeedsUser } from '@/lib/agent/needs';
+import { approvedAsItStands, delegableToCommit, exhaustedRepair, policyConfirmable, repairStuckNeed, repairTries, staleRepair, unrepairableStale, describeNeed, NEED_CLEARED, NEED_MOVED_ON, needStillHolds, needsUser, openRowsElsewhere, requiredWork, waitingOnTable, type NeedsUser } from '@/lib/agent/needs';
 import { assertHonestOutcome, verifyOutcome } from '@/lib/agent/outcome';
 import { outlineStageFor } from '@/lib/outline/actions';
 import { effectiveRenderer } from '@/lib/workflow/stage-artifact';
@@ -128,6 +128,8 @@ interface Options {
   template: WorkflowTemplate;
   state: WorkflowState;
   stage: StageDefinition | undefined;
+  /** Rows chosen in the table on screen and not saved yet: Resume saves them before it carries on. */
+  unsavedRows?: { stageId: string; save: () => Promise<void> } | null;
   bundles: Record<string, StageArtifactBundle>;
   context: StageContext;
   stageEvaluation: StageEvaluation;
@@ -1240,6 +1242,19 @@ export function useGoLoop(opts: Options) {
    * a nearly spent window is closed and the next one opened instead.
    */
   const update = useCallback(async (chosen: ExecutionPolicy = policy) => {
+    // Decisions chosen in the table but not saved: as far as Go can read, the
+    // rows are still undecided, so Resume stopped again at once and said nothing
+    // (6 Nov, production, book test). They are saved first, as an outline's
+    // unsaved edits are before its approval.
+    const unsaved = latest.current.unsavedRows;
+    if (unsaved && waitingOnTable(runRef.current?.needs, unsaved.stageId)) {
+      try {
+        await unsaved.save();
+      } catch (e) {
+        setError(asError(e, 'Could not save your decisions, so Go has not resumed.').message);
+        return;
+      }
+    }
     if (phaseRef.current === 'watching') {
       setError(WATCHING_ELSEWHERE);
       return;

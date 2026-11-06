@@ -1496,6 +1496,7 @@ export function WorkflowWorkspace({
     state,
     // Go works the stage the project is on, never one the user is browsing.
     stage: getStage(template, state.current_stage_id),
+    unsavedRows: stage && stage.renderer === 'review' && dirtyState?.dirty ? { stageId: stage.id, save: dirtyState.save } : null,
     bundles: stageBundles,
     context,
     stageEvaluation: evaluateStage(template, state.current_stage_id, context),
@@ -1934,12 +1935,16 @@ export function WorkflowWorkspace({
   // Go stopped on the objective check: the pause notice offers Go's own action.
   const objectiveNeed =
     go.run && !go.run.ended_at && go.run.status === 'awaiting_decision' && go.run.needs?.kind === 'objective_check' ? go.run.needs : null;
-  const completion = completionSummary(template, state, context, {
-    goWaiting,
-    objectiveUnmet: objectiveAssessment ? { blockers: objectiveAssessment.blockers.map((b) => b.need), next: executableNext(objectiveAssessment)?.title ?? null } : null,
-    objectiveNotRechecked: objectiveStale,
-    approvalsOnEarlier,
-  });
+  const completion = {
+    ...completionSummary(template, state, context, {
+      goWaiting,
+      objectiveUnmet: objectiveAssessment ? { blockers: objectiveAssessment.blockers.map((b) => b.need), next: executableNext(objectiveAssessment)?.title ?? null } : null,
+      objectiveNotRechecked: objectiveStale,
+      approvalsOnEarlier,
+    }),
+    // The finish dialog names the document that is delivered, not the stage that first drafted it (6 Nov, production book test).
+    ...(deliverable ? { deliverable } : {}),
+  };
   // The sidebar counts what Go stops on, not only stage statuses (12 Oct).
   const progressCaption = progressCaptionText(progress, state.project_status === 'finalized', completion.outstanding);
   // The deliverable's latest objective check, for the finished screen (C4).
