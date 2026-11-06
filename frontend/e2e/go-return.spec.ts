@@ -108,3 +108,51 @@ test('straight after an answer about earlier work, Go goes back there itself, on
   await expect(page.locator('header').getByRole('heading', { name: 'Output and evaluation', exact: true })).toBeVisible({ timeout: 30_000 });
   await page.screenshot({ path: test.info().outputPath('01-went-back-after-the-answer.png'), fullPage: true });
 });
+
+/**
+ * 6 Nov, production (the slide deck example): Go accepted the review's findings and
+ * asked for sign-off on a deck with none of them in it. Under "handle them for me"
+ * they go back to the deliverable first; the return is Go's, with its reason.
+ */
+test('accepted findings on the last review go back to the deliverable before sign-off', async ({ page }) => {
+  test.setTimeout(300_000);
+  await page.goto('/examples/slide-deck');
+  await page.getByRole('button', { name: 'Try it on this sample' }).click();
+  await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}$/, { timeout: 30_000 });
+  const id = page.url().split('/').at(-1)!;
+  // A prepared example waits for a press, so the deck and its review are drafted by hand here.
+  const slides = page.locator('header').getByRole('heading', { name: 'Slides', exact: true });
+  for (let i = 0; i < 4 && !(await slides.isVisible().catch(() => false)); i += 1) {
+    await pressTransition(page);
+    await page.waitForTimeout(1_200);
+  }
+  await expect(slides).toBeVisible();
+  await page.getByRole('button', { name: 'Draft this stage' }).first().click();
+  await expect(stageArtifact(page)).toContainText('Mock', { timeout: 60_000 });
+  await pressTransition(page);
+  await expect(page.locator('header').getByRole('heading', { name: 'Final review', exact: true })).toBeVisible({ timeout: 30_000 });
+  await page.getByRole('button', { name: 'Draft this stage' }).first().click();
+  await expect(stageArtifact(page)).toContainText('Mock', { timeout: 60_000 });
+  const [art] = await serviceSelect('artifacts', `project_id=eq.${id}&stage_id=eq.final_review&select=id,user_id`);
+  await serviceInsert('artifact_versions', {
+    user_id: art.user_id, project_id: id, artifact_id: art.id, source_operation: 'stage_edit', instruction: '', model: '', mode: 'analyst',
+    content: JSON.stringify({
+      kind: 'stage_items',
+      items: [{ id: 'r1', finding: 'The ask slide runs long', why_it_matters: 'Nobody reads it', suggested_change: 'Cut it to one line', severity: 'minor', status: 'accepted', status_source: 'policy' }],
+    }),
+  });
+  await page.reload();
+  await expect(stageArtifact(page)).toContainText('The ask slide runs long', { timeout: 30_000 });
+
+  await page.getByRole('button', { name: 'Let Go run this' }).click();
+  await expect.poll(
+    async () => (await serviceSelect('workflow_events', `project_id=eq.${id}&type=eq.stage_returned&select=id`)).length,
+    { timeout: 60_000 }
+  ).toBe(1);
+  const [returned] = await serviceSelect('workflow_events', `project_id=eq.${id}&type=eq.stage_returned&select=actor,stage_id,to_stage_id,payload`);
+  expect(returned).toMatchObject({
+    actor: 'system', stage_id: 'final_review', to_stage_id: 'slides',
+    payload: { agent_return: true, work: expect.stringContaining('accepted finding') },
+  });
+  await page.screenshot({ path: test.info().outputPath('01-accepted-fixes-went-back.png'), fullPage: true });
+});

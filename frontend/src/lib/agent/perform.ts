@@ -50,7 +50,8 @@ import { checkVerdict as sharedCheckVerdict } from '@/lib/workflow/check-verdict
 import { proposeTargets } from '@/lib/workflow/proposals';
 import { proposeStatuses } from '@/lib/workflow/propose';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
-import { dataFileBriefs, formatManuscript, summariseStageContent } from '@/lib/workflow/digest';
+import { buildStageDigest, dataFileBriefs, formatManuscript, summariseStageContent } from '@/lib/workflow/digest';
+import { appendBatch, parseAssessment, scaleForRequest, scaleFromSpec, serializeAssessment } from '@/lib/workflow/assess';
 import { stageContentForSummary, stageEvidence } from '@/lib/workflow/evidence';
 import { blocksCompletion, deliverableStage, describeOutstanding, evaluateStage, outstandingWork, remainingStages } from '@/lib/workflow/engine';
 import { describeBasis, executableNext, openWithNextLine, pausedLine, stillMet, type ObjectiveAssessment, type ObjectiveBasis } from '@/lib/workflow/objective';
@@ -1534,6 +1535,47 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         output: recorded.length
           ? `Recorded ${recorded.length} fact${recorded.length === 1 ? '' : 's'} from ${docs.map((d) => d.name).join(', ')} under your routine-decision policy, each quoted from its file:\n${recorded.map((f) => `- ${f.statement}`).join('\n')}`
           : `Read ${docs.map((d) => d.name).join(', ')}; it states no fact that is not already on record.`,
+      });
+    }
+
+    case 'assess': {
+      // 6 Nov: pressing "Try it on this sample" asked for this batch to be judged.
+      // Go stopped and sent the tester to a button that could not help.
+      const text = ctx.stage.assess?.offered_batch?.trim();
+      if (!text) return done(key, { status: 'failed', output: 'This stage was given no batch to judge.', toolsUsed: [], changes: {} });
+      if (!ctx.appendStageVersion) throw new Error('This view cannot save versions.');
+      const head = ctx.bundles[ctx.stage.id]?.versions.at(-1)?.content ?? '';
+      const saved = parseAssessment(head);
+      const scale = saved?.scale ?? scaleFromSpec(ctx.stage.assess);
+      const existing = saved?.items ?? [];
+      const res = await api.assessBatch(
+        {
+          inputs: inputsFrom(ctx.project),
+          digest: buildStageDigest(ctx.template, ctx.state, ctx.project, ctx.bundles, ctx.stage.id),
+          scale: scaleForRequest(scale),
+          text,
+          stage_hint: ctx.stage.entry_prompt_hint ?? '',
+          already: existing.map((i) => i.subject ?? '').filter(Boolean),
+          model: ctx.project.model,
+          web_access: webAccessOf(ctx.project),
+        },
+        ctx.signal
+      );
+      await keepWeb(ctx, res, ctx.stage);
+      if (!res.items.length) return done(key, { status: 'failed', output: 'The batch came back with nothing judged.', toolsUsed: ['model'], changes: {} });
+      const created = await ctx.appendStageVersion(ctx.stage.id, ctx.stage.label, {
+        content: serializeAssessment(scale, appendBatch(existing, res.items, new Date().toISOString())),
+        source_operation: 'assess_batch',
+        base_content: head,
+        model: res.model_used || ctx.project.model,
+        mode: modeForStage(ctx.project, ctx.stage),
+        change_summary: `Go mode judged the sample batch: ${res.items.length} item${res.items.length === 1 ? '' : 's'}.`,
+      });
+      const versionId = (created as { id?: unknown } | null)?.id;
+      return done(key, {
+        status: 'succeeded', toolsUsed: ['model'],
+        changes: typeof versionId === 'string' ? { version_ids: [versionId] } : {},
+        output: `Judged ${res.items.length} item${res.items.length === 1 ? '' : 's'} from the sample batch. The table on this stage has each verdict and why; change any of them.`,
       });
     }
 

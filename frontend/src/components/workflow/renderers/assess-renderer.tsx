@@ -150,7 +150,7 @@ export function AssessRenderer({
       />
 
       {editable && onAssessBatch && (
-        <section aria-label={t('assess.newBatch')} className="rounded-xl bg-[var(--surface-container-low)] p-5">
+        <section data-batch-box aria-label={t('assess.newBatch')} className="rounded-xl bg-[var(--surface-container-low)] p-5">
           {!locked && (
             <ScalePicker
               picked={picked}

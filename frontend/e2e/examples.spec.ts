@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import { API_URL } from './env';
-import { dismissBetaNotice, serviceSelect, transitionBar } from './helpers';
+import { dismissBetaNotice, servicePatch, serviceSelect, transitionBar } from './helpers';
 
 /**
  * The curated examples (the client's call, 4 Nov): a visitor with no account can
@@ -128,6 +128,38 @@ test('deal screening: the sample batch fills the box, and only Assess runs anyth
   await expect(page.getByRole('table')).toBeVisible({ timeout: 30_000 });
   expect(calls).toEqual(['/api/assess-batch']);
   await page.screenshot({ path: test.info().outputPath('02-verdicts.png'), fullPage: true });
+});
+
+test('deal screening under Go: it judges the sample batch itself, and does not check the prepared criteria', async ({ page }) => {
+  test.setTimeout(120_000);
+  const calls = backendCalls(page);
+  await page.goto('/examples/deal-screening');
+  await dismissBetaNotice(page);
+  await page.getByRole('button', { name: 'Try it on this sample' }).click();
+  await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}$/, { timeout: 30_000 });
+  await expect(page.getByRole('heading', { name: 'Mandate and criteria' })).toBeVisible();
+  const id = page.url().split('/').at(-1)!;
+  // A real planner moves on once the criteria are approved; the scripted one is told to.
+  await servicePatch('projects', `id=eq.${id}`, { objective: 'Screen the deals [[mock:plan=advance_stage]]' });
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Mandate and criteria' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Let Go run this' }).click();
+  const card = page.getByRole('region', { name: 'Go mode needs you' });
+  await expect(card).toContainText('I approve these criteria for judging every deal', { timeout: 30_000 });
+  // The prepared text was read by nobody but the user: no check, no rewrite.
+  expect(calls).not.toContain('/api/generate-stage-artifact');
+  expect(calls).not.toContain('/api/evaluate-stage');
+  const versions = await serviceSelect('artifact_versions', `project_id=eq.${id}&select=source_operation`);
+  expect(versions).toEqual([{ source_operation: 'example_prewritten' }]);
+
+  await card.getByRole('button', { name: 'Approve and resume' }).click();
+  await expect.poll(() => calls.filter((c) => c === '/api/assess-batch').length, { timeout: 60_000 }).toBe(1);
+  await expect(page.getByRole('table').first()).toBeVisible({ timeout: 30_000 });
+  await page.screenshot({ path: test.info().outputPath('01-go-judged-the-batch.png'), fullPage: true });
+  const steps = await serviceSelect('agent_steps', `project_id=eq.${id}&action_key=eq.assess_batch&select=status,output`);
+  expect(steps[0].status).toBe('succeeded');
+  expect(steps[0].output).toContain('from the sample batch');
 });
 
 test('the slide deck example asks for slides in the form the PowerPoint export reads', async ({ page }) => {

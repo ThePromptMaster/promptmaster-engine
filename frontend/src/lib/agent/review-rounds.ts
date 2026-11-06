@@ -21,7 +21,8 @@
  */
 
 import type { ExecutionPolicy, AgentStep } from '@/types/agent';
-import type { WorkflowEvent } from '@/lib/workflow/types';
+import { deliverableStage } from '@/lib/workflow/engine';
+import type { StageDefinition, WorkflowEvent, WorkflowTemplate } from '@/lib/workflow/types';
 import type { RoutineDecisions } from '@/types/project';
 import type { StageItem, StageItemSchema } from '@/lib/workflow/stage-artifact';
 import { carriedForwardUnmet, parseItems, positiveVerdict } from '@/lib/workflow/stage-artifact';
@@ -29,6 +30,9 @@ import { carriedForwardUnmet, parseItems, positiveVerdict } from '@/lib/workflow
 /** A question, or a return, that is about going back to apply fixes the review accepted. */
 const MERGE_ASK = /\b(?:go(?:ing)? back|return(?:ing)?|merge[ds]?)\b/i;
 const ACCEPTED = /\baccept(?:ed|s)?\b/i;
+
+/** Trips back for accepted fixes on one review: the policy's limit on returns applies as well. */
+const MAX_FIX_RETURNS = 3;
 
 export const CARRY_REASON = 'Carried forward: a newer fix from a later review round. Go already merged one round of accepted fixes, so it is left open here instead of going back again. Accept it to have it applied.';
 
@@ -90,6 +94,51 @@ export function carryNewerFixes(args: {
     carried: newer.map(asCarried),
     rounds: returns.length,
   };
+}
+
+/**
+ * Accepted fixes on the last review that have not reached the deliverable, or null.
+ *
+ * 6 Nov, production (the slide deck example): Go accepted eight routine findings, the
+ * user accepted a major one, and Go then asked them to approve the deck for the board.
+ * No fix was in it, because nothing after the last stage applies them and the planner
+ * is not asked once only an approval is left. Under "handle them for me" the fixes go
+ * back to the deliverable first, once; later rounds are carried forward
+ * (`carryNewerFixes`), except what the user accepted themselves.
+ *
+ * Not in a workflow with chapters: those have their own revision stage (L-161).
+ */
+export function fixesToMerge(args: {
+  template: WorkflowTemplate;
+  stage: StageDefinition;
+  items: readonly StageItem[];
+  /** Rows still undecided: those come first. */
+  undecided: number;
+  events: readonly Pick<WorkflowEvent, 'type' | 'stage_id' | 'created_at'>[];
+  /** The review stage's versions, oldest first. */
+  versions: readonly { content: string; created_at: string }[];
+  policy: ExecutionPolicy;
+  routine: RoutineDecisions;
+}): { target: { id: string; label: string }; rows: StageItem[] } | null {
+  const { template, stage, items, policy, routine } = args;
+  if (policy !== 'autonomous' || routine !== 'handle') return null;
+  if (stage.renderer !== 'review' || stage.transitions.default_next || args.undecided > 0) return null;
+  if (template.stages.some((s) => s.renderer === 'long_form')) return null;
+  const deliverable = deliverableStage(template);
+  if (!deliverable || !(stage.transitions.allow_return_to ?? []).includes(deliverable.id)) return null;
+
+  // A row with nothing to change has nothing to carry back.
+  const fixes = items.filter((i) => i.status === 'accepted' && (i.suggested_change ?? '').trim() && !positiveVerdict(i));
+  const returns = args.events.filter((e) => e.type === 'stage_returned' && e.stage_id === stage.id).map((e) => e.created_at);
+  if (!returns.length) return fixes.length ? { target: { id: deliverable.id, label: deliverable.label }, rows: fixes } : null;
+  if (returns.length >= MAX_FIX_RETURNS) return null;
+
+  // Sent back already: only what the user accepted since, which is theirs to have applied.
+  const last = returns.reduce((a, b) => (a > b ? a : b));
+  const before = [...args.versions].reverse().find((v) => v.created_at <= last);
+  const merged = new Set((parseItems(before?.content) ?? []).map((i) => i.id));
+  const theirs = fixes.filter((i) => !merged.has(i.id) && i.status_source === 'user');
+  return theirs.length ? { target: { id: deliverable.id, label: deliverable.label }, rows: theirs } : null;
 }
 
 /** "Carried forward: 7 newer fixes from the second review, …" */

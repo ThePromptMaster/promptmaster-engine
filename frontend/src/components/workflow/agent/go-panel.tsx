@@ -42,6 +42,7 @@ export interface NeedsActions {
   addStage?: (wanted: { title: string; kind: string; work: string }) => Promise<void>;
   /** Bring the stage's table into view, at the first row still to decide. */
   showTable?: () => void;
+  showBatch?: () => void;
   /** Bring the Data panel into view, where a file is attached. */
   showData?: () => void;
   /** Keep a reopened stage as it is now: its recheck is dismissed, on that stage only. */
@@ -249,6 +250,9 @@ export function GoPanel({
       case 'triage_findings':
         // The rows are the user's to decide one by one; the button only takes them there.
         needsActions?.showTable?.();
+        return;
+      case 'paste_batch':
+        needsActions?.showBatch?.();
         return;
       default:
         return;

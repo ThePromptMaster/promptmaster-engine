@@ -3301,3 +3301,23 @@ It needs Autonomous with routine decisions handed to Go. Otherwise Go asks "Shal
 and a plain yes does it: one more question, by design, because going back is then the user's. On
 that first move after an answer, a stage waiting only for an approval spends one planner call
 before its card appears, because the answer has to be read first.
+
+### L-190 — Under Go, an example is run rather than checked; accepted findings reach the deliverable (2026-11-06)
+
+Found by running the four examples on production. Three things changed.
+
+- **A batch Go was given, it judges.** On an Assess stage holding a sample, Go runs it
+  (`assess_batch`). With none, it asks for one by the box's name (`paste_batch`), before any planner
+  call. It used to tell testers to attach a data file, which does nothing there.
+- **A prepared stage is left alone.** Go no longer checks or rewrites a version an example prepared
+  (`facts.prepared`). It paid to, and its rewrite of the deal criteria ruled out every sample deal.
+- **Accepted findings go back first.** On the last stage, when it is a review, accepted findings that
+  ask for a change go back to the deliverable before sign-off (`fixesToMerge`). Go asked a tester to
+  approve a deck for the board with none of its nine accepted fixes in it.
+
+The costs: going back redrafts the deliverable and rereads it, so a run costs more and takes longer.
+It happens once. Later rounds are carried forward, except what the user accepted themselves. It
+needs Autonomous with routine decisions handed to Go, so under "Ask me" a user can still approve work
+whose accepted findings were never applied, unless they go back by hand. A workflow with chapters is
+unchanged, because it has its own revision stage. A row with no suggested change has nothing to
+carry back and stays as it is.

@@ -104,7 +104,7 @@ Deal-breakers: turnaround situations. More than 40% of revenue from one regulate
 
 **Strong positives.** Recurring or contracted revenue. A fragmented market with add-on targets. Management willing to stay.
 
-**Deal-breakers.** Turnaround situations. More than 40% of revenue from one regulated payer. Environmental liability that is not ring-fenced. Minority stakes.
+**Deal-breakers.** Turnaround situations. More than 40% of revenue from one regulated payer. Environmental liability that is not ring-fenced. Minority stakes. A deal hits one only if its teaser shows it. No teaser declares itself clear of these, so silence on a deal-breaker is a question for diligence and never holds a deal back from the best verdict.
 
-**How verdicts work.** The best verdict meets every must-have and hits no deal-breaker. A close call misses nothing outright but is silent on a must-have or depends on an adjusted figure. Anything that misses a must-have or hits a deal-breaker is ruled out, however good the rest looks.`,
+**How verdicts work.** The best verdict meets every must-have and shows no deal-breaker. A close call misses nothing outright but is silent on a must-have or depends on an adjusted figure. Anything that misses a must-have or shows a deal-breaker is ruled out, however good the rest looks.`,
 };

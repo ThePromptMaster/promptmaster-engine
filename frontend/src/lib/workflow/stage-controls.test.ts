@@ -74,3 +74,12 @@ describe('a More-menu tool says what it does (4 Nov, Lakeside)', () => {
     expect(controls.find((c) => c.id === 'mark-complete')?.does).toBeUndefined();
   });
 });
+
+describe('an Assess stage names its own buttons (6 Nov, production: Go said "Attach a data file")', () => {
+  it('lists Assess, and the sample batch only while it is offered', () => {
+    const labels = (sample: boolean) => stageControls({ more: [], options: [], assess: { sample } }).map((c) => c.label);
+    expect(labels(true)).toEqual(['Use the sample batch', 'Assess']);
+    expect(labels(false)).toEqual(['Assess']);
+    expect(stageControls({ more: [], options: [] })).toEqual([]);
+  });
+});

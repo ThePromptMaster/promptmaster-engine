@@ -79,7 +79,7 @@ import {
 } from '@/lib/workflow/engine';
 import { checkVerdict } from '@/lib/workflow/check-verdict';
 import { buildStageDigest, formatManuscript, summariseStageContent } from '@/lib/workflow/digest';
-import { appendBatch, scaleForRequest, serializeAssessment, type AssessScale } from '@/lib/workflow/assess';
+import { appendBatch, batchAwaited, scaleForRequest, serializeAssessment, type AssessScale } from '@/lib/workflow/assess';
 import { keepFound, webAccessOf } from '@/lib/workflow/web-found';
 import { goWaitingLine, objectiveNotRechecked, objectiveUnmet, executableNext } from '@/lib/workflow/objective';
 import { recordFacts, supersedeFact } from '@/lib/supabase/facts';
@@ -1717,6 +1717,12 @@ export function WorkflowWorkspace({
         // is not in front it does not move at all (production pass, 2026-10-01).
         table.scrollIntoView({ block: 'start' });
       },
+      showBatch: () => {
+        const box = document.querySelector<HTMLElement>('[data-batch-box]');
+        if (!box) return;
+        box.querySelector<HTMLElement>('textarea')?.focus({ preventScroll: true });
+        box.scrollIntoView({ block: 'start' });
+      },
       showData: () => {
         const panel = document.querySelector<HTMLElement>('[data-panel="project-data"]');
         if (!panel) return;
@@ -2108,6 +2114,9 @@ export function WorkflowWorkspace({
         proposeRows: rendererHoldsItems(stage.renderer) && proposeTargets(parseItems(stageBundles[stage.id]?.versions.at(-1)?.content) ?? [], itemSchemaFor(stage)).length > 0,
         nextStep: nextStep && nextStep.kind !== 'working' ? nextStep.label : null,
         addSections: Boolean(addSectionsFrom),
+        ...(stage.renderer === 'assess' && isEditable
+          ? { assess: { sample: Boolean(batchAwaited(stage, stageBundles[stage.id]?.versions.at(-1)?.content)?.offered) } }
+          : {}),
         go: isCurrent
           ? goPanelControls(go.run ? {
               status: go.run.status, ended_at: go.run.ended_at, pending: Boolean(go.pendingStep),

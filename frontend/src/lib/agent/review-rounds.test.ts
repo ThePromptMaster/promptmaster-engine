@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { carryNewerFixes, describeCarried, reasksCarried, CARRY_REASON } from './review-rounds';
+import { carryNewerFixes, describeCarried, fixesToMerge, reasksCarried, CARRY_REASON } from './review-rounds';
+import { templateFromDesign } from '@/lib/workflow/custom';
+import { BOOK_V1 } from '@/lib/workflow/templates/book.v1';
+import { SINGLE_OUTPUT_V1 } from '@/lib/workflow/templates/single-output.v1';
 import { serializeItems, type StageItem, type StageItemSchema } from '@/lib/workflow/stage-artifact';
 
 const schema: StageItemSchema = {
@@ -98,5 +101,74 @@ describe('going back for fixes already carried forward (19 Oct, FIELDGUIDE, afte
   it('is still asked when nothing was carried, or the user accepted a fix themselves', () => {
     expect(reasksCarried({ ...ask, question: reask, items: newerRoutine })).toBeNull();
     expect(reasksCarried({ ...ask, question: reask, items: [...carried, row('fr15', 'Add the reason.', { status_source: 'user' })] })).toBeNull();
+  });
+});
+
+describe('accepted fixes reach the deliverable before it is signed off (6 Nov, production)', () => {
+  const stage = SINGLE_OUTPUT_V1.stages.find((x) => x.id === 'summary')!;
+  const fix = (id: string, status_source = 'policy'): StageItem => ({
+    id, finding: `Finding ${id}`, suggested_change: 'Cut it', severity: 'minor', status: 'accepted', status_source,
+  } as StageItem);
+  const base = {
+    template: SINGLE_OUTPUT_V1, stage, items: [fix('a'), fix('b', 'user')], undecided: 0,
+    events: [], versions: [], policy: 'autonomous' as const, routine: 'handle' as const,
+  };
+
+  it('goes back to the deliverable, with the rows there are to apply', () => {
+    const merge = fixesToMerge(base);
+    expect(merge?.target).toEqual({ id: 'output', label: 'Output and evaluation' });
+    expect(merge?.rows.map((r) => r.id)).toEqual(['a', 'b']);
+  });
+
+  it('leaves it to the user unless the run may go back itself', () => {
+    expect(fixesToMerge({ ...base, routine: 'ask' })).toBeNull();
+    expect(fixesToMerge({ ...base, policy: 'guided' })).toBeNull();
+  });
+
+  it('waits for undecided rows', () => {
+    expect(fixesToMerge({ ...base, undecided: 1 })).toBeNull();
+  });
+
+  it('has nothing to carry when no row asks for a change', () => {
+    expect(fixesToMerge({ ...base, items: [{ ...fix('a'), suggested_change: '' }] })).toBeNull();
+    expect(fixesToMerge({ ...base, items: [{ ...fix('a'), suggested_change: 'No change needed' }] })).toBeNull();
+    expect(fixesToMerge({ ...base, items: [{ ...fix('a'), status: 'rejected' }] })).toBeNull();
+  });
+
+  it('only on the last stage: a review with a stage after it hands its rows on', () => {
+    const critique = BOOK_V1.stages.find((x) => x.id === 'critique')!;
+    expect(fixesToMerge({ ...base, template: BOOK_V1, stage: critique })).toBeNull();
+  });
+
+  it('not in a workflow with chapters, which has its own revision stage', () => {
+    const last = BOOK_V1.stages.at(-1)!;
+    expect(fixesToMerge({ ...base, template: BOOK_V1, stage: last })).toBeNull();
+  });
+
+  it('finds the deliverable of a designed workflow', () => {
+    const template = templateFromDesign({
+      name: 'Deck', description: '', deliverable: 'deck', inquiry: false,
+      stages: [
+        { label: 'Message', short_label: 'Message', kind: 'write', purpose: '', instruction: 'x', required: true, approval: '' },
+        { label: 'Slides', short_label: 'Slides', kind: 'write', purpose: '', instruction: 'x', required: true, approval: '' },
+        { label: 'Final review', short_label: 'Review', kind: 'check', purpose: '', instruction: 'x', required: true, approval: 'I approve' },
+      ],
+    }, 'custom_ex_test');
+    const last = template.stages.at(-1)!;
+    expect(fixesToMerge({ ...base, template, stage: last })?.target.label).toBe('Slides');
+  });
+
+  it('sent back once, a later round goes back only for what the user accepted', () => {
+    const events = [{ type: 'stage_returned' as const, stage_id: 'summary', created_at: '2026-11-06T10:00:00Z' }];
+    const versions = [{ content: serializeItems([fix('a')]), created_at: '2026-11-06T09:00:00Z' }];
+    // Merged last time.
+    expect(fixesToMerge({ ...base, events, versions, items: [fix('a')] })).toBeNull();
+    // Newer, and routine: carried forward instead.
+    expect(fixesToMerge({ ...base, events, versions, items: [fix('a'), fix('c')] })).toBeNull();
+    // Newer, and the user's own.
+    expect(fixesToMerge({ ...base, events, versions, items: [fix('a'), fix('d', 'user')] })?.rows.map((r) => r.id)).toEqual(['d']);
+    // But not for ever.
+    const many = [...events, ...events, ...events];
+    expect(fixesToMerge({ ...base, events: many, versions, items: [fix('d', 'user')] })).toBeNull();
   });
 });

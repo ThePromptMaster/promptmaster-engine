@@ -586,3 +586,37 @@ describe('Resume saves what was chosen in the table first (6 Nov, production boo
     expect(waitingOnTable(null, 'review')).toBe(false);
   });
 });
+
+describe('an Assess stage with nothing to judge (6 Nov, production)', () => {
+  const stage = { ...BOOK_V1.stages[0], renderer: 'assess' as const, exit_criteria: [] };
+  const input = {
+    state: initialState(BOOK_V1), stage, stageEvaluation: { canAdvance: false, unmet: [], criteria: [] } as unknown as StageEvaluation,
+    allowed: [] as string[], policy: 'autonomous' as const, outlineStageId: null,
+  };
+
+  it('asks for the batch before any planner call, in words that name the box', () => {
+    const need = needsUser({ ...input, facts: { batch: { offered: false, noun: 'deals' } } });
+    expect(need).toMatchObject({ kind: 'paste_batch', stageId: stage.id, noun: 'deals' });
+    const said = describeNeed(need!, () => 'Screen');
+    expect(said.message).toContain('Paste the deals into the box on this stage and press Assess');
+    expect(said.action).toBe('Go to the box');
+  });
+
+  it('says items when the stage has no word for them', () => {
+    const need = needsUser({ ...input, facts: { batch: { offered: false, noun: null } } });
+    expect(describeNeed(need!, () => 'Screen').message).toContain('Paste the items');
+  });
+
+  it('judges a batch it was given rather than asking', () => {
+    const facts = { batch: { offered: true, noun: 'deals' } };
+    expect(needsUser({ ...input, facts })).toBeNull();
+    expect(requiredWork({ stage, facts, stageEvaluation: input.stageEvaluation, allowed: ['assess_batch'] })?.key).toBe('assess_batch');
+  });
+
+  it('stops asking once something is judged', () => {
+    const need = { kind: 'paste_batch' as const, stageId: stage.id, noun: 'deals' };
+    const held = (facts: object) => needStillHolds(need, { ...input, facts, objective: 'x', currentStageId: stage.id });
+    expect(held({ batch: { offered: false, noun: 'deals' } })).toBe(true);
+    expect(held({})).toBe(false);
+  });
+});

@@ -32,6 +32,7 @@ const DOING: Record<string, MessageKey> = {
   run_computation: 'doing.compute',
   extract_facts: 'doing.facts',
   return_to_stage: 'doing.return',
+  assess_batch: 'doing.assess',
 };
 
 /** The stage a step works on: its target when it names one, else the stage it stands on. */

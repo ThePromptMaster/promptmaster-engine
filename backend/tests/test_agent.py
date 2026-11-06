@@ -643,6 +643,13 @@ def test_no_answer_waiting_says_nothing_about_one():
     assert "THE USER HAS JUST ANSWERED" not in user
 
 
+def test_assess_batch_is_on_the_menu_only_when_offered():
+    _, offered = build_next_action_prompt(INPUTS, STATE, ["assess_batch"], "autonomous")
+    assert "assess_batch: Assess the sample batch" in offered
+    _, not_offered = build_next_action_prompt(INPUTS, STATE, RESEARCH, "autonomous")
+    assert "assess_batch" not in not_offered
+
+
 def test_return_to_stage_says_what_it_needs():
     from promptmaster.agent_actions import ACTIONS_BY_KEY
     when = ACTIONS_BY_KEY["return_to_stage"].when

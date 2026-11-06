@@ -10,8 +10,7 @@ import {
   serializeAssessment,
   setVerdict,
   sortByVerdict,
-  verdictCounts,
-} from './assess';
+  verdictCounts, batchAwaited } from './assess';
 import { parseItems } from './stage-artifact';
 import { validateTemplate } from './validate';
 import { SINGLE_OUTPUT_V1 } from './templates/single-output.v1';
@@ -82,5 +81,20 @@ describe('the Assess stage\'s count is checked by PromptMaster, not ticked (prod
     expect(empty).toMatchObject({ satisfied: false });
     expect(empty.manual).toBeFalsy();
     expect(evaluateStage(ASSESSMENT_V1, 'assess', { ...ctx, itemCounts: { assess: 3 } }).criteria[0].satisfied).toBe(true);
+  });
+});
+
+describe('batchAwaited', () => {
+  const stage = { renderer: 'assess', assess: { item_noun: 'deals', offered_batch: 'A deal.' } };
+
+  it('says what an empty Assess stage is waiting for', () => {
+    expect(batchAwaited(stage, '')).toEqual({ offered: true, noun: 'deals' });
+    expect(batchAwaited({ renderer: 'assess' }, null)).toEqual({ offered: false, noun: null });
+  });
+
+  it('is nothing once a row is judged, and on any other stage', () => {
+    const judged = JSON.stringify({ kind: 'stage_items', items: [{ id: 'a', subject: 'A', verdict: 'Green' }] });
+    expect(batchAwaited(stage, judged)).toBeNull();
+    expect(batchAwaited({ renderer: 'prose' }, '')).toBeNull();
   });
 });

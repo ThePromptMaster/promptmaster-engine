@@ -43,7 +43,7 @@ import { deliverableDocument } from '@/lib/workflow/deliverable';
 import { actionFor, actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, ROUTINE_DEFAULT_STEP, USER_ANSWER_STEP, whatApprovalDoes } from '@/lib/agent/actions';
 import { contextWithFacts, readOutcomeProof, readStageFacts, type StageFacts } from '@/lib/agent/facts';
 import { serializeItems, stageDrafts } from '@/lib/workflow/stage-artifact';
-import { carryNewerFixes, describeCarried, reasksCarried } from '@/lib/agent/review-rounds';
+import { carryNewerFixes, describeCarried, fixesToMerge, reasksCarried, type NewerFixes } from '@/lib/agent/review-rounds';
 import { approvedAsItStands, delegableToCommit, exhaustedRepair, policyConfirmable, repairStuckNeed, repairTries, staleRepair, unrepairableStale, describeNeed, NEED_CLEARED, NEED_MOVED_ON, needStillHolds, needsUser, openRowsElsewhere, requiredWork, waitingOnTable, type NeedsUser } from '@/lib/agent/needs';
 import { assertHonestOutcome, verifyOutcome } from '@/lib/agent/outcome';
 import { outlineStageFor } from '@/lib/outline/actions';
@@ -792,6 +792,63 @@ export function useGoLoop(opts: Options) {
           break;
         }
 
+        // Newer fixes left open on the review, with the reason, instead of another trip back.
+        const carryFixes = async (fixes: NewerFixes): Promise<boolean> => {
+          const here = o.stage;
+          if (!o.appendStageVersion || !here) return false;
+          const step = await startAgentStep({
+            runId: current.id, userId: o.project.user_id, projectId: o.project.id, idx: stepsRef.current.length,
+            stageId: here.id, mode: modeForStage(o.project, here), actionKey: 'confirm_proposals',
+            params: { carried_forward: fixes.carried.map((i) => i.id) },
+            rationale: `Instead of going back again: one round of accepted fixes was already merged, and the newer ones are routine.`,
+            expectedOutcome: 'The newer fixes left open on the review, with the reason; the work goes on.', needsDecision: false, decisionQuestion: null,
+          });
+          upsertStep(step);
+          const output = describeCarried(fixes);
+          let failed = false;
+          try {
+            await o.appendStageVersion(here.id, here.label, {
+              content: serializeItems(fixes.items),
+              source_operation: 'agent_triage',
+              base_content: o.bundles[here.id]?.versions.at(-1)?.content ?? '',
+              instruction: 'Carried the newer review fixes forward under the routine-decision policy.',
+              model: o.project.model,
+              mode: modeForStage(o.project, here),
+              change_summary: output,
+            });
+          } catch {
+            failed = true;
+          }
+          upsertStep(await finishAgentStep(step.id, failed
+            ? { status: 'failed', label: null, output: 'Could not save the carried-forward fixes; asking instead.' }
+            : { status: 'succeeded', label: null, output }));
+          return !failed;
+        };
+
+        // Accepted fixes reach the deliverable before anyone is asked to sign it off (6 Nov).
+        const isLastReview = effectiveRenderer(o.stage) === 'review' && !o.stage.transitions.default_next;
+        const merge = repair || userReturn || !facts.review
+          ? null
+          : fixesToMerge({
+              template: o.template, stage: o.stage, items: facts.review.items,
+              undecided: facts.review.material.length + facts.review.routine.length,
+              events: freshEvents, versions: o.bundles[o.stage.id]?.versions ?? [], policy: current.policy, routine,
+            });
+        if (merge && !allowed.includes('return_to_stage')) allowed.push('return_to_stage');
+        // …and a later round's are carried forward, not a second trip back.
+        const laterRound = !repair && !merge && isLastReview && facts.review
+          ? carryNewerFixes({
+              question: 'go back to apply the accepted fixes',
+              isReviewStage: true, stageId: o.stage.id,
+              items: facts.review.items, schema: facts.review.schema, steps: stepsRef.current, events: freshEvents,
+              versions: o.bundles[o.stage.id]?.versions ?? [], policy: current.policy, routine,
+            })
+          : null;
+        if (laterRound && (await carryFixes(laterRound))) {
+          await o.onRefresh?.();
+          continue;
+        }
+
         // "Approve it as it stands": nothing more is checked or applied there.
         const asItStands = approvedAsItStands([...priorStepsRef.current, ...stepsRef.current], o.stage.id);
 
@@ -803,7 +860,7 @@ export function useGoLoop(opts: Options) {
           outlineStageId: outlineStageFor(o.template)?.id ?? null, largeJobAcknowledged: largeJobOkRef.current,
           runAttemptsLeft, lookupDue, routine, commitTried, asItStands, ...(openElsewhere.length ? { openElsewhere } : {}),
         };
-        const need = repair ? null : needsUser(needInput);
+        const need = repair || merge ? null : needsUser(needInput);
         if (need) {
           await setRunStatus('awaiting_decision', describeNeed(need, stageLabelFor).message, need);
           break;
@@ -823,6 +880,17 @@ export function useGoLoop(opts: Options) {
               rationale: `You chose: "${userReturn.answer.slice(0, 200)}". Going back to ${userReturn.label} to do it.`,
               expected: `The work is back on ${userReturn.label}; the stages after it are rechecked once it changes.`,
               params: { stage_id: userReturn.id, reason: `You chose: ${userReturn.answer}`.slice(0, 1_000), work: userReturn.answer.slice(0, 2_000), by_user: true },
+            }
+          : null) ?? (merge
+          ? {
+              key: 'return_to_stage',
+              rationale: `${merge.rows.length} accepted finding${merge.rows.length === 1 ? '' : 's'} on ${o.stage.label} ${merge.rows.length === 1 ? 'is' : 'are'} not in ${merge.target.label} yet. Going back to put ${merge.rows.length === 1 ? 'it' : 'them'} in before you are asked to sign off.`,
+              expected: `${merge.target.label} revised with the accepted findings; ${o.stage.label} reads it again.`,
+              params: {
+                stage_id: merge.target.id,
+                reason: `The accepted findings on ${o.stage.label} are not in ${merge.target.label} yet.`,
+                work: `Apply the ${merge.rows.length} accepted finding${merge.rows.length === 1 ? '' : 's'} from ${o.stage.label}.`,
+              },
             }
           : null) ?? (justLeftToGo ? null : requiredWork({
           stage: o.stage, facts, stageEvaluation, allowed, lookupDue, routine, commitTried, runAttemptsLeft, asItStands,
@@ -868,37 +936,9 @@ export function useGoLoop(opts: Options) {
               versions: o.bundles[o.stage.id]?.versions ?? [], policy: current.policy, routine,
             })
           : null;
-        if (newerFixes && o.appendStageVersion) {
-          const step = await startAgentStep({
-            runId: current.id, userId: o.project.user_id, projectId: o.project.id, idx: stepsRef.current.length,
-            stageId: o.stage.id, mode: modeForStage(o.project, o.stage), actionKey: 'confirm_proposals',
-            params: { carried_forward: newerFixes.carried.map((i) => i.id) },
-            rationale: `Instead of going back again: one round of accepted fixes was already merged, and the newer ones are routine.`,
-            expectedOutcome: 'The newer fixes left open on the review, with the reason; the work goes on.', needsDecision: false, decisionQuestion: null,
-          });
-          upsertStep(step);
-          const output = describeCarried(newerFixes);
-          let failed = false;
-          try {
-            await o.appendStageVersion(o.stage.id, o.stage.label, {
-              content: serializeItems(newerFixes.items),
-              source_operation: 'agent_triage',
-              base_content: o.bundles[o.stage.id]?.versions.at(-1)?.content ?? '',
-              instruction: 'Carried the newer review fixes forward under the routine-decision policy.',
-              model: o.project.model,
-              mode: modeForStage(o.project, o.stage),
-              change_summary: output,
-            });
-          } catch {
-            failed = true;
-          }
-          upsertStep(await finishAgentStep(step.id, failed
-            ? { status: 'failed', label: null, output: 'Could not save the carried-forward fixes; asking instead.' }
-            : { status: 'succeeded', label: null, output }));
-          if (!failed) {
-            await o.onRefresh?.();
-            continue;
-          }
+        if (newerFixes && (await carryFixes(newerFixes))) {
+          await o.onRefresh?.();
+          continue;
         }
         // Nor is going back for the fixes it just carried forward (19 Oct, FIELDGUIDE).
         const carriedNote = !required && (performer === 'ask' || performer === 'return') && facts.review && allowed.includes('declare_objective_complete')
