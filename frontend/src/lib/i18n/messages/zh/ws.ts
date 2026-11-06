@@ -8,6 +8,9 @@ export const zh: Record<keyof typeof en, string> = {
   'progress.leftOpen': '{count} 个未完成',
   'progress.toGo': '还剩 {count} 个',
   'progress.stillOpen': '{count} 个仍未完成',
+  'progress.objectiveNotRechecked': '目标尚未重新检查',
+  'progress.reconfirm_one': '{count} 项批准待重新确认',
+  'progress.reconfirm_other': '{count} 项批准待重新确认',
   'progress.goWaiting': 'Go 正在等待你',
 
   'ws.workflowForm': '{name}工作流 · {form}',

@@ -469,6 +469,8 @@ export const hi: Record<keyof typeof en, string> = {
   'out.objOpenNext': 'उद्देश्य अभी खुला है — अगला काम अभी किया जा सकता है: {next}',
   'out.objOpenNextWaiting': 'उद्देश्य अभी खुला है — अगला काम अभी किया जा सकता है: {next}। केवल दूसरे काम के लिए कमी: {list}',
   'out.objNotMet': 'उद्देश्य पूरा नहीं हुआ',
+  'out.objNotRechecked': 'पिछली जाँच में उद्देश्य पूरा नहीं था और तब से काम बदल गया है: इसकी दोबारा जाँच नहीं हुई',
+  'out.approvalEarlier': '{label}: आपकी स्वीकृति “{approval}” v{version} पर दी गई थी; मौजूदा संस्करण v{current} है',
   'wserr.noChange': 'तालिका में कुछ भी नहीं बदलेगा।',
   'wserr.noDrafting': 'इस वर्कफ़्लो में कोई ड्राफ़्टिंग चरण नहीं है।',
   'wserr.noPlace': 'इस चरण में अभी ड्राफ़्ट रखने की कोई जगह नहीं है। पेज फिर से लोड करें और दोबारा कोशिश करें।',

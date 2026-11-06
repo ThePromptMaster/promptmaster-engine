@@ -469,6 +469,8 @@ export const sw: Record<keyof typeof en, string> = {
   'out.objOpenNext': 'Lengo bado liko wazi — inayofuata inaweza kufanywa sasa: {next}',
   'out.objOpenNextWaiting': 'Lengo bado liko wazi — inayofuata inaweza kufanywa sasa: {next}. Kinakosekana kwa kazi nyingine tu: {list}',
   'out.objNotMet': 'Lengo halijafikiwa',
+  'out.objNotRechecked': 'Lengo halikufikiwa kwenye ukaguzi wa mwisho na kazi imebadilika tangu wakati huo: halijakaguliwa tena',
+  'out.approvalEarlier': '{label}: idhini yako “{approval}” ilitolewa kwenye v{version}; toleo la sasa ni v{current}',
   'wserr.noChange': 'Hakuna kitu kwenye jedwali kingebadilika.',
   'wserr.noDrafting': 'Mtiririko huu wa kazi hauna hatua ya kuandika rasimu.',
   'wserr.noPlace': 'Hatua hii bado haina mahali pa kuhifadhi rasimu. Pakia ukurasa upya na ujaribu tena.',

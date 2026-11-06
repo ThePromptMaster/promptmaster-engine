@@ -8,6 +8,9 @@ export const ar: Record<keyof typeof en, string> = {
   'progress.leftOpen': 'متروكة مفتوحة: {count}',
   'progress.toGo': 'متبقية: {count}',
   'progress.stillOpen': 'لا تزال مفتوحة: {count}',
+  'progress.objectiveNotRechecked': 'لم يُعد فحص الهدف',
+  'progress.reconfirm_one': 'موافقة واحدة ({count}) لإعادة التأكيد',
+  'progress.reconfirm_other': '{count} موافقات لإعادة التأكيد',
   'progress.goWaiting': 'Go بانتظارك',
 
   'ws.workflowForm': 'سير عمل {name} · {form}',

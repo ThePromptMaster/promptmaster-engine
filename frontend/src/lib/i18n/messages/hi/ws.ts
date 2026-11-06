@@ -8,6 +8,9 @@ export const hi: Record<keyof typeof en, string> = {
   'progress.leftOpen': '{count} खुले छोड़े गए',
   'progress.toGo': '{count} बाकी',
   'progress.stillOpen': '{count} अभी खुले',
+  'progress.objectiveNotRechecked': 'उद्देश्य की दोबारा जाँच नहीं हुई',
+  'progress.reconfirm_one': '{count} स्वीकृति की फिर से पुष्टि करनी है',
+  'progress.reconfirm_other': '{count} स्वीकृतियों की फिर से पुष्टि करनी है',
   'progress.goWaiting': 'Go आपकी प्रतीक्षा कर रहा है',
 
   'ws.workflowForm': '{name} वर्कफ़्लो · {form}',
