@@ -736,6 +736,25 @@ L-153 – L-160).
 | Go's progress, Run details, the call ceiling, run cost (#500; L-159) | `lib/agent/doing.ts` `doingNow`; `go-control.tsx` (`doing`, `calls`, `data-run-details`); `model-usage.ts` run meter (`startRunMeter`, `runMeterCalls`, `takeOutsideCost`); `policy.MAX_MODEL_CALLS_PER_CHAIN`; planner calls tagged `go:plan`; `project-cost.goShare` |
 | First use; the sample (#501; L-160) | `go.intro`, landing copy, `setup.optionalTag`, `door.allOptional`, `start.creatingNow`; `components/projects/sample-field.tsx`, `projects.sample_output` (`20261126000000`), `PMInput.sample_output`, `project_context.sample_block` |
 
+### Curated examples and first use (2026-11-06)
+
+A catalog in `lib/projects/examples/`, public previews at `/examples` (outside the `proxy.ts`
+matcher), and `startExample()`. An example is a `DesignedWorkflow` written by hand, so it goes
+through `templateFromDesign`, `validateTemplate` and an unlisted `publishUserTemplate`, and nothing
+downstream can tell it from a designed project. Its words are stored in English and shown from the
+dictionaries: `lib/i18n/templates.ts` files every user's `custom_ex_<key>_<suffix>` under
+`example_<key>`.
+
+| What | Where |
+|---|---|
+| The sample's first stage, no model involved | `source_operation: 'example_prewritten'` (`PREPARED_OPERATION`) |
+| Nothing spent until a press | `projects.example_key` holds auto-draft (`use-stage-generation.ts`); `readStageFigures` skips a prepared version |
+| A batch offered in the paste box | `AssessSpec.offered_batch`, read from the stage's own spec, so no renderer branches on a workflow |
+| A real slide deck | `lib/export/pptx-export.ts`, offered for any deliverable with at least three slide-level headings |
+| A link that survives sign-in | `rememberNext` / `takeRememberedNext` (`lib/auth/next-path.ts`), because the callback address is fixed in production |
+| A way in on a first visit | `components/examples/prompty-help.tsx`, after the beta notice |
+| Whether any of it helps | `lib/admin/start-funnel.ts`, derived from existing rows, on `/admin` |
+
 ## Extension points
 
 These are the seams the system was built to be extended at. Working with them is

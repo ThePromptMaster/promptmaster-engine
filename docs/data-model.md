@@ -12,7 +12,7 @@ future change does not undo a guarantee without noticing.
 
 | Table | What it holds |
 |---|---|
-| `projects` | One row per project. Setup fields, workflow key, `stage` cursor, `revision`, soft-delete. |
+| `projects` | One row per project. Setup fields, workflow key, `stage` cursor, `revision`, soft-delete. `example_key` marks a curated example's sample (L-180). |
 | `artifacts` | One per stage per project (`kind` + `stage_id`). Holds `current_version_id`, `version_count`, `long_form`, `outline_draft`, `summary`. |
 | `artifact_versions` | Append-only version history. Content, prompt, model, mode, `finish_reason`, `user_rating`, `continuity_snapshot`, `colour_scheme` (palette at creation), `colour` (the user's choice of button colour) and `background_colour` (the button's fill and the stage tint; null follows `colour`) — the display fields besides the rating that may change. |
 | `evaluations` | Alignment / drift / clarity / completeness per version, with `needs_realignment` as a generated column. |

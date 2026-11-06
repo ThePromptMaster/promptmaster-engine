@@ -3058,6 +3058,62 @@ at start and in the setup) reaches every prompt as THE USER'S SAMPLE — matched
 style, never a source — up to 12,000 characters. (Corrected 6 Nov: until then it was dropped when
 a project came through the recommended setup or the conversation, and chapter and outline calls
 never carried it. All four ways in and every writer now do.) It is not shown in the workspace's
-own setup panel yet; it is set at start. The landing walkthrough is proposed, not built, until Sean picks
-the audience and workflow.
+own setup panel yet; it is set at start. The guided walkthrough and the video are still proposed,
+not built; the landing page's curated examples are L-180.
+
+### L-180 — Curated business examples (2026-11-06)
+
+Four examples (deal screening, investment memo, business analysis, slide deck) on invented
+material, public at `/examples`. Each is a workflow written by hand in the designer's form and
+saved per user, unlisted, the way a designed workflow is, so no seed migration and nothing added
+to the picker. Costs of that choice:
+
+- The recommender does not know them. Asking for an investment memo in your own words gets a
+  designed workflow, not this one. Only a card or a direct link reaches an example's workflow.
+- Each start publishes a template row for that user, as a designed project does. They cannot be
+  deleted (the trigger allows only `status` and `listed`), and they are unlisted.
+- Sample material and each workflow's prompts are in English in every language. Stage names and
+  guidance are translated at display; the project writes in the user's language. A long sample
+  in English next to a Spanish interface is the visible seam.
+- Nothing drafts itself on a sample (`projects.example_key`), so a stage opens blank with "Draft
+  this stage". That is deliberate (the client: exploring should not start paid runs unasked), and
+  it differs from every other project. The preview says what uses credit; chat, a brief edit
+  (`use-brief-change.ts`) and Check still spend when pressed.
+- A copy of a sample keeps `example_key`, so a copy holds too.
+- The samples are built to contain contradictions, and `examples.test.ts` keeps the arithmetic
+  true. Whether a model catches them is a property of the run, not a guarantee.
+
+### L-181 — A designed workflow's success criterion before 6 Nov (2026-11-06)
+
+`publishUserTemplate` and `toTemplate` left out `execution`, so the criterion and stop conditions
+set when a workflow was designed never reached Go's planner or the objective check once the
+project pinned it. Fixed for new rows. Rows saved earlier have nothing to read and behave as they
+did; template rows are immutable, so they stay that way.
+
+### L-182 — PowerPoint export is text, one table a slide (2026-11-06)
+
+`lib/export/pptx-export.ts` reads the deliverable's Markdown: the shallowest heading level used at
+least three times is a slide, with its bullets, one table and speaker notes. No charts, pictures
+or theme, one Arial layout, and text shrinks to fit rather than splitting a slide. A document with
+fewer than three such headings is not offered it. Any deliverable with enough headings is, so a
+long memo can be downloaded as a poor deck. Checked with a unit test that reads the file back and
+with macOS Quick Look; a person must open one in PowerPoint and Google Slides on each change.
+
+### L-183 — Prompty is a still and a bubble, not a guide (2026-11-06)
+
+A still of the landing page's Spline robot (`public/prompty.png`) with a dismissible bubble on the
+landing page, the start screen and an empty project list. The repo does not say where that Spline
+scene came from, so the client should confirm we may use it as a mascot. Seen once per browser
+(`localStorage`), not per account, so it opens again on a new device. It does not point at anything
+on the page, follow project state or narrate. The guided tour and the video are estimated, not
+built.
+
+### L-184 — How people start is a direction, not a measurement (2026-11-06)
+
+The `/admin` panel derives from projects, events, artifacts and Go runs, with no telemetry. So it
+cannot see someone who opened a preview and left, or a visit that created nothing. Soft-deleted
+projects vanish after the 30-day purge, so a longer window undercounts. A first day runs from a
+person's first event to their last, so it misses reading time after the last press. Numbers are
+small enough that one person moves them, and people who click an example choose to, so an example's
+rates are not comparable to own-work rates as an effect of the example.
 
