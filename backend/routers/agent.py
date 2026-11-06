@@ -277,6 +277,8 @@ async def api_web_search(req: WebSearchRequest, client: OpenRouterClient = Depen
     plugin; nothing stored here. Refused unless the project's switch is on."""
     if req.web_access != "on":
         raise HTTPException(status_code=403, detail="Web access is off for this project. Turn it on to search the web.")
+    if req.inputs.third_party:
+        raise HTTPException(status_code=403, detail="This project holds material other people wrote, so it does not search the web.")
     try:
         result = await search_web(client, req.model or None, req.inputs, req.query, req.purpose, req.max_results)
     except OpenRouterError as e:

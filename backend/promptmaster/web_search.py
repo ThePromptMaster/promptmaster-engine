@@ -285,7 +285,9 @@ async def with_web(
     as they were. A failed decision or search never costs the work: it is done
     from the project, and `web_note` says so.
     """
-    if web_access != "on":
+    # Never with other people's words in the prompt: injected text must not be able
+    # to send a search (the client's call, 4 Nov).
+    if web_access != "on" or inputs.third_party:
         return inputs, WebUse()
     try:
         system, user = build_work_decision_prompt(inputs, task, current)

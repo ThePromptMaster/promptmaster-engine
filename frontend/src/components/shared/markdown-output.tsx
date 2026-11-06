@@ -114,8 +114,15 @@ export function MarkdownOutput({ content }: MarkdownOutputProps) {
           </span>
         );
       }
-      // eslint-disable-next-line @next/next/no-img-element
-      return <img src={raw} alt={alt ?? ''} />;
+      // No image from anywhere else. A browser fetches it the moment it is drawn, so
+      // text that talks a model into writing one could send what the project holds
+      // to any address, in the URL, with no click (the client's call, 4 Nov: mail is
+      // about to reach prompts).
+      return (
+        <span data-image-not-loaded className="block rounded-lg bg-[var(--surface-container-low)] px-4 py-3 text-label text-[var(--on-surface-variant)]">
+          {t('pnl.image', { alt: alt ?? '' })}
+        </span>
+      );
     },
   };
   return (

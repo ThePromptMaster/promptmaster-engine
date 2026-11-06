@@ -55,6 +55,7 @@ export function inputsFrom(project: Project, citing = ''): PMInput {
     output_format: project.output_format,
     context: project.context ?? '',
     ...(project.sample_output?.trim() ? { sample_output: project.sample_output } : {}),
+    ...(project.third_party?.length ? { third_party: project.third_party } : {}),
     facts: factsForRequest(project.facts),
     ...(project.sources?.some((s) => !s.retired_at) ? { sources: sourcesForRequest(project.sources, citing) } : {}),
     ...(project.applied_instructions?.length

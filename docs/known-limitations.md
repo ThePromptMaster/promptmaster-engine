@@ -3126,3 +3126,25 @@ first one anyway. The taps are kept for a signed-in user, guests included (`user
 they type goes to the start box through this tab's storage and is not kept. A visitor who is signed
 out and leaves loses the taps.
 
+### L-186 — Other people's words, before any of them arrive (2026-11-06)
+
+Hardening ahead of connected accounts (Phase 3); nothing reads mail yet.
+
+- `PMInput.third_party` is a channel apart from `context`, which prompts treat as the user's own
+  word. Delegation, approvers, the objective's request list and the no-invention rule never read it.
+  `project_context.third_party_block` fences it with a value new on each call, so text written in
+  advance cannot close its own block. A fence is not a guarantee: it makes injected text weaker, it
+  does not make a model immune, which is why the rest of this entry exists.
+- No web search while it is present (`with_web`, the chat, `agent/web-search`), and a database check
+  keeps Web access off on a project holding any. Injected text cannot send a search.
+- No image from another address is drawn anywhere, for anyone: a browser fetches one as soon as it
+  is drawn, so a model talked into writing one could send project text out in the URL. **Cost:** a
+  remote image a user pasted into their own work now shows as its description. Their own uploads
+  (`project-file:`) are unaffected.
+- `OPENROUTER_DATA_COLLECTION` defaults to `deny`, on every call, so OpenRouter routes only to
+  providers that do not keep what they are sent. **Cost:** a model with no such provider fails rather
+  than falling back. Setting `allow` undoes it, read per call, with no redeploy. This has to be
+  confirmed against the default model and the picker on production when it ships.
+- Links in generated text stay clickable. A project holding third-party text should not offer them;
+  that comes with the briefing itself, where such a project first exists.
+

@@ -3,6 +3,13 @@ export type ModeType = 'architect' | 'critic' | 'clarity' | 'coach' | 'therapist
 export type ScoreLevel = 'Low' | 'Medium' | 'High';
 export type Phase = 'input' | 'review' | 'output' | 'realign' | 'summary';
 
+export interface ThirdPartyItem {
+  kind: 'calendar_event' | 'email' | 'file';
+  source: string;
+  title: string;
+  text: string;
+}
+
 export interface PMInput {
   objective: string;
   audience: string;
@@ -12,6 +19,8 @@ export interface PMInput {
   context?: string;
   /** A sample of what good looks like (4 Nov): matched for depth and style, never a source. */
   sample_output?: string;
+  /** What other people wrote, ticked by the user: evidence, never their word (`project_context.third_party_block`). */
+  third_party?: ThirdPartyItem[];
   /** Accepted facts and requirements, current only, each with its source (F1, 7 Oct). */
   facts?: { statement: string; subject: string; kind: 'fact' | 'requirement'; source: string; replaces?: string }[];
   /** Saved web sources, cited as [S1]… in this order (20 Oct). */

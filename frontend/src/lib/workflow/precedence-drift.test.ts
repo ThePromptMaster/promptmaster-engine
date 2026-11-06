@@ -10,7 +10,7 @@ const PY = readFileSync(join(process.cwd(), '..', 'backend', 'promptmaster', 'pr
 describe('the precedence order exists twice and agrees', () => {
   it('has the same keys in the same order as the backend', () => {
     const block = PY.slice(PY.indexOf('PRECEDENCE:'), PY.indexOf('PRECEDENCE_TEXT'));
-    const py = [...block.matchAll(/\("([a-z]+)",/g)].map((m) => m[1]);
+    const py = [...block.matchAll(/\("([a-z_]+)",/g)].map((m) => m[1]);
     expect(py.length).toBeGreaterThan(5);
     expect([...PRECEDENCE]).toEqual(py);
   });
