@@ -391,9 +391,9 @@ Since 2026-10-03 a project can hold images (PNG, JPEG, WebP, GIF, up to 5 MB eac
 a link that expires.
 
 What is not done:
-- **No model sees the pixels.** A prompt is told each image's caption and the exact text
-  that places it, so placement is only as good as the caption. Vision input would need
-  multimodal content in `llm_client` and a cost decision.
+- **No writer sees the pixels.** A prompt is told each image's caption and the exact text
+  that places it, so placement is only as good as the caption. Since 6 Nov the one exception
+  is the side chat, for the next message after an attachment (L-172).
 - **Chapters cannot be edited by hand.** They get images only when the model places them
   while drafting or revising. Prose stages also have an "Insert image" button in the editor.
 - **Exports:**
@@ -573,7 +573,7 @@ direction. Two things still count as work Go may do first:
 | L-25 | Revision snapshots have no one-click restore into sections | open |
 | L-26 | Go's planner reads a 6,000-character opening of the manuscript on review stages | accepted |
 | L-27 | The user's brief has no immutable copy; edits replace it in place | accepted |
-| L-28 | Images placed by caption; no model sees pixels; plain exports | accepted |
+| L-28 | Images placed by caption; only the side chat's next message sees pixels; plain exports | accepted |
 | L-29 | User-designed workflows: no chapter stages, no rename/archive | accepted |
 | L-30 | Exploration rounds start by the user; earlier rounds summarised | accepted |
 | L-31 | Exit criteria enforced by the app, not the database | accepted |
@@ -2904,6 +2904,10 @@ so its approval question has no newer version behind it and is stopped as a repe
 why ("Option B is already in bold … Do you approve this version?"); the user ticks the approval,
 or asks for a real change.
 
+Updated in #513 and #515 (6 Nov; L-167). A same-button match quotes only the current question and asks
+it, with an answer box. A typed answer re-arms the guard. Words alone count as a repeat only after a move
+on the stage, or at 70% overlap straight after an answer.
+
 ### L-151 — An answer given to Go reopens nothing on the stage it was given on (2026-11-04)
 
 Shipped in #483, corrected in #484.
@@ -3059,3 +3063,147 @@ style, never a source — up to 12,000 characters. It is not shown in the worksp
 panel yet; it is set at start. The landing walkthrough is proposed, not built, until Sean picks
 the audience and workflow.
 
+### L-161 — One deliverable: what the user downloads is what Go judged (2026-11-06)
+
+Shipped in #505 and #509; the finish dialog's name in #522. A book test had two copies of the book: the review's corrections went
+into the finished stage, while the export, the objective check and "Have Go fix it" used the
+chapters. `deliverableDocument` (`lib/workflow/deliverable.ts`) now chooses one by its content: a
+later required prose stage holding at least 80% of the chapters' words is what is judged, repaired
+and exported. Under 15% it is a note and goes after the chapters. Between the two the chapters stay,
+and the finished screen says the later stage was not used, so no text is lost or doubled.
+`deliverableStage` is unchanged, and the system Book and Research workflows behave as before. Reads
+before saving evidence and before judging are fresh.
+
+The cost: the choice goes by word count, so a later stage that holds the same length of different
+text would be taken as the book. A finished stage holds about 27,000 words. Past that the chapters
+stay the deliverable, with the notice, and accepted findings are not carried into them; a long book
+needs a revision stage over the chapters, as the Book workflow has.
+
+### L-162 — Repairs stop after two tries; the check says what it read (2026-11-06)
+
+Shipped in #507. Each press of "Have Go fix it" used to count as a fresh start, so nothing limited
+them: five presses rewrote the book five times at about $1.60 each. After two tries since the user
+last changed anything, no repair is offered. The user can open it, tell Go how, or finish with it
+stated as a limitation. The objective check reads up to 120,000 characters, each section keeping its
+opening, and records the version and the characters read; the notice shows them. The deliverable
+check reads 200,000 and says so when it clips.
+
+The cost: a repair that would have worked on a third try is not offered until the user does
+something, and past 120,000 characters the end of a section is not read. The limit has unit tests;
+as of this entry it has not fired on production, because the rerun was met at the first check.
+
+### L-163 — The sidebar caption names stale approvals and an out-of-date check (2026-11-06)
+
+Shipped in #508. "6 done · 0 to go" counted closed stages. `outstandingWork` now adds "objective not
+rechecked" (blocking) when a verdict was overtaken by a later version, and "approval on an earlier
+version" (not blocking) when the content approved has since changed. Go's "met" line names stale
+approvals. They do not block, because an approval that stays standing across a small change is a
+decision the user may already be happy with.
+
+### L-164 — A deliverable written in parts: the last part sees the whole; the note cites this version (2026-11-06)
+
+Shipped in #510 and #511. Above 5,000 words a repair goes in parts. The part with a note was shown
+the chapters labelled "Work from this text", so it reported problems the other parts had just fixed.
+That part now goes last, with the revised whole text (`whole_text`, up to 120,000 characters in the
+prompt) and without the first draft. The writer is told to quote this document. Passages a note
+quotes that this version does not hold go to the deliverable check as `note_quotes`, and saying the
+text was not available while it is there is an issue.
+
+The cost: quotes are matched as exact text, so a note may legitimately quote an old passage, which is
+why the check judges them rather than code rejecting them. The phrases that recognise a review note
+and a claim of no access are English only, so in another language these two checks do not fire.
+
+### L-165 — The chapter plan leaves later stages' work to them; a chapter the brief names is its own section (2026-11-06)
+
+Shipped in #511 and #519. A review note written as section 8 of the plan could never have seen the
+chapters. The plan is now told the later stages' labels and leaves their work to them, and a chapter
+or part the brief names is its own section whatever the target count says. This is a prompt rule, not
+a parser filter, because "Literature review" is a real section, so a model can still break it. The
+user sees the plan before approving it.
+
+### L-166 — A word limit that finds nothing to count says "not verified" (2026-11-06)
+
+Shipped in #512. A bold line holding "email" counted as the Email heading, so a section of `---` was
+counted as 0 words and passed. A bold sentence (eight or more words ending in punctuation) is no
+longer a heading, the first naming heading with words under it wins, and zero words under an upper
+limit is "not verified". An empty section under a minimum, or "0 questions", still fails. The
+eight-word line is a judgement: a shorter bold sentence naming the part is still read as its heading.
+
+### L-167 — "Do whatever is best" decides, in the text (2026-11-06)
+
+Shipped in #513. Updates L-150. A delegated answer wrote one step and nothing else: the next moves
+were code-required checks that never read it, and the document kept "Unresolved". Now, when the
+question's words are in the text and the choice is not the user's own, the stage reopens through a
+`brief_changed`, Go decides, states it as settled and says "Chosen: …" in its note to the user, and a
+fact is recorded as "chosen by Go when you left it to Go". Otherwise Go says to choose now or says
+what is left. The button is hidden on approval questions.
+
+L-150's same-button match now quotes only the current question, not the earlier one, and pauses with
+an answer box. A typed answer re-arms the guard. Words alone count as a repeat only after a move, or
+at 70% overlap: on 6 Nov the guard stopped a follow-up with "0 moves". Whether the text can settle it
+goes by the question's words, so a reworded question can fall on the wrong side, and then Go asks.
+A kept question drops out of the run's account once answered (#542), on the same word overlap. A
+same-button stop has unit tests and did not occur on the production pass.
+
+### L-168 — A report recorded from the chat stays out of the work until the user says otherwise (2026-11-06)
+
+Shipped in #514; wording in #536. Two clicks put a simulated report into an approved pack, and neither said so. Facts
+recorded from an Ask reply, when every added fact is one, are judged but only proposed: "This may
+affect X. Nothing has changed." with "Update X with this" and "Keep on record only". The same number
+of clicks updates the work. A superseding fact and a hand-added fact reopen as before. A pasted report
+or claim is not offered as a fact unless asked, and if it is recorded it is marked `reported` and every
+prompt and the facts panel say "reported and not verified". A finished project judges no change until it
+is reopened, and says that rather than "nothing relied on these".
+
+The cost: this is judged by where the fact came from, not by what it says. A real change told to the
+side chat now takes one more click, and a writer is told to keep a reported fact out rather than being
+prevented from using it.
+
+### L-169 — The side chat reads the run from the record (2026-11-06)
+
+Shipped in #515; the cost in #541. The chat's picture of a run came from the page, which could lag. The latest run and
+its steps are read from the database when a message is sent, with last activity, moves and cost, across
+up to the last four earlier windows and this one. If that read fails the chat says so rather than saying there
+is no run.
+
+### L-170 — What goes with "Make it a project" is capped, the conversation first (2026-11-06)
+
+Shipped in #516. A long attachment fit alone and any conversation beside it tipped the request past
+200,000 characters. The conversation goes first, room is kept for data-file lines, and a document that
+is cut is named on the screen. `generate-setup` still reads only 12,000 characters of it, the front
+door reads 40,000, and "Change it" does not read attachments.
+
+### L-171 — The next-step bar says what is being written (2026-11-06)
+
+Shipped in #517. Drafting used to show only in the stage's own panel, so a tester saw no sign of work
+from the top of the page. The phone's bottom bar is unchanged.
+
+### L-172 — The side chat reads what is attached to the next message (2026-11-06)
+
+Shipped in #518. Updates L-28. The chat request carried no files, so 11 uploaded screenshots got "nothing
+arrived". A document's text and images now go with the next message, and images are reduced in the browser
+(1,568 pixels, JPEG). A message carries up to 60,000 characters of text and 3 MB of images, under Vercel's
+4.5 MB request limit, and what does not fit is named as not read. The chat also knows what the project holds:
+up to 40 files, by name, kind and short preview.
+
+The cost: this is the one place a model sees pixels; drafts and Go still do not. An image is sent once, with
+that message, and later questions rely on what the chat said about it; it says so if asked for more. A message
+with 11 screenshots and a short file cost $0.35 on production; that goes on the usage row like any other.
+
+### L-173 — An outside agent cannot propose a change or read its status (2026-11-06)
+
+Not built; see `docs/assessments/2026-11-06-book-deliverable-and-agents.md`. Everything goes through the
+browser with the signed-in user's token: no API keys, no agent identity (`actor` is `user | system`), no
+status endpoint, no webhooks and no outbound email. Separate authorization of a customer email has to be
+enforced by whatever holds the email credentials, because PromptMaster cannot enforce what it does not
+execute.
+
+### L-174 — Resume saves what was chosen in a findings table (2026-11-06)
+
+Shipped in #522. Decisions in a findings table stay in the page until "Save as new version", at the bottom of a
+long table. With Go waiting on those rows, Resume read them as undecided and stopped again at once, with the same
+words. Resume now saves them first when Go is waiting on the table of the stage on screen, and shows the error if
+the save fails. Unsaved prose edits behave as before: Resume does not save them.
+
+The cost: the path has a unit test on the condition and no test through the hook, and it has not yet run on
+production, because no later run stopped on major findings.
