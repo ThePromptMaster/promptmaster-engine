@@ -396,6 +396,10 @@ export default function LandingPage() {
           <p className="text-xs text-white/60">
             {t('land.footer')}
           </p>
+          <p className="flex items-center gap-3 text-xs text-white/60">
+            <Link href="/privacy" className="hover:text-white">{t('legal.privacy')}</Link>
+            <Link href="/terms" className="hover:text-white">{t('legal.terms')}</Link>
+          </p>
           <LocaleSwitch tone="dark" />
         </div>
       </footer>

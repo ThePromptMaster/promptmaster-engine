@@ -65,6 +65,8 @@ export const sw: Record<keyof typeof en, string> = {
   "ex.startHere": "Anza hapa",
   "ex.askPlate": "Una nini cha kufanya wiki hii? (hiari)",
   "ex.startFromPlate": "Anza na hili",
+  "legal.privacy": "Faragha",
+  "legal.terms": "Masharti",
   "ex.investment_memo.title": "Waraka wa uwekezaji",
   "ex.investment_memo.blurb": "Geuza muhtasari wa muuzaji na faili la fedha kuwa waraka wa kamati, namba zikiwa zimekokotolewa na kila dai likiwa limekaguliwa dhidi ya data.",
   "ex.investment_memo.gets": "Waraka unaoanza na pendekezo na bei, unaosema wapi muhtasari na data vinatofautiana, na unaoorodhesha kile uchunguzi lazima uamue.",

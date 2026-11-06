@@ -58,6 +58,7 @@ does not exist in the repository**; and `[db.network_restrictions]` is disabled 
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | Public. |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Public, RLS-constrained. |
 | `NEXT_PUBLIC_AUTH_PROVIDERS` | No | Comma-separated sign-in providers to offer beside Google: `azure`, `github`, `custom:yahoo`. Set one only after its app exists and Supabase is configured for it; unset shows Google alone. Read at build, so a change needs a redeploy. |
+| `NEXT_PUBLIC_CONTACT_EMAIL` | For Google's review | The address `/privacy` and `/terms` give. Unset, they point at the feedback form. Read at build. |
 | `NEXT_PUBLIC_API_URL` | Yes in production | The backend Vercel URL. Defaults to `http://localhost:8000` — **if it is unset in production the app silently calls localhost and every generation fails in the browser.** |
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | **Secret. Bypasses RLS.** Used only by `/api/jobs/drain`. Never expose it to the client; never prefix it `NEXT_PUBLIC_`. |
 | `CRON_SECRET` | Yes | The bearer token Vercel Cron presents to `/api/jobs/drain`. Compared in constant time; an unset value cannot match, so the cron simply stops working. |

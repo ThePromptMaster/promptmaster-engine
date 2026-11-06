@@ -3148,3 +3148,14 @@ Hardening ahead of connected accounts (Phase 3); nothing reads mail yet.
 - Links in generated text stay clickable. A project holding third-party text should not offer them;
   that comes with the briefing itself, where such a project first exists.
 
+### L-187 — Privacy and terms pages are unreviewed, and in English (2026-11-06)
+
+`/privacy` and `/terms` exist because Google's review requires a policy on the verified domain and
+because connected accounts need one. They are written from what the code does, not from a template,
+and **counsel has not reviewed them**. Section 9 of the contract requires counsel review of the beta
+notice, which still tells users not to enter personal data; that notice and connected accounts
+cannot both stand for a general audience, so connections stay behind a pilot list until it is
+reviewed. A change to what is stored or where it goes must change `/privacy` in the same pull request.
+There is no self-serve account deletion: the page says to write to us. `NEXT_PUBLIC_CONTACT_EMAIL` is
+the address it gives; unset, it points at the feedback form, which Google will not accept.
+

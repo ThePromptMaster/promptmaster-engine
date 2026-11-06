@@ -65,6 +65,8 @@ export const hi: Record<keyof typeof en, string> = {
   "ex.startHere": "यहाँ से शुरू करें",
   "ex.askPlate": "इस हफ़्ते आपके पास कौन सा काम है? (वैकल्पिक)",
   "ex.startFromPlate": "इससे शुरू करें",
+  "legal.privacy": "निजता",
+  "legal.terms": "शर्तें",
   "ex.investment_memo.title": "निवेश ज्ञापन",
   "ex.investment_memo.blurb": "विक्रेता के टीज़र और वित्तीय फ़ाइल से समिति के लिए ज्ञापन बनाएँ: आँकड़े निकाले हुए और हर दावा डेटा से जाँचा हुआ।",
   "ex.investment_memo.gets": "ऐसा ज्ञापन जो सिफ़ारिश और कीमत से शुरू होता है, बताता है कि टीज़र और डेटा कहाँ अलग हैं, और गिनाता है कि जाँच-पड़ताल में क्या तय होना है।",
