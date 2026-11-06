@@ -1318,6 +1318,22 @@ function WorkflowSlice({ template }: { template: WorkflowTemplate }) {
 const ADMIN_OVERVIEW: AdminOverview = {
   windowDays: 30,
   generatedAt: new Date(Date.now() - 4 * 60_000).toISOString(),
+  startFunnel: {
+    lines: [
+      { kind: 'own', guest: false, people: 6, projects: 9, firstDraft: 7, usedGo: 3, finished: 2, finishedEarly: 1 },
+      { kind: 'own', guest: true, people: 4, projects: 4, firstDraft: 2, usedGo: 0, finished: 0, finishedEarly: 0 },
+      { kind: 'example', guest: true, people: 3, projects: 4, firstDraft: 2, usedGo: 1, finished: 1, finishedEarly: 0 },
+    ],
+    examples: [
+      { key: 'deal_screening', people: 2, projects: 2, firstDraft: 2, usedGo: 0, finished: 1 },
+      { key: 'investment_memo', people: 2, projects: 2, firstDraft: 0, usedGo: 1, finished: 0 },
+    ],
+    triedExample: 3,
+    ownAfterExample: 1,
+    people: 12,
+    cameBack: 3,
+    medianFirstDayMinutes: 14,
+  },
   totals: {
     calls: 1_284,
     tokensIn: 3_940_112,

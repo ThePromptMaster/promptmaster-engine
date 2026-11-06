@@ -108,6 +108,8 @@ export interface AdminOverview {
   errorTally: AdminErrorTally[];
   /** FR-22: beta feedback, newest first. Not windowed — see the route. */
   feedback: AdminFeedbackRow[];
+  /** How people start and how far they get. Absent if it could not be read; `warnings` says why. */
+  startFunnel?: import('./start-funnel').StartFunnel;
   /**
    * Set when a section could not be read — a missing table, a permissions
    * problem. Surfaced rather than swallowed: an admin page that silently shows

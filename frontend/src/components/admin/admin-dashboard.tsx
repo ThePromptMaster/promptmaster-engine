@@ -90,6 +90,7 @@ export function AdminDashboard({ overview, onWindowChange, refreshing, onRefresh
       </section>
 
       <FeedbackPanel overview={overview} />
+      <StartsPanel overview={overview} />
       <FailedJobsPanel overview={overview} />
       <UsagePanel overview={overview} />
       <OperationsPanel overview={overview} />
@@ -521,6 +522,80 @@ function UsagePanel({ overview }: { overview: AdminOverview }) {
 
 const seconds = (ms: number | null) => (ms === null ? '—' : ms < 10_000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.round(ms / 1000)} s`);
 const share = (x: number) => (x === 0 ? '—' : `${Math.round(x * 100)}%`);
+
+const sentence = (key: string) => {
+  const words = key.replace(/_/g, ' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
+};
+
+/**
+ * How people start and how far they get (4 Nov: "you're seeing people hop on it and
+ * it's like they're hopping off again"). Counted from what happened, so history
+ * counts too. Too few people to read as more than a direction, and it says so.
+ */
+function StartsPanel({ overview }: { overview: AdminOverview }) {
+  const funnel = overview.startFunnel;
+  if (!funnel) return null;
+  const wayIn = (kind: 'own' | 'example', guest: boolean) =>
+    `${kind === 'own' ? 'Their own work' : 'An example'}, ${guest ? 'as a guest' : 'with an account'}`;
+  return (
+    <Panel
+      title="How people start"
+      description={`Projects started in the last ${overview.windowDays} days and how far they got. Copies, imports and admins are not counted. With this few people, one person moves these a lot: read them as a direction.`}
+    >
+      {funnel.lines.length === 0 ? (
+        <EmptyState icon="info">Nobody started a project in this period.</EmptyState>
+      ) : (
+        <>
+          <TableScroll>
+            <table className="w-full min-w-[42rem] border-collapse">
+              <thead>
+                <tr className="bg-[var(--surface-container)]">
+                  <Th>Way in</Th>
+                  <Th align="right">People</Th>
+                  <Th align="right">Projects</Th>
+                  <Th align="right">First draft</Th>
+                  <Th align="right">Used Go</Th>
+                  <Th align="right">Finished</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {funnel.lines.map((l) => (
+                  <tr key={`${l.kind}:${l.guest}`} className="odd:bg-[var(--surface-container-lowest)]">
+                    <Td>{wayIn(l.kind, l.guest)}</Td>
+                    <Td align="right">{formatTokens(l.people)}</Td>
+                    <Td align="right" muted>{formatTokens(l.projects)}</Td>
+                    <Td align="right" muted>{formatTokens(l.firstDraft)}</Td>
+                    <Td align="right" muted>{formatTokens(l.usedGo)}</Td>
+                    <Td align="right" muted>
+                      {formatTokens(l.finished)}
+                      {l.finishedEarly > 0 && <span className="ms-1 text-label text-[var(--on-surface-variant)]">({l.finishedEarly} early)</span>}
+                    </Td>
+                  </tr>
+                ))}
+                {funnel.examples.map((e) => (
+                  <tr key={e.key} className="odd:bg-[var(--surface-container-lowest)]">
+                    <Td muted>{sentence(e.key)}</Td>
+                    <Td align="right" muted>{formatTokens(e.people)}</Td>
+                    <Td align="right" muted>{formatTokens(e.projects)}</Td>
+                    <Td align="right" muted>{formatTokens(e.firstDraft)}</Td>
+                    <Td align="right" muted>{formatTokens(e.usedGo)}</Td>
+                    <Td align="right" muted>{formatTokens(e.finished)}</Td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableScroll>
+          <p className="px-5 py-3 text-label text-[var(--on-surface-variant)]">
+            {funnel.cameBack} of {funnel.people} came back on another day
+            {funnel.medianFirstDayMinutes !== null ? `; the median first day lasted ${funnel.medianFirstDayMinutes} min` : ''}.
+            {funnel.triedExample > 0 ? ` ${funnel.ownAfterExample} of ${funnel.triedExample} who tried an example went on to their own work.` : ''}
+          </p>
+        </>
+      )}
+    </Panel>
+  );
+}
 
 /** E1 (5 Oct): where the spend went — by Go move or route — how long calls took, and how much was rework. */
 function OperationsPanel({ overview }: { overview: AdminOverview }) {
