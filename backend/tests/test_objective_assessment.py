@@ -702,3 +702,12 @@ class TestLongDocumentRead:
         assert 0 < out.read_chars < out.total_chars
         prompt = client.generate_json.await_args.kwargs["prompt"]
         assert "OPENING12 " in prompt
+
+
+def test_a_count_of_each_chapter_answers_a_requirement_about_each_chapter():
+    from promptmaster.objective_assessment import _measured_for
+
+    counted = "Each chapter: roughly 600–800 words — 6 chapters, 690–787 words each"
+    assert _measured_for("Roughly 600–800 words per chapter", [counted]) == counted
+    assert _measured_for("A 500-word summary", [counted]) is None
+
