@@ -22,6 +22,7 @@ import { UpgradeBanner } from './upgrade-banner';
 import { templateDiff } from '@/lib/workflow/upgrade';
 import { ProjectCost } from './project-cost';
 import { BlockForm, BlockedNotice, CompletionDialog, ManuscriptCutNotice, ObjectivePausedNotice } from './stage-status-panels';
+import { LIMITATION_NOTE, statedLimitation } from '@/lib/agent/objective-fixes';
 import { StageToolResult } from './stage-tool-result';
 import { CRITIQUE_TOOLS, REWRITE_TOOLS, useStageTools } from './use-stage-tools';
 import { FRAMING_KINDS, nextStageAction, type ReportedPanelStep } from '@/lib/workflow/next-action';
@@ -406,7 +407,7 @@ export function WorkflowWorkspace({
   const [upgrading, setUpgrading] = useState(false);
   // `from`: which Finish opened it. The dialog is drawn beside that button, so a
   // press on the acceptance box's Finish is answered where the user is looking.
-  const [finishing, setFinishing] = useState<{ option: TransitionOption; note?: string; from?: 'checklist' | 'bar' } | null>(null);
+  const [finishing, setFinishing] = useState<{ option: TransitionOption; note?: string; from?: 'checklist' | 'bar'; limitation?: string } | null>(null);
   // Finishing ends here: the dialog closes and the finished view, drawn at the
   // top, is brought into view — the user pressed Finish further down the page.
   const finishedRef = useRef<HTMLDivElement>(null);
@@ -1671,7 +1672,8 @@ export function WorkflowWorkspace({
         const last = !getStage(template, state.current_stage_id)?.transitions.default_next;
         const option = (last ? transitions.find((o) => o.kind === 'finish') : undefined)
           ?? { kind: 'finish' as const, toStageId: null, label: t('early.finish'), requiresNote: false, early: true };
-        setFinishing({ option, note: `Finished with this stated as a limitation: ${items.join('; ').slice(0, 1_500)}` });
+        const limitation = items.join('; ').slice(0, 1_500);
+        setFinishing({ option, note: `${LIMITATION_NOTE}${limitation}`, limitation });
       },
       // One row on another stage, decided from Go's stop that names it (1 Nov).
       decideRow: async (rowStageId: string, rowId: string, status: 'accepted' | 'rejected', reason?: string) => {
@@ -2234,6 +2236,7 @@ export function WorkflowWorkspace({
     <CompletionDialog
       summary={completion}
       early={Boolean(finishing.option.early)}
+      stated={finishing.limitation}
       show={outstandingShow}
       busy={busy}
       error={transitionError}
@@ -2620,6 +2623,7 @@ export function WorkflowWorkspace({
               bundle={{ project, template, state, events: events ?? [], stages: bundles ?? {}, evaluations: evaluations ?? {} }}
               completion={completion}
               evaluation={deliverableEvaluation}
+              limitation={statedLimitation(lastFinish?.reason)}
               onReopen={() => void reopenProject()}
               onEdit={() => {
                 // Reopen, and land on the stage that holds the work itself.

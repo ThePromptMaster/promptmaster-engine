@@ -3096,8 +3096,13 @@ opening, and records the version and the characters read; the notice shows them.
 check reads 200,000 and says so when it clips.
 
 The cost: a repair that would have worked on a third try is not offered until the user does
-something, and past 120,000 characters the end of a section is not read. The limit has unit tests;
-as of this entry it has not fired on production, because the rerun was met at the first check.
+something, and past 120,000 characters the end of a section is not read.
+
+It has run on production, on a test copy (fe62b7b6, 6 Nov). Real checks kept passing because Go's repairs
+kept working, so the check's verdict was forced in the browser; the rest was the deployed code. Two presses,
+then the limit's card with no repair offered. A Go answer and a reopening did not restart the count, and an
+answer in the check's own box did. Finishing from the card asks for no other reason, records the limitation
+and says it on the finished screen (`statedLimitation`).
 
 ### L-163 — The sidebar caption names stale approvals and an out-of-date check (2026-11-06)
 
@@ -3135,6 +3140,8 @@ counted as 0 words and passed. A bold sentence (eight or more words ending in pu
 longer a heading, the first naming heading with words under it wins, and zero words under an upper
 limit is "not verified". An empty section under a minimum, or "0 questions", still fails. The
 eight-word line is a judgement: a shorter bold sentence naming the part is still read as its heading.
+On production, a limit on an email a note did not contain came back "Not verified: The email must be
+under 130 words" (fe62b7b6, 6 Nov).
 
 ### L-167 — "Do whatever is best" decides, in the text (2026-11-06)
 
@@ -3150,7 +3157,8 @@ an answer box. A typed answer re-arms the guard. Words alone count as a repeat o
 at 70% overlap: on 6 Nov the guard stopped a follow-up with "0 moves". Whether the text can settle it
 goes by the question's words, so a reworded question can fall on the wrong side, and then Go asks.
 A kept question drops out of the run's account once answered (#542), on the same word overlap. A
-same-button stop has unit tests and did not occur on the production pass.
+repeat by its words stopped runs on production on 6 Nov, with the answer box, and a typed answer carried
+on. A same-button stop has unit tests only: it has not occurred on production.
 
 ### L-168 — A report recorded from the chat stays out of the work until the user says otherwise (2026-11-06)
 

@@ -36,3 +36,12 @@ export function objectiveFixes(input: {
   );
   return input.events.filter((e) => e.type === 'brief_changed' && e.reason === FIX_OBJECTIVE_REASON && at(e.created_at) > lastChange).length;
 }
+
+/** How a finish from the repair limit is recorded: the limitation first, then anything else said. */
+export const LIMITATION_NOTE = 'Finished with this stated as a limitation: ';
+
+/** The limitation a finish was recorded with, if any: what the finished screen says beside the work. */
+export function statedLimitation(reason: string | null | undefined): string | null {
+  if (!reason?.startsWith(LIMITATION_NOTE)) return null;
+  return reason.slice(LIMITATION_NOTE.length).split(' — Finished with ')[0].trim() || null;
+}

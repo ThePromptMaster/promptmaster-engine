@@ -21,6 +21,8 @@ interface Props {
   completion: CompletionSummary;
   /** The deliverable's latest objective check, when one was ever run. */
   evaluation?: Evaluation;
+  /** What the project was finished with stated as a limitation (Go's repair limit), said beside the work. */
+  limitation?: string | null;
   onReopen: () => void;
   /** Reopen the project and go to the stage that holds the work. */
   onEdit?: () => void;
@@ -34,7 +36,7 @@ interface Props {
  * it, copy it, save it as Markdown, Word or PDF, or reopen the project to
  * keep improving it. The stage-by-stage record stays below, as it was.
  */
-export function ProjectFinished({ bundle, completion, evaluation, onReopen, onEdit, onNewVersion }: Props) {
+export function ProjectFinished({ bundle, completion, evaluation, limitation, onReopen, onEdit, onNewVersion }: Props) {
   const t = useT();
   const locale = useLocale();
   const { project, template } = bundle;
@@ -112,6 +114,11 @@ export function ProjectFinished({ bundle, completion, evaluation, onReopen, onEd
               .join(' · ')
           : t('pnl.nothingWritten', { stage: stage ? stageText(locale, template.key, stage, 'label') : t('pnl.theDeliverable'), noun })}
       </p>
+      {limitation && (
+        <p role="note" data-stated-limitation className="mt-2 text-body text-[var(--on-surface)]">
+          {t('ssp.statedLimitation', { text: limitation })}
+        </p>
+      )}
       {doc?.partial && (
         <p role="note" data-deliverable-partial className="mt-2 text-body text-[var(--on-surface-variant)]">
           {t('pnl.deliverablePartial', { later: doc.partial.label, chapters: doc.partial.chapters })}

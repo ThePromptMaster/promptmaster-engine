@@ -370,6 +370,7 @@ export const hi: Record<keyof typeof en, string> = {
   'ssp.stillOpen_other': 'अभी भी खुला — {count} चीज़ें:',
   'ssp.goTo': '{stage} पर जाएँ',
   'ssp.whyFinish': 'इसे खुला रखते हुए पूरा क्यों करें? यह प्रोजेक्ट के साथ दर्ज होता है।',
+  'ssp.statedLimitation': 'परियोजना के साथ एक सीमा के रूप में दर्ज: {text}',
   'ssp.whyFinishLabel': 'काम खुला रहते हुए पूरा क्यों करें',
   'ssp.against': 'आपके उद्देश्य की तुलना में',
   'ssp.scores': 'संरेखण {a} · स्पष्टता {c} · भटकाव {d} (निम्न अच्छा है)',
