@@ -110,11 +110,11 @@ import { accentVariables, backgroundOfVersion, rootSurfaces, versionTintVariable
 import { goIsAsking, nextAction } from '@/lib/workflow/next-step';
 import { holdPendingChange, pendingChanges, settlePendingChange, type PendingChange } from '@/lib/workflow/conflict-trail';
 import { keptConflictsOf } from '@/lib/workflow/routine-conflicts';
-import { FactsNextStep } from './facts-next-step';
+import { FactsNextStep, OfferedChangeNotice } from './facts-next-step';
 import { FactReconcileNotice } from './fact-change-list';
 import { factChangesFromRevision, withMeaningChanges, type FactChange } from '@/lib/workflow/fact-reconcile';
 import { useBriefChange } from './use-brief-change';
-import { openBriefChange, settledChange } from '@/lib/workflow/brief-change';
+import { openBriefChange, proposedChange, settledChange, type ProposedChange } from '@/lib/workflow/brief-change';
 import { contextFromDocuments } from '@/lib/data/extract-text';
 import { ChatAttach } from './chat-attach';
 import { INPUT_LIMITS } from '@/lib/projects/input-limits';
@@ -1122,7 +1122,7 @@ export function WorkflowWorkspace({
         const plan = planFactRecording(action.facts ?? [], project.facts);
         await recordFacts(
           project,
-          plan.insert.map((f) => ({ statement: f.statement, subject: f.subject || null, kind: f.kind ?? 'fact', source_kind: 'chat' as const, source_ref: ref }))
+          plan.insert.map((f) => ({ statement: f.statement, subject: f.subject || null, kind: f.kind ?? 'fact', source_kind: 'chat' as const, source_ref: f.reported ? { ...ref, reported: true } : ref }))
         );
         for (const { old, fact } of plan.supersede) await supersedeFact(project, old, fact.statement, ref, 'chat');
         await onReload?.();
@@ -1267,6 +1267,8 @@ export function WorkflowWorkspace({
     enabled: project.status !== 'finalized' && events !== null,
   });
   const briefChange = useMemo(() => openBriefChange(events ?? [], state), [events, state]);
+  // What a fact recorded from the chat may affect: offered, nothing reopened (5 Nov).
+  const offeredChange = useMemo(() => proposedChange(events ?? []), [events]);
   // The last step of the sequence, "Updated and checked", until dismissed.
   const [settledDismissed, setSettledDismissed] = useState<string | null>(null);
   const settled = useMemo(() => {
@@ -1542,6 +1544,24 @@ export function WorkflowWorkspace({
    * Output was reopened and changed, Apply and continue was pressed on Summary,
    * and Output stayed "Reopened" after Go had finished).
    */
+  /** The user takes the offered change up: the stages it names are reopened, with why, and Go updates them. */
+  const takeOfferedChange = useCallback(async (offer: ProposedChange) => {
+    setTransitionError(null);
+    try {
+      await appendEvent({
+        type: 'brief_changed', stage_id: offer.stageId, reason: 'Update the work with what was recorded',
+        payload: { field: 'facts', kind: 'fact', presentation_only: false, affected: offer.affected, takes_up: offer.at },
+      });
+      await go.applyAndContinue();
+    } catch (e) {
+      setTransitionError(e instanceof Error && e.message ? t('wsa.failedWhy', { message: e.message }) : t('wsa.failed'));
+    }
+  }, [appendEvent, go, t]);
+  const keepOfferedChange = useCallback(
+    (offer: ProposedChange) => appendEvent({ type: 'brief_change_dismissed', stage_id: offer.stageId, reason: 'Kept on record only', payload: { change_at: offer.at, stage_ids: [] } }),
+    [appendEvent]
+  );
+
   const continueWork = useCallback(async () => {
     setTransitionError(null);
     try {
@@ -2646,6 +2666,15 @@ export function WorkflowWorkspace({
               }}
               onDiscard={(c) => void settlePendingChange(c.id, 'withdrawn').then(upsertRecommendation, () => undefined)}
             />
+            {offeredChange && appendStageVersion && project.status !== 'finalized' && (
+              <OfferedChangeNotice
+                names={offeredChange.affected.map((a) => { const s = template.stages.find((x) => x.id === a.stage_id); return s ? stageText(locale, template.key, s, 'label') : a.stage_id; })}
+                reasons={offeredChange.affected.map((a) => a.reason)}
+                onUpdate={() => void takeOfferedChange(offeredChange)}
+                onKeep={() => void keepOfferedChange(offeredChange)}
+                updating={go.active}
+              />
+            )}
             <BriefChangeNotice
               change={briefChange}
               stageLabel={(id) => { const s = template.stages.find((x) => x.id === id); return s ? stageText(locale, template.key, s, 'label') : id; }}
@@ -3259,6 +3288,11 @@ export function WorkflowWorkspace({
               afterActionDone={
                 <FactsNextStep
                   judging={judgingChange}
+                  offered={offeredChange && appendStageVersion && project.status !== 'finalized' ? {
+                    names: offeredChange.affected.map((a) => template.stages.find((s) => s.id === a.stage_id)?.label ?? a.stage_id),
+                    onUpdate: () => void takeOfferedChange(offeredChange),
+                    onKeep: () => void keepOfferedChange(offeredChange),
+                  } : undefined}
                   waiting={[...(briefChange?.stageIds ?? []), ...(briefChange?.alsoWaiting ?? [])].map((id) => template.stages.find((s) => s.id === id)?.label ?? id)}
                   onUpdate={appendStageVersion && project.status !== 'finalized' ? () => void continueWork() : undefined}
                   updating={go.active}

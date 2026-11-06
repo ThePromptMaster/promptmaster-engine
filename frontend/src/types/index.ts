@@ -540,7 +540,7 @@ export interface ReplyAction {
   updates?: { id: string; status?: string; reason?: string; fields?: Record<string, string> }[];
   rows?: Record<string, string>[];
   /** `record_facts`: facts the user supplied, recorded only on confirmation (F3, 7 Oct). */
-  facts?: { statement: string; subject?: string; kind?: 'fact' | 'requirement'; replaces?: string }[];
+  facts?: { statement: string; subject?: string; kind?: 'fact' | 'requirement'; replaces?: string; reported?: boolean }[];
 }
 
 export interface SuggestActionsRequest {
