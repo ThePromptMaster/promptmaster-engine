@@ -469,6 +469,19 @@ def _state_with_data():
     ]})
 
 
+def test_a_short_file_reaches_the_model_whole():
+    """6 Nov, production: "This analysis works from five of those rows", of 24."""
+    from promptmaster.schemas import DataFileBrief, format_data_files
+    short = DataFileBrief(name="orders.csv", columns=["month", "orders"], sample=[[f"m{i}", str(i)] for i in range(24)], rows=24)
+    text = format_data_files([short])
+    assert "every row of it, so use them all:" in text
+    assert "m0 | 0" in text and "m23 | 23" in text
+    assert "e.g." not in text
+    long = DataFileBrief(name="orders.csv", columns=["month", "orders"], sample=[["m0", "0"]], rows=1204)
+    text = format_data_files([long])
+    assert "every row" not in text and "e.g. m0 | 0" in text
+
+
 def test_the_planner_is_told_what_data_exists_and_when_there_is_none():
     _, with_data = build_next_action_prompt(INPUTS, _state_with_data(), RESEARCH, "guided")
     assert "DATA THE PROJECT HOLDS (readable by code you run" in with_data

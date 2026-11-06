@@ -26,7 +26,7 @@ export const en = {
   'data.imagesHint': 'Drafts can place these where they help; in an edit, “Insert image” puts one where your cursor is.',
   'data.empty':
     'No data or images attached. Without data, analyses can be planned but not run, and PromptMaster will say so. Attach CSV, TSV, JSON or text files, or an Excel workbook (.xlsx, converted to CSV), and Go can run code against them. Attach a PDF or Word brief and its text can go into the project context. Add photos or figures (PNG, JPEG, WebP, GIF) to place them in your work. Up to {mb} MB each.',
-  'data.codeReads': "Code that Go runs can read these. PromptMaster is shown each file's columns and first rows, not the file.",
+  'data.codeReads': "Code that Go runs can read these. PromptMaster is shown each file's columns and first rows, or every row of a short file.",
   'data.addText': 'Add document text',
   'data.oneHasText': '{name} has text every stage could quote.',
   'data.manyHaveText': '{count} documents have text every stage could quote.',
@@ -64,7 +64,7 @@ export const es: Keys = {
   'data.imagesHint': 'Los borradores pueden colocarlas donde ayuden; al editar, «Insertar imagen» pone una donde esté el cursor.',
   'data.empty':
     'No hay datos ni imágenes adjuntos. Sin datos, los análisis se pueden planificar pero no ejecutar, y PromptMaster lo dirá. Adjunta archivos CSV, TSV, JSON o de texto, o un libro de Excel (.xlsx, convertido a CSV), y Go podrá ejecutar código sobre ellos. Adjunta un planteamiento en PDF o Word y su texto puede pasar al contexto del proyecto. Añade fotos o figuras (PNG, JPEG, WebP, GIF) para colocarlas en tu trabajo. Hasta {mb} MB cada uno.',
-  'data.codeReads': 'El código que ejecuta Go puede leerlos. A PromptMaster se le muestran las columnas y las primeras filas de cada archivo, no el archivo.',
+  'data.codeReads': 'El código que ejecuta Go puede leerlos. A PromptMaster se le muestran las columnas y las primeras filas de cada archivo, o todas las filas si es corto.',
   'data.addText': 'Añadir el texto del documento',
   'data.oneHasText': '{name} tiene texto que cualquier etapa podría citar.',
   'data.manyHaveText': '{count} documentos tienen texto que cualquier etapa podría citar.',
@@ -100,7 +100,7 @@ export const fr: Keys = {
   'data.imagesHint': 'Les brouillons peuvent les placer là où elles aident ; en modification, « Insérer une image » en place une à l’endroit du curseur.',
   'data.empty':
     'Aucune donnée ni image jointe. Sans données, les analyses peuvent être planifiées mais pas exécutées, et PromptMaster le dira. Joignez des fichiers CSV, TSV, JSON ou texte, ou un classeur Excel (.xlsx, converti en CSV), et Go pourra exécuter du code dessus. Joignez un brief PDF ou Word et son texte pourra rejoindre le contexte du projet. Ajoutez des photos ou des figures (PNG, JPEG, WebP, GIF) pour les placer dans votre travail. Jusqu’à {mb} Mo chacun.',
-  'data.codeReads': 'Le code exécuté par Go peut les lire. PromptMaster voit les colonnes et les premières lignes de chaque fichier, pas le fichier.',
+  'data.codeReads': 'Le code exécuté par Go peut les lire. PromptMaster voit les colonnes et les premières lignes de chaque fichier, ou toutes les lignes s’il est court.',
   'data.addText': 'Ajouter le texte du document',
   'data.oneHasText': '{name} contient du texte que chaque étape pourrait citer.',
   'data.manyHaveText': '{count} documents contiennent du texte que chaque étape pourrait citer.',
@@ -136,7 +136,7 @@ export const pt: Keys = {
   'data.imagesHint': 'Os rascunhos podem colocá-las onde ajudam; numa edição, “Inserir imagem” põe uma onde está o cursor.',
   'data.empty':
     'Nenhum dado ou imagem anexado. Sem dados, as análises podem ser planejadas, mas não executadas, e o PromptMaster vai avisar. Anexe arquivos CSV, TSV, JSON ou de texto, ou uma planilha do Excel (.xlsx, convertida em CSV), e o Go poderá rodar código sobre eles. Anexe um briefing em PDF ou Word e o texto pode ir para o contexto do projeto. Adicione fotos ou figuras (PNG, JPEG, WebP, GIF) para colocá-las no seu trabalho. Até {mb} MB cada.',
-  'data.codeReads': 'O código que o Go roda pode lê-los. O PromptMaster vê as colunas e as primeiras linhas de cada arquivo, não o arquivo.',
+  'data.codeReads': 'O código que o Go roda pode lê-los. O PromptMaster vê as colunas e as primeiras linhas de cada arquivo, ou todas as linhas se for curto.',
   'data.addText': 'Adicionar o texto do documento',
   'data.oneHasText': '{name} tem texto que qualquer etapa poderia citar.',
   'data.manyHaveText': '{count} documentos têm texto que qualquer etapa poderia citar.',

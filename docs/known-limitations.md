@@ -3321,3 +3321,15 @@ needs Autonomous with routine decisions handed to Go, so under "Ask me" a user c
 whose accepted findings were never applied, unless they go back by hand. A workflow with chapters is
 unchanged, because it has its own revision stage. A row with no suggested change has nothing to
 carry back and stays as it is.
+
+### L-191 — A short data file reaches the model whole (2026-11-06)
+
+Found on the production pass: shown the first rows of a 24-month file, an analysis said it "works
+from five of those rows". A file of up to 60 rows and 6,000 characters now keeps every row in its
+preview, and prompts carry them all. Longer files are still previewed, and read in full only by code
+run in the sandbox.
+
+The costs: those rows are in every prompt of the project, about 600 tokens for a 24-row file. A
+model can do arithmetic on them by hand instead of running code, so "Compute; do not estimate" is
+still an instruction rather than a rule. Files attached before this keep their stored five-row
+preview until they are attached again.

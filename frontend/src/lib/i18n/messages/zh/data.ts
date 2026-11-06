@@ -28,7 +28,7 @@ export const zh: Record<keyof typeof en, string> = {
   'data.imagesHint': '草稿可以把它们放在有帮助的位置；编辑时，“插入图片”会在光标处插入一张。',
   'data.empty':
     '尚未附加任何数据或图片。没有数据时，分析可以规划但无法运行，PromptMaster 会如实说明。附加 CSV、TSV、JSON 或文本文件，或 Excel 工作簿（.xlsx，会转换为 CSV），Go 就能针对它们运行代码。附加 PDF 或 Word 格式的简介，其文本可以加入项目背景。添加照片或图表（PNG、JPEG、WebP、GIF），即可将它们放入你的工作中。每个文件最大 {mb} MB。',
-  'data.codeReads': 'Go 运行的代码可以读取这些文件。PromptMaster 看到的是每个文件的列和前几行，而不是文件本身。',
+  'data.codeReads': 'Go 运行的代码可以读取这些文件。PromptMaster 看到的是每个文件的列和前几行；较短的文件则是全部行。',
   'data.addText': '添加文档文本',
   'data.oneHasText': '{name} 中有可供每个阶段引用的文本。',
   'data.manyHaveText': '{count} 个文档中有可供每个阶段引用的文本。',

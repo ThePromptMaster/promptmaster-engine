@@ -38,6 +38,13 @@ export function isSpreadsheet(name: string): boolean {
   return extensionOf(name) === SPREADSHEET_EXTENSION;
 }
 const SAMPLE_ROWS = 5;
+/**
+ * A file this short reaches the prompts whole (6 Nov, production): shown its first
+ * rows of a 24-month file, the analysis said it "works from five of those rows", and
+ * a tester's small CSV would have gone the same way. Longer files are for code to read.
+ */
+const WHOLE_ROWS = 60;
+const WHOLE_CHARS = 6_000;
 const MAX_COLUMNS = 60;
 const CELL_MAX = 80;
 
@@ -49,7 +56,7 @@ export interface DataPreview {
   height?: number;
   /** Column names (table), top-level keys (json). */
   columns: string[];
-  /** The first rows, each cell clipped. */
+  /** The first rows, or every row of a short file, each cell clipped. */
   sample: string[][];
   /** Data rows, not counting the header (table); array length (json); lines (text). */
   rows: number;
@@ -104,13 +111,14 @@ const clip = (value: string) => (value.length > CELL_MAX ? `${value.slice(0, CEL
 
 export function previewOf(name: string, text: string): DataPreview {
   const ext = extensionOf(name);
+  const kept = (rows: number) => (rows <= WHOLE_ROWS && text.length <= WHOLE_CHARS ? rows : SAMPLE_ROWS);
   if (ext === '.json') {
     try {
       const parsed: unknown = JSON.parse(text);
       const list = Array.isArray(parsed) ? parsed : null;
       const first = list ? list[0] : parsed;
       const columns = first && typeof first === 'object' ? Object.keys(first as object).slice(0, MAX_COLUMNS) : [];
-      const sample = (list ?? [parsed]).slice(0, SAMPLE_ROWS).map((row) =>
+      const sample = (list ?? [parsed]).slice(0, kept(list?.length ?? 1)).map((row) =>
         columns.map((c) => clip(String((row as Record<string, unknown>)?.[c] ?? '')))
       );
       return { kind: 'json', columns, sample, rows: list ? list.length : 1 };
@@ -122,7 +130,7 @@ export function previewOf(name: string, text: string): DataPreview {
   if (ext === '.csv' || ext === '.tsv') {
     const delimiter = ext === '.tsv' ? '\t' : ',';
     const columns = splitLine(lines[0] ?? '', delimiter).slice(0, MAX_COLUMNS);
-    const sample = lines.slice(1, 1 + SAMPLE_ROWS).map((l) => splitLine(l, delimiter).slice(0, MAX_COLUMNS).map(clip));
+    const sample = lines.slice(1, 1 + kept(lines.length - 1)).map((l) => splitLine(l, delimiter).slice(0, MAX_COLUMNS).map(clip));
     return { kind: 'table', columns, sample, rows: Math.max(0, lines.length - 1) };
   }
   return { kind: 'text', columns: [], sample: lines.slice(0, SAMPLE_ROWS).map((l) => [clip(l)]), rows: lines.length };

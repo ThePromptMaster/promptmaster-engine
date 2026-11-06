@@ -27,7 +27,7 @@ export const sw: Record<keyof typeof en, string> = {
   'data.removeNamed': 'Ondoa {name}',
   'data.imagesHint': 'Rasimu zinaweza kuziweka pale zinaposaidia; unapohariri, “Weka picha” huweka moja pale kishale chako kilipo.',
   'data.empty': 'Hakuna data wala picha zilizoambatishwa. Bila data, uchambuzi unaweza kupangwa lakini hauwezi kuendeshwa, na PromptMaster itasema hivyo. Ambatisha mafaili ya CSV, TSV, JSON au maandishi, au kitabu cha Excel (.xlsx, kinachobadilishwa kuwa CSV), na Go inaweza kuendesha msimbo juu yake. Ambatisha maelezo ya PDF au Word na maandishi yake yanaweza kuingia kwenye muktadha wa mradi. Ongeza picha au michoro (PNG, JPEG, WebP, GIF) ili kuziweka kwenye kazi yako. Hadi MB {mb} kila moja.',
-  'data.codeReads': 'Msimbo unaoendeshwa na Go unaweza kusoma haya. PromptMaster inaonyeshwa safu wima za kila faili na safu zake za kwanza, si faili lenyewe.',
+  'data.codeReads': 'Msimbo unaoendeshwa na Go unaweza kusoma haya. PromptMaster inaonyeshwa safu wima za kila faili na safu zake za kwanza, au safu zote za faili fupi.',
   'data.addText': 'Ongeza maandishi ya hati',
   'data.oneHasText': '{name} ina maandishi ambayo kila hatua ingeweza kunukuu.',
   'data.manyHaveText': 'Hati {count} zina maandishi ambayo kila hatua ingeweza kunukuu.',

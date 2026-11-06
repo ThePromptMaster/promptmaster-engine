@@ -550,14 +550,15 @@ class StageDigestEntry(BaseModel):
 class DataFileBrief(BaseModel):
     """One data file attached to the project, as a prompt may know it.
 
-    The name, the column names, the first few rows and the row count — computed
-    by the client when the file was attached. The file itself never reaches a
-    model; it is read only by code run in the sandbox, at /data/<name>.
+    The name, the column names, the first few rows (every row of a short file)
+    and the row count — computed by the client when the file was attached. A longer
+    file never reaches a model; it is read only by code run in the sandbox, at
+    /data/<name>.
     """
     name: str = Field(..., max_length=200)
     kind: str = Field(default="table")
     columns: list[str] = Field(default_factory=list, max_length=60)
-    sample: list[list[str]] = Field(default_factory=list, max_length=5)
+    sample: list[list[str]] = Field(default_factory=list, max_length=60)
     rows: int = Field(default=0)
 
 
@@ -571,9 +572,12 @@ def format_data_files(files: list["DataFileBrief"]) -> str:
         cols = ", ".join(f.columns[:60]) or "(no columns read)"
         lines.append(f"- /data/{f.name} — {f.rows} {'lines' if f.kind == 'text' else 'rows'}; columns: {cols}")
         # All the preview holds: five fiscal years cut to three sent a memo's analysis to
-        # the teaser for the last two (6 Nov, production).
-        for row in f.sample[:5]:
-            lines.append("    e.g. " + " | ".join(str(c)[:80] for c in row))
+        # the teaser for the last two (6 Nov, production). A short file is all there.
+        whole = f.kind != "text" and f.rows > 0 and len(f.sample) >= f.rows
+        if whole:
+            lines.append("    every row of it, so use them all:")
+        for row in f.sample[:60]:
+            lines.append(("    " if whole else "    e.g. ") + " | ".join(str(c)[:80] for c in row))
     return "\n".join(lines)
 
 
