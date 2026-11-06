@@ -13,6 +13,7 @@ export const ar: Record<keyof typeof en, string> = {
   "start.advanced": "طرق متقدمة للبدء",
   "start.advancedHide": "إخفاء الطرق المتقدمة للبدء",
   "start.advancedNote": "تخطَّ المحادثة: احصل على إعداد مقترح مما كتبته، أو اختر سير العمل بنفسك.",
+  "start.docCut": "{names} أطول من أن يحتفظ به المشروع كاملًا: تُستخدم أول 200,000 حرف منه فقط.",
   "quick.takeFull": "انقل هذا إلى عملية PromptMaster الكاملة",
   "quick.takeFullNote": "مراحل وفحوص ومراجعات وقرارات، مبنية على ما لديك هنا.",
   "quick.takeFullTitle": "انقل هذا إلى العملية الكاملة",
