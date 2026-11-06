@@ -3,10 +3,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const getLatestAgentRun = vi.fn();
 const listAgentSteps = vi.fn();
 const listChainSteps = vi.fn();
+const earlierWindowsCost = vi.fn();
 vi.mock('@/lib/supabase/agent', () => ({
   getLatestAgentRun: (...a: unknown[]) => getLatestAgentRun(...a),
   listAgentSteps: (...a: unknown[]) => listAgentSteps(...a),
   listChainSteps: (...a: unknown[]) => listChainSteps(...a),
+  earlierWindowsCost: (...a: unknown[]) => earlierWindowsCost(...a),
 }));
 
 import { runRecordTrace, withRunRecord } from './chat-run-record';
@@ -23,6 +25,8 @@ beforeEach(() => {
   listAgentSteps.mockReset();
   listChainSteps.mockReset();
   listChainSteps.mockResolvedValue([]);
+  earlierWindowsCost.mockReset();
+  earlierWindowsCost.mockResolvedValue(0);
 });
 
 describe('the run as the chat is told it', () => {
@@ -40,6 +44,16 @@ describe('the run as the chat is told it', () => {
     listChainSteps.mockResolvedValue([step({}), step({ action_key: 'user_answer', output: 'Yes' })]);
     listAgentSteps.mockResolvedValue([step({})]);
     expect((await withRunRecord(context, 'p', NOW)).go_run?.moves).toBe(2);
+  });
+
+  it('counts the cost of those windows too, so the moves and the cost cover the same work', async () => {
+    getLatestAgentRun.mockResolvedValue({ ...run, cost_usd: '1.01' });
+    listChainSteps.mockResolvedValue([step({}), step({})]);
+    listAgentSteps.mockResolvedValue([step({})]);
+    earlierWindowsCost.mockResolvedValue(2.34);
+    const out = await withRunRecord(context, 'p', NOW);
+    expect(out.go_run?.moves).toBe(3);
+    expect(out.go_run?.cost_usd).toBeCloseTo(3.35);
   });
 
   it('says there has been no run only when the record says so', async () => {

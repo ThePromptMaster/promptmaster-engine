@@ -5,7 +5,7 @@
  * one tab's memory of the run, which is empty until it has loaded and goes on saying
  * "running" after the tab that drove it has closed.
  */
-import { getLatestAgentRun, listAgentSteps, listChainSteps } from '@/lib/supabase/agent';
+import { earlierWindowsCost, getLatestAgentRun, listAgentSteps, listChainSteps } from '@/lib/supabase/agent';
 import type { AgentRun, AgentStep } from '@/types/agent';
 import type { ChatContext } from '@/types';
 
@@ -43,8 +43,10 @@ export async function withRunRecord(context: ChatContext, projectId: string, now
   try {
     const run = await getLatestAgentRun(projectId);
     if (!run) return { ...context, go_run: null, go_run_read: true };
-    const [earlier, own] = await Promise.all([listChainSteps(run), listAgentSteps(run.id)]);
-    return { ...context, go_run: runRecordTrace(run, [...earlier, ...own], context.go_run?.objective ?? '', now), go_run_read: true };
+    const [earlier, own, before] = await Promise.all([listChainSteps(run), listAgentSteps(run.id), earlierWindowsCost(run)]);
+    const trace = runRecordTrace(run, [...earlier, ...own], context.go_run?.objective ?? '', now);
+    // The moves cover every window, so the cost does too: on production the chat said "34 moves" beside one window's $1.01.
+    return { ...context, go_run: { ...trace, cost_usd: trace.cost_usd == null ? trace.cost_usd : trace.cost_usd + before }, go_run_read: true };
   } catch {
     return context.go_run ? context : { ...context, go_run: null, go_run_read: false };
   }

@@ -98,6 +98,20 @@ export async function listChainSteps(run: Pick<AgentRun, 'continues_run_id'>, ma
   return windows.flat();
 }
 
+/** What the windows before this run cost: `cost_usd` is per window, and a run's story is all of them. */
+export async function earlierWindowsCost(run: Pick<AgentRun, 'continues_run_id'>, maxRuns = 4): Promise<number> {
+  let total = 0;
+  let parentId = run.continues_run_id;
+  for (let i = 0; i < maxRuns && parentId; i += 1) {
+    const { data, error } = await createClient().from('agent_runs').select('cost_usd, continues_run_id').eq('id', parentId).maybeSingle();
+    if (error || !data) break;
+    const cost = Number(data.cost_usd);
+    if (Number.isFinite(cost)) total += cost;
+    parentId = (data.continues_run_id as string | null) ?? null;
+  }
+  return total;
+}
+
 export async function startAgentStep(step: {
   runId: string;
   userId: string;
