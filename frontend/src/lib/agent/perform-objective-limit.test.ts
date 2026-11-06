@@ -67,3 +67,33 @@ describe('the check that is still unmet after Go has tried twice', () => {
     expect(event.payload.basis).toMatchObject({ stage_id: 'output', version_number: 3, read: { chars: 24, total: 24 } });
   });
 });
+
+describe('a limit on each chapter (6 Nov, a book test: "Roughly 600–800 words per chapter" came back not checked)', () => {
+  const words = (n: number) => Array.from({ length: n }, (_, i) => `w${i}`).join(' ');
+  const withChapters = (counts: number[]) => {
+    const base = ctx([]);
+    const content = counts.map((n, i) => `## ${i + 1}. Chapter\n\n${words(n)}`).join('\n\n');
+    return {
+      ...base,
+      project: { ...base.project, constraints: 'Roughly 600–800 words per chapter.' },
+      bundles: { output: { artifact: null, versions: [{ id: 'v3', version_number: 3, content, source_operation: 'agent_revise' }] } },
+    } as unknown as PerformContext;
+  };
+
+  it('tells the check the count it could not make, and records it', async () => {
+    await performStep(withChapters([690, 787]));
+    const [request] = agentAssessObjective.mock.calls[0] as [{ measured: string[]; failed_checks: string[] }];
+    expect(request.measured).toEqual(['Each chapter: roughly 600–800 words — 2 chapters, 690–787 words each']);
+    expect(request.failed_checks).toEqual([]);
+    const [, , event] = appendWorkflowEvent.mock.calls.find((c) => (c as unknown[])[2] && ((c as unknown[])[2] as { type: string }).type === 'objective_assessed') as unknown as [string, string, { payload: { basis: { measured: string[] } } }];
+    expect(event.payload.basis.measured).toEqual(request.measured);
+  });
+
+  it('says which chapter is well off, as something still unmet', async () => {
+    await performStep(withChapters([700, 300]));
+    const [request] = agentAssessObjective.mock.calls[0] as [{ measured: string[]; failed_checks: string[] }];
+    expect(request.measured).toEqual([]);
+    expect(request.failed_checks).toEqual(['Each chapter: roughly 600–800 words — measured 2. Chapter: 300 words']);
+  });
+});
+

@@ -3059,3 +3059,16 @@ style, never a source — up to 12,000 characters. It is not shown in the worksp
 panel yet; it is set at start. The landing walkthrough is proposed, not built, until Sean picks
 the audience and workflow.
 
+### L-188 — A limit on each chapter or section (2026-11-06)
+
+"Roughly 600–800 words per chapter" was counted nowhere, so the objective check said not checked at
+690–787. Without its hedge the same words were read as the whole document's limit, so "each section
+at most 150 words" failed a document on its total. Now a limit that says what it is per is counted
+on each part (`measureEach`), and the check is told the count. A firm one holds a prose deliverable
+as any limit does. A hedged one ("roughly", "about", or a plain "700 words per chapter") holds no
+stage up, as before, and allows 15% on a range and 25% on a single figure before the check hears it
+as unmet. Chapters on a long-form stage are never a stage's blocking check, only the objective
+check's, because repairing chapters to fit is a long job for a count. It reads the headings: a text
+with none is not verified, and a chapter's parts are found by the word "chapter" in a heading, or
+else the top-level headings, leaving sources, references and a review note out.
+
