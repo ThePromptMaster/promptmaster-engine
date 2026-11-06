@@ -61,9 +61,11 @@ The client's brief on a test copy (0d7745e7), through the same designed workflow
 | The note | Its quotes are from v3; the first draft's note labelled passages from the earlier draft as such. It says word counts were estimated by reading |
 | The export | The LaTeX export was captured in the page and holds v3's last correction. The Word export reads the same text, by the code |
 | Caption | "6 done · 0 to go", with every approval on the current version |
-| Cost and time | $4.96 and 84 calls against $12.91; 55 minutes, most of it waiting on approvals |
+| Cost and time | Go's runs cost $4.91 against $12.91, the same measure for both; 55 minutes, most of it waiting on approvals |
 
-Not exercised by this run: the repair limit, because the objective was met at the first check. That part has unit tests only.
+Not exercised by this run: the repair limit, because the objective was met at the first check. It was run separately on production afterwards (L-162). Real checks kept passing once Go's repairs worked, so the check's verdict was forced in the browser.
+
+![The repair limit's card](../media/pr/nov6/repair-limit-card.jpg)
 
 ![Final book, finished](../media/pr/nov6/book-finished.jpg)
 
