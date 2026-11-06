@@ -488,6 +488,12 @@ class OpenRouterClient:
         except json.JSONDecodeError as parse_error:
             pass
 
+        # The object with words around it: nothing to repair, and the repair is a call the
+        # provider's filter can refuse (6 Nov, production: Sonnet 5.5 planning a run).
+        embedded = self._embedded_object(cleaned)
+        if embedded is not None:
+            return embedded, usage
+
         # Cut off at the limit, not malformed: a repair would close the
         # brackets on half an answer — a stage check that lost its findings
         # and read as clean (2 Nov, production: every check on a long
@@ -736,6 +742,19 @@ class OpenRouterClient:
             return True
         msg = str(error)
         return any(code in msg for code in ["429", "500", "502", "503", "504", "timed out", "Network error"])
+
+    @staticmethod
+    def _embedded_object(text: str) -> dict | None:
+        """The JSON object in a reply with words around it, or None. From the first brace to
+        the last, so a reply that only mentions braces, or was cut off, is not taken for one."""
+        start, end = text.find("{"), text.rfind("}")
+        if start < 0 or end <= start:
+            return None
+        try:
+            found = json.loads(text[start : end + 1])
+        except json.JSONDecodeError:
+            return None
+        return found if isinstance(found, dict) else None
 
     def _clean_json_response(self, content: str) -> str:
         """Strip markdown code blocks from JSON response."""
