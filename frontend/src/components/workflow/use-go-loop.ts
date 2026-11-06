@@ -61,7 +61,7 @@ import { performStep, type PerformContext, type StepOutcome } from '@/lib/agent/
 import { needsExpert, packageMarkdown, recordDocuments } from '@/lib/agent/expert';
 import { auditStop, describeAudit, proposedDefault, touchesObjective } from '@/lib/agent/stop-audit';
 import { recordRoutineDefault } from '@/lib/supabase/facts';
-import { allowedActions, answeredReturn, reconsiderNote, returnTargets, runAttemptsFor, stageHasCurrentDraft, toolsFor, polishSinceDirection, polishCapped, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, withoutEndlessPolish, withoutSettledRuns, withoutOverride, DEFAULT_BUDGET_STEPS, MAX_MODEL_CALLS_PER_CHAIN, fitsBudget, noChange, plannedBeforeLatestChange, preempt, shouldPause, stateFingerprint, stepCost } from '@/lib/agent/policy';
+import { allowedActions, answeredReturn, returnsForAnswer, reconsiderNote, returnTargets, runAttemptsFor, stageHasCurrentDraft, toolsFor, polishSinceDirection, polishCapped, unsavedDerivation, saveInsteadOfRepeating, moveOnInsteadOfRejudging, withoutEndlessPolish, withoutSettledRuns, withoutOverride, DEFAULT_BUDGET_STEPS, MAX_MODEL_CALLS_PER_CHAIN, fitsBudget, noChange, plannedBeforeLatestChange, preempt, shouldPause, stateFingerprint, stepCost } from '@/lib/agent/policy';
 import {
   autoWindowsLeft,
   createAgentRun,
@@ -722,7 +722,13 @@ export function useGoLoop(opts: Options) {
         });
         // An answer that names going back is the user's return; Go carries it out (13 Oct).
         const userReturn = answeredReturn(o.template, o.stage, [...priorStepsRef.current, ...stepsRef.current]);
-        if (goBackTo.length || userReturn) allowed.push('return_to_stage');
+        // An answer that means changing earlier work without saying "go back" (6 Nov):
+        // the planner reads it, and goes back itself where the run may.
+        const answerReturn = userReturn ? null : returnsForAnswer({
+          template: o.template, stage: o.stage, policy: current.policy, routine,
+          steps: [...priorStepsRef.current, ...stepsRef.current],
+        });
+        if (goBackTo.length || userReturn || answerReturn?.mayGo) allowed.push('return_to_stage');
         // 25 Oct: the next task the saved work names becomes a stage of its own
         // — in an investigation, with routine decisions handed to Go, at most
         // three a run (the database holds the same limits).
@@ -792,11 +798,12 @@ export function useGoLoop(opts: Options) {
         // Before the planner is asked: is the next move the user's? (B4)
         // Findings undecided on other stages are named with any approval asked here (2 Nov).
         const openElsewhere = openRowsElsewhere(o.template, o.state, context, o.stage.id);
-        const need = repair ? null : needsUser({
+        const needInput = {
           state: o.state, stage: o.stage, facts, stageEvaluation, allowed, policy: current.policy,
           outlineStageId: outlineStageFor(o.template)?.id ?? null, largeJobAcknowledged: largeJobOkRef.current,
           runAttemptsLeft, lookupDue, routine, commitTried, asItStands, ...(openElsewhere.length ? { openElsewhere } : {}),
-        });
+        };
+        const need = repair ? null : needsUser(needInput);
         if (need) {
           await setRunStatus('awaiting_decision', describeNeed(need, stageLabelFor).message, need);
           break;
@@ -833,7 +840,8 @@ export function useGoLoop(opts: Options) {
                   template: o.template, state: o.state, stage: o.stage!, bundles: o.bundles,
                   stageEvaluation, latestEvaluation: o.latestEvaluation, steps: [...priorStepsRef.current, ...stepsRef.current],
                   context, approvedOutline: o.approvedOutline, facts, dataFiles: dataFileBriefs(o.project), tools: toolsFor(o.project), routine: o.project.routine_decisions ?? undefined, delegation: delegationSentences(o.project), memory: reconsider ? [reconsider.note, ...memory].slice(0, 24) : memory, controls: o.getControls?.() ?? undefined,
-                  returnTargets: goBackTo,
+                  returnTargets: goBackTo.length || !answerReturn?.mayGo ? goBackTo : answerReturn.stages,
+                  answerReturn,
                   // Said, not silently withheld (4 Nov, Lakeside): "I cannot make that edit from here".
                   polishPaused: polishCapped(polishedHere, stageEvaluation.canAdvance) && !allowed.includes('revise_stage') ? polishedHere : undefined,
                 }),
@@ -905,6 +913,16 @@ export function useGoLoop(opts: Options) {
         }
         // Before a question interrupts the user: does it hold the work up? (Q1b)
         if (!required && actionFor(choice.action_key)?.performer === 'ask') {
+          // The way back kept the planner in the loop only so it could read the answer.
+          // It asked instead: what the stage is waiting for gets its own card, with its
+          // own box, as it would have without that offer (6 Nov).
+          const waiting = answerReturn?.mayGo && !goBackTo.length
+            ? needsUser({ ...needInput, allowed: allowed.filter((k) => k !== 'return_to_stage') })
+            : null;
+          if (waiting) {
+            await setRunStatus('awaiting_decision', describeNeed(waiting, stageLabelFor).message, waiting);
+            break;
+          }
           const nextId = nextSuggestedStage(o.template, o.state);
           const question = choice.decision_question || choice.rationale || '';
           // A choice whose default the question itself names is routine under

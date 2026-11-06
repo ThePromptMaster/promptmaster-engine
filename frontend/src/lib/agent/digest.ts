@@ -100,6 +100,8 @@ export interface AgentStateDigest {
   polish_paused?: number;
   /** The earlier stages Go may go back to from here (Q2), when it may. */
   return_targets?: { id: string; label: string }[];
+  /** The user has just answered: the stages that answer may send the work back to, and whether Go may go itself. */
+  answer_return?: { may_go: boolean; stages: { id: string; label: string }[] };
   /**
    * Which workflow the project is on, and its stages in order. Without it
    * the planner spoke Research to a book — asking for "planned runs with
@@ -187,6 +189,8 @@ export function buildAgentState(input: {
   controls?: readonly StageControl[];
   /** Stages Go may go back to from this one, when return_to_stage is offered (Q2). */
   returnTargets?: readonly { id: string; label: string }[];
+  /** The user has just answered (`returnsForAnswer`). */
+  answerReturn?: { stages: readonly { id: string; label: string }[]; mayGo: boolean } | null;
   /** Polishing moves since the user's last direction, when the cap has taken Revise away. */
   polishPaused?: number;
 }): AgentStateDigest {
@@ -380,6 +384,7 @@ export function buildAgentState(input: {
     ...(input.controls ? { controls: input.controls.slice(0, CONTROLS_MAX).map((c) => ({ label: c.label, where: PLACE_WORDS[c.place], ...(c.does ? { does: c.does } : {}) })) } : {}),
     ...(input.polishPaused ? { polish_paused: input.polishPaused } : {}),
     ...(input.returnTargets?.length ? { return_targets: input.returnTargets.map((t) => ({ id: t.id, label: t.label })) } : {}),
+    ...(input.answerReturn ? { answer_return: { may_go: input.answerReturn.mayGo, stages: input.answerReturn.stages.map((t) => ({ id: t.id, label: t.label })) } } : {}),
     workflow: describeWorkflow(template),
     tools,
     ...(input.routine ? { routine_decisions: input.routine } : {}),

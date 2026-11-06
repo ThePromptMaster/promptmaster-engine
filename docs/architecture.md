@@ -521,7 +521,8 @@ The stage rail is a view of that projection.
 these): `actor` is `user | system`, never a model; a stage move on a model's suggestion
 needs an accepted recommendation and is then the user's; a `system` move needs a running
 agent run under a recorded authorization, and each policy may record only certain moves;
-skip, go back, finalize and reopen are user-only; versions are append-only; execution
+skip, go back, finalize and reopen are the user's, except that a run with routine decisions
+handed to it may skip an optional stage and go back (below); versions are append-only; execution
 labels are re-checked against real sandbox runs; one running agent run per project.
 
 **What only the app enforces:** exit criteria, which transitions are offered, the
@@ -655,7 +656,7 @@ and say what it did. Assessment: `docs/assessments/2026-10-09-research-go-and-br
 |---|---|
 | Runs Go can carry out | runs rows' `producible_by` (`stage-artifact.ts` `producibleBy`, `awaitsAttempt`); `policy.runAttemptsFor`; `needs.requiredWork` → `run_computation` per row; a failed or impossible run is recorded on its row (`perform.ts` `setAsideFrom`) and the run continues |
 | Stopping only when it must | `lib/agent/stop-audit.ts` (`auditStop`, `proposedDefault`); a question naming its own default is answered by it under `handle` and recorded as a policy fact (`recordRoutineDefault`, step `routine_default`); approval cards offer "Carry on with other work first" |
-| Going back | `return_to_stage` (both registries); offered by `policy.returnTargets` when the saved text asks for more (`asksForMoreWork`), under Autonomous + `handle`, at most `MAX_RETURNS`; the database checks it (`20261029000000`); the work is added to the earlier stage as a version, which reopens what was built on it |
+| Going back | `return_to_stage` (both registries); offered by `policy.returnTargets` when the saved text asks for more (`asksForMoreWork`), under Autonomous + `handle`, at most `MAX_RETURNS`; the database checks it (`20261029000000`); the work is added to the earlier stage as a version, which reopens what was built on it. Straight after an answer `policy.returnsForAnswer` offers it on any workflow (`answer_return` in the planner state), because whether an answer means changing earlier work is the planner's reading; under `ask` the planner asks a yes or no instead, and `answeredReturn` acts on the yes (L-189) |
 | Repetition | a repeat preemption carries `repeating`; the loop withdraws those moves once (`reconsiderNote`); saving an unsaved reasoning result is exempt from the polish cap |
 | Expert judgment | `/api/agent/expert-package` (`promptmaster/expert_review.py`): working quoted verbatim from the record, executed only where a sandbox run is on record; shown on the question card (`expertPackage`) |
 | Human-only work | `lib/workflow/human-requirements.ts`: rows naming it need a person; `failedChecks` holds the objective until the user's fact reports a result |

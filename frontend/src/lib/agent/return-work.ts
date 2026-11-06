@@ -31,7 +31,7 @@ export function returnInstruction(
   work: string,
 ): string {
   const rows = returningRows(from, fromContent);
-  const lead = `Further investigation asked for by ${from.label}: ${work}`;
+  const lead = `Further work asked for by ${from.label}: ${work}`;
   const table = rows
     ? `\n${from.label}'s rows, as saved (apply what they settle or ask for; a row carried forward stays open):\n${rows}`
     : '';
