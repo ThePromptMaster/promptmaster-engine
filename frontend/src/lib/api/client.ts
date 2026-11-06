@@ -883,6 +883,8 @@ export const api = {
   ): Promise<{
     findings: { id: string; verdict: 'carried' | 'not_carried' | 'not_applicable'; quote: string; note: string }[];
     contradictions: { rule_quote: string; conflicts_quote: string; problem: string; fix: string }[];
+    read_chars?: number;
+    total_chars?: number;
     model_used: string;
   }> {
     return apiFetch('/api/agent/check-deliverable', { method: 'POST', body: JSON.stringify(req), signal });

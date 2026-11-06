@@ -47,6 +47,8 @@ export interface NeedsActions {
   keepStage?: (stageId: string, reason?: string) => Promise<void>;
   /** Show a stage on the page. */
   openStage?: (stageId: string) => void;
+  /** Open the Finish dialog, with what is still unmet recorded as the limitation it finishes with (5 Nov). */
+  finishWithLimitation?: (items: readonly string[]) => void;
   /**
    * Decide one review row on another stage, from Go's stop that names it
    * (1 Nov): saved as the user's own decision on that stage's table.
@@ -217,6 +219,9 @@ export function GoPanel({
         // on to what the workflow still holds, or stop here.
         if (option === 'fix') return go.fixObjective(need.items);
         if (option === 'stop') return go.stop();
+        // Tried twice (5 Nov): open it to change it, or finish with it stated. Neither runs Go again.
+        if (option === 'open') return needsActions?.openStage?.(need.stageId);
+        if (option === 'finish') return needsActions?.finishWithLimitation?.(need.items);
         if ((option === 'accept_row' || option === 'reject_row') && need.rows?.length === 1 && needsActions?.decideRow) {
           const row = need.rows[0];
           await needsActions.decideRow(

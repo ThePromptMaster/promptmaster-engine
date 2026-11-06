@@ -143,3 +143,15 @@ def test_a_statement_a_table_on_record_contradicts_is_found_with_the_row_quoted(
     assert out.contradictions[0].conflicts_quote.startswith("v1: Effect of dose")
     # Without the table, the row quote is not on record, so nothing is kept.
     assert parse(raw, inputs, text, []).contradictions == []
+
+
+def test_a_text_past_the_limit_is_read_in_part_and_says_so_rather_than_refused():
+    """5 Nov: over 200,000 characters the route answered 422, recorded only as
+    "the check could not run"."""
+    from promptmaster.deliverable_check import MAX_CHECK_CONTENT, build_prompt
+    from promptmaster.schemas import PMInput
+
+    book = "\n\n".join(f"## Chapter {i}\n\nOPENING{i} " + "word " * 10_000 for i in range(1, 8))
+    assert len(book) > MAX_CHECK_CONTENT
+    _, user = build_prompt(PMInput(objective="Report what was reproduced.", mode="analyst"), "Book", book, [])
+    assert "OPENING7 " in user and "the rest of this section is not shown" in user

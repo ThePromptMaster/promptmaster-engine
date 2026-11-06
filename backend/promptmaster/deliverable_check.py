@@ -28,12 +28,16 @@ import re
 
 from pydantic import BaseModel, Field
 
+from .limits import clip_by_section
 from .llm_client import OpenRouterClient
 from .project_context import context_block
 from .schemas import PMInput
 
 MAX_FINDINGS = 30
 MAX_CONTRADICTIONS = 5
+#: The deliverable text the check reads. Longer text is clipped per section and
+#: said, not refused: a refusal read as "the check could not run" (5 Nov).
+MAX_CHECK_CONTENT = 200_000
 
 
 class AcceptedFinding(BaseModel):
@@ -77,6 +81,9 @@ class Contradiction(BaseModel):
 class DeliverableCheck(BaseModel):
     findings: list[FindingCheck] = Field(default_factory=list)
     contradictions: list[Contradiction] = Field(default_factory=list)
+    #: How much of the text was shown to the check, in characters.
+    read_chars: int = 0
+    total_chars: int = 0
 
 
 _INSTRUCTION = (
@@ -131,7 +138,7 @@ def build_prompt(
         + (f"{facts}\n" if facts else "")
         + f"\nACCEPTED FINDINGS:\n{rows or '(none)'}\n\n"
         + _tables_block(tables)
-        + f"THE DELIVERABLE — {label}:\n{content}"
+        + f"THE DELIVERABLE — {label}:\n{clip_by_section(content, MAX_CHECK_CONTENT)[0]}"
     )
     return _INSTRUCTION, user
 
@@ -199,4 +206,7 @@ async def check_deliverable(
         return DeliverableCheck()
     system, user = build_prompt(inputs, label, content, findings, tables)
     raw, _usage = await client.generate_json(prompt=user, system=system, temperature=0, max_tokens=3_000, model=model)
-    return parse(raw, inputs, content, findings, tables)
+    parsed = parse(raw, inputs, content, findings, tables)
+    parsed.read_chars = clip_by_section(content, MAX_CHECK_CONTENT)[1]
+    parsed.total_chars = len(content.strip())
+    return parsed

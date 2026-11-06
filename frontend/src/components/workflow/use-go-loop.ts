@@ -38,6 +38,7 @@ import { RefusedRevision } from '@/lib/workflow/commit-check';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { api, type AnswerContradiction } from '@/lib/api/client';
+import { ANSWER_OBJECTIVE_REASON, FIX_OBJECTIVE_REASON } from '@/lib/agent/objective-fixes';
 import { actionFor, actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, ROUTINE_DEFAULT_STEP, USER_ANSWER_STEP, whatApprovalDoes } from '@/lib/agent/actions';
 import { contextWithFacts, readOutcomeProof, readStageFacts, type StageFacts } from '@/lib/agent/facts';
 import { serializeItems, stageDrafts } from '@/lib/workflow/stage-artifact';
@@ -1438,7 +1439,7 @@ export function useGoLoop(opts: Options) {
       }
       try {
         const unmet = await reopenJudged(
-          'Fix what the objective check found unmet',
+          FIX_OBJECTIVE_REASON,
           `the objective check found these unmet — fix each, keep everything else the brief asks for: ${items.join('; ').slice(0, 800)}`
         );
         if (unmet) await Promise.all([o.onRefresh?.(), o.reloadEvents()]);
@@ -1488,7 +1489,7 @@ export function useGoLoop(opts: Options) {
         // reason, and Go's repair revises it. Matching the answer to the text
         // it corrects is not possible in code; the judged stage is known.
         const unmet = /objective is not met/i.test(current.stop_reason ?? '')
-          ? await reopenJudged('Your answer to the objective check', `your answer to "${asked.slice(0, 240)}" was: ${text.trim().slice(0, 600)}`)
+          ? await reopenJudged(ANSWER_OBJECTIVE_REASON, `your answer to "${asked.slice(0, 240)}" was: ${text.trim().slice(0, 600)}`)
           : objectiveUnmet(o.events);
         if (fact || st?.status === 'blocked' || unmet) {
           await Promise.all([o.onRefresh?.(), o.reloadEvents()]);

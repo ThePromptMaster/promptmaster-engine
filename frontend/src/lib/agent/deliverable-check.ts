@@ -46,6 +46,8 @@ export interface DeliverableCheckRecord {
   bounded?: boolean;
   /** The check could not run; nothing was concluded from it. */
   failed?: boolean;
+  /** Set when only part of the text fitted the check (5 Nov): how much it was shown, in characters. */
+  read?: { chars: number; total: number };
 }
 
 /**
@@ -156,7 +158,8 @@ export function describeCheck(r: DeliverableCheckRecord | null, label: string): 
   if (r.failed) return ` The check of ${label} against the accepted findings could not run, so nothing was concluded from it.`;
   const on = `${label}${r.version_number ? ` v${r.version_number}` : ''}`;
   const carried = r.accepted ? `${r.carried} of ${r.accepted} accepted finding${r.accepted === 1 ? '' : 's'} shown carried into ${on}` : `no accepted findings to carry into ${on}`;
-  if (!r.issues.length) return ` Checked: ${carried}; no contradiction found.`;
-  if (r.bounded) return ` Checked: ${carried}. Still open after ${MAX_CHECK_ROUNDS} repair rounds, so stated as limitations: ${r.issues.join('; ')}.`;
-  return ` Checked: ${carried}; ${r.issues.length} issue${r.issues.length === 1 ? '' : 's'} found.`;
+  const part = r.read && r.read.chars < r.read.total ? ` It read ${r.read.chars.toLocaleString('en-US')} of ${r.read.total.toLocaleString('en-US')} characters.` : '';
+  if (!r.issues.length) return ` Checked: ${carried}; no contradiction found.${part}`;
+  if (r.bounded) return ` Checked: ${carried}. Still open after ${MAX_CHECK_ROUNDS} repair rounds, so stated as limitations: ${r.issues.join('; ')}.${part}`;
+  return ` Checked: ${carried}; ${r.issues.length} issue${r.issues.length === 1 ? '' : 's'} found.${part}`;
 }

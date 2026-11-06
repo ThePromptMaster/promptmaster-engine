@@ -110,6 +110,7 @@ export function ObjectivePausedNotice({
   onResume,
   resumeDisabled = false,
   onAnswer,
+  answerPrompt,
   resumeLabel,
 }: {
   assessment: ObjectiveAssessment;
@@ -121,6 +122,8 @@ export function ObjectivePausedNotice({
    * workshop: "Make it obvious … exactly where I should respond").
    */
   onAnswer?: (text: string) => Promise<void> | void;
+  /** What the answer box asks when no blocker names a question: "tell Go how" after two repairs (5 Nov). */
+  answerPrompt?: string;
   /**
    * The button's words when Go is waiting on this check: the same action the
    * Go panel offers (17 Oct, Sean, FIELDGUIDE: Output said "Have Go fix
@@ -129,12 +132,18 @@ export function ObjectivePausedNotice({
   resumeLabel?: string;
 }) {
   const t = useT();
+  const locale = useLocale();
   const ask = assessment.blockers.map((b) => b.ask?.trim()).find(Boolean);
   // A next task that can be done now: the objective is open, not paused, and
   // what is missing waits only for other work (26 Oct, production: "Paused —
   // the objective is not met" beside a Go run carrying on with that task).
   const next = executableNext(assessment);
   const missing = assessment.blockers.map((b) => b.need.replace(/[.\s]+$/, ''));
+  const prompt = ask ? t('ssp.respond', { ask }) : answerPrompt;
+  // Which saved text the check read, and how much of it (5 Nov): "the delivered
+  // copy" and "what Go described" were two different stages.
+  const read = assessment.basis?.read;
+  const readOf = assessment.basis ? `${assessment.basis.stage_label}${assessment.basis.version_number ? ` v${assessment.basis.version_number}` : ''}` : '';
   const [answer, setAnswer] = useState('');
   const [sending, setSending] = useState(false);
   return (
@@ -150,6 +159,13 @@ export function ObjectivePausedNotice({
               : assessment.blockers.length ? t('ssp.paused') : t('ssp.notMetYet')}
           </p>
           <p className="mt-1 text-label text-[var(--on-surface-variant)]">{assessment.reason}</p>
+          {read && (
+            <p data-objective-read className="mt-1 text-label text-[var(--on-surface-variant)]">
+              {read.chars < read.total
+                ? t('ssp.readPart', { what: readOf, chars: read.chars.toLocaleString(locale), total: read.total.toLocaleString(locale) })
+                : t('ssp.readAll', { what: readOf, chars: read.total.toLocaleString(locale) })}
+            </p>
+          )}
           {!next && assessment.blockers.length > 0 && (
             <>
               <p className="mt-2 text-label font-semibold text-[var(--on-surface)]">{t('ssp.waitingFor')}</p>
@@ -172,7 +188,7 @@ export function ObjectivePausedNotice({
               <p className="mt-1 text-label text-[var(--on-surface-variant)]">{t('ssp.allowedBy', { by: assessment.limitations![0].allowed_by })}</p>
             </>
           )}
-          {ask && onAnswer && (
+          {prompt && onAnswer && (
             <form
               aria-label={t('ssp.answerLabel')}
               className="mt-3 rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2"
@@ -184,7 +200,7 @@ export function ObjectivePausedNotice({
               }}
             >
               <label htmlFor="objective-answer" className="text-label font-semibold text-[var(--on-surface)]">
-                {t('ssp.respond', { ask })}
+                {prompt}
               </label>
               <div className="mt-1.5 flex flex-wrap gap-2">
                 <input
@@ -217,7 +233,7 @@ export function ObjectivePausedNotice({
               {assessment.proposed_next.join('; ')}
             </p>
           )}
-          {onResume && !(ask && onAnswer) && (
+          {onResume && !(prompt && onAnswer) && (
             <div className="mt-3 flex flex-wrap gap-2">
               <button
                 onClick={onResume}

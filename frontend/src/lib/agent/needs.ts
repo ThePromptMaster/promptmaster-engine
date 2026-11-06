@@ -84,12 +84,16 @@ type Need =
    *  - `unmet`: the requirements found unmet, by name;
    *  - `no_evidence`: called met, but no passage of the deliverable showed it;
    *  - `stages_left`: met, with the workflow still holding stages;
-   *  - `work_open`: the deliverable is written, other work is still open.
+   *  - `work_open`: the deliverable is written, other work is still open;
+   *  - `repair_limit`: unmet, after Go has tried to fix it twice since the user
+   *    last changed anything (5 Nov): no further repair is offered.
    */
   | {
       kind: 'objective_check';
       stageId: string;
-      finding: 'unmet' | 'no_evidence' | 'stages_left' | 'work_open';
+      finding: 'unmet' | 'no_evidence' | 'stages_left' | 'work_open' | 'repair_limit';
+      /** `repair_limit`: how many times Go has tried. */
+      tried?: number;
       /** The unmet requirements, the open work, or the stages left — as the record names them. */
       items: string[];
       /** The stage Go moves to next, for `stages_left`. */
@@ -830,7 +834,7 @@ export function needStillHolds(
  * lifts the block and leaves the user on the stage — what the More menu's
  * "Continue this stage" does — without Go resuming.
  */
-export type StuckOption = 'resume' | 'add_data' | 'skip' | 'retry' | 'clear' | 'fix' | 'stop' | 'keep' | 'open' | 'accept_row' | 'reject_row';
+export type StuckOption = 'resume' | 'add_data' | 'skip' | 'retry' | 'clear' | 'fix' | 'stop' | 'keep' | 'open' | 'finish' | 'accept_row' | 'reject_row';
 
 /** At most this many ways forward on a stuck card (2 Oct screenshots: five was too many). */
 export const STUCK_OPTIONS_MAX = 3;
@@ -1087,6 +1091,14 @@ function describeObjectiveCheck(
         { id: 'stop' as const, label: t('need.fixMyself') },
       ];
       return { message: t('need.unmet', { list: list || t('need.seeRecord'), stage }), action: options[0].label, options };
+    }
+    case 'repair_limit': {
+      const options = [
+        { id: 'open' as const, label: t('need.openStage', { stage }) },
+        { id: 'finish' as const, label: t('need.finishLimitation') },
+        { id: 'stop' as const, label: t('need.stopHere') },
+      ];
+      return { message: t('need.repairLimit', { count: need.tried ?? 2, stage, list: list || t('need.seeRecord') }), action: options[0].label, options };
     }
     case 'no_evidence': {
       const options = [
