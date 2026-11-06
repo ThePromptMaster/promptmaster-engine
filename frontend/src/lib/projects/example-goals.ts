@@ -9,3 +9,28 @@ export function goalFromSearch(search: string, max: number): string {
   const goal = new URLSearchParams(search).get('goal')?.trim() ?? '';
   return goal.slice(0, max);
 }
+
+/**
+ * What someone typed elsewhere, for the start box to pick up once. In this tab's
+ * storage rather than the URL: it can be about their work, and a URL ends up in
+ * logs and histories.
+ */
+const START_GOAL_KEY = 'pm.start.goal';
+
+export function rememberStartGoal(goal: string): void {
+  try {
+    sessionStorage.setItem(START_GOAL_KEY, goal);
+  } catch {
+    // Storage blocked: the box just starts empty.
+  }
+}
+
+export function takeStartGoal(): string {
+  try {
+    const goal = sessionStorage.getItem(START_GOAL_KEY) ?? '';
+    sessionStorage.removeItem(START_GOAL_KEY);
+    return goal;
+  } catch {
+    return '';
+  }
+}

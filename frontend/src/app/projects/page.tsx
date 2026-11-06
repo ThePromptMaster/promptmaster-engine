@@ -18,6 +18,7 @@ import { accentVariables } from '@/lib/appearance/colours';
 import { GuestBanner } from '@/components/projects/guest-banner';
 import { DeletedProjects } from '@/components/projects/deleted-projects';
 import { ExampleCards } from '@/components/examples/example-cards';
+import { ExampleQuestionnaire } from '@/components/examples/example-questionnaire';
 import { PromptyHelp } from '@/components/examples/prompty-help';
 import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import { shownStageId } from '@/lib/i18n/stage';
@@ -345,6 +346,9 @@ export default function ProjectsPage() {
           <section aria-label={t('ex.startFrom')} className="mx-auto mt-5 max-w-[640px] text-start">
             <h3 className="mb-2 text-label uppercase tracking-wider text-[var(--on-surface-variant)]">{t('ex.startFrom')}</h3>
             <ExampleCards />
+            <div className="mt-4">
+              <ExampleQuestionnaire />
+            </div>
           </section>
           <Link
             href="/projects/new"
