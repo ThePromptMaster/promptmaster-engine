@@ -48,6 +48,7 @@ export const ar: Record<keyof typeof en, string> = {
   'na.allDone': 'كل ما تحتاجه هذه المرحلة منجز.',
   'ns.goWorking': 'Go يعمل…',
   'ns.goWorkingOn': 'Go يعمل على {what}…',
+  'ns.drafting': 'جارٍ كتابة {what}…',
   'ns.keeps': 'يحتفظ بتغييراتك على {stage} ويجعل Go يعيد التحقق مما جاء بعدها.',
   'ns.thisStage': 'هذه المرحلة',
   'ns.goWaiting': 'Go بانتظارك في المرحلة الحالية.',
