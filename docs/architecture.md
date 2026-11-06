@@ -124,11 +124,11 @@ The full endpoint inventory is in [`api.md`](api.md).
   evaluate a stage's exit criteria, project state from the event log, list available
   transitions. `templates/*.v1.ts` are the authoring source for the system workflows
   (`book`, `research`, `single_output`, `exploration`, `assessment`, `quick`).
-- **The start (27 Oct, Sean 26 Oct; 4 Nov).** `projects/new` leads with **Get an answer**: a project
-  pinned to `quick` (one prose stage, drafted as it opens), made without a setup screen.
-  **Start the conversation** sits beside it (4 Nov). "I know what I want to do" and Choose
-  yourself are under **"Advanced ways to start"** — not plain "Advanced", which the Setup
-  Simple/Advanced switch already uses — and it stays open once a user opens it (`pm.start.full.v1`,
+- **The start (27 Oct; 4 Nov).** `projects/new` offers two ways in under "Start either way…".
+  **Build a plan with me** (stronger look) is the conversation with an outline beside it. **Get a
+  first draft** is a project pinned to `quick` (one prose stage, drafted as it opens), made without
+  a setup screen. "I know what I want to do" and Choose yourself are under **"More ways to
+  start"**, and it stays open once a user opens it (`pm.start.full.v1`,
   the key the earlier "Start with the full workflow instead" toggle used). **Ask me
   questions** (Sean, 31 Oct) is a button in the start conversation, not on the first screen:
   `FrontDoor` asks `guide-next-question` with the conversation so far as material, shows the
