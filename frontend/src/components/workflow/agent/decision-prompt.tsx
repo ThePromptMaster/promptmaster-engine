@@ -79,8 +79,11 @@ export function QuestionPrompt({
   expertPackage,
   choices = [],
   change,
+  canLeaveToGo = true,
 }: {
   question: string;
+  /** "Do whatever is best" is no answer to an approval, or to a question it already did not settle (5 Nov). */
+  canLeaveToGo?: boolean;
   /**
    * The stage's latest version came from applied findings: what it changed,
    * shown beside the question (19 Oct, Research › Method — Go asked which
@@ -135,15 +138,17 @@ export function QuestionPrompt({
               {c}
             </button>
           ))}
-          <button
-            type="button"
-            disabled={checking}
-            onClick={() => onAnswer(DELEGATED_ANSWER)}
-            title={t('qp.bestHint')}
-            className="rounded-lg bg-[var(--surface-container-low)] px-4 py-2 text-start text-title text-[var(--pm-primary)] disabled:opacity-60"
-          >
-            {t('qp.best')}
-          </button>
+          {canLeaveToGo && (
+            <button
+              type="button"
+              disabled={checking}
+              onClick={() => onAnswer(DELEGATED_ANSWER)}
+              title={t('qp.bestHint')}
+              className="rounded-lg bg-[var(--surface-container-low)] px-4 py-2 text-start text-title text-[var(--pm-primary)] disabled:opacity-60"
+            >
+              {t('qp.best')}
+            </button>
+          )}
         </div>
       {onTick && approvals.length > 0 && (
         <div className="mt-3 flex flex-col items-start gap-2">

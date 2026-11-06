@@ -49,6 +49,8 @@ type Need =
       questions?: string[];
       /** Answers the user can click (13 Oct); the text box stays for anything else. */
       choices?: string[];
+      /** A pause on a question already answered: "do whatever is best" would only bring it back. */
+      repeat?: boolean;
     }
   | { kind: 'wait_for_jobs'; stageId: string; pending: number; complete: number; total: number }
   /**

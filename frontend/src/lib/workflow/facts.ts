@@ -33,6 +33,8 @@ export function factSource(f: Pick<ProjectFact, 'source_kind' | 'source_ref' | '
       ? `from${file}`
       : f.source_kind === 'chat' && f.source_ref?.via === 'front door'
         ? 'from your conversation'
+        : f.source_ref?.delegated
+          ? 'chosen by Go when you left it to Go'
         : f.source_ref?.via === 'go answer'
           ? 'your answer to Go'
           : f.source_ref?.via === 'revision'
@@ -40,7 +42,7 @@ export function factSource(f: Pick<ProjectFact, 'source_kind' | 'source_ref' | '
             : SOURCE_WORDS[f.source_kind];
   const by = f.accepted_by === 'policy' ? ', accepted under your routine-decision policy' : '';
   // Said apart from what the user said, in the chip and in every prompt (S2b).
-  const assumed = f.origin === 'model_assumed' ? ', assumed by PromptMaster (you did not say it)' : '';
+  const assumed = f.origin === 'model_assumed' && !f.source_ref?.delegated ? ', assumed by PromptMaster (you did not say it)' : '';
   const when = day(f.created_at);
   return `${base}${when ? `, ${when}` : ''}${by}${assumed}`;
 }

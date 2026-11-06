@@ -62,7 +62,8 @@ import { useProjectStore } from '@/stores/project-store';
 import { describeValue, leftoverMentions, leftoverValues, namedLeftovers, type SupersededValue } from '@/lib/workflow/fact-values';
 import { revertsUserVersion, USER_CHOSEN_OPERATIONS } from '@/lib/workflow/fact-reconcile';
 import { hasIdChanges, idChangeDefault, idChangeQuestion, idChanges, removedByUser } from '@/lib/workflow/id-changes';
-import { recordPolicyFacts } from '@/lib/supabase/facts';
+import { recordFacts, recordPolicyFacts } from '@/lib/supabase/facts';
+import { chosenFrom, delegatedFact, delegatedQuestion, DELEGATED_RULE, isDelegatedWhy } from '@/lib/workflow/answers';
 import { checkGoal } from './code-check';
 import { unmetHumanRequirements } from '@/lib/workflow/human-requirements';
 import { approverFindings, approverSources } from '@/lib/workflow/approver-support';
@@ -1187,7 +1188,8 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // find. One call names those sentences, only when a fact replaced
       // something; the repair must change each, checked in code below.
       const claims = before || measuredRepair ? [] : await dependentClaimsFor(ctx.project, target.label, head, ctx.signal);
-      const instruction = recheckInstruction(target.label, why, superseded, before ? 'table' : 'prose') + measuredLine + decidedLine + claimsInstruction(claims);
+      const leftToGo = isDelegatedWhy(why);
+      const instruction = recheckInstruction(target.label, why, superseded, before ? 'table' : 'prose') + (leftToGo ? DELEGATED_RULE : '') + measuredLine + decidedLine + claimsInstruction(claims);
       const fresh = await readManuscript(ctx, target);
       if (!fresh) return manuscriptMissing(key, target);
       // A head the model cut off is finished first, so the repair starts from
@@ -1233,7 +1235,9 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         const notes = results.map((r) => r.note?.trim()).filter((n): n is string => Boolean(n));
         const joined = joinParts(results.map((r) => r.text));
         const last = results.find((r) => r.res)?.res ?? null;
-        const res = { ...(last ?? ({} as Awaited<ReturnType<typeof api.generateStageArtifact>>)), finish_reason: 'stop' };
+        // Every part's note to the user, not only the first's: a choice is said where it was made.
+        const said = results.map((r) => r.res?.note_to_user?.trim()).filter(Boolean).join(' ');
+        const res = { ...(last ?? ({} as Awaited<ReturnType<typeof api.generateStageArtifact>>)), finish_reason: 'stop', ...(said ? { note_to_user: said } : {}) };
         return { res, content: notes.length ? `What changed: ${notes.join(' ')}\n\n${joined}` : joined };
       };
       const attempt = async (text: string) => {
@@ -1417,6 +1421,11 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
           changes: typeof versionId === 'string' ? { version_ids: [versionId] } : {},
           output: `${cutOffMessage(target.label, content)} ${target.label} stays reopened.`,
         });
+      }
+      // The choice on record, so the next check and draft read it as decided (5 Nov).
+      if (leftToGo && typeof versionId === 'string') {
+        const chosen = chosenFrom([res.note_to_user, userSplit.note].filter(Boolean).join(' '));
+        await recordFacts(ctx.project, [delegatedFact(delegatedQuestion(why), chosen ?? `see ${target.label}, the version saved with this choice`, { run_id: ctx.run.id, stage_id: target.id, version_id: versionId })]).catch(() => undefined);
       }
       // Closed again only when its own requirements hold; a reserved approval
       // stays the user's, and the stage stays reopened until they give it.
