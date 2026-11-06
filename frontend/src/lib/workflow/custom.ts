@@ -42,6 +42,8 @@ export interface DesignedStage {
   scale_levels?: string[];
   /** Assess stages: what is pasted, plural. */
   item_noun?: string;
+  /** Assess stages: a batch to offer in the paste box (a curated example's sample). */
+  offered_batch?: string;
 }
 
 export interface DesignedWorkflow {
@@ -190,7 +192,11 @@ function assessSpec(s: DesignedStage): AssessSpec {
   const levels = (s.scale_levels ?? []).map((l) => l.trim()).filter(Boolean).slice(0, 7);
   const scale: AssessSpec['scale'] =
     levels.length >= 2 ? levels.map((label, i) => ({ label, tone: toneAt(i, levels.length) })) : presetScale(s.scale) ? s.scale! : 'traffic';
-  return { scale, ...(s.item_noun?.trim() ? { item_noun: s.item_noun.trim() } : {}) };
+  return {
+    scale,
+    ...(s.item_noun?.trim() ? { item_noun: s.item_noun.trim() } : {}),
+    ...(s.offered_batch?.trim() ? { offered_batch: s.offered_batch.trim() } : {}),
+  };
 }
 
 function loopTarget(design: DesignedWorkflow, i: number, ids: readonly string[]): string | null {

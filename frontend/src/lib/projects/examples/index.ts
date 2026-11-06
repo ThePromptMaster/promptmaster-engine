@@ -4,6 +4,7 @@ import type { ModeType } from '@/types';
 
 import { BUSINESS_ANALYSIS } from './business-analysis';
 import type { ExampleKey } from './cards';
+import { DEAL_SCREENING } from './deal-screening';
 import { INVESTMENT_MEMO } from './investment-memo';
 
 /**
@@ -38,15 +39,19 @@ export interface Example {
   files?: { name: string; text: string }[];
 }
 
-export const EXAMPLES: readonly Example[] = [INVESTMENT_MEMO, BUSINESS_ANALYSIS];
+export const EXAMPLES: readonly Example[] = [DEAL_SCREENING, INVESTMENT_MEMO, BUSINESS_ANALYSIS];
 
 export function exampleBySlug(slug: string): Example | undefined {
   return EXAMPLES.find((e) => e.slug === slug);
 }
 
 /** `suffix` is what makes the key this user's own; RLS admits `custom_` keys only. */
-export function exampleWorkflow(example: Example, suffix: string): WorkflowTemplate {
-  return templateFromDesign(example.design, `ex_${example.key}_${suffix}`);
+export function exampleWorkflow(example: Example, suffix: string, { own = false }: { own?: boolean } = {}): WorkflowTemplate {
+  // On the user's own work there is no sample to offer.
+  const design = own
+    ? { ...example.design, stages: example.design.stages.map((stage) => ({ ...stage, offered_batch: undefined })) }
+    : example.design;
+  return templateFromDesign(design, `ex_${example.key}_${suffix}`);
 }
 
 /** The first rows of a data file, for the preview. */

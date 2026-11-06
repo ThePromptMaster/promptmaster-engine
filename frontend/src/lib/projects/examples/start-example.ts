@@ -34,7 +34,7 @@ export async function startExample(
   }
 ): Promise<string> {
   const suffix = crypto.randomUUID().replace(/-/g, '').slice(0, 10);
-  const draft = exampleWorkflow(example, suffix);
+  const draft = exampleWorkflow(example, suffix, { own: Boolean(own) });
   const problems = validateTemplate(draft);
   if (problems.length) throw new Error(problems[0]);
   const template = await publishUserTemplate(draft, userId, { listed: false });

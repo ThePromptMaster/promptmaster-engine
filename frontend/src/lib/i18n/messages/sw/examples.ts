@@ -36,6 +36,7 @@ export const sw: Record<keyof typeof en, string> = {
   "ex.startOwn": "Au anza kwa maneno yako",
   "ex.see": "Tazama mfano huu",
   "op.example_prewritten": "Imeandaliwa kwa mfano huu",
+  "ex.useBatch": "Tumia kundi la mfano",
   "ex.investment_memo.title": "Waraka wa uwekezaji",
   "ex.investment_memo.blurb": "Geuza muhtasari wa muuzaji na faili la fedha kuwa waraka wa kamati, namba zikiwa zimekokotolewa na kila dai likiwa limekaguliwa dhidi ya data.",
   "ex.investment_memo.gets": "Waraka unaoanza na pendekezo na bei, unaosema wapi muhtasari na data vinatofautiana, na unaoorodhesha kile uchunguzi lazima uamue.",

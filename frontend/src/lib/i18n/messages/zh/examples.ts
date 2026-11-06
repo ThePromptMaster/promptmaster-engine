@@ -36,6 +36,7 @@ export const zh: Record<keyof typeof en, string> = {
   "ex.startOwn": "或者用你自己的话开始",
   "ex.see": "查看此示例",
   "op.example_prewritten": "为此示例准备",
+  "ex.useBatch": "使用样例批次",
   "ex.investment_memo.title": "投资备忘录",
   "ex.investment_memo.blurb": "把卖方的项目简介和财务文件变成提交投委会的备忘录：数字都算出来，每项说法都对照数据核实。",
   "ex.investment_memo.gets": "一份开篇就给出建议和价格的备忘录，指出简介与数据的分歧，并列出尽职调查必须解决的问题。",

@@ -99,6 +99,8 @@ export function AssessRenderer({
   }, [items, filter, bestFirst, scale]);
   const stageName = stageText(locale, templateKey, stage, 'label');
   const noun = stage.assess?.item_noun?.trim();
+  // A sample to offer: it fills the box, and only pressing Assess runs anything.
+  const sampleBatch = stage.assess?.offered_batch?.trim();
 
   async function run() {
     if (!onAssessBatch || !text.trim() || running || !validScale(scale)) return;
@@ -174,6 +176,16 @@ export function AssessRenderer({
             className="mt-2 max-h-[40vh] w-full resize-none overflow-y-auto rounded-lg bg-[var(--surface-container-lowest)] px-3 py-2 text-body text-[var(--on-surface)] outline-none focus:ring-2 focus:ring-[var(--pm-primary)]"
           />
           <LimitCounter length={text.length} limit={ASSESS_PASTE_MAX} />
+          {sampleBatch && !text.trim() && items.length === 0 && (
+            <button
+              type="button"
+              onClick={() => setText(sampleBatch)}
+              className="mt-2 inline-flex items-center gap-1.5 text-label font-semibold text-[var(--pm-primary)] hover:underline"
+            >
+              <span aria-hidden className="material-symbols-outlined text-[16px]">content_paste</span>
+              {t('ex.useBatch')}
+            </button>
+          )}
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <button
               type="button"

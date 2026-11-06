@@ -6,6 +6,8 @@ import { validateTemplate } from '@/lib/workflow/validate';
 import { en } from '@/lib/i18n/messages/en';
 import { MAX_FILE_BYTES } from '@/lib/data/preview';
 import { INPUT_LIMITS } from '@/lib/projects/input-limits';
+import { definitionOf, toTemplate } from '@/lib/supabase/workflow';
+import { ASSESS_PASTE_MAX } from '@/lib/workflow/assess';
 
 import { EXAMPLE_CARDS } from './cards';
 import { EXAMPLES, csvPreview, exampleBySlug, exampleWorkflow } from './index';
@@ -120,6 +122,32 @@ describe('the business analysis sample', () => {
     const thirdParty = (saving - 1.35) * west;
     expect(ownSite).toBeLessThan(0);
     expect(thirdParty).toBeGreaterThan(300_000);
+  });
+});
+
+describe('the deal screening sample', () => {
+  const deals = exampleBySlug('deal-screening')!;
+  const stage = exampleWorkflow(deals, 'abc123def0').stages.find((s) => s.renderer === 'assess')!;
+  const batch = stage.assess?.offered_batch ?? '';
+
+  it('offers a batch the assess step can take', () => {
+    expect(batch.length).toBeGreaterThan(0);
+    expect(batch.length).toBeLessThanOrEqual(ASSESS_PASTE_MAX);
+    // The server takes 12 at a time (assessment.MAX_ASSESS_ITEMS).
+    expect(batch.split('\n\n')).toHaveLength(6);
+  });
+
+  it('offers no sample on the user\'s own work', () => {
+    const own = exampleWorkflow(deals, 'abc123def0', { own: true }).stages.find((s) => s.renderer === 'assess')!;
+    expect(own.assess?.offered_batch).toBeUndefined();
+    expect(own.assess?.scale).toBe('traffic');
+    expect(validateTemplate(exampleWorkflow(deals, 'abc123def0', { own: true }))).toEqual([]);
+  });
+
+  it('survives being saved, which is the only way it reaches the page', () => {
+    const template = exampleWorkflow(deals, 'abc123def0');
+    const back = toTemplate({ id: 'r', key: template.key, version: 1, name: template.name, description: '', definition: definitionOf(template) });
+    expect(back.stages.find((s) => s.renderer === 'assess')?.assess?.offered_batch).toBe(batch);
   });
 });
 

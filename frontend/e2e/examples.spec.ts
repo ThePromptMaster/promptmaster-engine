@@ -103,3 +103,27 @@ test('an unknown example says so and offers the real ones', async ({ page }) => 
   await expect(page.getByRole('heading', { name: 'There is no example here' })).toBeVisible();
   await expect(page.getByRole('link', { name: /Business analysis/ })).toBeVisible();
 });
+
+test('deal screening: the sample batch fills the box, and only Assess runs anything', async ({ page }) => {
+  test.setTimeout(120_000);
+  const calls = backendCalls(page);
+  await page.goto('/examples/deal-screening');
+  await dismissBetaNotice(page);
+  await page.getByRole('button', { name: 'Try it on this sample' }).click();
+  await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}$/, { timeout: 30_000 });
+
+  await expect(page.getByRole('heading', { name: 'Mandate and criteria' })).toBeVisible();
+  await page.getByRole('checkbox', { name: 'I approve these criteria for judging every deal' }).check();
+  await transitionBar(page).getByRole('button', { name: /^Continue to/ }).click();
+  await expect(page.getByRole('heading', { name: 'Screen the deals' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Use the sample batch' }).click();
+  await expect(page.getByLabel('Paste the deals to assess')).toHaveValue(/Tamarack Ridge Fasteners/);
+  await page.screenshot({ path: test.info().outputPath('01-sample-batch.png'), fullPage: true });
+  expect(calls).toEqual([]);
+
+  await page.getByRole('region', { name: 'New batch' }).getByRole('button', { name: 'Assess', exact: true }).click();
+  await expect(page.getByRole('table')).toBeVisible({ timeout: 30_000 });
+  expect(calls).toEqual(['/api/assess-batch']);
+  await page.screenshot({ path: test.info().outputPath('02-verdicts.png'), fullPage: true });
+});

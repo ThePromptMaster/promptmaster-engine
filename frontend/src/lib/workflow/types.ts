@@ -44,6 +44,11 @@ export interface AssessSpec {
   scale: string | { label: string; tone: 'good' | 'caution' | 'bad' | 'neutral'; meaning?: string }[];
   /** What is pasted, plural, as the paste box names it ("profiles"); absent says "items". */
   item_noun?: string;
+  /**
+   * A batch to offer in the box, for a curated example's sample (4 Nov). It fills
+   * the box and runs nothing; pressing Assess is what spends. Nothing else reads it.
+   */
+  offered_batch?: string;
 }
 
 /**

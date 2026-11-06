@@ -7,6 +7,7 @@
  * `index.ts`.
  */
 export const EXAMPLE_CARDS = [
+  { key: 'deal_screening', slug: 'deal-screening', icon: 'filter_alt' },
   { key: 'investment_memo', slug: 'investment-memo', icon: 'request_quote' },
   { key: 'business_analysis', slug: 'business-analysis', icon: 'query_stats' },
 ] as const;
