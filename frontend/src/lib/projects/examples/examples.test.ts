@@ -10,6 +10,8 @@ import { INPUT_LIMITS } from '@/lib/projects/input-limits';
 import { definitionOf, toTemplate } from '@/lib/supabase/workflow';
 import { ASSESS_PASTE_MAX } from '@/lib/workflow/assess';
 
+import { mayAddStages } from '@/lib/workflow/added-stages';
+
 import { EXAMPLE_CARDS } from './cards';
 import { EXAMPLES, csvPreview, exampleBySlug, exampleWorkflow } from './index';
 
@@ -75,6 +77,21 @@ describe('the examples', () => {
       });
     });
   }
+});
+
+describe('Go on an example (6 Nov, production)', () => {
+  it.each(EXAMPLES.map((e) => [e.key, e] as const))('%s keeps its stages, saved or not', (_key, example) => {
+    const template = exampleWorkflow(example, '0000000000');
+    expect(mayAddStages(template)).toBe(false);
+    const saved = toTemplate({ id: 't', key: template.key, version: 1, name: template.name, description: template.description, definition: definitionOf(template) });
+    expect(mayAddStages(saved)).toBe(false);
+  });
+
+  it('an investigation may still add one', () => {
+    expect(mayAddStages({ key: 'research' })).toBe(true);
+    expect(mayAddStages({ key: 'custom_x', inquiry: true })).toBe(true);
+    expect(mayAddStages({ key: 'custom_x' })).toBe(false);
+  });
 });
 
 describe('the investment memo sample', () => {

@@ -154,3 +154,14 @@ export function addedByRun(events: readonly Pick<WorkflowEvent, 'type' | 'agent_
 export function addedSignature(events: readonly Pick<WorkflowEvent, 'type' | 'payload'>[] | null | undefined): string {
   return (events ?? []).map(addedStageOf).filter((s): s is AddedStage => s !== null).map((s) => `${s.id}@${s.after}`).join('|');
 }
+
+/**
+ * Whether Go may add a stage to this workflow for the next task the work names.
+ *
+ * An investigation may (25 Oct). A curated example may not: on production (6 Nov) a
+ * fix to the memo became a stage called "Reconcile debt-service wording", the memo still
+ * said the old thing, the next review flagged the difference, and so on, round after round.
+ */
+export function mayAddStages(template: Pick<WorkflowTemplate, 'key' | 'inquiry' | 'fixed_stages'>): boolean {
+  return (template.key === 'research' || Boolean(template.inquiry)) && !template.fixed_stages;
+}

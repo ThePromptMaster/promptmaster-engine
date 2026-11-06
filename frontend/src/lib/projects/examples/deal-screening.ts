@@ -30,6 +30,7 @@ export const DEAL_SCREENING: Example = {
     description: 'Set the criteria once, then judge every deal against them on a traffic light, and shortlist what to take forward.',
     deliverable: 'deal shortlist',
     inquiry: false,
+    fixed_stages: true,
     execution: {
       kind: 'finite',
       success_criterion:

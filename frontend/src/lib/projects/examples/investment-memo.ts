@@ -29,6 +29,7 @@ export const INVESTMENT_MEMO: Example = {
     description: 'From a teaser and a data file to a committee memo: numbers worked out, claims checked, a price named.',
     deliverable: 'investment memo',
     inquiry: true,
+    fixed_stages: true,
     execution: {
       kind: 'finite',
       success_criterion:

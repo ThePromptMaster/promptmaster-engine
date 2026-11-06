@@ -52,6 +52,8 @@ export interface DesignedWorkflow {
   deliverable: string;
   inquiry: boolean;
   execution?: WorkflowExecution;
+  /** Go works within these stages and never adds one. */
+  fixed_stages?: boolean;
   stages: DesignedStage[];
 }
 
@@ -182,6 +184,7 @@ export function templateFromDesign(design: DesignedWorkflow, suffix: string): Wo
     outline_stage: hasChapters ? 'explicit' : 'none',
     nouns: { deliverable: design.deliverable.trim() || 'piece', unit: hasChapters ? 'chapter' : 'part' },
     ...(design.inquiry ? { inquiry: true } : {}),
+    ...(design.fixed_stages ? { fixed_stages: true } : {}),
     ...(design.execution ? { execution: { ...design.execution, success_criterion: design.execution.success_criterion.trim() } } : {}),
     stages,
   };
@@ -221,6 +224,7 @@ export function designFromTemplate(template: WorkflowTemplate): DesignedWorkflow
     description: template.description,
     deliverable: template.nouns?.deliverable ?? 'piece',
     inquiry: Boolean(template.inquiry),
+    ...(template.fixed_stages ? { fixed_stages: true } : {}),
     ...(template.execution ? { execution: template.execution } : {}),
     // A chapter plan is part of the chapters stage after it, not a stage of its own.
     stages: template.stages.filter((s, i) => !(s.renderer === 'outline' && template.stages[i + 1]?.renderer === 'long_form')).map((s) => {
