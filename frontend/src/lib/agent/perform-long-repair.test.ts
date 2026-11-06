@@ -158,3 +158,26 @@ describe("applying a check's findings to a text too long for one call (2 Nov, pr
     expect(out.output).toMatch(/cut off .* not saved; v8 stays as it is/);
   });
 });
+
+describe('the part that reports on the rest reads the rest (5 Nov, a book test)', () => {
+  const NOTE = '# Review note\n\nChapter 4 holds.\n';
+
+  it('goes last, with the others as revised and without the first draft', async () => {
+    const { c } = ctx({ content: `${BOOK}\n${NOTE}` });
+    await performStep(c);
+    const calls = generateStageArtifact.mock.calls.map(([req]) => req);
+    const last = calls.at(-1);
+    expect(last.existing_content).toContain('Review note');
+    expect(last.whole_text).toContain('# Chapter 1 (revised)');
+    expect(last.whole_text).toContain('# Chapter 5 (revised)');
+    expect(last.digest.manuscript).toBe('');
+    expect(calls.slice(0, -1).every((r) => !r.whole_text)).toBe(true);
+  });
+
+  it('with no note, the last part is that part', async () => {
+    const { c } = ctx({ content: BOOK });
+    await performStep(c);
+    const calls = generateStageArtifact.mock.calls.map(([req]) => req);
+    expect(calls.at(-1).whole_text).toContain('# Chapter 1 (revised)');
+  });
+});

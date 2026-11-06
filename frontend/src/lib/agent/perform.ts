@@ -71,7 +71,7 @@ import { writtenClaimFindings } from '@/lib/workflow/claim-support';
 import { isSuperseded, markSuperseded, replacedValues } from '@/lib/workflow/superseded-rows';
 import { figureFindings, figureSources } from '@/lib/workflow/figure-support';
 import { asIteration } from '@/lib/workflow/legacy';
-import { headingOutline, joinParts, needsParts, partInstruction, splitIntoParts } from '@/lib/workflow/long-prose';
+import { headingOutline, joinParts, needsParts, partInstruction, partThatReads, splitIntoParts } from '@/lib/workflow/long-prose';
 import {
   evaluationRecord,
   evaluationRequest, withoutHandCounts,
@@ -1207,22 +1207,28 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       let searched = false;
       const attemptInParts = async (text: string) => {
         const results: { text: string; note: string | null; kept: boolean; res: Awaited<ReturnType<typeof api.generateStageArtifact>> | null }[] = new Array(chunks.length);
-        const revisePart = async (i: number) => {
-          const request = generationRequest(ctx.project, ctx.template, ctx.state, fresh, target, chunks[i], text + partInstruction(i, chunks.length, outline));
+        // The part that reports on the rest goes last, against what the others became (5 Nov).
+        const reads = partThatReads(chunks);
+        const first = reads === 0 ? 1 : 0;
+        const revisePart = async (i: number, whole = '') => {
+          const built = generationRequest(ctx.project, ctx.template, ctx.state, fresh, target, chunks[i], text + partInstruction(i, chunks.length, outline));
+          const request = whole ? { ...built, whole_text: whole, digest: { ...built.digest, manuscript: '' } } : built;
           // The first part of the first attempt may search; the rest use what is saved.
-          const res = await api.generateStageArtifact(searched || i > 0 ? { ...request, web_access: 'off' } : request, ctx.signal);
-          if (i === 0) await keepWeb(ctx, res, target);
+          const res = await api.generateStageArtifact(searched || i !== first ? { ...request, web_access: 'off' } : request, ctx.signal);
+          if (i === first) await keepWeb(ctx, res, target);
           const { note, body } = splitChangeNote(generationContent(target, res));
           // A part still cut off, or returned empty, is kept as it was rather
           // than saved half-written; the step says which.
           const kept = !body.trim() || res.finish_reason === 'length';
           results[i] = { text: kept ? chunks[i] : body, note: kept ? null : note, kept, res };
         };
-        await revisePart(0);
+        await revisePart(first);
         searched = true;
-        for (let next = 1; next < chunks.length; next += PART_CONCURRENCY) {
-          await Promise.all(chunks.slice(next, next + PART_CONCURRENCY).map((_, j) => revisePart(next + j)));
+        const others = chunks.map((_, i) => i).filter((i) => i !== first && i !== reads);
+        for (let next = 0; next < others.length; next += PART_CONCURRENCY) {
+          await Promise.all(others.slice(next, next + PART_CONCURRENCY).map((i) => revisePart(i)));
         }
+        await revisePart(reads, joinParts(chunks.map((c, i) => results[i]?.text ?? c)));
         partsKept = results.flatMap((r, i) => (r.kept ? [i + 1] : []));
         const notes = results.map((r) => r.note?.trim()).filter((n): n is string => Boolean(n));
         const joined = joinParts(results.map((r) => r.text));

@@ -20,7 +20,7 @@ from deps import get_client
 from promptmaster.catchphrases import without_repeated_catchphrases
 from promptmaster.reader_text import split_user_note
 from promptmaster.errors import PRESERVED_EVALUATION, PRESERVED_STAGE_VERSIONS
-from promptmaster.limits import MAX_INSTRUCTION_CHARS
+from promptmaster.limits import MAX_INSTRUCTION_CHARS, MAX_WHOLE_TEXT_CHARS
 from promptmaster.measured import MAX_LINES as MAX_MEASURED, MeasuredLine
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError, resolve_model
 from promptmaster.schemas import (
@@ -73,6 +73,9 @@ class GenerateStageArtifactRequest(BaseModel):
     web_access: WebAccess = "off"
     #: On a check stage: what code counted on the written work it checks (4 Nov).
     measured: list[MeasuredLine] = Field(default_factory=list, max_length=MAX_MEASURED)
+    #: One part of a long revision that reports on the rest: the whole document as
+    #: it now stands, read-only (5 Nov, a book test).
+    whole_text: str = Field(default="", max_length=MAX_WHOLE_TEXT_CHARS)
 
 
 @router.post("/generate-stage-artifact")
@@ -105,6 +108,7 @@ async def api_generate_stage_artifact(
             existing_content=req.existing_content,
             instruction=req.instruction,
             measured=req.measured,
+            whole_text=req.whole_text,
         )
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_STAGE_VERSIONS)

@@ -830,3 +830,51 @@ def test_every_stage_says_how_each_result_stands(basic_inputs, prose_stage, dige
     system, _user = build_stage_prompt(basic_inputs, prose_stage, digest)
     assert "SAY HOW EACH RESULT STANDS" in system
     assert "Never call a result calculated, computed, verified" in system
+
+
+class TestWholeDocument:
+    """5 Nov (a book test): the part of a long finished book holding the review note
+    saw neither the chapters beside it nor anything newer than the first draft."""
+
+    def _build(self, **kw):
+        from promptmaster.schemas import PMInput, StageDescriptor, StageDigest
+        from promptmaster.stage import build_stage_prompt
+
+        digest = kw.pop("digest", StageDigest())
+        return build_stage_prompt(
+            PMInput(objective="A book", mode="analyst"),
+            StageDescriptor(id="finished", label="Finished book", renderer="prose"),
+            digest,
+            existing_content="## Review note\n\nOld note.",
+            instruction="Revise it.",
+            **kw,
+        )[1]
+
+    def test_the_part_that_reports_is_given_the_whole_document(self):
+        user = self._build(whole_text="## Chapter 4\n\nSam approves 2pm.")
+        assert "THE WHOLE DOCUMENT THIS PART BELONGS TO" in user
+        assert "Sam approves 2pm." in user
+        assert "never say it was not available" in user
+
+    def test_other_parts_are_not(self):
+        assert "THE WHOLE DOCUMENT" not in self._build()
+
+    def test_a_very_long_document_is_read_by_section_within_the_limit(self):
+        long = "\n\n".join(f"## Chapter {i}\n\nOPENING{i} " + "word " * 10_000 for i in range(1, 7))
+        user = self._build(whole_text=long)
+        assert "OPENING6 " in user
+        assert "the rest of this section is not shown" in user
+
+    def test_a_first_draft_this_stage_replaced_is_labelled_so(self):
+        from promptmaster.schemas import StageDigest
+
+        user = self._build(digest=StageDigest(manuscript="Sam approves 2:30.", manuscript_is_earlier=True))
+        assert "AS IT WAS FIRST DRAFTED" in user
+        assert "never report a problem of this draft as a problem of the work" in user
+        assert "Work from this text" not in user
+
+    def test_otherwise_the_manuscript_is_what_to_work_from(self):
+        from promptmaster.schemas import StageDigest
+
+        user = self._build(digest=StageDigest(manuscript="Sam approves 2:30."))
+        assert "Work from this text" in user

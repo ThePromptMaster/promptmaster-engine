@@ -229,3 +229,28 @@ describe('a note to the user is a change note (4 Nov, Lakeside proposal)', () =>
     expect(isChangeNote('**Not part of this proposal:** follow-up support and travel.')).toBe(false);
   });
 });
+
+describe('what is not put back, and where (5 Nov, a book test)', () => {
+  it('a label is not put back without what it introduced', () => {
+    const before = '# Book\n\nChapter text.\n\n**Other required points:**\n- A point that went.\n';
+    const after = '# Book\n\nChapter text.\n';
+    const kept = keepUnasked(before, after, 'Bring it into line');
+    expect(kept.text).not.toContain('Other required points');
+    expect(kept.reported).toContain('**Other required points:**');
+  });
+
+  it('a line whose neighbours all went does not land above the title', () => {
+    const before = 'Opening sentence that the revision rewrote completely here.\n\nKeep this short line.\n';
+    const after = '# A new title\n\nWholly new text that shares none of those words at all.\n';
+    const kept = keepUnasked(before, after, 'Bring it into line');
+    expect(kept.text.startsWith('# A new title')).toBe(true);
+    expect(kept.restored).not.toContain('Keep this short line.');
+    expect(kept.reported).toContain('Keep this short line.');
+  });
+
+  it('a short line at the very top of the old text may still go back there', () => {
+    const before = 'Status: draft\n\n# Title\n\nBody text here.\n';
+    const after = '# Title\n\nBody text here.\n';
+    expect(keepUnasked(before, after, 'Bring it into line').text.startsWith('Status: draft')).toBe(true);
+  });
+});

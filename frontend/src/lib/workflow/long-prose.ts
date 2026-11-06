@@ -116,6 +116,22 @@ export function partInstruction(index: number, count: number, outline: string): 
   );
 }
 
+/** A heading for what reports on the document rather than being part of it. */
+const REPORTS_ON_THE_REST = /^#{1,6}\s.*\b(?:review|reviewer|note|notes|checked|checks?)\b/im;
+
+/**
+ * Which part is revised last, against what the others became (5 Nov, a book test):
+ * the one holding a note on the document, or else the last part, where one usually
+ * is. Parts are otherwise revised side by side, so a note written beside the
+ * chapters saw none of them and reported on the first draft instead.
+ */
+export function partThatReads(chunks: readonly string[]): number {
+  for (let i = chunks.length - 1; i >= 0; i -= 1) {
+    if (REPORTS_ON_THE_REST.test(chunks[i])) return i;
+  }
+  return Math.max(0, chunks.length - 1);
+}
+
 /** Join revised parts: each ends with a newline so the next heading starts a line. */
 export function joinParts(parts: readonly string[]): string {
   return parts

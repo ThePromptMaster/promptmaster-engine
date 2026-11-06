@@ -30,6 +30,7 @@ import logging
 import re
 import uuid
 
+from .limits import whole_document_block
 from .work_form import FICTION_CHECK_RULE, FICTION_CLAIMS_RULE, form_of
 from .conversation import _shared_system
 from .llm_client import OpenRouterClient, OpenRouterDeadlineError, OpenRouterError
@@ -343,6 +344,7 @@ def build_stage_prompt(
     item_schema: StageItemSchema | None = None,
     existing_content: str = "",
     instruction: str = "",
+    whole_text: str = "",
 ) -> tuple[str, str]:
     """Build (system, user) prompts for one stage's artifact.
 
@@ -511,13 +513,23 @@ def build_stage_prompt(
     if digest.manuscript.strip():
         parts += [
             "",
-            f"THE {(form.key if form else 'manuscript').upper()} AS DRAFTED — the actual {form.unit + 's' if form else 'chapters'}. "
-            "Work from this text, not from the summaries above, and point to the "
-            f"{form.unit if form else 'chapter'} and passage you mean:",
+            (
+                f"THE {(form.key if form else 'manuscript').upper()} AS IT WAS FIRST DRAFTED — the earlier draft this "
+                "stage's own text replaces. This stage's text is the work now, and it wins wherever the two differ: "
+                "never bring an earlier wording back, and never report a problem of this draft as a problem of the work."
+                if digest.manuscript_is_earlier
+                else f"THE {(form.key if form else 'manuscript').upper()} AS DRAFTED — the actual {form.unit + 's' if form else 'chapters'}. "
+                "Work from this text, not from the summaries above, and point to the "
+                f"{form.unit if form else 'chapter'} and passage you mean:"
+            ),
             "--- BEGIN MANUSCRIPT ---",
             digest.manuscript.strip(),
             "--- END MANUSCRIPT ---",
         ]
+
+    whole = whole_document_block(whole_text)
+    if whole:
+        parts += ["", whole]
 
     if existing_content.strip() and instruction.strip():
         # A revision, not a fresh attempt. "Produce a better one; do not repeat
@@ -734,6 +746,7 @@ async def generate_stage_artifact(
     existing_content: str = "",
     instruction: str = "",
     measured: list[MeasuredLine] | None = None,
+    whole_text: str = "",
 ) -> GenerateStageArtifactResponse:
     """Generate one stage's artifact. One LLM call.
 
@@ -749,6 +762,7 @@ async def generate_stage_artifact(
         item_schema=item_schema,
         existing_content=existing_content,
         instruction=instruction,
+        whole_text=whole_text,
     )
     # A check table is told what code counted on the work it checks (4 Nov,
     # Sean: "Estimated length is about 470–490 words … No word count was run").

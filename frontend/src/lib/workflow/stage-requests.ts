@@ -1,3 +1,4 @@
+import { holdsTheWork } from './deliverable';
 import { factsForRequest } from './facts';
 import { referencePayload } from './references';
 import { sourcesForRequest, withoutSourcesList } from './sources';
@@ -100,7 +101,10 @@ export function generationRequest(
         : (target.entry_prompt_hint ?? ''),
       artifact_kind: target.expected_artifacts[0]?.kind ?? '',
     },
-    digest: buildStageDigest(template, state, project, bundles, target.id),
+    digest: {
+      ...buildStageDigest(template, state, project, bundles, target.id),
+      ...(holdsTheWork(template, bundles, target.id) ? { manuscript_is_earlier: true } : {}),
+    },
     item_schema: rendererHoldsItems(target.renderer)
       ? {
           item_label: schema.itemLabel,

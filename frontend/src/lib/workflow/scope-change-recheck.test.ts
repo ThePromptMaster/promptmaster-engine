@@ -29,10 +29,11 @@ const facts = [
 ];
 
 describe('a recheck after a scope change keeps what the change removed out', () => {
-  it('the reason alone does not say drop, so the guard put Option A back (the bug)', () => {
+  it('the reason alone does not say drop, and a line with nothing left to stand after no longer goes above the title (5 Nov)', () => {
     const kept = keepUnasked(before, after, why);
-    expect(kept.restored).toContain('**Option A: lease a second site.**');
-    expect(kept.text.startsWith('**Option A')).toBe(true);
+    expect(kept.restored).not.toContain('**Option A: lease a second site.**');
+    expect(kept.reported).toContain('**Option A: lease a second site.**');
+    expect(kept.text.startsWith('# Recommendation')).toBe(true);
   });
 
   it('with the requirements recorded since the version, nothing comes back', () => {

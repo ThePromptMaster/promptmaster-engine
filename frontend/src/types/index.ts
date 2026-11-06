@@ -440,6 +440,8 @@ export interface ApplyAuditRequest {
  * dialog is the one spliced into the prompt.
  */
 export interface ApplyRecommendationsRequest {
+  /** One part of a long text that reports on the rest: the whole document, read-only (5 Nov). */
+  whole_text?: string;
   /** The project's Web access switch: on, the work searches the web first when it needs outside facts (22 Oct). */
   web_access?: 'on' | 'off';
   inputs: PMInput;
@@ -492,6 +494,8 @@ export interface StageDigestEntry {
 }
 
 export interface StageDigestRequest {
+  /** This stage's own text holds the work now; the manuscript is the earlier draft (5 Nov). */
+  manuscript_is_earlier?: boolean;
   objective: string;
   audience: string;
   prior_stages: StageDigestEntry[];
@@ -565,6 +569,8 @@ export interface GenerateStageArtifactRequest {
   instruction?: string;
   /** On a check stage: what code counted on the written work it checks (4 Nov). */
   measured?: MeasuredLine[];
+  /** One part of a long revision that reports on the rest: the whole document, read-only (5 Nov). */
+  whole_text?: string;
   model?: string;
 }
 

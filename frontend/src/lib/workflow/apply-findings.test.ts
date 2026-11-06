@@ -89,6 +89,9 @@ describe('applying findings to a long text (2 Nov, production: 13,504 words came
     expect(rev.after.match(/^## Revised \d/gm)).toEqual(['## Revised 1', '## Revised 2', '## Revised 3', '## Revised 4']);
     expect(rev.finishReason).toBe('stop');
     expect(rev.parts).toEqual({ count: calls.length, kept: [] });
+    // The last part reads what the others became (5 Nov): only it is given the whole.
+    expect(calls.at(-1)!.whole_text).toContain('## Revised 1');
+    expect(calls.slice(0, -1).every((c) => !c.whole_text)).toBe(true);
   });
 
   it('keeps a part that comes back cut off as it was, and says which', async () => {

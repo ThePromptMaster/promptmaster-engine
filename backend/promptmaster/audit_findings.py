@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 import uuid
 
+from .limits import whole_document_block
 from .conversation import _shared_system
 from .llm_client import OpenRouterClient
 from .schemas import AuditFinding, Iteration, PMInput
@@ -124,6 +125,7 @@ def build_apply_audit_prompt(
     source_iteration: Iteration,
     findings: list[AuditFinding],
     iterations: list[Iteration],
+    whole_text: str = "",
 ) -> tuple[str, str]:
     """Build (system, user) prompts for the apply-audit LLM call."""
     system = _shared_system(inputs, iterations, _APPLY_AUDIT_INSTRUCTION)
@@ -134,6 +136,7 @@ def build_apply_audit_prompt(
         f"Constraints: {inputs.constraints or '(none)'}\n"
         f"Output format: {inputs.output_format or '(none)'}\n\n"
         + (f"{context_block(inputs)}\n\n" if context_block(inputs) else "")
+        + (f"{whole_document_block(whole_text)}\n\n" if whole_text.strip() else "")
         + f"PREVIOUS OUTPUT (revise this — do not repeat verbatim):\n"
         f"{source_iteration.output}\n\n"
         f"FINDINGS TO ADDRESS:\n{findings_block}\n\n"

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { headingOutline, joinParts, needsParts, partInstruction, splitIntoParts } from './long-prose';
+import { headingOutline, joinParts, needsParts, partInstruction, splitIntoParts, partThatReads } from './long-prose';
 import { countWords } from './measurable';
 
 const words = (n: number, w = 'word') => Array.from({ length: n }, () => w).join(' ');
@@ -52,5 +52,20 @@ describe('a prose text too long for one call is cut into parts (31 Oct, Sean)', 
 
   it('joins revised parts so each next heading starts its own line', () => {
     expect(joinParts(['Intro text.', '# Chapter 1\n\nBody.\n'])).toBe('Intro text.\n\n# Chapter 1\n\nBody.\n');
+  });
+});
+
+describe('which part is revised last, against the others (5 Nov)', () => {
+  it('the one holding a note on the document', () => {
+    expect(partThatReads(['## Chapter 1\n\nText.', '## Review note\n\nHolds.', '## Appendix\n\nText.'])).toBe(1);
+    expect(partThatReads(['## Chapter 1\n\nText.', '## Chapter 2\n\nText.\n\n## Review Note: Checked\n\nHolds.'])).toBe(1);
+  });
+
+  it('the last part when none is', () => {
+    expect(partThatReads(['## Chapter 1\n\nText.', '## Chapter 2\n\nText.', '## Chapter 3\n\nText.'])).toBe(2);
+  });
+
+  it('a word in the prose is not a heading', () => {
+    expect(partThatReads(['Please review the note.\n\n## Chapter 1\n\nText.', '## Chapter 2\n\nText.'])).toBe(1);
   });
 });

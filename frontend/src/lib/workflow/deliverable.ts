@@ -75,3 +75,13 @@ export function deliverableDocument(template: WorkflowTemplate, bundles: Record<
   }
   return { ...manuscript, partial: { label: last.label, chapters: base.label } };
 }
+
+/**
+ * Whether this stage's own text holds the work, so the manuscript is the earlier
+ * draft it replaced. Told to its writer: labelled "work from this text", the first
+ * draft brought its problems back into the corrected one.
+ */
+export function holdsTheWork(template: WorkflowTemplate, bundles: Record<string, StageArtifactBundle>, stageId: string): boolean {
+  const base = deliverableStage(template);
+  return base?.renderer === 'long_form' && stageId !== base.id && deliverableDocument(template, bundles)?.stage.id === stageId;
+}
