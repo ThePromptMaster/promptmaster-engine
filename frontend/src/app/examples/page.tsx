@@ -3,6 +3,7 @@
 import Link from 'next/link';
 
 import { ExampleCards } from '@/components/examples/example-cards';
+import { ExampleQuestionnaire } from '@/components/examples/example-questionnaire';
 import { useT } from '@/lib/i18n/i18n-provider';
 
 export default function ExamplesPage() {
@@ -14,6 +15,9 @@ export default function ExamplesPage() {
       <p className="mt-3 text-body text-[var(--on-surface-variant)]">{t('ex.lead')}</p>
       <div className="mt-6">
         <ExampleCards />
+      </div>
+      <div className="mt-6">
+        <ExampleQuestionnaire />
       </div>
       <Link href="/projects/new" className="mt-6 inline-flex items-center gap-1 text-body font-medium text-[var(--pm-primary)] hover:underline">
         {t('ex.startOwn')}

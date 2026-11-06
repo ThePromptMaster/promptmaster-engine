@@ -3117,3 +3117,10 @@ person's first event to their last, so it misses reading time after the last pre
 small enough that one person moves them, and people who click an example choose to, so an example's
 rates are not comparable to own-work rates as an effect of the example.
 
+### L-185 — The questionnaire orders the examples, nothing more (2026-11-06)
+
+Three taps, offered on `/examples` and the empty project list, folded until asked for, for someone
+not sure which example is theirs. It only reorders the four examples (`examples/rank.ts`), with no
+model and no learning, so someone whose work fits none is told the first one anyway. The taps are
+kept for a signed-in user, guests included (`user_preferences`). What they type goes to the start box
+through this tab's storage and is not kept. A visitor who is signed out and leaves loses the taps.

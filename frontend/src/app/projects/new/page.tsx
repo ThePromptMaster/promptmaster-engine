@@ -38,7 +38,7 @@ import { imagePreview } from '@/lib/data/preview';
 import { INPUT_LIMITS } from '@/lib/projects/input-limits';
 import { ExampleCards } from '@/components/examples/example-cards';
 import { PromptyHelp } from '@/components/examples/prompty-help';
-import { goalFromSearch } from '@/lib/projects/example-goals';
+import { goalFromSearch, takeStartGoal } from '@/lib/projects/example-goals';
 import { attachProjectFile } from '@/lib/supabase/project-files';
 import { LimitCounter } from '@/components/shared/limit-counter';
 import { clearSetupDraft, loadSetupDraft, saveSetupDraft } from '@/lib/supabase/setup-drafts';
@@ -217,7 +217,9 @@ export default function NewProjectPage() {
   const goalBox = useRef<HTMLTextAreaElement | null>(null);
   useEffect(() => {
     const typed = goalBox.current?.value ?? '';
-    const goal = typed.trim() ? typed.slice(0, INPUT_LIMITS.objective) : goalFromSearch(window.location.search, INPUT_LIMITS.objective);
+    const goal = typed.trim()
+      ? typed.slice(0, INPUT_LIMITS.objective)
+      : takeStartGoal().slice(0, INPUT_LIMITS.objective) || goalFromSearch(window.location.search, INPUT_LIMITS.objective);
     if (goal) setObjective((current) => current || goal);
   }, []);
 
