@@ -2215,7 +2215,10 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         // Sean, workshop): the answer is recorded as a fact and the judged
         // stage revised with it (`answer` in use-go-loop).
         const asks = [...new Set(assessment.blockers.map((b) => b.ask?.trim()).filter((a): a is string => !!a))];
-        const blocked = assessment.blockers.length > 0 && !asks.length;
+        // A next task that can be done now, on a workflow that keeps its stages, is a fix to
+        // those stages: not blocked by what only other work needs (6 Nov, production: "Can't
+        // continue", about a contradiction in the memo that Go could fix).
+        const blocked = assessment.blockers.length > 0 && !asks.length && !executableNext(assessment);
         // What was found unmet, by name, and what each button does (11 Oct,
         // survey brief: a pause that named nothing and asked nothing).
         const failed = unmetItems(assessment);
