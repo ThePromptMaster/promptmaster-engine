@@ -30,7 +30,9 @@ It excludes admins, and its counts come from rows the product already saves.
 | Their own work, with an account | 13 | 27 | 15 | 11 | 3 (1 early) |
 | Their own work, as a guest | 7 | 19 | 12 | 12 | 0 |
 
-6 of those 21 people came back on another day. The median first day lasted 12 minutes.
+6 of the 21 people then on the panel came back on another day: these 20, plus one of our own test
+guests on an example. The median first day lasted 12 minutes. Our test guests count, so the panel
+moves as we test: later that evening it read 6 of 23 and 6 minutes.
 
 Read it as a direction. There are few people, and the guest row includes our own production test
 guests. It does match what the call described: about half of account projects never reach a first
