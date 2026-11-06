@@ -666,3 +666,44 @@ describe('a section quoted from the project beside (client feedback, 21 Oct, ema
     expect(chatMessage).not.toHaveBeenCalled();
   });
 });
+
+describe('the thread stays at its end (6 Nov: the next-step card’s last buttons sat out of view)', () => {
+  function withResizeObserver() {
+    const callbacks: (() => void)[] = [];
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback: () => void) {
+        callbacks.push(callback);
+      }
+      observe() {}
+      disconnect() {}
+    });
+    return () => callbacks.forEach((callback) => callback());
+  }
+
+  function sized(thread: HTMLElement, height: { scrollHeight: number; clientHeight: number }) {
+    Object.defineProperty(thread, 'scrollHeight', { configurable: true, value: height.scrollHeight });
+    Object.defineProperty(thread, 'clientHeight', { configurable: true, value: height.clientHeight });
+  }
+
+  it('follows what grows under the last reply, and what takes height from it', () => {
+    const changed = withResizeObserver();
+    panel();
+    const thread = document.querySelector<HTMLElement>('[aria-live="polite"]')!;
+    sized(thread, { scrollHeight: 900, clientHeight: 300 });
+    changed();
+    expect(thread.scrollTop).toBe(900);
+    vi.unstubAllGlobals();
+  });
+
+  it('leaves someone alone who has scrolled up to read', async () => {
+    const changed = withResizeObserver();
+    panel();
+    const thread = document.querySelector<HTMLElement>('[aria-live="polite"]')!;
+    sized(thread, { scrollHeight: 900, clientHeight: 300 });
+    thread.scrollTop = 100;
+    thread.dispatchEvent(new Event('scroll', { bubbles: true }));
+    changed();
+    expect(thread.scrollTop).toBe(100);
+    vi.unstubAllGlobals();
+  });
+});
