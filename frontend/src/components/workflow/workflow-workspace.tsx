@@ -21,7 +21,7 @@ import { CheckpointPanel } from './checkpoint-panel';
 import { UpgradeBanner } from './upgrade-banner';
 import { templateDiff } from '@/lib/workflow/upgrade';
 import { ProjectCost } from './project-cost';
-import { BlockForm, BlockedNotice, CompletionDialog, ObjectivePausedNotice } from './stage-status-panels';
+import { BlockForm, BlockedNotice, CompletionDialog, ManuscriptCutNotice, ObjectivePausedNotice } from './stage-status-panels';
 import { StageToolResult } from './stage-tool-result';
 import { CRITIQUE_TOOLS, REWRITE_TOOLS, useStageTools } from './use-stage-tools';
 import { FRAMING_KINDS, nextStageAction, type ReportedPanelStep } from '@/lib/workflow/next-action';
@@ -78,7 +78,7 @@ import {
   tickClosesStage,
 } from '@/lib/workflow/engine';
 import { checkVerdict } from '@/lib/workflow/check-verdict';
-import { buildStageDigest, formatManuscript, summariseStageContent } from '@/lib/workflow/digest';
+import { buildStageDigest, formatManuscript, manuscriptCut, summariseStageContent } from '@/lib/workflow/digest';
 import { appendBatch, batchAwaited, scaleForRequest, serializeAssessment, type AssessScale } from '@/lib/workflow/assess';
 import { keepFound, webAccessOf } from '@/lib/workflow/web-found';
 import { goWaitingLine, objectiveNotRechecked, objectiveUnmet, executableNext } from '@/lib/workflow/objective';
@@ -128,7 +128,7 @@ import { readStageFigures, type StageFigures } from '@/lib/workflow/figures';
 import { FiguresOnRecord } from './figures-on-record';
 import { WebSources } from './web-sources';
 import type { ReplyAction } from '@/types';
-import { buildStageContext, measureStageContent } from '@/lib/workflow/context';
+import { buildStageContext, manuscriptSourceFor, measureStageContent } from '@/lib/workflow/context';
 import { proposeSummary, proposeTargets } from '@/lib/workflow/proposals';
 import { proposeStatuses } from '@/lib/workflow/propose';
 import type { StageContext, WorkflowTemplate, BlockKind } from '@/lib/workflow/types';
@@ -1908,6 +1908,9 @@ export function WorkflowWorkspace({
   const deliverable = deliverableDocument(template, stageBundles)?.stage;
   const deliverableBundle = deliverable ? stageBundles[deliverable.id] : undefined;
   const deliverableSections = deliverableBundle?.artifact?.long_form?.outline ?? [];
+  // What this stage is given of the chapters, when it is not all of them (5 Nov).
+  const chaptersRead = stageDrafts(stage) ? manuscriptSourceFor(template, stage) : null;
+  const chaptersCut = chaptersRead ? manuscriptCut(stageBundles[chaptersRead.id]?.artifact?.long_form?.outline ?? []) : null;
   // Go waiting on the user is outstanding work as much as an open finding is.
   const goStopped =
     go.run && !go.run.ended_at && (go.run.status === 'awaiting_decision' || go.run.status === 'blocked')
@@ -2804,6 +2807,7 @@ export function WorkflowWorkspace({
                 underneath a working editor. A derived outline sits on the
                 drafting stage, whose renderer still has work to do, so only the
                 explicit case suppresses it. */}
+            {chaptersRead && chaptersCut && <ManuscriptCutNotice cut={chaptersCut} holder={chaptersRead.short_label ?? chaptersRead.label} />}
             <RefusedRevisions refused={refusedSince(events ?? [], stage.id, headVersion)} head={headVersion} />
             {!outlinePanelHere && showFinishedHint && canReopen && finishedHintBar}
             {explicitOutlineHere ? null : !stageDrafts(stage) &&

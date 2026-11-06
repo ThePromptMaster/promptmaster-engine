@@ -338,6 +338,7 @@ export const ar: Record<keyof typeof en, string> = {
   'ssp.tellGoHow': 'أخبر Go بكلماتك كيف يصلحه:',
   'ssp.readAll': 'قرأ الفحص {what}، جميع الأحرف البالغ عددها {chars}.',
   'ssp.readPart': 'قرأ الفحص {chars} من أصل {total} حرفًا من {what}: لم يُعرض باقي أطول أقسامه.',
+  'ssp.manuscriptCut': 'تُعرض على هذه المرحلة {chars} من أصل {total} حرفًا في {holder}. يُقتطع كل فصل طويل ليناسب الحد، لذا فإن ما تقوله يخص بدايات تلك الفصول لا نهاياتها. اقرأ النهايات بنفسك.',
   'ssp.yourAnswer': 'إجابتك',
   'ssp.recording': 'جارٍ التسجيل…',
   'ssp.recordContinue': 'سجّلها وتابع',

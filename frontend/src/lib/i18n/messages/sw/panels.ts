@@ -338,6 +338,7 @@ export const sw: Record<keyof typeof en, string> = {
   'ssp.tellGoHow': 'Mwambie Go jinsi ya kulirekebisha, kwa maneno yako mwenyewe:',
   'ssp.readAll': 'Ukaguzi ulisoma {what}, herufi zote {chars}.',
   'ssp.readPart': 'Ukaguzi ulisoma herufi {chars} kati ya {total} za {what}: sehemu iliyobaki ya vipengele virefu zaidi haikuonyeshwa.',
+  'ssp.manuscriptCut': 'Hatua hii inaonyeshwa herufi {chars} kati ya {total} za {holder}. Kila sura ndefu hukatwa ili itoshe, kwa hivyo inachosema kinahusu mwanzo wa sura hizo, si mwisho wake. Soma miisho wewe mwenyewe.',
   'ssp.yourAnswer': 'Jibu lako',
   'ssp.recording': 'Inarekodi…',
   'ssp.recordContinue': 'Rekodi na uendelee',

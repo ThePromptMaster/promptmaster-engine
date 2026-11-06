@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { ObjectivePausedNotice } from './stage-status-panels';
+import { ManuscriptCutNotice, ObjectivePausedNotice } from './stage-status-panels';
 import { describeNeed } from '@/lib/agent/needs';
 
 const assessment = {
@@ -121,5 +121,14 @@ describe('the notice says which saved text the check read (5 Nov, a book test)',
   it('says nothing on an older record that did not note it', () => {
     render(<ObjectivePausedNotice assessment={{ ...assessment, basis }} />);
     expect(screen.queryByText(/The check read/)).not.toBeInTheDocument();
+  });
+});
+
+describe('a stage given part of the chapters says so (5 Nov, a book test)', () => {
+  it('names what it read and how much, and that the ends were not read', () => {
+    render(<ManuscriptCutNotice cut={{ chars: 119500, total: 250000 }} holder="Manuscript" />);
+    const note = screen.getByRole('note');
+    expect(note).toHaveTextContent('This stage is shown 119,500 of the 250,000 characters in Manuscript.');
+    expect(note).toHaveTextContent('not their ends');
   });
 });

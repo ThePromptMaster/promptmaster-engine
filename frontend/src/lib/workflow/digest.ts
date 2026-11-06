@@ -138,6 +138,21 @@ export function formatManuscript(
     .join('\n\n');
 }
 
+/**
+ * How much of the chapters a stage after them is given, when it is not all of
+ * them (5 Nov, a book test: "If the review can't access the manuscript, the app
+ * should show what's blocked and why"). No chapter text at all already stops the
+ * stage (`ManuscriptMissing`). Past the budget the model was told where each
+ * chapter was cut, and the person reading its review was not. Pure.
+ */
+export function manuscriptCut(
+  sections: Pick<OutlineSection, 'title' | 'content' | 'status'>[],
+  max = MANUSCRIPT_MAX
+): { chars: number; total: number } | null {
+  const total = formatManuscript(sections, Number.POSITIVE_INFINITY).length;
+  return total > max ? { chars: formatManuscript(sections, max).length, total } : null;
+}
+
 function truncate(text: string, max = SUMMARY_MAX): string {
   const clean = text.replace(/\s+/g, ' ').trim();
   if (clean.length <= max) return clean;
