@@ -76,11 +76,11 @@ Stage work:
 
 | Method | Path | `api` method | Router | Status |
 |---|---|---|---|---|
-| POST | `/api/generate-stage-artifact` | `generateStageArtifact` | `stage.py` | **Live** — **one** LLM call, deliberately not the full pipeline. The request carries the item schema's statuses and which of them the model may set; anything else it returns is dropped |
+| POST | `/api/generate-stage-artifact` | `generateStageArtifact` | `stage.py` | **Live** — **one** LLM call, deliberately not the full pipeline. The request carries the item schema's statuses and which of them the model may set; anything else it returns is dropped Takes `whole_text` (the document as revised, when one part of a long deliverable is written last; up to 120,000 characters reach the prompt). |
 | POST | `/api/evaluate-stage-artifact` | `evaluateStageArtifact` | `stage.py` | **Live** |
 | POST | `/api/extract-figures` | `extractFigures` | `stage.py` | **Live** — called once when a stage is completed. Returns `{figures: [{name, value, context}]}`; a value is kept only if the stage's text contains it verbatim (`promptmaster/figures.py`) |
 | POST | `/api/dependent-claims` | `dependentClaims` | `stage.py` | **Live** — sentences whose conclusion no longer follows from an accepted fact that replaced something (18 Oct, Summit). Called by Go's stage check and repair, and the manual stage check, only when a fact changed; a quote is kept only if it is verbatim in the text (`promptmaster/dependent_claims.py`) |
-| POST | `/api/apply-recommendations` | `applyRecommendations` | `audit.py` | **Live** — FR-09, one call for a multi-select apply |
+| POST | `/api/apply-recommendations` | `applyRecommendations` | `audit.py` | **Live** — FR-09, one call for a multi-select apply Takes `whole_text`, as `generate-stage-artifact` does. |
 | POST | `/api/check-conflicts` | `checkConflicts` | `conflicts.py` | **Live** — one JSON call per instruction (side chat, reply action buttons, Go's revisions); returns only conflicts with things actually listed |
 | POST | `/api/flow-trigger` | `flowTrigger` | `engine.py` | **Live** — Refine, Realign, Challenge, Reframe, Self-audit from the stage's More menu |
 | POST | `/api/continue-document` | `continueDocument` | `continuation.py` | **Live** — "Continue writing" on a draft that was cut off |
@@ -90,8 +90,8 @@ Side chat:
 
 | Method | Path | `api` method | Router | Status |
 |---|---|---|---|---|
-| POST | `/api/chat-message` | `chatMessage` | `conversation.py` | **Live** |
-| POST | `/api/suggest-actions` | `suggestActions` | `conversation.py` | **Live** — given a chat reply and the stage, returns at most four actions `{label, kind: revise \| row_updates \| add_rows, …}`; "Do nothing" is added by the client. Prompt in `promptmaster/reply_actions.py` |
+| POST | `/api/chat-message` | `chatMessage` | `conversation.py` | **Live** Takes `attachments` (`{name, text?, image?, not_read?}`, up to 30, for the next message only; 60,000 characters of text, 1.5 MB per image) and `context.files` (what the project holds). Images go as model image parts; the prompt names any not read. |
+| POST | `/api/suggest-actions` | `suggestActions` | `conversation.py` | **Live** — given a chat reply and the stage, returns at most four actions `{label, kind: revise \| row_updates \| add_rows, …}`; "Do nothing" is added by the client. Prompt in `promptmaster/reply_actions.py` A fact offered from a pasted report or claim carries `reported: true`. |
 | POST | `/api/apply-to-answer` | `applyToAnswer` | `conversation.py` | **Live** |
 | POST | `/api/save-as-new-version` | `saveAsNewVersion` | `conversation.py` | **Live** |
 
@@ -99,7 +99,7 @@ Outline and long-form:
 
 | Method | Path | `api` method | Router | Status |
 |---|---|---|---|---|
-| POST | `/api/generate-outline` | `generateOutline` | `long_form.py` | **Live** |
+| POST | `/api/generate-outline` | `generateOutline` | `long_form.py` | **Live** Takes `later_stages`, so the plan leaves their work to them. |
 | POST | `/api/generate-section-prose` | *(not in `client.ts`)* | `long_form.py` | **Live — worker only**, via `lib/jobs/generator.ts` |
 | POST | `/api/extract-section-record` | *(not in `client.ts`)* | `long_form.py` | **Live — worker only**, via `lib/jobs/generator.ts` |
 | POST | `/api/estimate-job` | `estimateJob` | `usage.py` | **Live** — the cost estimate shown before a large drafting run |
@@ -121,6 +121,8 @@ Go mode (the loop itself runs in the browser; see [`architecture.md`](architectu
 | POST | `/api/agent/write-code` | `agentWriteCode` | `agent.py` | **Live** — code only, never claimed output (label `code_written`). Told the project's data files by name, columns and first rows |
 | POST | `/api/agent/interpret-result` | `agentInterpretResult` | `agent.py` | **Live** — takes the real stdout/stderr/exit code from a `sandbox_runs` row (label `result_interpreted`) |
 | POST | `/api/agent/triage` | `agentTriage` | `agent.py` | **Live** — decides a review table's routine findings |
+| POST | `/api/agent/assess-objective` | `agentAssessObjective` | `agent.py` | **Live** — is the objective met, judged before Go may say so. Reads up to 120,000 characters, each section keeping its opening; returns `read_chars` and `total_chars`, recorded on `objective_assessed` |
+| POST | `/api/agent/check-deliverable` | `agentCheckDeliverable` | `agent.py` | **Live** — the deliverable against accepted findings and tables; reads up to 200,000 characters and says when it clips. Takes `note_quotes`: passages a review note quotes that this version does not hold, for the check to judge |
 | POST | `/api/agent/literature` | `agentLiterature` | `agent.py` | **Live** — no model. Takes up to 20 `{id, work}`; searches OpenAlex by title and returns `{matches: [{id, found, title, authors, year, doi, url, note}]}`. A match needs 80% of the title's words and a year within one (`promptmaster/literature.py`). Used by "Look up these works" (Literature), "Look up these sources" (Fact-check) and Go's `check_literature` |
 | POST | `/api/agent/literature-search` | `agentLiteratureSearch` | `agent.py` | **Live** — no model. Takes `{query (≤300), limit (≤10, default 8)}`; searches OpenAlex by topic and returns `{works: [{id, found, title, authors, year, doi, url, note}], reached}`. `reached: false` means OpenAlex could not be asked, which is not "nothing found". Titles under three meaningful words and repeats are dropped. Used by Go's `check_literature` when it is given a `query` or no works are listed yet |
 | GET | `/api/agent/actions` | *(none)* | `agent.py` | Dormant — the registry is mirrored in TypeScript and `actions-drift.test.ts` keeps the two equal |
