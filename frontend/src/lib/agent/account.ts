@@ -11,7 +11,8 @@
  */
 
 import type { AgentRun, AgentStep } from '@/types/agent';
-import { actionFor, actionLabel, ROUTINE_DEFAULT_STEP } from './actions';
+import { actionFor, actionLabel, ROUTINE_DEFAULT_STEP, USER_ANSWER_STEP } from './actions';
+import { questionOverlap, SAME_QUESTION } from './repeat-question';
 import { translate, type Vars } from '@/lib/i18n/translate';
 import type { Locale } from '@/lib/i18n/locales';
 import { shownStopReason } from '@/lib/i18n/stop-reasons';
@@ -34,6 +35,21 @@ function firstSentence(text: string): string {
   const t = text.trim().split('\n')[0];
   const m = /^(.{20,}?[.?!])\s/.exec(`${t} `);
   return (m ? m[1] : t).slice(0, 300);
+}
+
+/**
+ * Whether the user has answered this kept question since it was set aside: the
+ * same words, asked at a later step, with an answer after it. A run told "do
+ * whatever is best" went on listing the question as kept for the user after it
+ * had settled it (6 Nov, production).
+ */
+function answeredSince(steps: readonly AgentStep[], from: number, kept: string): boolean {
+  const later = steps.slice(from);
+  return later.some((s, i) =>
+    s.action_key === 'request_user_decision' &&
+    questionOverlap(s.decision_question || s.output || '', kept) >= SAME_QUESTION &&
+    later.slice(i + 1).some((a) => a.action_key === USER_ANSWER_STEP)
+  );
 }
 
 /**
@@ -77,7 +93,9 @@ export function runAccount(
   const did = parts.length ? `${parts.join('; ')}.`.replace(/^./, (c) => c.toUpperCase()) : '';
 
   const setAside = [
-    ...steps.filter((s) => typeof s.params?.set_aside_question === 'string').map((s) => t('acct.questionKept', { question: String(s.params!.set_aside_question).slice(0, 300) })),
+    ...steps
+      .filter((s, i) => typeof s.params?.set_aside_question === 'string' && !answeredSince(steps, i, String(s.params!.set_aside_question)))
+      .map((s) => t('acct.questionKept', { question: String(s.params!.set_aside_question).slice(0, 300) })),
     ...steps.filter((s) => typeof s.changes?.set_aside === 'string').map((s) => t('acct.couldNot', { what: String(s.changes!.set_aside) })),
     ...steps.filter((s) => s.action_key === ROUTINE_DEFAULT_STEP && s.status === 'succeeded').map((s) => firstSentence(s.output).replace(/^Routine default taken by Go under your routine-decision policy \(yours to change\): /, t('acct.routine'))),
   ];

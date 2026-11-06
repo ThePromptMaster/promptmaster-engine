@@ -23,6 +23,20 @@ describe('the run account (Q3c; Sean, 9 Oct: "a short account of what it did, wh
     );
   });
 
+  it('a kept question the user has since answered is no longer kept (6 Nov, production: "do whatever is best")', () => {
+    const asked = 'Which sign should the note use for the Regge action?';
+    const withAnswer = [
+      step('advance_stage', { params: { set_aside_question: asked } }),
+      step('request_user_decision', { decision_question: asked }),
+      step('user_answer', { output: 'Do whatever is best' }),
+    ];
+    expect(runAccount(run('completed'), withAnswer, label)?.setAside).toEqual([]);
+    // Asked and not answered, or a different question answered: still kept.
+    expect(runAccount(run('completed'), withAnswer.slice(0, 2), label)?.setAside).toHaveLength(1);
+    const other = [withAnswer[0], step('request_user_decision', { decision_question: 'Should damping be included in the model?' }), withAnswer[2]];
+    expect(runAccount(run('completed'), other, label)?.setAside).toHaveLength(1);
+  });
+
   it('a window used up is a resource pause, not a problem', () => {
     const a = runAccount(run('budget_exhausted'), steps, label)!;
     expect(a.kind).toBe('window');
