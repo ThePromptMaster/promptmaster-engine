@@ -1,5 +1,6 @@
 'use client';
 
+import { withRunRecord } from '@/lib/workflow/chat-run-record';
 import { keepFound, renumberResponse, webAccessOf, withWebLine } from '@/lib/workflow/web-found';
 import { savedNumbers } from '@/lib/workflow/sources';
 import { RefusedRevision } from '@/lib/workflow/commit-check';
@@ -337,7 +338,9 @@ export function useStageChat({
       try {
         const priorHistory = asHistory(messages);
         await persist('user', message, 'discuss');
-        const sentContext = getChatContext?.();
+        // The run as recorded now, not as this tab last saw it (5 Nov).
+        const built = getChatContext?.();
+        const sentContext = built ? await withRunRecord(built, project.id) : built;
 
         const response = await api.chatMessage({
           inputs: inputsFrom(project),

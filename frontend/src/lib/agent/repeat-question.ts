@@ -31,6 +31,8 @@ export interface AskedStep {
 
 /** Shared content words, as a share of the shorter question, above which two questions are one. */
 export const SAME_QUESTION = 0.3;
+/** With no move since the answer, it takes this much to be the same question rather than a follow-up. */
+export const SAME_QUESTION_AT_ONCE = 0.7;
 
 const STOP_WORDS = new Set(
   ('the and that this with from your there they them then than have will would could should which what when where about into only ' +
@@ -159,9 +161,14 @@ export function repeatedQuestion(input: {
     if (steps.slice(answerAt + 1).some((s) => s.action_key === USER_ANSWER_STEP && (s.output ?? '').trim() && !isDelegatedAnswer(s.output ?? ''))) return;
     const asked = questionOf(step);
     const sameButton = Boolean(control) && controlOf(step) === control;
-    const sameWords = questionOverlap(asked, question) >= SAME_QUESTION;
+    const overlap = questionOverlap(asked, question);
+    const sameWords = overlap >= SAME_QUESTION;
     if (!sameButton && !sameWords) return;
     const since = steps.slice(answerAt + 1).filter((s) => s.stage_id === stageId && s.action_key !== USER_ANSWER_STEP);
+    // Right after an answer, with nothing done since, sharing some words is a
+    // follow-up to it, not the same question (6 Nov, prod: "which version should
+    // be final?" stopped as a repeat of what it followed, with "0 moves").
+    if (!since.length && !sameButton && overlap < SAME_QUESTION_AT_ONCE) return;
     found = {
       asked: asked.split(/\n\s*\n/)[0].trim(),
       answer,
