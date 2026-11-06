@@ -10,11 +10,11 @@
  * the same thing.
  */
 
-import { getArtifact, listArtifacts } from '@/lib/supabase/versions';
+import { getArtifact, listArtifacts, listVersions } from '@/lib/supabase/versions';
 import type { Artifact } from '@/types/project';
 import type { StageDefinition, WorkflowTemplate } from '@/lib/workflow/types';
 
-import { manuscriptSourceFor } from './context';
+import { manuscriptArtifactFor, manuscriptSourceFor } from './context';
 import { effectiveRenderer, itemSchemaFor } from './stage-artifact';
 import { isTriageTable } from './triage';
 import type { StageArtifactBundle } from './digest';
@@ -111,4 +111,36 @@ export async function freshOrPage(
 ): Promise<Record<string, StageArtifactBundle>> {
   if (!manuscriptSourceFor(template, target)) return bundles;
   return withFreshManuscript(template, target, bundles, projectId).catch(() => bundles);
+}
+
+/**
+ * `bundles` with a long-form stage's chapters and saved versions read again
+ * (5 Nov, a six-chapter book test). The chapters are written by the job queue,
+ * so the copy a Go step started with holds the text from before its own
+ * repair: "Full draft saved" was the old manuscript four times in a row (v3=v4,
+ * v5=v6, v7=v8, v9=v10), and the objective check judged the old chapters.
+ * `withFreshManuscript` does not cover this: it reads for a stage after the
+ * manuscript, and a long-form stage has none. A failed read keeps the page's
+ * copy; a stage that is not long-form is returned as it is.
+ */
+export async function withCurrentLongForm(
+  template: WorkflowTemplate,
+  stage: StageDefinition,
+  bundles: Record<string, StageArtifactBundle>
+): Promise<Record<string, StageArtifactBundle>> {
+  if (stage.renderer !== 'long_form') return bundles;
+  const holder = manuscriptArtifactFor(template, stage, bundles);
+  if (!holder) return bundles;
+  try {
+    const [artifact, versions] = await Promise.all([getArtifact(holder.id), listVersions(holder.id)]);
+    if (!artifact) return bundles;
+    const holderStage = artifact.stage_id ?? stage.id;
+    const next = { ...bundles, [holderStage]: { ...bundles[holderStage], artifact, versions } };
+    // A later long-form stage (Revision, Editing) keeps its own snapshots on its own artifact.
+    const own = bundles[stage.id]?.artifact;
+    if (own && own.id !== holder.id) next[stage.id] = { ...bundles[stage.id], versions: await listVersions(own.id) };
+    return next;
+  } catch {
+    return bundles;
+  }
 }
