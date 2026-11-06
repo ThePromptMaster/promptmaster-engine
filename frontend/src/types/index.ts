@@ -269,7 +269,16 @@ export interface ChatContext {
     objective: string;
     /** What Go is asking, one item per question (31 Oct). */
     questions?: string[];
+    /** Read from the database when the user asked (5 Nov), with how far along it is and how recently it moved. */
+    from_record?: boolean;
+    moves?: number;
+    cost_usd?: number | null;
+    last_activity_minutes?: number | null;
   } | null;
+  /** False when the run record could not be read for this reply, so `go_run: null` does not mean no run. */
+  go_run_read?: boolean;
+  /** The files in the project's Data panel (5 Nov: the chat said there were none). */
+  files?: { name: string; note: string }[];
   /** The stage's status as the page shows it (31 Oct). */
   stage_status?: string;
   /** The stage's latest versions, oldest first, the one on screen marked (31 Oct). */
@@ -288,6 +297,8 @@ export interface ChatMessageRequest {
   context?: ChatContext;
   /** The project's Web access switch (22 Oct): on, the chat may search the web. */
   web_access?: 'on' | 'off';
+  /** What the user attached to this message (5 Nov). */
+  attachments?: { name: string; text?: string; image?: string; not_read?: boolean }[];
 }
 
 export interface ChatMessageResponse {
@@ -540,7 +551,7 @@ export interface ReplyAction {
   updates?: { id: string; status?: string; reason?: string; fields?: Record<string, string> }[];
   rows?: Record<string, string>[];
   /** `record_facts`: facts the user supplied, recorded only on confirmation (F3, 7 Oct). */
-  facts?: { statement: string; subject?: string; kind?: 'fact' | 'requirement'; replaces?: string }[];
+  facts?: { statement: string; subject?: string; kind?: 'fact' | 'requirement'; replaces?: string; reported?: boolean }[];
 }
 
 export interface SuggestActionsRequest {

@@ -12,6 +12,7 @@
  * what was asked, what the user answered and what is still open, and spends
  * nothing more until the user acts.
  */
+import { isDelegatedAnswer } from '@/lib/workflow/answers';
 import { USER_CHOSEN_OPERATIONS } from '@/lib/workflow/fact-reconcile';
 
 import { USER_ANSWER_STEP } from './actions';
@@ -30,6 +31,8 @@ export interface AskedStep {
 
 /** Shared content words, as a share of the shorter question, above which two questions are one. */
 export const SAME_QUESTION = 0.3;
+/** With no move since the answer, it takes this much to be the same question rather than a follow-up. */
+export const SAME_QUESTION_AT_ONCE = 0.7;
 
 const STOP_WORDS = new Set(
   ('the and that this with from your there they them then than have will would could should which what when where about into only ' +
@@ -99,6 +102,14 @@ export interface Repeat {
   moves: number;
   /** What those moves cost, where it is known. */
   spent: number;
+  /**
+   * It names the same button, in different words (5 Nov, a research project: the
+   * pause quoted a convention question from an hour before, when what was left
+   * was the user's own check, under the button both questions named).
+   */
+  byButton: boolean;
+  /** The button, as the question named it. */
+  control: string;
 }
 
 /**
@@ -145,15 +156,26 @@ export function repeatedQuestion(input: {
     const answer = (answered.output ?? '').trim();
     if (!answer || userChangedSince(answered.finished_at ?? answered.started_at ?? '')) return;
     if (approval && newVersionSince(step.finished_at ?? step.started_at ?? '')) return;
+    // Answered again since in their own words: the answer to a pause. That is new
+    // to go on, so the question may be asked once more (5 Nov).
+    if (steps.slice(answerAt + 1).some((s) => s.action_key === USER_ANSWER_STEP && (s.output ?? '').trim() && !isDelegatedAnswer(s.output ?? ''))) return;
     const asked = questionOf(step);
     const sameButton = Boolean(control) && controlOf(step) === control;
-    if (!sameButton && questionOverlap(asked, question) < SAME_QUESTION) return;
+    const overlap = questionOverlap(asked, question);
+    const sameWords = overlap >= SAME_QUESTION;
+    if (!sameButton && !sameWords) return;
     const since = steps.slice(answerAt + 1).filter((s) => s.stage_id === stageId && s.action_key !== USER_ANSWER_STEP);
+    // Right after an answer, with nothing done since, sharing some words is a
+    // follow-up to it, not the same question (6 Nov, prod: "which version should
+    // be final?" stopped as a repeat of what it followed, with "0 moves").
+    if (!since.length && !sameButton && overlap < SAME_QUESTION_AT_ONCE) return;
     found = {
       asked: asked.split(/\n\s*\n/)[0].trim(),
       answer,
       moves: since.length,
       spent: since.reduce((sum, s) => sum + (Number(s.cost_usd) || 0), 0),
+      byButton: !sameWords,
+      control: (input.control ?? '').trim(),
     };
   });
   return found;
@@ -170,10 +192,19 @@ const clip = (text: string, max: number) => {
  */
 export function repeatPause(repeat: Repeat, stageLabel: string, open: string): string {
   const still = clip(open.split(/\n\s*\n/)[0] ?? open, 300);
+  const stated = /[.?!…]$/.test(still) ? still : `${still}.`;
+  if (repeat.byButton) {
+    return (
+      `The next step here is yours: "${clip(repeat.control, 200)}". ` +
+      `${repeat.moves} moves on ${stageLabel} since your last answer have not changed that, so I have stopped rather than ask again. ` +
+      `I was going to ask: ${stated} ` +
+      'Nothing more is spent until you act: do that, change the text yourself, or tell me what to do differently here.'
+    );
+  }
   return (
     `I asked this before — "${clip(repeat.asked, 300)}" — and you answered "${clip(repeat.answer, 200)}". ` +
     `${repeat.moves} moves on ${stageLabel} since then have not settled it, so I have stopped rather than ask you again. ` +
-    `Still open: ${/[.?!…]$/.test(still) ? still : `${still}.`} ` +
-    'Nothing more is spent until you act: change the text yourself, or tell me what to do differently and press Resume.'
+    `Still open: ${stated} ` +
+    'Nothing more is spent until you act: change the text yourself, or tell me what to do differently here.'
   );
 }

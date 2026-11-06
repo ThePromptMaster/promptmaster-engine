@@ -38,4 +38,6 @@ export const ar: Record<keyof typeof en, string> = {
   'facts.src.revision': 'حُدّثت بمراجعتك',
   'facts.src.policy': '، قُبلت وفق سياستك للقرارات الروتينية',
   'facts.src.assumed': '، افترضها PromptMaster (لم تذكرها أنت)',
+  'facts.src.delegated': 'اختاره Go عندما تركت له القرار',
+  'facts.src.reported': '، مُبلَّغ عنه ولم يُتحقق منه',
 };

@@ -32,7 +32,7 @@ import type { WorkflowTemplate } from '@/lib/workflow/types';
 import type { SetupRationale } from '@/types';
 import { splitAsk } from '@/lib/projects/split-ask';
 import { StartAttachments, type StartImage } from '@/components/projects/start-attachments';
-import { documentsOf, materialFrom, type PreparedFile } from '@/lib/data/attachments';
+import { documentsCut, documentsOf, materialFrom, setupMaterial, type PreparedFile } from '@/lib/data/attachments';
 import { contextFromDocuments } from '@/lib/data/extract-text';
 import { imagePreview } from '@/lib/data/preview';
 import { INPUT_LIMITS } from '@/lib/projects/input-limits';
@@ -297,7 +297,7 @@ export default function NewProjectPage() {
   /** A recommended setup for the ask (or the conversation's brief), without applying it. */
   async function suggestSetup(given?: { question: string; answer: string }[], from?: { objective: string; material: string; audience?: string }) {
     const ask = from?.objective ?? objective;
-    const brought = [material, from?.material ?? ''].filter(Boolean).join('\n\n');
+    const brought = setupMaterial(from?.material ?? '', material, INPUT_LIMITS.context);
     // A workflow designed for this work is the default (Sean, 23 Oct: "the
     // default is a custom workflow after answering what you want to do or a
     // conversation"), worked out beside the usual setup. The standard
@@ -808,6 +808,11 @@ export default function NewProjectPage() {
               onImages={setStartImages}
               disabled={working !== null}
             />
+            {documentsCut(startFiles, INPUT_LIMITS.context).length > 0 && (
+              <p role="note" data-start-cut className="mt-2 text-label text-[var(--on-surface-variant)]">
+                {t('start.docCut', { names: documentsCut(startFiles, INPUT_LIMITS.context).join(', ') })}
+              </p>
+            )}
             <div className="mt-3">
               <SampleField value={draft.sample_output ?? ''} onChange={(v) => setDraft((d) => ({ ...d, sample_output: v }))} disabled={working !== null} />
             </div>

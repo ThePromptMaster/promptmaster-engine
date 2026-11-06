@@ -67,6 +67,9 @@ class FactToRecord(BaseModel):
     #: browser records it as superseding that fact, so history keeps was/now
     #: rather than two current values (Sean, 14 Oct, SUMMIT).
     replaces: str = Field(default="", max_length=2_000)
+    #: What someone else reported or claimed, recorded because the user asked: it says
+    #: what was said, not what is true, so it stays out of the work unless asked (5 Nov).
+    reported: bool = False
 
 
 class ReplyAction(BaseModel):
@@ -134,6 +137,10 @@ _FACTS_KIND = (
     "- A request, suggestion or proposal by someone in the project (\"Luis asks to count "
     "those days\") is recorded as a fact about the request, never as a requirement: "
     "nobody has approved it.\n"
+    "- Text the user pasted for you to review (an incoming message, a report, a handoff, "
+    "someone's claim about what they did) is not something the user supplied as true. Do not "
+    "offer to record it, or what they say they have not approved or authorised, unless they "
+    "ask you to. If they ask, record it as what was said and add \"reported\": true.\n"
 )
 
 _SHAPE = (
@@ -141,7 +148,7 @@ _SHAPE = (
     '{"actions": [{"label": "...", "kind": "revise", "instruction": "..."}, '
     '{"label": "...", "kind": "row_updates", "updates": [{"id": "...", "status": "...", "reason": "...", "fields": {}}]}, '
     '{"label": "...", "kind": "add_rows", "rows": [{}]}, '
-    '{"label": "...", "kind": "record_facts", "facts": [{"statement": "...", "subject": "...", "kind": "fact", "replaces": ""}]}]}'
+    '{"label": "...", "kind": "record_facts", "facts": [{"statement": "...", "subject": "...", "kind": "fact", "replaces": "", "reported": false}]}]}'
 )
 
 
@@ -275,6 +282,7 @@ def parse_record_facts(item: dict, question: str, known: list[str] | None = None
         replaces = by_norm.get(_norm(" ".join(str(f.get("replaces") or "").split())), "")
         facts.append(FactToRecord(
             statement=statement, subject=" ".join(str(f.get("subject") or "").split())[:200], kind=kind, replaces=replaces,
+            reported=f.get("reported") is True,
         ))
     return facts
 

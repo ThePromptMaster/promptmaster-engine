@@ -29,6 +29,7 @@
  * boundary itself live in `use-stage-chat.ts`.
  */
 
+import type { MessageAttachment } from '@/lib/data/attachments';
 import { useT } from '@/lib/i18n/i18n-provider';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { describeLines } from '@/lib/workflow/preservation';
@@ -143,6 +144,8 @@ interface Props {
   isTable?: boolean;
   /** Where the user is, sent with every question (3 Oct call). */
   getChatContext?: () => ChatContext;
+  /** What was attached, until the next message carries it (5 Nov). */
+  nextMessageAttachments?: { current: MessageAttachment[] };
   /** Questions offered before the user types, from the stage's state (3 Oct call). */
   starters?: string[];
   /** A control beside the composer that attaches a file to the project. */
@@ -222,6 +225,7 @@ export function ChatPanel({
   applying = false,
   isTable = false,
   getChatContext,
+  nextMessageAttachments,
   starters = [],
   attach,
   onFactsChanged,
@@ -250,6 +254,7 @@ export function ChatPanel({
     appendStageVersion,
     restoreStageVersion,
     getChatContext,
+    nextMessageAttachments,
     onFactsChanged,
     onPatchSetup,
     onSourcesChanged,

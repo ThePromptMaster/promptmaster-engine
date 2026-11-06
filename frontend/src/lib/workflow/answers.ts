@@ -15,6 +15,7 @@ import { documentText, type StageArtifactBundle } from './digest';
 import type { WorkflowTemplate } from './types';
 
 const QUESTION_MAX = 600;
+const STATEMENT_MAX = 2_000;
 
 /**
  * "Do whatever is best" on Go's question card (25 Oct, Sean: "this would be a
@@ -30,8 +31,74 @@ export const DELEGATED_ANSWER =
 export function isDelegatedAnswer(answer: string): boolean {
   return answer.trim() === DELEGATED_ANSWER || /^do (?:whatever|what) (?:is|you think is) best\b/i.test(answer.trim());
 }
-const STATEMENT_MAX = 2_000;
 
+/**
+ * What "Do whatever is best" asks of Go (5 Nov, a research project). Saying so was
+ * not enough: the moves after it were checks that never read the answer, Go named
+ * its choice once in a rationale, and the document went on saying "Unresolved. The
+ * researcher should state both." Now it reopens the stage the question is about,
+ * so the next move is the repair, told to decide it.
+ */
+const DELEGATED_WHY = 'you left this to me: ';
+
+export function delegatedWhy(question: string): string {
+  return `${DELEGATED_WHY}"${questionOf(question)}"`;
+}
+
+export function isDelegatedWhy(why: string): boolean {
+  return why.startsWith(DELEGATED_WHY);
+}
+
+/** The question a `delegatedWhy` asked, back out of it. */
+export function delegatedQuestion(why: string): string {
+  return why.slice(DELEGATED_WHY.length).replace(/^"|"$/g, '');
+}
+
+/**
+ * Told to the repair. Says "state it as settled", never "remove": asking for a
+ * removal switches off the check that puts back what a revision drops unasked.
+ */
+export const DELEGATED_RULE =
+  ' DECIDE IT NOW. The user left this question to you: pick the answer that best serves the objective, the accepted facts and the current text, and state it as settled wherever the text raises it, so that nothing in the document still treats it as open, lists it as unresolved or asks the reader to decide it. Change nothing else. In your note to the user, begin with "Chosen: " and the choice in one sentence, then say why.';
+
+/** "Chosen: …" out of the writer's note to the user; null when it did not say. */
+export function chosenFrom(note: string | null | undefined): string | null {
+  const m = (note ?? '').match(/\bChosen:\s*([^\n]+?)(?=(?:\s+(?:Why|Because)\b:?)|\n|$)/i);
+  const said = m?.[1]?.trim();
+  return said ? said.slice(0, 1_000) : null;
+}
+
+/** The choice on record, said apart from what the user said: every later check and draft reads it. */
+export function delegatedFact(question: string, chosen: string, ref: { run_id: string; stage_id: string; version_id: string }): NewFact {
+  const asked = questionOf(question);
+  return {
+    statement: `Chosen by Go when you left it to Go${asked ? ` — asked "${asked}"` : ''}: ${chosen}`.slice(0, STATEMENT_MAX),
+    subject: 'Decision',
+    kind: 'fact',
+    source_kind: 'user_edit',
+    origin: 'model_assumed',
+    source_ref: { via: 'go answer', delegated: true, question: asked, ...ref },
+  };
+}
+
+/** Options only the user can carry out: "I'll attach the paper", "I've checked it". */
+const FIRST_PERSON = /^\s*i(?:['’](?:ll|ve|m|d)|\s)/i;
+
+const significant = (text: string) => [...new Set((text.toLowerCase().match(/[\p{L}\p{N}]{4,}/gu) ?? []))];
+
+/**
+ * Whether the question is one the text can settle: most of its words are in the
+ * text, and the choices are not all things only the user can do. Otherwise there
+ * is nothing to revise, and the planner is told to choose or say what is left.
+ */
+export function settlesInTheText(question: string, choices: readonly string[] | undefined, text: string): boolean {
+  if (!text.trim()) return false;
+  if (choices?.length && choices.every((c) => FIRST_PERSON.test(c))) return false;
+  const asked = significant(questionOf(question));
+  if (!asked.length) return false;
+  const here = new Set(significant(text));
+  return asked.filter((w) => here.has(w)).length / asked.length >= 0.5;
+}
 /**
  * Go's sentences about its own buttons and abilities. Not part of what was
  * decided: on 4 Nov (Sean, Lakeside) "There is no button that starts this

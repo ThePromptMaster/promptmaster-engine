@@ -87,6 +87,59 @@ export function documentsOf(files: readonly PreparedFile[]): { name: string; tex
  */
 export function materialFrom(files: readonly PreparedFile[], limit: number): string {
   const data = files.filter((f) => !f.text).map((f) => `- ${f.file.name}: ${describePreview(f.preview)}`);
-  const docs = contextFromDocuments('', documentsOf(files), limit).context;
-  return [docs, data.length ? `Data files attached:\n${data.join('\n')}` : ''].filter(Boolean).join('\n\n');
+  const lines = data.length ? `Data files attached:\n${data.join('\n')}` : '';
+  // Room is kept for the data files: a long document filled the limit, and these
+  // lines tipped it over, so the request was refused (5 Nov).
+  const docs = contextFromDocuments('', documentsOf(files), Math.max(0, limit - (lines ? lines.length + 2 : 0))).context;
+  return [docs, lines].filter(Boolean).join('\n\n');
+}
+
+const MATERIAL_CUT = '\n\n[…the rest of the material was not sent: it is still in the project]';
+
+/**
+ * What was said first, then what was attached, within `limit` (5 Nov, a book
+ * attached to a conversation). The two were joined with no limit, so a long document
+ * that fit on its own was refused once there was any conversation beside it: "`material`
+ * is longer than the 200,000-character limit". And setup reads only the opening, so
+ * with the document first it never read the conversation at all.
+ */
+export function setupMaterial(said: string, attached: string, limit: number): string {
+  const joined = [said.trim(), attached.trim()].filter(Boolean).join('\n\n');
+  return joined.length <= limit ? joined : `${joined.slice(0, Math.max(0, limit - MATERIAL_CUT.length))}${MATERIAL_CUT}`;
+}
+
+/** Attached documents too long for a project to hold whole, by name (5 Nov): said, not silently cut. */
+export function documentsCut(files: readonly PreparedFile[], limit: number): string[] {
+  return contextFromDocuments('', documentsOf(files), limit).cut;
+}
+
+/** A file attached to one side-chat message, as the request carries it (5 Nov). */
+export interface MessageAttachment {
+  name: string;
+  text?: string;
+  /** An image as a data URL, already scaled down. */
+  image?: string;
+  /** Saved in the project, but more than this message can carry: named, so the reply can say so. */
+  not_read?: boolean;
+}
+
+/** A document's words carried with a message. A longer one is cut, with a note. */
+export const MESSAGE_TEXT_MAX = 60_000;
+/** What a message can carry in all: a request is refused at about 4.5 MB, and the project's own text comes too. */
+export const MESSAGE_ATTACHMENTS_MAX = 3_000_000;
+
+/**
+ * What one message can carry, in the order attached. What does not fit stays named,
+ * so the reply can say it was not read: eleven phone screenshots are more than one
+ * message holds.
+ */
+export function withinMessage(items: readonly MessageAttachment[], max = MESSAGE_ATTACHMENTS_MAX): MessageAttachment[] {
+  let used = 0;
+  return items.map((item) => {
+    const text = item.text && item.text.length > MESSAGE_TEXT_MAX ? `${item.text.slice(0, MESSAGE_TEXT_MAX)}\n[…the rest of this document was not sent with the message]` : item.text;
+    const size = (item.image?.length ?? 0) + (text?.length ?? 0);
+    if (used + size > max) return { name: item.name, not_read: true };
+    used += size;
+    return { ...item, ...(text !== undefined ? { text } : {}) };
+  });
 }

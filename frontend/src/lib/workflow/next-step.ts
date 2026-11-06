@@ -35,6 +35,8 @@ export interface NextActionInput {
   awaitingUpdate: readonly string[];
   goActive: boolean;
   goWorkingOn?: string;
+  /** The stage's draft is being written, not by Go: said at the top too (5 Nov). */
+  drafting?: string | null;
   /** The live run, if it is paused. */
   run: { status: string; ended_at: string | null; hasNeed: boolean; asking: boolean } | null;
   /** The open stage is the project's current one, where Go's own panel shows its card and Resume. */
@@ -55,6 +57,9 @@ export function goIsAsking(stopReason: string | null | undefined): boolean {
 export function nextAction(i: NextActionInput): NextAction | null {
   if (i.finalized || !i.canAct || i.heldChanges > 0) return null;
   if (i.goActive) return { kind: 'working', label: i.goWorkingOn ? tr('ns.goWorkingOn', { what: i.goWorkingOn }) : tr('ns.goWorking'), why: '' };
+  // A tester could not tell the AI was working: the only sign was far down the
+  // page, below the brief and the facts, and looked like something to fill in.
+  if (i.drafting) return { kind: 'working', label: tr('ns.drafting', { what: i.drafting }), why: '' };
   if (i.reopenedHere) {
     return {
       kind: 'apply_continue_reopened',

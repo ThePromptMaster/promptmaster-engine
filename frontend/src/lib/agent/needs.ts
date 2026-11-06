@@ -49,6 +49,8 @@ type Need =
       questions?: string[];
       /** Answers the user can click (13 Oct); the text box stays for anything else. */
       choices?: string[];
+      /** A pause on a question already answered: "do whatever is best" would only bring it back. */
+      repeat?: boolean;
     }
   | { kind: 'wait_for_jobs'; stageId: string; pending: number; complete: number; total: number }
   /**
@@ -178,6 +180,11 @@ export const SHOW_TABLE = 'Go to the table';
  */
 export function needIsDecidedOnStage(need: Pick<NeedsUser, 'kind'>): boolean {
   return need.kind === 'decide_rows' || need.kind === 'triage_findings';
+}
+
+/** Whether Go is waiting on this stage's table, so what the user chose there is what it waits for. */
+export function waitingOnTable(need: NeedsUser | null | undefined, stageId: string): boolean {
+  return Boolean(need && needIsDecidedOnStage(need) && 'stageId' in need && need.stageId === stageId);
 }
 
 /** Whether a stop reason is one of the two "nothing is asked of you now" notes. */

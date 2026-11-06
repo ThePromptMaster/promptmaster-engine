@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { answeredOnStages, leftToGo, meaningOf, openBriefChange, presentationOnly, settledChange } from './brief-change';
+import { answeredOnStages, leftToGo, meaningOf, openBriefChange, presentationOnly, settledChange, onlyFromTheChat, proposedChange } from './brief-change';
 import { factsText } from './facts';
 import type { ProjectFact } from '@/types/project';
 import { laterDoneStages, projectState } from './engine';
 import { BOOK_V1 } from './templates/book.v1';
+import { SINGLE_OUTPUT_V1 } from './templates/single-output.v1';
 import type { WorkflowEvent } from './types';
 
 const ev = (type: WorkflowEvent['type'], stage_id: string, created_at: string, extra: Partial<WorkflowEvent> = {}): WorkflowEvent => ({
@@ -201,5 +202,46 @@ describe('an answer given to Go is left to Go on the stage it was asked from (4 
   it('an answer recorded without its stage is judged everywhere', () => {
     const loose = fact('f4', 'Decided by the user — answered: yes', { via: 'go answer', run_id: 'r1' });
     expect(answeredOnStages(factsText([brief]), [brief, loose])).toBeNull();
+  });
+});
+
+describe('a fact recorded from a side-chat reply is offered, not applied (5 Nov, a rollout pack)', () => {
+  const fact = (statement: string, source_kind: string, via?: string) => ({ statement, kind: 'fact', source_kind, source_ref: via ? { via } : {}, retired_at: null, created_at: '2026-11-05T21:58:19Z' }) as never;
+
+  it('when every fact added came from the chat', () => {
+    const before = '';
+    expect(onlyFromTheChat(before, [fact('An agent says it moved the date.', 'chat', 'side chat')])).toBe(true);
+  });
+
+  it('not one typed into the facts panel or given with "Change it", which reopen at once', () => {
+    expect(onlyFromTheChat('', [fact('The budget is $12,000.', 'user_edit')])).toBe(false);
+    expect(onlyFromTheChat('', [fact('From chat.', 'chat', 'side chat'), fact('By hand.', 'user_edit')])).toBe(false);
+  });
+
+  it('not what the start conversation brought in', () => {
+    expect(onlyFromTheChat('', [fact('From the start.', 'chat', 'front door')])).toBe(false);
+  });
+
+  it('not when nothing was added', () => {
+    expect(onlyFromTheChat('', [])).toBe(false);
+  });
+
+  const offered = { type: 'brief_changed', stage_id: 'pack', created_at: '2026-11-05T21:58:29Z', payload: { affected: [], proposed: [{ stage_id: 'pack', reason: 'It says the drafts are unsent.' }] } } as never;
+
+  it('stays offered until the user decides', () => {
+    expect(proposedChange([offered])).toEqual({ at: '2026-11-05T21:58:29Z', stageId: 'pack', affected: [{ stage_id: 'pack', reason: 'It says the drafts are unsent.' }] });
+  });
+
+  it('is gone once taken up, or kept on record', () => {
+    expect(proposedChange([offered, { type: 'brief_changed', stage_id: 'pack', created_at: '2026-11-05T21:59:00Z', payload: { takes_up: '2026-11-05T21:58:29Z', affected: [] } } as never])).toBeNull();
+    expect(proposedChange([offered, { type: 'brief_change_dismissed', stage_id: 'pack', created_at: '2026-11-05T21:59:00Z', payload: { change_at: '2026-11-05T21:58:29Z' } } as never])).toBeNull();
+  });
+
+  it('reopens nothing while it is offered', () => {
+    const state = projectState(SINGLE_OUTPUT_V1, [
+      { type: 'stage_marked_complete', stage_id: 'input', created_at: '2026-11-05T21:00:00Z' } as never,
+      { ...(offered as object), stage_id: 'input', payload: { affected: [], proposed: [{ stage_id: 'input', reason: 'x' }] } } as never,
+    ]);
+    expect(state.stages.input?.status).not.toBe('stale');
   });
 });

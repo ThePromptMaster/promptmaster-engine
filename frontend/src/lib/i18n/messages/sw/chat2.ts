@@ -8,7 +8,7 @@ export const sw: Record<keyof typeof en, string> = {
   'ra.suggest': 'Pendekeza hatua za kuchukua kuhusu jibu hili',
   'ra.recordLabel': 'Rekodi taarifa za hakika',
   'ra.becomeFacts': 'Hizi zinakuwa taarifa za hakika za mradi zilizokubaliwa',
-  'ra.becomeFactsWhy': 'Kila hatua, ukaguzi na gumzo vitazisoma kuanzia sasa. Kazi iliyokamilika iliyotegemea kilichobadilika inafunguliwa tena ili ikaguliwe upya.',
+  'ra.becomeFactsWhy': 'Kila hatua, ukaguzi na gumzo vitazisoma kuanzia sasa. Ikiwa kazi iliyokamilika inaweza kuathirika, wewe ndiye unayeamua kama isasishwe. Ukweli unaochukua nafasi ya ukweli wa awali hufungua upya kazi iliyotumia ule wa zamani.',
   'ra.requirement': 'Hitaji: ',
   'ra.recording': 'Inarekodi…',
   'ra.recordThis': 'Rekodi taarifa hii ya hakika',

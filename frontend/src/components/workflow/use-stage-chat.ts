@@ -1,5 +1,7 @@
 'use client';
 
+import { withinMessage, type MessageAttachment } from '@/lib/data/attachments';
+import { withRunRecord } from '@/lib/workflow/chat-run-record';
 import { keepFound, renumberResponse, webAccessOf, withWebLine } from '@/lib/workflow/web-found';
 import { savedNumbers } from '@/lib/workflow/sources';
 import { RefusedRevision } from '@/lib/workflow/commit-check';
@@ -160,6 +162,8 @@ interface Options {
   restoreStageVersion?: (stageId: string, versionId: string) => Promise<void>;
   /** Where the user is: stage, workflow, outline, chapters, buttons (3 Oct call). */
   getChatContext?: () => ChatContext;
+  /** What was attached, until a message carries it (5 Nov). */
+  nextMessageAttachments?: { current: MessageAttachment[] };
   /** After facts were updated with a revision, so the project reloads them. */
   onFactsChanged?: () => Promise<unknown> | void;
   /**
@@ -228,6 +232,7 @@ export function useStageChat({
   appendStageVersion,
   restoreStageVersion,
   getChatContext,
+  nextMessageAttachments,
   onFactsChanged,
   onPatchSetup,
   onSourcesChanged,
@@ -337,7 +342,10 @@ export function useStageChat({
       try {
         const priorHistory = asHistory(messages);
         await persist('user', message, 'discuss');
-        const sentContext = getChatContext?.();
+        // The run as recorded now, not as this tab last saw it (5 Nov).
+        const built = getChatContext?.();
+        const sentContext = built ? await withRunRecord(built, project.id) : built;
+        const attachments = withinMessage(nextMessageAttachments?.current ?? []);
 
         const response = await api.chatMessage({
           inputs: inputsFrom(project),
@@ -347,7 +355,10 @@ export function useStageChat({
           model: project.model,
           context: sentContext,
           web_access: project.web_access ?? 'off',
+          ...(attachments.length ? { attachments } : {}),
         });
+        // Carried only once the reply is back: a failed send keeps them for the next try.
+        if (nextMessageAttachments) nextMessageAttachments.current = [];
 
         // The sources the reply cites are saved before the reply is, so a
         // reloaded thread never shows an [S#] the project does not hold

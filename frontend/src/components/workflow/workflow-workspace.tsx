@@ -25,6 +25,7 @@ import { BlockForm, BlockedNotice, CompletionDialog, ObjectivePausedNotice } fro
 import { StageToolResult } from './stage-tool-result';
 import { CRITIQUE_TOOLS, REWRITE_TOOLS, useStageTools } from './use-stage-tools';
 import { FRAMING_KINDS, nextStageAction, type ReportedPanelStep } from '@/lib/workflow/next-action';
+import { PREPARED_OPERATION } from '@/lib/projects/examples/cards';
 import { describeNeed } from '@/lib/agent/needs';
 import { addSectionsLabel, goPanelControls, stageControls, type StageControl } from '@/lib/workflow/stage-controls';
 import { inputsChanged, stageInputs } from '@/lib/workflow/stage-inputs';
@@ -110,11 +111,11 @@ import { accentVariables, backgroundOfVersion, rootSurfaces, versionTintVariable
 import { goIsAsking, nextAction } from '@/lib/workflow/next-step';
 import { holdPendingChange, pendingChanges, settlePendingChange, type PendingChange } from '@/lib/workflow/conflict-trail';
 import { keptConflictsOf } from '@/lib/workflow/routine-conflicts';
-import { FactsNextStep } from './facts-next-step';
+import { FactsNextStep, OfferedChangeNotice } from './facts-next-step';
 import { FactReconcileNotice } from './fact-change-list';
 import { factChangesFromRevision, withMeaningChanges, type FactChange } from '@/lib/workflow/fact-reconcile';
 import { useBriefChange } from './use-brief-change';
-import { openBriefChange, settledChange } from '@/lib/workflow/brief-change';
+import { openBriefChange, proposedChange, settledChange, type ProposedChange } from '@/lib/workflow/brief-change';
 import { contextFromDocuments } from '@/lib/data/extract-text';
 import { ChatAttach } from './chat-attach';
 import { INPUT_LIMITS } from '@/lib/projects/input-limits';
@@ -146,6 +147,7 @@ import { freshOrPage } from '@/lib/workflow/fresh-manuscript';
 import { addedSignature, designAddedStage, effectiveTemplate } from '@/lib/workflow/added-stages';
 import { approvalsOnEarlierVersion, withApprovals } from '@/lib/workflow/approvals';
 import { deliverableDocument } from '@/lib/workflow/deliverable';
+import type { MessageAttachment } from '@/lib/data/attachments';
 import { isFailedEvaluation, lastCompletedCheck } from '@/lib/workflow/evaluation-failure';
 import { otherWorkFor } from '@/lib/agent/other-work';
 import { createClient as createBrowserClient } from '@/lib/supabase/client';
@@ -1122,7 +1124,7 @@ export function WorkflowWorkspace({
         const plan = planFactRecording(action.facts ?? [], project.facts);
         await recordFacts(
           project,
-          plan.insert.map((f) => ({ statement: f.statement, subject: f.subject || null, kind: f.kind ?? 'fact', source_kind: 'chat' as const, source_ref: ref }))
+          plan.insert.map((f) => ({ statement: f.statement, subject: f.subject || null, kind: f.kind ?? 'fact', source_kind: 'chat' as const, source_ref: f.reported ? { ...ref, reported: true } : ref }))
         );
         for (const { old, fact } of plan.supersede) await supersedeFact(project, old, fact.statement, ref, 'chat');
         await onReload?.();
@@ -1267,6 +1269,10 @@ export function WorkflowWorkspace({
     enabled: project.status !== 'finalized' && events !== null,
   });
   const briefChange = useMemo(() => openBriefChange(events ?? [], state), [events, state]);
+  // What was attached in the side chat, until the next message carries it (5 Nov).
+  const forNextMessage = useRef<MessageAttachment[]>([]);
+  // What a fact recorded from the chat may affect: offered, nothing reopened (5 Nov).
+  const offeredChange = useMemo(() => proposedChange(events ?? []), [events]);
   // The last step of the sequence, "Updated and checked", until dismissed.
   const [settledDismissed, setSettledDismissed] = useState<string | null>(null);
   const settled = useMemo(() => {
@@ -1491,6 +1497,7 @@ export function WorkflowWorkspace({
     state,
     // Go works the stage the project is on, never one the user is browsing.
     stage: getStage(template, state.current_stage_id),
+    unsavedRows: stage && stage.renderer === 'review' && dirtyState?.dirty ? { stageId: stage.id, save: dirtyState.save } : null,
     bundles: stageBundles,
     context,
     stageEvaluation: evaluateStage(template, state.current_stage_id, context),
@@ -1542,6 +1549,24 @@ export function WorkflowWorkspace({
    * Output was reopened and changed, Apply and continue was pressed on Summary,
    * and Output stayed "Reopened" after Go had finished).
    */
+  /** The user takes the offered change up: the stages it names are reopened, with why, and Go updates them. */
+  const takeOfferedChange = useCallback(async (offer: ProposedChange) => {
+    setTransitionError(null);
+    try {
+      await appendEvent({
+        type: 'brief_changed', stage_id: offer.stageId, reason: 'Update the work with what was recorded',
+        payload: { field: 'facts', kind: 'fact', presentation_only: false, affected: offer.affected, takes_up: offer.at },
+      });
+      await go.applyAndContinue();
+    } catch (e) {
+      setTransitionError(e instanceof Error && e.message ? t('wsa.failedWhy', { message: e.message }) : t('wsa.failed'));
+    }
+  }, [appendEvent, go, t]);
+  const keepOfferedChange = useCallback(
+    (offer: ProposedChange) => appendEvent({ type: 'brief_change_dismissed', stage_id: offer.stageId, reason: 'Kept on record only', payload: { change_at: offer.at, stage_ids: [] } }),
+    [appendEvent]
+  );
+
   const continueWork = useCallback(async () => {
     setTransitionError(null);
     try {
@@ -1597,6 +1622,7 @@ export function WorkflowWorkspace({
     awaitingUpdate: awaitingLabels,
     goActive: go.active,
     goWorkingOn: getStage(template, state.current_stage_id)?.label,
+    drafting: generation.generating ? stage?.label : null,
     run: go.run ? { status: go.run.status, ended_at: go.run.ended_at, hasNeed: Boolean(go.run.needs), asking: goIsAsking(go.run.stop_reason) } : null,
     onCurrentStage: isCurrent,
   });
@@ -1807,7 +1833,9 @@ export function WorkflowWorkspace({
     hasContent,
     truncated,
     evaluable: draftable && Boolean(stageEvaluation.evaluate),
-    framing: FRAMING_KINDS.has(stage.expected_artifacts[0]?.kind ?? ''),
+    // A curated example's first stage is written for the reader to approve: leading
+    // with a paid check on it hid moving on under More, on a tester's first screen.
+    framing: FRAMING_KINDS.has(stage.expected_artifacts[0]?.kind ?? '') || headVersion?.source_operation === PREPARED_OPERATION,
     evaluated: Boolean(headEvaluation) && !isFailedEvaluation(headEvaluation),
     evaluationClean: Boolean(
       headEvaluation &&
@@ -1910,12 +1938,16 @@ export function WorkflowWorkspace({
   // Go stopped on the objective check: the pause notice offers Go's own action.
   const objectiveNeed =
     go.run && !go.run.ended_at && go.run.status === 'awaiting_decision' && go.run.needs?.kind === 'objective_check' ? go.run.needs : null;
-  const completion = completionSummary(template, state, context, {
-    goWaiting,
-    objectiveUnmet: objectiveAssessment ? { blockers: objectiveAssessment.blockers.map((b) => b.need), next: executableNext(objectiveAssessment)?.title ?? null } : null,
-    objectiveNotRechecked: objectiveStale,
-    approvalsOnEarlier,
-  });
+  const completion = {
+    ...completionSummary(template, state, context, {
+      goWaiting,
+      objectiveUnmet: objectiveAssessment ? { blockers: objectiveAssessment.blockers.map((b) => b.need), next: executableNext(objectiveAssessment)?.title ?? null } : null,
+      objectiveNotRechecked: objectiveStale,
+      approvalsOnEarlier,
+    }),
+    // The finish dialog names the document that is delivered, not the stage that first drafted it (6 Nov, production book test).
+    ...(deliverable ? { deliverable } : {}),
+  };
   // The sidebar counts what Go stops on, not only stage statuses (12 Oct).
   const progressCaption = progressCaptionText(progress, state.project_status === 'finalized', completion.outstanding);
   // The deliverable's latest objective check, for the finished screen (C4).
@@ -2646,6 +2678,15 @@ export function WorkflowWorkspace({
               }}
               onDiscard={(c) => void settlePendingChange(c.id, 'withdrawn').then(upsertRecommendation, () => undefined)}
             />
+            {offeredChange && appendStageVersion && project.status !== 'finalized' && (
+              <OfferedChangeNotice
+                names={offeredChange.affected.map((a) => { const s = template.stages.find((x) => x.id === a.stage_id); return s ? stageText(locale, template.key, s, 'label') : a.stage_id; })}
+                reasons={offeredChange.affected.map((a) => a.reason)}
+                onUpdate={() => void takeOfferedChange(offeredChange)}
+                onKeep={() => void keepOfferedChange(offeredChange)}
+                updating={go.active}
+              />
+            )}
             <BriefChangeNotice
               change={briefChange}
               stageLabel={(id) => { const s = template.stages.find((x) => x.id === id); return s ? stageText(locale, template.key, s, 'label') : id; }}
@@ -3180,9 +3221,12 @@ export function WorkflowWorkspace({
                     project={project}
                     existingNames={(project.data_files ?? []).map((f) => f.name)}
                     onChanged={() => onReload?.()}
-                    onAddToContext={(documents) =>
-                      onPatchProject({ context: contextFromDocuments(project.context ?? '', documents, INPUT_LIMITS.context).context })
-                    }
+                    onAddToContext={(documents) => {
+                      const { context: added, cut } = contextFromDocuments(project.context ?? '', documents, INPUT_LIMITS.context);
+                      onPatchProject({ context: added });
+                      return cut;
+                    }}
+                    onForNextMessage={(items) => { forNextMessage.current = [...forNextMessage.current, ...items]; }}
                     disabled={!isEditable}
                   />
                 )
@@ -3199,6 +3243,7 @@ export function WorkflowWorkspace({
               )}
               // Built when a message is sent, not on every render: it carries the chapters.
               // It carries what changed since the chat's last reply too (31 Oct).
+              nextMessageAttachments={forNextMessage}
               getChatContext={() => {
                 const built = buildChatContext({
                   template, state, project, stage, bundles: stageBundles, controls: pageControls,
@@ -3259,9 +3304,15 @@ export function WorkflowWorkspace({
               afterActionDone={
                 <FactsNextStep
                   judging={judgingChange}
+                  offered={offeredChange && appendStageVersion && project.status !== 'finalized' ? {
+                    names: offeredChange.affected.map((a) => template.stages.find((s) => s.id === a.stage_id)?.label ?? a.stage_id),
+                    onUpdate: () => void takeOfferedChange(offeredChange),
+                    onKeep: () => void keepOfferedChange(offeredChange),
+                  } : undefined}
                   waiting={[...(briefChange?.stageIds ?? []), ...(briefChange?.alsoWaiting ?? [])].map((id) => template.stages.find((s) => s.id === id)?.label ?? id)}
                   onUpdate={appendStageVersion && project.status !== 'finalized' ? () => void continueWork() : undefined}
                   updating={go.active}
+                  finished={project.status === 'finalized'}
                   updated={settledChange(events ?? [], state, Date.now())?.stageIds.map((id) => template.stages.find((s) => s.id === id)?.label ?? id)}
                 />
               }

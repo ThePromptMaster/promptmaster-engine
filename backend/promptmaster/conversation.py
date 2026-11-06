@@ -7,7 +7,7 @@ instruction and what they put in the user message.
 
 from __future__ import annotations
 
-from .page_context import ChatContext, format_chat_context
+from .page_context import ChatAttachment, ChatContext, format_chat_context
 from .prompt_builder import build_prompt, resolve_mode_config
 from .schemas import ChatMessage, Iteration, PMInput
 from .self_model import PROMPTMASTER_SELF_MODEL
@@ -107,6 +107,7 @@ def build_chat_reply_prompt(
     context: ChatContext | None = None,
     found: str = "",
     web: str = "",
+    attached: str = "",
 ) -> tuple[str, str]:
     """Build (system, user) prompt for a fluid chat reply.
 
@@ -129,9 +130,34 @@ def build_chat_reply_prompt(
         + (f"{web}\n\n" if web else "")
         + (f"{found}\n\n" if found else "")
         + f"USER MESSAGE:\n{user_message}\n\n"
-        "Reply to the user's message. Be conversational and concise."
+        + (f"{attached}\n\n" if attached else "")
+        + "Reply to the user's message. Be conversational and concise."
     )
     return system, user_prompt
+
+
+def attached_block(attachments: list[ChatAttachment]) -> str:
+    """What the user attached to this message (5 Nov: eleven screenshots uploaded, and the
+    chat said "No, no photos came through"). "" when nothing was."""
+    if not attachments:
+        return ""
+    lines = ["ATTACHED TO THIS MESSAGE, just now, by the user. You can read these:"]
+    for a in attachments:
+        if a.not_read:
+            continue
+        if a.image:
+            lines.append(f"- {a.name}: an image, shown to you with this message. Look at it.")
+        elif a.text.strip():
+            lines += [f"### From {a.name}", a.text.strip()]
+        else:
+            lines.append(f"- {a.name}: attached, with no text to read.")
+    unread = [a.name for a in attachments if a.not_read]
+    if unread:
+        lines.append(
+            f"Attached but too much for one message, so not shown to you: {', '.join(unread)}. They are saved in the "
+            "project. Say which you did not see, and ask for them in the next message."
+        )
+    return "\n".join(lines)
 
 
 # --------------------------------------------------------------------------

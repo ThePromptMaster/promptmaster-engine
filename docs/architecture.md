@@ -755,6 +755,30 @@ dictionaries: `lib/i18n/templates.ts` files every user's `custom_ex_<key>_<suffi
 | A way in on a first visit | `components/examples/prompty-help.tsx`, after the beta notice |
 | Whether any of it helps | `lib/admin/start-funnel.ts`, derived from existing rows, on `/admin` |
 
+### One delivered copy, truthful stops and what the chat can read (2026-11-06)
+
+A book test delivered one copy while Go described another, a side-chat report reached an approved
+pack through two unlabelled clicks, and "do whatever is best" recorded an answer and changed nothing
+(L-161 to L-174; `docs/assessments/2026-11-06-book-deliverable-and-agents.md`).
+
+| Concern | Where it lives |
+|---|---|
+| Which document is delivered (#509; L-161) | `lib/workflow/deliverable.ts::deliverableDocument(template, bundles)`: by content, not by renderer. `deliverableStage` still answers "which stage writes the chapters". Read `deliverableDocument` for anything that judges, repairs, exports or names the delivered work. `completionSummary.deliverableDone` stays stage-based; the workspace overrides only the name it shows |
+| Reads are current (#505) | `lib/workflow/fresh-manuscript.ts::withCurrentLongForm` before saving evidence and before judging |
+| Repairs stop; what was read (#507; L-162) | `lib/agent/objective-fixes.ts` (`MAX_OBJECTIVE_FIXES`, counted since the user last changed anything); `needs.ts` finding `repair_limit`. `limits.clip_by_section` keeps each section's opening; `objective_assessed.basis.read` holds characters read |
+| The caption agrees with Go (#508; L-163) | `engine.ts` items `objective_not_rechecked` and `approval_on_earlier_version`; `approvals.approvalsOnEarlierVersion`, `objective.objectiveNotRechecked` |
+| Parts see the whole (#510; L-164) | `long-prose.ts::partThatReads`; `whole_text` on `generate-stage-artifact` and `apply-recommendations`, `limits.whole_document_block`; `StageDigest.manuscript_is_earlier` |
+| The note cites this version (#511; L-164) | `stage.py::REVIEW_NOTE_RULE`; `deliverable-check.ts` `splitReviewNote`, `noteQuotesNotInText`, `noAccessClaim`; `deliverable_check.py` `note_quotes` |
+| The chapter plan (#511, #519; L-165) | `long_form.py::_later_stages_rule`; `generate-outline` takes `later_stages` from `outline/actions.ts::stagesAfterPlan` |
+| A word limit on a part (#512; L-166) | `measurable.ts` `isBoldSentence`, `partRange`, `holdsWords` |
+| Delegated answers (#513; L-167) | `answers.ts` `delegatedWhy`, `delegatedQuestion`, `DELEGATED_RULE`, `settlesInTheText`, `delegatedFact`; `use-go-loop.ts::answer` appends the `brief_changed` |
+| Truthful stops (#513, #515; L-167) | `repeat-question.ts`: a same-button match quotes the current question and asks; `SAME_QUESTION_AT_ONCE` for a follow-up straight after an answer |
+| Review-only stays out (#514; L-168) | `brief-change.ts` `onlyFromTheChat`, `proposedChange`; `use-brief-change.ts` writes `affected: []` plus `proposed`; `facts-next-step.tsx::OfferedChangeNotice`; `reply_actions.py` `reported`; `project_context.py` says "reported and not verified" |
+| The chat reads the run (#515; L-169) | `lib/workflow/chat-run-record.ts`; `page_context.py` `GoRunTrace`, `format_go_run` |
+| Start material (#516; L-170) | `lib/data/attachments.ts::setupMaterial`, `documentsCut` |
+| Chat attachments (#518; L-172) | `chat-attach.tsx` → `attachments.ts::withinMessage` → `ChatAttachment` → `conversation.attached_block`; `llm_client.generate(images=…)`; `normalize-image.ts::imageForMessage` |
+| Resume and unsaved rows (#522; L-174) | `use-go-loop.ts::update` saves `unsavedRows` first when `needs.waitingOnTable` holds |
+
 ## Extension points
 
 These are the seams the system was built to be extended at. Working with them is

@@ -56,7 +56,9 @@ def _system_and_prompt(payload: dict[str, Any]) -> tuple[str, str]:
         if message.get("role") == "system":
             system = message.get("content", "")
         elif message.get("role") == "user":
-            prompt = message.get("content", "")
+            content = message.get("content", "")
+            # With images the content is parts; the markers are in the text.
+            prompt = content if isinstance(content, str) else " ".join(p.get("text", "") for p in content if p.get("type") == "text")
     return system, prompt
 
 

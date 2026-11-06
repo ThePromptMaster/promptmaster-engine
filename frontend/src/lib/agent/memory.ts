@@ -14,6 +14,7 @@ import { CONFLICT_CATEGORY, isPendingChangeRow } from '@/lib/workflow/conflict-t
 import type { Recommendation } from '@/lib/supabase/recommendations';
 import type { WorkflowEvent, WorkflowTemplate } from '@/lib/workflow/types';
 import type { AgentStep } from '@/types/agent';
+import { isDelegatedAnswer } from '@/lib/workflow/answers';
 import { USER_ANSWER_STEP } from './actions';
 
 export const MEMORY_MAX_LINES = 20;
@@ -60,7 +61,11 @@ export function projectMemory(input: {
     if (s.action_key !== USER_ANSWER_STEP || !s.output.trim()) return;
     const asked = [...steps.slice(0, i)].reverse().find((p) => p.decision_question || p.params?.conflict_question);
     const question = asked?.decision_question || (asked?.params?.conflict_question ? asked.output : '');
-    lines.push(`Asked${question ? ` "${clip(question).slice(0, 120)}"` : ''}, the user answered: ${s.output}`);
+    // Left to Go, this says what that asks for, within the line's limit: clipped,
+    // "…tell me what you chose" was lost, and it read as already decided (5 Nov).
+    lines.push(isDelegatedAnswer(s.output)
+      ? `Asked${question ? ` "${clip(question).slice(0, 120)}"` : ''}, the user left it to you: choose now and say so in your note; what only they can do, say.`
+      : `Asked${question ? ` "${clip(question).slice(0, 120)}"` : ''}, the user answered: ${s.output}`);
   });
 
   // The most recent are the ones most likely to bear on what comes next.

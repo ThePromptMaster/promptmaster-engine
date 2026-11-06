@@ -103,11 +103,66 @@ describe('a question Go already asked (4 Nov, Lakeside)', () => {
   it('says once what was asked, what was answered and what is still open', () => {
     const r = repeatedQuestion({ question: Q15, control: SHORTER, stageId: 'final_proposal', steps: RUN })!;
     const said = repeatPause(r, 'Final proposal', Q15);
-    expect(said).toMatch(/^I asked this before — "The proposal still ends with four internal notes/);
-    expect(said).toContain('you answered "Remove the notes and trim to 650 words, keeping all figures"');
-    expect(said).toContain('3 moves on Final proposal since then have not settled it, so I have stopped rather than ask you again.');
-    expect(said).toContain("Still open: The final proposal still ends with an 'Outside the proposal' note");
+    expect(said).toMatch(/^The next step here is yours: "Refine: make it shorter"\./);
+    expect(said).toContain('3 moves on Final proposal since your last answer have not changed that');
+    expect(said).toContain("I was going to ask: The final proposal still ends with an 'Outside the proposal' note");
+    expect(said).not.toContain('The proposal still ends with four internal notes');
     expect(said).toMatch(/Nothing more is spent until you act/);
+  });
+
+  it('a question in the same words quotes what was asked and answered', () => {
+    const steps = [...RUN, ask(Q15, 18), answer('Do whatever is best', 20), revise(20), revise(21)];
+    const r = repeatedQuestion({ question: Q19, control: null, stageId: 'final_proposal', steps })!;
+    expect(r.byButton).toBe(false);
+    const said = repeatPause(r, 'Final proposal', Q19);
+    expect(said).toMatch(/^I asked this before — "The final proposal still ends/);
+    expect(said).toContain('you answered "Do whatever is best"');
+    expect(said).toContain('Still open: How do you want the notes block');
+    expect(said).toContain('tell me what to do differently here.');
+  });
+});
+
+describe('straight after an answer, with nothing done since (6 Nov, prod)', () => {
+  const FIRST = "Your requirement asks for 'Riverside Conference Centre' and 'half past four', and none of those words has seven letters. Should the note allow these two phrases as the only exceptions to the seven-letter rule, or keep every word at seven letters and leave the venue and finish time out?";
+  const FOLLOW = 'Should the earlier all-seven-letter note be the final version, so it replaces the current note that names the venue and finish time, or do you want that stage to write a fresh note under the same rule?';
+
+  it('a follow-up that shares some words is not a repeat', () => {
+    const steps = [ask(FIRST, 1, ''), answer('Keep every word at seven letters', 2)];
+    expect(questionOverlap(FIRST, FOLLOW)).toBeGreaterThanOrEqual(SAME_QUESTION);
+    expect(repeatedQuestion({ question: FOLLOW, control: null, stageId: 'final_proposal', steps })).toBeNull();
+  });
+
+  it('the same question again is', () => {
+    const steps = [ask(FIRST, 1, ''), answer('Keep every word at seven letters', 2)];
+    expect(repeatedQuestion({ question: FIRST, control: null, stageId: 'final_proposal', steps })).not.toBeNull();
+  });
+});
+
+describe('a different question naming the same button (5 Nov, a research project)', () => {
+  const CHECK = 'I have checked this derivation and approve the next stage building on it';
+  const CONVENTION = 'In your note, does the symbol mean the product of differences, so that its square has degree 20, or the discriminant itself?';
+  const NEXT = 'You have now seen the lift argument and the passing structural checks. How do you want to proceed?';
+  const steps = [ask(CONVENTION, 1, CHECK), answer('Do whatever is best', 2), revise(3), revise(4)];
+
+  it('is not said to be the earlier question: it says what is left is theirs, under that button', () => {
+    const r = repeatedQuestion({ question: NEXT, control: CHECK, stageId: 'final_proposal', steps })!;
+    expect(r.byButton).toBe(true);
+    const said = repeatPause(r, 'Thread derivations', NEXT);
+    expect(said).toContain(`The next step here is yours: "${CHECK}"`);
+    expect(said).toContain('I was going to ask: You have now seen the lift argument');
+    expect(said).not.toContain('discriminant');
+  });
+});
+
+describe('an answer in the user\'s own words after a pause', () => {
+  it('lets the question be asked once more: that is new to go on', () => {
+    const steps = [...RUN, answer('Take the notes out and leave the figures as they are', 19)];
+    expect(repeatedQuestion({ question: Q15, control: SHORTER, stageId: 'final_proposal', steps })).toBeNull();
+  });
+
+  it('"Do whatever is best" is not new to go on', () => {
+    const steps = [...RUN, answer('Do whatever is best', 19)];
+    expect(repeatedQuestion({ question: Q15, control: SHORTER, stageId: 'final_proposal', steps })).not.toBeNull();
   });
 });
 
@@ -116,7 +171,9 @@ describe('the pause in the interface language', () => {
     const { shownStopReason } = await import('@/lib/i18n/stop-reasons');
     const r = repeatedQuestion({ question: Q15, control: SHORTER, stageId: 'final_proposal', steps: RUN })!;
     const said = repeatPause(r, 'Final proposal', Q15);
-    expect(shownStopReason('es', said)).toMatch(/^Ya te pregunté esto/);
+    expect(shownStopReason('es', said)).toMatch(/^El siguiente paso aquí es tuyo/);
     expect(shownStopReason('en', said)).toBe(said);
+    const words = repeatPause({ ...r, byButton: false }, 'Final proposal', Q15);
+    expect(shownStopReason('es', words)).toMatch(/^Ya te pregunté esto/);
   });
 });

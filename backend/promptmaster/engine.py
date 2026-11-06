@@ -16,6 +16,7 @@ async def generate(
     prompt_text: str,
     system_text: str,
     model: str | None = None,
+    images: list[str] | None = None,
 ) -> str:
     """Execute a single generation call. Returns the output text."""
     content, _usage = await client.generate(
@@ -24,6 +25,7 @@ async def generate(
         temperature=0.7,
         max_tokens=4096,
         model=model,
+        **({"images": images} if images else {}),
     )
     return content
 

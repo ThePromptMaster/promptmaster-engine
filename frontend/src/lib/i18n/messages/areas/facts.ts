@@ -36,6 +36,8 @@ export const en = {
   'facts.src.revision': 'updated with your revision',
   'facts.src.policy': ', accepted under your routine-decision policy',
   'facts.src.assumed': ', assumed by PromptMaster (you did not say it)',
+  'facts.src.delegated': 'chosen by Go when you left it to Go',
+  'facts.src.reported': ', reported and not verified',
 } as const;
 
 type Keys = Record<keyof typeof en, string>;
@@ -77,6 +79,8 @@ export const es: Keys = {
   'facts.src.revision': 'actualizado con tu revisión',
   'facts.src.policy': ', aceptado según tu política de decisiones rutinarias',
   'facts.src.assumed': ', supuesto por PromptMaster (no lo dijiste tú)',
+  'facts.src.delegated': 'elegido por Go cuando se lo dejaste a Go',
+  'facts.src.reported': ', comunicado y sin verificar',
 };
 
 export const fr: Keys = {
@@ -116,6 +120,8 @@ export const fr: Keys = {
   'facts.src.revision': 'mis à jour avec votre révision',
   'facts.src.policy': ', accepté selon votre règle de décisions courantes',
   'facts.src.assumed': ', supposé par PromptMaster (vous ne l’avez pas dit)',
+  'facts.src.delegated': 'choisi par Go quand vous le lui avez laissé',
+  'facts.src.reported': ', signalé et non vérifié',
 };
 
 export const pt: Keys = {
@@ -155,4 +161,6 @@ export const pt: Keys = {
   'facts.src.revision': 'atualizado com a sua revisão',
   'facts.src.policy': ', aceito pela sua política de decisões rotineiras',
   'facts.src.assumed': ', suposto pelo PromptMaster (você não disse isso)',
+  'facts.src.delegated': 'escolhido pelo Go quando você deixou para o Go',
+  'facts.src.reported': ', relatado e não verificado',
 };

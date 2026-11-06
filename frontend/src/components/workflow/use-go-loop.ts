@@ -44,7 +44,7 @@ import { actionFor, actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, ROUTINE_DE
 import { contextWithFacts, readOutcomeProof, readStageFacts, type StageFacts } from '@/lib/agent/facts';
 import { serializeItems, stageDrafts } from '@/lib/workflow/stage-artifact';
 import { carryNewerFixes, describeCarried, reasksCarried } from '@/lib/agent/review-rounds';
-import { approvedAsItStands, delegableToCommit, exhaustedRepair, policyConfirmable, repairStuckNeed, repairTries, staleRepair, unrepairableStale, describeNeed, NEED_CLEARED, NEED_MOVED_ON, needStillHolds, needsUser, openRowsElsewhere, requiredWork, type NeedsUser } from '@/lib/agent/needs';
+import { approvedAsItStands, delegableToCommit, exhaustedRepair, policyConfirmable, repairStuckNeed, repairTries, staleRepair, unrepairableStale, describeNeed, NEED_CLEARED, NEED_MOVED_ON, needStillHolds, needsUser, openRowsElsewhere, requiredWork, waitingOnTable, type NeedsUser } from '@/lib/agent/needs';
 import { assertHonestOutcome, verifyOutcome } from '@/lib/agent/outcome';
 import { outlineStageFor } from '@/lib/outline/actions';
 import { effectiveRenderer } from '@/lib/workflow/stage-artifact';
@@ -53,7 +53,7 @@ import { projectMemory } from '@/lib/agent/memory';
 import { requestProjectCancel } from '@/lib/supabase/jobs';
 import { recordFacts } from '@/lib/supabase/facts';
 import { appendWorkflowEvent } from '@/lib/supabase/workflow';
-import { answerAsFact, answerDocuments, measuredDocument } from '@/lib/workflow/answers';
+import { answerAsFact, answerDocuments, measuredDocument, delegatedWhy, isDelegatedAnswer, settlesInTheText } from '@/lib/workflow/answers';
 import { authorizeRun, DEFAULT_AUTO_WINDOWS } from '@/lib/agent/authorize';
 import { buildAgentState } from '@/lib/agent/digest';
 import { delegationSentences } from '@/lib/agent/delegation';
@@ -128,6 +128,8 @@ interface Options {
   template: WorkflowTemplate;
   state: WorkflowState;
   stage: StageDefinition | undefined;
+  /** Rows chosen in the table on screen and not saved yet: Resume saves them before it carries on. */
+  unsavedRows?: { stageId: string; save: () => Promise<void> } | null;
   bundles: Record<string, StageArtifactBundle>;
   context: StageContext;
   stageEvaluation: StageEvaluation;
@@ -804,6 +806,10 @@ export function useGoLoop(opts: Options) {
         // planner might prefer (4 Oct): a cut-off draft is finished, and at an
         // approval the findings are applied and the work checked first.
         const loops = o.template.stages.some((s) => s.transitions.loop_to);
+        // Left to Go with nothing in the text to settle: the planner moves next,
+        // told to choose, before any check that never read the answer (5 Nov).
+        const lastStep = stepsRef.current.at(-1);
+        const justLeftToGo = lastStep?.action_key === USER_ANSWER_STEP && isDelegatedAnswer(lastStep.output ?? '');
         const required = repair ?? (userReturn
           ? {
               key: 'return_to_stage',
@@ -811,10 +817,10 @@ export function useGoLoop(opts: Options) {
               expected: `The work is back on ${userReturn.label}; the stages after it are rechecked once it changes.`,
               params: { stage_id: userReturn.id, reason: `You chose: ${userReturn.answer}`.slice(0, 1_000), work: userReturn.answer.slice(0, 2_000), by_user: true },
             }
-          : null) ?? requiredWork({
+          : null) ?? (justLeftToGo ? null : requiredWork({
           stage: o.stage, facts, stageEvaluation, allowed, lookupDue, routine, commitTried, runAttemptsLeft, asItStands,
           ...(loops ? { round: { staleDraft: stageDrafts(o.stage) && !hasDraft } } : {}),
-        });
+        }));
         const choice = required
           ? {
               action_key: required.key, params: required.params ?? {}, rationale: required.rationale, expected_outcome: required.expected,
@@ -940,7 +946,9 @@ export function useGoLoop(opts: Options) {
             versions: o.bundles[o.stage.id]?.versions ?? [], facts: o.project.facts ?? [],
           });
           if (repeat) {
-            await setRunStatus('blocked', repeatPause(repeat, o.stage.label, question));
+            // With somewhere to answer: "tell me what to do differently" over a
+            // blocked run had no box, and Resume only fired this again (5 Nov).
+            await setRunStatus('awaiting_decision', repeatPause(repeat, o.stage.label, question), { kind: 'answer_question', question, repeat: true });
             break;
           }
           const { audit, instead } = auditStop({
@@ -1234,6 +1242,19 @@ export function useGoLoop(opts: Options) {
    * a nearly spent window is closed and the next one opened instead.
    */
   const update = useCallback(async (chosen: ExecutionPolicy = policy) => {
+    // Decisions chosen in the table but not saved: as far as Go can read, the
+    // rows are still undecided, so Resume stopped again at once and said nothing
+    // (6 Nov, production, book test). They are saved first, as an outline's
+    // unsaved edits are before its approval.
+    const unsaved = latest.current.unsavedRows;
+    if (unsaved && waitingOnTable(runRef.current?.needs, unsaved.stageId)) {
+      try {
+        await unsaved.save();
+      } catch (e) {
+        setError(asError(e, 'Could not save your decisions, so Go has not resumed.').message);
+        return;
+      }
+    }
     if (phaseRef.current === 'watching') {
       setError(WATCHING_ELSEWHERE);
       return;
@@ -1490,10 +1511,24 @@ export function useGoLoop(opts: Options) {
         // deliverable that was judged, so it is reopened with the answer as the
         // reason, and Go's repair revises it. Matching the answer to the text
         // it corrects is not possible in code; the judged stage is known.
-        const unmet = /objective is not met/i.test(current.stop_reason ?? '')
-          ? await reopenJudged(ANSWER_OBJECTIVE_REASON, `your answer to "${asked.slice(0, 240)}" was: ${text.trim().slice(0, 600)}`)
+        const leftToGo = isDelegatedAnswer(text);
+        const onObjective = /objective is not met/i.test(current.stop_reason ?? '');
+        // "Do whatever is best" on a question the text can settle: the stage is
+        // reopened to decide it, so the repair comes before any check (5 Nov).
+        const head = o.bundles[o.stage.id]?.versions.at(-1)?.content ?? '';
+        const reopensForChoice = leftToGo && !onObjective && o.stage.renderer === 'prose' && st?.status !== 'blocked' &&
+          settlesInTheText(asked, current.needs?.kind === 'answer_question' ? current.needs.choices : undefined, head);
+        if (reopensForChoice) {
+          await appendWorkflowEvent(o.project.id, o.project.user_id, {
+            type: 'brief_changed', stage_id: o.stage.id, actor: 'user', reason: 'Left to Go to decide',
+            payload: { field: 'facts', kind: 'answer', affected: [{ stage_id: o.stage.id, reason: delegatedWhy(asked) }] },
+          });
+        }
+        // Left to Go is not the user's word on how to fix it, so it does not start the repair count again.
+        const unmet = onObjective
+          ? await reopenJudged(leftToGo ? FIX_OBJECTIVE_REASON : ANSWER_OBJECTIVE_REASON, `your answer to "${asked.slice(0, 240)}" was: ${text.trim().slice(0, 600)}`)
           : objectiveUnmet(o.events);
-        if (fact || st?.status === 'blocked' || unmet) {
+        if (fact || st?.status === 'blocked' || unmet || reopensForChoice) {
           await Promise.all([o.onRefresh?.(), o.reloadEvents()]);
         }
         await go();

@@ -3,8 +3,8 @@
 import { useRef, useState } from 'react';
 import { useT } from '@/lib/i18n/i18n-provider';
 
-import { documentsOf, prepareFiles } from '@/lib/data/attachments';
-import { normalizeImage } from '@/lib/data/normalize-image';
+import { documentsOf, prepareFiles, type MessageAttachment } from '@/lib/data/attachments';
+import { imageForMessage, normalizeImage } from '@/lib/data/normalize-image';
 import { PICKABLE_EXTENSIONS, imagePreview, isImage, rejectReason } from '@/lib/data/preview';
 import { attachProjectFile } from '@/lib/supabase/project-files';
 import type { Project } from '@/types/project';
@@ -15,20 +15,27 @@ import type { Project } from '@/types/project';
  *
  * It stores the file exactly as the project's data panel does — same checks,
  * same `project_files` row — and then asks before a document's words go into
- * the project context. Nothing is attached to a message: the chat reads the
- * project, so the file is the project's from the moment it is stored.
+ * the project context.
+ *
+ * What was attached also goes with the next message (5 Nov: eleven screenshots
+ * uploaded, and the chat answered "No, no photos came through"). The chat request
+ * carried no files at all; only text added to the project context ever reached it.
  */
 export function ChatAttach({
   project,
   existingNames,
   onChanged,
   onAddToContext,
+  onForNextMessage,
   disabled = false,
 }: {
   project: Pick<Project, 'id' | 'user_id'>;
   existingNames: readonly string[];
   onChanged: () => void | Promise<void>;
-  onAddToContext?: (documents: { name: string; text: string }[]) => void;
+  /** Adds the documents' words to the project context. Returns the ones cut for length. */
+  onAddToContext?: (documents: { name: string; text: string }[]) => string[];
+  /** What was attached, to go with the next message. */
+  onForNextMessage?: (items: MessageAttachment[]) => void;
   disabled?: boolean;
 }) {
   const t = useT();
@@ -60,6 +67,7 @@ export function ChatAttach({
       // iPhone and could not tell whether it had worked). Each gets the caption
       // its name suggests, which can be changed under the project's images.
       const added: string[] = [];
+      const forNext: MessageAttachment[] = [];
       for (const picked of images) {
         const normal = await normalizeImage(picked);
         if ('error' in normal) {
@@ -76,6 +84,8 @@ export function ChatAttach({
           await attachProjectFile(project, normal.file, imagePreview(normal.file.name, '', bitmap?.width ?? 0, bitmap?.height ?? 0));
           bitmap?.close();
           added.push(normal.file.name);
+          const image = await imageForMessage(normal.file);
+          forNext.push(image ? { name: normal.file.name, image } : { name: normal.file.name, not_read: true });
           if (normal.note) prepared.notes.push(normal.note);
         } catch (e) {
           failed.push(t('pnl.couldNotStore', { name: normal.file.name, why: e instanceof Error && e.message ? ` (${e.message})` : '' }));
@@ -84,13 +94,25 @@ export function ChatAttach({
       if (added.length) {
         prepared.notes.push(t('pnl.addedImages', { count: added.length, names: added.join(', ') }));
       }
-      setReadable(documentsOf(prepared.ready.filter((p) => stored.includes(p.file.name))));
+      const docs = documentsOf(prepared.ready.filter((p) => stored.includes(p.file.name)));
+      setReadable(docs);
+      const dataFiles = stored.filter((name) => !docs.some((d) => d.name === name));
+      const withNext: MessageAttachment[] = [...docs.map((d) => ({ name: d.name, text: d.text })), ...dataFiles.map((name) => ({ name })), ...forNext];
+      if (withNext.length) onForNextMessage?.(withNext);
       setMessage(
-        [stored.length ? t('pnl.attachedTo', { names: stored.join(', ') }) : '', ...prepared.notes, ...failed]
+        [
+          stored.length ? t('pnl.attachedTo', { names: stored.join(', ') }) : '',
+          ...prepared.notes,
+          ...failed,
+          withNext.length && onForNextMessage ? t('pnl.goesWithNext') : '',
+        ]
           .filter(Boolean)
           .join(' ')
       );
       if (stored.length || added.length) await onChanged();
+    } catch {
+      // It said nothing at all when a file could not be read (5 Nov).
+      setMessage(t('pnl.attachFailed'));
     } finally {
       setBusy(false);
       if (input.current) input.current.value = '';
@@ -131,9 +153,9 @@ export function ChatAttach({
         <button
           type="button"
           onClick={() => {
-            onAddToContext(readable);
+            const cut = onAddToContext(readable);
             setReadable([]);
-            setMessage(t('pnl.addedToContext'));
+            setMessage(cut.length ? t('pnl.addedPart', { names: cut.join(', ') }) : t('pnl.addedToContext'));
           }}
           className="self-start rounded-lg bg-[var(--surface-container-high)] px-3 py-1 text-label text-[var(--on-surface)]"
         >

@@ -58,3 +58,13 @@ describe('a cleared request is not a question (2 Nov, production pass)', () => {
   });
 });
 
+describe('the draft being written is said at the top (5 Nov, a first-time tester)', () => {
+  it('says so, with nothing for the user to press', () => {
+    expect(nextAction({ ...base, drafting: 'Answer' })).toEqual({ kind: 'working', label: 'Writing Answer…', why: '' });
+  });
+
+  it("Go's own work says Go, and what the user has to do comes after", () => {
+    expect(nextAction({ ...base, goActive: true, drafting: 'Answer' })?.label).toMatch(/^Go is working/);
+    expect(nextAction({ ...base, drafting: null })).toBeNull();
+  });
+});

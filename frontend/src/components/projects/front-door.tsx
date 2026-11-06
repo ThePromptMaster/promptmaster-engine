@@ -1,5 +1,6 @@
 'use client';
 
+import { setupMaterial } from '@/lib/data/attachments';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 import { api } from '@/lib/api/client';
@@ -52,7 +53,7 @@ export function questionsAsked(turns: readonly Turn[]): { question: string; answ
 }
 
 /** How much of the conversation the next question reads, from its end. */
-const QUESTION_CONTEXT_CHARS = 16_000;
+const QUESTION_CONTEXT_CHARS = 10_000;
 
 /** A search a reply made (22 Oct): what for, and what it found that is new to the conversation. */
 export interface FrontDoorSearch {
@@ -212,9 +213,8 @@ export function FrontDoor({
     setError(null);
     try {
       const conversation = from.map((x) => `${x.role === 'user' ? 'Me' : 'PromptMaster'}: ${x.content}`).join('\n\n');
-      const read = [material.trim(), conversation ? `THE CONVERSATION SO FAR:\n${conversation.slice(-QUESTION_CONTEXT_CHARS)}` : '']
-        .filter(Boolean)
-        .join('\n\n');
+      // The conversation first: this call reads only the opening of what it is sent.
+      const read = setupMaterial(conversation ? `THE CONVERSATION SO FAR:\n${conversation.slice(-QUESTION_CONTEXT_CHARS)}` : '', material, INPUT_LIMITS.context);
       const res = await api.guideNextQuestion({
         objective: (brief.objective || opening || from.find((x) => x.role === 'user')?.content || '').trim().slice(0, INPUT_LIMITS.objective),
         answered: asked,
