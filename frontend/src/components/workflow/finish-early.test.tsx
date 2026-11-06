@@ -41,6 +41,15 @@ describe('finishing with what you have', () => {
     expect(screen.getByRole('textbox')).toBeInTheDocument();
   });
 
+  it('from the repair limit, says what is recorded and asks nothing more', async () => {
+    const onConfirm = vi.fn();
+    render(<CompletionDialog summary={summary} stated="Names the desk — it does not" busy={false} onConfirm={onConfirm} onCancel={vi.fn()} />);
+    expect(screen.getByRole('note')).toHaveTextContent('Recorded with the project as a limitation: Names the desk — it does not');
+    expect(screen.queryByRole('textbox')).toBeNull();
+    await userEvent.click(screen.getAllByRole('button')[0]);
+    expect(onConfirm).toHaveBeenCalledWith(undefined);
+  });
+
   it('says on the finished project what was not done, with the way back to each', async () => {
     const onGoBack = vi.fn();
     render(<ProjectFinishedBanner onReopen={vi.fn()} notDone={[{ text: 'Review: I have read the plan', stageId: 'review' }]} onGoBack={onGoBack} />);

@@ -277,10 +277,13 @@ export function CompletionDialog({
   show,
   error,
   early = false,
+  stated,
 }: {
   summary: CompletionSummary;
   /** Finishing early, from a stage before the last: no reason asked; what is open is kept as not done yet (26 Oct). */
   early?: boolean;
+  /** Finishing from Go's repair limit: what is recorded as the limitation, so no other reason is asked. */
+  stated?: string;
   /** How stage names and Go's request are said here; without it, the English the items hold. */
   show?: OutstandingShow;
   busy: boolean;
@@ -313,7 +316,7 @@ export function CompletionDialog({
   // me to finish … despite the unresolved finding").
   const open = (summary.outstanding ?? []).filter((i) => i.kind !== 'unmet_blocking' || !summary.leftOpenStages.some((s) => s.id === i.stageId));
   // Optional rows are listed, and finishing past them needs no reason (C3).
-  const needsReason = !early && open.some(blocksCompletion);
+  const needsReason = !early && !stated && open.some(blocksCompletion);
   const rows: [string, number][] = [
     [t('ssp.row.completed'), summary.completed],
     [t('ssp.row.skipped'), summary.skipped],
@@ -372,7 +375,12 @@ export function CompletionDialog({
           </ul>
         </div>
       )}
-      {!early && !needsReason && open.length > 0 && (
+      {stated && (
+        <p role="note" data-stated-limitation className="mt-3 rounded-lg bg-[var(--surface-container-low)] px-4 py-3 text-label text-[var(--on-surface)]">
+          {t('ssp.statedLimitation', { text: stated })}
+        </p>
+      )}
+      {!early && !stated && !needsReason && open.length > 0 && (
         // Optional rows only: named, and finishing needs no reason (C3, 8 Oct).
         <div role="group" aria-label={t('ssp.optional')} className="mt-3 rounded-lg bg-[var(--surface-container-low)] px-4 py-3">
           <p className="text-label font-semibold text-[var(--on-surface)]">{t('ssp.optionalTitle')}</p>
@@ -464,7 +472,7 @@ export function CompletionDialog({
           disabled={busy || (needsReason && !reason.trim())}
           className="rounded-lg bg-[var(--pm-primary)] px-5 py-2 text-title text-[var(--on-primary)] disabled:opacity-50"
         >
-          {busy ? t('ssp.finishing') : early ? t('early.finish') : !summary.deliverableDone ? t('ssp.override') : needsReason ? t('ssp.finishAnyway') : t('ssp.finishProject')}
+          {busy ? t('ssp.finishing') : early ? t('early.finish') : !summary.deliverableDone ? t('ssp.override') : needsReason || stated ? t('ssp.finishAnyway') : t('ssp.finishProject')}
         </button>
         <button onClick={onCancel} className="rounded-lg px-4 py-2 text-title text-[var(--on-surface-variant)]">
           {t('pnl.notYet')}

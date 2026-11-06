@@ -370,6 +370,7 @@ export const zh: Record<keyof typeof en, string> = {
   'ssp.stillOpen_other': '仍未完成，共 {count} 项：',
   'ssp.goTo': '前往 {stage}',
   'ssp.whyFinish': '为什么在仍有未完成事项时结束？此说明会随项目一起记录。',
+  'ssp.statedLimitation': '已作为限制记录在项目中：{text}',
   'ssp.whyFinishLabel': '为何在仍有未完成工作时结束',
   'ssp.against': '对照你的目标',
   'ssp.scores': '对齐度 {a} · 清晰度 {c} · 偏离度 {d}（越低越好）',

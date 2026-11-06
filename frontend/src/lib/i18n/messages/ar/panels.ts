@@ -370,6 +370,7 @@ export const ar: Record<keyof typeof en, string> = {
   'ssp.stillOpen_other': 'لا يزال مفتوحًا — أمور (العدد: {count}):',
   'ssp.goTo': 'الانتقال إلى {stage}',
   'ssp.whyFinish': 'لماذا تنهي مع بقاء هذا مفتوحًا؟ يُسجَّل ذلك مع المشروع.',
+  'ssp.statedLimitation': 'مسجَّل مع المشروع كقيد: {text}',
   'ssp.whyFinishLabel': 'سبب الإنهاء مع بقاء عمل مفتوح',
   'ssp.against': 'مقابل هدفك',
   'ssp.scores': 'المواءمة {a} · الوضوح {c} · الانحراف {d} (المنخفض جيد)',

@@ -553,6 +553,11 @@ describe('the finished screen puts the work at the centre (C4, Sean 28 Sep item 
     stages: { [stage.id]: { artifact: null, versions: [researchVersion(content)] } },
   });
 
+  it('says what it was finished with stated as a limitation, beside the work (6 Nov)', () => {
+    render(<ProjectFinished bundle={bundle('One two three four five.')} completion={summary} limitation="Names the desk" onReopen={vi.fn()} />);
+    expect(screen.getByText('Recorded with the project as a limitation: Names the desk')).toBeInTheDocument();
+  });
+
   it('says it is complete, counts the words, and reads the work on request', async () => {
     render(<ProjectFinished bundle={bundle('One two three four five.')} completion={summary} onReopen={vi.fn()} />);
     expect(screen.getByRole('heading', { name: 'Your work is complete' })).toBeInTheDocument();

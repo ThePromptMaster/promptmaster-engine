@@ -370,6 +370,7 @@ export const sw: Record<keyof typeof en, string> = {
   'ssp.stillOpen_other': 'Bado wazi — mambo {count}:',
   'ssp.goTo': 'Nenda kwenye {stage}',
   'ssp.whyFinish': 'Kwa nini ukamilishe huku hili likiwa wazi? Inarekodiwa pamoja na mradi.',
+  'ssp.statedLimitation': 'Imerekodiwa pamoja na mradi kama kikomo: {text}',
   'ssp.whyFinishLabel': 'Kwa nini ukamilishe huku kazi bado iko wazi',
   'ssp.against': 'Dhidi ya lengo lako',
   'ssp.scores': 'Ulinganifu {a} · Uwazi {c} · Mkengeuko {d} (chini ni vizuri)',
