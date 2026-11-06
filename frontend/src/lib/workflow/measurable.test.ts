@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { countQuestions, countSections, countWords, measure, parseRequirements, requirementsForStage, sectionFor, type MeasurableRequirement } from './measurable';
+import { isPart, countQuestions, countSections, countWords, measure, parseRequirements, requirementsForStage, sectionFor, type MeasurableRequirement } from './measurable';
 import { SINGLE_OUTPUT_V1 } from './templates/single-output.v1';
 import type { StageDefinition } from './types';
 
@@ -541,5 +541,23 @@ describe('a limit on each chapter or section (6 Nov, a book test)', () => {
     expect(firm.map((e) => e.requirement.per)).toEqual(['section']);
     expect(measure(firm[0].requirement, `## One\n\n${words(90)}\n\n## Two\n\n${words(90)}`, firm[0].whole)!.satisfied).toBe(true);
     expect(requirementsForStage(deliverable, 'output', one('Roughly 600–800 words per chapter.'))).toEqual([]);
+  });
+});
+
+describe('a limit on the thing being written is a limit on all of it (6 Nov, production)', () => {
+  const only = (text: string) => parseRequirements([text]);
+
+  it.each(['essay', 'article', 'paper', 'note', 'proposal', 'speech', 'story', 'newsletter', 'write-up'])('the %s', (noun) => {
+    const [r] = only(`The ${noun} must be exactly 2,137 words, not one more or fewer.`);
+    expect(r).toMatchObject({ subject: '', min: 2137, max: 2137 });
+    expect(isPart(r)).toBe(false);
+    const counted = measure(r, Array.from({ length: 2137 }, () => 'word').join(' '), true);
+    expect(counted?.satisfied).toBe(true);
+  });
+
+  it('a part is still a part', () => {
+    expect(only('Speaker notes must be at most 40 words.')[0].subject).toBe('speaker note');
+    expect(only('Cover note limited to 150 words.')[0].subject).toBe('cover note');
+    expect(only('The executive update must be no more than 100 words.')[0].subject).toBe('executive update');
   });
 });

@@ -140,7 +140,7 @@ function partBefore(text: string, start: number): string {
   // "Whole document under 600 words, including headings": the whole, not a
   // part named "whole document" (2 Nov, production pass: the requirement a
   // generated setup recorded was measured nowhere, and its headings rule lost).
-  if (WHOLE.test(phrase) || WHOLE.test(words.at(-1)!)) return '';
+  if (WHOLE.test(phrase) || WHOLE.test(words.at(-1)!) || phrase === 'note') return '';
   // "executive summary" is the summary every other check already knows.
   const listed = phrase.match(SUBJECT_RE);
   if (listed) return canonical(listed[1]);
@@ -183,7 +183,7 @@ function itemBefore(text: string, start: number): string {
   if (!words.length || words.length > 4) return '';
   if (words.some((w) => NOT_A_NAME.test(w) || !/^[a-z][a-z-]*$/i.test(w))) return '';
   const phrase = words.slice(-2).join(' ').toLowerCase();
-  if (WHOLE.test(phrase) || WHOLE.test(words.at(-1)!)) return '';
+  if (WHOLE.test(phrase) || WHOLE.test(words.at(-1)!) || phrase === 'note') return '';
   const listed = phrase.match(SUBJECT_RE);
   if (listed) return canonical(listed[1]);
   return phrase.replace(/(?<!s)s$/, '');
@@ -221,7 +221,9 @@ const TRAILING_VERB = /^(?:is|are|be|must|should|shall|will|stays?|remains?|kept
 const APPROXIMATE = /(?:\b(?:roughly|about|around|approximately|approx\.?|some|circa|nearly|almost)|~|约)\s*$/i;
 
 /** Names for the whole deliverable, not a part of it. */
-const WHOLE = /^(?:deliverable|document|output|response|pack|package|whole(?: thing)?|text|draft|piece|it)$/i;
+// 6 Nov, production: "The essay must be exactly 2,137 words" went looking for a section called
+// "essay", found none, and the length was never counted.
+const WHOLE = /^(?:deliverable|document|output|response|pack|package|whole(?: thing)?|text|draft|piece|it|essay|article|paper|proposal|speech|story|newsletter|write-?up)$/i;
 
 /** What a limit can apply to each of. */
 const UNITS = 'chapter|section|part|slide|lesson|module|scene|episode';
