@@ -113,7 +113,12 @@ def build_outline_prompt(inputs: PMInput, suggested_section_count: int, later_st
         f"{context_line(inputs)}"
         f"Output format: {inputs.output_format or '(none)'}\n"
         f"Target section count: {suggested_section_count} (use this as a guide; "
-        "adjust if the objective genuinely needs more or fewer).\n\n"
+        "adjust if the objective genuinely needs more or fewer).\n"
+        # 6 Nov (prod, a six-chapter book): with no plan yet the target is the
+        # minimum, 3, and the model took it: "Chapter 3 … and Chapter 4 …".
+        "The brief wins over the target: when it names chapters or parts (\"a six-chapter book\"), each one is its "
+        "own section, and anything else it asks to be written (a short outline, an appendix) is its own section too. "
+        "Never put two chapters in one section.\n\n"
         f"{_later_stages_rule(later_stages)}"
         "Return JSON with one field:\n"
         '- outline: array of {"title": string, "abstract": string}\n\n'
