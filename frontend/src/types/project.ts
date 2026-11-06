@@ -142,6 +142,8 @@ export interface Project {
   context?: string;
   /** A sample of what good looks like (4 Nov); a standard for depth and style, never a source. */
   sample_output?: string | null;
+  /** The curated example this project is the sample of (`lib/projects/examples`); nothing drafts on its own there. */
+  example_key?: string | null;
 
   mode: ModeType;
   custom_name: string;
@@ -211,6 +213,8 @@ export interface ProjectSummary {
   workflow: string;
   /** The template version it pins; the list reads the workflow's name from it. */
   workflow_template_id?: string | null;
+  /** The curated example this project is the sample of, if any. */
+  example_key?: string | null;
   stage: string;
   status: ProjectStatus;
   /** The project's own accent colour, shown on its card. */

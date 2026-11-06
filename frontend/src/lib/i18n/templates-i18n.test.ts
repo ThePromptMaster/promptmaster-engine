@@ -33,4 +33,12 @@ describe('the system workflows in every language (client, 21 Oct)', () => {
     expect(templateDescription('pt', 'single_output', 'x')).toContain('entrega');
     expect(groupLabel('fr', 'planning', 'Planning')).toBe('Planification');
   });
+
+  it('shows an example\'s workflow translated, under any user\'s key for it, and leaves other custom keys alone', () => {
+    const stage = { id: 'deal_brief', label: 'Deal brief', short_label: 'Brief', entry_guidance: '' };
+    expect(stageText('es', 'custom_ex_investment_memo_abc123def0', stage, 'label')).toBe('Resumen de la operación');
+    expect(stageText('en', 'custom_ex_investment_memo_abc123def0', stage, 'label')).toBe('Deal brief');
+    expect(stageText('es', 'custom_abc123', stage, 'label')).toBe('Deal brief');
+    expect(templateDescription('fr', 'custom_ex_investment_memo_abc123def0', 'x')).toContain('mémo');
+  });
 });

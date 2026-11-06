@@ -21,6 +21,16 @@ function look(locale: Locale, key: string): string | undefined {
   return (DICTIONARIES[locale] as Record<string, string>)[key];
 }
 
+/**
+ * Where a workflow's words are filed. A curated example's workflow is saved per
+ * user under a key of its own (`lib/projects/examples`), and all of them share
+ * the example's words. A custom workflow has none, and shows its own.
+ */
+function wordsKey(templateKey: string): string {
+  const example = /^custom_ex_([a-z_]+)_[0-9a-f]{10}$/.exec(templateKey);
+  return example ? `example_${example[1]}` : templateKey;
+}
+
 export function stageText(
   locale: Locale,
   templateKey: string | null | undefined,
@@ -29,11 +39,11 @@ export function stageText(
 ): string {
   const own = stage[FIELD[field]] ?? '';
   if (!templateKey) return own;
-  return look(locale, `stage.${templateKey}.${stage.id}.${field}`) ?? own;
+  return look(locale, `stage.${wordsKey(templateKey)}.${stage.id}.${field}`) ?? own;
 }
 
 export function templateDescription(locale: Locale, templateKey: string | null | undefined, own: string): string {
-  return (templateKey && look(locale, `template.${templateKey}.description`)) || own;
+  return (templateKey && look(locale, `template.${wordsKey(templateKey)}.description`)) || own;
 }
 
 export function groupLabel(locale: Locale, group: StageGroup, own: string): string {
@@ -52,7 +62,7 @@ export function unitsText(locale: Locale, unit: string): string {
 
 /** A system workflow's name ("Book", "Livre"); a custom one as written. */
 export function workflowName(locale: Locale, templateKey: string | null | undefined, own: string): string {
-  return (templateKey && look(locale, `workflow.name.${templateKey}`)) || own;
+  return (templateKey && look(locale, `workflow.name.${wordsKey(templateKey)}`)) || own;
 }
 
 /**

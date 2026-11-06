@@ -48,6 +48,8 @@ const OPERATION_LABEL: Record<string, string> = {
   finished_version: 'Finished version',
   // Sean, 26 Oct: the answer a Quick answer project gave, carried into the full process.
   carried_from_quick: 'Your quick answer',
+  // The first stage of a curated example; no model wrote it.
+  example_prewritten: 'Prepared for this example',
 };
 
 /**
@@ -60,7 +62,7 @@ const OPERATION_LABEL: Record<string, string> = {
 const SAVED_OPERATIONS = new Set([
   'stage_edit', 'chat_instruct', 'applied_recommendations', 'applied_findings', 'restore', 'outline_edit', 'initial',
   'chat_save', 'chat_rows', 'literature_lookup', 'literature_search', 'sandbox_result', 'long_form_complete', 'manuscript_snapshot', 'finished_version',
-  'assess_batch', 'carried_from_quick',
+  'assess_batch', 'carried_from_quick', 'example_prewritten',
 ]);
 
 export function isSaved(operation: string | null | undefined): boolean {
