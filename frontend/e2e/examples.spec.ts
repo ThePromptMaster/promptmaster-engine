@@ -128,15 +128,16 @@ test('deal screening: the sample batch fills the box, and only Assess runs anyth
   await page.screenshot({ path: test.info().outputPath('02-verdicts.png'), fullPage: true });
 });
 
-test('a deliverable laid out as slides downloads as a PowerPoint file', async ({ page }) => {
-  test.setTimeout(120_000);
+test('the slide deck example asks for slides in the form the PowerPoint export reads', async ({ page }) => {
+  test.setTimeout(60_000);
   await page.goto('/examples/slide-deck');
   await dismissBetaNotice(page);
   await expect(page.getByRole('heading', { name: 'Slide deck' })).toBeVisible();
   await page.getByRole('button', { name: 'Try it on this sample' }).click();
   await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}$/, { timeout: 30_000 });
   await expect(page.getByRole('heading', { name: 'Audience and message' })).toBeVisible();
-  const [project] = await serviceSelect('projects', `id=${'eq.' + page.url().split('/').at(-1)}&select=output_format,example_key`);
+  const id = page.url().split('/').at(-1)!;
+  const [project] = await serviceSelect('projects', `id=eq.${id}&select=output_format,example_key`);
   expect(project.example_key).toBe('slide_deck');
   expect(project.output_format).toContain('Speaker notes:');
 });

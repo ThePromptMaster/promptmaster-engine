@@ -142,6 +142,9 @@ const ACCENT = '004AC6';
 const RULE = 'D0D5DD';
 const RIGHT_TO_LEFT = /[֐-ࣿ]/;
 
+/** On every machine that opens the file, unlike Inter. */
+const FONT = 'Arial';
+
 type OutputType = 'blob' | 'arraybuffer';
 
 /** The deck as a file. The library is loaded here, when someone asks for one. */
