@@ -47,7 +47,7 @@ describe('the run as the chat is told it', () => {
   });
 
   it('counts the cost of those windows too, so the moves and the cost cover the same work', async () => {
-    getLatestAgentRun.mockResolvedValue({ ...run, cost_usd: '1.01' });
+    getLatestAgentRun.mockResolvedValue(Object.assign({}, run, { cost_usd: '1.01' }));
     listChainSteps.mockResolvedValue([step({}), step({})]);
     listAgentSteps.mockResolvedValue([step({})]);
     earlierWindowsCost.mockResolvedValue(2.34);
