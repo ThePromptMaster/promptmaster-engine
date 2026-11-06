@@ -3055,7 +3055,9 @@ Output format say Optional, and the conversation's outline says every field is; 
 says the project is being created right under the button; the landing page no longer says a chat
 is faster. A sample of what good looks like (`projects.sample_output`, ≤60,000 characters, folded
 at start and in the setup) reaches every prompt as THE USER'S SAMPLE — matched for depth and
-style, never a source — up to 12,000 characters. It is not shown in the workspace's own setup
-panel yet; it is set at start. The landing walkthrough is proposed, not built, until Sean picks
+style, never a source — up to 12,000 characters. (Corrected 6 Nov: until then it was dropped when
+a project came through the recommended setup or the conversation, and chapter and outline calls
+never carried it. All four ways in and every writer now do.) It is not shown in the workspace's
+own setup panel yet; it is set at start. The landing walkthrough is proposed, not built, until Sean picks
 the audience and workflow.
 

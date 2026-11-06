@@ -323,6 +323,8 @@ export default function NewProjectPage() {
       constraints: suggestion.constraints,
       output_format: suggestion.output_format,
       mode: suggestion.mode,
+      // What the user pasted as a sample stays theirs, whichever way in they took.
+      ...(draft.sample_output?.trim() ? { sample_output: draft.sample_output } : {}),
     };
     return { suggestion, recommended, standard, design, draft: suggested };
   }

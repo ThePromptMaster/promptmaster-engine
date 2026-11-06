@@ -107,6 +107,7 @@ function inputsFor(project: Project): PMInput {
     constraints: project.constraints,
     output_format: project.output_format,
     context: project.context ?? '',
+    ...(project.sample_output?.trim() ? { sample_output: project.sample_output } : {}),
     mode: project.mode,
     custom_name: project.custom_name,
     custom_preamble: project.custom_preamble,
