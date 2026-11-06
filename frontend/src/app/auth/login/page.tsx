@@ -40,6 +40,9 @@ export default function LoginPage() {
   // nothing would sign in (28 Oct), so Sign in waits for it.
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => setHydrated(true), []);
+  // Where they were going stays with them between the two pages (6 Nov).
+  const next = hydrated ? nextFromLocation() : null;
+  const signupHref = next ? `/auth/signup?next=${encodeURIComponent(next)}` : '/auth/signup';
 
   const handleGuest = async () => {
     setError(null);
@@ -314,7 +317,7 @@ export default function LoginPage() {
           <p className="text-body text-[var(--on-surface-variant)]">
             {t('auth.noAccount')}{' '}
             <Link
-              href="/auth/signup"
+              href={signupHref}
               className="text-[var(--pm-primary)] font-medium hover:underline ms-1"
             >
               {t('auth.signUp')}

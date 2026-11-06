@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useProjectStore } from '@/stores/project-store';
 import { SignInTimeout, withTimeout } from '@/lib/auth/sign-in';
+import { nextFromLocation, rememberNext } from '@/lib/auth/next-path';
+import { PROVIDER_SCOPES, type ProviderId } from '@/lib/auth/providers';
 import type { Provider, Session, User } from '@supabase/supabase-js';
 
 /**
@@ -71,6 +73,7 @@ export function useAuth() {
 
   /** Resolves to whether a session came back — false when the email must be confirmed first. */
   const signUp = useCallback(async (email: string, password: string, fullName: string) => {
+    rememberNext(nextFromLocation());
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
