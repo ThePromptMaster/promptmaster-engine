@@ -3309,6 +3309,7 @@ export function WorkflowWorkspace({
                   waiting={[...(briefChange?.stageIds ?? []), ...(briefChange?.alsoWaiting ?? [])].map((id) => template.stages.find((s) => s.id === id)?.label ?? id)}
                   onUpdate={appendStageVersion && project.status !== 'finalized' ? () => void continueWork() : undefined}
                   updating={go.active}
+                  finished={project.status === 'finalized'}
                   updated={settledChange(events ?? [], state, Date.now())?.stageIds.map((id) => template.stages.find((s) => s.id === id)?.label ?? id)}
                 />
               }

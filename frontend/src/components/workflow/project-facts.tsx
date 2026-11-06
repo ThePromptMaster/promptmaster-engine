@@ -28,6 +28,8 @@ function shownSource(f: ProjectFact, t: ReturnType<typeof useT>, locale: string)
       ? t('facts.src.fileNamed', { name })
       : f.source_kind === 'chat' && f.source_ref?.via === 'front door'
         ? t('facts.src.frontDoor')
+        : f.source_ref?.delegated
+          ? t('facts.src.delegated')
         : f.source_ref?.via === 'go answer'
           ? t('facts.src.goAnswer')
           : f.source_ref?.via === 'revision'
@@ -35,7 +37,7 @@ function shownSource(f: ProjectFact, t: ReturnType<typeof useT>, locale: string)
             : t(`facts.src.${f.source_kind}`);
   const d = new Date(f.created_at);
   const when = Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString(locale, { day: 'numeric', month: 'short' });
-  return `${base}${when ? `, ${when}` : ''}${f.accepted_by === 'policy' ? t('facts.src.policy') : ''}${f.origin === 'model_assumed' ? t('facts.src.assumed') : ''}`;
+  return `${base}${when ? `, ${when}` : ''}${f.accepted_by === 'policy' ? t('facts.src.policy') : ''}${f.origin === 'model_assumed' && !f.source_ref?.delegated ? t('facts.src.assumed') : ''}${f.source_ref?.reported ? t('facts.src.reported') : ''}`;
 }
 
 export function ProjectFacts({

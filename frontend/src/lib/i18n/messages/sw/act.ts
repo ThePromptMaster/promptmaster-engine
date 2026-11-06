@@ -79,6 +79,7 @@ export const sw: Record<keyof typeof en, string> = {
   'fns.checking': 'Inakagua taarifa hizi za hakika zinaathiri nini…',
   'fns.updated': 'Imesasishwa na kukaguliwa: {names}.',
   'fns.nothing': 'Hakuna kazi iliyokamilika iliyozitegemea, kwa hiyo hakuna kinachohitaji kusasishwa.',
+  'fns.finished': 'Mradi huu umekamilika, kwa hiyo hakuna kilichofunguliwa upya. Ili kuyaingiza kwenye kazi, bonyeza {button}.',
   'fns.mayAffect': 'Hili linaweza kuathiri {names}. Hakuna kilichobadilika.',
   'fns.updateWith': 'Sasisha {names} kwa hili',
   'fns.keepOnRecord': 'Weka kwenye kumbukumbu tu',

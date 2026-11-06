@@ -79,6 +79,7 @@ export const ar: Record<keyof typeof en, string> = {
   'fns.checking': 'جارٍ التحقق مما تؤثر فيه هذه الحقائق…',
   'fns.updated': 'حُدّث وتم التحقق منه: {names}.',
   'fns.nothing': 'لم يعتمد عليها أي عمل منجز، لذا لا شيء يحتاج إلى تحديث.',
+  'fns.finished': 'هذا المشروع منتهٍ، لذا لم يُعَد فتح أي شيء. لإدخال هذه في العمل، اضغط {button}.',
   'fns.mayAffect': 'قد يؤثر هذا في {names}. لم يتغير شيء.',
   'fns.updateWith': 'حدّث {names} بهذا',
   'fns.keepOnRecord': 'أبقِه في السجل فقط',

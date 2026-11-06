@@ -17,6 +17,7 @@ export function FactsNextStep({
   onUpdate,
   updating,
   updated,
+  finished = false,
 }: {
   /** The change check is still working out what the facts affect. */
   judging: boolean;
@@ -28,6 +29,8 @@ export function FactsNextStep({
   updating: boolean;
   /** The stages the last change reopened, once each is finished again. */
   updated?: readonly string[];
+  /** A finished project judges no change until it is reopened, so "nothing relied on these" would be a guess. */
+  finished?: boolean;
 }) {
   const t = useT();
   const text = 'text-label text-[var(--on-surface-variant)]';
@@ -79,6 +82,7 @@ export function FactsNextStep({
       </p>
     );
   }
+  if (finished) return <p className={text}>{t('fns.finished', { button: t('pnl.continueImproving') })}</p>;
   return <p className={text}>{t('fns.nothing')}</p>;
 }
 
