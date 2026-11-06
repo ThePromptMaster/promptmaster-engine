@@ -38,4 +38,6 @@ export const hi: Record<keyof typeof en, string> = {
   'facts.src.revision': 'आपके संशोधन से अपडेट किया गया',
   'facts.src.policy': ', आपकी नियमित-निर्णय नीति के तहत स्वीकृत',
   'facts.src.assumed': ', PromptMaster द्वारा माना गया (आपने यह नहीं कहा)',
+  'facts.src.delegated': 'जब आपने Go पर छोड़ा तो Go ने चुना',
+  'facts.src.reported': ', बताया गया और सत्यापित नहीं',
 };

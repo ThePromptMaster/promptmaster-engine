@@ -38,4 +38,6 @@ export const zh: Record<keyof typeof en, string> = {
   'facts.src.revision': '已随你的修改更新',
   'facts.src.policy': '，按你的常规决定策略接受',
   'facts.src.assumed': '，由 PromptMaster 假定（你没有说明）',
+  'facts.src.delegated': '你交给 Go 决定后由 Go 选择',
+  'facts.src.reported': '，据报告，未经核实',
 };

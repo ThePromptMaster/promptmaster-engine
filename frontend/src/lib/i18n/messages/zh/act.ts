@@ -79,6 +79,7 @@ export const zh: Record<keyof typeof en, string> = {
   'fns.checking': '正在检查这些事实会影响哪些内容…',
   'fns.updated': '已更新并检查：{names}。',
   'fns.nothing': '没有已完成的内容依赖这些事实，因此无需更新。',
+  'fns.finished': '此项目已完成，因此没有重新打开任何内容。要将这些内容纳入工作，请点按“{button}”。',
   'fns.mayAffect': '这可能影响 {names}。目前没有任何改动。',
   'fns.updateWith': '据此更新 {names}',
   'fns.keepOnRecord': '仅保留在记录中',

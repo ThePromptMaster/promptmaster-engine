@@ -23,6 +23,12 @@ describe('what a fact recorded from the chat may affect', () => {
     expect(screen.getByText('Nothing finished relied on these, so nothing needs updating.')).toBeInTheDocument();
   });
 
+  it('on a finished project, nothing was judged, so it does not say nothing relied on them', () => {
+    render(<FactsNextStep judging={false} waiting={[]} updating={false} finished />);
+    expect(screen.getByText('This project is finished, so nothing was reopened. To bring these into the work, press Continue improving.')).toBeInTheDocument();
+    expect(screen.queryByText('Nothing finished relied on these, so nothing needs updating.')).toBeNull();
+  });
+
   it('the notice at the top of the page says why, and does the same', async () => {
     const onUpdate = vi.fn();
     render(<OfferedChangeNotice names={['Final pack']} reasons={['It says the drafts are unsent.']} onUpdate={onUpdate} onKeep={() => undefined} updating={false} />);

@@ -8,7 +8,7 @@ export const zh: Record<keyof typeof en, string> = {
   'ra.suggest': '为这条回复推荐操作',
   'ra.recordLabel': '记录事实',
   'ra.becomeFacts': '这些将成为已接受的项目事实',
-  'ra.becomeFactsWhy': '从现在起，每个阶段、检查和对话都会读取它们。依赖已改动内容的已完成工作会被重新打开以便复查。',
+  'ra.becomeFactsWhy': '从现在起，每个阶段、检查和对话都会读取它们。如果可能影响已完成的工作，由你决定是否更新。取代旧事实的事实会重新打开使用旧事实的工作。',
   'ra.requirement': '要求：',
   'ra.recording': '正在记录…',
   'ra.recordThis': '记录这条事实',

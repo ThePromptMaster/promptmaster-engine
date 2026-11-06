@@ -38,4 +38,6 @@ export const sw: Record<keyof typeof en, string> = {
   'facts.src.revision': 'imesasishwa kwa marekebisho yako',
   'facts.src.policy': ', imekubaliwa chini ya sera yako ya maamuzi ya kawaida',
   'facts.src.assumed': ', imedhaniwa na PromptMaster (hukuisema)',
+  'facts.src.delegated': 'imechaguliwa na Go ulipomwachia Go',
+  'facts.src.reported': ', imeripotiwa na haijathibitishwa',
 };
