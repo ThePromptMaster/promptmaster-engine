@@ -48,6 +48,7 @@ export const hi: Record<keyof typeof en, string> = {
   "na.allDone": "इस चरण के लिए ज़रूरी सब कुछ हो चुका है।",
   "ns.goWorking": "Go काम कर रहा है…",
   "ns.goWorkingOn": "Go {what} पर काम कर रहा है…",
+  "ns.drafting": "{what} लिखा जा रहा है…",
   "ns.keeps": "{stage} में आपके बदलाव रखता है और Go से उसके बाद आए काम की दोबारा जाँच करवाता है।",
   "ns.thisStage": "यह चरण",
   "ns.goWaiting": "Go मौजूदा चरण पर आपका इंतज़ार कर रहा है।",

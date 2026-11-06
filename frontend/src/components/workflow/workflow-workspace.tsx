@@ -1617,6 +1617,7 @@ export function WorkflowWorkspace({
     awaitingUpdate: awaitingLabels,
     goActive: go.active,
     goWorkingOn: getStage(template, state.current_stage_id)?.label,
+    drafting: generation.generating ? stage?.label : null,
     run: go.run ? { status: go.run.status, ended_at: go.run.ended_at, hasNeed: Boolean(go.run.needs), asking: goIsAsking(go.run.stop_reason) } : null,
     onCurrentStage: isCurrent,
   });

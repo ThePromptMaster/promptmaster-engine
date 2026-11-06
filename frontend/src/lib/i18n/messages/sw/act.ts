@@ -48,6 +48,7 @@ export const sw: Record<keyof typeof en, string> = {
   'na.allDone': 'Kila kitu ambacho hatua hii inahitaji kimekamilika.',
   'ns.goWorking': 'Go inafanya kazi…',
   'ns.goWorkingOn': 'Go inafanyia kazi {what}…',
+  'ns.drafting': 'Inaandika {what}…',
   'ns.keeps': 'Inabakiza mabadiliko yako kwenye {stage} na Go inakagua upya kilichokuja baada yake.',
   'ns.thisStage': 'hatua hii',
   'ns.goWaiting': 'Go inakusubiri kwenye hatua ya sasa.',

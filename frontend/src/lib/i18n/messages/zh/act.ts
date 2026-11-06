@@ -48,6 +48,7 @@ export const zh: Record<keyof typeof en, string> = {
   'na.allDone': '本阶段所需的一切均已完成。',
   'ns.goWorking': 'Go 正在处理…',
   'ns.goWorkingOn': 'Go 正在处理{what}…',
+  'ns.drafting': '正在撰写 {what}…',
   'ns.keeps': '保留你对 {stage} 的修改，并让 Go 重新检查其后的内容。',
   'ns.thisStage': '本阶段',
   'ns.goWaiting': 'Go 正在当前阶段等待你。',
