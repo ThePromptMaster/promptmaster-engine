@@ -261,7 +261,7 @@ export function measureStageContent(
 }
 
 /** What it says when a limit could not be counted. */
-export const NOT_COUNTED = 'not verified: no part of the saved text is headed for it, so it was not counted';
+export const NOT_COUNTED = 'not verified: PromptMaster could not find that part in the saved text, so it was not counted';
 
 /**
  * The limits a stage answers for that code could not count on `content` (4
