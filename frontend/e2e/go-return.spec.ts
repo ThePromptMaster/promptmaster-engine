@@ -120,13 +120,17 @@ test('accepted findings on the last review go back to the deliverable before sig
   await page.getByRole('button', { name: 'Try it on this sample' }).click();
   await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}$/, { timeout: 30_000 });
   const id = page.url().split('/').at(-1)!;
-  const finalReview = page.locator('header').getByRole('heading', { name: 'Final review', exact: true });
-  for (let i = 0; i < 5 && !(await finalReview.isVisible().catch(() => false)); i += 1) {
+  // A prepared example waits for a press, so the deck and its review are drafted by hand here.
+  const slides = page.locator('header').getByRole('heading', { name: 'Slides', exact: true });
+  for (let i = 0; i < 4 && !(await slides.isVisible().catch(() => false)); i += 1) {
     await pressTransition(page);
     await page.waitForTimeout(1_200);
   }
-  await expect(finalReview).toBeVisible();
-  // A prepared example waits for a press, so the review is drafted by hand here.
+  await expect(slides).toBeVisible();
+  await page.getByRole('button', { name: 'Draft this stage' }).first().click();
+  await expect(stageArtifact(page)).toContainText('Mock', { timeout: 60_000 });
+  await pressTransition(page);
+  await expect(page.locator('header').getByRole('heading', { name: 'Final review', exact: true })).toBeVisible({ timeout: 30_000 });
   await page.getByRole('button', { name: 'Draft this stage' }).first().click();
   await expect(stageArtifact(page)).toContainText('Mock', { timeout: 60_000 });
   const [art] = await serviceSelect('artifacts', `project_id=eq.${id}&stage_id=eq.final_review&select=id,user_id`);
