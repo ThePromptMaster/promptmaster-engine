@@ -215,6 +215,42 @@ export function answeredOnStages(before: string, facts: readonly ProjectFact[] |
   return stages;
 }
 
+/**
+ * Whether every fact just added was recorded from a side-chat reply (5 Nov, a
+ * rollout pack). Asking about something is not asking to change the work: a pasted
+ * report, recorded with a click, reopened the approved pack, and one more click
+ * called "Apply and continue" wrote it in. Such a change is judged and offered, and
+ * nothing is reopened until the user says so. A fact typed into the facts panel, or
+ * given with "Change it", reopens at once, as does one that replaces another.
+ */
+export function onlyFromTheChat(before: string, facts: readonly ProjectFact[] | undefined): boolean {
+  const had = new Set(before.split('\n'));
+  const added = currentFacts(facts).filter((f) => !had.has(factLine(f)));
+  return added.length > 0 && added.every((f) => f.source_kind === 'chat' && f.source_ref?.via !== 'front door');
+}
+
+/** What a recorded fact may affect, offered and not yet decided. */
+export interface ProposedChange {
+  /** When the change was recorded: what deciding it refers to. */
+  at: string;
+  stageId: string;
+  affected: { stage_id: string; reason: string }[];
+}
+
+/** The latest change offered and not yet decided. Null once it is taken, kept on record, or overtaken by a stage it names going stale. */
+export function proposedChange(events: readonly WorkflowEvent[]): ProposedChange | null {
+  for (let i = events.length - 1; i >= 0; i -= 1) {
+    const e = events[i];
+    if (e.type !== 'brief_changed' || !Array.isArray(e.payload?.proposed) || !(e.payload.proposed as unknown[]).length) continue;
+    const at = e.created_at ?? '';
+    const decided = events.slice(i + 1).some((later) =>
+      (later.type === 'brief_changed' && later.payload?.takes_up === at) ||
+      (later.type === 'brief_change_dismissed' && later.payload?.change_at === at));
+    return decided ? null : { at, stageId: e.stage_id, affected: e.payload.proposed as ProposedChange['affected'] };
+  }
+  return null;
+}
+
 /** The judged stages without those an answer was given on (`answeredOnStages`), and which those were. */
 export function leftToGo<A extends { stage_id: string }>(affected: readonly A[], answeredOn: ReadonlySet<string> | null): { affected: A[]; left: string[] } {
   if (!answeredOn?.size) return { affected: [...affected], left: [] };

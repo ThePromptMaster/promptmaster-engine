@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { api } from '@/lib/api/client';
-import { BRIEF_FIELDS, answeredOnStages, finishedConclusions, leftToGo, presentationOnly, type WatchedField } from '@/lib/workflow/brief-change';
+import { BRIEF_FIELDS, answeredOnStages, finishedConclusions, leftToGo, onlyFromTheChat, presentationOnly, type WatchedField } from '@/lib/workflow/brief-change';
 import { factsText } from '@/lib/workflow/facts';
 import { stagesUsingFacts, statementsOf } from '@/lib/workflow/fact-dependencies';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
@@ -120,10 +120,13 @@ export function useBriefChange({
             // the stage it was given on is then left to Go, which acts on it
             // there (4 Nov).
             const { affected, left } = leftToGo(impact.affected, field === 'facts' ? answeredOnStages(before, p.facts) : null);
+            // Recorded from a side-chat reply: offered, and nothing reopens until the user says so (5 Nov).
+            const onlyOffered = field === 'facts' && onlyFromTheChat(before, p.facts);
             await append({
               type: 'brief_changed', stage_id: at,
               payload: {
-                field, kind: impact.kind, presentation_only: false, affected, ...(left.length ? { left_to_go: left } : {}),
+                field, kind: impact.kind, presentation_only: false, affected: onlyOffered ? [] : affected, ...(onlyOffered && affected.length ? { proposed: affected } : {}),
+                ...(left.length ? { left_to_go: left } : {}),
                 calculations_hold: impact.calculations_hold, had_computed: stages.some((st) => st.computed),
                 ...texts,
               },

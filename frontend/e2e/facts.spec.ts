@@ -56,7 +56,7 @@ test('facts given in the chat are recorded on confirmation, read by every reques
   // the same facts again, and says what comes next.
   await expect(chat.getByRole('status').filter({ hasText: '2 facts recorded' })).toBeVisible();
   await expect(chat.getByRole('button', { name: 'Record these 2 facts' })).toHaveCount(0);
-  await expect(chat).toContainText(/Nothing finished relied on these|awaiting an update|Checking what these facts affect/);
+  await expect(chat).toContainText(/Nothing finished relied on these|may affect|awaiting an update|Checking what these facts affect/);
   await page.screenshot({ path: test.info().outputPath('02-facts-recorded.png') });
   expect(await serviceSelect('project_facts', `project_id=eq.${id}&select=id`)).toHaveLength(2);
 

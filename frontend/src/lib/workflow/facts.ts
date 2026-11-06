@@ -41,10 +41,12 @@ export function factSource(f: Pick<ProjectFact, 'source_kind' | 'source_ref' | '
             ? 'updated with your revision'
             : SOURCE_WORDS[f.source_kind];
   const by = f.accepted_by === 'policy' ? ', accepted under your routine-decision policy' : '';
+  // What someone else said, in every prompt and chip (5 Nov, a pasted agent report).
+  const reported = f.source_ref?.reported ? ', reported and not verified' : '';
   // Said apart from what the user said, in the chip and in every prompt (S2b).
   const assumed = f.origin === 'model_assumed' && !f.source_ref?.delegated ? ', assumed by PromptMaster (you did not say it)' : '';
   const when = day(f.created_at);
-  return `${base}${when ? `, ${when}` : ''}${by}${assumed}`;
+  return `${base}${when ? `, ${when}` : ''}${by}${assumed}${reported}`;
 }
 
 /**

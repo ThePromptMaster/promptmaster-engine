@@ -89,3 +89,22 @@ def test_the_route_returns_parsed_actions():
     assert res.json()["actions"] == [{"label": "Tighten the opening", "kind": "revise", "instruction": "Shorten it.", "updates": [], "rows": [], "facts": []}]
     system = client.generate_json.call_args.kwargs["system"]
     assert "TURN AN ANSWER INTO ACTIONS" in system
+
+
+def test_a_pasted_report_is_not_offered_as_a_fact_unless_asked():
+    """5 Nov (a rollout pack): a review of a simulated agent report was offered as facts,
+    recorded with a click, and reached the approved pack."""
+    from promptmaster.reply_actions import _FACTS_KIND
+
+    assert "Text the user pasted for you to review" in _FACTS_KIND
+    assert 'add "reported": true' in _FACTS_KIND
+
+
+def test_reported_survives_parsing_and_only_true_counts():
+    from promptmaster.reply_actions import parse_record_facts
+
+    q = "Record this: the vendor says it moved the date to November 20."
+    item = {"facts": [{"statement": "The vendor says it moved the date to November 20.", "reported": True}]}
+    assert parse_record_facts(item, q)[0].reported is True
+    item = {"facts": [{"statement": "The vendor says it moved the date to November 20.", "reported": "yes"}]}
+    assert parse_record_facts(item, q)[0].reported is False
