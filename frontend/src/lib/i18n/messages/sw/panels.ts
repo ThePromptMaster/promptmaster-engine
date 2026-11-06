@@ -166,6 +166,7 @@ export const sw: Record<keyof typeof en, string> = {
   'pnl.skippedN': '{n} zimerukwa',
   'pnl.leftOpenN': '{n} zimeachwa wazi',
   'pnl.nothingWritten': 'Hakuna kilichoandikwa kwenye {stage}, kwa hivyo bado hakuna {noun} ya kusoma au kuhamisha.',
+  'pnl.deliverablePartial': '{later} ina sehemu tu ya {chapters}, kwa hiyo hii ni {chapters} kama ilivyo sasa. Marekebisho yaliyofanywa ndani ya {later} pekee hayapo hapa.',
   'pnl.theDeliverable': 'hatua ya matokeo ya mwisho',
   'pnl.hideNoun': 'Ficha {noun}',
   'pnl.readNoun': 'Soma {noun} kamili',

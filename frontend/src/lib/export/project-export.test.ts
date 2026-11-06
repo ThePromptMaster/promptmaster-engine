@@ -321,6 +321,20 @@ describe('Markdown export carries the manuscript (A2)', () => {
     expect(md.match(/## 1\. Habitat/g)).toHaveLength(1);
   });
 
+  it('a later stage holding the corrected work is what is delivered, not the chapters (5 Nov)', () => {
+    const b = bookWithChapters();
+    const later = { id: 'finished', label: 'Finished book', short_label: 'Finished', required: true, renderer: 'prose', exit_criteria: [], expected_artifacts: [], transitions: { default_next: null, allow_skip: false, allow_return_to: [] } };
+    const body = Array.from({ length: 200 }, () => 'Corrected').join(' ');
+    const finished = {
+      ...b,
+      template: { ...b.template, stages: [...b.template.stages.map((s) => (s.renderer === 'long_form' ? s : { ...s, renderer: s.renderer === 'prose' ? ('review' as const) : s.renderer })), later as never] },
+      stages: { ...b.stages, finished: { artifact: null, versions: [{ id: 'f9', version_number: 9, content: `## Chapter 4\n\nSam approves 2pm. ${body}` } as never] } },
+    };
+    const doc = toManuscriptMarkdown(finished);
+    expect(doc).toContain('Sam approves 2pm.');
+    expect(doc).not.toContain('Acacia leaves, mostly.');
+  });
+
   it('the manuscript alone is title plus chapters', () => {
     const doc = toManuscriptMarkdown(bookWithChapters());
     expect(doc).toMatch(/^# Governing AI-assisted work\n\n## 1\. Habitat/);

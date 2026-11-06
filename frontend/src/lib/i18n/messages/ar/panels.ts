@@ -166,6 +166,7 @@ export const ar: Record<keyof typeof en, string> = {
   'pnl.skippedN': 'متخطاة: {n}',
   'pnl.leftOpenN': 'متروكة مفتوحة: {n}',
   'pnl.nothingWritten': 'لم يُكتب شيء في {stage}، لذا لا يوجد {noun} لقراءته أو تصديره بعد.',
+  'pnl.deliverablePartial': 'لا يحوي {later} سوى جزء من {chapters}، لذا هذا هو {chapters} كما هو الآن. التصحيحات التي أُجريت في {later} فقط ليست فيه.',
   'pnl.theDeliverable': 'مرحلة المُخرَج',
   'pnl.hideNoun': 'إخفاء {noun}',
   'pnl.readNoun': 'اقرأ {noun} كاملًا',

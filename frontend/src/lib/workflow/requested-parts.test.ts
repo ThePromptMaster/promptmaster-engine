@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { missingParts } from './requested-parts';
+import { asksForReviewNote, missingParts } from './requested-parts';
 
 /** 28 Oct (Sean, HarborDesk test): "one requested change log was missing". */
 
@@ -36,5 +36,21 @@ describe('missingParts', () => {
   it('says nothing about an empty work or a request for none of these', () => {
     expect(missingParts(project({ constraints: 'Include a change log.' }), '')).toEqual([]);
     expect(missingParts(project(), 'Text.')).toEqual([]);
+  });
+});
+
+describe('a review note asked for beside the work (5 Nov, a book test)', () => {
+  const ask = (text: string) => ({ objective: 'A book', constraints: text, output_format: '', facts: [], applied_instructions: [] });
+
+  it('is recognised in the words a brief uses', () => {
+    expect(asksForReviewNote(ask('Report any broken cross-references or inconsistencies in a short note outside the book.'))).toBe(true);
+    expect(asksForReviewNote(ask('A short review note follows.'))).toBe(true);
+    expect(asksForReviewNote(ask('Keep it plain.'))).toBe(false);
+    expect(asksForReviewNote(ask('No review note.'))).toBe(false);
+  });
+
+  it('a finished text without one names it as missing', () => {
+    expect(missingParts(ask('A short review note follows.'), '## Chapter 1\n\nText.')).toEqual(['review note']);
+    expect(missingParts(ask('A short review note follows.'), '## Chapter 1\n\nText.\n\n## Review note\n\nHolds.')).toEqual([]);
   });
 });

@@ -166,6 +166,7 @@ export const zh: Record<keyof typeof en, string> = {
   'pnl.skippedN': '跳过 {n} 个',
   'pnl.leftOpenN': '{n} 个未关闭',
   'pnl.nothingWritten': '{stage}中尚未写入任何内容，因此还没有可阅读或导出的{noun}。',
+  'pnl.deliverablePartial': '{later} 只包含 {chapters} 的一部分，所以这里是 {chapters} 的当前内容。只在 {later} 中做的修改不在其中。',
   'pnl.theDeliverable': '交付阶段',
   'pnl.hideNoun': '隐藏{noun}',
   'pnl.readNoun': '阅读完整{noun}',

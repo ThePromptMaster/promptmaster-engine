@@ -24,14 +24,13 @@
  * source of truth, and nothing that can fail halfway and leave a partial file.
  */
 
-import { manuscriptArtifactFor } from '@/lib/workflow/context';
+import { deliverableDocument } from '@/lib/workflow/deliverable';
 import { formatManuscript } from '@/lib/workflow/digest';
-import { deliverableStage } from '@/lib/workflow/engine';
 import { isProposed, parseItems, primaryArtifactKind, statusOption, itemSchemaFor } from '@/lib/workflow/stage-artifact';
 import { STAMP_NOTE, stampFor } from '@/lib/workflow/version-stamp';
 import { forReader } from '@/lib/workflow/reader-text';
 import { sourcesSection, withoutSourcesList } from '@/lib/workflow/sources';
-import { asksForChangeLog } from '@/lib/workflow/requested-parts';
+import { asksForChangeLog, asksForReviewNote } from '@/lib/workflow/requested-parts';
 import type { StageDefinition, WorkflowEvent, WorkflowState, WorkflowTemplate } from '@/lib/workflow/types';
 import type { Artifact, ArtifactVersion, Evaluation, Project } from '@/types/project';
 
@@ -118,18 +117,13 @@ function carriedSection(bundle: ExportBundle): string {
  */
 export function toManuscriptMarkdown(bundle: ExportBundle): string {
   const { project, template, stages } = bundle;
-  const stage = deliverableStage(template);
-  if (!stage) return '';
-  const raw =
-    stage.renderer === 'long_form'
-      ? formatManuscript(
-          manuscriptArtifactFor(template, stage, stages)?.long_form?.outline ?? [],
-          Number.POSITIVE_INFINITY
-        )
-      : (stages[stage.id]?.versions.at(-1)?.content ?? '');
+  // The same text the objective check reads (5 Nov): one deliverable.
+  const doc = deliverableDocument(template, stages as Parameters<typeof deliverableDocument>[1]);
+  if (!doc) return '';
+  const raw = doc.text;
   // The work for its reader: no notes about the revision (28 Oct), unless the
   // user asked for a change log. A list stage's document is left as stored.
-  const body = /^\s*[{[]/.test(raw) ? raw : withoutSourcesList(forReader(raw, asksForChangeLog(project)));
+  const body = /^\s*[{[]/.test(raw) ? raw : withoutSourcesList(forReader(raw, asksForChangeLog(project), asksForReviewNote(project)));
   if (!body.trim()) return '';
   // The sources the work cites, listed once at the end (31 Oct).
   const cited = /^\s*[{[]/.test(raw) ? '' : sourcesSection(body, project.sources);

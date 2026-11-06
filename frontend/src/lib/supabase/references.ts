@@ -2,6 +2,7 @@ import { createClient } from './client';
 import { listProjectFacts } from './facts';
 import { getLatestTemplate, getTemplateById } from './workflow';
 import { currentFacts } from '@/lib/workflow/facts';
+import { deliverableDocument } from '@/lib/workflow/deliverable';
 import { deliverableStage } from '@/lib/workflow/engine';
 import { formatManuscript } from '@/lib/workflow/digest';
 import { manuscriptArtifactFor } from '@/lib/workflow/context';
@@ -155,7 +156,7 @@ export async function loadLiveMaterial(ref: ProjectReference): Promise<Reference
   if (base.deleted || !row) return base;
 
   const template = await templateFor(row as { workflow: string; workflow_template_id: string | null });
-  const stage = template ? deliverableStage(template) : undefined;
+  let stage = template ? deliverableStage(template) : undefined;
   const [{ data: artifacts }, facts] = await Promise.all([
     supabase
       .from('artifacts')
@@ -170,7 +171,21 @@ export async function loadLiveMaterial(ref: ProjectReference): Promise<Reference
     );
     const artifact = manuscriptArtifactFor(template, stage, bundles);
     if (stage.renderer === 'long_form') {
-      text = formatManuscript(artifact?.long_form?.outline ?? [], REFERENCE_MAX * 2);
+      // The other project's delivered text (5 Nov): a stage after the chapters
+      // may finish them, so its latest version is read before deciding.
+      const after = template.stages.slice(template.stages.map((s) => s.renderer).lastIndexOf('long_form') + 1).filter((s) => s.required && s.renderer === 'prose');
+      const heads = after.map((s) => bundles[s.id]?.artifact?.current_version_id).filter((id): id is string => Boolean(id));
+      const { data: versions } = heads.length
+        ? await supabase.from('artifact_versions').select('id, version_number, content, artifact_id').in('id', heads)
+        : { data: [] };
+      for (const s of after) {
+        const b = bundles[s.id];
+        const head = (versions ?? []).find((v: { id: string }) => v.id === b?.artifact?.current_version_id);
+        if (b && head) bundles[s.id] = { ...b, versions: [head as unknown as (typeof b.versions)[number]] };
+      }
+      const doc = deliverableDocument(template, bundles);
+      stage = doc?.stage ?? stage;
+      text = doc && doc.stage.renderer !== 'long_form' ? doc.text : formatManuscript(artifact?.long_form?.outline ?? [], REFERENCE_MAX * 2);
     } else if (artifact?.current_version_id) {
       const { data: head } = await supabase.from('artifact_versions').select('content').eq('id', artifact.current_version_id).maybeSingle();
       text = (head?.content as string) ?? '';

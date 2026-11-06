@@ -67,7 +67,6 @@ import {
   projectState,
   type TransitionOption,
   completionSummary,
-  deliverableStage,
   describeOutstanding,
   outstandingBeyondCriteria,
   shownOutstanding,
@@ -146,6 +145,7 @@ import { useExperience } from '@/lib/projects/experience';
 import { freshOrPage } from '@/lib/workflow/fresh-manuscript';
 import { addedSignature, designAddedStage, effectiveTemplate } from '@/lib/workflow/added-stages';
 import { approvalsOnEarlierVersion, withApprovals } from '@/lib/workflow/approvals';
+import { deliverableDocument } from '@/lib/workflow/deliverable';
 import { isFailedEvaluation, lastCompletedCheck } from '@/lib/workflow/evaluation-failure';
 import { otherWorkFor } from '@/lib/agent/other-work';
 import { createClient as createBrowserClient } from '@/lib/supabase/client';
@@ -1871,7 +1871,7 @@ export function WorkflowWorkspace({
   const isBlocked = stageState?.status === 'blocked';
 
   // PM-14: what finishing would be finishing.
-  const deliverable = deliverableStage(template);
+  const deliverable = deliverableDocument(template, stageBundles)?.stage;
   const deliverableBundle = deliverable ? stageBundles[deliverable.id] : undefined;
   const deliverableSections = deliverableBundle?.artifact?.long_form?.outline ?? [];
   // Go waiting on the user is outstanding work as much as an open finding is.
@@ -1919,7 +1919,7 @@ export function WorkflowWorkspace({
   // The sidebar counts what Go stops on, not only stage statuses (12 Oct).
   const progressCaption = progressCaptionText(progress, state.project_status === 'finalized', completion.outstanding);
   // The deliverable's latest objective check, for the finished screen (C4).
-  const deliverableHead = completion.deliverable ? bundles?.[completion.deliverable.id]?.versions.at(-1) : undefined;
+  const deliverableHead = deliverable ? bundles?.[deliverable.id]?.versions.at(-1) : undefined;
   const deliverableEvaluation = deliverableHead ? evaluations?.[deliverableHead.id] : undefined;
 
   /** Score the deliverable against the objective. 1 model call, on request. */
@@ -2579,13 +2579,13 @@ export function WorkflowWorkspace({
               onReopen={() => void reopenProject()}
               onEdit={() => {
                 // Reopen, and land on the stage that holds the work itself.
-                const holder = deliverableStage(template);
+                const holder = deliverable;
                 void reopenProject().then(() => holder && setViewingStageId(holder.id === state.current_stage_id ? null : holder.id));
               }}
               onNewVersion={
                 appendStageVersion
                   ? async () => {
-                      const holder = deliverableStage(template);
+                      const holder = deliverable;
                       if (!holder) return;
                       // The finished text is saved before anything can change it.
                       const kept = await keepFinishedVersion({ template, stage: holder, bundles: stageBundles, project, appendStageVersion });

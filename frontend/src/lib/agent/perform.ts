@@ -30,6 +30,7 @@ import { notRemovedByUser } from '@/lib/workflow/removed-text';
 import { addedClaims, noInventedDetails, suppliedText } from '@/lib/workflow/fact-boundary';
 import { isDone } from '@/lib/workflow/types';
 import { approvalsOnEarlierVersion } from '@/lib/workflow/approvals';
+import { deliverableDocument } from '@/lib/workflow/deliverable';
 import { appliedFindingsVersion, carryUserFields, findingsInstruction, reviseWithFindings } from '@/lib/workflow/apply-findings';
 import { findInstructionConflicts, recordConflictChoice } from '@/lib/workflow/conflict-trail';
 import { choiceLabels, gist, type InstructionConflict } from '@/lib/workflow/instruction-conflicts';
@@ -1968,7 +1969,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // A question asked on the deliverable stage names the findings still
       // undecided elsewhere (2 Nov prod pass: "Do you approve version 14 …"
       // with nine Check rows open, none named).
-      const allOpen = deliverableStage(ctx.template)?.id === ctx.stage.id ? openRowsElsewhere(ctx.template, ctx.state, ctx.context, ctx.stage.id) : [];
+      const allOpen = deliverableDocument(ctx.template, ctx.bundles)?.stage.id === ctx.stage.id ? openRowsElsewhere(ctx.template, ctx.state, ctx.context, ctx.stage.id) : [];
       // …except those this version already carries out, shown from its own
       // text or a measured result (4 Nov, prod: i10 "Session 1 timings sum to
       // 105" listed under a version where they summed to 90). Under the
@@ -2032,17 +2033,20 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // criterion is not met is a deliverable (email 13); whether the
       // objective is met is judged, quoted, and recorded.
       if (ctx.deliverableDone) {
-        const holder = deliverableStage(ctx.template);
-        const content = holder ? await deliverableText(ctx, holder.id) : '';
+        // The text the project delivers, read now: the export prints the same one (5 Nov).
+        const chapters = deliverableStage(ctx.template);
+        const doc = deliverableDocument(ctx.template, chapters ? await withCurrentLongForm(ctx.template, chapters, ctx.bundles) : ctx.bundles);
+        const holder = doc?.stage;
+        const content = doc?.text ?? '';
         // Met on this version already, and nothing changed since: the verdict
         // stands, without another model call (11 Oct).
-        const head = holder ? ctx.bundles[holder.id]?.versions.at(-1) : undefined;
+        const head = doc?.version ?? undefined;
         const kept = holder && head
           ? stillMet(await listWorkflowEvents(ctx.project.id), ctx.project.facts ?? [], { stageId: holder.id, versionId: head.id })
           : null;
         const { assessment, basis } = kept
           ? { assessment: kept, basis: kept.basis }
-          : await judgeObjective(ctx, holder ?? null, content);
+          : await judgeObjective(ctx, holder ?? null, content, undefined, undefined, doc ? { version: doc.version } : undefined);
         // The check ran and was recorded: the record says so (10 Oct, email 3:
         // "'Analyzed or performed' and 'Tools' show dashes").
         const judged = kept
@@ -2638,7 +2642,15 @@ function cutOffMessage(label: string, content: string): string {
  * `objective_assessed`, and return it (6–7 Oct). Used at the end of the work
  * and at the end of each round of ongoing work.
  */
-async function judgeObjective(ctx: PerformContext, holder: StageDefinition | null, content: string, labelOverride?: string, laterStage?: string) {
+async function judgeObjective(
+  ctx: PerformContext,
+  holder: StageDefinition | null,
+  content: string,
+  labelOverride?: string,
+  laterStage?: string,
+  /** The saved version this text is, when the caller knows: for chapters, none may be. */
+  saved?: { version: { id: string; version_number: number } | null }
+) {
   const label = labelOverride ?? holder?.label ?? 'the deliverable';
   // What code counted and found met, with the count: the check may not count
   // again (11 Oct, survey brief: "the saved deliverable exceeds 200 words").
@@ -2647,7 +2659,7 @@ async function judgeObjective(ctx: PerformContext, holder: StageDefinition | nul
     : [];
   // The accepted findings and the text's own consistency, checked first: what
   // fails goes to the assessment as failed checks (1 Nov).
-  const check = holder ? await checkDeliverable(ctx, holder, content, label) : null;
+  const check = holder ? await checkDeliverable(ctx, holder, content, label, saved) : null;
   const assessment = await api.agentAssessObjective(
     {
       inputs: inputsFrom(ctx.project),
@@ -2669,7 +2681,7 @@ async function judgeObjective(ctx: PerformContext, holder: StageDefinition | nul
     ctx.signal
   );
   // What the verdict rests on, recorded with it (10 Oct, emails 3, 5, 8).
-  const head = holder ? ctx.bundles[holder.id]?.versions.at(-1) : undefined;
+  const head = saved ? saved.version : holder ? ctx.bundles[holder.id]?.versions.at(-1) : undefined;
   const criteria = assessment.criteria ?? [];
   const basis: ObjectiveBasis = {
     stage_id: holder?.id ?? '',
@@ -2714,9 +2726,15 @@ async function judgeObjective(ctx: PerformContext, holder: StageDefinition | nul
  * result; after the run's repair rounds are used up the issues are limitations.
  * A check that cannot run concludes nothing and never blocks the assessment.
  */
-async function checkDeliverable(ctx: PerformContext, holder: StageDefinition, content: string, label: string): Promise<DeliverableCheckRecord | null> {
+async function checkDeliverable(
+  ctx: PerformContext,
+  holder: StageDefinition,
+  content: string,
+  label: string,
+  saved?: { version: { id: string; version_number: number } | null }
+): Promise<DeliverableCheckRecord | null> {
   if (!content.trim()) return null;
-  const head = ctx.bundles[holder.id]?.versions.at(-1);
+  const head = saved ? saved.version : ctx.bundles[holder.id]?.versions.at(-1);
   const events = ctx.loadEvents ? await ctx.loadEvents() : [];
   const kept = checkedVersion(events, head?.id ?? null);
   const rounds = roundsUsed(events, ctx.run.id, holder.id);
