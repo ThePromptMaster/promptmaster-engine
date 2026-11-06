@@ -101,6 +101,7 @@ export const INVESTMENT_MEMO: Example = {
       'Use only the supplied material and the data file. Where the teaser and the data disagree, say so and use the data. Label anything we assume.',
     output_format: 'A memo: recommendation first, then the business, the numbers, the risks, what diligence must settle, and the price.',
     mode: 'analyst',
+    model: 'anthropic/claude-sonnet-5.5',
     context: `SAMPLE MATERIAL. Everything below is invented for this example: the company, the people and every number.
 
 Seller's teaser, Project Harrow (Harrowgate Cold Chain Services):

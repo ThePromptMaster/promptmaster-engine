@@ -104,6 +104,7 @@ export const BUSINESS_ANALYSIS: Example = {
       'Use only the supplied notes and the data file. Where the notes and the data disagree, say so and use the data. Label anything we assume.',
     output_format: 'A decision memo: the answer first, then the reasons, the numbers, what could change it, and next steps.',
     mode: 'analyst',
+    model: 'anthropic/claude-sonnet-5.5',
     context: `SAMPLE MATERIAL. Everything below is invented for this example: the company, the people and every number.
 
 Brackenfield Home Goods sells homeware online across the US from one warehouse in Columbus, Ohio.

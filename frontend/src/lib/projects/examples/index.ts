@@ -34,6 +34,11 @@ export interface Example {
     output_format: string;
     context: string;
     mode: ModeType;
+    /**
+     * Set where a run on the default model cost more than about $3 (6 Nov, production: the
+     * memo $4 or more). An example is a demonstration; own work keeps the default.
+     */
+    model?: string;
   };
   /** The first stage, already written, so trying the sample costs nothing until a press. */
   prepared: string;
