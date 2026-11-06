@@ -19,6 +19,13 @@ from .saved_documents import format_prior_documents
 from .schemas import StageDigest, StageDigestEntry
 
 
+#: A document attached to one message, and an image: browsers scale images down first.
+MAX_ATTACHMENT_TEXT = 60_000
+MAX_ATTACHMENT_IMAGE = 1_500_000
+MAX_ATTACHMENTS = 30
+MAX_FILES_LISTED = 40
+
+
 class PageButton(BaseModel):
     """One button on the stage's page: its exact words, and where it is."""
 
@@ -55,6 +62,25 @@ class GoRunTrace(BaseModel):
     last_activity_minutes: int | None = Field(default=None, ge=0)
 
 
+class ChatAttachment(BaseModel):
+    """A file attached to one side-chat message (5 Nov)."""
+
+    name: str = Field(max_length=300)
+    #: A document's words, as read in the browser.
+    text: str = Field(default="", max_length=MAX_ATTACHMENT_TEXT)
+    #: An image as a data URL, scaled down in the browser.
+    image: str = Field(default="", max_length=MAX_ATTACHMENT_IMAGE, pattern=r"^(?:data:image/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+)?$")
+    #: Saved in the project, but more than one message can carry: named, so the reply can say so.
+    not_read: bool = False
+
+
+class ProjectFileBrief(BaseModel):
+    """A file the project holds, as the chat is told it."""
+
+    name: str = Field(max_length=300)
+    note: str = Field(default="", max_length=600)
+
+
 class VersionTrace(BaseModel):
     """One saved version of the stage (31 Oct, Sean: the chat "gave me wrong
     version numbers" — it was told only the latest number, even when an older
@@ -89,6 +115,8 @@ class ChatContext(BaseModel):
     go_run: GoRunTrace | None = None
     #: False when the run record could not be read for this reply: then None says nothing.
     go_run_read: bool = True
+    #: The files in the project's Data panel (5 Nov: the chat said there were none).
+    files: list[ProjectFileBrief] = Field(default_factory=list, max_length=MAX_FILES_LISTED)
     #: The stage's status as the page shows it ("complete", "reopened: …", "stuck: …").
     stage_status: str = Field(default="", max_length=600)
     #: The stage's latest versions, oldest first.
@@ -219,6 +247,18 @@ def format_changes(changes: list[str]) -> str:
     return "SINCE YOUR LAST REPLY:\n" + "\n".join(f"- {' '.join(c.split())[:300]}" for c in changes) + "\n" + CHANGES_RULE
 
 
+def format_files(files: list[ProjectFileBrief]) -> str:
+    if not files:
+        return ""
+    lines = ["FILES IN THIS PROJECT'S DATA PANEL (all of them are in the project; never say one is not there):"]
+    lines += [f"- {f.name}{f': {f.note}' if f.note else ''}" for f in files]
+    lines.append(
+        "You see more of a file than this line only when its text is in the project context or it is attached to the "
+        "user's latest message. A file attached to an earlier message is not shown again: to look at it, ask for it again."
+    )
+    return "\n".join(lines)
+
+
 def format_chat_context(ctx: ChatContext | None) -> str:
     """The block that tells the chat where the user is. '' when nothing was sent,
     so a caller that predates it gets exactly the old prompt."""
@@ -251,6 +291,9 @@ def format_chat_context(ctx: ChatContext | None) -> str:
     versions = format_versions(ctx.versions)
     if versions:
         lines += ["", versions]
+    files = format_files(ctx.files)
+    if files:
+        lines += ["", files]
     lines += ["", format_go_run(ctx.go_run, ctx.go_run_read), "", WHAT_CHAT_CAN_CHANGE]
     lines += ["", format_buttons(ctx.buttons), "", NEVER_PASTE_RULE]
     changes = format_changes(ctx.changes)

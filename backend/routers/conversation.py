@@ -15,6 +15,7 @@ from deps import get_client
 from promptmaster.catchphrases import without_repeated_catchphrases
 from promptmaster.project_context import highest_source_number
 from promptmaster.conversation import (
+    attached_block,
     build_apply_to_answer_prompt,
     build_chat_reply_prompt,
     build_save_as_new_version_prompt,
@@ -24,7 +25,7 @@ from promptmaster.errors import PRESERVED_NOTHING_WRITTEN
 from promptmaster.limits import MAX_CHAT_MESSAGE_CHARS
 from promptmaster.llm_client import OpenRouterClient, OpenRouterError
 from routers._errors import llm_http_error
-from promptmaster.page_context import ChatContext, scrub_button_mentions
+from promptmaster.page_context import MAX_ATTACHMENTS, ChatAttachment, ChatContext, scrub_button_mentions
 from promptmaster.schemas import ChatMessage, Iteration, PMInput
 from promptmaster.session_context import _label_trigger
 from promptmaster.reply_actions import ActionTable, ReplyAction, suggest_reply_actions
@@ -67,6 +68,8 @@ class ChatMessageRequest(BaseModel):
     #: The project's "Web access" switch, as the browser read it (22 Oct).
     #: On, the chat may search the web for a question that needs it.
     web_access: Literal["on", "off"] = "off"
+    #: What the user attached to this message (5 Nov).
+    attachments: list[ChatAttachment] = Field(default_factory=list, max_length=MAX_ATTACHMENTS)
 
 
 class ChatMessageResponse(BaseModel):
@@ -181,12 +184,14 @@ async def api_chat_message(
             context=req.context,
             found=found,
             web=chat_web_line(req.web_access),
+            attached=attached_block(req.attachments),
         )
         reply = await generate(
             client=client,
             prompt_text=prompt_text,
             system_text=system_text,
             model=model,
+            images=[a.image for a in req.attachments if a.image and not a.not_read] or None,
         )
         msg = ChatMessage(
             id=uuid.uuid4().hex,

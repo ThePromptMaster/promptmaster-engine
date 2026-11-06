@@ -150,3 +150,16 @@ async def test_a_filtered_repair_keeps_the_first_answer(monkeypatch):
     with pytest.raises(NotJSONError) as caught:
         await client.generate_json("q")
     assert caught.value.content == '{"reply": "Half an obj'
+
+
+@pytest.mark.asyncio
+async def test_generate_shows_images_beside_the_prompt_and_only_when_given():
+    """5 Nov: screenshots attached in the side chat, the one path that sends pixels."""
+    client = OpenRouterClient(api_key="test-key")
+    client._request_with_retries = AsyncMock(return_value=("Seen.", {}, "stop"))
+    await client.generate(prompt="Look.", images=["data:image/jpeg;base64,AAAA"])
+    user = client._request_with_retries.call_args.args[0]["messages"][-1]
+    assert user["content"][0] == {"type": "text", "text": "Look."}
+    assert user["content"][1] == {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,AAAA"}}
+    await client.generate(prompt="Plain.")
+    assert client._request_with_retries.call_args.args[0]["messages"][-1]["content"] == "Plain."

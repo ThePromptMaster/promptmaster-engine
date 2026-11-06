@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { documentsCut, materialFrom, setupMaterial, type PreparedFile } from './attachments';
+import { documentsCut, materialFrom, setupMaterial, withinMessage, type PreparedFile } from './attachments';
 
 /**
  * 5 Nov (a book attached to a conversation): "Could not set the project up: `material` is
@@ -43,5 +43,26 @@ describe('a document too long for a project', () => {
   it('is named, so the cut is said', () => {
     expect(documentsCut([doc('book.docx', 60_000), doc('note.docx', 10)], LIMIT)).toContain('book.docx');
     expect(documentsCut([doc('note.docx', 10)], LIMIT)).toEqual([]);
+  });
+});
+
+describe('what one side-chat message can carry (5 Nov: eleven phone screenshots)', () => {
+  const image = (name: string, size: number) => ({ name, image: `data:image/jpeg;base64,${'A'.repeat(size)}` });
+
+  it('carries what fits, in order, and names the rest as not read', () => {
+    const out = withinMessage([image('1.png', 1_000), image('2.png', 1_000), image('3.png', 1_000)], 2_200);
+    expect(out[0].image).toBeTruthy();
+    expect(out[1].image).toBeTruthy();
+    expect(out[2]).toEqual({ name: '3.png', not_read: true });
+  });
+
+  it('a long document is cut, and says so', () => {
+    const [doc] = withinMessage([{ name: 'book.docx', text: 'word '.repeat(20_000) }]);
+    expect(doc.text!.length).toBeLessThan(61_000);
+    expect(doc.text).toContain('the rest of this document was not sent');
+  });
+
+  it('a file with nothing to read is still named', () => {
+    expect(withinMessage([{ name: 'sales.csv' }])).toEqual([{ name: 'sales.csv' }]);
   });
 });

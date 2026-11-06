@@ -329,8 +329,12 @@ class OpenRouterClient:
         model: str | None = None,
         timeout: float | None = None,
         deadline: float | None = None,
+        images: list[str] | None = None,
     ) -> tuple[str, dict[str, int]]:
         """Generate a response from the LLM with automatic retry.
+
+        `images`: data URLs the model is shown beside the prompt (5 Nov: screenshots
+        attached in the side chat, the one path that sends pixels; L-28).
 
         Returns:
             Tuple of (response_content, usage_stats).
@@ -338,7 +342,10 @@ class OpenRouterClient:
         messages = []
         if system:
             messages.append({"role": "system", "content": system})
-        messages.append({"role": "user", "content": prompt})
+        messages.append({
+            "role": "user",
+            "content": [{"type": "text", "text": prompt}, *({"type": "image_url", "image_url": {"url": url}} for url in images)] if images else prompt,
+        })
 
         runs_on = resolve_model(model or self.model)
         payload: dict[str, Any] = {

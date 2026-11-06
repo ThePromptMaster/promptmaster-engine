@@ -152,3 +152,46 @@ def test_go_questions_are_listed_one_per_line():
 
     text = format_chat_context(ChatContext(go_run=GoRunTrace(status="awaiting_decision", questions=["Should the limit change?", "Should I cite a source?"])))
     assert "What Go is asking the user, each on its own:\n1. Should the limit change?\n2. Should I cite a source?" in text
+
+
+def test_what_is_attached_to_a_message_reaches_the_model(basic_inputs, basic_iteration):
+    """5 Nov (a book test): "No, no photos came through", with eleven uploaded."""
+    stub = AsyncMock()
+    stub.generate = AsyncMock(return_value=("I can see the stop message.", {}))
+    app.dependency_overrides[get_client] = lambda: stub
+    try:
+        r = TestClient(app).post(
+            "/api/chat-message",
+            json={
+                "inputs": basic_inputs.model_dump(),
+                "active_iteration": basic_iteration.model_dump(),
+                "user_message": "Can you see these?",
+                "attachments": [
+                    {"name": "IMG_1.png", "image": "data:image/jpeg;base64,AAAA"},
+                    {"name": "IMG_2.png", "image": "data:image/jpeg;base64,BBBB", "not_read": True},
+                    {"name": "notes.docx", "text": "The launch moved."},
+                ],
+            },
+        )
+    finally:
+        app.dependency_overrides.pop(get_client, None)
+    assert r.status_code == 200, r.text
+    kwargs = stub.generate.call_args.kwargs
+    assert kwargs["images"] == ["data:image/jpeg;base64,AAAA"]
+    assert "IMG_1.png: an image" in kwargs["prompt"]
+    assert "The launch moved." in kwargs["prompt"]
+    assert "too much for one message" in kwargs["prompt"] and "IMG_2.png" in kwargs["prompt"]
+
+
+def test_a_message_with_nothing_attached_sends_no_images(basic_inputs, basic_iteration):
+    stub = AsyncMock()
+    stub.generate = AsyncMock(return_value=("Sure.", {}))
+    app.dependency_overrides[get_client] = lambda: stub
+    try:
+        TestClient(app).post(
+            "/api/chat-message",
+            json={"inputs": basic_inputs.model_dump(), "active_iteration": basic_iteration.model_dump(), "user_message": "Hi"},
+        )
+    finally:
+        app.dependency_overrides.pop(get_client, None)
+    assert "images" not in stub.generate.call_args.kwargs

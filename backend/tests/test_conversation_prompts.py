@@ -179,3 +179,46 @@ class TestChatReadsTheRunRecord:
         said = format_go_run(None, read=False)
         assert "could not be read" in said and "do not say it has not run" in said
         assert "could not be read" in format_chat_context(ChatContext(stage_label="Final", go_run_read=False))
+
+
+class TestChatAttachments:
+    """5 Nov (a book test): eleven screenshots uploaded in the side chat, and it answered
+    "No, no photos came through … the Data panel shows nothing new"."""
+
+    def test_a_document_is_read_and_an_image_is_named(self):
+        from promptmaster.conversation import attached_block
+        from promptmaster.page_context import ChatAttachment
+
+        block = attached_block([
+            ChatAttachment(name="notes.docx", text="The launch moved."),
+            ChatAttachment(name="IMG_1.png", image="data:image/jpeg;base64,AAAA"),
+        ])
+        assert "### From notes.docx" in block and "The launch moved." in block
+        assert "IMG_1.png: an image, shown to you with this message" in block
+
+    def test_too_much_for_one_message_is_named_and_said(self):
+        from promptmaster.conversation import attached_block
+        from promptmaster.page_context import ChatAttachment
+
+        block = attached_block([ChatAttachment(name="IMG_12.png", not_read=True)])
+        assert "too much for one message" in block and "IMG_12.png" in block
+        assert attached_block([]) == ""
+
+    def test_only_an_image_data_url_is_accepted(self):
+        import pytest as _pytest
+        from pydantic import ValidationError
+
+        from promptmaster.page_context import ChatAttachment
+
+        assert ChatAttachment(name="a", image="data:image/png;base64,AAAA").image
+        with _pytest.raises(ValidationError):
+            ChatAttachment(name="a", image="https://example.com/a.png")
+
+    def test_the_projects_files_are_named_and_said_to_be_there(self):
+        from promptmaster.page_context import ProjectFileBrief
+
+        said = format_chat_context(ChatContext(stage_label="Final", files=[ProjectFileBrief(name="IMG_1.png", note="an image")]))
+        assert "FILES IN THIS PROJECT'S DATA PANEL" in said
+        assert "IMG_1.png: an image" in said
+        assert "never say one is not there" in said
+        assert "DATA PANEL" not in format_chat_context(ChatContext(stage_label="Final"))
