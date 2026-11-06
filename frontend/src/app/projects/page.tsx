@@ -18,6 +18,7 @@ import { accentVariables } from '@/lib/appearance/colours';
 import { GuestBanner } from '@/components/projects/guest-banner';
 import { DeletedProjects } from '@/components/projects/deleted-projects';
 import { ExampleCards } from '@/components/examples/example-cards';
+import { PromptyHelp } from '@/components/examples/prompty-help';
 import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import { shownStageId } from '@/lib/i18n/stage';
 import { workflowName } from '@/lib/i18n/templates';
@@ -330,6 +331,7 @@ export default function ProjectsPage() {
         </div>
       )}
 
+      <PromptyHelp place="list" autoOpen={projects?.length === 0 && selection === 'all'} />
       {projects?.length === 0 && selection === 'all' && (
         <div className="rounded-2xl bg-[var(--surface-container-low)] px-8 py-16 text-center">
           <span

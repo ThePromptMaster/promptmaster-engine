@@ -141,3 +141,23 @@ test('the slide deck example asks for slides in the form the PowerPoint export r
   expect(project.example_key).toBe('slide_deck');
   expect(project.output_format).toContain('Speaker notes:');
 });
+
+test('Prompty offers a way in once, after the beta notice, and stays on as Help', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: 'Got it' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Prompty' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Got it' }).click();
+
+  const prompty = page.getByRole('dialog', { name: 'Prompty' });
+  await expect(prompty).toContainText('Want to see an example, or start with your own project?');
+  await page.screenshot({ path: test.info().outputPath('prompty-landing.png') });
+  await prompty.getByRole('link', { name: 'Show me an example' }).click();
+  await expect(page.locator('#examples')).toBeInViewport();
+  await expect(prompty).toHaveCount(0);
+
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Help' })).toBeVisible();
+  await expect(prompty).toHaveCount(0);
+  await page.getByRole('button', { name: 'Help' }).click();
+  await expect(prompty).toBeVisible();
+});

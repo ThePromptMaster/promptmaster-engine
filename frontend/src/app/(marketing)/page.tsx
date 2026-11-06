@@ -10,6 +10,7 @@ import { useT } from '@/lib/i18n/i18n-provider';
 import type { MessageKey } from '@/lib/i18n/messages/en';
 import { LocaleSwitch } from '@/components/shared/locale-switch';
 import { ColourMenu } from '@/components/shared/colour-preferences';
+import { PromptyHelp } from '@/components/examples/prompty-help';
 import { EXAMPLE_CARDS, exampleHref } from '@/lib/projects/examples/cards';
 
 /**
@@ -382,6 +383,8 @@ export default function LandingPage() {
           </Link>
         </div>
       </section>
+
+      <PromptyHelp place="landing" />
 
       {/* ===== FOOTER ===== */}
       <footer className="pt-10 pb-24 md:py-12 border-t border-white/5">

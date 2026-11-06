@@ -60,6 +60,11 @@ function setDismissedState(dismissed: boolean) {
   listeners.forEach((listener) => listener());
 }
 
+/** Whether the notice has been dealt with, for anything that should not sit on top of it. */
+export function useBetaNoticeDismissed(): boolean {
+  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot) === 'dismissed';
+}
+
 /**
  * FR-22: the controlled-beta notice.
  *
