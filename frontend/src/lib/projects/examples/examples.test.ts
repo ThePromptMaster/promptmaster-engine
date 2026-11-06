@@ -13,7 +13,7 @@ import { ASSESS_PASTE_MAX } from '@/lib/workflow/assess';
 import { mayAddStages } from '@/lib/workflow/added-stages';
 
 import { EXAMPLE_CARDS } from './cards';
-import { EXAMPLES, csvPreview, exampleBySlug, exampleWorkflow } from './index';
+import { EXAMPLES, csvPreview, exampleBySlug, exampleWorkflow, resultOf } from './index';
 
 const dict = en as Record<string, string>;
 
@@ -77,6 +77,29 @@ describe('the examples', () => {
       });
     });
   }
+});
+
+describe('what a real run produced (6 Nov, production)', () => {
+  it.each(EXAMPLES.map((e) => [e.key, e] as const))('%s has a dated result', (_key, example) => {
+    const result = resultOf(example);
+    expect(result).toBeDefined();
+    expect(result!.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(result!.costUsd).toBeGreaterThan(0);
+    expect(result!.minutes).toBeGreaterThan(0);
+    expect(result!.text.length).toBeGreaterThan(500);
+  });
+
+  it('is the work, with nothing a model said to the user left in it', () => {
+    for (const example of EXAMPLES) {
+      expect(resultOf(example)!.text).not.toMatch(/Notes for you|Kept out of the document|\[\[mock/i);
+    }
+  });
+
+  it('shows the planted catches, so a visitor sees what a check is for', () => {
+    expect(resultOf({ key: 'deal_screening' })!.text).toMatch(/Tamarack/);
+    expect(resultOf({ key: 'slide_deck' })!.text).toMatch(/15\.1 months/);
+    expect(deckFromMarkdown(resultOf({ key: 'slide_deck' })!.text).slides.length).toBeGreaterThanOrEqual(5);
+  });
 });
 
 describe('Go on an example (6 Nov, production)', () => {

@@ -756,6 +756,12 @@ dictionaries: `lib/i18n/templates.ts` files every user's `custom_ex_<key>_<suffi
 | A way in on a first visit | `components/examples/prompty-help.tsx`, after the beta notice |
 | Whether any of it helps | `lib/admin/start-funnel.ts`, derived from existing rows, on `/admin` |
 
+
+A preview shows what a real production run produced (`lib/projects/examples/results.ts`), with its
+date, time and cost, copied as the run finished. The memo and analysis pin Sonnet 5.5, and no example
+gains stages under Go (`fixed_stages`, L-192). Costs and the first-use baseline are in
+`docs/assessments/2026-11-06-first-engagement.md`.
+
 ### One delivered copy, truthful stops and what the chat can read (2026-11-06)
 
 A book test delivered one copy while Go described another, a side-chat report reached an approved

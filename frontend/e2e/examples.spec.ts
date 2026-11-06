@@ -162,6 +162,19 @@ test('deal screening under Go: it judges the sample batch itself, and does not c
   expect(steps[0].output).toContain('from the sample batch');
 });
 
+test('a preview shows what a real run produced, dated, with no account and nothing spent', async ({ page }) => {
+  const calls = backendCalls(page);
+  await page.goto('/examples/deal-screening');
+  await dismissBetaNotice(page);
+  await expect(page.getByRole('heading', { name: 'What it produced' })).toBeVisible();
+  await expect(page.getByText(/A real run of this example on /)).toBeVisible();
+  await expect(page.locator('[data-finished-result]')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Show the finished result' }).click();
+  await expect(page.locator('[data-finished-result]')).toContainText('Tamarack Ridge Fasteners');
+  await page.screenshot({ path: test.info().outputPath('01-finished-result.png'), fullPage: true });
+  expect(calls).toEqual([]);
+});
+
 test('the slide deck example asks for slides in the form the PowerPoint export reads', async ({ page }) => {
   test.setTimeout(60_000);
   await page.goto('/examples/slide-deck');
