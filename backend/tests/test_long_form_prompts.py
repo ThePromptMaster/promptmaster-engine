@@ -355,3 +355,13 @@ def test_what_later_stages_do_is_not_a_section_of_the_plan():
     assert "Review manuscript against outline; Finished book and review note" in user
     assert "no section for checking, reviewing or reporting on the other sections" in user
     assert "no section for checking" not in build_outline_prompt(inputs, 7)[1]
+
+
+def test_chapters_the_brief_names_are_a_section_each_whatever_the_target():
+    """6 Nov (prod, a six-chapter book): target 3, and it planned "Chapter 3 … and Chapter 4 …"."""
+    from promptmaster.long_form import build_outline_prompt
+    from promptmaster.schemas import PMInput
+
+    user = build_outline_prompt(PMInput(objective="A six-chapter book", mode="analyst"), 3)[1]
+    assert "each one is its own section" in user
+    assert "Never put two chapters in one section." in user
