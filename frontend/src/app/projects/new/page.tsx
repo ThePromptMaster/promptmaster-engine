@@ -38,6 +38,7 @@ import { imagePreview } from '@/lib/data/preview';
 import { INPUT_LIMITS } from '@/lib/projects/input-limits';
 import { ExampleCards } from '@/components/examples/example-cards';
 import { PromptyHelp } from '@/components/examples/prompty-help';
+import { ConnectOffer } from '@/components/personalize/connect-offer';
 import { goalFromSearch, takeStartGoal } from '@/lib/projects/example-goals';
 import { attachProjectFile } from '@/lib/supabase/project-files';
 import { LimitCounter } from '@/components/shared/limit-counter';
@@ -864,6 +865,9 @@ export default function NewProjectPage() {
             <h2 className="text-label uppercase tracking-wider text-[var(--on-surface-variant)]">{t('ex.startFrom')}</h2>
             <div className="mt-3">
               <ExampleCards compact />
+              <div className="mt-3">
+                <ConnectOffer />
+              </div>
             </div>
           </section>
 

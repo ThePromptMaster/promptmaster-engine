@@ -202,6 +202,16 @@ export function AppHeader() {
 
               <div className="my-1 h-px bg-[var(--surface-container-high)]" />
 
+              <Link
+                href="/projects/settings"
+                role="menuitem"
+                onClick={() => setOpen(false)}
+                className="flex w-full items-center gap-2.5 px-4 py-2.5 text-start text-body text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-low)]"
+              >
+                <span aria-hidden className="material-symbols-outlined text-[18px]">settings</span>
+                {t('settings.title')}
+              </Link>
+
               <button
                 type="button"
                 role="menuitem"

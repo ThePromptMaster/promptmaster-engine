@@ -337,6 +337,17 @@ def _json_reply(system: str, prompt: str) -> dict:
     from promptmaster import conflicts
     from promptmaster import assessment
 
+    if system.startswith("You suggest work PromptMaster could do for this person"):
+        # One suggestion per item shared, so a browser test sees where each came from.
+        titles = re.findall(r"^\[T\d+\] \S+ · [^·]* · (.*)$", prompt, re.M)
+        return {
+            "work_summary": "Mock: what the shared items show.",
+            "suggestions": [
+                {"example_key": "", "title": f"Mock: work for {t}"[:60], "why": f"Mock: from {t}.", "objective": f"Prepare the work {t} calls for.", "based_on": [i + 1]}
+                for i, t in enumerate(titles)
+            ],
+        }
+
     if assessment._ASSESS_INSTRUCTION[:60] in system:
         # One row per blank-line-separated block of the paste, verdicts taken
         # from the scale in turn, so a browser test sees each level once.

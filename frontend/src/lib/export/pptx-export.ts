@@ -140,7 +140,7 @@ const INK = '1B1B1F';
 const QUIET = '5F6368';
 const ACCENT = '004AC6';
 const RULE = 'D0D5DD';
-const RIGHT_TO_LEFT = /[֐-ࣿ]/;
+const RIGHT_TO_LEFT = /[\u0590-\u08FF]/;
 
 /** On every machine that opens the file, unlike Inter. */
 const FONT = 'Arial';

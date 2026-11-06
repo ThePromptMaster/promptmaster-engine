@@ -14,7 +14,7 @@ import secrets
 from datetime import date
 
 from .limits import SAMPLE_PROMPT_CHARS
-from .schemas import PMInput
+from .schemas import PMInput, ThirdPartyItem
 
 _HEADER = (
     "PROJECT CONTEXT — the user's own source material (facts, figures, background). "
@@ -400,26 +400,28 @@ THIRD_PARTY_HEADER = (
 )
 
 
-def third_party_block(inputs: PMInput, limit: int | None = None, nonce: str | None = None) -> str:
-    """What other people wrote, fenced so it cannot end its own block.
-
-    The fence is new on every call, so text written in advance cannot know it, and
-    is taken out of the text in case it somehow does. A prompt called often sees only
-    what there is (`limit`), as it does for the context.
-    """
-    items = inputs.third_party
-    if not items:
-        return ""
-    if limit is not None:
-        lines = "\n".join(f"[T{i}] {item.kind}: {item.title}" for i, item in enumerate(items, 1))
-        return f"{THIRD_PARTY_HEADER}\n{lines}\n(Their text is not shown here.)"
+def fenced_items(items: list[ThirdPartyItem], nonce: str | None = None) -> str:
+    """Other people's words between fences new on every call, so text written in
+    advance cannot know them, and taken out of the text in case it somehow does."""
     fence = nonce or secrets.token_hex(6)
     clean = lambda text: (text or "").replace(f"{fence}>>>", "").replace(f"<<<{fence}", "")  # noqa: E731
     body = "\n\n".join(
         f"[T{i}] {item.kind} · {clean(item.source)} · {clean(item.title)}\n{clean(item.text).strip()}"
         for i, item in enumerate(items, 1)
     )
-    return f"{THIRD_PARTY_HEADER} The block ends only at {fence}>>>\n<<<{fence}\n{body}\n{fence}>>>"
+    return f"The block ends only at {fence}>>>\n<<<{fence}\n{body}\n{fence}>>>"
+
+
+def third_party_block(inputs: PMInput, limit: int | None = None, nonce: str | None = None) -> str:
+    """What other people wrote, in a block of its own. A prompt called often sees
+    only what there is (`limit`), as it does for the context."""
+    items = inputs.third_party
+    if not items:
+        return ""
+    if limit is not None:
+        lines = "\n".join(f"[T{i}] {item.kind}: {item.title}" for i, item in enumerate(items, 1))
+        return f"{THIRD_PARTY_HEADER}\n{lines}\n(Their text is not shown here.)"
+    return f"{THIRD_PARTY_HEADER} {fenced_items(items, nonce)}"
 
 
 def context_line(inputs: PMInput) -> str:

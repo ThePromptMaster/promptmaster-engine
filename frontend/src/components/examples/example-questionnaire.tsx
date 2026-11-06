@@ -18,11 +18,11 @@ import { loadPreferences, savePreferences } from '@/lib/supabase/preferences';
  * optional, and no model is asked. The two taps are remembered for a signed-in user;
  * what they type goes to the start box and nowhere else.
  */
-export function ExampleQuestionnaire() {
+export function ExampleQuestionnaire({ startOpen = false }: { startOpen?: boolean }) {
   const t = useT();
   const router = useRouter();
   const { user } = useAuth();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(startOpen);
   const [work, setWork] = useState<string | undefined>();
   const [need, setNeed] = useState<string | undefined>();
   const [plate, setPlate] = useState('');

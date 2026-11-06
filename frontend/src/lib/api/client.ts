@@ -644,6 +644,20 @@ export const api = {
     return apiFetch('/api/revision-facts', { method: 'POST', body: JSON.stringify(req) });
   },
 
+  /** Up to three pieces of work, from items the user ticked. Saves nothing; the token never comes here (4 Nov). */
+  async suggestWorkflows(req: {
+    items: import('@/types').ThirdPartyItem[];
+    catalog: { key: string; title: string; description: string }[];
+    profile?: Record<string, string>;
+    model?: string;
+  }): Promise<{
+    work_summary: string;
+    suggestions: { example_key: string; title: string; why: string; objective: string; based_on: number[] }[];
+    model_used: string;
+  }> {
+    return apiFetch('/api/suggest-workflows', { method: 'POST', body: JSON.stringify(req) });
+  },
+
   /** One turn of the conversational front door: a reply and the draft brief (6 Oct, email 8). Saves nothing. */
   async frontDoor(req: {
     turns: { role: 'user' | 'assistant'; content: string }[];

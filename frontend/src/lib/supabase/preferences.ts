@@ -7,9 +7,13 @@ export interface QuestionnaireAnswers {
   need?: string;
 }
 
+/** Which accounts were connected and when. Never a token: those stay in the browser's memory. */
+export type ConnectedAccounts = Partial<Record<'google' | 'microsoft', { connected_at: string }>>;
+
 export interface UserPreferences {
   personalization: Personalization;
   questionnaire: QuestionnaireAnswers;
+  connections: ConnectedAccounts;
 }
 
 /**
@@ -19,7 +23,7 @@ export interface UserPreferences {
 export async function loadPreferences(userId: string): Promise<UserPreferences | null> {
   const { data, error } = await createClient()
     .from('user_preferences')
-    .select('personalization, questionnaire')
+    .select('personalization, questionnaire, connections')
     .eq('user_id', userId)
     .maybeSingle();
   if (error) throw error;
