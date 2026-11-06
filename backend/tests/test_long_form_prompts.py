@@ -342,3 +342,16 @@ def test_the_drafting_stage_s_hint_reaches_the_section_prompt(basic_inputs):
     rev_system, _ = build_section_revision_prompt(basic_inputs, _book_outline(), 0, revision, stage_hint=hint)
     assert f"THIS STAGE:\n{hint}" in rev_system
     assert "[INTERNAL SCAFFOLDING]" not in rev_system
+
+
+def test_what_later_stages_do_is_not_a_section_of_the_plan():
+    """5 Nov (a book test): the plan held a "Review Note" section, and a section writer
+    never sees the other chapters, so the note could only say the text was not available."""
+    from promptmaster.long_form import build_outline_prompt
+    from promptmaster.schemas import PMInput
+
+    inputs = PMInput(objective="A six-chapter book", mode="analyst")
+    user = build_outline_prompt(inputs, 7, ["Review manuscript against outline", "Finished book and review note"])[1]
+    assert "Review manuscript against outline; Finished book and review note" in user
+    assert "no section for checking, reviewing or reporting on the other sections" in user
+    assert "no section for checking" not in build_outline_prompt(inputs, 7)[1]

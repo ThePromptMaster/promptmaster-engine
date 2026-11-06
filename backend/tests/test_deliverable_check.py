@@ -155,3 +155,14 @@ def test_a_text_past_the_limit_is_read_in_part_and_says_so_rather_than_refused()
     assert len(book) > MAX_CHECK_CONTENT
     _, user = build_prompt(PMInput(objective="Report what was reproduced.", mode="analyst"), "Book", book, [])
     assert "OPENING7 " in user and "the rest of this section is not shown" in user
+
+
+def test_quotes_the_note_makes_that_the_text_does_not_hold_are_put_to_the_check():
+    """5 Nov: the delivered note quoted "I'm approving it at 2:30" as still in the book."""
+    from promptmaster.deliverable_check import build_prompt
+
+    _, user = build_prompt(INPUTS, "Book", "## Chapter 4\n\nSam approves 2pm.", [], None, ["I'm approving it at 2:30, not 2."])
+    assert "THE DOCUMENT'S OWN REVIEW NOTE QUOTES" in user
+    assert "I'm approving it at 2:30, not 2." in user
+    assert "A note may quote an earlier draft" in user
+    assert "THE DOCUMENT'S OWN REVIEW NOTE QUOTES" not in build_prompt(INPUTS, "Book", "Text.", [])[1]

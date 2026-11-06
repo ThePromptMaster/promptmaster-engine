@@ -529,6 +529,8 @@ export const api = {
     suggested_section_count: number;
     model?: string;
     web_access?: 'on' | 'off';
+    /** The stages after this plan, by label: what they do is not a section (5 Nov). */
+    later_stages?: string[];
   }): Promise<GenerateOutlineResponse> {
     return apiFetch('/api/generate-outline', {
       method: 'POST',
@@ -877,6 +879,8 @@ export const api = {
       content: string;
       accepted: { id: string; stage_label: string; finding: string; suggested_change: string }[];
       tables?: { label: string; rows: string }[];
+      /** Passages the document's own review note quotes that the rest of it does not hold (5 Nov). */
+      note_quotes?: string[];
       model?: string;
     },
     signal?: AbortSignal
