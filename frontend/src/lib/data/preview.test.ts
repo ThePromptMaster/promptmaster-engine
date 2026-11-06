@@ -20,12 +20,22 @@ describe('previewOf: what a model is shown of an attached file', () => {
     expect(previewOf('bad.json', '{nope')).toMatchObject({ kind: 'text' });
   });
 
-  it('keeps a quoted quote, and never shows more than five rows', () => {
+  it('keeps a quoted quote', () => {
     expect(splitLine('a,"say ""hi""",c', ',')).toEqual(['a', 'say "hi"', 'c']);
-    const many = ['h', ...Array.from({ length: 40 }, (_, i) => String(i))].join('\n');
-    const p = previewOf('m.csv', many);
-    expect(p.sample).toHaveLength(5);
-    expect(p.rows).toBe(40);
+  });
+
+  it('keeps every row of a short file, and five of a long one', () => {
+    const rows = (n: number) => ['h', ...Array.from({ length: n }, (_, i) => String(i))].join('\n');
+    expect(previewOf('m.csv', rows(40)).sample).toHaveLength(40);
+    expect(previewOf('m.csv', rows(60)).sample).toHaveLength(60);
+    const long = previewOf('m.csv', rows(61));
+    expect(long.sample).toHaveLength(5);
+    expect(long.rows).toBe(61);
+    // Few rows, but a lot of text: that is not short.
+    const wide = ['h', ...Array.from({ length: 10 }, () => 'x'.repeat(700))].join('\n');
+    expect(previewOf('m.csv', wide).sample).toHaveLength(5);
+    const json = JSON.stringify(Array.from({ length: 12 }, (_, i) => ({ id: i })));
+    expect(previewOf('m.json', json).sample).toHaveLength(12);
   });
 });
 

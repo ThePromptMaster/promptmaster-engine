@@ -495,8 +495,9 @@ def build_stage_prompt(
         "",
         (
             "DATA THE PROJECT HOLDS — files attached by the user, which code run for "
-            "this project can read. You are shown their shape, not their contents: "
-            "do not state any result from them unless it is given to you elsewhere.\n" + data
+            "this project can read. A file listed with every row is yours to work from, "
+            "using all of them. Of any other you are shown its shape, not its contents: "
+            "do not state a result from it unless it is given to you elsewhere.\n" + data
         ) if data else (
             "DATA THE PROJECT HOLDS: none. No dataset or file has been attached. Do "
             "not write as though any data had been examined. A calculation from "
