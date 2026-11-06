@@ -47,14 +47,14 @@ import { checkVerdict as sharedCheckVerdict } from '@/lib/workflow/check-verdict
 import { proposeTargets } from '@/lib/workflow/proposals';
 import { proposeStatuses } from '@/lib/workflow/propose';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
-import { dataFileBriefs, summariseStageContent } from '@/lib/workflow/digest';
+import { dataFileBriefs, formatManuscript, summariseStageContent } from '@/lib/workflow/digest';
 import { stageContentForSummary, stageEvidence } from '@/lib/workflow/evidence';
 import { blocksCompletion, deliverableStage, describeOutstanding, evaluateStage, outstandingWork, remainingStages } from '@/lib/workflow/engine';
 import { describeBasis, executableNext, openWithNextLine, pausedLine, stillMet, type ObjectiveAssessment, type ObjectiveBasis } from '@/lib/workflow/objective';
 import { addedByRun, designAddedStage, MAX_ADDED_PER_RUN, type AddedStage } from '@/lib/workflow/added-stages';
 import { attachedDocuments, currentFacts, supersededFactValues } from '@/lib/workflow/facts';
 import { acceptedRowsBefore, outcomeTablesBefore, checkedVersion, describeCheck, issuesFrom, MAX_CHECK_ROUNDS, roundsUsed, type DeliverableCheckRecord } from './deliverable-check';
-import { InputMissing, ManuscriptMissing, checkedStageFor, withFreshManuscript } from '@/lib/workflow/fresh-manuscript';
+import { InputMissing, ManuscriptMissing, checkedStageFor, withCurrentLongForm, withFreshManuscript } from '@/lib/workflow/fresh-manuscript';
 import { useProjectStore } from '@/stores/project-store';
 import { describeValue, leftoverMentions, leftoverValues, namedLeftovers, type SupersededValue } from '@/lib/workflow/fact-values';
 import { revertsUserVersion, USER_CHOSEN_OPERATIONS } from '@/lib/workflow/fact-reconcile';
@@ -1723,7 +1723,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         // 7 Oct (L-54): before another round, is the objective already met —
         // or blocked on something no round can produce? Judged on this round's
         // work, the same check as at the end, and recorded.
-        const roundText = roundContent(ctx, to);
+        const roundText = await roundContent(ctx, to);
         const next = ctx.stage.transitions.default_next;
         const nextLabel = next ? ctx.template.stages.find((s) => s.id === next)?.label : undefined;
         const { assessment: verdict } = await judgeObjective(ctx, ctx.stage, roundText, `the round that ended at ${ctx.stage.label}`, nextLabel);
@@ -2031,7 +2031,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // objective is met is judged, quoted, and recorded.
       if (ctx.deliverableDone) {
         const holder = deliverableStage(ctx.template);
-        const content = holder ? deliverableText(ctx, holder.id) : '';
+        const content = holder ? await deliverableText(ctx, holder.id) : '';
         // Met on this version already, and nothing changed since: the verdict
         // stands, without another model call (11 Oct).
         const head = holder ? ctx.bundles[holder.id]?.versions.at(-1) : undefined;
@@ -2215,15 +2215,15 @@ export function unmetItems(a: Pick<ObjectiveAssessment, 'unmet' | 'criteria'>): 
 }
 
 /** The deliverable as text, for the objective check: the manuscript for a long-form stage, else the head version. */
-function deliverableText(ctx: Pick<PerformContext, 'bundles' | 'template'>, stageId: string): string {
-  const bundle = ctx.bundles[stageId];
+async function deliverableText(ctx: Pick<PerformContext, 'bundles' | 'template'>, stageId: string): Promise<string> {
   const stage = ctx.template.stages.find((s) => s.id === stageId);
   if (stage?.renderer === 'long_form') {
-    return (bundle?.artifact?.long_form?.outline ?? [])
-      .map((sec) => `## ${sec.title}\n\n${sec.content ?? ''}`)
-      .join('\n\n');
+    // The chapters as they stand, read now, and only those with text: the page's
+    // copy lags the job queue, and an empty chapter is not a chapter to judge.
+    const bundles = await withCurrentLongForm(ctx.template, stage, ctx.bundles);
+    return formatManuscript(manuscriptArtifactFor(ctx.template, stage, bundles)?.long_form?.outline ?? [], Number.POSITIVE_INFINITY);
   }
-  return bundle?.versions.at(-1)?.content ?? '';
+  return ctx.bundles[stageId]?.versions.at(-1)?.content ?? '';
 }
 
 /**
@@ -2442,8 +2442,10 @@ async function recheckManuscript(
   await ctx.refresh?.();
   const evaluation = evaluateStage(ctx.template, target.id, ctx.context);
   const actor = stageMoveActor(ctx.run.policy, ctx.approvedByUser);
+  // The chapters as the repair left them, not as this step found them: the
+  // saved "full draft" held the text from before the repair (5 Nov).
   const evidence = evaluation.canAdvance
-    ? await stageEvidence({ template: ctx.template, stage: target, bundles: ctx.bundles, project: ctx.project, appendStageVersion: ctx.appendStageVersion })
+    ? await stageEvidence({ template: ctx.template, stage: target, bundles: await withCurrentLongForm(ctx.template, target, ctx.bundles), project: ctx.project, appendStageVersion: ctx.appendStageVersion })
     : undefined;
   if (evaluation.canAdvance && (evidence || actor === 'user')) {
     await appendWorkflowEvent(ctx.project.id, ctx.project.user_id, {
@@ -2757,14 +2759,13 @@ async function closeRound(ctx: PerformContext, key: string, close: RoundClose): 
 }
 
 /** This round's work as one text: every stage from where the round starts to the one that closes it. */
-function roundContent(ctx: Pick<PerformContext, 'bundles' | 'template' | 'stage'>, fromStageId: string): string {
+async function roundContent(ctx: Pick<PerformContext, 'bundles' | 'template' | 'stage'>, fromStageId: string): Promise<string> {
   const ids = ctx.template.stages.map((s) => s.id);
   const start = ids.indexOf(fromStageId);
   const end = ids.indexOf(ctx.stage.id);
-  return ctx.template.stages
-    .slice(Math.max(0, start), end + 1)
-    .map((s) => `## ${s.label}\n\n${deliverableText(ctx, s.id)}`)
-    .join('\n\n');
+  const stages = ctx.template.stages.slice(Math.max(0, start), end + 1);
+  const texts = await Promise.all(stages.map((s) => deliverableText(ctx, s.id)));
+  return stages.map((s, i) => `## ${s.label}\n\n${texts[i]}`).join('\n\n');
 }
 
 /** What the latest check of the current draft says is wrong with it (`checkVerdict` in lib/workflow, shared with the stage bar). */
