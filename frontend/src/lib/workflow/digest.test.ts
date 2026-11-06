@@ -8,6 +8,7 @@ import {
   buildStageDigest,
   documentText,
   formatManuscript,
+  manuscriptCut,
   summariseStageContent,
   type StageArtifactBundle,
 } from './digest';
@@ -273,6 +274,18 @@ describe('the manuscript in the digest', () => {
     // Every chapter is represented, each marked as cut rather than silently ending.
     expect(text.match(/^## \d+\./gm)).toHaveLength(10);
     expect(text.match(/omitted to fit the review budget/g)).toHaveLength(10);
+  });
+
+  it('says how much a stage is given, only when it is not all of it (5 Nov)', () => {
+    const chapter = (words: number, i: number) => ({ title: `Chapter ${i}`, content: 'word '.repeat(words), status: 'complete' as const });
+    expect(manuscriptCut([chapter(1_000, 1), chapter(1_000, 2)])).toBeNull();
+    expect(manuscriptCut([])).toBeNull();
+    const long = Array.from({ length: 10 }, (_, i) => chapter(10_000, i + 1));
+    const cut = manuscriptCut(long)!;
+    expect(cut.total).toBe(formatManuscript(long, Number.POSITIVE_INFINITY).length);
+    expect(cut.total).toBeGreaterThan(MANUSCRIPT_MAX);
+    expect(cut.chars).toBe(formatManuscript(long).length);
+    expect(cut.chars).toBeLessThan(cut.total);
   });
 });
 

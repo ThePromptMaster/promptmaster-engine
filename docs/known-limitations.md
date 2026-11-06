@@ -320,6 +320,11 @@ long book those stages therefore review the opening of each chapter, not all of 
 Reviewing chapter by chapter would remove the cap and multiply the calls. The earlier
 design sent a 320-character summary, and the review stages reviewed the summary.
 
+Since 6 Nov the stage says so on screen, with how many characters it is shown out of how
+many (`manuscriptCut`, `ManuscriptCutNotice`). Until then the model was told where each
+chapter was cut and the person reading its review was not. A stage with no chapter text to
+read does not run, and says why (`ManuscriptMissing`).
+
 ### L-25 · A Revision/Editing rewrite keeps the old text as a flat snapshot · `open`
 
 Before a Revision or Editing stage rewrites the chapters, the whole manuscript is saved

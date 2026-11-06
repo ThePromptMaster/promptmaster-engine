@@ -338,6 +338,7 @@ export const zh: Record<keyof typeof en, string> = {
   'ssp.tellGoHow': '用你自己的话告诉 Go 如何修复：',
   'ssp.readAll': '检查读取了 {what}，全部 {chars} 个字符。',
   'ssp.readPart': '检查读取了 {what} 全部 {total} 个字符中的 {chars} 个：最长章节的其余部分未显示。',
+  'ssp.manuscriptCut': '此阶段只能看到 {holder} 全部 {total} 个字符中的 {chars} 个。每个较长的章节都会被截短，所以它的结论只涉及这些章节的开头，不涉及结尾。结尾部分请您自己阅读。',
   'ssp.yourAnswer': '你的回答',
   'ssp.recording': '正在记录…',
   'ssp.recordContinue': '记录并继续',

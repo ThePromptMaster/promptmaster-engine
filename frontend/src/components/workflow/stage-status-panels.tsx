@@ -99,6 +99,17 @@ export function BlockedNotice({ kind, kinds, reason, onUnblock }: { kind: BlockK
   );
 }
 
+/** A stage after the chapters reads part of them: said, with how much (5 Nov). */
+export function ManuscriptCutNotice({ cut, holder }: { cut: { chars: number; total: number }; holder: string }) {
+  const t = useT();
+  const locale = useLocale();
+  return (
+    <p role="note" data-manuscript-cut className="mb-3 rounded-lg bg-[var(--surface-container-high)] px-4 py-2.5 text-label text-[var(--on-surface)]">
+      {t('ssp.manuscriptCut', { holder, chars: cut.chars.toLocaleString(locale), total: cut.total.toLocaleString(locale) })}
+    </p>
+  );
+}
+
 /**
  * The objective is not met, though the workflow's stages may all be done
  * (7 Oct; Sean, 6 Oct, email 13: "the project should remain blocked or
