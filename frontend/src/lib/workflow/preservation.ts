@@ -32,6 +32,8 @@ export function asksForRemovals(instruction: string): boolean {
 
 /** The most words a line may have and still be put back by itself. */
 const SHORT_LINE_WORDS = 14;
+/** A line that only labels what follows it. */
+const LABEL_ONLY = /^[*_]*[^*_:]{1,80}:[*_]*:?[*_]*$/;
 
 const TIME = /\b\d{1,2}(?::\d{2})?\s*(?:a\.?\s?m\.?|p\.?\s?m\.?)|\bnoon\b|\bmidnight\b/gi;
 const NUMBER = /\$?\d[\d,]*(?:\.\d+)?%?/g;
@@ -133,7 +135,9 @@ export function removedLines(before: string, after: string): Removal[] {
     // a.m. — Training … Maya facilitates", and the old line was put back beside it).
     if (w.length >= 2 && afterSets.some((set) => w.every((x) => set.has(x)))) continue;
     if (labels(line).some((l) => relabelled.has(l))) continue;
-    out.push({ line: raw.replace(/\s+$/, ''), restorable: w.length <= SHORT_LINE_WORDS });
+    // A label is nothing without what it introduced: "**Other required points:**"
+    // came back alone, above the title of a finished book (5 Nov).
+    out.push({ line: raw.replace(/\s+$/, ''), restorable: w.length <= SHORT_LINE_WORDS && !LABEL_ONLY.test(line) });
   }
   return out;
 }
@@ -174,6 +178,8 @@ export function restoreLines(before: string, after: string, lines: readonly stri
     });
     return best;
   };
+  const opensOnTitle = /^#{1,6}\s/.test(after.trimStart());
+  const titleAt = b.findIndex((l) => /^#{1,6}\s/.test(l));
   /** Runs of lines to put back, each after a line of `after` (or at the top: -1). */
   const inserts = new Map<number, string[]>();
   let anchor = -1;
@@ -183,6 +189,13 @@ export function restoreLines(before: string, after: string, lines: readonly stri
       const at = placeOf(b[i]);
       if (at >= 0) anchor = at;
       i += 1;
+      continue;
+    }
+    // Nothing before it survived and the new text opens on its title: above the
+    // title is not where it stood, so it is not put there (5 Nov). A line that
+    // did stand above the old title may go back.
+    if (anchor < 0 && opensOnTitle && !(titleAt >= 0 && i < titleAt)) {
+      while (i < b.length && (!b[i].trim() || want.has(b[i].trim()))) i += 1;
       continue;
     }
     // A run: the lines to put back, with any blank lines between them.
@@ -239,9 +252,13 @@ export function keepUnasked(
   const replaced = correctedValues(instruction);
   const stale = (line: string) => replaced.some((v) => statesValue(line, v.kind, v.value));
   const removed = removedLines(before, after).filter((r) => keep(r.line) && !stale(r.line) && !mentioned(r.line));
-  const restored = removed.filter((r) => r.restorable).map((r) => r.line.trim());
-  const reported = removed.filter((r) => !r.restorable).map((r) => r.line.trim());
-  return { text: restoreLines(before, after, restored), restored, reported };
+  const wanted = removed.filter((r) => r.restorable).map((r) => r.line.trim());
+  const text = restoreLines(before, after, wanted);
+  // What found a place is said as put back; the rest is reported as gone.
+  const back = new Set(text.split('\n').map((l) => l.trim()));
+  const restored = wanted.filter((l) => back.has(l));
+  const reported = [...removed.filter((r) => !r.restorable).map((r) => r.line.trim()), ...wanted.filter((l) => !back.has(l))];
+  return { text, restored, reported };
 }
 
 /**

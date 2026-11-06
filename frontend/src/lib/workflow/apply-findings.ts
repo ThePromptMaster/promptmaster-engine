@@ -21,7 +21,7 @@ import type { StageDefinition } from '@/lib/workflow/types';
 import type { AuditFinding, GenerateStageArtifactRequest } from '@/types';
 import type { Project } from '@/types/project';
 import { keepFound, webAccessOf, withWebLine, type WebFound } from '@/lib/workflow/web-found';
-import { headingOutline, joinParts, needsParts, partInstruction, splitIntoParts } from '@/lib/workflow/long-prose';
+import { headingOutline, joinParts, needsParts, partInstruction, partThatReads, splitIntoParts } from '@/lib/workflow/long-prose';
 import { splitUserNote } from './user-note';
 
 export interface PendingRevision {
@@ -179,20 +179,25 @@ async function reviseInParts(args: {
   const chunks = splitIntoParts(content);
   const outline = headingOutline(content);
   const results: { text: string; kept: boolean; instruction: string; web: WebFound | null }[] = new Array(chunks.length);
-  const revisePart = async (i: number) => {
+  // The part that reports on the rest goes last, against what the others became (5 Nov).
+  const reads = partThatReads(chunks);
+  const first = reads === 0 ? 1 : 0;
+  const revisePart = async (i: number, whole = '') => {
     const scope: AuditFinding = { id: 'part', category: 'Scope', summary: `Part ${i + 1} of ${chunks.length}`, suggested_change: partInstruction(i, chunks.length, outline).trim() };
     const res = await api.applyRecommendations(
-      { inputs: inputsFrom(project), content: chunks[i], findings: [...findings, scope], model: project.model, web_access: i === 0 ? webAccessOf(project) : 'off' },
+      { inputs: inputsFrom(project), content: chunks[i], findings: [...findings, scope], model: project.model, web_access: i === first ? webAccessOf(project) : 'off', ...(whole ? { whole_text: whole } : {}) },
       signal
     );
-    const web = i === 0 ? await keepFound(project, res, where) : null;
+    const web = i === first ? await keepFound(project, res, where) : null;
     const kept = !res.content.trim() || res.finish_reason === 'length';
     results[i] = { text: kept ? chunks[i] : splitUserNote(res.content).body, kept, instruction: res.instruction, web };
   };
-  await revisePart(0);
-  for (let next = 1; next < chunks.length; next += PART_CONCURRENCY) {
-    await Promise.all(chunks.slice(next, next + PART_CONCURRENCY).map((_, j) => revisePart(next + j)));
+  await revisePart(first);
+  const others = chunks.map((_, i) => i).filter((i) => i !== first && i !== reads);
+  for (let next = 0; next < others.length; next += PART_CONCURRENCY) {
+    await Promise.all(others.slice(next, next + PART_CONCURRENCY).map((i) => revisePart(i)));
   }
+  await revisePart(reads, joinParts(chunks.map((c, i) => results[i]?.text ?? c)));
   const kept = results.flatMap((r, i) => (r.kept ? [i + 1] : []));
   if (kept.length === chunks.length) throw new Error('No part of the revision came back usable.');
   return {
@@ -202,7 +207,7 @@ async function reviseInParts(args: {
     instruction: results[0].instruction,
     finishReason: 'stop',
     source,
-    web: results[0].web,
+    web: results[first].web,
     parts: { count: chunks.length, kept },
   };
 }

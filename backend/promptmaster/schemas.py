@@ -600,6 +600,9 @@ class StageDigest(BaseModel):
     audience: str = Field(default="")
     prior_stages: list["StageDigestEntry"] = Field(default_factory=list, max_length=60)
     manuscript: str = Field(default="", max_length=200_000, description="Drafted chapters, bounded by the client.")
+    #: This stage's own text holds the work now, corrected: the manuscript is the
+    #: earlier draft, not what to work from (5 Nov, a book test).
+    manuscript_is_earlier: bool = False
     #: The project's data files; empty when none is attached.
     data_files: list[DataFileBrief] = Field(default_factory=list, max_length=20)
     #: Figures earlier stages established, each exactly as that stage wrote it.

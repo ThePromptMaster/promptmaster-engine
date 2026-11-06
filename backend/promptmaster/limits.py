@@ -55,6 +55,10 @@ MAX_SAMPLE_CHARS = 60_000
 SAMPLE_PROMPT_CHARS = 12_000
 #: A one-off instruction — a revise request, a chat instruction, a stage hint.
 MAX_INSTRUCTION_CHARS = 20_000
+#: The whole document a part of a long revision may read. The prompt reads at most
+#: WHOLE_TEXT_PROMPT_CHARS of it, each section keeping its opening.
+MAX_WHOLE_TEXT_CHARS = 1_000_000
+WHOLE_TEXT_PROMPT_CHARS = 120_000
 #: What someone types into the side chat, a "Guide me" answer, or the
 #: description of a workflow to design. 6 Oct, email 12: "We should be able to
 #: have unlimited amount of characters for workflow and other chat boxes if
@@ -192,3 +196,24 @@ def clip_by_section(text: str, limit: int) -> tuple[str, int]:
         kept.append(cut.rstrip() + _SECTION_CUT)
         shown += len(cut)
     return "\n\n".join(kept), shown
+
+
+def whole_document_block(whole_text: str) -> str:
+    """The whole document, for the one part of a long revision that reports on it.
+
+    5 Nov (a book test): a long finished book was revised in parts, and the part
+    holding the review note saw neither the chapters beside it nor anything newer
+    than the first draft, so it wrote that the finished chapters "were not available",
+    and listed the first draft's problems as if they were still there. "" when there
+    is none.
+    """
+    if not whole_text.strip():
+        return ""
+    shown, _ = clip_by_section(whole_text, WHOLE_TEXT_PROMPT_CHARS)
+    return (
+        "THE WHOLE DOCUMENT THIS PART BELONGS TO, AS IT NOW STANDS. Read it, and write only your part. "
+        "Whatever your part says about the document (a review note, a cross-reference, a list of what "
+        "was checked) describes this text: it is in front of you, so never say it was not available, "
+        "and never report a problem it no longer has. Quote it exactly.\n"
+        f"--- BEGIN WHOLE DOCUMENT ---\n{shown}\n--- END WHOLE DOCUMENT ---"
+    )

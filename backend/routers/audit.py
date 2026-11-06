@@ -9,8 +9,9 @@ under a different name.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
+from promptmaster.limits import MAX_WHOLE_TEXT_CHARS
 from promptmaster.web_search import WebAccess, WebUse, cite_only_known, with_web
 from deps import get_client
 from promptmaster.audit_findings import (
@@ -78,6 +79,9 @@ class ApplyRecommendationsRequest(BaseModel):
     #: The project's Web access switch (22 Oct): on, this searches the web
     #: first when the work needs outside facts.
     web_access: WebAccess = "off"
+    #: One part of a long text that reports on the rest: the whole document as it
+    #: now stands, read-only (5 Nov, a book test).
+    whole_text: str = Field(default="", max_length=MAX_WHOLE_TEXT_CHARS)
 
 
 class ApplyRecommendationsResponse(WebUse):
@@ -206,6 +210,7 @@ async def api_apply_recommendations(
             source_iteration=source,
             findings=req.findings,
             iterations=[],
+            whole_text=req.whole_text,
         )
 
         revised, _usage, finish_reason = await client.generate_with_meta(
