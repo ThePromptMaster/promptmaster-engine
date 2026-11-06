@@ -10,6 +10,7 @@ import { useT } from '@/lib/i18n/i18n-provider';
 import type { MessageKey } from '@/lib/i18n/messages/en';
 import { LocaleSwitch } from '@/components/shared/locale-switch';
 import { ColourMenu } from '@/components/shared/colour-preferences';
+import { EXAMPLE_CARDS, exampleHref } from '@/lib/projects/examples/cards';
 
 /**
  * What the product is for, in the words a first-time visitor asks in (Harold,
@@ -31,7 +32,12 @@ const STEPS: { step: string; key: 'step1' | 'step2' | 'step3' | 'step4'; icon: s
   { step: '04', key: 'step4', icon: 'verified_user' },
 ];
 
-const AUDIENCE = ['analysts', 'auditors', 'lawyers', 'strategists', 'researchers', 'consultants'] as const;
+/**
+ * What it is for, as work rather than job titles (the client's call, 4 Nov; a
+ * tester, the same day: "if a tool is for everyone, then it's for no one"). The
+ * product stays general, and the last line says so.
+ */
+const WORK = ['memos', 'screens', 'analyses', 'decks', 'reports', 'anything'] as const;
 
 const MANAGED = [
   { icon: 'account_tree', key: 'workflow' },
@@ -173,6 +179,33 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ===== EXAMPLES ===== */}
+      {/* What it does, on work a visitor recognises, with no account: a tester
+          read the whole page and "did not understand what PromptMaster
+          accomplished" (4 Nov). Each opens a public preview. */}
+      <section id="examples" className="py-10 md:py-16">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="text-center mb-8 md:mb-12 space-y-4">
+            <p className="text-sm font-bold uppercase tracking-[0.2em] text-blue-400">{t('ex.kicker')}</p>
+            <h2 className="text-4xl md:text-5xl font-semibold text-white tracking-tight">{t('land.examplesTitle')}</h2>
+            <p className="text-base text-white/75 max-w-2xl mx-auto leading-relaxed">{t('land.examplesLead')}</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {EXAMPLE_CARDS.map((card) => (
+              <Link
+                key={card.key}
+                href={exampleHref(card.slug)}
+                className="block h-full bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6 space-y-3 transition-colors hover:bg-white/[0.07]"
+              >
+                <span aria-hidden className="material-symbols-outlined text-blue-400">{card.icon}</span>
+                <span className="block text-lg font-bold text-white">{t(`ex.${card.key}.title`)}</span>
+                <span className="block text-sm md:text-[15px] text-white/75 leading-relaxed">{t(`ex.${card.key}.blurb`)}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ===== PRODUCT SHOWCASE (ContainerScroll) ===== */}
       <section className="relative">
         <ContainerScroll
@@ -257,12 +290,12 @@ export default function LandingPage() {
           </div>
 
           <div className="flex flex-wrap justify-center gap-3">
-            {AUDIENCE.map((who) => (
+            {WORK.map((work) => (
               <Card
-                key={who}
+                key={work}
                 className="px-6 py-3 bg-white/[0.03] border-white/[0.06] cursor-default"
               >
-                <span className="text-sm font-semibold text-white">{t(`land.who.${who}`)}</span>
+                <span className="text-sm font-semibold text-white">{t(`land.work.${work}`)}</span>
               </Card>
             ))}
           </div>
