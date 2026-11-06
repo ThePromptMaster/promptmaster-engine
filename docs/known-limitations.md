@@ -3327,10 +3327,11 @@ carry back and stays as it is.
 
 Found on the production pass: shown the first rows of a 24-month file, an analysis said it "works
 from five of those rows". A file of up to 60 rows and 6,000 characters now keeps every row in its
-preview, and prompts carry them all. Longer files are still previewed, and read in full only by code
-run in the sandbox.
+preview, and the stage, planner and objective-check prompts carry them all. The side chat still gets
+each file's name and a short note, not its rows, so it says it cannot see them. Longer files are still
+previewed, and read in full only by code run in the sandbox.
 
-The costs: those rows are in every prompt of the project, about 600 tokens for a 24-row file. A
+The costs: those rows are in each of those prompts, about 600 tokens for a 24-row file. A
 model can do arithmetic on them by hand instead of running code, so "Compute; do not estimate" is
 still an instruction rather than a rule. Files attached before this keep their stored five-row
 preview until they are attached again.
