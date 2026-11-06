@@ -82,3 +82,44 @@ describe('an objective with a next task that can be done now is open, not paused
     expect(screen.getByText('Paused — the objective is not met')).toBeInTheDocument();
   });
 });
+
+describe('after two repairs the check stops offering another (5 Nov, a book test)', () => {
+  const need = { kind: 'objective_check' as const, stageId: 'finished', finding: 'repair_limit' as const, tried: 2, items: ['The note describes an older draft'] };
+
+  it("the Go card says what is still unmet and offers no further repair", () => {
+    const d = describeNeed(need, () => 'Finished book');
+    expect(d.message).toContain('tried to fix Finished book 2 times');
+    expect(d.message).toContain('The note describes an older draft');
+    expect(d.options?.map((o) => o.id)).toEqual(['open', 'finish', 'stop']);
+    expect(d.options?.map((o) => o.label).join(' ')).not.toMatch(/Have Go fix/);
+  });
+
+  it('the notice takes how to fix it in the user\'s own words, and has no resume button', async () => {
+    const onAnswer = vi.fn();
+    render(<ObjectivePausedNotice assessment={assessment} onAnswer={onAnswer} answerPrompt="Tell Go how to fix it, in your own words:" />);
+    expect(screen.queryByRole('button', { name: 'Resume Go' })).not.toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText('Tell Go how to fix it, in your own words:'), 'Rewrite only the note');
+    await user.click(screen.getByRole('button', { name: /Record it and continue/i }));
+    expect(onAnswer).toHaveBeenCalledWith('Rewrite only the note');
+  });
+});
+
+describe('the notice says which saved text the check read (5 Nov, a book test)', () => {
+  const basis = { stage_id: 'finished', stage_label: 'Finished book', version_id: 'v9', version_number: 9, measured: [], assessed: [], not_checked: [] };
+
+  it('the whole of it', () => {
+    render(<ObjectivePausedNotice assessment={{ ...assessment, basis: { ...basis, read: { chars: 32246, total: 32246 } } }} />);
+    expect(screen.getByText('The check read Finished book v9, all 32,246 characters.')).toBeInTheDocument();
+  });
+
+  it('or how much of it, when only part fitted', () => {
+    render(<ObjectivePausedNotice assessment={{ ...assessment, basis: { ...basis, read: { chars: 120000, total: 360000 } } }} />);
+    expect(screen.getByText(/read 120,000 of the 360,000 characters of Finished book v9/)).toBeInTheDocument();
+  });
+
+  it('says nothing on an older record that did not note it', () => {
+    render(<ObjectivePausedNotice assessment={{ ...assessment, basis }} />);
+    expect(screen.queryByText(/The check read/)).not.toBeInTheDocument();
+  });
+});

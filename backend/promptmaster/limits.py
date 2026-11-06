@@ -27,6 +27,8 @@ expected maximum is a cap that will trip.
 
 from __future__ import annotations
 
+import re
+
 # ---------------------------------------------------------------------------
 # Free text carried into prompts
 # ---------------------------------------------------------------------------
@@ -143,3 +145,50 @@ def estimate_long_form_tokens(section_count: int) -> tuple[int, int]:
         EST_TOKENS_IN_BASE + EST_TOKENS_IN_PER_PRIOR_SECTION * i for i in range(count)
     )
     return tokens_in, tokens_out
+
+
+# ---------------------------------------------------------------------------
+# Reading a long text within a limit
+# ---------------------------------------------------------------------------
+
+_SECTION_START = re.compile(r"(?m)^(?=#{1,3}\s)")
+_SECTION_CUT = "\n\n[… the rest of this section is not shown, to fit this check's limit …]"
+_MIDDLE_CUT = "\n[… the middle of the text is not shown, to fit this check's limit …]\n"
+
+
+def clip_by_section(text: str, limit: int) -> tuple[str, int]:
+    """`text` cut to about `limit` characters, and how many of its characters are shown.
+
+    A check that kept only the two ends of a long text never saw the chapters in
+    its middle (5 Nov, a book test). Each section now keeps its opening: short ones
+    whole, the long ones sharing what is left, each cut marked so a model does not
+    read a truncation as where the section ends. A text with no headings keeps both
+    ends, as before.
+    """
+    text = text.strip()
+    if len(text) <= limit:
+        return text, len(text)
+    parts = [p.rstrip() for p in _SECTION_START.split(text) if p.strip()]
+    if len(parts) < 2:
+        half = max(1, (limit - len(_MIDDLE_CUT)) // 2)
+        return f"{text[:half]}{_MIDDLE_CUT}{text[-half:]}", half * 2
+    share = limit // len(parts)
+    for _ in range(4):
+        short = [p for p in parts if len(p) <= share]
+        if len(short) == len(parts):
+            break
+        share = max(200, (limit - sum(len(p) for p in short)) // (len(parts) - len(short)) - len(_SECTION_CUT))
+    kept: list[str] = []
+    shown = 0
+    for part in parts:
+        if len(part) <= share:
+            kept.append(part)
+            shown += len(part)
+            continue
+        cut = part[:share]
+        space = cut.rfind(" ")
+        if space > share * 0.8:
+            cut = cut[:space]
+        kept.append(cut.rstrip() + _SECTION_CUT)
+        shown += len(cut)
+    return "\n\n".join(kept), shown

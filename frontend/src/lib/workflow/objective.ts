@@ -43,6 +43,11 @@ export interface ObjectiveAssessment {
    * is missing.
    */
   next_task?: NextTask | null;
+  /** Which version the check read, and how much of it (5 Nov); absent on older records. */
+  basis?: ObjectiveBasis;
+  /** How much of the text was shown to the check, from the response (5 Nov). */
+  read_chars?: number;
+  total_chars?: number;
 }
 
 export interface NextTask {
@@ -86,6 +91,8 @@ export interface ObjectiveBasis {
   not_checked: string[];
   /** The deliverable check's finding in counts (1 Nov, `lib/agent/deliverable-check.ts`). */
   check?: string;
+  /** How much of the text the check was shown, in characters (5 Nov); absent on older records. */
+  read?: { chars: number; total: number };
 }
 
 /** "Checked Output v3: 2 measured in code, 4 assessed by the model; not verified: fits on one page." */
@@ -97,7 +104,8 @@ export function describeBasis(b: ObjectiveBasis): string {
     met ? `${met} assessed by the AI model against the text` : '',
   ].filter(Boolean);
   const unchecked = b.not_checked.length ? ` Not verified: ${b.not_checked.join('; ')}.` : '';
-  return `Checked ${where}${parts.length ? `: ${parts.join(', ')}` : ''}.${unchecked}${b.check ? ` ${b.check}` : ''}`;
+  const clipped = b.read && b.read.chars < b.read.total ? ` It read ${b.read.chars.toLocaleString('en-US')} of ${b.read.total.toLocaleString('en-US')} characters: the rest of the longest sections was not shown.` : '';
+  return `Checked ${where}${parts.length ? `: ${parts.join(', ')}` : ''}.${unchecked}${clipped}${b.check ? ` ${b.check}` : ''}`;
 }
 
 /** The latest assessment in the log, if any. */
@@ -121,6 +129,7 @@ export function latestObjectiveAssessment(events: readonly WorkflowEvent[]): (Ob
       ...(Array.isArray(p.limitations) ? { limitations: p.limitations } : {}),
       ...(p.ready_for_later_stage ? { ready_for_later_stage: true } : {}),
       ...(p.next_task && typeof p.next_task === 'object' ? { next_task: p.next_task } : {}),
+      ...(p.basis && typeof p.basis === 'object' ? { basis: p.basis } : {}),
       at: e.created_at ?? '',
     };
   }

@@ -28,13 +28,15 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from .agent_actions import ACTIONS_BY_KEY
+from .limits import clip_by_section
 from .llm_client import OpenRouterClient
 from .project_context import CHECK_CONTEXT_MAX, brief_lines, context_block
 from .schemas import DataFileBrief, PMInput, format_data_files
 
-#: The deliverable text a check reads; the verdict and blockers of a long
-#: log are in its opening and closing, so both ends are kept.
-MAX_ASSESS_CONTENT = 40_000
+#: The deliverable text a check reads. Until 5 Nov this was 40,000 characters,
+#: the first and last 20,000, so a long document's middle chapters were never
+#: judged. Past this limit each section keeps its opening (`clip_by_section`).
+MAX_ASSESS_CONTENT = 120_000
 MAX_BLOCKERS = 8
 MAX_ITEMS = 12
 
@@ -164,6 +166,10 @@ class ObjectiveAssessment(BaseModel):
     ready_for_later_stage: bool = False
     #: The next executable task, when the objective is not met; None when there is none.
     next_task: NextTask | None = None
+    #: How much of the text was shown to the check, in characters (5 Nov): said
+    #: with the verdict, so a clipped read is not taken for a whole one.
+    read_chars: int = 0
+    total_chars: int = 0
 
 
 class RunStep(BaseModel):
@@ -173,11 +179,7 @@ class RunStep(BaseModel):
 
 
 def _clip(text: str) -> str:
-    text = text.strip()
-    if len(text) <= MAX_ASSESS_CONTENT:
-        return text
-    half = MAX_ASSESS_CONTENT // 2
-    return f"{text[:half]}\n[…the middle of the text is not shown…]\n{text[-half:]}"
+    return clip_by_section(text, MAX_ASSESS_CONTENT)[0]
 
 
 def build_assessment_prompt(
@@ -916,4 +918,6 @@ async def assess_objective(
             prompt=user + EVIDENCE_RETRY, system=system, temperature=0, max_tokens=1_600, model=model
         )
         parsed = parse_assessment(again, content, steps, failed_checks, measured, requests, record_text(inputs), known_versions, later_stage, data_files)
+    parsed.read_chars = clip_by_section(content, MAX_ASSESS_CONTENT)[1]
+    parsed.total_chars = len(content.strip())
     return parsed

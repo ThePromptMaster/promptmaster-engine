@@ -16,6 +16,7 @@ import { enqueueDraftJobs, enqueueRevisionJobs, writtenSections } from '@/lib/jo
 import { listProjectJobs } from '@/lib/supabase/jobs';
 import { jobsSpent } from '@/lib/supabase/project-cost';
 import { addStepCost } from '@/lib/supabase/model-usage';
+import { MAX_OBJECTIVE_FIXES, objectiveFixes } from './objective-fixes';
 import { generateOutlineDraft } from '@/lib/outline/actions';
 import { countNamedSections, parseOutlineDocument } from '@/lib/outline/model';
 import { approvedOutlineVersionId, commitOutlineVersion } from '@/lib/supabase/outline';
@@ -2151,6 +2152,15 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         // What was found unmet, by name, and what each button does (11 Oct,
         // survey brief: a pause that named nothing and asked nothing).
         const failed = unmetItems(assessment);
+        // Tried twice since the user last changed anything, and still not met:
+        // another repair is not offered (5 Nov, five presses on one review note).
+        const fixes = failed.length
+          ? objectiveFixes({
+              events: ctx.loadEvents ? await ctx.loadEvents() : [],
+              versions: Object.values(ctx.bundles).flatMap((b) => b?.versions ?? []),
+              facts: ctx.project.facts ?? [],
+            })
+          : 0;
         return done(key, {
           ...judged, status: 'succeeded',
           output: `${line}${performed}${proposed} ${describeBasis(basis)}${assessment.model_note ? ` The check's own words: "${assessment.model_note}"` : ''}`,
@@ -2158,7 +2168,8 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
           ...(blocked ? {} : asks.length ? { needs: { kind: 'answer_question' as const, question: `${line} ${asks.join(' ')}` } } : {
             needs: {
               kind: 'objective_check' as const, stageId: holder?.id ?? ctx.stage.id,
-              finding: failed.length ? 'unmet' as const : 'no_evidence' as const, items: failed,
+              finding: fixes >= MAX_OBJECTIVE_FIXES ? 'repair_limit' as const : failed.length ? 'unmet' as const : 'no_evidence' as const, items: failed,
+              ...(fixes >= MAX_OBJECTIVE_FIXES ? { tried: fixes } : {}),
             },
           }),
         });
@@ -2639,7 +2650,7 @@ async function judgeObjective(ctx: PerformContext, holder: StageDefinition | nul
       steps: ctx.digest.recent_steps.map((s) => ({ action_key: s.action_key, execution_label: s.execution_label, output: s.output })),
       // The criterion the workflow was designed against, kept from the objective (7 Oct).
       success_criterion: ctx.template.execution?.success_criterion ?? '',
-      failed_checks: [...failedChecks(ctx), ...(check && !check.bounded && !check.failed ? check.issues : [])].slice(0, 40),
+      failed_checks: [...failedChecks(ctx), ...(check && !check.bounded && !check.failed ? check.issues : [])].slice(0, 30),
       measured,
       // The saved versions, and the earlier ones the text cites (19 Oct, HARBOR).
       known_versions: knownVersions(ctx.template, ctx.bundles),
@@ -2663,6 +2674,7 @@ async function judgeObjective(ctx: PerformContext, holder: StageDefinition | nul
     assessed: criteria.filter((c) => c.verdict !== 'not_checked'),
     not_checked: criteria.filter((c) => c.verdict === 'not_checked').map((c) => c.requirement),
     ...(check ? { check: describeCheck(check, labelOverride ?? holder?.short_label ?? label).trim() } : {}),
+    ...(assessment.total_chars ? { read: { chars: assessment.read_chars ?? assessment.total_chars, total: assessment.total_chars } } : {}),
   };
   const payload = {
     outcome: assessment.outcome, reason: assessment.reason, basis_quote: assessment.basis_quote,
@@ -2713,7 +2725,8 @@ async function checkDeliverable(ctx: PerformContext, holder: StageDefinition, co
     const issues = issuesFrom(res, rows, label);
     const carried = res.findings.filter((f) => f.verdict === 'carried').length;
     const accepted = rows.length - res.findings.filter((f) => f.verdict === 'not_applicable').length;
-    return { ...at, accepted, carried, issues, ...(issues.length && rounds >= MAX_CHECK_ROUNDS ? { bounded: true } : {}) };
+    const part = res.total_chars && (res.read_chars ?? res.total_chars) < res.total_chars ? { read: { chars: res.read_chars ?? 0, total: res.total_chars } } : {};
+    return { ...at, accepted, carried, issues, ...part, ...(issues.length && rounds >= MAX_CHECK_ROUNDS ? { bounded: true } : {}) };
   } catch {
     return { ...at, accepted: rows.length, carried: 0, issues: [], failed: true };
   }

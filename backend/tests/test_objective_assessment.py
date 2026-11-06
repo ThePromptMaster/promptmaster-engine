@@ -6,6 +6,8 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock
 
+import pytest
+
 from fastapi.testclient import TestClient
 
 from deps import get_client
@@ -644,3 +646,59 @@ def test_data_an_attached_file_holds_is_not_missing():
                      {"need": "the 2026 pricing sheet", "kind": "data_missing"}],
     }, LOG, STEPS, data_files=files)
     assert [b.need for b in a.blockers] == ["the pricing sheet"] or [b.need for b in a.blockers] == ["the 2026 pricing sheet"]
+
+
+class TestLongDocumentRead:
+    """5 Nov (a book test): the check read the first and last 20,000 characters,
+    so a long document's middle chapters were never judged."""
+
+    def _book(self, chapters: int = 12, each: int = 15_000) -> str:
+        return "\n\n".join(f"## Chapter {i}\n\nOPENING{i} " + "word " * (each // 5) + f"ENDING{i}" for i in range(1, chapters + 1))
+
+    def test_every_chapter_keeps_its_opening_and_the_cut_is_marked(self):
+        from promptmaster.limits import clip_by_section
+
+        book = self._book()
+        text, shown = clip_by_section(book, 120_000)
+        for i in range(1, 13):
+            assert f"OPENING{i} " in text
+        assert "ENDING6" not in text
+        assert "the rest of this section is not shown" in text
+        assert shown < len(book)
+        assert len(text) <= 125_000
+
+    def test_short_sections_are_kept_whole_and_the_long_ones_share_the_rest(self):
+        from promptmaster.limits import clip_by_section
+
+        book = "## Note\n\nKEEP THIS NOTE WHOLE.\n\n## Long\n\n" + "word " * 60_000
+        text, _ = clip_by_section(book, 100_000)
+        assert "KEEP THIS NOTE WHOLE." in text
+        assert len(text) > 90_000
+
+    def test_a_text_within_the_limit_is_shown_whole(self):
+        from promptmaster.limits import clip_by_section
+
+        assert clip_by_section("## A\n\nshort", 1_000) == ("## A\n\nshort", len("## A\n\nshort"))
+
+    def test_a_text_with_no_headings_keeps_both_ends(self):
+        from promptmaster.limits import clip_by_section
+
+        text, shown = clip_by_section("START " + "word " * 40_000 + " FINISH", 50_000)
+        assert "START" in text and "FINISH" in text and "the middle of the text is not shown" in text
+        assert shown < 50_000
+
+    @pytest.mark.asyncio
+    async def test_the_verdict_says_how_much_was_read(self):
+        from unittest.mock import AsyncMock, MagicMock
+
+        from promptmaster.objective_assessment import assess_objective
+        from promptmaster.schemas import PMInput
+
+        client = MagicMock()
+        client.generate_json = AsyncMock(return_value=({"outcome": "not_met", "reason": "No.", "blockers": []}, {}))
+        book = self._book()
+        out = await assess_objective(client, None, PMInput(objective="Find whether the Regge action's Hessian is positive definite.", mode="analyst"), "Book", book, [])
+        assert out.total_chars == len(book.strip())
+        assert 0 < out.read_chars < out.total_chars
+        prompt = client.generate_json.await_args.kwargs["prompt"]
+        assert "OPENING12 " in prompt

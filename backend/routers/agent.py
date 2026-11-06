@@ -389,7 +389,7 @@ async def api_assess_objective(req: AssessObjectiveRequest, client: OpenRouterCl
 class CheckDeliverableRequest(BaseModel):
     inputs: PMInput
     deliverable_label: str = Field(default="", max_length=200)
-    content: str = Field(min_length=1, max_length=200_000)
+    content: str = Field(min_length=1, max_length=1_000_000)
     accepted: list[AcceptedFinding] = Field(default_factory=list, max_length=60)
     #: Outcome tables before the deliverable, as their rows stand (4 Nov).
     tables: list[RecordedTable] = Field(default_factory=list, max_length=MAX_TABLES)

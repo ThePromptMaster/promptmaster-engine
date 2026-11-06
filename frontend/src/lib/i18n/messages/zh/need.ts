@@ -63,6 +63,8 @@ export const zh: Record<keyof typeof en, string> = {
   'need.notRevisedByGo': '{stage}需要重新检查：{why}。这类阶段我不会自行修改，我能修复的阶段都已修复。请保持其当前状态并继续推进，或者打开它自行修改。',
   'need.fixAndCheck': '让 Go 修正{stage}并重新检查',
   'need.fixMyself': '我自己来修改',
+  'need.finishLimitation': '完成，并把这一点列为局限',
+  'need.repairLimit': '我已尝试修复 {stage} {count} 次，检查仍然发现：{list}。再修复一次也不太可能解决，所以在你选择之前不会再产生费用：自己修改，在页面的输入框中告诉我怎么做，或者把这一点列为局限并完成。',
   'need.unmet': '目标尚未达成——未满足：{list}。我可以修正{stage}并重新检查。',
   'need.seeRecord': '请查看下方记录中的检查',
   'need.carryOn': '继续',

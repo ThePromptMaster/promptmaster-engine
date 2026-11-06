@@ -1634,6 +1634,14 @@ export function WorkflowWorkspace({
         await appendEvent({ type: 'brief_change_dismissed', stage_id: keepId, reason: reason ?? 'Kept as it is after repairs did not settle it.', payload: { change_at: since, stage_ids: [keepId] } });
       },
       openStage: (openId: string) => setViewingStageId(openId === state.current_stage_id ? null : openId),
+      // Finish from where Go stopped: the last stage's Finish, or finishing early before it.
+      finishWithLimitation: (items: readonly string[]) => {
+        setViewingStageId(null);
+        const last = !getStage(template, state.current_stage_id)?.transitions.default_next;
+        const option = (last ? transitions.find((o) => o.kind === 'finish') : undefined)
+          ?? { kind: 'finish' as const, toStageId: null, label: t('early.finish'), requiresNote: false, early: true };
+        setFinishing({ option, note: `Finished with this stated as a limitation: ${items.join('; ').slice(0, 1_500)}` });
+      },
       // One row on another stage, decided from Go's stop that names it (1 Nov).
       decideRow: async (rowStageId: string, rowId: string, status: 'accepted' | 'rejected', reason?: string) => {
         const target = template.stages.find((s) => s.id === rowStageId);
@@ -1685,7 +1693,7 @@ export function WorkflowWorkspace({
         panel.scrollIntoView({ block: 'center' });
       },
     }),
-    [project.id, project.user_id, project.model, project.mode, materialiseOutline, refreshEvents, setBlocked, handleToggleManual, onReload, transitions, handleTransition, state, appendEvent, template, bundles, appendStageVersion, stage?.label]
+    [project.id, project.user_id, project.model, project.mode, materialiseOutline, refreshEvents, setBlocked, handleToggleManual, onReload, transitions, handleTransition, state, appendEvent, template, bundles, appendStageVersion, stage?.label, t]
   );
 
   // For Go's card on a stuck stage: has anything changed since it was marked
@@ -2604,7 +2612,7 @@ export function WorkflowWorkspace({
                   // One action for one pause: when Go is waiting on this check,
                   // the button is the Go panel's own (17 Oct, FIELDGUIDE).
                   onResume={
-                    !appendStageVersion
+                    !appendStageVersion || objectiveNeed?.finding === 'repair_limit'
                       ? undefined
                       : objectiveNeed?.finding === 'unmet'
                         ? () => void go.fixObjective(objectiveNeed.items)
@@ -2613,10 +2621,11 @@ export function WorkflowWorkspace({
                   resumeLabel={objectiveNeed ? (describeNeed(objectiveNeed, (id) => stageNameShown(id, 'short'), {}, locale).action ?? undefined) : undefined}
                   resumeDisabled={go.active}
                   onAnswer={
-                    appendStageVersion && go.run && !go.run.ended_at && go.run.status === 'awaiting_decision' && go.run.needs?.kind === 'answer_question'
+                    appendStageVersion && go.run && !go.run.ended_at && go.run.status === 'awaiting_decision' && (go.run.needs?.kind === 'answer_question' || objectiveNeed?.finding === 'repair_limit')
                       ? (text) => go.answer(text)
                       : undefined
                   }
+                  answerPrompt={objectiveNeed?.finding === 'repair_limit' ? t('ssp.tellGoHow') : undefined}
                 />
               </div>
             )}

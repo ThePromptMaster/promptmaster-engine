@@ -63,6 +63,8 @@ export const sw: Record<keyof typeof en, string> = {
   'need.notRevisedByGo': '{stage} inahitaji kukaguliwa upya: {why}. Siirekebishi hatua ya aina hii mwenyewe, na hatua ninazoweza kurekebisha zimerekebishwa. Iache kama ilivyo sasa na uendelee, au ifungue na uibadilishe mwenyewe.',
   'need.fixAndCheck': 'Acha Go irekebishe {stage} na ikague tena',
   'need.fixMyself': 'Nitairekebisha mwenyewe',
+  'need.finishLimitation': 'Maliza ukitaja hili kama kikomo',
+  'need.repairLimit': 'Nimejaribu kurekebisha {stage} mara {count} na ukaguzi bado unapata: {list}. Marekebisho mengine hayana uwezekano wa kumaliza hili, kwa hiyo hakuna kinachotumika zaidi hadi uchague: libadilishe mwenyewe, niambie jinsi gani kwenye kisanduku cha ukurasa, au maliza ukitaja hili kama kikomo.',
   'need.unmet': 'Lengo bado halijafikiwa — halijafikiwa: {list}. Ninaweza kurekebisha {stage} na kukagua tena.',
   'need.seeRecord': 'ona ukaguzi kwenye rekodi hapa chini',
   'need.carryOn': 'Endelea',
