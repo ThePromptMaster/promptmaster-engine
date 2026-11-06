@@ -1496,6 +1496,7 @@ export function WorkflowWorkspace({
     state,
     // Go works the stage the project is on, never one the user is browsing.
     stage: getStage(template, state.current_stage_id),
+    unsavedRows: stage && stage.renderer === 'review' && dirtyState?.dirty ? { stageId: stage.id, save: dirtyState.save } : null,
     bundles: stageBundles,
     context,
     stageEvaluation: evaluateStage(template, state.current_stage_id, context),

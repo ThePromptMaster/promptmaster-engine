@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { BOOK_V1 } from '@/lib/workflow/templates/book.v1';
 import { initialState, projectState } from '@/lib/workflow/engine';
 import type { StageEvaluation, WorkflowEvent } from '@/lib/workflow/types';
-import { approvedAsItStands, delegableToCommit, describeNeed, needIsDecidedOnStage, needStillHolds, needsUser, repairStuckNeed, requiredWork, staleRepair, unrepairableStale, type NeedsUser } from './needs';
+import { approvedAsItStands, delegableToCommit, describeNeed, needIsDecidedOnStage, needStillHolds, needsUser, repairStuckNeed, requiredWork, staleRepair, unrepairableStale, waitingOnTable, type NeedsUser } from './needs';
 import { shownStopReason } from '@/lib/i18n/stop-reasons';
 import { RESEARCH_V1 } from '@/lib/workflow/templates/research.v1';
 
@@ -574,5 +574,15 @@ describe('a reopened stage Go does not revise is the user\'s to keep or open (2 
     expect(shownStopReason('es', d.message)).toMatch(/necesita una revisión/);
     // Still the user's while the stage waits; gone once it is kept.
     expect(needStillHolds(need, { ...base, state: withStale({ outline: stale }), stage: stage('outline'), facts: {}, stageEvaluation: evaluation('outline'), objective: 'o', currentStageId: 'drafting' })).toBe(true);
+  });
+});
+
+describe('Resume saves what was chosen in the table first (6 Nov, production book test)', () => {
+  it('is waiting on the table only for rows on that same stage', () => {
+    expect(waitingOnTable({ kind: 'triage_findings', stageId: 'review', count: 2 }, 'review')).toBe(true);
+    expect(waitingOnTable({ kind: 'decide_rows', stageId: 'review', count: 2, itemLabel: 'row' }, 'review')).toBe(true);
+    expect(waitingOnTable({ kind: 'triage_findings', stageId: 'review', count: 2 }, 'manuscript')).toBe(false);
+    expect(waitingOnTable({ kind: 'tick_criterion', stageId: 'review', onStage: 'review', criterionId: 'a', label: 'b', authority: 'reserved' } as NeedsUser, 'review')).toBe(false);
+    expect(waitingOnTable(null, 'review')).toBe(false);
   });
 });

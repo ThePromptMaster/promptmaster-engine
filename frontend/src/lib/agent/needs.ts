@@ -182,6 +182,11 @@ export function needIsDecidedOnStage(need: Pick<NeedsUser, 'kind'>): boolean {
   return need.kind === 'decide_rows' || need.kind === 'triage_findings';
 }
 
+/** Whether Go is waiting on this stage's table, so what the user chose there is what it waits for. */
+export function waitingOnTable(need: NeedsUser | null | undefined, stageId: string): boolean {
+  return Boolean(need && needIsDecidedOnStage(need) && 'stageId' in need && need.stageId === stageId);
+}
+
 /** Whether a stop reason is one of the two "nothing is asked of you now" notes. */
 export function isClearedNote(reason: string | null | undefined): boolean {
   return reason === NEED_CLEARED || reason === NEED_MOVED_ON;
