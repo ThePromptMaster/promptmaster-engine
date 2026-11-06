@@ -342,6 +342,12 @@ interface Line {
   level: number;
 }
 
+/** Eight or more words ending in punctuation. "**Assumptions.**" is still a heading. */
+function isBoldSentence(text: string): boolean {
+  const t = text.trim();
+  return /[.!?)"”]$/.test(t) && t.split(/\s+/).length >= 8;
+}
+
 const QUESTION_PREFIX = /^(?:[-*+]\s+|\d+[.)]\s+|q\s*\d*[.:)]\s*|question\s*\d*[.:)]\s*)/i;
 
 function lines(text: string): Line[] {
@@ -350,6 +356,10 @@ function lines(text: string): Line[] {
     const md = t.match(/^(#{1,6})\s+(.*)$/);
     if (md) return { text: md[2].trim(), level: md[1].length };
     const bold = t.match(/^\*\*(.+?)\*\*:?$/) ?? t.match(/^__(.+?)__:?$/);
+    // A whole sentence in bold is emphasis, not a heading: "**DRAFT. Not ready to
+    // send: the email send is not approved.**" was read as the Email section,
+    // whose body was the rule under it, and counted as 0 words (5 Nov).
+    if (bold && isBoldSentence(bold[1])) return { text: t, level: 0 };
     if (bold) return { text: bold[1].trim(), level: 7 };
     if (/^[A-Z][^.?!]{1,58}:$/.test(t)) return { text: t.slice(0, -1), level: 8 };
     return { text: t, level: 0 };
@@ -421,9 +431,21 @@ function sectionRange(all: Line[], subject: string): { start: number; end: numbe
     const rest = heads.slice(1);
     return rest.length > 0 && rest.every(({ l }) => l.level > first.l.level);
   };
-  const found = heads.find(({ l, i }) => named(l) && !isTitle(i));
-  if (!found) return null;
-  const start = found.i;
+  const naming = heads.filter(({ l, i }) => named(l) && !isTitle(i));
+  if (!naming.length) return null;
+  // The first that holds any words: a line that only mentions the subject, with
+  // nothing under it, is not its section. With none, the first, so a minimum still fails.
+  const ranges = naming.map(({ i }) => partRange(all, subject, i, named));
+  return ranges.find((r) => holdsWords(all.slice(r.start + 1, r.end))) ?? ranges[0];
+}
+
+/** Whether these lines hold anything but headings and rules. */
+function holdsWords(body: readonly Line[]): boolean {
+  return body.some((l) => l.level === 0 && /[\p{L}\p{N}]/u.test(l.text));
+}
+
+/** `subject`'s section from its heading at `start`, up to where it ends. */
+function partRange(all: Line[], subject: string, start: number, named: (l: Line) => boolean): { start: number; end: number } {
   const level = all[start].level;
   for (let i = start + 1; i < all.length; i += 1) {
     const l = all[i];
@@ -507,8 +529,10 @@ function hasOtherParts(text: string): boolean {
 }
 
 /** "from “first words” to “last words”": which text a count was made of. */
+const RULE_LINE = /^\s*(?:-{3,}|\*{3,}|_{3,}|={3,})\s*$/;
+
 export function quoteSpan(text: string): string {
-  const words = lines(text).filter((l) => l.level === 0 && !NOTE.test(l.text)).map((l) => plain(l.text)).join(' ').split(/\s+/).filter(Boolean);
+  const words = lines(text).filter((l) => l.level === 0 && !NOTE.test(l.text) && !RULE_LINE.test(l.text)).map((l) => plain(l.text)).join(' ').split(/\s+/).filter(Boolean);
   if (!words.length) return '';
   if (words.length <= 12) return `“${words.join(' ')}”`;
   return `from “${words.slice(0, 5).join(' ')}” to “${words.slice(-5).join(' ')}”`;
@@ -622,6 +646,9 @@ export function measure(r: MeasurableRequirement, text: string, whole = false): 
   const name = subjectLabel(r.subject);
   if (r.kind === 'words') {
     const n = countWords(section, { headings: r.headings });
+    // Nothing to count under an upper limit is not a pass: it was not found, so
+    // it says it could not verify it (5 Nov). With a minimum, an empty part fails.
+    if (n === 0 && r.min === undefined && section !== text) return null;
     const ok = (r.min === undefined || n >= r.min) && (r.max === undefined || n <= r.max);
     // The count says which text it was made of, so a wrong section shows (12 Oct).
     const span = r.subject && section !== text ? quoteSpan(section) : '';

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { countQuestions, countSections, countWords, measure, parseRequirements, requirementsForStage, sectionFor } from './measurable';
+import { countQuestions, countSections, countWords, measure, parseRequirements, requirementsForStage, sectionFor, type MeasurableRequirement } from './measurable';
 import { SINGLE_OUTPUT_V1 } from './templates/single-output.v1';
 import type { StageDefinition } from './types';
 
@@ -410,5 +410,61 @@ describe('questions end in any of the question marks (24 Oct)', () => {
     expect(countQuestions('1. 你的预算是多少？\n2. 谁来批准？').total).toBe(2);
     expect(countQuestions('1. ما هي الميزانية؟').total).toBe(1);
     expect(countQuestions('1. What is the budget?').total).toBe(1);
+  });
+});
+
+describe('the part a limit is counted on (5 Nov, a rollout pack)', () => {
+  const email = { id: 'email', kind: 'words', subject: 'email', max: 130 } as MeasurableRequirement;
+  const PACK = [
+    '# Reporting Dashboard Pilot: Launch Drafts',
+    '',
+    '**DRAFT. Not approved to send or publish. Not ready to send: the date change and the email send are not approved.**',
+    '',
+    '---',
+    '',
+    '## 1. Internal Launch Brief',
+    '',
+    'For the rollout team. Do not send the customer email.',
+    '',
+    '---',
+    '',
+    '## 2. Customer Email',
+    '',
+    '**To:** Workspace admins',
+    '',
+    'Hello. On November 18 we will turn on access for you.',
+    '',
+    '---',
+    '',
+    '## 3. Support FAQ',
+    '',
+    'Answers.',
+  ].join('\n');
+
+  it('a bold sentence that mentions it is not its heading, and a separator is not its text', () => {
+    const m = measure(email, PACK, true)!;
+    expect(m.value).toMatch(/^1\d words, counted /);
+    expect(m.value).not.toContain('---');
+    expect(m.satisfied).toBe(true);
+  });
+
+  it('a one-word bold label is still a heading', () => {
+    expect(measure(email, '**Email.**\n\nHello there, this is the text.\n\n**Other.**\n\nMore.', false)!.value).toMatch(/^6 words/);
+  });
+
+  it('the first heading naming it with words under it wins, over one with nothing under it', () => {
+    const text = '## Email\n\n---\n\n## Customer email\n\nHello there friend.\n';
+    expect(measure(email, text, false)!.value).toMatch(/^3 words/);
+  });
+
+  it('nothing to count under an upper limit says it could not be verified, never "0 words", met', () => {
+    expect(measure(email, '## Email\n\n---\n\n## Other\n\nText.\n', false)).toBeNull();
+    expect(measure(email, '## Email\n\n---\n\n## Other\n\nText.\n', true)).toBeNull();
+  });
+
+  it('with a minimum, an empty part still fails, so it is still repaired', () => {
+    const m = measure({ ...email, min: 50 } as MeasurableRequirement, '## Email\n\n---\n\n## Other\n\nText.\n', false)!;
+    expect(m.satisfied).toBe(false);
+    expect(m.detail).toBe('0 words');
   });
 });
