@@ -20,6 +20,7 @@ import { deliverableNouns } from '@/lib/workflow/labels';
 import { useEffect, useRef, useState } from 'react';
 
 import { downloadBlob, downloadFile } from '@/lib/utils';
+import { deckFromMarkdown, deckToPptx, isDeck } from '@/lib/export/pptx-export';
 import {
   exportFilename,
   toJson,
@@ -64,6 +65,14 @@ export function ExportMenu({ bundle }: { bundle: ExportBundle }) {
     const { imagesForDocx } = await import('@/lib/export/images-export');
     const blob = await manuscriptToDocx(manuscript, bundle.project.title || 'Untitled project', await imagesForDocx(manuscript, bundle.project.data_files));
     downloadBlob(blob, exportFilename(bundle.project, 'md').replace(/\.md$/, '.docx'));
+    setOpen(false);
+  }
+
+  // A deliverable laid out as slides, whichever workflow wrote it (4 Nov).
+  const deck = isDeck(manuscript);
+  async function exportDeck() {
+    const blob = await deckToPptx(deckFromMarkdown(manuscript), bundle.project.title || 'Untitled project');
+    downloadBlob(blob, exportFilename(bundle.project, 'md').replace(/\.md$/, '.pptx'));
     setOpen(false);
   }
 
@@ -153,6 +162,16 @@ export function ExportMenu({ bundle }: { bundle: ExportBundle }) {
                   {t('export.wordHint', { noun, units })}
                 </span>
               </button>
+              {deck && (
+                <button
+                  role="menuitem"
+                  onClick={() => void exportDeck()}
+                  className="block w-full px-4 py-3 text-start transition-colors hover:bg-[var(--surface-container-low)]"
+                >
+                  <span className="block text-body text-[var(--on-surface)]">{t('export.pptx')}</span>
+                  <span className="mt-0.5 block text-label text-[var(--on-surface-variant)]">{t('export.pptxHint')}</span>
+                </button>
+              )}
               <a
                 role="menuitem"
                 href={`/projects/${bundle.project.id}/print`}

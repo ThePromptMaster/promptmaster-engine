@@ -32,6 +32,7 @@ import { hi as panelsArea } from './hi/panels';
 import { hi as startersArea } from './hi/starters';
 import { hi as assessArea } from './hi/assess';
 import { hi as quickArea } from './hi/quick';
+import { hi as examplesArea } from './hi/examples';
 
 export const hi: Messages = {
   'header.account': 'खाता',
@@ -345,4 +346,5 @@ export const hi: Messages = {
   ...startersArea,
   ...assessArea,
   ...quickArea,
+  ...examplesArea,
 };

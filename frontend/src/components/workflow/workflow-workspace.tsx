@@ -25,6 +25,7 @@ import { BlockForm, BlockedNotice, CompletionDialog, ObjectivePausedNotice } fro
 import { StageToolResult } from './stage-tool-result';
 import { CRITIQUE_TOOLS, REWRITE_TOOLS, useStageTools } from './use-stage-tools';
 import { FRAMING_KINDS, nextStageAction, type ReportedPanelStep } from '@/lib/workflow/next-action';
+import { PREPARED_OPERATION } from '@/lib/projects/examples/cards';
 import { describeNeed } from '@/lib/agent/needs';
 import { addSectionsLabel, goPanelControls, stageControls, type StageControl } from '@/lib/workflow/stage-controls';
 import { inputsChanged, stageInputs } from '@/lib/workflow/stage-inputs';
@@ -1832,7 +1833,9 @@ export function WorkflowWorkspace({
     hasContent,
     truncated,
     evaluable: draftable && Boolean(stageEvaluation.evaluate),
-    framing: FRAMING_KINDS.has(stage.expected_artifacts[0]?.kind ?? ''),
+    // A curated example's first stage is written for the reader to approve: leading
+    // with a paid check on it hid moving on under More, on a tester's first screen.
+    framing: FRAMING_KINDS.has(stage.expected_artifacts[0]?.kind ?? '') || headVersion?.source_operation === PREPARED_OPERATION,
     evaluated: Boolean(headEvaluation) && !isFailedEvaluation(headEvaluation),
     evaluationClean: Boolean(
       headEvaluation &&
@@ -2630,8 +2633,10 @@ export function WorkflowWorkspace({
           <div className="mb-8">
             {/* The stage's exit criteria say whether the project's setup fields
                 belong here — no stage in any template asks for them twice, and
-                nothing about this reads the workflow's name. */}
-            {stageWantsSetup(stage) && !isQuickAnswer(template) ? (
+                nothing about this reads the workflow's name. A stage prepared for the
+                reader has them filled in already: as a form they put the brief itself
+                three screens down, on a tester's first look (6 Nov). */}
+            {stageWantsSetup(stage) && !isQuickAnswer(template) && headVersion?.source_operation !== PREPARED_OPERATION ? (
               <ProjectSetup
                 project={project}
                 stage={stage}

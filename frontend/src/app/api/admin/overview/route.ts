@@ -28,7 +28,7 @@
 
 import { NextResponse, type NextRequest } from 'next/server';
 
-import { createAdminClient, requireAdmin } from '@/lib/admin/access';
+import { adminUserIds, createAdminClient, requireAdmin } from '@/lib/admin/access';
 import type {
   AdminErrorRow,
   AdminErrorTally,
@@ -38,6 +38,14 @@ import type {
   AdminUsageRow,
 } from '@/lib/admin/types';
 
+import {
+  rollUpStarts,
+  type StartArtifactRow,
+  type StartEventRow,
+  type StartFunnel,
+  type StartProjectRow,
+  type StartTemplateRow,
+} from '@/lib/admin/start-funnel';
 import { rollUpOperations, rollUpProjects, type UsageDetailRow } from '@/lib/admin/usage-rollups';
 
 export const dynamic = 'force-dynamic';
@@ -58,6 +66,7 @@ const ROLLUP_LIMIT = 10_000;
 const FEEDBACK_LIMIT = 200;
 /** Project ids per title lookup; they travel in the URL. */
 const TITLE_BATCH = 100;
+const USERS_PER_PAGE = 1000;
 
 export async function GET(request: NextRequest) {
   // Authorise BEFORE touching the service-role key. See the module docstring.
@@ -78,11 +87,13 @@ export async function GET(request: NextRequest) {
   const since = new Date(Date.now() - windowDays * 86_400_000).toISOString();
   const warnings: string[] = [];
 
-  const [usageRows, jobRows, errorRows, feedback] = await Promise.all([
+  const users = listAllUsers(supabase);
+  const [usageRows, jobRows, errorRows, feedback, startFunnel] = await Promise.all([
     fetchUsage(supabase, since, warnings),
     fetchFailedJobs(supabase, warnings),
     fetchErrors(supabase, since, warnings),
     fetchFeedback(supabase, warnings),
+    fetchStarts(supabase, since, users, warnings),
   ]);
 
   // Resolve every id we are about to show, in two queries rather than N.
@@ -100,7 +111,7 @@ export async function GET(request: NextRequest) {
   ]);
 
   const [emails, projectTitles] = await Promise.all([
-    resolveEmails(supabase, userIds, warnings),
+    resolveEmails(users, userIds, warnings),
     resolveProjectTitles(supabase, projectIds, warnings),
   ]);
 
@@ -161,6 +172,7 @@ export async function GET(request: NextRequest) {
       reuseLikelihood: row.reuse_likelihood,
       createdAt: row.created_at,
     })) satisfies AdminFeedbackRow[],
+    ...(startFunnel ? { startFunnel } : {}),
     warnings,
   };
 
@@ -305,27 +317,115 @@ async function fetchFeedback(
 // Resolving ids into things a person recognises
 // ---------------------------------------------------------------------------
 
+interface AccountRow {
+  id: string;
+  email?: string;
+  is_anonymous?: boolean;
+}
+
+/**
+ * Everyone, once a request. `auth.users` is not exposed through PostgREST, so this
+ * goes through the admin API, a page at a time. Null if it could not be read.
+ */
+async function listAllUsers(supabase: Client): Promise<AccountRow[] | null> {
+  const all: AccountRow[] = [];
+  for (let page = 1; page <= 50; page += 1) {
+    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: USERS_PER_PAGE });
+    if (error) return null;
+    const rows = (data?.users ?? []) as AccountRow[];
+    all.push(...rows);
+    if (rows.length < USERS_PER_PAGE) break;
+  }
+  return all;
+}
+
 async function resolveEmails(
-  supabase: Client,
+  users: Promise<AccountRow[] | null>,
   userIds: string[],
   warnings: string[]
 ): Promise<Map<string, string>> {
   const emails = new Map<string, string>();
   if (userIds.length === 0) return emails;
 
-  // `auth.users` is not exposed through PostgREST, so this goes through the
-  // admin API. It pages, and a controlled beta fits comfortably in one page.
-  const { data, error } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
-  if (error) {
+  const rows = await users;
+  if (!rows) {
     warnings.push(
       'User email addresses could not be resolved, so rows are labelled by id.'
     );
     return emails;
   }
-  for (const user of data?.users ?? []) {
+  for (const user of rows) {
     if (user.email) emails.set(user.id, user.email);
   }
   return emails;
+}
+
+/** How people start and how far they get, from the rows that already say so. */
+async function fetchStarts(
+  supabase: Client,
+  since: string,
+  users: Promise<AccountRow[] | null>,
+  warnings: string[]
+): Promise<StartFunnel | null> {
+  const say = (what: string, why: string) => warnings.push(`How people start could not be worked out (${what}): ${why}`);
+  const projects = await supabase
+    .from('projects')
+    .select('id, user_id, example_key, workflow_template_id, created_at')
+    .gte('created_at', since)
+    .limit(ROLLUP_LIMIT);
+  if (projects.error) {
+    say('projects', projects.error.message);
+    return null;
+  }
+  const projectRows = (projects.data ?? []) as StartProjectRow[];
+  if (!projectRows.length) {
+    return rollUpStarts({ projects: [], events: [], artifacts: [], goProjects: [], templates: [], guests: new Set(), excluded: new Set() });
+  }
+
+  const [events, artifacts, runs, accounts] = await Promise.all([
+    supabase
+      .from('workflow_events')
+      .select('project_id, user_id, type, created_at, early:payload->early')
+      .gte('created_at', since)
+      .limit(ROLLUP_LIMIT),
+    supabase.from('artifacts').select('project_id, stage_id, version_count').gte('created_at', since).limit(ROLLUP_LIMIT),
+    supabase.from('agent_runs').select('project_id').gte('created_at', since).limit(ROLLUP_LIMIT),
+    users,
+  ]);
+  const failed = events.error ?? artifacts.error ?? runs.error;
+  if (failed) {
+    say('events, artifacts or runs', failed.message);
+    return null;
+  }
+  const eventRows = (events.data ?? []) as StartEventRow[];
+  if (eventRows.length >= ROLLUP_LIMIT) {
+    warnings.push(`Only ${ROLLUP_LIMIT.toLocaleString()} project events were read, so "How people start" understates the period.`);
+  }
+
+  const templateIds = unique(projectRows.map((p) => p.workflow_template_id));
+  const templates: StartTemplateRow[] = [];
+  for (let i = 0; i < templateIds.length; i += TITLE_BATCH) {
+    const { data, error } = await supabase
+      .from('workflow_templates')
+      .select('id, stages:definition->stages')
+      .in('id', templateIds.slice(i, i + TITLE_BATCH));
+    if (error) {
+      say('workflows', error.message);
+      return null;
+    }
+    templates.push(...((data ?? []) as unknown as StartTemplateRow[]));
+  }
+  if (!accounts) warnings.push('Guests could not be told from accounts in "How people start": the user list could not be read.');
+
+  return rollUpStarts({
+    projects: projectRows,
+    events: eventRows,
+    artifacts: (artifacts.data ?? []) as StartArtifactRow[],
+    goProjects: ((runs.data ?? []) as { project_id: string }[]).map((r) => r.project_id),
+    templates,
+    guests: new Set((accounts ?? []).filter((u) => u.is_anonymous).map((u) => u.id)),
+    excluded: new Set(adminUserIds()),
+  });
 }
 
 async function resolveProjectTitles(

@@ -14,11 +14,12 @@ interface TemplateRow {
     derived_outline?: WorkflowTemplate['derived_outline'];
     nouns?: WorkflowTemplate['nouns'];
     inquiry?: boolean;
+    execution?: WorkflowTemplate['execution'];
     stages: StageDefinition[];
   };
 }
 
-function toTemplate(row: TemplateRow): WorkflowTemplate & { id: string } {
+export function toTemplate(row: TemplateRow): WorkflowTemplate & { id: string } {
   return {
     id: row.id,
     key: row.key,
@@ -29,7 +30,24 @@ function toTemplate(row: TemplateRow): WorkflowTemplate & { id: string } {
     derived_outline: row.definition.derived_outline,
     ...(row.definition.nouns ? { nouns: row.definition.nouns } : {}),
     ...(row.definition.inquiry ? { inquiry: true } : {}),
+    ...(row.definition.execution ? { execution: row.definition.execution } : {}),
     stages: row.definition.stages,
+  };
+}
+
+/**
+ * What a template's row holds besides its columns. Every field a reader uses
+ * has to be here and in `toTemplate`: until 6 Nov `execution` was in neither,
+ * so the success criterion set when a workflow was designed was gone as soon as
+ * the project pinned it, and neither Go's planner nor its objective check saw it.
+ */
+export function definitionOf(template: WorkflowTemplate): TemplateRow['definition'] {
+  return {
+    outline_stage: template.outline_stage,
+    ...(template.nouns ? { nouns: template.nouns } : {}),
+    ...(template.inquiry ? { inquiry: true } : {}),
+    ...(template.execution ? { execution: template.execution } : {}),
+    stages: template.stages,
   };
 }
 
@@ -137,12 +155,7 @@ export async function publishUserTemplate(
       version: template.version,
       name: template.name,
       description: template.description,
-      definition: {
-        outline_stage: template.outline_stage,
-        ...(template.nouns ? { nouns: template.nouns } : {}),
-        ...(template.inquiry ? { inquiry: true } : {}),
-        stages: template.stages,
-      },
+      definition: definitionOf(template),
       status: 'published',
       listed,
       is_system: false,

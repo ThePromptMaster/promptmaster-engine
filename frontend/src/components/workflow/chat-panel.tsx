@@ -273,6 +273,7 @@ export function ChatPanel({
 
   const panelRef = useRef<HTMLElement>(null);
   const threadRef = useRef<HTMLDivElement>(null);
+  const threadBodyRef = useRef<HTMLDivElement>(null);
 
   const sections = useMemo(() => documentSections(content), [content]);
   const spec = modeText(t, mode);
@@ -319,6 +320,23 @@ export function ChatPanel({
     const el = threadRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [chat.messages.length, chat.proposal]);
+
+  // And stay at its end while what is under the last reply changes, unless they
+  // have scrolled up to read. The next-step card arrives after the reply, and the
+  // "page has changed" note below the thread takes height from it, so the card's
+  // last buttons sat out of view until someone scrolled (6 Nov).
+  const atThreadEnd = useRef(true);
+  useEffect(() => {
+    const el = threadRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const follow = () => {
+      if (atThreadEnd.current) el.scrollTop = el.scrollHeight;
+    };
+    const observer = new ResizeObserver(follow);
+    observer.observe(el);
+    if (threadBodyRef.current) observer.observe(threadBodyRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   const scopeReady =
     scope === 'document'
@@ -626,7 +644,12 @@ export function ChatPanel({
         ref={threadRef}
         className="min-h-0 flex-1 overflow-y-auto px-5 py-4 sidebar-scroll"
         aria-live="polite"
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          atThreadEnd.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
+        }}
       >
+        <div ref={threadBodyRef}>
         {chat.loading ? (
           <p className="text-label text-[var(--on-surface-variant)]">{t('chat.loading')}</p>
         ) : chat.messages.length === 0 ? (
@@ -773,6 +796,7 @@ export function ChatPanel({
             awaitingUpdate={awaitingUpdate}
           />
         )}
+        </div>
       </div>
 
       {/* 31 Oct (Sean): the run's status and the buttons changed under the

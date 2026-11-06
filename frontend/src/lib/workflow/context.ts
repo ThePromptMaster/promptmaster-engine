@@ -320,6 +320,27 @@ export function measureEvidence(
   return { id: 'measured.evidence', label, satisfied: false, value: detail, detail };
 }
 
+/**
+ * Limits on each chapter or section, counted on the text the project delivers. A stage's
+ * own checks cover prose stages, and never chapters or a hedged figure, so without this
+ * the objective check had nothing but its own reading (6 Nov, a book test: "Roughly
+ * 600–800 words per chapter" came back not checked, at 690–787).
+ */
+export function eachPartMeasurements(
+  project: Pick<Project, 'objective' | 'constraints'> & Partial<Pick<Project, 'output_format' | 'facts'>>,
+  content: string
+): Measurement[] {
+  if (!content.trim()) return [];
+  return governingRequirements(
+    project.objective ?? '',
+    parseRequirements([project.objective ?? '', project.constraints ?? '', project.output_format ?? '']),
+    currentFacts(project.facts).filter((f) => f.kind === 'requirement').map((f) => parseRequirements([f.statement]))
+  )
+    .filter((r) => r.per)
+    .map((r) => measure(r, content))
+    .filter((m): m is Measurement => m !== null);
+}
+
 /** The measurable requirements a stage answers for, unmeasured. */
 export function stageRequirements(
   project: Pick<Project, 'objective' | 'constraints'> & Partial<Pick<Project, 'output_format' | 'facts'>>,

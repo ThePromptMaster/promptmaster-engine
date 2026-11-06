@@ -468,3 +468,78 @@ describe('the part a limit is counted on (5 Nov, a rollout pack)', () => {
     expect(m.detail).toBe('0 words');
   });
 });
+
+describe('a limit on each chapter or section (6 Nov, a book test)', () => {
+  const words = (n: number) => Array.from({ length: n }, (_, i) => `word${i}`).join(' ');
+  const one = (text: string) => parseRequirements([text]);
+
+  it('reads the ways it is written, and none of them as the whole document', () => {
+    expect(one('Roughly 600–800 words per chapter.')).toEqual([
+      expect.objectContaining({ id: 'words:each chapter', per: 'chapter', min: 600, max: 800, approximate: true, subject: '' }),
+    ]);
+    expect(one('Each section is capped at 150 words.')[0]).toMatchObject({ per: 'section', max: 150 });
+    expect(one('Each section is capped at 150 words.')[0].approximate).toBeUndefined();
+    expect(one('A guide with six chapters of 600-800 words.')[0]).toMatchObject({ per: 'chapter', min: 600, max: 800 });
+    expect(one('Every slide must be no more than 40 words.')[0]).toMatchObject({ per: 'slide', max: 40 });
+    expect(one('Six chapters, about 700 words each.')[0]).toMatchObject({ per: 'chapter', min: 700, max: 700, approximate: true });
+    expect(one('Six 700-word chapters.')[0]).toMatchObject({ per: 'chapter', min: 700, max: 700, approximate: true });
+    expect(one('700 words per module.')[0]).toMatchObject({ per: 'module', approximate: true });
+    expect(one('Five sections, at most 200 words each.')[0]).toMatchObject({ per: 'section', max: 200 });
+  });
+
+  it('leaves alone what is not per anything', () => {
+    expect(one('A report under 600 words in total.')[0]).toMatchObject({ subject: 'report', max: 600 });
+    expect(one('A report under 600 words in total.')[0].per).toBeUndefined();
+    // The limit is on the summary each chapter ends with.
+    const summary = one('Each chapter ends with a summary of at most 100 words.');
+    expect(summary).toHaveLength(1);
+    expect(summary[0]).toMatchObject({ subject: 'summary', max: 100 });
+    expect(summary[0].per).toBeUndefined();
+    // A hedged figure on the whole is still a target, measured nowhere (2 Nov).
+    expect(one('About four sections on history (roughly 4,500–5,000 words).')).toEqual([]);
+    expect(one('Write 700 words.').filter((r) => r.kind === 'words')).toEqual([]);
+  });
+
+  const BOOK = (counts: number[]) => `# The First 90 Days\n\n${counts.map((n, i) => `## ${i + 1}. Chapter title ${i + 1}\n\n${words(n)}`).join('\n\n')}`;
+
+  it('counts each chapter of a manuscript and shows it, without the title', () => {
+    const r = one('Roughly 600–800 words per chapter.')[0];
+    expect(measure(r, BOOK([690, 787, 702]))).toEqual({
+      id: 'measured.words:each chapter',
+      label: 'Each chapter: roughly 600–800 words',
+      satisfied: true,
+      value: '3 chapters, 690–787 words each',
+    });
+  });
+
+  it('says which ones are off, allowing what "roughly" allows and nothing for a firm limit', () => {
+    const roughly = one('Roughly 600–800 words per chapter.')[0];
+    expect(measure(roughly, BOOK([700, 900]))!.satisfied).toBe(true);
+    const off = measure(roughly, BOOK([700, 400]))!;
+    expect(off.satisfied).toBe(false);
+    expect(off.detail).toBe('2. Chapter title 2: 400 words');
+    const firm = one('Chapters of 600-800 words.')[0];
+    expect(measure(firm, BOOK([700, 900]))!.satisfied).toBe(false);
+  });
+
+  it('prefers headings that name the unit, and leaves what follows the work out', () => {
+    const r = one('Each chapter is at most 100 words.')[0];
+    const text = `# Book\n\n## Foreword\n\n${words(500)}\n\n## Chapter 1\n\n${words(50)}\n\n## Chapter 2\n\n${words(60)}\n\n## Review note\n\n${words(500)}`;
+    expect(measure(r, text)).toMatchObject({ satisfied: true, value: '2 chapters, 50–60 words each' });
+    const sections = one('Each section is at most 100 words.')[0];
+    const pack = `# Pack\n\n## Plan\n\n${words(80)}\n\n## Risks\n\n${words(90)}\n\n## Sources\n\n${words(500)}`;
+    expect(measure(sections, pack)).toMatchObject({ satisfied: true, value: '2 sections, 80–90 words each' });
+  });
+
+  it('cannot verify a text with no such parts', () => {
+    expect(measure(one('Each section is at most 100 words.')[0], words(50))).toBeNull();
+  });
+
+  it('holds a stage to a firm limit on each part, never to a hedged one, and never the whole to either', () => {
+    const deliverable = { id: 'output', label: 'Output', renderer: 'prose', expected_artifacts: [] } as unknown as StageDefinition;
+    const firm = requirementsForStage(deliverable, 'output', one('Each section is at most 100 words.'));
+    expect(firm.map((e) => e.requirement.per)).toEqual(['section']);
+    expect(measure(firm[0].requirement, `## One\n\n${words(90)}\n\n## Two\n\n${words(90)}`, firm[0].whole)!.satisfied).toBe(true);
+    expect(requirementsForStage(deliverable, 'output', one('Roughly 600–800 words per chapter.'))).toEqual([]);
+  });
+});

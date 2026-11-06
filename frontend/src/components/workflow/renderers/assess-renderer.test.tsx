@@ -78,4 +78,21 @@ describe('the Assess stage (client, 25 Oct)', () => {
     expect(screen.queryByRole('button', { name: 'Assess' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Remove/ })).not.toBeInTheDocument();
   });
+
+  it('offers a sample batch from the stage\'s own spec: it fills the box and runs nothing', async () => {
+    const onAssessBatch = vi.fn(async () => 'done');
+    const stage = { ...STAGE, assess: { ...STAGE.assess!, offered_batch: 'Acme Fasteners. Revenue $62M.' } };
+    render(<StageRenderer {...props({ stage, schema: itemSchemaFor(stage), onAssessBatch })} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Use the sample batch' }));
+    expect(screen.getByLabelText('Paste the profiles to assess')).toHaveValue('Acme Fasteners. Revenue $62M.');
+    expect(onAssessBatch).not.toHaveBeenCalled();
+    // Filled, it has nothing more to offer.
+    expect(screen.queryByRole('button', { name: 'Use the sample batch' })).toBeNull();
+  });
+
+  it('offers nothing when the stage has no sample', () => {
+    render(<StageRenderer {...props({ onAssessBatch: vi.fn(async () => 'done') })} />);
+    expect(screen.queryByRole('button', { name: 'Use the sample batch' })).toBeNull();
+  });
 });

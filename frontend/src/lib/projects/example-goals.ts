@@ -1,31 +1,36 @@
 /**
- * Goals a first-time user can start from (Harold, via Sean, 9 Oct: someone
- * starting from a blank slate "can't really answer any questions until they get
- * the ball rolling"). Each fits Single output, the workflow first testers are
- * shown, and carries a figure so the facts and the checks have something to hold.
+ * A new-project link can carry a goal for the box (`/projects/new?goal=…`). The
+ * empty list's three goal links are gone: curated examples took their place
+ * (`lib/projects/examples`, the client's call, 4 Nov), and they say more.
  */
-export const EXAMPLE_GOALS: { label: string; goal: string }[] = [
-  {
-    label: 'A recommendation memo',
-    goal: 'Write a one-page memo recommending whether our 12-person team should move from Slack to Microsoft Teams. Budget is $8,000 a year.',
-  },
-  {
-    label: 'A short briefing',
-    goal: 'Write a two-page briefing for a board on the main risks of adopting AI tools in a 200-person accounting firm, with a recommended first step.',
-  },
-  {
-    label: 'A plan with numbers',
-    goal: 'Draft a 90-day plan to cut customer support response time from 24 hours to 8 hours for a team of 6 agents, without new hires.',
-  },
-];
-
-/** The URL that opens a new project with this goal already in the box. */
-export function newProjectHref(goal: string): string {
-  return `/projects/new?goal=${encodeURIComponent(goal)}`;
-}
 
 /** The goal a new-project URL carries, if any: trimmed, and capped like the box itself. */
 export function goalFromSearch(search: string, max: number): string {
   const goal = new URLSearchParams(search).get('goal')?.trim() ?? '';
   return goal.slice(0, max);
+}
+
+/**
+ * What someone typed elsewhere, for the start box to pick up once. In this tab's
+ * storage rather than the URL: it can be about their work, and a URL ends up in
+ * logs and histories.
+ */
+const START_GOAL_KEY = 'pm.start.goal';
+
+export function rememberStartGoal(goal: string): void {
+  try {
+    sessionStorage.setItem(START_GOAL_KEY, goal);
+  } catch {
+    // Storage blocked: the box just starts empty.
+  }
+}
+
+export function takeStartGoal(): string {
+  try {
+    const goal = sessionStorage.getItem(START_GOAL_KEY) ?? '';
+    sessionStorage.removeItem(START_GOAL_KEY);
+    return goal;
+  } catch {
+    return '';
+  }
 }

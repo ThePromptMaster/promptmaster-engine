@@ -5,7 +5,8 @@
  *
  * "No stage opens blank" is the decision this implements: entering a stage that
  * has nothing starts a draft on its own, so the user always has something to
- * react to rather than a cursor blinking in an empty box.
+ * react to rather than a cursor blinking in an empty box. The one exception is
+ * an example's sample, where the next step says "Draft this stage" instead.
  *
  * Three properties matter more than the mechanics:
  *
@@ -215,8 +216,11 @@ export function useStageGeneration({
 
   // Auto-draft on entry. Deliberately narrow: the current stage only, a
   // renderer that generates, nothing already written, and not already tried.
+  // Not on an example's sample: exploring one should not start paid runs
+  // unasked (the client, 4 Nov), so every run there is a labelled press.
+  const held = Boolean(project.example_key);
   useEffect(() => {
-    if (!enabled || !stage) return;
+    if (!enabled || !stage || held) return;
     if (!stageDrafts(stage)) return;
     if (attempted.current.has(stage.id)) return;
 
@@ -231,7 +235,7 @@ export function useStageGeneration({
     }
 
     void generate(stage, { auto: true });
-  }, [enabled, stage, bundles, generate]);
+  }, [enabled, stage, bundles, generate, held]);
 
   const regenerate = useCallback(
     (options?: { force?: boolean }) => {

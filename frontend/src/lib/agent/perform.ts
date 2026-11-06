@@ -23,7 +23,7 @@ import { approvedOutlineVersionId, commitOutlineVersion } from '@/lib/supabase/o
 import { appendWorkflowEvent, listWorkflowEvents } from '@/lib/supabase/workflow';
 import { getArtifact } from '@/lib/supabase/versions';
 import { listRecentRunOutputs } from '@/lib/supabase/agent';
-import { manuscriptArtifactFor, manuscriptSourceFor, measureStageContent, measuredLines, stageRequirements } from '@/lib/workflow/context';
+import { eachPartMeasurements, manuscriptArtifactFor, manuscriptSourceFor, measureStageContent, measuredLines, stageRequirements } from '@/lib/workflow/context';
 import { COUNTING_RULE, isPart, measure, replaceSection, sectionFor, type MeasurableRequirement } from '@/lib/workflow/measurable';
 import { askedOfRecheck, describeLines, isChangeNote, keepUnasked, structureDropped } from '@/lib/workflow/preservation';
 import { notRemovedByUser } from '@/lib/workflow/removed-text';
@@ -2669,9 +2669,10 @@ async function judgeObjective(
   const label = labelOverride ?? holder?.label ?? 'the deliverable';
   // What code counted and found met, with the count: the check may not count
   // again (11 Oct, survey brief: "the saved deliverable exceeds 200 words").
-  const measured = holder
-    ? (ctx.context.measured?.[holder.id] ?? []).filter((m) => m.satisfied).map((m) => `${m.label} — ${m.value ?? 'met'}`)
-    : [];
+  const stageCounts = holder ? ctx.context.measured?.[holder.id] ?? [] : [];
+  // Limits on each chapter or section, counted on this text, which a stage's own checks may not reach.
+  const eachPart = holder ? eachPartMeasurements(ctx.project, content).filter((m) => !stageCounts.some((c) => c.id === m.id)) : [];
+  const measured = [...stageCounts, ...eachPart].filter((m) => m.satisfied).map((m) => `${m.label} — ${m.value ?? 'met'}`);
   // The accepted findings and the text's own consistency, checked first: what
   // fails goes to the assessment as failed checks (1 Nov).
   const check = holder ? await checkDeliverable(ctx, holder, content, label, saved) : null;
@@ -2683,7 +2684,11 @@ async function judgeObjective(
       steps: ctx.digest.recent_steps.map((s) => ({ action_key: s.action_key, execution_label: s.execution_label, output: s.output })),
       // The criterion the workflow was designed against, kept from the objective (7 Oct).
       success_criterion: ctx.template.execution?.success_criterion ?? '',
-      failed_checks: [...failedChecks(ctx), ...(check && !check.bounded && !check.failed ? check.issues : [])].slice(0, 30),
+      failed_checks: [
+        ...failedChecks(ctx),
+        ...eachPart.filter((m) => !m.satisfied).map((m) => `${m.label} — measured ${m.detail ?? m.value ?? 'not met'}`),
+        ...(check && !check.bounded && !check.failed ? check.issues : []),
+      ].slice(0, 30),
       measured,
       // The saved versions, and the earlier ones the text cites (19 Oct, HARBOR).
       known_versions: knownVersions(ctx.template, ctx.bundles),

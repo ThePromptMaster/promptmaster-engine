@@ -126,13 +126,14 @@ AGENT_ACTIONS: list[AgentAction] = [
                      "another round. Params: reason (one or two plain sentences: what the next round should "
                      "pursue, and why it is worth it). The user starts the round; it is their decision."),
     AgentAction(key="return_to_stage", family="workflow", label="Go back to an earlier stage",
-                when="Only offered under Autonomous with routine decisions handed to Go. The saved work on this "
-                     "stage says more investigation is needed that belongs to an earlier stage — a run that was not "
-                     "made, a further sweep or case, a source to obtain, a method that must change, another "
-                     "explanation to examine. Go back to the stage that does that work (one listed under GO BACK TO), "
-                     "do it, and the stages after it are rechecked from the new results. Params: stage_id, reason "
-                     "(one plain sentence: what in the saved work asks for it), work (what is to be done there, "
-                     "specifically: the runs, cases, source or change).",
+                when="Only offered under Autonomous with routine decisions handed to Go. Either the saved work on "
+                     "this stage says more investigation is needed that belongs to an earlier stage — a run that was "
+                     "not made, a further sweep or case, a source to obtain, a method that must change, another "
+                     "explanation to examine — or the user has just answered and carrying out their answer means "
+                     "changing what an earlier stage holds. Go back to the stage that does that work (one listed "
+                     "under GO BACK TO), do it, and the stages after it are rechecked from the new results. Params: "
+                     "stage_id, reason (one plain sentence: what in the saved work or the answer asks for it), work "
+                     "(what is to be done there, specifically: the runs, cases, source or change).",
                 important=True),
     # 25 Oct (Sean, quantum gravity): the next calculation was named, written
     # into the report as a new stage, and never became one.

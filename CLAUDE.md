@@ -106,6 +106,8 @@ A project pins a **workflow template version** (`projects.workflow_template_id`)
 - A completed stage's figures are recorded on its artifact (`key_figures`, read by `POST /api/extract-figures`, which keeps a value only if the stage's text contains it exactly) and handed to later stages to quote (`establishedFigures` in `lib/workflow/digest.ts`). Not an exit criterion.
 - Generation is `POST /api/generate-stage-artifact`, one LLM call. It does *not* use `build_iteration_with_full_pipeline` — that scores output against `inputs.objective`, which judges a list of audience segments against the wrong thing, and costs four calls where one will do.
 
+**Curated examples** (`lib/projects/examples/`, public `/examples`; L-180): hand-written designed workflows on invented material, saved per user and unlisted, so no seed migration. Everything in them is English and the screen shows the dictionary's words (`example_<key>` in `lib/i18n/templates.ts`). `projects.example_key` marks a sample, and nothing drafts itself there. A sample's contradictions are deliberate; `examples.test.ts` keeps the numbers honest. To add one: a file in that folder, a line in `cards.ts`, and its words in `areas/examples.ts`.
+
 **Stage state is projected from the `workflow_events` log in exactly one place** (`projectState` in `engine.ts`). Events are the record; `projects.stage` is a denormalised cursor for the list view.
 
 **What PromptMaster can verify is a rule; what is left is the user's approval, worded in the first person** ("I approve this analysis plan for execution"). The checklist groups them as "PromptMaster verified" and "You approve".

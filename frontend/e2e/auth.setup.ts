@@ -23,5 +23,7 @@ setup('sign in', async ({ page }) => {
   // spec that clicked before it showed found it over the start screen's
   // options (main CI, 24 Oct). Every signed-in spec starts with it dismissed.
   await page.evaluate(() => localStorage.setItem('pm.beta-notice.v1', 'dismissed'));
+  // And Prompty's first-visit offer, which has its own spec (examples.spec.ts).
+  await page.evaluate(() => localStorage.setItem('pm.prompty.v1', 'seen'));
   await page.context().storageState({ path: path.join(__dirname, '.auth', 'state.json') });
 });

@@ -13,6 +13,7 @@
  */
 
 import { api } from '@/lib/api/client';
+import { PREPARED_OPERATION } from '@/lib/projects/examples/cards';
 import { itemSchemaFor, rendererHoldsItems, stageContentForChat } from './stage-artifact';
 import type { StageDefinition } from './types';
 import type { Project } from '@/types/project';
@@ -47,13 +48,15 @@ export function figureSourceText(stage: StageDefinition, content: string): strin
 export async function readStageFigures(
   project: Pick<Project, 'model'>,
   stage: StageDefinition,
-  head: { id: string; content: string } | null | undefined,
+  head: { id: string; content: string; source_operation?: string } | null | undefined,
   /** What is stored now: the figures a sandbox run printed are carried over, whatever the text says. */
   stored?: { figures?: Figure[] } | null
 ): Promise<StageFigures | null> {
   if (!head) return null;
   const printed = (stored?.figures ?? []).filter((f) => f.source === 'sandbox');
   const kept: StageFigures | null = printed.length ? { version_id: head.id, figures: printed } : null;
+  // Pressing Continue on an example's prepared text costs nothing (the client, 4 Nov).
+  if (head.source_operation === PREPARED_OPERATION) return kept;
   const text = figureSourceText(stage, head.content);
   if (!/\d/.test(text)) return kept;
   const timeout = new Promise<StageFigures | null>((resolve) => setTimeout(() => resolve(kept), FIGURES_TIMEOUT_MS));

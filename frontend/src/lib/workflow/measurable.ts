@@ -39,6 +39,13 @@ export interface MeasurableRequirement {
   headings?: boolean;
   /** The words it was read from, for the checklist. */
   source: string;
+  /** A limit on each of these rather than on the whole: "600–800 words per chapter". */
+  per?: string;
+  /**
+   * A figure the brief hedged ("roughly 600–800 words per chapter"): a target, so it
+   * is counted and shown to the objective check, never a check that blocks a stage.
+   */
+  approximate?: boolean;
   /**
    * "There is no 500-word limit on the complete package": a statement that a
    * limit does not apply. It measures nothing; it retires the requirement it
@@ -216,11 +223,39 @@ const APPROXIMATE = /(?:\b(?:roughly|about|around|approximately|approx\.?|some|c
 /** Names for the whole deliverable, not a part of it. */
 const WHOLE = /^(?:deliverable|document|output|response|pack|package|whole(?: thing)?|text|draft|piece|it)$/i;
 
+/** What a limit can apply to each of. */
+const UNITS = 'chapter|section|part|slide|lesson|module|scene|episode';
+/** "per chapter", "for each section", "each". */
+const EACH_AFTER = new RegExp(`^\\s*(?:(?:per|each|every|(?:for|in) (?:each|every)|a|an)\\s+(${UNITS})\\b|(each|apiece)\\b)`, 'i');
+/** "each chapter …", "every section …", "chapters of …", where only linking words stand between it and the limit. */
+const EACH_BEFORE = new RegExp(`\\b(?:(?:each|every|per)\\s+(${UNITS})|(${UNITS})s\\s+of)\\b([^.;:\\n]*)$`, 'i');
+const ONLY_LINKS = /^(?:\s|,|—|–|-|~|\b(?:is|are|should|must|shall|will|be|been|stay|stays|run|runs|kept|keep|to|limited|capped|at|about|around|roughly|approximately|approx|some|of|no|not|more|fewer|less|than|under|between|within|up|a|maximum|minimum|most|least)\b)*$/i;
+/** The unit named nearest before "700 words each". */
+const LAST_UNIT = new RegExp(`\\b(${UNITS})s?\\b(?![\\s\\S]*\\b(?:${UNITS})s?\\b)`, 'i');
+
+/**
+ * What this limit applies to each of, or '' when it is not per anything. 6 Nov (a book
+ * test): "Roughly 600–800 words per chapter" was counted nowhere, and without its
+ * hedge the same words were the whole document's limit, so a six-chapter book failed
+ * an 800-word check.
+ */
+function unitOfLimit(before: string, after: string): string {
+  const next = after.match(EACH_AFTER);
+  if (next?.[1]) return next[1].toLowerCase();
+  if (next) {
+    const sentence = before.split(/[.!?]\s/).at(-1) ?? '';
+    return sentence.match(LAST_UNIT)?.[1].toLowerCase() ?? 'section';
+  }
+  const prev = before.match(EACH_BEFORE);
+  if (prev && ONLY_LINKS.test(prev[3])) return (prev[1] ?? prev[2]).toLowerCase();
+  return '';
+}
+
 /** The measurable requirements stated in these texts, de-duplicated. */
 export function parseRequirements(texts: readonly string[]): MeasurableRequirement[] {
   const out = new Map<string, MeasurableRequirement>();
   const add = (r: Omit<MeasurableRequirement, 'id'>) => {
-    const id = `${r.kind}:${r.subject || 'all'}`;
+    const id = `${r.kind}:${r.per ? `each ${r.per}` : r.subject || 'all'}`;
     const had = out.get(id);
     if (!had) out.set(id, { id, ...r });
     // The same limit said again with its counting rule: the rule holds.
@@ -254,12 +289,32 @@ export function parseRequirements(texts: readonly string[]): MeasurableRequireme
       [/(\d{1,5})\s*(?:-|–|—|~|～|到|至)\s*(\d{1,5})\s*个?字/g, (m) => ({ min: Number(m[1]), max: Number(m[2]) })],
       [/(?:不超过|不多于|不超出|最多|少于|控制在|限)\s*(\d{1,5})\s*个?字|(\d{1,5})\s*个?字\s*(?:以内|以下|之内)|字数\s*(?:不超过|不多于|最多|少于|控制在|限)\s*(\d{1,5})/g, (m) => ({ max: Number(m[1] ?? m[2] ?? m[3]) })],
       [/(?:至少|不少于|不低于)\s*(\d{1,5})\s*个?字|(\d{1,5})\s*个?字\s*以上/g, (m) => ({ min: Number(m[1] ?? m[2]) })],
+      // A plain figure is a limit only when it says what it is per: "700 words each",
+      // "700 words per chapter", "six 700-word chapters". Read as a target.
+      [new RegExp(`\\b${NUM}[\\s-]*words?\\b(?=\\s+(?:per|each|apiece|every|(?:for|in) (?:each|every)|a (?:${UNITS})\\b|an (?:${UNITS})\\b))`, 'gi'), (m) => ({ min: num(m[1]), max: num(m[1]), approximate: true })],
+      [new RegExp(`\\b${NUM}-words?\\s+(${UNITS})s\\b`, 'gi'), (m) => ({ min: num(m[1]), max: num(m[1]), approximate: true, per: m[2].toLowerCase() })],
     ];
     for (const [re, read] of patterns) {
       for (const m of t.matchAll(re)) {
         const r = read(m);
         if ((r.min ?? 0) > 20_000 || (r.max ?? 0) > 20_000) continue;
-        if (APPROXIMATE.test(t.slice(Math.max(0, m.index! - 20), m.index!))) continue;
+        const hedged = APPROXIMATE.test(t.slice(Math.max(0, m.index! - 20), m.index!));
+        const end = m.index! + m[0].length;
+        const per = r.per ?? unitOfLimit(t.slice(Math.max(0, m.index! - 120), m.index!), t.slice(end, end + 40));
+        if (per) {
+          if (!NEGATED.test(t.slice(Math.max(0, m.index! - 40), m.index!))) {
+            const sentence = t.slice(Math.max(0, t.lastIndexOf('.', m.index!) + 1), t.indexOf('.', end) + 1 || t.length);
+            add({
+              kind: 'words', subject: '', source: m[0].trim(), ...r, per,
+              ...(hedged ? { approximate: true } : {}),
+              ...(HEADINGS_COUNTED.test(sentence) ? { headings: true } : {}),
+            });
+          }
+          continue;
+        }
+        // A plain figure with nothing it is per is not a limit at all.
+        if (r.approximate) continue;
+        if (hedged) continue;
         // "Keep the summary to 250 words" names its subject inside the match.
         const inside = m[0].match(SUBJECT_RE);
         const subject = inside ? canonical(inside[1]) : partBefore(t, m.index!) || itemBefore(t, m.index!) || subjectNear(t, m.index!, m.index! + m[0].length);
@@ -618,17 +673,70 @@ const subjectLabel = (s: string) => SUBJECT_LABEL[s] ?? (s ? s[0].toUpperCase() 
 export const isPart = (r: Pick<MeasurableRequirement, 'subject'>) => Boolean(r.subject) && !SUBJECTS.includes(r.subject) && r.subject !== 'frequently asked questions';
 
 function rangeText(r: MeasurableRequirement): string {
+  if (r.approximate) {
+    if (r.min !== undefined && r.max !== undefined) return r.min === r.max ? `about ${r.min}` : `roughly ${r.min}–${r.max}`;
+    return r.max !== undefined ? `about ${r.max} at most` : `about ${r.min} at least`;
+  }
   if (r.min !== undefined && r.max !== undefined) return r.min === r.max ? `exactly ${r.min}` : `${r.min}–${r.max}`;
   return r.max !== undefined ? `at most ${r.max}` : `at least ${r.min}`;
 }
 
 /** How a requirement is named wherever it is shown, measured or not: "Memo: at most 500 words (headings included)". */
 export function requirementLabel(r: MeasurableRequirement): string {
-  const name = subjectLabel(r.subject);
+  const name = r.per ? `Each ${r.per}` : subjectLabel(r.subject);
   if (r.kind === 'words') return `${name}: ${rangeText(r)} words${r.headings ? ' (headings included)' : ''}`;
   if (r.kind === 'pages') return `${name}: ${rangeText(r)} page${r.max === 1 ? '' : 's'} (estimated)`;
   if (r.kind === 'sections') return `${name}: ${rangeText(r)} sections`;
   return `${name}: ${rangeText(r)} questions${r.answered ? ', each answered' : ''}`;
+}
+
+/** Sections a document ends on that are not parts of the work. */
+const AFTER_MATTER = /^(?:\d+[.)]\s*)?(?:sources?|references?|bibliography|appendix|review note|notes?|what changed)\b/i;
+
+/**
+ * The chapters or sections of a text: the headings that name the unit when any do,
+ * otherwise the headings at the top of its structure, without a lone title or what
+ * follows the work. Each runs to the next heading at its level or above.
+ */
+function partsOf(text: string, unit: string): { title: string; body: string }[] {
+  const all = lines(text);
+  const heads = all.map((l, i) => ({ l, i })).filter(({ l }) => l.level > 0 && l.level <= 7 && !isQuestion(l) && !NOTE.test(l.text));
+  if (!heads.length) return [];
+  const naming = heads.filter(({ l }) => new RegExp(`\\b${unit}\\b`, 'i').test(l.text));
+  let chosen = naming;
+  if (!chosen.length) {
+    const top = Math.min(...heads.map((h) => h.l.level));
+    const atTop = heads.filter((h) => h.l.level === top);
+    const rest = heads.filter((h) => h.l.level > top);
+    const level = atTop.length === 1 && rest.length ? Math.min(...rest.map((h) => h.l.level)) : top;
+    chosen = heads.filter((h) => h.l.level === level && !AFTER_MATTER.test(h.l.text));
+  }
+  return chosen.map(({ l, i }) => {
+    const end = all.findIndex((x, j) => j > i && x.level > 0 && x.level <= l.level && !isQuestion(x));
+    const body = all.slice(i + 1, end < 0 ? all.length : end).map((x) => (x.level > 0 ? `# ${x.text}` : x.text)).join('\n');
+    return { title: l.text, body };
+  });
+}
+
+/** How far a hedged figure may stray and still be what the brief said: "roughly" is not a limit. */
+const RANGE_SLACK = 0.15;
+const TARGET_SLACK = 0.25;
+
+/** A limit on each chapter or section, counted on each one; null when the text is not divided into any. */
+function measureEach(r: MeasurableRequirement, text: string): Measurement | null {
+  const parts = partsOf(text, r.per!).map((p) => ({ title: p.title, n: countWords(p.body, { headings: r.headings }) }));
+  if (!parts.length) return null;
+  const slack = r.approximate ? (r.min === r.max ? TARGET_SLACK : RANGE_SLACK) : 0;
+  const low = r.min === undefined ? 0 : Math.floor(r.min * (1 - slack));
+  const high = r.max === undefined ? Infinity : Math.ceil(r.max * (1 + slack));
+  const off = parts.filter((p) => p.n < low || p.n > high);
+  const counts = parts.map((p) => p.n);
+  const least = Math.min(...counts);
+  const most = Math.max(...counts);
+  const units = `${parts.length} ${r.per}${parts.length === 1 ? '' : 's'}`;
+  const value = `${units}, ${least === most ? least : `${least}–${most}`} words${parts.length === 1 ? '' : ' each'}`;
+  const detail = off.slice(0, 6).map((p) => `${p.title.length > 40 ? `${p.title.slice(0, 40)}…` : p.title}: ${p.n} words`).join('; ');
+  return { id: `measured.${r.id}`, label: requirementLabel(r), satisfied: off.length === 0, value, ...(off.length ? { detail } : {}) };
 }
 
 /**
@@ -637,6 +745,7 @@ export function requirementLabel(r: MeasurableRequirement): string {
  * with no heading naming it the whole text is what is measured.
  */
 export function measure(r: MeasurableRequirement, text: string, whole = false): Measurement | null {
+  if (r.per) return measureEach(r, text);
   const headed = sectionFor(text, r.subject);
   // A part with no heading of its own is the opening prose, never the whole
   // document with its tables and questions (12 Oct, Cedar: 80 words read as 212).
@@ -733,6 +842,8 @@ export function requirementsForStage(
   const wholeSubjects = new Set(deliverables.length ? deliverables : named);
   const out: { requirement: MeasurableRequirement; whole: boolean }[] = [];
   for (const r of requirements) {
+    // A target the brief hedged holds no stage up; the objective check gets its count.
+    if (r.approximate) continue;
     const aboutIt = Boolean(r.subject) && !preparesFor(stage.label, r.subject) &&
       (r.subject === 'faq' ? /\bfaq\b|frequently asked questions/.test(about) : about.includes(r.subject));
     if (aboutIt) out.push({ requirement: r, whole: true });

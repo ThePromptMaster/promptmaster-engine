@@ -153,7 +153,7 @@ test('an example goal opens a new project with the goal in the box', async ({ pa
   await page.screenshot({ path: test.info().outputPath('example-goal-prefilled.png') });
 });
 
-test('an empty project list explains a project and offers example goals', async ({ page }) => {
+test('an empty project list explains a project and offers the curated examples', async ({ page }) => {
   // A first-time user: the list comes back empty.
   await page.route('**/rest/v1/projects?*', async (route) => {
     if (route.request().method() === 'GET' && route.request().url().includes('deleted_at=is.null')) {
@@ -166,7 +166,6 @@ test('an empty project list explains a project and offers example goals', async 
   await expect(page.getByText('Nothing here yet')).toBeVisible();
   await expect(page.getByText(/A project takes one goal to a finished deliverable/)).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('empty-projects-examples.png'), fullPage: true });
-  await page.getByRole('link', { name: /A recommendation memo/ }).click();
-  await expect(page).toHaveURL(/\/projects\/new\?goal=/);
-  await expect(page.getByLabel('What do you want to do or figure out?')).toHaveValue(/Slack to Microsoft Teams/);
+  await page.getByRole('link', { name: /Investment memo/ }).click();
+  await expect(page).toHaveURL(/\/examples\/investment-memo$/);
 });

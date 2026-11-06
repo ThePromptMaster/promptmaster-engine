@@ -36,7 +36,9 @@ import { documentsCut, documentsOf, materialFrom, setupMaterial, type PreparedFi
 import { contextFromDocuments } from '@/lib/data/extract-text';
 import { imagePreview } from '@/lib/data/preview';
 import { INPUT_LIMITS } from '@/lib/projects/input-limits';
-import { goalFromSearch } from '@/lib/projects/example-goals';
+import { ExampleCards } from '@/components/examples/example-cards';
+import { PromptyHelp } from '@/components/examples/prompty-help';
+import { goalFromSearch, takeStartGoal } from '@/lib/projects/example-goals';
 import { attachProjectFile } from '@/lib/supabase/project-files';
 import { LimitCounter } from '@/components/shared/limit-counter';
 import { clearSetupDraft, loadSetupDraft, saveSetupDraft } from '@/lib/supabase/setup-drafts';
@@ -215,7 +217,9 @@ export default function NewProjectPage() {
   const goalBox = useRef<HTMLTextAreaElement | null>(null);
   useEffect(() => {
     const typed = goalBox.current?.value ?? '';
-    const goal = typed.trim() ? typed.slice(0, INPUT_LIMITS.objective) : goalFromSearch(window.location.search, INPUT_LIMITS.objective);
+    const goal = typed.trim()
+      ? typed.slice(0, INPUT_LIMITS.objective)
+      : takeStartGoal().slice(0, INPUT_LIMITS.objective) || goalFromSearch(window.location.search, INPUT_LIMITS.objective);
     if (goal) setObjective((current) => current || goal);
   }, []);
 
@@ -321,6 +325,8 @@ export default function NewProjectPage() {
       constraints: suggestion.constraints,
       output_format: suggestion.output_format,
       mode: suggestion.mode,
+      // What the user pasted as a sample stays theirs, whichever way in they took.
+      ...(draft.sample_output?.trim() ? { sample_output: draft.sample_output } : {}),
     };
     return { suggestion, recommended, standard, design, draft: suggested };
   }
@@ -855,6 +861,16 @@ export default function NewProjectPage() {
               {t('start.creatingNow')}
             </p>
           )}
+
+          {/* The menu (the client's call, 4 Nov): always available, where the two
+              buttons above wait for words in the box. */}
+          <PromptyHelp place="start" />
+          <section aria-label={t('ex.startFrom')} className="mt-8">
+            <h2 className="text-label uppercase tracking-wider text-[var(--on-surface-variant)]">{t('ex.startFrom')}</h2>
+            <div className="mt-3">
+              <ExampleCards compact />
+            </div>
+          </section>
 
           <button
             type="button"

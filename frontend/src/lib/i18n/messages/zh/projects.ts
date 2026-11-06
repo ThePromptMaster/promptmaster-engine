@@ -29,13 +29,6 @@ export const zh: Record<keyof typeof en, string> = {
   'list.moveError': '无法移动该项目。',
   'list.deleteError': '无法删除该项目。',
 
-  'examples.memo.label': '一份建议备忘录',
-  'examples.memo.goal': '写一份一页的备忘录，就我们 12 人的团队是否应从 Slack 迁移到 Microsoft Teams 提出建议。预算为每年 8,000 美元。',
-  'examples.briefing.label': '一份简短的简报',
-  'examples.briefing.goal': '为董事会写一份两页的简报，说明一家 200 人的会计师事务所采用 AI 工具的主要风险，并建议第一步行动。',
-  'examples.plan.label': '一份带数字的计划',
-  'examples.plan.goal': '为一个 6 名客服人员的团队起草一份 90 天计划，在不新增人手的前提下，将客户支持响应时间从 24 小时缩短到 8 小时。',
-
   'folders.label': '文件夹',
   'folders.all': '所有项目',
   'folders.unfiled': '未归档',

@@ -31,6 +31,7 @@ import { sw as panelsArea } from './sw/panels';
 import { sw as startersArea } from './sw/starters';
 import { sw as assessArea } from './sw/assess';
 import { sw as quickArea } from './sw/quick';
+import { sw as examplesArea } from './sw/examples';
 
 export const sw: Messages = {
   'header.account': 'Akaunti',
@@ -338,4 +339,5 @@ export const sw: Messages = {
   ...startersArea,
   ...assessArea,
   ...quickArea,
+  ...examplesArea,
 };

@@ -175,6 +175,13 @@ class AgentLatestChange(BaseModel):
     diff: str = Field(default="", max_length=4_000)
 
 
+class AgentAnswerReturn(BaseModel):
+    """The stages the user's latest answer may send the work back to (`returnsForAnswer`)."""
+
+    may_go: bool = False
+    stages: list[AgentStageRef] = Field(default_factory=list, max_length=12)
+
+
 class AgentState(BaseModel):
     """What the planner may know. Assembled by the client from the project.
 
@@ -210,6 +217,8 @@ class AgentState(BaseModel):
     workflow: AgentWorkflow | None = None
     #: The earlier stages this stage may go back to (its template's allow_return_to), by label.
     return_targets: list[AgentStageRef] = Field(default_factory=list, max_length=12)
+    #: The user has just answered: where that answer may send the work, and whether Go may go itself.
+    answer_return: AgentAnswerReturn | None = None
     #: The project's "Routine decisions": 'handle' when they are Go's to make.
     routine_decisions: str = Field(default="", max_length=20)
     #: The user's own sentences on what may be done without asking, what to ask
@@ -416,10 +425,31 @@ def _format_state(inputs: PMInput, state: AgentState) -> str:
         facts.append(
             "GO BACK TO (stages this one may return to, for return_to_stage — by stage_id): "
             + "; ".join(f"{t.id} ({t.label or t.id})" for t in state.return_targets)
-            + ". Choose by what the saved work asks for: more runs or cases → the experiment stage; a "
-            "different approach → the method stage; a missing source → the literature stage; another "
+            + ". Choose by what the saved work asks for. In an investigation: more runs or cases → the experiment "
+            "stage; a different approach → the method stage; a missing source → the literature stage; another "
             "explanation → the alternatives stage. Going back is one response among others, not a reflex."
         )
+    if state.answer_return is not None and state.answer_return.stages:
+        # 6 Nov, production pass: on Final review the answer was "keep every word
+        # at seven letters and leave the venue out", the note to change was on
+        # Output, and Go asked how to do it and pointed at a button.
+        earlier = "; ".join(t.label or t.id for t in state.answer_return.stages)
+        lead = "THE USER HAS JUST ANSWERED (the user_answer move below). Act on what they said. "
+        rest = "If it changes nothing held earlier, go on with the moves here."
+        if state.answer_return.may_go:
+            facts.append(
+                f"{lead}If carrying it out means changing work held on an earlier stage ({earlier}), choose "
+                "return_to_stage now, to the stage that holds that work, with work saying exactly what changes. "
+                "Their answer is the instruction: do not ask how to carry it out, do not ask them to confirm it, "
+                f"and do not send them to a button. {rest}"
+            )
+        else:
+            facts.append(
+                f"{lead}If carrying it out means changing work held on an earlier stage ({earlier}), going back is "
+                "the user's on this project, so ask one yes-or-no question in these words: \"Shall I go back to "
+                "<that stage> and <what changes>?\". A yes takes the work back there at once, so do not send them "
+                f"to a button. {rest}"
+            )
     if state.routine_decisions == "handle":
         # Q1b (9 Oct, production): Go asked the user to choose a pendulum's
         # length, g and amplitudes, proposing a default in the same question.

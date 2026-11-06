@@ -34,15 +34,6 @@ export const en = {
   'list.deleteError': 'Could not delete the project.',
 
   // lib/projects/example-goals.ts, as shown on the empty list
-  'examples.memo.label': 'A recommendation memo',
-  'examples.memo.goal':
-    'Write a one-page memo recommending whether our 12-person team should move from Slack to Microsoft Teams. Budget is $8,000 a year.',
-  'examples.briefing.label': 'A short briefing',
-  'examples.briefing.goal':
-    'Write a two-page briefing for a board on the main risks of adopting AI tools in a 200-person accounting firm, with a recommended first step.',
-  'examples.plan.label': 'A plan with numbers',
-  'examples.plan.goal':
-    'Draft a 90-day plan to cut customer support response time from 24 hours to 8 hours for a team of 6 agents, without new hires.',
 
   // components/projects/folders-sidebar.tsx
   'folders.label': 'Folders',
@@ -159,16 +150,6 @@ export const es: Keys = {
   'list.moveError': 'No se pudo mover el proyecto.',
   'list.deleteError': 'No se pudo eliminar el proyecto.',
 
-  'examples.memo.label': 'Un memorando de recomendación',
-  'examples.memo.goal':
-    'Escribe un memorando de una página que recomiende si nuestro equipo de 12 personas debería pasar de Slack a Microsoft Teams. El presupuesto es de 8.000 $ al año.',
-  'examples.briefing.label': 'Un informe breve',
-  'examples.briefing.goal':
-    'Escribe un informe de dos páginas para un consejo sobre los principales riesgos de adoptar herramientas de IA en una firma contable de 200 personas, con un primer paso recomendado.',
-  'examples.plan.label': 'Un plan con cifras',
-  'examples.plan.goal':
-    'Redacta un plan de 90 días para reducir el tiempo de respuesta de atención al cliente de 24 a 8 horas en un equipo de 6 agentes, sin nuevas contrataciones.',
-
   'folders.label': 'Carpetas',
   'folders.all': 'Todos los proyectos',
   'folders.unfiled': 'Sin carpeta',
@@ -276,16 +257,6 @@ export const fr: Keys = {
   'list.moveError': 'Impossible de déplacer le projet.',
   'list.deleteError': 'Impossible de supprimer le projet.',
 
-  'examples.memo.label': 'Une note de recommandation',
-  'examples.memo.goal':
-    'Rédige une note d’une page recommandant si notre équipe de 12 personnes doit passer de Slack à Microsoft Teams. Le budget est de 8 000 $ par an.',
-  'examples.briefing.label': 'Une courte note de synthèse',
-  'examples.briefing.goal':
-    'Rédige une note de synthèse de deux pages pour un conseil d’administration sur les principaux risques liés à l’adoption d’outils d’IA dans un cabinet comptable de 200 personnes, avec une première étape recommandée.',
-  'examples.plan.label': 'Un plan chiffré',
-  'examples.plan.goal':
-    'Rédige un plan de 90 jours pour réduire le délai de réponse du support client de 24 heures à 8 heures pour une équipe de 6 agents, sans embauche.',
-
   'folders.label': 'Dossiers',
   'folders.all': 'Tous les projets',
   'folders.unfiled': 'Non classés',
@@ -392,16 +363,6 @@ export const pt: Keys = {
   'list.aProject': 'projeto',
   'list.moveError': 'Não foi possível mover o projeto.',
   'list.deleteError': 'Não foi possível excluir o projeto.',
-
-  'examples.memo.label': 'Um memorando de recomendação',
-  'examples.memo.goal':
-    'Escreva um memorando de uma página recomendando se nossa equipe de 12 pessoas deve trocar o Slack pelo Microsoft Teams. O orçamento é de US$ 8.000 por ano.',
-  'examples.briefing.label': 'Um resumo executivo curto',
-  'examples.briefing.goal':
-    'Escreva um resumo de duas páginas para um conselho sobre os principais riscos de adotar ferramentas de IA em um escritório de contabilidade de 200 pessoas, com um primeiro passo recomendado.',
-  'examples.plan.label': 'Um plano com números',
-  'examples.plan.goal':
-    'Elabore um plano de 90 dias para reduzir o tempo de resposta do suporte ao cliente de 24 para 8 horas em uma equipe de 6 atendentes, sem novas contratações.',
 
   'folders.label': 'Pastas',
   'folders.all': 'Todos os projetos',
