@@ -12,8 +12,8 @@ test('a sample pasted at the start reaches the project through the recommended s
   await page.goto('/projects/new');
   await dismissBetaNotice(page);
   await page.getByLabel('What do you want to do or figure out?').fill('A one-page memo on moving our team from Slack to Teams');
-  await page.locator('summary', { hasText: '' }).click();
-  await page.getByRole('textbox', { name: '' }).fill('Short sentences. Numbers first. No jargon.');
+  await page.locator('summary', { hasText: 'A sample of what good looks like' }).click();
+  await page.getByRole('textbox', { name: 'A sample of what good looks like' }).fill('Short sentences. Numbers first. No jargon.');
 
   await page.getByRole('button', { name: /I know what I want to do/ }).click();
   await page.getByRole('radio', { name: /^Single output/ }).click();
