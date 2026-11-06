@@ -48,6 +48,8 @@ function makeQuery(rows: unknown[]) {
   for (const method of ['select', 'gte', 'in', 'order', 'limit', 'eq']) {
     chain[method] = () => chain;
   }
+  // One page of rows, as the route now reads them.
+  chain.range = async (from: number, to: number) => ({ data: rows.slice(from, to + 1), error: null, count: rows.length });
   // `await`ing the builder is what PostgREST does.
   chain.then = (...args: unknown[]) =>
     (result.then as (...a: unknown[]) => unknown)(...args);

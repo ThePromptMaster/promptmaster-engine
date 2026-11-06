@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 
 import { StartAttachments, type StartImage } from '@/components/projects/start-attachments';
+import { MarkdownOutput } from '@/components/shared/markdown-output';
 import { useAuth } from '@/hooks/use-auth';
 import { guestErrorMessage } from '@/lib/auth/guest';
 import { goSignedIn } from '@/lib/auth/sign-in';
@@ -13,7 +14,7 @@ import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import type { MessageKey } from '@/lib/i18n/messages/en';
 import { getLocale } from '@/lib/i18n/store';
 import { stageText } from '@/lib/i18n/templates';
-import { csvPreview, exampleWorkflow, type Example } from '@/lib/projects/examples';
+import { csvPreview, exampleWorkflow, resultOf, type Example } from '@/lib/projects/examples';
 import { startExample } from '@/lib/projects/examples/start-example';
 import { INPUT_LIMITS } from '@/lib/projects/input-limits';
 import { splitAsk } from '@/lib/projects/split-ask';
@@ -33,6 +34,7 @@ export function ExamplePreview({ example }: { example: Example }) {
   const [working, setWorking] = useState<null | 'sample' | 'own'>(null);
   const [error, setError] = useState<string | null>(null);
   const [showSample, setShowSample] = useState(false);
+  const [showResult, setShowResult] = useState(false);
   const [ask, setAsk] = useState('');
   const [files, setFiles] = useState<PreparedFile[]>([]);
   const [images, setImages] = useState<StartImage[]>([]);
@@ -40,6 +42,7 @@ export function ExamplePreview({ example }: { example: Example }) {
   // The key's suffix only has to look like a real one: nothing here is saved.
   const template = useMemo(() => exampleWorkflow(example, '0000000000'), [example]);
   const word = (field: string) => t(`ex.${example.key}.${field}` as MessageKey);
+  const result = resultOf(example);
 
   async function whoIsStarting(): Promise<string> {
     if (user) return user.id;
@@ -130,6 +133,33 @@ export function ExamplePreview({ example }: { example: Example }) {
         <h2 className="text-headline text-[var(--on-surface)]">{t('ex.getsTitle')}</h2>
         <p className="mt-2 text-body text-[var(--on-surface)]">{word('gets')}</p>
       </section>
+
+      {result && (
+        <section className="mt-8">
+          <h2 className="text-headline text-[var(--on-surface)]">{t('ex.resultTitle')}</h2>
+          <p className="mt-2 text-body text-[var(--on-surface-variant)]">
+            {t('ex.resultNote', {
+              date: new Date(result.date).toLocaleDateString(locale, { dateStyle: 'long', timeZone: 'UTC' }),
+              minutes: result.minutes,
+              cost: result.costUsd.toFixed(2),
+            })}
+          </p>
+          <button
+            type="button"
+            onClick={() => setShowResult((v) => !v)}
+            aria-expanded={showResult}
+            className="mt-2 inline-flex items-center gap-1 text-body font-medium text-[var(--pm-primary)] hover:underline"
+          >
+            <span aria-hidden className="material-symbols-outlined text-[18px]">{showResult ? 'expand_less' : 'expand_more'}</span>
+            {showResult ? t('ex.resultHide') : t('ex.resultShow')}
+          </button>
+          {showResult && (
+            <div dir="ltr" data-finished-result className="mt-3 rounded-xl bg-[var(--surface-container-lowest)] p-4 text-start">
+              <MarkdownOutput content={result.text} />
+            </div>
+          )}
+        </section>
+      )}
 
       <section className="mt-8">
         <h2 className="text-headline text-[var(--on-surface)]">{t('ex.stagesTitle')}</h2>

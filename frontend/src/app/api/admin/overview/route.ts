@@ -58,11 +58,11 @@ const MAX_WINDOW_DAYS = 365;
 /** Lists are for reading, not for exporting. Roll-ups cover the whole window. */
 const LIST_LIMIT = 50;
 /**
- * Ceiling on rows pulled for the roll-up. A controlled beta will not approach
- * it; if it ever does, the page says so rather than quietly reporting a
- * fraction of the spend as if it were all of it.
+ * Ceiling on rows pulled for the roll-up. If it is reached, the page says so
+ * rather than quietly reporting a fraction of the spend as if it were all of it.
+ * The beta passed 10,000 calls in a month by 6 Nov.
  */
-const ROLLUP_LIMIT = 10_000;
+const ROLLUP_LIMIT = 100_000;
 /** Feedback rows shown. The count above the list is exact regardless. */
 const FEEDBACK_LIMIT = 200;
 /** Project ids per title lookup; they travel in the URL. */
