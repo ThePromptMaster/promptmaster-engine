@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { deckFromMarkdown } from '@/lib/export/pptx-export';
 import { deliverableStage } from '@/lib/workflow/engine';
 import { rendererHoldsItems } from '@/lib/workflow/stage-artifact';
 import { validateTemplate } from '@/lib/workflow/validate';
@@ -148,6 +149,26 @@ describe('the deal screening sample', () => {
     const template = exampleWorkflow(deals, 'abc123def0');
     const back = toTemplate({ id: 'r', key: template.key, version: 1, name: template.name, description: '', definition: definitionOf(template) });
     expect(back.stages.find((s) => s.renderer === 'assess')?.assess?.offered_batch).toBe(batch);
+  });
+});
+
+describe('the slide deck sample', () => {
+  const deck = exampleBySlug('slide-deck')!;
+
+  it('has notes that do not add up where the example says they do not', () => {
+    const { context } = deck.project;
+    expect(context).toContain('about 18 months of runway');
+    // $9.2M of cash at $610,000 a month.
+    expect(Math.floor(9_200_000 / 610_000)).toBe(15);
+    expect(context).toContain('Cash $9.2M');
+    expect(context).toContain('Net burn $610,000 a month');
+  });
+
+  it('asks for slides in the form the PowerPoint export reads', () => {
+    expect(deck.project.output_format).toContain('"## "');
+    expect(deck.project.output_format).toContain('"Speaker notes:"');
+    const written = '## One point\n- a\nSpeaker notes: say it.\n## Two\n- b\n## Three\n- c\n';
+    expect(deckFromMarkdown(written).slides[0].notes).toBe('say it.');
   });
 });
 

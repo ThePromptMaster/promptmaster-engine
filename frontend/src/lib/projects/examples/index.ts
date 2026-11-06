@@ -6,6 +6,7 @@ import { BUSINESS_ANALYSIS } from './business-analysis';
 import type { ExampleKey } from './cards';
 import { DEAL_SCREENING } from './deal-screening';
 import { INVESTMENT_MEMO } from './investment-memo';
+import { SLIDE_DECK } from './slide-deck';
 
 /**
  * A curated example: a workflow written by hand, in the form the workflow
@@ -39,7 +40,7 @@ export interface Example {
   files?: { name: string; text: string }[];
 }
 
-export const EXAMPLES: readonly Example[] = [DEAL_SCREENING, INVESTMENT_MEMO, BUSINESS_ANALYSIS];
+export const EXAMPLES: readonly Example[] = [DEAL_SCREENING, INVESTMENT_MEMO, BUSINESS_ANALYSIS, SLIDE_DECK];
 
 export function exampleBySlug(slug: string): Example | undefined {
   return EXAMPLES.find((e) => e.slug === slug);
