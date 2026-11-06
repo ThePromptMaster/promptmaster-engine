@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import { API_URL } from './env';
-import { dismissBetaNotice, servicePatch, serviceSelect, transitionBar } from './helpers';
+import { servicePatch, serviceSelect, transitionBar } from './helpers';
 
 /**
  * The curated examples (the client's call, 4 Nov): a visitor with no account can
@@ -9,6 +9,15 @@ import { dismissBetaNotice, servicePatch, serviceSelect, transitionBar } from '.
  * anything runs until they press something that says it will.
  */
 test.use({ storageState: { cookies: [], origins: [] } });
+
+/**
+ * Every test here starts with nothing stored, so the beta notice always comes, but
+ * only after hydration. The shared helper looks once: on a slow run it misses the
+ * notice, which then sits over the stage's Continue button until the test times out.
+ */
+async function pressGotIt(page: Page) {
+  await page.getByRole('button', { name: 'Got it' }).click({ timeout: 15_000 });
+}
 
 function backendCalls(page: Page): string[] {
   const calls: string[] = [];
@@ -24,7 +33,7 @@ test('an example from a signed-out visit: nothing is spent until a press says so
   const shot = (name: string) => page.screenshot({ path: test.info().outputPath(name), fullPage: true });
 
   await page.goto('/examples');
-  await dismissBetaNotice(page);
+  await pressGotIt(page);
   await expect(page.getByRole('heading', { name: 'Start from a real piece of work' })).toBeVisible();
   await shot('01-examples.png');
   await page.getByRole('link', { name: /Investment memo/ }).click();
@@ -79,7 +88,7 @@ test('an example from a signed-out visit: nothing is spent until a press says so
 test('the same workflow on your own work is an ordinary project', async ({ page }) => {
   test.setTimeout(120_000);
   await page.goto('/examples/business-analysis');
-  await dismissBetaNotice(page);
+  await pressGotIt(page);
   await page.getByLabel('What do you need?').fill('Should we move our support team to a four-day week?');
   await page.getByRole('button', { name: 'Start with my own work' }).click();
   await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}$/, { timeout: 30_000 });
@@ -101,7 +110,7 @@ test('the same workflow on your own work is an ordinary project', async ({ page 
 
 test('an unknown example says so and offers the real ones', async ({ page }) => {
   await page.goto('/examples/nothing-here');
-  await dismissBetaNotice(page);
+  await pressGotIt(page);
   await expect(page.getByRole('heading', { name: 'There is no example here' })).toBeVisible();
   await expect(page.getByRole('link', { name: /Business analysis/ })).toBeVisible();
 });
@@ -110,7 +119,7 @@ test('deal screening: the sample batch fills the box, and only Assess runs anyth
   test.setTimeout(120_000);
   const calls = backendCalls(page);
   await page.goto('/examples/deal-screening');
-  await dismissBetaNotice(page);
+  await pressGotIt(page);
   await page.getByRole('button', { name: 'Try it on this sample' }).click();
   await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}$/, { timeout: 30_000 });
 
@@ -134,7 +143,7 @@ test('deal screening under Go: it judges the sample batch itself, and does not c
   test.setTimeout(120_000);
   const calls = backendCalls(page);
   await page.goto('/examples/deal-screening');
-  await dismissBetaNotice(page);
+  await pressGotIt(page);
   await page.getByRole('button', { name: 'Try it on this sample' }).click();
   await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}$/, { timeout: 30_000 });
   await expect(page.getByRole('heading', { name: 'Mandate and criteria' })).toBeVisible();
@@ -165,7 +174,7 @@ test('deal screening under Go: it judges the sample batch itself, and does not c
 test('a preview shows what a real run produced, dated, with no account and nothing spent', async ({ page }) => {
   const calls = backendCalls(page);
   await page.goto('/examples/deal-screening');
-  await dismissBetaNotice(page);
+  await pressGotIt(page);
   await expect(page.getByRole('heading', { name: 'What it produced' })).toBeVisible();
   await expect(page.getByText(/A real run of this example on /)).toBeVisible();
   await expect(page.locator('[data-finished-result]')).toHaveCount(0);
@@ -178,7 +187,7 @@ test('a preview shows what a real run produced, dated, with no account and nothi
 test('the slide deck example asks for slides in the form the PowerPoint export reads', async ({ page }) => {
   test.setTimeout(60_000);
   await page.goto('/examples/slide-deck');
-  await dismissBetaNotice(page);
+  await pressGotIt(page);
   await expect(page.getByRole('heading', { name: 'Slide deck' })).toBeVisible();
   await page.getByRole('button', { name: 'Try it on this sample' }).click();
   await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}$/, { timeout: 30_000 });
