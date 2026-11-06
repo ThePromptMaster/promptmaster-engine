@@ -26,7 +26,7 @@ describe('returnInstruction', () => {
 
   it('is the bare work when the returning stage holds no rows', () => {
     const text = returnInstruction(output, 'Some prose draft.', stage('input'), 'Tighten the objective');
-    expect(text).toBe(`Further investigation asked for by ${output.label}: Tighten the objective\nRevise to take this in. Keep everything that still holds exactly as it is.`);
+    expect(text).toBe(`Further work asked for by ${output.label}: Tighten the objective\nRevise to take this in. Keep everything that still holds exactly as it is.`);
   });
 
   it('adds nothing for an empty table', () => {

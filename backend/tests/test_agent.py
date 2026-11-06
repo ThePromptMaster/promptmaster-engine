@@ -610,10 +610,44 @@ def test_the_planner_is_told_where_it_may_go_back_and_to_choose_by_the_problem()
     assert "GO BACK TO" not in none
 
 
+def test_straight_after_an_answer_the_planner_goes_back_rather_than_asks_how():
+    """6 Nov, production pass: on Final review the answer was "keep every word at seven
+    letters and leave the venue out", the note to change was on Output, and Go asked how."""
+    from promptmaster.agent import AgentAnswerReturn, AgentStageRef
+    stages = [AgentStageRef(id="output", label="Output and evaluation"), AgentStageRef(id="realign", label="Realignment")]
+    go = STATE.model_copy(update={"return_targets": stages, "answer_return": AgentAnswerReturn(may_go=True, stages=stages)})
+    _, user = build_next_action_prompt(INPUTS, go, RESEARCH, "autonomous")
+    assert "THE USER HAS JUST ANSWERED" in user
+    assert "changing work held on an earlier stage (Output and evaluation; Realignment), choose return_to_stage now" in user
+    assert "do not ask how to carry it out" in user
+    assert "do not send them to a button" in user
+    assert "If it changes nothing held earlier, go on with the moves here." in user
+    assert "Shall I go back to" not in user
+
+
+def test_when_going_back_is_the_users_the_planner_asks_a_yes_a_yes_can_act_on():
+    """`answeredReturn` acts on a plain yes when the question said "go back to <stage>"."""
+    from promptmaster.agent import AgentAnswerReturn, AgentStageRef
+    stages = [AgentStageRef(id="output", label="Output and evaluation")]
+    ask = STATE.model_copy(update={"answer_return": AgentAnswerReturn(may_go=False, stages=stages)})
+    _, user = build_next_action_prompt(INPUTS, ask, RESEARCH, "autonomous")
+    assert "THE USER HAS JUST ANSWERED" in user
+    assert 'Shall I go back to <that stage> and <what changes>?' in user
+    assert "A yes takes the work back there at once" in user
+    assert "choose return_to_stage now" not in user
+    assert "GO BACK TO" not in user
+
+
+def test_no_answer_waiting_says_nothing_about_one():
+    _, user = build_next_action_prompt(INPUTS, STATE, RESEARCH, "autonomous")
+    assert "THE USER HAS JUST ANSWERED" not in user
+
+
 def test_return_to_stage_says_what_it_needs():
     from promptmaster.agent_actions import ACTIONS_BY_KEY
     when = ACTIONS_BY_KEY["return_to_stage"].when
     assert "Params: stage_id, reason" in when and "work (what is to be done there" in when
+    assert "the user has just answered and carrying out their answer means changing what an earlier stage holds" in when
     assert ACTIONS_BY_KEY["return_to_stage"].important
 
 

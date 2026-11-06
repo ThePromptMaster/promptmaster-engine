@@ -3287,3 +3287,17 @@ check's, because repairing chapters to fit is a long job for a count. It reads t
 with none is not verified, and a chapter's parts are found by the word "chapter" in a heading, or
 else the top-level headings, leaving sources, references and a review note out.
 
+### L-189 — After an answer, going back is the planner's reading of it (2026-11-06)
+
+Found on a production pass: on Final review Go asked a question, the answer meant changing the
+note on Output without saying "go back", and Go could only ask how to do it. Straight after an
+answer, the stages this one may return to are now on offer on every workflow
+(`policy.returnsForAnswer`).
+
+The costs: whether an answer means changing earlier work is a model's reading, not a rule, so it
+can go back when it need not, or stay and do the work here. Each return shows its reason in the
+run's account, is recorded as Go's rather than the user's, and is limited to `MAX_RETURNS` a run.
+It needs Autonomous with routine decisions handed to Go. Otherwise Go asks "Shall I go back to …?",
+and a plain yes does it: one more question, by design, because going back is then the user's. On
+that first move after an answer, a stage waiting only for an approval spends one planner call
+before its card appears, because the answer has to be read first.

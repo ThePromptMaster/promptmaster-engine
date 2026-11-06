@@ -857,6 +857,64 @@ describe('a repair cascade stops (Sean, 10 Oct, email 7.6)', () => {
   });
 });
 
+describe('going back after an answer that does not say so (6 Nov, production pass)', () => {
+  // The project: asked on Final review whether to allow two phrases, the user
+  // kept the rule, and the note to change was on Output. Go could only ask how.
+  const answer = { action_key: 'user_answer', status: 'succeeded' };
+  const asked = { action_key: 'request_user_decision', status: 'succeeded' };
+  const base = async () => {
+    const { SINGLE_OUTPUT_V1 } = await import('@/lib/workflow/templates/single-output.v1');
+    return {
+      template: SINGLE_OUTPUT_V1, stage: SINGLE_OUTPUT_V1.stages.find((s) => s.id === 'summary')!,
+      policy: 'autonomous' as const, routine: 'handle' as const, steps: [asked, answer],
+    };
+  };
+
+  it('offers the stages this one may go back to, on a workflow that is no investigation', async () => {
+    const { returnsForAnswer } = await import('./policy');
+    expect(returnsForAnswer(await base())).toEqual({
+      mayGo: true,
+      stages: [{ id: 'output', label: 'Output and evaluation' }, { id: 'realign', label: 'Realignment' }],
+    });
+  });
+
+  it('leaves going back to the user unless the run may do it (the database checks the same)', async () => {
+    const { returnsForAnswer } = await import('./policy');
+    const b = await base();
+    expect(returnsForAnswer({ ...b, routine: 'ask' })?.mayGo).toBe(false);
+    expect(returnsForAnswer({ ...b, policy: 'guided' })?.mayGo).toBe(false);
+    expect(returnsForAnswer({ ...b, routine: 'ask' })?.stages.map((s) => s.id)).toEqual(['output', 'realign']);
+  });
+
+  it('holds only until something has acted on the answer', async () => {
+    const { returnsForAnswer } = await import('./policy');
+    const b = await base();
+    const after = (action_key: string) => returnsForAnswer({ ...b, steps: [asked, answer, { action_key, status: 'succeeded' }] });
+    // Recording what it settled is not acting on it.
+    expect(after('confirm_proposals')?.mayGo).toBe(true);
+    expect(after('extract_facts')?.mayGo).toBe(true);
+    expect(after('revise_stage')).toBeNull();
+    expect(after('return_to_stage')).toBeNull();
+    expect(after('request_user_decision')).toBeNull();
+    expect(returnsForAnswer({ ...b, steps: [asked] })).toBeNull();
+    expect(returnsForAnswer({ ...b, steps: [] })).toBeNull();
+  });
+
+  it('has nothing to offer on a stage with nowhere to go back to', async () => {
+    const { returnsForAnswer } = await import('./policy');
+    const b = await base();
+    const input = b.template.stages.find((s) => s.id === 'input')!;
+    expect(returnsForAnswer({ ...b, stage: input })).toBeNull();
+  });
+
+  it("past the run's own limit the question is the user's, whose returns are not limited", async () => {
+    const { returnsForAnswer, MAX_RETURNS } = await import('./policy');
+    const b = await base();
+    const made = Array.from({ length: MAX_RETURNS }, () => ({ action_key: 'return_to_stage', status: 'succeeded' }));
+    expect(returnsForAnswer({ ...b, steps: [...made, asked, answer] })?.mayGo).toBe(false);
+  });
+});
+
 describe('a return the user chose in an answer (13 Oct, production pass)', () => {
   it('names the stage to go back to, once, and only one this stage may return to', async () => {
     const { answeredReturn } = await import('./policy');
@@ -869,6 +927,9 @@ describe('a return the user chose in an answer (13 Oct, production pass)', () =>
     // A stage it may not go back to, or no going back named: nothing.
     expect(answeredReturn(BOOK_V1, critique, [{ ...answer, output: 'Go back to Objective' }])).toBeNull();
     expect(answeredReturn(BOOK_V1, critique, [{ ...answer, output: 'Override and continue to Fact-check' }])).toBeNull();
+    // In the words a person also uses.
+    expect(answeredReturn(BOOK_V1, critique, [{ ...answer, output: 'Return to Revision and fix the screenplay first' }])).toMatchObject({ id: 'revision' });
+    expect(answeredReturn(BOOK_V1, critique, [{ ...answer, output: 'Yes, returning to the Revision stage is right' }])).toMatchObject({ id: 'revision' });
   });
 
   it('a plain yes to Go asking to go back to a stage goes back to that stage (18 Oct, pilot)', async () => {

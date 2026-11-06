@@ -158,8 +158,8 @@ export function returnTargets(input: {
     .map((s) => ({ id: s.id, label: s.label }));
 }
 
-/** "go back to Output…", "move back to the Revision stage". */
-const BACK_TO_EN = /\b(?:go|going|move|send it|take it)\s+back\s+to\s+(?:the\s+)?([A-Za-z][A-Za-z -]{1,60})/i;
+/** "go back to Output…", "move back to the Revision stage", "return to Output". */
+const BACK_TO_EN = /\b(?:(?:go|going|move|send it|take it)\s+back\s+to|return(?:ing)?\s+to)\s+(?:the\s+)?([A-Za-z][A-Za-z -]{1,60})/i;
 /**
  * The same in Spanish, French and Portuguese (client, 21 Oct: "pick your
  * language"): "vuelve a Revisión", "retourne à la Révision", "volte para a
@@ -222,6 +222,46 @@ export function answeredReturn(
   const question = (asked?.decision_question || (asked?.output ?? '').split('\n')[0] || '').trim();
   const proposed = question ? namedReturn(template, stage, question) : null;
   return proposed ? { ...proposed, answer } : null;
+}
+
+/** Moves that record what an answer settled, rather than act on it. */
+const RECORDS_ONLY = new Set(['confirm_proposals', 'extract_facts']);
+
+/**
+ * The stages the user's latest answer may send the work back to when it does
+ * not say so in words, or null when no answer is waiting to be acted on.
+ *
+ * 6 Nov, production pass: asked on Final review whether to allow two phrases
+ * or "keep every word at seven letters and leave the venue and finish time
+ * out", the user chose the second, and the note to change was on Output. Going
+ * back was offered only in an investigation or on an answer saying "go back
+ * to…", so all the planner could do was ask how to do it and point at a
+ * button. Whether an answer needs earlier work changed is a reading of what it
+ * means, so that stays the planner's; this decides only that it may.
+ *
+ * Under Autonomous with routine decisions handed to Go, and within
+ * MAX_RETURNS, Go goes back itself (`mayGo`; the database checks the same) and
+ * the return is recorded as Go's. Otherwise going back is the user's, and the
+ * planner asks a yes or no that `answeredReturn` acts on. Only for the move
+ * straight after the answer: one already acted on is no reason to go back.
+ */
+export function returnsForAnswer(input: {
+  template: WorkflowTemplate;
+  stage: StageDefinition;
+  policy: ExecutionPolicy;
+  routine: RoutineDecisions;
+  steps: readonly { action_key: string; status: string }[];
+}): { stages: { id: string; label: string }[]; mayGo: boolean } | null {
+  const { template, stage, steps } = input;
+  const at = steps.map((s) => s.action_key).lastIndexOf(USER_ANSWER_STEP);
+  if (at < 0 || steps.slice(at + 1).some((s) => !RECORDS_ONLY.has(s.action_key))) return null;
+  const stages = (stage.transitions.allow_return_to ?? [])
+    .map((id) => template.stages.find((s) => s.id === id))
+    .filter((s): s is StageDefinition => Boolean(s))
+    .map((s) => ({ id: s.id, label: s.label }));
+  if (!stages.length) return null;
+  const made = steps.filter((s) => s.action_key === 'return_to_stage' && s.status === 'succeeded').length;
+  return { stages, mayGo: input.policy === 'autonomous' && input.routine === 'handle' && made < MAX_RETURNS };
 }
 
 /** Moves that polish a stage rather than move the work on. */
