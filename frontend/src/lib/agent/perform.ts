@@ -29,6 +29,7 @@ import { askedOfRecheck, describeLines, isChangeNote, keepUnasked, structureDrop
 import { notRemovedByUser } from '@/lib/workflow/removed-text';
 import { addedClaims, noInventedDetails, suppliedText } from '@/lib/workflow/fact-boundary';
 import { isDone } from '@/lib/workflow/types';
+import { approvalsOnEarlierVersion } from '@/lib/workflow/approvals';
 import { appliedFindingsVersion, carryUserFields, findingsInstruction, reviseWithFindings } from '@/lib/workflow/apply-findings';
 import { findInstructionConflicts, recordConflictChoice } from '@/lib/workflow/conflict-trail';
 import { choiceLabels, gist, type InstructionConflict } from '@/lib/workflow/instruction-conflicts';
@@ -2103,10 +2104,15 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
                   },
             });
           }
+          // Met on this text; an approval given on an earlier one still needs
+          // saying, or "done" reads as approved (5 Nov).
+          const earlier = approvalsOnEarlierVersion(ctx.project, ctx.template, ctx.bundles)
+            .map((a) => ` Your approval "${a.approval}" was given on ${a.label} v${a.version}; the current version is v${a.current}, so re-confirm it if it should stand.`)
+            .join('');
           return done(key, {
             ...judged, status: 'succeeded',
-            output: `The objective is met on ${basis.stage_label}${basis.version_number ? ` v${basis.version_number}` : ''}: "${assessment.basis_quote}". ${checked}${deferredNote(ctx)}`,
-            stop: { status: 'completed', reason: `Objective met.${deferredNote(ctx)}` },
+            output: `The objective is met on ${basis.stage_label}${basis.version_number ? ` v${basis.version_number}` : ''}: "${assessment.basis_quote}". ${checked}${deferredNote(ctx)}${earlier}`,
+            stop: { status: 'completed', reason: `Objective met.${deferredNote(ctx)}${earlier}` },
           });
         }
         // 25 Oct (Sean, quantum gravity): an objective that is still open is

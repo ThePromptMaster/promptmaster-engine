@@ -652,7 +652,8 @@ export function progressCaptionText(
 ): string {
   const waiting = outstanding.some((o) => o.kind === 'go_waiting');
   // A stale stage is already counted "to go"; the rest is open on top of the stages.
-  const open = outstanding.filter((o) => blocksCompletion(o) && o.kind !== 'stale_stage' && o.kind !== 'go_waiting').length;
+  const open = outstanding.filter((o) => blocksCompletion(o) && o.kind !== 'stale_stage' && o.kind !== 'go_waiting' && o.kind !== 'objective_not_rechecked').length;
+  const reconfirm = outstanding.filter((o) => o.kind === 'approval_on_earlier_version').length;
   // In the interface's language (client, 21 Oct): the rail's caption is read, not parsed.
   return [
     finished ? tr('progress.finished') : null,
@@ -661,6 +662,8 @@ export function progressCaptionText(
     progress.leftOpen > 0 ? tr('progress.leftOpen', { count: progress.leftOpen }) : null,
     progress.remaining > 0 || !finished ? tr('progress.toGo', { count: progress.remaining }) : null,
     open > 0 ? tr('progress.stillOpen', { count: open }) : null,
+    outstanding.some((o) => o.kind === 'objective_not_rechecked') ? tr('progress.objectiveNotRechecked') : null,
+    reconfirm > 0 ? tr('progress.reconfirm', { count: reconfirm }) : null,
     waiting ? tr('progress.goWaiting') : null,
   ]
     .filter(Boolean)
@@ -847,7 +850,11 @@ export type OutstandingItem =
    */
   | { kind: 'check_says'; stageId: string; label: string; says: string }
   | { kind: 'go_waiting'; label: string; need: string }
-  | { kind: 'objective_unmet'; label: string; blockers: string[]; next?: string | null };
+  | { kind: 'objective_unmet'; label: string; blockers: string[]; next?: string | null }
+  /** The check said not met and the work has changed since: it has to be checked again (5 Nov). */
+  | { kind: 'objective_not_rechecked'; label: string }
+  /** The user approved an earlier text than the stage holds now (5 Nov). Listed; it holds nothing up. */
+  | { kind: 'approval_on_earlier_version'; stageId: string; label: string; approval: string; version: number; current: number };
 
 export interface OutstandingExtras {
   /** Go stopped and is waiting on the user: what it needs, in one line. */
@@ -857,6 +864,10 @@ export interface OutstandingExtras {
   objectiveUnmet?: { blockers: string[]; next?: string | null } | null;
   /** What the latest check of the current stage's draft holds against it (`checkVerdict`). */
   checkSays?: { stageId: string; says: string } | null;
+  /** The latest assessment said not met and the work has changed since (`objectiveNotRechecked`). */
+  objectiveNotRechecked?: boolean;
+  /** Approvals given on an earlier text than the stage holds now (`approvalsOnEarlierVersion`). */
+  approvalsOnEarlier?: readonly { stageId: string; label: string; approval: string; version: number; current: number }[];
 }
 
 export function outstandingWork(
@@ -930,6 +941,8 @@ export function outstandingWork(
   if (extras.objectiveUnmet) {
     out.push({ kind: 'objective_unmet', label: 'Objective', blockers: extras.objectiveUnmet.blockers, ...(extras.objectiveUnmet.next ? { next: extras.objectiveUnmet.next } : {}) });
   }
+  if (extras.objectiveNotRechecked) out.push({ kind: 'objective_not_rechecked', label: 'Objective' });
+  for (const a of extras.approvalsOnEarlier ?? []) out.push({ kind: 'approval_on_earlier_version', ...a });
   if (extras.goWaiting) out.push({ kind: 'go_waiting', label: 'Go', need: extras.goWaiting });
   return out;
 }
@@ -1020,12 +1033,17 @@ export function shownOutstanding(raw: OutstandingItem, locale: Locale, show: Out
           : t('out.objOpenNext', { next: item.next });
       }
       return item.blockers.length ? t('out.objWaiting', { list: item.blockers.join('; ') }) : t('out.objNotMet');
+    case 'objective_not_rechecked':
+      return t('out.objNotRechecked');
+    case 'approval_on_earlier_version':
+      return t('out.approvalEarlier', { label: item.label, approval: item.approval, version: item.version, current: item.current });
   }
 }
 
 /** Whether an outstanding item holds up "Objective met" and plain "Finish project". Optional rows do not. */
 export function blocksCompletion(item: OutstandingItem): boolean {
-  if (item.kind === 'check_says') return false;
+  // A repair after an approval is routine: said, but no reason asked to finish past it.
+  if (item.kind === 'check_says' || item.kind === 'approval_on_earlier_version') return false;
   return !('optional' in item && item.optional);
 }
 

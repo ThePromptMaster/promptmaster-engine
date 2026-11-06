@@ -81,7 +81,7 @@ import { checkVerdict } from '@/lib/workflow/check-verdict';
 import { buildStageDigest, formatManuscript, summariseStageContent } from '@/lib/workflow/digest';
 import { appendBatch, scaleForRequest, serializeAssessment, type AssessScale } from '@/lib/workflow/assess';
 import { keepFound, webAccessOf } from '@/lib/workflow/web-found';
-import { goWaitingLine, objectiveUnmet, executableNext } from '@/lib/workflow/objective';
+import { goWaitingLine, objectiveNotRechecked, objectiveUnmet, executableNext } from '@/lib/workflow/objective';
 import { recordFacts, supersedeFact } from '@/lib/supabase/facts';
 import { factsAlreadyRecorded, planFactRecording } from '@/lib/workflow/record-facts';
 import { ProjectReferences } from './project-references';
@@ -145,7 +145,7 @@ import type { Artifact, ArtifactVersion, Evaluation, Project, ProjectPatch, Rout
 import { useExperience } from '@/lib/projects/experience';
 import { freshOrPage } from '@/lib/workflow/fresh-manuscript';
 import { addedSignature, designAddedStage, effectiveTemplate } from '@/lib/workflow/added-stages';
-import { withApprovals } from '@/lib/workflow/approvals';
+import { approvalsOnEarlierVersion, withApprovals } from '@/lib/workflow/approvals';
 import { isFailedEvaluation, lastCompletedCheck } from '@/lib/workflow/evaluation-failure';
 import { otherWorkFor } from '@/lib/agent/other-work';
 import { createClient as createBrowserClient } from '@/lib/supabase/client';
@@ -637,13 +637,18 @@ export function WorkflowWorkspace({
     const headId = stageBundles[state.current_stage_id]?.versions.at(-1)?.id;
     return current ? checkVerdict(evaluations?.[headId ?? ''], headId, current) : null;
   }, [template, state.current_stage_id, stageBundles, evaluations]);
+  // What the count says beyond stages (5 Nov): an approval on an earlier text, and a check overtaken by a change.
+  const objectiveStale = useMemo(() => objectiveNotRechecked(events ?? [], project.facts ?? []), [events, project.facts]);
+  const approvalsOnEarlier = useMemo(() => approvalsOnEarlierVersion(project, template, stageBundles), [project, template, stageBundles]);
   const outstanding = useMemo(
     () =>
       outstandingWork(template, state, context, {
         objectiveUnmet: objectiveAssessment ? { blockers: objectiveAssessment.blockers.map((b) => b.need), next: executableNext(objectiveAssessment)?.title ?? null } : null,
         checkSays: currentCheckSays ? { stageId: state.current_stage_id, says: currentCheckSays } : null,
+        objectiveNotRechecked: objectiveStale,
+        approvalsOnEarlier,
       }),
-    [template, state, context, objectiveAssessment, currentCheckSays]
+    [template, state, context, objectiveAssessment, currentCheckSays, objectiveStale, approvalsOnEarlier]
   );
   const openFindings = useMemo(() => openFindingsByStage(outstanding), [outstanding]);
   // The last stage reads as finished while the objective is not (13 Oct, Sean,
@@ -1908,6 +1913,8 @@ export function WorkflowWorkspace({
   const completion = completionSummary(template, state, context, {
     goWaiting,
     objectiveUnmet: objectiveAssessment ? { blockers: objectiveAssessment.blockers.map((b) => b.need), next: executableNext(objectiveAssessment)?.title ?? null } : null,
+    objectiveNotRechecked: objectiveStale,
+    approvalsOnEarlier,
   });
   // The sidebar counts what Go stops on, not only stage statuses (12 Oct).
   const progressCaption = progressCaptionText(progress, state.project_status === 'finalized', completion.outstanding);

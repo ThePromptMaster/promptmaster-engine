@@ -6,6 +6,9 @@ export const en = {
   'progress.leftOpen': '{count} left open',
   'progress.toGo': '{count} to go',
   'progress.stillOpen': '{count} still open',
+  'progress.objectiveNotRechecked': 'objective not rechecked',
+  'progress.reconfirm_one': '{count} approval to re-confirm',
+  'progress.reconfirm_other': '{count} approvals to re-confirm',
   'progress.goWaiting': 'Go is waiting for you',
 
   'ws.workflowForm': '{name} workflow · {form}',
@@ -52,6 +55,9 @@ export const es: Keys = {
   'progress.leftOpen': '{count} dejadas abiertas',
   'progress.toGo': '{count} por hacer',
   'progress.stillOpen': '{count} aún abiertas',
+  'progress.objectiveNotRechecked': 'objetivo sin volver a comprobar',
+  'progress.reconfirm_one': '{count} aprobación por reconfirmar',
+  'progress.reconfirm_other': '{count} aprobaciones por reconfirmar',
   'progress.goWaiting': 'Go te está esperando',
 
   'ws.workflowForm': 'Flujo {name} · {form}',
@@ -96,6 +102,9 @@ export const fr: Keys = {
   'progress.leftOpen': '{count} laissées ouvertes',
   'progress.toGo': '{count} restantes',
   'progress.stillOpen': '{count} encore ouvertes',
+  'progress.objectiveNotRechecked': 'objectif non revérifié',
+  'progress.reconfirm_one': '{count} approbation à reconfirmer',
+  'progress.reconfirm_other': '{count} approbations à reconfirmer',
   'progress.goWaiting': 'Go vous attend',
 
   'ws.workflowForm': 'Parcours {name} · {form}',
@@ -140,6 +149,9 @@ export const pt: Keys = {
   'progress.leftOpen': '{count} deixadas abertas',
   'progress.toGo': '{count} a fazer',
   'progress.stillOpen': '{count} ainda abertas',
+  'progress.objectiveNotRechecked': 'objetivo não verificado de novo',
+  'progress.reconfirm_one': '{count} aprovação a reconfirmar',
+  'progress.reconfirm_other': '{count} aprovações a reconfirmar',
   'progress.goWaiting': 'O Go está esperando você',
 
   'ws.workflowForm': 'Fluxo {name} · {form}',

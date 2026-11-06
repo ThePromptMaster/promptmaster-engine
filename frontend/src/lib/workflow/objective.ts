@@ -146,22 +146,44 @@ export function objectiveUnmet(
   events: readonly WorkflowEvent[],
   facts: readonly { created_at: string }[] = []
 ): ObjectiveAssessment | null {
+  const latest = unmetVerdict(events);
+  return latest && !changedSince(latest.at, events, facts) ? latest : null;
+}
+
+/**
+ * The check said not met, and something has changed since, so nothing stands
+ * either way until it is checked again (5 Nov, a book test: "6 done · 0 to go"
+ * while Go said the review was incomplete). The verdict stops counting as "not
+ * met" the moment a repair is saved, and the caption had nothing to say instead.
+ */
+export function objectiveNotRechecked(
+  events: readonly WorkflowEvent[],
+  facts: readonly { created_at: string }[] = []
+): boolean {
+  const latest = unmetVerdict(events);
+  return Boolean(latest) && changedSince(latest!.at, events, facts);
+}
+
+function unmetVerdict(events: readonly WorkflowEvent[]) {
   const latest = latestObjectiveAssessment(events);
   if (!latest || latest.outcome === 'met') return null;
   // A round check that found nothing left for the user moved the work on to
   // the stage that writes the deliverable: it is not a pause (20 Oct, prod
   // pass: "The objective is not met yet" and "Resume Go" stood beside a Go
   // waiting only for the package's approval).
-  if (latest.ready_for_later_stage) return null;
-  // Until 8 Oct this returned the latest assessment whatever happened after
-  // it, so a project kept "waiting for" the launch date and the price after
-  // both had been answered (Sean, 7 Oct, email 11).
-  const at = Date.parse(latest.at);
-  if (Number.isNaN(at)) return latest;
-  const after = (iso: string | undefined) => Boolean(iso) && Date.parse(iso!) > at;
-  const changed =
-    events.some((e) => CHANGES_SINCE.has(e.type) && after(e.created_at)) || facts.some((f) => after(f.created_at));
-  return changed ? null : latest;
+  return latest.ready_for_later_stage ? null : latest;
+}
+
+/**
+ * Until 8 Oct the latest assessment was returned whatever happened after it,
+ * so a project kept "waiting for" the launch date and the price after both had
+ * been answered (7 Oct, email 11).
+ */
+function changedSince(iso: string, events: readonly WorkflowEvent[], facts: readonly { created_at: string }[]): boolean {
+  const at = Date.parse(iso);
+  if (Number.isNaN(at)) return false;
+  const after = (when: string | undefined) => Boolean(when) && Date.parse(when!) > at;
+  return events.some((e) => CHANGES_SINCE.has(e.type) && after(e.created_at)) || facts.some((f) => after(f.created_at));
 }
 
 /** What makes an "objective not met" a thing to check again rather than a standing verdict. */
