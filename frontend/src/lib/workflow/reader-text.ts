@@ -20,9 +20,14 @@ import { withoutStamps } from './version-stamp';
 /** A heading for a note about the revision, not part of the document. */
 const NOTE_HEADING =
   /^(#{1,6})\s+\**(?:what changed|changes? (?:in|to|made in|from|since) (?:this|the|that|an?) (?:previous |earlier |last |prior )?(?:version|revision|draft)|revision notes?|change notes?|notes? on (?:this|the) (?:version|revision|draft)|reviewer'?s? notes?|review notes?)\b/i;
+const REVIEW_NOTE_HEADING = /^(#{1,6})\s+\**(?:reviewer'?s? notes?|review notes?)\b/i;
 
-/** The document without the notes about how it was made. */
-export function forReader(text: string, keepChangeLog = false): string {
+/**
+ * The document without the notes about how it was made. `keepReviewNote`: the
+ * user asked for a review note beside the work (5 Nov, a book test), so it is
+ * part of what they get.
+ */
+export function forReader(text: string, keepChangeLog = false, keepReviewNote = false): string {
   const stamped = withoutStamps(text);
   if (keepChangeLog) return stamped;
   // A note to the user at the end, from a version saved before 4 Nov (`user-note.ts`).
@@ -34,7 +39,7 @@ export function forReader(text: string, keepChangeLog = false): string {
     if (skipping && heading && heading[1].length <= skipping) skipping = 0;
     if (skipping) continue;
     const note = line.match(NOTE_HEADING);
-    if (note) {
+    if (note && !(keepReviewNote && REVIEW_NOTE_HEADING.test(line))) {
       skipping = note[1].length;
       continue;
     }

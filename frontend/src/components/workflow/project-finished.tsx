@@ -7,8 +7,9 @@ import { nounText, stageText, unitsText } from '@/lib/i18n/templates';
 
 import { MarkdownOutput } from '@/components/shared/markdown-output';
 import { downloadBlob, downloadFile } from '@/lib/utils';
+import { deliverableDocument } from '@/lib/workflow/deliverable';
 import { carriedForward, CARRIED_HEADING, exportFilename, toManuscriptMarkdown, type ExportBundle } from '@/lib/export/project-export';
-import { deliverableStage, type CompletionSummary } from '@/lib/workflow/engine';
+import { type CompletionSummary } from '@/lib/workflow/engine';
 import { deliverableNouns } from '@/lib/workflow/labels';
 import { asksForChangeLog, missingParts } from '@/lib/workflow/requested-parts';
 import { internalMentions } from '@/lib/workflow/reader-text';
@@ -37,7 +38,8 @@ export function ProjectFinished({ bundle, completion, evaluation, onReopen, onEd
   const t = useT();
   const locale = useLocale();
   const { project, template } = bundle;
-  const stage = deliverableStage(template);
+  const doc = useMemo(() => deliverableDocument(template, bundle.stages as Parameters<typeof deliverableDocument>[1]), [template, bundle.stages]);
+  const stage = doc?.stage;
   const inSections = stage?.renderer === 'long_form';
   const nouns = deliverableNouns(template, project);
   const noun = nounText(locale, nouns.deliverable);
@@ -110,6 +112,11 @@ export function ProjectFinished({ bundle, completion, evaluation, onReopen, onEd
               .join(' · ')
           : t('pnl.nothingWritten', { stage: stage ? stageText(locale, template.key, stage, 'label') : t('pnl.theDeliverable'), noun })}
       </p>
+      {doc?.partial && (
+        <p role="note" data-deliverable-partial className="mt-2 text-body text-[var(--on-surface-variant)]">
+          {t('pnl.deliverablePartial', { later: doc.partial.label, chapters: doc.partial.chapters })}
+        </p>
+      )}
       {evaluation && (
         <div className="mt-2">
           <EvaluationScores evaluation={evaluation} />

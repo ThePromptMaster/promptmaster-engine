@@ -39,6 +39,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { api, type AnswerContradiction } from '@/lib/api/client';
 import { ANSWER_OBJECTIVE_REASON, FIX_OBJECTIVE_REASON } from '@/lib/agent/objective-fixes';
+import { deliverableDocument } from '@/lib/workflow/deliverable';
 import { actionFor, actionLabel, AWAIT_SECTIONS_STEP, INTERPRET_STEP, ROUTINE_DEFAULT_STEP, USER_ANSWER_STEP, whatApprovalDoes } from '@/lib/agent/actions';
 import { contextWithFacts, readOutcomeProof, readStageFacts, type StageFacts } from '@/lib/agent/facts';
 import { serializeItems, stageDrafts } from '@/lib/workflow/stage-artifact';
@@ -77,7 +78,7 @@ import {
 import { dataFileBriefs, type StageArtifactBundle } from '@/lib/workflow/digest';
 import type { StageFigures } from '@/lib/workflow/figures';
 import type { StageControl } from '@/lib/workflow/stage-controls';
-import { deliverableStage, evaluateStage, getStage, nextSuggestedStage } from '@/lib/workflow/engine';
+import { evaluateStage, getStage, nextSuggestedStage } from '@/lib/workflow/engine';
 import { objectiveUnmet } from '@/lib/workflow/objective';
 import { addedByRun, MAX_ADDED_PER_RUN } from '@/lib/workflow/added-stages';
 import { isDone } from '@/lib/workflow/types';
@@ -755,7 +756,7 @@ export function useGoLoop(opts: Options) {
           extraTriesRef.current
         );
         const drafted = new Set(Object.entries(o.bundles).filter(([, b]) => (b?.versions.length ?? 0) > 0).map(([id]) => id));
-        const holder = deliverableStage(o.template);
+        const holder = deliverableDocument(o.template, o.bundles)?.stage;
         const carriedRows = Object.values(context.carriedForward ?? {}).flat();
         const carried = current.policy === 'autonomous' && routine === 'handle' && holder && carriedRows.length
           ? { deliverableId: holder.id, rows: carriedRows }
@@ -1404,8 +1405,9 @@ export function useGoLoop(opts: Options) {
    */
   const reopenJudged = useCallback(async (title: string, why: string) => {
     const o = latest.current;
-    const judged = deliverableStage(o.template);
     const unmet = objectiveUnmet(o.events);
+    // The stage the check read, as it recorded (5 Nov): not the chapters, when a later stage holds the work.
+    const judged = o.template.stages.find((s) => s.id === unmet?.basis?.stage_id) ?? deliverableDocument(o.template, o.bundles)?.stage;
     const judgedStatus = judged ? o.state.stages[judged.id]?.status : undefined;
     if (judged && unmet && (isDone(judgedStatus) || judgedStatus === 'in_progress')) {
       await appendWorkflowEvent(o.project.id, o.project.user_id, {

@@ -11,6 +11,8 @@
  * deliverable, so the reader can say what it is showing. Pure.
  */
 
+import { deliverableDocument } from './deliverable';
+import type { StageArtifactBundle } from './digest';
 import { deliverableStage } from './engine';
 import type { WorkflowTemplate } from './types';
 
@@ -27,7 +29,9 @@ export function readerLag(
   template: WorkflowTemplate,
   stages: Record<string, { versions: readonly { created_at: string }[] } | undefined>
 ): ReaderLag | null {
-  const deliverable = deliverableStage(template);
+  const base = deliverableStage(template);
+  // Past the chapters, the stage that finishes them may be what the reader shows.
+  const deliverable = base?.renderer === 'long_form' ? deliverableDocument(template, stages as Record<string, StageArtifactBundle>)?.stage : base;
   // A manuscript is read from its sections, which every chapter edit updates.
   if (!deliverable || deliverable.renderer === 'long_form') return null;
   const shownAt = stages[deliverable.id]?.versions.at(-1)?.created_at;

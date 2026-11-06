@@ -29,7 +29,13 @@ const PARTS: readonly Part[] = [
   { asked: /\b(glossary)\b/i },
   { asked: /\b(faqs?|frequently asked questions)\b/i },
   { asked: /\b(bibliography|reference list|list of references)\b/i },
+  // 5 Nov (a book test): "report … in a short note outside the book". REVIEW_NOTE_PART.
+  {
+    asked: /\b(review note|note outside (?:the )?(?:book|document|report|manuscript|work))\b/i,
+    shown: /^#{1,6}\s.*\b(review|reviewer|note)\b/im,
+  },
 ];
+const REVIEW_NOTE_PART = PARTS.length - 1;
 
 /** "no change log", "without a cover note", "remove the glossary": not asked for. */
 const DECLINED = /\b(no|without|not|never|don'?t|do not|remove|drop|omit|exclude|skip)\b(?:\W+\w+){0,3}\W*$/i;
@@ -65,6 +71,11 @@ function asked(project: Asking): (string | null)[] {
 /** Whether the user asked for a change log or revision history: then the work may talk about versions. */
 export function asksForChangeLog(project: Asking): boolean {
   return asked(project)[0] !== null;
+}
+
+/** Whether the user asked for a review note beside the work: then it is part of what they get, and stays in the export. */
+export function asksForReviewNote(project: Asking): boolean {
+  return asked(project)[REVIEW_NOTE_PART] !== null;
 }
 
 /**

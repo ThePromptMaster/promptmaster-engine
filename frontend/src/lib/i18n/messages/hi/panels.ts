@@ -166,6 +166,7 @@ export const hi: Record<keyof typeof en, string> = {
   'pnl.skippedN': '{n} छोड़े गए',
   'pnl.leftOpenN': '{n} खुले छोड़े गए',
   'pnl.nothingWritten': '{stage} पर कुछ नहीं लिखा गया, इसलिए अभी पढ़ने या निर्यात करने के लिए कोई {noun} नहीं है।',
+  'pnl.deliverablePartial': '{later} में {chapters} का केवल एक हिस्सा है, इसलिए यह {chapters} है जैसा अभी है। जो सुधार केवल {later} में किए गए वे इसमें नहीं हैं।',
   'pnl.theDeliverable': 'डिलीवरेबल चरण',
   'pnl.hideNoun': '{noun} छिपाएँ',
   'pnl.readNoun': 'पूरा {noun} पढ़ें',
