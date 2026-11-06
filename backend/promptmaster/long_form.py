@@ -89,7 +89,22 @@ _OUTLINE_SYSTEM = (
 )
 
 
-def build_outline_prompt(inputs: PMInput, suggested_section_count: int) -> tuple[str, str]:
+def _later_stages_rule(later_stages: list[str] | None) -> str:
+    """5 Nov (a book test): the chapter plan held a "Review Note" section, and a section
+    writer sees the outline and its own text, never the other chapters, so the note could
+    only say the text was not available. A later stage does that work, with the chapters
+    in front of it."""
+    labels = [l.strip() for l in (later_stages or []) if l.strip()]
+    if not labels:
+        return ""
+    return (
+        f"The stages after these sections are: {'; '.join(labels[:12])}. They do their own work, with the "
+        "written sections in front of them. Plan only the work itself: no section for checking, reviewing "
+        "or reporting on the other sections, and no section for what one of those stages produces.\n\n"
+    )
+
+
+def build_outline_prompt(inputs: PMInput, suggested_section_count: int, later_stages: list[str] | None = None) -> tuple[str, str]:
     """Build (system, user) prompts for outline generation."""
     user = (
         f"Objective: {inputs.objective}\n"
@@ -99,6 +114,7 @@ def build_outline_prompt(inputs: PMInput, suggested_section_count: int) -> tuple
         f"Output format: {inputs.output_format or '(none)'}\n"
         f"Target section count: {suggested_section_count} (use this as a guide; "
         "adjust if the objective genuinely needs more or fewer).\n\n"
+        f"{_later_stages_rule(later_stages)}"
         "Return JSON with one field:\n"
         '- outline: array of {"title": string, "abstract": string}\n\n'
         "Each abstract must be ONE short sentence (≤20 words) describing what that "
@@ -112,9 +128,10 @@ async def generate_outline(
     model: str | None,
     inputs: PMInput,
     suggested_section_count: int,
+    later_stages: list[str] | None = None,
 ) -> list[OutlineSection]:
     """Generate an outline. Returns OutlineSection[] with auto-assigned ids and default fields."""
-    system, user = build_outline_prompt(inputs, suggested_section_count)
+    system, user = build_outline_prompt(inputs, suggested_section_count, later_stages)
     result, _usage = await client.generate_json(
         prompt=user,
         system=system,

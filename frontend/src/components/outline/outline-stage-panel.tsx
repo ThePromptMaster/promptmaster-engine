@@ -18,7 +18,8 @@ import {
   parseOutlineDocument,
   staleDrafts,
 } from '@/lib/outline/model';
-import { approveOutline, generateOutlineDraft, loadOutline } from '@/lib/outline/actions';
+import { approveOutline, generateOutlineDraft, loadOutline, stagesAfterPlan } from '@/lib/outline/actions';
+import type { WorkflowTemplate } from '@/lib/workflow/types';
 import { applyOutlineEdit } from '@/lib/outline/use-outline-draft';
 import {
   approvedOutlineVersionId,
@@ -57,6 +58,8 @@ interface Props {
   events: WorkflowEvent[];
   /** Called after an approval, so the workspace can re-read the event log. */
   onEventsChanged?: () => void | Promise<unknown>;
+  /** The workflow, so a plan knows what later stages do and leaves it to them (5 Nov). */
+  template?: Pick<WorkflowTemplate, 'stages'>;
   /** Prose already written, per outline item. Owned by the drafting surface. */
   drafts?: SectionDraftBinding[];
   onRewriteSection?: (itemId: string) => void;
@@ -115,6 +118,7 @@ function inputsFor(project: Project): PMInput {
 export function OutlineStagePanel({
   project,
   stageId,
+  template,
   events,
   onEventsChanged,
   drafts = [],
@@ -360,13 +364,13 @@ export function OutlineStagePanel({
       // The same call Go mode's generate_outline makes (B2a). Derived outlines
       // re-derive and never call a model; either way the merge keeps a section
       // that has left the outline in the orphan tray with its prose intact.
-      edit(await generateOutlineDraft({ project, doc, drafts, derive: derive ? () => derive(form) : undefined, stageId }));
+      edit(await generateOutlineDraft({ project, doc, drafts, derive: derive ? () => derive(form) : undefined, stageId, template }));
     } catch (e) {
       setError(e instanceof Error ? e.message : tr('ol.couldNotRegen'));
     } finally {
       setRegeneratingAll(false);
     }
-  }, [project, doc, drafts, edit, derive, form, stageId]);
+  }, [project, doc, drafts, edit, derive, form, stageId, template]);
 
   const handleRegenerateItem = useCallback(
     async (itemId: string) => {
@@ -399,6 +403,7 @@ export function OutlineStagePanel({
           suggested_section_count: doc.items.length,
           model: project.model,
           web_access: webAccessOf(project),
+          later_stages: stagesAfterPlan(template, stageId),
         });
         await keepFound(project, res, { stageId });
         const { outline } = res;
@@ -411,7 +416,7 @@ export function OutlineStagePanel({
         setRegeneratingItemId(null);
       }
     },
-    [doc, project, edit, derive, formOf, form, stageId]
+    [doc, project, edit, derive, formOf, form, stageId, template]
   );
 
   const handleDiscardDraft = useCallback(() => {

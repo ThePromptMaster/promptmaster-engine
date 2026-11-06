@@ -337,6 +337,15 @@ EVIDENCE_WORDS_RULE = (
 )
 
 
+#: 5 Nov (a book test): "Short review citing passages from that same saved version."
+REVIEW_NOTE_RULE = (
+    "IF THIS STAGE'S TEXT INCLUDES A NOTE ON THE WORK (a review note, a note on what was checked): it reviews the "
+    "work as this text holds it now. For each point, quote the passage from this text, exactly. Say what you read. "
+    "Something an earlier draft had that this text no longer has is not a finding; report only what is wrong now. "
+    "Never say the text was not available when it is in front of you; if something truly was not, name exactly what."
+)
+
+
 def build_stage_prompt(
     inputs: PMInput,
     stage: StageDescriptor,
@@ -530,6 +539,9 @@ def build_stage_prompt(
     whole = whole_document_block(whole_text)
     if whole:
         parts += ["", whole]
+
+    if digest.manuscript.strip() or whole:
+        parts += ["", REVIEW_NOTE_RULE]
 
     if existing_content.strip() and instruction.strip():
         # A revision, not a fresh attempt. "Produce a better one; do not repeat

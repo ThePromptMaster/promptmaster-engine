@@ -20,7 +20,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from promptmaster.deliverable_check import MAX_TABLES, AcceptedFinding, DeliverableCheck, RecordedTable, check_deliverable
+from promptmaster.deliverable_check import MAX_TABLES, AcceptedFinding, DeliverableCheck, RecordedTable, check_deliverable, MAX_NOTE_QUOTES
 from promptmaster.web_search import WebAccess, WebUse, cite_only_known, with_web
 from deps import get_client, llm_mode
 from promptmaster.literature import MAX_SEARCH_RESULTS, MAX_WORKS, WorkMatch, WorkQuery, lookup_works, search_works
@@ -393,6 +393,8 @@ class CheckDeliverableRequest(BaseModel):
     accepted: list[AcceptedFinding] = Field(default_factory=list, max_length=60)
     #: Outcome tables before the deliverable, as their rows stand (4 Nov).
     tables: list[RecordedTable] = Field(default_factory=list, max_length=MAX_TABLES)
+    #: Passages the document's own review note quotes that the rest of it does not hold (5 Nov).
+    note_quotes: list[str] = Field(default_factory=list, max_length=MAX_NOTE_QUOTES)
     model: str = ""
 
 
@@ -405,7 +407,7 @@ async def api_check_deliverable(req: CheckDeliverableRequest, client: OpenRouter
     """Whether the deliverable carries the accepted findings and holds together
     (1 Nov). 1 LLM call; a check — writes nothing, never searches the web."""
     try:
-        result = await check_deliverable(client, req.model or None, req.inputs, req.deliverable_label or "the deliverable", req.content, req.accepted, req.tables)
+        result = await check_deliverable(client, req.model or None, req.inputs, req.deliverable_label or "the deliverable", req.content, req.accepted, req.tables, req.note_quotes)
     except OpenRouterError as e:
         raise llm_http_error(e, PRESERVED_NOTHING_WRITTEN)
     return CheckDeliverableResponse(**result.model_dump(), model_used=_model_used(req.model, client))

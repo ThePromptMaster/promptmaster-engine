@@ -56,7 +56,7 @@ import { blocksCompletion, deliverableStage, describeOutstanding, evaluateStage,
 import { describeBasis, executableNext, openWithNextLine, pausedLine, stillMet, type ObjectiveAssessment, type ObjectiveBasis } from '@/lib/workflow/objective';
 import { addedByRun, designAddedStage, MAX_ADDED_PER_RUN, type AddedStage } from '@/lib/workflow/added-stages';
 import { attachedDocuments, currentFacts, supersededFactValues } from '@/lib/workflow/facts';
-import { acceptedRowsBefore, outcomeTablesBefore, checkedVersion, describeCheck, issuesFrom, MAX_CHECK_ROUNDS, roundsUsed, type DeliverableCheckRecord } from './deliverable-check';
+import { acceptedRowsBefore, noAccessClaim, noteQuotesNotInText, outcomeTablesBefore, checkedVersion, describeCheck, issuesFrom, MAX_CHECK_ROUNDS, roundsUsed, type DeliverableCheckRecord } from './deliverable-check';
 import { InputMissing, ManuscriptMissing, checkedStageFor, withCurrentLongForm, withFreshManuscript } from '@/lib/workflow/fresh-manuscript';
 import { useProjectStore } from '@/stores/project-store';
 import { describeValue, leftoverMentions, leftoverValues, namedLeftovers, type SupersededValue } from '@/lib/workflow/fact-values';
@@ -938,7 +938,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
       // by the same function the panel's own button calls; no model is asked.
       const derived = ctx.template.outline_stage === 'derived';
       const doc = await generateOutlineDraft({
-        project: ctx.project, doc: f.doc, drafts: [], stageId: ctx.stage.id, agentRunId: ctx.run.id,
+        project: ctx.project, doc: f.doc, drafts: [], stageId: ctx.stage.id, agentRunId: ctx.run.id, template: ctx.template,
         // In the form the project's reader calls for; the user can lay it out the other way on the outline.
         ...(derived ? { derive: () => deriveOutlineItems(ctx.template, ctx.state, ctx.bundles, { form: defaultOutlineForm(ctx.template, ctx.project) }) } : {}),
       });
@@ -2746,19 +2746,21 @@ async function checkDeliverable(
   const rounds = roundsUsed(events, ctx.run.id, holder.id);
   const at = { version_id: head?.id ?? null, version_number: head?.version_number ?? null };
   if (kept) return { ...kept, ...at, bounded: Boolean(kept.issues.length) && rounds >= MAX_CHECK_ROUNDS };
-  const rows = acceptedRowsBefore(ctx.template, ctx.bundles, holder.id);
+  const rows = acceptedRowsBefore(ctx.template, ctx.bundles, holder.id, ctx.state);
+  const noteQuotes = noteQuotesNotInText(content);
+  const claim = noAccessClaim(content);
   try {
     const res = await api.agentCheckDeliverable(
-      { inputs: inputsFrom(ctx.project), deliverable_label: label, content, accepted: rows, tables: outcomeTablesBefore(ctx.template, ctx.bundles, holder.id), model: ctx.project.model },
+      { inputs: inputsFrom(ctx.project), deliverable_label: label, content, accepted: rows, tables: outcomeTablesBefore(ctx.template, ctx.bundles, holder.id), ...(noteQuotes.length ? { note_quotes: noteQuotes } : {}), model: ctx.project.model },
       ctx.signal
     );
-    const issues = issuesFrom(res, rows, label);
+    const issues = [...issuesFrom(res, rows, label), ...(claim ? [claim] : [])];
     const carried = res.findings.filter((f) => f.verdict === 'carried').length;
     const accepted = rows.length - res.findings.filter((f) => f.verdict === 'not_applicable').length;
     const part = res.total_chars && (res.read_chars ?? res.total_chars) < res.total_chars ? { read: { chars: res.read_chars ?? 0, total: res.total_chars } } : {};
     return { ...at, accepted, carried, issues, ...part, ...(issues.length && rounds >= MAX_CHECK_ROUNDS ? { bounded: true } : {}) };
   } catch {
-    return { ...at, accepted: rows.length, carried: 0, issues: [], failed: true };
+    return { ...at, accepted: rows.length, carried: 0, issues: claim ? [claim] : [], failed: true };
   }
 }
 

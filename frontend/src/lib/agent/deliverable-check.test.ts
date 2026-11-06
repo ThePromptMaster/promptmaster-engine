@@ -10,7 +10,7 @@ import { serializeItems } from '@/lib/workflow/stage-artifact';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
 import type { WorkflowEvent } from '@/lib/workflow/types';
 import type { Artifact, ArtifactVersion } from '@/types/project';
-import { acceptedRowsBefore, checkedVersion, describeCheck, issuesFrom, MAX_CHECK_ROUNDS, roundsUsed, type DeliverableCheckRecord } from './deliverable-check';
+import { acceptedRowsBefore, checkedVersion, describeCheck, issuesFrom, MAX_CHECK_ROUNDS, roundsUsed, type DeliverableCheckRecord, noAccessClaim, noteQuotesNotInText } from './deliverable-check';
 
 const bundle = (stageId: string, content: string): StageArtifactBundle => ({
   artifact: { id: `a-${stageId}`, stage_id: stageId, long_form: null } as unknown as Artifact,
@@ -69,5 +69,65 @@ describe('the review is bounded and does not repeat itself', () => {
     expect(describeCheck(record({ issues: [] }), 'Final memo')).toBe(' Checked: 2 of 3 accepted findings shown carried into Final memo v1; no contradiction found.');
     expect(describeCheck(record({ bounded: true }), 'Final memo')).toBe(' Checked: 2 of 3 accepted findings shown carried into Final memo v1. Still open after 2 repair rounds, so stated as limitations: x.');
     expect(describeCheck(record({ failed: true }), 'Final memo')).toContain('could not run, so nothing was concluded from it');
+  });
+});
+
+describe("the note cites the version it sits in (5 Nov, a six-chapter book test)", () => {
+  const chapters = `## Chapter 4\n\n"Following our conversation today, I've approved your request to finish at 2pm every Friday." ${'word '.repeat(220)}\n`;
+  const withNote = (note: string) => `${chapters}\n## Review Note: Manuscript Checked Against the Outline\n\n${note}\n`;
+
+  it('finds a passage the note quotes that this version does not hold', () => {
+    const text = withNote('Chapter 4 is inconsistent. Sam says, "I\'m approving it at 2:30, not 2." It must follow the outline.');
+    expect(noteQuotesNotInText(text)).toEqual(["I'm approving it at 2:30, not 2."]);
+  });
+
+  it('a passage it does hold is fine, however its quote marks and capitals differ', () => {
+    const text = withNote('Chapter 4 holds: “following our conversation today, I’ve approved your request to finish at 2pm every Friday.”');
+    expect(noteQuotesNotInText(text)).toEqual([]);
+  });
+
+  it('short phrases in quotes are not passages, and a document with no note has nothing to check', () => {
+    expect(noteQuotesNotInText(withNote('It uses the phrase "approved exception" throughout.'))).toEqual([]);
+    expect(noteQuotesNotInText('## Chapter 1\n\nHe said "this is not in any other chapter at all".')).toEqual([]);
+  });
+
+  it('reads the numbered heading the chapters use, and stops at the next heading', () => {
+    const text = `## 1. One\n\nText.\n\n## 8. Review Note\n\nIt quotes "a passage that is not in the text".\n\n## 9. Appendix\n\nIt also says "a passage in the appendix text here".`;
+    expect(noteQuotesNotInText(text)).toEqual(['a passage that is not in the text']);
+  });
+
+  it('a note saying it could not read the work, beside the work, is an issue', () => {
+    const said = 'The text of Chapters 1 to 6 was not in front of me when I wrote it, so I could inspect only the outline.';
+    expect(noAccessClaim(withNote(said))).toContain('was not in front of me');
+    expect(noAccessClaim(withNote('The chapter text was not available to me.'))).toContain('not available');
+  });
+
+  it('is no issue without the work beside it, or about something else', () => {
+    expect(noAccessClaim(`## Chapter 1\n\nShort.\n\n## Review note\n\nThe chapter text was not available to me.`)).toBeNull();
+    expect(noAccessClaim(withNote('I read all six chapters. No external sources were available to me.'))).toBeNull();
+  });
+});
+
+describe("a manuscript's own later reviews reach the check (5 Nov)", () => {
+  const rows = (id: string) => serializeItems([{ id, finding: `Finding ${id}`, severity: 'minor', status: 'accepted', status_source: 'user' }]);
+  const bundles = { continuity: bundle('continuity', rows('c1')), critique: bundle('critique', rows('k1')) };
+  const state = (done: Record<string, string>) => ({ stages: Object.fromEntries(Object.entries(done).map(([id, status]) => [id, { status }])) }) as never;
+
+  it('those before the last long-form stage done', () => {
+    const rows = acceptedRowsBefore(BOOK_V1, bundles, 'drafting', state({ revision: 'complete' }));
+    expect(rows.map((r) => r.id)).toEqual(['c1']);
+  });
+
+  it('the later ones too, once Editing is done', () => {
+    const rows = acceptedRowsBefore(BOOK_V1, bundles, 'drafting', state({ revision: 'complete', editing: 'complete' }));
+    expect(rows.map((r) => r.id)).toEqual(['c1', 'k1']);
+  });
+
+  it('none it has not reached yet: nothing has tried to carry them', () => {
+    expect(acceptedRowsBefore(BOOK_V1, bundles, 'drafting', state({ revision: 'in_progress' }))).toEqual([]);
+  });
+
+  it('without the state, as before', () => {
+    expect(acceptedRowsBefore(BOOK_V1, bundles, 'drafting')).toEqual([]);
   });
 });

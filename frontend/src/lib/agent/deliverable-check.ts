@@ -16,7 +16,7 @@ import { effectiveRenderer, itemSchemaFor, parseItems } from '@/lib/workflow/sta
 import { isSuperseded } from '@/lib/workflow/superseded-rows';
 import { isTriageTable } from '@/lib/workflow/triage';
 import type { StageArtifactBundle } from '@/lib/workflow/digest';
-import type { WorkflowEvent, WorkflowTemplate } from '@/lib/workflow/types';
+import { isDone, type WorkflowEvent, type WorkflowState, type WorkflowTemplate } from '@/lib/workflow/types';
 
 /** How many times in one run the check's issues are sent back for repair. */
 export const MAX_CHECK_ROUNDS = 2;
@@ -55,9 +55,21 @@ export interface DeliverableCheckRecord {
  * their table words them. Rows a later fact superseded are left out: they no
  * longer describe what the work must do.
  */
-export function acceptedRowsBefore(template: WorkflowTemplate, bundles: Record<string, StageArtifactBundle>, holderId: string): AcceptedRow[] {
-  const end = template.stages.findIndex((s) => s.id === holderId);
-  return template.stages.slice(0, end < 0 ? template.stages.length : end).flatMap((stage) => {
+export function acceptedRowsBefore(
+  template: WorkflowTemplate,
+  bundles: Record<string, StageArtifactBundle>,
+  holderId: string,
+  /** With the state, a manuscript's own later reviews count, up to the last long-form stage done (5 Nov). */
+  state?: Pick<WorkflowState, 'stages'>
+): AcceptedRow[] {
+  const holderAt = template.stages.findIndex((s) => s.id === holderId);
+  // Book's Continuity, Critique and Fact-check come after Drafting, which holds the
+  // chapters, so their accepted rows never reached this check. Findings Revision or
+  // Editing has not reached yet are left out: nothing has tried to carry them.
+  const reached = state && template.stages[holderAt]?.renderer === 'long_form'
+    ? template.stages.reduce((last, s, i) => (s.renderer === 'long_form' && isDone(state.stages[s.id]?.status) ? i : last), holderAt)
+    : holderAt;
+  return template.stages.slice(0, reached < 0 ? template.stages.length : reached).flatMap((stage) => {
     if (effectiveRenderer(stage) !== 'review') return [];
     const schema = itemSchemaFor(stage);
     if (!isTriageTable(schema)) return [];
@@ -162,4 +174,64 @@ export function describeCheck(r: DeliverableCheckRecord | null, label: string): 
   if (!r.issues.length) return ` Checked: ${carried}; no contradiction found.${part}`;
   if (r.bounded) return ` Checked: ${carried}. Still open after ${MAX_CHECK_ROUNDS} repair rounds, so stated as limitations: ${r.issues.join('; ')}.${part}`;
   return ` Checked: ${carried}; ${r.issues.length} issue${r.issues.length === 1 ? '' : 's'} found.${part}`;
+}
+
+/** A heading for a note on the document itself. */
+const REVIEW_NOTE_HEADING = /^(#{1,6})\s+\**(?:\d+[.)]\s+)?(?:review(?:er'?s?)? notes?|notes? on (?:the|this) (?:review|manuscript|draft|document|book)|what was checked)\b/i;
+
+const normalised = (text: string) =>
+  text.replace(/[*_`#>|\\]/g, '').replace(/[’‘]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, ' ').trim().toLowerCase();
+
+/** The document's review note, and the rest of it. Null when it has none. */
+export function splitReviewNote(text: string): { note: string; rest: string } | null {
+  const lines = text.split('\n');
+  const start = lines.findIndex((l) => REVIEW_NOTE_HEADING.test(l));
+  if (start < 0) return null;
+  const level = lines[start].match(/^#+/)![0].length;
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i += 1) {
+    const h = lines[i].match(/^(#{1,6})\s/);
+    if (h && h[1].length <= level) {
+      end = i;
+      break;
+    }
+  }
+  return { note: lines.slice(start, end).join('\n'), rest: [...lines.slice(0, start), ...lines.slice(end)].join('\n') };
+}
+
+const QUOTED = /[“"]([^”"\n]{10,400})[”"]/g;
+
+/**
+ * Passages the review note quotes that the rest of this version does not hold
+ * (5 Nov, a book test). The check judges them: a note may quote an earlier draft
+ * or the brief, saying so. Found in code, so it cannot be argued away.
+ */
+export function noteQuotesNotInText(text: string, max = 12): string[] {
+  const parts = splitReviewNote(text);
+  if (!parts) return [];
+  const rest = normalised(parts.rest);
+  const out: string[] = [];
+  for (const m of parts.note.matchAll(QUOTED)) {
+    const quote = m[1].trim();
+    if (quote.split(/\s+/).length < 4) continue;
+    if (!rest.includes(normalised(quote).replace(/[.,;:!?]+$/, ''))) out.push(quote);
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+/** "Was not available to me", in a note beside the text it says it could not see. */
+const NO_ACCESS =
+  /[^.\n]*\b(?:(?:chapters?|manuscript|draft|text)\b[^.\n]{0,60}\b(?:(?:was|were) not (?:available|in front of me)|(?:wasn't|weren't) (?:available|in front of me))|(?:could|can) (?:only inspect|inspect only|not (?:read|inspect|see))\b[^.\n]{0,60}\b(?:chapters?|manuscript|draft|text|outline))[^.\n]*\./i;
+
+/**
+ * The note says it could not read the work, and this version holds the work: an
+ * issue the check does not have to find (5 Nov: "The text of Chapters 1 to 6 was not
+ * in front of me"). Only when the rest of the document is real text.
+ */
+export function noAccessClaim(text: string): string | null {
+  const parts = splitReviewNote(text);
+  if (!parts || parts.rest.split(/\s+/).filter(Boolean).length < 200) return null;
+  const said = parts.note.match(NO_ACCESS)?.[0]?.trim();
+  return said ? `The review note says it could not read the work, and this version holds it: "${said.slice(0, 300)}"` : null;
 }

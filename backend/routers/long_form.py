@@ -99,6 +99,8 @@ class GenerateOutlineRequest(BaseModel):
     #: The project's Web access switch (22 Oct): on, this searches the web
     #: first when the work needs outside facts.
     web_access: WebAccess = "off"
+    #: The stages after this plan, by label: what they do is not a section (5 Nov).
+    later_stages: list[str] = Field(default_factory=list, max_length=40)
 
 
 class GenerateSectionRequest(BaseModel):
@@ -214,6 +216,7 @@ async def api_generate_outline(
             model=req.model or None,
             inputs=inputs,
             suggested_section_count=req.suggested_section_count,
+            later_stages=req.later_stages,
         )
         return GenerateOutlineResponse(outline=outline, **dict(web))
     except (OpenRouterError, ValueError) as e:

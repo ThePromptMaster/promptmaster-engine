@@ -74,6 +74,20 @@ export interface GenerateOutlineArgs {
   stageId?: string | null;
   /** Go's run, when Go asked for it. */
   agentRunId?: string | null;
+  /** The template, so the plan knows what later stages do (5 Nov). */
+  template?: Pick<WorkflowTemplate, 'stages'>;
+}
+
+/**
+ * The stages after a chapter plan, by label, for its prompt: what they do is not
+ * a section of the plan (5 Nov, a book test: a "Review Note" chapter, written by
+ * a section writer that never sees the other chapters). Chapters themselves are
+ * what the plan is for, so they are left out.
+ */
+export function stagesAfterPlan(template: Pick<WorkflowTemplate, 'stages'> | undefined, planStageId: string | null | undefined): string[] {
+  if (!template) return [];
+  const at = template.stages.findIndex((s) => s.id === planStageId);
+  return at < 0 ? [] : template.stages.slice(at + 1).filter((s) => s.renderer !== 'long_form').map((s) => s.label.slice(0, 120));
 }
 
 /**
@@ -91,6 +105,7 @@ export async function generateOutlineDraft(args: GenerateOutlineArgs): Promise<O
     suggested_section_count: Math.max(args.sectionCount ?? 0, doc.items.length, 3),
     model: project.model,
     web_access: webAccessOf(project),
+    later_stages: stagesAfterPlan(args.template, args.stageId),
   });
   await keepFound(project, res, { stageId: args.stageId ?? null, agentRunId: args.agentRunId ?? null });
   const { outline } = res;

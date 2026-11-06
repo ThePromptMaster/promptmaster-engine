@@ -35,6 +35,7 @@ from .schemas import PMInput
 
 MAX_FINDINGS = 30
 MAX_CONTRADICTIONS = 5
+MAX_NOTE_QUOTES = 12
 #: The deliverable text the check reads. Longer text is clipped per section and
 #: said, not refused: a refusal read as "the check could not run" (5 Nov).
 MAX_CHECK_CONTENT = 200_000
@@ -124,8 +125,27 @@ def _tables_block(tables: list[RecordedTable] | None) -> str:
     ) + "\n\n"
 
 
+def _note_quotes_block(quotes: list[str] | None) -> str:
+    """5 Nov (a book test): the delivered review note quoted "I'm approving it at 2:30",
+    as a problem still in the book, when the chapters beside it said 2pm."""
+    kept = [" ".join(q.split()) for q in (quotes or [])[:MAX_NOTE_QUOTES] if q.strip()]
+    if not kept:
+        return ""
+    return (
+        "PASSAGES THE DOCUMENT'S OWN REVIEW NOTE QUOTES THAT THE REST OF THIS TEXT DOES NOT CONTAIN (found in code):\n"
+        + "\n".join(f'- "{q}"' for q in kept)
+        + "\nA note may quote an earlier draft or the brief, saying so. A note that presents one of these as what the "
+        "document says now is a contradiction: report it, quoting the note's sentence and what the text says instead.\n\n"
+    )
+
+
 def build_prompt(
-    inputs: PMInput, label: str, content: str, findings: list[AcceptedFinding], tables: list[RecordedTable] | None = None,
+    inputs: PMInput,
+    label: str,
+    content: str,
+    findings: list[AcceptedFinding],
+    tables: list[RecordedTable] | None = None,
+    note_quotes: list[str] | None = None,
 ) -> tuple[str, str]:
     rows = "\n".join(
         f"- {f.id}{f' ({f.stage_label})' if f.stage_label else ''}: {' '.join(f.finding.split())}"
@@ -138,6 +158,7 @@ def build_prompt(
         + (f"{facts}\n" if facts else "")
         + f"\nACCEPTED FINDINGS:\n{rows or '(none)'}\n\n"
         + _tables_block(tables)
+        + _note_quotes_block(note_quotes)
         + f"THE DELIVERABLE — {label}:\n{clip_by_section(content, MAX_CHECK_CONTENT)[0]}"
     )
     return _INSTRUCTION, user
@@ -201,10 +222,11 @@ async def check_deliverable(
     content: str,
     findings: list[AcceptedFinding],
     tables: list[RecordedTable] | None = None,
+    note_quotes: list[str] | None = None,
 ) -> DeliverableCheck:
     if not content.strip():
         return DeliverableCheck()
-    system, user = build_prompt(inputs, label, content, findings, tables)
+    system, user = build_prompt(inputs, label, content, findings, tables, note_quotes)
     raw, _usage = await client.generate_json(prompt=user, system=system, temperature=0, max_tokens=3_000, model=model)
     parsed = parse(raw, inputs, content, findings, tables)
     parsed.read_chars = clip_by_section(content, MAX_CHECK_CONTENT)[1]

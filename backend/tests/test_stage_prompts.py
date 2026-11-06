@@ -878,3 +878,16 @@ class TestWholeDocument:
 
         user = self._build(digest=StageDigest(manuscript="Sam approves 2:30."))
         assert "Work from this text" in user
+
+
+def test_a_stage_that_reads_the_chapters_is_told_a_note_reviews_this_text():
+    """5 Nov: "a short review citing passages from that same saved version"."""
+    from promptmaster.schemas import PMInput, StageDescriptor, StageDigest
+    from promptmaster.stage import build_stage_prompt
+
+    stage = StageDescriptor(id="finished", label="Finished book", renderer="prose")
+    inputs = PMInput(objective="A book", mode="analyst")
+    with_chapters = build_stage_prompt(inputs, stage, StageDigest(manuscript="Chapter text."))[1]
+    assert "quote the passage from this text, exactly" in with_chapters
+    assert "Never say the text was not available" in with_chapters
+    assert "quote the passage from this text" not in build_stage_prompt(inputs, stage, StageDigest())[1]

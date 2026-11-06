@@ -2722,6 +2722,7 @@ export function WorkflowWorkspace({
                 <OutlineStagePanel
                   project={project}
                   stageId={stage.id}
+                  template={template}
                   events={events ?? []}
                   onEventsChanged={refreshEvents}
                   refreshToken={stageBundles[stage.id]?.versions.length ?? 0}
