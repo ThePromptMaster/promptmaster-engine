@@ -29,7 +29,7 @@ from pydantic import BaseModel, Field
 
 from .agent_actions import ACTION_KEYS, ACTIONS_BY_KEY, AGENT_ACTIONS
 from .conversation import _shared_system
-from .llm_client import OpenRouterClient
+from .llm_client import NotJSONError, OpenRouterClient
 from .page_context import scrub_button_mentions
 from .schemas import PMInput, DataFileBrief, format_data_files
 from .project_context import context_block
@@ -714,14 +714,28 @@ def _ask(question: str) -> NextAction:
     )
 
 
+#: Times the planner is asked for a move before the run stops on an error. On Sonnet 5.5
+#: (6 Nov, production) about one reply in seven came back as prose, and each stopped the run.
+_PLANNER_TRIES = 3
+_PLANNER_REMINDER = "\n\nYour last reply was not a JSON object. Reply with the JSON object only, with no words around it."
+
+
 async def choose_next_action(
     client: OpenRouterClient, model: str | None, inputs: PMInput, state: AgentState,
     allowed: list[str], policy: str,
 ) -> NextAction:
     system, user = build_next_action_prompt(inputs, state, allowed, policy)
-    result, _usage = await client.generate_json(
-        prompt=user, system=system, temperature=0.2, max_tokens=900, model=model,
-    )
+    for attempt in range(_PLANNER_TRIES):
+        try:
+            result, _usage = await client.generate_json(
+                prompt=user if attempt == 0 else user + _PLANNER_REMINDER,
+                system=system, temperature=0.2, max_tokens=900, model=model,
+            )
+            break
+        except NotJSONError:
+            if attempt == _PLANNER_TRIES - 1:
+                raise
+            logger.warning("Planner did not answer in JSON; asking again")
     return parse_next_action(result, allowed, state.controls)
 
 

@@ -163,3 +163,36 @@ async def test_generate_shows_images_beside_the_prompt_and_only_when_given():
     assert user["content"][1] == {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,AAAA"}}
     await client.generate(prompt="Plain.")
     assert client._request_with_retries.call_args.args[0]["messages"][-1]["content"] == "Plain."
+
+
+async def test_an_object_with_words_around_it_needs_no_repair(monkeypatch):
+    """6 Nov, production: on Sonnet 5.5 the repair pass was answered by the content filter,
+    and the planner's perfectly good object was lost to a 502."""
+    from promptmaster.llm_client import OpenRouterClient
+
+    client = OpenRouterClient(api_key="k")
+    calls = []
+
+    async def fake_generate(**kw):
+        calls.append(kw)
+        return ('Looking at the state, the next move is clear.\n\n{"action_key": "advance_stage", "params": {}}\n\nThat moves on.', {})
+
+    monkeypatch.setattr(client, "generate", fake_generate)
+    result, _ = await client.generate_json("q")
+    assert result == {"action_key": "advance_stage", "params": {}}
+    assert len(calls) == 1
+
+
+async def test_braces_that_are_not_an_object_still_go_to_repair(monkeypatch):
+    from promptmaster.llm_client import OpenRouterClient
+
+    client = OpenRouterClient(api_key="k")
+    replies = iter([('The {broken "json": } here', {}), ('{"fixed": true}', {})])
+
+    async def fake_generate(**_kw):
+        return next(replies)
+
+    monkeypatch.setattr(client, "generate", fake_generate)
+    result, _ = await client.generate_json("q")
+    assert result == {"fixed": True}
+

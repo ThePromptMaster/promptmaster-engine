@@ -663,6 +663,34 @@ def test_assess_batch_is_on_the_menu_only_when_offered():
     assert "assess_batch" not in not_offered
 
 
+async def test_the_planner_is_asked_again_when_it_answers_in_prose():
+    """6 Nov, production: on Sonnet 5.5 a prose reply stopped the run with an error."""
+    import pytest
+    from promptmaster.agent import choose_next_action
+    from promptmaster.llm_client import NotJSONError
+
+    class Client:
+        def __init__(self, replies):
+            self.replies, self.prompts = list(replies), []
+
+        async def generate_json(self, prompt, **_kw):
+            self.prompts.append(prompt)
+            reply = self.replies.pop(0)
+            if reply is None:
+                raise NotJSONError("prose", content="Words.")
+            return reply, {}
+
+    good = {"action_key": RESEARCH[0], "params": {}, "rationale": "r", "expected_outcome": "e"}
+    client = Client([None, good])
+    choice = await choose_next_action(client, None, INPUTS, STATE, RESEARCH, "autonomous")
+    assert choice.action_key == RESEARCH[0]
+    assert "Reply with the JSON object only" not in client.prompts[0]
+    assert "Reply with the JSON object only" in client.prompts[1]
+
+    with pytest.raises(NotJSONError):
+        await choose_next_action(Client([None, None, None]), None, INPUTS, STATE, RESEARCH, "autonomous")
+
+
 def test_return_to_stage_says_what_it_needs():
     from promptmaster.agent_actions import ACTIONS_BY_KEY
     when = ACTIONS_BY_KEY["return_to_stage"].when
