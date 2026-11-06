@@ -69,7 +69,7 @@ Not exercised by this run: the repair limit, because the objective was met at th
 
 ![The review note, in the delivered text](../media/pr/nov6/book-review-note.jpg)
 
-Three small things the rerun found, fixed the same day: Resume did nothing while decisions in a findings table were unsaved (#522); the finish dialog still named the Manuscript (#522); the chapter plan could put two chapters in one section (#519).
+Three small things the rerun found, fixed the same day: Resume did nothing while decisions in a findings table were unsaved (#522, since seen working on production); the finish dialog still named the Manuscript (#522); the chapter plan could put two chapters in one section (#519).
 
 ### Known limit
 

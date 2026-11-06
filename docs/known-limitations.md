@@ -3207,8 +3207,9 @@ long table. With Go waiting on those rows, Resume read them as undecided and sto
 words. Resume now saves them first when Go is waiting on the table of the stage on screen, and shows the error if
 the save fails. Unsaved prose edits behave as before: Resume does not save them.
 
-The cost: the path has a unit test on the condition and no test through the hook, and it has not yet run on
-production, because no later run stopped on major findings.
+The cost: the path has a unit test on the condition and no test through the hook. It has run on production: on a
+slide deck example on 6 Nov, a major finding set in the table and Resume pressed without saving made a new version
+("Edited by hand") and the run carried on.
 
 ### L-180 — Curated business examples (2026-11-06)
 
