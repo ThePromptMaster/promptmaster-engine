@@ -47,6 +47,7 @@ import {
   type StartTemplateRow,
 } from '@/lib/admin/start-funnel';
 import { rollUpOperations, rollUpProjects, type UsageDetailRow } from '@/lib/admin/usage-rollups';
+import { readAll, type ReadAll } from './read-all';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -194,19 +195,22 @@ interface UsageRow extends UsageDetailRow {
 }
 
 async function fetchUsage(supabase: Client, since: string, warnings: string[]) {
-  const { data, error } = await supabase
-    .from('model_usage')
-    .select('user_id, project_id, route, operation, attempt, elapsed_ms, tokens_in, tokens_out, cost_usd, created_at')
-    .gte('created_at', since)
-    .order('created_at', { ascending: false })
-    .limit(ROLLUP_LIMIT);
+  const { rows, error, capped } = await readAll<UsageRow>(
+    (from, to) => supabase
+      .from('model_usage')
+      .select('user_id, project_id, route, operation, attempt, elapsed_ms, tokens_in, tokens_out, cost_usd, created_at')
+      .gte('created_at', since)
+      .order('created_at', { ascending: false })
+      .order('id')
+      .range(from, to),
+    ROLLUP_LIMIT
+  );
 
   if (error) {
-    warnings.push(`Usage could not be read: ${error.message}`);
-    return [];
+    warnings.push(`Usage could not be read: ${error}`);
+    if (!rows.length) return [];
   }
-  const rows = (data ?? []) as UsageRow[];
-  if (rows.length >= ROLLUP_LIMIT) {
+  if (capped) {
     warnings.push(
       `Only the most recent ${ROLLUP_LIMIT.toLocaleString()} calls were counted, so the totals below understate the period.`
     );
@@ -262,20 +266,21 @@ interface ErrorRow {
 }
 
 async function fetchErrors(supabase: Client, since: string, warnings: string[]) {
-  const { data, error } = await supabase
-    .from('error_events')
-    .select(
-      'id, user_id, project_id, code, title, message, route, request_id, http_status, source, created_at'
-    )
-    .gte('created_at', since)
-    .order('created_at', { ascending: false })
-    .limit(ROLLUP_LIMIT);
+  const { rows, error } = await readAll<ErrorRow>(
+    (from, to) => supabase
+      .from('error_events')
+      .select('id, user_id, project_id, code, title, message, route, request_id, http_status, source, created_at')
+      .gte('created_at', since)
+      .order('created_at', { ascending: false })
+      .order('id')
+      .range(from, to),
+    ROLLUP_LIMIT
+  );
 
   if (error) {
-    warnings.push(`Errors could not be read: ${error.message}`);
-    return [];
+    warnings.push(`Errors could not be read: ${error}`);
   }
-  return (data ?? []) as ErrorRow[];
+  return rows;
 }
 
 interface FeedbackRow {
@@ -368,38 +373,41 @@ async function fetchStarts(
   warnings: string[]
 ): Promise<StartFunnel | null> {
   const say = (what: string, why: string) => warnings.push(`How people start could not be worked out (${what}): ${why}`);
-  const projects = await supabase
-    .from('projects')
-    .select('id, user_id, example_key, workflow_template_id, created_at')
-    .gte('created_at', since)
-    .limit(ROLLUP_LIMIT);
+  const projects = await readAll<StartProjectRow>(
+    (from, to) => supabase
+      .from('projects')
+      .select('id, user_id, example_key, workflow_template_id, created_at')
+      .gte('created_at', since)
+      .order('created_at', { ascending: false })
+      .order('id')
+      .range(from, to),
+    ROLLUP_LIMIT
+  );
   if (projects.error) {
-    say('projects', projects.error.message);
+    say('projects', projects.error);
     return null;
   }
-  const projectRows = (projects.data ?? []) as StartProjectRow[];
+  // Only the projects that count: an admin's test runs are most of the rows there are.
+  const excluded = new Set(adminUserIds());
+  const projectRows = projects.rows.filter((p) => !excluded.has(p.user_id));
   if (!projectRows.length) {
     return rollUpStarts({ projects: [], events: [], artifacts: [], goProjects: [], templates: [], guests: new Set(), excluded: new Set() });
   }
+  const ids = projectRows.map((p) => p.id);
 
   const [events, artifacts, runs, accounts] = await Promise.all([
-    supabase
-      .from('workflow_events')
-      .select('project_id, user_id, type, created_at, early:payload->early')
-      .gte('created_at', since)
-      .limit(ROLLUP_LIMIT),
-    supabase.from('artifacts').select('project_id, stage_id, version_count').gte('created_at', since).limit(ROLLUP_LIMIT),
-    supabase.from('agent_runs').select('project_id').gte('created_at', since).limit(ROLLUP_LIMIT),
+    readForProjects<StartEventRow>(supabase, 'workflow_events', 'project_id, user_id, type, created_at, early:payload->early', ids, since),
+    readForProjects<StartArtifactRow>(supabase, 'artifacts', 'project_id, stage_id, version_count', ids, since),
+    readForProjects<{ project_id: string }>(supabase, 'agent_runs', 'project_id', ids, since),
     users,
   ]);
   const failed = events.error ?? artifacts.error ?? runs.error;
   if (failed) {
-    say('events, artifacts or runs', failed.message);
+    say('events, artifacts or runs', failed);
     return null;
   }
-  const eventRows = (events.data ?? []) as StartEventRow[];
-  if (eventRows.length >= ROLLUP_LIMIT) {
-    warnings.push(`Only ${ROLLUP_LIMIT.toLocaleString()} project events were read, so "How people start" understates the period.`);
+  if (projects.capped || events.capped || artifacts.capped || runs.capped) {
+    warnings.push(`Only ${ROLLUP_LIMIT.toLocaleString()} rows of each kind were read, so "How people start" understates the period.`);
   }
 
   const templateIds = unique(projectRows.map((p) => p.workflow_template_id));
@@ -419,13 +427,41 @@ async function fetchStarts(
 
   return rollUpStarts({
     projects: projectRows,
-    events: eventRows,
-    artifacts: (artifacts.data ?? []) as StartArtifactRow[],
-    goProjects: ((runs.data ?? []) as { project_id: string }[]).map((r) => r.project_id),
+    events: events.rows,
+    artifacts: artifacts.rows,
+    goProjects: runs.rows.map((r) => r.project_id),
     templates,
     guests: new Set((accounts ?? []).filter((u) => u.is_anonymous).map((u) => u.id)),
-    excluded: new Set(adminUserIds()),
+    excluded,
   });
+}
+
+/** Rows of a table for these projects: their ids travel in the URL, so a batch at a time. */
+async function readForProjects<T>(
+  supabase: Client,
+  table: string,
+  columns: string,
+  projectIds: string[],
+  since: string
+): Promise<ReadAll<T>> {
+  const rows: T[] = [];
+  for (let i = 0; i < projectIds.length; i += TITLE_BATCH) {
+    const batch = projectIds.slice(i, i + TITLE_BATCH);
+    const read = await readAll<T>(
+      (from, to) => supabase
+        .from(table)
+        .select(columns)
+        .in('project_id', batch)
+        .gte('created_at', since)
+        .order('created_at')
+        .order('id')
+        .range(from, to),
+      ROLLUP_LIMIT - rows.length
+    );
+    rows.push(...read.rows);
+    if (read.error || read.capped) return { rows, error: read.error, capped: read.capped };
+  }
+  return { rows, error: null, capped: false };
 }
 
 async function resolveProjectTitles(
