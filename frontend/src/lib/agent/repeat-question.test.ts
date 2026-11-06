@@ -122,6 +122,22 @@ describe('a question Go already asked (4 Nov, Lakeside)', () => {
   });
 });
 
+describe('straight after an answer, with nothing done since (6 Nov, prod)', () => {
+  const FIRST = "Your requirement asks for 'Riverside Conference Centre' and 'half past four', and none of those words has seven letters. Should the note allow these two phrases as the only exceptions to the seven-letter rule, or keep every word at seven letters and leave the venue and finish time out?";
+  const FOLLOW = 'Should the earlier all-seven-letter note be the final version, so it replaces the current note that names the venue and finish time, or do you want that stage to write a fresh note under the same rule?';
+
+  it('a follow-up that shares some words is not a repeat', () => {
+    const steps = [ask(FIRST, 1, ''), answer('Keep every word at seven letters', 2)];
+    expect(questionOverlap(FIRST, FOLLOW)).toBeGreaterThanOrEqual(SAME_QUESTION);
+    expect(repeatedQuestion({ question: FOLLOW, control: null, stageId: 'final_proposal', steps })).toBeNull();
+  });
+
+  it('the same question again is', () => {
+    const steps = [ask(FIRST, 1, ''), answer('Keep every word at seven letters', 2)];
+    expect(repeatedQuestion({ question: FIRST, control: null, stageId: 'final_proposal', steps })).not.toBeNull();
+  });
+});
+
 describe('a different question naming the same button (5 Nov, a research project)', () => {
   const CHECK = 'I have checked this derivation and approve the next stage building on it';
   const CONVENTION = 'In your note, does the symbol mean the product of differences, so that its square has degree 20, or the discriminant itself?';
