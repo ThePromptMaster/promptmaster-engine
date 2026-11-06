@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useAuth } from '@/hooks/use-auth';
 import { authErrorMessage } from '@/lib/auth/auth-errors';
 import { goSignedIn } from '@/lib/auth/sign-in';
+import { nextFromLocation } from '@/lib/auth/next-path';
 import { useT } from '@/lib/i18n/i18n-provider';
 import { LocaleSwitch } from '@/components/shared/locale-switch';
 
@@ -44,6 +45,9 @@ export default function SignupPage() {
   // As on the sign-in page: a click before the script runs would submit natively.
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => setHydrated(true), []);
+  // Where they were going stays with them between the two pages (6 Nov).
+  const next = hydrated ? nextFromLocation() : null;
+  const loginHref = next ? `/auth/login?next=${encodeURIComponent(next)}` : '/auth/login';
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,7 +68,7 @@ export default function SignupPage() {
       // your email" would send them looking for a message that never comes.
       const signedIn = await signUp(email, password, fullName);
       // A full page load, so the proxy sees the new session (28 Oct).
-      if (signedIn) goSignedIn('/projects');
+      if (signedIn) goSignedIn(nextFromLocation() ?? '/projects');
       else setSuccess(true);
     } catch (err) {
       setError(authErrorMessage(err, 'auth.err.create'));
@@ -112,7 +116,7 @@ export default function SignupPage() {
               <strong className="text-[var(--on-surface)]">{email}</strong>{t('auth.confirmSentAfter')}
             </p>
             <Link
-              href="/auth/login"
+              href={loginHref}
               className="inline-block text-body font-medium text-[var(--pm-primary)] hover:underline"
             >
               {t('auth.backToSignInLower')}
@@ -226,7 +230,7 @@ export default function SignupPage() {
           <p className="text-body text-[var(--on-surface-variant)]">
             {t('auth.haveAccount')}{' '}
             <Link
-              href="/auth/login"
+              href={loginHref}
               className="text-[var(--pm-primary)] font-medium hover:underline ms-1"
             >
               {t('auth.signInLower')}

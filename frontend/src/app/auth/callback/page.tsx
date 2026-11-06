@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { resetWasRequested, safeNext } from '@/lib/auth/next-path';
+import { resetWasRequested, safeNext, takeRememberedNext } from '@/lib/auth/next-path';
 import { useT } from '@/lib/i18n/i18n-provider';
 import { getLocale, tr } from '@/lib/i18n/store';
 
@@ -18,7 +18,7 @@ export default function AuthCallbackPage() {
   // render rather than copied into state from an effect.
   const errorParam = searchParams.get('error');
   const errorDescription = searchParams.get('error_description');
-  const next = safeNext(searchParams.get('next')) ?? '/projects';
+  const next = safeNext(searchParams.get('next'));
   const tokenHash = searchParams.get('token_hash');
   const otpType = searchParams.get('type');
   const [verifyError, setVerifyError] = useState<string | null>(null);
@@ -50,7 +50,9 @@ export default function AuthCallbackPage() {
     };
     // A reset this browser asked for goes to the page that sets the password,
     // whichever event (or none, if it fired before this listener) arrives.
-    const signedIn = () => go(resetWasRequested() ? '/auth/reset' : next);
+    // Google and the sign-up email come back to the bare callback, so where they
+    // were going was remembered before they left.
+    const signedIn = () => go(resetWasRequested() ? '/auth/reset' : next ?? takeRememberedNext() ?? '/projects');
 
     // A link carrying a token hash (an email template pointing here, or an
     // admin-issued link) is verified directly. Unlike the code exchange it does
