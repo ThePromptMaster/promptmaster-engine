@@ -21,7 +21,7 @@ test('a new user gets one box, a link warning, one screen and Start', async ({ p
   await expect(page.getByRole('heading', { name: 'What do you want to do or figure out?' })).toBeVisible();
   await expect(page.getByText(/PromptMaster writes the result itself; you review and approve/)).toBeVisible();
   // 14 Oct call: the conversation is the way in for everyone; the workflow list is the advanced setup's.
-  await expect(page.getByRole('button', { name: /Start the conversation/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Build a plan with me/ })).toBeVisible();
   // 23 Oct (email 8): choosing the workflow is a way in of its own, in both setups, and the setup in use is shown.
   await expect(page.getByRole('button', { name: /Choose the workflow yourself/ })).toBeVisible();
   await expect(page.getByRole('radio', { name: 'Simple' })).toHaveAttribute('aria-checked', 'true');

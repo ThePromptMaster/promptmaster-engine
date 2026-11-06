@@ -54,7 +54,7 @@ async function conversation(page: import('@playwright/test').Page) {
   await page.getByLabel('What do you want to do or figure out?').fill('Why do giraffes have such long necks?');
   // The full-workflow ways are open for the E2E user (auth.setup.ts).
   await expect(page.getByRole('button', { name: /Guide me|Ask me a few questions/ })).toHaveCount(0);
-  await page.getByRole('button', { name: /Start the conversation/ }).click();
+  await page.getByRole('button', { name: /Build a plan with me/ }).click();
   const convo = page.getByRole('region', { name: 'Conversation' });
   await expect(convo).toContainText('Mock: who is this for?', { timeout: 30_000 });
   return convo;

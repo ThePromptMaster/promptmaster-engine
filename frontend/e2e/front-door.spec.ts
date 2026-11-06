@@ -19,7 +19,7 @@ test('a conversation builds a draft brief; only confirmed facts become the proje
   await expect(page.getByRole('button', { name: /I know what I want to do/ })).toBeVisible();
   // 31 Oct: "Ask me questions" is in the conversation, not here.
   await expect(page.getByRole('button', { name: /Guide me — ask me questions/ })).toHaveCount(0);
-  await page.getByRole('button', { name: /Start the conversation/ }).click();
+  await page.getByRole('button', { name: /Build a plan with me/ }).click();
 
   const convo = page.getByRole('region', { name: 'Conversation' });
   const brief = page.getByRole('complementary', { name: 'Draft brief' });
@@ -71,7 +71,7 @@ test('the setup screen is still there before the project is made', async ({ page
   await page.goto('/projects/new');
   await dismissBetaNotice(page);
   await page.getByLabel('What do you want to do or figure out?').fill('Choose one research project for next quarter');
-  await page.getByRole('button', { name: /Start the conversation/ }).click();
+  await page.getByRole('button', { name: /Build a plan with me/ }).click();
   const brief = page.getByRole('complementary', { name: 'Draft brief' });
   await expect(page.getByRole('region', { name: 'Conversation' })).toContainText('Mock: who is this for?', { timeout: 30_000 });
   await brief.getByLabel('Objective').fill('Choose one research project for next quarter');
@@ -84,7 +84,7 @@ test('a piece of writing the conversation produces comes in its own block, ready
   await page.goto('/projects/new');
   await dismissBetaNotice(page);
   await page.getByLabel('What do you want to do or figure out?').fill('A short lunch invitation for my team [[mock:draft]]');
-  await page.getByRole('button', { name: /Start the conversation/ }).click();
+  await page.getByRole('button', { name: /Build a plan with me/ }).click();
   const convo = page.getByRole('region', { name: 'Conversation' });
   const draft = convo.getByRole('region', { name: 'Draft' });
   await expect(draft).toContainText('Hi team — lunch is on Wednesday at 1:00 p.m.', { timeout: 30_000 });

@@ -61,9 +61,9 @@ import { SampleField } from '@/components/projects/sample-field';
  * "Ask me questions" lives in the conversation, beside the outline, not on
  * this first screen (Sean, 31 Oct).
  *
- * The first screen leads with "Get an answer" and "Start the conversation"
- * side by side; "I know what I want to do" and "Choose the workflow
- * yourself" are under "Advanced ways to start" (Sean, 4 Nov).
+ * The first screen offers "Build a plan with me" and "Get a first draft" side
+ * by side, each saying what you get; "I know what I want to do" and "Choose the
+ * workflow yourself" are under "More ways to start" (the client, 4 Nov).
  */
 
 type Step = 'ask' | 'talk' | 'setup';
@@ -78,7 +78,7 @@ function titleFrom(objective: string): string {
 
 /** The id of a workflow designed for this project and not yet saved (24 Oct). */
 const DESIGNED = 'designed:';
-/** Whether this user keeps "Advanced ways to start" open on the start screen (the key predates the name). */
+/** Whether this user keeps "More ways to start" open on the start screen (the key predates the name). */
 const FULL_KEY = 'pm.start.full.v1';
 /** How much of the ask and the conversation goes to the workflow designer. */
 const DESIGN_BRIEF_MAX = 8_000;
@@ -154,10 +154,9 @@ export default function NewProjectPage() {
     return { ...ask, context: contextFromDocuments(ask.context, documentsOf(startFiles), INPUT_LIMITS.context).context };
   };
   const [working, setWorking] = useState<null | 'questions' | 'setup' | 'creating'>(null);
-  // Sean, 26 Oct: the start is an answer, as in Claude. Sean, 4 Nov: the
-  // conversation sits beside it, and "Advanced ways to start" (the setup from
-  // what you wrote, or choosing the workflow) is one press away and, once
-  // opened, stays open for this user — under the key it always had.
+  // "More ways to start" (the setup from what you wrote, or choosing the
+  // workflow) is one press away and, once opened, stays open for this user —
+  // under the key it always had.
   const [showFull, setShowFull] = useState(false);
   useEffect(() => {
     try {
@@ -815,38 +814,42 @@ export default function NewProjectPage() {
             )}
           </div>
 
-          {/* Sean, 26 Oct: an answer first, as in Claude. Sean, 4 Nov: the
-              conversation beside it, and the other two ways in under
-              "Advanced ways to start". The answer stays the primary action. */}
-          <div className="mt-4 flex flex-wrap items-center justify-end gap-3">
+          {/* Two ways in, each saying what you get (the client, 4 Nov): the
+              conversation has the stronger look because talking it through is
+              what people should discover, and the quick route stays beside it.
+              The other two ways in are under "More ways to start". */}
+          <p className="mt-4 text-body text-[var(--on-surface-variant)]">{t('start.eitherWay')}</p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <button
               onClick={() => { setError(null); setStep('talk'); }}
               disabled={!hasObjective || working !== null}
-              className="inline-flex items-center gap-2 rounded-xl bg-[var(--surface-container-high)] px-6 py-3 text-title text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-highest)] disabled:opacity-40"
+              className="rounded-2xl bg-[var(--pm-primary)] px-6 py-4 text-start text-[var(--on-primary)] transition-opacity hover:opacity-90 disabled:opacity-40"
             >
-              {t('start.startConversation')}
-              <span aria-hidden className="material-symbols-outlined text-[20px]">forum</span>
+              <span className="flex items-center justify-between gap-2 text-title">
+                {t('start.startConversation')}
+                <span aria-hidden className="material-symbols-outlined text-[20px]">forum</span>
+              </span>
+              <span className="mt-1 block text-label opacity-90">{t('start.conversationNote')}</span>
             </button>
             <button
               onClick={quickStart}
               disabled={!hasObjective || working !== null || !user || !templateFor('quick')}
-              className="inline-flex items-center gap-2 rounded-xl bg-[var(--pm-primary)] px-6 py-3 text-title text-[var(--on-primary)] transition-opacity hover:opacity-90 disabled:opacity-40"
+              className="rounded-2xl bg-[var(--surface-container-high)] px-6 py-4 text-start text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-container-highest)] disabled:opacity-40"
             >
-              {working === 'creating' ? t('start.creating') : t('start.quickAnswer')}
-              <span aria-hidden className="material-symbols-outlined text-[20px]">arrow_upward</span>
+              <span className="flex items-center justify-between gap-2 text-title">
+                {working === 'creating' ? t('start.creating') : t('start.quickAnswer')}
+                <span aria-hidden className="material-symbols-outlined text-[20px]">arrow_upward</span>
+              </span>
+              <span className="mt-1 block text-label text-[var(--on-surface-variant)]">{t('start.quickNote')}</span>
             </button>
           </div>
-          {/* 4 Nov (Jordan, via Sean): the sign that work had started was far below the button pressed. */}
+          {/* 4 Nov: the sign that work had started was far below the button pressed. */}
           {working === 'creating' && (
             <p role="status" data-start-status className="mt-2 flex items-center justify-end gap-2 text-body text-[var(--on-surface)]">
               <span aria-hidden className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--pm-primary)] border-t-transparent" />
               {t('start.creatingNow')}
             </p>
           )}
-          <div className="mt-2 space-y-1 text-end text-label text-[var(--on-surface-variant)]">
-            <p><span className="font-medium text-[var(--on-surface)]">{t('start.quickAnswer')}</span> — {t('start.quickNote')}</p>
-            <p><span className="font-medium text-[var(--on-surface)]">{t('start.startConversation')}</span> — {t('start.conversationNote')}</p>
-          </div>
 
           <button
             type="button"

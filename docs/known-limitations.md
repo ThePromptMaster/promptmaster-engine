@@ -2420,8 +2420,8 @@ looks as it did. The timeline's dot still shows the button colour only.
 
 ### L-123 — A quick answer moves into the full process once, and a manuscript does not take it as a version (2026-10-27)
 
-The start screen leads with **Get an answer** (Sean, 26 Oct), with **Start the conversation**
-beside it since 4 Nov ("I know what I want to do" and Choose yourself are under "Advanced ways to
+The start screen's quick route is **Get a first draft** (was "Get an answer", renamed 6 Nov), beside
+**Build a plan with me** ("I know what I want to do" and Choose yourself are under "More ways to
 start"): a project on the one-stage
 `quick` workflow, drafted as it opens. **Take this into the full PromptMaster process** re-pins
 the same project (`workflow_switched`, `20261122000000_workflow_switched_event.sql`) to a

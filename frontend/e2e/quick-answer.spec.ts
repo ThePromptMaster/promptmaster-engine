@@ -20,11 +20,14 @@ test('an answer first, then the same project taken into the full process', async
   test.setTimeout(120_000);
   await page.goto('/projects/new');
   await dismissBetaNotice(page);
-  // Sean, 4 Nov: the conversation sits beside the answer; the setup from
-  // what you wrote and choosing the workflow are under "Advanced ways to start".
-  await expect(page.getByRole('button', { name: /Start the conversation/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /Get an answer/ })).toBeVisible();
-  const advanced = page.getByRole('button', { name: 'Advanced ways to start' });
+  // 4 Nov: two ways in, each saying what you get; the setup from what you
+  // wrote and choosing the workflow are under "More ways to start".
+  await expect(page.getByText('Start either way. You can develop your work into a full project as you go.')).toBeVisible();
+  await expect(page.getByRole('button', { name: /Build a plan with me.*Talk it through while an outline takes shape/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Get a first draft.*Get an answer or draft from what you've supplied/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Build a plan with me/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Get a first draft/ })).toBeVisible();
+  const advanced = page.getByRole('button', { name: 'More ways to start' });
   await expect(advanced).toHaveAttribute('aria-expanded', 'false');
   await expect(page.getByRole('button', { name: /I know what I want to do/ })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /Choose the workflow yourself/ })).toHaveCount(0);
@@ -32,11 +35,11 @@ test('an answer first, then the same project taken into the full process', async
   await advanced.click();
   await expect(page.getByRole('button', { name: /I know what I want to do/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /Choose the workflow yourself/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Hide advanced ways to start' })).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.getByRole('button', { name: 'Hide the other ways to start' })).toHaveAttribute('aria-expanded', 'true');
   await page.screenshot({ path: test.info().outputPath('start-screen-advanced.png') });
 
   await page.getByLabel('What do you want to do or figure out?').fill('Write a two-line thank-you note to the volunteers');
-  await page.getByRole('button', { name: /Get an answer/ }).click();
+  await page.getByRole('button', { name: /Get a first draft/ }).click();
   await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}$/);
   const projectId = page.url().split('/').at(-1)!;
 
