@@ -266,6 +266,8 @@ export interface WorkflowTemplate {
    * check read the success criterion; set by the workflow designer.
    */
   execution?: WorkflowExecution;
+  /** Go works within these stages and never adds one (a curated example's shape is the point of it). */
+  fixed_stages?: boolean;
   stages: StageDefinition[];
 }
 

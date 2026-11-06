@@ -16,6 +16,7 @@ export const SLIDE_DECK: Example = {
     description: 'From rough notes to a finished deck: the message, the storyline, every slide, then a hard read.',
     deliverable: 'slide deck',
     inquiry: false,
+    fixed_stages: true,
     execution: {
       kind: 'finite',
       success_criterion:

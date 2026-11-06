@@ -3334,3 +3334,21 @@ The costs: those rows are in every prompt of the project, about 600 tokens for a
 model can do arithmetic on them by hand instead of running code, so "Compute; do not estimate" is
 still an instruction rather than a rule. Files attached before this keep their stored five-row
 preview until they are attached again.
+
+### L-192 — The memo and analysis examples run on Sonnet 5.5 and keep their stages (2026-11-06)
+
+Run on production with "Let Go run this", on the default model, the memo cost $5.23 and the analysis
+$4.14, over the plan's limit of about $3 for an example. Both now pin Sonnet 5.5; a project on the
+user's own work keeps the default. Its reviews still caught the planted contradictions.
+
+Go no longer adds stages to an example (`fixed_stages`, `mayAddStages`). A fix to the memo became a
+stage called "Reconcile debt-service wording", the memo still said the old thing, and the next review
+flagged the difference, round after round. An investigation still may.
+
+Sonnet's planner replied in prose, or with words around the object, about one time in seven, and each
+one stopped the run. An object with words around it is now read as it stands, and the planner is asked
+again, up to twice. A run can still stop on that error, and "Retrying is safe" is true when it does.
+
+The costs: a pinned model is a choice made for the user, shown in the example's setup. A final review
+can find something new every round, so a tester who accepts every major finding keeps going until
+they stop accepting; each round costs about $0.30 on Sonnet.

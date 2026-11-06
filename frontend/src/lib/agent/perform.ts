@@ -55,7 +55,7 @@ import { appendBatch, parseAssessment, scaleForRequest, scaleFromSpec, serialize
 import { stageContentForSummary, stageEvidence } from '@/lib/workflow/evidence';
 import { blocksCompletion, deliverableStage, describeOutstanding, evaluateStage, outstandingWork, remainingStages } from '@/lib/workflow/engine';
 import { describeBasis, executableNext, openWithNextLine, pausedLine, stillMet, type ObjectiveAssessment, type ObjectiveBasis } from '@/lib/workflow/objective';
-import { addedByRun, designAddedStage, MAX_ADDED_PER_RUN, type AddedStage } from '@/lib/workflow/added-stages';
+import { addedByRun, designAddedStage, mayAddStages, MAX_ADDED_PER_RUN, type AddedStage } from '@/lib/workflow/added-stages';
 import { attachedDocuments, currentFacts, supersededFactValues } from '@/lib/workflow/facts';
 import { acceptedRowsBefore, noAccessClaim, noteQuotesNotInText, outcomeTablesBefore, checkedVersion, describeCheck, issuesFrom, MAX_CHECK_ROUNDS, roundsUsed, type DeliverableCheckRecord } from './deliverable-check';
 import { InputMissing, ManuscriptMissing, checkedStageFor, withCurrentLongForm, withFreshManuscript } from '@/lib/workflow/fresh-manuscript';
@@ -2182,7 +2182,7 @@ export async function performStep(ctx: PerformContext): Promise<StepOutcome> {
         // three a run); otherwise it proposes it, with the button to add it.
         // Investigations only: a writing workflow's unmet objective is fixed in
         // its own stages ("Have Go fix it"), not by adding new ones.
-        const next = ctx.template.key === 'research' || ctx.template.inquiry ? executableNext(assessment) : null;
+        const next = mayAddStages(ctx.template) ? executableNext(assessment) : null;
         if (next) {
           const open = openWithNextLine(assessment, next);
           const routine = ctx.run.policy === 'autonomous' && ctx.project.routine_decisions === 'handle';

@@ -80,7 +80,7 @@ import type { StageFigures } from '@/lib/workflow/figures';
 import type { StageControl } from '@/lib/workflow/stage-controls';
 import { evaluateStage, getStage, nextSuggestedStage } from '@/lib/workflow/engine';
 import { objectiveUnmet } from '@/lib/workflow/objective';
-import { addedByRun, MAX_ADDED_PER_RUN } from '@/lib/workflow/added-stages';
+import { addedByRun, mayAddStages, MAX_ADDED_PER_RUN } from '@/lib/workflow/added-stages';
 import { isDone } from '@/lib/workflow/types';
 import { documentsAwaitingFacts } from '@/lib/workflow/facts';
 import { modeForStage } from '@/lib/workflow/stage-mode';
@@ -733,7 +733,7 @@ export function useGoLoop(opts: Options) {
         // — in an investigation, with routine decisions handed to Go, at most
         // three a run (the database holds the same limits).
         if (
-          current.policy === 'autonomous' && routine === 'handle' && (o.template.key === 'research' || o.template.inquiry) &&
+          current.policy === 'autonomous' && routine === 'handle' && mayAddStages(o.template) &&
           addedByRun(o.events, current.id) < MAX_ADDED_PER_RUN
         ) allowed.push('add_stage');
         // Q2b: after going round in circles, the repeated moves are off the table for the next choice.

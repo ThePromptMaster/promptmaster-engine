@@ -67,7 +67,8 @@ export function GuestBanner() {
   return (
     <div id="save-account" className="mb-8 rounded-2xl bg-[var(--surface-container-low)] px-6 py-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0 flex-1">
+        {/* A floor on its width, so on a phone the button drops below it rather than squeezing it. */}
+        <div className="min-w-[16rem] flex-1">
           <p className="text-title text-[var(--on-surface)]">{t('guest.title')}</p>
           <p className="mt-1 max-w-[62ch] text-body text-[var(--on-surface-variant)]">
             {t('guest.body')}

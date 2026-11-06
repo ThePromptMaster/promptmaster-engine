@@ -44,6 +44,7 @@ export const BUSINESS_ANALYSIS: Example = {
     description: 'From a question and a data file to a recommendation: options compared on the same basis, and what the data cannot say.',
     deliverable: 'recommendation',
     inquiry: true,
+    fixed_stages: true,
     execution: {
       kind: 'finite',
       success_criterion:
