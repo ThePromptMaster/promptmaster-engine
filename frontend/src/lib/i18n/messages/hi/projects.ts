@@ -32,15 +32,6 @@ export const hi: Record<keyof typeof en, string> = {
   'list.deleteError': 'प्रोजेक्ट हटाया नहीं जा सका।',
 
   // lib/projects/example-goals.ts, as shown on the empty list
-  'examples.memo.label': 'एक सिफ़ारिश मेमो',
-  'examples.memo.goal':
-    'एक पेज का मेमो लिखें जिसमें सिफ़ारिश हो कि हमारी 12 लोगों की टीम को Slack से Microsoft Teams पर जाना चाहिए या नहीं। बजट $8,000 प्रति वर्ष है।',
-  'examples.briefing.label': 'एक छोटी ब्रीफ़िंग',
-  'examples.briefing.goal':
-    '200 लोगों की एक अकाउंटिंग फ़र्म में AI टूल अपनाने के मुख्य जोखिमों पर बोर्ड के लिए दो पेज की ब्रीफ़िंग लिखें, साथ में पहला सुझाया गया कदम भी।',
-  'examples.plan.label': 'आँकड़ों के साथ एक योजना',
-  'examples.plan.goal':
-    '6 एजेंटों की टीम के लिए, बिना नई भर्ती के, ग्राहक सहायता का जवाब देने का समय 24 घंटे से घटाकर 8 घंटे करने की 90-दिन की योजना का ड्राफ़्ट बनाएँ।',
 
   // components/projects/folders-sidebar.tsx
   'folders.label': 'फ़ोल्डर',

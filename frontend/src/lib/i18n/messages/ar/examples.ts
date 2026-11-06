@@ -39,6 +39,7 @@ export const ar: Record<keyof typeof en, string> = {
   "ex.useBatch": "استخدم الدفعة النموذجية",
   "export.pptx": "PowerPoint",
   "export.pptxHint": "يصبح كل عنوان شريحة، مع نقاطها وجداولها وملاحظات المتحدث.",
+  "ex.startFrom": "ابدأ من مثال",
   "ex.investment_memo.title": "مذكرة استثمار",
   "ex.investment_memo.blurb": "حوّل عرض البائع المختصر وملفًا ماليًا إلى مذكرة للجنة، مع حساب الأرقام وفحص كل ادعاء مقابل البيانات.",
   "ex.investment_memo.gets": "مذكرة تبدأ بتوصية وسعر، وتبيّن مواضع الخلاف بين العرض والبيانات، وتسرد ما يجب أن يحسمه الفحص النافي للجهالة.",

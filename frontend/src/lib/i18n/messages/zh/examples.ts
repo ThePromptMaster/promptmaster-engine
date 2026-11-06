@@ -39,6 +39,7 @@ export const zh: Record<keyof typeof en, string> = {
   "ex.useBatch": "使用样例批次",
   "export.pptx": "PowerPoint",
   "export.pptxHint": "每个标题变成一张幻灯片，带上要点、表格和演讲备注。",
+  "ex.startFrom": "从示例开始",
   "ex.investment_memo.title": "投资备忘录",
   "ex.investment_memo.blurb": "把卖方的项目简介和财务文件变成提交投委会的备忘录：数字都算出来，每项说法都对照数据核实。",
   "ex.investment_memo.gets": "一份开篇就给出建议和价格的备忘录，指出简介与数据的分歧，并列出尽职调查必须解决的问题。",

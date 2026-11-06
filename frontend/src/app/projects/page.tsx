@@ -17,7 +17,7 @@ import type { ProjectFolder, ProjectSummary } from '@/types/project';
 import { accentVariables } from '@/lib/appearance/colours';
 import { GuestBanner } from '@/components/projects/guest-banner';
 import { DeletedProjects } from '@/components/projects/deleted-projects';
-import { newProjectHref } from '@/lib/projects/example-goals';
+import { ExampleCards } from '@/components/examples/example-cards';
 import { useLocale, useT } from '@/lib/i18n/i18n-provider';
 import { shownStageId } from '@/lib/i18n/stage';
 import { workflowName } from '@/lib/i18n/templates';
@@ -41,9 +41,6 @@ function storedSelection(): FolderSelection {
     return 'all';
   }
 }
-
-/** The example goals on the empty list, in the interface's language (`lib/projects/example-goals.ts` holds the English). */
-const EXAMPLES = ['memo', 'briefing', 'plan'] as const;
 
 /**
  * Whether the pointer is a mouse. Only then is a card draggable onto a folder:
@@ -343,21 +340,10 @@ export default function ProjectsPage() {
           </span>
           <p className="mt-3 text-headline text-[var(--on-surface)]">{t('list.emptyTitle')}</p>
           <p className="mx-auto mt-2 max-w-[460px] text-body text-[var(--on-surface-variant)]">{t('list.emptyBody')}</p>
-          <ul className="mx-auto mt-5 flex max-w-[560px] flex-col gap-2 text-start">
-            {EXAMPLES.map((key) => ({ label: t(`examples.${key}.label`), goal: t(`examples.${key}.goal`) })).map((example) => (
-              <li key={example.label}>
-                <Link
-                  href={newProjectHref(example.goal)}
-                  className="block rounded-xl bg-[var(--surface-container-lowest)] px-4 py-3 transition-colors hover:bg-[var(--surface-container-high)]"
-                >
-                  <span className="block text-label uppercase tracking-wider text-[var(--on-surface-variant)]">
-                    {example.label}
-                  </span>
-                  <span className="mt-1 block text-body text-[var(--on-surface)]">{example.goal}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <section aria-label={t('ex.startFrom')} className="mx-auto mt-5 max-w-[640px] text-start">
+            <h3 className="mb-2 text-label uppercase tracking-wider text-[var(--on-surface-variant)]">{t('ex.startFrom')}</h3>
+            <ExampleCards />
+          </section>
           <Link
             href="/projects/new"
             className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[var(--pm-primary)] px-5 py-3 text-title text-[var(--on-primary)]"
@@ -417,6 +403,11 @@ export default function ProjectsPage() {
                       </span>
 
                       <span className="hidden shrink-0 items-center gap-2 text-label text-[var(--on-surface-variant)] sm:flex">
+                        {p.example_key && (
+                          <span className="rounded-md bg-[var(--surface-container-high)] px-2 py-1 font-semibold text-[var(--pm-primary)]">
+                            {t('ex.chip')}
+                          </span>
+                        )}
                         <span className="rounded-md bg-[var(--surface-container-high)] px-2 py-1">
                           {workflowLabel(p)}
                         </span>

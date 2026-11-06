@@ -39,6 +39,7 @@ export const sw: Record<keyof typeof en, string> = {
   "ex.useBatch": "Tumia kundi la mfano",
   "export.pptx": "PowerPoint",
   "export.pptxHint": "Kila kichwa kinakuwa slaidi, pamoja na vidokezo, majedwali na maelezo ya mzungumzaji.",
+  "ex.startFrom": "Anza na mfano",
   "ex.investment_memo.title": "Waraka wa uwekezaji",
   "ex.investment_memo.blurb": "Geuza muhtasari wa muuzaji na faili la fedha kuwa waraka wa kamati, namba zikiwa zimekokotolewa na kila dai likiwa limekaguliwa dhidi ya data.",
   "ex.investment_memo.gets": "Waraka unaoanza na pendekezo na bei, unaosema wapi muhtasari na data vinatofautiana, na unaoorodhesha kile uchunguzi lazima uamue.",

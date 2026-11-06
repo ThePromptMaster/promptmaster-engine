@@ -32,15 +32,6 @@ export const ar: Record<keyof typeof en, string> = {
   'list.deleteError': 'تعذّر حذف المشروع.',
 
   // lib/projects/example-goals.ts, as shown on the empty list
-  'examples.memo.label': 'مذكرة توصية',
-  'examples.memo.goal':
-    'اكتب مذكرة من صفحة واحدة توصي بما إذا كان ينبغي لفريقنا المكوّن من 12 شخصًا الانتقال من Slack إلى Microsoft Teams. الميزانية 8,000 دولار سنويًا.',
-  'examples.briefing.label': 'إحاطة قصيرة',
-  'examples.briefing.goal':
-    'اكتب إحاطة من صفحتين لمجلس إدارة حول المخاطر الرئيسية لاعتماد أدوات الذكاء الاصطناعي في شركة محاسبة تضم 200 شخص، مع خطوة أولى موصى بها.',
-  'examples.plan.label': 'خطة بالأرقام',
-  'examples.plan.goal':
-    'ضع مسودة خطة مدتها 90 يومًا لخفض زمن الاستجابة في دعم العملاء من 24 ساعة إلى 8 ساعات لفريق من 6 موظفين، دون تعيينات جديدة.',
 
   // components/projects/folders-sidebar.tsx
   'folders.label': 'المجلدات',

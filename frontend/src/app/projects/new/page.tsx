@@ -36,6 +36,7 @@ import { documentsOf, materialFrom, type PreparedFile } from '@/lib/data/attachm
 import { contextFromDocuments } from '@/lib/data/extract-text';
 import { imagePreview } from '@/lib/data/preview';
 import { INPUT_LIMITS } from '@/lib/projects/input-limits';
+import { ExampleCards } from '@/components/examples/example-cards';
 import { goalFromSearch } from '@/lib/projects/example-goals';
 import { attachProjectFile } from '@/lib/supabase/project-files';
 import { LimitCounter } from '@/components/shared/limit-counter';
@@ -850,6 +851,15 @@ export default function NewProjectPage() {
               {t('start.creatingNow')}
             </p>
           )}
+
+          {/* The menu (the client's call, 4 Nov): always available, where the two
+              buttons above wait for words in the box. */}
+          <section aria-label={t('ex.startFrom')} className="mt-8">
+            <h2 className="text-label uppercase tracking-wider text-[var(--on-surface-variant)]">{t('ex.startFrom')}</h2>
+            <div className="mt-3">
+              <ExampleCards compact />
+            </div>
+          </section>
 
           <button
             type="button"
