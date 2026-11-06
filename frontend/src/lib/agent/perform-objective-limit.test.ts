@@ -97,3 +97,29 @@ describe('a limit on each chapter (6 Nov, a book test: "Roughly 600–800 words 
   });
 });
 
+describe('a fixable problem on a workflow that keeps its stages (6 Nov, production)', () => {
+  const fixed = () => {
+    const base = ctx([]);
+    return { ...base, template: { ...SINGLE_OUTPUT_V1, inquiry: true, fixed_stages: true } } as unknown as PerformContext;
+  };
+  const found = {
+    outcome: 'not_met', reason: 'It contradicts itself.', basis_quote: '', performed: [], proposed_next: [],
+    criteria: [{ requirement: 'Says one thing', verdict: 'not_met', basis: 'It says two.' }],
+    next_task: { title: 'Fix the contradiction', kind: 'write', work: 'Drop one sentence.', needs: [] },
+    read_chars: 24, total_chars: 24, model_used: 'm',
+  };
+
+  it('offers to fix it, rather than saying it cannot continue over what only other work needs', async () => {
+    agentAssessObjective.mockResolvedValue({ ...found, blockers: [{ need: 'conversion data', kind: 'data_missing' }] });
+    const out = await performStep(fixed());
+    expect(out.stop?.status).toBe('awaiting_decision');
+    expect(out.needs).toMatchObject({ kind: 'objective_check', finding: 'unmet' });
+    expect(appendWorkflowEvent.mock.calls.some((c) => ((c as unknown[])[2] as { type?: string })?.type === 'stage_added')).toBe(false);
+  });
+
+  it('is still blocked when nothing can be done now', async () => {
+    agentAssessObjective.mockResolvedValue({ ...found, next_task: undefined, blockers: [{ need: 'conversion data', kind: 'data_missing' }] });
+    const out = await performStep(fixed());
+    expect(out.stop?.status).toBe('blocked');
+  });
+});
