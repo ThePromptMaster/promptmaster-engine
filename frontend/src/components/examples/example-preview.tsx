@@ -154,7 +154,7 @@ export function ExamplePreview({ example }: { example: Example }) {
             {showResult ? t('ex.resultHide') : t('ex.resultShow')}
           </button>
           {showResult && (
-            <div dir="ltr" data-finished-result className="mt-3 rounded-xl bg-[var(--surface-container-lowest)] p-4 text-start">
+            <div dir="ltr" lang="en" data-finished-result className="mt-3 rounded-xl bg-[var(--surface-container-lowest)] p-4 text-start">
               <MarkdownOutput content={result.text} />
             </div>
           )}
@@ -189,7 +189,7 @@ export function ExamplePreview({ example }: { example: Example }) {
           {showSample ? t('ex.sampleHide') : t('ex.sampleShow')}
         </button>
         {showSample && (
-          <div dir="ltr" className="mt-3 space-y-4 rounded-xl bg-[var(--surface-container-lowest)] p-4 text-start">
+          <div dir="ltr" lang="en" className="mt-3 space-y-4 rounded-xl bg-[var(--surface-container-lowest)] p-4 text-start">
             <p className="whitespace-pre-wrap text-body text-[var(--on-surface)]">{example.project.context}</p>
             {(example.files ?? []).map((f) => {
               const preview = csvPreview(f.text);
