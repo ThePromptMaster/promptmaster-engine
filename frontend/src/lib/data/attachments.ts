@@ -112,3 +112,34 @@ export function setupMaterial(said: string, attached: string, limit: number): st
 export function documentsCut(files: readonly PreparedFile[], limit: number): string[] {
   return contextFromDocuments('', documentsOf(files), limit).cut;
 }
+
+/** A file attached to one side-chat message, as the request carries it (5 Nov). */
+export interface MessageAttachment {
+  name: string;
+  text?: string;
+  /** An image as a data URL, already scaled down. */
+  image?: string;
+  /** Saved in the project, but more than this message can carry: named, so the reply can say so. */
+  not_read?: boolean;
+}
+
+/** A document's words carried with a message. A longer one is cut, with a note. */
+export const MESSAGE_TEXT_MAX = 60_000;
+/** What a message can carry in all: a request is refused at about 4.5 MB, and the project's own text comes too. */
+export const MESSAGE_ATTACHMENTS_MAX = 3_000_000;
+
+/**
+ * What one message can carry, in the order attached. What does not fit stays named,
+ * so the reply can say it was not read: eleven phone screenshots are more than one
+ * message holds.
+ */
+export function withinMessage(items: readonly MessageAttachment[], max = MESSAGE_ATTACHMENTS_MAX): MessageAttachment[] {
+  let used = 0;
+  return items.map((item) => {
+    const text = item.text && item.text.length > MESSAGE_TEXT_MAX ? `${item.text.slice(0, MESSAGE_TEXT_MAX)}\n[…the rest of this document was not sent with the message]` : item.text;
+    const size = (item.image?.length ?? 0) + (text?.length ?? 0);
+    if (used + size > max) return { name: item.name, not_read: true };
+    used += size;
+    return { ...item, ...(text !== undefined ? { text } : {}) };
+  });
+}

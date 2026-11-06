@@ -8,6 +8,7 @@
  * stage digest and Go's planner use.
  */
 
+import { describePreview } from '@/lib/data/preview';
 import { buildStageDigest, formatManuscript, type StageArtifactBundle } from './digest';
 import { draftingStageId } from './derived-outline';
 import { stageContentForChat, itemSchemaFor } from './stage-artifact';
@@ -69,6 +70,7 @@ export function chatContentFor(
 
 /** Go steps the chat is shown: enough to answer "why did it stop?". */
 const GO_STEPS_MAX = 12;
+const FILES_MAX = 40;
 /** Versions the chat is shown: the latest, which is what it is asked about. */
 const VERSIONS_MAX = 8;
 
@@ -151,6 +153,7 @@ export function buildChatContext(input: {
           ...(goRun.run.questions?.length ? { questions: goRun.run.questions.slice(0, 8).map((q) => q.slice(0, 600)) } : {}),
         }
       : null,
+    files: (project.data_files ?? []).slice(0, FILES_MAX).map((f) => ({ name: f.name.slice(0, 300), note: describePreview(f.preview).slice(0, 600) })),
     stage_status: stageStatusLine(state.stages[stage.id]),
     versions: versions.slice(-VERSIONS_MAX).map((v) => ({
       number: v.version_number,

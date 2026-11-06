@@ -146,6 +146,7 @@ import { freshOrPage } from '@/lib/workflow/fresh-manuscript';
 import { addedSignature, designAddedStage, effectiveTemplate } from '@/lib/workflow/added-stages';
 import { approvalsOnEarlierVersion, withApprovals } from '@/lib/workflow/approvals';
 import { deliverableDocument } from '@/lib/workflow/deliverable';
+import type { MessageAttachment } from '@/lib/data/attachments';
 import { isFailedEvaluation, lastCompletedCheck } from '@/lib/workflow/evaluation-failure';
 import { otherWorkFor } from '@/lib/agent/other-work';
 import { createClient as createBrowserClient } from '@/lib/supabase/client';
@@ -1267,6 +1268,8 @@ export function WorkflowWorkspace({
     enabled: project.status !== 'finalized' && events !== null,
   });
   const briefChange = useMemo(() => openBriefChange(events ?? [], state), [events, state]);
+  // What was attached in the side chat, until the next message carries it (5 Nov).
+  const forNextMessage = useRef<MessageAttachment[]>([]);
   // What a fact recorded from the chat may affect: offered, nothing reopened (5 Nov).
   const offeredChange = useMemo(() => proposedChange(events ?? []), [events]);
   // The last step of the sequence, "Updated and checked", until dismissed.
@@ -3210,9 +3213,12 @@ export function WorkflowWorkspace({
                     project={project}
                     existingNames={(project.data_files ?? []).map((f) => f.name)}
                     onChanged={() => onReload?.()}
-                    onAddToContext={(documents) =>
-                      onPatchProject({ context: contextFromDocuments(project.context ?? '', documents, INPUT_LIMITS.context).context })
-                    }
+                    onAddToContext={(documents) => {
+                      const { context: added, cut } = contextFromDocuments(project.context ?? '', documents, INPUT_LIMITS.context);
+                      onPatchProject({ context: added });
+                      return cut;
+                    }}
+                    onForNextMessage={(items) => { forNextMessage.current = [...forNextMessage.current, ...items]; }}
                     disabled={!isEditable}
                   />
                 )
@@ -3229,6 +3235,7 @@ export function WorkflowWorkspace({
               )}
               // Built when a message is sent, not on every render: it carries the chapters.
               // It carries what changed since the chat's last reply too (31 Oct).
+              nextMessageAttachments={forNextMessage}
               getChatContext={() => {
                 const built = buildChatContext({
                   template, state, project, stage, bundles: stageBundles, controls: pageControls,

@@ -90,6 +90,32 @@ async function encode(bitmap: ImageBitmap, width: number, height: number, qualit
   return new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/jpeg', quality));
 }
 
+/** Longest side an image is shown to a model at: larger only costs more. */
+export const CHAT_IMAGE_SIDE = 1568;
+
+/**
+ * An image as a small data URL, to go with one side-chat message (5 Nov): a phone
+ * screenshot is a megabyte or more, and a request can carry about four. Null when it
+ * cannot be read in this browser.
+ */
+export async function imageForMessage(file: Blob, quality = 0.8): Promise<string | null> {
+  const bitmap = await decode(file);
+  if (!bitmap) return null;
+  try {
+    const { width, height } = fitWithin(bitmap.width, bitmap.height, CHAT_IMAGE_SIDE);
+    const blob = await encode(bitmap, width, height, quality);
+    if (!blob) return null;
+    return await new Promise<string | null>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : null);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } finally {
+    bitmap.close();
+  }
+}
+
 /**
  * The image as it should be stored, or an error the user can act on. A file
  * already small enough, in a format the project takes, comes back unchanged.

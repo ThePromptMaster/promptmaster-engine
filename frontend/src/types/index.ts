@@ -277,6 +277,8 @@ export interface ChatContext {
   } | null;
   /** False when the run record could not be read for this reply, so `go_run: null` does not mean no run. */
   go_run_read?: boolean;
+  /** The files in the project's Data panel (5 Nov: the chat said there were none). */
+  files?: { name: string; note: string }[];
   /** The stage's status as the page shows it (31 Oct). */
   stage_status?: string;
   /** The stage's latest versions, oldest first, the one on screen marked (31 Oct). */
@@ -295,6 +297,8 @@ export interface ChatMessageRequest {
   context?: ChatContext;
   /** The project's Web access switch (22 Oct): on, the chat may search the web. */
   web_access?: 'on' | 'off';
+  /** What the user attached to this message (5 Nov). */
+  attachments?: { name: string; text?: string; image?: string; not_read?: boolean }[];
 }
 
 export interface ChatMessageResponse {
