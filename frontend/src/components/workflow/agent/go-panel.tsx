@@ -8,6 +8,7 @@ import type { ModeType } from '@/types';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
+import { asksForApproval } from '@/lib/agent/repeat-question';
 import { approvalsAskedFor, describeNeed, isClearedNote, needIsDecidedOnStage, type NeedContext, type StuckOption } from '@/lib/agent/needs';
 import type { useGoLoop } from '../use-go-loop';
 import { GoTerms } from './authorization-dialog';
@@ -413,6 +414,7 @@ export function GoPanel({
               question={shownStopReason(locale, go.run.stop_reason, stageByEnglish)}
               expertPackage={go.run.needs?.kind === 'answer_question' ? go.run.needs.expertPackage : undefined}
               choices={go.run.needs?.kind === 'answer_question' ? go.run.needs.choices : undefined}
+              canLeaveToGo={!(go.run.needs?.kind === 'answer_question' && go.run.needs.repeat) && !asksForApproval(go.run.stop_reason)}
               change={latestChange ?? undefined}
               onAnswer={(t, contradicted) => void go.answer(t, contradicted)}
               checkAnswer={go.checkAnswer}
