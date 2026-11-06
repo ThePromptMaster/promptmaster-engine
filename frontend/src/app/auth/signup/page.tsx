@@ -7,6 +7,7 @@ import { authErrorMessage } from '@/lib/auth/auth-errors';
 import { goSignedIn } from '@/lib/auth/sign-in';
 import { useT } from '@/lib/i18n/i18n-provider';
 import { LocaleSwitch } from '@/components/shared/locale-switch';
+import { ProviderButtons } from '@/components/shared/provider-buttons';
 
 /**
  * Create an account.
@@ -220,6 +221,13 @@ export default function SignupPage() {
               {isLoading ? t('auth.creating') : t('auth.createAccount')}
             </button>
           </form>
+
+          <div className="relative py-2 flex items-center gap-4">
+            <div className="flex-grow h-[1px] bg-[var(--surface-container-high)]" />
+            <span className="text-label font-bold text-[var(--outline)] uppercase tracking-widest">{t('auth.or')}</span>
+            <div className="flex-grow h-[1px] bg-[var(--surface-container-high)]" />
+          </div>
+          <ProviderButtons onError={setError} />
         </section>
 
         <footer className="mt-6 text-center">

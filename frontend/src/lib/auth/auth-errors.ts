@@ -12,11 +12,11 @@ import type { MessageKey } from '@/lib/i18n/messages/en';
  * own sentence; an unknown one gets this page's own fallback, with Supabase's
  * words after it so nothing is hidden.
  */
-export function authErrorMessage(err: unknown, fallback: MessageKey): string {
+export function authErrorMessage(err: unknown, fallback: MessageKey, values?: Record<string, string>): string {
   const raw = err instanceof Error ? err.message : typeof (err as { message?: unknown })?.message === 'string' ? String((err as { message: string }).message) : '';
-  if (getLocale() === 'en') return raw || tr(fallback);
+  if (getLocale() === 'en') return raw || tr(fallback, values);
   const code = typeof (err as { code?: unknown })?.code === 'string' ? String((err as { code: string }).code) : '';
   const key = `auth.code.${code}`;
   if (code && key in DICTIONARIES.en) return tr(key as MessageKey);
-  return raw ? `${tr(fallback)} (${raw})` : tr(fallback);
+  return raw ? `${tr(fallback, values)} (${raw})` : tr(fallback, values);
 }
