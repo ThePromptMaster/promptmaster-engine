@@ -116,7 +116,6 @@ test('an unknown example says so and offers the real ones', async ({ page }) => 
 });
 
 test('meeting briefing: from the card to the briefing stage, nothing spent before the press', async ({ page }) => {
-test('suggest work: nothing is sent until the press, and a suggestion starts a real project', async ({ page }) => {
   test.setTimeout(120_000);
   const calls = backendCalls(page);
   await page.goto('/examples');
@@ -134,6 +133,13 @@ test('suggest work: nothing is sent until the press, and a suggestion starts a r
   await expect(page.getByRole('heading', { name: 'Briefing' })).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('02-briefing-stage.png'), fullPage: true });
   expect(calls).toEqual([]);
+});
+
+test('suggest work: nothing is sent until the press, and a suggestion starts a real project', async ({ page }) => {
+  test.setTimeout(120_000);
+  const calls = backendCalls(page);
+  await page.goto('/examples');
+  await pressGotIt(page);
   await page.getByRole('button', { name: /Three quick questions/ }).click();
   await page.getByLabel(/on your plate/).fill('A board deck by Friday, and a budget review on Tuesday');
   await page.screenshot({ path: test.info().outputPath('01-before-press.png'), fullPage: true });
