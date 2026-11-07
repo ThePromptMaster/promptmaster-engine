@@ -47,6 +47,7 @@ export const zh: Record<keyof typeof en, string> = {
   "prompty.name": "Prompty",
   "prompty.hello": "想先看个示例，还是从你自己的项目开始？",
   "prompty.example": "给我看个示例",
+  "prompty.allExamples": "查看全部示例",
   "prompty.mine": "帮我开始我的项目",
   "prompty.explore": "我自己看看",
   "prompty.start": "想一起理清思路，还是直接拿一份初稿？",

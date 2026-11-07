@@ -47,6 +47,7 @@ export const ar: Record<keyof typeof en, string> = {
   "prompty.name": "Prompty",
   "prompty.hello": "هل تريد رؤية مثال، أم تبدأ بمشروعك الخاص؟",
   "prompty.example": "أرني مثالًا",
+  "prompty.allExamples": "عرض كل الأمثلة",
   "prompty.mine": "ساعدني في بدء مشروعي",
   "prompty.explore": "سأستكشف بنفسي",
   "prompty.start": "هل تريد أن نحدد نهجك معًا، أم تحصل على مسودة أولى؟",

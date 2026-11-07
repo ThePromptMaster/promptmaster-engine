@@ -47,6 +47,7 @@ export const hi: Record<keyof typeof en, string> = {
   "prompty.name": "Prompty",
   "prompty.hello": "क्या आप कोई उदाहरण देखना चाहेंगे, या अपनी परियोजना से शुरू करना चाहेंगे?",
   "prompty.example": "मुझे एक उदाहरण दिखाएँ",
+  "prompty.allExamples": "सभी उदाहरण देखें",
   "prompty.mine": "मेरी परियोजना शुरू करने में मदद करें",
   "prompty.explore": "खुद देखूँगा/देखूँगी",
   "prompty.start": "क्या आप साथ मिलकर अपना तरीका तय करना चाहेंगे, या पहला मसौदा पाना चाहेंगे?",

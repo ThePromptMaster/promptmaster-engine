@@ -207,7 +207,7 @@ test('Prompty offers a way in once, after the beta notice, and stays on as Help'
   const prompty = page.getByRole('dialog', { name: 'Prompty' });
   await expect(prompty).toContainText('Want to see an example, or start with your own project?');
   await page.screenshot({ path: test.info().outputPath('prompty-landing.png') });
-  await prompty.getByRole('link', { name: 'Show me an example' }).click();
+  await prompty.getByRole('link', { name: 'See all examples' }).click();
   await expect(page.locator('#examples')).toBeInViewport();
   await expect(prompty).toHaveCount(0);
 
